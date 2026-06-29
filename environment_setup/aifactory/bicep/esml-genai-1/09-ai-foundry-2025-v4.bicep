@@ -109,6 +109,8 @@ param default_model_sku string = 'Standard'
 // Security and networking
 param enablePublicAccessWithPerimeter bool = false
 param centralDnsZoneByPolicyInHub bool = false
+@description('Disable local (API key / "admin account") authentication on the AI Foundry/AI Services account, forcing Entra ID (AAD) only. Default true keeps key auth disabled. Set false to allow local API keys (some orgs require keys, others forbid them by policy).')
+param disableLocalAuth bool = true
 
 // ============================================================================
 // PS-Networking: Needs to be here, even if not used, since .JSON file
@@ -598,7 +600,7 @@ var aiFoundryDefinitionBase = {
     allowProjectManagement: true
     createCapabilityHosts: enableCaphost
     location: location
-    disableLocalAuth: true
+    disableLocalAuth: disableLocalAuth
     networking: aiFoundryNetworkingConfig
     project: {
       name: defaultProjectName
@@ -821,6 +823,7 @@ module aiFoundry2025NoAvmV22AccountOnly '../modules/csFoundry/aiFoundry2025AvmOf
     azureCosmosDBAccountResourceId: useCosmosForFoundry ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.DocumentDB/databaseAccounts', namingConvention.outputs.cosmosDBName) : ''
     aiSearchResourceId: needsAISearch ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName) : ''
     customerManagedKey: customerManagedKey
+    disableLocalAuth: disableLocalAuth
   }
   dependsOn: [
     existingTargetRG
@@ -879,6 +882,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     cmkKeyName: cmkForFoundry ? cmkKeyName : ''
     cmkKeyVersion: cmkForFoundry ? cmkKeyVersion : ''
     cmkKeyVaultResourceId: cmkForFoundry ? resourceId(inputKeyvaultSubscription, inputKeyvaultResourcegroup, 'Microsoft.KeyVault/vaults', inputKeyvault) : ''
+    disableLocalAuth: disableLocalAuth
   }
   dependsOn: [
     existingTargetRG

@@ -127,6 +127,9 @@ param centralDnsZoneByPolicyInHub bool = false
 @description('Restrict outbound network access for the AI Services account.')
 param restrictOutboundNetworkAccess bool = true
 
+@description('Disable local (API key / "admin account") authentication, forcing Entra ID (AAD) only. Default true keeps key auth disabled. Set false to allow local API keys.')
+param disableLocalAuth bool = true
+
 @description('Optional tags applied to newly created resources.')
 param tags object = {}
 
@@ -262,8 +265,8 @@ resource aiAccountCreate 'Microsoft.CognitiveServices/accounts@2025-04-01-previe
     customSubDomainName: aiAccountName
     networkAcls: networkAcls
     publicNetworkAccess: publicNetworkAccess
-    // AAD-only (no local API keys) for the hardened private posture; matches Microsoft's standard-agent sample.
-    disableLocalAuth: true
+    // AAD-only (no local API keys) for the hardened private posture; matches Microsoft's standard-agent sample. Override via disableLocalAuth param.
+    disableLocalAuth: disableLocalAuth
     #disable-next-line BCP036
     networkInjections: agentNetworkInjectionEnabled ? [
       {
@@ -332,8 +335,8 @@ resource aiAccountUpdateWithCMK 'Microsoft.CognitiveServices/accounts@2025-04-01
     customSubDomainName: aiAccountName
     networkAcls: networkAcls
     publicNetworkAccess: publicNetworkAccess
-    // AAD-only (no local API keys) for the hardened private posture; matches Microsoft's standard-agent sample.
-    disableLocalAuth: true
+    // AAD-only (no local API keys) for the hardened private posture; matches Microsoft's standard-agent sample. Override via disableLocalAuth param.
+    disableLocalAuth: disableLocalAuth
     #disable-next-line BCP036
     networkInjections: agentNetworkInjectionEnabled ? [
       {

@@ -89,6 +89,7 @@ variables:
   enablePublicGenAIAccess: "true" # <optional>Public GenAI access (control plane)<default>true<recommended> false to enable fully private networking.
   allowPublicAccessWhenBehindVnet: "true" # <optional>Public UI access when behind vNet<default>true<recommended> false to enable fully private networking.
   enablePublicAccessWithPerimeter: "true" # <optional>Public access with network perimeter<default>true<recommended> false to enable fully private networking.
+  disableLocalAuth: "true" # <optional>Disable local API key ("admin account") auth on Cognitive/AI Services & Foundry, AAD-only<default>true<recommended> true, disables key auth (many orgs forbid keys). <otherwise> false, allow local API keys.
 
   # ============================================================================
   # MANDATORY(CHANGE RARELY):RBAC restrictions
