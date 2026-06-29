@@ -2612,7 +2612,8 @@ steps:
      --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
      --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters addAISearch="$(addAISearch)" \
-     --parameters enablePublicNetworkAccessForCognitive="$(allowPublicAccessWhenBehindVnet)"
+     --parameters enablePublicNetworkAccessForCognitive="$(allowPublicAccessWhenBehindVnet)" \
+     --parameters disableLocalAuth="$(disableLocalAuth)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '64-databases'
@@ -3705,6 +3706,7 @@ steps:
      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
      --parameters addAIFoundry="$(addAIFoundry)" \
+     --parameters disableLocalAuth="$(disableLocalAuth)" \
      --no-wait
      
      deploy_rc=$?
@@ -4228,6 +4230,7 @@ steps:
      --parameters aiFoundryV2ProjectExists="$_aiFoundryV2ProjectExists" \
      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
+     --parameters disableLocalAuth="$(disableLocalAuth)" \
      --parameters addAIFoundry="$(addAIFoundry)" 2>&1) && deploy_rc=0 || deploy_rc=$?
 
      echo "$deploy_output"

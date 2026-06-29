@@ -1,0 +1,4 @@
+# Test deps. Unit tests run on stdlib only; these add pytest + mocking sugar.
+pytest>=7.4
+pytest-mock>=3.12
+PyYAML>=6.0

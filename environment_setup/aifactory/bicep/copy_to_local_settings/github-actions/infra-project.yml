@@ -200,6 +200,7 @@ jobs:
       enablePublicGenAIAccess: ${{ vars.ENABLE_PUBLIC_GENAI_ACCESS || 'false' }}
       allowPublicAccessWhenBehindVnet: ${{ vars.ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET || 'false' }}
       enablePublicAccessWithPerimeter: ${{ vars.ENABLE_PUBLIC_ACCESS_WITH_PERIMETER || 'false' }}
+      disableLocalAuth: ${{ vars.DISABLE_LOCAL_AUTH || 'true' }}
       updateKeyvaultRbac: ${{ vars.UPDATE_KEYVAULT_RBAC || 'false' }}
       updateRbac: ${{ vars.UPDATE_RBAC || 'false' }}
       disableContributorAccessForUsers: ${{ vars.DISABLE_CONTRIBUTOR_ACCESS_FOR_USERS || 'false' }}
@@ -2111,7 +2112,8 @@ jobs:
               --parameters enableAISearchSharedPrivateLink="${{ env.enableAISearchSharedPrivateLink }}" \
               --parameters cmk="${{ env.cmk }}" \
               --parameters cmkKeyName="${{ env.cmkKeyName }}" \
-              --parameters addAISearch="${{ env.addAISearch }}"
+              --parameters addAISearch="${{ env.addAISearch }}" \
+              --parameters disableLocalAuth="${{ env.disableLocalAuth }}"
 
       - name: 64-databases
         if: env.deleteAllServicesForProject != 'true'
@@ -3034,6 +3036,7 @@ jobs:
               --parameters updateAIFoundry="${{ env.updateAIFoundry }}" \
               --parameters enableDefenderforAISubLevel="${{ env.enableDefenderforAISubLevel }}" \
               --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
+              --parameters disableLocalAuth="${{ env.disableLocalAuth }}" \
               --parameters addAIFoundry="${{ env.addAIFoundry }}"
 
       - name: 69a-Grant-NetworkContributor-For-Injection
@@ -3340,6 +3343,7 @@ jobs:
               --parameters aiFoundryV2ProjectExists="${{ env.aiFoundryV2ProjectExists }}" \
               --parameters enableDefenderforAISubLevel="${{ env.enableDefenderforAISubLevel }}" \
               --parameters enableDefenderforAIResourceLevel="${{ env.enableDefenderforAIResourceLevel }}" \
+              --parameters disableLocalAuth="${{ env.disableLocalAuth }}" \
               --parameters addAIFoundry="${{ env.addAIFoundry }}"
 
       - name: 69c_cosmosdb_data_contributor_for_foundry_project

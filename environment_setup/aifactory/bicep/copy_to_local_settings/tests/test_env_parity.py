@@ -42,6 +42,7 @@ ALIASES = {
     "admin_commonResourceSuffix": "ADMIN_COMMON_RESOURCE_SUFFIX",
     "admin_prjResourceSuffix": "ADMIN_PRJ_RESOURCE_SUFFIX",
     "use_ad_groups": "USE_AD_GROUPS",
+    "disableLocalAuth": "DISABLE_LOCAL_AUTH",
     "tenantId": "TENANT_ID",
     "azure_machinelearning_sp_oid": "TENANT_AZUREML_OID",
     # Seeding key vault (ADO is per-env, GitHub template is single)
