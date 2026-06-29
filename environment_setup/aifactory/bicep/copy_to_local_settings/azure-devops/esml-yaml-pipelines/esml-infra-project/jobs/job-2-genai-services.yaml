@@ -2612,8 +2612,7 @@ steps:
      --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
      --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters addAISearch="$(addAISearch)" \
-     --parameters enablePublicNetworkAccessForCognitive="$(allowPublicAccessWhenBehindVnet)" \
-     --parameters disableLocalAuth="$(disableLocalAuth)"
+     --parameters enablePublicNetworkAccessForCognitive="$(allowPublicAccessWhenBehindVnet)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '64-databases'
@@ -3706,7 +3705,6 @@ steps:
      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
      --parameters addAIFoundry="$(addAIFoundry)" \
-     --parameters disableLocalAuth="$(disableLocalAuth)" \
      --no-wait
      
      deploy_rc=$?
@@ -3929,9 +3927,15 @@ steps:
       echo "Total max wait time: $total_max_minutes minutes"
       echo ""
       
-      # Initial wait - Foundry account creation typically takes 15-17 minutes
+      # Initial wait - Foundry account creation typically takes 15-17 minutes.
+      # Break the wait into 1-minute heartbeats so the hosted agent keeps receiving
+      # log output. A single long silent sleep can make the agent drop the job with
+      # "logs may have not finished uploading / This job was abandoned".
       echo "⏳ Waiting $initial_wait_minutes minutes before first status check..."
-      sleep $((initial_wait_minutes * 60))
+      for ((m = 1; m <= initial_wait_minutes; m++)); do
+        sleep 60
+        echo "   ...initial wait $m/$initial_wait_minutes min"
+      done
       echo ""
       
       # Now start polling
@@ -3982,9 +3986,9 @@ steps:
             echo "##[error]  3. Race condition in Azure's async background provisioning"
             echo "##[error]"
             echo "##[error]✅ Resolution:"
-            echo "##[error]  This task has retryCountOnTaskFailure=3. Azure DevOps will automatically"
-            echo "##[error]  retry the deployment. The retry almost always succeeds because the"
-            echo "##[error]  infrastructure has stabilized by then."
+            echo "##[error]  This task does NOT fail the pipeline. It leaves foundry_69a_deployment_succeeded"
+            echo "##[error]  unset, so the downstream self-heal purge + 2nd-option (69a 2nd attempt) recover"
+            echo "##[error]  automatically once the Microsoft-managed infrastructure has stabilized."
             echo "##[error]"
             echo "##[error]Alternative (if retries fail):"
             echo "##[error]  Set disableAgentNetworkInjection=true to skip automatic provisioning"
@@ -4054,7 +4058,7 @@ steps:
      # When disableAgentNetworkInjection=false the platform auto-provisions the
      # account-level capability host asynchronously. The project-level caphost
      # (deployed inside 69b) will fail if the account caphost is not yet Succeeded.
-     # This task polls until it reaches Succeeded (or times out after ~15 min).
+     # This task polls until it reaches Succeeded (or times out after ~20 min).
 
      az account set --subscription "$(dev_test_prod_sub_id)"
 
@@ -4089,7 +4093,7 @@ steps:
      # actually unblocks the project caphost in 69b.
      list_url="https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts?api-version=2025-07-01-preview"
 
-     max_attempts=30   # 30 x 20s = 10 min
+     max_attempts=60   # 60 x 20s = 20 min
      prov_state="NotFound"
      for i in $(seq 1 $max_attempts); do
        caphost_list=$(az rest --method GET --url "$list_url" -o json 2>/dev/null || echo "")
@@ -4123,7 +4127,7 @@ steps:
        sleep 20
      done
 
-     echo "##[warning]Account capability host did not reach Succeeded within 10 min (last state: $prov_state)."
+     echo "##[warning]Account capability host did not reach Succeeded within 20 min (last state: $prov_state)."
      echo "##[warning]Proceeding to 69b anyway — retryCountOnTaskFailure may recover."
 - task: AzureCLI@2
   displayName: '69b-aifoundry-2025-2ndOption-AccountUpdate'
@@ -4230,7 +4234,6 @@ steps:
      --parameters aiFoundryV2ProjectExists="$_aiFoundryV2ProjectExists" \
      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)" \
-     --parameters disableLocalAuth="$(disableLocalAuth)" \
      --parameters addAIFoundry="$(addAIFoundry)" 2>&1) && deploy_rc=0 || deploy_rc=$?
 
      echo "$deploy_output"
@@ -4623,6 +4626,21 @@ steps:
 
      if [ -z "$project_endpoint" ]; then
        project_endpoint=$(echo "$project_json" | jq -r '.value[0].properties.endpoint // empty')
+     fi
+
+     # Fallback: the 2026-01-15-preview projects API often returns an empty properties.endpoint
+     # even for a healthy project. Construct it deterministically from the account + project name
+     # (https://<account>.services.ai.azure.com/api/projects/<project>) — same form used by
+     # usecase_code/agent_foundry/*.py.
+     if [ -z "$project_endpoint" ]; then
+       project_name=$(echo "$project_json" | jq -r "[.value[] | select(.name | startswith(\"aif2-p${projectNumber}\"))] | .[0].name // empty")
+       if [ -z "$project_name" ]; then
+         project_name=$(echo "$project_json" | jq -r '.value[0].name // empty')
+       fi
+       if [ -n "$project_name" ]; then
+         project_endpoint="https://${account_name}.services.ai.azure.com/api/projects/${project_name}"
+         echo "ℹ️  ARM properties.endpoint empty; constructed endpoint: $project_endpoint"
+       fi
      fi
 
      if [ -z "$project_endpoint" ]; then
