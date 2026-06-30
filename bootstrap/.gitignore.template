@@ -124,4 +124,5 @@ temp_data/
 # Hidden dot-folders: ignore all (e.g. .tools, .idea, .vs) except .github
 .*/
 !.github/
-
+aa_ref_code/
+aifactory-templates/
