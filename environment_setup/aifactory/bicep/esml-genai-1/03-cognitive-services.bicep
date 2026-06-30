@@ -662,7 +662,14 @@ var sharedPrivateLinksForAISearch = enableAISearchSharedPrivateLink ? [
 ] : []
 
 // AI Search Service
-module aiSearchService '../modules/aiSearch.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry))) {
+// NOTE: This module intentionally runs even when the AI Search already exists
+// (aiSearchExists=true). Gating on !aiSearchExists previously skipped the whole
+// module on re-runs, so network/firewall properties (publicNetworkAccess) were
+// never re-applied and a service first created as public ("All networks") kept
+// that stale config forever. The deployment is idempotent for a stable name +
+// SKU, so re-running safely re-enforces publicNetworkAccess='Disabled' (private)
+// whenever enablePublicGenAIAccess and enablePublicAccessWithPerimeter are false.
+module aiSearchService '../modules/aiSearch.bicep' = if (enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) {
   name: take('03-AzureAISearch4${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
