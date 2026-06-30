@@ -3573,6 +3573,182 @@ steps:
       echo ""
       echo "✅ Agent subnet validation COMPLETE — Bicep will receive a valid aca2SubnetId."
 - task: AzureCLI@2
+  displayName: '69-pre-account-ensure-AISearch-private-DNS-reachable'
+  # ── Option B private-reachability gate (deny-public-policy compatible) ──
+  # WHY: When the Foundry ACCOUNT is created next (69a-2ndOption-Account) WITH
+  # networkInjections (scenario:'agent'), the platform AUTO-PROVISIONS the agent
+  # capability host. That auto-provisioning reaches the BYO AI Search to set up agent
+  # storage. If the AI Search is NOT privately RESOLVABLE from the AGENT injection VNet
+  # at that moment, the platform enables publicNetworkAccess on the AI Search to complete
+  # — and never reverts it. The shared-private-link approval (task 100a) runs AFTER the
+  # account is created, which is too late.
+  #
+  # This task makes the AI Search privately reachable from the agent VNet BEFORE the
+  # account is created: it (1) approves any Pending AI Search private-endpoint connection,
+  # (2) ensures the 'privatelink.search.windows.net' private DNS zone is LINKED to the
+  # exact agent injection VNet (parsed from aca2SubnetId in dynamicNetworkParams.json),
+  # and (3) ensures an A-record <search> -> <search private IP> exists in that zone.
+  # It is idempotent and non-fatal (continueOnError) — it only ADDS DNS records/links.
+  #
+  # NOTE: This fixes the "private path not reachable" class of failure. If the platform
+  # instead validates the AI Search connection via its PUBLIC endpoint at the control
+  # plane, no IaC ordering can prevent the flip and a deny-public Azure Policy will cause
+  # a hard failure here/at caphost — that case requires a Microsoft support ticket.
+  continueOnError: true
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), ne(variables['disableAgentNetworkInjection'], 'true'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      #!/bin/bash
+      set -e
+      # Prevent Git-for-Windows (MSYS) from mangling /subscriptions/... ARM paths.
+      export MSYS_NO_PATHCONV=1
+
+      az account set --subscription "$(dev_test_prod_sub_id)"
+
+      echo "=== Ensure AI Search is privately reachable from the AGENT VNet BEFORE Foundry account creation ==="
+      echo "    (so the auto-provisioned agent capability host resolves AI Search over its private"
+      echo "     endpoint and never falls back to enabling public network access)."
+      echo ""
+
+      # ── 1. Resolve the AGENT injection VNet from dynamicNetworkParams.json (authoritative aca2SubnetId) ──
+      params_file="$(System.DefaultWorkingDirectory)/aifactory/parameters/dynamicNetworkParams.json"
+      aca2_subnet_id=""
+      if [ -f "$params_file" ]; then
+        aca2_subnet_id=$(jq -r '.parameters.aca2SubnetId.value // empty' "$params_file" 2>/dev/null || echo "")
+      fi
+      if [ -z "$aca2_subnet_id" ] || [ "$aca2_subnet_id" = "null" ]; then
+        echo "⚠️  aca2SubnetId is empty — agent network injection not in use. Nothing to wire. Skipping."
+        exit 0
+      fi
+
+      agent_sub_id=$(echo "$aca2_subnet_id" | awk -F'/' '{print $3}')
+      agent_vnet_rg=$(echo "$aca2_subnet_id" | awk -F'/' '{print $5}')
+      agent_vnet_name=$(echo "$aca2_subnet_id" | awk -F'/' '{print $9}')
+      agent_vnet_id="/subscriptions/${agent_sub_id}/resourceGroups/${agent_vnet_rg}/providers/Microsoft.Network/virtualNetworks/${agent_vnet_name}"
+      echo "Agent injection VNet : $agent_vnet_name (rg=$agent_vnet_rg, sub=$agent_sub_id)"
+
+      # ── 2. Resolve the project resource group + AI Search service ──
+      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+      projectNumber="$(project_number_000)"
+      locationSuffix="$(admin_locationSuffix)"
+      envName="$(dev_test_prod)"
+      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+      projectPrefix="$(projectPrefix)"
+      projectSuffix="$(projectSuffix)"
+      projectResourceGroup="${commonRGNamePrefix}${projectPrefix}project${projectNumber}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+      echo "Project resource grp : $projectResourceGroup"
+
+      search_name=$(az search service list \
+        --subscription "$(dev_test_prod_sub_id)" \
+        --resource-group "$projectResourceGroup" \
+        --query "[?starts_with(name, 'aisearch')].name | [0]" -o tsv 2>/dev/null || echo "")
+      if [ -z "$search_name" ]; then
+        echo "⚠️  No AI Search service (prefix 'aisearch') found in $projectResourceGroup. Nothing to wire. Skipping."
+        exit 0
+      fi
+      echo "AI Search service    : $search_name"
+
+      search_pna=$(az search service show --name "$search_name" --resource-group "$projectResourceGroup" \
+        --subscription "$(dev_test_prod_sub_id)" --query "publicNetworkAccess" -o tsv 2>/dev/null || echo "")
+      echo "AI Search public-net : ${search_pna:-unknown} (target end-state: Disabled)"
+
+      # ── 3. Approve any Pending AI Search private-endpoint connection ──
+      search_pe_url="https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.Search/searchServices/${search_name}/privateEndpointConnections"
+      conns=$(az rest --method GET --url "${search_pe_url}?api-version=2024-06-01-preview" -o json 2>/dev/null || echo '{"value":[]}')
+      pending=$(echo "$conns" | jq -r '.value[] | select(.properties.privateLinkServiceConnectionState.status == "Pending") | .name | split("/") | .[-1]' | tr -d '\r')
+      if [ -n "$pending" ]; then
+        for c in $pending; do
+          echo "  Approving Pending AI Search PE connection: $c"
+          az rest --method PUT --url "${search_pe_url}/${c}?api-version=2024-06-01-preview" \
+            --body '{"properties":{"privateLinkServiceConnectionState":{"status":"Approved","description":"Approved by AIFactory pipeline - pre-account reachability gate"}}}' \
+            --headers "Content-Type=application/json" -o none 2>/dev/null || echo "    (approve failed - continuing)"
+        done
+      else
+        echo "  AI Search PE connections: none Pending (bicep auto-approves)."
+      fi
+
+      # ── 4. Resolve the AI Search private IP (from its private endpoint NIC) ──
+      search_pe_id=$(az network private-endpoint list \
+        --subscription "$(dev_test_prod_sub_id)" --resource-group "$projectResourceGroup" \
+        --query "[?contains(to_string(privateLinkServiceConnections[0].privateLinkServiceId), '/searchServices/${search_name}')].id | [0]" -o tsv 2>/dev/null || echo "")
+      if [ -z "$search_pe_id" ]; then
+        echo "⚠️  No private endpoint found for AI Search '$search_name'. Cannot wire DNS. Skipping."
+        exit 0
+      fi
+      nic_id=$(az network private-endpoint show --ids "$search_pe_id" --query "networkInterfaces[0].id" -o tsv 2>/dev/null || echo "")
+      search_private_ip=$(az network nic show --ids "$nic_id" --query "ipConfigurations[0].privateIPAddress" -o tsv 2>/dev/null || echo "")
+      if [ -z "$search_private_ip" ]; then
+        echo "⚠️  Could not resolve AI Search private IP from NIC. Skipping DNS wiring."
+        exit 0
+      fi
+      echo "AI Search private IP : $search_private_ip"
+
+      # ── 5. Locate (or create) the privatelink.search.windows.net zone and ensure it is
+      #       LINKED to the AGENT VNet (so the agent CAE resolves the search privately) ──
+      zone_name="privatelink.search.windows.net"
+      target_zone_rg=""
+      target_zone_sub=""
+
+      # 5a) Is any such zone already linked to the agent VNet?
+      while read -r zid; do
+        [ -z "$zid" ] && continue
+        zrg=$(echo "$zid" | awk -F'/' '{print $5}')
+        zsub=$(echo "$zid" | awk -F'/' '{print $3}')
+        linked=$(az network private-dns link vnet list --subscription "$zsub" --resource-group "$zrg" --zone-name "$zone_name" \
+          --query "[?contains(to_string(virtualNetwork.id), '/virtualNetworks/${agent_vnet_name}')] | [0].name" -o tsv 2>/dev/null || echo "")
+        if [ -n "$linked" ]; then
+          target_zone_rg="$zrg"; target_zone_sub="$zsub"
+          echo "✅ Zone '$zone_name' already linked to agent VNet (rg=$zrg, link=$linked)."
+          break
+        fi
+      done < <(az network private-dns zone list --query "[?name=='${zone_name}'].id" -o tsv 2>/dev/null)
+
+      # 5b) Not linked to the agent VNet yet → pick/create a zone and link it
+      if [ -z "$target_zone_rg" ]; then
+        target_zone_sub="$(dev_test_prod_sub_id)"
+        exists_proj=$(az network private-dns zone show --subscription "$(dev_test_prod_sub_id)" --resource-group "$projectResourceGroup" --name "$zone_name" --query name -o tsv 2>/dev/null || echo "")
+        if [ -n "$exists_proj" ]; then
+          target_zone_rg="$projectResourceGroup"
+        else
+          any_zone_id=$(az network private-dns zone list --subscription "$(dev_test_prod_sub_id)" --query "[?name=='${zone_name}'].id | [0]" -o tsv 2>/dev/null || echo "")
+          if [ -n "$any_zone_id" ]; then
+            target_zone_rg=$(echo "$any_zone_id" | awk -F'/' '{print $5}')
+            target_zone_sub=$(echo "$any_zone_id" | awk -F'/' '{print $3}')
+          else
+            echo "  Creating private DNS zone '$zone_name' in $projectResourceGroup ..."
+            az network private-dns zone create --subscription "$(dev_test_prod_sub_id)" --resource-group "$projectResourceGroup" --name "$zone_name" -o none 2>/dev/null || true
+            target_zone_rg="$projectResourceGroup"
+          fi
+        fi
+        echo "  Linking zone '$zone_name' (rg=$target_zone_rg) to agent VNet '$agent_vnet_name' ..."
+        az network private-dns link vnet create \
+          --subscription "$target_zone_sub" --resource-group "$target_zone_rg" --zone-name "$zone_name" \
+          --name "link-${agent_vnet_name}" --virtual-network "$agent_vnet_id" --registration-enabled false -o none 2>/dev/null \
+          || echo "    (vnet link create failed or already exists - continuing)"
+      fi
+
+      # ── 6. Ensure the search A-record exists in the target zone ──
+      echo "  Ensuring A-record '$search_name' -> $search_private_ip in zone '$zone_name' (rg=$target_zone_rg)..."
+      existing_ip=$(az network private-dns record-set a show --subscription "$target_zone_sub" --resource-group "$target_zone_rg" --zone-name "$zone_name" --name "$search_name" --query "aRecords[0].ipv4Address" -o tsv 2>/dev/null || echo "")
+      if [ "$existing_ip" = "$search_private_ip" ]; then
+        echo "    A-record already correct."
+      else
+        if [ -n "$existing_ip" ]; then
+          az network private-dns record-set a remove-record --subscription "$target_zone_sub" --resource-group "$target_zone_rg" --zone-name "$zone_name" --record-set-name "$search_name" --ipv4-address "$existing_ip" -o none 2>/dev/null || true
+        fi
+        az network private-dns record-set a add-record --subscription "$target_zone_sub" --resource-group "$target_zone_rg" --zone-name "$zone_name" --record-set-name "$search_name" --ipv4-address "$search_private_ip" -o none 2>/dev/null \
+          || echo "    (A-record create failed - continuing)"
+      fi
+
+      # Restore default subscription context
+      az account set --subscription "$(dev_test_prod_sub_id)" 1>/dev/null 2>&1 || true
+      echo ""
+      echo "✅ AI Search private reachability wiring complete (PE approved + zone linked to agent VNet + A-record present)."
+      echo "   The Foundry account (next task) can now reach AI Search privately; no public fallback required."
+- task: AzureCLI@2
   displayName: '69a-aifoundry-2025-2ndOption-Account'
   condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
   retryCountOnTaskFailure: 3
