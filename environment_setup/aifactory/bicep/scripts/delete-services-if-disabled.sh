@@ -330,14 +330,15 @@ if [ "$skip_aisearch_deletion" = "false" ] && [ "$enableAISearch" = "false" ] &&
       while IFS= read -r shared_pe_name; do
         if [ -n "$shared_pe_name" ]; then
           echo "    - $shared_pe_name"
-          echo "    Deleting shared private endpoint: $shared_pe_name (async, no-wait)"
-          # Use --no-wait to avoid blocking on locked resources
+          echo "    Deleting shared private endpoint: $shared_pe_name"
+          # NOTE: 'az search shared-private-link-resource delete' does NOT support --no-wait.
+          # The server-side delete is asynchronous regardless; the wait/verify + REST
+          # force-delete fallback below handles any that are still draining or locked.
           az search shared-private-link-resource delete \
             --resource-group "$projectResourceGroup" \
             --service-name "$aisearch_name" \
             --name "$shared_pe_name" \
-            --yes \
-            --no-wait 2>&1 || echo "    Warning: Failed to initiate deletion of $shared_pe_name"
+            --yes 2>&1 || echo "    Warning: Failed to initiate deletion of $shared_pe_name"
         fi
       done <<< "$shared_pe_list"
       
