@@ -10,7 +10,9 @@ The **AI Factory Configuration Wizard** is a guided, form-based desktop tool tha
 - **Speeds up first-time setup** — no need to read through a large configuration file to find what to change
 - **ITSM-friendly** — core teams can generate the correct configuration directly from a service ticket and trigger the pipeline on behalf of the requesting team. Or get the "initial full configuration", where the ITSM tickets only contain the *project specifics* such as *which resources a team wants to order* e.g. have enabled=true (checkboxes in Wizard)
 
-## Download
+## Download - Version `0.44`
+
+Stable Version 2026-06-30 is version `0.44`
 
 | Platform | File |
 |---|---|
