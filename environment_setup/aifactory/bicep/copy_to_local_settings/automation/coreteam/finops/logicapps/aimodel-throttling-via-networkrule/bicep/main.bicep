@@ -2,32 +2,46 @@
 // main.bicep  (targetScope = subscription)
 // Deploys the automated "throttle GenAI when over budget/tokens" chain:
 //
-//   Azure Monitor / Consumption
+//   Azure Monitor / Consumption   (in the TARGET / throttled subscription)
 //        |  (cost budget alert  AND/OR  token scheduled-query alert)
 //        v
-//   Action Group
-//        |  (logicAppReceiver)
+//   Action Group  ] these two live in the MANAGEMENT subscription/RG
+//   Logic App     ]  ("Enterprise Scale AI Factory management subscription")
+//        |  reject private endpoints + disable public access (cross-subscription)
 //        v
-//   Logic App (Consumption, managed identity)
-//        |  reject private endpoints + disable public access
-//        v
-//   Azure AI Foundry / Cognitive Services accounts in scope  -> callers blocked
+//   Azure AI Foundry / Cognitive Services accounts in the TARGET scope -> callers blocked
+//
+// The Logic App + Action Group (governance tooling used by the core team) can
+// live in a DIFFERENT subscription/resource group than the subscription or
+// resource group that is throttled. Run this deployment against the TARGET
+// subscription (the one to throttle); the Logic App + Action Group are deployed
+// cross-subscription into the management subscription/RG.
 //
 // Works on a whole SUBSCRIPTION or a single project RESOURCE GROUP.
 // Turn the cap OFF (revert) with scripts/throttle-genai.ps1|sh -Action Unthrottle.
 // =============================================================================
 targetScope = 'subscription'
 
-// ------------------------- Scope -------------------------
-@description('Throttle scope: whole subscription, or a single AI Factory project resource group.')
+// ------------------------- Scope (what gets throttled) -------------------------
+@description('Throttle scope: whole subscription, or a single AI Factory project resource group. This applies to the TARGET subscription.')
 @allowed([ 'Subscription', 'ResourceGroup' ])
 param throttleScope string = 'ResourceGroup'
+
+@description('The TARGET subscription id to throttle (the subscription connected to the AI Factory that should be capped). Leave empty to use the subscription this deployment runs against.')
+param targetSubscriptionId string = ''
 
 @description('The AI Factory project resource group to throttle & budget. Required when throttleScope=ResourceGroup and esmlAifactoryExists=false.')
 param targetResourceGroup string = ''
 
-@description('Resource group that HOSTS the Logic App + Action Group (management RG). Defaults to targetResourceGroup.')
-param throttleResourceGroup string = ''
+// ------------------------- Enterprise Scale AI Factory management subscription -------------------------
+// The Logic App + Action Group are governance/management tooling. In the
+// Enterprise Scale AI Factory they live in a central "management subscription"
+// used by the core team to manage OTHER subscriptions / AI Factory scalesets.
+@description('Subscription id that HOSTS the Logic App + Action Group (the Enterprise Scale AI Factory management subscription). Leave empty to use the same subscription as the target (single-subscription AI Factory).')
+param managementSubscriptionId string = ''
+
+@description('REQUIRED. Resource group (in managementSubscriptionId) that HOSTS the Logic App + Action Group. Must be DIFFERENT from the throttled resource group - the management RG is never throttled.')
+param managementResourceGroup string
 
 @description('Azure region for the Logic App and alert rule.')
 param location string = deployment().location
@@ -98,6 +112,9 @@ param workspaceResourceId string = ''
 @description('Resource group of the Log Analytics workspace (where the alert rule is created).')
 param workspaceResourceGroup string = ''
 
+@description('Subscription id of the Log Analytics workspace. Leave empty to use the management subscription.')
+param workspaceSubscriptionId string = ''
+
 @description('Token threshold over the window (e.g. 50000000 = 50M tokens/month).')
 param tokenThreshold int = 50000000
 
@@ -111,11 +128,19 @@ param notifyEmails array = []
 var derivedProjectRG = '${aifactoryPrefixRG}${projectPrefix}project${projectNumber}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
 var resolvedTargetRg = !empty(targetResourceGroup) ? targetResourceGroup : (esmlAifactoryExists ? derivedProjectRG : '')
 
-var hostRg = empty(throttleResourceGroup) ? resolvedTargetRg : throttleResourceGroup
+// TARGET (throttled) subscription. Explicit param wins; else the deployment subscription.
+var targetSubId = empty(targetSubscriptionId) ? subscription().subscriptionId : targetSubscriptionId
 var isSubScope = throttleScope == 'Subscription'
+var targetSubScopeId = '/subscriptions/${targetSubId}'
 var scopeResourceId = isSubScope
-  ? subscription().id
-  : '${subscription().id}/resourceGroups/${resolvedTargetRg}'
+  ? targetSubScopeId
+  : '${targetSubScopeId}/resourceGroups/${resolvedTargetRg}'
+
+// MANAGEMENT subscription/RG that hosts the Logic App + Action Group.
+// Subscription defaults to the target subscription (single-sub AI Factory demo);
+// the management RG is always explicit and distinct from the throttled RG.
+var mgmtSubId = empty(managementSubscriptionId) ? targetSubId : managementSubscriptionId
+var mgmtRg = managementResourceGroup
 
 var logicAppNameResolved = empty(logicAppName) ? '${namePrefix}-logic' : logicAppName
 var actionGroupName = '${namePrefix}-ag'
@@ -125,7 +150,7 @@ var tokenAlertName = '${namePrefix}-token-alert'
 // ------------------------- Logic App (throttle executor) -------------------------
 module logicApp 'modules/logicApp.throttle.bicep' = {
   name: 'deploy-throttle-logicapp'
-  scope: resourceGroup(hostRg)
+  scope: resourceGroup(mgmtSubId, mgmtRg)
   params: {
     location: location
     logicAppName: logicAppNameResolved
@@ -135,9 +160,10 @@ module logicApp 'modules/logicApp.throttle.bicep' = {
   }
 }
 
-// ------------------------- RBAC for the Logic App MI -------------------------
+// ------------------------- RBAC for the Logic App MI (on the TARGET subscription/RG) -------------------------
 module raSub 'modules/roleAssignment.subscription.bicep' = if (isSubScope) {
   name: 'deploy-throttle-rbac-sub'
+  scope: subscription(targetSubId)
   params: {
     principalId: logicApp.outputs.principalId
   }
@@ -145,7 +171,7 @@ module raSub 'modules/roleAssignment.subscription.bicep' = if (isSubScope) {
 
 module raRg 'modules/roleAssignment.resourcegroup.bicep' = if (!isSubScope) {
   name: 'deploy-throttle-rbac-rg'
-  scope: resourceGroup(resolvedTargetRg)
+  scope: resourceGroup(targetSubId, resolvedTargetRg)
   params: {
     principalId: logicApp.outputs.principalId
   }
@@ -154,7 +180,7 @@ module raRg 'modules/roleAssignment.resourcegroup.bicep' = if (!isSubScope) {
 // ------------------------- Action Group -------------------------
 module actionGroup 'modules/actionGroup.bicep' = {
   name: 'deploy-throttle-actiongroup'
-  scope: resourceGroup(hostRg)
+  scope: resourceGroup(mgmtSubId, mgmtRg)
   params: {
     actionGroupName: actionGroupName
     logicAppName: logicApp.outputs.logicAppName
@@ -163,9 +189,10 @@ module actionGroup 'modules/actionGroup.bicep' = {
   }
 }
 
-// ------------------------- Cost budget -------------------------
+// ------------------------- Cost budget (on the TARGET subscription/RG) -------------------------
 module budgetSub 'modules/budget.subscription.bicep' = if (enableBudget && isSubScope) {
   name: 'deploy-throttle-budget-sub'
+  scope: subscription(targetSubId)
   params: {
     budgetName: budgetName
     amount: budgetAmount
@@ -178,7 +205,7 @@ module budgetSub 'modules/budget.subscription.bicep' = if (enableBudget && isSub
 
 module budgetRg 'modules/budget.resourcegroup.bicep' = if (enableBudget && !isSubScope) {
   name: 'deploy-throttle-budget-rg'
-  scope: resourceGroup(resolvedTargetRg)
+  scope: resourceGroup(targetSubId, resolvedTargetRg)
   params: {
     budgetName: budgetName
     amount: budgetAmount
@@ -192,7 +219,7 @@ module budgetRg 'modules/budget.resourcegroup.bicep' = if (enableBudget && !isSu
 // ------------------------- Token scheduled-query alert -------------------------
 module tokenAlert 'modules/scheduledQueryAlert.tokens.bicep' = if (enableTokenAlert) {
   name: 'deploy-throttle-token-alert'
-  scope: resourceGroup(empty(workspaceResourceGroup) ? hostRg : workspaceResourceGroup)
+  scope: resourceGroup(empty(workspaceSubscriptionId) ? mgmtSubId : workspaceSubscriptionId, empty(workspaceResourceGroup) ? mgmtRg : workspaceResourceGroup)
   params: {
     location: location
     alertName: tokenAlertName
@@ -208,3 +235,6 @@ output logicAppName string = logicApp.outputs.logicAppName
 output logicAppPrincipalId string = logicApp.outputs.principalId
 output actionGroupId string = actionGroup.outputs.actionGroupId
 output throttleScopeResourceId string = scopeResourceId
+output targetSubscriptionId string = targetSubId
+output managementSubscriptionId string = mgmtSubId
+output managementResourceGroup string = mgmtRg

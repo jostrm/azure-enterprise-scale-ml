@@ -1,0 +1,28 @@
+{
+  "$comment": "Inputs for Update-ShowbackReport.ps1 (AI Factory FinOps SHOWBACK). Resource NAMES are NOT hardcoded: the runbook derives Subscription + Resource Groups from these settings (same rules as infra-project.yml / CmnAIfactoryNaming.bicep) and discovers ALL project resource groups by naming pattern. Override at runtime via runbook parameters. Set -Source github|ado to read real values from .env / variables.yaml instead of this 'naming' block.",
+
+  "naming": {
+    "_comment": "Concat rules from .env (root) + infra-project.yml + CmnAIfactoryNaming.bicep. Project RG = {aifactoryPrefix}{projectPrefix}project{NNN}-{locationShort}-{env}{aifactorySuffix}{projectSuffix}. Common RG = {aifactoryPrefix}{vnetResourceGroupBase}-{locationShort}-{env}{aifactorySuffix}. projectNumber is NOT used by showback (it enumerates ALL projects).",
+    "aifactoryPrefix": "gh-",
+    "aifactorySuffix": "-001",
+    "projectPrefix": "esml-",
+    "projectSuffix": "-rg",
+    "projectNumber": "004",
+    "locationShort": "sdc",
+    "env": "dev",
+    "vnetResourceGroupBase": "esml-common"
+  },
+
+  "showback": {
+    "_comment": "Showback behaviour. currency is a display label only (figures use the account billing currency). uploadToLake=true archives MD/HTML/PDF to the common data lake under aifactory-governance/showback/{env}/{yyyy/MM/dd}/. lakeContainerName mirrors the ADO variable of the same name.",
+    "currency": "USD",
+    "includeForecast": true,
+    "uploadToLake": false,
+    "lakeContainerName": "reports",
+
+    "sampleProjects": [
+      { "resourceGroup": "gh-esml-project001-sdc-dev-001-rg", "projectNumber": "001", "costCenter": "CC-1000", "owner": "team-alpha@contoso.com", "currentCost": 1240.55, "forecastCost": 2810.00 },
+      { "resourceGroup": "gh-esml-project004-sdc-dev-001-rg", "projectNumber": "004", "costCenter": "CC-2000", "owner": "team-bravo@contoso.com", "currentCost": 640.10,  "forecastCost": 1490.00 }
+    ]
+  }
+}

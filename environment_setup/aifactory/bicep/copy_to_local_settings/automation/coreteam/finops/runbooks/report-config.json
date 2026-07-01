@@ -1,0 +1,39 @@
+{
+  "$comment": "Inputs for Update-FoundryTokenReport.ps1. Mirrors the 'Model info' and 'Discount and adjustments' sections of the report. Resource NAMES are NOT hardcoded: the runbook derives Resource Group + Subscription from these settings (same rules as infra-project.yml / CmnAIfactoryNaming.bicep) and then discovers the Foundry account, Log Analytics workspace and App Insights by type. Override at runtime via runbook parameters.",
+
+  "naming": {
+    "_comment": "Concat rules from .env (root) + infra-project.yml + CmnAIfactoryNaming.bicep. Project RG = {aifactoryPrefix}{projectPrefix}project{projectNumber}-{locationShort}-{env}{aifactorySuffix}{projectSuffix}. Common RG = {aifactoryPrefix}{vnetResourceGroupBase}-{locationShort}-{env}{aifactorySuffix}. Log Analytics lives in the Common RG (la-cmn-...).",
+    "aifactoryPrefix": "gh-",
+    "aifactorySuffix": "-001",
+    "projectPrefix": "esml-",
+    "projectSuffix": "-rg",
+    "projectNumber": "004",
+    "locationShort": "sdc",
+    "env": "dev",
+    "vnetResourceGroupBase": "esml-common"
+  },
+
+  "discountAndAdjustments": {
+    "eaDiscount": 0.29,
+    "cacheRate": 0.35,
+    "ptuHandleSpikes": false,
+    "aiGatewayLoadBalancerExists": true,
+    "workdaysPerMonth": 22
+  },
+
+  "models": [
+    {
+      "name": "GPT 5.1",
+      "deploymentNameMatch": "gpt-5.1",
+      "inputTpmPerPtu": 4750,
+      "outputInputRatio": 8,
+      "latencyTps": 50,
+      "inputCostPerMTokens": 0.38,
+      "cachedCostPerMTokens": 0.14,
+      "outputCostPerMTokens": 11.0
+    }
+  ],
+
+  "totalUsersWithAccess": 50000,
+  "avgSessionLengthMinutes": 3
+}
