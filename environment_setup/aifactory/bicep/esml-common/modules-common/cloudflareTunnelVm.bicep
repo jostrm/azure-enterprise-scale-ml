@@ -6,7 +6,7 @@
 
 // ============================================================================
 // ARCHITECTURE:
-// User → DNS (domain-specific-ai-sourcing-dev.internal.ericsson.com)
+// User → DNS (your-app.internal.example.com)
 //      → Cloudflare (with Tunnel)
 //      → Cloudflare Tunnel Agent (in Azure VM/Container Instance)
 //      → Private ACA FQDN (e.g., gentleflower-2e0ff142.swedencentral.azurecontainerapps.io)
@@ -16,7 +16,7 @@
 // ADVANTAGES:
 // - Maintains ACA as private (security compliant)
 // - No reverse proxy complexity on the ACA side
-// - Works with Ericsson's security policies (outbound-only connections)
+// - Works with your organization's security policies (outbound-only connections)
 // - Minimal latency (direct tunnel connection)
 // - No public IP exposure on Azure resources
 // - Cloudflare handles DDoS protection and WAF
