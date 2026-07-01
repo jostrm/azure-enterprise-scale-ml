@@ -18,13 +18,21 @@ targetScope = 'subscription'
 // ================================================================
 
 // ============== SKUs ==============
-@description('App Service Plan SKU for Logic Apps hosting')
+@description('App Service Plan SKU for Logic Apps hosting - Dev')
 @allowed(['WS1', 'WS2', 'WS3', 'EP1', 'EP2', 'EP3', 'P1V2', 'P2V2', 'P3V2', 'P1V3', 'P2V3', 'P3V3'])
-param appServicePlanSku string = 'WS1' // WS1 = Workflow Standard 1, EP = Elastic Premium, PV2/PV3 = Premium V2/V3
+param skuLogicAppsDev string = 'WS1' // WS1 = Workflow Standard 1, EP = Elastic Premium, PV2/PV3 = Premium V2/V3
+@description('App Service Plan SKU for Logic Apps hosting - Stage/Prod (test=Stage)')
+@allowed(['WS1', 'WS2', 'WS3', 'EP1', 'EP2', 'EP3', 'P1V2', 'P2V2', 'P3V2', 'P1V3', 'P2V3', 'P3V3'])
+param skuLogicAppsStageProd string = 'WS1'
+var appServicePlanSku = env == 'dev' ? skuLogicAppsDev : skuLogicAppsStageProd
 
-@description('Event Hub Namespace SKU tier')
+@description('Event Hub Namespace SKU tier - Dev')
 @allowed(['Basic', 'Standard', 'Premium'])
-param eventHubSkuTier string = 'Basic'
+param skuEventHubsDev string = 'Basic'
+@description('Event Hub Namespace SKU tier - Stage/Prod (test=Stage)')
+@allowed(['Basic', 'Standard', 'Premium'])
+param skuEventHubsStageProd string = 'Basic'
+var eventHubSkuTier = env == 'dev' ? skuEventHubsDev : skuEventHubsStageProd
 
 @description('Event Hub Namespace SKU capacity (throughput units)')
 param eventHubSkuCapacity int = 1
@@ -151,9 +159,13 @@ param botServiceExists bool = false
 param botMicrosoftAppId string = ''
 @description('AI Foundry agent endpoint URL for bot messaging')
 param botAgentEndpoint string = ''
-@description('Bot Service SKU')
+@description('Bot Service SKU - Dev')
 @allowed(['F0', 'S1'])
-param botServiceSku string = 'S1'
+param skuBotServiceDev string = 'S1'
+@description('Bot Service SKU - Stage/Prod (test=Stage)')
+@allowed(['F0', 'S1'])
+param skuBotServiceStageProd string = 'S1'
+var botServiceSku = env == 'dev' ? skuBotServiceDev : skuBotServiceStageProd
 
 @description('Tags to apply to all resources')
 param tags object

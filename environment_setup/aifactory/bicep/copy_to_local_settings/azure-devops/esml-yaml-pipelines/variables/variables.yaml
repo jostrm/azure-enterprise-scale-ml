@@ -244,12 +244,80 @@ variables:
   # === Standalone AKS (without Azure ML) ===
   enableAKS: "false" # <optional>Deploy standalone AKS cluster in project RG<default>false<keep-as-is>
   aksSkuName: "Base" # <optional>AKS SKU name<default>Base<keep-as-is> <otherwise> "Standard" for production workloads.
-  aksSkuTier: "Standard" # <optional>AKS SKU tier<default>Standard<keep-as-is> <otherwise> "Free" or "Premium".
+  # Per-environment AKS SKU tier (Dev vs Stage/Prod; test=Stage uses the *StageProd value).
+  skuTierAksDev: "Standard" # <optional>AKS SKU tier Dev<default>Standard ['Free','Standard','Premium']
+  skuTierAksStageProd: "Standard" # <optional>AKS SKU tier Stage/Prod<default>Standard ['Free','Standard','Premium']
+  # Node VM size. Leave empty to use template default (dev: Standard_B4ms, test/prod: Standard_DS13-2_v2).
+  skuAksDev: "" # <optional>AKS dev node VM size<default>""<keep-as-is> empty=template default Standard_B4ms.
+  skuAksStageProd: "" # <optional>AKS test/prod node VM size<default>""<keep-as-is> empty=template default Standard_DS13-2_v2.
   aksEnablePrivateCluster: "true" # <optional>Enable private AKS cluster<default>true<recommended> <otherwise> false for public access.
   # === AKS Network Configuration (applies to both standalone and Azure ML AKS) ===
   aksOutboundType: "loadBalancer" # <optional>AKS outbound traffic type<default>loadBalancer<keep-as-is> <otherwise> userDefinedRouting, if you have Azure Firewall and UDR configured.
   aksPrivateDNSZone: "system" # <optional>AKS private DNS zone<default>system<keep-as-is> <otherwise> "none" or full resource ID of a private DNS zone.
   aksAzureFirewallPrivateIp: "" # <optional>AKS Azure Firewall private IP<default>""<mandatory> if aksOutboundType:'userDefinedRouting' <ensure> IP within the Azure Firewall subnet range.
+
+  # ============================================================================
+  # PER-ENVIRONMENT SERVICE SKUs (Dev vs Stage/Prod). dev_test_prod: dev|test|prod
+  # test = Stage, so both 'test' and 'prod' use the *StageProd values; 'dev' uses *Dev.
+  # Naming: sku<Service>Dev / sku<Service>StageProd (+ skuTier<Service>* where a tier applies).
+  # Leave "" to fall back to the bicep template default for that service.
+  # ============================================================================
+  # --- Core Infrastructure (02) ---
+  skuStorageAccountDev: "Standard_LRS" # Project Storage Account SKU Dev ['Standard_LRS','Standard_GRS','Standard_RAGRS','Standard_ZRS','Premium_LRS','Premium_ZRS','Standard_GZRS','Standard_RAGZRS']
+  skuStorageAccountStageProd: "Standard_LRS" # Project Storage Account SKU Stage/Prod
+  # --- Cognitive Services (03) ---
+  skuAISearchDev: "standard" # AI Search SKU Dev ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] ('free' not allowed with private endpoints)
+  skuAISearchStageProd: "standard" # AI Search SKU Stage/Prod
+  skuAIServicesDev: "S0" # Azure AI Services (multi-service account) SKU Dev
+  skuAIServicesStageProd: "S0" # Azure AI Services (multi-service account) SKU Stage/Prod
+  skuOpenAIDev: "S0" # Azure OpenAI SKU Dev
+  skuOpenAIStageProd: "S0" # Azure OpenAI SKU Stage/Prod
+  skuContentSafetyDev: "S0" # Content Safety SKU Dev
+  skuContentSafetyStageProd: "S0" # Content Safety SKU Stage/Prod
+  skuVisionDev: "S1" # Azure AI Vision SKU Dev
+  skuVisionStageProd: "S1" # Azure AI Vision SKU Stage/Prod
+  skuSpeechDev: "S0" # Azure AI Speech SKU Dev
+  skuSpeechStageProd: "S0" # Azure AI Speech SKU Stage/Prod
+  skuDocIntelligenceDev: "S0" # Document Intelligence SKU Dev
+  skuDocIntelligenceStageProd: "S0" # Document Intelligence SKU Stage/Prod
+  skuBingDev: "G2" # Bing Custom Search SKU Dev ['G2']
+  skuBingStageProd: "G2" # Bing Custom Search SKU Stage/Prod
+  # --- Databases (04) ---
+  skuPostgreSQLDev: "Standard_B1ms" # PostgreSQL compute SKU Dev
+  skuPostgreSQLStageProd: "Standard_B1ms" # PostgreSQL compute SKU Stage/Prod
+  skuTierPostgreSQLDev: "Burstable" # PostgreSQL tier Dev ['Burstable','GeneralPurpose','MemoryOptimized']
+  skuTierPostgreSQLStageProd: "Burstable" # PostgreSQL tier Stage/Prod
+  skuRedisDev: "Standard" # Redis SKU Dev ['Basic','Standard','Premium']
+  skuRedisStageProd: "Standard" # Redis SKU Stage/Prod
+  skuSQLDatabaseDev: "S0" # Azure SQL DB (DTU model) SKU Dev
+  skuSQLDatabaseStageProd: "S0" # Azure SQL DB (DTU model) SKU Stage/Prod
+  skuTierSQLDatabaseDev: "Standard" # Azure SQL DB tier Dev ['Basic','Standard','Premium']
+  skuTierSQLDatabaseStageProd: "Standard" # Azure SQL DB tier Stage/Prod
+  skuElasticDev: "ess-consumption-2024_Monthly" # Elastic Cloud SKU Dev
+  skuElasticStageProd: "ess-consumption-2024_Monthly" # Elastic Cloud SKU Stage/Prod
+  # --- Compute: Web App & Function (05) ---
+  skuWebAppDev: "P1v3" # Web App plan SKU Dev
+  skuWebAppStageProd: "P1v3" # Web App plan SKU Stage/Prod
+  skuTierWebAppDev: "PremiumV3" # Web App plan tier Dev
+  skuTierWebAppStageProd: "PremiumV3" # Web App plan tier Stage/Prod
+  skuFunctionDev: "EP1" # Function plan SKU Dev
+  skuFunctionStageProd: "EP1" # Function plan SKU Stage/Prod
+  skuTierFunctionDev: "ElasticPremium" # Function plan tier Dev
+  skuTierFunctionStageProd: "ElasticPremium" # Function plan tier Stage/Prod
+  # --- ML / Data platform (07) ---
+  skuAzureMLDev: "basic" # Azure ML workspace SKU Dev ['basic','standard']
+  skuAzureMLStageProd: "basic" # Azure ML workspace SKU Stage/Prod
+  skuTierAzureMLDev: "basic" # Azure ML workspace tier Dev
+  skuTierAzureMLStageProd: "basic" # Azure ML workspace tier Stage/Prod
+  skuDatabricksDev: "premium" # Databricks SKU Dev ['trial','premium']
+  skuDatabricksStageProd: "premium" # Databricks SKU Stage/Prod
+  # --- Integration (11) ---
+  skuLogicAppsDev: "WS1" # Logic Apps plan SKU Dev ['WS1','WS2','WS3','EP1','EP2','EP3','P1V2','P2V2','P3V2','P1V3','P2V3','P3V3']
+  skuLogicAppsStageProd: "WS1" # Logic Apps plan SKU Stage/Prod
+  skuEventHubsDev: "Basic" # Event Hubs tier Dev ['Basic','Standard','Premium']
+  skuEventHubsStageProd: "Basic" # Event Hubs tier Stage/Prod
+  skuBotServiceDev: "S1" # Bot Service SKU Dev ['F0','S1']
+  skuBotServiceStageProd: "S1" # Bot Service SKU Stage/Prod
 
   enableDatabricks: "false" # <optional>Deploy Databricks workspace<default>false<keep-as-is>
   # === Cognitive Services ===

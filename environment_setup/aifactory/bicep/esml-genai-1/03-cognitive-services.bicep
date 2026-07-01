@@ -17,17 +17,35 @@ targetScope = 'subscription'
 // ============================================================================
 @allowed(['disabled', 'free', 'standard'])
 param semanticSearchTier string = 'free'
-@allowed(['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2'])
-param aiSearchSKUName string = 'standard'
 param aiSearchReplicaCount int = 1
 param aiSearchPartitionCount int = 1
-param csAIservicesSKU string = 'S0'
-param csOpenAISKU string = 'S0'
-param csContentSafetySKU string = 'S0'
-param csVisionSKU string = 'S1'
-param csSpeechSKU string = 'S0'
-param csDocIntelligenceSKU string = 'S0'
 param storageAccountSkuName string = 'Standard_LRS'
+
+// ===== Per-environment SKUs (Dev vs Stage/Prod; test=Stage). Resolved by env below. =====
+@allowed(['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2'])
+param skuAISearchDev string = 'standard'
+@allowed(['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2'])
+param skuAISearchStageProd string = 'standard'
+param skuAIServicesDev string = 'S0'
+param skuAIServicesStageProd string = 'S0'
+param skuOpenAIDev string = 'S0'
+param skuOpenAIStageProd string = 'S0'
+param skuContentSafetyDev string = 'S0'
+param skuContentSafetyStageProd string = 'S0'
+param skuVisionDev string = 'S1'
+param skuVisionStageProd string = 'S1'
+param skuSpeechDev string = 'S0'
+param skuSpeechStageProd string = 'S0'
+param skuDocIntelligenceDev string = 'S0'
+param skuDocIntelligenceStageProd string = 'S0'
+
+var aiSearchSKUName = env == 'dev' ? skuAISearchDev : skuAISearchStageProd
+var csAIservicesSKU = env == 'dev' ? skuAIServicesDev : skuAIServicesStageProd
+var csOpenAISKU = env == 'dev' ? skuOpenAIDev : skuOpenAIStageProd
+var csContentSafetySKU = env == 'dev' ? skuContentSafetyDev : skuContentSafetyStageProd
+var csVisionSKU = env == 'dev' ? skuVisionDev : skuVisionStageProd
+var csSpeechSKU = env == 'dev' ? skuSpeechDev : skuSpeechStageProd
+var csDocIntelligenceSKU = env == 'dev' ? skuDocIntelligenceDev : skuDocIntelligenceStageProd
 
 // ============================================================================
 // PARAMETERS - Core Configuration
@@ -89,7 +107,9 @@ param env string
 
 param enableBing bool = false
 param enableBingCustomSearch bool = false
-param bingCustomSearchSku string = 'G2' // ['G2'] G2 is custom search with grounding
+param skuBingDev string = 'G2' // ['G2'] G2 is custom search with grounding
+param skuBingStageProd string = 'G2'
+var bingCustomSearchSku = env == 'dev' ? skuBingDev : skuBingStageProd
 
 @description('Project number (e.g., "005")')
 param projectNumber string

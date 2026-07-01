@@ -40,6 +40,11 @@ param functionSKU object = {
   family: 'EP'
   capacity: 1
 }
+// Per-environment Function App SKU (Dev vs Stage/Prod). name+tier vary per env; family/capacity from functionSKU.
+param skuFunctionDev string = 'EP1'
+param skuFunctionStageProd string = 'EP1'
+param skuTierFunctionDev string = 'ElasticPremium'
+param skuTierFunctionStageProd string = 'ElasticPremium'
 // Web App configuration
 param webappSKU object = {
   name: 'P1v3'
@@ -47,6 +52,11 @@ param webappSKU object = {
   family: 'Pv3'
   capacity: 1
 }
+// Per-environment Web App SKU (Dev vs Stage/Prod). name+tier vary per env; family/capacity from webappSKU.
+param skuWebAppDev string = 'P1v3'
+param skuWebAppStageProd string = 'P1v3'
+param skuTierWebAppDev string = 'PremiumV3'
+param skuTierWebAppStageProd string = 'PremiumV3'
 
 // ============== AKS SKUs ==============
 @description('Specifies the SKU name for the AKS cluster')
@@ -56,13 +66,6 @@ param webappSKU object = {
 ])
 param aksSkuName string = 'Base'
 
-@description('Specifies the SKU tier for the AKS cluster')
-@allowed([
-  'Free'
-  'Standard'
-  'Premium'
-])
-param aksSkuTier string = 'Standard'
 param aksLoadBalancerSku string = 'standard' // 'basic' or 'standard'
 param aksEnablePrivateCluster bool = true
 param aksManagedOutboundIPs int = 1
@@ -79,8 +82,24 @@ param aksPrivateDNSZone string = 'system' // 'none', 'system' or resource ID
 // AKS compute configuration
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
-param aks_dev_sku_override string = ''
-param aks_test_prod_sku_override string = ''
+@description('AKS node VM size for Dev. Empty = template default (aks_dev_defaults[0]).')
+param skuAksDev string = ''
+@description('AKS node VM size for Stage/Prod (test=Stage). Empty = template default (aks_testProd_defaults[0]).')
+param skuAksStageProd string = ''
+@description('AKS cluster tier for Dev')
+@allowed([
+  'Free'
+  'Standard'
+  'Premium'
+])
+param skuTierAksDev string = 'Standard'
+@description('AKS cluster tier for Stage/Prod (test=Stage)')
+@allowed([
+  'Free'
+  'Standard'
+  'Premium'
+])
+param skuTierAksStageProd string = 'Standard'
 param aks_version_override string = ''
 param aks_dev_nodes_override int = -1
 param aks_test_prod_nodes_override int = -1
@@ -454,11 +473,25 @@ var aks_testProd_defaults = [
 ]
 
 // Resolved AKS compute parameters
-var aks_dev_sku_param = !empty(aks_dev_sku_override) ? aks_dev_sku_override : aks_dev_defaults[0]
-var aks_test_prod_sku_param = !empty(aks_test_prod_sku_override) ? aks_test_prod_sku_override : aks_testProd_defaults[0]
+var aks_dev_sku_param = !empty(skuAksDev) ? skuAksDev : aks_dev_defaults[0]
+var aks_test_prod_sku_param = !empty(skuAksStageProd) ? skuAksStageProd : aks_testProd_defaults[0]
 var aks_version_param = !empty(aks_version_override) ? aks_version_override : aksDefaultVersion
 var aks_dev_nodes_param = aks_dev_nodes_override != -1 ? aks_dev_nodes_override : 1
 var aks_test_prod_nodes_param = aks_test_prod_nodes_override != -1 ? aks_test_prod_nodes_override : 3
+
+// Resolved per-environment App Service SKUs (Web App / Function): name+tier per env, family+capacity from base object
+var webappSKUResolved = {
+  name: env == 'dev' ? skuWebAppDev : skuWebAppStageProd
+  tier: env == 'dev' ? skuTierWebAppDev : skuTierWebAppStageProd
+  family: webappSKU.family
+  capacity: webappSKU.capacity
+}
+var functionSKUResolved = {
+  name: env == 'dev' ? skuFunctionDev : skuFunctionStageProd
+  tier: env == 'dev' ? skuTierFunctionDev : skuTierFunctionStageProd
+  family: functionSKU.family
+  capacity: functionSKU.capacity
+}
 
 // AKS subnet selection: prefer aksSubnetId, fall back to aks2SubnetId
 var aksSubnetIdResolved = !empty(aksSubnetId) ? aksSubnetId : aks2SubnetId
@@ -754,7 +787,7 @@ module webapp '../modules/webapp.bicep' = if(!webAppExists && enableWebApp) {
     name: webAppName
     location: location
     tags: tagsProject
-    sku: byoASEv3 ? webappSKUAce : webappSKU
+    sku: byoASEv3 ? webappSKUAce : webappSKUResolved
     alwaysOn: webappAlwaysOn
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
@@ -840,7 +873,7 @@ module function '../modules/function.bicep' = if(!functionAppExists && enableFun
     name: functionAppName
     location: location
     tags: tagsProject
-    sku: byoASEv3 ? webappSKUAce : functionSKU
+    sku: byoASEv3 ? webappSKUAce : functionSKUResolved
     alwaysOn: functionAlwaysOn
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
@@ -1139,7 +1172,7 @@ module aksDev '../modules/aksCluster.bicep' = if(env == 'dev' && !aksExists && !
     tags: tagsProject
     location: location
     skuName: aksSkuName
-    skuTier: aksSkuTier
+    skuTier: skuTierAksDev
     aksExists: aksExists
     kubernetesVersion: aks_version_param
     dnsPrefix: '${aksClusterName}-dns'
@@ -1188,7 +1221,7 @@ module aksTestProd '../modules/aksCluster.bicep' = if((env == 'test' || env == '
     tags: tagsProject
     location: location
     skuName: aksSkuName
-    skuTier: aksSkuTier
+    skuTier: skuTierAksStageProd
     aksExists: aksExists
     kubernetesVersion: aks_version_param
     dnsPrefix: '${aksClusterName}-dns'
