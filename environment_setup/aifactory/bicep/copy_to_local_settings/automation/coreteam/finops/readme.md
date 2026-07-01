@@ -115,7 +115,7 @@ Two turn-key capabilities ship today, mapped to the FinOps Framework:
 
 ---
 
-## AI FinOps roadmap (Crawl → Walk → Run)
+## AI Factory FinOps: Implemented & Roadmap (Crawl → Walk → Run)
 
 FinOps maturity grows from basic visibility to full accountability and business-value optimization.
 Below is the AI Factory take on the FinOps capabilities — what ships today and where we're heading.
