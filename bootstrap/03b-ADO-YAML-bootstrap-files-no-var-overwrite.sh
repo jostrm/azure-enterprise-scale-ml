@@ -45,3 +45,7 @@ cp -r "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/c
 cp -r "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-common/." "$SCRIPT_DIR/aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-common/"
 cp -r "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/." "$SCRIPT_DIR/aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/"
 cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md" "$SCRIPT_DIR/aifactory/esml-infra/azure-devops/bicep/yaml/readme.md"
+
+# Automation (core-team runbooks, FinOps showback/token reports) -> aifactory/automation
+mkdir -p "$SCRIPT_DIR/aifactory/automation/"
+cp -r "$SCRIPT_DIR/aifactory-templates/automation/." "$SCRIPT_DIR/aifactory/automation/"
