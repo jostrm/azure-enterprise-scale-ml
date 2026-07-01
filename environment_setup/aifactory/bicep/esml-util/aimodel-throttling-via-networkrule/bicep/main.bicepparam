@@ -11,6 +11,19 @@ using './main.bicep'
 
 // --- Scope: one project RG (change to 'Subscription' to cap the whole sub) ---
 param throttleScope = 'ResourceGroup'
+
+// OPTION A - AI Factory exists: derive the project RG from the naming convention.
+//   Set esmlAifactoryExists=true and fill the naming params; leave targetResourceGroup empty.
+param esmlAifactoryExists = false
+param env = 'dev'
+param aifactoryPrefixRG = ''     // e.g. 'acme-1-'
+param projectPrefix = ''
+param projectSuffix = ''
+param projectNumber = ''         // e.g. '001'
+param locationSuffix = ''        // e.g. 'swc'
+param aifactorySuffixRG = ''     // e.g. '-001'
+
+// OPTION B - No AI Factory: pass the project RG explicitly.
 param targetResourceGroup = 'acme-1-esml-project001-swc-dev-001-rg'
 
 // Management RG hosting the Logic App + Action Group (defaults to targetResourceGroup if empty)
@@ -33,10 +46,10 @@ param tags = {
 
 // --- Cost budget trigger ---
 param enableBudget = true
-param budgetAmount = 5000
-param actualThresholdPercent = 100
-param forecastThresholdPercent = 90
-param budgetStartDate = '2026-07-01'
+param budgetAmount = 100                 // $100/month cap (billing currency)
+param actualThresholdPercent = 100       // throttle when ACTUAL spend hits $100
+param forecastThresholdPercent = 90      // early throttle when FORECAST hits $90
+param budgetStartDate = '2026-07-01'     // must be the first of a month
 
 // --- Token scheduled-query trigger (optional; needs a workspace with Foundry metrics) ---
 param enableTokenAlert = false

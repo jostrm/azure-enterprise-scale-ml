@@ -106,11 +106,16 @@ param tokenThreshold int = 50000000
 param notifyEmails array = []
 
 // ------------------------- Computed -------------------------
-var hostRg = empty(throttleResourceGroup) ? targetResourceGroup : throttleResourceGroup
+// When esmlAifactoryExists, derive the project RG from the AI Factory convention:
+//   {prefixRG}{projectPrefix}project{projectNumber}-{locationSuffix}-{env}{suffixRG}{projectSuffix}
+var derivedProjectRG = '${aifactoryPrefixRG}${projectPrefix}project${projectNumber}-${locationSuffix}-${env}${aifactorySuffixRG}${projectSuffix}'
+var resolvedTargetRg = !empty(targetResourceGroup) ? targetResourceGroup : (esmlAifactoryExists ? derivedProjectRG : '')
+
+var hostRg = empty(throttleResourceGroup) ? resolvedTargetRg : throttleResourceGroup
 var isSubScope = throttleScope == 'Subscription'
 var scopeResourceId = isSubScope
   ? subscription().id
-  : '${subscription().id}/resourceGroups/${targetResourceGroup}'
+  : '${subscription().id}/resourceGroups/${resolvedTargetRg}'
 
 var logicAppNameResolved = empty(logicAppName) ? '${namePrefix}-logic' : logicAppName
 var actionGroupName = '${namePrefix}-ag'
@@ -140,7 +145,7 @@ module raSub 'modules/roleAssignment.subscription.bicep' = if (isSubScope) {
 
 module raRg 'modules/roleAssignment.resourcegroup.bicep' = if (!isSubScope) {
   name: 'deploy-throttle-rbac-rg'
-  scope: resourceGroup(targetResourceGroup)
+  scope: resourceGroup(resolvedTargetRg)
   params: {
     principalId: logicApp.outputs.principalId
   }
@@ -173,7 +178,7 @@ module budgetSub 'modules/budget.subscription.bicep' = if (enableBudget && isSub
 
 module budgetRg 'modules/budget.resourcegroup.bicep' = if (enableBudget && !isSubScope) {
   name: 'deploy-throttle-budget-rg'
-  scope: resourceGroup(targetResourceGroup)
+  scope: resourceGroup(resolvedTargetRg)
   params: {
     budgetName: budgetName
     amount: budgetAmount
