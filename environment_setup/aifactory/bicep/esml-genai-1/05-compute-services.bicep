@@ -48,6 +48,25 @@ param webappSKU object = {
   capacity: 1
 }
 
+// Per-environment Web App / Function plan SKU (name) and tier passed from the pipeline (Dev vs Stage/Prod).
+// Empty = fall back to the template default object above. test(=Stage) uses the *StageProd value.
+@description('Web App plan SKU name for dev. Empty = webappSKU.name default.')
+param skuWebAppDev string = ''
+@description('Web App plan SKU name for stage/prod. Empty = webappSKU.name default.')
+param skuWebAppStageProd string = ''
+@description('Web App plan SKU tier for dev. Empty = webappSKU.tier default.')
+param skuTierWebAppDev string = ''
+@description('Web App plan SKU tier for stage/prod. Empty = webappSKU.tier default.')
+param skuTierWebAppStageProd string = ''
+@description('Function plan SKU name for dev. Empty = functionSKU.name default.')
+param skuFunctionDev string = ''
+@description('Function plan SKU name for stage/prod. Empty = functionSKU.name default.')
+param skuFunctionStageProd string = ''
+@description('Function plan SKU tier for dev. Empty = functionSKU.tier default.')
+param skuTierFunctionDev string = ''
+@description('Function plan SKU tier for stage/prod. Empty = functionSKU.tier default.')
+param skuTierFunctionStageProd string = ''
+
 // ============== AKS SKUs ==============
 @description('Specifies the SKU name for the AKS cluster')
 @allowed([
@@ -469,6 +488,21 @@ var aks_dev_sku_param = !empty(skuAksDev) ? skuAksDev : (!empty(aks_dev_sku_over
 var aks_test_prod_sku_param = !empty(skuAksStageProd) ? skuAksStageProd : (!empty(aks_test_prod_sku_override) ? aks_test_prod_sku_override : aks_testProd_defaults[0])
 // Resolved AKS SKU tier per environment (fall back to aksSkuTier when per-env not provided)
 var aksSkuTierResolved = env == 'dev' ? (!empty(skuTierAksDev) ? skuTierAksDev : aksSkuTier) : (!empty(skuTierAksStageProd) ? skuTierAksStageProd : aksSkuTier)
+
+// Resolved per-env Web App / Function plan SKU objects.
+// Override name + tier from the pipeline; keep family + capacity from the template default object.
+var webAppSkuNameResolved = env == 'dev' ? (!empty(skuWebAppDev) ? skuWebAppDev : webappSKU.name) : (!empty(skuWebAppStageProd) ? skuWebAppStageProd : webappSKU.name)
+var webAppSkuTierResolved = env == 'dev' ? (!empty(skuTierWebAppDev) ? skuTierWebAppDev : webappSKU.tier) : (!empty(skuTierWebAppStageProd) ? skuTierWebAppStageProd : webappSKU.tier)
+var webappSKUResolved = union(webappSKU, {
+  name: webAppSkuNameResolved
+  tier: webAppSkuTierResolved
+})
+var functionSkuNameResolved = env == 'dev' ? (!empty(skuFunctionDev) ? skuFunctionDev : functionSKU.name) : (!empty(skuFunctionStageProd) ? skuFunctionStageProd : functionSKU.name)
+var functionSkuTierResolved = env == 'dev' ? (!empty(skuTierFunctionDev) ? skuTierFunctionDev : functionSKU.tier) : (!empty(skuTierFunctionStageProd) ? skuTierFunctionStageProd : functionSKU.tier)
+var functionSKUResolved = union(functionSKU, {
+  name: functionSkuNameResolved
+  tier: functionSkuTierResolved
+})
 var aks_version_param = !empty(aks_version_override) ? aks_version_override : aksDefaultVersion
 var aks_dev_nodes_param = aks_dev_nodes_override != -1 ? aks_dev_nodes_override : 1
 var aks_test_prod_nodes_param = aks_test_prod_nodes_override != -1 ? aks_test_prod_nodes_override : 3
@@ -767,7 +801,7 @@ module webapp '../modules/webapp.bicep' = if(!webAppExists && enableWebApp) {
     name: webAppName
     location: location
     tags: tagsProject
-    sku: byoASEv3 ? webappSKUAce : webappSKU
+    sku: byoASEv3 ? webappSKUAce : webappSKUResolved
     alwaysOn: webappAlwaysOn
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
@@ -853,7 +887,7 @@ module function '../modules/function.bicep' = if(!functionAppExists && enableFun
     name: functionAppName
     location: location
     tags: tagsProject
-    sku: byoASEv3 ? webappSKUAce : functionSKU
+    sku: byoASEv3 ? webappSKUAce : functionSKUResolved
     alwaysOn: functionAlwaysOn
     vnetName: vnetNameFull
     vnetResourceGroupName: vnetResourceGroupName
