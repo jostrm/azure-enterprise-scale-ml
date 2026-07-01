@@ -12,18 +12,28 @@ targetScope = 'subscription'
 @description('Enable Cosmos DB free tier (one per subscription)')
 param enableCosmosFreeTier bool = false
 // ============================================================================
-// SKU for services
+// SKU for services - per-environment (Dev vs Stage/Prod; test=Stage). Resolved by env below.
 // ============================================================================
 // PostgreSQL
-param postgreSQLSKU object = {
-  name: 'Standard_B1ms'
-  tier: 'Burstable'
+param skuPostgreSQLDev string = 'Standard_B1ms'
+param skuPostgreSQLStageProd string = 'Standard_B1ms'
+param skuTierPostgreSQLDev string = 'Burstable'
+param skuTierPostgreSQLStageProd string = 'Burstable'
+var postgreSQLSKU = {
+  name: env == 'dev' ? skuPostgreSQLDev : skuPostgreSQLStageProd
+  tier: env == 'dev' ? skuTierPostgreSQLDev : skuTierPostgreSQLStageProd
 }
 // Redis
-param redisSKU string = 'Standard'
-// SQL Server
-param sqlServerSKU_DTU string = 'S0'
-param sqlServerTier_DTU string = 'Standard'
+param skuRedisDev string = 'Standard'
+param skuRedisStageProd string = 'Standard'
+var redisSKU = env == 'dev' ? skuRedisDev : skuRedisStageProd
+// SQL Server (DTU model)
+param skuSQLDatabaseDev string = 'S0'
+param skuSQLDatabaseStageProd string = 'S0'
+param skuTierSQLDatabaseDev string = 'Standard'
+param skuTierSQLDatabaseStageProd string = 'Standard'
+var sqlServerSKU_DTU = env == 'dev' ? skuSQLDatabaseDev : skuSQLDatabaseStageProd
+var sqlServerTier_DTU = env == 'dev' ? skuTierSQLDatabaseDev : skuTierSQLDatabaseStageProd
 
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
@@ -183,7 +193,9 @@ param elasticDeploymentSize string = 'small'
 
 @description('Elastic Cloud SKU')
 @allowed(['ess-consumption-2024_Monthly'])
-param elasticSku string = 'ess-consumption-2024_Monthly'
+param skuElasticDev string = 'ess-consumption-2024_Monthly'
+param skuElasticStageProd string = 'ess-consumption-2024_Monthly'
+var elasticSku = env == 'dev' ? skuElasticDev : skuElasticStageProd
 
 @description('Enable Elasticsearch monitoring')
 param elasticMonitoringEnabled bool = true

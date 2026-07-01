@@ -13,8 +13,11 @@ targetScope = 'subscription'
 
 // SKU for services
 // ============================================================================
+// Per-environment Storage Account SKU: 'dev' uses the Dev SKU, 'test'(Stage) and 'prod' use the StageProd SKU.
 @allowed(['Standard_LRS', 'Standard_GRS', 'Standard_RAGRS', 'Standard_ZRS', 'Premium_LRS', 'Premium_ZRS', 'Standard_GZRS', 'Standard_RAGZRS'])
-param storageAccountSkuName string = 'Standard_LRS'
+param skuStorageAccountDev string = 'Standard_LRS'
+@allowed(['Standard_LRS', 'Standard_GRS', 'Standard_RAGRS', 'Standard_ZRS', 'Premium_LRS', 'Premium_ZRS', 'Standard_GZRS', 'Standard_RAGZRS'])
+param skuStorageAccountStageProd string = 'Standard_LRS'
 @allowed(['Premium', 'Standard', 'Basic']) 
 param containerRegistrySkuName string = 'Premium' // NB! Basic and Standard ACR SKUs don't support private endpoints.
 param bingSearchSKU string = 'S1'
@@ -174,6 +177,9 @@ param commonResourceName string = 'esml-common'
 
 // ============== VARIABLES ==============
 var subscriptionIdDevTestProd = subscription().subscriptionId
+
+// Per-environment Storage Account SKU resolution (test=Stage uses the StageProd SKU)
+var storageAccountSkuName = env == 'dev' ? skuStorageAccountDev : skuStorageAccountStageProd
 
 // Calculated variables
 var projectName = 'prj${projectNumber}'

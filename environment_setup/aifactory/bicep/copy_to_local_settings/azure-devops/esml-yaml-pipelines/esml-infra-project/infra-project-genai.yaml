@@ -71,6 +71,32 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
+                  phase: 'infra'
+    # AI Foundry runs in its OWN deployment job so it starts with a FRESH Microsoft-hosted
+    # 60-minute agent budget (the free-tier per-job cap silently overrides timeoutInMinutes).
+    # The job-2 template re-runs its preamble (00_*..05c_*) in this phase to re-derive
+    # detection vars, salt, seeding-KV secrets and firewall whitelisting on the new agent.
+    - deployment: ESGenAI_Foundry
+      condition: in(dependencies.ESGenAI_Services.result, 'Succeeded')
+      dependsOn: ESGenAI_Services
+      displayName: Deploy AI Foundry (fresh agent budget)
+      timeoutInMinutes: 240
+      pool:
+        vmImage: windows-2022
+      environment: Dev
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - checkout: self
+                submodules: recursive
+                fetchDepth: 0
+                displayName: 'Checkout with submodules'
+              - template: ./jobs/job-2-genai-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.dev_service_connection }}
+                  serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
+                  phase: 'foundry'
 - stage: Stage_GenAI_Project
   displayName: Stage GenAI Project
   condition: and(eq(variables['Build.Reason'], 'Manual'), in(dependencies.Dev_GenAI_Project.result, 'Succeeded'))
@@ -124,6 +150,32 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
                   serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
+                  phase: 'infra'
+    # AI Foundry runs in its OWN deployment job so it starts with a FRESH Microsoft-hosted
+    # 60-minute agent budget (the free-tier per-job cap silently overrides timeoutInMinutes).
+    # The job-2 template re-runs its preamble (00_*..05c_*) in this phase to re-derive
+    # detection vars, salt, seeding-KV secrets and firewall whitelisting on the new agent.
+    - deployment: ESGenAI_Foundry
+      condition: in(dependencies.ESGenAI_Services.result, 'Succeeded')
+      dependsOn: ESGenAI_Services
+      displayName: Deploy AI Foundry (fresh agent budget)
+      timeoutInMinutes: 240
+      pool:
+        vmImage: windows-2022
+      environment: Stage
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - checkout: self
+                submodules: recursive
+                fetchDepth: 0
+                displayName: 'Checkout with submodules'
+              - template: ./jobs/job-2-genai-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.test_service_connection }}
+                  serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
+                  phase: 'foundry'
 - stage: Prod_GenAI_Project
   displayName: Prod GenAI Project
   condition: and(eq(variables['Build.Reason'], 'Manual'), or(in(dependencies.Stage_GenAI_Project.result, 'Succeeded', 'Skipped'), in(dependencies.Dev_GenAI_Project.result, 'Succeeded')))
@@ -179,3 +231,29 @@ stages:
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
                   serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
+                  phase: 'infra'
+    # AI Foundry runs in its OWN deployment job so it starts with a FRESH Microsoft-hosted
+    # 60-minute agent budget (the free-tier per-job cap silently overrides timeoutInMinutes).
+    # The job-2 template re-runs its preamble (00_*..05c_*) in this phase to re-derive
+    # detection vars, salt, seeding-KV secrets and firewall whitelisting on the new agent.
+    - deployment: ESGenAI_Foundry
+      condition: in(dependencies.ESGenAI_Services.result, 'Succeeded')
+      dependsOn: ESGenAI_Services
+      displayName: Deploy AI Foundry (fresh agent budget)
+      timeoutInMinutes: 240
+      pool:
+        vmImage: windows-2022
+      environment: Prod
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - checkout: self
+                submodules: recursive
+                fetchDepth: 0
+                displayName: 'Checkout with submodules'
+              - template: ./jobs/job-2-genai-services.yaml
+                parameters:
+                  serviceConnection: ${{ variables.prod_service_connection }}
+                  serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
+                  phase: 'foundry'

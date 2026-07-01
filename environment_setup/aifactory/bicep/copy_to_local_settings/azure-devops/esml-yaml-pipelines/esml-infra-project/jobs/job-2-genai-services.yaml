@@ -3,6 +3,17 @@ parameters:
     type: string
   - name: serviceConnectionSeeding
     type: string
+  # phase selects which half of this template compiles-in as "active":
+  #   'infra'   -> all 61..101-rbac infra tasks run; Foundry (69*..10-dashboards) tasks are skipped.
+  #   'foundry' -> Foundry tasks run; infra tasks are skipped.
+  # The preamble (00_*..05c_*) runs in BOTH phases because each phase is a separate
+  # Microsoft-hosted job with a fresh agent (new IP, no inherited variables/secrets/files).
+  - name: phase
+    type: string
+    default: 'infra'
+    values:
+      - infra
+      - foundry
 
 steps:
 # ---------------------------------------------------------------------------
@@ -1294,7 +1305,7 @@ steps:
   # Runs when:
   # - enableAFoundryCaphost=true AND cleanFoundryCaphost=true AND
   # - (deleteAllServicesForProject=true OR (enableDeleteForDisabledResources=true AND enableAIFoundry=false))
-  condition: and(succeeded(), eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['cleanFoundryCaphost'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), and(eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'false'))))
+  condition: and(succeeded(), eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['cleanFoundryCaphost'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), and(eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'false'))), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1382,7 +1393,7 @@ steps:
     admin_prjResourceSuffix: $(admin_prjResourceSuffix)
 - task: AzureCLI@2
   displayName: '06b_Delete_Service_If_Not_Enabled_And_Exists'
-  condition: and(succeeded(), eq(variables['enableDeleteForDisabledResources'], 'true'))
+  condition: and(succeeded(), eq(variables['enableDeleteForDisabledResources'], 'true'), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1471,7 +1482,7 @@ steps:
   # If a purge call fails the pipeline stops here (set -e) — Owner on subscription has purge rights.
   # Emits output variable purgeSoftDeleted.purgeRan (true/false) so 06c2 can skip the subnet-release
   # wait when nothing actually qualified for purge.
-  condition: and(succeeded(), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'true')))
+  condition: and(succeeded(), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'true')), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1795,7 +1806,7 @@ steps:
   # - 06c_Purge task succeeded
   # - deleteAllForProject != true (ULTRA mode tears down RG + networking; no redeploy follows, so waiting for subnet release is pointless)
   # - BYO_subnets != true (customer manages their own subnets — never held by this pipeline, nothing to wait for)
-  condition: and(succeeded(), eq(variables['purgeSoftDeleted.purgeRan'], 'true'), ne(variables['deleteAllForProject'], 'true'), ne(variables['BYO_subnets'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')), eq(variables['enableAIFoundry'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'))
+  condition: and(succeeded(), eq(variables['purgeSoftDeleted.purgeRan'], 'true'), ne(variables['deleteAllForProject'], 'true'), ne(variables['BYO_subnets'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')), eq(variables['enableAIFoundry'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1896,7 +1907,7 @@ steps:
 - task: AzureCLI@2
   displayName: '06d_Cleanup_Disconnected_SharedPrivateLinks'
   continueOnError: true
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableAISearchSharedPrivateLink'], 'true'), eq(variables['aiSearchExists'], 'true'))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableAISearchSharedPrivateLink'], 'true'), eq(variables['aiSearchExists'], 'true'), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1984,7 +1995,7 @@ steps:
 - task: AzureCLI@2
   displayName: '06e_Create_Policy_Exemptions_FoundrySubnets'
   continueOnError: true
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['policyExemptionAssignmentIds'], '[]'), ne(variables['policyExemptionAssignmentIds'], ''), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['policyExemptionAssignmentIds'], '[]'), ne(variables['policyExemptionAssignmentIds'], ''), succeeded(), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2039,7 +2050,7 @@ steps:
      echo "=== 06e Policy Exemptions complete ==="
 - task: AzureCLI@2
   displayName: '05d_Build default image offline, to private registry (ACR) if not exists'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2223,7 +2234,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 - task: AzureCLI@2
   displayName: 'Check and Delete Orphan Role Assignments'
-  condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
+  condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2316,7 +2327,7 @@ steps:
 
 - task: AzureCLI@2
   displayName: '61-foundation'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), succeeded(), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2444,7 +2455,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '62-core-infrastructure'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded(), ne('${{ parameters.phase }}', 'foundry'))
   retryCountOnTaskFailure: 2
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -2523,6 +2534,8 @@ steps:
      --parameters acr_adminUserEnabled="$(acr_adminUserEnabled)" \
      --parameters acr_dedicated="$(acr_dedicated)" \
      --parameters containerRegistrySkuName="$(acr_SKU)" \
+     --parameters skuStorageAccountDev="$(skuStorageAccountDev)" \
+     --parameters skuStorageAccountStageProd="$(skuStorageAccountStageProd)" \
      --parameters enableProjectVM="$(enableProjectVM)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters updateKeyvaultRbac="$(updateKeyvaultRbac)" \
@@ -2530,7 +2543,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '63-cognitive-services'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))), ne('${{ parameters.phase }}', 'foundry'))
   retryCountOnTaskFailure: 2
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -2575,8 +2588,23 @@ steps:
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters enableAIServices="$(enableAIServices)" \
      --parameters enableAISearch="$(enableAISearch)" \
-     --parameters aiSearchSKUName="$(admin_aiSearchTier)" \
+     --parameters skuAISearchDev="$(skuAISearchDev)" \
+     --parameters skuAISearchStageProd="$(skuAISearchStageProd)" \
      --parameters semanticSearchTier="$(admin_semanticSearchTier)" \
+     --parameters skuAIServicesDev="$(skuAIServicesDev)" \
+     --parameters skuAIServicesStageProd="$(skuAIServicesStageProd)" \
+     --parameters skuOpenAIDev="$(skuOpenAIDev)" \
+     --parameters skuOpenAIStageProd="$(skuOpenAIStageProd)" \
+     --parameters skuContentSafetyDev="$(skuContentSafetyDev)" \
+     --parameters skuContentSafetyStageProd="$(skuContentSafetyStageProd)" \
+     --parameters skuVisionDev="$(skuVisionDev)" \
+     --parameters skuVisionStageProd="$(skuVisionStageProd)" \
+     --parameters skuSpeechDev="$(skuSpeechDev)" \
+     --parameters skuSpeechStageProd="$(skuSpeechStageProd)" \
+     --parameters skuDocIntelligenceDev="$(skuDocIntelligenceDev)" \
+     --parameters skuDocIntelligenceStageProd="$(skuDocIntelligenceStageProd)" \
+     --parameters skuBingDev="$(skuBingDev)" \
+     --parameters skuBingStageProd="$(skuBingStageProd)" \
      --parameters enableAzureOpenAI="$(enableAzureOpenAI)" \
      --parameters enableContentSafety="$(enableContentSafety)" \
      --parameters enableAzureAIVision="$(enableAzureAIVision)" \
@@ -2616,7 +2644,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '64-databases'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_64_databases'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_64_databases'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2665,6 +2693,16 @@ steps:
      --parameters postgreSQLVersion="17" \
      --parameters enableRedisCache="$(enableRedisCache)" \
      --parameters enableSQLDatabase="$(enableSQLDatabase)" \
+     --parameters skuPostgreSQLDev="$(skuPostgreSQLDev)" \
+     --parameters skuPostgreSQLStageProd="$(skuPostgreSQLStageProd)" \
+     --parameters skuTierPostgreSQLDev="$(skuTierPostgreSQLDev)" \
+     --parameters skuTierPostgreSQLStageProd="$(skuTierPostgreSQLStageProd)" \
+     --parameters skuRedisDev="$(skuRedisDev)" \
+     --parameters skuRedisStageProd="$(skuRedisStageProd)" \
+     --parameters skuSQLDatabaseDev="$(skuSQLDatabaseDev)" \
+     --parameters skuSQLDatabaseStageProd="$(skuSQLDatabaseStageProd)" \
+     --parameters skuTierSQLDatabaseDev="$(skuTierSQLDatabaseDev)" \
+     --parameters skuTierSQLDatabaseStageProd="$(skuTierSQLDatabaseStageProd)" \
      --parameters enableElasticsearch="$(enableElasticsearch)" \
      --parameters elasticExists="$(elasticExists)" \
      --parameters elasticType="$(elasticType)" \
@@ -2673,7 +2711,8 @@ steps:
      --parameters elasticLastName="$(elasticLastName)" \
      --parameters elasticCompanyName="$(elasticCompanyName)" \
      --parameters elasticDeploymentSize="$(elasticDeploymentSize)" \
-     --parameters elasticSku="$(elasticSku)" \
+     --parameters skuElasticDev="$(skuElasticDev)" \
+     --parameters skuElasticStageProd="$(skuElasticStageProd)" \
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
@@ -2692,7 +2731,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '65-compute-services'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_65_compute_services'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_65_compute_services'], 'true'), succeeded(), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2753,6 +2792,14 @@ steps:
      --parameters functionVersion="$(functionVersion)" \
      --parameters webAppRuntime="$(webAppRuntime)" \
      --parameters webAppRuntimeVersion="$(webAppRuntimeVersion)" \
+     --parameters skuWebAppDev="$(skuWebAppDev)" \
+     --parameters skuWebAppStageProd="$(skuWebAppStageProd)" \
+     --parameters skuTierWebAppDev="$(skuTierWebAppDev)" \
+     --parameters skuTierWebAppStageProd="$(skuTierWebAppStageProd)" \
+     --parameters skuFunctionDev="$(skuFunctionDev)" \
+     --parameters skuFunctionStageProd="$(skuFunctionStageProd)" \
+     --parameters skuTierFunctionDev="$(skuTierFunctionDev)" \
+     --parameters skuTierFunctionStageProd="$(skuTierFunctionStageProd)" \
      --parameters aseSku="$(aseSku)" \
      --parameters aseSkuCode="$(aseSkuCode)" \
      --parameters aseSkuWorkers="$(aseSkuWorkers)" \
@@ -2775,14 +2822,17 @@ steps:
      --parameters enableAKS="$(enableAKS)" \
      --parameters aksExists="$(aksExists)" \
      --parameters aksSkuName="$(aksSkuName)" \
-     --parameters aksSkuTier="$(aksSkuTier)" \
+     --parameters skuTierAksDev="$(skuTierAksDev)" \
+     --parameters skuTierAksStageProd="$(skuTierAksStageProd)" \
      --parameters aksEnablePrivateCluster="$(aksEnablePrivateCluster)" \
      --parameters aksOutboundType="$(aksOutboundType)" \
-     --parameters aksPrivateDNSZone="$(aksPrivateDNSZone)"
+     --parameters aksPrivateDNSZone="$(aksPrivateDNSZone)" \
+     --parameters skuAksDev="$(skuAksDev)" \
+     --parameters skuAksStageProd="$(skuAksStageProd)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '66-ai-platform'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_66_ai_platform'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_66_ai_platform'], 'true'), succeeded(), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2868,7 +2918,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '67-data_ml_platform'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_67_data_ml_platform'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_67_data_ml_platform'], 'true'), succeeded(), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2904,8 +2954,8 @@ steps:
      --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
-     --parameters aks_dev_sku_override="$(admin_aks_gpu_sku_dev_override)" \
-     --parameters aks_test_prod_sku_override="$(admin_aks_gpu_sku_test_prod_override)" \
+     --parameters skuAksGpuDev="$(admin_aks_gpu_sku_dev_override)" \
+     --parameters skuAksGpuStageProd="$(admin_aks_gpu_sku_test_prod_override)" \
      --parameters aks_version_override="$(admin_aks_version_override)" \
      --parameters aks_dev_nodes_override="$(admin_aks_nodes_dev_override)" \
      --parameters aks_test_prod_nodes_override="$(admin_aks_nodes_testProd_override)" \
@@ -2931,6 +2981,12 @@ steps:
      --parameters enableDatafactory="$(enableDatafactory)" \
      --parameters enableAzureMachineLearning="$(enableAzureMachineLearning)" \
      --parameters enableDatabricks="$(enableDatabricks)" \
+     --parameters skuAzureMLDev="$(skuAzureMLDev)" \
+     --parameters skuAzureMLStageProd="$(skuAzureMLStageProd)" \
+     --parameters skuTierAzureMLDev="$(skuTierAzureMLDev)" \
+     --parameters skuTierAzureMLStageProd="$(skuTierAzureMLStageProd)" \
+     --parameters skuDatabricksDev="$(skuDatabricksDev)" \
+     --parameters skuDatabricksStageProd="$(skuDatabricksStageProd)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters addAzureMachineLearning="$(addAzureMachineLearning)" \
      --parameters enableAksForAzureML="$(enableAksForAzureML)" \
@@ -2945,7 +3001,7 @@ steps:
   # in 'Pending' state. They must be APPROVED on each TARGET resource before the ADF
   # AutoResolve managed Integration Runtime can reach the data stores over Private Link.
   # Reads the 67-data-ml-platform deployment output and approves any pending connection.
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_67_data_ml_platform'], 'true'), eq(variables['enableDatafactory'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_67_data_ml_platform'], 'true'), eq(variables['enableDatafactory'], 'true'), succeeded(), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2990,7 +3046,7 @@ steps:
       echo "Done approving ADF managed private endpoints."
 - task: AzureCLI@2
   displayName: '68-integration'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_68_integration'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_68_integration'], 'true'), succeeded(), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3036,6 +3092,10 @@ steps:
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters enableLogicApps="$(enableLogicApps)" \
      --parameters enableEventHubs="$(enableEventHubs)" \
+     --parameters skuLogicAppsDev="$(skuLogicAppsDev)" \
+     --parameters skuLogicAppsStageProd="$(skuLogicAppsStageProd)" \
+     --parameters skuEventHubsDev="$(skuEventHubsDev)" \
+     --parameters skuEventHubsStageProd="$(skuEventHubsStageProd)" \
      --parameters logicAppsExists="$(logicAppsExists)" \
      --parameters eventHubsExists="$(eventHubsExists)" \
      --parameters functionAppExists="$(functionAppExists)" \
@@ -3045,12 +3105,13 @@ steps:
      --parameters enableBotService="$(enableBotService)" \
      --parameters addAIFoundry="$(addAIFoundry)" \
      --parameters botServiceExists="$(botServiceExists)" \
-     --parameters botServiceSku="S1" \
+     --parameters skuBotServiceDev="$(skuBotServiceDev)" \
+     --parameters skuBotServiceStageProd="$(skuBotServiceStageProd)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '99_detect_existing_acr_role_assignments'
-  condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
+  condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3118,7 +3179,7 @@ steps:
      echo "##vso[task.setvariable variable=skipACRAssignments]false"
 - task: AzureCLI@2
   displayName: '100-rbac-security'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_100_rbac_security'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_100_rbac_security'], 'true'), succeeded(), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3214,7 +3275,7 @@ steps:
 - task: AzureCLI@2
   displayName: '101-rbac-common-rg'
   continueOnError: true
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_101_rbac_common_rg'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_101_rbac_common_rg'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded(), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3275,9 +3336,20 @@ steps:
      --parameters existingAcrPushSPPrincipals="$(existingAcrPushSPPrincipals)" \
      --parameters disableSubnetJoinAction="$(disableSubnetJoinAction)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+# In phase='foundry' this is a NEW job/agent, so 100-rbac-security (which sets
+# pre_foundry_gate_passed in the infra phase) did NOT run here. This job depends on the
+# infra job having succeeded, so re-assert the gate for the Foundry tasks below.
+- task: Bash@3
+  displayName: 'phase-foundry-set-gate'
+  condition: eq('${{ parameters.phase }}', 'foundry')
+  inputs:
+    targetType: 'inline'
+    script: |
+      echo "Foundry phase: re-asserting pre_foundry_gate_passed=true (infra 100-rbac gate ran in the prior job)."
+      echo "##vso[task.setvariable variable=pre_foundry_gate_passed]true"
 - task: AzureCLI@2
   displayName: '69-aifoundry-2025-1stOption'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), or(eq(variables['foundryDeploymentType'], '1'), eq(variables['foundryDeploymentType'], '3')))
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), or(eq(variables['foundryDeploymentType'], '1'), eq(variables['foundryDeploymentType'], '3')), eq('${{ parameters.phase }}', 'foundry'))
   # continueOnError: true
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -3353,7 +3425,7 @@ steps:
   # subscription, which is required by the auto-provisioned invisible ACA environment
   # that backs the agent service.
   continueOnError: false
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), ne(variables['disableAgentNetworkInjection'], 'true'))
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), ne(variables['disableAgentNetworkInjection'], 'true'), eq('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3595,7 +3667,7 @@ steps:
   # plane, no IaC ordering can prevent the flip and a deny-public Azure Policy will cause
   # a hard failure here/at caphost — that case requires a Microsoft support ticket.
   continueOnError: true
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), ne(variables['disableAgentNetworkInjection'], 'true'))
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), ne(variables['disableAgentNetworkInjection'], 'true'), eq('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3750,7 +3822,7 @@ steps:
       echo "   The Foundry account (next task) can now reach AI Search privately; no public fallback required."
 - task: AzureCLI@2
   displayName: '69a-aifoundry-2025-2ndOption-Account'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), eq('${{ parameters.phase }}', 'foundry'))
   retryCountOnTaskFailure: 3
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -3922,7 +3994,7 @@ steps:
 # best-effort — it logs warnings and ALWAYS exits 0, and it must never fail or block the deployment.
 - task: AzureCLI@2
   displayName: '69a-Grant-NetworkContributor-For-Injection (best-effort)'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), succeeded())
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), succeeded(), eq('${{ parameters.phase }}', 'foundry'))
   retryCountOnTaskFailure: 2
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -4062,7 +4134,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69a-Poll-Deployment-Status'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), succeeded())
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), succeeded(), eq('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4222,7 +4294,7 @@ steps:
 - task: AzureCLI@2
   displayName: '69-wait-account-caphost-succeeded'
   continueOnError: false
-  condition: and(eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), not(failed()), not(canceled()), ne(variables['disableAgentNetworkInjection'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  condition: and(eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), not(failed()), not(canceled()), ne(variables['disableAgentNetworkInjection'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), eq('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4307,7 +4379,7 @@ steps:
      echo "##[warning]Proceeding to 69b anyway — retryCountOnTaskFailure may recover."
 - task: AzureCLI@2
   displayName: '69b-aifoundry-2025-2ndOption-AccountUpdate'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), ne(variables['foundry_1st_option_succeeded'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), ne(variables['foundry_1st_option_succeeded'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), eq('${{ parameters.phase }}', 'foundry'))
   retryCountOnTaskFailure: 2
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -4448,7 +4520,7 @@ steps:
 - task: AzureCLI@2
   displayName: '69c_cosmosdb_data_contributor_for_foundry_project'
   continueOnError: true
-  condition: and(eq(variables['enableAIFoundry'], 'true'), eq(variables['enableCosmosDB'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded())
+  condition: and(eq(variables['enableAIFoundry'], 'true'), eq(variables['enableCosmosDB'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4583,7 +4655,7 @@ steps:
 - task: AzureCLI@2
   displayName: '100a_approve_AI_Search_shared_private_links'
   continueOnError: true
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAISearchSharedPrivateLink'], 'true'), or(and(eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true')), eq(variables['enableAISearch'], 'true')))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAISearchSharedPrivateLink'], 'true'), or(and(eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true')), eq(variables['enableAISearch'], 'true')), eq('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4697,7 +4769,7 @@ steps:
 - task: AzureCLI@2
   displayName: '100b_create_foundry_agent'
   continueOnError: true
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAIFoundry'], 'true'))
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAIFoundry'], 'true'), eq('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4875,7 +4947,7 @@ steps:
      echo "=== Agent creation task completed ==="
 - task: AzureCLI@2
   displayName: '101_generate_hosts_file_info'
-  condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
+  condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'), eq('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4900,7 +4972,7 @@ steps:
   # If task 62 / 63 / etc. failed BEFORE 69a, the started markers are never set
   # (69a/69b's own conditions require pre_foundry_gate_passed=true and succeeded()),
   # so 110 stays skipped and any healthy caphost from a prior run is preserved.
-  condition: and(or(and(eq(variables['foundry_69a_started'], 'true'), ne(variables['foundry_69a_deployment_succeeded'], 'true')), and(eq(variables['foundry_69b_started'], 'true'), ne(variables['foundry_69b_succeeded'], 'true')), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
+  condition: and(or(and(eq(variables['foundry_69a_started'], 'true'), ne(variables['foundry_69a_deployment_succeeded'], 'true')), and(eq(variables['foundry_69b_started'], 'true'), ne(variables['foundry_69b_succeeded'], 'true')), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'), eq('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4910,7 +4982,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '111_If_Error_AIFoundryHubAndProject_DeleteIt'
-  condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4920,7 +4992,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '112_If_Error_AIServices_DeleteIt'
-  condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '63-cognitive-services'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '63-cognitive-services'), eq(variables['System.StageResult'], 'Failed')), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4930,7 +5002,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '113_If_Error_AIFoundryProject_DeleteIt'
-  condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '69-aifoundry-2025'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '69-aifoundry-2025'), eq(variables['System.StageResult'], 'Failed')), eq('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4940,7 +5012,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '114_Purge_If_SoftDeleted_111_112_After5minutes'
-  condition: and(eq(variables['debugEnableCleaning'], 'true'), or(eq(variables['71_deleted'], 'true'), eq(variables['72_deleted'], 'true')))
+  condition: and(eq(variables['debugEnableCleaning'], 'true'), or(eq(variables['71_deleted'], 'true'), eq(variables['72_deleted'], 'true')), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4950,7 +5022,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '10-aifactory-dashboards'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_10_aifactory_dashboards'], 'true'), succeeded())
+  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_10_aifactory_dashboards'], 'true'), succeeded(), eq('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4997,7 +5069,9 @@ steps:
      az keyvault network-rule remove --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$(admin_ip_fw)"
 - task: AzureCLI@2
   displayName: '08_az_remove_ips_from_ACR_FW_whitelist'
-  condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
+  # ACR IP whitelist is only added during the infra phase (05d build image), so only
+  # remove it there. In the foundry phase acr_registry_name/acr_added_ips are never set.
+  condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'), ne('${{ parameters.phase }}', 'foundry'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash

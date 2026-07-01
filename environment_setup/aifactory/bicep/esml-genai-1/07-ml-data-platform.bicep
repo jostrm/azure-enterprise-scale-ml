@@ -11,9 +11,13 @@ targetScope = 'subscription'
 // - RBAC and permissions for ML platform, Data Factory, Databricks
 // ================================================================
 
-// ============== AML SKUs ==============
-param mlWorkspaceSkuName string = 'basic'
-param mlWorkspaceSkuTier string = 'basic'
+// ============== AML SKUs (per-environment: Dev vs Stage/Prod; test=Stage). Resolved by env below. ==============
+param skuAzureMLDev string = 'basic'
+param skuAzureMLStageProd string = 'basic'
+param skuTierAzureMLDev string = 'basic'
+param skuTierAzureMLStageProd string = 'basic'
+var mlWorkspaceSkuName = env == 'dev' ? skuAzureMLDev : skuAzureMLStageProd
+var mlWorkspaceSkuTier = env == 'dev' ? skuTierAzureMLDev : skuTierAzureMLStageProd
 // ============== AKS SKUs ==============
 @description('Specifies the SKU name for the AKS cluster')
 @allowed([
@@ -150,17 +154,23 @@ param databricksExists bool = false
 
 // ================= DATARBRICKS PARAMETERS =================
 // NB! The 'standard' SKU is deprecated by Azure (DatabricksStandardSkuNotSupported). Use 'premium' (or 'trial').
-@description('Databricks SKU (trial, premium). The standard SKU is deprecated by Azure.')
+@description('Databricks SKU (trial, premium) for Dev. The standard SKU is deprecated by Azure.')
 @allowed(['trial','premium'])
-param databricksSkuName string = 'premium'
+param skuDatabricksDev string = 'premium'
+@description('Databricks SKU (trial, premium) for Stage/Prod (test=Stage). The standard SKU is deprecated by Azure.')
+@allowed(['trial','premium'])
+param skuDatabricksStageProd string = 'premium'
+var databricksSkuName = env == 'dev' ? skuDatabricksDev : skuDatabricksStageProd
 @description('Use custom VNet (customer-managed) for Databricks instead of managed networking')
 param useDatabricksCustomVNet bool = true
 
 // Networking / AKS settings needed for AML & attached AKS
 param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
-param aks_dev_sku_override string = ''
-param aks_test_prod_sku_override string = ''
+@description('AKS (for Azure ML, GPU) node VM size for Dev. Empty = template default.')
+param skuAksGpuDev string = ''
+@description('AKS (for Azure ML, GPU) node VM size for Stage/Prod (test=Stage). Empty = template default.')
+param skuAksGpuStageProd string = ''
 param aks_version_override string = ''
 param aks_dev_nodes_override int = -1
 param aks_test_prod_nodes_override int = -1
@@ -330,8 +340,8 @@ param ci_devTest_defaults array = [
 var aksDefaultVersion = '1.33.2'
 
 // Resolved compute parameters
-var aks_dev_sku_param = !empty(aks_dev_sku_override) ? aks_dev_sku_override : aks_dev_defaults[0]
-var aks_test_prod_sku_param = !empty(aks_test_prod_sku_override) ? aks_test_prod_sku_override : aks_testProd_defaults[0]
+var aks_dev_sku_param = !empty(skuAksGpuDev) ? skuAksGpuDev : aks_dev_defaults[0]
+var aks_test_prod_sku_param = !empty(skuAksGpuStageProd) ? skuAksGpuStageProd : aks_testProd_defaults[0]
 var aks_version_param = !empty(aks_version_override) ? aks_version_override : aksDefaultVersion
 var aks_dev_nodes_param = aks_dev_nodes_override != -1 ? aks_dev_nodes_override : 1
 var aks_test_prod_nodes_param = aks_test_prod_nodes_override != -1 ? aks_test_prod_nodes_override : 3
