@@ -2478,6 +2478,8 @@ steps:
      --parameters adminPassword="$ADMIN_PASSWORD" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
      --parameters env="$(dev_test_prod)" \
+     --parameters skuStorageAccountDev="$(skuStorageAccountDev)" \
+     --parameters skuStorageAccountStageProd="$(skuStorageAccountStageProd)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
      --parameters technicalAdminsEmail="$(technical_admins_email)" \
@@ -2581,7 +2583,22 @@ steps:
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters enableAIServices="$(enableAIServices)" \
      --parameters enableAISearch="$(enableAISearch)" \
-     --parameters aiSearchSKUName="$(admin_aiSearchTier)" \
+     --parameters skuAISearchDev="$(skuAISearchDev)" \
+     --parameters skuAISearchStageProd="$(skuAISearchStageProd)" \
+     --parameters skuAIServicesDev="$(skuAIServicesDev)" \
+     --parameters skuAIServicesStageProd="$(skuAIServicesStageProd)" \
+     --parameters skuOpenAIDev="$(skuOpenAIDev)" \
+     --parameters skuOpenAIStageProd="$(skuOpenAIStageProd)" \
+     --parameters skuContentSafetyDev="$(skuContentSafetyDev)" \
+     --parameters skuContentSafetyStageProd="$(skuContentSafetyStageProd)" \
+     --parameters skuVisionDev="$(skuVisionDev)" \
+     --parameters skuVisionStageProd="$(skuVisionStageProd)" \
+     --parameters skuSpeechDev="$(skuSpeechDev)" \
+     --parameters skuSpeechStageProd="$(skuSpeechStageProd)" \
+     --parameters skuDocIntelligenceDev="$(skuDocIntelligenceDev)" \
+     --parameters skuDocIntelligenceStageProd="$(skuDocIntelligenceStageProd)" \
+     --parameters skuBingDev="$(skuBingDev)" \
+     --parameters skuBingStageProd="$(skuBingStageProd)" \
      --parameters semanticSearchTier="$(admin_semanticSearchTier)" \
      --parameters enableAzureOpenAI="$(enableAzureOpenAI)" \
      --parameters enableContentSafety="$(enableContentSafety)" \
@@ -2636,6 +2653,18 @@ steps:
      --template-file "esml-genai-1/04-databases.bicep" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
      --parameters env="$(dev_test_prod)" \
+     --parameters skuPostgreSQLDev="$(skuPostgreSQLDev)" \
+     --parameters skuPostgreSQLStageProd="$(skuPostgreSQLStageProd)" \
+     --parameters skuTierPostgreSQLDev="$(skuTierPostgreSQLDev)" \
+     --parameters skuTierPostgreSQLStageProd="$(skuTierPostgreSQLStageProd)" \
+     --parameters skuRedisDev="$(skuRedisDev)" \
+     --parameters skuRedisStageProd="$(skuRedisStageProd)" \
+     --parameters skuSQLDatabaseDev="$(skuSQLDatabaseDev)" \
+     --parameters skuSQLDatabaseStageProd="$(skuSQLDatabaseStageProd)" \
+     --parameters skuTierSQLDatabaseDev="$(skuTierSQLDatabaseDev)" \
+     --parameters skuTierSQLDatabaseStageProd="$(skuTierSQLDatabaseStageProd)" \
+     --parameters skuElasticDev="$(skuElasticDev)" \
+     --parameters skuElasticStageProd="$(skuElasticStageProd)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
      --parameters technicalAdminsEmail="$(technical_admins_email)" \
@@ -2717,6 +2746,19 @@ steps:
      --template-file "esml-genai-1/05-compute-services.bicep" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
      --parameters env="$(dev_test_prod)" \
+     --parameters skuWebAppDev="$(skuWebAppDev)" \
+     --parameters skuWebAppStageProd="$(skuWebAppStageProd)" \
+     --parameters skuTierWebAppDev="$(skuTierWebAppDev)" \
+     --parameters skuTierWebAppStageProd="$(skuTierWebAppStageProd)" \
+     --parameters skuFunctionDev="$(skuFunctionDev)" \
+     --parameters skuFunctionStageProd="$(skuFunctionStageProd)" \
+     --parameters skuTierFunctionDev="$(skuTierFunctionDev)" \
+     --parameters skuTierFunctionStageProd="$(skuTierFunctionStageProd)" \
+     --parameters aksSkuName="$(aksSkuName)" \
+     --parameters skuAksDev="$(skuAksDev)" \
+     --parameters skuAksStageProd="$(skuAksStageProd)" \
+     --parameters skuTierAksDev="$(skuTierAksDev)" \
+     --parameters skuTierAksStageProd="$(skuTierAksStageProd)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
      --parameters technicalAdminsEmail="$(technical_admins_email)" \
@@ -2888,6 +2930,12 @@ steps:
      --template-file "esml-genai-1/07-ml-data-platform.bicep" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
      --parameters env="$(dev_test_prod)" \
+     --parameters skuAzureMLDev="$(skuAzureMLDev)" \
+     --parameters skuAzureMLStageProd="$(skuAzureMLStageProd)" \
+     --parameters skuTierAzureMLDev="$(skuTierAzureMLDev)" \
+     --parameters skuTierAzureMLStageProd="$(skuTierAzureMLStageProd)" \
+     --parameters skuDatabricksDev="$(skuDatabricksDev)" \
+     --parameters skuDatabricksStageProd="$(skuDatabricksStageProd)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters location="$(admin_location)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
@@ -3010,6 +3058,12 @@ steps:
      --template-file "esml-genai-1/11-integration.bicep" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
      --parameters env="$(dev_test_prod)" \
+     --parameters skuLogicAppsDev="$(skuLogicAppsDev)" \
+     --parameters skuLogicAppsStageProd="$(skuLogicAppsStageProd)" \
+     --parameters skuEventHubsDev="$(skuEventHubsDev)" \
+     --parameters skuEventHubsStageProd="$(skuEventHubsStageProd)" \
+     --parameters skuBotServiceDev="$(skuBotServiceDev)" \
+     --parameters skuBotServiceStageProd="$(skuBotServiceStageProd)" \
      --parameters projectNumber="$(project_number_000)" \
      --parameters location="$(admin_location)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
