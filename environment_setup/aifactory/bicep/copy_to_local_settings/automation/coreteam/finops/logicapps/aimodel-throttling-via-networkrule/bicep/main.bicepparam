@@ -26,8 +26,15 @@ param aifactorySuffixRG = ''     // e.g. '-001'
 // OPTION B - No AI Factory: pass the project RG explicitly.
 param targetResourceGroup = 'acme-1-esml-project001-swc-dev-001-rg'
 
-// Management RG hosting the Logic App + Action Group (defaults to targetResourceGroup if empty)
-param throttleResourceGroup = ''
+// TARGET subscription to throttle. Leave empty to use the subscription this deployment runs against.
+param targetSubscriptionId = ''          // e.g. '22222222-2222-2222-2222-222222222222'
+
+// --- Enterprise Scale AI Factory management subscription (hosts the Logic App + Action Group) ---
+// The Logic App + Action Group are core-team governance tooling and often live in a CENTRAL
+// management subscription/RG. In a single-subscription AI Factory (e.g. a demo) the subscription
+// is the same - just use a SEPARATE management resource group. The management RG is NEVER throttled.
+param managementSubscriptionId = ''      // empty -> same subscription as the target (single-sub AI Factory)
+param managementResourceGroup = 'esml-management-tools-rg'   // REQUIRED, must differ from the throttled RG
 
 param location = 'swedencentral'
 param namePrefix = 'esml-throttle-prj001'
@@ -55,6 +62,7 @@ param budgetStartDate = '2026-07-01'     // must be the first of a month
 param enableTokenAlert = false
 param workspaceResourceId = ''
 param workspaceResourceGroup = ''
+param workspaceSubscriptionId = ''       // empty -> management subscription
 param tokenThreshold = 50000000
 
 // --- Extra notifications ---

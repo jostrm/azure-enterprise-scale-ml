@@ -1,0 +1,25 @@
+{
+  "$comment": "PROJECT-level config, reused across ALL reports. Naming = concat seed (GitHub .env / ADO variables.yaml / CmnAIfactoryNaming.bicep). discountAndAdjustments = project-wide pricing assumptions. Report-specific inputs (e.g. model rates) live in each report's own report-config.json.",
+
+  "naming": {
+    "aifactoryPrefix": "gh-",
+    "aifactorySuffix": "-001",
+    "projectPrefix": "esml-",
+    "projectSuffix": "-rg",
+    "projectNumber": "004",
+    "locationShort": "sdc",
+    "env": "dev",
+    "vnetResourceGroupBase": "esml-common"
+  },
+
+  "discountAndAdjustments": {
+    "eaDiscount": 0.29,
+    "cacheRate": 0.35,
+    "ptuHandleSpikes": false,
+    "aiGatewayLoadBalancerExists": true,
+    "workdaysPerMonth": 22
+  },
+
+  "totalUsersWithAccess": 50000,
+  "avgSessionLengthMinutes": 3
+}
