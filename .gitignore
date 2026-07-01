@@ -123,3 +123,4 @@ temp_data/
 debug/
 # Local reference code (not part of the repo)
 aa_ref_code/
+ignore.md
