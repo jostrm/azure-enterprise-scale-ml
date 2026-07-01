@@ -3,6 +3,12 @@ parameters:
     type: string
   - name: serviceConnectionSeeding
     type: string
+  - name: phase
+    type: string
+    default: 'infra'
+    values:
+      - infra
+      - foundry
 
 steps:
 # ---------------------------------------------------------------------------
