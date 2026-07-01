@@ -23,7 +23,7 @@ targetScope = 'subscription'
 @allowed([ 'Subscription', 'ResourceGroup' ])
 param throttleScope string = 'ResourceGroup'
 
-@description('The AI Factory project resource group to throttle & budget. Required when throttleScope=ResourceGroup.')
+@description('The AI Factory project resource group to throttle & budget. Required when throttleScope=ResourceGroup and esmlAifactoryExists=false.')
 param targetResourceGroup string = ''
 
 @description('Resource group that HOSTS the Logic App + Action Group (management RG). Defaults to targetResourceGroup.')
@@ -31,6 +31,32 @@ param throttleResourceGroup string = ''
 
 @description('Azure region for the Logic App and alert rule.')
 param location string = deployment().location
+
+// ------------------------- AI Factory naming (esml-aifactory-exists) -------------------------
+@description('When true, the project/vnet resource-group names are DERIVED from the AI Factory naming convention using the parameters below - no need to pass targetResourceGroup. When false, pass names explicitly.')
+param esmlAifactoryExists bool = false
+
+@description('AI Factory environment (used for naming derivation).')
+@allowed([ 'dev', 'test', 'prod' ])
+param env string = 'dev'
+
+@description('AI Factory: admin_aifactoryPrefixRG (e.g. "acme-1-").')
+param aifactoryPrefixRG string = ''
+
+@description('AI Factory: projectPrefix (often empty).')
+param projectPrefix string = ''
+
+@description('AI Factory: projectSuffix (often empty).')
+param projectSuffix string = ''
+
+@description('AI Factory: project_number_000 (e.g. "001").')
+param projectNumber string = ''
+
+@description('AI Factory: admin_locationSuffix (e.g. "swc", "weu").')
+param locationSuffix string = ''
+
+@description('AI Factory: admin_aifactorySuffixRG (e.g. "-001").')
+param aifactorySuffixRG string = ''
 
 // ------------------------- Naming -------------------------
 @description('Prefix for created resources.')
