@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import unittest
 
-from tests.domain import paas
-from tests.integration.base_live import LiveAzureTestCase
+from domain import paas
+from integration.base_live import LiveAzureTestCase
 
 
 class TestPaasValidation(LiveAzureTestCase):

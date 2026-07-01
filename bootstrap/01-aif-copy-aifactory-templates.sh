@@ -8,7 +8,7 @@ NC='\033[0m' # No Color
 
 ################### VARIABLES ###################
 copy_notebooks=false
-init_esml_util=true
+init_esml_util=false
 ################### VARIABLES ###################
 # 02. Copy template files to the new repository
 echo -e "${YELLOW}02. COPY TEMPLATE files (Azure Devops pipeline, GHA workflow, Bicep Variable file, environment file) to your repo ${NC}"
@@ -63,6 +63,10 @@ cp -r "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/githu
 
 mkdir -p "$aif_dir/esml-infra/github-actions/terraform/"
 cp -r "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"* "$aif_dir/esml-infra/github-actions/terraform/"
+
+## TEMPLATES: automation (core-team runbooks, FinOps showback/token reports, etc.)
+mkdir -p "$aif_dir/automation/"
+cp -r "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/automation/." "$aif_dir/automation/"
 
 ## Azure Dashboards
 mkdir -p "$aif_dir/esml-infra/azure_dashboards/"

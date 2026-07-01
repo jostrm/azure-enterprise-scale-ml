@@ -6,7 +6,7 @@ checks; safe to run repeatedly against a live deployment.
 """
 from __future__ import annotations
 
-from ..base import cli, naming
+from base import cli, naming
 
 
 def acr_reachable(registry: str) -> bool:

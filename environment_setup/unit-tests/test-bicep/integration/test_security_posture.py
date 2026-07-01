@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import unittest
 
-from tests.domain import governance
-from tests.integration.base_live import LiveAzureTestCase
+from domain import governance
+from integration.base_live import LiveAzureTestCase
 
 
 class TestSecurityPosture(LiveAzureTestCase):

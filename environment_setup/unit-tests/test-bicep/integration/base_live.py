@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import unittest
 
-from tests.app.lifecycle import live_enabled
-from tests.base import cli
+from app.lifecycle import live_enabled
+from base import cli
 
 
 class LiveAzureTestCase(unittest.TestCase):

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from tests.domain.scenarios import (
+from domain.scenarios import (
     SERVICE_FLAGS,
     ByoMode,
     NetworkMode,

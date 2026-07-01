@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import unittest
 
-from tests.domain.scenarios import all_enabled
-from tests.integration.base_live import LiveAzureTestCase
+from domain.scenarios import all_enabled
+from integration.base_live import LiveAzureTestCase
 
 
 class TestProjectAllEnabled(LiveAzureTestCase):

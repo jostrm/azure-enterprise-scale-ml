@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..base import cli
-from ..domain.scenarios import Scenario
+from base import cli
+from domain.scenarios import Scenario
 
 
 @dataclass

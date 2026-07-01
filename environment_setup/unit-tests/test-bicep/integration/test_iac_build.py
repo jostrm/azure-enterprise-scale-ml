@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import unittest
 
-from tests.domain import iac
-from tests.integration.base_live import LiveAzureTestCase
+from domain import iac
+from integration.base_live import LiveAzureTestCase
 
 
 class TestIacBuild(LiveAzureTestCase):
