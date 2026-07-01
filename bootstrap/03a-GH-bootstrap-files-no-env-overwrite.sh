@@ -36,3 +36,7 @@ mkdir -p "$SCRIPT_DIR/aifactory/automation/"
 cp -r "$SCRIPT_DIR/aifactory-templates/automation/." "$SCRIPT_DIR/aifactory/automation/"
 
 echo -e "${GREEN}Success! ${NC}"
+
+echo -e "${YELLOW}Prompt to use with Github copilot to compare .env with .env.template and update it:${NC}"
+echo ""
+echo "Compare the .env file at root, with the newer .env.template. Copy all values from .env into the new template .env.template. If some variables are similar but not excat, try to map these simce they may be renamed. There may possible be more variables in .env.template. After this , then rename .env to .env.bak and env.template to .env"
