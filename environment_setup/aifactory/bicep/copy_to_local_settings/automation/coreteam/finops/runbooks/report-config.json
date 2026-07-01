@@ -14,8 +14,8 @@
   },
 
   "discountAndAdjustments": {
-    "eaDiscount": 0.29,
-    "cacheRate": 0.35,
+    "eaDiscount": 0.05,
+    "cacheRate": 0.15,
     "ptuHandleSpikes": false,
     "aiGatewayLoadBalancerExists": true,
     "workdaysPerMonth": 22
@@ -34,6 +34,6 @@
     }
   ],
 
-  "totalUsersWithAccess": 50000,
+  "totalUsersWithAccess": 10000,
   "avgSessionLengthMinutes": 3
 }
