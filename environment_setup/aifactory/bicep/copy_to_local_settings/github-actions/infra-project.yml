@@ -177,6 +177,7 @@ jobs:
       aseSkuCode: ${{ vars.ASE_SKU_CODE || 'I1v2' }}
       aseSkuWorkers: ${{ vars.ASE_SKU_WORKERS || '1' }}
       enableLogicApps: ${{ vars.ENABLE_LOGIC_APPS || 'false' }}
+      logicAppType: ${{ vars.LOGIC_APP_TYPE || 'Standard' }}
       enableEventHubs: ${{ vars.ENABLE_EVENT_HUBS || 'false' }}
       enableBotService: ${{ vars.ENABLE_BOT_SERVICE || 'true' }}
       enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
@@ -2455,6 +2456,12 @@ jobs:
           azcliversion: latest
           inlineScript: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+            # Guard: Logic Apps 'Consumption' is multi-tenant and has NO private endpoint / VNet integration support.
+            # Fail fast instead of silently deploying a public Logic App when private networking is intended.
+            if [ "${{ env.enableLogicApps }}" = "true" ] && [ "${{ env.logicAppType }}" = "Consumption" ] && [ "${{ env.enablePublicAccessWithPerimeter }}" != "true" ]; then
+              echo "::error::Logic Apps 'Consumption' cannot be deployed in private networking mode (ENABLE_PUBLIC_ACCESS_WITH_PERIMETER=false). Consumption has no private endpoints / VNet integration. Set LOGIC_APP_TYPE='Standard' for private networking, or set ENABLE_PUBLIC_ACCESS_WITH_PERIMETER='true'."
+              exit 1
+            fi
             az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-68-integration" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
@@ -2503,6 +2510,7 @@ jobs:
               --parameters enableBotService="${{ env.enableBotService }}" \
               --parameters addAIFoundry="${{ env.addAIFoundry }}" \
               --parameters botServiceExists="${{ env.botServiceExists }}" \
+              --parameters logiAppType="${{ env.logicAppType }}" \
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}"
 
       - name: 99_check_acr_role_assignments
