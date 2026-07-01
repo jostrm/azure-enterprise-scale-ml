@@ -285,7 +285,7 @@ output uniqueInAIFenv string = uniqueInAIFenv
 output randomSalt string = randomSalt
 output projectTypeESMLName string = 'esml'
 output projectTypeGenAIName string = 'genai'
-output aksClusterName string = 'esml${projectNumber}-${locationSuffix}-${env}'
+output aksClusterName string = 'aks${projectNumber}-${locationSuffix}-${env}'
 output dataFactoryName string = adfName
 
 // Complete naming convention output with type safety
@@ -368,6 +368,6 @@ output namingConvention aifactoryNamingType = {
   randomSalt: randomSalt
   projectTypeESMLName: 'esml'
   projectTypeGenAIName: 'genai'
-  aksClusterName: 'esml${projectNumber}-${locationSuffix}-${env}'
+  aksClusterName: 'aks${projectNumber}-${locationSuffix}-${env}'
   dataFactoryName: adfName
 }
