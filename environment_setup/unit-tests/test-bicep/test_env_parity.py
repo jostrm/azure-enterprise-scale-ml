@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[5]
+ROOT = Path(__file__).resolve().parents[3]
 YAML_PATH = ROOT / (
     "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/"
     "esml-yaml-pipelines/variables/variables.yaml"

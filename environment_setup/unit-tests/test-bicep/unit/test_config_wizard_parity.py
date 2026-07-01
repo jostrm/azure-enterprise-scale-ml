@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import unittest
 
-from tests.base.config import env_defaults, yaml_defaults
-from tests.domain.scenarios import NETWORK_FLAGS, SERVICE_FLAGS
+from base.config import env_defaults, yaml_defaults
+from domain.scenarios import NETWORK_FLAGS, SERVICE_FLAGS
 
 
 def _yaml_keys_ci(yaml: dict[str, str]) -> set[str]:

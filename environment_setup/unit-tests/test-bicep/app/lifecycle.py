@@ -8,8 +8,8 @@ from __future__ import annotations
 import os
 from contextlib import contextmanager
 
-from ..domain import factory, project
-from ..domain.scenarios import Scenario
+from domain import factory, project
+from domain.scenarios import Scenario
 
 
 def live_enabled() -> bool:

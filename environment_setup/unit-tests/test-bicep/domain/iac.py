@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..base import cli, config
+from base import cli, config
 
 
 def bicep_templates(directory: Path) -> list[Path]:

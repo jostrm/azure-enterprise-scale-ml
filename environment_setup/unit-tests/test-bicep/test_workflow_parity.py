@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[5]
+ROOT = Path(__file__).resolve().parents[3]
 GHA_COMMON = ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-common.yml"
 GHA_PROJECT = ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project.yml"
 

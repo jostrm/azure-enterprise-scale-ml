@@ -19,7 +19,7 @@ tests/
 ## Run
 
 ```bash
-cd environment_setup/aifactory/bicep/copy_to_local_settings/tests
+cd environment_setup/unit-tests/test-bicep
 python -m pytest unit -q            # offline unit tests
 LIVE_AZURE=1 az login && python -m pytest integration -q   # live (opt-in)
 ```

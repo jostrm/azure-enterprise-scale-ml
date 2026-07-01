@@ -10,7 +10,7 @@ tests can assert least-privilege RBAC and Defender propagation.
 """
 from __future__ import annotations
 
-from ..base import cli, config
+from base import cli, config
 
 # Vars that must always be present and non-empty in the GitHub .env.template.
 MANDATORY_VARS: tuple[str, ...] = (

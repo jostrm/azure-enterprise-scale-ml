@@ -4,8 +4,8 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
-from tests.domain import governance
-from tests.domain.scenarios import all_disabled, matrix
+from domain import governance
+from domain.scenarios import all_disabled, matrix
 
 
 class TestSecurityPostureMocked(unittest.TestCase):
@@ -21,14 +21,14 @@ class TestSecurityPostureMocked(unittest.TestCase):
         self.assertEqual(0, governance.public_endpoint_count(all_disabled().env_overrides()))
 
     @mock.patch(
-        "tests.domain.governance.cli.az_json",
+        "domain.governance.cli.az_json",
         return_value={"properties": {"disableLocalAuth": True}},
     )
     def test_key_auth_disabled_true(self, _json) -> None:
         self.assertTrue(governance.key_auth_disabled("foundry1"))
 
     @mock.patch(
-        "tests.domain.governance.cli.az_json",
+        "domain.governance.cli.az_json",
         return_value={"properties": {"disableLocalAuth": False}},
     )
     def test_key_auth_disabled_false(self, _json) -> None:

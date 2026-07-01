@@ -10,10 +10,9 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-# tests/base/config.py -> .../copy_to_local_settings/tests/base
-# parents: 0=base 1=tests 2=copy_to_local_settings 3=bicep 4=aifactory
-#          5=environment_setup 6=<repo root>
-REPO_ROOT = Path(__file__).resolve().parents[6]
+# test-bicep/base/config.py -> .../unit-tests/test-bicep/base
+# parents: 0=base 1=test-bicep 2=unit-tests 3=environment_setup 4=<repo root>
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 CLS = REPO_ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings"
 

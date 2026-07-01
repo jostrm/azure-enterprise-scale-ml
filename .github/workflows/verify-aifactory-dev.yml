@@ -3,10 +3,12 @@ on:
   push:
     paths:
       - "environment_setup/aifactory/bicep/copy_to_local_settings/**"
+      - "environment_setup/unit-tests/**"
       - ".github/workflows/verify-aifactory-dev.yml"
   pull_request:
     paths:
       - "environment_setup/aifactory/bicep/copy_to_local_settings/**"
+      - "environment_setup/unit-tests/**"
       - ".github/workflows/verify-aifactory-dev.yml"
   workflow_dispatch:
 env:
@@ -26,7 +28,7 @@ env:
   project_number_000: '001' #ESML Projectnumber, three digits: 001
   user_emails_comma_separated_list: "" # Comma-separated, email(s) of new user(s) to grant admin permissions"
 jobs:
-  verify-unit-tests:
+  run-iac-unit-tests:
     name: Run AI Factory IaC unit tests (env/workflow parity, scenarios)
     runs-on: ubuntu-latest
     steps:
@@ -35,21 +37,8 @@ jobs:
         with:
           python-version: "3.x"
       - name: "Run unit tests"
-        working-directory: environment_setup/aifactory/bicep/copy_to_local_settings
-        run: python -m unittest discover -s tests -p "test_*.py" -v
-  verify-infra:
-    env: 
-      admin_storage_account: "adminstoracc123" # ESML AIFactory common datalake (storage account) name
-      dev_test_prod: "dev" # ESML AIFactory environment: [dev,test,prod]
-      dev_test_prod_sub_id: "a1234567-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # Subscription ID of the deployed resources for the environment
-    name: Verifies provisioning in DEV of an AI Factory common, and 2 project types ESML, ESGENAI
-    environment:
-      name: DEV
-    runs-on: ubuntu-latest
-    steps:
-      - name: "Verify environment"
-        run: echo "Running on ${{ env.dev_test_prod }} environment"
-      - run: bicep --version
+        working-directory: environment_setup/unit-tests
+        run: python -m unittest discover -s test-bicep -p "test_*.py" -v
   verify-dataops-template:
     name: Verifies DATAOPS template in DEV for DataOps, ingestion from sources to ESML datalake
     environment:

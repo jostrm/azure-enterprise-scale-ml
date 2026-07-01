@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import unittest
 
-from tests.base import config
-from tests.domain import governance
+from base import config
+from domain import governance
 
 
 class TestConfigIntegrity(unittest.TestCase):
