@@ -49,3 +49,7 @@ cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy
 # Automation (core-team runbooks, FinOps showback/token reports) -> aifactory/automation
 mkdir -p "$SCRIPT_DIR/aifactory/automation/"
 cp -r "$SCRIPT_DIR/aifactory-templates/automation/." "$SCRIPT_DIR/aifactory/automation/"
+
+echo -e "${YELLOW}Prompt to use with Github copilot to compare variables.yaml and update it:${NC}"
+echo ""
+echo "Compare the variables.yaml under my folder aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml with the newer variables-template.yaml in same folder. Copy all values from variables.yaml into the new template variables-template.yaml. If some variables are similar but not excat, try to map these simce they may be renamed. There may possible be more variables in variables-template.yaml. After this then rename variables.yaml to variables.bak and variables-template.yaml to variables.yaml"
