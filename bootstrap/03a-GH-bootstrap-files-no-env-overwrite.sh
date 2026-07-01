@@ -31,12 +31,8 @@ cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy
 cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project.yml" "$SCRIPT_DIR/aifactory/esml-infra/github-actions/bicep/infra-project.yml"
 cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project.yml" "$SCRIPT_DIR/.github/workflows/infra-project.yml"
 
-# YAML - infra-add-project-member.yml -> aifactory + .gihub/workflows
-#cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-add-project-member.yml" "$SCRIPT_DIR/aifactory/esml-infra/github-actions/bicep/infra-add-project-member.yml"
-#cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-add-project-member.yml" "$SCRIPT_DIR/.github/workflows/infra-add-project-member.yml"
-
-# YAML - infra-add-core-member.yml -> aifactory + .gihub/workflows
-#cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-add-core-member.yml" "$SCRIPT_DIR/aifactory/esml-infra/github-actions/bicep/infra-add-core-member.yml"
-#cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-add-core-member.yml" "$SCRIPT_DIR/.github/workflows/infra-add-core-member.yml"
+# Automation (core-team runbooks, FinOps showback/token reports) -> aifactory/automation
+mkdir -p "$SCRIPT_DIR/aifactory/automation/"
+cp -r "$SCRIPT_DIR/aifactory-templates/automation/." "$SCRIPT_DIR/aifactory/automation/"
 
 echo -e "${GREEN}Success! ${NC}"
