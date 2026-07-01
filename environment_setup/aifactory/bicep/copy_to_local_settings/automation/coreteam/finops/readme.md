@@ -157,3 +157,141 @@ Not everything is covered yet; this is the direction of travel.
 > The goal is not simply saving money, but **maximizing the business value** of the AI Factory's
 > AI investments — visibility and guardrails first, then allocation, forecasting and optimization,
 > and finally accountability and ROI.
+
+
+# AI FACTORY BASELINE INFO - HOW to get Resource names
+## Whenever you need to add a variables in variables.yaml or .env
+If .env is updated, then also this script needs to be updated: environment_setup\aifactory\bicep\copy_to_local_settings\github-actions\03a-GH-create-or-update-github-variables.sh
+
+The same does not apply for Azure devops, where only variables.yaml needs updated: environment_setup\aifactory\bicep\copy_to_local_settings\azure-devops\esml-yaml-pipelines\variables\variables.yaml
+## Naming convention - how do you retrieve the names of Azure resources in the AI Factory? 
+
+You may see this in various places
+- bicep: environment_setup\aifactory\bicep\modules\common\CmnAIfactoryNaming.bicep
+- other powershell or bash scripts, tested and verified, such as: 
+    - environment_setup\aifactory\bicep\scripts\delete-subnets-for-projects.sh
+    - environment_setup\aifactory\bicep\scripts\delete-caphost-and-foundry-and-its-subnet.sh
+    - environment_setup\aifactory\bicep\scripts\delete-services-if-disabled.sh
+- Azure devops pipeine
+    - variables.yaml environment_setup\aifactory\bicep\copy_to_local_settings\azure-devops\esml-yaml-pipelines\variables\variables.yaml
+    - environment_setup\aifactory\bicep\copy_to_local_settings\azure-devops\esml-yaml-pipelines\esml-infra-project\jobs\job-2-genai-services.yaml
+    - environment_setup\aifactory\bicep\copy_to_local_settings\azure-devops\esml-yaml-pipelines\esml-infra-project\jobs\job-1-genai-networking.yaml
+    - environment_setup\aifactory\bicep\copy_to_local_settings\azure-devops\esml-yaml-pipelines\esml-infra-common\jobs\job-1-aif-cmn.yaml
+
+Easiest way may be to look at the code in the Azure devops pipelines, since all conditional things is concidered, suchas  BYO_subnets. BYO_Vnets
+See the following sections: How to find names of resources in the AI Factory,  Common resource group and vNetResource group, Project specific resource group
+
+
+### How to find names of resources in the AI Factory
+
+It depends if user uses Azure Devops or Github
+
+If Azure devops, then the Variables.yaml should be used. It is located under their "aifactory" folder at this location with real values: aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml
+- But hte template you can always use to know what variables exists. This is located here: environment_setup\aifactory\bicep\copy_to_local_settings\azure-devops\esml-yaml-pipelines\variables\variables.yaml
+
+If Github, then the .env file at root should be looked at, a template exists here: environment_setup\aifactory\bicep\copy_to_local_settings\github-actions\.env.template  which you can use to see "which variables", but not the real values.  The real values should be read from root where the .env file is 
+
+#### Common resource group and vNetResource group
+
+See in the YAML how this is concatenated from variables.yaml at task `00_resolve_network_env_placeholders`
+
+ BYO="$(BYO_subnets)"
+      if [ "$BYO" = "true" ]; then
+        NETWORK_ENV="$(network_env)"
+        echo "BYO_subnets=true: using network_env=$NETWORK_ENV and provided subnet names"
+      else
+        NETWORK_ENV=""
+        echo "BYO_subnets=false: network_env forced to empty; Bicep/PS1 will use naming convention"
+        echo "##vso[task.setvariable variable=network_env]"
+        echo "##vso[task.setvariable variable=subnetCommon]"
+        echo "##vso[task.setvariable variable=subnetCommonScoring]"
+        echo "##vso[task.setvariable variable=subnetCommonPowerbiGw]"
+        echo "##vso[task.setvariable variable=subnetProjGenAI]"
+        echo "##vso[task.setvariable variable=subnetProjAKS]"
+        echo "##vso[task.setvariable variable=subnetProjAKS2]"
+        echo "##vso[task.setvariable variable=subnetProjACA]"
+        echo "##vso[task.setvariable variable=subnetProjACA2]"
+        echo "##vso[task.setvariable variable=subnetProjDatabricksPublic]"
+        echo "##vso[task.setvariable variable=subnetProjDatabricksPrivate]"
+      fi
+
+      VNET_RG="$(vnetResourceGroup_param)"
+      VNET_NAME="$(vnetNameFull_param)"
+
+      echo "Original vnetResourceGroup_param: $VNET_RG"
+      echo "Original vnetNameFull_param: $VNET_NAME"
+      echo "network_env value: $NETWORK_ENV"
+
+      # Replace <network_env> placeholder in VNET_RG if it exists
+      if [[ "$VNET_RG" == *"<network_env>"* ]]; then
+        echo "Found <network_env> placeholder in vnetResourceGroup_param"
+        VNET_RG="${VNET_RG//<network_env>/$NETWORK_ENV}"
+        echo "Replaced with network_env value: $NETWORK_ENV"
+      fi
+
+      # Replace <network_env> placeholder in VNET_NAME if it exists
+      if [[ "$VNET_NAME" == *"<network_env>"* ]]; then
+        echo "Found <network_env> placeholder in vnetNameFull_param"
+        VNET_NAME="${VNET_NAME//<network_env>/$NETWORK_ENV}"
+        echo "Replaced with network_env value: $NETWORK_ENV"
+      fi
+
+      # If VNET variables are not set (empty or unexpanded), use naming convention
+      if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_param\)* ]]; then
+        VNET_NAME="$(vnetNameBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)"
+        echo "VNET name not set, using naming convention: $VNET_NAME"
+      else
+        echo "Using provided VNET name: $VNET_NAME"
+      fi
+
+      if [ -z "$VNET_RG" ] || [[ "$VNET_RG" == \$\(vnetResourceGroup_param\)* ]]; then
+        VNET_RG="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+        echo "VNET resource group not set, using naming convention: $VNET_RG"
+      else
+        echo "Using provided VNET resource group: $VNET_RG"
+      fi
+
+      # Set resolved values as pipeline variables for reuse
+      echo "##vso[task.setvariable variable=vnetResourceGroup_resolved]$VNET_RG"
+      echo "##vso[task.setvariable variable=vnetNameFull_resolved]$VNET_NAME"
+
+      echo "Resolved vnetResourceGroup: $VNET_RG"
+      echo "Resolved vnetNameFull: $VNET_NAME"
+      echo "Variables set: vnetResourceGroup_resolved, vnetNameFull_resolved, network_env=$NETWORK_ENV"
+
+#### Project specific resource group
+
+See in the YAML how this is concatenated from variables.yaml at task `05b_Check if resource exists`
+
+      # Input parameters
+      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
+      projectNumber="$(project_number_000)"
+      projectName="prj${projectNumber}"
+      locationSuffix="$(admin_locationSuffix)"
+      envName="$(dev_test_prod)"
+      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
+      # uniqueInAIFenv="$(aifactory_salt)" # not used in this script. fuzzy match is used instead.
+      resourceSuffix="$(admin_prjResourceSuffix)"
+      prjResourceSuffixNoDash="${resourceSuffix#-}"
+      twoNumbers="${resourceSuffix:2:2}"
+      
+      # Set project prefix and suffix from pipeline variables
+      projectPrefix="$(projectPrefix)"
+      projectSuffix="$(projectSuffix)"
+
+      # Construct resource group name
+      projectNameReplaced="${projectName/prj/project}"
+      targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
+
+      # Debug resource group construction
+      echo "=== RESOURCE GROUP CONSTRUCTION DEBUG ==="
+      echo "commonRGNamePrefix: '$commonRGNamePrefix'"
+      echo "projectPrefix: '$projectPrefix'"
+      echo "projectNameReplaced: '$projectNameReplaced'"
+      echo "locationSuffix: '$locationSuffix'"
+      echo "envName: '$envName'"
+      echo "aifactorySuffixRG: '$aifactorySuffixRG'"
+      echo "projectSuffix: '$projectSuffix'"
+      echo "Final targetResourceGroup: '$targetResourceGroup'"
+
+
