@@ -2182,7 +2182,6 @@ jobs:
               --parameters elasticLastName="${{ env.elasticLastName }}" \
               --parameters elasticCompanyName="${{ env.elasticCompanyName }}" \
               --parameters elasticDeploymentSize="${{ env.elasticDeploymentSize }}" \
-              --parameters elasticSku="${{ env.elasticSku }}" \
               --parameters skuPostgreSQLDev="${{ vars.SKU_POSTGRESQL_DEV || 'Standard_B1ms' }}" \
               --parameters skuPostgreSQLStageProd="${{ vars.SKU_POSTGRESQL_STAGEPROD || 'Standard_B1ms' }}" \
               --parameters skuTierPostgreSQLDev="${{ vars.SKU_TIER_POSTGRESQL_DEV || 'Burstable' }}" \
