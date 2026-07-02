@@ -1021,19 +1021,32 @@ steps:
       # preflight with 'NodeResourceGroupAlreadyExists' when that node RG is left behind by a prior
       # failed/partial deployment (cluster rolled back, node RG orphaned) or is still held by a cluster in a
       # non-Succeeded state. Reconcile here so this stage is safely re-runnable (idempotent):
-      #   * Succeeded cluster bound to the node RG -> aksExists=true (deployment references it, skips create -> no collision)
+      #   * Succeeded cluster bound to the node RG, SAME node SKU as desired -> aksExists=true (skip create -> no collision)
+      #   * Succeeded cluster bound but DIFFERENT node SKU (skuAksDev/skuAksStageProd drift) -> delete it + node RG
+      #     (agentPoolProfile.vmSize cannot change in place before api 2026-01-02-preview -> PropertyChangeNotAllowed)
+      #     -> aksExists=false (clean recreate on the new SKU)
       #   * Non-Succeeded cluster (Failed/Canceled/partial) -> delete it (frees node RG) -> aksExists=false (clean recreate)
       #   * Orphaned node RG, no cluster bound -> delete node RG -> aksExists=false (clean recreate)
       aksDetected=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerService/managedClusters" "$aksName" "$envName")
       if [ "$(enableAKS)" = "true" ]; then
         aksNodeRG="aks-${targetResourceGroup}"
+        # Desired node SKU for this environment (empty = fall back to bicep template default, so we do NOT force drift).
+        if [ "$envName" = "dev" ]; then aksDesiredVmSize="$(skuAksDev)"; else aksDesiredVmSize="$(skuAksStageProd)"; fi
         boundClusterId=$(az aks list --subscription "$(dev_test_prod_sub_id)" --query "[?nodeResourceGroup=='$aksNodeRG'].id | [0]" -o tsv 2>/dev/null)
         if [ -n "$boundClusterId" ]; then
           aksState=$(az aks show --ids "$boundClusterId" --query "provisioningState" -o tsv 2>/dev/null)
-          echo "AKS: node RG '$aksNodeRG' is bound to cluster '$boundClusterId' (provisioningState=$aksState)"
-          if [ "$aksState" = "Succeeded" ]; then
-            echo "AKS: healthy cluster present -> forcing aksExists=true (deployment updates in place, no create/collision)."
+          aksCurrentVmSize=$(az aks show --ids "$boundClusterId" --query "agentPoolProfiles[0].vmSize" -o tsv 2>/dev/null)
+          echo "AKS: node RG '$aksNodeRG' is bound to cluster '$boundClusterId' (provisioningState=$aksState, vmSize=$aksCurrentVmSize, desired=${aksDesiredVmSize:-<template-default>})"
+          if [ "$aksState" = "Succeeded" ] && { [ -z "$aksDesiredVmSize" ] || [ "$aksDesiredVmSize" = "$aksCurrentVmSize" ]; }; then
+            echo "AKS: healthy cluster present with matching node SKU -> forcing aksExists=true (skip create, no collision, no drift)."
             aksDetected="true"
+          elif [ "$aksState" = "Succeeded" ]; then
+            echo "AKS: node SKU DRIFT (current='$aksCurrentVmSize' desired='$aksDesiredVmSize'). agentPoolProfile.vmSize cannot change in place -> deleting cluster + node RG to recreate on the new SKU..."
+            az aks delete --ids "$boundClusterId" --yes 2>/dev/null || echo "AKS WARNING: 'az aks delete' failed for $boundClusterId"
+            if az group show --name "$aksNodeRG" --subscription "$(dev_test_prod_sub_id)" >/dev/null 2>&1; then
+              az group delete --name "$aksNodeRG" --subscription "$(dev_test_prod_sub_id)" --yes 2>/dev/null || echo "AKS WARNING: failed to delete node RG '$aksNodeRG'"
+            fi
+            aksDetected="false"
           else
             echo "AKS: cluster is NOT successful (state=$aksState) -> deleting it and its node RG for a clean redeploy..."
             az aks delete --ids "$boundClusterId" --yes 2>/dev/null || echo "AKS WARNING: 'az aks delete' failed for $boundClusterId"
