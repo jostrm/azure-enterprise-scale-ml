@@ -248,7 +248,7 @@ variables:
   skuTierAksDev: "Standard" # <optional>AKS SKU tier Dev<default>Standard ['Free','Standard','Premium']
   skuTierAksStageProd: "Standard" # <optional>AKS SKU tier Stage/Prod<default>Standard ['Free','Standard','Premium']
   # Node VM size. Leave empty to use template default (dev: Standard_B4ms, test/prod: Standard_DS13-2_v2).
-  skuAksDev: "" # <optional>AKS dev node VM size<default>""<keep-as-is> empty=template default Standard_B4ms.
+  skuAksDev: "Standard_D4s_v5" # <optional>AKS dev node VM size<default>""<keep-as-is> empty=template default Standard_B4ms.
   skuAksStageProd: "" # <optional>AKS test/prod node VM size<default>""<keep-as-is> empty=template default Standard_DS13-2_v2.
   aksEnablePrivateCluster: "true" # <optional>Enable private AKS cluster<default>true<recommended> <otherwise> false for public access.
   # === AKS Network Configuration (applies to both standalone and Azure ML AKS) ===
