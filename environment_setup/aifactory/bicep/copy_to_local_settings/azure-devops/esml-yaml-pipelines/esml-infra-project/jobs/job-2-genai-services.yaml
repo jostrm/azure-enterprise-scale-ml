@@ -2708,7 +2708,6 @@ steps:
      --parameters elasticLastName="$(elasticLastName)" \
      --parameters elasticCompanyName="$(elasticCompanyName)" \
      --parameters elasticDeploymentSize="$(elasticDeploymentSize)" \
-     --parameters elasticSku="$(elasticSku)" \
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
@@ -2958,8 +2957,8 @@ steps:
      --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
-     --parameters aks_dev_sku_override="$(admin_aks_gpu_sku_dev_override)" \
-     --parameters aks_test_prod_sku_override="$(admin_aks_gpu_sku_test_prod_override)" \
+     --parameters skuAksGpuDev="$(admin_aks_gpu_sku_dev_override)" \
+     --parameters skuAksGpuStageProd="$(admin_aks_gpu_sku_test_prod_override)" \
      --parameters aks_version_override="$(admin_aks_version_override)" \
      --parameters aks_dev_nodes_override="$(admin_aks_nodes_dev_override)" \
      --parameters aks_test_prod_nodes_override="$(admin_aks_nodes_testProd_override)" \
@@ -3105,7 +3104,6 @@ steps:
      --parameters enableBotService="$(enableBotService)" \
      --parameters addAIFoundry="$(addAIFoundry)" \
      --parameters botServiceExists="$(botServiceExists)" \
-     --parameters botServiceSku="S1" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
