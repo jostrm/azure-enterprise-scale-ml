@@ -2821,8 +2821,6 @@ steps:
      --parameters addAISearch="$(addAISearch)" \
      --parameters enableAKS="$(enableAKS)" \
      --parameters aksExists="$(aksExists)" \
-     --parameters aksSkuName="$(aksSkuName)" \
-     --parameters aksSkuTier="$(aksSkuTier)" \
      --parameters aksEnablePrivateCluster="$(aksEnablePrivateCluster)" \
      --parameters aksOutboundType="$(aksOutboundType)" \
      --parameters aksPrivateDNSZone="$(aksPrivateDNSZone)"

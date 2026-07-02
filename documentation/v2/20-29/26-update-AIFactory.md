@@ -80,7 +80,7 @@ The below files will be updated via `bash` scripts:
 
 `Compare the variables.yaml under my folder aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml with the newer variables-template.yaml in same folder. Copy all values from variables.yaml into the new template variables-template.yaml. If some variables are similar but not excat, try to map these simce they may be renamed. There may possible be more variables in variables-template.yaml. After this then rename variables.yaml to variables.bak and variables-template.yaml to variables.yaml`
 
-**Traditioanl compare tool**
+**Traditional compare tool**
 
     - Compare the file with a file comparing tool such as VS Code, or Git, to see if any new variables have been added, that you need to set, then set them. 
 
@@ -139,7 +139,7 @@ You may use VS Code and just "Pull" the submodule `azure-enterprise-scale-ml`, o
 
 `Compare the .env file at root, with the newer .env.template. Copy all values from .env into the new template .env.template. If some variables are similar but not excat, try to map these simce they may be renamed. There may possible be more variables in .env.template. After this , then rename .env to .env.bak and env.template to .env`
 
-**Traditioanl compare tool**
+**Traditional compare tool**
 
 Compare the file, to see if any new environment variables have been added, that you need to set, then set them
 
