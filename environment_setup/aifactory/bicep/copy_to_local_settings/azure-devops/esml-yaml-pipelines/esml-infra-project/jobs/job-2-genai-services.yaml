@@ -1015,7 +1015,42 @@ steps:
       echo "##vso[task.setvariable variable=eventHubsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.EventHub/namespaces" "$eventHubsName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=dataFactoryExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DataFactory/factories" "$dataFactoryName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=botServiceExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.BotService/botServices" "$botServiceName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=aksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerService/managedClusters" "$aksName" "$envName")"
+      # --- AKS existence + idempotent node-RG reconciliation (fixes NodeResourceGroupAlreadyExists) ---
+      # The AKS node resource group name is DETERMINISTIC: aks-<projectRG> (see 05-compute-services.bicep
+      # var aksNodeResourceGroupName). The bicep only CREATES AKS when aksExists=false. An AKS create fails
+      # preflight with 'NodeResourceGroupAlreadyExists' when that node RG is left behind by a prior
+      # failed/partial deployment (cluster rolled back, node RG orphaned) or is still held by a cluster in a
+      # non-Succeeded state. Reconcile here so this stage is safely re-runnable (idempotent):
+      #   * Succeeded cluster bound to the node RG -> aksExists=true (deployment references it, skips create -> no collision)
+      #   * Non-Succeeded cluster (Failed/Canceled/partial) -> delete it (frees node RG) -> aksExists=false (clean recreate)
+      #   * Orphaned node RG, no cluster bound -> delete node RG -> aksExists=false (clean recreate)
+      aksDetected=$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerService/managedClusters" "$aksName" "$envName")
+      if [ "$(enableAKS)" = "true" ]; then
+        aksNodeRG="aks-${targetResourceGroup}"
+        boundClusterId=$(az aks list --subscription "$(dev_test_prod_sub_id)" --query "[?nodeResourceGroup=='$aksNodeRG'].id | [0]" -o tsv 2>/dev/null)
+        if [ -n "$boundClusterId" ]; then
+          aksState=$(az aks show --ids "$boundClusterId" --query "provisioningState" -o tsv 2>/dev/null)
+          echo "AKS: node RG '$aksNodeRG' is bound to cluster '$boundClusterId' (provisioningState=$aksState)"
+          if [ "$aksState" = "Succeeded" ]; then
+            echo "AKS: healthy cluster present -> forcing aksExists=true (deployment updates in place, no create/collision)."
+            aksDetected="true"
+          else
+            echo "AKS: cluster is NOT successful (state=$aksState) -> deleting it and its node RG for a clean redeploy..."
+            az aks delete --ids "$boundClusterId" --yes 2>/dev/null || echo "AKS WARNING: 'az aks delete' failed for $boundClusterId"
+            if az group show --name "$aksNodeRG" --subscription "$(dev_test_prod_sub_id)" >/dev/null 2>&1; then
+              az group delete --name "$aksNodeRG" --subscription "$(dev_test_prod_sub_id)" --yes 2>/dev/null || echo "AKS WARNING: failed to delete node RG '$aksNodeRG'"
+            fi
+            aksDetected="false"
+          fi
+        elif az group show --name "$aksNodeRG" --subscription "$(dev_test_prod_sub_id)" >/dev/null 2>&1; then
+          echo "AKS: found ORPHANED node resource group '$aksNodeRG' (no cluster bound) -> deleting so create can succeed..."
+          az group delete --name "$aksNodeRG" --subscription "$(dev_test_prod_sub_id)" --yes 2>/dev/null || echo "AKS WARNING: failed to delete orphaned node RG '$aksNodeRG'"
+          aksDetected="false"
+        else
+          echo "AKS: no cluster and no node resource group '$aksNodeRG' found (clean state)."
+        fi
+      fi
+      echo "##vso[task.setvariable variable=aksExists]$aksDetected"
       echo "##vso[task.setvariable variable=amlExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$amlName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=openaiExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.CognitiveServices/accounts" "$openaiName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=aiSearchExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Search/searchServices" "$safeNameAISearch" "$suffixStandardNoDash")"
