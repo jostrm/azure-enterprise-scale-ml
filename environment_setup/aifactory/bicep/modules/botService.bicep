@@ -161,8 +161,8 @@ resource botManagedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@20
 }
 
 // Determine which identity to use
-var identityResourceId = microsoftAppType == 'UserAssignedMSI' ? (empty(userAssignedManagedIdentityResourceId) ? botManagedIdentity.id : userAssignedManagedIdentityResourceId) : ''
-var appId = microsoftAppType == 'UserAssignedMSI' ? (empty(userAssignedManagedIdentityResourceId) ? botManagedIdentity.properties.clientId : microsoftAppId) : microsoftAppId
+var identityResourceId = microsoftAppType == 'UserAssignedMSI' ? (empty(userAssignedManagedIdentityResourceId) ? botManagedIdentity!.id : userAssignedManagedIdentityResourceId) : ''
+var appId = microsoftAppType == 'UserAssignedMSI' ? (empty(userAssignedManagedIdentityResourceId) ? botManagedIdentity!.properties.clientId : microsoftAppId) : microsoftAppId
 
 // ============================================================================
 // AZURE BOT SERVICE
