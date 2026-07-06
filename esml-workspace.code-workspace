@@ -9,6 +9,12 @@
             "statusBar.background" : "#5b0252",
             "statusBar.noFolderBackground" : "#5b0252",
             "statusBar.debuggingBackground": "#5b0252"
-        }
+		},
+		"chat.tools.terminal.autoApprove": {
+			"/^python -m pytest environment_setup/unit-tests/test-bicep/test_env_parity\\.py -q 2>&1 \\| Select-Object -Last 30$/": {
+				"approve": true,
+				"matchCommandLine": true
+			}
+		}
 	}
 }
