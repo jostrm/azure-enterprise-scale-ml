@@ -24,6 +24,178 @@ AIFACTORY_VERSION_MINOR="24"
 
 ---
 
+# 🩹 Patch v1.24.1
+
+**Release Date:** July 2026 &nbsp;•&nbsp; **Type:** Feature patch (backward compatible)
+
+This patch focuses on **simpler configuration**, **per-environment cost control (SKUs)**,
+**safer & more powerful delete modes**, **stronger pre-deployment validation**, and a
+**built-in AI FinOps toolset**. Highlights below.
+
+## 🔑 Configuration Simplification
+
+### 🙅 No Service Principals Required
+**Managed Identity is now the default path — SPs are fully optional**
+
+- ✅ **Leave SP fields empty**: the project/common Service Principal seeding-Key-Vault secret-name
+  variables can be left as **empty strings** and the pipeline runs on **Managed Identity** only.
+- 🚫 **`<ignore>` sentinel**: any SP-related value containing `"<ignore>"` is **skipped/ignored**,
+  so you don't have to delete lines to opt out.
+- 🎯 **Affected variables** (all optional now):
+  ```yaml
+  # Common SP (seeding KV secret names) — leave "" or use "<ignore>"
+  inputCommonSPIDKey: ""
+  inputCommonSPSecretKey: ""
+  commonServicePrincipleOIDKey: ""
+  # Project SP (seeding KV secret names) — leave "" or use "<ignore>"
+  project_service_principal_AppID_seeding_kv_name: ""
+  project_service_principal_OID_seeding_kv_name: ""
+  project_service_principal_Secret_seeding_kv_name: ""
+  ```
+- 💡 **Why it matters**: fewer secrets to rotate, no SP lifecycle to manage, and a cleaner
+  least-privilege posture out of the box.
+
+### 💲 Per-Environment SKUs for ALL Services
+**Right-size Dev cheaply, scale Stage/Prod — from a single config**
+
+- 🎛️ **New naming pattern**: `sku<Service>Dev` / `sku<Service>StageProd`
+  (plus `skuTier<Service>Dev` / `skuTier<Service>StageProd` where a tier applies).
+- 🔀 **Resolution logic**: `env == 'dev' ? <sku>Dev : <sku>StageProd`
+  (**`test` = Stage**, so both `test` and `prod` use the `*StageProd` value).
+- 🧩 **Empty = template default**: leave `""` to fall back to the bicep default for that service.
+- 📦 **Covered services**: Storage Account, AI Search, AI Services, OpenAI, Content Safety, Vision,
+  Speech, Document Intelligence, Bing, PostgreSQL (+tier), Redis, SQL Database (+tier), Elastic,
+  Web App (+tier), Function (+tier), AKS (+tier), Azure ML (+tier), Databricks, Logic Apps,
+  Event Hubs, Bot Service.
+  ```yaml
+  # Example: cheap Dev, robust Stage/Prod
+  skuStorageAccountDev: "Standard_LRS"
+  skuStorageAccountStageProd: "Standard_ZRS"
+  skuTierPostgreSQLDev: "Burstable"
+  skuTierPostgreSQLStageProd: "GeneralPurpose"
+  skuFunctionDev: "EP1"
+  skuFunctionStageProd: "EP2"
+  ```
+
+## 🗑️ Project Delete Modes
+**Graduated, opt-in deletion — from a single service sweep to full teardown**
+
+| Mode | Variable | Scope |
+|------|----------|-------|
+| ♻️ Incremental cleanup | `enableDeleteForDisabledResources: "true"` | Deletes only services turned **off** via `enable*` flags. |
+| 🧹 Delete project services | `deleteAllServicesForProject: "true"` | Deletes all services in the **project RG** (step 04), then **stops** the pipeline. Key Vault **retained** by default. |
+| 🔐 Also delete Key Vault | `deleteKeyvaultAlso: "true"` | Extends the above to also remove the project Key Vault (secrets, CMK keys, RBAC). |
+| 💥 ULTRA delete | `deleteAllForProject: "true"` | **Full teardown**: ALL resources in the project RG **and** networking resources (**subnets, NSGs**) in the common RG. |
+
+- 🛡️ **Safety-first defaults**: Key Vault is retained unless you explicitly opt in.
+- ⚠️ **Use ULTRA delete with extreme caution** — it removes shared networking artifacts (subnets/NSGs).
+
+## 🧙 AI Factory Configuration Wizard
+**Updated for the new patch capabilities (Windows / macOS / Linux)**
+
+- 💲 **Per-environment SKUs**: the wizard now prompts for `Dev` vs `Stage/Prod` SKUs per service.
+- 🔒 **Disable Local Auth** is now **exposed** in the wizard (see below).
+- 🧭 Cross-platform installers under `environment_setup/install_config_wizard/{windows,macos,linux}`.
+
+## 🔐 Disable Local Auth — Now Default
+**AAD/Entra-only access for Cognitive/AI Services & Foundry**
+
+```yaml
+disableLocalAuth: "true"   # NEW default — disables API-key ("admin account") auth
+```
+
+- ✅ **Secure by default**: key-based auth is **off**, aligning with orgs that forbid keys.
+- 🧙 **Wizard-exposed**: toggle directly during configuration.
+- 🔁 **Override**: set `"false"` to allow local API keys where required.
+
+## ☸️ Standalone AKS + Dedicated Subnet
+**Run AKS without Azure ML — on its own network segment**
+
+```yaml
+enableAKS: "true"                 # Standalone AKS in the project RG (no Azure ML required)
+enableAksForAzureML: "false"      # Independent from the Azure ML inference cluster
+skuTierAksDev: "Standard"
+aksEnablePrivateCluster: "true"
+```
+
+- 🌐 **Own subnet**: AKS gets a **dedicated subnet** (isolated from GenAI/ACA/Web App), avoiding
+  `SubnetIsDelegated` collisions and improving network isolation.
+- 🔒 **Private cluster** support with configurable outbound type and private DNS zone.
+
+## 🧪 Preflight Validation (Pipelines)
+**Fail fast — validate configuration & environment before any resource is created**
+
+- 🧾 **Config checks**: scans `variables.yaml` for unresolved `<todo>` placeholders and
+  mandatory/optional gaps (severity from the inline `<mandatory>`/`<optional>` tags).
+- 🌐 **Networking/CIDR sanity**: Python `ipaddress`-based checks — valid CIDRs, subnet-of-vNet,
+  overlaps, minimum sizes, and AKS UDR requirements (non-system DNS + firewall IP).
+- 🔎 **Live checks** (opt-out): quota, model availability, region, and provider registration.
+- 🧱 **Runs early**: in the **networking job** (config-only, offline) *before* subnet creation, and
+  again fully in the **services job** — true fail-fast in both Azure DevOps and GitHub Actions.
+
+## 💰 Automation & AI FinOps
+**Built-in tooling to see, control and account for AI/token spend**
+
+- 📊 **Foundry Token Report runbook**: real per-model / per-project token usage from Log Analytics,
+  with **PAYGO-vs-PTU recommendations**, scheduled and exported to **HTML / Markdown / PDF**.
+- 🧾 **Showback / chargeback report**: cost attribution per subscription, project and environment.
+- 🚦 **AI model consumption throttling (circuit breaker)**: a **real-time, consumption-based**
+  Logic App that **blocks over-consumption** at a budget threshold by cutting model network access
+  (public disabled and/or private endpoints rejected) — something **Azure Policy cannot do**.
+  Reversible ON/OFF with exact-state restore; works **with or without** an AI Gateway, with **zero
+  change** to project teams' solutions.
+- 📈 **Per-project / per-environment dashboards**: token usage, cost and budget burn-down.
+- 📁 Location: `automation/coreteam/finops` (runbooks, showback, logicapps).
+
+## 🧰 Unit Tests
+**A scalable, N-tier IaC test suite ships with this version**
+
+- 🧱 **Layered design** (`base` → `domain` → `app` → `unit`/`integration`): offline **mocked**
+  unit tests plus **opt-in live** integration tests (`LIVE_AZURE=1`) with guaranteed cleanup.
+- 🔁 **Parity tests**: `test_env_parity.py` (ADO `variables.yaml` ↔ GitHub `.env.template` variable
+  & default parity, incl. the new per-env SKUs) and `test_workflow_parity.py` (workflow parity).
+- ▶️ Run: `cd environment_setup/unit-tests/test-bicep && python -m pytest unit -q`.
+
+## 🏗️ Azure DevOps Pipeline: 2 → 3 Jobs
+**AI Foundry deployment isolated into its own job**
+
+- 🧩 **New topology**: `ESGenAI_Networking` → `ESGenAI_Services` → **`ESGenAI_Foundry`**.
+- ⏱️ **Fresh agent budget**: AI Foundry (a long-running deployment) runs in its **own job** so it
+  starts on a **fresh Microsoft-hosted agent** — avoiding timeouts on the shared services job.
+- 🔁 The Foundry job re-derives its context (re-runs the `00_*`..`05c_*` preamble) via a `phase: 'foundry'` parameter.
+
+## 🏷️ BYO Contributor Role
+**Bring your own custom role for finer-grained access control**
+
+```yaml
+BYOContributorRoleID: "b24988ac-6180-42a0-ab88-20f7382dd24c"  # Azure built-in Contributor (default)
+# → replace with a CUSTOM role definition ID for least-privilege
+```
+
+- 🎯 **Least privilege**: swap the built-in Contributor for a scoped custom role ID.
+
+## ➕ Also Included (you may have missed these)
+
+- 🌐 **Dedicated Web App subnet** (`snt-prj<xxx>-webapp`): robust fix for the `SubnetIsDelegated`
+  collision when Web App/Function VNet-integration shared a subnet with AKS.
+- 🔁 **ADO ↔ GitHub Actions parity**: per-environment SKUs, delete modes, SP-optional config and
+  networking variables are mirrored across both platforms (verified by the parity unit tests).
+- 🧾 **Self-documenting `variables.yaml`**: inline `<mandatory>`/`<optional>`/`<recommended>`/
+  `<default>`/`<ensure>` tags drive both the wizard prompts and preflight severity.
+- 🏭 **Data Factory hardening**: UAMI-based linked services + managed VNet egress with automated
+  managed private-endpoint approval in the pipeline.
+- 👥 **AD group-based personas**: `use_ad_groups: "true"` assigns project members via Entra ID
+  security groups (team lead / data scientist / front-end) instead of individual ObjectIDs.
+
+### 📝 Upgrade Notes (v1.24 → v1.24.1)
+
+- **No breaking changes.** New SKU variables default to previous behavior when left `""`.
+- If you previously configured Service Principals, they **still work** — the new empty/`<ignore>`
+  behavior is purely additive.
+- Review `disableLocalAuth` (now defaults to `"true"`); set `"false"` if you rely on API keys.
+
+---
+
 # 🚀 What's New in v1.24
 
 ## 🔒 Security Enhancements
