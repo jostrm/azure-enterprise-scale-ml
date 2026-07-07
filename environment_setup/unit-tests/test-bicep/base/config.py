@@ -26,6 +26,7 @@ ADO_VARIABLES_YAML = (
 
 GENAI_BICEP_DIR = REPO_ROOT / "environment_setup/aifactory/bicep/esml-genai-1"
 COMMON_BICEP_DIR = REPO_ROOT / "environment_setup/aifactory/bicep/esml-common"
+MODULES_BICEP_DIR = REPO_ROOT / "environment_setup/aifactory/bicep/modules"
 
 
 def parse_env_template(path: Path = GH_ENV_TEMPLATE) -> dict[str, str]:
