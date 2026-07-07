@@ -199,7 +199,15 @@ module aksTestProd 'aksCluster.bicep' = if((env == 'test' || env == 'prod') && !
   ]
 }
 
-resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && env == 'dev' && !empty(aksSubnetId)) {
+// Single AML AKS-inference compute resource for ALL environments.
+// IMPORTANT: dev and test/prod must NOT be two separate resources here — they would
+// compile to the SAME ARM resource name (aksName under the same parent workspace),
+// and Bicep then inserts an implicit dependsOn from the second to the first. For a
+// prod deployment the (condition-excluded) dev twin is referenced but not emitted,
+// causing: "The resource '.../computes/<aksName>' is not defined in the template."
+// Merging into one resource with env-selected properties eliminates that collision,
+// so Azure ML deploys correctly with AKS in dev, test and prod.
+resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && !empty(aksSubnetId)) {
   name: aksName
   parent: azureMLWorkspace
   location: location
@@ -208,36 +216,12 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     computeLocation: location
     description: 'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
     resourceId: aksResourceId
-    properties: union({
+    properties: union((env == 'dev') ? {
       agentCount: 1
       clusterPurpose: 'DevTest'
       agentVmSize: aksVmSku_dev
       loadBalancerType: 'InternalLoadBalancer'
-    }, !aksExists ? {
-      aksNetworkingConfiguration: {
-        subnetId: aksSubnetId
-        dnsServiceIP: aksDnsServiceIP
-        dockerBridgeCidr: aksDockerBridgeCidr
-        serviceCidr: aksServiceCidr
-      }
-      loadBalancerSubnet: aksSubnetName
-    } : {})
-  }
-  dependsOn: [
-    ...(!aksExists ? [aksDev] : [])
-  ]
-}
-
-resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && (env == 'test' || env == 'prod') && !empty(aksSubnetId)) {
-  name: aksName
-  parent: azureMLWorkspace
-  location: location
-  properties: {
-    computeType: 'AKS'
-    computeLocation: location
-    description: 'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
-    resourceId: aksResourceId
-    properties: union({
+    } : {
       agentCount: 3
       clusterPurpose: 'FastProd'
       agentVmSize: aksVmSku_testProd
@@ -253,6 +237,7 @@ resource machineLearningComputeTestProd 'Microsoft.MachineLearningServices/works
     } : {})
   }
   dependsOn: [
-    ...(!aksExists ? [aksTestProd] : [])
+    ...(!aksExists && env == 'dev' ? [aksDev] : [])
+    ...(!aksExists && (env == 'test' || env == 'prod') ? [aksTestProd] : [])
   ]
 }
