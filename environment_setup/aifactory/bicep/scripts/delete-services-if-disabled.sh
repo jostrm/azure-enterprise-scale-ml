@@ -2179,22 +2179,59 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   
   # Step 1: Delete Storage Accounts
   echo "=== Step 1: Deleting Storage Accounts ==="
+  # NOTE: strip CR — the Windows-hosted az CLI emits CRLF in -o tsv output, and a trailing '\r'
+  # embedded in the account name causes ARM to return 'Bad Request' on delete.
   storage_accounts=$(az storage account list \
     --resource-group "$projectResourceGroup" \
     --query "[].name" \
-    -o tsv 2>/dev/null || echo "")
+    -o tsv 2>/dev/null | tr -d '\r' || echo "")
   
   if [ -n "$storage_accounts" ]; then
+    subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
     while IFS= read -r sa_name; do
+      # Defensive: trim any stray CR/whitespace so the name never corrupts an ARM URL
+      sa_name="$(echo "$sa_name" | tr -d '\r' | xargs)"
       if [ -n "$sa_name" ]; then
         echo "Deleting storage account: $sa_name"
-        # Delete private endpoints first
+        # Delete private endpoints first (name-pattern based, project RG only)
         delete_storage_private_endpoints "$sa_name"
-        # Delete the storage account
-        az storage account delete \
+
+        # Resolve the account id + remove any REMAINING private endpoint CONNECTIONS on the
+        # account itself. The name-pattern search above misses PEs whose resource lives in a
+        # different RG (e.g. the common/vnet RG); those lingering connections make the account
+        # delete return 'Bad Request'. Deleting by the connection's privateEndpoint.id handles
+        # PEs in ANY resource group.
+        sa_id=$(az storage account show --name "$sa_name" --resource-group "$projectResourceGroup" \
+          --query id -o tsv 2>/dev/null | tr -d '\r' || echo "")
+        if [ -n "$sa_id" ]; then
+          pe_ids=$(az storage account show --name "$sa_name" --resource-group "$projectResourceGroup" \
+            --query "privateEndpointConnections[].properties.privateEndpoint.id" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+          if [ -n "$pe_ids" ]; then
+            while IFS= read -r pe_id; do
+              [ -n "$pe_id" ] || continue
+              echo "  Removing lingering private endpoint (blocks account delete): $pe_id"
+              az network private-endpoint delete --ids "$pe_id" 2>&1 \
+                || az rest --method DELETE --url "https://management.azure.com${pe_id}?api-version=2023-11-01" 2>&1 \
+                || echo "    ⚠️  Failed to delete PE $pe_id"
+            done <<< "$pe_ids"
+          fi
+        fi
+
+        # Delete the storage account; on failure retry once via the REST API (a raw 400 from the
+        # storage RP is not always surfaced cleanly by 'az storage account delete').
+        if ! az storage account delete \
           --name "$sa_name" \
           --resource-group "$projectResourceGroup" \
-          --yes 2>&1 || echo "  Warning: Failed to delete storage account $sa_name"
+          --yes 2>&1; then
+          echo "  Primary delete failed for $sa_name — attempting REST fallback"
+          if [ -n "$sa_id" ]; then
+            az rest --method DELETE --url "https://management.azure.com${sa_id}?api-version=2023-05-01" 2>&1 \
+              && echo "  ✓ REST delete succeeded: $sa_name" \
+              || echo "  Warning: Failed to delete storage account $sa_name (may have a resource lock, legal hold, or an in-use private endpoint connection)"
+          else
+            echo "  Warning: Failed to delete storage account $sa_name"
+          fi
+        fi
       fi
     done <<< "$storage_accounts"
     echo "✓ Storage accounts deleted"
@@ -2503,14 +2540,20 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   # Step 4c: Delete User Assigned Managed Identities (mi-prj* and mi-aca-prj*)
   echo ""
   echo "=== Step 4c: Deleting User Assigned Managed Identities (mi-prj*, mi-aca-prj*) ==="
+  # NOTE: strip CR — the Windows-hosted az CLI emits CRLF in -o tsv output. A trailing '\r' left
+  # on the identity name corrupts the ARM URL: 'az identity delete' url-encodes it (real ARM 400
+  # 'Bad Request'), while the 'az rest' fallback passes the raw CR through and the frontend proxy
+  # returns the HTML "Bad Request - Invalid URL / HTTP Error 400". Stripping it fixes both paths.
   uamis=$(az identity list \
     --resource-group "$projectResourceGroup" \
     --query "[?starts_with(name, 'mi-prj') || starts_with(name, 'mi-aca-prj')].name" \
-    -o tsv 2>/dev/null || echo "")
+    -o tsv 2>/dev/null | tr -d '\r' || echo "")
   
   if [ -n "$uamis" ]; then
     subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
     while IFS= read -r uami_name; do
+      # Defensive: trim any stray CR/whitespace so the name never corrupts an ARM URL
+      uami_name="$(echo "$uami_name" | tr -d '\r' | xargs)"
       if [ -n "$uami_name" ]; then
         echo "Deleting User Assigned Managed Identity: $uami_name"
 

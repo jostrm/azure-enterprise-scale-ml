@@ -18,6 +18,13 @@
 # Options:
 #   --include-search   also throttle Microsoft.Search/searchServices
 #   --dry-run          print actions only
+# Run report (stored in the target RG primary storage account, on by default):
+#   --skip-report                 do not generate/upload a report
+#   --report-storage-account <n>  explicit storage account (else auto-discover sa...1... in the RG)
+#   --report-resource-group  <rg> RG of the storage account (default: the throttled RG)
+#   --report-container       <n>  blob container (default: aifactory)
+#   --report-local-dir       <p>  local output dir (default: temp)
+#   Report blob path: aifactory/automation/finops/reports/<yyyyMMdd>/throttle-report-<action>-<utc>.{md,html,pdf}
 # =============================================================================
 set -euo pipefail
 
@@ -27,6 +34,10 @@ ACTION=""; SCOPE=""; SUBSCRIPTION=""; RESOURCE_GROUP=""; INCLUDE_SEARCH="false";
 # AI Factory naming
 ESML_AIFACTORY_EXISTS="false"; VARS_FILE=""; ENV_NAME="dev"; PROJECT_NUMBER=""
 VNET_RESOURCE_GROUP=""; VNET_NAME=""; PRIVATE_DNS_RG=""; STORAGE_ACCOUNT_NAME=""
+# Report output
+SKIP_REPORT="false"; REPORT_STORAGE_ACCOUNT=""; REPORT_RESOURCE_GROUP=""; REPORT_CONTAINER="aifactory"; REPORT_LOCAL_DIR=""
+REPORT_ROWS_FILE="$(mktemp)"
+trap 'rm -f "$REPORT_ROWS_FILE" 2>/dev/null || true' EXIT
 
 TAG_STATE="esmlThrottleState"
 TAG_PREV_PNA="esmlThrottlePrevPublicNet"
@@ -49,6 +60,11 @@ while [[ $# -gt 0 ]]; do
     --vnet-name)              VNET_NAME="$2"; shift 2;;
     --private-dns-rg)         PRIVATE_DNS_RG="$2"; shift 2;;
     --storage-account)        STORAGE_ACCOUNT_NAME="$2"; shift 2;;
+    --skip-report)            SKIP_REPORT="true"; shift;;
+    --report-storage-account) REPORT_STORAGE_ACCOUNT="$2"; shift 2;;
+    --report-resource-group)  REPORT_RESOURCE_GROUP="$2"; shift 2;;
+    --report-container)       REPORT_CONTAINER="$2"; shift 2;;
+    --report-local-dir)       REPORT_LOCAL_DIR="$2"; shift 2;;
     --dry-run)                DRY_RUN="true"; shift;;
     --help)
       grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
@@ -130,6 +146,11 @@ run() { # run or echo when dry-run
   if [[ "$DRY_RUN" == "true" ]]; then echo -e "${YELLOW}  [dry-run] $*${NC}"; else eval "$@"; fi
 }
 
+# Append one report row: Type | Name | ResourceGroup | Result | Detail
+add_report_row() {
+  printf '%s|%s|%s|%s|%s\n' "$1" "$2" "$3" "$4" "$5" >> "$REPORT_ROWS_FILE"
+}
+
 list_cognitive() {
   if [[ "$SCOPE" == "resourcegroup" ]]; then
     az resource list -g "$RESOURCE_GROUP" --resource-type 'Microsoft.CognitiveServices/accounts' \
@@ -159,7 +180,11 @@ throttle_account() {
   echo -e "${CYAN}-> Cognitive account: $name (rg: $rg)${NC}"
 
   local state; state="$(get_tag "$id" "$TAG_STATE")"
-  if [[ "$state" == "throttled" ]]; then echo -e "${YELLOW}   already throttled - skipping${NC}"; return; fi
+  if [[ "$state" == "throttled" ]]; then
+    echo -e "${YELLOW}   already throttled - skipping${NC}"
+    add_report_row "CognitiveServices" "$name" "$rg" "Skipped" "Already throttled"
+    return
+  fi
 
   local prevPna prevAcl
   prevPna="$(az resource show --ids "$id" --query "properties.publicNetworkAccess" -o tsv 2>/dev/null || echo Enabled)"
@@ -192,6 +217,8 @@ throttle_account() {
     ${TAG_STATE}=throttled ${TAG_PREV_PNA}=${prevPna} ${TAG_PREV_ACL}=${prevAcl} \
     ${TAG_PREV_PECS}=\"${rejected}\" ${TAG_TIMESTAMP}=\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\" -o none"
   echo -e "${GREEN}   throttled (prev publicNet=$prevPna, prev acl=$prevAcl)${NC}"
+  local rslt="Throttled"; [[ "$DRY_RUN" == "true" ]] && rslt="Throttled (dry-run)"
+  add_report_row "CognitiveServices" "$name" "$rg" "$rslt" "prev publicNet=$prevPna; prev acl=$prevAcl"
 }
 
 unthrottle_account() {
@@ -199,7 +226,11 @@ unthrottle_account() {
   echo -e "${CYAN}-> Cognitive account: $name (rg: $rg)${NC}"
 
   local state; state="$(get_tag "$id" "$TAG_STATE")"
-  if [[ "$state" != "throttled" ]]; then echo -e "${YELLOW}   not throttled by this tool - skipping${NC}"; return; fi
+  if [[ "$state" != "throttled" ]]; then
+    echo -e "${YELLOW}   not throttled by this tool - skipping${NC}"
+    add_report_row "CognitiveServices" "$name" "$rg" "Skipped" "Not throttled by this tool"
+    return
+  fi
 
   local prevPna prevAcl pecs
   prevPna="$(get_tag "$id" "$TAG_PREV_PNA")"; [[ -z "$prevPna" ]] && prevPna="Enabled"
@@ -220,6 +251,8 @@ unthrottle_account() {
 
   run "az resource tag --ids \"$id\" --is-incremental --tags ${TAG_STATE}=normal -o none"
   echo -e "${GREEN}   un-throttled (restored)${NC}"
+  local rslt="Un-throttled"; [[ "$DRY_RUN" == "true" ]] && rslt="Un-throttled (dry-run)"
+  add_report_row "CognitiveServices" "$name" "$rg" "$rslt" "restored publicNet=$prevPna; acl=$prevAcl"
 }
 
 status_account() {
@@ -229,6 +262,8 @@ status_account() {
   pna="$(az resource show --ids "$id" --query "properties.publicNetworkAccess" -o tsv 2>/dev/null || true)"
   acl="$(az resource show --ids "$id" --query "properties.networkAcls.defaultAction" -o tsv 2>/dev/null || true)"
   printf "  %-45s state=%-9s publicNet=%-9s acl=%s\n" "$name" "$state" "$pna" "$acl"
+  local rg2; rg2="$(az resource show --ids "$id" --query resourceGroup -o tsv 2>/dev/null || true)"
+  add_report_row "CognitiveServices" "$name" "$rg2" "state=$state" "publicNet=$pna; acl=$acl"
 }
 
 # small helper to count json array length using jq
@@ -259,12 +294,124 @@ if [[ "$INCLUDE_SEARCH" == "true" ]]; then
     sname="$(echo "$SEARCH_JSON" | jq -r ".[$sidx].name")"
     srg="$(echo "$SEARCH_JSON"   | jq -r ".[$sidx].rg")"
     case "$ACTION" in
-      throttle)   echo -e "${CYAN}-> AI Search: $sname -> disabled${NC}"; run "az search service update -g \"$srg\" -n \"$sname\" --public-access disabled -o none";;
-      unthrottle) echo -e "${CYAN}-> AI Search: $sname -> enabled${NC}";  run "az search service update -g \"$srg\" -n \"$sname\" --public-access enabled -o none";;
-      status)     pna="$(az search service show -g "$srg" -n "$sname" --query publicNetworkAccess -o tsv 2>/dev/null || true)"; printf "  %-45s publicNet=%s\n" "$sname" "$pna";;
+      throttle)   echo -e "${CYAN}-> AI Search: $sname -> disabled${NC}"; run "az search service update -g \"$srg\" -n \"$sname\" --public-access disabled -o none"; sr="Throttled"; [[ "$DRY_RUN" == "true" ]] && sr="Throttled (dry-run)"; add_report_row "AISearch" "$sname" "$srg" "$sr" "publicNetworkAccess=Disabled";;
+      unthrottle) echo -e "${CYAN}-> AI Search: $sname -> enabled${NC}";  run "az search service update -g \"$srg\" -n \"$sname\" --public-access enabled -o none"; sr="Un-throttled"; [[ "$DRY_RUN" == "true" ]] && sr="Un-throttled (dry-run)"; add_report_row "AISearch" "$sname" "$srg" "$sr" "publicNetworkAccess=Enabled";;
+      status)     pna="$(az search service show -g "$srg" -n "$sname" --query publicNetworkAccess -o tsv 2>/dev/null || true)"; printf "  %-45s publicNet=%s\n" "$sname" "$pna"; add_report_row "AISearch" "$sname" "$srg" "publicNet=$pna" "";;
     esac
     sidx=$((sidx+1))
   done
+fi
+
+# ---------------------------------------------------------------------------
+# Run report -> target RG primary storage account
+#   Container : $REPORT_CONTAINER (default 'aifactory')
+#   Blob path : automation/finops/reports/<yyyyMMdd>/throttle-report-<action>-<utc>.{md,html,pdf}
+# ---------------------------------------------------------------------------
+
+# Best-effort discovery of the AI Factory project PRIMARY storage account (sa...1...) in a RG.
+resolve_primary_storage_account() {
+  local rg="$1"
+  local names; names="$(az storage account list --resource-group "$rg" --query "[].name" -o tsv 2>/dev/null || true)"
+  [[ -z "$names" ]] && return 0
+  local sa_names; sa_names="$(echo "$names" | grep -E '^sa' || true)"
+  [[ -z "$sa_names" ]] && sa_names="$names"
+  local count; count="$(echo "$sa_names" | grep -c . || true)"
+  if [[ "$count" -eq 1 ]]; then echo "$sa_names"; return 0; fi
+  # Prefer the primary '1' account when a '2' sibling exists.
+  local n
+  while IFS= read -r n; do
+    [[ -z "$n" ]] && continue
+    if [[ "$n" == *1* ]] && echo "$sa_names" | grep -qx "${n/1/2}"; then echo "$n"; return 0; fi
+  done <<< "$sa_names"
+  echo "$sa_names" | sort | head -n1
+}
+
+if [[ "$SKIP_REPORT" != "true" ]]; then
+  _utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  _dateDir="$(date -u +%Y%m%d)"
+  _stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  _baseName="throttle-report-${ACTION}-${_stamp}"
+  _blobPrefix="automation/finops/reports/${_dateDir}/"
+  _outDir="${REPORT_LOCAL_DIR:-${TMPDIR:-/tmp}/genai-throttle-reports/${_dateDir}}"
+  mkdir -p "$_outDir"
+
+  # Build the Markdown report from the collected rows.
+  _rowsMd=""
+  if [[ -s "$REPORT_ROWS_FILE" ]]; then
+    while IFS='|' read -r t n rg res det; do
+      _rowsMd+="| ${t} | ${n} | ${rg} | ${res} | ${det} |"$'\n'
+    done < "$REPORT_ROWS_FILE"
+  else
+    _rowsMd="| _(none)_ | | | | |"$'\n'
+  fi
+  _rowCount="$(wc -l < "$REPORT_ROWS_FILE" | tr -d ' ')"
+  _rgLabel="${RESOURCE_GROUP:-(subscription-wide)}"
+
+  _md="$_outDir/$_baseName.md"
+  cat > "$_md" <<EOF
+# GenAI throttle run report
+
+| Field | Value |
+|-------|-------|
+| Action | $ACTION |
+| Scope | $SCOPE |
+| Subscription | $SUBSCRIPTION |
+| Resource group | $_rgLabel |
+| Include AI Search | $INCLUDE_SEARCH |
+| Dry run | $DRY_RUN |
+| Run (UTC) | $_utc |
+| Resources acted on | $_rowCount |
+
+## Results
+
+| Type | Name | Resource group | Result | Detail |
+|------|------|----------------|--------|--------|
+$_rowsMd
+EOF
+
+  # Minimal HTML wrapper (escaped) for a portable report next to the markdown.
+  _html="$_outDir/$_baseName.html"
+  {
+    echo "<!doctype html><html><head><meta charset='utf-8'><title>$_baseName</title>"
+    echo "<style>body{font-family:Segoe UI,Arial;margin:32px;color:#222}pre{white-space:pre-wrap;font-family:Consolas,monospace;font-size:13px}</style></head><body><pre>"
+    sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$_md"
+    echo "</pre></body></html>"
+  } > "$_html"
+
+  # Best-effort PDF via headless Chromium/Edge/Chrome (skipped silently if none present).
+  _pdf="$_outDir/$_baseName.pdf"
+  _browser="$(command -v msedge || command -v microsoft-edge || command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+  if [[ -n "$_browser" ]]; then
+    "$_browser" --headless=new --disable-gpu --no-pdf-header-footer \
+      --print-to-pdf="$_pdf" "file://$_html" >/dev/null 2>&1 || true
+  fi
+
+  echo -e "${CYAN}Report generated: $_md${NC}"
+
+  # Resolve the target storage account (primary of the throttled RG).
+  _reportRg="${REPORT_RESOURCE_GROUP:-$RESOURCE_GROUP}"
+  if [[ -n "$REPORT_STORAGE_ACCOUNT" ]]; then _reportSa="$REPORT_STORAGE_ACCOUNT"
+  elif [[ -n "$STORAGE_ACCOUNT_NAME" ]]; then _reportSa="$STORAGE_ACCOUNT_NAME"
+  elif [[ -n "$_reportRg" ]]; then _reportSa="$(resolve_primary_storage_account "$_reportRg")"
+  else _reportSa=""; fi
+
+  if [[ -n "$_reportSa" && -n "$_reportRg" ]]; then
+    echo -e "${CYAN}Uploading report to storage account '$_reportSa' (rg '$_reportRg') -> $REPORT_CONTAINER/$_blobPrefix${NC}"
+    if [[ "$DRY_RUN" == "true" ]]; then
+      echo -e "${YELLOW}  [dry-run] would upload: $REPORT_CONTAINER/${_blobPrefix}${_baseName}.{md,html,pdf}${NC}"
+    else
+      az storage container create --account-name "$_reportSa" --name "$REPORT_CONTAINER" --auth-mode login --only-show-errors >/dev/null || true
+      for f in "$_md" "$_html" "$_pdf"; do
+        [[ -f "$f" ]] || continue
+        az storage blob upload --account-name "$_reportSa" --container-name "$REPORT_CONTAINER" \
+          --name "${_blobPrefix}$(basename "$f")" --file "$f" --auth-mode login --overwrite --only-show-errors >/dev/null
+        echo -e "${GREEN}  uploaded: $REPORT_CONTAINER/${_blobPrefix}$(basename "$f")${NC}"
+      done
+    fi
+  else
+    echo -e "${YELLOW}No target storage account resolved (subscription scope or no 'sa*' account found). Report kept locally at: $_outDir${NC}"
+    echo -e "${YELLOW}  Pass --report-storage-account <name> (+ --report-resource-group <rg>) to upload.${NC}"
+  fi
 fi
 
 echo -e "${GREEN}Done. action=$ACTION scope=$SCOPE $( [[ "$DRY_RUN" == "true" ]] && echo '(dry-run - no changes made)')${NC}"
