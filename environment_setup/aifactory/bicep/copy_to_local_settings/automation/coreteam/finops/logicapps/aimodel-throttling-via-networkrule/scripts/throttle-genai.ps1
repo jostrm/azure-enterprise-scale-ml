@@ -50,6 +50,24 @@
 .PARAMETER DryRun
     Print the actions that would be taken without making changes.
 
+.PARAMETER SkipReport
+    Do not generate or upload a run report. By default a .md/.html/.pdf report of the run is written
+    and uploaded to the target RG's primary storage account under
+    'aifactory/automation/finops/reports/<yyyyMMdd>/'.
+
+.PARAMETER ReportStorageAccount
+    Explicit storage account for the report. If omitted, the AI Factory project primary account
+    (sa...1...) is auto-discovered in the target resource group.
+
+.PARAMETER ReportResourceGroup
+    Resource group holding the report storage account. Defaults to the throttled -ResourceGroup.
+
+.PARAMETER ReportContainer
+    Blob container for reports. Default: 'aifactory'.
+
+.PARAMETER ReportLocalDir
+    Local directory to write the report files before upload. Default: a temp directory.
+
 .EXAMPLE
     # AI Factory exists: derive the project RG (and vnet/DNS) from variables.yaml
     ./throttle-genai.ps1 -Action Throttle -Scope ResourceGroup -EsmlAifactoryExists `
@@ -118,10 +136,35 @@ param(
     [string]$StorageAccountName,
 
     [Parameter(Mandatory = $false)]
-    [switch]$DryRun
+    [switch]$DryRun,
+
+    # --- Report output (store a run report in the target RG primary storage account) ---
+    [Parameter(Mandatory = $false)]
+    [switch]$SkipReport,
+
+    [Parameter(Mandatory = $false)]
+    [string]$ReportStorageAccount,
+
+    [Parameter(Mandatory = $false)]
+    [string]$ReportResourceGroup,
+
+    [Parameter(Mandatory = $false)]
+    [string]$ReportContainer = 'aifactory',
+
+    [Parameter(Mandatory = $false)]
+    [string]$ReportLocalDir
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Collects one row per resource acted on, for the run report written to blob.
+$script:ReportRows = New-Object System.Collections.Generic.List[object]
+function Add-ReportRow {
+    param($Type, $Name, $ResourceGroup, $Result, $Detail)
+    $script:ReportRows.Add([pscustomobject]@{
+        Type = $Type; Name = $Name; ResourceGroup = $ResourceGroup; Result = $Result; Detail = $Detail
+    })
+}
 
 # Tag keys used to preserve prior state for a clean revert.
 $TAG_STATE      = 'esmlThrottleState'          # throttled | normal
@@ -285,7 +328,11 @@ function Invoke-ThrottleAccount {
 
     $show = Get-AccountShow -rg $rg -name $name
     $current = Get-Tag $show.tags $TAG_STATE
-    if ($current -eq 'throttled') { Write-Warn "   already throttled - skipping"; return }
+    if ($current -eq 'throttled') {
+        Write-Warn "   already throttled - skipping"
+        Add-ReportRow -Type 'CognitiveServices' -Name $name -ResourceGroup $rg -Result 'Skipped' -Detail 'Already throttled'
+        return
+    }
 
     $prevPna = if ($show.properties.publicNetworkAccess) { $show.properties.publicNetworkAccess } else { 'Enabled' }
     $prevAcl = if ($show.properties.networkAcls.defaultAction) { $show.properties.networkAcls.defaultAction } else { 'Allow' }
@@ -318,6 +365,9 @@ function Invoke-ThrottleAccount {
         $TAG_TIMESTAMP = (Get-Date -AsUTC -Format o)
     }
     Write-Ok  "   throttled (prev publicNet=$prevPna, prev acl=$prevAcl, PEs rejected=$($rejectedNames.Count))"
+    Add-ReportRow -Type 'CognitiveServices' -Name $name -ResourceGroup $rg `
+        -Result $(if ($DryRun) { 'Throttled (DryRun)' } else { 'Throttled' }) `
+        -Detail "prev publicNet=$prevPna; prev acl=$prevAcl; PEs rejected=$($rejectedNames.Count)"
 }
 
 # ---------------------------------------------------------------------------
@@ -331,7 +381,11 @@ function Invoke-UnthrottleAccount {
 
     $show = Get-AccountShow -rg $rg -name $name
     $state = Get-Tag $show.tags $TAG_STATE
-    if ($state -ne 'throttled') { Write-Warn "   not throttled by this tool - skipping"; return }
+    if ($state -ne 'throttled') {
+        Write-Warn "   not throttled by this tool - skipping"
+        Add-ReportRow -Type 'CognitiveServices' -Name $name -ResourceGroup $rg -Result 'Skipped' -Detail 'Not throttled by this tool'
+        return
+    }
 
     $prevPna = Get-Tag $show.tags $TAG_PREV_PNA; if (-not $prevPna) { $prevPna = 'Enabled' }
     $prevAcl = Get-Tag $show.tags $TAG_PREV_ACL; if (-not $prevAcl) { $prevAcl = 'Allow' }
@@ -362,6 +416,9 @@ function Invoke-UnthrottleAccount {
         az resource tag --ids $show.id --tags "$TAG_STATE=normal" --is-incremental | Out-Null
     }
     Write-Ok "   un-throttled (restored)"
+    Add-ReportRow -Type 'CognitiveServices' -Name $name -ResourceGroup $rg `
+        -Result $(if ($DryRun) { 'Un-throttled (DryRun)' } else { 'Un-throttled' }) `
+        -Detail "restored publicNet=$prevPna; acl=$prevAcl"
 }
 
 # ---------------------------------------------------------------------------
@@ -376,6 +433,7 @@ function Show-AccountStatus {
     $acl = $show.properties.networkAcls.defaultAction
     $color = if ($state -eq 'throttled') { 'Red' } else { 'Green' }
     Write-Host ("  {0,-45} state={1,-9} publicNet={2,-9} acl={3}" -f $acct.name, $state, $pna, $acl) -ForegroundColor $color
+    Add-ReportRow -Type 'CognitiveServices' -Name $acct.name -ResourceGroup $acct.resourceGroup -Result "state=$state" -Detail "publicNet=$pna; acl=$acl"
 }
 
 # ---------------------------------------------------------------------------
@@ -406,17 +464,156 @@ if ($IncludeSearch) {
                 'Throttle' {
                     Write-Info "-> AI Search: $name (rg: $rg) -> publicNetworkAccess=Disabled"
                     if (-not $DryRun) { az search service update -g $rg -n $name --public-access disabled | Out-Null }
+                    Add-ReportRow -Type 'AISearch' -Name $name -ResourceGroup $rg -Result $(if ($DryRun) { 'Throttled (DryRun)' } else { 'Throttled' }) -Detail 'publicNetworkAccess=Disabled'
                 }
                 'Unthrottle' {
                     Write-Info "-> AI Search: $name (rg: $rg) -> publicNetworkAccess=Enabled"
                     if (-not $DryRun) { az search service update -g $rg -n $name --public-access enabled | Out-Null }
+                    Add-ReportRow -Type 'AISearch' -Name $name -ResourceGroup $rg -Result $(if ($DryRun) { 'Un-throttled (DryRun)' } else { 'Un-throttled' }) -Detail 'publicNetworkAccess=Enabled'
                 }
                 'Status' {
                     $pna = az search service show -g $rg -n $name --query publicNetworkAccess -o tsv 2>$null
                     Write-Host ("  {0,-45} publicNet={1}" -f $name, $pna)
+                    Add-ReportRow -Type 'AISearch' -Name $name -ResourceGroup $rg -Result "publicNet=$pna" -Detail ''
                 }
             }
         }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Run report -> target RG primary storage account
+#   Container : $ReportContainer (default 'aifactory')
+#   Blob path : automation/finops/reports/<yyyyMMdd>/throttle-report-<action>-<utc>.{md,html,pdf}
+# ---------------------------------------------------------------------------
+
+# Best-effort discovery of the AI Factory project PRIMARY storage account (sa...1...) in a RG.
+# The live name carries an unpredictable salt, so we discover by type and prefer the '1' (primary)
+# over the '2' (secondary) account. Pass -ReportStorageAccount / -StorageAccountName to be explicit.
+function Resolve-PrimaryStorageAccount {
+    param([string]$Rg)
+    $json = az storage account list --resource-group $Rg --query "[].name" -o json 2>$null
+    if ([string]::IsNullOrWhiteSpace($json)) { return $null }
+    $names = @($json | ConvertFrom-Json | Where-Object { $_ -like 'sa*' })
+    if ($names.Count -eq 0) { $names = @($json | ConvertFrom-Json) }   # fall back to any account
+    if ($names.Count -eq 0) { return $null }
+    if ($names.Count -eq 1) { return $names[0] }
+    # Prefer the primary '1' account when a matching '2' sibling exists (sa...1... vs sa...2...).
+    foreach ($n in $names) {
+        if ($n -match '1' -and ($names -contains ($n -replace '1', '2'))) { return $n }
+    }
+    return ($names | Sort-Object)[0]
+}
+
+# Markdown -> minimal styled HTML (reuses the finops runbook renderer when reachable).
+function Convert-ThrottleReportToHtml {
+    param([string]$Markdown, [string]$Title)
+    $mod = Join-Path $PSScriptRoot '..\..\..\runbooks\common\AifFactory.psm1'
+    if (Test-Path $mod) {
+        try {
+            Import-Module $mod -Force -ErrorAction Stop
+            return (ConvertTo-ReportHtml -Markdown $Markdown -Title $Title)
+        } catch { }
+    }
+    $body = ($Markdown -replace '&', '&amp;' -replace '<', '&lt;' -replace '>', '&gt;')
+    @"
+<!doctype html><html><head><meta charset='utf-8'><title>$Title</title>
+<style>body{font-family:Segoe UI,Arial;margin:32px;color:#222}pre{white-space:pre-wrap;font-family:Consolas,monospace;font-size:13px}</style>
+</head><body><pre>$body</pre></body></html>
+"@
+}
+
+# Produces .md/.html and a best-effort .pdf (headless Edge/Chrome, else PSWritePDF, else html only).
+function Export-ThrottleReportFiles {
+    param([string]$Markdown, [string]$BaseName, [string]$OutDir)
+    if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir -Force | Out-Null }
+    $OutDir = (Resolve-Path $OutDir).Path
+    $md = Join-Path $OutDir "$BaseName.md"; $html = Join-Path $OutDir "$BaseName.html"; $pdf = Join-Path $OutDir "$BaseName.pdf"
+    $Markdown | Out-File $md -Encoding utf8
+    (Convert-ThrottleReportToHtml -Markdown $Markdown -Title $BaseName) | Out-File $html -Encoding utf8
+    $browser = @('msedge', 'chrome') | ForEach-Object { (Get-Command $_ -EA SilentlyContinue).Source } | Where-Object { $_ } | Select-Object -First 1
+    if (-not $browser) { foreach ($p in 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe', 'C:\Program Files\Microsoft\Edge\Application\msedge.exe', 'C:\Program Files\Google\Chrome\Application\chrome.exe') { if (Test-Path $p) { $browser = $p; break } } }
+    if ($browser) {
+        $uri = 'file:///' + ((Resolve-Path $html).Path -replace '\\', '/')
+        $prof = Join-Path ([System.IO.Path]::GetTempPath()) ('aifpdf-' + (Get-Random))
+        $eargs = @('--headless=new', '--disable-gpu', '--no-pdf-header-footer', "--user-data-dir=$prof", "--print-to-pdf=$pdf", $uri)
+        $proc = Start-Process $browser -ArgumentList $eargs -PassThru -WindowStyle Hidden
+        if (-not $proc.WaitForExit(20000)) { try { $proc.Kill() } catch { } }
+        Remove-Item $prof -Recurse -Force -EA SilentlyContinue
+    }
+    if (-not (Test-Path $pdf) -and (Get-Module -ListAvailable PSWritePDF)) {
+        Import-Module PSWritePDF; ConvertTo-PDF -InputFile $html -OutputFile $pdf -ErrorAction SilentlyContinue
+    }
+    [pscustomobject]@{ Md = $md; Html = $html; Pdf = ((Test-Path $pdf) ? $pdf : $null) }
+}
+
+if (-not $SkipReport) {
+    $utc       = Get-Date -AsUTC
+    $dateDir   = $utc.ToString('yyyyMMdd')
+    $stamp     = $utc.ToString('yyyyMMddTHHmmssZ')
+    $baseName  = "throttle-report-$($Action.ToLower())-$stamp"
+    $blobPrefix = "automation/finops/reports/$dateDir/"
+
+    # Build the Markdown report from the collected rows.
+    $rowsMd = if ($script:ReportRows.Count -gt 0) {
+        ($script:ReportRows | ForEach-Object { "| $($_.Type) | $($_.Name) | $($_.ResourceGroup) | $($_.Result) | $($_.Detail) |" }) -join "`n"
+    } else { "| _(none)_ | | | | |" }
+
+    $reportMd = @"
+# GenAI throttle run report
+
+| Field | Value |
+|-------|-------|
+| Action | $Action |
+| Scope | $Scope |
+| Subscription | $SubscriptionId |
+| Resource group | $(if ($ResourceGroup) { $ResourceGroup } else { '(subscription-wide)' }) |
+| Include AI Search | $([bool]$IncludeSearch) |
+| Dry run | $([bool]$DryRun) |
+| Run (UTC) | $($utc.ToString('o')) |
+| Resources acted on | $($script:ReportRows.Count) |
+
+## Results
+
+| Type | Name | Resource group | Result | Detail |
+|------|------|----------------|--------|--------|
+$rowsMd
+"@
+
+    # Where to write locally, then upload.
+    $outDir = if ($ReportLocalDir) { $ReportLocalDir } else { Join-Path ([System.IO.Path]::GetTempPath()) "genai-throttle-reports/$dateDir" }
+    try {
+        $files = Export-ThrottleReportFiles -Markdown $reportMd -BaseName $baseName -OutDir $outDir
+        $pdfNote = if ($files.Pdf) { ", $($files.Pdf)" } else { '' }
+        Write-Info "Report generated: $($files.Md)$pdfNote"
+    } catch {
+        Write-Warn "Report generation failed: $($_.Exception.Message)"
+        $files = $null
+    }
+
+    # Resolve the target storage account (primary of the throttled RG).
+    $reportRg = if ($ReportResourceGroup) { $ReportResourceGroup } elseif ($ResourceGroup) { $ResourceGroup } else { '' }
+    $reportSa = if ($ReportStorageAccount) { $ReportStorageAccount } elseif ($StorageAccountName) { $StorageAccountName } elseif ($reportRg) { Resolve-PrimaryStorageAccount -Rg $reportRg } else { $null }
+
+    if ($files -and $reportSa -and $reportRg) {
+        Write-Info "Uploading report to storage account '$reportSa' (rg '$reportRg') -> $ReportContainer/$blobPrefix"
+        if ($DryRun) {
+            Write-Warn "  [DryRun] would upload: $ReportContainer/$blobPrefix$baseName.{md,html,pdf}"
+        } else {
+            # Ensure the container exists (idempotent), then upload each produced file.
+            az storage container create --account-name $reportSa --name $ReportContainer --auth-mode login --only-show-errors | Out-Null
+            foreach ($f in @($files.Md, $files.Html, $files.Pdf)) {
+                if ($f -and (Test-Path $f)) {
+                    $blob = "$blobPrefix$(Split-Path $f -Leaf)"
+                    az storage blob upload --account-name $reportSa --container-name $ReportContainer `
+                        --name $blob --file $f --auth-mode login --overwrite --only-show-errors | Out-Null
+                    Write-Ok "  uploaded: $ReportContainer/$blob"
+                }
+            }
+        }
+    } elseif (-not $reportSa) {
+        Write-Warn "No target storage account resolved (subscription scope or no 'sa*' account found). Report kept locally at: $outDir"
+        Write-Warn "  Pass -ReportStorageAccount <name> (+ -ReportResourceGroup <rg>) to upload."
     }
 }
 
