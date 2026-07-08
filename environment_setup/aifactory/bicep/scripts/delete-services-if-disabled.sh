@@ -2189,8 +2189,12 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   if [ -n "$storage_accounts" ]; then
     subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
     while IFS= read -r sa_name; do
-      # Defensive: trim any stray CR/whitespace so the name never corrupts an ARM URL
-      sa_name="$(echo "$sa_name" | tr -d '\r' | xargs)"
+      # Defensive: trim any stray CR/whitespace so the name never corrupts an ARM URL.
+      # NOTE: use pure-bash trimming (not '| xargs') — on ADO Windows agents the exported
+      # environment is large enough that xargs fails with 'environment is too large for exec'.
+      sa_name="${sa_name//$'\r'/}"
+      sa_name="${sa_name#"${sa_name%%[![:space:]]*}"}"
+      sa_name="${sa_name%"${sa_name##*[![:space:]]}"}"
       if [ -n "$sa_name" ]; then
         echo "Deleting storage account: $sa_name"
         # Delete private endpoints first (name-pattern based, project RG only)
@@ -2552,8 +2556,12 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   if [ -n "$uamis" ]; then
     subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
     while IFS= read -r uami_name; do
-      # Defensive: trim any stray CR/whitespace so the name never corrupts an ARM URL
-      uami_name="$(echo "$uami_name" | tr -d '\r' | xargs)"
+      # Defensive: trim any stray CR/whitespace so the name never corrupts an ARM URL.
+      # NOTE: use pure-bash trimming (not '| xargs') — on ADO Windows agents the exported
+      # environment is large enough that xargs fails with 'environment is too large for exec'.
+      uami_name="${uami_name//$'\r'/}"
+      uami_name="${uami_name#"${uami_name%%[![:space:]]*}"}"
+      uami_name="${uami_name%"${uami_name##*[![:space:]]}"}"
       if [ -n "$uami_name" ]; then
         echo "Deleting User Assigned Managed Identity: $uami_name"
 
