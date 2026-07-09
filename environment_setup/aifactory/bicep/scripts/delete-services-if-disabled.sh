@@ -318,94 +318,121 @@ if [ "$skip_aisearch_deletion" = "false" ] && [ "$enableAISearch" = "false" ] &&
     -o tsv | head -n1)
   
   if [ -n "$aisearch_name" ]; then
-    # Get all shared private link resources
-    shared_pe_list=$(az search shared-private-link-resource list \
-      --resource-group "$projectResourceGroup" \
-      --service-name "$aisearch_name" \
-      --query "[].name" \
-      -o tsv 2>/dev/null || echo "")
-    
-    if [ -n "$shared_pe_list" ]; then
-      echo "  Found shared private endpoints for AI Search:"
-      while IFS= read -r shared_pe_name; do
-        if [ -n "$shared_pe_name" ]; then
-          echo "    - $shared_pe_name"
-          echo "    Deleting shared private endpoint: $shared_pe_name"
-          # NOTE: 'az search shared-private-link-resource delete' does NOT support --no-wait.
-          # The server-side delete is asynchronous regardless; the wait/verify + REST
-          # force-delete fallback below handles any that are still draining or locked.
-          az search shared-private-link-resource delete \
-            --resource-group "$projectResourceGroup" \
-            --service-name "$aisearch_name" \
-            --name "$shared_pe_name" \
-            --yes 2>&1 || echo "    Warning: Failed to initiate deletion of $shared_pe_name"
-        fi
-      done <<< "$shared_pe_list"
-      
-      # Wait for shared private endpoints to be fully deleted
-      echo "  Waiting 30 seconds for shared private endpoints deletion to complete..."
-      sleep 30
-      
-      # Verify deletion
-      echo "  Verifying shared private endpoints deletion..."
-      remaining_spl=$(az search shared-private-link-resource list \
-        --resource-group "$projectResourceGroup" \
-        --service-name "$aisearch_name" \
-        --query "[].name" \
-        -o tsv 2>/dev/null || echo "")
-      
-      if [ -z "$remaining_spl" ]; then
-        echo "  ✓ All shared private endpoints deleted successfully"
-      else
-        echo "  ⚠️  Some shared private endpoints still exist, waiting additional 30 seconds..."
-        sleep 30
-        
-        # Final check and force delete any remaining via REST API
-        remaining_spl=$(az search shared-private-link-resource list \
+    # =========================================================================
+    # Shared Private Link Resources (SPL) MUST be gone before the search service
+    # can be deleted. A single lingering SPL — e.g. 'shared-pe-foundry-cogsvc'
+    # pointing at a Cognitive Services account — makes the service delete fail with:
+    #   ConflictError / LockedSPLResourceFound:
+    #   "Unable to verify management locks on Resource '.../accounts/<foundry>'.
+    #    manually delete the SPL resource '.../sharedPrivateLinkResources/<name>' first"
+    #
+    # We enumerate SPLs via the REST API (authoritative — the CLI extension can
+    # under-report / return empty while an SPL is still attached), force-delete each,
+    # then POLL until none remain before deleting the service.
+    # =========================================================================
+    subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
+    spl_api_version="2025-02-01-preview"
+    spl_base_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Search/searchServices/${aisearch_name}/sharedPrivateLinkResources"
+
+    echo "  Enumerating shared private link resources (REST)..."
+    spl_names=$(az rest --method GET --url "${spl_base_url}?api-version=${spl_api_version}" \
+      --query "value[].name" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+
+    if [ -n "$spl_names" ]; then
+      echo "  Found shared private link resources:"
+      while IFS= read -r spl_name; do
+        spl_name="${spl_name//$'\r'/}"
+        [ -z "$spl_name" ] && continue
+        echo "    - $spl_name"
+      done <<< "$spl_names"
+
+      # Issue delete for each (CLI first for a graceful async delete, then REST as a
+      # fallback in case the CLI extension can't see it).
+      while IFS= read -r spl_name; do
+        spl_name="${spl_name//$'\r'/}"
+        [ -z "$spl_name" ] && continue
+        echo "    Deleting shared private link resource: $spl_name"
+        az search shared-private-link-resource delete \
           --resource-group "$projectResourceGroup" \
           --service-name "$aisearch_name" \
-          --query "[].name" \
-          -o tsv 2>/dev/null | tr -d '\r' || echo "")
-        
-        if [ -n "$remaining_spl" ]; then
-          echo "  Force deleting remaining shared private endpoints via REST API..."
-          subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
-          while IFS= read -r remaining_pe; do
-            if [ -n "$remaining_pe" ]; then
-              echo "    Force deleting: $remaining_pe"
-              rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Search/searchServices/${aisearch_name}/sharedPrivateLinkResources/${remaining_pe}?api-version=2025-02-01-preview"
-              az rest --method DELETE --url "$rest_url" --headers "Content-Type=application/json" 2>&1 || echo "    Warning: Force delete failed for $remaining_pe"
-            fi
-          done <<< "$remaining_spl"
-          
-          echo "  Waiting additional 20 seconds after force deletion..."
-          sleep 20
+          --name "$spl_name" \
+          --yes 2>&1 || echo "    (CLI delete non-zero; retrying via REST)"
+        az rest --method DELETE \
+          --url "${spl_base_url}/${spl_name}?api-version=${spl_api_version}" \
+          --headers "Content-Type=application/json" -o none 2>&1 \
+          || echo "    (REST delete non-zero for $spl_name)"
+      done <<< "$spl_names"
+
+      # Poll until every SPL is gone (server-side delete is async). Cap ~5 minutes and
+      # re-issue REST DELETE each round since SPLs can otherwise get stuck.
+      echo "  Waiting for shared private link resources to drain..."
+      spl_wait_max=20      # 20 * 15s = 300s
+      spl_wait_count=0
+      remaining_spl=""
+      while [ $spl_wait_count -lt $spl_wait_max ]; do
+        remaining_spl=$(az rest --method GET --url "${spl_base_url}?api-version=${spl_api_version}" \
+          --query "value[].name" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+        if [ -z "$remaining_spl" ]; then
+          echo "  ✓ All shared private link resources deleted"
+          break
         fi
+        while IFS= read -r spl_name; do
+          spl_name="${spl_name//$'\r'/}"
+          [ -z "$spl_name" ] && continue
+          az rest --method DELETE \
+            --url "${spl_base_url}/${spl_name}?api-version=${spl_api_version}" \
+            --headers "Content-Type=application/json" -o none 2>/dev/null || true
+        done <<< "$remaining_spl"
+        spl_wait_count=$((spl_wait_count + 1))
+        echo "    Still draining ($spl_wait_count/$spl_wait_max): $(echo "$remaining_spl" | tr '\n' ' ')"
+        sleep 15
+      done
+
+      if [ -n "$remaining_spl" ]; then
+        echo "  ⚠️  Shared private link resources still present after wait: $(echo "$remaining_spl" | tr '\n' ' ')"
+        echo "  ⚠️  Search service delete may fail with LockedSPLResourceFound; continuing anyway."
       fi
     else
-      echo "  No shared private endpoints found"
+      echo "  No shared private link resources found"
     fi
-    subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
-    
-    for shared_pe_name in "${foundry_shared_endpoints[@]}"; do
-      echo "    Checking for: $shared_pe_name"
-      rest_url="https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Search/searchServices/${aisearch_name}/sharedPrivateLinkResources/${shared_pe_name}?api-version=2025-02-01-preview"
-      az rest --method DELETE --url "$rest_url" --headers "Content-Type=application/json" -o none 2>/dev/null && echo "    ✓ Deleted $shared_pe_name" || true
-    done
-    
+
     echo "  Shared private endpoints deletion completed"
     
     # STEP 2: Delete regular private endpoints (always attempt, fail silently if not found)
     delete_private_endpoints "$aisearch_name" "AI Search"
     
-    # STEP 3: Delete the AI Search service
+    # STEP 3: Delete the AI Search service. Retry on LockedSPLResourceFound — a shared
+    # private link resource can still be draining even after the poll above; re-force the
+    # remaining SPLs via REST between attempts.
     echo "Deleting AI Search service: $aisearch_name"
-    az search service delete \
-      --resource-group "$projectResourceGroup" \
-      --name "$aisearch_name" \
-      --yes 2>&1
-    
-    if [ $? -eq 0 ]; then
+    search_delete_ok=false
+    for attempt in 1 2 3; do
+      delete_output=$(az search service delete \
+        --resource-group "$projectResourceGroup" \
+        --name "$aisearch_name" \
+        --yes 2>&1) && { search_delete_ok=true; break; }
+
+      echo "$delete_output"
+      if echo "$delete_output" | grep -qi "LockedSPLResourceFound\|sharedPrivateLinkResources"; then
+        echo "  ⚠️  Attempt $attempt: blocked by lingering shared private link resource — re-forcing SPL delete..."
+        leftover_spl=$(az rest --method GET --url "${spl_base_url}?api-version=${spl_api_version}" \
+          --query "value[].name" -o tsv 2>/dev/null | tr -d '\r' || echo "")
+        while IFS= read -r spl_name; do
+          spl_name="${spl_name//$'\r'/}"
+          [ -z "$spl_name" ] && continue
+          echo "    Force deleting leftover SPL: $spl_name"
+          az rest --method DELETE \
+            --url "${spl_base_url}/${spl_name}?api-version=${spl_api_version}" \
+            --headers "Content-Type=application/json" -o none 2>/dev/null || true
+        done <<< "$leftover_spl"
+        sleep 20
+      else
+        # A different (non-SPL) error — no point retrying the same way.
+        break
+      fi
+    done
+
+    if [ "$search_delete_ok" = "true" ]; then
       echo "✅ Successfully deleted AI Search service"
       echo "##vso[task.setvariable variable=aiSearchExists]false"
     else
