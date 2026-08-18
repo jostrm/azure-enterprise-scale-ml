@@ -207,7 +207,7 @@ jobs:
       enableDefenderforAIResourceLevel: ${{ vars.ENABLE_DEFENDER_FOR_AI_RESOURCE_LEVEL || 'false' }}
 
       # Complete mode vs Incremental mode
-      enableDeleteForDisabledResources: ${{ vars.ENABLE_DELETE_FOR_DISABLED_RESOURCES || 'true' }}
+      enableDeleteForDisabledResources: ${{ vars.ENABLE_DELETE_FOR_DISABLED_RESOURCES || 'false' }}
       deleteAllServicesForProject: ${{ vars.DELETE_ALL_SERVICES_FOR_PROJECT || 'false' }}
       deleteAllForProject: ${{ vars.DELETE_ALL_FOR_PROJECT || 'false' }}
 

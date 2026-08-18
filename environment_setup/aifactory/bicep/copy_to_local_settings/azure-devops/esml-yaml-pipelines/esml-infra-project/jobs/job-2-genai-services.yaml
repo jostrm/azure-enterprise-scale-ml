@@ -1100,7 +1100,15 @@ steps:
       echo "##vso[task.setvariable variable=redisExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Cache/Redis" "$redisName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=postgreSQLExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DBforPostgreSQL/flexibleServers" "$postgreSQLName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=sqlServerExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers" "$sqlServerName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=sqlDBExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Sql/servers/databases" "$sqlDBName" "*")"
+      # sqlDBExists: SQL databases are CHILD resources; az returns their name as "<server>/<db>",
+      # so starts_with('sqldb-...') never matches and the old suffix "*" never matched either
+      # (ends_with(name,'*') is always false) -> sqlDBExists was permanently false.
+      # Detect the AI Factory database precisely by matching the full db name anywhere in "<server>/<db>".
+      sqlDBExistsVal="false"
+      if az resource list --resource-group "$targetResourceGroup" --resource-type "Microsoft.Sql/servers/databases" --query "[?contains(name, '${sqlDBName}')].name" -o tsv 2>/dev/null | grep -q .; then
+        sqlDBExistsVal="true"
+      fi
+      echo "##vso[task.setvariable variable=sqlDBExists]$sqlDBExistsVal"
       echo "##vso[task.setvariable variable=elasticExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Elastic/monitors" "$elasticName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=acrProjectExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ContainerRegistry/registries" "$acrProjectName" "$suffixAcr")"
       echo "##vso[task.setvariable variable=vmExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Compute/virtualMachines" "$vmName" "$suffixStandard")"
@@ -1447,6 +1455,7 @@ steps:
     admin_aifactoryPrefixRG: $(admin_aifactoryPrefixRG)
     admin_aifactorySuffixRG: $(admin_aifactorySuffixRG)
     admin_locationSuffix: $(admin_locationSuffix)
+    admin_prjResourceSuffix: $(admin_prjResourceSuffix)
     dev_test_prod: $(dev_test_prod)
     project_number_000: $(project_number_000)
     projectPrefix: $(projectPrefix)
