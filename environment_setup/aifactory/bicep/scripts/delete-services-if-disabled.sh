@@ -27,14 +27,42 @@ echo "Target resource group: $projectResourceGroup"
 #              Set to true to also delete the Key Vault (e.g. for a full teardown).
 # Normalize to lowercase because ADO serializes unquoted YAML booleans as "True"/"False" (capital T/F)
 # and all bash comparisons in this script use lowercase "true"/"false"
+enableDeleteForDisabledResources=$(echo "${enableDeleteForDisabledResources:-false}" | tr '[:upper:]' '[:lower:]')
 deleteAllServicesForProject=$(echo "${deleteAllServicesForProject:-false}" | tr '[:upper:]' '[:lower:]')
 deleteAllForProject=$(echo "${deleteAllForProject:-false}" | tr '[:upper:]' '[:lower:]')
 deleteKeyvaultAlso=$(echo "${deleteKeyvaultAlso:-false}" | tr '[:upper:]' '[:lower:]')
 echo ""
 echo "=== Delete Mode ==="
+echo "enableDeleteForDisabledResources: $enableDeleteForDisabledResources"
 echo "deleteAllServicesForProject: $deleteAllServicesForProject"
 echo "deleteAllForProject: $deleteAllForProject"
 echo "deleteKeyvaultAlso: $deleteKeyvaultAlso"
+
+# =============================================================================
+# SAFETY GUARD (defense in depth):
+# The per-service delete blocks below only test "enableX=false && xExists=true"
+# and do NOT re-check whether cleanup was actually requested. They historically
+# trusted the ADO task condition (enableDeleteForDisabledResources=true) as the
+# sole gate. If this script is ever invoked for any other reason (queue-time
+# variable override, ULTRA-mode promotion edge cases, a mis-evaluated task
+# condition, or a manual run), those blocks would delete every service whose
+# enable* flag is false - which is exactly how "add one service to an existing
+# project" could silently remove unrelated resources.
+#
+# This guard makes the SCRIPT itself safe: if NONE of the three delete modes is
+# explicitly enabled, no resource is deleted and the script exits successfully.
+#   - enableDeleteForDisabledResources : incremental cleanup (delete disabled services)
+#   - deleteAllServicesForProject      : complete project-services teardown
+#   - deleteAllForProject              : ULTRA teardown (whole project RG + networking)
+# =============================================================================
+if [ "$enableDeleteForDisabledResources" != "true" ] && \
+   [ "$deleteAllServicesForProject" != "true" ] && \
+   [ "$deleteAllForProject" != "true" ]; then
+  echo ""
+  echo "🛑 No delete mode is enabled (enableDeleteForDisabledResources, deleteAllServicesForProject and deleteAllForProject are all not 'true')."
+  echo "   Skipping all resource deletion - nothing will be removed."
+  exit 0
+fi
 if [ "$deleteAllServicesForProject" = "true" ]; then
   if [ "$deleteKeyvaultAlso" = "true" ]; then
     echo "🔥 deleteAllServicesForProject=true + deleteKeyvaultAlso=true: EVERYTHING will be deleted including KeyVault, Storage, AppInsights, and networking resources in common RG"
@@ -1138,11 +1166,35 @@ if [ "$enableSQLDatabase" = "false" ] && [ "$sqlServerExists" = "true" ]; then
   echo "✓ SQL Database is disabled but exists - proceeding with deletion"
   
   sqlServerName="sql-${projectName}-${locationSuffix}-${envName}"
-  
-  sql_server=$(az sql server list \
+  # Match the SAME AI Factory naming convention the detection uses:
+  #   starts_with(name, 'sql-<project>-<loc>-<env>') AND ends_with(name, '<resourceSuffix>')
+  # resourceSuffix (admin_prjResourceSuffix, e.g. '-001') scopes the match to the exact
+  # AI Factory-created server, so a co-located SQL server that AI Factory did NOT create
+  # (different suffix) is never matched. A bare prefix match + 'head -n1' could otherwise
+  # pick the wrong server when more than one 'sql-...' server exists in the RG.
+  resourceSuffix="${admin_prjResourceSuffix}"
+  if [ -n "$resourceSuffix" ]; then
+    sqlServerQuery="[?starts_with(name, '${sqlServerName}') && ends_with(name, '${resourceSuffix}')].name"
+  else
+    # No suffix configured -> fall back to prefix-only (legacy behaviour).
+    sqlServerQuery="[?starts_with(name, '${sqlServerName}')].name"
+  fi
+
+  # Collect ALL matches so we can refuse to act on an ambiguous result instead of
+  # blindly deleting the first one.
+  mapfile -t sql_matches < <(az sql server list \
     --resource-group "$projectResourceGroup" \
-    --query "[?starts_with(name, '${sqlServerName}')].name" \
-    -o tsv | head -n1)
+    --query "$sqlServerQuery" \
+    -o tsv 2>/dev/null | tr -d '\r' | sed '/^$/d')
+
+  if [ "${#sql_matches[@]}" -gt 1 ]; then
+    echo "⚠️  Multiple SQL servers matched the AI Factory naming convention ('${sqlServerName}...${resourceSuffix}'):"
+    printf '     - %s\n' "${sql_matches[@]}"
+    echo "⚠️  Refusing to delete an ambiguous match - skipping SQL Server deletion (no resource removed)."
+    sql_server=""
+  else
+    sql_server="${sql_matches[0]:-}"
+  fi
   
   if [ -n "$sql_server" ]; then
     echo "Found SQL Server: $sql_server"
@@ -1164,7 +1216,7 @@ if [ "$enableSQLDatabase" = "false" ] && [ "$sqlServerExists" = "true" ]; then
       echo "❌ Failed to delete SQL Server"
     fi
   else
-    echo "⚠️  SQL Server not found with prefix: $sqlServerName"
+    echo "⚠️  No unambiguous AI Factory SQL Server found (prefix: '${sqlServerName}', suffix: '${resourceSuffix}') - skipping deletion"
   fi
 elif [ "$enableSQLDatabase" = "true" ]; then
   echo "ℹ️  SQL Database is enabled - skipping deletion"
