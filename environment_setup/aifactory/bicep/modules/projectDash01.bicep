@@ -75,6 +75,74 @@ param location string
 @description('Whether AI Foundry was added (addAIFoundry=true) - affects V2 account naming')
 param addAIFoundry bool = false
 
+@description('Service configuration used to build the dashboard inventory.')
+param enableAIFoundry bool = false
+param enableAIFoundryHub bool = false
+param addAIFoundryHub bool = false
+param enableAFoundryCaphost bool = false
+param enableAISearch bool = false
+param addAISearch bool = false
+param enableCosmosDB bool = false
+param enableAzureOpenAI bool = false
+param enableAIServices bool = false
+param enableAzureAIVision bool = false
+param enableAzureSpeech bool = false
+param enableAIDocIntelligence bool = false
+param enableContentSafety bool = false
+param enableBing bool = false
+param enableBingCustomSearch bool = false
+param enableAzureMachineLearning bool = false
+param addAzureMachineLearning bool = false
+param enableAKS bool = false
+param enableAksForAzureML bool = false
+param enableDatafactory bool = false
+param enableDatabricks bool = false
+param enableContainerApps bool = false
+param enableFunction bool = false
+param enableWebApp bool = false
+param enableLogicApps bool = false
+param enableEventHubs bool = false
+param enableBotService bool = false
+param enablePostgreSQL bool = false
+param enableRedisCache bool = false
+param enableSQLDatabase bool = false
+param enableElasticsearch bool = false
+param allowPublicAccessWhenBehindVnet bool = false
+param enablePublicGenAIAccess bool = false
+param enablePublicAccessWithPerimeter bool = false
+param cmk bool = false
+param useCommonACR bool = true
+param acrSku string = 'Premium'
+param cosmosKind string = 'GlobalDocumentDB'
+param aksSkuName string = 'Base'
+param aksSkuTier string = 'Standard'
+param skuAISearchDev string = 'standard'
+param skuAISearchStageProd string = 'standard'
+param skuAIServicesDev string = 'S0'
+param skuAIServicesStageProd string = 'S0'
+param skuOpenAIDev string = 'S0'
+param skuOpenAIStageProd string = 'S0'
+param skuContentSafetyDev string = 'S0'
+param skuContentSafetyStageProd string = 'S0'
+param skuVisionDev string = 'S1'
+param skuVisionStageProd string = 'S1'
+param skuSpeechDev string = 'S0'
+param skuSpeechStageProd string = 'S0'
+param skuDocIntelligenceDev string = 'S0'
+param skuDocIntelligenceStageProd string = 'S0'
+param skuPostgreSQLDev string = 'Standard_B1ms'
+param skuPostgreSQLStageProd string = 'Standard_B1ms'
+param skuRedisDev string = 'Standard'
+param skuRedisStageProd string = 'Standard'
+param skuSQLDatabaseDev string = 'S0'
+param skuSQLDatabaseStageProd string = 'S0'
+param skuElasticDev string = 'ess-consumption-2024_Monthly'
+param skuElasticStageProd string = 'ess-consumption-2024_Monthly'
+param skuWebAppDev string = 'P1v3'
+param skuWebAppStageProd string = 'P1v3'
+param skuFunctionDev string = 'EP1'
+param skuFunctionStageProd string = 'EP1'
+
 @description('Resource tags')
 param tags object = {}
 
@@ -137,6 +205,64 @@ var foundryAccountResId    = '${rgResourceId}/providers/Microsoft.CognitiveServi
 var keyvaultResId          = '${rgResourceId}/providers/Microsoft.KeyVault/vaults/${namingOutputs.keyvaultName}'
 var storage2001ResId       = '${rgResourceId}/providers/Microsoft.Storage/storageAccounts/${namingOutputs.storageAccount2001Name}'
 var aiSearchResId          = '${rgResourceId}/providers/Microsoft.Search/searchServices/${namingOutputs.safeNameAISearch}'
+var isDev = env == 'dev'
+var privateNetworking = !(allowPublicAccessWhenBehindVnet && enablePublicGenAIAccess && enablePublicAccessWithPerimeter)
+var foundryWithPrivateCaphost = (enableAIFoundry || addAIFoundry) && enableAFoundryCaphost && privateNetworking
+var needsContainerRegistry = enableAIFoundry || addAIFoundry || enableAzureMachineLearning || addAzureMachineLearning || enableContainerApps
+var aiSearchSku = isDev ? skuAISearchDev : skuAISearchStageProd
+var aiServicesSku = isDev ? skuAIServicesDev : skuAIServicesStageProd
+var openAiSku = isDev ? skuOpenAIDev : skuOpenAIStageProd
+var contentSafetySku = isDev ? skuContentSafetyDev : skuContentSafetyStageProd
+var visionSku = isDev ? skuVisionDev : skuVisionStageProd
+var speechSku = isDev ? skuSpeechDev : skuSpeechStageProd
+var docIntelligenceSku = isDev ? skuDocIntelligenceDev : skuDocIntelligenceStageProd
+var postgreSqlSku = isDev ? skuPostgreSQLDev : skuPostgreSQLStageProd
+var redisSku = isDev ? skuRedisDev : skuRedisStageProd
+var sqlDatabaseSku = isDev ? skuSQLDatabaseDev : skuSQLDatabaseStageProd
+var elasticSku = isDev ? skuElasticDev : skuElasticStageProd
+var webAppSku = isDev ? skuWebAppDev : skuWebAppStageProd
+var functionSku = isDev ? skuFunctionDev : skuFunctionStageProd
+var enabledByUserServices = concat(
+  (enableAIFoundry || addAIFoundry) ? ['AI Foundry | SKU: Standard | Purpose: AI agent and application creation.'] : [],
+  (enableAIFoundryHub || addAIFoundryHub) ? ['AI Foundry Hub v1 | SKU: Standard | Purpose: legacy AI Foundry workspace hub.'] : [],
+  ((enableAISearch || addAISearch) && !foundryWithPrivateCaphost) ? ['AI Search | SKU: ${aiSearchSku} | Purpose: search, retrieval, and grounding.'] : [],
+  (enableCosmosDB && !foundryWithPrivateCaphost) ? ['Cosmos DB | SKU: ${cosmosKind} | Purpose: application data and agent threads.'] : [],
+  enableAzureOpenAI ? ['Azure OpenAI | SKU: ${openAiSku} | Purpose: generative AI model deployments.'] : [],
+  enableAIServices ? ['Azure AI Services | SKU: ${aiServicesSku} | Purpose: multi-service AI APIs.'] : [],
+  enableAzureAIVision ? ['Azure AI Vision | SKU: ${visionSku} | Purpose: image analysis and OCR.'] : [],
+  enableAzureSpeech ? ['Azure AI Speech | SKU: ${speechSku} | Purpose: speech recognition and synthesis.'] : [],
+  enableAIDocIntelligence ? ['Document Intelligence | SKU: ${docIntelligenceSku} | Purpose: document extraction and analysis.'] : [],
+  enableContentSafety ? ['Azure AI Content Safety | SKU: ${contentSafetySku} | Purpose: harmful-content detection.'] : [],
+  enableBing ? ['Bing Search | SKU: G2 | Purpose: web search grounding.'] : [],
+  enableBingCustomSearch ? ['Bing Custom Search | SKU: G2 | Purpose: domain-specific web search.'] : [],
+  (enableAzureMachineLearning || addAzureMachineLearning) ? ['Azure Machine Learning | SKU: - | Purpose: machine learning experimentation, training, and MLOps.'] : [],
+  (enableAKS || enableAksForAzureML) ? ['Azure Kubernetes Service | SKU: ${aksSkuName} ${aksSkuTier} | Purpose: managed Kubernetes and Azure ML inference compute.'] : [],
+  enableDatafactory ? ['Azure Data Factory | SKU: - | Purpose: data ingestion and orchestration.'] : [],
+  enableDatabricks ? ['Azure Databricks | SKU: - | Purpose: data engineering and analytics.'] : [],
+  enableContainerApps ? ['Azure Container Apps | SKU: Consumption | Purpose: containerized application hosting.'] : [],
+  enableFunction ? ['Azure Functions | SKU: ${functionSku} | Purpose: event-driven serverless workloads.'] : [],
+  enableWebApp ? ['Azure App Service | SKU: ${webAppSku} | Purpose: web application hosting.'] : [],
+  enableLogicApps ? ['Azure Logic Apps | SKU: Standard | Purpose: workflow automation and integration.'] : [],
+  enableEventHubs ? ['Azure Event Hubs | SKU: Standard | Purpose: event ingestion and streaming.'] : [],
+  enableBotService ? ['Azure Bot Service | SKU: - | Purpose: conversational bot channels.'] : [],
+  enablePostgreSQL ? ['Azure Database for PostgreSQL | SKU: ${postgreSqlSku} | Purpose: relational data, vectors, and GIS.'] : [],
+  enableRedisCache ? ['Azure Cache for Redis | SKU: ${redisSku} | Purpose: low-latency cache and session state.'] : [],
+  enableSQLDatabase ? ['Azure SQL Database | SKU: ${sqlDatabaseSku} | Purpose: relational application data.'] : [],
+  enableElasticsearch ? ['Elastic Cloud | SKU: ${elasticSku} | Purpose: search and observability workloads.'] : []
+)
+var mandatoryServices = concat(
+  [
+    'Storage Account | SKU: Standard_LRS | Purpose: required artifact, data, and service storage.'
+    'Key Vault | SKU: Standard | Purpose: required secret, key, and certificate storage.'
+    'Application Insights | SKU: pay-as-you-go | Purpose: required application telemetry and monitoring.'
+  ],
+  privateNetworking ? ['Private Endpoints | SKU: - | Purpose: private connectivity for enabled Azure PaaS services.'] : [],
+  foundryWithPrivateCaphost ? ['AI Search | SKU: ${aiSearchSku} | Purpose: required by private Foundry capability hosts for Foundry IQ.'] : [],
+  foundryWithPrivateCaphost ? ['Cosmos DB | SKU: ${cosmosKind} | Purpose: required by private Foundry capability hosts for agent threads and state.'] : [],
+  (needsContainerRegistry && (privateNetworking || cmk)) ? ['${useCommonACR ? 'Shared ' : ''}Container Registry | SKU: ${acrSku} | Purpose: required by Foundry, Azure ML, and Container Apps; Premium supports private endpoints and CMK.'] : []
+)
+var enabledByUserMarkdown = empty(enabledByUserServices) ? '- No optional services are enabled.' : '- ${join(enabledByUserServices, '\n- ')}'
+var mandatoryServicesMarkdown = '- ${join(mandatoryServices, '\n- ')}'
 
 // Portal deep links
 var aiFoundryProjectUrl    = 'https://ai.azure.com/build/overview?tid=${tenant().tenantId}&wsid=${foundryAccountResId}/projects/${aifV2ProjectName}'
@@ -281,6 +407,25 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
               asset: {
                 idInputName: 'id'
                 type: 'Microsoft.Search/searchServices'
+              }
+            }
+          }
+          // ── ROW 11-18: Service configuration inventory ───────────────────────
+          {
+            position: { x: 0, y: 11, colSpan: 12, rowSpan: 8 }
+            metadata: {
+              inputs: []
+              type: 'Extension/HubsExtension/PartType/MarkdownPart'
+              settings: {
+                content: {
+                  settings: {
+                    content: '## Service Configuration\n\n### Enabled by user\n${enabledByUserMarkdown}\n\n### Enabled since mandatory, due to Azure compatibility\n${mandatoryServicesMarkdown}'
+                    title: ''
+                    subtitle: ''
+                    markdownSource: 1
+                    markdownUri: null
+                  }
+                }
               }
             }
           }

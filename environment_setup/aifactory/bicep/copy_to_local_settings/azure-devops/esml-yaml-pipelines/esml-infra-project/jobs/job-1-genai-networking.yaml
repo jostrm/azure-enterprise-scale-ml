@@ -4,6 +4,13 @@ parameters:
   - name: serviceConnectionSeeding
     type: string
 steps:
+- task: PythonScript@0
+  displayName: '00_apply_json_config_override'
+  condition: and(succeeded(), ne(variables['configOverrideFile'], ''))
+  inputs:
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py'
+    arguments: '--file "$(configOverrideFile)" --environment "$(dev_test_prod)" --format azure-devops'
+    workingDirectory: '$(System.DefaultWorkingDirectory)'
 - task: AzureCLI@2
   displayName: '00_resolve_network_env_placeholders'
   inputs:

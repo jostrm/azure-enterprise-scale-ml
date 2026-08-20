@@ -11,6 +11,13 @@ parameters:
       - foundry
 
 steps:
+- task: PythonScript@0
+  displayName: '00_apply_json_config_override'
+  condition: and(succeeded(), ne(variables['configOverrideFile'], ''))
+  inputs:
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py'
+    arguments: '--file "$(configOverrideFile)" --environment "$(dev_test_prod)" --format azure-devops'
+    workingDirectory: '$(System.DefaultWorkingDirectory)'
 # ---------------------------------------------------------------------------
 # PREFLIGHT (early, fail-fast): validate AI Search/model quota, Elasticsearch
 # policy/RP blocks, resource-provider registration and region support for THIS
@@ -639,9 +646,16 @@ steps:
           echo "centralDnsZoneByPolicyInHub=true: privDnsResourceGroup_param not set, using constructed name: $privDnsResourceGroupName"
         fi
       else
-        # DNS zones are in the common resource group in the same subscription as dev_test_prod_sub_id
+        # DNS zones are in the common resource group in the same subscription as dev_test_prod_sub_id.
+        # Honor a custom (BYO) common resource group name from commonResourceGroup_param; only fall
+        # back to the default naming convention when it is unset (or the macro was not substituted).
         privDnsSubscription="$(dev_test_prod_sub_id)"
-        privDnsResourceGroupName="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+        COMMON_RG_INPUT="$(commonResourceGroup_param)"
+        if [ -n "$COMMON_RG_INPUT" ] && [ "$COMMON_RG_INPUT" != "\$(commonResourceGroup_param)" ]; then
+          privDnsResourceGroupName="$COMMON_RG_INPUT"
+        else
+          privDnsResourceGroupName="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+        fi
         echo "centralDnsZoneByPolicyInHub=false: assuming DNS zones are in the common resource group"
         echo "  subscription: $privDnsSubscription"
         echo "  resource group: $privDnsResourceGroupName"
@@ -2312,8 +2326,15 @@ steps:
       projectPrefix="$(projectPrefix)"
       projectSuffix="$(projectSuffix)"
       
-      # Construct common resource group name
-      commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
+      # Construct common resource group name.
+      # Honor a custom (BYO) common resource group name from commonResourceGroup_param; only fall
+      # back to the default naming convention when it is unset (or the macro was not substituted).
+      COMMON_RG_INPUT="$(commonResourceGroup_param)"
+      if [ -n "$COMMON_RG_INPUT" ] && [ "$COMMON_RG_INPUT" != "\$(commonResourceGroup_param)" ]; then
+        commonResourceGroup="$COMMON_RG_INPUT"
+      else
+        commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
+      fi
       echo "commonResourceGroup resolved to: $commonResourceGroup"
       
       # Construct project resource group name
@@ -3187,8 +3208,15 @@ steps:
      projectPrefix="$(projectPrefix)"
      projectSuffix="$(projectSuffix)"
 
-     # Construct common resource group name
-     commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
+     # Construct common resource group name.
+     # Honor a custom (BYO) common resource group name from commonResourceGroup_param; only fall
+     # back to the default naming convention when it is unset (or the macro was not substituted).
+     COMMON_RG_INPUT="$(commonResourceGroup_param)"
+     if [ -n "$COMMON_RG_INPUT" ] && [ "$COMMON_RG_INPUT" != "\$(commonResourceGroup_param)" ]; then
+       commonResourceGroup="$COMMON_RG_INPUT"
+     else
+       commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
+     fi
      echo "Common RG resolved to: ${commonResourceGroup}"
 
      # ACR Push role ID
@@ -5092,6 +5120,72 @@ steps:
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
      --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters addAIFoundry="$(addAIFoundry)" \
+     --parameters enableAIFoundry="$(enableAIFoundry)" \
+     --parameters enableAIFoundryHub="$(enableAIFoundryHub)" \
+     --parameters addAIFoundryHub="$(addAIFoundryHub)" \
+     --parameters enableAFoundryCaphost="$(enableAFoundryCaphost)" \
+     --parameters enableAISearch="$(enableAISearch)" \
+     --parameters addAISearch="$(addAISearch)" \
+     --parameters enableCosmosDB="$(enableCosmosDB)" \
+     --parameters enableAzureOpenAI="$(enableAzureOpenAI)" \
+     --parameters enableAIServices="$(enableAIServices)" \
+     --parameters enableAzureAIVision="$(enableAzureAIVision)" \
+     --parameters enableAzureSpeech="$(enableAzureSpeech)" \
+     --parameters enableAIDocIntelligence="$(enableAIDocIntelligence)" \
+     --parameters enableContentSafety="$(enableContentSafety)" \
+     --parameters enableBing="$(enableBing)" \
+     --parameters enableBingCustomSearch="$(enableBingCustomSearch)" \
+     --parameters enableAzureMachineLearning="$(enableAzureMachineLearning)" \
+     --parameters addAzureMachineLearning="$(addAzureMachineLearning)" \
+     --parameters enableAKS="$(enableAKS)" \
+     --parameters enableAksForAzureML="$(enableAksForAzureML)" \
+     --parameters enableDatafactory="$(enableDatafactory)" \
+     --parameters enableDatabricks="$(enableDatabricks)" \
+     --parameters enableContainerApps="$(enableContainerApps)" \
+     --parameters enableFunction="$(enableFunction)" \
+     --parameters enableWebApp="$(enableWebApp)" \
+     --parameters enableLogicApps="$(enableLogicApps)" \
+     --parameters enableEventHubs="$(enableEventHubs)" \
+     --parameters enableBotService="$(enableBotService)" \
+     --parameters enablePostgreSQL="$(enablePostgreSQL)" \
+     --parameters enableRedisCache="$(enableRedisCache)" \
+     --parameters enableSQLDatabase="$(enableSQLDatabase)" \
+     --parameters enableElasticsearch="$(enableElasticsearch)" \
+     --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
+     --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
+     --parameters enablePublicAccessWithPerimeter="$(enablePublicAccessWithPerimeter)" \
+     --parameters cmk="$(cmk)" \
+     --parameters useCommonACR="$(useCommonACR)" \
+     --parameters acrSku="$(acr_SKU)" \
+     --parameters cosmosKind="$(cosmosKind)" \
+     --parameters aksSkuName="$(aksSkuName)" \
+     --parameters aksSkuTier="$(aksSkuTier)" \
+     --parameters skuAISearchDev="$(skuAISearchDev)" \
+     --parameters skuAISearchStageProd="$(skuAISearchStageProd)" \
+     --parameters skuAIServicesDev="$(skuAIServicesDev)" \
+     --parameters skuAIServicesStageProd="$(skuAIServicesStageProd)" \
+     --parameters skuOpenAIDev="$(skuOpenAIDev)" \
+     --parameters skuOpenAIStageProd="$(skuOpenAIStageProd)" \
+     --parameters skuContentSafetyDev="$(skuContentSafetyDev)" \
+     --parameters skuContentSafetyStageProd="$(skuContentSafetyStageProd)" \
+     --parameters skuVisionDev="$(skuVisionDev)" \
+     --parameters skuVisionStageProd="$(skuVisionStageProd)" \
+     --parameters skuSpeechDev="$(skuSpeechDev)" \
+     --parameters skuSpeechStageProd="$(skuSpeechStageProd)" \
+     --parameters skuDocIntelligenceDev="$(skuDocIntelligenceDev)" \
+     --parameters skuDocIntelligenceStageProd="$(skuDocIntelligenceStageProd)" \
+     --parameters skuPostgreSQLDev="$(skuPostgreSQLDev)" \
+     --parameters skuPostgreSQLStageProd="$(skuPostgreSQLStageProd)" \
+     --parameters skuRedisDev="$(skuRedisDev)" \
+     --parameters skuRedisStageProd="$(skuRedisStageProd)" \
+     --parameters skuSQLDatabaseDev="$(skuSQLDatabaseDev)" \
+     --parameters skuSQLDatabaseStageProd="$(skuSQLDatabaseStageProd)" \
+     --parameters skuElasticDev="$(skuElasticDev)" \
+     --parameters skuElasticStageProd="$(skuElasticStageProd)" \
+     --parameters skuWebAppDev="$(skuWebAppDev)" \
+     --parameters skuWebAppStageProd="$(skuWebAppStageProd)" \
+     --parameters skuFunctionDev="$(skuFunctionDev)" \
+     --parameters skuFunctionStageProd="$(skuFunctionStageProd)" \
      --parameters genaiSubnetId="" \
      --parameters aksSubnetId="" \
      --parameters acaSubnetId="" \

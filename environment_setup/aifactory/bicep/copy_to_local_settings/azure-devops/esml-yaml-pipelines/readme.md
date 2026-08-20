@@ -97,6 +97,28 @@ Configure and setting up the actual `AI Application Landingzones` a.k.a `AI Fact
     - ☑️ Import [infra-project-genai.yaml](./esml-infra-project/infra-project-genai.yaml)
     - ☑️ Run the preffered Azure Devops Stage(Dev, Stage, or Prod) for which environment, you want to create the project in? (Uncheck all except DEV, if only DEV)
 
+## Optional JSON project configuration
+
+`infra-project-genai.yaml` exposes two queue-time parameters:
+
+- `devConfigFile` for a Dev JSON configuration file.
+- `stageProdConfigFile` for one shared Stage and Prod JSON configuration file.
+
+Paths are relative to `$(System.DefaultWorkingDirectory)` unless absolute. Use
+all 304 variable names from `variables.yaml` / the wizard's
+`variables.json`, such as `enableAIFoundry`, `enablePostgreSQL`, and
+`acr_SKU`. The Dev file has one `dev` object. The shared Stage/Prod file has
+one `stage_prod` object, which is applied unchanged to both environments. The
+files
+[`azure-devops.project-config.dev.example.json`](../../pipeline-config/azure-devops.project-config.dev.example.json)
+and
+[`azure-devops.project-config.stage_prod.example.json`](../../pipeline-config/azure-devops.project-config.stage_prod.example.json)
+show the expected format.
+
+JSON configuration is for non-secret deployment settings only. Keep service
+connections, credentials, and other secrets in Azure DevOps service
+connections, secret variables, or Key Vault.
+
 # QUICK TIPS: Add/Remove services to project, or create NEW project?
 - ❓Q1: If you want to ADD more services to same project? 
 - A: Edit Variables.yaml, Checkin code, Re-run pipeline
