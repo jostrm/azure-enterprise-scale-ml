@@ -81,6 +81,74 @@ param acaSubnetId string = ''
 @description('Whether AI Foundry was added (addAIFoundry=true) — affects AI Foundry V2 account naming')
 param addAIFoundry bool = false
 
+@description('Service configuration used to describe the deployed project on its dashboard.')
+param enableAIFoundry bool = false
+param enableAIFoundryHub bool = false
+param addAIFoundryHub bool = false
+param enableAFoundryCaphost bool = false
+param enableAISearch bool = false
+param addAISearch bool = false
+param enableCosmosDB bool = false
+param enableAzureOpenAI bool = false
+param enableAIServices bool = false
+param enableAzureAIVision bool = false
+param enableAzureSpeech bool = false
+param enableAIDocIntelligence bool = false
+param enableContentSafety bool = false
+param enableBing bool = false
+param enableBingCustomSearch bool = false
+param enableAzureMachineLearning bool = false
+param addAzureMachineLearning bool = false
+param enableAKS bool = false
+param enableAksForAzureML bool = false
+param enableDatafactory bool = false
+param enableDatabricks bool = false
+param enableContainerApps bool = false
+param enableFunction bool = false
+param enableWebApp bool = false
+param enableLogicApps bool = false
+param enableEventHubs bool = false
+param enableBotService bool = false
+param enablePostgreSQL bool = false
+param enableRedisCache bool = false
+param enableSQLDatabase bool = false
+param enableElasticsearch bool = false
+param allowPublicAccessWhenBehindVnet bool = false
+param enablePublicGenAIAccess bool = false
+param enablePublicAccessWithPerimeter bool = false
+param cmk bool = false
+param useCommonACR bool = true
+param acrSku string = 'Premium'
+param cosmosKind string = 'GlobalDocumentDB'
+param aksSkuName string = 'Base'
+param aksSkuTier string = 'Standard'
+param skuAISearchDev string = 'standard'
+param skuAISearchStageProd string = 'standard'
+param skuAIServicesDev string = 'S0'
+param skuAIServicesStageProd string = 'S0'
+param skuOpenAIDev string = 'S0'
+param skuOpenAIStageProd string = 'S0'
+param skuContentSafetyDev string = 'S0'
+param skuContentSafetyStageProd string = 'S0'
+param skuVisionDev string = 'S1'
+param skuVisionStageProd string = 'S1'
+param skuSpeechDev string = 'S0'
+param skuSpeechStageProd string = 'S0'
+param skuDocIntelligenceDev string = 'S0'
+param skuDocIntelligenceStageProd string = 'S0'
+param skuPostgreSQLDev string = 'Standard_B1ms'
+param skuPostgreSQLStageProd string = 'Standard_B1ms'
+param skuRedisDev string = 'Standard'
+param skuRedisStageProd string = 'Standard'
+param skuSQLDatabaseDev string = 'S0'
+param skuSQLDatabaseStageProd string = 'S0'
+param skuElasticDev string = 'ess-consumption-2024_Monthly'
+param skuElasticStageProd string = 'ess-consumption-2024_Monthly'
+param skuWebAppDev string = 'P1v3'
+param skuWebAppStageProd string = 'P1v3'
+param skuFunctionDev string = 'EP1'
+param skuFunctionStageProd string = 'EP1'
+
 // ============================================================================
 // PARAMETERS - Random Values & Salts
 // ============================================================================
@@ -157,6 +225,74 @@ module projectDashboard '../modules/projectDash01.bicep' = {
 
     // AI Foundry naming mode
     addAIFoundry: addAIFoundry
+
+    // Dashboard service inventory
+    enableAIFoundry: enableAIFoundry
+    enableAIFoundryHub: enableAIFoundryHub
+    addAIFoundryHub: addAIFoundryHub
+    enableAFoundryCaphost: enableAFoundryCaphost
+    enableAISearch: enableAISearch
+    addAISearch: addAISearch
+    enableCosmosDB: enableCosmosDB
+    enableAzureOpenAI: enableAzureOpenAI
+    enableAIServices: enableAIServices
+    enableAzureAIVision: enableAzureAIVision
+    enableAzureSpeech: enableAzureSpeech
+    enableAIDocIntelligence: enableAIDocIntelligence
+    enableContentSafety: enableContentSafety
+    enableBing: enableBing
+    enableBingCustomSearch: enableBingCustomSearch
+    enableAzureMachineLearning: enableAzureMachineLearning
+    addAzureMachineLearning: addAzureMachineLearning
+    enableAKS: enableAKS
+    enableAksForAzureML: enableAksForAzureML
+    enableDatafactory: enableDatafactory
+    enableDatabricks: enableDatabricks
+    enableContainerApps: enableContainerApps
+    enableFunction: enableFunction
+    enableWebApp: enableWebApp
+    enableLogicApps: enableLogicApps
+    enableEventHubs: enableEventHubs
+    enableBotService: enableBotService
+    enablePostgreSQL: enablePostgreSQL
+    enableRedisCache: enableRedisCache
+    enableSQLDatabase: enableSQLDatabase
+    enableElasticsearch: enableElasticsearch
+    allowPublicAccessWhenBehindVnet: allowPublicAccessWhenBehindVnet
+    enablePublicGenAIAccess: enablePublicGenAIAccess
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    cmk: cmk
+    useCommonACR: useCommonACR
+    acrSku: acrSku
+    cosmosKind: cosmosKind
+    aksSkuName: aksSkuName
+    aksSkuTier: aksSkuTier
+    skuAISearchDev: skuAISearchDev
+    skuAISearchStageProd: skuAISearchStageProd
+    skuAIServicesDev: skuAIServicesDev
+    skuAIServicesStageProd: skuAIServicesStageProd
+    skuOpenAIDev: skuOpenAIDev
+    skuOpenAIStageProd: skuOpenAIStageProd
+    skuContentSafetyDev: skuContentSafetyDev
+    skuContentSafetyStageProd: skuContentSafetyStageProd
+    skuVisionDev: skuVisionDev
+    skuVisionStageProd: skuVisionStageProd
+    skuSpeechDev: skuSpeechDev
+    skuSpeechStageProd: skuSpeechStageProd
+    skuDocIntelligenceDev: skuDocIntelligenceDev
+    skuDocIntelligenceStageProd: skuDocIntelligenceStageProd
+    skuPostgreSQLDev: skuPostgreSQLDev
+    skuPostgreSQLStageProd: skuPostgreSQLStageProd
+    skuRedisDev: skuRedisDev
+    skuRedisStageProd: skuRedisStageProd
+    skuSQLDatabaseDev: skuSQLDatabaseDev
+    skuSQLDatabaseStageProd: skuSQLDatabaseStageProd
+    skuElasticDev: skuElasticDev
+    skuElasticStageProd: skuElasticStageProd
+    skuWebAppDev: skuWebAppDev
+    skuWebAppStageProd: skuWebAppStageProd
+    skuFunctionDev: skuFunctionDev
+    skuFunctionStageProd: skuFunctionStageProd
     
     // Tags
     tags: union(tags, tagsProject, {
