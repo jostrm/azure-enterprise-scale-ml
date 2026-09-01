@@ -131,16 +131,30 @@ resource openAIDiagSettingsOpenAI 'Microsoft.Insights/diagnosticSettings@2021-05
   scope: cognitiveOpenAI
   properties: {
     workspaceId: logAnalyticsWorkspace.id
-    logs: [
+    metrics: [
       {
-        categoryGroup: 'allLogs'
+        category: 'AllMetrics'
         enabled: true
       }
     ]
+    logs: [
+      {
+        category: 'RequestResponse'
+        enabled: true
+      }
+      {
+        category: 'Trace'
+        enabled: true
+      }
+      {
+        category: 'AzureOpenAIRequestUsage'
+        enabled: true
+      }
+    ]
+    // Null retains the legacy AzureDiagnostics destination rather than dedicated tables.
     logAnalyticsDestinationType: null
   }
 }
-
 resource pendCognitiveServicesOpenAI 'Microsoft.Network/privateEndpoints@2023-04-01' = if(!enablePublicAccessWithPerimeter){
   location: location
   name: '${cognitiveName}-pend'

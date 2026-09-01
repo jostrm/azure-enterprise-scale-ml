@@ -996,6 +996,7 @@ module aiFoundryAccountDiagnostics '../modules/diagnostics/cognitiveServicesDiag
     cognitiveServiceName: aifV2Name
     logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
     diagnosticSettingLevel: diagnosticSettingLevel
+    includeAzureOpenAIUsageTelemetry: true
   }
   dependsOn: [
     ...(foundryV22AccountOnly && enableAIFoundry && !useAVMFoundry && !aiFoundryV2Exists ? [aiFoundry2025NoAvmV22AccountOnly] : [])
