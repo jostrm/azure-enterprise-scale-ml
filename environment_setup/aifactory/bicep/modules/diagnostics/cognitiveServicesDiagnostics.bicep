@@ -16,6 +16,9 @@ param logAnalyticsWorkspaceId string
 @allowed(['gold', 'silver', 'bronze'])
 param diagnosticSettingLevel string = 'silver'
 
+@description('Enable the RequestResponse, Trace, and AzureOpenAIRequestUsage categories required for Azure OpenAI and AI Foundry telemetry, regardless of diagnostic setting level.')
+param includeAzureOpenAIUsageTelemetry bool = false
+
 @description('Optional. Name of the diagnostic setting. Defaults to "default" so PUT idempotently updates any pre-existing policy-created diagnostic setting that already pins the Log Analytics workspace (Azure rejects a second setting reusing the same sink + category).')
 param diagnosticSettingName string = 'default'
 
@@ -79,9 +82,27 @@ var bronzeLogs = [
   }
 ]
 
-// Select metrics and logs based on diagnostic level
+// AI Foundry telemetry is required at every tier. The default Log Analytics destination
+// remains AzureDiagnostics because no dedicated-table destination is configured.
+var foundryRequiredLogs = [
+  {
+    category: 'RequestResponse'
+    enabled: true
+  }
+  {
+    category: 'Trace'
+    enabled: true
+  }
+  {
+    category: 'AzureOpenAIRequestUsage'
+    enabled: true
+  }
+]
+
+// Select metrics and logs based on diagnostic level.
 var selectedMetrics = diagnosticSettingLevel == 'gold' ? goldMetrics : diagnosticSettingLevel == 'silver' ? silverMetrics : bronzeMetrics
-var selectedLogs = diagnosticSettingLevel == 'gold' ? goldLogs : diagnosticSettingLevel == 'silver' ? silverLogs : bronzeLogs
+var tierLogs = diagnosticSettingLevel == 'gold' ? goldLogs : diagnosticSettingLevel == 'silver' ? silverLogs : bronzeLogs
+var selectedLogs = includeAzureOpenAIUsageTelemetry ? union(tierLogs, foundryRequiredLogs) : tierLogs
 
 // Cognitive Services Diagnostic Settings
 resource cognitiveServiceDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {

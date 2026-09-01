@@ -99,21 +99,25 @@ Configure and setting up the actual `AI Application Landingzones` a.k.a `AI Fact
 
 ## Optional JSON project configuration
 
-`infra-project-genai.yaml` exposes two queue-time parameters:
+`infra-project-genai.yaml` exposes one queue-time parameter, `configFile`, for
+a combined JSON configuration file. Paths are relative to
+`$(System.DefaultWorkingDirectory)` unless absolute.
 
-- `devConfigFile` for a Dev JSON configuration file.
-- `stageProdConfigFile` for one shared Stage and Prod JSON configuration file.
+The file may use all 304 variable names from `variables.yaml` / the wizard's
+`variables.json`, such as `enableAIFoundry`, `enablePostgreSQL`, and `acr_SKU`.
+It contains a `dev` object and a `stage_prod` object. The pipeline selects
+`dev` for the Dev stage and `stage_prod` for both Stage and Prod:
 
-Paths are relative to `$(System.DefaultWorkingDirectory)` unless absolute. Use
-all 304 variable names from `variables.yaml` / the wizard's
-`variables.json`, such as `enableAIFoundry`, `enablePostgreSQL`, and
-`acr_SKU`. The Dev file has one `dev` object. The shared Stage/Prod file has
-one `stage_prod` object, which is applied unchanged to both environments. The
-files
-[`azure-devops.project-config.dev.example.json`](../../pipeline-config/azure-devops.project-config.dev.example.json)
-and
-[`azure-devops.project-config.stage_prod.example.json`](../../pipeline-config/azure-devops.project-config.stage_prod.example.json)
-show the expected format.
+```json
+{
+    "dev": {
+        "enableAIFoundry": "true"
+    },
+    "stage_prod": {
+        "enableAIFoundry": "true"
+    }
+}
+```
 
 JSON configuration is for non-secret deployment settings only. Keep service
 connections, credentials, and other secrets in Azure DevOps service

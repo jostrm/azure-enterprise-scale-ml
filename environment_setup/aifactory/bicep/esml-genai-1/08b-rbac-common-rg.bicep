@@ -333,6 +333,22 @@ module cmnRbacVNet '../modules/vnetRBACReader.bicep' = if (!disableSubnetJoinAct
   ]
 }
 
+// ============== LOG ANALYTICS READER ACCESS ==============
+// Project members require workspace-scoped read/query access to investigate their
+// project's diagnostics without receiving Reader access to the whole common RG.
+module logAnalyticsReaderProjectMembers '../modules/logAnalyticsRbacReader.bicep' = {
+  name: take('08b-rbacLogAnalytics${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  params: {
+    workspaceName: namingConvention.outputs.laWorkspaceName
+    userObjectIds: userIdsUnique
+    useAdGroups: useAdGroups
+  }
+  dependsOn: [
+    existingTargetRG
+  ]
+}
+
 // ============== DATA LAKE ACCESS ==============
 // RBAC for Data Lake - AI Foundry Integration
 module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!aiHubExists && enableAIFoundryHub) {
@@ -381,6 +397,9 @@ output commonAcrRbacDeployed bool = useCommonACR
 
 @description('Common VNet Network Contributor RBAC deployment status (for subnet join permissions)')
 output commonVNetRbacDeployed bool = !disableSubnetJoinAction
+
+@description('Number of project members granted Log Analytics Reader on the common workspace')
+output logAnalyticsReaderProjectMembersAssigned int = length(userIdsUnique)
 
 @description('Number of filtered user principals for ACR RBAC (after removing existing assignments)')
 output acrUserPrincipalsFiltered int = length(userIdsFiltered)

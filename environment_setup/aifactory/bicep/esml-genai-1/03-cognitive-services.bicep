@@ -972,20 +972,19 @@ module aiServicesDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostic
   ]
 }
 
-// Azure OpenAI Diagnostic Settings
-module openaiDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (!openaiExists && enableAzureOpenAI && !skipDiagAOAI) {
+// Azure OpenAI diagnostics for an account that pre-dates this deployment. Newly created
+// OpenAI accounts are configured by csOpenAI.bicep in the same deployment, avoiding a
+// conflicting second diagnostic setting named "default".
+module openaiDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (openaiExists && enableAzureOpenAI && !skipDiagAOAI) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-diagOpenAI-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     cognitiveServiceName: aoaiName
     logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
     diagnosticSettingLevel: diagnosticSettingLevel
+    includeAzureOpenAIUsageTelemetry: true
   }
-  dependsOn: [
-    csAzureOpenAI
-  ]
 }
-
 // Content Safety Diagnostic Settings
 module contentSafetyDiagnostics '../modules/diagnostics/cognitiveServicesDiagnostics.bicep' = if (enableContentSafety && !skipDiagContentSafety) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -1043,7 +1042,7 @@ module docIntelligenceDiagnostics '../modules/diagnostics/cognitiveServicesDiagn
 }
 
 // AI Search Diagnostic Settings
-module aiSearchDiagnostics '../modules/diagnostics/aiSearchDiagnostics.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) && !skipDiagAISearch) {
+module aiSearchDiagnostics '../modules/diagnostics/aiSearchDiagnostics.bicep' = if ((enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) && !skipDiagAISearch) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-diagAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

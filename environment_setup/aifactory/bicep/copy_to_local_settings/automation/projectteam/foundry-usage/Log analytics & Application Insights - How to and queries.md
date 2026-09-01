@@ -4,7 +4,7 @@ Use this guide to explore Foundry and Azure OpenAI usage yourself, then turn the
 
 ## Before you start
 
-Your Foundry or Azure OpenAI resource must send the `RequestResponse` and `Trace` diagnostic categories to the Log Analytics workspace. The identity opening the workspace needs **Log Analytics Reader** permission. Run `verify-and-configure-foundry-diagnostics.sh` to check this automatically; add `--apply` to create or repair the workspace diagnostic setting. Open the Azure portal, then search for and select the relevant **Log Analytics workspace**.
+Your Foundry or Azure OpenAI resource must send the `RequestResponse`, `Trace`, and `AzureOpenAIRequestUsage` diagnostic categories to the Log Analytics workspace. The AI Factory Bicep configuration enables these categories and `AllMetrics` for Foundry and Azure OpenAI at bronze, silver, and gold levels. Azure AI Search is configured with its supported `OperationLogs` category and `AllMetrics` at every level. The identity opening the workspace needs **Log Analytics Reader** permission. Run `verify-and-configure-foundry-diagnostics.sh` to inspect or repair an existing diagnostic setting. Open the Azure portal, then search for and select the relevant **Log Analytics workspace**.
 
 The report queries use `AzureDiagnostics`. The verifier reports the diagnostic setting's `logAnalyticsDestinationType`: unset or `AzureDiagnostics` uses this table; `Dedicated` writes to resource-specific tables. For a dedicated destination, select **Logs**, inspect the tables list, and replace `AzureDiagnostics` with the appropriate Cognitive Services table.
 
@@ -17,7 +17,7 @@ The report queries use `AzureDiagnostics`. The verifier reports the diagnostic s
 5. Select **Chart**, choose **Time chart**, and set the aggregation to `Sum` or `Count` as appropriate. For a separate line per model deployment, choose **Split by** > `ModelDeployment`.
 6. Select **Save** to add the chart to a Log Analytics dashboard or Azure dashboard.
 
-For a point-and-click view, open the Foundry, Azure OpenAI, or Application Insights resource, then select **Monitoring** > **Insights** to review the built-in overview. Select **Monitoring** > **Metrics** to create a custom chart. Set the time range to 30 days and add request/token metrics such as `ModelRequests`, `InputTokens`, and `OutputTokens`. Use **Apply splitting** only when a deployment dimension is offered.
+For a point-and-click view, open the Foundry, Azure OpenAI, or Application Insights resource, then select **Monitoring** > **Insights** to review the built-in overview. Select **Monitoring** > **Metrics** to create a custom chart. Set the time range to 30 days and add request/token metrics such as `AzureOpenAIRequests`, `ProcessedPromptTokens`, and `GeneratedTokens`. Use **Apply splitting** by `ModelDeploymentName` when that dimension is offered.
 
 ## Shared query setup
 
@@ -70,7 +70,7 @@ UsageEvents
 
 ## Token usage for model deployments
 
-Set `ResourceId` to the Foundry or Azure OpenAI account. Enable the `AzureOpenAIRequestUsage` diagnostic category with `verify-and-configure-foundry-diagnostics.sh --enable-azure-openai-request-usage --apply`; this query returns input, output, and cached token totals by deployment and day. Fields absent from the diagnostic payload are reported as zero.
+Set `ResourceId` to the Foundry or Azure OpenAI account. AI Factory enables the `AzureOpenAIRequestUsage` diagnostic category automatically for Foundry and Azure OpenAI. This query returns input, output, and cached token totals by deployment and day. Fields absent from the diagnostic payload are reported as zero.
 
 ```kusto
 UsageEvents
@@ -122,3 +122,29 @@ AppRequests
 ```
 
 This counts calls reaching the application, not necessarily calls reaching a specific Foundry deployment. To attribute application requests to a deployment, include the deployment name in an Application Insights custom dimension and extract it with `customDimensions["modelDeploymentName"]`.
+## Azure AI Search requests and latency
+
+Azure AI Search supports `OperationLogs` and `AllMetrics`; both are configured by AI Factory at bronze, silver, and gold levels. Set `SearchResourceId` to the AI Search service resource ID. This report shows request volume, failures, and average operation duration per day.
+
+```kusto
+let SearchResourceId = tolower("/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.Search/searchServices/<search-service>");
+AzureDiagnostics
+| where TimeGenerated >= ago(30d)
+| where Category == "OperationLogs"
+| extend ActualResourceId = tolower(iff(
+    isnotempty(tostring(column_ifexists("_ResourceId", ""))),
+    tostring(column_ifexists("_ResourceId", "")),
+    tostring(column_ifexists("ResourceId", ""))))
+| where ActualResourceId == SearchResourceId
+| extend StatusCode = toint(tostring(column_ifexists("ResultSignature", "0")))
+| extend Duration = todouble(column_ifexists("DurationMs", 0.0))
+| summarize
+    Requests = count(),
+    FailedRequests = countif(StatusCode >= 400),
+    AverageDurationMs = avg(Duration)
+    by Day = bin(TimeGenerated, 1d), OperationName
+| order by Day asc
+| render timechart
+```
+
+For capacity and performance trends, use **Metrics** on the AI Search resource and chart `SearchQueriesPerSecond`, `SearchLatency`, and `ThrottledSearchQueriesPercentage`.
