@@ -21,6 +21,7 @@ mkdir -p "$SCRIPT_DIR/aifactory/esml-infra/github-actions/bicep/"
 
 # .ENV file & 03a-GH-create-or-update-github-variables.sh
 cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/.env.template" "$SCRIPT_DIR/.env"
+cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/variables.json" "$SCRIPT_DIR/aifactory/variables.json"
 cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/03a-GH-create-or-update-github-variables.sh" "$SCRIPT_DIR/10-GH-create-or-update-github-variables.sh"
 
 # YAML - Common -> aifactory + .gihub/workflows
