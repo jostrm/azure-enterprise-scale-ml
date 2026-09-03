@@ -1040,3 +1040,8 @@ module privateDnsAzureDatafactory '../../modules/privateDns.bicep' = if(!central
   ]
 }
 
+@description('Admin VM resource ID. Empty when enableAdminVM is false or only AI Gateway networking is deployed.')
+output adminVmResourceId string = enableAdminVM && !deployOnlyAIGatewayNetworking ? vmPrivate!.outputs.vmResourceId : ''
+
+@description('Admin VM name and recommended self-hosted Azure DevOps agent name. Empty when the admin VM is disabled.')
+output adminVmName string = enableAdminVM && !deployOnlyAIGatewayNetworking ? vmPrivate!.outputs.vmName : ''

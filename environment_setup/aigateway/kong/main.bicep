@@ -47,12 +47,12 @@ param kongCpu int = 2
 @description('Kong container memory in GB')
 param kongMemoryGb int = 4
 
-@description('Azure OpenAI endpoint URL (private)')
-param azureOpenAIEndpoint string
+@description('Private or public APIM gateway hostname, without protocol or path. APIM owns Azure OpenAI token limiting, routing, and Retry-After handling.')
+param apimGatewayHost string
 
-@description('Azure OpenAI API key (from Key Vault)')
+@description('Kong consumer API key. Clients must present this as x-api-key in addition to their APIM subscription key.')
 @secure()
-param azureOpenAIApiKey string
+param kongConsumerApiKey string
 
 @description('User-assigned managed identity resource ID (optional)')
 param userAssignedIdentityId string = ''
@@ -120,8 +120,8 @@ module kongAci 'modules/kong-aci.bicep' = {
     kongSubnetId: kongNetworking.outputs.kongSubnetId
     storageAccountName: kongStorage.outputs.storageAccountName
     fileShareName: kongStorage.outputs.fileShareName
-    azureOpenAIEndpoint: azureOpenAIEndpoint
-    azureOpenAIApiKey: azureOpenAIApiKey
+    apimGatewayHost: apimGatewayHost
+    kongConsumerApiKey: kongConsumerApiKey
     userAssignedIdentityId: userAssignedIdentityId
     commonResourceSuffix: commonResourceSuffix
   }

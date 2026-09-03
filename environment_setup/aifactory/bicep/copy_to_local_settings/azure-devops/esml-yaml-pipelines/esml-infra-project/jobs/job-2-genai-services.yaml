@@ -11,6 +11,21 @@ parameters:
       - foundry
 
 steps:
+- task: PowerShell@2
+  displayName: '00_validate_admin_vm_build_agent'
+  condition: and(succeeded(), eq(variables['enableAdminVM'], 'true'), eq(variables['useAdminVMBuildAgent'], 'true'))
+  inputs:
+    targetType: inline
+    script: |
+      $missing = @('az', 'bash', 'git', 'python') | Where-Object {
+        -not (Get-Command $_ -ErrorAction SilentlyContinue)
+      }
+      if ($missing) {
+        throw "The selected admin-VM build agent is missing required commands: $($missing -join ', '). Install them on the VM, restart the Azure Pipelines agent service, and retry."
+      }
+
+      Write-Host 'Admin-VM build-agent prerequisites are available.'
+
 - task: PythonScript@0
   displayName: '00_apply_json_config_override'
   condition: and(succeeded(), ne(variables['configOverrideFile'], ''))

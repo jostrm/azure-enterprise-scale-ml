@@ -131,6 +131,8 @@ steps:
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 
+# enableAdminVM above creates its RBAC prerequisites. The VM itself is deployed by
+# 03_az_bicep_deploy_resources after private networking is available.
 - task: AzureCLI@2
   displayName: '02_az_bicep_networking'
   condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'))

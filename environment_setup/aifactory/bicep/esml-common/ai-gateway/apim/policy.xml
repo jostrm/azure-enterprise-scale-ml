@@ -1,0 +1,20 @@
+<policies>
+  <inbound>
+    <base />
+    <llm-token-limit counter-key="azure-openai-gpt55-pool-global" tokens-per-minute="__AGGREGATE_TPM__" estimate-prompt-tokens="true" retry-after-header-name="Retry-After" />
+    <llm-token-limit counter-key="@(context.Subscription.Id)" tokens-per-minute="__CALLER_TPM__" estimate-prompt-tokens="true" retry-after-header-name="Retry-After" />
+    <authentication-managed-identity resource="https://cognitiveservices.azure.com" />
+  </inbound>
+  <backend>
+    <retry condition="@(context.Response != null && context.Response.StatusCode == 429)" count="__RETRY_COUNT__" interval="1" first-fast-retry="false">
+      <set-backend-service backend-id="__BACKEND_POOL_NAME__" />
+      <forward-request buffer-request-body="true" />
+    </retry>
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

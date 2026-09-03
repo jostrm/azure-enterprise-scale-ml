@@ -1,0 +1,170 @@
+name: infra-ai-gateway
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment to deploy
+        required: true
+        type: choice
+        options:
+        - dev
+        - stage
+        - prod
+        default: dev
+
+jobs:
+  deploy:
+    name: AI Gateway
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    env:
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_LOCATION: ${{ vars.AIFACTORY_LOCATION }}
+      AIFACTORY_LOCATION_SHORT: ${{ vars.AIFACTORY_LOCATION_SHORT }}
+      AIFACTORY_PREFIX: ${{ vars.AIFACTORY_PREFIX }}
+      AIFACTORY_SUFFIX: ${{ vars.AIFACTORY_SUFFIX }}
+      ADMIN_COMMON_RESOURCE_SUFFIX: ${{ vars.ADMIN_COMMON_RESOURCE_SUFFIX || '-001' }}
+      TAGS: ${{ vars.TAGS || '{}' }}
+      ENABLE_APIM: ${{ vars.ENABLE_APIM || 'false' }}
+      APIM_GATEWAY_SUBSCRIPTION_ID: ${{ vars.APIM_GATEWAY_SUBSCRIPTION_ID || '' }}
+      APIM_GATEWAY_RESOURCE_GROUP: ${{ vars.APIM_GATEWAY_RESOURCE_GROUP || '' }}
+      APIM_GATEWAY_SERVICE_NAME: ${{ vars.APIM_GATEWAY_SERVICE_NAME || '' }}
+      APIM_GATEWAY_SKU: ${{ vars.APIM_GATEWAY_SKU || 'StandardV2' }}
+      APIM_GATEWAY_SKU_CAPACITY: ${{ vars.APIM_GATEWAY_SKU_CAPACITY || '1' }}
+      APIM_GATEWAY_API_ID: ${{ vars.APIM_GATEWAY_API_ID || 'azure-openai-gpt55' }}
+      APIM_GATEWAY_API_PATH: ${{ vars.APIM_GATEWAY_API_PATH || 'openai' }}
+      APIM_GATEWAY_BACKEND_POOL_NAME: ${{ vars.APIM_GATEWAY_BACKEND_POOL_NAME || 'aoai-gpt55-pool' }}
+      APIM_GATEWAY_AGGREGATE_TPM: ${{ vars.APIM_GATEWAY_AGGREGATE_TPM || '' }}
+      APIM_GATEWAY_CALLER_TPM: ${{ vars.APIM_GATEWAY_CALLER_TPM || '10000' }}
+      APIM_GATEWAY_RETRY_COUNT: ${{ vars.APIM_GATEWAY_RETRY_COUNT || '2' }}
+      APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE: ${{ vars.APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE || 'false' }}
+      APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID: ${{ vars.APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID || '' }}
+      APIM_GATEWAY_BACKENDS_JSON: ${{ vars.APIM_GATEWAY_BACKENDS_JSON || '[]' }}
+      ENABLE_KONG: ${{ vars.ENABLE_KONG || 'false' }}
+      KONG_GATEWAY_VNET_RESOURCE_GROUP: ${{ vars.KONG_GATEWAY_VNET_RESOURCE_GROUP || '' }}
+      KONG_GATEWAY_VNET_NAME: ${{ vars.KONG_GATEWAY_VNET_NAME || '' }}
+      KONG_GATEWAY_SUBNET_CIDR: ${{ vars.KONG_GATEWAY_SUBNET_CIDR || '' }}
+      KONG_GATEWAY_SUBNET_NAME: ${{ vars.KONG_GATEWAY_SUBNET_NAME || 'snet-kong-001' }}
+      KONG_GATEWAY_APIM_HOST: ${{ vars.KONG_GATEWAY_APIM_HOST || '' }}
+      KONG_GATEWAY_IMAGE: ${{ vars.KONG_GATEWAY_IMAGE || 'kong/kong-gateway:3.9' }}
+      KONG_GATEWAY_CPU: ${{ vars.KONG_GATEWAY_CPU || '2' }}
+      KONG_GATEWAY_MEMORY_GB: ${{ vars.KONG_GATEWAY_MEMORY_GB || '4' }}
+      KONG_CONSUMER_API_KEY: ${{ secrets.KONG_CONSUMER_API_KEY }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy APIM Azure OpenAI pool
+      if: env.ENABLE_APIM == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        required=(APIM_GATEWAY_RESOURCE_GROUP APIM_GATEWAY_SERVICE_NAME APIM_GATEWAY_AGGREGATE_TPM APIM_GATEWAY_BACKENDS_JSON)
+        for variable in "${required[@]}"; do
+          if [[ -z "${!variable}" || "${!variable}" == "[]" ]]; then
+            echo "::error::$variable must be set when ENABLE_APIM=true."
+            exit 1
+          fi
+        done
+        case "$APIM_GATEWAY_SKU" in
+          Developer|Basic|Standard|Premium|BasicV2|StandardV2|PremiumV2) ;;
+          *) echo "::error::APIM_GATEWAY_SKU must be Developer, Basic, Standard, Premium, BasicV2, StandardV2, or PremiumV2."; exit 1 ;;
+        esac
+        if ! [[ "$APIM_GATEWAY_SKU_CAPACITY" =~ ^[1-9][0-9]*$ ]]; then
+          echo "::error::APIM_GATEWAY_SKU_CAPACITY must be a positive integer."
+          exit 1
+        fi
+        if [[ "$APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE" == "true" && -z "$APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID" ]]; then
+          echo "::error::APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID must be set when APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE=true."
+          exit 1
+        fi
+        apim_subscription_id="${APIM_GATEWAY_SUBSCRIPTION_ID:-$AZURE_SUBSCRIPTION_ID}"
+        apim_resource_id="/subscriptions/$apim_subscription_id/resourceGroups/$APIM_GATEWAY_RESOURCE_GROUP/providers/Microsoft.ApiManagement/service/$APIM_GATEWAY_SERVICE_NAME"
+        current_sku="$(az rest --method get --url "https://management.azure.com$apim_resource_id?api-version=2024-05-01" --query sku.name --output tsv)"
+        if [[ "$current_sku" == *V2 && "$APIM_GATEWAY_SKU" != *V2 ]] || [[ "$current_sku" != *V2 && "$APIM_GATEWAY_SKU" == *V2 ]]; then
+          echo "::error::APIM cannot migrate between classic and v2 SKUs in place. Create a new $APIM_GATEWAY_SKU APIM instance and update APIM_GATEWAY_SERVICE_NAME."
+          exit 1
+        fi
+        current_capacity="$(az rest --method get --url "https://management.azure.com$apim_resource_id?api-version=2024-05-01" --query sku.capacity --output tsv)"
+        if [[ "$current_sku" != "$APIM_GATEWAY_SKU" || "$current_capacity" != "$APIM_GATEWAY_SKU_CAPACITY" ]]; then
+          az rest --method patch --url "https://management.azure.com$apim_resource_id?api-version=2024-05-01" --headers 'If-Match=*' --body "{\"sku\":{\"name\":\"$APIM_GATEWAY_SKU\",\"capacity\":$APIM_GATEWAY_SKU_CAPACITY}}"
+          for attempt in {1..180}; do
+            state="$(az rest --method get --url "https://management.azure.com$apim_resource_id?api-version=2024-05-01" --query properties.provisioningState --output tsv)"
+            case "$state" in
+              Succeeded) break ;;
+              Failed|Canceled) echo "::error::APIM SKU update ended in state $state."; exit 1 ;;
+            esac
+            sleep 30
+          done
+          if [[ "$state" != "Succeeded" ]]; then
+            echo "::error::Timed out waiting for the APIM SKU update."
+            exit 1
+          fi
+        fi
+        az deployment sub create \
+          --name "aigw-apim-${{ inputs.environment }}-${{ github.run_id }}" \
+          --subscription "$apim_subscription_id" \
+          --location "$AZURE_LOCATION" \
+          --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/main.bicep" \
+          --parameters apimServiceName="$APIM_GATEWAY_SERVICE_NAME" \
+          --parameters apimResourceGroupName="$APIM_GATEWAY_RESOURCE_GROUP" \
+          --parameters apimSubscriptionId="$apim_subscription_id" \
+          --parameters apiId="$APIM_GATEWAY_API_ID" \
+          --parameters apiPath="$APIM_GATEWAY_API_PATH" \
+          --parameters backendPoolName="$APIM_GATEWAY_BACKEND_POOL_NAME" \
+          --parameters aggregateTokensPerMinute="$APIM_GATEWAY_AGGREGATE_TPM" \
+          --parameters callerTokensPerMinute="$APIM_GATEWAY_CALLER_TPM" \
+          --parameters retryCount="$APIM_GATEWAY_RETRY_COUNT" \
+          --parameters assignOpenAIUserRole="$APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE" \
+          --parameters apimManagedIdentityPrincipalId="$APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID" \
+          --parameters azureOpenAIBackends="$APIM_GATEWAY_BACKENDS_JSON"
+
+    - name: Deploy Kong edge gateway
+      if: env.ENABLE_KONG == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        required=(KONG_GATEWAY_VNET_RESOURCE_GROUP KONG_GATEWAY_VNET_NAME KONG_GATEWAY_SUBNET_CIDR KONG_GATEWAY_APIM_HOST KONG_CONSUMER_API_KEY)
+        for variable in "${required[@]}"; do
+          if [[ -z "${!variable}" ]]; then
+            echo "::error::$variable must be set when ENABLE_KONG=true."
+            exit 1
+          fi
+        done
+        environment_name="${{ inputs.environment }}"
+        if [[ "$environment_name" == "stage" ]]; then environment_name="test"; fi
+        deployment_name="aigw-kong-${environment_name}-${{ github.run_id }}"
+        kong_resource_group="$(az deployment sub create \
+          --name "$deployment_name" \
+          --subscription "$AZURE_SUBSCRIPTION_ID" \
+          --location "$AZURE_LOCATION" \
+          --template-file "azure-enterprise-scale-ml/environment_setup/aigateway/kong/main.bicep" \
+          --parameters env="$environment_name" \
+          --parameters location="$AZURE_LOCATION" \
+          --parameters locationSuffix="$AIFACTORY_LOCATION_SHORT" \
+          --parameters aifactorySuffixRG="$AIFACTORY_SUFFIX" \
+          --parameters commonRGNamePrefix="$AIFACTORY_PREFIX" \
+          --parameters tags="$TAGS" \
+          --parameters vnetResourceGroupName="$KONG_GATEWAY_VNET_RESOURCE_GROUP" \
+          --parameters vnetName="$KONG_GATEWAY_VNET_NAME" \
+          --parameters kongSubnetCidr="$KONG_GATEWAY_SUBNET_CIDR" \
+          --parameters kongSubnetName="$KONG_GATEWAY_SUBNET_NAME" \
+          --parameters apimGatewayHost="$KONG_GATEWAY_APIM_HOST" \
+          --parameters kongConsumerApiKey="$KONG_CONSUMER_API_KEY" \
+          --parameters kongImage="$KONG_GATEWAY_IMAGE" \
+          --parameters kongCpu="$KONG_GATEWAY_CPU" \
+          --parameters kongMemoryGb="$KONG_GATEWAY_MEMORY_GB" \
+          --query properties.outputs.kongResourceGroupName.value \
+          --output tsv)"
+        container_group_name="aci-kong-${AIFACTORY_LOCATION_SHORT}-${environment_name}${ADMIN_COMMON_RESOURCE_SUFFIX}"
+        storage_account_name="$(az deployment sub show --name "$deployment_name" --query properties.outputs.storageAccountName.value --output tsv)"
+        pwsh -File "azure-enterprise-scale-ml/environment_setup/aigateway/kong/scripts/upload-kong-config.ps1" -ResourceGroupName "$kong_resource_group" -StorageAccountName "$storage_account_name" -SubscriptionId "$AZURE_SUBSCRIPTION_ID" -ApimGatewayHost "$KONG_GATEWAY_APIM_HOST" -KongConsumerApiKey "$KONG_CONSUMER_API_KEY"
+        az container restart --resource-group "$kong_resource_group" --name "$container_group_name"

@@ -183,3 +183,9 @@ resource keyvaultadminPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2019-09-
     }
   }
 }
+
+@description('Private VM resource ID. Use this to identify a self-hosted build agent without deriving its name externally.')
+output vmResourceId string = virtualMachine.id
+
+@description('Private VM name. Register self-hosted Azure DevOps agents with this exact name.')
+output vmName string = virtualMachine.name

@@ -1,0 +1,133 @@
+parameters:
+- name: serviceConnection
+  type: string
+
+steps:
+- task: AzureCLI@2
+  displayName: Deploy APIM Azure OpenAI pool
+  condition: eq(variables['ENABLE_APIM'], 'true')
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+    inlineScript: |
+      set -euo pipefail
+      required=(apimGatewayResourceGroup apimGatewayServiceName apimGatewayAggregateTpm apimGatewayBackendsJson)
+      for variable in "${required[@]}"; do
+        value="$(printenv "$variable" || true)"
+        if [[ -z "$value" || "$value" == "[]" ]]; then
+          echo "##vso[task.logissue type=error]$variable must be set when ENABLE_APIM=true."
+          exit 1
+        fi
+      done
+      case "$(apimGatewaySku)" in
+        Developer|Basic|Standard|Premium|BasicV2|StandardV2|PremiumV2) ;;
+        *) echo "##vso[task.logissue type=error]apimGatewaySku must be Developer, Basic, Standard, Premium, BasicV2, StandardV2, or PremiumV2."; exit 1 ;;
+      esac
+      if ! [[ "$(apimGatewaySkuCapacity)" =~ ^[1-9][0-9]*$ ]]; then
+        echo "##vso[task.logissue type=error]apimGatewaySkuCapacity must be a positive integer."
+        exit 1
+      fi
+      if [[ "$(apimGatewayAssignOpenAIUserRole)" == "true" && -z "$(apimGatewayManagedIdentityPrincipalId)" ]]; then
+        echo "##vso[task.logissue type=error]apimGatewayManagedIdentityPrincipalId must be set when apimGatewayAssignOpenAIUserRole=true."
+        exit 1
+      fi
+      apimSubscriptionId="$(apimGatewaySubscriptionId)"
+      if [[ -z "$apimSubscriptionId" ]]; then apimSubscriptionId="$(dev_test_prod_sub_id)"; fi
+      apimResourceId="/subscriptions/$apimSubscriptionId/resourceGroups/$(apimGatewayResourceGroup)/providers/Microsoft.ApiManagement/service/$(apimGatewayServiceName)"
+      currentSku="$(az rest --method get --url "https://management.azure.com$apimResourceId?api-version=2024-05-01" --query sku.name --output tsv)"
+      if [[ "$currentSku" == *V2 && "$(apimGatewaySku)" != *V2 ]] || [[ "$currentSku" != *V2 && "$(apimGatewaySku)" == *V2 ]]; then
+        echo "##vso[task.logissue type=error]APIM cannot migrate between classic and v2 SKUs in place. Create a new $(apimGatewaySku) APIM instance and update apimGatewayServiceName."
+        exit 1
+      fi
+      currentCapacity="$(az rest --method get --url "https://management.azure.com$apimResourceId?api-version=2024-05-01" --query sku.capacity --output tsv)"
+      if [[ "$currentSku" != "$(apimGatewaySku)" || "$currentCapacity" != "$(apimGatewaySkuCapacity)" ]]; then
+        az rest --method patch --url "https://management.azure.com$apimResourceId?api-version=2024-05-01" --headers 'If-Match=*' --body "{\"sku\":{\"name\":\"$(apimGatewaySku)\",\"capacity\":$(apimGatewaySkuCapacity)}}"
+        for attempt in {1..180}; do
+          state="$(az rest --method get --url "https://management.azure.com$apimResourceId?api-version=2024-05-01" --query properties.provisioningState --output tsv)"
+          case "$state" in
+            Succeeded) break ;;
+            Failed|Canceled) echo "##vso[task.logissue type=error]APIM SKU update ended in state $state."; exit 1 ;;
+          esac
+          sleep 30
+        done
+        if [[ "$state" != "Succeeded" ]]; then
+          echo "##vso[task.logissue type=error]Timed out waiting for the APIM SKU update."
+          exit 1
+        fi
+      fi
+      az deployment sub create \
+        --name "aigw-apim-$(dev_test_prod)-$(Build.BuildId)" \
+        --subscription "$apimSubscriptionId" \
+        --location "$(admin_location)" \
+        --template-file "esml-common/ai-gateway/apim/main.bicep" \
+        --parameters apimServiceName="$(apimGatewayServiceName)" \
+        --parameters apimResourceGroupName="$(apimGatewayResourceGroup)" \
+        --parameters apimSubscriptionId="$apimSubscriptionId" \
+        --parameters apiId="$(apimGatewayApiId)" \
+        --parameters apiPath="$(apimGatewayApiPath)" \
+        --parameters backendPoolName="$(apimGatewayBackendPoolName)" \
+        --parameters aggregateTokensPerMinute="$(apimGatewayAggregateTpm)" \
+        --parameters callerTokensPerMinute="$(apimGatewayCallerTpm)" \
+        --parameters retryCount="$(apimGatewayRetryCount)" \
+        --parameters assignOpenAIUserRole="$(apimGatewayAssignOpenAIUserRole)" \
+        --parameters apimManagedIdentityPrincipalId="$(apimGatewayManagedIdentityPrincipalId)" \
+        --parameters azureOpenAIBackends='$(apimGatewayBackendsJson)'
+  env:
+    apimGatewayResourceGroup: $(apimGatewayResourceGroup)
+    apimGatewayServiceName: $(apimGatewayServiceName)
+    apimGatewayAggregateTpm: $(apimGatewayAggregateTpm)
+    apimGatewayBackendsJson: $(apimGatewayBackendsJson)
+
+- task: AzureCLI@2
+  displayName: Deploy Kong edge gateway
+  condition: eq(variables['ENABLE_KONG'], 'true')
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml'
+    inlineScript: |
+      set -euo pipefail
+      required=(kongGatewayVnetResourceGroup kongGatewayVnetName kongGatewaySubnetCidr kongGatewayApimHost kongConsumerApiKey)
+      for variable in "${required[@]}"; do
+        value="$(printenv "$variable" || true)"
+        if [[ -z "$value" ]]; then
+          echo "##vso[task.logissue type=error]$variable must be set when ENABLE_KONG=true."
+          exit 1
+        fi
+      done
+      deploymentName="aigw-kong-$(dev_test_prod)-$(Build.BuildId)"
+      kongResourceGroup="$(az deployment sub create \
+        --name "$deploymentName" \
+        --subscription "$(dev_test_prod_sub_id)" \
+        --location "$(admin_location)" \
+        --template-file "environment_setup/aigateway/kong/main.bicep" \
+        --parameters env="$(dev_test_prod)" \
+        --parameters location="$(admin_location)" \
+        --parameters locationSuffix="$(admin_locationSuffix)" \
+        --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
+        --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
+        --parameters tags='$(tags)' \
+        --parameters vnetResourceGroupName="$(kongGatewayVnetResourceGroup)" \
+        --parameters vnetName="$(kongGatewayVnetName)" \
+        --parameters kongSubnetCidr="$(kongGatewaySubnetCidr)" \
+        --parameters kongSubnetName="$(kongGatewaySubnetName)" \
+        --parameters apimGatewayHost="$(kongGatewayApimHost)" \
+        --parameters kongConsumerApiKey="$(kongConsumerApiKey)" \
+        --parameters kongImage="$(kongGatewayImage)" \
+        --parameters kongCpu="$(kongGatewayCpu)" \
+        --parameters kongMemoryGb="$(kongGatewayMemoryGb)" \
+        --query properties.outputs.kongResourceGroupName.value \
+        --output tsv)"
+      containerGroupName="aci-kong-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)"
+      storageAccountName="$(az deployment sub show --name "$deploymentName" --query properties.outputs.storageAccountName.value --output tsv)"
+      pwsh -File "environment_setup/aigateway/kong/scripts/upload-kong-config.ps1" -ResourceGroupName "$kongResourceGroup" -StorageAccountName "$storageAccountName" -SubscriptionId "$(dev_test_prod_sub_id)" -ApimGatewayHost "$(kongGatewayApimHost)" -KongConsumerApiKey "$(kongConsumerApiKey)"
+      az container restart --resource-group "$kongResourceGroup" --name "$containerGroupName"
+  env:
+    kongGatewayVnetResourceGroup: $(kongGatewayVnetResourceGroup)
+    kongGatewayVnetName: $(kongGatewayVnetName)
+    kongGatewaySubnetCidr: $(kongGatewaySubnetCidr)
+    kongGatewayApimHost: $(kongGatewayApimHost)
+    kongConsumerApiKey: $(kongConsumerApiKey)

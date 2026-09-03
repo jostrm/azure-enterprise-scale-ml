@@ -1,6 +1,6 @@
 # ============================================================================
 # Upload Kong declarative config to Azure File Share
-# Usage: ./upload-kong-config.ps1 -ResourceGroupName <rg> -StorageAccountName <sa> -SubscriptionId <sub>
+# Usage: ./upload-kong-config.ps1 -ResourceGroupName <rg> -StorageAccountName <sa> -SubscriptionId <sub> -ApimGatewayHost <host> -KongConsumerApiKey <key>
 # ============================================================================
 param(
     [Parameter(Mandatory=$true)]
@@ -19,10 +19,11 @@ param(
     [string]$FileShareName = "kong-config",
 
     [Parameter(Mandatory=$false)]
-    [string]$AzureOpenAIApiKey = "",
+    [Parameter(Mandatory=$true)]
+    [string]$ApimGatewayHost,
 
-    [Parameter(Mandatory=$false)]
-    [string]$KongConsumerApiKey = ""
+    [Parameter(Mandatory=$true)]
+    [string]$KongConsumerApiKey
 )
 
 Write-Host "============================================"
@@ -48,22 +49,19 @@ if (-not $storageKey) {
     exit 1
 }
 
-# Read and process kong.yaml - replace environment variable placeholders
-$kongConfig = Get-Content -Path $KongConfigPath -Raw
-
-if ($AzureOpenAIApiKey) {
-    $kongConfig = $kongConfig -replace '\$\{AZURE_OPENAI_API_KEY\}', $AzureOpenAIApiKey
-    Write-Host "Replaced AZURE_OPENAI_API_KEY placeholder"
+if (-not (Test-Path -LiteralPath $KongConfigPath -PathType Leaf)) {
+    Write-Error "Kong configuration file was not found: $KongConfigPath"
+    exit 1
 }
 
-if ($KongConsumerApiKey) {
-    $kongConfig = $kongConfig -replace '\$\{KONG_CONSUMER_API_KEY\}', $KongConsumerApiKey
-    Write-Host "Replaced KONG_CONSUMER_API_KEY placeholder"
-} else {
-    # Generate a random consumer key if not provided
-    $generatedKey = [System.Guid]::NewGuid().ToString()
-    $kongConfig = $kongConfig -replace '\$\{KONG_CONSUMER_API_KEY\}', $generatedKey
-    Write-Host "Generated KONG_CONSUMER_API_KEY: $generatedKey"
+# Render the DB-less configuration before upload. The deployed file is complete
+# even if the Kong image's configuration parser changes its env-var handling.
+$kongConfig = Get-Content -LiteralPath $KongConfigPath -Raw
+$kongConfig = $kongConfig.Replace('${APIM_GATEWAY_HOST}', $ApimGatewayHost)
+$kongConfig = $kongConfig.Replace('${KONG_CONSUMER_API_KEY}', $KongConsumerApiKey)
+if ($kongConfig.Contains('${APIM_GATEWAY_HOST}') -or $kongConfig.Contains('${KONG_CONSUMER_API_KEY}')) {
+    Write-Error "Kong configuration contains unresolved placeholders."
+    exit 1
 }
 
 # Write processed config to temp file
