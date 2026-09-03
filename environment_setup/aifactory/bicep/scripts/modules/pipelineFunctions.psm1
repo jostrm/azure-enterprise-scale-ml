@@ -66,6 +66,8 @@ function Import-Dependencies {
     $azResourcesVersion="4.3.0"
     $azNetworkVersion="4.10.0"
     $subnetVersion="1.0.6"
+    # Build agents commonly run as non-admin service accounts, so module installs must use a writable scope.
+    $moduleInstallScope="CurrentUser"
     switch ($callingScriptName) {
         "generateUserParameters.ps1" { 
             Write-Verbose "(disabled due to DEMO env, no AD permission to lookup username) Installing dependencies for $callingScriptName"
@@ -76,17 +78,17 @@ function Import-Dependencies {
          }
         "genDynamicNetworkParamFile.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope AllUsers -Force -AllowClobber
-            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope AllUsers -Force -AllowClobber
+            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
             Import-Module Az.Resources
             Import-Module Az.Accounts
             Import-Module Az.Network
          }
         "subnetCalc.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope AllUsers -Force -AllowClobber
-            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope AllUsers -Force -AllowClobber
-            Install-Module Subnet -MinimumVersion $subnetVersion -Scope AllUsers -Force -AllowClobber
+            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-Module Subnet -MinimumVersion $subnetVersion -Scope $moduleInstallScope -Force -AllowClobber
             Import-Module Az.Resources
             Import-Module Az.Accounts
             Import-Module Az.Network
@@ -94,9 +96,9 @@ function Import-Dependencies {
         }
         "subnetCalc_v2.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope AllUsers -Force -AllowClobber
-            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope AllUsers -Force -AllowClobber
-            Install-Module Subnet -MinimumVersion $subnetVersion -Scope AllUsers -Force -AllowClobber
+            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-Module Subnet -MinimumVersion $subnetVersion -Scope $moduleInstallScope -Force -AllowClobber
             Import-Module Az.Resources
             Import-Module Az.Accounts
             Import-Module Az.Network
