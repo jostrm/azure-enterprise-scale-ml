@@ -56,10 +56,6 @@ def read_object(value: Any, location: str) -> dict[str, Any]:
     return value
 
 
-def configuration_section(environment: str) -> str:
-    return "dev" if environment == "dev" else "stage_prod"
-
-
 def serialize(value: Any, variable_name: str) -> str:
     if value is None:
         fail(f"Variable '{variable_name}' cannot be null.")
@@ -74,7 +70,7 @@ def serialize(value: Any, variable_name: str) -> str:
     )
 
 
-def selected_values(config: dict[str, Any], environment: str) -> dict[str, str]:
+def selected_values(config: dict[str, Any], environment: str) -> tuple[dict[str, str], str]:
     supported_keys = {"dev", "stage_prod"}
     unknown_keys = set(config).difference(supported_keys)
     if unknown_keys:
@@ -84,14 +80,17 @@ def selected_values(config: dict[str, Any], environment: str) -> dict[str, str]:
             + "."
         )
 
-    section = configuration_section(environment)
+    # The canonical variables.json has one "dev" section which is a shared
+    # baseline for all environments. A stage_prod section remains optional for
+    # callers that need an explicit Stage/Prod override.
+    section = "stage_prod" if environment != "dev" and "stage_prod" in config else "dev"
     values = read_object(config.get(section, {}), section)
     serialized: dict[str, str] = {}
     for name, value in values.items():
         if not VARIABLE_NAME.fullmatch(name):
             fail(f"'{name}' is not a valid pipeline variable name.")
         serialized[name] = serialize(value, name)
-    return serialized
+    return serialized, section
 
 
 def is_reserved(name: str, pipeline_format: str) -> bool:
@@ -167,11 +166,11 @@ def main() -> None:
         fail(f"Invalid JSON in {config_file}: {error.msg} (line {error.lineno}).")
 
     environment = args.environment
-    values = selected_values(read_object(config, "root"), environment)
+    values, section = selected_values(read_object(config, "root"), environment)
     applied, skipped = apply(values, args.format, args.github_workflow)
     print(
         f"Applied {applied} of {len(values)} configuration variable(s) from "
-        f"{config_file.name} using the {configuration_section(environment)} section."
+        f"{config_file.name} using the {section} section."
     )
     if skipped:
         print(

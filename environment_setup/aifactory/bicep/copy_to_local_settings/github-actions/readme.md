@@ -151,23 +151,14 @@ Start with setting up a common AIFactory environment, example, the DEV environme
 Then you can import and run the pipelines to setup 1-M projects. There are 2 AIFactory project types supported as of now: 
 - [infra-project.yml](./infra-project.yml)
 
-## Optional JSON project configuration
+## Canonical JSON configuration
 
-`infra-project.yml` can load a JSON configuration at dispatch time. This lets a
-pipeline run override the non-secret deployment settings normally sourced from
-GitHub Environment variables, without updating those variables first.
-
-- `dev_config_file`: repository-relative path to the Dev configuration.
-- `stage_prod_config_file`: repository-relative path to the shared Stage and
-  Prod configuration.
-
-Use the 300 GitHub Actions variable names from the `.env` template (for
-example, `ENABLE_AI_FOUNDRY`, `ENABLE_POSTGRESQL`, and `ACR_SKU`). The Dev
-file has one `dev` object. The shared Stage/Prod file has one `stage_prod`
-object, which is applied unchanged to both environments. Start with
-[`github-actions.project-config.dev.example.json`](../pipeline-config/github-actions.project-config.dev.example.json)
-and
-[`github-actions.project-config.stage_prod.example.json`](../pipeline-config/github-actions.project-config.stage_prod.example.json).
+`infra-project.yml` loads the canonical
+`azure-enterprise-scale-ml/environment_setup/aifactory/variables.json` file by
+default. It contains one `dev` object sourced from the Azure DevOps
+`variables.yaml` defaults. The object is the shared baseline for Dev, Stage,
+and Prod; add an optional `stage_prod` object only when Stage/Prod need
+different non-secret values.
 
 Do not store credentials, service-connection settings, or GitHub secrets in
 these files. GitHub Environments continue to provide the deployment identity

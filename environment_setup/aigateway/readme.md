@@ -201,7 +201,7 @@ The following variables are added to `variables.yaml` under the Kong section:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `enableKongGateway` | `false` | Enable/disable Kong deployment |
+| `ENABLE_KONG` | `false` | Enable/disable Kong deployment |
 | `kong_image` | `kong/kong-gateway:3.9` | Kong Docker image |
 | `kong_cpu` | `2` | CPU cores for ACI |
 | `kong_memory_gb` | `4` | Memory GB for ACI |

@@ -58,34 +58,6 @@ resource kongNsg 'Microsoft.Network/networkSecurityGroups@2024-01-01' = {
         }
       }
       {
-        name: 'Deny-Kong-Admin-External'
-        properties: {
-          priority: 200
-          direction: 'Inbound'
-          access: 'Deny'
-          protocol: 'Tcp'
-          sourceAddressPrefix: 'Internet'
-          sourcePortRange: '*'
-          destinationAddressPrefix: '*'
-          destinationPortRange: '8001'
-          description: 'Deny external access to Kong admin API'
-        }
-      }
-      {
-        name: 'Allow-Kong-Admin-VNet'
-        properties: {
-          priority: 150
-          direction: 'Inbound'
-          access: 'Allow'
-          protocol: 'Tcp'
-          sourceAddressPrefix: 'VirtualNetwork'
-          sourcePortRange: '*'
-          destinationAddressPrefix: '*'
-          destinationPortRange: '8001'
-          description: 'Allow VNet access to Kong admin API'
-        }
-      }
-      {
         name: 'Allow-HTTPS-Outbound'
         properties: {
           priority: 100
@@ -120,6 +92,11 @@ resource kongSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-01-01' = {
         properties: {
           serviceName: 'Microsoft.ContainerInstance/containerGroups'
         }
+      }
+    ]
+    serviceEndpoints: [
+      {
+        service: 'Microsoft.Storage'
       }
     ]
     privateEndpointNetworkPolicies: 'Disabled'

@@ -7,20 +7,26 @@ on:
         description: GitHub Environment to load variables/secrets from [dev,stage,prod]
         required: true
         default: dev
-      dev_config_file:
-        description: Optional repository-relative Dev JSON configuration override file
+      config_file:
+        description: Repository-relative canonical AI Factory JSON configuration file
         required: false
-        default: ''
-      stage_prod_config_file:
-        description: Optional repository-relative Stage and Prod JSON configuration override file
+        default: 'azure-enterprise-scale-ml/environment_setup/aifactory/variables.json'
+      use_admin_vm_build_agent:
+        description: Run this project deployment on the registered Windows admin-VM runner
+        type: boolean
         required: false
-        default: ''
+        default: false
+      admin_vm_runner_label:
+        description: Custom label assigned when registering the GitHub runner on the admin VM
+        type: string
+        required: false
+        default: aifactory-admin-vm
 
 jobs:
   deploy-project:
     name: Project (Networking + Services)
     environment: ${{ github.event.inputs.environment }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.use_admin_vm_build_agent && fromJSON(format('["self-hosted","Windows","{0}"]', inputs.admin_vm_runner_label)) || 'ubuntu-latest' }}
     defaults:
       run:
         shell: pwsh
@@ -70,6 +76,7 @@ jobs:
       runNetworkingVar: ${{ vars.RUN_JOB1_NETWORKING || 'true' }}
       disable_whitelisting_for_build_agents: ${{ vars.DISABLE_WHITELISTING_FOR_BUILD_AGENTS || 'false' }}
       disable_whitelisting_for_built_agents: ${{ vars.DISABLE_WHITELISTING_FOR_BUILD_AGENTS || vars.DISABLE_WHITELISTING_FOR_BUILT_AGENTS || 'false' }}
+      enableAdminVM: ${{ vars.ENABLE_ADMIN_VM || 'false' }}
 
       # Versioning/salt
       AIFACTORY_VERSION_MAJOR: ${{ vars.AIFACTORY_VERSION_MAJOR }}
@@ -339,6 +346,20 @@ jobs:
       debug_disable_10_aifactory_dashboards: ${{ vars.DEBUG_DISABLE_10_AIFACTORY_DASHBOARDS || 'true' }}
 
     steps:
+      - name: Validate admin-VM runner selection
+        if: ${{ inputs.use_admin_vm_build_agent }}
+        shell: pwsh
+        run: |
+          if ($env:enableAdminVM -ne 'true') {
+            throw 'Set the GitHub Environment variable ENABLE_ADMIN_VM=true before selecting the admin-VM runner.'
+          }
+          $missing = @('az', 'bash', 'git', 'python') | Where-Object {
+            -not (Get-Command $_ -ErrorAction SilentlyContinue)
+          }
+          if ($missing) {
+            throw "The selected admin-VM runner is missing required commands: $($missing -join ', '). Install them on the VM and retry."
+          }
+
       - name: 00_Fix_Azure_Config_Permissions
         shell: bash
         run: |
@@ -361,10 +382,10 @@ jobs:
           submodules: true
 
       - name: 00_Apply_JSON_Config_Override
-        if: ${{ (github.event.inputs.environment == 'dev' && github.event.inputs.dev_config_file != '') || (github.event.inputs.environment != 'dev' && github.event.inputs.stage_prod_config_file != '') }}
+        if: ${{ github.event.inputs.config_file != '' }}
         shell: bash
         env:
-          CONFIG_FILE: ${{ github.event.inputs.environment == 'dev' && github.event.inputs.dev_config_file || github.event.inputs.stage_prod_config_file }}
+          CONFIG_FILE: ${{ github.event.inputs.config_file }}
         run: |
           set -euo pipefail
           python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \

@@ -32,12 +32,12 @@ param storageAccountName string
 @description('File share name')
 param fileShareName string
 
-@description('Azure OpenAI endpoint (private)')
-param azureOpenAIEndpoint string
+@description('APIM gateway hostname, without protocol or path.')
+param apimGatewayHost string
 
-@description('Azure OpenAI API key')
+@description('Kong consumer API key')
 @secure()
-param azureOpenAIApiKey string
+param kongConsumerApiKey string
 
 @description('User-assigned managed identity resource ID')
 param userAssignedIdentityId string = ''
@@ -121,7 +121,7 @@ resource kongContainerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05
             }
             {
               name: 'KONG_ADMIN_LISTEN'
-              value: '0.0.0.0:8001'
+              value: '127.0.0.1:8001'
             }
             {
               name: 'KONG_LOG_LEVEL'
@@ -144,12 +144,12 @@ resource kongContainerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05
               value: '/dev/stderr'
             }
             {
-              name: 'AZURE_OPENAI_ENDPOINT'
-              value: azureOpenAIEndpoint
+              name: 'APIM_GATEWAY_HOST'
+              value: apimGatewayHost
             }
             {
-              name: 'AZURE_OPENAI_API_KEY'
-              secureValue: azureOpenAIApiKey
+              name: 'KONG_CONSUMER_API_KEY'
+              secureValue: kongConsumerApiKey
             }
           ]
           volumeMounts: [
@@ -204,10 +204,6 @@ resource kongContainerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05
         }
         {
           port: 8443
-          protocol: 'TCP'
-        }
-        {
-          port: 8001
           protocol: 'TCP'
         }
       ]

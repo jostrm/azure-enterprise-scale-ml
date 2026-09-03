@@ -1,0 +1,74 @@
+trigger: none
+
+variables:
+- template: ../variables/variables.yaml
+
+stages:
+- stage: Dev
+  displayName: AI_Gateway_Dev
+  variables:
+    dev_test_prod: dev
+    dev_test_prod_sub_id: $(dev_sub_id)
+  jobs:
+  - deployment: AI_Gateway_Dev
+    displayName: AI_Gateway_Dev
+    pool:
+      vmImage: ubuntu-latest
+    environment: Dev
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+            submodules: true
+          - template: ./jobs/job-2-ai-gateway.yaml
+            parameters:
+              serviceConnection: ${{ variables.dev_service_connection }}
+
+- stage: Stage
+  dependsOn: Dev
+  condition: eq(variables['Build.Reason'], 'Manual')
+  displayName: AI_Gateway_Stage
+  variables:
+    dev_test_prod: test
+    dev_test_prod_sub_id: $(test_sub_id)
+  jobs:
+  - deployment: AI_Gateway_Stage
+    displayName: AI_Gateway_Stage
+    pool:
+      vmImage: ubuntu-latest
+    environment: Stage
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+            submodules: true
+          - template: ./jobs/job-2-ai-gateway.yaml
+            parameters:
+              serviceConnection: ${{ variables.test_service_connection }}
+
+- stage: Prod
+  dependsOn:
+  - Dev
+  - Stage
+  condition: and(eq(variables['Build.Reason'], 'Manual'), in(dependencies.Stage.result, 'Succeeded', 'Skipped'))
+  displayName: AI_Gateway_Prod
+  variables:
+    dev_test_prod: prod
+    dev_test_prod_sub_id: $(prod_sub_id)
+  jobs:
+  - deployment: AI_Gateway_Prod
+    displayName: AI_Gateway_Prod
+    pool:
+      vmImage: ubuntu-latest
+    environment: Prod
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+            submodules: true
+          - template: ./jobs/job-2-ai-gateway.yaml
+            parameters:
+              serviceConnection: ${{ variables.prod_service_connection }}

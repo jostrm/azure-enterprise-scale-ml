@@ -15,9 +15,9 @@
 
 parameters:
   - name: configFile
-    displayName: JSON configuration override file
+    displayName: Canonical AI Factory JSON configuration file
     type: string
-    default: ''
+    default: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/variables.json'
 
 trigger: none
   # branches:
@@ -64,7 +64,15 @@ stages:
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
       pool:
-        vmImage: windows-2022
+        ${{ if and(eq(variables.enableAdminVM, 'true'), eq(variables.useAdminVMBuildAgent, 'true')) }}:
+          name: $(adminVMBuildAgentPool)
+          demands:
+            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+              - Agent.Name -equals $(adminVMBuildAgentName)
+            ${{ else }}:
+              - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
+        ${{ else }}:
+          vmImage: windows-2022
       environment: Dev  
       strategy:
         runOnce:
@@ -89,7 +97,15 @@ stages:
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
       pool:
-        vmImage: windows-2022
+        ${{ if and(eq(variables.enableAdminVM, 'true'), eq(variables.useAdminVMBuildAgent, 'true')) }}:
+          name: $(adminVMBuildAgentPool)
+          demands:
+            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+              - Agent.Name -equals $(adminVMBuildAgentName)
+            ${{ else }}:
+              - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
+        ${{ else }}:
+          vmImage: windows-2022
       environment: Dev
       strategy:
         runOnce:
@@ -144,7 +160,15 @@ stages:
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
       pool:
-        vmImage: windows-2022
+        ${{ if and(eq(variables.enableAdminVM, 'true'), eq(variables.useAdminVMBuildAgent, 'true')) }}:
+          name: $(adminVMBuildAgentPool)
+          demands:
+            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+              - Agent.Name -equals $(adminVMBuildAgentName)
+            ${{ else }}:
+              - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
+        ${{ else }}:
+          vmImage: windows-2022
       environment: Stage  
       strategy:
         runOnce:
@@ -169,7 +193,15 @@ stages:
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
       pool:
-        vmImage: windows-2022
+        ${{ if and(eq(variables.enableAdminVM, 'true'), eq(variables.useAdminVMBuildAgent, 'true')) }}:
+          name: $(adminVMBuildAgentPool)
+          demands:
+            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+              - Agent.Name -equals $(adminVMBuildAgentName)
+            ${{ else }}:
+              - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
+        ${{ else }}:
+          vmImage: windows-2022
       environment: Stage
       strategy:
         runOnce:
@@ -226,7 +258,15 @@ stages:
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
       pool:
-        vmImage: windows-2022
+        ${{ if and(eq(variables.enableAdminVM, 'true'), eq(variables.useAdminVMBuildAgent, 'true')) }}:
+          name: $(adminVMBuildAgentPool)
+          demands:
+            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+              - Agent.Name -equals $(adminVMBuildAgentName)
+            ${{ else }}:
+              - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
+        ${{ else }}:
+          vmImage: windows-2022
       environment: Prod
       strategy:
         runOnce:
@@ -251,7 +291,15 @@ stages:
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
       pool:
-        vmImage: windows-2022
+        ${{ if and(eq(variables.enableAdminVM, 'true'), eq(variables.useAdminVMBuildAgent, 'true')) }}:
+          name: $(adminVMBuildAgentPool)
+          demands:
+            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+              - Agent.Name -equals $(adminVMBuildAgentName)
+            ${{ else }}:
+              - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
+        ${{ else }}:
+          vmImage: windows-2022
       environment: Prod
       strategy:
         runOnce:

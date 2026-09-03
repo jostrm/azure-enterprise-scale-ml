@@ -103,6 +103,9 @@ variables:
   # ============================================================================
   addBastionHost: "false" # <optional>Add Bastion Host in common RG<default>false<keep-as-is>
   enableAdminVM: "false" # <optional>Enable Admin VM in common RG<default>false<keep-as-is>
+  useAdminVMBuildAgent: "false" # <optional>Run GenAI services jobs on the admin VM<default>false<keep-as-is> Set true only after enableAdminVM=true and an Azure DevOps agent with the VM's Bicep-generated name is online.
+  adminVMBuildAgentPool: "Default" # <optional>Azure DevOps pool hosting the admin VM agent<default>Default<keep-as-is> Change only when the agent is registered in a custom pool.
+  adminVMBuildAgentName: "" # <optional>Azure DevOps agent name override<default><keep-as-is> Leave empty for the Bicep-generated admin VM name; set to an existing VM agent name such as vm-test when reusing one.
   # ============================================================================
   # MANDATORY(CHANGE RARELY):Diagnostics - on all resources.
   # ============================================================================
@@ -370,6 +373,33 @@ variables:
   enableEventHubs: "false" # <optional>Deploy Azure Event Hubs<default>false<keep-as-is>
   enableBotService: "true" # <optional>Deploy Azure Bot Service<default>true<keep-as-is> Required for Microsoft Foundry agent scenarios.
   foundryApiManagementResourceId: "" # <optional>APIM resource ID for Foundry integration<default>""<keep-as-is> <otherwise> provide existing API Management resource ID to integrate with Microsoft Foundry.
+
+  # === AI Gateway (separate infra-ai-gateway pipeline; disabled by default) ===
+  ENABLE_APIM: "false" # Deploy APIM Azure OpenAI pool, token guard, 429-aware backend circuit breakers, and API policy.
+  apimGatewaySubscriptionId: "" # Subscription containing APIM. Empty uses the environment subscription.
+  apimGatewayResourceGroup: "" # Resource group containing the existing APIM service.
+  apimGatewayServiceName: "" # Existing APIM service with system-assigned managed identity enabled.
+  apimGatewaySku: "StandardV2" # AI gateway SKU: BasicV2=dev/test; StandardV2=production default with VNet integration; PremiumV2=private inbound/outbound, zones, and high scale. Classic Developer/Basic/Standard/Premium are supported but cannot be migrated to v2 in place. Consumption is unsupported because APIM backend circuit breakers are unavailable.
+  apimGatewaySkuCapacity: 1 # BasicV2/StandardV2 scale to 10 units; PremiumV2 scales to 30 units. Set capacity based on APIM gateway CPU/memory metrics.
+  apimGatewayApiId: "azure-openai-gpt55"
+  apimGatewayApiPath: "openai"
+  apimGatewayBackendPoolName: "aoai-gpt55-pool"
+  apimGatewayAggregateTpm: "" # 80-90% of the summed TPM across all GPT-5.5 backends.
+  apimGatewayCallerTpm: "10000" # Fair-use TPM allocation per APIM subscription.
+  apimGatewayRetryCount: "2"
+  apimGatewayAssignOpenAIUserRole: "false" # Requires roleAssignments/write in every backend subscription.
+  apimGatewayManagedIdentityPrincipalId: "" # APIM system-assigned managed identity object ID.
+  apimGatewayBackendsJson: "[]" # JSON array; see esml-common/ai-gateway/apim/README.md.
+  ENABLE_KONG: "false" # Deploys Kong as an optional private edge proxy to APIM.
+  kongGatewayVnetResourceGroup: ""
+  kongGatewayVnetName: ""
+  kongGatewaySubnetCidr: "" # Dedicated, unused /28 or larger subnet.
+  kongGatewaySubnetName: "snet-kong-001"
+  kongGatewayApimHost: "" # APIM gateway hostname without protocol/path.
+  kongGatewayImage: "kong/kong-gateway:3.9"
+  kongGatewayCpu: 2
+  kongGatewayMemoryGb: 4
+  # Set kongConsumerApiKey as an Azure DevOps secret variable; never add it here.
 
   # ============================================================================
   # MANDATORY (POST SETUP of a PROJECT): runNetworkingVar
