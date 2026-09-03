@@ -78,31 +78,31 @@ function Import-Dependencies {
          }
         "genDynamicNetworkParamFile.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Import-Module Az.Resources
+            Install-Module Az.Resources -RequiredVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-Module Az.Network -RequiredVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
             Import-Module Az.Accounts
-            Import-Module Az.Network
+            Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
          }
         "subnetCalc.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Install-Module Subnet -MinimumVersion $subnetVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Import-Module Az.Resources
+            Install-Module Az.Resources -RequiredVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-Module Az.Network -RequiredVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-Module Subnet -RequiredVersion $subnetVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
             Import-Module Az.Accounts
-            Import-Module Az.Network
-            Import-Module Subnet
+            Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
+            Import-Module Subnet -RequiredVersion $subnetVersion -Force
         }
         "subnetCalc_v2.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            Install-Module Az.Resources -MinimumVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Install-Module Az.Network -MinimumVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Install-Module Subnet -MinimumVersion $subnetVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Import-Module Az.Resources
+            Install-Module Az.Resources -RequiredVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-Module Az.Network -RequiredVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-Module Subnet -RequiredVersion $subnetVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
             Import-Module Az.Accounts
-            Import-Module Az.Network
-            Import-Module Subnet
+            Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
+            Import-Module Subnet -RequiredVersion $subnetVersion -Force
         }
         Default {
             Write-Error "Sorry, could not match caller name with any switch conditions..."
