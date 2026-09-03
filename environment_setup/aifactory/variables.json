@@ -282,7 +282,7 @@
     "subnetProjAKS": "snt-prj<xxx>-aks",
     "subnetProjAKS2": "snt-<network_env>prj<xxx>-aks2",
     "subnetProjACA": "snt-prj<xxx>-aca",
-    "subnetProjACA2": "snt-prj<xxx>-aca2",
+    "subnetProjACA2": "snt-prj<xxx>-aca-002",
     "subnetProjWebapp": "snt-prj<xxx>-webapp",
     "subnetProjDatabricksPublic": "snt-prj001-dbxpub",
     "subnetProjDatabricksPrivate": "snt-prj<xxx>-dbxpriv",
