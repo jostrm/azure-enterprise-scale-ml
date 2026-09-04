@@ -35,6 +35,31 @@ fi
 state_dir="${AIFACTORY_LAUNCHER_STATE_DIR:?Stable launcher state directory is missing.}"
 trap 'rm -rf -- "$state_dir"' EXIT
 
+json_override_choice="${AIFACTORY_USE_JSON_OVERRIDE:-}"
+while true; do
+  if [[ -z "$json_override_choice" && -t 0 ]]; then
+    read -r -p "Do you want to override with variables.json? [y/N]: " json_override_choice
+  fi
+  case "${json_override_choice,,}" in
+    y|yes)
+      use_json_override=true
+      config_override_file="$CONFIG_FILE"
+      echo "JSON override enabled: $CONFIG_FILE"
+      break
+      ;;
+    ""|n|no)
+      use_json_override=false
+      config_override_file=""
+      echo "JSON override disabled; the pipeline will use variables.yaml."
+      break
+      ;;
+    *)
+      echo "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
+      json_override_choice=""
+      ;;
+  esac
+done
+
 for command in git az; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "ERROR: Required command '$command' is not available." >&2
@@ -405,14 +430,16 @@ if [[ ! -f "$VARIABLES_FILE" ]]; then
   echo "ERROR: Active Azure DevOps variables file is missing: $VARIABLES_FILE" >&2
   exit 1
 fi
-if [[ ! -f "$CONFIG_FILE" ]]; then
+if [[ "$use_json_override" == "true" && ! -f "$CONFIG_FILE" ]]; then
   echo "ERROR: Active JSON configuration file is missing: $CONFIG_FILE" >&2
   exit 1
 fi
 cp "$VARIABLES_FILE" "$state_dir/variables.yaml"
-cp "$CONFIG_FILE" "$state_dir/variables.json"
 cp "$VARIABLES_FILE" "$backup_dir/variables.yaml"
-cp "$CONFIG_FILE" "$backup_dir/variables.json"
+if [[ "$use_json_override" == "true" ]]; then
+  cp "$CONFIG_FILE" "$state_dir/variables.json"
+  cp "$CONFIG_FILE" "$backup_dir/variables.json"
+fi
 
 resume_after_bootstrap=false
 if [[ "${1:-}" == "--resume-after-bootstrap" ]]; then
@@ -452,7 +479,7 @@ if [[ ! -f "$VARIABLES_TEMPLATE_FILE" ]]; then
   echo "ERROR: Azure DevOps variables template was not generated: $VARIABLES_TEMPLATE_FILE" >&2
   exit 1
 fi
-if [[ ! -f "$CONFIG_TEMPLATE_FILE" ]]; then
+if [[ "$use_json_override" == "true" && ! -f "$CONFIG_TEMPLATE_FILE" ]]; then
   echo "ERROR: JSON configuration template was not generated: $CONFIG_TEMPLATE_FILE" >&2
   exit 1
 fi
@@ -533,7 +560,8 @@ if legacy:
 output_path.write_text("\n".join(result) + "\n", encoding="utf-8")
 PY
 
-"${PYTHON[@]}" - "$CONFIG_TEMPLATE_FILE" "$state_dir/variables.json" "$CONFIG_FILE" <<'PY'
+if [[ "$use_json_override" == "true" ]]; then
+  "${PYTHON[@]}" - "$CONFIG_TEMPLATE_FILE" "$state_dir/variables.json" "$CONFIG_FILE" <<'PY'
 import json
 import sys
 from collections import OrderedDict
@@ -558,10 +586,11 @@ def merge(template_value, active_value):
 
 output_path.write_text(json.dumps(merge(template, active), indent=2) + "\n", encoding="utf-8")
 PY
+fi
 
 rm -f "$VARIABLES_TEMPLATE_FILE" "$CONFIG_TEMPLATE_FILE"
 
-"${PYTHON[@]}" - "$state_dir/preview-request.json" "$BRANCH" "$CONFIG_FILE" "$RUNNER_SELECTION" "$PIPELINE_YAML_PATH" <<'PY'
+"${PYTHON[@]}" - "$state_dir/preview-request.json" "$BRANCH" "$CONFIG_FILE" "$RUNNER_SELECTION" "$use_json_override" "$PIPELINE_YAML_PATH" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -578,12 +607,13 @@ request = {
     "templateParameters": {
         "configFile": sys.argv[3],
         "runnerSelection": sys.argv[4],
+        "useJsonConfigOverride": sys.argv[5] == "true",
     },
     "stagesToSkip": [
         "Stage_GenAI_Project",
         "Prod_GenAI_Project",
     ],
-    "yamlOverride": Path(sys.argv[5]).read_text(encoding="utf-8-sig"),
+    "yamlOverride": Path(sys.argv[6]).read_text(encoding="utf-8-sig"),
 }
 Path(sys.argv[1]).write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
 PY
@@ -617,7 +647,7 @@ else
   echo "No tracked template changes required a commit."
 fi
 
-"${PYTHON[@]}" - "$state_dir/run-request.json" "$BRANCH" "$CONFIG_FILE" "$RUNNER_SELECTION" <<'PY'
+"${PYTHON[@]}" - "$state_dir/run-request.json" "$BRANCH" "$CONFIG_FILE" "$RUNNER_SELECTION" "$use_json_override" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -633,6 +663,7 @@ request = {
     "templateParameters": {
         "configFile": sys.argv[3],
         "runnerSelection": sys.argv[4],
+        "useJsonConfigOverride": sys.argv[5] == "true",
     },
     "stagesToSkip": [
         "Stage_GenAI_Project",

@@ -436,7 +436,7 @@ jobs:
           submodules: true
 
       - name: 00_Materialize_Protected_JSON_Config
-        if: ${{ env.AIFACTORY_CONFIG_JSON != '' }}
+        if: ${{ inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
         shell: bash
         env:
           CONFIG_FILE: ${{ inputs.config_file }}
