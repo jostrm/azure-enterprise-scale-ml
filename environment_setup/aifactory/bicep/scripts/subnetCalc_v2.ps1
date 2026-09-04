@@ -335,7 +335,7 @@ if ($PSBoundParameters.ContainsKey('vnetNameFull_param') -and $vnetNameFull_para
 if ( $useServicePrincipal -eq $null -or $useServicePrincipal -eq "" -or $useServicePrincipal -eq $false )
 {
     $useServicePrincipal = $false
-    Write-Host "Using current context active AzContext (AzurePowerShell task service connection)"
+    Write-Host $(if ($env:GITHUB_ACTIONS -eq 'true') { "Using authenticated Azure CLI context" } else { "Using current AzContext (AzurePowerShell task service connection)" })
 }
 else
 {
@@ -351,8 +351,17 @@ else
 }
 $vnetObj = $null
 
-if ($(Get-AzContext).Subscription -ne "") {
-    write-host "Successfully logged in as $($(Get-AzContext).Account) to $($(Get-AzContext).Subscription)"
+$hasAzureContext = $env:GITHUB_ACTIONS -eq 'true'
+if (-not $hasAzureContext) {
+    $hasAzureContext = $(Get-AzContext).Subscription -ne ""
+}
+if ($hasAzureContext) {
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+        Write-Host "Using Azure CLI subscription '$subscriptionId'."
+    }
+    else {
+        write-host "Successfully logged in as $($(Get-AzContext).Account) to $($(Get-AzContext).Subscription)"
+    }
 
     # This PSObject must be sorted by value in ascending order
 

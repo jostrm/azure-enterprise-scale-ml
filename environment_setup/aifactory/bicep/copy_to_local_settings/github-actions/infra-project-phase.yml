@@ -429,7 +429,6 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-          enable-AzPSSession: true
 
       - name: 00_Checkout
         uses: actions/checkout@v4
