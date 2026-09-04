@@ -63,6 +63,7 @@ function ConvertTo-Variables {
 
 function Import-Dependencies {
     $callingScriptName = (Get-PSCallStack)[1].Command
+    $azAccountsVersion="5.3.4"
     $azResourcesVersion="4.3.0"
     $azNetworkVersion="4.10.0"
     $subnetVersion="1.0.6"
@@ -80,8 +81,8 @@ function Import-Dependencies {
             Write-Verbose "Installing dependencies for $callingScriptName"
             Install-Module Az.Resources -RequiredVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
             Install-Module Az.Network -RequiredVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Import-Module Az.Accounts -RequiredVersion $azAccountsVersion -Force
             Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
-            Import-Module Az.Accounts
             Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
          }
         "subnetCalc.ps1" { 
@@ -89,8 +90,8 @@ function Import-Dependencies {
             Install-Module Az.Resources -RequiredVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
             Install-Module Az.Network -RequiredVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
             Install-Module Subnet -RequiredVersion $subnetVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Import-Module Az.Accounts -RequiredVersion $azAccountsVersion -Force
             Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
-            Import-Module Az.Accounts
             Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
             Import-Module Subnet -RequiredVersion $subnetVersion -Force
         }
@@ -99,8 +100,8 @@ function Import-Dependencies {
             Install-Module Az.Resources -RequiredVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
             Install-Module Az.Network -RequiredVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
             Install-Module Subnet -RequiredVersion $subnetVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Import-Module Az.Accounts -RequiredVersion $azAccountsVersion -Force
             Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
-            Import-Module Az.Accounts
             Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
             Import-Module Subnet -RequiredVersion $subnetVersion -Force
         }
