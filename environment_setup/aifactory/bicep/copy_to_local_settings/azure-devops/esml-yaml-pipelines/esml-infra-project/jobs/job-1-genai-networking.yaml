@@ -404,7 +404,7 @@ steps:
   displayName: '02_az_set_ip_to_seeding_keyvault_FW_whitelist'
   condition: ne(variables['disable_whitelisting_for_build_agents'], 'true')
   inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
+    azureSubscription: ${{ parameters.serviceConnectionSeeding }}
     scriptType: bash
     scriptLocation: 'inlineScript'
     inlineScript: |
@@ -421,6 +421,54 @@ steps:
        exit 1
      fi
      az keyvault network-rule add --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$ip_to_add"
+
+     for attempt in 1 2 3 4 5 6; do
+       public_network_access=$(az keyvault show --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --query 'properties.publicNetworkAccess' -o tsv)
+       ip_rule_exists=$(az keyvault show --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --query "length(properties.networkAcls.ipRules[?value=='$ip_to_add'])" -o tsv)
+       echo "Key Vault network check $attempt/6: publicNetworkAccess=$public_network_access, matchingIpRules=$ip_rule_exists"
+       if [ "$public_network_access" = "Enabled" ] && [ "$ip_rule_exists" -gt 0 ]; then
+         exit 0
+       fi
+       sleep 10
+     done
+
+     echo "##[error]Key Vault public network configuration did not persist."
+     exit 1
+- task: AzureCLI@2
+  displayName: '02b_az_prepare_seeding_keyvault_private_dns'
+  condition: and(succeeded(), eq(variables['disable_whitelisting_for_build_agents'], 'true'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnectionSeeding }}
+    scriptType: pscore
+    scriptLocation: inlineScript
+    inlineScript: |
+     $vnetResourceGroup = "$(vnetResourceGroup_resolved)"
+     if ([string]::IsNullOrWhiteSpace($vnetResourceGroup) -or $vnetResourceGroup -match '^\$\(.+\)$') {
+       $vnetResourceGroup = "$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+     }
+     $vnetName = "$(vnetNameFull_resolved)"
+     if ([string]::IsNullOrWhiteSpace($vnetName) -or $vnetName -match '^\$\(.+\)$') {
+       $vnetName = "$(vnetNameBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)"
+     }
+     $dnsZoneSubscription = if ("$(centralDnsZoneByPolicyInHub)" -eq 'true') {
+       "$(privDnsSubscription_param)"
+     } else {
+       "$(dev_test_prod_sub_id)"
+     }
+     $dnsZoneResourceGroup = if ("$(centralDnsZoneByPolicyInHub)" -eq 'true') {
+       "$(privDnsResourceGroup_param)"
+     } else {
+       $vnetResourceGroup
+     }
+     & "$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/prepareSeedingKeyVaultPrivateDns.ps1" `
+       -VaultSubscription "$(admin_bicep_input_keyvault_subscription)" `
+       -VaultResourceGroup "$(admin_bicep_kv_fw_rg)" `
+       -VaultName "$(admin_bicep_kv_fw)" `
+       -VnetSubscription "$(dev_test_prod_sub_id)" `
+       -VnetResourceGroup $vnetResourceGroup `
+       -VnetName $vnetName `
+       -DnsZoneSubscription $dnsZoneSubscription `
+       -DnsZoneResourceGroup $dnsZoneResourceGroup
 - task: AzureKeyVault@2  
   displayName: '03_az_download_seeding_keyvault'
   inputs:
@@ -716,7 +764,7 @@ steps:
   displayName: '08_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
+    azureSubscription: ${{ parameters.serviceConnectionSeeding }}
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: | 

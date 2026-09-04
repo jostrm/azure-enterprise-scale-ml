@@ -103,7 +103,9 @@ variables:
   # ============================================================================
   addBastionHost: "false" # <optional>Add Bastion Host in common RG<default>false<keep-as-is>
   enableAdminVM: "false" # <optional>Enable Admin VM in common RG<default>false<keep-as-is>
-  useAdminVMBuildAgent: "false" # <optional>Run GenAI services jobs on the admin VM<default>false<keep-as-is> Set true only after enableAdminVM=true and an Azure DevOps agent with the VM's Bicep-generated name is online.
+  useSelfHostedBuildAgent: "false" # <optional>Use a self-hosted build agent/runner<default>false<keep-as-is> ADO uses adminVMBuildAgentPool/adminVMBuildAgentName; GHA uses selfHostedRunnerLabel.
+  selfHostedRunnerLabel: "aifactory-admin-vm" # <optional>GitHub self-hosted runner label<default>aifactory-admin-vm<keep-as-is>
+  useAdminVMBuildAgent: "false" # <deprecated>Legacy alias for useSelfHostedBuildAgent. Retained for configuration compatibility.
   adminVMBuildAgentPool: "Default" # <optional>Azure DevOps pool hosting the admin VM agent<default>Default<keep-as-is> Change only when the agent is registered in a custom pool.
   adminVMBuildAgentName: "" # <optional>Azure DevOps agent name override<default><keep-as-is> Leave empty for the Bicep-generated admin VM name; set to an existing VM agent name such as vm-test when reusing one.
   # ============================================================================
@@ -224,7 +226,7 @@ variables:
   addAIFoundry: "false" # <optional>Add new AI Foundry instance with new name<default>false<keep-as-is> <otherwise> true, provisions a new AI Foundry with a new random name (for debugging or re-run) to get a fresh start. Still you should delete the old instance.
   enableAFoundryCaphost: "true" # <optional>AI Foundry capability host<default>true<recommended> ensures agents metadata and history/threads are saved in your subscription using CosmosDB, Storage, AI Search.
   cleanFoundryCaphost: "false" # <optional>Clean up capability host on deletion<default>true<keep-as-is> <otherwise> false, leaves capability host and its resources (such as VMs) in place when deleting the Foundry project.
-  foundryDeploymentType: "2" # <optional>AI Foundry deployment type<default>2<keep-as-is> '1'=based on PG, '2'=based on AVM, '3'=both. '1' is tested first; falls back to '2' on failure.
+  foundryDeploymentType: "2" # <deprecated>Retained for configuration compatibility. AI Foundry now always uses the second-option account deployment.
   enableAIFactoryCreatedDefaultProjectForAIFv2: "true" # <optional>AI Factory default project for AIFv2<default>true<keep-as-is> <otherwise> false, Azure creates a default project with additional CosmosDB, Storage, AI Search, and connections.
   disableAgentNetworkInjection: "false" # <optional>Disable agent network injection<default>false<keep-as-is> false, requires Container Apps subnet in 172.16.0.0/12 or 192.168.0.0/16. <otherwise> true, disables network injection.
   # NetworkInjection -> Known agent functional limitations, if false: Azure Blob Storage: using Azure Blob Storage files with the File Search tool isn't supported.

@@ -12,8 +12,8 @@ parameters:
 
 steps:
 - task: PowerShell@2
-  displayName: '00_validate_admin_vm_build_agent'
-  condition: and(succeeded(), eq(variables['enableAdminVM'], 'true'), eq(variables['useAdminVMBuildAgent'], 'true'))
+  displayName: '00_validate_self_hosted_build_agent'
+  condition: and(succeeded(), or(eq(variables['useSelfHostedBuildAgent'], 'true'), eq(variables['useAdminVMBuildAgent'], 'true')))
   inputs:
     targetType: inline
     script: |
@@ -21,10 +21,10 @@ steps:
         -not (Get-Command $_ -ErrorAction SilentlyContinue)
       }
       if ($missing) {
-        throw "The selected admin-VM build agent is missing required commands: $($missing -join ', '). Install them on the VM, restart the Azure Pipelines agent service, and retry."
+        throw "The selected self-hosted build agent is missing required commands: $($missing -join ', '). Install them on the agent, restart the Azure Pipelines agent service, and retry."
       }
 
-      Write-Host 'Admin-VM build-agent prerequisites are available.'
+      Write-Host 'Self-hosted build-agent prerequisites are available.'
 
 - task: PythonScript@0
   displayName: '00_apply_json_config_override'
@@ -43,7 +43,7 @@ steps:
 # ---------------------------------------------------------------------------
 - task: AzureCLI@2
   displayName: '00_preflight_quota_policy_checks'
-  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -214,7 +214,7 @@ steps:
       echo "Variables set: vnetResourceGroup_resolved, vnetNameFull_resolved, network_env=$NETWORK_ENV"
 - task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
-  condition: and(ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'), ne(variables['deleteAllForProject'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'), ne(variables['deleteAllForProject'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -280,7 +280,7 @@ steps:
 
 - task: PowerShell@2
   displayName: '00_check_for_submodule'
-  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     targetType: 'inline'
     script: |
@@ -336,7 +336,7 @@ steps:
   displayName: '00_generate_deployment_random_value'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: pscore
+    scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
       # Generate a random deployment ID for this entire pipeline run
@@ -347,13 +347,13 @@ steps:
       Write-Host ""
       # Write-Host "Sleeping 15 minutes to allow Azure resource propagation..."
       # Start-Sleep -Seconds 900
-      Write-Host "Sleep complete — resuming pipeline."
+      Write-Host "Sleep complete - resuming pipeline."
 - task: AzureCLI@2
   displayName: '00_pwsh_print_info'
-  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: pscore
+    scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
         Write-Host " - FOUNDRY"
@@ -363,7 +363,6 @@ steps:
         Write-Host "addAIFoundry is: $(addAIFoundry)"
         Write-Host "enableAFoundryCaphost is: $(enableAFoundryCaphost)"
         Write-Host "cleanFoundryCaphost is: $(cleanFoundryCaphost)"
-        Write-Host "foundryDeploymentType is: $(foundryDeploymentType)"
         Write-Host " - AI FACTORY: NAMING"
         Write-Host "project_number_000 (001) is: $(project_number_000)"
         Write-Host "projectPrefix (esml-) is: $(projectPrefix)"
@@ -451,11 +450,11 @@ steps:
   displayName: '02_az_set_ip_to_seeding_keyvault_FW_whitelist'
   condition: ne(variables['disable_whitelisting_for_build_agents'], 'true')
   inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
+    azureSubscription: ${{ parameters.serviceConnectionSeeding }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: | 
-     set -uo pipefail
+     set -euo pipefail
      az account set --subscription "$(admin_bicep_input_keyvault_subscription)"
 
      ip_to_add="$(admin_ip_fw)"
@@ -464,11 +463,297 @@ steps:
        exit 1
      fi
 
+     public_network_access=$(az keyvault show --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --query 'properties.publicNetworkAccess' -o tsv)
+     if [ "$public_network_access" = "Disabled" ]; then
+       echo "##[error]Seeding Key Vault public network access is Disabled. A Microsoft-hosted agent cannot reach this vault, and an IP rule has no effect while public access is disabled."
+       echo "##[error]Use a self-hosted Azure DevOps agent in the Key Vault VNet with private DNS resolution, then set disable_whitelisting_for_build_agents=true. Alternatively, change the governing Azure Policy to permit public network access for this vault."
+       exit 1
+     fi
+
      az keyvault update --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --public-network-access Enabled --default-action Deny
-     echo "Waiting for network rules to propagate..."
-     sleep 10
-     
      az keyvault network-rule add --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$ip_to_add"
+
+     # The data-plane secret task follows immediately. Verify the ARM update was accepted and
+     # has propagated before it tries to list secrets from this Microsoft-hosted agent.
+     for attempt in 1 2 3 4 5 6; do
+       public_network_access=$(az keyvault show --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --query 'properties.publicNetworkAccess' -o tsv)
+       ip_rule_exists=$(az keyvault show --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --query "length(properties.networkAcls.ipRules[?value=='$ip_to_add'])" -o tsv)
+       echo "Key Vault network check $attempt/6: publicNetworkAccess=$public_network_access, matchingIpRules=$ip_rule_exists"
+       if [ "$public_network_access" = "Enabled" ] && [ "$ip_rule_exists" -gt 0 ]; then
+         echo "Seeding Key Vault is reachable through public access from the whitelisted build-agent IP."
+         exit 0
+       fi
+       sleep 10
+     done
+
+     echo "##[error]Key Vault network configuration did not persist: publicNetworkAccess must be Enabled and IP $ip_to_add must be present before AzureKeyVault@2 runs. Check Azure Policy or permissions for ${{ parameters.serviceConnectionSeeding }}."
+     exit 1
+- task: AzureCLI@2
+  displayName: '02b_az_prepare_seeding_keyvault_private_dns'
+  condition: and(succeeded(), eq(variables['disable_whitelisting_for_build_agents'], 'true'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnectionSeeding }}
+    scriptType: ps
+    scriptLocation: inlineScript
+    inlineScript: |
+     $ErrorActionPreference = 'Stop'
+
+     function Invoke-AzJson {
+       param(
+         [Parameter(Mandatory = $true)]
+         [string] $Operation,
+         [Parameter(Mandatory = $true)]
+         [string[]] $Arguments
+       )
+
+       $output = & az @Arguments --only-show-errors --output json 2>&1
+       if ($LASTEXITCODE -ne 0) {
+         throw "$Operation failed: $($output -join [Environment]::NewLine)"
+       }
+
+       $json = $output -join [Environment]::NewLine
+       if ([string]::IsNullOrWhiteSpace($json)) {
+         return $null
+       }
+       return $json | ConvertFrom-Json
+     }
+
+     function Invoke-AzCommand {
+       param(
+         [Parameter(Mandatory = $true)]
+         [string] $Operation,
+         [Parameter(Mandatory = $true)]
+         [string[]] $Arguments
+       )
+
+       $output = & az @Arguments --only-show-errors --output none 2>&1
+       if ($LASTEXITCODE -ne 0) {
+         throw "$Operation failed: $($output -join [Environment]::NewLine)"
+       }
+     }
+
+     $vaultSubscription = "$(admin_bicep_input_keyvault_subscription)"
+     $vaultResourceGroup = "$(admin_bicep_kv_fw_rg)"
+     $vaultName = "$(admin_bicep_kv_fw)"
+     $vnetSubscription = "$(dev_test_prod_sub_id)"
+     $vnetResourceGroup = "$(vnetResourceGroup_resolved)"
+     $vnetName = "$(vnetNameFull_resolved)"
+     $dnsZoneName = 'privatelink.vaultcore.azure.net'
+     $useCentralDns = "$(centralDnsZoneByPolicyInHub)" -eq 'true'
+     $dnsZoneSubscription = if ($useCentralDns) { "$(privDnsSubscription_param)" } else { $vnetSubscription }
+     $dnsZoneResourceGroup = if ($useCentralDns) { "$(privDnsResourceGroup_param)" } else { $vnetResourceGroup }
+     $vaultHostName = "$vaultName.vault.azure.net"
+
+     foreach ($requiredValue in @{
+       vaultSubscription = $vaultSubscription
+       vaultResourceGroup = $vaultResourceGroup
+       vaultName = $vaultName
+       vnetSubscription = $vnetSubscription
+       vnetResourceGroup = $vnetResourceGroup
+       vnetName = $vnetName
+       dnsZoneSubscription = $dnsZoneSubscription
+       dnsZoneResourceGroup = $dnsZoneResourceGroup
+     }.GetEnumerator()) {
+       if ([string]::IsNullOrWhiteSpace($requiredValue.Value) -or $requiredValue.Value -match '^\$\(.+\)$') {
+         throw "Required pipeline value '$($requiredValue.Key)' is empty or unresolved."
+       }
+     }
+
+     $vault = Invoke-AzJson -Operation 'Read seeding Key Vault' -Arguments @(
+       'keyvault', 'show',
+       '--subscription', $vaultSubscription,
+       '--resource-group', $vaultResourceGroup,
+       '--name', $vaultName
+     )
+     $privateEndpointConnections = @(Invoke-AzJson -Operation 'List seeding Key Vault private endpoint connections' -Arguments @(
+       'network', 'private-endpoint-connection', 'list',
+       '--id', $vault.id
+     ))
+
+     $approvedConnection = $privateEndpointConnections |
+       Where-Object {
+         $state = if ($null -ne $_.privateLinkServiceConnectionState) {
+           $_.privateLinkServiceConnectionState.status
+         } else {
+           $_.properties.privateLinkServiceConnectionState.status
+         }
+         $state -eq 'Approved'
+       } |
+       Select-Object -First 1
+
+     if ($null -eq $approvedConnection) {
+       $pendingConnection = $privateEndpointConnections |
+         Where-Object {
+           $state = if ($null -ne $_.privateLinkServiceConnectionState) {
+             $_.privateLinkServiceConnectionState.status
+           } else {
+             $_.properties.privateLinkServiceConnectionState.status
+           }
+           $state -eq 'Pending'
+         } |
+         Select-Object -First 1
+
+       if ($null -ne $pendingConnection) {
+         Write-Host "Approving pending Key Vault private endpoint connection '$($pendingConnection.id)'."
+         Invoke-AzCommand -Operation 'Approve seeding Key Vault private endpoint connection' -Arguments @(
+           'network', 'private-endpoint-connection', 'approve',
+           '--id', $pendingConnection.id,
+           '--description', 'Approved for the AI Factory private build agent'
+         )
+         $privateEndpointConnections = @(Invoke-AzJson -Operation 'Refresh seeding Key Vault private endpoint connections' -Arguments @(
+           'network', 'private-endpoint-connection', 'list',
+           '--id', $vault.id
+         ))
+         $approvedConnection = $privateEndpointConnections |
+           Where-Object {
+             $state = if ($null -ne $_.privateLinkServiceConnectionState) {
+               $_.privateLinkServiceConnectionState.status
+             } else {
+               $_.properties.privateLinkServiceConnectionState.status
+             }
+             $state -eq 'Approved'
+           } |
+           Select-Object -First 1
+       }
+     }
+
+     $privateEndpointId = if ($null -ne $approvedConnection.privateEndpoint) {
+       $approvedConnection.privateEndpoint.id
+     } else {
+       $approvedConnection.properties.privateEndpoint.id
+     }
+     if ([string]::IsNullOrWhiteSpace($privateEndpointId)) {
+       $connectionStates = @(
+         $privateEndpointConnections |
+           ForEach-Object {
+             $state = if ($null -ne $_.privateLinkServiceConnectionState) {
+               $_.privateLinkServiceConnectionState.status
+             } else {
+               $_.properties.privateLinkServiceConnectionState.status
+             }
+             "$($_.name):$state"
+           }
+       ) -join ', '
+       throw "Key Vault '$vaultName' has no approved private endpoint connection. Connections: $connectionStates"
+     }
+
+     $privateEndpoint = Invoke-AzJson -Operation 'Read seeding Key Vault private endpoint' -Arguments @(
+       'network', 'private-endpoint', 'show',
+       '--ids', $privateEndpointId
+     )
+     $privateEndpointNicId = @($privateEndpoint.networkInterfaces)[0].id
+     if ([string]::IsNullOrWhiteSpace($privateEndpointNicId)) {
+       throw "Private endpoint '$privateEndpointId' has no network interface."
+     }
+     $privateEndpointNic = Invoke-AzJson -Operation 'Read private endpoint network interface' -Arguments @(
+       'network', 'nic', 'show',
+       '--ids', $privateEndpointNicId
+     )
+     $privateEndpointIp = @($privateEndpointNic.ipConfigurations)[0].privateIPAddress
+     if ([string]::IsNullOrWhiteSpace($privateEndpointIp)) {
+       throw "Private endpoint '$privateEndpointId' has no private IP address."
+     }
+
+     $vnet = Invoke-AzJson -Operation 'Read build-agent VNet' -Arguments @(
+       'network', 'vnet', 'show',
+       '--subscription', $vnetSubscription,
+       '--resource-group', $vnetResourceGroup,
+       '--name', $vnetName
+     )
+     $dnsZone = Invoke-AzJson -Operation 'Read Key Vault private DNS zone' -Arguments @(
+       'network', 'private-dns', 'zone', 'show',
+       '--subscription', $dnsZoneSubscription,
+       '--resource-group', $dnsZoneResourceGroup,
+       '--name', $dnsZoneName
+     )
+
+     $vnetLinks = @(Invoke-AzJson -Operation 'List Key Vault private DNS VNet links' -Arguments @(
+       'network', 'private-dns', 'link', 'vnet', 'list',
+       '--subscription', $dnsZoneSubscription,
+       '--resource-group', $dnsZoneResourceGroup,
+       '--zone-name', $dnsZoneName
+     ))
+     $matchingVnetLink = $vnetLinks |
+       Where-Object { $_.virtualNetwork.id -ieq $vnet.id } |
+       Select-Object -First 1
+     if ($null -eq $matchingVnetLink) {
+       $vnetLinkName = "$vnetName-vaultcore"
+       Write-Host "Creating private DNS VNet link '$vnetLinkName'."
+       Invoke-AzCommand -Operation 'Create Key Vault private DNS VNet link' -Arguments @(
+         'network', 'private-dns', 'link', 'vnet', 'create',
+         '--subscription', $dnsZoneSubscription,
+         '--resource-group', $dnsZoneResourceGroup,
+         '--zone-name', $dnsZoneName,
+         '--name', $vnetLinkName,
+         '--virtual-network', $vnet.id,
+         '--registration-enabled', 'false'
+       )
+     } else {
+       Write-Host "Private DNS zone is linked to VNet '$vnetName' by '$($matchingVnetLink.name)'."
+     }
+
+     $privateEndpointIdParts = $privateEndpointId -split '/'
+     if ($privateEndpointIdParts.Count -lt 9) {
+       throw "Unexpected private endpoint resource ID: $privateEndpointId"
+     }
+     $privateEndpointSubscription = $privateEndpointIdParts[2]
+     $privateEndpointResourceGroup = $privateEndpointIdParts[4]
+     $privateEndpointName = $privateEndpointIdParts[8]
+     $dnsZoneGroups = @(Invoke-AzJson -Operation 'List private endpoint DNS zone groups' -Arguments @(
+       'network', 'private-endpoint', 'dns-zone-group', 'list',
+       '--subscription', $privateEndpointSubscription,
+       '--resource-group', $privateEndpointResourceGroup,
+       '--endpoint-name', $privateEndpointName
+     ))
+     $matchingDnsZoneGroup = $dnsZoneGroups |
+       Where-Object {
+         @($_.privateDnsZoneConfigs) |
+           Where-Object { $_.privateDnsZoneId -ieq $dnsZone.id }
+       } |
+       Select-Object -First 1
+
+     if ($null -eq $matchingDnsZoneGroup) {
+       foreach ($dnsZoneGroup in $dnsZoneGroups) {
+         Write-Host "Removing incorrect private DNS zone group '$($dnsZoneGroup.name)'."
+         Invoke-AzCommand -Operation 'Remove incorrect private endpoint DNS zone group' -Arguments @(
+           'network', 'private-endpoint', 'dns-zone-group', 'delete',
+           '--subscription', $privateEndpointSubscription,
+           '--resource-group', $privateEndpointResourceGroup,
+           '--endpoint-name', $privateEndpointName,
+           '--name', $dnsZoneGroup.name
+         )
+       }
+
+       Write-Host "Creating Key Vault private DNS zone group on '$privateEndpointName'."
+       Invoke-AzCommand -Operation 'Create Key Vault private endpoint DNS zone group' -Arguments @(
+         'network', 'private-endpoint', 'dns-zone-group', 'create',
+         '--subscription', $privateEndpointSubscription,
+         '--resource-group', $privateEndpointResourceGroup,
+         '--endpoint-name', $privateEndpointName,
+         '--name', 'aifactory-seeding-keyvault',
+         '--private-dns-zone', $dnsZone.id,
+         '--zone-name', 'vaultcore'
+       )
+     } else {
+       Write-Host "Private endpoint DNS zone group '$($matchingDnsZoneGroup.name)' uses the expected zone."
+     }
+
+     for ($attempt = 1; $attempt -le 18; $attempt++) {
+       Clear-DnsClientCache -ErrorAction SilentlyContinue
+       $resolvedAddresses = @(
+         Resolve-DnsName -Name $vaultHostName -Type A -ErrorAction SilentlyContinue |
+           Where-Object { -not [string]::IsNullOrWhiteSpace($_.IPAddress) } |
+           Select-Object -ExpandProperty IPAddress -Unique
+       )
+       Write-Host "Key Vault private DNS check $attempt/18: expected=$privateEndpointIp resolved=$($resolvedAddresses -join ',')"
+       if ($resolvedAddresses -contains $privateEndpointIp) {
+         Write-Host "Key Vault '$vaultHostName' resolves to approved private endpoint IP '$privateEndpointIp'."
+         exit 0
+       }
+       Start-Sleep -Seconds 10
+     }
+
+     throw "Key Vault '$vaultHostName' did not resolve to private endpoint IP '$privateEndpointIp'. Verify the '$dnsZoneName' zone link and private endpoint DNS zone group."
 - task: AzureKeyVault@2
   displayName: '03_az_download_seeding_keyvault'
   inputs:
@@ -478,7 +763,7 @@ steps:
   displayName: '03b_create_temp_json_files'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: pscore
+    scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
       # Create temporary JSON files from YAML variables with correct filenames expected by task 04
@@ -583,7 +868,7 @@ steps:
       Get-ChildItem -Path $tempDir -Filter "*.json" | ForEach-Object { Write-Host "  Found: $($_.FullName)" }
 - task: PowerShell@2
   displayName: '04_debug_check_files_and_paths'
-  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     targetType: 'inline'
     script: |
@@ -633,158 +918,107 @@ steps:
   condition: ne(variables['debug_disable_validation_tasks'], 'true')
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
+    scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
-      #!/bin/bash
+      $ErrorActionPreference = 'Stop'
+      $centralDnsByPolicy = "$(centralDnsZoneByPolicyInHub)"
+      $unexpandedPrivDnsSubscription = '$' + '(privDnsSubscription_param)'
+      $unexpandedPrivDnsResourceGroup = '$' + '(privDnsResourceGroup_param)'
+      $unexpandedCommonResourceGroup = '$' + '(commonResourceGroup_param)'
 
-      # Input parameters
-      CENTRAL_DNS_BY_POLICY="$(centralDnsZoneByPolicyInHub)"
-
-      if [ "$CENTRAL_DNS_BY_POLICY" = "true" ]; then
+      if ($centralDnsByPolicy -eq 'true') {
         # Hub-managed DNS: zones may be in a dedicated hub subscription/RG
-        PRIV_DNS_SUB_PARAM="$(privDnsSubscription_param)"
-        if [ -n "$PRIV_DNS_SUB_PARAM" ] && [ "$PRIV_DNS_SUB_PARAM" != "\$(privDnsSubscription_param)" ]; then
-          privDnsSubscription="$PRIV_DNS_SUB_PARAM"
-          echo "centralDnsZoneByPolicyInHub=true: using privDnsSubscription_param: $privDnsSubscription"
-        else
-          privDnsSubscription="$(dev_test_prod_sub_id)"
-          echo "centralDnsZoneByPolicyInHub=true: privDnsSubscription_param not set, using dev_test_prod_sub_id: $privDnsSubscription"
-        fi
+        $privDnsSubscriptionParam = "$(privDnsSubscription_param)"
+        if (-not [string]::IsNullOrWhiteSpace($privDnsSubscriptionParam) -and $privDnsSubscriptionParam -ne $unexpandedPrivDnsSubscription) {
+          $privDnsSubscription = $privDnsSubscriptionParam
+          Write-Host "centralDnsZoneByPolicyInHub=true: using privDnsSubscription_param: $privDnsSubscription"
+        } else {
+          $privDnsSubscription = "$(dev_test_prod_sub_id)"
+          Write-Host "centralDnsZoneByPolicyInHub=true: privDnsSubscription_param not set, using dev_test_prod_sub_id: $privDnsSubscription"
+        }
 
-        PRIV_DNS_RG_PARAM="$(privDnsResourceGroup_param)"
-        if [ -n "$PRIV_DNS_RG_PARAM" ] && [ "$PRIV_DNS_RG_PARAM" != "\$(privDnsResourceGroup_param)" ]; then
-          privDnsResourceGroupName="$PRIV_DNS_RG_PARAM"
-          echo "centralDnsZoneByPolicyInHub=true: using privDnsResourceGroup_param: $privDnsResourceGroupName"
-        else
-          privDnsResourceGroupName="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
-          echo "centralDnsZoneByPolicyInHub=true: privDnsResourceGroup_param not set, using constructed name: $privDnsResourceGroupName"
-        fi
-      else
+        $privDnsResourceGroupParam = "$(privDnsResourceGroup_param)"
+        if (-not [string]::IsNullOrWhiteSpace($privDnsResourceGroupParam) -and $privDnsResourceGroupParam -ne $unexpandedPrivDnsResourceGroup) {
+          $privDnsResourceGroupName = $privDnsResourceGroupParam
+          Write-Host "centralDnsZoneByPolicyInHub=true: using privDnsResourceGroup_param: $privDnsResourceGroupName"
+        } else {
+          $privDnsResourceGroupName = "$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+          Write-Host "centralDnsZoneByPolicyInHub=true: privDnsResourceGroup_param not set, using constructed name: $privDnsResourceGroupName"
+        }
+      } else {
         # DNS zones are in the common resource group in the same subscription as dev_test_prod_sub_id.
         # Honor a custom (BYO) common resource group name from commonResourceGroup_param; only fall
         # back to the default naming convention when it is unset (or the macro was not substituted).
-        privDnsSubscription="$(dev_test_prod_sub_id)"
-        COMMON_RG_INPUT="$(commonResourceGroup_param)"
-        if [ -n "$COMMON_RG_INPUT" ] && [ "$COMMON_RG_INPUT" != "\$(commonResourceGroup_param)" ]; then
-          privDnsResourceGroupName="$COMMON_RG_INPUT"
-        else
-          privDnsResourceGroupName="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
-        fi
-        echo "centralDnsZoneByPolicyInHub=false: assuming DNS zones are in the common resource group"
-        echo "  subscription: $privDnsSubscription"
-        echo "  resource group: $privDnsResourceGroupName"
-      fi
-
-      az account set --subscription "$privDnsSubscription"
-      
-      location="$(admin_location)"
-
-      # Define DNS Zones as space-separated pairs (variable_name:dns_zone_name)
-      # Using a simple approach compatible with all shell versions
-      dnsZonePairs=(
-        "zoneazurecontainerapps:privatelink.${location}.azurecontainerapps.io"
-        "zoneredis:privatelink.redis.cache.windows.net"
-        "zonepostgres:privatelink.postgres.database.azure.com"
-        "zonesql:privatelink.database.windows.net"
-        "zoneMongo:privatelink.mongo.cosmos.azure.com"
-        "zoneServicesAi:privatelink.services.ai.azure.com"
-        "zoneAPIM:privatelink.azure-api.net"
-      )
-
-      # Get vnet information for link checking
-      VNET_NAME="$(vnetNameFull_resolved)"
-      VNET_RG="$(vnetResourceGroup_resolved)"
-      VNET_SUBSCRIPTION="$(dev_test_prod_sub_id)"
-      
-      # Print variables for debugging before checking
-      echo "=== DNS Zone Check Configuration ==="
-      echo "Private DNS Subscription: $privDnsSubscription"
-      echo "Private DNS Resource Group: $privDnsResourceGroupName"
-      echo "Location: $location"
-      echo "VNet Name: $VNET_NAME"
-      echo "VNet Resource Group: $VNET_RG"
-      echo "===================================="
-
-      # Helper function to check if a Private DNS Zone exists (log VNet link status but don't fail on missing link)
-      dns_zone_and_link_exists() {
-        local subscription="$1"
-        local resourceGroup="$2"
-        local dnsZoneName="$3"
-        local vnetName="$4"
-        local vnetRg="$5"
-        local vnetSub="$6"
-
-        # Send debug output to stderr so it doesn't interfere with the return value
-        echo "Checking DNS Zone: $dnsZoneName in RG: $resourceGroup, Subscription: $subscription" >&2
-        
-        # Validate inputs
-        if [ -z "$vnetName" ] || [ -z "$vnetRg" ]; then
-          echo "  ⚠️  WARNING: VNet name or RG is empty. VNet Name: '$vnetName', VNet RG: '$vnetRg'" >&2
-          echo "  Falling back to zone-only check..." >&2
-        fi
-        
-        # First check if the DNS zone exists
-        local output
-        output=$(az network private-dns zone show --subscription "$subscription" --resource-group "$resourceGroup" --name "$dnsZoneName" 2>&1)
-        local zone_status=$?
-
-        if [ $zone_status -ne 0 ]; then
-          echo "  ❌ DNS Zone not found" >&2
-          echo "  Error details: $output" >&2
-          echo "false"
-          return
-        fi
-        
-        echo "  ✅ DNS Zone found" >&2
-        
-        # If vnet parameters are missing, only check zone existence (legacy behavior)
-        if [ -z "$vnetName" ] || [ -z "$vnetRg" ]; then
-          echo "  ⚠️  Skipping VNet link check due to missing VNet parameters" >&2
-          echo "true"
-          return
-        fi
-        
-        # Now check if vnet link exists for this zone
-        echo "  🔍 Checking vnet links for zone..." >&2
-        echo "  VNet Full Name: $vnetName" >&2
-        echo "  VNet Resource Group: $vnetRg" >&2
-        
-        # Use the VNet's subscription (may differ from DNS subscription)
-        local vnet_full_id="/subscriptions/$vnetSub/resourceGroups/$vnetRg/providers/Microsoft.Network/virtualNetworks/$vnetName"
-        echo "  Expected VNet ID: $vnet_full_id" >&2
-        
-        # List all vnet links for this zone and check if our vnet is linked
-        local links_output
-        links_output=$(az network private-dns link vnet list --subscription "$subscription" --resource-group "$resourceGroup" --zone-name "$dnsZoneName" --query "[?virtualNetwork.id=='$vnet_full_id'].name" -o tsv 2>&1)
-        local links_status=$?
-        
-        echo "  VNet link query status: $links_status" >&2
-        echo "  VNet link query output: '$links_output'" >&2
-        
-        if [ $links_status -eq 0 ] && [ -n "$links_output" ]; then
-          echo "  ✅ VNet link EXISTS for this zone (link name: $links_output)" >&2
-        elif [ $links_status -eq 0 ]; then
-          echo "  ⚠️  Zone found but no VNet link to expected VNet" >&2
-        else
-          echo "  ⚠️  Unable to query VNet links (status $links_status); not failing zone existence" >&2
-          echo "  Raw output: $links_output" >&2
-        fi
-
-        # Per requirement: only zone absence should return false
-        echo "true"
+        $privDnsSubscription = "$(dev_test_prod_sub_id)"
+        $commonResourceGroupParam = "$(commonResourceGroup_param)"
+        if (-not [string]::IsNullOrWhiteSpace($commonResourceGroupParam) -and $commonResourceGroupParam -ne $unexpandedCommonResourceGroup) {
+          $privDnsResourceGroupName = $commonResourceGroupParam
+        } else {
+          $privDnsResourceGroupName = "$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+        }
+        Write-Host 'centralDnsZoneByPolicyInHub=false: assuming DNS zones are in the common resource group'
+        Write-Host "  subscription: $privDnsSubscription"
+        Write-Host "  resource group: $privDnsResourceGroupName"
       }
 
-      # Check each DNS Zone and its vnet link
-      for pair in "${dnsZonePairs[@]}"; do
-        # Split the pair by colon
-        key="${pair%%:*}"
-        dnsZoneName="${pair#*:}"
-        
-        exists=$(dns_zone_and_link_exists "$privDnsSubscription" "$privDnsResourceGroupName" "$dnsZoneName" "$VNET_NAME" "$VNET_RG" "$VNET_SUBSCRIPTION")
-        echo "##vso[task.setvariable variable=${key}Exists]${exists}"
-        echo "Result - DNS Zone: $dnsZoneName, Zone and VNet Link Exists: $exists"
-      done
+      az account set --subscription "$privDnsSubscription"
+      if ($LASTEXITCODE -ne 0) { throw "Unable to select Private DNS subscription $privDnsSubscription." }
+
+      $location = "$(admin_location)"
+      $dnsZonePairs = @(
+        "zoneazurecontainerapps:privatelink.$location.azurecontainerapps.io"
+        'zoneredis:privatelink.redis.cache.windows.net'
+        'zonepostgres:privatelink.postgres.database.azure.com'
+        'zonesql:privatelink.database.windows.net'
+        'zoneMongo:privatelink.mongo.cosmos.azure.com'
+        'zoneServicesAi:privatelink.services.ai.azure.com'
+        'zoneAPIM:privatelink.azure-api.net'
+      )
+
+      $vnetName = "$(vnetNameFull_resolved)"
+      $vnetResourceGroup = "$(vnetResourceGroup_resolved)"
+      $vnetSubscription = "$(dev_test_prod_sub_id)"
+      Write-Host '=== DNS Zone Check Configuration ==='
+      Write-Host "Private DNS Subscription: $privDnsSubscription"
+      Write-Host "Private DNS Resource Group: $privDnsResourceGroupName"
+      Write-Host "Location: $location"
+      Write-Host "VNet Name: $vnetName"
+      Write-Host "VNet Resource Group: $vnetResourceGroup"
+      Write-Host '===================================='
+
+      foreach ($pair in $dnsZonePairs) {
+        $key, $dnsZoneName = $pair -split ':', 2
+        Write-Host "Checking DNS Zone: $dnsZoneName in RG: $privDnsResourceGroupName, Subscription: $privDnsSubscription"
+        $zoneOutput = az network private-dns zone show --subscription "$privDnsSubscription" --resource-group "$privDnsResourceGroupName" --name "$dnsZoneName" 2>&1
+        $zoneStatus = $LASTEXITCODE
+        $exists = 'true'
+
+        if ($zoneStatus -ne 0) {
+          Write-Host '  DNS Zone not found'
+          Write-Host "  Error details: $($zoneOutput | Out-String)"
+          $exists = 'false'
+        } elseif ([string]::IsNullOrWhiteSpace($vnetName) -or [string]::IsNullOrWhiteSpace($vnetResourceGroup)) {
+          Write-Host '  DNS Zone found; skipping VNet link check because the VNet name or resource group is empty'
+        } else {
+          $vnetFullId = "/subscriptions/$vnetSubscription/resourceGroups/$vnetResourceGroup/providers/Microsoft.Network/virtualNetworks/$vnetName"
+          $linksOutput = az network private-dns link vnet list --subscription "$privDnsSubscription" --resource-group "$privDnsResourceGroupName" --zone-name "$dnsZoneName" --query "[?virtualNetwork.id=='$vnetFullId'].name" -o tsv 2>&1
+          $linksStatus = $LASTEXITCODE
+
+          Write-Host "  VNet link query status: $linksStatus"
+          Write-Host "  VNet link query output: '$($linksOutput | Out-String)'"
+          if ($linksStatus -eq 0 -and -not [string]::IsNullOrWhiteSpace(($linksOutput | Out-String))) {
+            Write-Host "  VNet link exists for this zone: $($linksOutput | Out-String)"
+          } elseif ($linksStatus -eq 0) {
+            Write-Host '  Zone found but no VNet link to expected VNet'
+          } else {
+            Write-Host '  Unable to query VNet links; not failing zone existence'
+          }
+        }
+
+        Write-Host "##vso[task.setvariable variable=$($key)Exists]$exists"
+        Write-Host "Result - DNS Zone: $dnsZoneName, Zone and VNet Link Exists: $exists"
+      }
 - task: AzureCLI@2
   displayName: '05b_Check if resource exists'
   inputs:
@@ -1385,7 +1619,7 @@ steps:
   # Runs when:
   # - enableAFoundryCaphost=true AND cleanFoundryCaphost=true AND
   # - (deleteAllServicesForProject=true OR (enableDeleteForDisabledResources=true AND enableAIFoundry=false))
-  condition: and(succeeded(), eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['cleanFoundryCaphost'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), and(eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'false'))))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['cleanFoundryCaphost'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), and(eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'false'))))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1473,7 +1707,7 @@ steps:
     admin_prjResourceSuffix: $(admin_prjResourceSuffix)
 - task: AzureCLI@2
   displayName: '06b_Delete_Service_If_Not_Enabled_And_Exists'
-  condition: and(succeeded(), eq(variables['enableDeleteForDisabledResources'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), eq(variables['enableDeleteForDisabledResources'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1563,7 +1797,7 @@ steps:
   # If a purge call fails the pipeline stops here (set -e) — Owner on subscription has purge rights.
   # Emits output variable purgeSoftDeleted.purgeRan (true/false) so 06c2 can skip the subnet-release
   # wait when nothing actually qualified for purge.
-  condition: and(succeeded(), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'true')))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'true')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1887,7 +2121,7 @@ steps:
   # - 06c_Purge task succeeded
   # - deleteAllForProject != true (ULTRA mode tears down RG + networking; no redeploy follows, so waiting for subnet release is pointless)
   # - BYO_subnets != true (customer manages their own subnets — never held by this pipeline, nothing to wait for)
-  condition: and(succeeded(), eq(variables['purgeSoftDeleted.purgeRan'], 'true'), ne(variables['deleteAllForProject'], 'true'), ne(variables['BYO_subnets'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')), eq(variables['enableAIFoundry'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), eq(variables['purgeSoftDeleted.purgeRan'], 'true'), ne(variables['deleteAllForProject'], 'true'), ne(variables['BYO_subnets'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true')), eq(variables['enableAIFoundry'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1988,7 +2222,7 @@ steps:
 - task: AzureCLI@2
   displayName: '06d_Cleanup_Disconnected_SharedPrivateLinks'
   continueOnError: true
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableAISearchSharedPrivateLink'], 'true'), eq(variables['aiSearchExists'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableAISearchSharedPrivateLink'], 'true'), eq(variables['aiSearchExists'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2076,7 +2310,7 @@ steps:
 - task: AzureCLI@2
   displayName: '06e_Create_Policy_Exemptions_FoundrySubnets'
   continueOnError: true
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['policyExemptionAssignmentIds'], '[]'), ne(variables['policyExemptionAssignmentIds'], ''), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['policyExemptionAssignmentIds'], '[]'), ne(variables['policyExemptionAssignmentIds'], ''), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2131,7 +2365,7 @@ steps:
      echo "=== 06e Policy Exemptions complete ==="
 - task: AzureCLI@2
   displayName: '05d_Build default image offline, to private registry (ACR) if not exists'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2315,107 +2549,122 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 - task: AzureCLI@2
   displayName: 'Check and Delete Orphan Role Assignments'
-  condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
+    scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
-      set -e
-      
-      echo "Checking for orphan role assignments..."
-      
-      # Set subscription
-      az account set --subscription "$(dev_test_prod_sub_id)"
-      
-      # Input parameters
-      commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-      projectNumber="$(project_number_000)"
-      projectName="prj${projectNumber}"
-      locationSuffix="$(admin_locationSuffix)"
-      envName="$(dev_test_prod)"
-      aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-      vnetResourceGroupBase="$(vnetResourceGroupBase)"
-      
-      # Set project prefix and suffix from pipeline variables
-      projectPrefix="$(projectPrefix)"
-      projectSuffix="$(projectSuffix)"
-      
-      # Construct common resource group name.
-      # Honor a custom (BYO) common resource group name from commonResourceGroup_param; only fall
-      # back to the default naming convention when it is unset (or the macro was not substituted).
-      COMMON_RG_INPUT="$(commonResourceGroup_param)"
-      if [ -n "$COMMON_RG_INPUT" ] && [ "$COMMON_RG_INPUT" != "\$(commonResourceGroup_param)" ]; then
-        commonResourceGroup="$COMMON_RG_INPUT"
-      else
-        commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
-      fi
-      echo "commonResourceGroup resolved to: $commonResourceGroup"
-      
-      # Construct project resource group name
-      projectNameReplaced="${projectName/prj/project}"
-      projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-      echo "projectResourceGroup resolved to: $projectResourceGroup"
-      
-      # Function to check and delete orphan role assignments
-      check_and_delete_orphans() {
-        local resourceGroup=$1
-        local rgScope="/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${resourceGroup}"
-        
-        echo "Checking resource group: $resourceGroup"
-        echo "Scope: $rgScope"
-        
-        # Check if resource group exists
-        if ! az group show --name "$resourceGroup" &>/dev/null; then
-          echo "Resource group $resourceGroup does not exist, skipping..."
-          return 0
-        fi
-        
-        # Get orphan role assignments
-        orphanCount=$(az role assignment list --scope "$rgScope" --query "[?principalName==null]" -o tsv | wc -l)
-        
-        if [ "$orphanCount" -gt 0 ]; then
-          echo "Found $orphanCount orphan role assignment(s) in $resourceGroup"
-          
-          # Get orphan role assignment IDs
-          orphanIds=$(az role assignment list --scope "$rgScope" --query "[?principalName==null].id" -o tsv)
-          
-          # Delete each orphan role assignment
-          while IFS= read -r assignmentId; do
-            if [ -n "$assignmentId" ]; then
-              echo "Attempting to delete orphan role assignment: $assignmentId"
-              
-              if az role assignment delete --ids "$assignmentId" 2>&1; then
-                echo "Successfully deleted orphan role assignment: $assignmentId"
-              else
-                echo "Warning: Failed to delete orphan role assignment: $assignmentId (may require additional permissions)"
-              fi
-            fi
-          done <<< "$orphanIds"
-        else
-          echo "No orphan role assignments found in $resourceGroup"
-        fi
+      $ErrorActionPreference = 'Stop'
+      $subscriptionId = "$(dev_test_prod_sub_id)"
+      Write-Host 'Checking for orphan role assignments...'
+
+      az account set --subscription $subscriptionId
+      if ($LASTEXITCODE -ne 0) {
+        throw "Unable to select subscription '$subscriptionId'."
       }
-      
-      # Check common resource group
-      if [ -n "$commonResourceGroup" ]; then
-        echo "=== Checking Common Resource Group ==="
-        check_and_delete_orphans "$commonResourceGroup" || echo "Warning: Error processing common resource group, continuing..."
-      fi
-      
-      # Check project resource group
-      if [ -n "$projectResourceGroup" ]; then
-        echo ""
-        echo "=== Checking Project Resource Group ==="
-        check_and_delete_orphans "$projectResourceGroup" || echo "Warning: Error processing project resource group, continuing..."
-      fi
-      
-      echo ""
-      echo "Orphan role assignment check completed"
+
+      $commonRGNamePrefix = "$(admin_aifactoryPrefixRG)"
+      $projectNumber = "$(project_number_000)"
+      $locationSuffix = "$(admin_locationSuffix)"
+      $environmentName = "$(dev_test_prod)"
+      $aifactorySuffixRG = "$(admin_aifactorySuffixRG)"
+      $vnetResourceGroupBase = "$(vnetResourceGroupBase)"
+      $projectPrefix = "$(projectPrefix)"
+      $projectSuffix = "$(projectSuffix)"
+
+      $commonResourceGroupInput = "$(commonResourceGroup_param)"
+      $unexpandedCommonResourceGroup = '$' + '(commonResourceGroup_param)'
+      if (
+        -not [string]::IsNullOrWhiteSpace($commonResourceGroupInput) -and
+        $commonResourceGroupInput -ne $unexpandedCommonResourceGroup
+      ) {
+        $commonResourceGroup = $commonResourceGroupInput
+      } else {
+        $commonResourceGroup = "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffix-$environmentName$aifactorySuffixRG"
+      }
+      $projectResourceGroup = "$commonRGNamePrefix$projectPrefix" +
+        "project$projectNumber-$locationSuffix-$environmentName$aifactorySuffixRG$projectSuffix"
+
+      Write-Host "commonResourceGroup resolved to: $commonResourceGroup"
+      Write-Host "projectResourceGroup resolved to: $projectResourceGroup"
+
+      function Remove-OrphanRoleAssignments {
+        param(
+          [Parameter(Mandatory = $true)]
+          [string] $ResourceGroup
+        )
+
+        $scope = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroup"
+        Write-Host "Checking resource group: $ResourceGroup"
+        Write-Host "Scope: $scope"
+
+        $resourceGroupExistsOutput = az group exists `
+          --subscription $subscriptionId `
+          --name $ResourceGroup `
+          --only-show-errors `
+          --output tsv 2>&1
+        if ($LASTEXITCODE -ne 0) {
+          throw "Unable to check whether resource group '$ResourceGroup' exists: $($resourceGroupExistsOutput -join [Environment]::NewLine)"
+        }
+        $resourceGroupExists = ($resourceGroupExistsOutput -join '').Trim()
+        if ($resourceGroupExists -ne 'true') {
+          Write-Host "Resource group $ResourceGroup does not exist yet; skipping orphan cleanup before 61-foundation."
+          return
+        }
+
+        $orphanOutput = az role assignment list `
+          --subscription $subscriptionId `
+          --scope $scope `
+          --query "[?principalName==null].id" `
+          --only-show-errors `
+          --output tsv
+        if ($LASTEXITCODE -ne 0) {
+          throw "Unable to list role assignments at '$scope'."
+        }
+
+        $orphanText = $orphanOutput -join [Environment]::NewLine
+        $orphanIds = @(
+          $orphanText -split '\s+' |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        )
+        if ($orphanIds.Count -eq 0) {
+          Write-Host "No orphan role assignments found in $ResourceGroup"
+          return
+        }
+
+        Write-Host "Found $($orphanIds.Count) orphan role assignment(s) in $ResourceGroup"
+        foreach ($assignmentId in $orphanIds) {
+          Write-Host "Attempting to delete orphan role assignment: $assignmentId"
+          $deleteOutput = az role assignment delete `
+            --subscription $subscriptionId `
+            --ids $assignmentId `
+            --only-show-errors 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Successfully deleted orphan role assignment: $assignmentId"
+          } else {
+            Write-Warning "Failed to delete orphan role assignment '$assignmentId': $($deleteOutput -join [Environment]::NewLine)"
+          }
+        }
+      }
+
+      foreach ($resourceGroup in @($commonResourceGroup, $projectResourceGroup)) {
+        if ([string]::IsNullOrWhiteSpace($resourceGroup)) {
+          continue
+        }
+        try {
+          Remove-OrphanRoleAssignments -ResourceGroup $resourceGroup
+        } catch {
+          Write-Warning "Error processing resource group '$resourceGroup'; continuing. $($_.Exception.Message)"
+        }
+      }
+
+      Write-Host 'Orphan role assignment check completed'
+      exit 0
 
 - task: AzureCLI@2
   displayName: '61-foundation'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2543,7 +2792,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '62-core-infrastructure'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
   retryCountOnTaskFailure: 2
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -2631,7 +2880,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '63-cognitive-services'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
   retryCountOnTaskFailure: 2
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -2732,7 +2981,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '64-databases'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_64_databases'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_64_databases'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2819,7 +3068,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '65-compute-services'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_65_compute_services'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_65_compute_services'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2920,7 +3169,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '66-ai-platform'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_66_ai_platform'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_66_ai_platform'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3006,7 +3255,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '67-data_ml_platform'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_67_data_ml_platform'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_67_data_ml_platform'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3089,7 +3338,7 @@ steps:
   # in 'Pending' state. They must be APPROVED on each TARGET resource before the ADF
   # AutoResolve managed Integration Runtime can reach the data stores over Private Link.
   # Reads the 67-data-ml-platform deployment output and approves any pending connection.
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_67_data_ml_platform'], 'true'), eq(variables['enableDatafactory'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_67_data_ml_platform'], 'true'), eq(variables['enableDatafactory'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3134,7 +3383,7 @@ steps:
       echo "Done approving ADF managed private endpoints."
 - task: AzureCLI@2
   displayName: '68-integration'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_68_integration'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_68_integration'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3199,82 +3448,98 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '99_detect_existing_acr_role_assignments'
-  condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
+    scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
-     #!/bin/bash
-     set -e
+     $ErrorActionPreference = 'Stop'
+     $subscriptionId = "$(dev_test_prod_sub_id)"
+     $commonRGNamePrefix = "$(admin_aifactoryPrefixRG)"
+     $locationSuffix = "$(admin_locationSuffix)"
+     $environmentName = "$(dev_test_prod)"
+     $aifactorySuffixRG = "$(admin_aifactorySuffixRG)"
+     $vnetResourceGroupBase = "$(vnetResourceGroupBase)"
+     $acrPushRoleId = '8311e382-0749-4cb8-b61a-304f252e45ec'
 
-     # Query existing acrPush role assignments at the RESOURCE GROUP level
-     # This makes the deployment idempotent by detecting which principals already have the role
-     az account set --subscription "$(dev_test_prod_sub_id)"
+     az account set --subscription $subscriptionId
+     if ($LASTEXITCODE -ne 0) {
+       throw "Unable to select subscription '$subscriptionId'."
+     }
 
-     # Input parameters
-     commonRGNamePrefix="$(admin_aifactoryPrefixRG)"
-     projectNumber="$(project_number_000)"
-     projectName="prj${projectNumber}"
-     locationSuffix="$(admin_locationSuffix)"
-     envName="$(dev_test_prod)"
-     aifactorySuffixRG="$(admin_aifactorySuffixRG)"
-     vnetResourceGroupBase="$(vnetResourceGroupBase)"
-     projectPrefix="$(projectPrefix)"
-     projectSuffix="$(projectSuffix)"
+     $commonResourceGroupInput = "$(commonResourceGroup_param)"
+     $unexpandedCommonResourceGroup = '$' + '(commonResourceGroup_param)'
+     if (
+       -not [string]::IsNullOrWhiteSpace($commonResourceGroupInput) -and
+       $commonResourceGroupInput -ne $unexpandedCommonResourceGroup
+     ) {
+       $commonResourceGroup = $commonResourceGroupInput
+     } else {
+       $commonResourceGroup = "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffix-$environmentName$aifactorySuffixRG"
+     }
+     Write-Host "Common RG resolved to: $commonResourceGroup"
 
-     # Construct common resource group name.
-     # Honor a custom (BYO) common resource group name from commonResourceGroup_param; only fall
-     # back to the default naming convention when it is unset (or the macro was not substituted).
-     COMMON_RG_INPUT="$(commonResourceGroup_param)"
-     if [ -n "$COMMON_RG_INPUT" ] && [ "$COMMON_RG_INPUT" != "\$(commonResourceGroup_param)" ]; then
-       commonResourceGroup="$COMMON_RG_INPUT"
-     else
-       commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
-     fi
-     echo "Common RG resolved to: ${commonResourceGroup}"
-
-     # ACR Push role ID
-     acrPushRoleId="8311e382-0749-4cb8-b61a-304f252e45ec"
-
-     # Check if common RG exists
-     if ! az group show --name "$commonResourceGroup" &> /dev/null; then
-       echo "Common resource group does not exist yet. No existing assignments to check."
-       echo "##vso[task.setvariable variable=existingAcrPushUserPrincipals]"
-       echo "##vso[task.setvariable variable=existingAcrPushSPPrincipals]"
+     $existsOutput = az group exists `
+       --subscription $subscriptionId `
+       --name $commonResourceGroup `
+       --only-show-errors `
+       --output tsv 2>&1
+     if ($LASTEXITCODE -ne 0) {
+       throw "Unable to check whether resource group '$commonResourceGroup' exists: $($existsOutput -join [Environment]::NewLine)"
+     }
+     if (($existsOutput -join '').Trim() -ne 'true') {
+       Write-Host 'Common resource group does not exist yet. No existing assignments to check.'
+       Write-Host '##vso[task.setvariable variable=existingAcrPushUserPrincipals]'
+       Write-Host '##vso[task.setvariable variable=existingAcrPushSPPrincipals]'
+       Write-Host '##vso[task.setvariable variable=skipACRAssignments]false'
        exit 0
-     fi
+     }
 
-     # Query existing role assignments at the RG scope (not ACR scope)
-     rgScope="/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${commonResourceGroup}"
-     echo "Querying existing acrPush role assignments at RG scope: ${rgScope}"
+     $rgScope = "/subscriptions/$subscriptionId/resourceGroups/$commonResourceGroup"
+     Write-Host "Querying existing acrPush role assignments at RG scope: $rgScope"
 
-     # Get existing User/Group principals with acrPush role
-     existingUserPrincipals=$(az role assignment list \
-       --resource-group "$commonResourceGroup" \
-       --role "$acrPushRoleId" \
-       --query "[?principalType=='User' || principalType=='Group'].principalId" \
-       -o tsv 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo "")
+     $existingUserOutput = az role assignment list `
+       --subscription $subscriptionId `
+       --resource-group $commonResourceGroup `
+       --role $acrPushRoleId `
+       --query "[?principalType=='User' || principalType=='Group'].principalId" `
+       --only-show-errors `
+       --output tsv 2>&1
+     if ($LASTEXITCODE -ne 0) {
+       throw "Unable to query User/Group acrPush assignments: $($existingUserOutput -join [Environment]::NewLine)"
+     }
 
-     # Get existing ServicePrincipal principals with acrPush role
-     existingSPPrincipals=$(az role assignment list \
-       --resource-group "$commonResourceGroup" \
-       --role "$acrPushRoleId" \
-       --query "[?principalType=='ServicePrincipal'].principalId" \
-       -o tsv 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo "")
+     $existingSPOutput = az role assignment list `
+       --subscription $subscriptionId `
+       --resource-group $commonResourceGroup `
+       --role $acrPushRoleId `
+       --query "[?principalType=='ServicePrincipal'].principalId" `
+       --only-show-errors `
+       --output tsv 2>&1
+     if ($LASTEXITCODE -ne 0) {
+       throw "Unable to query ServicePrincipal acrPush assignments: $($existingSPOutput -join [Environment]::NewLine)"
+     }
 
-     echo "Existing User/Group principals with acrPush: ${existingUserPrincipals:-none}"
-     echo "Existing ServicePrincipal principals with acrPush: ${existingSPPrincipals:-none}"
+     $existingUserPrincipals = @(
+       ($existingUserOutput -join [Environment]::NewLine) -split '\s+' |
+         Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+     ) -join ','
+     $existingSPPrincipals = @(
+       ($existingSPOutput -join [Environment]::NewLine) -split '\s+' |
+         Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+     ) -join ','
 
-     # Set pipeline variables with comma-separated principal IDs
-     echo "##vso[task.setvariable variable=existingAcrPushUserPrincipals]${existingUserPrincipals}"
-     echo "##vso[task.setvariable variable=existingAcrPushSPPrincipals]${existingSPPrincipals}"
-     
-     # Set skipACRAssignments to false since we're handling idempotency properly with filtering
-     echo "##vso[task.setvariable variable=skipACRAssignments]false"
+     $userDisplay = if ($existingUserPrincipals) { $existingUserPrincipals } else { 'none' }
+     $spDisplay = if ($existingSPPrincipals) { $existingSPPrincipals } else { 'none' }
+     Write-Host "Existing User/Group principals with acrPush: $userDisplay"
+     Write-Host "Existing ServicePrincipal principals with acrPush: $spDisplay"
+     Write-Host "##vso[task.setvariable variable=existingAcrPushUserPrincipals]$existingUserPrincipals"
+     Write-Host "##vso[task.setvariable variable=existingAcrPushSPPrincipals]$existingSPPrincipals"
+     Write-Host '##vso[task.setvariable variable=skipACRAssignments]false'
 - task: AzureCLI@2
   displayName: '100-rbac-security'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_100_rbac_security'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_100_rbac_security'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3365,12 +3630,11 @@ steps:
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters addAISearch="$(addAISearch)" \
      --parameters skipExistingRoleAssignments="$(skipACRAssignments)"
-     echo "##vso[task.setvariable variable=pre_foundry_gate_passed]true"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '101-rbac-common-rg'
   continueOnError: true
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_101_rbac_common_rg'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_101_rbac_common_rg'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3432,66 +3696,6 @@ steps:
      --parameters disableSubnetJoinAction="$(disableSubnetJoinAction)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
-  displayName: '69-aifoundry-2025-1stOption'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), or(eq(variables['foundryDeploymentType'], '1'), eq(variables['foundryDeploymentType'], '3')))
-  # continueOnError: true
-  inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-     az account set --subscription "$(dev_test_prod_sub_id)"
-
-     # Safe-default pipeline vars that may not be set if detection task was skipped
-     _aiFoundryV2Exists="$(aiFoundryV2Exists)"
-     _aiFoundryV2ProjectExists="$(aiFoundryV2ProjectExists)"
-     if [[ "$_aiFoundryV2Exists" == *"aiFoundryV2Exists"* ]]; then _aiFoundryV2Exists="false"; fi
-     if [[ "$_aiFoundryV2ProjectExists" == *"aiFoundryV2ProjectExists"* ]]; then _aiFoundryV2ProjectExists="false"; fi
-
-     az deployment sub create \
-      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-69-aifoundry-2025-account-1st" \
-      --subscription "$(dev_test_prod_sub_id)" \
-      --location "$(admin_location)" \
-      --template-file "esml-genai-1/09-ai-foundry-2025-v2.bicep" \
-      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
-      --parameters targetSubscriptionId="$(dev_test_prod_sub_id)" \
-      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
-      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
-      --parameters commonResourceName="$(vnetResourceGroupBase)" \
-      --parameters locationSuffix="$(admin_locationSuffix)" \
-      --parameters env="$(dev_test_prod)" \
-      --parameters projectNumber="$(project_number_000)" \
-      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
-      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
-      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
-      --parameters location="$(admin_location)" \
-      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
-      --parameters randomValue="$(deployment_random_value)" \
-      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
-      --parameters technicalAdminsEmail="$(technical_admins_email)" \
-      --parameters subscriptionIdDevTestProd="$(dev_test_prod_sub_id)" \
-      --parameters apiManagementResourceId="$(foundryApiManagementResourceId)" \
-      --parameters privDnsSubscription_param="$(privDnsSubscription_param)" \
-      --parameters privDnsResourceGroup_param="$(privDnsResourceGroup_param)" \
-      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
-      --parameters projectPrefix="$(projectPrefix)" \
-      --parameters projectSuffix="$(projectSuffix)" \
-      --parameters tags='$(tagsProject)' \
-      --parameters addAIFoundry="$(addAIFoundry)" \
-      --parameters enableAISearch="$(enableAISearch)" \
-      --parameters enableAISearchSharedPrivateLink="$(enableAISearchSharedPrivateLink)" \
-      --parameters aiFoundryV2Exists="$_aiFoundryV2Exists" \
-      --parameters aiFoundryV2ProjectExists="$_aiFoundryV2ProjectExists" \
-      --parameters enableDefenderforAISubLevel="$(enableDefenderforAISubLevel)" \
-      --parameters enableDefenderforAIResourceLevel="$(enableDefenderforAIResourceLevel)"
-      
-      # If the deployment succeeded, set a variable to skip the fallback option
-      if [ $? -eq 0 ]; then
-        echo "##vso[task.setvariable variable=foundry_1st_option_succeeded]true"
-        echo "First option succeeded - will skip second option"
-      fi
-    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
-- task: AzureCLI@2
   displayName: '69a-Validate-Subnet-For-NetworkInjection'
   # Validates the AGENT subnet (aca2SubnetId) actually written into dynamicNetworkParams.json
   # — not just the conventional name — because that is the value Bicep injects into
@@ -3509,7 +3713,7 @@ steps:
   # subscription, which is required by the auto-provisioned invisible ACA environment
   # that backs the agent service.
   continueOnError: false
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), ne(variables['disableAgentNetworkInjection'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), succeeded(), eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), ne(variables['disableAgentNetworkInjection'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3751,7 +3955,7 @@ steps:
   # plane, no IaC ordering can prevent the flip and a deny-public Azure Policy will cause
   # a hard failure here/at caphost — that case requires a Microsoft support ticket.
   continueOnError: true
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), ne(variables['disableAgentNetworkInjection'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), succeeded(), eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), ne(variables['disableAgentNetworkInjection'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -3906,7 +4110,7 @@ steps:
       echo "   The Foundry account (next task) can now reach AI Search privately; no public fallback required."
 - task: AzureCLI@2
   displayName: '69a-aifoundry-2025-2ndOption-Account'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), succeeded(), eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'))
   retryCountOnTaskFailure: 3
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -4078,7 +4282,7 @@ steps:
 # best-effort — it logs warnings and ALWAYS exits 0, and it must never fail or block the deployment.
 - task: AzureCLI@2
   displayName: '69a-Grant-NetworkContributor-For-Injection (best-effort)'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), succeeded())
   retryCountOnTaskFailure: 2
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -4218,7 +4422,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69a-Poll-Deployment-Status'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), eq(variables['pre_foundry_gate_passed'], 'true'), ne(variables['foundry_1st_option_succeeded'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4378,7 +4582,7 @@ steps:
 - task: AzureCLI@2
   displayName: '69-wait-account-caphost-succeeded'
   continueOnError: false
-  condition: and(eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), not(failed()), not(canceled()), ne(variables['disableAgentNetworkInjection'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), not(failed()), not(canceled()), ne(variables['disableAgentNetworkInjection'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4463,7 +4667,7 @@ steps:
      echo "##[warning]Proceeding to 69b anyway — retryCountOnTaskFailure may recover."
 - task: AzureCLI@2
   displayName: '69b-aifoundry-2025-2ndOption-AccountUpdate'
-  condition: and(eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded(), ne(variables['foundry_1st_option_succeeded'], 'true'), or(eq(variables['foundryDeploymentType'], '2'), eq(variables['foundryDeploymentType'], '3')))
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), succeeded())
   retryCountOnTaskFailure: 2
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -4604,7 +4808,7 @@ steps:
 - task: AzureCLI@2
   displayName: '69c_cosmosdb_data_contributor_for_foundry_project'
   continueOnError: true
-  condition: and(eq(variables['enableAIFoundry'], 'true'), eq(variables['enableCosmosDB'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableCosmosDB'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4657,15 +4861,19 @@ steps:
        --query "id" -o tsv)
 
      # Find the project and its system-assigned identity principal ID
-     project_json=$(az rest --method GET \
-       --url "https://management.azure.com${foundry_account_id}/projects?api-version=2025-04-01-preview" \
-       -o json 2>/dev/null | tr -d '\r' || echo '{"value":[]}')
+     projects_url="https://management.azure.com${foundry_account_id}/projects?api-version=2025-04-01-preview"
+     project_count=$(az rest --method GET \
+       --url "$projects_url" \
+       --query "length(value)" -o tsv 2>/dev/null || echo "0")
+     project_names=$(az rest --method GET \
+       --url "$projects_url" \
+       --query "join(', ', value[].name)" -o tsv 2>/dev/null || echo "")
+     project_principal_id=$(az rest --method GET \
+       --url "$projects_url" \
+       --query "value[?identity.principalId != null].identity.principalId | [0]" -o tsv 2>/dev/null || echo "")
 
-     echo "DEBUG: Projects found: $(echo "$project_json" | jq '.value | length')"
-     echo "DEBUG: Project names: $(echo "$project_json" | jq -r '[.value[].name] | join(", ")')"
-
-     project_principal_id=$(echo "$project_json" | jq -r \
-       '[.value[] | select(.identity.principalId != null and .identity.principalId != "")] | .[0].identity.principalId // empty')
+     echo "DEBUG: Projects found: ${project_count:-0}"
+     echo "DEBUG: Project names: ${project_names:-none}"
 
      # Fallback: if REST list didn't yield a principalId, construct the project name
      # from salt variables (same formula as 06a / CmnAIfactoryNaming.bicep) and query directly.
@@ -4679,10 +4887,9 @@ steps:
          cleanRandomValue=$(echo "$cleanRandomValue" | awk '{print tolower($0)}')
          foundry_project_name=$(echo "aif2-p${projectNumber}${uniqueInAIFenv}${cleanRandomValue}" | awk '{print tolower($0)}' | cut -c1-12)
          echo "DEBUG 69c fallback: constructed project name='$foundry_project_name'"
-         fallback_json=$(az rest --method GET \
+         project_principal_id=$(az rest --method GET \
            --url "https://management.azure.com${foundry_account_id}/projects/${foundry_project_name}?api-version=2025-04-01-preview" \
-           -o json 2>/dev/null | tr -d '\r' || echo '{}')
-         project_principal_id=$(echo "$fallback_json" | jq -r '.identity.principalId // empty')
+           --query "identity.principalId" -o tsv 2>/dev/null || echo "")
          echo "DEBUG 69c fallback: principalId='$project_principal_id'"
        else
          echo "Salt variables not available (salt='$uniqueInAIFenv', random='$saltRandom10'). Cannot construct project name."
@@ -4739,7 +4946,7 @@ steps:
 - task: AzureCLI@2
   displayName: '100a_approve_AI_Search_shared_private_links'
   continueOnError: true
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAISearchSharedPrivateLink'], 'true'), or(and(eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true')), eq(variables['enableAISearch'], 'true')))
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAISearchSharedPrivateLink'], 'true'), or(and(eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true')), eq(variables['enableAISearch'], 'true')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -4853,7 +5060,7 @@ steps:
 - task: AzureCLI@2
   displayName: '100b_create_foundry_agent'
   continueOnError: true
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAIFoundry'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['enableAIFoundry'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5031,7 +5238,7 @@ steps:
      echo "=== Agent creation task completed ==="
 - task: AzureCLI@2
   displayName: '101_generate_hosts_file_info'
-  condition: and(succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5054,9 +5261,9 @@ steps:
   #      before delete-services-if-disabled.sh removes the project RG.
   #
   # If task 62 / 63 / etc. failed BEFORE 69a, the started markers are never set
-  # (69a/69b's own conditions require pre_foundry_gate_passed=true and succeeded()),
+  # (69a/69b's own conditions require the Foundry phase and succeeded()),
   # so 110 stays skipped and any healthy caphost from a prior run is preserved.
-  condition: and(or(and(eq(variables['foundry_69a_started'], 'true'), ne(variables['foundry_69a_deployment_succeeded'], 'true')), and(eq(variables['foundry_69b_started'], 'true'), ne(variables['foundry_69b_succeeded'], 'true')), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), or(and(eq(variables['foundry_69a_started'], 'true'), ne(variables['foundry_69a_deployment_succeeded'], 'true')), and(eq(variables['foundry_69b_started'], 'true'), ne(variables['foundry_69b_succeeded'], 'true')), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5066,7 +5273,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '111_If_Error_AIFoundryHubAndProject_DeleteIt'
-  condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5076,7 +5283,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '112_If_Error_AIServices_DeleteIt'
-  condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '63-cognitive-services'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '63-cognitive-services'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5086,7 +5293,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '113_If_Error_AIFoundryProject_DeleteIt'
-  condition: and(failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '69-aifoundry-2025'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(eq('${{ parameters.phase }}', 'foundry'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '69-aifoundry-2025'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5096,7 +5303,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '114_Purge_If_SoftDeleted_111_112_After5minutes'
-  condition: and(eq(variables['debugEnableCleaning'], 'true'), or(eq(variables['71_deleted'], 'true'), eq(variables['72_deleted'], 'true')))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), eq(variables['debugEnableCleaning'], 'true'), or(eq(variables['71_deleted'], 'true'), eq(variables['72_deleted'], 'true')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5106,7 +5313,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '10-aifactory-dashboards'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_10_aifactory_dashboards'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_10_aifactory_dashboards'], 'true'), succeeded())
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5211,7 +5418,7 @@ steps:
   displayName: '07_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
-    azureSubscription: ${{ parameters.serviceConnection }}
+    azureSubscription: ${{ parameters.serviceConnectionSeeding }}
     scriptLocation: inlineScript
     scriptType: bash
     inlineScript: | 
@@ -5219,7 +5426,7 @@ steps:
      az keyvault network-rule remove --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$(admin_ip_fw)"
 - task: AzureCLI@2
   displayName: '08_az_remove_ips_from_ACR_FW_whitelist'
-  condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash

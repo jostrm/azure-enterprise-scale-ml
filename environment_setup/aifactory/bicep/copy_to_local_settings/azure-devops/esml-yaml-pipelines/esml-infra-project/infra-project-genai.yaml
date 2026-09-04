@@ -10,14 +10,22 @@
 #
 #Prod_GenAI_Project:
 #❌ Never runs automatically - requires manual trigger
-#✅ Only runs when manually triggered AND (Stage succeeded/skipped OR Dev succeeded)
+#✅ Only runs when manually triggered AND Dev and Stage both succeeded
 #✅ Can be manually triggered from any branch
 
 parameters:
   - name: configFile
     displayName: Canonical AI Factory JSON configuration file
     type: string
-    default: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/variables.json'
+    default: 'aifactory/variables.json'
+  - name: runnerSelection
+    displayName: Build agent selection
+    type: string
+    default: from-config
+    values:
+      - from-config
+      - microsoft-hosted
+      - self-hosted
 
 trigger: none
   # branches:
@@ -44,7 +52,15 @@ stages:
       displayName: Deploy Private Network
       timeoutInMinutes: 120
       pool:
-        vmImage: windows-2022
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
+          name: $(adminVMBuildAgentPool)
+          demands:
+            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+              - Agent.Name -equals $(adminVMBuildAgentName)
+            ${{ else }}:
+              - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
+        ${{ else }}:
+          vmImage: windows-2022
       environment: Dev  
       strategy:
         runOnce:
@@ -64,7 +80,7 @@ stages:
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
       pool:
-        ${{ if and(eq(variables.enableAdminVM, 'true'), eq(variables.useAdminVMBuildAgent, 'true')) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -87,17 +103,16 @@ stages:
                   serviceConnection: ${{ variables.dev_service_connection }}
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
                   phase: 'infra'
-    # AI Foundry runs in its OWN deployment job so it starts with a FRESH Microsoft-hosted
-    # 60-minute agent budget (the free-tier per-job cap silently overrides timeoutInMinutes).
-    # The job-2 template re-runs its preamble (00_*..05c_*) in this phase to re-derive
-    # detection vars, salt, seeding-KV secrets and firewall whitelisting on the new agent.
+    # AI Foundry runs in its own deployment job. The phase parameter excludes all infra
+    # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
+    # dynamic network parameters, resource detection, and salt) are re-created.
     - deployment: ESGenAI_Foundry
       condition: in(dependencies.ESGenAI_Services.result, 'Succeeded')
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
       pool:
-        ${{ if and(eq(variables.enableAdminVM, 'true'), eq(variables.useAdminVMBuildAgent, 'true')) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -140,7 +155,15 @@ stages:
       displayName: Deploy Private Network
       timeoutInMinutes: 240
       pool:
-        vmImage: windows-2022
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
+          name: $(adminVMBuildAgentPool)
+          demands:
+            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+              - Agent.Name -equals $(adminVMBuildAgentName)
+            ${{ else }}:
+              - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
+        ${{ else }}:
+          vmImage: windows-2022
       environment: Stage
       strategy:
         runOnce:
@@ -160,7 +183,7 @@ stages:
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
       pool:
-        ${{ if and(eq(variables.enableAdminVM, 'true'), eq(variables.useAdminVMBuildAgent, 'true')) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -183,17 +206,16 @@ stages:
                   serviceConnection: ${{ variables.test_service_connection }}
                   serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
                   phase: 'infra'
-    # AI Foundry runs in its OWN deployment job so it starts with a FRESH Microsoft-hosted
-    # 60-minute agent budget (the free-tier per-job cap silently overrides timeoutInMinutes).
-    # The job-2 template re-runs its preamble (00_*..05c_*) in this phase to re-derive
-    # detection vars, salt, seeding-KV secrets and firewall whitelisting on the new agent.
+    # AI Foundry runs in its own deployment job. The phase parameter excludes all infra
+    # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
+    # dynamic network parameters, resource detection, and salt) are re-created.
     - deployment: ESGenAI_Foundry
       condition: in(dependencies.ESGenAI_Services.result, 'Succeeded')
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
       pool:
-        ${{ if and(eq(variables.enableAdminVM, 'true'), eq(variables.useAdminVMBuildAgent, 'true')) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -218,7 +240,7 @@ stages:
                   phase: 'foundry'
 - stage: Prod_GenAI_Project
   displayName: Prod GenAI Project
-  condition: and(eq(variables['Build.Reason'], 'Manual'), or(in(dependencies.Stage_GenAI_Project.result, 'Succeeded', 'Skipped'), in(dependencies.Dev_GenAI_Project.result, 'Succeeded')))
+  condition: and(eq(variables['Build.Reason'], 'Manual'), eq(dependencies.Dev_GenAI_Project.result, 'Succeeded'), eq(dependencies.Stage_GenAI_Project.result, 'Succeeded'))
   dependsOn: 
     - Stage_GenAI_Project
     - Dev_GenAI_Project
@@ -238,7 +260,15 @@ stages:
       displayName: Deploy Private Network
       timeoutInMinutes: 120
       pool:
-        vmImage: windows-2022
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
+          name: $(adminVMBuildAgentPool)
+          demands:
+            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+              - Agent.Name -equals $(adminVMBuildAgentName)
+            ${{ else }}:
+              - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
+        ${{ else }}:
+          vmImage: windows-2022
       environment: Prod
       strategy:
         runOnce:
@@ -258,7 +288,7 @@ stages:
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
       pool:
-        ${{ if and(eq(variables.enableAdminVM, 'true'), eq(variables.useAdminVMBuildAgent, 'true')) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -281,17 +311,16 @@ stages:
                   serviceConnection: ${{ variables.prod_service_connection }}
                   serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
                   phase: 'infra'
-    # AI Foundry runs in its OWN deployment job so it starts with a FRESH Microsoft-hosted
-    # 60-minute agent budget (the free-tier per-job cap silently overrides timeoutInMinutes).
-    # The job-2 template re-runs its preamble (00_*..05c_*) in this phase to re-derive
-    # detection vars, salt, seeding-KV secrets and firewall whitelisting on the new agent.
+    # AI Foundry runs in its own deployment job. The phase parameter excludes all infra
+    # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
+    # dynamic network parameters, resource detection, and salt) are re-created.
     - deployment: ESGenAI_Foundry
       condition: in(dependencies.ESGenAI_Services.result, 'Succeeded')
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
       pool:
-        ${{ if and(eq(variables.enableAdminVM, 'true'), eq(variables.useAdminVMBuildAgent, 'true')) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             ${{ if ne(variables.adminVMBuildAgentName, '') }}:
