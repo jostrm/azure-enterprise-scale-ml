@@ -85,6 +85,27 @@ function Import-Dependencies {
 
     # Build agents commonly run as non-admin service accounts, so module installs must use a writable scope.
     $moduleInstallScope="CurrentUser"
+
+    function Install-DependencyIfMissing {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string] $Name,
+
+            [Parameter(Mandatory = $true)]
+            [string] $RequiredVersion
+        )
+
+        $installed = Get-Module -ListAvailable -Name $Name |
+            Where-Object { $_.Version -eq [version]$RequiredVersion } |
+            Select-Object -First 1
+        if ($null -eq $installed) {
+            Install-Module $Name -RequiredVersion $RequiredVersion -Scope $moduleInstallScope -Force -AllowClobber
+        }
+        else {
+            Write-Verbose "Using installed $Name $RequiredVersion from '$($installed.ModuleBase)'."
+        }
+    }
+
     switch ($callingScriptName) {
         "generateUserParameters.ps1" { 
             Write-Verbose "(disabled due to DEMO env, no AD permission to lookup username) Installing dependencies for $callingScriptName"
@@ -95,23 +116,19 @@ function Import-Dependencies {
          }
         "genDynamicNetworkParamFile.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            if ($null -eq $loadedAzAccounts) {
-                Install-Module Az.Accounts -RequiredVersion $azAccountsVersion -Scope $moduleInstallScope -Force -AllowClobber
-            }
-            Install-Module Az.Resources -RequiredVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Install-Module Az.Network -RequiredVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-DependencyIfMissing -Name Az.Accounts -RequiredVersion $azAccountsVersion
+            Install-DependencyIfMissing -Name Az.Resources -RequiredVersion $azResourcesVersion
+            Install-DependencyIfMissing -Name Az.Network -RequiredVersion $azNetworkVersion
             Import-CompatibleAzAccounts
             Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
             Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
          }
         "subnetCalc.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            if ($null -eq $loadedAzAccounts) {
-                Install-Module Az.Accounts -RequiredVersion $azAccountsVersion -Scope $moduleInstallScope -Force -AllowClobber
-            }
-            Install-Module Az.Resources -RequiredVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Install-Module Az.Network -RequiredVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Install-Module Subnet -RequiredVersion $subnetVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-DependencyIfMissing -Name Az.Accounts -RequiredVersion $azAccountsVersion
+            Install-DependencyIfMissing -Name Az.Resources -RequiredVersion $azResourcesVersion
+            Install-DependencyIfMissing -Name Az.Network -RequiredVersion $azNetworkVersion
+            Install-DependencyIfMissing -Name Subnet -RequiredVersion $subnetVersion
             Import-CompatibleAzAccounts
             Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
             Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
@@ -119,12 +136,10 @@ function Import-Dependencies {
         }
         "subnetCalc_v2.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            if ($null -eq $loadedAzAccounts) {
-                Install-Module Az.Accounts -RequiredVersion $azAccountsVersion -Scope $moduleInstallScope -Force -AllowClobber
-            }
-            Install-Module Az.Resources -RequiredVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Install-Module Az.Network -RequiredVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Install-Module Subnet -RequiredVersion $subnetVersion -Scope $moduleInstallScope -Force -AllowClobber
+            Install-DependencyIfMissing -Name Az.Accounts -RequiredVersion $azAccountsVersion
+            Install-DependencyIfMissing -Name Az.Resources -RequiredVersion $azResourcesVersion
+            Install-DependencyIfMissing -Name Az.Network -RequiredVersion $azNetworkVersion
+            Install-DependencyIfMissing -Name Subnet -RequiredVersion $subnetVersion
             Import-CompatibleAzAccounts
             Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
             Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
