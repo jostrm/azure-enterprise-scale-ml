@@ -67,6 +67,22 @@ function Import-Dependencies {
     $azResourcesVersion="4.3.0"
     $azNetworkVersion="4.10.0"
     $subnetVersion="1.0.6"
+    $loadedAzAccounts = Get-Module Az.Accounts | Select-Object -First 1
+    if ($null -ne $loadedAzAccounts -and $loadedAzAccounts.Version -ge [version]"5.5.0") {
+        $azAccountsVersion = $loadedAzAccounts.Version.ToString()
+        $azResourcesVersion = "10.2.0"
+        $azNetworkVersion = "8.2.0"
+    }
+
+    function Import-CompatibleAzAccounts {
+        if ($null -eq (Get-Module Az.Accounts)) {
+            Import-Module Az.Accounts -RequiredVersion $azAccountsVersion -Force
+        }
+        else {
+            Write-Verbose "Using preloaded Az.Accounts $((Get-Module Az.Accounts).Version)."
+        }
+    }
+
     # Build agents commonly run as non-admin service accounts, so module installs must use a writable scope.
     $moduleInstallScope="CurrentUser"
     switch ($callingScriptName) {
@@ -79,28 +95,37 @@ function Import-Dependencies {
          }
         "genDynamicNetworkParamFile.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
+            if ($null -eq $loadedAzAccounts) {
+                Install-Module Az.Accounts -RequiredVersion $azAccountsVersion -Scope $moduleInstallScope -Force -AllowClobber
+            }
             Install-Module Az.Resources -RequiredVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
             Install-Module Az.Network -RequiredVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Import-Module Az.Accounts -RequiredVersion $azAccountsVersion -Force
+            Import-CompatibleAzAccounts
             Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
             Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
          }
         "subnetCalc.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
+            if ($null -eq $loadedAzAccounts) {
+                Install-Module Az.Accounts -RequiredVersion $azAccountsVersion -Scope $moduleInstallScope -Force -AllowClobber
+            }
             Install-Module Az.Resources -RequiredVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
             Install-Module Az.Network -RequiredVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
             Install-Module Subnet -RequiredVersion $subnetVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Import-Module Az.Accounts -RequiredVersion $azAccountsVersion -Force
+            Import-CompatibleAzAccounts
             Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
             Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
             Import-Module Subnet -RequiredVersion $subnetVersion -Force
         }
         "subnetCalc_v2.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
+            if ($null -eq $loadedAzAccounts) {
+                Install-Module Az.Accounts -RequiredVersion $azAccountsVersion -Scope $moduleInstallScope -Force -AllowClobber
+            }
             Install-Module Az.Resources -RequiredVersion $azResourcesVersion -Scope $moduleInstallScope -Force -AllowClobber
             Install-Module Az.Network -RequiredVersion $azNetworkVersion -Scope $moduleInstallScope -Force -AllowClobber
             Install-Module Subnet -RequiredVersion $subnetVersion -Scope $moduleInstallScope -Force -AllowClobber
-            Import-Module Az.Accounts -RequiredVersion $azAccountsVersion -Force
+            Import-CompatibleAzAccounts
             Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
             Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
             Import-Module Subnet -RequiredVersion $subnetVersion -Force
