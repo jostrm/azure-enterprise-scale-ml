@@ -152,6 +152,19 @@ $privateEndpoint = Invoke-AzJson -Operation 'Read seeding Key Vault private endp
     'network', 'private-endpoint', 'show',
     '--ids', $privateEndpointId
 )
+$effectiveVnetSubscription = $VnetSubscription
+$effectiveVnetResourceGroup = $VnetResourceGroup
+$effectiveVnetName = $VnetName
+$privateEndpointSubnetId = $privateEndpoint.subnet.id
+if (-not [string]::IsNullOrWhiteSpace($privateEndpointSubnetId)) {
+    $subnetIdParts = $privateEndpointSubnetId -split '/'
+    if ($subnetIdParts.Count -ge 11) {
+        $effectiveVnetSubscription = $subnetIdParts[2]
+        $effectiveVnetResourceGroup = $subnetIdParts[4]
+        $effectiveVnetName = $subnetIdParts[8]
+        Write-Host "Using the private endpoint VNet '$effectiveVnetSubscription/$effectiveVnetResourceGroup/$effectiveVnetName' for DNS linkage."
+    }
+}
 $privateEndpointNicId = @($privateEndpoint.networkInterfaces)[0].id
 if ([string]::IsNullOrWhiteSpace($privateEndpointNicId)) {
     throw "Private endpoint '$privateEndpointId' has no network interface."
@@ -168,13 +181,14 @@ if ([string]::IsNullOrWhiteSpace($privateEndpointIp)) {
 
 $vnet = Invoke-AzJson -Operation 'Read build-agent VNet' -Arguments @(
     'network', 'vnet', 'show',
-    '--subscription', $VnetSubscription,
-    '--resource-group', $VnetResourceGroup,
-    '--name', $VnetName
+    '--subscription', $effectiveVnetSubscription,
+    '--resource-group', $effectiveVnetResourceGroup,
+    '--name', $effectiveVnetName
 )
 $dnsZone = $null
 $dnsZoneCandidates = @(
     [pscustomobject]@{ Subscription = $DnsZoneSubscription; ResourceGroup = $DnsZoneResourceGroup },
+    [pscustomobject]@{ Subscription = $effectiveVnetSubscription; ResourceGroup = $effectiveVnetResourceGroup },
     [pscustomobject]@{ Subscription = $VnetSubscription; ResourceGroup = $VnetResourceGroup }
 )
 $checkedDnsLocations = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -216,7 +230,7 @@ $matchingVnetLink = $vnetLinks |
     Where-Object { $_.virtualNetwork.id -ieq $vnet.id } |
     Select-Object -First 1
 if ($null -eq $matchingVnetLink) {
-    $vnetLinkName = "$VnetName-vaultcore"
+    $vnetLinkName = "$effectiveVnetName-vaultcore"
     Write-Host "Creating private DNS VNet link '$vnetLinkName'."
     Invoke-AzCommand -Operation 'Create Key Vault private DNS VNet link' -Arguments @(
         'network', 'private-dns', 'link', 'vnet', 'create',
@@ -229,7 +243,7 @@ if ($null -eq $matchingVnetLink) {
     )
 }
 else {
-    Write-Host "Private DNS zone is linked to VNet '$VnetName' by '$($matchingVnetLink.name)'."
+    Write-Host "Private DNS zone is linked to VNet '$effectiveVnetName' by '$($matchingVnetLink.name)'."
 }
 
 $privateEndpointIdParts = $privateEndpointId -split '/'
