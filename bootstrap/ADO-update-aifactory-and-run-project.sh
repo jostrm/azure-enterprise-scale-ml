@@ -14,8 +14,26 @@ readonly VARIABLES_TEMPLATE_FILE="aifactory/esml-infra/azure-devops/bicep/yaml/v
 readonly CONFIG_FILE="aifactory/variables.json"
 readonly CONFIG_TEMPLATE_FILE="aifactory/variables-template.json"
 readonly RUNNER_SELECTION="${ADO_RUNNER_SELECTION:-self-hosted}"
+readonly AZURE_DEVOPS_RESOURCE_URL="https://app.vssps.visualstudio.com/"
+readonly ADO_SETTINGS_FILE="${ADO_SETTINGS_FILE:-$HOME/.aifactory-ado-settings.json}"
+auth_method="${ADO_AUTH_METHOD:-aad}"
 
 cd "$REPO_ROOT"
+
+if [[ "${AIFACTORY_LAUNCHER_STABLE:-}" != "1" ]]; then
+  state_dir="$HOME/.aifactory-update-state/ado-$$"
+  stable_launcher="$state_dir/ADO-update-aifactory-and-run-project.sh"
+  mkdir -p "$state_dir"
+  cp "${BASH_SOURCE[0]}" "$stable_launcher"
+  chmod +x "$stable_launcher"
+  export AIFACTORY_LAUNCHER_STABLE=1
+  export AIFACTORY_LAUNCHER_STATE_DIR="$state_dir"
+  export AIFACTORY_REPO_ROOT="$REPO_ROOT"
+  exec bash "$stable_launcher" "$@"
+fi
+
+state_dir="${AIFACTORY_LAUNCHER_STATE_DIR:?Stable launcher state directory is missing.}"
+trap 'rm -rf -- "$state_dir"' EXIT
 
 for command in git az; do
   if ! command -v "$command" >/dev/null 2>&1; then
@@ -33,13 +51,47 @@ else
   echo "ERROR: A working Python 3 interpreter is required." >&2
   exit 1
 fi
-if ! az extension show --name azure-devops >/dev/null 2>&1; then
-  echo "ERROR: The Azure CLI azure-devops extension is required." >&2
-  echo "Install it with: az extension add --name azure-devops" >&2
-  exit 1
+
+ado_repository_name="${ADO_REPOSITORY_NAME:-}"
+if [[ -z "$ado_repository_name" ]]; then
+  origin_url=$(git remote get-url origin)
+  ado_repository_name=$("${PYTHON[@]}" -c '
+import sys
+from urllib.parse import unquote, urlparse
+
+url = sys.argv[1].rstrip("/")
+parsed = urlparse(url)
+path = unquote(parsed.path).rstrip("/")
+if "/_git/" in path:
+    name = path.rsplit("/_git/", 1)[1]
+elif parsed.scheme:
+    name = path.rsplit("/", 1)[-1]
+else:
+    name = url.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+print(name.removesuffix(".git"))
+' "$origin_url")
 fi
 
-devops_defaults=$(az devops configure --list 2>/dev/null || true)
+read_saved_setting() {
+  local name="$1"
+  if [[ ! -f "$ADO_SETTINGS_FILE" ]]; then
+    return
+  fi
+  "${PYTHON[@]}" -c '
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8-sig") as settings_file:
+    value = json.load(settings_file).get(sys.argv[2], "")
+if isinstance(value, str):
+    print(value)
+' "$ADO_SETTINGS_FILE" "$name"
+}
+
+devops_defaults=""
+if az extension show --name azure-devops >/dev/null 2>&1; then
+  devops_defaults=$(az devops configure --list 2>/dev/null || true)
+fi
 read_devops_default() {
   local name="$1"
   printf '%s\n' "$devops_defaults" | "${PYTHON[@]}" -c '
@@ -54,17 +106,28 @@ for line in sys.stdin:
 ' "$name"
 }
 
-ado_organization="${ADO_ORGANIZATION:-$(read_devops_default organization)}"
-ado_project="${ADO_PROJECT:-$(read_devops_default project)}"
+ado_organization="${ADO_ORGANIZATION:-}"
+ado_project="${ADO_PROJECT:-}"
+if [[ -z "$ado_organization" ]]; then
+  ado_organization="$(read_saved_setting organization)"
+fi
+if [[ -z "$ado_project" ]]; then
+  ado_project="$(read_saved_setting project)"
+fi
+if [[ -z "$ado_organization" ]]; then
+  ado_organization="$(read_devops_default organization)"
+fi
+if [[ -z "$ado_project" ]]; then
+  ado_project="$(read_devops_default project)"
+fi
 devops_defaults_prompted=false
 if [[ -z "$ado_organization" || -z "$ado_project" ]]; then
   if [[ ! -t 0 ]]; then
     echo "ERROR: Azure DevOps organization and project are required in non-interactive mode." >&2
-    echo "Set ADO_ORGANIZATION and ADO_PROJECT, or configure Azure CLI defaults:" >&2
-    echo "  az devops configure --defaults organization=https://dev.azure.com/<org> project=<project>" >&2
+    echo "Set ADO_ORGANIZATION and ADO_PROJECT before starting this script." >&2
     exit 1
   fi
-  echo "Azure DevOps settings are not configured. Enter them once; they will be saved as Azure CLI defaults."
+  echo "Azure DevOps settings are not configured. Enter them once; they will be saved locally for future runs."
 fi
 while [[ -z "$ado_organization" ]]; do
   read -r -p "Azure DevOps organization name or URL: " ado_organization
@@ -80,38 +143,243 @@ case "$ado_organization" in
 esac
 ado_organization="${ado_organization%/}"
 if [[ "$devops_defaults_prompted" == "true" ]]; then
-  az devops configure \
-    --defaults organization="$ado_organization" project="$ado_project" \
-    >/dev/null
-  echo "Saved Azure DevOps organization and project for future runs."
+  "${PYTHON[@]}" - "$ADO_SETTINGS_FILE" "$ado_organization" "$ado_project" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+settings_path = Path(sys.argv[1])
+settings_path.parent.mkdir(parents=True, exist_ok=True)
+settings_path.write_text(
+    json.dumps({"organization": sys.argv[2], "project": sys.argv[3]}, indent=2) + "\n",
+    encoding="utf-8",
+)
+PY
+  echo "Saved Azure DevOps organization and project locally for future runs."
 fi
 
-state_dir="$HOME/.aifactory-update-state/ado-$$"
-mkdir -p "$state_dir"
-trap 'rm -rf -- "$state_dir"' EXIT
-cp "$0" "$state_dir/ADO-update-aifactory-and-run-project.sh"
+configure_pat_auth() {
+  if [[ -z "${AZURE_DEVOPS_EXT_PAT:-}" ]]; then
+    if [[ ! -t 0 ]]; then
+      echo "ERROR: AZURE_DEVOPS_EXT_PAT is required for PAT authentication." >&2
+      return 1
+    fi
+    echo "Personal Microsoft accounts require an Azure DevOps PAT with Build Read & execute permission."
+    echo "Create one at: $ado_organization/_usersSettings/tokens"
+    read -r -s -p "Azure DevOps PAT (input is hidden): " AZURE_DEVOPS_EXT_PAT
+    echo
+  fi
+  if [[ -z "$AZURE_DEVOPS_EXT_PAT" ]]; then
+    echo "ERROR: An empty Azure DevOps PAT cannot be used." >&2
+    return 1
+  fi
+  auth_method=pat
+}
+
+ado_tenant="${ADO_TENANT:-}"
+case "${auth_method,,}" in
+  aad|entra)
+    unset AZURE_DEVOPS_EXT_PAT
+    if ! az account show >/dev/null 2>&1; then
+      if [[ ! -t 0 ]]; then
+        echo "ERROR: An Azure CLI Microsoft Entra session is required in non-interactive mode." >&2
+        echo "Run 'AZURE_CORE_LOGIN_EXPERIENCE_V2=off az login --allow-no-subscriptions' before starting this script." >&2
+        exit 1
+      fi
+      echo "No active Azure CLI Microsoft Entra session was found. Opening browser sign-in..."
+      echo "In the browser account picker, select 'Use another account' and enter the full email address."
+      echo "No Azure subscription is required; this sign-in is only for Azure DevOps."
+      if ! AZURE_CORE_LOGIN_EXPERIENCE_V2=off \
+        az login --allow-no-subscriptions >/dev/null; then
+        echo "Browser sign-in was blocked or canceled. Falling back to Azure DevOps PAT authentication."
+        configure_pat_auth
+      fi
+    fi
+    ;;
+  pat|msa)
+    configure_pat_auth
+    ;;
+  *)
+    echo "ERROR: Unsupported ADO_AUTH_METHOD '$auth_method'. Use 'aad' (default) or 'pat'." >&2
+    exit 1
+    ;;
+esac
+
 backup_dir="$HOME/.aifactory-backups/$(basename "$REPO_ROOT")/$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$backup_dir"
 
-az pipelines list \
-  --organization "$ado_organization" \
-  --project "$ado_project" \
-  --output json > "$state_dir/pipelines.json"
+url_encode() {
+  "${PYTHON[@]}" -c 'import sys; from urllib.parse import quote; print(quote(sys.argv[1], safe=""))' "$1"
+}
 
-pipeline_id=$("${PYTHON[@]}" - "$state_dir/pipelines.json" "$PIPELINE_YAML_PATH" "$PIPELINE_NAME" <<'PY'
+get_ado_auth_header() {
+  local token
+  if [[ "${auth_method,,}" == "pat" ]]; then
+    AZURE_DEVOPS_EXT_PAT="$AZURE_DEVOPS_EXT_PAT" "${PYTHON[@]}" -c '
+import base64
+import os
+
+credential = base64.b64encode(
+    (":" + os.environ["AZURE_DEVOPS_EXT_PAT"]).encode()
+).decode()
+print(f"Basic {credential}")
+'
+    return
+  fi
+
+  local -a token_args
+  token_args=(
+    account get-access-token
+    --resource "$AZURE_DEVOPS_RESOURCE_URL"
+    --query accessToken
+    --output tsv
+  )
+  if [[ -n "$ado_tenant" ]]; then
+    token_args+=(--tenant "$ado_tenant")
+  fi
+  token=$(az "${token_args[@]}")
+  printf 'Bearer %s\n' "$token"
+}
+
+ado_request() {
+  local method="$1"
+  local url="$2"
+  local input_file="${3:-}"
+  local auth_header
+  auth_header=$(get_ado_auth_header)
+  ADO_AUTH_HEADER="$auth_header" "${PYTHON[@]}" - "$method" "$url" "$input_file" <<'PY'
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+
+method, url, input_file = sys.argv[1:4]
+data = None
+if input_file:
+    with open(input_file, "rb") as request_file:
+        data = request_file.read()
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+request = urllib.request.Request(
+    url,
+    data=data,
+    method=method,
+    headers={
+        "Accept": "application/json",
+        "Authorization": os.environ["ADO_AUTH_HEADER"],
+        "Content-Type": "application/json",
+    },
+)
+try:
+    with urllib.request.build_opener(NoRedirect).open(request) as response:
+        sys.stdout.buffer.write(response.read())
+except urllib.error.HTTPError as error:
+    body = error.read().decode("utf-8", errors="replace")
+    if error.code in {301, 302, 303, 307, 308}:
+        print("ERROR: Azure DevOps redirected this identity to sign-in.", file=sys.stderr)
+        raise SystemExit(42)
+    message = body
+    try:
+        payload = json.loads(body)
+        message = payload.get("message") or payload.get("error", {}).get("message") or body
+    except json.JSONDecodeError:
+        pass
+    print(f"ERROR: Azure DevOps API returned HTTP {error.code}: {message}", file=sys.stderr)
+    raise SystemExit(1)
+except urllib.error.URLError as error:
+    print(f"ERROR: Azure DevOps API request failed: {error.reason}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+}
+
+ado_project_encoded="$(url_encode "$ado_project")"
+ado_api_base="$ado_organization/$ado_project_encoded/_apis"
+pipelines_url="$ado_api_base/build/definitions?includeAllProperties=true&api-version=7.1&%24top=1000"
+ado_entra_settings_url="$ado_organization/_settings/organizationAad"
+
+if ado_request GET "$pipelines_url" > "$state_dir/pipelines.json"; then
+  :
+else
+  request_status=$?
+  if [[ "$request_status" -ne 42 || "${auth_method,,}" == "pat" ]]; then
+    exit "$request_status"
+  fi
+  if [[ ! -t 0 ]]; then
+    echo "ERROR: The current Microsoft Entra tenant cannot access this Azure DevOps organization." >&2
+    echo "Set ADO_TENANT to the Entra tenant ID/domain connected to the Azure DevOps organization." >&2
+    echo "This can differ from the tenant associated with your Azure subscription." >&2
+    echo "For a personal Microsoft account, set ADO_AUTH_METHOD=pat and AZURE_DEVOPS_EXT_PAT." >&2
+    exit 1
+  fi
+  echo "The current Azure CLI tenant cannot access this Azure DevOps organization."
+  echo "Enter the Entra tenant connected to the Azure DevOps organization, not necessarily your Azure subscription tenant."
+  echo "To find it:"
+  echo "  1. Open $ado_entra_settings_url (this link takes you there directly)."
+  echo "  2. Or, open $ado_organization, click Organization settings in the lower-left corner,"
+  echo "     then click Microsoft Entra in the left menu."
+  echo "  3. Copy the Directory (tenant) ID."
+  echo "  4. If only the directory name is shown, open that directory in the Microsoft Entra admin center,"
+  echo "     then select Overview and copy Tenant ID."
+  echo "If Microsoft Entra ID is unavailable, ask the Azure DevOps organization owner or enter 'pat'."
+  echo "If the organization is not connected to Entra ID, use PAT authentication."
+  auth_choice="$ado_tenant"
+  while [[ -z "$auth_choice" ]]; do
+    read -r -p "Azure DevOps-connected Entra tenant ID/domain, or 'pat': " auth_choice
+  done
+  case "${auth_choice,,}" in
+    pat|msa|consumers)
+      configure_pat_auth
+      ;;
+    *)
+      ado_tenant="$auth_choice"
+      echo "Opening browser sign-in for the specified Entra tenant..."
+      echo "In the browser account picker, select 'Use another account' and enter the full email address."
+      echo "No Azure subscription is required; this sign-in is only for Azure DevOps."
+      if ! AZURE_CORE_LOGIN_EXPERIENCE_V2=off \
+        az login \
+        --tenant "$ado_tenant" \
+        --allow-no-subscriptions \
+        >/dev/null; then
+        echo "Browser sign-in was blocked by Conditional Access or canceled."
+        echo "Falling back to Azure DevOps PAT authentication."
+        configure_pat_auth
+      fi
+      ;;
+  esac
+  if ! ado_request GET "$pipelines_url" > "$state_dir/pipelines.json"; then
+    echo "ERROR: The signed-in identity still cannot access Azure DevOps organization '$ado_organization' project '$ado_project'." >&2
+    exit 1
+  fi
+fi
+
+pipeline_id=$("${PYTHON[@]}" - "$state_dir/pipelines.json" "$PIPELINE_YAML_PATH" "$PIPELINE_NAME" "$ado_repository_name" <<'PY'
 import json
 import sys
 from pathlib import PurePosixPath
 
-pipelines = json.loads(open(sys.argv[1], encoding="utf-8-sig").read())
+payload = json.loads(open(sys.argv[1], encoding="utf-8-sig").read())
+pipelines = payload.get("value", []) if isinstance(payload, dict) else payload
 target_path = str(PurePosixPath(sys.argv[2].replace("\\", "/"))).lstrip("/").lower()
 target_name = sys.argv[3].lower()
+target_repository = sys.argv[4].lower()
 
 path_matches = []
 name_matches = []
 for pipeline in pipelines:
-    process = pipeline.get("process") or {}
-    yaml_path = str(process.get("yamlFilename") or "").replace("\\", "/").lstrip("/").lower()
+    if str(pipeline.get("queueStatus") or "enabled").lower() != "enabled":
+        continue
+    process = pipeline.get("process") or pipeline.get("configuration") or {}
+    repository = pipeline.get("repository") or {}
+    repository_name = str(repository.get("name") or repository.get("id") or "").lower()
+    if repository_name and repository_name != target_repository:
+        continue
+    yaml_path = str(
+        process.get("yamlFilename") or process.get("path") or ""
+    ).replace("\\", "/").lstrip("/").lower()
     if yaml_path == target_path:
         path_matches.append(pipeline)
     if str(pipeline.get("name") or "").lower() == target_name:
@@ -121,9 +389,14 @@ matches = path_matches or name_matches
 if len(matches) != 1:
     reason = "not found" if not matches else "ambiguous"
     raise SystemExit(
-        f"Azure DevOps pipeline is {reason}; expected YAML path {sys.argv[2]!r} "
-        f"or pipeline name {sys.argv[3]!r}."
+        f"Enabled Azure DevOps pipeline is {reason}; expected YAML path {sys.argv[2]!r} "
+        f"or pipeline name {sys.argv[3]!r} in repository {sys.argv[4]!r}."
     )
+print(
+    f"Using Azure DevOps pipeline {matches[0]['name']!r} "
+    f"(ID {matches[0]['id']}) from repository {sys.argv[4]!r}.",
+    file=sys.stderr,
+)
 print(matches[0]["id"])
 PY
 )
@@ -288,6 +561,49 @@ PY
 
 rm -f "$VARIABLES_TEMPLATE_FILE" "$CONFIG_TEMPLATE_FILE"
 
+"${PYTHON[@]}" - "$state_dir/preview-request.json" "$BRANCH" "$CONFIG_FILE" "$RUNNER_SELECTION" "$PIPELINE_YAML_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+request = {
+    "previewRun": True,
+    "resources": {
+        "repositories": {
+            "self": {
+                "refName": f"refs/heads/{sys.argv[2]}",
+            }
+        }
+    },
+    "templateParameters": {
+        "configFile": sys.argv[3],
+        "runnerSelection": sys.argv[4],
+    },
+    "stagesToSkip": [
+        "Stage_GenAI_Project",
+        "Prod_GenAI_Project",
+    ],
+    "yamlOverride": Path(sys.argv[5]).read_text(encoding="utf-8-sig"),
+}
+Path(sys.argv[1]).write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
+PY
+
+echo "Validating the Azure DevOps pipeline before commit and push..."
+ado_request \
+  POST \
+  "$ado_api_base/pipelines/$pipeline_id/runs?api-version=7.1" \
+  "$state_dir/preview-request.json" \
+  > "$state_dir/preview-response.json"
+"${PYTHON[@]}" - "$state_dir/preview-response.json" <<'PY'
+import json
+import sys
+
+response = json.loads(open(sys.argv[1], encoding="utf-8-sig").read())
+if not response.get("finalYaml"):
+    raise SystemExit("Azure DevOps preview did not return compiled YAML.")
+PY
+echo "Azure DevOps pipeline validation succeeded."
+
 cp "$state_dir/ADO-update-aifactory-and-run-project.sh" "$REPO_ROOT/ADO-update-aifactory-and-run-project.sh"
 chmod +x "$REPO_ROOT/ADO-update-aifactory-and-run-project.sh"
 
@@ -326,15 +642,11 @@ request = {
 Path(sys.argv[1]).write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
 PY
 
-az devops invoke \
-  --organization "$ado_organization" \
-  --area pipelines \
-  --resource runs \
-  --route-parameters project="$ado_project" pipelineId="$pipeline_id" \
-  --api-version "7.1" \
-  --http-method POST \
-  --in-file "$state_dir/run-request.json" \
-  --output json > "$state_dir/run.json"
+ado_request \
+  POST \
+  "$ado_api_base/pipelines/$pipeline_id/runs?api-version=7.1" \
+  "$state_dir/run-request.json" \
+  > "$state_dir/run.json"
 
 mapfile -t run_details < <("${PYTHON[@]}" - "$state_dir/run.json" <<'PY'
 import json
@@ -354,17 +666,16 @@ if [[ -n "$run_url" ]]; then
 fi
 
 while true; do
-  az pipelines runs show \
-    --organization "$ado_organization" \
-    --project "$ado_project" \
-    --id "$run_id" \
-    --output json > "$state_dir/run-status.json"
+  ado_request \
+    GET \
+    "$ado_api_base/pipelines/$pipeline_id/runs/$run_id?api-version=7.1" \
+    > "$state_dir/run-status.json"
   mapfile -t run_state < <("${PYTHON[@]}" - "$state_dir/run-status.json" <<'PY'
 import json
 import sys
 
 run = json.loads(open(sys.argv[1], encoding="utf-8-sig").read())
-print(run.get("status") or "")
+print(run.get("state") or run.get("status") or "")
 print(run.get("result") or "")
 PY
 )

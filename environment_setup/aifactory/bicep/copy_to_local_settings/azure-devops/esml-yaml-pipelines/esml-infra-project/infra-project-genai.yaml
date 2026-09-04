@@ -55,9 +55,9 @@ stages:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
-            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+            - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
               - Agent.Name -equals $(adminVMBuildAgentName)
-            ${{ else }}:
+            - ${{ else }}:
               - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
         ${{ else }}:
           vmImage: windows-2022
@@ -83,9 +83,9 @@ stages:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
-            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+            - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
               - Agent.Name -equals $(adminVMBuildAgentName)
-            ${{ else }}:
+            - ${{ else }}:
               - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
         ${{ else }}:
           vmImage: windows-2022
@@ -115,9 +115,9 @@ stages:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
-            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+            - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
               - Agent.Name -equals $(adminVMBuildAgentName)
-            ${{ else }}:
+            - ${{ else }}:
               - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
         ${{ else }}:
           vmImage: windows-2022
@@ -158,9 +158,9 @@ stages:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
-            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+            - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
               - Agent.Name -equals $(adminVMBuildAgentName)
-            ${{ else }}:
+            - ${{ else }}:
               - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
         ${{ else }}:
           vmImage: windows-2022
@@ -186,9 +186,9 @@ stages:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
-            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+            - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
               - Agent.Name -equals $(adminVMBuildAgentName)
-            ${{ else }}:
+            - ${{ else }}:
               - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
         ${{ else }}:
           vmImage: windows-2022
@@ -218,9 +218,9 @@ stages:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
-            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+            - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
               - Agent.Name -equals $(adminVMBuildAgentName)
-            ${{ else }}:
+            - ${{ else }}:
               - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
         ${{ else }}:
           vmImage: windows-2022
@@ -263,9 +263,9 @@ stages:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
-            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+            - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
               - Agent.Name -equals $(adminVMBuildAgentName)
-            ${{ else }}:
+            - ${{ else }}:
               - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
         ${{ else }}:
           vmImage: windows-2022
@@ -291,9 +291,9 @@ stages:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
-            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+            - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
               - Agent.Name -equals $(adminVMBuildAgentName)
-            ${{ else }}:
+            - ${{ else }}:
               - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
         ${{ else }}:
           vmImage: windows-2022
@@ -323,9 +323,9 @@ stages:
         ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
-            ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+            - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
               - Agent.Name -equals $(adminVMBuildAgentName)
-            ${{ else }}:
+            - ${{ else }}:
               - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
         ${{ else }}:
           vmImage: windows-2022
