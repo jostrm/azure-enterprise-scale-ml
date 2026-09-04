@@ -657,8 +657,13 @@ print(run["id"])
 print(((run.get("_links") or {}).get("web") or {}).get("href") or "")
 PY
 )
-run_id="${run_details[0]}"
+run_id="${run_details[0]%$'\r'}"
 run_url="${run_details[1]:-}"
+run_url="${run_url%$'\r'}"
+if [[ ! "$run_id" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: Azure DevOps returned an invalid run ID: $(printf '%q' "$run_id")" >&2
+  exit 1
+fi
 
 echo "Watching Azure DevOps run $run_id..."
 if [[ -n "$run_url" ]]; then
@@ -679,8 +684,9 @@ print(run.get("state") or run.get("status") or "")
 print(run.get("result") or "")
 PY
 )
-  run_status="${run_state[0]}"
+  run_status="${run_state[0]%$'\r'}"
   run_result="${run_state[1]:-}"
+  run_result="${run_result%$'\r'}"
   if [[ "$run_status" == "completed" ]]; then
     break
   fi
