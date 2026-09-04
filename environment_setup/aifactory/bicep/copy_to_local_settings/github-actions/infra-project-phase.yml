@@ -518,8 +518,7 @@ jobs:
 
       - name: 00_Initialize_Derived_Variables
         run: |
-          $net = '${{ env.network_env }}'
-          if (-not $net) { $net = '${{ env.dev_test_prod }}' }
+          $net = $Env:network_env
           "network_env=$net" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           if (-not $Env:deployment_random_value -or $Env:deployment_random_value -eq '') {
             $rand = [System.Guid]::NewGuid().ToString('N').Substring(0,10)
