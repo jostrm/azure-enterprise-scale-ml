@@ -15,6 +15,10 @@ TARGET_REPO="${GH_TARGET_REPO:-githuborg/enterprise-scale-aifactory-001}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Copy the update-and-run helpers to the parent repository root.
+cp "$SCRIPT_DIR/bootstrap/ADO-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/../ADO-update-aifactory-and-run-project.sh"
+cp "$SCRIPT_DIR/bootstrap/GH-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/../GH-update-aifactory-and-run-project.sh"
+
 gh_ok() {
     if ! command -v gh >/dev/null 2>&1; then
         echo -e "${RED}GitHub CLI (gh) is not installed. Skipping workflow dispatch.${NC}"
