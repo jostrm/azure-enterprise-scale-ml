@@ -172,12 +172,39 @@ $vnet = Invoke-AzJson -Operation 'Read build-agent VNet' -Arguments @(
     '--resource-group', $VnetResourceGroup,
     '--name', $VnetName
 )
-$dnsZone = Invoke-AzJson -Operation 'Read Key Vault private DNS zone' -Arguments @(
-    'network', 'private-dns', 'zone', 'show',
-    '--subscription', $DnsZoneSubscription,
-    '--resource-group', $DnsZoneResourceGroup,
-    '--name', $dnsZoneName
+$dnsZone = $null
+$dnsZoneCandidates = @(
+    [pscustomobject]@{ Subscription = $DnsZoneSubscription; ResourceGroup = $DnsZoneResourceGroup },
+    [pscustomobject]@{ Subscription = $VnetSubscription; ResourceGroup = $VnetResourceGroup }
 )
+$checkedDnsLocations = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($candidate in $dnsZoneCandidates) {
+    $candidateKey = "$($candidate.Subscription)/$($candidate.ResourceGroup)"
+    if ([string]::IsNullOrWhiteSpace($candidate.Subscription) -or
+        [string]::IsNullOrWhiteSpace($candidate.ResourceGroup) -or
+        -not $checkedDnsLocations.Add($candidateKey)) {
+        continue
+    }
+
+    $output = & az network private-dns zone show `
+        --subscription $candidate.Subscription `
+        --resource-group $candidate.ResourceGroup `
+        --name $dnsZoneName `
+        --only-show-errors `
+        --output json 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        $dnsZone = ($output -join [Environment]::NewLine) | ConvertFrom-Json
+        $DnsZoneSubscription = $candidate.Subscription
+        $DnsZoneResourceGroup = $candidate.ResourceGroup
+        Write-Host "Using Key Vault private DNS zone from '$DnsZoneSubscription/$DnsZoneResourceGroup'."
+        break
+    }
+
+    Write-Warning "Key Vault private DNS zone is unavailable at '$candidateKey': $($output -join [Environment]::NewLine)"
+}
+if ($null -eq $dnsZone) {
+    throw "Private DNS zone '$dnsZoneName' was not found in the configured or VNet-local DNS locations."
+}
 
 $vnetLinks = @(Invoke-AzJson -Operation 'List Key Vault private DNS VNet links' -Arguments @(
     'network', 'private-dns', 'link', 'vnet', 'list',
