@@ -56,11 +56,34 @@ for line in sys.stdin:
 
 ado_organization="${ADO_ORGANIZATION:-$(read_devops_default organization)}"
 ado_project="${ADO_PROJECT:-$(read_devops_default project)}"
+devops_defaults_prompted=false
 if [[ -z "$ado_organization" || -z "$ado_project" ]]; then
-  echo "ERROR: Azure DevOps organization and project are required." >&2
-  echo "Set ADO_ORGANIZATION and ADO_PROJECT, or configure Azure CLI defaults:" >&2
-  echo "  az devops configure --defaults organization=https://dev.azure.com/<org> project=<project>" >&2
-  exit 1
+  if [[ ! -t 0 ]]; then
+    echo "ERROR: Azure DevOps organization and project are required in non-interactive mode." >&2
+    echo "Set ADO_ORGANIZATION and ADO_PROJECT, or configure Azure CLI defaults:" >&2
+    echo "  az devops configure --defaults organization=https://dev.azure.com/<org> project=<project>" >&2
+    exit 1
+  fi
+  echo "Azure DevOps settings are not configured. Enter them once; they will be saved as Azure CLI defaults."
+fi
+while [[ -z "$ado_organization" ]]; do
+  read -r -p "Azure DevOps organization name or URL: " ado_organization
+  devops_defaults_prompted=true
+done
+while [[ -z "$ado_project" ]]; do
+  read -r -p "Azure DevOps project name: " ado_project
+  devops_defaults_prompted=true
+done
+case "$ado_organization" in
+  http://*|https://*) ;;
+  *) ado_organization="https://dev.azure.com/$ado_organization" ;;
+esac
+ado_organization="${ado_organization%/}"
+if [[ "$devops_defaults_prompted" == "true" ]]; then
+  az devops configure \
+    --defaults organization="$ado_organization" project="$ado_project" \
+    >/dev/null
+  echo "Saved Azure DevOps organization and project for future runs."
 fi
 
 state_dir="$HOME/.aifactory-update-state/ado-$$"

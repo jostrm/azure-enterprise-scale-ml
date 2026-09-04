@@ -17,6 +17,8 @@ bash ./GH-update-aifactory-and-run-project.sh
 
 These scripts replace the manual feature-update steps below. They protect existing work, update the AI Factory submodule and templates, merge the existing configuration into the latest templates, commit and push the changes, start the project pipeline or workflow, and monitor the run until it finishes.
 
+On the first Azure DevOps run, the ADO script prompts for your organization name or URL and project name, then saves them as Azure CLI defaults for future runs.
+
 ## Prerequisites: An existing AI Factory
 [Prerequisites - End-to-end setup](./24-end-2-end-setup.md)
 
