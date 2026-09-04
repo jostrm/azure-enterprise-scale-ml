@@ -187,8 +187,8 @@ $vnet = Invoke-AzJson -Operation 'Read build-agent VNet' -Arguments @(
 )
 $dnsZone = $null
 $dnsZoneCandidates = @(
-    [pscustomobject]@{ Subscription = $DnsZoneSubscription; ResourceGroup = $DnsZoneResourceGroup },
     [pscustomobject]@{ Subscription = $effectiveVnetSubscription; ResourceGroup = $effectiveVnetResourceGroup },
+    [pscustomobject]@{ Subscription = $DnsZoneSubscription; ResourceGroup = $DnsZoneResourceGroup },
     [pscustomobject]@{ Subscription = $VnetSubscription; ResourceGroup = $VnetResourceGroup }
 )
 $checkedDnsLocations = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
