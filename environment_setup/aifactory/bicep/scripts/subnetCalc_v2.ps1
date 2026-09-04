@@ -462,7 +462,21 @@ if ($(Get-AzContext).Subscription -ne "") {
 
     Write-Host "vnetName: $($vnetName)"
     Write-Host "vnetResourceGroup: $($vnetResourceGroup)"
-    $vnetObj = Get-AzVirtualNetwork -ResourceGroupName $vnetResourceGroup -Name $vnetName
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+        $vnetJson = & az network vnet show `
+            --subscription $subscriptionId `
+            --resource-group $vnetResourceGroup `
+            --name $vnetName `
+            --only-show-errors `
+            --output json 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to read VNet '$vnetResourceGroup/$vnetName': $($vnetJson -join [Environment]::NewLine)"
+        }
+        $vnetObj = ($vnetJson -join [Environment]::NewLine) | ConvertFrom-Json
+    }
+    else {
+        $vnetObj = Get-AzVirtualNetwork -ResourceGroupName $vnetResourceGroup -Name $vnetName
+    }
 
     $lastAllocatedNetwork, $lastAllocatedCidr = @($vnetObj.Subnets | Sort-Object { $_.AddressPrefix.split("/")[0] -as [Version]} -Bottom 1)[0].AddressPrefix.split("/") # JOSTRM fixed sort (version and no CIDR, instead of "string sort" and CIDR)
     $startIp  = Find-NextIpAddress $(Get-Subnet $lastAllocatedNetwork -MaskBits $lastAllocatedCidr).BroadcastAddress.IPAddressToString

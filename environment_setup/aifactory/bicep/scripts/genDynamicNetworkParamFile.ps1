@@ -441,6 +441,37 @@ write-host "vnetResourceGroup is: $($vnetResourceGroup)"
 write-host "BYO_subnets_bool is: $($BYO_subnets_bool)"
 write-host "vnetResourceGroup_param is: $($vnetResourceGroup_param)"
 
+function Get-DeploymentOutputValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ResourceGroupName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $DeploymentName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $OutputName
+    )
+
+    if ($env:GITHUB_ACTIONS -eq 'true') {
+        $value = & az deployment group show `
+            --subscription $subscriptionId `
+            --resource-group $ResourceGroupName `
+            --name $DeploymentName `
+            --query "properties.outputs.$OutputName.value" `
+            --output tsv `
+            --only-show-errors 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to read output '$OutputName' from deployment '$ResourceGroupName/$DeploymentName': $($value -join [Environment]::NewLine)"
+        }
+        return ($value -join [Environment]::NewLine).Trim()
+    }
+
+    return (Get-AzResourceGroupDeployment `
+        -ResourceGroupName $ResourceGroupName `
+        -Name $DeploymentName).Outputs[$OutputName].Value
+}
+
 # Non-BYO path: fetch subnets from prior deployment outputs (never mutate names)
 if ($BYO_subnets_bool -eq $false) {
 
@@ -449,9 +480,10 @@ if ($BYO_subnets_bool -eq $false) {
 
     write-host "BYO_subnets is FALSE and BYOVnet is not true either - Fetching subnet IDs from deployment: $($deploymentPrefix)SubnetDeplProj"
     write-host "Project type all :  trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj for AKS name"
-    $aksSubnetId=(Get-AzResourceGroupDeployment `
-    -ResourceGroupName "$lookupResourceGroup" `
-    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aksSubnetId.Value
+    $aksSubnetId = Get-DeploymentOutputValue `
+        -ResourceGroupName $lookupResourceGroup `
+        -DeploymentName "$($deploymentPrefix)SubnetDeplProj" `
+        -OutputName 'aksSubnetId'
 
     if ([string]::IsNullOrEmpty($aksSubnetId)) {
         Write-Host "##vso[task.logissue type=warning]AksSubnetId is null or empty. This will likely cause deployment issues. Please delete the 3 project subnets (snt-prj001-genai,snt-prj001-aks,snt-prj001-aca), and set runNetworkingVar=True again."
@@ -473,39 +505,46 @@ if ($BYO_subnets_bool -eq $false) {
 
     write-host "Project type: all - trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj"
 
-    $genaiSubnetId=(Get-AzResourceGroupDeployment `
-    -ResourceGroupName "$vnetResourceGroup" `
-    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.genaiSubnetId.Value
+    $genaiSubnetId = Get-DeploymentOutputValue `
+        -ResourceGroupName $vnetResourceGroup `
+        -DeploymentName "$($deploymentPrefix)SubnetDeplProj" `
+        -OutputName 'genaiSubnetId'
     write-host "genaiSubnetId: $genaiSubnetId"
     write-host "aksSubnetId: $aksSubnetId"
 
-    $aks2SubnetId=(Get-AzResourceGroupDeployment `
-    -ResourceGroupName "$lookupResourceGroup" `
-    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aks2SubnetId.Value
+    $aks2SubnetId = Get-DeploymentOutputValue `
+        -ResourceGroupName $lookupResourceGroup `
+        -DeploymentName "$($deploymentPrefix)SubnetDeplProj" `
+        -OutputName 'aks2SubnetId'
     write-host "aks2SubnetId: $aks2SubnetId"
 
-    $acaSubnetId=(Get-AzResourceGroupDeployment `
-    -ResourceGroupName "$lookupResourceGroup" `
-    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.acaSubnetId.Value
+    $acaSubnetId = Get-DeploymentOutputValue `
+        -ResourceGroupName $lookupResourceGroup `
+        -DeploymentName "$($deploymentPrefix)SubnetDeplProj" `
+        -OutputName 'acaSubnetId'
     write-host "acaSubnetId: $acaSubnetId"
 
-    $aca2SubnetId=(Get-AzResourceGroupDeployment `
-    -ResourceGroupName "$lookupResourceGroup" `
-    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.aca2SubnetId.Value
+    $aca2SubnetId = Get-DeploymentOutputValue `
+        -ResourceGroupName $lookupResourceGroup `
+        -DeploymentName "$($deploymentPrefix)SubnetDeplProj" `
+        -OutputName 'aca2SubnetId'
     write-host "aca2SubnetId: $aca2SubnetId"
 
-    $webappSubnetId=(Get-AzResourceGroupDeployment `
-    -ResourceGroupName "$lookupResourceGroup" `
-    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.webappSubnetId.Value
+    $webappSubnetId = Get-DeploymentOutputValue `
+        -ResourceGroupName $lookupResourceGroup `
+        -DeploymentName "$($deploymentPrefix)SubnetDeplProj" `
+        -OutputName 'webappSubnetId'
     write-host "webappSubnetId: $webappSubnetId"
 
-    $dbxPubSubnetName=(Get-AzResourceGroupDeployment `
-    -ResourceGroupName "$lookupResourceGroup" `
-    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPubSubnetName.value
+    $dbxPubSubnetName = Get-DeploymentOutputValue `
+        -ResourceGroupName $lookupResourceGroup `
+        -DeploymentName "$($deploymentPrefix)SubnetDeplProj" `
+        -OutputName 'dbxPubSubnetName'
 
-    $dbxPrivSubnetName=(Get-AzResourceGroupDeployment `
-    -ResourceGroupName "$lookupResourceGroup" `
-    -Name "$($deploymentPrefix)SubnetDeplProj").Outputs.dbxPrivSubnetName.value
+    $dbxPrivSubnetName = Get-DeploymentOutputValue `
+        -ResourceGroupName $lookupResourceGroup `
+        -DeploymentName "$($deploymentPrefix)SubnetDeplProj" `
+        -OutputName 'dbxPrivSubnetName'
 
     write-host "dbxPubSubnetName: $dbxPubSubnetName"
     write-host "dbxPrivSubnetName: $dbxPrivSubnetName"
@@ -780,4 +819,3 @@ if ($saveFileInADOGitRepo -eq $true) {
     Write-Host "  # Specify parent repository path explicitly:" -ForegroundColor Gray
     Write-Host "  .\genDynamicNetworkParamFile.ps1 [your parameters] -saveFileInADOGitRepo `$true -parentGitRepoPath 'C:\path\to\parent\repo'" -ForegroundColor Gray
 }
-
