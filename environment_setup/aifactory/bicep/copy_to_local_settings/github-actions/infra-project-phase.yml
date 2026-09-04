@@ -496,9 +496,7 @@ jobs:
             'admin_bicep_kv_fw',
             'admin_bicep_kv_fw_rg',
             'tenantId',
-            'project_number_000',
-            'AIFACTORY_SALT',
-            'AIFACTORY_SALT_RANDOM'
+            'project_number_000'
           )
           $placeholders = @('<todo>', '<todo_id>', 'TODO', 'todo', '-')
           $errors = @()
