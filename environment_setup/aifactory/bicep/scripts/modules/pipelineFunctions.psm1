@@ -115,9 +115,8 @@ function Import-Dependencies {
             #Import-Module Az.Accounts
          }
         "genDynamicNetworkParamFile.ps1" { 
-            Write-Verbose "Installing dependencies for $callingScriptName"
+             Write-Verbose "Installing dependencies for $callingScriptName"
              if ($env:GITHUB_ACTIONS -eq 'true') {
-                 Import-CompatibleAzAccounts
                  break
              }
              Install-DependencyIfMissing -Name Az.Accounts -RequiredVersion $azAccountsVersion
@@ -131,7 +130,6 @@ function Import-Dependencies {
             Write-Verbose "Installing dependencies for $callingScriptName"
             if ($env:GITHUB_ACTIONS -eq 'true') {
                 Install-DependencyIfMissing -Name Subnet -RequiredVersion $subnetVersion
-                Import-CompatibleAzAccounts
                 Import-Module Subnet -RequiredVersion $subnetVersion -Force
                 break
             }
@@ -148,7 +146,6 @@ function Import-Dependencies {
             Write-Verbose "Installing dependencies for $callingScriptName"
             if ($env:GITHUB_ACTIONS -eq 'true') {
                 Install-DependencyIfMissing -Name Subnet -RequiredVersion $subnetVersion
-                Import-CompatibleAzAccounts
                 Import-Module Subnet -RequiredVersion $subnetVersion -Force
                 break
             }
