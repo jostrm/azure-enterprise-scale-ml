@@ -63,7 +63,7 @@ jobs:
           submodules: true
 
       - name: Materialize protected JSON configuration
-        if: ${{ env.AIFACTORY_CONFIG_JSON != '' }}
+        if: ${{ inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
         shell: bash
         env:
           CONFIG_FILE: ${{ inputs.config_file }}
@@ -88,16 +88,19 @@ jobs:
           import os
           from pathlib import Path
 
-          config_path = Path(os.environ["CONFIG_FILE"])
-          if not config_path.is_file():
-              raise SystemExit(f"Configuration file not found: {config_path}")
+          config = {}
+          config_file = os.environ["CONFIG_FILE"].strip()
+          if config_file:
+              config_path = Path(config_file)
+              if not config_path.is_file():
+                  raise SystemExit(f"Configuration file not found: {config_path}")
 
-          payload = json.loads(config_path.read_text(encoding="utf-8-sig"))
-          environment = "${{ inputs.environment }}"
-          section = "stage_prod" if environment != "dev" and isinstance(payload.get("stage_prod"), dict) else "dev"
-          config = payload.get(section)
-          if not isinstance(config, dict):
-              raise SystemExit(f"Configuration file has no object for section '{section}'")
+              payload = json.loads(config_path.read_text(encoding="utf-8-sig"))
+              environment = "${{ inputs.environment }}"
+              section = "stage_prod" if environment != "dev" and isinstance(payload.get("stage_prod"), dict) else "dev"
+              config = payload.get(section)
+              if not isinstance(config, dict):
+                  raise SystemExit(f"Configuration file has no object for section '{section}'")
 
           def as_bool(value):
               return str(value).strip().lower() in {"1", "true", "yes", "on"}

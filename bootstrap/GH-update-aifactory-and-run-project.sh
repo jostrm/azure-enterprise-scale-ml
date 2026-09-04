@@ -2,15 +2,57 @@
 
 set -euo pipefail
 
-readonly REPO_ROOT="C:/code/code_py_25/002_demo/azure-enterprise-scale-byor-110"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly REPO_ROOT="${AIFACTORY_REPO_ROOT:-C:/code/code_py_25/002_demo/azure-enterprise-scale-byor-110}"
 readonly SUBMODULE_PATH="azure-enterprise-scale-ml"
 readonly SUBMODULE_BRANCH="release/v1.24"
 readonly WORKFLOW_FILE="infra-project.yml"
 readonly CONFIG_FILE="aifactory/variables.json"
+readonly CONFIG_TEMPLATE_FILE="aifactory/variables-template.json"
 readonly ENVIRONMENT="dev"
 readonly RUNNER_LABEL="aifactory-admin-vm"
 
 cd "$REPO_ROOT"
+
+if [[ "${AIFACTORY_LAUNCHER_STABLE:-}" != "1" ]]; then
+  state_dir="$HOME/.aifactory-update-state/gh-$$"
+  stable_launcher="$state_dir/GH-update-aifactory-and-run-project.sh"
+  mkdir -p "$state_dir"
+  cp "${BASH_SOURCE[0]}" "$stable_launcher"
+  chmod +x "$stable_launcher"
+  export AIFACTORY_LAUNCHER_STABLE=1
+  export AIFACTORY_LAUNCHER_STATE_DIR="$state_dir"
+  export AIFACTORY_REPO_ROOT="$REPO_ROOT"
+  exec bash "$stable_launcher" "$@"
+fi
+
+state_dir="${AIFACTORY_LAUNCHER_STATE_DIR:?Stable launcher state directory is missing.}"
+trap 'rm -rf -- "$state_dir"' EXIT
+
+json_override_choice="${AIFACTORY_USE_JSON_OVERRIDE:-}"
+while true; do
+  if [[ -z "$json_override_choice" && -t 0 ]]; then
+    read -r -p "Do you want to override with variables.json? [y/N]: " json_override_choice
+  fi
+  case "${json_override_choice,,}" in
+    y|yes)
+      use_json_override=true
+      config_override_file="$CONFIG_FILE"
+      echo "JSON override enabled: $CONFIG_FILE"
+      break
+      ;;
+    ""|n|no)
+      use_json_override=false
+      config_override_file=""
+      echo "JSON override disabled; the workflow will use GitHub variables and secrets."
+      break
+      ;;
+    *)
+      echo "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
+      json_override_choice=""
+      ;;
+  esac
+done
 
 for command in git gh; do
   if ! command -v "$command" >/dev/null 2>&1; then
@@ -30,17 +72,13 @@ else
 fi
 gh auth status >/dev/null
 
-state_dir="$HOME/.aifactory-update-state/$$"
-mkdir -p "$state_dir"
-trap 'rm -rf "$state_dir"' EXIT
-cp "$0" "$state_dir/GH-update-aifactory-and-run-project.sh"
-backup_dir="$HOME/.aifactory-backups/azure-enterprise-scale-byor-110/$(date -u +%Y%m%dT%H%M%SZ)"
+backup_dir="$HOME/.aifactory-backups/$(basename "$REPO_ROOT")/$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$backup_dir"
 
 if [[ -f .env ]]; then
   cp .env "$state_dir/current.env"
 fi
-if [[ -f "$CONFIG_FILE" ]]; then
+if [[ "$use_json_override" == "true" && -f "$CONFIG_FILE" ]]; then
   cp "$CONFIG_FILE" "$state_dir/variables.json"
 fi
 if [[ -f .env.bak ]]; then
@@ -81,11 +119,12 @@ if [[ "$resume_after_bootstrap" == "false" ]]; then
   bash "03-GH-bootstrap-files-no-env-overwrite.sh"
 fi
 
-if [[ -f "$state_dir/variables.json" ]]; then
+if [[ "$use_json_override" == "true" && -f "$state_dir/variables.json" ]]; then
   cp "$state_dir/variables.json" "$CONFIG_FILE"
 fi
 
-"${PYTHON[@]}" - "$CONFIG_FILE" "aifactory/variables-template.json" "$RUNNER_LABEL" <<'PY'
+if [[ "$use_json_override" == "true" ]]; then
+  "${PYTHON[@]}" - "$CONFIG_FILE" "$CONFIG_TEMPLATE_FILE" "$RUNNER_LABEL" <<'PY'
 import json
 import sys
 from collections import OrderedDict
@@ -121,6 +160,8 @@ dev["selfHostedRunnerLabel"] = runner_label
 dev["disable_whitelisting_for_build_agents"] = "true"
 active_path.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
 PY
+fi
+rm -f "$CONFIG_TEMPLATE_FILE"
 
 if [[ ! -f .env.template ]]; then
   echo "ERROR: .env.template was not generated." >&2
@@ -242,10 +283,12 @@ else:
 PY
 )
 
-gh secret set AIFACTORY_CONFIG_JSON \
-  --repo "$github_repo" \
-  --env "$ENVIRONMENT" \
-  < "$CONFIG_FILE"
+if [[ "$use_json_override" == "true" ]]; then
+  gh secret set AIFACTORY_CONFIG_JSON \
+    --repo "$github_repo" \
+    --env "$ENVIRONMENT" \
+    < "$CONFIG_FILE"
+fi
 
 grep -q 'AIFACTORY_CONFIG_JSON' ".github/workflows/$WORKFLOW_FILE"
 grep -q 'runner_selection' ".github/workflows/$WORKFLOW_FILE"
@@ -275,7 +318,7 @@ gh workflow run "$WORKFLOW_FILE" \
   --repo "$github_repo" \
   --ref main \
   --raw-field environment="$ENVIRONMENT" \
-  --raw-field config_file="$CONFIG_FILE" \
+  --raw-field config_file="$config_override_file" \
   --raw-field runner_selection=self-hosted \
   --raw-field self_hosted_runner_label="$RUNNER_LABEL"
 
