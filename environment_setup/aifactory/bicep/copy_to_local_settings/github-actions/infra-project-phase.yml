@@ -81,6 +81,9 @@ jobs:
       useSelfHostedBuildAgent: ${{ inputs.use_self_hosted }}
       selfHostedRunnerLabel: ${{ inputs.runner_label }}
       MSYS_NO_PATHCONV: '1'
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.longpaths
+      GIT_CONFIG_VALUE_0: 'true'
 
       # Versioning/salt
       AIFACTORY_VERSION_MAJOR: ${{ vars.AIFACTORY_VERSION_MAJOR }}
