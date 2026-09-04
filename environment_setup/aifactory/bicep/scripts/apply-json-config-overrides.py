@@ -167,6 +167,15 @@ def main() -> None:
 
     environment = args.environment
     values, section = selected_values(read_object(config, "root"), environment)
+    if args.format == "github":
+        network_environment_key = {
+            "dev": "network_env_dev",
+            "stage": "network_env_stage",
+            "test": "network_env_stage",
+            "prod": "network_env_prod",
+        }[environment]
+        if network_environment_key in values:
+            values["network_env"] = values[network_environment_key]
     applied, skipped = apply(values, args.format, args.github_workflow)
     print(
         f"Applied {applied} of {len(values)} configuration variable(s) from "
