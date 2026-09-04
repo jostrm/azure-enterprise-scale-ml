@@ -69,6 +69,7 @@ if [[ "$orchestrator" == "a" ]]; then
 
     # YAML - infra-project.yml -> aifactory-templates + .github/workflows
     rm -f "$SCRIPT_DIR/../.github/workflows/infra-project.yml"
+    rm -f "$SCRIPT_DIR/../.github/workflows/infra-project-phase.yml"
 
     # Back-compat cleanup (older name)
     rm -f "$SCRIPT_DIR/../.github/workflows/infra-project-genai.yml"
@@ -136,4 +137,3 @@ else
     echo -e "${RED}Invalid choice. Please run the script again and enter a valid option.${NC}"
     exit 1
 fi
-
