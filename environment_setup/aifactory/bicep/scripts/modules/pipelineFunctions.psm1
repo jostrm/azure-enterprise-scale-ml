@@ -116,7 +116,11 @@ function Import-Dependencies {
          }
         "genDynamicNetworkParamFile.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            Install-DependencyIfMissing -Name Az.Accounts -RequiredVersion $azAccountsVersion
+             if ($env:GITHUB_ACTIONS -eq 'true') {
+                 Import-CompatibleAzAccounts
+                 break
+             }
+             Install-DependencyIfMissing -Name Az.Accounts -RequiredVersion $azAccountsVersion
             Install-DependencyIfMissing -Name Az.Resources -RequiredVersion $azResourcesVersion
             Install-DependencyIfMissing -Name Az.Network -RequiredVersion $azNetworkVersion
             Import-CompatibleAzAccounts
@@ -125,6 +129,12 @@ function Import-Dependencies {
          }
         "subnetCalc.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
+            if ($env:GITHUB_ACTIONS -eq 'true') {
+                Install-DependencyIfMissing -Name Subnet -RequiredVersion $subnetVersion
+                Import-CompatibleAzAccounts
+                Import-Module Subnet -RequiredVersion $subnetVersion -Force
+                break
+            }
             Install-DependencyIfMissing -Name Az.Accounts -RequiredVersion $azAccountsVersion
             Install-DependencyIfMissing -Name Az.Resources -RequiredVersion $azResourcesVersion
             Install-DependencyIfMissing -Name Az.Network -RequiredVersion $azNetworkVersion
@@ -136,6 +146,12 @@ function Import-Dependencies {
         }
         "subnetCalc_v2.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
+            if ($env:GITHUB_ACTIONS -eq 'true') {
+                Install-DependencyIfMissing -Name Subnet -RequiredVersion $subnetVersion
+                Import-CompatibleAzAccounts
+                Import-Module Subnet -RequiredVersion $subnetVersion -Force
+                break
+            }
             Install-DependencyIfMissing -Name Az.Accounts -RequiredVersion $azAccountsVersion
             Install-DependencyIfMissing -Name Az.Resources -RequiredVersion $azResourcesVersion
             Install-DependencyIfMissing -Name Az.Network -RequiredVersion $azNetworkVersion
