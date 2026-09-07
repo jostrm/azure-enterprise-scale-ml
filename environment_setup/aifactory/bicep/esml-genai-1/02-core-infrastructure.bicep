@@ -914,20 +914,6 @@ module containerRegistryDiagnostics '../modules/diagnostics/containerRegistryDia
   ]
 }
 
-// Application Insights Diagnostic Settings
-module applicationInsightsDiagnostics '../modules/diagnostics/applicationInsightsDiagnostics.bicep' = if (!applicationInsightExists) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('02-diagAppInsights-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    applicationInsightsName: applicationInsightName
-    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
-    diagnosticSettingLevel: diagnosticSettingLevel
-  }
-  dependsOn: [
-    applicationInsights
-  ]
-}
-
 // ============================================================================
 // AMPLS Integration in Foundation Deployment
 // ============================================================================

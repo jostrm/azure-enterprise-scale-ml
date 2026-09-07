@@ -1277,20 +1277,6 @@ module aksTestProd '../modules/aksCluster.bicep' = if((env == 'test' || env == '
 
 // ============== DIAGNOSTIC SETTINGS ==============
 
-// Application Insights Diagnostic Settings
-module appInsightsDiagnostics '../modules/diagnostics/applicationInsightsDiagnostics.bicep' = if (!applicationInsightExists && enableAppInsightsDashboard) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('05-diagAppInsights-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    applicationInsightsName: applicationInsightName
-    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
-    diagnosticSettingLevel: diagnosticSettingLevel
-  }
-  dependsOn: [
-    appinsights
-  ]
-}
-
 // Web App Diagnostic Settings
 module webAppDiagnostics '../modules/diagnostics/webAppsDiagnostics.bicep' = if (!webAppExists && enableWebApp) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)

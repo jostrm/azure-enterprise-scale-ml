@@ -72,6 +72,7 @@ variables:
   # ============================================================================
   # MANDATORY(CHANGE ONCE): Azure Devops
   # ============================================================================
+  azureDevOpsTenantId: "<todo>_AzureDevOpsTenantId" # <mandatory>Microsoft Entra tenant ID connected to the Azure DevOps organization. This can differ from tenantId used for Azure deployments.
   # Azure DevOps - Service Connections for task subscription
   dev_service_connection: "<todo>_ado_service_connection" # <mandatory>ADO service connection for DEV<default><todo>_ado_service_connection<ensure> name matches your Azure DevOps service connection for the DEV subscription.
   test_service_connection: "<todo>_ado_service_connection" # <mandatory>ADO service connection for STAGE<default><todo>_ado_service_connection<ensure> name matches your Azure DevOps service connection for the STAGE subscription.

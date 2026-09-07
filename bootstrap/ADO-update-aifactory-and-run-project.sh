@@ -239,6 +239,113 @@ login_with_entra() {
 }
 
 ado_tenant="${ADO_TENANT:-}"
+tenant_config_prompted=false
+if [[ -z "$ado_tenant" ]]; then
+  if [[ "$use_json_override" == "true" ]]; then
+    tenant_config_source="$CONFIG_FILE"
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+      echo "ERROR: JSON override is enabled, but configuration file is missing: $CONFIG_FILE" >&2
+      exit 1
+    fi
+    ado_tenant=$("${PYTHON[@]}" - "$CONFIG_FILE" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8-sig"))
+dev = config.get("dev", {})
+if isinstance(dev, dict):
+    print(str(dev.get("azureDevOpsTenantId", "")).strip())
+PY
+)
+  else
+    tenant_config_source="$VARIABLES_FILE"
+    if [[ ! -f "$VARIABLES_FILE" ]]; then
+      echo "ERROR: Azure DevOps variables file is missing: $VARIABLES_FILE" >&2
+      exit 1
+    fi
+    ado_tenant=$("${PYTHON[@]}" - "$VARIABLES_FILE" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+assignment = re.compile(r"^\s*azureDevOpsTenantId:\s*(.*?)\s*(?:#.*)?$")
+for line in Path(sys.argv[1]).read_text(encoding="utf-8-sig").splitlines():
+    match = assignment.match(line)
+    if match:
+        print(match.group(1).strip().strip("'\""))
+        break
+PY
+)
+  fi
+else
+  tenant_config_source="ADO_TENANT"
+fi
+
+if [[ -z "$ado_tenant" || "$ado_tenant" == *"<todo>"* || "$ado_tenant" == '$('* ||
+      "$ado_tenant" =~ [[:space:]/] ]]; then
+  if [[ ! -t 0 ]]; then
+    echo "ERROR: azureDevOpsTenantId is missing or unresolved in $tenant_config_source." >&2
+    echo "Set it to the Microsoft Entra tenant connected to the Azure DevOps organization." >&2
+    exit 1
+  fi
+  echo "azureDevOpsTenantId is missing or unresolved in $tenant_config_source."
+  echo "Use the Microsoft Entra tenant connected to the Azure DevOps organization, not tenantId used for Azure deployments."
+  while true; do
+    read -r -p "Azure DevOps-connected Entra tenant ID/domain: " ado_tenant
+    if [[ -n "$ado_tenant" && "$ado_tenant" != *"<todo>"* &&
+          "$ado_tenant" != '$('* && ! "$ado_tenant" =~ [[:space:]/] ]]; then
+      break
+    fi
+    echo "Enter a tenant GUID or verified tenant domain without spaces." >&2
+  done
+  tenant_config_prompted=true
+fi
+
+if [[ "$tenant_config_prompted" == "true" ]]; then
+  if [[ "$use_json_override" == "true" ]]; then
+    "${PYTHON[@]}" - "$CONFIG_FILE" "$ado_tenant" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+config = json.loads(path.read_text(encoding="utf-8-sig"))
+for section in ("dev", "stage_prod"):
+    values = config.get(section)
+    if isinstance(values, dict):
+        values["azureDevOpsTenantId"] = sys.argv[2]
+path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+PY
+  else
+    "${PYTHON[@]}" - "$VARIABLES_FILE" "$ado_tenant" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+tenant = sys.argv[2]
+lines = path.read_text(encoding="utf-8-sig").splitlines()
+assignment = re.compile(r"^(\s*)azureDevOpsTenantId:\s*.*$")
+for index, line in enumerate(lines):
+    match = assignment.match(line)
+    if match:
+        lines[index] = f'{match.group(1)}azureDevOpsTenantId: "{tenant}"'
+        break
+else:
+    tenant_line = next(
+        (index for index, line in enumerate(lines) if re.match(r"^\s*tenantId:", line)),
+        None,
+    )
+    insert_at = tenant_line + 1 if tenant_line is not None else 1
+    lines.insert(insert_at, f'  azureDevOpsTenantId: "{tenant}"')
+path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+  fi
+  echo "Saved azureDevOpsTenantId to $tenant_config_source."
+fi
+echo "Using Azure DevOps-connected Entra tenant from $tenant_config_source."
+
 case "${auth_method,,}" in
   aad|entra)
     unset AZURE_DEVOPS_EXT_PAT
