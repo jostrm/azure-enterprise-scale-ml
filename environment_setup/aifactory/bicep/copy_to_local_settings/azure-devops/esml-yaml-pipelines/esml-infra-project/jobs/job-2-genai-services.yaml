@@ -421,18 +421,6 @@ steps:
         done
       }
 
-      print_ado_warning() {
-        local operation="$1"
-        local output="$2"
-        if [ -z "$output" ]; then
-          echo "##[warning]$operation failed without an error message."
-          return
-        fi
-        while IFS= read -r line; do
-          [ -n "$line" ] && echo "##[warning]$operation: $line"
-        done <<< "$output"
-      }
-
       PRIMARY_IP=""
       for svc in "https://api.ipify.org" "https://checkip.amazonaws.com" "https://ifconfig.me/ip" "http://ipinfo.io/ip"; do
         candidate=$(curl -s --max-time 10 "$svc" | tr -d '[:space:]')
@@ -493,6 +481,18 @@ steps:
        done
      }
 
+     print_ado_warning() {
+       local operation="$1"
+       local output="$2"
+       if [ -z "$output" ]; then
+         echo "##[warning]$operation failed without an error message."
+         return
+       fi
+       while IFS= read -r line; do
+         [ -n "$line" ] && echo "##[warning]$operation: $line"
+       done <<< "$output"
+     }
+
      for value_name in vault_subscription vault_resource_group vault_name ip_to_add; do
        value="${!value_name}"
        if [ -z "$value" ] || [[ "$value" == '$('* ]]; then
@@ -546,10 +546,10 @@ steps:
        echo "##[warning]Could not enable Key Vault public network access. Azure Policy or permissions may have rejected the update. Continuing with the IP-rule attempt and verification for diagnostics."
      fi
 
+     add_error=""
      if [ -n "$existing_rule" ]; then
        echo "IP rule '$existing_rule' already exists; it will be preserved during cleanup."
      else
-       add_error=""
        if ! add_error=$(az keyvault network-rule add \
          --subscription "$vault_subscription" \
          --resource-group "$vault_resource_group" \
@@ -604,6 +604,17 @@ steps:
      done
 
      echo "##[warning]Key Vault network configuration did not persist: publicNetworkAccess must be Enabled, defaultAction must be Deny, and IP $ip_to_add must be present. Check Azure Policy or permissions for ${{ parameters.serviceConnectionSeeding }}. Continuing so AzureKeyVault@2 can expose the customer-specific access behavior."
+     if [ -n "$update_error" ] || [ -n "$add_error" ]; then
+       echo "##[warning]Captured Azure CLI error details:"
+       if [ -n "$update_error" ]; then
+         print_ado_warning "az keyvault update" "$update_error"
+       fi
+       if [ -n "$add_error" ]; then
+         print_ado_warning "az keyvault network-rule add" "$add_error"
+       fi
+     else
+       echo "##[warning]Azure CLI returned no command error. The requested update completed, but the observed Key Vault state remained publicNetworkAccess=$public_network_access, defaultAction=$default_action, matchingIpRule=${matching_rule:-none}. Azure Policy may have modified or reverted the setting."
+     fi
      exit 0
 - task: AzureCLI@2
   displayName: '02b_az_prepare_seeding_keyvault_private_dns'
