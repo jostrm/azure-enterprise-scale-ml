@@ -4082,6 +4082,35 @@ jobs:
               --parameters tags='${{ env.tags }}' \
               --parameters tagsProject='${{ env.tagsProject }}'
 
+      - name: 10b-reconcile-aifactory-dashboard
+        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && success()
+        continue-on-error: true
+        shell: bash
+        env:
+          DASHBOARD_CURRENT_SUBSCRIPTION_ID: ${{ env.dev_test_prod_sub_id }}
+          DASHBOARD_CURRENT_ENV: ${{ env.dev_test_prod }}
+          DASHBOARD_PROJECT_NUMBER: ${{ env.project_number_000 }}
+          DASHBOARD_LOCATION: ${{ env.admin_location }}
+          DASHBOARD_LOCATION_SUFFIX: ${{ env.admin_locationSuffix }}
+          DASHBOARD_RG_PREFIX: ${{ env.admin_aifactoryPrefixRG }}
+          DASHBOARD_RG_SUFFIX: ${{ env.admin_aifactorySuffixRG }}
+          DASHBOARD_PROJECT_PREFIX: ${{ env.projectPrefix }}
+          DASHBOARD_PROJECT_SUFFIX: ${{ env.projectSuffix }}
+          DASHBOARD_COMMON_NAME: ${{ env.vnetResourceGroupBase }}
+          DASHBOARD_COMMON_RG: ${{ env.commonResourceGroup_param }}
+          DASHBOARD_DEV_SUBSCRIPTION_ID: ${{ vars.DEV_SUBSCRIPTION_ID }}
+          DASHBOARD_STAGE_SUBSCRIPTION_ID: ${{ vars.STAGE_SUBSCRIPTION_ID }}
+          DASHBOARD_PROD_SUBSCRIPTION_ID: ${{ vars.PROD_SUBSCRIPTION_ID }}
+          DASHBOARD_CENTRAL_DNS: ${{ env.centralDnsZoneByPolicyInHub }}
+          DASHBOARD_PRIVATE_DNS_SUBSCRIPTION_ID: ${{ env.privDnsSubscription_param }}
+          DASHBOARD_PRIVATE_DNS_RESOURCE_GROUP: ${{ env.privDnsResourceGroup_param }}
+          DASHBOARD_VNET_SUBSCRIPTION_ID: ${{ env.dev_test_prod_sub_id }}
+          DASHBOARD_VNET_RESOURCE_GROUP: ${{ env.vnetResourceGroup_resolved }}
+          DASHBOARD_CONFIG_FILE: ${{ inputs.config_file }}
+          DASHBOARD_TEMPLATE_FILE: ${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/aifactory-dash-01.bicep
+        run: |
+            python3 "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-aifactory-dashboard.py"
+
       - name: Remove runner IP from seeding Key Vault
         if: always() && env.disable_whitelisting_for_build_agents != 'true'
         shell: bash
