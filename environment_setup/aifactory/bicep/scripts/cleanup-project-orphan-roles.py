@@ -51,6 +51,8 @@ class Config:
             f"{prefix}{env_value('PROJECT_PREFIX')}project{number}-{location}-"
             f"{environment}{suffix}{env_value('PROJECT_SUFFIX')}"
         )
+        # Match the RBAC Bicep commonResourceGroup expression. The BYO VNet RG
+        # resolved by 00_resolve_network_env_placeholders is a separate scope.
         common_rg = env_value(
             "COMMON_RG", f"{prefix}{env_value('COMMON_NAME', 'esml-common')}-{location}-{environment}{suffix}"
         )
