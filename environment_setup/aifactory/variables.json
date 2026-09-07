@@ -61,6 +61,8 @@
     "disableRBACAdminOnRGForUsers": "true",
     "disableSubnetJoinAction": "false",
     "addBastionHost": "false",
+    "bastion_subscription_resource_group": "",
+    "bastion_custom_name": "",
     "enableAdminVM": "false",
     "useSelfHostedBuildAgent": "false",
     "selfHostedRunnerLabel": "aifactory-admin-vm",

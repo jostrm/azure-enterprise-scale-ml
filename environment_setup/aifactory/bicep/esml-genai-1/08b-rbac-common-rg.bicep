@@ -125,6 +125,8 @@ var targetResourceGroup = '${commonRGNamePrefix}${projectPrefix}${replace(projec
 
 // Networking calculations
 var vnetNameFull = !empty(vnetNameFull_param) ? replace(vnetNameFull_param, '<network_env>', network_env) : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
+var vnetResourceGroupName = !empty(vnetResourceGroup_param) ? replace(vnetResourceGroup_param, '<network_env>', network_env) : commonResourceGroup
+var vnetInCommonResourceGroup = toLower(vnetResourceGroupName) == toLower(commonResourceGroup)
 
 // Random salt for unique naming
 var randomSalt = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? substring(randomValue, 0, 10): aifactorySalt10char
@@ -283,11 +285,23 @@ module rbacKeyvaultCommon4Users '../modules/kvRbacReaderOnCommon.bicep' = if(emp
     bastion_service_name: empty(bastionName) ? 'bastion-${locationSuffix}-${env}${commonResourceSuffix}' : bastionName
     useAdGroups: useAdGroups
     servicePrincipleAndMIArray: spAndMiArray
-    vNetName: vnetNameFull
+    vNetName: vnetInCommonResourceGroup ? vnetNameFull : ''
   }
   dependsOn: [
     existingTargetRG
   ]
+}
+
+// The Key Vault module runs in the common RG; BYO VNet Reader must run in the network RG.
+module rbacReaderByoVNet '../modules/vnetRBACReaderOnly.bicep' = if (empty(bastionResourceGroup) && addBastionHost && !vnetInCommonResourceGroup) {
+  scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
+  name: take('08b-rbacReaderByoVNet${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    vNetName: vnetNameFull
+    servicePrincipleAndMIArray: spAndMiArray
+    user_object_ids: p011_genai_team_lead_array
+    useAdGroups: useAdGroups
+  }
 }
 
 // ============== ACR ACCESS ==============
@@ -319,11 +333,13 @@ module cmnRbacACR '../modules/commonRGRbac.bicep' = if(useCommonACR) {
 // Can be disabled with disableSubnetJoinAction=true if subnet join permissions
 // are managed separately (e.g., via Azure Policy or external RBAC)
 module cmnRbacVNet '../modules/vnetRBACReader.bicep' = if (!disableSubnetJoinAction) {
-  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  scope: resourceGroup(subscriptionIdDevTestProd, vnetResourceGroupName)
   name: take('08b-rbacVNetSubnetJoin${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
     vNetName: vnetNameFull
     common_bastion_subnet_name: 'AzureBastionSubnet'
+    // Subnet join RBAC must not assume an AI Factory Bastion NSG exists in a BYO network.
+    assignBastionNsgRole: false
     servicePrincipleAndMIArray: spAndMiArray
     user_object_ids: p011_genai_team_lead_array
     useAdGroups: useAdGroups

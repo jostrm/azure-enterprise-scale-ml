@@ -103,6 +103,8 @@ variables:
   # MANDATORY(CHANGE RARELY):Client Access: Services to be added to deployment. CreateIfNotExists logic
   # ============================================================================
   addBastionHost: "false" # <optional>Add Bastion Host in common RG<default>false<keep-as-is>
+  bastion_subscription_resource_group: "" # <optional>Bastion resource group override for common RG RBAC<default>''<keep-as-is> Empty uses the common resource group.
+  bastion_custom_name: "" # <optional>Bastion name override for common RG RBAC<default>''<keep-as-is> Empty uses the standard Bastion naming convention.
   enableAdminVM: "false" # <optional>Enable Admin VM in common RG<default>false<keep-as-is>
   useSelfHostedBuildAgent: "false" # <optional>Use a self-hosted build agent/runner<default>false<keep-as-is> ADO uses adminVMBuildAgentPool/adminVMBuildAgentName; GHA uses selfHostedRunnerLabel.
   selfHostedRunnerLabel: "aifactory-admin-vm" # <optional>GitHub self-hosted runner label<default>aifactory-admin-vm<keep-as-is>
