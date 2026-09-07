@@ -35,6 +35,30 @@ fi
 state_dir="${AIFACTORY_LAUNCHER_STATE_DIR:?Stable launcher state directory is missing.}"
 trap 'rm -rf -- "$state_dir"' EXIT
 
+confirm_commit_and_continue() {
+  local choice="${AIFACTORY_COMMIT_CHANGES:-}"
+  while true; do
+    if [[ -z "$choice" && -t 0 ]]; then
+      read -r -p "Commit and continue? [y/N]: " choice
+    fi
+    case "${choice,,}" in
+      y|yes)
+        return 0
+        ;;
+      ""|n|no)
+        return 1
+        ;;
+      *)
+        echo "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
+        if [[ ! -t 0 ]]; then
+          return 1
+        fi
+        choice=""
+        ;;
+    esac
+  done
+}
+
 json_override_choice="${AIFACTORY_USE_JSON_OVERRIDE:-}"
 while true; do
   if [[ -z "$json_override_choice" && -t 0 ]]; then
@@ -484,6 +508,127 @@ if [[ "$use_json_override" == "true" && ! -f "$CONFIG_TEMPLATE_FILE" ]]; then
   exit 1
 fi
 
+"${PYTHON[@]}" - \
+  "$state_dir/variables.yaml" \
+  "$VARIABLES_TEMPLATE_FILE" \
+  "$state_dir/variables.json" \
+  "$CONFIG_TEMPLATE_FILE" \
+  "$use_json_override" <<'PY'
+import json
+import re
+import sys
+from collections import OrderedDict
+from pathlib import Path
+
+active_yaml_path = Path(sys.argv[1])
+template_yaml_path = Path(sys.argv[2])
+active_json_path = Path(sys.argv[3])
+template_json_path = Path(sys.argv[4])
+use_json = sys.argv[5] == "true"
+removed_keys = {"useAdminVMBuildAgent"}
+assignment = re.compile(r"^\s{2}([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)$")
+
+
+def split_comment(text):
+    quote = None
+    escaped = False
+    for index, char in enumerate(text):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and quote == '"':
+            escaped = True
+            continue
+        if quote:
+            if char == quote:
+                quote = None
+            continue
+        if char in {"'", '"'}:
+            quote = char
+        elif char == "#" and (index == 0 or text[index - 1].isspace()):
+            return text[:index].rstrip()
+    return text.rstrip()
+
+
+def yaml_values(path):
+    values = OrderedDict()
+    if not path.is_file():
+        return values
+    for line in path.read_text(encoding="utf-8-sig").splitlines():
+        match = assignment.match(line)
+        if match:
+            values[match.group(1)] = split_comment(match.group(2))
+    return values
+
+
+def flatten_new(template, active, prefix=""):
+    changes = []
+    for key, value in template.items():
+        path = f"{prefix}.{key}" if prefix else key
+        if key not in active:
+            if isinstance(value, dict) and value:
+                changes.extend(flatten_new(value, {}, path))
+            else:
+                changes.append((path, value))
+        elif isinstance(value, dict) and isinstance(active[key], dict):
+            changes.extend(flatten_new(value, active[key], path))
+    return changes
+
+
+def find_removed(value, prefix=""):
+    removed = []
+    if not isinstance(value, dict):
+        return removed
+    for key, child in value.items():
+        path = f"{prefix}.{key}" if prefix else key
+        if key in removed_keys:
+            removed.append(path)
+        elif isinstance(child, dict):
+            removed.extend(find_removed(child, path))
+    return removed
+
+
+def print_section(label, new_values, removed):
+    if not new_values and not removed:
+        return False
+    print(f"\n{label}")
+    if new_values:
+        print("  New variables and template defaults:")
+        for name, value in new_values:
+            default = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+            print(f"    {name} = {default}")
+    if removed:
+        print("  Removed variables:")
+        for name in removed:
+            print(f"    {name}")
+    return True
+
+
+active_yaml = yaml_values(active_yaml_path)
+template_yaml = yaml_values(template_yaml_path)
+found = print_section(
+    "variables.yaml",
+    [(key, value) for key, value in template_yaml.items() if key not in active_yaml],
+    [key for key in active_yaml if key in removed_keys],
+)
+
+if use_json:
+    active_json = json.loads(
+        active_json_path.read_text(encoding="utf-8-sig"), object_pairs_hook=OrderedDict
+    )
+    template_json = json.loads(
+        template_json_path.read_text(encoding="utf-8-sig"), object_pairs_hook=OrderedDict
+    )
+    found = print_section(
+        "variables.json",
+        flatten_new(template_json, active_json),
+        find_removed(active_json),
+    ) or found
+
+if not found:
+    print("\nVariable template changes: no new or removed variables.")
+PY
+
 "${PYTHON[@]}" - "$VARIABLES_TEMPLATE_FILE" "$state_dir/variables.yaml" "$VARIABLES_FILE" <<'PY'
 import re
 import sys
@@ -641,6 +786,11 @@ chmod +x "$REPO_ROOT/ADO-update-aifactory-and-run-project.sh"
 
 git add -A
 if ! git diff --cached --quiet; then
+  if ! confirm_commit_and_continue; then
+    git restore --staged -- .
+    echo "Commit declined. Changes remain in the working tree; no push or pipeline run was started."
+    exit 0
+  fi
   git commit \
     -m "Update AI Factory templates and Azure DevOps pipeline" \
     -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
