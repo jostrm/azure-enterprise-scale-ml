@@ -400,7 +400,7 @@ steps:
         Write-Host "deployment_random_value is: $(deployment_random_value)"
 - task: AzureCLI@2
   displayName: '01_pwsh_get_IP_for_ADO_agent'
-  condition: ne(variables['disable_whitelisting_for_build_agents'], 'true')
+  condition: and(succeeded(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -410,12 +410,22 @@ steps:
       # Detect the build agent's public IPv4. ipinfo.io can be unreachable/rate-limited from the
       # ADO agent, which previously left admin_ip_fw empty and broke task 02 with
       # "'' does not appear to be an IPv4 or IPv6 network". Try several services and validate.
-      IPV4_RE='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+      is_valid_ipv4() {
+        local ip="$1" octet
+        local -a octets
+        IFS='.' read -r -a octets <<< "$ip"
+        [ "${#octets[@]}" -eq 4 ] || return 1
+        for octet in "${octets[@]}"; do
+          [[ "$octet" =~ ^[0-9]{1,3}$ ]] || return 1
+          ((10#$octet <= 255)) || return 1
+        done
+      }
+
       PRIMARY_IP=""
       for svc in "https://api.ipify.org" "https://checkip.amazonaws.com" "https://ifconfig.me/ip" "http://ipinfo.io/ip"; do
         candidate=$(curl -s --max-time 10 "$svc" | tr -d '[:space:]')
         echo "  $svc -> '${candidate}'"
-        if [[ "$candidate" =~ $IPV4_RE ]]; then
+        if is_valid_ipv4 "$candidate"; then
           PRIMARY_IP="$candidate"
           echo "Selected public IP '$PRIMARY_IP' from $svc"
           break
@@ -448,45 +458,133 @@ steps:
 
 - task: AzureCLI@2
   displayName: '02_az_set_ip_to_seeding_keyvault_FW_whitelist'
-  condition: ne(variables['disable_whitelisting_for_build_agents'], 'true')
+  condition: and(succeeded(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnectionSeeding }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: | 
      set -euo pipefail
-     az account set --subscription "$(admin_bicep_input_keyvault_subscription)"
-
+     vault_subscription="$(admin_bicep_input_keyvault_subscription)"
+     vault_resource_group="$(admin_bicep_kv_fw_rg)"
+     vault_name="$(admin_bicep_kv_fw)"
      ip_to_add="$(admin_ip_fw)"
-     if [ -z "$ip_to_add" ]; then
-       echo "##[error]admin_ip_fw is empty — build agent public IP was not detected in task 01. Cannot add an empty network rule."
+
+     is_valid_ipv4() {
+       local ip="$1" octet
+       local -a octets
+       IFS='.' read -r -a octets <<< "$ip"
+       [ "${#octets[@]}" -eq 4 ] || return 1
+       for octet in "${octets[@]}"; do
+         [[ "$octet" =~ ^[0-9]{1,3}$ ]] || return 1
+         ((10#$octet <= 255)) || return 1
+       done
+     }
+
+     for value_name in vault_subscription vault_resource_group vault_name ip_to_add; do
+       value="${!value_name}"
+       if [ -z "$value" ] || [[ "$value" == '$('* ]]; then
+         echo "##[error]Required value '$value_name' is empty or unresolved."
+         exit 1
+       fi
+     done
+     if ! is_valid_ipv4 "$ip_to_add"; then
+       echo "##[error]admin_ip_fw '$ip_to_add' is not a valid IPv4 address."
        exit 1
      fi
 
-     public_network_access=$(az keyvault show --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --query 'properties.publicNetworkAccess' -o tsv)
+     echo "##vso[task.setvariable variable=seeding_kv_ip_rule_added]false"
+
+     public_network_access=$(az keyvault show \
+       --subscription "$vault_subscription" \
+       --name "$vault_name" \
+       --resource-group "$vault_resource_group" \
+       --query 'properties.publicNetworkAccess' \
+       --output tsv \
+       --only-show-errors | tr -d '\r')
      if [ "$public_network_access" = "Disabled" ]; then
        echo "##[error]Seeding Key Vault public network access is Disabled. A Microsoft-hosted agent cannot reach this vault, and an IP rule has no effect while public access is disabled."
        echo "##[error]Use a self-hosted Azure DevOps agent in the Key Vault VNet with private DNS resolution, then set disable_whitelisting_for_build_agents=true. Alternatively, change the governing Azure Policy to permit public network access for this vault."
        exit 1
      fi
 
-     az keyvault update --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --public-network-access Enabled --default-action Deny
-     az keyvault network-rule add --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$ip_to_add"
+     existing_ip_rules=$(az keyvault show \
+       --subscription "$vault_subscription" \
+       --name "$vault_name" \
+       --resource-group "$vault_resource_group" \
+       --query 'properties.networkAcls.ipRules[].value' \
+       --output tsv \
+       --only-show-errors | tr -d '\r')
+     existing_rule=""
+     for rule in $existing_ip_rules; do
+       if [ "$rule" = "$ip_to_add" ] || [ "$rule" = "$ip_to_add/32" ]; then
+         existing_rule="$rule"
+         break
+       fi
+     done
+
+     az keyvault update \
+       --subscription "$vault_subscription" \
+       --name "$vault_name" \
+       --resource-group "$vault_resource_group" \
+       --public-network-access Enabled \
+       --default-action Deny \
+       --output none \
+       --only-show-errors
+
+     if [ -n "$existing_rule" ]; then
+       echo "IP rule '$existing_rule' already exists; it will be preserved during cleanup."
+     else
+       az keyvault network-rule add \
+         --subscription "$vault_subscription" \
+         --resource-group "$vault_resource_group" \
+         --name "$vault_name" \
+         --ip-address "$ip_to_add" \
+         --output none \
+         --only-show-errors
+       echo "##vso[task.setvariable variable=seeding_kv_ip_rule_added]true"
+     fi
 
      # The data-plane secret task follows immediately. Verify the ARM update was accepted and
      # has propagated before it tries to list secrets from this Microsoft-hosted agent.
      for attempt in 1 2 3 4 5 6; do
-       public_network_access=$(az keyvault show --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --query 'properties.publicNetworkAccess' -o tsv)
-       ip_rule_exists=$(az keyvault show --name "$(admin_bicep_kv_fw)" --resource-group "$(admin_bicep_kv_fw_rg)" --query "length(properties.networkAcls.ipRules[?value=='$ip_to_add'])" -o tsv)
-       echo "Key Vault network check $attempt/6: publicNetworkAccess=$public_network_access, matchingIpRules=$ip_rule_exists"
-       if [ "$public_network_access" = "Enabled" ] && [ "$ip_rule_exists" -gt 0 ]; then
-         echo "Seeding Key Vault is reachable through public access from the whitelisted build-agent IP."
+       public_network_access=$(az keyvault show \
+         --subscription "$vault_subscription" \
+         --name "$vault_name" \
+         --resource-group "$vault_resource_group" \
+         --query 'properties.publicNetworkAccess' \
+         --output tsv \
+         --only-show-errors | tr -d '\r')
+       default_action=$(az keyvault show \
+         --subscription "$vault_subscription" \
+         --name "$vault_name" \
+         --resource-group "$vault_resource_group" \
+         --query 'properties.networkAcls.defaultAction' \
+         --output tsv \
+         --only-show-errors | tr -d '\r')
+       current_ip_rules=$(az keyvault show \
+         --subscription "$vault_subscription" \
+         --name "$vault_name" \
+         --resource-group "$vault_resource_group" \
+         --query 'properties.networkAcls.ipRules[].value' \
+         --output tsv \
+         --only-show-errors | tr -d '\r')
+       matching_rule=""
+       for rule in $current_ip_rules; do
+         if [ "$rule" = "$ip_to_add" ] || [ "$rule" = "$ip_to_add/32" ]; then
+           matching_rule="$rule"
+           break
+         fi
+       done
+       echo "Key Vault network check $attempt/6: publicNetworkAccess=$public_network_access, defaultAction=$default_action, matchingIpRule=${matching_rule:-none}"
+       if [ "$public_network_access" = "Enabled" ] && [ "$default_action" = "Deny" ] && [ -n "$matching_rule" ]; then
+         echo "Seeding Key Vault public network rule is configured for the build-agent IP."
          exit 0
        fi
        sleep 10
      done
 
-     echo "##[error]Key Vault network configuration did not persist: publicNetworkAccess must be Enabled and IP $ip_to_add must be present before AzureKeyVault@2 runs. Check Azure Policy or permissions for ${{ parameters.serviceConnectionSeeding }}."
+     echo "##[error]Key Vault network configuration did not persist: publicNetworkAccess must be Enabled, defaultAction must be Deny, and IP $ip_to_add must be present before AzureKeyVault@2 runs. Check Azure Policy or permissions for ${{ parameters.serviceConnectionSeeding }}."
      exit 1
 - task: AzureCLI@2
   displayName: '02b_az_prepare_seeding_keyvault_private_dns'
@@ -5416,14 +5514,52 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '07_az_remove_ip_from_seeding_keyvault_FW_whitelist'
-  condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
+  condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'), eq(variables['seeding_kv_ip_rule_added'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnectionSeeding }}
     scriptLocation: inlineScript
     scriptType: bash
     inlineScript: | 
-     az account set --subscription "$(admin_bicep_input_keyvault_subscription)"
-     az keyvault network-rule remove --resource-group "$(admin_bicep_kv_fw_rg)" --name "$(admin_bicep_kv_fw)" --ip-address "$(admin_ip_fw)"
+     set -uo pipefail
+     vault_subscription="$(admin_bicep_input_keyvault_subscription)"
+     vault_resource_group="$(admin_bicep_kv_fw_rg)"
+     vault_name="$(admin_bicep_kv_fw)"
+     ip_to_remove="$(admin_ip_fw)"
+
+     if [ -z "$ip_to_remove" ] || [[ "$ip_to_remove" == '$('* ]]; then
+       echo "##[warning]Skipping Key Vault firewall cleanup because admin_ip_fw is empty or unresolved."
+       exit 0
+     fi
+
+     current_ip_rules=$(az keyvault show \
+       --subscription "$vault_subscription" \
+       --name "$vault_name" \
+       --resource-group "$vault_resource_group" \
+       --query 'properties.networkAcls.ipRules[].value' \
+       --output tsv \
+       --only-show-errors 2>/dev/null | tr -d '\r') || {
+         echo "##[warning]Could not read Key Vault firewall rules during cleanup."
+         exit 0
+       }
+     matching_rule=""
+     for rule in $current_ip_rules; do
+       if [ "$rule" = "$ip_to_remove" ] || [ "$rule" = "$ip_to_remove/32" ]; then
+         matching_rule="$rule"
+         break
+       fi
+     done
+     if [ -z "$matching_rule" ]; then
+       echo "Build-agent IP rule is already absent; cleanup is complete."
+       exit 0
+     fi
+
+     az keyvault network-rule remove \
+       --subscription "$vault_subscription" \
+       --resource-group "$vault_resource_group" \
+       --name "$vault_name" \
+       --ip-address "$matching_rule" \
+       --output none \
+       --only-show-errors || echo "##[warning]Failed to remove Key Vault IP rule '$matching_rule'."
 - task: AzureCLI@2
   displayName: '08_az_remove_ips_from_ACR_FW_whitelist'
   condition: and(eq('${{ parameters.phase }}', 'infra'), always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
