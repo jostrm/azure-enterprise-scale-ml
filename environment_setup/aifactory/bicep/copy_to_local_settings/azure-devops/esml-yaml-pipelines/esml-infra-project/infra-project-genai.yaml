@@ -25,7 +25,7 @@ parameters:
   - name: runnerSelection
     displayName: Build agent selection
     type: string
-    default: from-config
+    default: microsoft-hosted
     values:
       - from-config
       - microsoft-hosted
