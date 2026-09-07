@@ -225,6 +225,19 @@ configure_pat_auth() {
   auth_method=pat
 }
 
+login_with_entra() {
+  local -a login_args
+  login_args=(login --allow-no-subscriptions)
+  if [[ -n "$ado_tenant" ]]; then
+    login_args+=(--tenant "$ado_tenant")
+  fi
+
+  echo "Opening browser sign-in for Microsoft Entra authentication..." >&2
+  echo "In the browser account picker, select 'Use another account' and enter the full email address." >&2
+  echo "No Azure subscription is required; this sign-in is only for Azure DevOps." >&2
+  AZURE_CORE_LOGIN_EXPERIENCE_V2=off az "${login_args[@]}" >/dev/null
+}
+
 ado_tenant="${ADO_TENANT:-}"
 case "${auth_method,,}" in
   aad|entra)
@@ -235,11 +248,8 @@ case "${auth_method,,}" in
         echo "Run 'AZURE_CORE_LOGIN_EXPERIENCE_V2=off az login --allow-no-subscriptions' before starting this script." >&2
         exit 1
       fi
-      echo "No active Azure CLI Microsoft Entra session was found. Opening browser sign-in..."
-      echo "In the browser account picker, select 'Use another account' and enter the full email address."
-      echo "No Azure subscription is required; this sign-in is only for Azure DevOps."
-      if ! AZURE_CORE_LOGIN_EXPERIENCE_V2=off \
-        az login --allow-no-subscriptions >/dev/null; then
+      echo "No active Azure CLI Microsoft Entra session was found."
+      if ! login_with_entra; then
         echo "Browser sign-in was blocked or canceled. Falling back to Azure DevOps PAT authentication."
         configure_pat_auth
       fi
@@ -261,10 +271,10 @@ url_encode() {
   "${PYTHON[@]}" -c 'import sys; from urllib.parse import quote; print(quote(sys.argv[1], safe=""))' "$1"
 }
 
-get_ado_auth_header() {
-  local token
+refresh_ado_auth_header() {
+  local token token_error
   if [[ "${auth_method,,}" == "pat" ]]; then
-    AZURE_DEVOPS_EXT_PAT="$AZURE_DEVOPS_EXT_PAT" "${PYTHON[@]}" -c '
+    ado_auth_header=$(AZURE_DEVOPS_EXT_PAT="$AZURE_DEVOPS_EXT_PAT" "${PYTHON[@]}" -c '
 import base64
 import os
 
@@ -272,8 +282,12 @@ credential = base64.b64encode(
     (":" + os.environ["AZURE_DEVOPS_EXT_PAT"]).encode()
 ).decode()
 print(f"Basic {credential}")
-'
-    return
+')
+    if [[ -z "$ado_auth_header" ]]; then
+      echo "ERROR: Failed to construct the Azure DevOps PAT authorization header." >&2
+      return 1
+    fi
+    return 0
   fi
 
   local -a token_args
@@ -286,17 +300,48 @@ print(f"Basic {credential}")
   if [[ -n "$ado_tenant" ]]; then
     token_args+=(--tenant "$ado_tenant")
   fi
-  token=$(az "${token_args[@]}")
-  printf 'Bearer %s\n' "$token"
+
+  if ! token=$(az "${token_args[@]}" 2>&1); then
+    token_error="$token"
+    echo "Azure CLI authentication expired or became unavailable during the update." >&2
+    if [[ -n "$token_error" ]]; then
+      echo "$token_error" >&2
+    fi
+    if [[ ! -t 0 ]]; then
+      echo "ERROR: Interactive Microsoft Entra sign-in is required to continue." >&2
+      return 1
+    fi
+    if ! login_with_entra; then
+      echo "ERROR: Microsoft Entra sign-in failed or was canceled." >&2
+      return 1
+    fi
+    if ! token=$(az "${token_args[@]}" 2>&1); then
+      token_error="$token"
+      echo "ERROR: Could not acquire an Azure DevOps access token after signing in." >&2
+      if [[ -n "$token_error" ]]; then
+        echo "$token_error" >&2
+      fi
+      return 1
+    fi
+  fi
+
+  token="${token//$'\r'/}"
+  token="${token//$'\n'/}"
+  if [[ -z "$token" ]]; then
+    echo "ERROR: Azure CLI returned an empty Azure DevOps access token." >&2
+    return 1
+  fi
+  ado_auth_header="Bearer $token"
 }
 
 ado_request() {
   local method="$1"
   local url="$2"
   local input_file="${3:-}"
-  local auth_header
-  auth_header=$(get_ado_auth_header)
-  ADO_AUTH_HEADER="$auth_header" "${PYTHON[@]}" - "$method" "$url" "$input_file" <<'PY'
+  if ! refresh_ado_auth_header; then
+    return 1
+  fi
+  ADO_AUTH_HEADER="$ado_auth_header" "${PYTHON[@]}" - "$method" "$url" "$input_file" <<'PY'
 import json
 import os
 import sys
@@ -385,14 +430,7 @@ else
       ;;
     *)
       ado_tenant="$auth_choice"
-      echo "Opening browser sign-in for the specified Entra tenant..."
-      echo "In the browser account picker, select 'Use another account' and enter the full email address."
-      echo "No Azure subscription is required; this sign-in is only for Azure DevOps."
-      if ! AZURE_CORE_LOGIN_EXPERIENCE_V2=off \
-        az login \
-        --tenant "$ado_tenant" \
-        --allow-no-subscriptions \
-        >/dev/null; then
+      if ! login_with_entra; then
         echo "Browser sign-in was blocked by Conditional Access or canceled."
         echo "Falling back to Azure DevOps PAT authentication."
         configure_pat_auth
