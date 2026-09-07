@@ -61,9 +61,10 @@ def group_assignment(number: int, principal: str, scope: str) -> dict:
 
 
 class FakeAz:
-    def __init__(self) -> None:
-        self.records: dict[str, list] = {CONFIG.project_rg: [], CONFIG.common_rg: []}
-        self.exists: dict[str, bool] = {CONFIG.project_rg: True, CONFIG.common_rg: True}
+    def __init__(self, config=CONFIG) -> None:
+        self.config = config
+        self.records: dict[str, list] = {config.project_rg: [], config.common_rg: []}
+        self.exists: dict[str, bool] = {config.project_rg: True, config.common_rg: True}
         self.history: object = []
         self.live: dict[str, subprocess.CompletedProcess[str]] = {}
         self.live_sequences: dict[str, list[subprocess.CompletedProcess[str]]] = {}
@@ -83,7 +84,7 @@ class FakeAz:
         if args[:2] == ("group", "exists"):
             return response(self.exists[args[args.index("--name") + 1]])
         if args[:3] == ("deployment", "group", "list"):
-            assert args[args.index("--resource-group") + 1] == CONFIG.project_rg
+            assert args[args.index("--resource-group") + 1] == self.config.project_rg
             if isinstance(self.history, subprocess.CompletedProcess):
                 return self.history
             return response(self.history)
@@ -514,6 +515,63 @@ class TestProjectOrphanRoles(unittest.TestCase):
             ("ORPHAN_PROJECT_PREFIX", "../"),
         ):
             with self.subTest(key=key), patch.dict(os.environ, env | {key: value}, clear=True):
+                with self.assertRaises(ValueError):
+                    module.Config.from_env()
+
+    def test_custom_common_and_project_names_target_only_their_exact_scopes(self) -> None:
+        env = {
+            "ORPHAN_SUBSCRIPTION_ID": guid(1), "ORPHAN_PROJECT_NUMBER": "017",
+            "ORPHAN_LOCATION_SUFFIX": "sdc", "ORPHAN_ENV": "dev",
+            "ORPHAN_RG_PREFIX": "customer-", "ORPHAN_RG_SUFFIX": "-009",
+            "ORPHAN_PROJECT_PREFIX": "research-", "ORPHAN_PROJECT_SUFFIX": "-resources",
+            "ORPHAN_COMMON_NAME": "shared-platform",
+            # The networking resolver's values must not affect common-RG cleanup.
+            "vnetResourceGroup_param": "network-<network_env>-rg",
+            "vnetResourceGroup_resolved": "network-dev-rg",
+            "network_env": "dev", "BYO_subnets": "true",
+            "admin_commonResourceSuffix": "-001",
+        }
+        for override, expected_common in (
+            ("company.Shared_AI(Platform)", "company.Shared_AI(Platform)"),
+            ("", "customer-shared-platform-sdc-dev-009"),
+            ("$(commonResourceGroup_param)", "customer-shared-platform-sdc-dev-009"),
+        ):
+            with self.subTest(override=override), patch.dict(os.environ, env | {"ORPHAN_COMMON_RG": override}, clear=True):
+                config = module.Config.from_env()
+                self.assertEqual(expected_common, config.common_rg)
+                self.assertEqual("customer-research-project017-sdc-dev-009-resources", config.project_rg)
+                az = FakeAz(config)
+                direct = group_assignment(100, guid(2), config.scope(config.project_rg))
+                common = group_assignment(101, guid(2), config.scope(config.common_rg))
+                unrelated = group_assignment(102, guid(9), config.scope(config.common_rg))
+                network = group_assignment(103, guid(2), config.scope("network-dev-rg"))
+                conventional = group_assignment(104, guid(2), config.scope("customer-esml-common-sdc-dev-009"))
+                other_project = group_assignment(105, guid(2), config.scope(config.project_rg.replace("017", "018")))
+                az.records[config.project_rg] = [direct]
+                az.records[config.common_rg] = [common, unrelated, network, conventional, other_project]
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    self.assertEqual(2, module.cleanup(config, az))
+                self.assertCountEqual([direct["id"], common["id"]], az.deleted_ids)
+                checked_groups = [
+                    call[call.index("--name") + 1] for call in az.calls if call[:2] == ("group", "exists")
+                ]
+                self.assertEqual([config.project_rg, config.common_rg], checked_groups)
+                self.assertIn(expected_common, output.getvalue())
+
+    def test_empty_project_affixes_and_invalid_common_override_do_not_redirect_cleanup(self) -> None:
+        env = {
+            "ORPHAN_SUBSCRIPTION_ID": guid(1), "ORPHAN_PROJECT_NUMBER": "017",
+            "ORPHAN_LOCATION_SUFFIX": "sdc", "ORPHAN_ENV": "prod",
+            "ORPHAN_RG_PREFIX": "customer-", "ORPHAN_RG_SUFFIX": "-005",
+            "ORPHAN_PROJECT_PREFIX": "", "ORPHAN_PROJECT_SUFFIX": "",
+            "ORPHAN_COMMON_RG": "custom-shared-rg",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            config = module.Config.from_env()
+            self.assertEqual("customer-project017-sdc-prod-005", config.project_rg)
+            self.assertEqual("custom-shared-rg", config.common_rg)
+        for override in ("shared-<network_env>-rg", "shared/other-rg", "shared-$(unresolved)-rg"):
+            with self.subTest(override=override), patch.dict(os.environ, env | {"ORPHAN_COMMON_RG": override}, clear=True):
                 with self.assertRaises(ValueError):
                     module.Config.from_env()
 

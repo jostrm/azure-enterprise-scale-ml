@@ -86,6 +86,35 @@ class TestWorkflowParity(unittest.TestCase):
                 self.assertNotIn("principalName==null", cleanup)
                 self.assertNotIn("role assignment delete", cleanup)
 
+    def test_cleanup_custom_rg_bindings_do_not_use_byo_network_scope(self) -> None:
+        mappings = {
+            "ORPHAN_COMMON_RG": "commonResourceGroup_param",
+            "ORPHAN_COMMON_NAME": "vnetResourceGroupBase",
+            "ORPHAN_RG_PREFIX": "admin_aifactoryPrefixRG",
+            "ORPHAN_RG_SUFFIX": "admin_aifactorySuffixRG",
+            "ORPHAN_PROJECT_PREFIX": "projectPrefix",
+            "ORPHAN_PROJECT_SUFFIX": "projectSuffix",
+            "ORPHAN_LOCATION_SUFFIX": "admin_locationSuffix",
+            "ORPHAN_ENV": "dev_test_prod",
+            "ORPHAN_PROJECT_NUMBER": "project_number_000",
+        }
+        ado = _section(
+            _read_text(ADO_PROJECT_JOB), "displayName: 'Check and Delete Current Project Orphan Role Assignments'",
+            "displayName: '61-foundation'",
+        )
+        gha = _section(
+            _read_text(GHA_PROJECT_PHASE), "- name: Check and Delete Current Project Orphan Role Assignments",
+            "# === Deploy sequences ===",
+        )
+        for target, source in mappings.items():
+            with self.subTest(target=target):
+                self.assertEqual(f"$({source})", _env_value(ado, target))
+                self.assertEqual("${{ env." + source + " }}", _env_value(gha, target))
+        for cleanup in (ado, gha):
+            self.assertNotIn("vnetResourceGroup_resolved", cleanup)
+            self.assertNotIn("vnetResourceGroup_param", cleanup)
+            self.assertNotIn("admin_commonResourceSuffix", cleanup)
+
 
 if __name__ == "__main__":
     unittest.main()

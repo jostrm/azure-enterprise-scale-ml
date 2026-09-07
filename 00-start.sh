@@ -141,7 +141,9 @@ elif [[ "$orchestrator" == "g" ]]; then
     #cp "$SCRIPT_DIR/bootstrap/13-ESML-update-ip-rule-ux.sh" "$SCRIPT_DIR/../13-ESML-update-ip-rule-ux.sh"
 
     aif_success "Finished!"
-    aif_info "Next step: Run 01-aif-copy-aifactory-templates.sh"
+    aif_info "Next step 1st time: Run 01-aif-copy-aifactory-templates.sh"
+    aif_info "Next step 2nd time: If this is not your first time, you may Run ADO-update-aifactory-and-run-project.sh, if you already have a common and project repository, and want to run the IaC pipelines automatically."
+    
 else
     aif_error "Invalid choice. Please run the script again and enter a valid option."
     exit 1
