@@ -1,11 +1,16 @@
-
 #!/bin/bash
 
-# ANSI color codes
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+AIF_UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for AIF_UI_LIBRARY in "$AIF_UI_DIR/ui/terminal.sh" "$AIF_UI_DIR/azure-enterprise-scale-ml/bootstrap/ui/terminal.sh"; do
+    [[ ! -f "$AIF_UI_LIBRARY" ]] || break
+done
+if [[ ! -f "$AIF_UI_LIBRARY" ]]; then
+    printf 'ERROR: AI Factory terminal library is missing. Copy bootstrap/ui alongside this script.\n' >&2
+    exit 1
+fi
+source "$AIF_UI_LIBRARY"
+aif_banner "GITHUB / INITIALIZE" "Install workflows and baseline configuration."
+aif_warn "This route replaces .env and variables.json with template defaults."
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -34,4 +39,4 @@ cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy
 cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml" "$SCRIPT_DIR/aifactory/esml-infra/github-actions/bicep/infra-project-phase.yml"
 cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml" "$SCRIPT_DIR/.github/workflows/infra-project-phase.yml"
 
-echo -e "${GREEN}Success! ${NC}"
+aif_complete "GitHub bootstrap files copied."

@@ -2,6 +2,17 @@
 
 set -e
 
+AIF_UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for AIF_UI_LIBRARY in "$AIF_UI_DIR/ui/terminal.sh" "$AIF_UI_DIR/azure-enterprise-scale-ml/bootstrap/ui/terminal.sh"; do
+    [[ ! -f "$AIF_UI_LIBRARY" ]] || break
+done
+if [[ ! -f "$AIF_UI_LIBRARY" ]]; then
+    printf 'ERROR: AI Factory terminal library is missing. Copy bootstrap/ui alongside this script.\n' >&2
+    exit 1
+fi
+source "$AIF_UI_LIBRARY"
+aif_banner "GENAI / POST-PROVISION" "Configure the app, notebooks and search data."
+
 # Output environment variables to .env file using azd env get-values
 # azd env get-values > .env
 
@@ -9,7 +20,7 @@ set -e
 if [ -f .env ]; then
     source .env
 else
-    echo ".env file not found!"
+    aif_error ".env file not found!"
     exit 1
 fi
 
@@ -21,8 +32,8 @@ subscriptionId=$AZURE_SUBSCRIPTION_ID
 
 # Ensure all required environment variables are set
 if [ -z "$resourceGroupName" ] || [ -z "$searchService" ] || [ -z "$openAiService" ] || [ -z "$subscriptionId" ]; then
-    echo "One or more required environment variables are not set."
-    echo "Ensure that AZURE_RESOURCE_GROUP, AZURE_SEARCH_NAME, AZURE_OPENAI_NAME, AZURE_SUBSCRIPTION_ID are set."
+    aif_error "One or more required environment variables are not set."
+    aif_info "Ensure that AZURE_RESOURCE_GROUP, AZURE_SEARCH_NAME, AZURE_OPENAI_NAME, AZURE_SUBSCRIPTION_ID are set."
     exit 1
 fi
 
@@ -42,19 +53,21 @@ INTERNAL_ID=$(az cognitiveservices account show \
 # Construct the URL
 COGNITIVE_SERVICE_URL="https://oai.azure.com/portal/${INTERNAL_ID}?tenantid=${AZURE_TENANT_ID}"
 
-echo "--- ✅ | 1. Post-provisioning - env configured ---"
+aif_success "01 / Application environment configured."
 
 # Setup to run notebooks
-echo 'Installing dependencies from "requirements.txt"'
+aif_section "02 / Notebook dependencies"
+aif_info 'Installing dependencies from requirements.txt'
 python3 -m pip install -r src/api/requirements.txt > /dev/null
 python3 -m pip install ipython ipykernel > /dev/null      # Install ipython and ipykernel
 ipython kernel install --name=python3 --user > /dev/null # Configure the IPython kernel
 jupyter kernelspec list > /dev/null                      # Verify kernelspec list isn't empty
-echo "--- ✅ | 2. Post-provisioning - ready execute notebooks ---"
+aif_success "Notebook environment ready."
 
-echo "Populating data ...."
+aif_section "03 / Populate search data"
 jupyter nbconvert --execute --to python --ExecutePreprocessor.timeout=-1 data/create-azure-search.ipynb > /dev/null
 
-echo "--- ✅ | 3. Post-provisioning - populated data ---"
+aif_success "Search data populated."
 
-echo "--- 🎉 | 4. Access your ACA deployed web app here: ${WEB_SERVICE_ACA_URI}"
+aif_value "Web app" "$WEB_SERVICE_ACA_URI"
+aif_complete "Post-provisioning complete."

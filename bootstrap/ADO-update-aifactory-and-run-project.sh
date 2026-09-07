@@ -3,6 +3,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AIF_UI_DIR="$SCRIPT_DIR"
+for AIF_UI_LIBRARY in "$AIF_UI_DIR/ui/terminal.sh" "$AIF_UI_DIR/azure-enterprise-scale-ml/bootstrap/ui/terminal.sh"; do
+  [[ ! -f "$AIF_UI_LIBRARY" ]] || break
+done
+if [[ ! -f "$AIF_UI_LIBRARY" ]]; then
+  printf 'ERROR: AI Factory terminal library is missing. Copy bootstrap/ui alongside this script.\n' >&2
+  exit 1
+fi
+source "$AIF_UI_LIBRARY"
 readonly REPO_ROOT="${AIFACTORY_REPO_ROOT:-$SCRIPT_DIR}"
 readonly SUBMODULE_PATH="azure-enterprise-scale-ml"
 readonly SUBMODULE_BRANCH="release/v1.24"
@@ -24,6 +33,8 @@ if [[ "${AIFACTORY_LAUNCHER_STABLE:-}" != "1" ]]; then
   state_dir="$HOME/.aifactory-update-state/ado-$$"
   stable_launcher="$state_dir/ADO-update-aifactory-and-run-project.sh"
   mkdir -p "$state_dir"
+  mkdir -p "$state_dir/ui"
+  cp "$AIF_UI_LIBRARY" "$state_dir/ui/terminal.sh"
   cp "${BASH_SOURCE[0]}" "$stable_launcher"
   chmod +x "$stable_launcher"
   export AIFACTORY_LAUNCHER_STABLE=1
@@ -34,12 +45,16 @@ fi
 
 state_dir="${AIFACTORY_LAUNCHER_STATE_DIR:?Stable launcher state directory is missing.}"
 trap 'rm -rf -- "$state_dir"' EXIT
+aif_banner "AZURE DEVOPS / UPDATE + RUN" "Preserve configuration. Refresh templates. Deploy with intent."
+aif_value "Repository" "$REPO_ROOT"
+aif_value "Branch" "$BRANCH"
+aif_section "01 / Configuration"
 
 confirm_commit_and_continue() {
   local choice="${AIFACTORY_COMMIT_CHANGES:-}"
   while true; do
     if [[ -z "$choice" && -t 0 ]]; then
-      read -r -p "Commit and continue? [y/N]: " choice
+      read -r -p "$(aif_prompt "Commit and continue? [y/N]: ")" choice
     fi
     case "${choice,,}" in
       y|yes)
@@ -49,7 +64,7 @@ confirm_commit_and_continue() {
         return 1
         ;;
       *)
-        echo "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
+        aif_warn "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
         if [[ ! -t 0 ]]; then
           return 1
         fi
@@ -62,23 +77,23 @@ confirm_commit_and_continue() {
 json_override_choice="${AIFACTORY_USE_JSON_OVERRIDE:-}"
 while true; do
   if [[ -z "$json_override_choice" && -t 0 ]]; then
-    read -r -p "Do you want to override with variables.json? [y/N]: " json_override_choice
+    read -r -p "$(aif_prompt "Do you want to override with variables.json? [y/N]: ")" json_override_choice
   fi
   case "${json_override_choice,,}" in
     y|yes)
       use_json_override=true
       config_override_file="$CONFIG_FILE"
-      echo "JSON override enabled: $CONFIG_FILE"
+      aif_info "JSON override enabled: $CONFIG_FILE"
       break
       ;;
     ""|n|no)
       use_json_override=false
       config_override_file=""
-      echo "JSON override disabled; the pipeline will use variables.yaml."
+      aif_info "JSON override disabled; the pipeline will use variables.yaml."
       break
       ;;
     *)
-      echo "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
+      aif_warn "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
       json_override_choice=""
       ;;
   esac
@@ -86,7 +101,7 @@ done
 
 for command in git az; do
   if ! command -v "$command" >/dev/null 2>&1; then
-    echo "ERROR: Required command '$command' is not available." >&2
+    aif_error "Required command '$command' is not available." >&2
     exit 1
   fi
 done
@@ -97,7 +112,7 @@ elif command -v py >/dev/null 2>&1 && py -3 --version >/dev/null 2>&1; then
 elif command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then
   PYTHON=(python3)
 else
-  echo "ERROR: A working Python 3 interpreter is required." >&2
+  aif_error "A working Python 3 interpreter is required." >&2
   exit 1
 fi
 
@@ -137,6 +152,7 @@ if isinstance(value, str):
 ' "$ADO_SETTINGS_FILE" "$name"
 }
 
+aif_section "02 / Azure DevOps connection"
 devops_defaults=""
 if az extension show --name azure-devops >/dev/null 2>&1; then
   devops_defaults=$(az devops configure --list 2>/dev/null || true)
@@ -172,18 +188,18 @@ fi
 devops_defaults_prompted=false
 if [[ -z "$ado_organization" || -z "$ado_project" ]]; then
   if [[ ! -t 0 ]]; then
-    echo "ERROR: Azure DevOps organization and project are required in non-interactive mode." >&2
-    echo "Set ADO_ORGANIZATION and ADO_PROJECT before starting this script." >&2
+    aif_error "Azure DevOps organization and project are required in non-interactive mode." >&2
+    aif_info "Set ADO_ORGANIZATION and ADO_PROJECT before starting this script." >&2
     exit 1
   fi
-  echo "Azure DevOps settings are not configured. Enter them once; they will be saved locally for future runs."
+  aif_warn "Azure DevOps settings are not configured. Enter them once; they will be saved locally for future runs."
 fi
 while [[ -z "$ado_organization" ]]; do
-  read -r -p "Azure DevOps organization name or URL: " ado_organization
+  read -r -p "$(aif_prompt "Azure DevOps organization name or URL: ")" ado_organization
   devops_defaults_prompted=true
 done
 while [[ -z "$ado_project" ]]; do
-  read -r -p "Azure DevOps project name: " ado_project
+  read -r -p "$(aif_prompt "Azure DevOps project name: ")" ado_project
   devops_defaults_prompted=true
 done
 case "$ado_organization" in
@@ -204,22 +220,22 @@ settings_path.write_text(
     encoding="utf-8",
 )
 PY
-  echo "Saved Azure DevOps organization and project locally for future runs."
+  aif_success "Saved Azure DevOps organization and project locally for future runs."
 fi
 
 configure_pat_auth() {
   if [[ -z "${AZURE_DEVOPS_EXT_PAT:-}" ]]; then
     if [[ ! -t 0 ]]; then
-      echo "ERROR: AZURE_DEVOPS_EXT_PAT is required for PAT authentication." >&2
+      aif_error "AZURE_DEVOPS_EXT_PAT is required for PAT authentication." >&2
       return 1
     fi
-    echo "Personal Microsoft accounts require an Azure DevOps PAT with Build Read & execute permission."
-    echo "Create one at: $ado_organization/_usersSettings/tokens"
-    read -r -s -p "Azure DevOps PAT (input is hidden): " AZURE_DEVOPS_EXT_PAT
+    aif_info "Personal Microsoft accounts require an Azure DevOps PAT with Build Read & execute permission."
+    aif_info "Create one at: $ado_organization/_usersSettings/tokens"
+    read -r -s -p "$(aif_prompt "Azure DevOps PAT (input is hidden): ")" AZURE_DEVOPS_EXT_PAT
     echo
   fi
   if [[ -z "$AZURE_DEVOPS_EXT_PAT" ]]; then
-    echo "ERROR: An empty Azure DevOps PAT cannot be used." >&2
+    aif_error "An empty Azure DevOps PAT cannot be used." >&2
     return 1
   fi
   auth_method=pat
@@ -232,9 +248,9 @@ login_with_entra() {
     login_args+=(--tenant "$ado_tenant")
   fi
 
-  echo "Opening browser sign-in for Microsoft Entra authentication..." >&2
-  echo "In the browser account picker, select 'Use another account' and enter the full email address." >&2
-  echo "No Azure subscription is required; this sign-in is only for Azure DevOps." >&2
+  aif_info "Opening browser sign-in for Microsoft Entra authentication..." >&2
+  aif_info "In the browser account picker, select 'Use another account' and enter the full email address." >&2
+  aif_info "No Azure subscription is required; this sign-in is only for Azure DevOps." >&2
   AZURE_CORE_LOGIN_EXPERIENCE_V2=off az "${login_args[@]}" >/dev/null
 }
 
@@ -244,7 +260,7 @@ if [[ -z "$ado_tenant" ]]; then
   if [[ "$use_json_override" == "true" ]]; then
     tenant_config_source="$CONFIG_FILE"
     if [[ ! -f "$CONFIG_FILE" ]]; then
-      echo "ERROR: JSON override is enabled, but configuration file is missing: $CONFIG_FILE" >&2
+      aif_error "JSON override is enabled, but configuration file is missing: $CONFIG_FILE" >&2
       exit 1
     fi
     ado_tenant=$("${PYTHON[@]}" - "$CONFIG_FILE" <<'PY'
@@ -261,7 +277,7 @@ PY
   else
     tenant_config_source="$VARIABLES_FILE"
     if [[ ! -f "$VARIABLES_FILE" ]]; then
-      echo "ERROR: Azure DevOps variables file is missing: $VARIABLES_FILE" >&2
+      aif_error "Azure DevOps variables file is missing: $VARIABLES_FILE" >&2
       exit 1
     fi
     ado_tenant=$("${PYTHON[@]}" - "$VARIABLES_FILE" <<'PY'
@@ -285,19 +301,19 @@ fi
 if [[ -z "$ado_tenant" || "$ado_tenant" == *"<todo>"* || "$ado_tenant" == '$('* ||
       "$ado_tenant" =~ [[:space:]/] ]]; then
   if [[ ! -t 0 ]]; then
-    echo "ERROR: azureDevOpsTenantId is missing or unresolved in $tenant_config_source." >&2
-    echo "Set it to the Microsoft Entra tenant connected to the Azure DevOps organization." >&2
+    aif_error "azureDevOpsTenantId is missing or unresolved in $tenant_config_source." >&2
+    aif_info "Set it to the Microsoft Entra tenant connected to the Azure DevOps organization." >&2
     exit 1
   fi
-  echo "azureDevOpsTenantId is missing or unresolved in $tenant_config_source."
-  echo "Use the Microsoft Entra tenant connected to the Azure DevOps organization, not tenantId used for Azure deployments."
+  aif_warn "azureDevOpsTenantId is missing or unresolved in $tenant_config_source."
+  aif_info "Use the Microsoft Entra tenant connected to the Azure DevOps organization, not tenantId used for Azure deployments."
   while true; do
-    read -r -p "Azure DevOps-connected Entra tenant ID/domain: " ado_tenant
+    read -r -p "$(aif_prompt "Azure DevOps-connected Entra tenant ID/domain: ")" ado_tenant
     if [[ -n "$ado_tenant" && "$ado_tenant" != *"<todo>"* &&
           "$ado_tenant" != '$('* && ! "$ado_tenant" =~ [[:space:]/] ]]; then
       break
     fi
-    echo "Enter a tenant GUID or verified tenant domain without spaces." >&2
+    aif_info "Enter a tenant GUID or verified tenant domain without spaces." >&2
   done
   tenant_config_prompted=true
 fi
@@ -342,22 +358,22 @@ else:
 path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 PY
   fi
-  echo "Saved azureDevOpsTenantId to $tenant_config_source."
+  aif_success "Saved azureDevOpsTenantId to $tenant_config_source."
 fi
-echo "Using Azure DevOps-connected Entra tenant from $tenant_config_source."
+aif_info "Using Azure DevOps-connected Entra tenant from $tenant_config_source."
 
 case "${auth_method,,}" in
   aad|entra)
     unset AZURE_DEVOPS_EXT_PAT
     if ! az account show >/dev/null 2>&1; then
       if [[ ! -t 0 ]]; then
-        echo "ERROR: An Azure CLI Microsoft Entra session is required in non-interactive mode." >&2
-        echo "Run 'AZURE_CORE_LOGIN_EXPERIENCE_V2=off az login --tenant \"$ado_tenant\" --allow-no-subscriptions' before starting this script." >&2
+        aif_error "An Azure CLI Microsoft Entra session is required in non-interactive mode." >&2
+        aif_info "Run 'AZURE_CORE_LOGIN_EXPERIENCE_V2=off az login --tenant \"$ado_tenant\" --allow-no-subscriptions' before starting this script." >&2
         exit 1
       fi
-      echo "No active Azure CLI Microsoft Entra session was found."
+      aif_info "No active Azure CLI Microsoft Entra session was found."
       if ! login_with_entra; then
-        echo "Browser sign-in was blocked or canceled. Falling back to Azure DevOps PAT authentication."
+        aif_warn "Browser sign-in was blocked or canceled. Falling back to Azure DevOps PAT authentication."
         configure_pat_auth
       fi
     fi
@@ -366,7 +382,7 @@ case "${auth_method,,}" in
     configure_pat_auth
     ;;
   *)
-    echo "ERROR: Unsupported ADO_AUTH_METHOD '$auth_method'. Use 'aad' (default) or 'pat'." >&2
+    aif_error "Unsupported ADO_AUTH_METHOD '$auth_method'. Use 'aad' (default) or 'pat'." >&2
     exit 1
     ;;
 esac
@@ -391,7 +407,7 @@ credential = base64.b64encode(
 print(f"Basic {credential}")
 ')
     if [[ -z "$ado_auth_header" ]]; then
-      echo "ERROR: Failed to construct the Azure DevOps PAT authorization header." >&2
+      aif_error "Failed to construct the Azure DevOps PAT authorization header." >&2
       return 1
     fi
     return 0
@@ -410,23 +426,23 @@ print(f"Basic {credential}")
 
   if ! token=$(az "${token_args[@]}" 2>&1); then
     token_error="$token"
-    echo "Azure CLI authentication expired or became unavailable during the update." >&2
+    aif_info "Azure CLI authentication expired or became unavailable during the update." >&2
     if [[ -n "$token_error" ]]; then
-      echo "$token_error" >&2
+      aif_info "$token_error" >&2
     fi
     if [[ ! -t 0 ]]; then
-      echo "ERROR: Interactive Microsoft Entra sign-in is required to continue." >&2
+      aif_error "Interactive Microsoft Entra sign-in is required to continue." >&2
       return 1
     fi
     if ! login_with_entra; then
-      echo "ERROR: Microsoft Entra sign-in failed or was canceled." >&2
+      aif_error "Microsoft Entra sign-in failed or was canceled." >&2
       return 1
     fi
     if ! token=$(az "${token_args[@]}" 2>&1); then
       token_error="$token"
-      echo "ERROR: Could not acquire an Azure DevOps access token after signing in." >&2
+      aif_error "Could not acquire an Azure DevOps access token after signing in." >&2
       if [[ -n "$token_error" ]]; then
-        echo "$token_error" >&2
+        aif_info "$token_error" >&2
       fi
       return 1
     fi
@@ -435,7 +451,7 @@ print(f"Basic {credential}")
   token="${token//$'\r'/}"
   token="${token//$'\n'/}"
   if [[ -z "$token" ]]; then
-    echo "ERROR: Azure CLI returned an empty Azure DevOps access token." >&2
+    aif_error "Azure CLI returned an empty Azure DevOps access token." >&2
     return 1
   fi
   ado_auth_header="Bearer $token"
@@ -509,9 +525,9 @@ else
   if [[ "$request_status" -ne 42 || "${auth_method,,}" == "pat" ]]; then
     exit "$request_status"
   fi
-  echo "ERROR: azureDevOpsTenantId from $tenant_config_source cannot access Azure DevOps organization '$ado_organization' project '$ado_project'." >&2
-  echo "Verify the connected directory at: $ado_entra_settings_url" >&2
-  echo "Update azureDevOpsTenantId in $tenant_config_source, or set ADO_TENANT explicitly, then retry." >&2
+  aif_error "azureDevOpsTenantId from $tenant_config_source cannot access Azure DevOps organization '$ado_organization' project '$ado_project'." >&2
+  aif_info "Verify the connected directory at: $ado_entra_settings_url" >&2
+  aif_info "Update azureDevOpsTenantId in $tenant_config_source, or set ADO_TENANT explicitly, then retry." >&2
   exit 1
 fi
 
@@ -561,11 +577,11 @@ PY
 )
 
 if [[ ! -f "$VARIABLES_FILE" ]]; then
-  echo "ERROR: Active Azure DevOps variables file is missing: $VARIABLES_FILE" >&2
+  aif_error "Active Azure DevOps variables file is missing: $VARIABLES_FILE" >&2
   exit 1
 fi
 if [[ "$use_json_override" == "true" && ! -f "$CONFIG_FILE" ]]; then
-  echo "ERROR: Active JSON configuration file is missing: $CONFIG_FILE" >&2
+  aif_error "Active JSON configuration file is missing: $CONFIG_FILE" >&2
   exit 1
 fi
 cp "$VARIABLES_FILE" "$state_dir/variables.yaml"
@@ -576,6 +592,7 @@ if [[ "$use_json_override" == "true" ]]; then
 fi
 
 resume_after_bootstrap=false
+aif_section "03 / Protect local work and refresh templates"
 if [[ "${1:-}" == "--resume-after-bootstrap" ]]; then
   resume_after_bootstrap=true
 fi
@@ -589,14 +606,14 @@ if [[ "$resume_after_bootstrap" == "false" ]]; then
       --message "Before AI Factory submodule update $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
       >/dev/null
     submodule_stash_created=true
-    echo "Existing submodule work was protected in: $(git -C "$SUBMODULE_PATH" stash list -1 --format='%gd %s')"
+    aif_success "Existing submodule work was protected in: $(git -C "$SUBMODULE_PATH" stash list -1 --format='%gd %s')"
   fi
 
   if [[ -n "$(git status --porcelain)" ]]; then
     stash_message="Before AI Factory template update $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     git stash push --include-untracked --message "$stash_message" >/dev/null
     stash_created=true
-    echo "Existing work was protected in: $(git stash list -1 --format='%gd %s')"
+    aif_success "Existing work was protected in: $(git stash list -1 --format='%gd %s')"
   fi
 
   git checkout "$BRANCH"
@@ -610,20 +627,21 @@ if [[ "$resume_after_bootstrap" == "false" ]]; then
 fi
 
 if [[ ! -f "$VARIABLES_TEMPLATE_FILE" ]]; then
-  echo "ERROR: Azure DevOps variables template was not generated: $VARIABLES_TEMPLATE_FILE" >&2
+  aif_error "Azure DevOps variables template was not generated: $VARIABLES_TEMPLATE_FILE" >&2
   exit 1
 fi
 if [[ "$use_json_override" == "true" && ! -f "$CONFIG_TEMPLATE_FILE" ]]; then
-  echo "ERROR: JSON configuration template was not generated: $CONFIG_TEMPLATE_FILE" >&2
+  aif_error "JSON configuration template was not generated: $CONFIG_TEMPLATE_FILE" >&2
   exit 1
 fi
 
+aif_section "04 / Configuration changes"
 "${PYTHON[@]}" - \
   "$state_dir/variables.yaml" \
   "$VARIABLES_TEMPLATE_FILE" \
   "$state_dir/variables.json" \
   "$CONFIG_TEMPLATE_FILE" \
-  "$use_json_override" <<'PY'
+  "$use_json_override" <<'PY' | aif_stream
 import json
 import re
 import sys
@@ -875,7 +893,8 @@ request = {
 Path(sys.argv[1]).write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
 PY
 
-echo "Validating the Azure DevOps pipeline before commit and push..."
+aif_section "05 / Validate pipeline"
+aif_info "Compiling the pipeline before commit and push..."
 ado_request \
   POST \
   "$ado_api_base/pipelines/$pipeline_id/runs?api-version=7.1" \
@@ -889,16 +908,17 @@ response = json.loads(open(sys.argv[1], encoding="utf-8-sig").read())
 if not response.get("finalYaml"):
     raise SystemExit("Azure DevOps preview did not return compiled YAML.")
 PY
-echo "Azure DevOps pipeline validation succeeded."
+aif_success "Azure DevOps pipeline validation succeeded."
 
 cp "$state_dir/ADO-update-aifactory-and-run-project.sh" "$REPO_ROOT/ADO-update-aifactory-and-run-project.sh"
 chmod +x "$REPO_ROOT/ADO-update-aifactory-and-run-project.sh"
 
+aif_section "06 / Review and publish"
 git add -A
 if ! git diff --cached --quiet; then
   if ! confirm_commit_and_continue; then
     git restore --staged -- .
-    echo "Commit declined. Changes remain in the working tree; no push or pipeline run was started."
+    aif_warn "Commit declined. Changes remain in the working tree; no push or pipeline run was started."
     exit 0
   fi
   git commit \
@@ -906,7 +926,7 @@ if ! git diff --cached --quiet; then
     -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
   git push origin "$BRANCH"
 else
-  echo "No tracked template changes required a commit."
+  aif_info "No tracked template changes required a commit."
 fi
 
 "${PYTHON[@]}" - "$state_dir/run-request.json" "$BRANCH" "$CONFIG_FILE" "$RUNNER_SELECTION" "$use_json_override" <<'PY'
@@ -954,13 +974,14 @@ run_id="${run_details[0]%$'\r'}"
 run_url="${run_details[1]:-}"
 run_url="${run_url%$'\r'}"
 if [[ ! "$run_id" =~ ^[0-9]+$ ]]; then
-  echo "ERROR: Azure DevOps returned an invalid run ID: $(printf '%q' "$run_id")" >&2
+  aif_error "Azure DevOps returned an invalid run ID: $(printf '%q' "$run_id")" >&2
   exit 1
 fi
 
-echo "Watching Azure DevOps run $run_id..."
+aif_section "07 / Deployment"
+aif_value "Run" "$run_id"
 if [[ -n "$run_url" ]]; then
-  echo "$run_url"
+  aif_value "Open in browser" "$run_url"
 fi
 
 while true; do
@@ -987,16 +1008,16 @@ PY
 done
 
 if [[ "$run_result" != "succeeded" ]]; then
-  echo "ERROR: Azure DevOps run $run_id completed with result: ${run_result:-unknown}" >&2
+  aif_error "Azure DevOps run $run_id completed with result: ${run_result:-unknown}" >&2
   exit 1
 fi
 
 if [[ "$stash_created" == "true" ]]; then
-  echo "Pre-existing work remains protected in $(git stash list -1 --format='%gd')."
-  echo "Review generated changes before restoring that stash to avoid overwriting the update."
+  aif_info "Pre-existing work remains protected in $(git stash list -1 --format='%gd')."
+  aif_warn "Review generated changes before restoring that stash to avoid overwriting the update."
 fi
 if [[ "$submodule_stash_created" == "true" ]]; then
-  echo "Pre-existing submodule work remains protected in $(git -C "$SUBMODULE_PATH" stash list -1 --format='%gd')."
+  aif_info "Pre-existing submodule work remains protected in $(git -C "$SUBMODULE_PATH" stash list -1 --format='%gd')."
 fi
-echo "Azure DevOps run $run_id succeeded."
-echo "Configuration backups are stored outside the repository at $backup_dir."
+aif_value "Backups" "$backup_dir"
+aif_complete "Azure DevOps run $run_id succeeded."
