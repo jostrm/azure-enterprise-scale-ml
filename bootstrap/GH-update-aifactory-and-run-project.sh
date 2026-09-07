@@ -78,29 +78,6 @@ while true; do
   esac
 done
 
-skip_github_variables_choice="${AIFACTORY_SKIP_GITHUB_VARIABLES_UPDATE:-}"
-while true; do
-  if [[ -z "$skip_github_variables_choice" && -t 0 ]]; then
-    read -r -p "Do you want to skip updating GitHub variables from .env? [y/N]: " skip_github_variables_choice
-  fi
-  case "${skip_github_variables_choice,,}" in
-    y|yes)
-      skip_github_variables_update=true
-      echo "GitHub variable update skipped."
-      break
-      ;;
-    ""|n|no)
-      skip_github_variables_update=false
-      echo "GitHub variables will be updated from .env."
-      break
-      ;;
-    *)
-      echo "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
-      skip_github_variables_choice=""
-      ;;
-  esac
-done
-
 for command in git gh; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "ERROR: Required command '$command' is not available." >&2
@@ -454,9 +431,7 @@ fi
 mv -f .env.template .env
 rm -f "$CONFIG_TEMPLATE_FILE"
 
-if [[ "$skip_github_variables_update" == "false" ]]; then
-  printf 'd\n\n\nn\n' | bash "10-GH-create-or-update-github-variables.sh"
-fi
+printf 'd\n\n\nn\n' | bash "10-GH-create-or-update-github-variables.sh"
 
 github_repo=$("${PYTHON[@]}" - <<'PY'
 import re
