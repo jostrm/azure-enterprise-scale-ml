@@ -5513,6 +5513,48 @@ steps:
      --parameters tagsProject='$(tagsProject)'
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
+  displayName: '10b_reconcile_aifactory_dashboard'
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded())
+  continueOnError: true
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: pscore
+    scriptLocation: inlineScript
+    inlineScript: |
+      $python = Get-Command python3 -ErrorAction SilentlyContinue
+      if (-not $python) {
+        $python = Get-Command python -ErrorAction SilentlyContinue
+      }
+      if (-not $python) {
+        throw 'Python is required to reconcile the AI Factory dashboard.'
+      }
+      & $python.Source "$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-aifactory-dashboard.py"
+      if ($LASTEXITCODE -ne 0) {
+        throw "AI Factory dashboard reconciliation failed with exit code $LASTEXITCODE."
+      }
+  env:
+    DASHBOARD_CURRENT_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
+    DASHBOARD_CURRENT_ENV: $(dev_test_prod)
+    DASHBOARD_PROJECT_NUMBER: $(project_number_000)
+    DASHBOARD_LOCATION: $(admin_location)
+    DASHBOARD_LOCATION_SUFFIX: $(admin_locationSuffix)
+    DASHBOARD_RG_PREFIX: $(admin_aifactoryPrefixRG)
+    DASHBOARD_RG_SUFFIX: $(admin_aifactorySuffixRG)
+    DASHBOARD_PROJECT_PREFIX: $(projectPrefix)
+    DASHBOARD_PROJECT_SUFFIX: $(projectSuffix)
+    DASHBOARD_COMMON_NAME: $(vnetResourceGroupBase)
+    DASHBOARD_COMMON_RG: $(commonResourceGroup_param)
+    DASHBOARD_DEV_SUBSCRIPTION_ID: $(dev_sub_id)
+    DASHBOARD_STAGE_SUBSCRIPTION_ID: $(test_sub_id)
+    DASHBOARD_PROD_SUBSCRIPTION_ID: $(prod_sub_id)
+    DASHBOARD_CENTRAL_DNS: $(centralDnsZoneByPolicyInHub)
+    DASHBOARD_PRIVATE_DNS_SUBSCRIPTION_ID: $(privDnsSubscription_param)
+    DASHBOARD_PRIVATE_DNS_RESOURCE_GROUP: $(privDnsResourceGroup_param)
+    DASHBOARD_VNET_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
+    DASHBOARD_VNET_RESOURCE_GROUP: $(vnetResourceGroup_resolved)
+    DASHBOARD_CONFIG_FILE: $(configOverrideFile)
+    DASHBOARD_TEMPLATE_FILE: $(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/aifactory-dash-01.bicep
+- task: AzureCLI@2
   displayName: '07_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'), eq(variables['seeding_kv_ip_rule_added'], 'true'))
   inputs:
