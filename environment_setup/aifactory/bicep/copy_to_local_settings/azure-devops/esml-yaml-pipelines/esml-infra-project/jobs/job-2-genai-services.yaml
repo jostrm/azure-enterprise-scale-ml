@@ -2678,119 +2678,28 @@ steps:
       fi
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 - task: AzureCLI@2
-  displayName: 'Check and Delete Orphan Role Assignments'
+  displayName: 'Check and Delete Current Project Orphan Role Assignments'
   condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
+  env:
+    ORPHAN_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
+    ORPHAN_RG_PREFIX: $(admin_aifactoryPrefixRG)
+    ORPHAN_PROJECT_NUMBER: $(project_number_000)
+    ORPHAN_LOCATION_SUFFIX: $(admin_locationSuffix)
+    ORPHAN_ENV: $(dev_test_prod)
+    ORPHAN_RG_SUFFIX: $(admin_aifactorySuffixRG)
+    ORPHAN_PROJECT_PREFIX: $(projectPrefix)
+    ORPHAN_PROJECT_SUFFIX: $(projectSuffix)
+    ORPHAN_COMMON_RG: $(commonResourceGroup_param)
+    ORPHAN_COMMON_NAME: $(vnetResourceGroupBase)
+    ORPHAN_SCRIPT: $(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/cleanup-project-orphan-roles.py
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
       $ErrorActionPreference = 'Stop'
-      $subscriptionId = "$(dev_test_prod_sub_id)"
-      Write-Host 'Checking for orphan role assignments...'
-
-      az account set --subscription $subscriptionId
-      if ($LASTEXITCODE -ne 0) {
-        throw "Unable to select subscription '$subscriptionId'."
-      }
-
-      $commonRGNamePrefix = "$(admin_aifactoryPrefixRG)"
-      $projectNumber = "$(project_number_000)"
-      $locationSuffix = "$(admin_locationSuffix)"
-      $environmentName = "$(dev_test_prod)"
-      $aifactorySuffixRG = "$(admin_aifactorySuffixRG)"
-      $vnetResourceGroupBase = "$(vnetResourceGroupBase)"
-      $projectPrefix = "$(projectPrefix)"
-      $projectSuffix = "$(projectSuffix)"
-
-      $commonResourceGroupInput = "$(commonResourceGroup_param)"
-      $unexpandedCommonResourceGroup = '$' + '(commonResourceGroup_param)'
-      if (
-        -not [string]::IsNullOrWhiteSpace($commonResourceGroupInput) -and
-        $commonResourceGroupInput -ne $unexpandedCommonResourceGroup
-      ) {
-        $commonResourceGroup = $commonResourceGroupInput
-      } else {
-        $commonResourceGroup = "$commonRGNamePrefix$vnetResourceGroupBase-$locationSuffix-$environmentName$aifactorySuffixRG"
-      }
-      $projectResourceGroup = "$commonRGNamePrefix$projectPrefix" +
-        "project$projectNumber-$locationSuffix-$environmentName$aifactorySuffixRG$projectSuffix"
-
-      Write-Host "commonResourceGroup resolved to: $commonResourceGroup"
-      Write-Host "projectResourceGroup resolved to: $projectResourceGroup"
-
-      function Remove-OrphanRoleAssignments {
-        param(
-          [Parameter(Mandatory = $true)]
-          [string] $ResourceGroup
-        )
-
-        $scope = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroup"
-        Write-Host "Checking resource group: $ResourceGroup"
-        Write-Host "Scope: $scope"
-
-        $resourceGroupExistsOutput = az group exists `
-          --subscription $subscriptionId `
-          --name $ResourceGroup `
-          --only-show-errors `
-          --output tsv 2>&1
-        if ($LASTEXITCODE -ne 0) {
-          throw "Unable to check whether resource group '$ResourceGroup' exists: $($resourceGroupExistsOutput -join [Environment]::NewLine)"
-        }
-        $resourceGroupExists = ($resourceGroupExistsOutput -join '').Trim()
-        if ($resourceGroupExists -ne 'true') {
-          Write-Host "Resource group $ResourceGroup does not exist yet; skipping orphan cleanup before 61-foundation."
-          return
-        }
-
-        $orphanOutput = az role assignment list `
-          --subscription $subscriptionId `
-          --scope $scope `
-          --query "[?principalName==null].id" `
-          --only-show-errors `
-          --output tsv
-        if ($LASTEXITCODE -ne 0) {
-          throw "Unable to list role assignments at '$scope'."
-        }
-
-        $orphanText = $orphanOutput -join [Environment]::NewLine
-        $orphanIds = @(
-          $orphanText -split '\s+' |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-        )
-        if ($orphanIds.Count -eq 0) {
-          Write-Host "No orphan role assignments found in $ResourceGroup"
-          return
-        }
-
-        Write-Host "Found $($orphanIds.Count) orphan role assignment(s) in $ResourceGroup"
-        foreach ($assignmentId in $orphanIds) {
-          Write-Host "Attempting to delete orphan role assignment: $assignmentId"
-          $deleteOutput = az role assignment delete `
-            --subscription $subscriptionId `
-            --ids $assignmentId `
-            --only-show-errors 2>&1
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Successfully deleted orphan role assignment: $assignmentId"
-          } else {
-            Write-Warning "Failed to delete orphan role assignment '$assignmentId': $($deleteOutput -join [Environment]::NewLine)"
-          }
-        }
-      }
-
-      foreach ($resourceGroup in @($commonResourceGroup, $projectResourceGroup)) {
-        if ([string]::IsNullOrWhiteSpace($resourceGroup)) {
-          continue
-        }
-        try {
-          Remove-OrphanRoleAssignments -ResourceGroup $resourceGroup
-        } catch {
-          Write-Warning "Error processing resource group '$resourceGroup'; continuing. $($_.Exception.Message)"
-        }
-      }
-
-      Write-Host 'Orphan role assignment check completed'
-      exit 0
+      python "$env:ORPHAN_SCRIPT"
+      exit $LASTEXITCODE
 
 - task: AzureCLI@2
   displayName: '61-foundation'
@@ -3765,65 +3674,124 @@ steps:
   displayName: '101-rbac-common-rg'
   continueOnError: true
   condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_101_rbac_common_rg'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
+  env:
+    RBAC_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
+    RBAC_ENV: $(dev_test_prod)
+    RBAC_PROJECT_NUMBER: $(project_number_000)
+    RBAC_LOCATION: $(admin_location)
+    RBAC_LOCATION_SUFFIX: $(admin_locationSuffix)
+    RBAC_ADMINS_OID: $(technical_admins_ad_object_id)
+    RBAC_ADMINS_EMAIL: $(technical_admins_email)
+    RBAC_USE_COMMON_ACR: $(useCommonACR_override)
+    RBAC_VNET_BASE: $(vnetNameBase)
+    RBAC_VNET_RG: $(vnetResourceGroup_resolved)
+    RBAC_VNET_NAME: $(vnetNameFull_resolved)
+    RBAC_NETWORK_ENV: $(network_env)
+    RBAC_COMMON_RG: $(commonResourceGroup_param)
+    RBAC_RESOURCE_SUFFIX: $(admin_prjResourceSuffix)
+    RBAC_RG_SUFFIX: $(admin_aifactorySuffixRG)
+    RBAC_RG_PREFIX: $(admin_aifactoryPrefixRG)
+    RBAC_COMMON_SUFFIX: $(admin_commonResourceSuffix)
+    RBAC_COMMON_NAME: $(vnetResourceGroupBase)
+    RBAC_USE_AD_GROUPS: $(use_ad_groups)
+    RBAC_RANDOM_VALUE: $(deployment_random_value)
+    RBAC_SALT: $(aifactory_salt_random)
+    RBAC_ENABLE_AML: $(enableAzureMachineLearning)
+    RBAC_ENABLE_HUB: $(enableAIFoundryHub)
+    RBAC_ADD_HUB: $(addAIFoundryHub)
+    RBAC_ADD_AML: $(addAzureMachineLearning)
+    RBAC_ADD_BASTION: $(addBastionHost)
+    RBAC_BASTION_RG: $(bastion_subscription_resource_group)
+    RBAC_BASTION_NAME: $(bastion_custom_name)
+    RBAC_KEYVAULT: $(admin_bicep_kv_fw)
+    RBAC_KEYVAULT_RG: $(admin_bicep_kv_fw_rg)
+    RBAC_KEYVAULT_SUBSCRIPTION: $(admin_bicep_input_keyvault_subscription)
+    RBAC_SP_SECRET_NAME: $(project_service_principal_OID_seeding_kv_name)
+    RBAC_LAKE_PREFIX: $(commonLakeNamePrefixMax8chars)
+    RBAC_PROJECT_PREFIX: $(projectPrefix)
+    RBAC_PROJECT_SUFFIX: $(projectSuffix)
+    RBAC_AML_EXISTS: $(amlExists)
+    RBAC_HUB_EXISTS: $(aiHubExists)
+    RBAC_ACR_USER_PRINCIPALS: $(existingAcrPushUserPrincipals)
+    RBAC_ACR_SP_PRINCIPALS: $(existingAcrPushSPPrincipals)
+    RBAC_DISABLE_SUBNET_JOIN: $(disableSubnetJoinAction)
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
-     az account set --subscription "$(dev_test_prod_sub_id)"
+     set -euo pipefail
+
+     # ADO leaves missing macros unchanged. Read them as data, never as Bash source.
+     for name in ${!RBAC_@}; do
+       if [[ "${!name}" == '$('*')' ]]; then
+         printf -v "$name" '%s' ''
+       fi
+     done
+     for name in RBAC_SUBSCRIPTION_ID RBAC_ENV RBAC_PROJECT_NUMBER RBAC_LOCATION RBAC_RANDOM_VALUE RBAC_KEYVAULT RBAC_KEYVAULT_RG RBAC_KEYVAULT_SUBSCRIPTION; do
+       if [ -z "${!name:-}" ]; then
+         echo "##vso[task.logissue type=error]Missing required Common RG RBAC input: $name"
+         exit 1
+       fi
+     done
+
+     # Older customer variable files may not define these optional overrides.
+     RBAC_BASTION_RG="${RBAC_BASTION_RG:-}"
+     RBAC_BASTION_NAME="${RBAC_BASTION_NAME:-}"
+     az account set --subscription "$RBAC_SUBSCRIPTION_ID"
 
      # Compute effective RBAC flags: only true if the feature is enabled AND the resource
      # actually exists. This prevents RBAC Bicep from failing with ResourceNotFound when
      # a service is enabled in variables but was never deployed (e.g. debug_disable_67=true).
      AML_RBAC="false"
-     if [ "$(enableAzureMachineLearning)" = "true" ] && [ "$(amlExists)" = "true" ]; then AML_RBAC="true"; fi
-     echo "Effective enableAzureMachineLearning for Common RG RBAC: $AML_RBAC (amlExists=$(amlExists))"
+     if [ "${RBAC_ENABLE_AML:-false}" = "true" ] && [ "${RBAC_AML_EXISTS:-false}" = "true" ]; then AML_RBAC="true"; fi
+     echo "Effective enableAzureMachineLearning for Common RG RBAC: $AML_RBAC (amlExists=${RBAC_AML_EXISTS:-false})"
 
      az deployment sub create \
-     --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-101-rbac-common-rg" \
-     --subscription "$(dev_test_prod_sub_id)" \
-     --location "$(admin_location)" \
+     --name "esml-p${RBAC_PROJECT_NUMBER}-${RBAC_ENV}-${RBAC_LOCATION_SUFFIX:-}-${RBAC_RESOURCE_SUFFIX:-}${RBAC_COMMON_SUFFIX:-}PrjDepl-101-rbac-common-rg" \
+     --subscription "$RBAC_SUBSCRIPTION_ID" \
+     --location "$RBAC_LOCATION" \
      --template-file "esml-genai-1/08b-rbac-common-rg.bicep" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
-     --parameters env="$(dev_test_prod)" \
-     --parameters projectNumber="$(project_number_000)" \
-     --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
-     --parameters technicalAdminsEmail="$(technical_admins_email)" \
-     --parameters location="$(admin_location)" \
-     --parameters locationSuffix="$(admin_locationSuffix)" \
-     --parameters useCommonACR="$(useCommonACR_override)" \
-     --parameters vnetNameBase="$(vnetNameBase)" \
-     --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
-     --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \
-     --parameters network_env="$(network_env)" \
-     --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
-     --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
-     --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
-     --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
-     --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
-     --parameters commonResourceName="$(vnetResourceGroupBase)" \
-     --parameters useAdGroups="$(use_ad_groups)" \
-     --parameters randomValue="$(deployment_random_value)" \
-     --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters env="$RBAC_ENV" \
+     --parameters projectNumber="$RBAC_PROJECT_NUMBER" \
+     --parameters technicalAdminsObjectID="${RBAC_ADMINS_OID:-}" \
+     --parameters technicalAdminsEmail="${RBAC_ADMINS_EMAIL:-}" \
+     --parameters location="$RBAC_LOCATION" \
+     --parameters locationSuffix="${RBAC_LOCATION_SUFFIX:-}" \
+     --parameters useCommonACR="${RBAC_USE_COMMON_ACR:-true}" \
+     --parameters vnetNameBase="${RBAC_VNET_BASE:-}" \
+     --parameters vnetResourceGroup_param="${RBAC_VNET_RG:-}" \
+     --parameters vnetNameFull_param="${RBAC_VNET_NAME:-}" \
+     --parameters network_env="${RBAC_NETWORK_ENV:-}" \
+     --parameters commonResourceGroup_param="${RBAC_COMMON_RG:-}" \
+     --parameters resourceSuffix="${RBAC_RESOURCE_SUFFIX:-}" \
+     --parameters aifactorySuffixRG="${RBAC_RG_SUFFIX:-}" \
+     --parameters commonRGNamePrefix="${RBAC_RG_PREFIX:-}" \
+     --parameters commonResourceSuffix="${RBAC_COMMON_SUFFIX:-}" \
+     --parameters commonResourceName="${RBAC_COMMON_NAME:-esml-common}" \
+     --parameters useAdGroups="${RBAC_USE_AD_GROUPS:-true}" \
+     --parameters randomValue="$RBAC_RANDOM_VALUE" \
+     --parameters aifactorySalt10char="${RBAC_SALT:-}" \
      --parameters enableAzureMachineLearning="$AML_RBAC" \
-     --parameters enableAIFoundryHub="$(enableAIFoundryHub)" \
-     --parameters addAIFoundryHub="$(addAIFoundryHub)" \
-     --parameters addAzureMachineLearning="$(addAzureMachineLearning)" \
-     --parameters addBastionHost="$(addBastionHost)" \
-     --parameters bastionResourceGroup="$(bastion_subscription_resource_group)" \
-     --parameters bastionName="$(bastion_custom_name)" \
-     --parameters inputKeyvault="$(admin_bicep_kv_fw)" \
-     --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
-     --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
-     --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
-     --parameters commonLakeNamePrefixMax8chars="$(commonLakeNamePrefixMax8chars)" \
-     --parameters projectPrefix="$(projectPrefix)" \
-     --parameters projectSuffix="$(projectSuffix)" \
-     --parameters amlExists="$(amlExists)" \
-     --parameters aiHubExists="$(aiHubExists)" \
-     --parameters existingAcrPushUserPrincipals="$(existingAcrPushUserPrincipals)" \
-     --parameters existingAcrPushSPPrincipals="$(existingAcrPushSPPrincipals)" \
-     --parameters disableSubnetJoinAction="$(disableSubnetJoinAction)"
+     --parameters enableAIFoundryHub="${RBAC_ENABLE_HUB:-false}" \
+     --parameters addAIFoundryHub="${RBAC_ADD_HUB:-false}" \
+     --parameters addAzureMachineLearning="${RBAC_ADD_AML:-false}" \
+     --parameters addBastionHost="${RBAC_ADD_BASTION:-false}" \
+     --parameters bastionResourceGroup="$RBAC_BASTION_RG" \
+     --parameters bastionName="$RBAC_BASTION_NAME" \
+     --parameters inputKeyvault="$RBAC_KEYVAULT" \
+     --parameters inputKeyvaultResourcegroup="$RBAC_KEYVAULT_RG" \
+     --parameters inputKeyvaultSubscription="$RBAC_KEYVAULT_SUBSCRIPTION" \
+     --parameters projectServicePrincipleOID_SeedingKeyvaultName="${RBAC_SP_SECRET_NAME:-}" \
+     --parameters commonLakeNamePrefixMax8chars="${RBAC_LAKE_PREFIX:-}" \
+     --parameters projectPrefix="${RBAC_PROJECT_PREFIX:-}" \
+     --parameters projectSuffix="${RBAC_PROJECT_SUFFIX:-}" \
+     --parameters amlExists="${RBAC_AML_EXISTS:-false}" \
+     --parameters aiHubExists="${RBAC_HUB_EXISTS:-false}" \
+     --parameters existingAcrPushUserPrincipals="${RBAC_ACR_USER_PRINCIPALS:-}" \
+     --parameters existingAcrPushSPPrincipals="${RBAC_ACR_SP_PRINCIPALS:-}" \
+     --parameters disableSubnetJoinAction="${RBAC_DISABLE_SUBNET_JOIN:-false}"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69a-Validate-Subnet-For-NetworkInjection'

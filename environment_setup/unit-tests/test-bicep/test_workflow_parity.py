@@ -6,6 +6,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 GHA_COMMON = ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-common.yml"
 GHA_PROJECT = ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project.yml"
+GHA_PROJECT_PHASE = ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml"
+ADO_PROJECT_JOB = ROOT / (
+    "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/"
+    "esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml"
+)
 
 FORBIDDEN_NETWORK_KEYS = {"network_env_dev", "network_env_stage", "network_env_prod"}
 
@@ -23,6 +28,12 @@ def _env_value(content: str, key: str) -> str | None:
         if line.strip().startswith(f"{key}:"):
             return line.split(":", 1)[1].strip().strip('"')
     return None
+
+
+def _section(content: str, start: str, end: str) -> str:
+    start_index = content.index(start)
+    end_index = content.index(end, start_index)
+    return content[start_index:end_index]
 
 
 class TestWorkflowParity(unittest.TestCase):
@@ -50,6 +61,30 @@ class TestWorkflowParity(unittest.TestCase):
         content = _read_text(GHA_PROJECT)
         # env block should expose dev_test_prod
         self.assertIn("dev_test_prod:", content, msg="infra-project.yml missing dev_test_prod")
+
+    def test_orphan_cleanup_is_project_owned_in_both_rgs_and_fail_safe(self) -> None:
+        cases = (
+            (
+                ADO_PROJECT_JOB,
+                "displayName: 'Check and Delete Current Project Orphan Role Assignments'",
+                "displayName: '61-foundation'",
+            ),
+            (
+                GHA_PROJECT_PHASE,
+                "- name: Check and Delete Current Project Orphan Role Assignments",
+                "# === Deploy sequences ===",
+            ),
+        )
+        for path, start, end in cases:
+            with self.subTest(path=path):
+                cleanup = _section(_read_text(path), start, end)
+                self.assertIn("cleanup-project-orphan-roles.py", cleanup)
+                self.assertIn("ORPHAN_PROJECT_NUMBER", cleanup)
+                self.assertIn("ORPHAN_COMMON_RG", cleanup)
+                self.assertNotIn("ORPHAN_PROJECT_ENTRA_IDS", cleanup)
+                self.assertNotIn("technical_admins_ad_object_id", cleanup)
+                self.assertNotIn("principalName==null", cleanup)
+                self.assertNotIn("role assignment delete", cleanup)
 
 
 if __name__ == "__main__":

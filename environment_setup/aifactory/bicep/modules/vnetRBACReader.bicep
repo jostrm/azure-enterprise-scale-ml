@@ -7,6 +7,8 @@ param user_object_ids array
 param useAdGroups bool = false // Use AD groups for role assignments
 @description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
 param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+@description('Assign Contributor on the Bastion NSG. Disable for VNet-only subnet join RBAC.')
+param assignBastionNsgRole bool = true
 
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
 resource networkContributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
@@ -50,11 +52,11 @@ resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018
   name: contributorRoleId
 }
 
-resource nsgBastion4project 'Microsoft.Network/networkSecurityGroups@2020-06-01' existing = {
+resource nsgBastion4project 'Microsoft.Network/networkSecurityGroups@2020-06-01' existing = if (assignBastionNsgRole) {
   name: 'nsg-${common_bastion_subnet_name}'
 }
 
-resource contributorUserBastionNSG 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)):{
+resource contributorUserBastionNSG 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids)): if (assignBastionNsgRole) {
   name: guid('${user_object_ids[i]}-contributor-${common_bastion_subnet_name}-${resourceGroup().id}')
   properties: {
     roleDefinitionId: contributorRoleDefinition.id

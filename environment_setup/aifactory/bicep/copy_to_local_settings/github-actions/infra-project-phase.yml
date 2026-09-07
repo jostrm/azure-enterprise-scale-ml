@@ -1842,82 +1842,24 @@ jobs:
 
             echo "✅ ${wait_minutes}-minute wait complete! Subnet should now be fully released and ready for reuse."
 
-      - name: Check and Delete Orphan Role Assignments
-        # Removes orphan role assignments (principalName==null) at the common + project RG scopes,
-        # left behind when principals (e.g. purged identities) were deleted. Idempotent best-effort.
+      - name: Check and Delete Current Project Orphan Role Assignments
+        # Shared cleanup proves project ownership and principal deletion before touching either RG.
         if: inputs.phase == 'infra' && (success() && env.deleteAllServicesForProject != 'true')
         shell: bash
+        env:
+          ORPHAN_SUBSCRIPTION_ID: ${{ env.dev_test_prod_sub_id }}
+          ORPHAN_RG_PREFIX: ${{ env.admin_aifactoryPrefixRG }}
+          ORPHAN_PROJECT_NUMBER: ${{ env.project_number_000 }}
+          ORPHAN_LOCATION_SUFFIX: ${{ env.admin_locationSuffix }}
+          ORPHAN_ENV: ${{ env.dev_test_prod }}
+          ORPHAN_RG_SUFFIX: ${{ env.admin_aifactorySuffixRG }}
+          ORPHAN_PROJECT_PREFIX: ${{ env.projectPrefix }}
+          ORPHAN_PROJECT_SUFFIX: ${{ env.projectSuffix }}
+          ORPHAN_COMMON_RG: ${{ env.commonResourceGroup_param }}
+          ORPHAN_COMMON_NAME: ${{ env.vnetResourceGroupBase }}
         run: |
-            set -e
-
-            echo "Checking for orphan role assignments..."
-            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-
-            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
-            projectNumber="${{ env.project_number_000 }}"
-            projectName="prj${projectNumber}"
-            locationSuffix="${{ env.admin_locationSuffix }}"
-            envName="${{ env.dev_test_prod }}"
-            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
-            vnetResourceGroupBase="${{ env.vnetResourceGroupBase }}"
-            projectPrefix="${{ env.projectPrefix }}"
-            projectSuffix="${{ env.projectSuffix }}"
-
-            commonResourceGroup="${{ env.commonResourceGroup_param }}"
-            if [ -z "$commonResourceGroup" ]; then
-              commonResourceGroup="${commonRGNamePrefix}${vnetResourceGroupBase}-${locationSuffix}-${envName}${aifactorySuffixRG}"
-            fi
-            echo "commonResourceGroup resolved to: $commonResourceGroup"
-
-            projectNameReplaced="${projectName/prj/project}"
-            projectResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-            echo "projectResourceGroup resolved to: $projectResourceGroup"
-
-            check_and_delete_orphans() {
-              local resourceGroup=$1
-              local rgScope="/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${resourceGroup}"
-
-              echo "Checking resource group: $resourceGroup"
-              echo "Scope: $rgScope"
-
-              if ! az group show --name "$resourceGroup" &>/dev/null; then
-                echo "Resource group $resourceGroup does not exist, skipping..."
-                return 0
-              fi
-
-              orphanCount=$(az role assignment list --scope "$rgScope" --query "[?principalName==null]" -o tsv | wc -l)
-
-              if [ "$orphanCount" -gt 0 ]; then
-                echo "Found $orphanCount orphan role assignment(s) in $resourceGroup"
-                orphanIds=$(az role assignment list --scope "$rgScope" --query "[?principalName==null].id" -o tsv)
-                while IFS= read -r assignmentId; do
-                  if [ -n "$assignmentId" ]; then
-                    echo "Attempting to delete orphan role assignment: $assignmentId"
-                    if az role assignment delete --ids "$assignmentId" 2>&1; then
-                      echo "Successfully deleted orphan role assignment: $assignmentId"
-                    else
-                      echo "Warning: Failed to delete orphan role assignment: $assignmentId (may require additional permissions)"
-                    fi
-                  fi
-                done <<< "$orphanIds"
-              else
-                echo "No orphan role assignments found in $resourceGroup"
-              fi
-            }
-
-            if [ -n "$commonResourceGroup" ]; then
-              echo "=== Checking Common Resource Group ==="
-              check_and_delete_orphans "$commonResourceGroup" || echo "Warning: Error processing common resource group, continuing..."
-            fi
-
-            if [ -n "$projectResourceGroup" ]; then
-              echo ""
-              echo "=== Checking Project Resource Group ==="
-              check_and_delete_orphans "$projectResourceGroup" || echo "Warning: Error processing project resource group, continuing..."
-            fi
-
-            echo ""
-            echo "Orphan role assignment check completed"
+            set -euo pipefail
+            python azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/cleanup-project-orphan-roles.py
 
       # === Deploy sequences ===
 
@@ -2855,8 +2797,8 @@ jobs:
               --parameters addAIFoundryHub="${{ env.addAIFoundryHub }}" \
               --parameters addAzureMachineLearning="${{ env.addAzureMachineLearning }}" \
               --parameters addBastionHost="${{ env.addBastionHost }}" \
-              --parameters bastionResourceGroup="${{ env.bastion_subscription_resource_group }}" \
-              --parameters bastionName="${{ env.bastion_custom_name }}" \
+              --parameters bastionResourceGroup="${bastion_subscription_resource_group:-}" \
+              --parameters bastionName="${bastion_custom_name:-}" \
               --parameters inputKeyvault="${{ env.admin_bicep_kv_fw }}" \
               --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
               --parameters inputKeyvaultSubscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
