@@ -552,7 +552,8 @@ for line in template_path.read_text(encoding="utf-8-sig").splitlines():
     result.append(f"{indent}{key}:{spacing}{active[key]}{comment_suffix}")
     used.add(key)
 
-legacy = [key for key in active if key not in used]
+removed_keys = {"useAdminVMBuildAgent"}
+legacy = [key for key in active if key not in used and key not in removed_keys]
 if legacy:
     result.extend(["", "  # Legacy values preserved from the previous variables.yaml"])
     result.extend(active_lines[key] for key in legacy)
@@ -572,6 +573,7 @@ active_path = Path(sys.argv[2])
 output_path = Path(sys.argv[3])
 template = json.loads(template_path.read_text(encoding="utf-8-sig"), object_pairs_hook=OrderedDict)
 active = json.loads(active_path.read_text(encoding="utf-8-sig"), object_pairs_hook=OrderedDict)
+removed_keys = {"useAdminVMBuildAgent"}
 
 def merge(template_value, active_value):
     if isinstance(template_value, dict) and isinstance(active_value, dict):
@@ -579,7 +581,7 @@ def merge(template_value, active_value):
         for key, value in template_value.items():
             merged[key] = merge(value, active_value[key]) if key in active_value else value
         for key, value in active_value.items():
-            if key not in merged:
+            if key not in merged and key not in removed_keys:
                 merged[key] = value
         return merged
     return active_value

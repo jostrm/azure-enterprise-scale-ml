@@ -13,7 +13,7 @@ parameters:
 steps:
 - task: PowerShell@2
   displayName: '00_validate_self_hosted_build_agent'
-  condition: and(succeeded(), or(eq(variables['useSelfHostedBuildAgent'], 'true'), eq(variables['useAdminVMBuildAgent'], 'true')))
+  condition: and(succeeded(), eq(variables['useSelfHostedBuildAgent'], 'true'))
   inputs:
     targetType: inline
     script: |

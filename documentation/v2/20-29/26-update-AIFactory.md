@@ -19,6 +19,8 @@ These scripts replace the manual feature-update steps below. They protect existi
 
 Both scripts ask `Do you want to override with variables.json? [y/N]` before starting the update. Enter `y` to pass `aifactory/variables.json` as the deployment override. Enter `n`, or press Enter, to pass an empty configuration path: Azure DevOps then uses `variables.yaml`, while GitHub Actions uses its configured variables and secrets without applying `variables.json`.
 
+`useAdminVMBuildAgent` has been removed. Existing configurations must use `useSelfHostedBuildAgent` instead. The update scripts remove the deprecated key while merging configuration templates.
+
 The GitHub script also asks `Do you want to skip updating GitHub variables from .env? [y/N]`. Enter `y` to skip `10-GH-create-or-update-github-variables.sh`. Enter `n`, or press Enter, to update the GitHub variables from `.env` as usual.
 
 On the first Azure DevOps run, the ADO script prompts for your organization name or URL and project name, then saves them locally for future runs. Microsoft Entra ID is the default authentication method: the script reuses your active Azure CLI session or opens standard browser authentication when sign-in is required. In the browser account picker, select **Use another account** and enter the account's full email address. Standard browser authentication supports Conditional Access requirements that commonly block device-code authentication. No Azure subscription is required: authentication is only for the Entra tenant connected to Azure DevOps. The script temporarily disables Azure CLI's post-login subscription selector for this login and does not change the user's global Azure CLI configuration.
