@@ -352,7 +352,7 @@ case "${auth_method,,}" in
     if ! az account show >/dev/null 2>&1; then
       if [[ ! -t 0 ]]; then
         echo "ERROR: An Azure CLI Microsoft Entra session is required in non-interactive mode." >&2
-        echo "Run 'AZURE_CORE_LOGIN_EXPERIENCE_V2=off az login --allow-no-subscriptions' before starting this script." >&2
+        echo "Run 'AZURE_CORE_LOGIN_EXPERIENCE_V2=off az login --tenant \"$ado_tenant\" --allow-no-subscriptions' before starting this script." >&2
         exit 1
       fi
       echo "No active Azure CLI Microsoft Entra session was found."
@@ -509,45 +509,10 @@ else
   if [[ "$request_status" -ne 42 || "${auth_method,,}" == "pat" ]]; then
     exit "$request_status"
   fi
-  if [[ ! -t 0 ]]; then
-    echo "ERROR: The current Microsoft Entra tenant cannot access this Azure DevOps organization." >&2
-    echo "Set ADO_TENANT to the Entra tenant ID/domain connected to the Azure DevOps organization." >&2
-    echo "This can differ from the tenant associated with your Azure subscription." >&2
-    echo "For a personal Microsoft account, set ADO_AUTH_METHOD=pat and AZURE_DEVOPS_EXT_PAT." >&2
-    exit 1
-  fi
-  echo "The current Azure CLI tenant cannot access this Azure DevOps organization."
-  echo "Enter the Entra tenant connected to the Azure DevOps organization, not necessarily your Azure subscription tenant."
-  echo "To find it:"
-  echo "  1. Open $ado_entra_settings_url (this link takes you there directly)."
-  echo "  2. Or, open $ado_organization, click Organization settings in the lower-left corner,"
-  echo "     then click Microsoft Entra in the left menu."
-  echo "  3. Copy the Directory (tenant) ID."
-  echo "  4. If only the directory name is shown, open that directory in the Microsoft Entra admin center,"
-  echo "     then select Overview and copy Tenant ID."
-  echo "If Microsoft Entra ID is unavailable, ask the Azure DevOps organization owner or enter 'pat'."
-  echo "If the organization is not connected to Entra ID, use PAT authentication."
-  auth_choice="$ado_tenant"
-  while [[ -z "$auth_choice" ]]; do
-    read -r -p "Azure DevOps-connected Entra tenant ID/domain, or 'pat': " auth_choice
-  done
-  case "${auth_choice,,}" in
-    pat|msa|consumers)
-      configure_pat_auth
-      ;;
-    *)
-      ado_tenant="$auth_choice"
-      if ! login_with_entra; then
-        echo "Browser sign-in was blocked by Conditional Access or canceled."
-        echo "Falling back to Azure DevOps PAT authentication."
-        configure_pat_auth
-      fi
-      ;;
-  esac
-  if ! ado_request GET "$pipelines_url" > "$state_dir/pipelines.json"; then
-    echo "ERROR: The signed-in identity still cannot access Azure DevOps organization '$ado_organization' project '$ado_project'." >&2
-    exit 1
-  fi
+  echo "ERROR: azureDevOpsTenantId from $tenant_config_source cannot access Azure DevOps organization '$ado_organization' project '$ado_project'." >&2
+  echo "Verify the connected directory at: $ado_entra_settings_url" >&2
+  echo "Update azureDevOpsTenantId in $tenant_config_source, or set ADO_TENANT explicitly, then retry." >&2
+  exit 1
 fi
 
 pipeline_id=$("${PYTHON[@]}" - "$state_dir/pipelines.json" "$PIPELINE_YAML_PATH" "$PIPELINE_NAME" "$ado_repository_name" <<'PY'
