@@ -375,6 +375,18 @@ steps:
         done
       }
 
+      print_ado_warning() {
+        local operation="$1"
+        local output="$2"
+        if [ -z "$output" ]; then
+          echo "##[warning]$operation failed without an error message."
+          return
+        fi
+        while IFS= read -r line; do
+          [ -n "$line" ] && echo "##[warning]$operation: $line"
+        done <<< "$output"
+      }
+
       PRIMARY_IP=""
       for svc in "https://api.ipify.org" "https://checkip.amazonaws.com" "https://ifconfig.me/ip" "http://ipinfo.io/ip"; do
         candidate=$(curl -s --max-time 10 "$svc" | tr -d '[:space:]')
@@ -475,27 +487,31 @@ steps:
        fi
      done
 
-     if ! az keyvault update \
+     update_error=""
+     if ! update_error=$(az keyvault update \
        --subscription "$vault_subscription" \
        --name "$vault_name" \
        --resource-group "$vault_resource_group" \
        --public-network-access Enabled \
        --default-action Deny \
        --output none \
-       --only-show-errors; then
+       --only-show-errors 2>&1); then
+       print_ado_warning "az keyvault update" "$update_error"
        echo "##[warning]Could not enable Key Vault public network access. Azure Policy or permissions may have rejected the update. Continuing with the IP-rule attempt and verification for diagnostics."
      fi
 
      if [ -n "$existing_rule" ]; then
        echo "IP rule '$existing_rule' already exists; it will be preserved during cleanup."
      else
-       if ! az keyvault network-rule add \
+       add_error=""
+       if ! add_error=$(az keyvault network-rule add \
          --subscription "$vault_subscription" \
          --resource-group "$vault_resource_group" \
          --name "$vault_name" \
          --ip-address "$ip_to_add" \
          --output none \
-         --only-show-errors; then
+         --only-show-errors 2>&1); then
+         print_ado_warning "az keyvault network-rule add" "$add_error"
          echo "##[warning]Could not add Key Vault IP rule '$ip_to_add'. Azure Policy or permissions may have rejected the update. Continuing with verification for diagnostics."
        else
          echo "##vso[task.setvariable variable=seeding_kv_ip_rule_added]true"
@@ -538,8 +554,8 @@ steps:
        sleep 10
      done
 
-     echo "##[error]Key Vault public network configuration did not persist."
-     exit 1
+     echo "##[warning]Key Vault public network configuration did not persist: publicNetworkAccess must be Enabled, defaultAction must be Deny, and IP $ip_to_add must be present. Continuing so subsequent tasks can expose the customer-specific access behavior."
+     exit 0
 - task: AzureCLI@2
   displayName: '02b_az_prepare_seeding_keyvault_private_dns'
   condition: and(succeeded(), eq(variables['disable_whitelisting_for_build_agents'], 'true'))
