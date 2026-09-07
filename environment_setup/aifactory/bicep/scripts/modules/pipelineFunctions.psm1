@@ -116,7 +116,8 @@ function Import-Dependencies {
          }
         "genDynamicNetworkParamFile.ps1" { 
              Write-Verbose "Installing dependencies for $callingScriptName"
-             if ($env:GITHUB_ACTIONS -eq 'true') {
+             if ($env:GITHUB_ACTIONS -eq 'true' -or $env:AIFACTORY_USE_AZURE_CLI -eq 'true') {
+                 Write-Verbose "Using Azure CLI; skipping Az PowerShell module dependencies."
                  break
              }
              Install-DependencyIfMissing -Name Az.Accounts -RequiredVersion $azAccountsVersion

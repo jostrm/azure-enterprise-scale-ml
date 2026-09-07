@@ -1031,19 +1031,21 @@ steps:
       }
       Write-Host "=== END DEBUG ==="
 
-- task: AzurePowerShell@5
+- task: AzureCLI@2
   displayName: '04_pwsh_fetch_network_parameters'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    ScriptType: FilePath
-    ScriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
-    ScriptArguments: '-BYO_subnets "$(BYO_subnets)" -network_env "$(network_env)" -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)" -enableAIFoundry "$(enableAIFoundry)" -enableAksForAzureML "$(enableAksForAzureML)" -enableContainerApps "$(enableContainerApps)" -enableDatabricks "$(enableDatabricks)" -disableAgentNetworkInjection "$(disableAgentNetworkInjection)" -enableWebApp "$(enableWebApp)" -enableFunction "$(enableFunction)"'
-    azurePowerShellVersion: LatestVersion
-    pwsh: true
+    scriptType: pscore
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
+    arguments: '-BYO_subnets "$(BYO_subnets)" -network_env "$(network_env)" -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)" -enableAIFoundry "$(enableAIFoundry)" -enableAksForAzureML "$(enableAksForAzureML)" -enableContainerApps "$(enableContainerApps)" -enableDatabricks "$(enableDatabricks)" -disableAgentNetworkInjection "$(disableAgentNetworkInjection)" -enableWebApp "$(enableWebApp)" -enableFunction "$(enableFunction)"'
+    powerShellErrorActionPreference: stop
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
+  env:
+    AIFACTORY_USE_AZURE_CLI: 'true'
 - task: AzureCLI@2
   displayName: '05a_Check if Private DNS Zones exist'
-  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  condition: and(succeeded(), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: ps
@@ -1654,7 +1656,7 @@ steps:
       fi
 - task: AzureCLI@2
   displayName: '05c_Validate Required Parameters'
-  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  condition: and(succeeded(), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2350,7 +2352,7 @@ steps:
 - task: AzureCLI@2
   displayName: '06d_Cleanup_Disconnected_SharedPrivateLinks'
   continueOnError: true
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableAISearchSharedPrivateLink'], 'true'), eq(variables['aiSearchExists'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableAISearchSharedPrivateLink'], 'true'), eq(variables['aiSearchExists'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2493,7 +2495,7 @@ steps:
      echo "=== 06e Policy Exemptions complete ==="
 - task: AzureCLI@2
   displayName: '05d_Build default image offline, to private registry (ACR) if not exists'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_05_build_acr_image'], 'true'),ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash

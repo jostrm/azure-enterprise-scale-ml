@@ -453,7 +453,7 @@ function Get-DeploymentOutputValue {
         [string] $OutputName
     )
 
-    if ($env:GITHUB_ACTIONS -eq 'true') {
+    if ($env:GITHUB_ACTIONS -eq 'true' -or $env:AIFACTORY_USE_AZURE_CLI -eq 'true') {
         $value = & az deployment group show `
             --subscription $subscriptionId `
             --resource-group $ResourceGroupName `
