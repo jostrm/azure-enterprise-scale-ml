@@ -1,10 +1,21 @@
 #!/bin/bash
 
-# ANSI color codes
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+AIF_UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for AIF_UI_LIBRARY in "$AIF_UI_DIR/ui/terminal.sh" "$AIF_UI_DIR/azure-enterprise-scale-ml/bootstrap/ui/terminal.sh"; do
+    [[ ! -f "$AIF_UI_LIBRARY" ]] || break
+done
+if [[ ! -f "$AIF_UI_LIBRARY" ]]; then
+    # This entrypoint can be downloaded before the submodule (and shared theme) exists.
+    printf 'INFO: Shared theme not installed yet; using plain-text bootstrap output.\n' >&2
+    aif_banner() { printf '\n  // AI FACTORY / %s\n  %s\n\n' "$1" "$2"; }
+    aif_info() { printf '  [INFO] %s\n' "$*"; }
+    aif_success() { printf '  [OK] %s\n' "$*"; }
+    aif_error() { printf '  [ERROR] %s\n' "$*"; }
+    aif_value() { printf '  %s: %s\n' "$1" "$2"; }
+else
+    source "$AIF_UI_LIBRARY"
+fi
+aif_banner "SUBMODULE SETUP" "Connect your repository to AI Factory."
 
 function try()
 {
@@ -61,37 +72,37 @@ try
     if ! submodule_exists "$submodule_name"; then
         git submodule add https://github.com/jostrm/azure-enterprise-scale-ml || throw $AlreadyInIndex
     else
-        echo "Submodule $submodule_name already exists"
+        aif_info "Submodule $submodule_name already exists"
         if submodule_initialized "$submodule_path" && submodule_on_main "$submodule_path"; then
-            echo "Submodule is already updated and on the main branch"
+            aif_info "Submodule is already updated and on the main branch"
         else
-            echo "Updating submodule and checking out main branch"
+            aif_info "Updating submodule and checking out main branch"
             git submodule update --init --recursive
             #git submodule foreach 'git checkout main'
             git submodule foreach 'git checkout main || git checkout -b main origin/main'
         fi
     fi
     
-    echo -e "${GREEN}01. Success! ${NC}"
+    aif_success "Submodule setup complete."
     
-    echo "finished") # make sure to clear $ex_code, otherwise catch * will run # echo "finished" does the trick for this example
+    aif_info "Ready to copy templates.") # Preserve the successful subshell status for catch.
 # directly after closing the subshell you need to connect a group to the catch using ||
 catch || {
     # now you can handle
-    echo $ex_code
+    aif_value "Exit code" "$ex_code"
     case $ex_code in
         $AlreadyInIndex)
-            echo "submodule already exists in the index - now updating instead of adding"
+            aif_info "submodule already exists in the index - now updating instead of adding"
             git submodule update --init --recursive
-            echo "HEAD position was 00fc174 fix, switched to branch 'main'"
+            aif_info "HEAD position was 00fc174 fix, switched to branch 'main'"
             git submodule foreach 'git checkout main'
-            echo -e "${GREEN}01. Success! ${NC}"
+            aif_success "Submodule setup complete."
         ;;
         $AnotherException)
-            echo "AnotherException was thrown"
+            aif_error "AnotherException was thrown"
         ;;
         *)
-            echo "An unexpected exception was thrown"
+            aif_error "An unexpected exception was thrown"
             throw $ex_code # you can rethrow the "exception" causing the script to exit if not caught
         ;;
     esac

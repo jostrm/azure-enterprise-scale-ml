@@ -3,6 +3,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AIF_UI_DIR="$SCRIPT_DIR"
+for AIF_UI_LIBRARY in "$AIF_UI_DIR/ui/terminal.sh" "$AIF_UI_DIR/azure-enterprise-scale-ml/bootstrap/ui/terminal.sh"; do
+  [[ ! -f "$AIF_UI_LIBRARY" ]] || break
+done
+if [[ ! -f "$AIF_UI_LIBRARY" ]]; then
+  printf 'ERROR: AI Factory terminal library is missing. Copy bootstrap/ui alongside this script.\n' >&2
+  exit 1
+fi
+source "$AIF_UI_LIBRARY"
 readonly REPO_ROOT="${AIFACTORY_REPO_ROOT:-C:/code/code_py_25/002_demo/azure-enterprise-scale-byor-110}"
 readonly SUBMODULE_PATH="azure-enterprise-scale-ml"
 readonly SUBMODULE_BRANCH="release/v1.24"
@@ -18,6 +27,8 @@ if [[ "${AIFACTORY_LAUNCHER_STABLE:-}" != "1" ]]; then
   state_dir="$HOME/.aifactory-update-state/gh-$$"
   stable_launcher="$state_dir/GH-update-aifactory-and-run-project.sh"
   mkdir -p "$state_dir"
+  mkdir -p "$state_dir/ui"
+  cp "$AIF_UI_LIBRARY" "$state_dir/ui/terminal.sh"
   cp "${BASH_SOURCE[0]}" "$stable_launcher"
   chmod +x "$stable_launcher"
   export AIFACTORY_LAUNCHER_STABLE=1
@@ -28,12 +39,16 @@ fi
 
 state_dir="${AIFACTORY_LAUNCHER_STATE_DIR:?Stable launcher state directory is missing.}"
 trap 'rm -rf -- "$state_dir"' EXIT
+aif_banner "GITHUB / UPDATE + RUN" "Preserve configuration. Refresh templates. Deploy with intent."
+aif_value "Repository" "$REPO_ROOT"
+aif_value "Environment" "$ENVIRONMENT"
+aif_section "01 / Configuration"
 
 confirm_commit_and_continue() {
   local choice="${AIFACTORY_COMMIT_CHANGES:-}"
   while true; do
     if [[ -z "$choice" && -t 0 ]]; then
-      read -r -p "Commit and continue? [y/N]: " choice
+      read -r -p "$(aif_prompt "Commit and continue? [y/N]: ")" choice
     fi
     case "${choice,,}" in
       y|yes)
@@ -43,7 +58,7 @@ confirm_commit_and_continue() {
         return 1
         ;;
       *)
-        echo "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
+        aif_warn "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
         if [[ ! -t 0 ]]; then
           return 1
         fi
@@ -56,23 +71,23 @@ confirm_commit_and_continue() {
 json_override_choice="${AIFACTORY_USE_JSON_OVERRIDE:-}"
 while true; do
   if [[ -z "$json_override_choice" && -t 0 ]]; then
-    read -r -p "Do you want to override with variables.json? [y/N]: " json_override_choice
+    read -r -p "$(aif_prompt "Do you want to override with variables.json? [y/N]: ")" json_override_choice
   fi
   case "${json_override_choice,,}" in
     y|yes)
       use_json_override=true
       config_override_file="$CONFIG_FILE"
-      echo "JSON override enabled: $CONFIG_FILE"
+      aif_info "JSON override enabled: $CONFIG_FILE"
       break
       ;;
     ""|n|no)
       use_json_override=false
       config_override_file=""
-      echo "JSON override disabled; the workflow will use GitHub variables and secrets."
+      aif_info "JSON override disabled; the workflow will use GitHub variables and secrets."
       break
       ;;
     *)
-      echo "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
+      aif_warn "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
       json_override_choice=""
       ;;
   esac
@@ -80,7 +95,7 @@ done
 
 for command in git gh; do
   if ! command -v "$command" >/dev/null 2>&1; then
-    echo "ERROR: Required command '$command' is not available." >&2
+    aif_error "Required command '$command' is not available." >&2
     exit 1
   fi
 done
@@ -91,9 +106,10 @@ elif command -v py >/dev/null 2>&1 && py -3 --version >/dev/null 2>&1; then
 elif command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then
   PYTHON=(python3)
 else
-  echo "ERROR: A working Python 3 interpreter is required." >&2
+  aif_error "A working Python 3 interpreter is required." >&2
   exit 1
 fi
+aif_section "02 / GitHub connection"
 gh auth status >/dev/null
 
 backup_dir="$HOME/.aifactory-backups/$(basename "$REPO_ROOT")/$(date -u +%Y%m%dT%H%M%SZ)"
@@ -110,6 +126,7 @@ if [[ -f .env.bak ]]; then
 fi
 
 resume_after_bootstrap=false
+aif_section "03 / Protect local work and refresh templates"
 if [[ "${1:-}" == "--resume-after-bootstrap" ]]; then
   resume_after_bootstrap=true
 fi
@@ -120,7 +137,7 @@ if [[ "$resume_after_bootstrap" == "false" ]]; then
     stash_message="Before AI Factory template update $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     git stash push --include-untracked --message "$stash_message" >/dev/null
     stash_created=true
-    echo "Existing work was protected in: $(git stash list -1 --format='%gd %s')"
+    aif_success "Existing work was protected in: $(git stash list -1 --format='%gd %s')"
   fi
 
   if [[ -d "$SUBMODULE_PATH/.git" || -f "$SUBMODULE_PATH/.git" ]] &&
@@ -130,7 +147,7 @@ if [[ "$resume_after_bootstrap" == "false" ]]; then
       --message "Before AI Factory submodule update $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
       >/dev/null
     submodule_stash_created=true
-    echo "Existing submodule work was protected in: $(git -C "$SUBMODULE_PATH" stash list -1 --format='%gd %s')"
+    aif_success "Existing submodule work was protected in: $(git -C "$SUBMODULE_PATH" stash list -1 --format='%gd %s')"
   fi
 
   git checkout main
@@ -148,24 +165,25 @@ if [[ "$use_json_override" == "true" && -f "$state_dir/variables.json" ]]; then
 fi
 
 if [[ ! -f .env.template ]]; then
-  echo "ERROR: .env.template was not generated." >&2
+  aif_error ".env.template was not generated." >&2
   exit 1
 fi
 if [[ "$use_json_override" == "true" && ! -f "$state_dir/variables.json" ]]; then
-  echo "ERROR: Active JSON configuration file is missing: $CONFIG_FILE" >&2
+  aif_error "Active JSON configuration file is missing: $CONFIG_FILE" >&2
   exit 1
 fi
 if [[ "$use_json_override" == "true" && ! -f "$CONFIG_TEMPLATE_FILE" ]]; then
-  echo "ERROR: JSON configuration template was not generated: $CONFIG_TEMPLATE_FILE" >&2
+  aif_error "JSON configuration template was not generated: $CONFIG_TEMPLATE_FILE" >&2
   exit 1
 fi
 
+aif_section "04 / Configuration changes"
 "${PYTHON[@]}" - \
   "$state_dir/current.env" \
   ".env.template" \
   "$state_dir/variables.json" \
   "$CONFIG_TEMPLATE_FILE" \
-  "$use_json_override" <<'PY'
+  "$use_json_override" <<'PY' | aif_stream
 import json
 import re
 import sys
@@ -431,6 +449,7 @@ fi
 mv -f .env.template .env
 rm -f "$CONFIG_TEMPLATE_FILE"
 
+aif_section "05 / Synchronize GitHub configuration"
 printf 'd\n\n\nn\n' | bash "10-GH-create-or-update-github-variables.sh"
 
 github_repo=$("${PYTHON[@]}" - <<'PY'
@@ -469,6 +488,7 @@ grep -qxF "/$CONFIG_FILE" "$exclude_file" 2>/dev/null || printf '/%s\n' "$CONFIG
 cp "$state_dir/GH-update-aifactory-and-run-project.sh" "$REPO_ROOT/GH-update-aifactory-and-run-project.sh"
 chmod +x "$REPO_ROOT/GH-update-aifactory-and-run-project.sh"
 
+aif_section "06 / Review and publish"
 git add -A
 git rm --cached --ignore-unmatch .env.bak >/dev/null
 git restore --staged -- .env 2>/dev/null || true
@@ -476,7 +496,7 @@ git restore --staged -- "$CONFIG_FILE" 2>/dev/null || true
 if ! git diff --cached --quiet; then
   if ! confirm_commit_and_continue; then
     git restore --staged -- .
-    echo "Commit declined. Changes remain in the working tree; no push or workflow run was started."
+    aif_warn "Commit declined. Changes remain in the working tree; no push or workflow run was started."
     exit 0
   fi
   git commit \
@@ -484,7 +504,7 @@ if ! git diff --cached --quiet; then
     -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
   git push origin main
 else
-  echo "No tracked template changes required a commit."
+  aif_info "No tracked template changes required a commit."
 fi
 
 dispatch_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -512,18 +532,20 @@ for _ in {1..30}; do
 done
 
 if [[ -z "$run_id" ]]; then
-  echo "ERROR: Workflow was dispatched but its run ID could not be resolved." >&2
+  aif_error "Workflow was dispatched but its run ID could not be resolved." >&2
   exit 1
 fi
 
-echo "Watching GitHub Actions run $run_id..."
+aif_section "07 / Deployment"
+aif_value "Run" "$run_id"
 gh run watch "$run_id" --repo "$github_repo" --exit-status
 
 if [[ "$stash_created" == "true" ]]; then
-  echo "Pre-existing work remains protected in $(git stash list -1 --format='%gd')."
-  echo "Review generated changes before restoring that stash to avoid overwriting the update."
+  aif_info "Pre-existing work remains protected in $(git stash list -1 --format='%gd')."
+  aif_warn "Review generated changes before restoring that stash to avoid overwriting the update."
 fi
 if [[ "$submodule_stash_created" == "true" ]]; then
-  echo "Pre-existing submodule work remains protected in $(git -C "$SUBMODULE_PATH" stash list -1 --format='%gd')."
+  aif_info "Pre-existing submodule work remains protected in $(git -C "$SUBMODULE_PATH" stash list -1 --format='%gd')."
 fi
-echo "Environment backups are stored outside the repository at $backup_dir."
+aif_value "Backups" "$backup_dir"
+aif_complete "GitHub Actions run $run_id succeeded."

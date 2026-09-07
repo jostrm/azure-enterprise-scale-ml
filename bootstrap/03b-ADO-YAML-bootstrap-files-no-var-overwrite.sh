@@ -1,10 +1,15 @@
 #!/bin/bash
 
-# ANSI color codes
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+AIF_UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for AIF_UI_LIBRARY in "$AIF_UI_DIR/ui/terminal.sh" "$AIF_UI_DIR/azure-enterprise-scale-ml/bootstrap/ui/terminal.sh"; do
+    [[ ! -f "$AIF_UI_LIBRARY" ]] || break
+done
+if [[ ! -f "$AIF_UI_LIBRARY" ]]; then
+    printf 'ERROR: AI Factory terminal library is missing. Copy bootstrap/ui alongside this script.\n' >&2
+    exit 1
+fi
+source "$AIF_UI_LIBRARY"
+aif_banner "AZURE DEVOPS / REFRESH" "Update pipelines; preserve your active configuration."
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -51,6 +56,7 @@ cp "$SCRIPT_DIR/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy
 mkdir -p "$SCRIPT_DIR/aifactory/automation/"
 cp -r "$SCRIPT_DIR/aifactory-templates/automation/." "$SCRIPT_DIR/aifactory/automation/"
 
-echo -e "${YELLOW}Prompt to use with Github copilot to compare variables.yaml and update it:${NC}"
-echo ""
-echo "Compare the variables.yaml under my folder aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml with the newer variables-template.yaml in same folder. Copy all values from variables.yaml into the new template variables-template.yaml. If some variables are similar but not exact, try to map these simce they may be renamed. There may possible be more variables in variables-template.yaml. After this then rename variables.yaml to variables.bak and variables-template.yaml to variables.yaml"
+aif_section "Next / Merge configuration changes"
+aif_info "Use this prompt with GitHub Copilot:"
+printf '\n'
+aif_info "Compare the variables.yaml under my folder aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml with the newer variables-template.yaml in same folder. Copy all values from variables.yaml into the new template variables-template.yaml. If some variables are similar but not exact, try to map these simce they may be renamed. There may possible be more variables in variables-template.yaml. After this then rename variables.yaml to variables.bak and variables-template.yaml to variables.yaml"

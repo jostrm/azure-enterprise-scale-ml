@@ -1,10 +1,12 @@
 #!/bin/bash
 
-# ANSI color codes
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+AIF_UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ ! -f "$AIF_UI_DIR/bootstrap/ui/terminal.sh" ]]; then
+    printf 'ERROR: AI Factory terminal library is missing from bootstrap/ui.\n' >&2
+    exit 1
+fi
+source "$AIF_UI_DIR/bootstrap/ui/terminal.sh"
+aif_banner "LAUNCH CONTROL" "Your platform. Your orchestrator. One AI Factory."
 
 # Defaults
 TARGET_REPO="${GH_TARGET_REPO:-githuborg/enterprise-scale-aifactory-001}"
@@ -21,11 +23,11 @@ cp "$SCRIPT_DIR/bootstrap/GH-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/.
 
 gh_ok() {
     if ! command -v gh >/dev/null 2>&1; then
-        echo -e "${RED}GitHub CLI (gh) is not installed. Skipping workflow dispatch.${NC}"
+        aif_error "GitHub CLI (gh) is not installed. Skipping workflow dispatch."
         return 1
     fi
     if ! gh auth status >/dev/null 2>&1; then
-        echo -e "${RED}GitHub CLI is not authenticated. Run 'gh auth login' first.${NC}"
+        aif_error "GitHub CLI is not authenticated. Run 'gh auth login' first."
         return 1
     fi
     return 0
@@ -48,12 +50,15 @@ dispatch_project() {
 }
 
 # Prompt user for orchestrator choice
-echo -e "${YELLOW}Do you want to use Azure DevOps or GitHub as an orchestrator, to run the IaC pipelines? (Enter 'a' or 'g')${NC}"
-read -p "Orchestrator: " orchestrator
+aif_section "Choose your orchestrator"
+aif_value "[a]" "Azure DevOps / YAML pipelines"
+aif_value "[g]" "GitHub / Actions workflows"
+aif_info "Do you want to use Azure DevOps or GitHub as an orchestrator, to run the IaC pipelines? (Enter 'a' or 'g')"
+read -p "$(aif_prompt "Orchestrator: ")" orchestrator
 
 if [[ "$orchestrator" == "a" ]]; then
-    echo -e "${GREEN}You have chosen Azure DevOps.${NC}"
-    echo -e "${YELLOW}Cleaning potential old bootstrap files${NC}"
+    aif_success "You have chosen Azure DevOps."
+    aif_section "Cleaning potential old bootstrap files"
     
     # Delete potential Github BOOTSTRAP files,silent error if not exists
     rm -f "$SCRIPT_DIR/../01-aif-copy-aifactory-templates.sh"
@@ -84,7 +89,7 @@ if [[ "$orchestrator" == "a" ]]; then
     # YAML - infra-add-core-member.yml -> aifactory-templates + .github/workflows
     rm -f "$SCRIPT_DIR/../.github/workflows/infra-add-core-member.yml"
 
-    echo -e "${YELLOW}Copying new bootstrap files, to root of repository${NC}"
+    aif_section "Copying new bootstrap files, to root of repository"
 
     # Copy AZURE DEVOPS template file and bootstrap files, to root of repository
     cp "$SCRIPT_DIR/bootstrap/01-aif-copy-aifactory-templates.sh" "$SCRIPT_DIR/../01-aif-copy-aifactory-templates.sh"
@@ -94,26 +99,26 @@ if [[ "$orchestrator" == "a" ]]; then
     # Common
     cp "$SCRIPT_DIR/bootstrap/11-ESML-upload-lake-structure.sh" "$SCRIPT_DIR/../11-ESML-upload-lake-structure.sh"
     
-    echo -e "${GREEN}Finished!${NC}"
-    echo -e "${GREEN}Next step: Run 01-aif-copy-aifactory-templates.sh${NC}"
+    aif_success "Finished!"
+    aif_info "Next step: Run 01-aif-copy-aifactory-templates.sh"
 
     # Check if the directory exists, if not, create it
     if [ -d "$SCRIPT_DIR/../.github/workflows/" ]; then
-        echo -e "${YELLOW}Do you also want to remove the GITHUB folder (the workflows for AIFactory is removed) (Enter 'y' or 'n')${NC}"
-        read -p "Delete .github/workflows folder: " workflowsdelete
+        aif_info "Do you also want to remove the GITHUB folder (the workflows for AIFactory is removed) (Enter 'y' or 'n')"
+        read -p "$(aif_prompt "Delete .github/workflows folder: ")" workflowsdelete
         if [[ "$workflowsdelete" == "y" ]]; then
-            echo -e "${YELLOW}Deleting .github/workflows folder${NC}"
+            aif_info "Deleting .github/workflows folder"
             rm -rf "$SCRIPT_DIR/../.github/workflows"
             rm -rf "$SCRIPT_DIR/../.github"
-            echo -e "${GREEN}Finished!${NC}"
+            aif_success "Finished!"
         else
-            echo -e "${GREEN}Did not delete the folder.${NC}"
+            aif_info "Did not delete the folder."
         fi    
     fi
 
 elif [[ "$orchestrator" == "g" ]]; then
-    echo -e "${GREEN}You have chosen GitHub.${NC}"
-    echo -e "${YELLOW}Cleaning potential old bootstrap files${NC}"
+    aif_success "You have chosen GitHub."
+    aif_section "Cleaning potential old bootstrap files"
     
     # Deleting potetoil Azure Devops files, silent error if not exists
     rm -f "$SCRIPT_DIR/../02-ADO-YAML-bootstrap-files.sh"
@@ -124,7 +129,7 @@ elif [[ "$orchestrator" == "g" ]]; then
     rm -f "$SCRIPT_DIR/../10-GH-create-or-update-github-variables.sh"
     rm -f "$SCRIPT_DIR/../.env.template"
 
-    echo -e "${YELLOW}Copying new bootstrap files, to root of repository${NC}"
+    aif_section "Copying new bootstrap files, to root of repository"
 
     # Creating GitHub files,  to root of repository
     cp "$SCRIPT_DIR/bootstrap/01-aif-copy-aifactory-templates.sh" "$SCRIPT_DIR/../01-aif-copy-aifactory-templates.sh"
@@ -135,9 +140,9 @@ elif [[ "$orchestrator" == "g" ]]; then
     #cp "$SCRIPT_DIR/bootstrap/12-GENAI-update-ip-rule-ux.sh" "$SCRIPT_DIR/../12-GENAI-update-ip-rule-ux.sh"
     #cp "$SCRIPT_DIR/bootstrap/13-ESML-update-ip-rule-ux.sh" "$SCRIPT_DIR/../13-ESML-update-ip-rule-ux.sh"
 
-    echo -e "${GREEN}Finished!${NC}"
-    echo -e "${GREEN}Next step: Run 01-aif-copy-aifactory-templates.sh${NC}"
+    aif_success "Finished!"
+    aif_info "Next step: Run 01-aif-copy-aifactory-templates.sh"
 else
-    echo -e "${RED}Invalid choice. Please run the script again and enter a valid option.${NC}"
+    aif_error "Invalid choice. Please run the script again and enter a valid option."
     exit 1
 fi

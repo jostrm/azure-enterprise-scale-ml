@@ -1,10 +1,15 @@
 #!/bin/bash
 
-# ANSI color codes
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+AIF_UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for AIF_UI_LIBRARY in "$AIF_UI_DIR/ui/terminal.sh" "$AIF_UI_DIR/azure-enterprise-scale-ml/bootstrap/ui/terminal.sh"; do
+    [[ ! -f "$AIF_UI_LIBRARY" ]] || break
+done
+if [[ ! -f "$AIF_UI_LIBRARY" ]]; then
+    printf 'ERROR: AI Factory terminal library is missing. Copy bootstrap/ui alongside this script.\n' >&2
+    exit 1
+fi
+source "$AIF_UI_LIBRARY"
+aif_banner "GENAI / NETWORK ACCESS" "Update your project IP allowlist."
 
 
 # Static - EDIT THIS ONCE
@@ -20,12 +25,12 @@ rg_instance_suffix="-005" # -001 (The suffix on your AIFactory Common resource g
 salt="avhwo"
 # Static - EDIT THIS ONCE, END 
 
-echo -e "${GREEN}NB! This is for AI Project type: GenAI-1  with Azure AI Foundry (GenAIOps) ${NC}"
+aif_info "NB! This is for AI Project type: GenAI-1  with Azure AI Foundry (GenAIOps) "
 
 # Dynamic
-read -p "Enter the old IP address (leave blank if you dont know): " old_ip
-read -p "Enter the new, your current IP (IPv4 - run 'curl ifcfg.me' in terminal) address: " new_ip
-read -p "Enter the project number (001,002,...): " project_number
+read -p "$(aif_prompt "Enter the old IP address (leave blank if you dont know): ")" old_ip
+read -p "$(aif_prompt "Enter the new, your current IP (IPv4 - run 'curl ifcfg.me' in terminal) address: ")" new_ip
+read -p "$(aif_prompt "Enter the project number (001,002,...): ")" project_number
 
 # Trim leading and trailing whitespace from new_ip
 new_ip="${new_ip#"${new_ip%%[![:space:]]*}"}"   # Remove leading whitespace
@@ -62,36 +67,36 @@ storage_account_2="${storage_account_2//-/}" # Remove all hyphens
 
 if [ -n "$old_ip" ]; then
 
-    echo -e "${GREEN}Trying (may fail if cleaned earlier) to remove OLD ip${NC}"
+    aif_section "Trying (may fail if cleaned earlier) to remove OLD ip"
 
     # 3) AI Services (Cognitive services)
-    echo -e "${YELLOW}1/7: Azure AI Services: REMOVING old IP:"$old_ip"...${NC}"
+    aif_step "01/07" "Azure AI Services / remove $old_ip"
     az cognitiveservices account network-rule remove -g $rg --name $ai_services --ip-address "$old_ip"
     
     # 5) Keyvault
-    echo -e "${YELLOW}2/7: Azure Keyvault: REMOVING old IP:"$old_ip"...${NC}"
+    aif_step "02/07" "Key Vault / remove $old_ip"
     az keyvault network-rule remove --resource-group $rg --name $keyvault --ip-address $old_ip
 
     # Storage
-    echo -e "${YELLOW}3/7: Azure Storage Account 1: REMOVING old IP:"$old_ip"...${NC}"
+    aif_step "03/07" "Storage account 1 / remove $old_ip"
     az storage account network-rule remove --resource-group $rg  --account-name $storage_account_1 --ip-address $old_ip
-    echo -e "${YELLOW}4/7: Azure Storage Account 2: REMOVING old IP:"$old_ip"...${NC}"
+    aif_step "04/07" "Storage account 2 / remove $old_ip"
     az storage account network-rule remove --resource-group $rg  --account-name $storage_account_2 --ip-address $old_ip
 
     # Search
-    echo -e "${YELLOW}5/7: Azure AI Search: REMOVING old IP:"$old_ip"...${NC}"
+    aif_detail "05/07 / AI Search removal is not automated by this script."
     #az search service update --resource-group $rg --name $ai_search --remove ipRules $old_ip
     #Error: Couldn't find 'ipRules' in ''
 
     # 1) Azure AI Project: Update the Azure ML aiproject with the new IP rule
     #az ml workspace update --name $ai_project --resource-group $rg --network-acls "$old_ip"
-    echo -e "${YELLOW}6/7: Azure AI Foundry Project: REMOVING old IP:"$old_ip"...${NC}"
+    aif_detail "06/07 / Foundry Project removal is not automated by this script."
     #az ml workspace update --name $ai_project --resource-group $rg --remove networkAcls.ipRules "[{'value':'$old_ip'}]"
     #Error: Couldn't find 'networkAcls' in 'networkAcls'. Available options: []
 
     # 2) Azure AI Hub: Update the Azure ML ai_hub with the new IP rule
     #az ml workspace update --name $ai_hub --resource-group $rg --network-acls "$old_ip"
-    echo -e "${YELLOW}7/7: Azure AI Foundry Hub: REMOVING old IP:"$old_ip"...${NC}"
+    aif_detail "07/07 / Foundry Hub removal is not automated by this script."
     #az ml workspace update --name $ai_hub --resource-group $rg --remove networkAcls.ipRules "[{'value':'$old_ip'}]"
     #Error: Couldn't find 'networkAcls' in 'networkAcls'. Available options: []
 
@@ -99,44 +104,44 @@ fi
 
 ########### ADD new IP #########
 
-echo -e "${GREEN}Adding NEW ip${NC}"
+aif_section "Adding NEW ip"
 
 # 1) AI Services (Cognitive services)
-echo -e "${YELLOW} 1/7: AI Services: Adding new IP:"$new_ip"...${NC}"
+aif_step "01/07" "Azure AI Services / add $new_ip"
 az cognitiveservices account network-rule add -g $rg --name $ai_services --ip-address "$new_ip"
 
 # 2) AI Search
-echo -e "${YELLOW}2/7: AI Search: Adding new IP: "$new_ip"...${NC}"
+aif_step "02/07" "AI Search / add $new_ip"
 #az search service update --resource-group $rg --name $ai_search --set properties.networkRuleSet.ipRules="[{'value':'$new_ip'}]"
 az search service update --resource-group $rg --name $ai_search --ip-rules $new_ip
 
 # 3) Keyvault
 #az keyvault update --name $keyvault --resource-group $rg --set properties.networkAcls.ipRules="[{'value':'$new_ip'}]"
-echo -e "${YELLOW}3/7: Azure Keyvault: Adding new IP: "$new_ip"...${NC}"
+aif_step "03/07" "Key Vault / add $new_ip"
 az keyvault network-rule add --resource-group $rg --name $keyvault --ip-address "$new_ip"
 
 # 4,5) Storage account 1,2
-echo -e "${YELLOW}4/7: Azure Storage Account 1: Adding new IP: "$new_ip"...${NC}"
+aif_step "04/07" "Storage account 1 / add $new_ip"
 az storage account network-rule add --resource-group $rg  --account-name $storage_account_1 --ip-address "$new_ip"
-echo -e "${YELLOW}5/7: Azure Storage Account 2: Adding new IP: "$new_ip"...${NC}"
+aif_step "05/07" "Storage account 2 / add $new_ip"
 az storage account network-rule add --resource-group $rg  --account-name $storage_account_2 --ip-address "$new_ip"
 
 # 6) Azure AI Project: Update the Azure ML aiproject with the new IP rule
-echo -e "${YELLOW}6/7: AI Foundry Project: Adding new IP:"$new_ip"...${NC}"
+aif_detail "06/07 / Foundry Project allowlist is not automated by this script."
 #az ml workspace update --name $ai_project --resource-group $rg --network-acls "$new_ip"
 
 # 7) Azure AI Hub: Update the Azure ML ai_hub with the new IP rule
-echo -e "${YELLOW}7/7: AI Foundry Hub: Adding new IP: "$new_ip"...${NC}"
+aif_detail "07/07 / Foundry Hub allowlist is not automated by this script."
 #az ml workspace update --name $ai_hub --resource-group $rg --network-acls "$new_ip"
 
 # AML enabler
 #echo -e "${YELLOW}+ Enable Azure ML Private Link...${NC}"
 #az ml workspace update --resource-group $rg --name $ai_project --file ./aifactory/esml-util/001-aml.yml
 
-echo -e "${GREEN}Finished! ${NC}"
-echo -e "${GREEN}Be sure to update your Excel sheet, with your new IP adress for future updates (new_ip, old_ip)${NC}"
-echo -e "${GREEN}new_ip:$new_ip${NC}"
-echo -e "${GREEN}old_ip:$old_ip ${NC}"
+aif_section "Network update summary"
+aif_warn "Review any command errors above and record the new IP for your next update."
+aif_value "New IP" "$new_ip"
+aif_value "Previous IP" "${old_ip:-Not supplied}"
 
 # Azure ML --network-acls
 # Comma-separated list of IP addresses or IP ranges in CIDR notation that are allowed to access the workspace. Example: 'XX.XX.XX.XX,XX.XX.XX.XX/32'. 
