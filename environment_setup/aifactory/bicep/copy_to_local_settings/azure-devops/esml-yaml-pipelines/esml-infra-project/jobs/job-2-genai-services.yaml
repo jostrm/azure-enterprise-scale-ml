@@ -503,9 +503,7 @@ steps:
        --output tsv \
        --only-show-errors | tr -d '\r')
      if [ "$public_network_access" = "Disabled" ]; then
-       echo "##[error]Seeding Key Vault public network access is Disabled. A Microsoft-hosted agent cannot reach this vault, and an IP rule has no effect while public access is disabled."
-       echo "##[error]Use a self-hosted Azure DevOps agent in the Key Vault VNet with private DNS resolution, then set disable_whitelisting_for_build_agents=true. Alternatively, change the governing Azure Policy to permit public network access for this vault."
-       exit 1
+       echo "##[warning]Seeding Key Vault public network access is Disabled. Attempting to enable it temporarily before adding the build-agent IP rule. Azure Policy might reject this update."
      fi
 
      existing_ip_rules=$(az keyvault show \
@@ -523,26 +521,31 @@ steps:
        fi
      done
 
-     az keyvault update \
+     if ! az keyvault update \
        --subscription "$vault_subscription" \
        --name "$vault_name" \
        --resource-group "$vault_resource_group" \
        --public-network-access Enabled \
        --default-action Deny \
        --output none \
-       --only-show-errors
+       --only-show-errors; then
+       echo "##[warning]Could not enable Key Vault public network access. Azure Policy or permissions may have rejected the update. Continuing with the IP-rule attempt and verification for diagnostics."
+     fi
 
      if [ -n "$existing_rule" ]; then
        echo "IP rule '$existing_rule' already exists; it will be preserved during cleanup."
      else
-       az keyvault network-rule add \
+       if ! az keyvault network-rule add \
          --subscription "$vault_subscription" \
          --resource-group "$vault_resource_group" \
          --name "$vault_name" \
          --ip-address "$ip_to_add" \
          --output none \
-         --only-show-errors
-       echo "##vso[task.setvariable variable=seeding_kv_ip_rule_added]true"
+         --only-show-errors; then
+         echo "##[warning]Could not add Key Vault IP rule '$ip_to_add'. Azure Policy or permissions may have rejected the update. Continuing with verification for diagnostics."
+       else
+         echo "##vso[task.setvariable variable=seeding_kv_ip_rule_added]true"
+       fi
      fi
 
      # The data-plane secret task follows immediately. Verify the ARM update was accepted and
