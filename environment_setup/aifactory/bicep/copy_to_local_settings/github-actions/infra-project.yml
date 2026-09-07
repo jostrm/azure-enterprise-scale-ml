@@ -31,11 +31,6 @@ on:
         required: false
         default: ''
         type: string
-      use_admin_vm_build_agent:
-        description: Deprecated compatibility override; true selects the self-hosted runner
-        type: boolean
-        required: false
-        default: false
       admin_vm_runner_label:
         description: Deprecated compatibility alias for self_hosted_runner_label
         type: string
@@ -79,7 +74,6 @@ jobs:
           CONFIG_FILE: ${{ inputs.config_file }}
           RUNNER_SELECTION: ${{ inputs.runner_selection }}
           SELF_HOSTED_RUNNER_LABEL: ${{ inputs.self_hosted_runner_label }}
-          LEGACY_USE_ADMIN_VM_BUILD_AGENT: ${{ inputs.use_admin_vm_build_agent }}
           LEGACY_ADMIN_VM_RUNNER_LABEL: ${{ inputs.admin_vm_runner_label }}
         run: |
           set -euo pipefail
@@ -112,9 +106,7 @@ jobs:
               use_self_hosted = False
           else:
               use_self_hosted = (
-                  as_bool(os.environ["LEGACY_USE_ADMIN_VM_BUILD_AGENT"])
-                  or as_bool(config.get("useSelfHostedBuildAgent", False))
-                  or as_bool(config.get("useAdminVMBuildAgent", False))
+                  as_bool(config.get("useSelfHostedBuildAgent", False))
               )
 
           runner_label = (

@@ -59,7 +59,7 @@ stages:
       displayName: Deploy Private Network
       timeoutInMinutes: 120
       pool:
-        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -87,7 +87,7 @@ stages:
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
       pool:
-        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -119,7 +119,7 @@ stages:
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
       pool:
-        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -165,7 +165,7 @@ stages:
       displayName: Deploy Private Network
       timeoutInMinutes: 240
       pool:
-        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -193,7 +193,7 @@ stages:
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
       pool:
-        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -225,7 +225,7 @@ stages:
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
       pool:
-        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -273,7 +273,7 @@ stages:
       displayName: Deploy Private Network
       timeoutInMinutes: 120
       pool:
-        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -301,7 +301,7 @@ stages:
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
       pool:
-        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
@@ -333,7 +333,7 @@ stages:
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
       pool:
-        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), or(eq(variables.useSelfHostedBuildAgent, 'true'), eq(variables.useAdminVMBuildAgent, 'true')))) }}:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
           name: $(adminVMBuildAgentPool)
           demands:
             - ${{ if ne(variables.adminVMBuildAgentName, '') }}:

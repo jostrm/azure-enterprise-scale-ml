@@ -63,7 +63,6 @@
     "enableAdminVM": "false",
     "useSelfHostedBuildAgent": "false",
     "selfHostedRunnerLabel": "aifactory-admin-vm",
-    "useAdminVMBuildAgent": "false",
     "adminVMBuildAgentPool": "Default",
     "adminVMBuildAgentName": "",
     "diagnosticSettingLevel": "gold",

@@ -105,7 +105,6 @@ variables:
   enableAdminVM: "false" # <optional>Enable Admin VM in common RG<default>false<keep-as-is>
   useSelfHostedBuildAgent: "false" # <optional>Use a self-hosted build agent/runner<default>false<keep-as-is> ADO uses adminVMBuildAgentPool/adminVMBuildAgentName; GHA uses selfHostedRunnerLabel.
   selfHostedRunnerLabel: "aifactory-admin-vm" # <optional>GitHub self-hosted runner label<default>aifactory-admin-vm<keep-as-is>
-  useAdminVMBuildAgent: "false" # <deprecated>Legacy alias for useSelfHostedBuildAgent. Retained for configuration compatibility.
   adminVMBuildAgentPool: "Default" # <optional>Azure DevOps pool hosting the admin VM agent<default>Default<keep-as-is> Change only when the agent is registered in a custom pool.
   adminVMBuildAgentName: "" # <optional>Azure DevOps agent name override<default><keep-as-is> Leave empty for the Bicep-generated admin VM name; set to an existing VM agent name such as vm-test when reusing one.
   # ============================================================================

@@ -164,6 +164,7 @@ if not template_path.is_file():
 
 active = json.loads(active_path.read_text(encoding="utf-8-sig"), object_pairs_hook=OrderedDict)
 template = json.loads(template_path.read_text(encoding="utf-8-sig"), object_pairs_hook=OrderedDict)
+removed_keys = {"useAdminVMBuildAgent"}
 
 def merge(template_value, active_value):
     if isinstance(template_value, dict) and isinstance(active_value, dict):
@@ -171,7 +172,7 @@ def merge(template_value, active_value):
         for key, value in template_value.items():
             merged[key] = merge(value, active_value[key]) if key in active_value else value
         for key, value in active_value.items():
-            if key not in merged:
+            if key not in merged and key not in removed_keys:
                 merged[key] = value
         return merged
     return active_value
