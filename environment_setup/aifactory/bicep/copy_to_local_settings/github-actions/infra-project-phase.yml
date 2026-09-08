@@ -22,6 +22,10 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   deploy-project:
     name: Project ${{ inputs.phase }}
@@ -33,6 +37,7 @@ jobs:
     env:
       AIFACTORY_REPORT_JOB: deploy-project-${{ inputs.phase }}
       AIFACTORY_CONFIG_JSON: ${{ secrets.AIFACTORY_CONFIG_JSON }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       dev_test_prod: ${{ vars.AZURE_ENV_NAME }}
       dev_test_prod_sub_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       # Single source of truth for environment (matches ADO): dev_test_prod drives everything
@@ -431,7 +436,16 @@ jobs:
           $azureConfig = Join-Path $HOME '.azure'
           New-Item -ItemType Directory -Force -Path $azureConfig | Out-Null
 
-      - name: 00_Azure_Login
+      - name: 00_Azure_Login_OIDC
+        if: ${{ env.AZURE_CLIENT_ID != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: 00_Azure_Login_Service_Principal
+        if: ${{ env.AZURE_CLIENT_ID == '' }}
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}

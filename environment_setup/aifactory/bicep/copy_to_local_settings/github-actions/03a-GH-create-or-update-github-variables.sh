@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eo pipefail
+
 # ANSI color codes
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -347,6 +349,14 @@ repo_level_vars=(
   # === Networking ===
   "BYO_SUBNETS"
   "RUN_JOB1_NETWORKING"
+  "ADD_BASTION_HOST"
+  "ENABLE_ADMIN_VM"
+  "CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB"
+  "PRIV_DNS_SUBSCRIPTION_PARAM"
+  "PRIV_DNS_RESOURCE_GROUP_PARAM"
+  "ENABLE_PUBLIC_GENAI_ACCESS"
+  "ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET"
+  "ENABLE_PUBLIC_ACCESS_WITH_PERIMETER"
   
   # === Cost optimization ===
   "USE_COMMON_ACR_FOR_PROJECTS"
@@ -652,6 +662,7 @@ for env in "${selected_environments[@]}"; do
     echo -e "${YELLOW}Setting environment-specific variables and secrets for: $env${NC}"
     
     # Environment-specific secrets
+    create_or_update_secret $env "AZURE_CLIENT_ID" "${AZURE_CLIENT_ID:-}"
     create_or_update_secret $env "AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID" "$AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID"
     create_or_update_secret $env "TENANT_ID" "$TENANT_ID"
     create_or_update_secret $env "PROJECT_MEMBERS" "$PROJECT_MEMBERS"

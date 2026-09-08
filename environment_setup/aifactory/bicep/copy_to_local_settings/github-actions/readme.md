@@ -30,6 +30,23 @@ git config --system core.longpaths true
 
 ## START
 
+### Automated first scale set
+
+After adding this repository as the `azure-enterprise-scale-ml` submodule and
+running `00-start.sh`, a DEV-first setup can be prepared and deployed with:
+
+```bash
+bash ./GHA-create-new-aifactory-scaleset.sh
+```
+
+The launcher prompts for topology, access mode, subscription, region, CIDR,
+naming, deployment identity, seeding Key Vault, team group, and GitHub
+repository. It prefers a user-assigned managed identity federated to the GitHub
+`dev` environment, while retaining `AZURE_CREDENTIALS` as the explicit
+service-principal fallback. It commits the workflows, runs `infra-common.yml`,
+verifies the common resource group, and then runs `infra-project.yml`. Use
+`--dry-run` to review the plan or `--prepare-only` to stop before deployment.
+
 ### Last-run region reports (GitHub Actions and Azure DevOps)
 
 The common, project networking/services, and Foundry templates publish

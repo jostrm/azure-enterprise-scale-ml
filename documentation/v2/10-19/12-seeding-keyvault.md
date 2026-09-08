@@ -6,6 +6,15 @@ Purpose: We want to split the responsibility of who to create articfacts in Micr
 NB! **seeding keyvault = inputKeyvault** when speaking of variables and parameters in the AIFActory.
 - This, due to legacy reason (ESML AIFactory was established 2019), but will be synced in the future as seeding keyvault
 
+> [!IMPORTANT]
+> In v1.24 the seeding Key Vault resource is still required by the common and
+> project orchestration paths, even when no service-principal credentials are
+> needed. The vault may be empty when deployment uses managed-identity workload
+> federation and the optional common/project service-principal secret-name
+> variables are empty. Create project SP secrets only for workloads that still
+> require them, such as application authentication or unattended project
+> automation.
+
 ## Step 1) Create the keyvault and enable BICEP to use is
 
 1) Create an Azure Keyvult, in the AIFactory DEV Azure subscription, in a resource group that ESML Core team administrators has access to.
@@ -16,7 +25,7 @@ The below is needed for ADO and BICEP able to use this keyvault:
  `
  - Purpose: For AAD ADMIN to add 1-250 project service principles. 2022 we can reuse the SP's from the old projects 1-12.   External keyvault: `kv-esml-common-ext`
 
-## Step 2) Setup & Use the `Seeding keyvault`: Add information
+## Step 2) Optional: Add service-principal information
 
 
 ### Add new AIFactory PROJECT service principal information: Steps: 1-3 (ex:005)

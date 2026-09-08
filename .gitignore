@@ -15,6 +15,9 @@ downloads/
 eggs/
 .eggs/
 lib/
+!bootstrap/lib/
+!bootstrap/lib/*.py
+!bootstrap/lib/*.sh
 lib64/
 parts/
 sdist/

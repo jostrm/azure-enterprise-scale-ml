@@ -20,6 +20,23 @@ git config --system core.longpaths true
 
 ## START
 
+### Automated first scale set
+
+After adding this repository as the `azure-enterprise-scale-ml` submodule and
+running `00-start.sh`, a DEV-first setup can be prepared and deployed with:
+
+```bash
+bash ./ADO-create-new-aifactory-scaleset.sh
+```
+
+The launcher prompts for topology, access mode, subscription, region, CIDR,
+naming, deployment identity, seeding Key Vault, team group, and Azure DevOps
+project/repository. It prefers a user-assigned managed identity with workload
+identity federation, creates the Azure DevOps service connection and YAML
+pipelines, commits the generated automation, runs the common pipeline, verifies
+the common resource group, and then runs the first project pipeline. Use
+`--dry-run` to review the plan or `--prepare-only` to stop before deployment.
+
 1) Add or Update the submodule to your repo (to get the bootstrap files)
 
     ADD, if you are the first developer to checkin the code. Run from your repo root location:
