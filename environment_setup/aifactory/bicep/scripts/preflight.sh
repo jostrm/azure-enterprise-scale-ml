@@ -77,6 +77,7 @@ Environment escape hatches:
   PREFLIGHT_SKIP=true                  bypass everything
   PREFLIGHT_SKIP_AZURE_LOOKUPS=true    config-only (no az calls)
   LZ_PREFLIGHT_REGIONAL_SKIP=true      skip regional readiness only
+  PREFLIGHT_REPORT_DIR=<directory>    optional v1 JSON reports (requires tenantId/TENANT_ID)
 EOF
 }
 
@@ -131,9 +132,22 @@ ci_warning() {
 FAIL_COUNT=0
 WARN_COUNT=0
 FINDINGS=()   # "SEVERITY|CODE|MESSAGE|HINT"
+REPORT_FINDINGS=() # NUL-delimited at EXIT; preserve each finding's subscription.
+REPORT_COMPLETED="false"
+
+record_report_finding() {
+  [ -n "${PREFLIGHT_REPORT_DIR:-}" ] || return 0
+  local report_code="$2"
+  # Malformed usage responses must not become evidence of unavailable capacity.
+  if [ "$report_code" = "SEARCH_SKU_UNAVAILABLE" ] && [ "${search_discovery_valid:-}" != "true" ]; then
+    report_code="SEARCH_QUOTA_UNVALIDATED"
+  fi
+  REPORT_FINDINGS+=("${envname:-}" "${sub:-}" "$1" "$report_code" "$3" "${AI_SEARCH_TIER:-}")
+}
 
 add_finding() { # $1 sev  $2 code  $3 msg  $4 hint
   FINDINGS+=("$1|$2|$3|${4:-}")
+  record_report_finding "$1" "$2" "$3"
   case "$1" in
     # In WARN_ONLY mode a FAIL is still counted (for the summary) but surfaced as a
     # warning annotation so it never marks the CI task red / blocks the pipeline.
@@ -146,6 +160,29 @@ add_finding() { # $1 sev  $2 code  $3 msg  $4 hint
 # -----------------------------------------------------------------------------
 # 3. Skip / login guards
 # -----------------------------------------------------------------------------
+write_preflight_report() {
+  local original_status=$? report_python report_script
+  if [ -n "${PREFLIGHT_REPORT_DIR:-}" ]; then
+    report_python="${PYBIN:-$(command -v python3 2>/dev/null || command -v python 2>/dev/null || true)}"
+    report_script="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/region_report.py"
+    if [ -n "$report_python" ] && [ -f "$report_script" ]; then
+      export PF_REPORT_REGION="${LOCATION:-${OVERRIDE_LOCATION:-${admin_location:-${AIFACTORY_LOCATION:-}}}}"
+      export PF_REPORT_ENVIRONMENT="${ONLY_ENV:-}"
+      export PF_REPORT_SUBSCRIPTION_ID="${OVERRIDE_SUB:-}"
+      export PF_REPORT_COMPLETED="$REPORT_COMPLETED"
+      export PF_REPORT_EXIT_CODE="$original_status"
+      export PF_REPORT_TARGETS="$(printf '%s\n' "${TARGETS[@]:-}")"
+      { if [ "${#REPORT_FINDINGS[@]}" -gt 0 ]; then printf '%s\0' "${REPORT_FINDINGS[@]}"; fi; } |
+        "$report_python" "$report_script" preflight ||
+        echo "WARNING: AI Factory preflight report unavailable; original exit status is unchanged." >&2
+    else
+      echo "WARNING: AI Factory preflight report requires Python and region_report.py." >&2
+    fi
+  fi
+  return "$original_status"
+}
+trap write_preflight_report EXIT
+
 if [ "$SKIP" = "true" ]; then
   echo "preflight: PREFLIGHT_SKIP/--skip set -> skipping all checks (exit 0)."
   exit 0
@@ -390,7 +427,7 @@ az_capture() { # args: az subcommand + flags
 
 check_ai_search_quota() { # $1 subId
   is_true "$ENABLE_AI_SEARCH" || return 0
-  local sub="$1" sku url payload limit cur avail
+  local sub="$1" sku url payload limit cur avail search_discovery_valid
   sku="$(lc "$AI_SEARCH_TIER")"
   url="https://management.azure.com/subscriptions/$sub/providers/Microsoft.Search/locations/$LOCATION/usages?api-version=2025-05-01"
   az_capture rest --method get --url "$url" -o json; payload="$AZ_OUT"
@@ -405,7 +442,7 @@ check_ai_search_quota() { # $1 subId
     return 0
   fi
   # find usage entry whose name.value matches the sku (case-insensitive)
-  read -r limit cur < <(printf '%s' "$payload" | az_jq_search "$sku" | tr -d '\r')
+  read -r limit cur search_discovery_valid < <(printf '%s' "$payload" | az_jq_search "$sku" | tr -d '\r')
   # strip any stray non-digits (e.g. a CR from a Windows/Git-Bash python emitting CRLF)
   limit="${limit//[^0-9]/}"; cur="${cur//[^0-9]/}"
   if [ -z "$limit" ]; then
@@ -413,6 +450,7 @@ check_ai_search_quota() { # $1 subId
       "Pick a supported SKU/region for Azure AI Search."
     return 0
   fi
+  record_report_finding PASS SEARCH_SKU_AVAILABLE "SKU listed; live capacity is not established."
   avail=$(( limit - ${cur:-0} ))
   if [ "$limit" -le 0 ] || [ "$avail" -le 0 ]; then
     add_finding FAIL SEARCH_QUOTA_AT_LIMIT \
@@ -420,6 +458,7 @@ check_ai_search_quota() { # $1 subId
       "Request a quota increase or pick another region/SKU."
   else
     echo "  [OK] AI Search '$AI_SEARCH_TIER' in $LOCATION: $avail of $limit available."
+    record_report_finding PASS SEARCH_QUOTA_HEADROOM "Quota headroom; live capacity is not established."
   fi
 }
 
@@ -433,12 +472,17 @@ try:
     data = json.loads(os.environ.get("PF_JSON", "") or "")
 except Exception:
     sys.exit(0)
-for it in data.get("value", []):
+items = data.get("value") if isinstance(data, dict) else None
+if not isinstance(items, list):
+    sys.exit(0)
+for it in items:
     name = (it.get("name") or {})
     val = str(name.get("value", "")).lower()
     if val == sku:
         print(int(it.get("limit", 0)), int(it.get("currentValue", 0)))
         break
+else:
+    print("MISSING MISSING true")
 PY
 }
 
@@ -1066,6 +1110,7 @@ done
 # -----------------------------------------------------------------------------
 # 9. Report + exit
 # -----------------------------------------------------------------------------
+REPORT_COMPLETED="true"
 echo ""
 echo "============================================================"
 echo " PREFLIGHT RESULT: ${FAIL_COUNT} FAIL / ${WARN_COUNT} WARN"

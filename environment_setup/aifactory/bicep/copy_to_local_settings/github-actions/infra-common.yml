@@ -23,6 +23,7 @@ jobs:
     environment: dev
     runs-on: ubuntu-latest
     env:
+      AIFACTORY_REPORT_JOB: common-dev
       dev_test_prod: dev
       dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}"
       network_env: "${{ vars.DEV_NETWORK_ENV || vars.NETWORK_ENV || 'dev' }}"
@@ -96,15 +97,15 @@ jobs:
       lakeContainerName: "${{ vars.LAKE_CONTAINER_NAME }}"
       adminUsername: "${{ vars.ADMIN_USERNAME }}"
     steps:
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: true
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       # ---------------------------------------------------------------------
       # PREFLIGHT (early, fail-fast): validate region support, resource-provider
@@ -117,6 +118,7 @@ jobs:
         shell: bash
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-dev
           admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
           enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
           enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
@@ -345,6 +347,28 @@ jobs:
             --parameters enableDatafactoryCommon="${{ env.enableDatafactoryCommon }}" \
             --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"
 
+      - name: Report final pipeline job result (offline)
+        if: always()
+        shell: bash
+        env:
+          AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}
+          AIFACTORY_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-dev
+        run: |
+          helper="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/write-pipeline-region-report.sh"
+          if [ -f "$helper" ]; then bash "$helper"; else
+            echo "WARNING: AI Factory region report helper is unavailable (checkout may have failed)."
+          fi
+
+      - name: Publish AI Factory region reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: aifactory-region-reports-common-dev-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-dev/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
   common-stage:
     name: Stage Common
     needs: common-dev
@@ -352,6 +376,7 @@ jobs:
     environment: stage
     runs-on: ubuntu-latest
     env:
+      AIFACTORY_REPORT_JOB: common-stage
       dev_test_prod: test
       dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}"
       network_env: "${{ vars.STAGE_NETWORK_ENV || vars.NETWORK_ENV || 'test' }}"
@@ -425,15 +450,15 @@ jobs:
       lakeContainerName: "${{ vars.LAKE_CONTAINER_NAME }}"
       adminUsername: "${{ vars.ADMIN_USERNAME }}"
     steps:
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: true
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       # ---------------------------------------------------------------------
       # PREFLIGHT (early, fail-fast): validate region support, resource-provider
@@ -446,6 +471,7 @@ jobs:
         shell: bash
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-stage
           admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
           enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
           enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
@@ -671,6 +697,28 @@ jobs:
             --parameters enableDatafactoryCommon="${{ env.enableDatafactoryCommon }}" \
             --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"
 
+      - name: Report final pipeline job result (offline)
+        if: always()
+        shell: bash
+        env:
+          AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}
+          AIFACTORY_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-stage
+        run: |
+          helper="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/write-pipeline-region-report.sh"
+          if [ -f "$helper" ]; then bash "$helper"; else
+            echo "WARNING: AI Factory region report helper is unavailable (checkout may have failed)."
+          fi
+
+      - name: Publish AI Factory region reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: aifactory-region-reports-common-stage-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-stage/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
   common-prod:
     name: Prod Common
     needs:
@@ -680,6 +728,7 @@ jobs:
     environment: prod
     runs-on: ubuntu-latest
     env:
+      AIFACTORY_REPORT_JOB: common-prod
       dev_test_prod: prod
       dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}"
       network_env: "${{ vars.PROD_NETWORK_ENV || vars.NETWORK_ENV || 'prod' }}"
@@ -753,15 +802,15 @@ jobs:
       lakeContainerName: "${{ vars.LAKE_CONTAINER_NAME }}"
       adminUsername: "${{ vars.ADMIN_USERNAME }}"
     steps:
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: true
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       # ---------------------------------------------------------------------
       # PREFLIGHT (early, fail-fast): validate region support, resource-provider
@@ -774,6 +823,7 @@ jobs:
         shell: bash
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-prod
           admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
           enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
           enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
@@ -998,3 +1048,24 @@ jobs:
             --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
             --parameters enableDatafactoryCommon="${{ env.enableDatafactoryCommon }}" \
             --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"
+      - name: Report final pipeline job result (offline)
+        if: always()
+        shell: bash
+        env:
+          AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}
+          AIFACTORY_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-prod
+        run: |
+          helper="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/write-pipeline-region-report.sh"
+          if [ -f "$helper" ]; then bash "$helper"; else
+            echo "WARNING: AI Factory region report helper is unavailable (checkout may have failed)."
+          fi
+
+      - name: Publish AI Factory region reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: aifactory-region-reports-common-prod-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-prod/*.json
+          if-no-files-found: warn
+          retention-days: 14

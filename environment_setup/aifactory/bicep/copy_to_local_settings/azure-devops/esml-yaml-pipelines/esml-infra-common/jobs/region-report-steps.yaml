@@ -1,0 +1,36 @@
+steps:
+- task: Bash@3
+  displayName: 'Report final pipeline job result (offline)'
+  condition: always()
+  inputs:
+    targetType: inline
+    script: |
+      echo "##vso[task.setvariable variable=aifactoryRegionReportReady]false"
+      helper="$SYSTEM_DEFAULTWORKINGDIRECTORY/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/write-pipeline-region-report.sh"
+      if [ -f "$helper" ]; then
+        bash "$helper"
+      else
+        echo "WARNING: AI Factory region report helper is unavailable (checkout may have failed)."
+      fi
+      report_dir="$AIFACTORY_REPORT_DIR"
+      if command -v cygpath >/dev/null 2>&1; then report_dir="$(cygpath -u "$report_dir")"; fi
+      if compgen -G "$report_dir/*.json" >/dev/null; then
+        echo "##vso[task.setvariable variable=aifactoryRegionReportReady]true"
+      fi
+      exit 0
+  env:
+    AIFACTORY_REPORT_DIR: $(Build.ArtifactStagingDirectory)/aifactory-region-reports/$(System.JobId)-$(System.JobAttempt)
+    AIFACTORY_REPORT_REGION: $(admin_location)
+    AIFACTORY_REPORT_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
+    AIFACTORY_REPORT_TENANT_ID: $(tenantId)
+    AIFACTORY_REPORT_ENVIRONMENT: $(dev_test_prod)
+    AIFACTORY_REPORT_JOB_STATUS: $(Agent.JobStatus)
+
+- task: PublishPipelineArtifact@1
+  displayName: 'Publish AI Factory region reports'
+  condition: and(always(), eq(variables['aifactoryRegionReportReady'], 'true'))
+  continueOnError: true
+  inputs:
+    targetPath: $(Build.ArtifactStagingDirectory)/aifactory-region-reports/$(System.JobId)-$(System.JobAttempt)
+    artifact: aifactory-region-reports-$(System.StageName)-$(System.JobName)-$(System.JobAttempt)
+    publishLocation: pipeline

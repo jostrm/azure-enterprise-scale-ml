@@ -52,6 +52,8 @@ steps:
     arguments: '--environment "$(dev_test_prod)" --subscription "$(dev_test_prod_sub_id)" --location "$(admin_location)"'
   env:
     PREFLIGHT_SKIP: $(preflight_skip)
+    PREFLIGHT_REPORT_DIR: $(Build.ArtifactStagingDirectory)/aifactory-region-reports/$(System.JobId)-$(System.JobAttempt)
+    AIFACTORY_REPORT_TENANT_ID: $(tenantId)
     admin_location: $(admin_location)
     admin_aiSearchTier: $(admin_aiSearchTier)
     enableAISearch: $(enableAISearch)
@@ -5663,3 +5665,5 @@ steps:
       else
         echo "No registry name found - skipping public access disable"
       fi
+
+- template: ../../esml-infra-common/jobs/region-report-steps.yaml

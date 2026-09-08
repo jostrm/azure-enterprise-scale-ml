@@ -1,4 +1,5 @@
 variables:
+  aifactory-dash-01: "" # <optional>Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard.<default>""
   # ============================================================f================  
   # MANDATORY(CHANGE ONCE) - UPDATING submodule RELEASE version
   # If you want to upgrade the AIFactory (Long Term Support branches exists)
