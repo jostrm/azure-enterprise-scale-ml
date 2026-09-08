@@ -6,6 +6,7 @@ readonly AIF_SUBMODULE_URL="https://github.com/jostrm/azure-enterprise-scale-ml"
 readonly AIF_SUBMODULE_BRANCH="${AIF_SUBMODULE_BRANCH:-release/v1.24}"
 readonly AIF_ADO_RESOURCE="https://app.vssps.visualstudio.com/"
 readonly AIF_SCALESET_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export MSYS2_ARG_CONV_EXCL="${MSYS2_ARG_CONV_EXCL:+$MSYS2_ARG_CONV_EXCL;}/subscriptions/;/providers/;scope=/subscriptions/;privateLinksDnsZones="
 
 aif_scaleset_usage() {
   cat <<'EOF'
@@ -690,17 +691,19 @@ aif_register_resource_providers() {
     Microsoft.AppConfiguration Microsoft.Web
     Microsoft.OperationalInsights microsoft.insights
   )
-  local provider
+  local provider provider_error
   aif_info "Registering AI Factory resource providers in $subscription_id."
   for provider in "${providers[@]}"; do
     if [[ "$AIF_DRY_RUN" == "true" ]]; then
       aif_info "DRY-RUN: az provider register --namespace $provider --subscription $subscription_id"
     else
-      az provider register \
+      if ! provider_error="$(az provider register \
         --namespace "$provider" \
         --subscription "$subscription_id" \
         --output none \
-        --only-show-errors || aif_warn "Provider registration request failed: $provider"
+        --only-show-errors 2>&1)"; then
+        aif_warn "Provider registration was not permitted or available: $provider"
+      fi
     fi
   done
   if [[ "$AIF_DRY_RUN" != "true" ]]; then
