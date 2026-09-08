@@ -35,6 +35,7 @@ Common non-interactive variables:
   AIF_PROJECT_NUMBER=001
   AIF_TEAM_GROUP_NAME=acme-ai-prj001-team
   AIF_TEAM_MEMBER_EMAIL=jostrm@microsoft.com
+  AIF_SETUP_HUB_ACCESS=y|n
   AIF_CONFIGURE_VPN_CLIENT=y|n
   ADO_RUNNER_MODE=s|h
 EOF
@@ -323,6 +324,7 @@ aif_collect_answers() {
   AIF_ACCESS_HUB_VNET_NAME="${AIF_ACCESS_HUB_VNET_NAME:-}"
   AIF_ACCESS_HUB_VNET_CIDR="${AIF_ACCESS_HUB_VNET_CIDR:-}"
   AIF_VPN_CLIENT_CIDR="${AIF_VPN_CLIENT_CIDR:-}"
+  AIF_SETUP_HUB_ACCESS="${AIF_SETUP_HUB_ACCESS:-}"
   AIF_CONFIGURE_VPN_CLIENT="${AIF_CONFIGURE_VPN_CLIENT:-}"
   AIF_SEEDING_MODE="${AIF_SEEDING_MODE:-}"
   AIF_SEEDING_RESOURCE_GROUP="${AIF_SEEDING_RESOURCE_GROUP:-}"
@@ -394,12 +396,25 @@ aif_collect_answers() {
     else
       AIF_ACCESS_HUB_MODE="integrated"
     fi
-    local configure_vpn_client_default="n"
-    aif_is_windows && configure_vpn_client_default="y"
-    aif_prompt_yes_no AIF_CONFIGURE_VPN_CLIENT \
-      "Install and configure Azure VPN Client on this computer? (Y/n)" \
-      "$configure_vpn_client_default"
+    aif_info "Standalone with its own access hub can be reached through Azure VPN Gateway or Azure Bastion."
+    aif_info "The recommended setup enables an Entra-authenticated P2S VPN gateway in the hub and the free Bastion Developer SKU for the DEV admin VM."
+    if [[ "$AIF_ACCESS_HUB_MODE" == "external" || "$AIF_ACCESS_HUB_MODE" == "e" ]]; then
+      aif_info "Bastion Developer cannot traverse peering, so with an external hub it is placed in the DEV common VNet; with an integrated hub, that VNet is the hub."
+    fi
+    aif_prompt_yes_no AIF_SETUP_HUB_ACCESS \
+      "Set up Azure VPN Gateway in the hub and Bastion Developer for DEV? (Y/n)" \
+      "y"
+    if [[ "$AIF_SETUP_HUB_ACCESS" == "true" ]]; then
+      local configure_vpn_client_default="n"
+      aif_is_windows && configure_vpn_client_default="y"
+      aif_prompt_yes_no AIF_CONFIGURE_VPN_CLIENT \
+        "Install and configure Azure VPN Client on this computer? (Y/n)" \
+        "$configure_vpn_client_default"
+    else
+      AIF_CONFIGURE_VPN_CLIENT="false"
+    fi
   else
+    AIF_SETUP_HUB_ACCESS="false"
     AIF_CONFIGURE_VPN_CLIENT="false"
   fi
 
@@ -575,12 +590,7 @@ aif_collect_answers() {
       AIF_ENABLE_PUBLIC_PERIMETER="true"
       ;;
   esac
-  if [[ "$AIF_TOPOLOGY" == "s" && "$AIF_NETWORK_MODE" == "priv" ]]; then
-    aif_prompt_yes_no AIF_ADD_BASTION \
-      "Create Azure Bastion for private standalone access? (Y/n)" "y"
-  else
-    AIF_ADD_BASTION="false"
-  fi
+  AIF_ADD_BASTION="false"
 
   # The initial bootstrap intentionally deploys DEV only. Stage/Prod can be added
   # later with the configuration wizard after separate CIDRs/subscriptions exist.
@@ -603,6 +613,7 @@ aif_confirm_summary() {
   aif_value "Project" "$AIF_PROJECT_NUMBER"
   aif_value "Build runner" "$AIF_RUNNER_MODE"
   if [[ "$AIF_TOPOLOGY" == "s" ]]; then
+    aif_value "Hub VPN + DEV Bastion" "$AIF_SETUP_HUB_ACCESS"
     aif_value "Configure VPN client" "$AIF_CONFIGURE_VPN_CLIENT"
   fi
   aif_value "Team group" "$AIF_TEAM_GROUP_NAME"
@@ -1720,18 +1731,13 @@ aif_create_vpn_public_ip() {
     --only-show-errors
 }
 
-aif_ensure_vpn_access_hub() {
+aif_ensure_access_hub_vnet() {
   local mode="$1"
   local hub_subscription hub_resource_group hub_vnet hub_cidr
   hub_subscription="$AIF_HUB_SUBSCRIPTION_ID"
   hub_resource_group="$AIF_HUB_RESOURCE_GROUP"
   hub_vnet="$AIF_HUB_VNET_NAME"
   hub_cidr="$AIF_ACCESS_HUB_VNET_CIDR"
-  local gateway_subnet gateway_name public_ip_name
-  gateway_subnet="$(aif_last_subnet "$hub_cidr" 27)"
-  gateway_name="vpngw-aifactory-access-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"
-  public_ip_name="${gateway_name}-pip"
-
   aif_use_azure_tenant
   az provider register \
     --namespace Microsoft.Network \
@@ -1780,6 +1786,21 @@ aif_ensure_vpn_access_hub() {
     aif_error "Access-hub VNet '$hub_vnet' does not contain configured CIDR '$hub_cidr'." >&2
     exit 1
   fi
+}
+
+aif_ensure_vpn_access_hub() {
+  local mode="$1"
+  local hub_subscription hub_resource_group hub_vnet hub_cidr
+  hub_subscription="$AIF_HUB_SUBSCRIPTION_ID"
+  hub_resource_group="$AIF_HUB_RESOURCE_GROUP"
+  hub_vnet="$AIF_HUB_VNET_NAME"
+  hub_cidr="$AIF_ACCESS_HUB_VNET_CIDR"
+  local gateway_subnet gateway_name public_ip_name
+  gateway_subnet="$(aif_last_subnet "$hub_cidr" 27)"
+  gateway_name="vpngw-aifactory-access-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"
+  public_ip_name="${gateway_name}-pip"
+
+  aif_ensure_access_hub_vnet "$mode"
 
   if ! az network vnet subnet show \
     --subscription "$hub_subscription" \
@@ -1894,6 +1915,7 @@ aif_ensure_vpn_access_hub() {
     --aad-tenant "https://login.microsoftonline.com/$AIF_TENANT_ID" \
     --aad-audience "c632b3df-fb67-4d84-bdcf-b95ad541b5c8" \
     --aad-issuer "https://sts.windows.net/$AIF_TENANT_ID/" \
+    --custom-routes "$AIF_DEV_VNET_CIDR" \
     --output none
   az network vnet-gateway wait \
     --subscription "$hub_subscription" \
@@ -1904,6 +1926,47 @@ aif_ensure_vpn_access_hub() {
     --timeout 3600
   AIF_VPN_GATEWAY_NAME="$gateway_name"
   aif_success "Point-to-site VPN gateway '$gateway_name' is ready."
+}
+
+aif_ensure_bastion_developer() {
+  [[ "$AIF_SETUP_HUB_ACCESS" == "true" ]] || return 0
+  local subscription="$1" resource_group="$2" vnet_name="$3"
+  local bastion_name="bastion-${AIF_PREFIX%-}-${AIF_LOCATION_SHORT}-dev-${AIF_SCALESET_SUFFIX}"
+  local bastion_sku=""
+
+  if az network bastion show \
+    --subscription "$subscription" \
+    --resource-group "$resource_group" \
+    --name "$bastion_name" \
+    --output none 2>/dev/null; then
+    bastion_sku="$(az network bastion show \
+      --subscription "$subscription" \
+      --resource-group "$resource_group" \
+      --name "$bastion_name" \
+      --query sku.name \
+      --output tsv)"
+    bastion_sku="${bastion_sku//$'\r'/}"
+    aif_success "Azure Bastion '$bastion_name' already exists with SKU '$bastion_sku'."
+    return 0
+  fi
+
+  az network bastion create \
+    --subscription "$subscription" \
+    --resource-group "$resource_group" \
+    --name "$bastion_name" \
+    --location "$AIF_LOCATION" \
+    --sku Developer \
+    --vnet-name "$vnet_name" \
+    --no-wait \
+    --output none
+  az network bastion wait \
+    --subscription "$subscription" \
+    --resource-group "$resource_group" \
+    --name "$bastion_name" \
+    --created \
+    --interval 10 \
+    --timeout 900
+  aif_success "Azure Bastion Developer '$bastion_name' is ready for the DEV admin VM."
 }
 
 aif_configure_windows_vpn_client() {
@@ -1997,10 +2060,7 @@ PY
     "$AIF_SCALESET_LIB_DIR/aifactory_vpn_profile.py" \
     --input "$source_profile" \
     --output "$prepared_profile" \
-    --name "$profile_name" \
-    --dns-server "$AIF_DNS_RESOLVER_INBOUND_IP" \
-    --route "$AIF_DEV_VNET_CIDR" \
-    --route "$AIF_ACCESS_HUB_VNET_CIDR"
+    --name "$profile_name"
 
   local local_state_windows local_state profile_file profile_basename pbk
   local_state_windows="$(powershell.exe -NoProfile -NonInteractive -Command \
@@ -2008,7 +2068,7 @@ PY
   local_state_windows="${local_state_windows//$'\r'/}"
   local_state="$(cygpath -u "$local_state_windows")"
   mkdir -p "$local_state"
-  profile_basename="aifactory-${AIF_PREFIX%-}-${AIF_SCALESET_SUFFIX}.xml"
+  profile_basename="azurevpnconfig.xml"
   profile_file="$local_state/$profile_basename"
   pbk="$local_state/rasphone.pbk"
   if [[ -f "$profile_file" && -f "$pbk" ]] &&
@@ -2023,10 +2083,7 @@ PY
     aif_error "The AzureVpn.exe application alias is unavailable after installation." >&2
     exit 1
   fi
-  (
-    cd "$local_state"
-    AzureVpn.exe -i "$profile_basename" -f
-  )
+  (cd "$local_state" && AzureVpn.exe -i "$profile_basename")
   for ((attempt = 0; attempt < 30; attempt++)); do
     if [[ -f "$pbk" ]] && grep -Fqx "[$profile_name]" "$pbk"; then
       aif_success "Azure VPN Client profile '$profile_name' is configured."
@@ -2042,10 +2099,16 @@ aif_prepare_external_access_hub() {
   [[ "$AIF_ACCESS_HUB_MODE" == "external" ]] || return 0
   aif_section "12 / External AI Factory access hub"
   if [[ "$AIF_DRY_RUN" == "true" ]]; then
-    aif_info "DRY-RUN: create/reconcile external VNet, GatewaySubnet, VpnGw1AZ, and Entra-authenticated P2S configuration."
+    aif_info "DRY-RUN: create/reconcile the external access-hub VNet."
+    if [[ "$AIF_SETUP_HUB_ACCESS" == "true" ]]; then
+      aif_info "DRY-RUN: create/reconcile GatewaySubnet, VpnGw1AZ, and Entra-authenticated P2S configuration."
+    fi
     return 0
   fi
-  aif_ensure_vpn_access_hub external
+  aif_ensure_access_hub_vnet external
+  if [[ "$AIF_SETUP_HUB_ACCESS" == "true" ]]; then
+    aif_ensure_vpn_access_hub external
+  fi
 }
 
 aif_write_state_and_configure() {
@@ -3103,9 +3166,14 @@ aif_ensure_private_network_access() {
       --resource-group "$AIF_HUB_RESOURCE_GROUP" \
       --query '[].name' \
       --output tsv)
-  elif [[ "$AIF_ACCESS_HUB_MODE" == "integrated" ]]; then
+  elif [[ "$AIF_ACCESS_HUB_MODE" == "integrated" &&
+          "$AIF_SETUP_HUB_ACCESS" == "true" ]]; then
     aif_ensure_vpn_access_hub integrated
   fi
+  aif_ensure_bastion_developer \
+    "$AIF_DEV_SUBSCRIPTION_ID" \
+    "$common_rg" \
+    "$common_vnet"
 
   local seeding_kv_id seeding_pe_name zone_id
   seeding_kv_id="/subscriptions/$AIF_DEV_SUBSCRIPTION_ID/resourceGroups/$AIF_SEEDING_RESOURCE_GROUP/providers/Microsoft.KeyVault/vaults/$AIF_SEEDING_KEYVAULT_NAME"

@@ -100,7 +100,7 @@ def state() -> dict[str, object]:
 
 
 class TestScaleSetConfiguration(unittest.TestCase):
-    def test_vpn_profile_adds_name_dns_and_private_routes(self) -> None:
+    def test_vpn_profile_changes_only_the_connection_name(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / "source.xml"
@@ -117,28 +117,65 @@ class TestScaleSetConfiguration(unittest.TestCase):
                 source,
                 output,
                 "AI Factory spider-001",
-                "10.240.0.4",
-                ["172.16.0.0/18", "10.240.0.0/22", "172.16.0.0/18"],
             )
             profile = ET.parse(output).getroot()
             self.assertEqual(profile.findtext("name"), "AI Factory spider-001")
             client = profile.find("clientconfig")
             self.assertIsNotNone(client)
             assert client is not None
-            self.assertFalse(client.attrib)
             self.assertEqual(
-                client.findtext("dnsservers/dnsserver"),
-                "10.240.0.4",
+                output.read_text(encoding="utf-8"),
+                source.read_text(encoding="utf-8").replace(
+                    "<name>VNet</name>",
+                    "<name>AI Factory spider-001</name>",
+                ),
             )
-            routes = {
-                (route.findtext("destination"), route.findtext("mask"))
-                for route in client.findall("includeroutes/route")
-            }
-            self.assertEqual(
-                routes,
-                {("172.16.0.0", "18"), ("10.240.0.0", "22")},
+
+    def test_vpn_profile_preserves_data_contract_shape(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.xml"
+            output = root / "output.xml"
+            source.write_text(
+                '<?xml version="1.0"?>'
+                '<AzVpnProfile '
+                'xmlns="http://schemas.datacontract.org/2004/07/" '
+                'xmlns:i="http://www.w3.org/2001/XMLSchema-instance">'
+                '<clientconfig>'
+                '<dnsservers><DnsServerEntry>'
+                '<dnsserver>10.240.0.4</dnsserver>'
+                '</DnsServerEntry></dnsservers>'
+                '<includeroutes i:nil="true" />'
+                '</clientconfig>'
+                '<name>VNet</name>'
+                '</AzVpnProfile>',
+                encoding="utf-8",
             )
-            self.assertEqual(len(client.findall("includeroutes/route")), 2)
+            VPN.prepare_profile(
+                source,
+                output,
+                "AI Factory spider-001",
+            )
+            profile = ET.parse(output).getroot()
+            client = VPN.child(profile, "clientconfig")
+            assert client is not None
+            dns_servers = VPN.child(client, "dnsservers")
+            assert dns_servers is not None
+            dns_values = [
+                (element.text or "").strip()
+                for element in dns_servers.iter()
+                if VPN.local_name(element.tag) == "dnsserver"
+            ]
+            self.assertEqual(dns_values, ["10.240.0.4"])
+            include_routes = VPN.child(client, "includeroutes")
+            assert include_routes is not None
+            self.assertTrue(
+                any(
+                    VPN.local_name(key) == "nil"
+                    for key in include_routes.attrib
+                )
+            )
+            self.assertNotIn("ns0:", output.read_text(encoding="utf-8"))
 
     def test_subnet_plan_uses_first_four_26_networks(self) -> None:
         plan = CONFIG.subnet_plan("172.16.0.0/18")
@@ -329,7 +366,17 @@ class TestScaleSetWorkflowContracts(unittest.TestCase):
             script,
         )
         self.assertIn(
-            'AzureVpn.exe -i "$profile_basename" -f',
+            'profile_basename="azurevpnconfig.xml"',
+            script,
+        )
+        self.assertIn(
+            'AzureVpn.exe -i "$profile_basename"',
+            script,
+        )
+        self.assertIn('--custom-routes "$AIF_DEV_VNET_CIDR"', script)
+        self.assertIn("--sku Developer", script)
+        self.assertIn(
+            "Bastion Developer cannot traverse peering",
             script,
         )
 
