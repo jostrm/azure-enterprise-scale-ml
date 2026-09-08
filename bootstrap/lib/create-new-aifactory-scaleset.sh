@@ -2447,38 +2447,32 @@ aif_ensure_ado_pipeline() {
     echo 1
     return
   fi
-  local pipeline_id pipeline_json=""
-  if pipeline_json="$(az pipelines show \
+  local pipeline_id="" pipeline_values_output=""
+  if pipeline_values_output="$(az pipelines show \
     --organization "$ADO_ORGANIZATION" \
     --project "$ADO_PROJECT" \
     --name "$name" \
-    --output json 2>/dev/null)"; then
-    local pipeline_file="$AIF_STATE_DIR/pipeline-$name.json"
-    printf '%s' "$pipeline_json" > "$pipeline_file"
-    pipeline_id="$("${AIF_PYTHON[@]}" - \
-      "$pipeline_file" "$ADO_REPOSITORY_NAME" "$yaml_path" <<'PY'
-import json
-import sys
-from pathlib import PurePosixPath
-
-expected_repository = sys.argv[2].lower()
-expected_path = str(PurePosixPath(sys.argv[3].replace("\\", "/"))).lstrip("/").lower()
-pipeline = json.load(open(sys.argv[1], encoding="utf-8"))
-repository = pipeline.get("repository") or {}
-process = pipeline.get("process") or pipeline.get("configuration") or {}
-actual_repository = str(repository.get("name") or "").lower()
-actual_path = str(
-    process.get("yamlFilename") or process.get("path") or ""
-).replace("\\", "/").lstrip("/").lower()
-branch = str(repository.get("defaultBranch") or "").removeprefix("refs/heads/").lower()
-if actual_repository != expected_repository or actual_path != expected_path or branch != "main":
-    raise SystemExit(
-        "Existing pipeline name is bound to a different repository, branch, or YAML path: "
-        f"repository={actual_repository!r}, branch={branch!r}, path={actual_path!r}"
-    )
-print(pipeline["id"])
-PY
-)"
+    --query '[id,repository.name,process.yamlFilename,repository.defaultBranch]' \
+    --output tsv 2>/dev/null)"; then
+    local -a pipeline_values=()
+    local expected_path actual_repository actual_path branch
+    pipeline_values_output="${pipeline_values_output//$'\r'/}"
+    mapfile -t pipeline_values <<< "$pipeline_values_output"
+    pipeline_id="${pipeline_values[0]:-}"
+    actual_repository="${pipeline_values[1]:-}"
+    actual_path="${pipeline_values[2]:-}"
+    branch="${pipeline_values[3]:-}"
+    expected_path="${yaml_path//\\//}"
+    expected_path="${expected_path#/}"
+    actual_path="${actual_path//\\//}"
+    actual_path="${actual_path#/}"
+    branch="${branch#refs/heads/}"
+    if [[ "${actual_repository,,}" != "${ADO_REPOSITORY_NAME,,}" ||
+          "${actual_path,,}" != "${expected_path,,}" ||
+          "${branch,,}" != "main" ]]; then
+      aif_error "Existing pipeline name is bound to a different repository, branch, or YAML path: repository='$actual_repository', branch='$branch', path='$actual_path'." >&2
+      exit 1
+    fi
   else
     pipeline_id="$(az pipelines create \
       --organization "$ADO_ORGANIZATION" \
@@ -2492,7 +2486,10 @@ PY
       --query id \
       --output tsv)"
   fi
-  pipeline_id="${pipeline_id//$'\r'/}"
+  if [[ -z "$pipeline_id" ]]; then
+    aif_error "Azure DevOps did not return an ID for pipeline '$name'." >&2
+    exit 1
+  fi
   echo "$pipeline_id"
 }
 
