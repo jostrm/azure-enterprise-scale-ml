@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -38,14 +39,28 @@ def env_value(name: str, default: str = "") -> str:
 
 
 def az_cli(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["az", *args],
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
+    executable = shutil.which("az")
+    if not executable:
+        raise RuntimeError("Azure CLI is required for dashboard reconciliation; 'az' was not found on PATH.")
+    command = [executable]
+    if sys.platform == "win32" and Path(executable).suffix.lower() in (".cmd", ".bat"):
+        # Use the CLI's own runtime, as in cleanup-project-orphan-roles.py, not cmd.exe:
+        # dashboard URLs, ETags, and JSON-file arguments must stay literal.
+        cli_python = Path(executable).parent.parent / "python.exe"
+        if not cli_python.is_file():
+            raise RuntimeError(f"Cannot locate the Windows Azure CLI Python runtime: {cli_python}")
+        command = [str(cli_python), "-X", "utf8", "-IBm", "azure.cli"]
+    try:
+        return subprocess.run(
+            [*command, *args],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except OSError as error:
+        raise RuntimeError(f"Unable to launch Azure CLI for dashboard reconciliation: {error}") from error
 
 
 def error_code(result: subprocess.CompletedProcess[str]) -> str | None:
