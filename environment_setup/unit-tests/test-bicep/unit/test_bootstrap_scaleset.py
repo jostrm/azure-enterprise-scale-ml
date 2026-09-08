@@ -243,6 +243,26 @@ class TestScaleSetConfiguration(unittest.TestCase):
 
 
 class TestScaleSetWorkflowContracts(unittest.TestCase):
+    def test_vpn_public_ip_recovers_from_required_subscription_feature(self) -> None:
+        script = (
+            BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "Microsoft.Network/AllowBringYourOwnPublicIpAddress",
+            script,
+        )
+        self.assertIn(
+            "--name AllowBringYourOwnPublicIpAddress",
+            script,
+        )
+        self.assertIn(
+            'aif_create_vpn_public_ip \\\n'
+            '      "$hub_subscription" \\\n'
+            '      "$hub_resource_group" \\\n'
+            '      "$public_ip_name"',
+            script,
+        )
+
     def test_github_workflows_support_oidc_and_sp_fallback(self) -> None:
         common = (GHA_ROOT / "infra-common.yml").read_text(encoding="utf-8")
         project = (GHA_ROOT / "infra-project.yml").read_text(encoding="utf-8")
