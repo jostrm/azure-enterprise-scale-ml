@@ -1632,6 +1632,73 @@ PY
   aif_success "DNS Private Resolver inbound endpoint is available at $inbound_ip."
 }
 
+aif_create_vpn_public_ip() {
+  local subscription="$1"
+  local resource_group="$2"
+  local public_ip_name="$3"
+  local create_error="$AIF_STATE_DIR/vpn-public-ip-create.err"
+
+  if az network public-ip create \
+    --subscription "$subscription" \
+    --resource-group "$resource_group" \
+    --name "$public_ip_name" \
+    --location "$AIF_LOCATION" \
+    --allocation-method Static \
+    --sku Standard \
+    --version IPv4 \
+    --output none \
+    --only-show-errors 2>"$create_error"; then
+    rm -f -- "$create_error"
+    return 0
+  fi
+  if ! grep -qF "Microsoft.Network/AllowBringYourOwnPublicIpAddress" "$create_error"; then
+    cat "$create_error" >&2
+    rm -f -- "$create_error"
+    return 1
+  fi
+
+  aif_warn "The subscription policy requires the Microsoft.Network/AllowBringYourOwnPublicIpAddress feature; registering it and retrying."
+  az feature register \
+    --subscription "$subscription" \
+    --namespace Microsoft.Network \
+    --name AllowBringYourOwnPublicIpAddress \
+    --output none
+  local attempt feature_state=""
+  for ((attempt = 0; attempt < 60; attempt++)); do
+    feature_state="$(az feature show \
+      --subscription "$subscription" \
+      --namespace Microsoft.Network \
+      --name AllowBringYourOwnPublicIpAddress \
+      --query properties.state \
+      --output tsv)"
+    feature_state="${feature_state//$'\r'/}"
+    [[ "$feature_state" == "Registered" ]] && break
+    sleep 10
+  done
+  if [[ "$feature_state" != "Registered" ]]; then
+    aif_error "Microsoft.Network/AllowBringYourOwnPublicIpAddress did not become registered." >&2
+    rm -f -- "$create_error"
+    return 1
+  fi
+  az provider register \
+    --subscription "$subscription" \
+    --namespace Microsoft.Network \
+    --wait \
+    --output none \
+    --only-show-errors
+  rm -f -- "$create_error"
+  az network public-ip create \
+    --subscription "$subscription" \
+    --resource-group "$resource_group" \
+    --name "$public_ip_name" \
+    --location "$AIF_LOCATION" \
+    --allocation-method Static \
+    --sku Standard \
+    --version IPv4 \
+    --output none \
+    --only-show-errors
+}
+
 aif_ensure_vpn_access_hub() {
   local mode="$1"
   local hub_subscription hub_resource_group hub_vnet hub_cidr
@@ -1732,15 +1799,10 @@ aif_ensure_vpn_access_hub() {
     --resource-group "$hub_resource_group" \
     --name "$public_ip_name" \
     --output none 2>/dev/null; then
-    az network public-ip create \
-      --subscription "$hub_subscription" \
-      --resource-group "$hub_resource_group" \
-      --name "$public_ip_name" \
-      --location "$AIF_LOCATION" \
-      --allocation-method Static \
-      --sku Standard \
-      --version IPv4 \
-      --output none
+    aif_create_vpn_public_ip \
+      "$hub_subscription" \
+      "$hub_resource_group" \
+      "$public_ip_name"
   fi
 
   if ! az network vnet-gateway show \
