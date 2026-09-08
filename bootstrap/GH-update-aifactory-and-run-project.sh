@@ -315,8 +315,10 @@ if not found:
 PY
 
 if [[ "$use_json_override" == "true" ]]; then
-  "${PYTHON[@]}" - "$CONFIG_FILE" "$CONFIG_TEMPLATE_FILE" "$RUNNER_LABEL" <<'PY'
+  "${PYTHON[@]}" - "$CONFIG_FILE" "$CONFIG_TEMPLATE_FILE" "$RUNNER_LABEL" "$state_dir/current.env" <<'PY'
 import json
+import re
+import shlex
 import sys
 from collections import OrderedDict
 from pathlib import Path
@@ -324,6 +326,7 @@ from pathlib import Path
 active_path = Path(sys.argv[1])
 template_path = Path(sys.argv[2])
 runner_label = sys.argv[3]
+env_path = Path(sys.argv[4])
 
 if not active_path.is_file():
     raise SystemExit(f"Active configuration file is missing: {active_path}")
@@ -346,6 +349,30 @@ def merge(template_value, active_value):
     return active_value
 
 merged = merge(template, active)
+github_defaults = {
+    "GITHUB_USERNAME": "",
+    "GITHUB_USE_SSH": "false",
+    "GITHUB_TEMPLATE_REPO": "azure/enterprise-scale-aifactory",
+    "GITHUB_NEW_REPO": "",
+    "GITHUB_NEW_REPO_VISIBILITY": "public",
+}
+github_values = dict(github_defaults)
+if env_path.is_file():
+    for line in env_path.read_text(encoding="utf-8-sig").splitlines():
+        assignment = re.match(r"^\s*(?:export\s+)?([A-Z_][A-Z0-9_]*)\s*=(.*)$", line)
+        if assignment and assignment[1] in github_defaults:
+            words = shlex.split(assignment[2], comments=True)
+            if len(words) > 1:
+                raise ValueError(f"Expected one value for {assignment[1]}")
+            github_values[assignment[1]] = words[0] if words else ""
+for section in ("dev", "stage_prod"):
+    if section not in merged:
+        continue
+    # Only backfill missing bootstrap identity; explicit JSON values always win.
+    for key, value in github_values.items():
+        if key not in active.get(section, {}):
+            merged[section][key] = value
+merged.setdefault("_wizard", {})["orchestrator"] = "gha"
 dev = merged.setdefault("dev", OrderedDict())
 dev["useSelfHostedBuildAgent"] = "true"
 dev["selfHostedRunnerLabel"] = runner_label

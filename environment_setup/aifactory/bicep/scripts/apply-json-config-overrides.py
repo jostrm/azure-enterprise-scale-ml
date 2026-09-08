@@ -71,11 +71,11 @@ def serialize(value: Any, variable_name: str) -> str:
 
 
 def selected_values(config: dict[str, Any], environment: str) -> tuple[dict[str, str], str]:
-    supported_keys = {"dev", "stage_prod"}
+    supported_keys = {"dev", "stage_prod", "_wizard"}
     unknown_keys = set(config).difference(supported_keys)
     if unknown_keys:
         fail(
-            "The root object supports only 'dev' and 'stage_prod'; found "
+            "The root object supports only 'dev', 'stage_prod' and '_wizard'; found "
             + ", ".join(sorted(unknown_keys))
             + "."
         )
