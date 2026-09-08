@@ -948,7 +948,7 @@ aif_ensure_target_repository() {
   else
     if [[ "$AIF_ROUTE" == "ado" ]]; then
       local ado_coordinates expected_organization
-      ado_coordinates="$(aif_current_ado_coordinates)"
+      ado_coordinates="$(aif_current_ado_coordinates | tr -d '\r')"
       mapfile -t ado_origin <<< "$ado_coordinates"
       expected_organization="${ADO_ORGANIZATION##*/}"
       if [[ "${ado_origin[0],,}" != "${expected_organization,,}" ||
