@@ -255,6 +255,12 @@ Do not store credentials, service-connection settings, or GitHub secrets in
 these files. GitHub Environments continue to provide the deployment identity
 and secrets; JSON is for non-secret AI Factory deployment configuration.
 
+The dashboard link keeps its configuration key `aifactory-dash-01` in JSON.
+The override reader explicitly maps it to the shell-safe runtime variable
+`AIFACTORY_DASHBOARD_URL` for GitHub Actions and Azure DevOps. Empty values and
+URL fragments are preserved. Other invalid variable names are still rejected;
+conflicting values supplied under both names fail instead of overwriting one.
+
 
 > [!TIP]
 >  A quicker & easier way? You can use the AIFactory Github Template repository to get a bootstrapped repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage), ready to run. All files copied already. Just configure and run.

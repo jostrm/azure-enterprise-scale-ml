@@ -68,6 +68,31 @@ confirm_commit_and_continue() {
   done
 }
 
+confirm_update_github_variables() {
+  local choice="${AIFACTORY_UPDATE_GITHUB_VARIABLES:-}"
+  while true; do
+    if [[ -z "$choice" ]]; then
+      printf '%s' "$(aif_prompt "Update GitHub variables and secrets from .env? [y/N]: ")" >&2
+      if ! IFS= read -r choice; then
+        return 1
+      fi
+    fi
+    choice="${choice%$'\r'}"
+    case "${choice,,}" in
+      y|yes)
+        return 0
+        ;;
+      ""|n|no)
+        return 1
+        ;;
+      *)
+        aif_warn "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
+        choice=""
+        ;;
+    esac
+  done
+}
+
 json_override_choice="${AIFACTORY_USE_JSON_OVERRIDE:-}"
 while true; do
   if [[ -z "$json_override_choice" && -t 0 ]]; then
@@ -477,7 +502,15 @@ mv -f .env.template .env
 rm -f "$CONFIG_TEMPLATE_FILE"
 
 aif_section "05 / Synchronize GitHub configuration"
-printf 'd\n\n\nn\n' | bash "10-GH-create-or-update-github-variables.sh"
+if [[ "$use_json_override" == "true" ]]; then
+  aif_info "JSON override supplies deployment variables; bulk .env synchronization is optional."
+  aif_info "The JSON file will still be uploaded as one AIFACTORY_CONFIG_JSON secret. Existing authentication secrets must already be configured."
+fi
+if [[ "$use_json_override" != "true" ]] || confirm_update_github_variables; then
+  printf 'd\n\n\nn\n' | bash "10-GH-create-or-update-github-variables.sh"
+else
+  aif_info "Skipped bulk GitHub variable/secret updates from .env. The workflow will use JSON override: $config_override_file"
+fi
 
 github_repo=$("${PYTHON[@]}" - <<'PY'
 import re
