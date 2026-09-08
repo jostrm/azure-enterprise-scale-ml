@@ -1646,6 +1646,7 @@ aif_create_vpn_public_ip() {
     --allocation-method Static \
     --sku Standard \
     --version IPv4 \
+    --zone 1 2 3 \
     --output none \
     --only-show-errors 2>"$create_error"; then
     rm -f -- "$create_error"
@@ -1695,6 +1696,7 @@ aif_create_vpn_public_ip() {
     --allocation-method Static \
     --sku Standard \
     --version IPv4 \
+    --zone 1 2 3 \
     --output none \
     --only-show-errors
 }
@@ -1794,6 +1796,38 @@ aif_ensure_vpn_access_hub() {
     "$hub_vnet" \
     "$hub_cidr"
 
+  if az network public-ip show \
+    --subscription "$hub_subscription" \
+    --resource-group "$hub_resource_group" \
+    --name "$public_ip_name" \
+    --output none 2>/dev/null; then
+    local public_ip_zones public_ip_binding
+    public_ip_zones="$(az network public-ip show \
+      --subscription "$hub_subscription" \
+      --resource-group "$hub_resource_group" \
+      --name "$public_ip_name" \
+      --query 'zones[]' \
+      --output tsv)"
+    public_ip_zones="${public_ip_zones//$'\r'/}"
+    if [[ -z "$public_ip_zones" ]]; then
+      public_ip_binding="$(az network public-ip show \
+        --subscription "$hub_subscription" \
+        --resource-group "$hub_resource_group" \
+        --name "$public_ip_name" \
+        --query ipConfiguration.id \
+        --output tsv)"
+      public_ip_binding="${public_ip_binding//$'\r'/}"
+      if [[ -n "$public_ip_binding" ]]; then
+        aif_error "VPN public IP '$public_ip_name' has no availability zones and is already attached to '$public_ip_binding'." >&2
+        exit 1
+      fi
+      aif_warn "Recreating VPN public IP '$public_ip_name' with availability zones required by the AZ gateway SKU."
+      az network public-ip delete \
+        --subscription "$hub_subscription" \
+        --resource-group "$hub_resource_group" \
+        --name "$public_ip_name"
+    fi
+  fi
   if ! az network public-ip show \
     --subscription "$hub_subscription" \
     --resource-group "$hub_resource_group" \
