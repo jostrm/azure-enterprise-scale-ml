@@ -5,6 +5,7 @@ set -euo pipefail
 readonly AIF_SUBMODULE_URL="https://github.com/jostrm/azure-enterprise-scale-ml"
 readonly AIF_SUBMODULE_BRANCH="${AIF_SUBMODULE_BRANCH:-release/v1.24}"
 readonly AIF_ADO_RESOURCE="https://app.vssps.visualstudio.com/"
+readonly AIF_SCALESET_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 aif_scaleset_usage() {
   cat <<'EOF'
@@ -33,6 +34,7 @@ Common non-interactive variables:
   AIF_PROJECT_NUMBER=001
   AIF_TEAM_GROUP_NAME=acme-ai-prj001-team
   AIF_TEAM_MEMBER_EMAIL=jostrm@microsoft.com
+  ADO_RUNNER_MODE=s|h
 EOF
 }
 
@@ -53,6 +55,22 @@ aif_require_command() {
     aif_error "Required command '$1' is not available." >&2
     exit 1
   fi
+}
+
+aif_cleanup() {
+  local resource_group
+  for resource_group in \
+    "${AIF_TEMP_BOOTSTRAP_RG:-}" \
+    "${AIF_TEMP_MANAGED_RG:-}"; do
+    [[ -n "$resource_group" ]] || continue
+    az group delete \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --name "$resource_group" \
+      --yes \
+      --no-wait \
+      --output none 2>/dev/null || true
+  done
+  [[ -z "${AIF_STATE_DIR:-}" ]] || rm -rf -- "$AIF_STATE_DIR"
 }
 
 aif_python() {
@@ -173,9 +191,33 @@ for item in filter(None, (part.strip() for part in sys.argv[1].split(","))):
 PY
 }
 
+aif_validate_network_plan() {
+  "${AIF_PYTHON[@]}" - "$@" <<'PY'
+import ipaddress
+import sys
+
+networks = [ipaddress.ip_network(value, strict=True) for value in sys.argv[1:]]
+for index, network in enumerate(networks):
+    for other in networks[index + 1:]:
+        if network.overlaps(other):
+            raise SystemExit(f"Overlapping network ranges: {network} and {other}")
+PY
+}
+
+aif_validate_access_hub_cidr() {
+  "${AIF_PYTHON[@]}" - "$1" <<'PY'
+import ipaddress
+import sys
+
+network = ipaddress.ip_network(sys.argv[1], strict=True)
+if network.version != 4 or network.prefixlen > 24:
+    raise SystemExit(1)
+PY
+}
+
 aif_resolve_repo_root() {
   if [[ -n "$AIF_REPO_ROOT" ]]; then
-    AIF_REPO_ROOT="$(cd "$AIF_REPO_ROOT" 2>/dev/null && pwd)"
+    AIF_REPO_ROOT="$(realpath -m "$AIF_REPO_ROOT")"
     return
   fi
   local entry_dir superproject
@@ -262,6 +304,12 @@ aif_collect_answers() {
   AIF_TEAM_GROUP_NAME="${AIF_TEAM_GROUP_NAME:-}"
   AIF_TEAM_MEMBER_EMAIL="${AIF_TEAM_MEMBER_EMAIL:-}"
   AIF_IP_ALLOWLIST="${AIF_IP_ALLOWLIST:-}"
+  AIF_ACCESS_HUB_MODE="${AIF_ACCESS_HUB_MODE:-}"
+  AIF_ACCESS_HUB_SUBSCRIPTION_ID="${AIF_ACCESS_HUB_SUBSCRIPTION_ID:-}"
+  AIF_ACCESS_HUB_RESOURCE_GROUP="${AIF_ACCESS_HUB_RESOURCE_GROUP:-}"
+  AIF_ACCESS_HUB_VNET_NAME="${AIF_ACCESS_HUB_VNET_NAME:-}"
+  AIF_ACCESS_HUB_VNET_CIDR="${AIF_ACCESS_HUB_VNET_CIDR:-}"
+  AIF_VPN_CLIENT_CIDR="${AIF_VPN_CLIENT_CIDR:-}"
   AIF_SEEDING_MODE="${AIF_SEEDING_MODE:-}"
   AIF_SEEDING_RESOURCE_GROUP="${AIF_SEEDING_RESOURCE_GROUP:-}"
   AIF_SEEDING_KEYVAULT_NAME="${AIF_SEEDING_KEYVAULT_NAME:-}"
@@ -277,8 +325,8 @@ aif_collect_answers() {
   aif_prompt_choice AIF_TOPOLOGY \
     "Topology: standalone (s) or hub/spoke with central DNS (hs)" "s" "s hs"
   aif_prompt_choice AIF_NETWORK_MODE \
-    "Networking: private (priv), hybrid/IP allowlist (h), or public perimeter (pub)" \
-    "priv" "priv h pub"
+    "Networking: private-only (priv; enforced by policy)" \
+    "priv" "priv"
   aif_prompt_choice AIF_IDENTITY_MODE \
     "Deployment identity: create managed identity (c), existing managed identity (mi), or existing service principal (sp)" \
     "c" "c mi sp"
@@ -307,11 +355,30 @@ aif_collect_answers() {
     exit 1
   fi
 
-  if [[ "$AIF_NETWORK_MODE" == "h" ]]; then
-    aif_prompt_value AIF_IP_ALLOWLIST "Client IPv4 address/range allowlist (comma-separated)" ""
-    if ! aif_validate_ip_allowlist "$AIF_IP_ALLOWLIST"; then
-      aif_error "The client IP allowlist contains an invalid IPv4 address or range." >&2
-      exit 1
+  if [[ "$AIF_TOPOLOGY" == "s" ]]; then
+    aif_prompt_choice AIF_ACCESS_HUB_MODE \
+      "Standalone access hub: integrated in DEV common network (i) or external connectivity subscription (e)" \
+      "i" "i e"
+    if [[ "$AIF_ACCESS_HUB_MODE" == "e" ]]; then
+      aif_prompt_value AIF_ACCESS_HUB_SUBSCRIPTION_ID \
+        "External access-hub subscription ID" ""
+      aif_prompt_value AIF_ACCESS_HUB_RESOURCE_GROUP \
+        "External access-hub and private-DNS resource group" \
+        "aifactory-connectivity"
+      aif_prompt_value AIF_ACCESS_HUB_VNET_CIDR \
+        "External access-hub vNet CIDR" "10.240.0.0/22"
+      aif_prompt_value AIF_VPN_CLIENT_CIDR \
+        "Point-to-site VPN client address pool" "172.31.240.0/24"
+      if ! aif_validate_access_hub_cidr "$AIF_ACCESS_HUB_VNET_CIDR" ||
+         ! aif_validate_network_plan \
+           "$AIF_DEV_VNET_CIDR" \
+           "$AIF_ACCESS_HUB_VNET_CIDR" \
+           "$AIF_VPN_CLIENT_CIDR"; then
+        aif_error "DEV, access-hub, and VPN client CIDRs must be valid, non-overlapping IPv4 ranges." >&2
+        exit 1
+      fi
+    else
+      AIF_ACCESS_HUB_MODE="integrated"
     fi
   fi
 
@@ -319,21 +386,12 @@ aif_collect_answers() {
   AIF_HUB_RESOURCE_GROUP="${AIF_HUB_RESOURCE_GROUP:-}"
   AIF_HUB_VNET_NAME="${AIF_HUB_VNET_NAME:-}"
   AIF_HUB_VNET_RESOURCE_GROUP="${AIF_HUB_VNET_RESOURCE_GROUP:-}"
-  AIF_HUB_DNS_POLICY_READY="${AIF_HUB_DNS_POLICY_READY:-}"
   if [[ "$AIF_TOPOLOGY" == "hs" ]]; then
     aif_prompt_value AIF_HUB_SUBSCRIPTION_ID "Hub subscription ID" ""
     aif_prompt_value AIF_HUB_RESOURCE_GROUP "Hub private-DNS resource group" ""
     aif_prompt_value AIF_HUB_VNET_NAME "Hub vNet name" ""
     aif_prompt_value AIF_HUB_VNET_RESOURCE_GROUP \
       "Hub vNet resource group" "$AIF_HUB_RESOURCE_GROUP"
-    aif_prompt_yes_no AIF_HUB_DNS_POLICY_READY \
-      "Is the private-endpoint DNS-zone-group policy assigned to the landing-zone subscriptions? (y/N)" \
-      "n"
-    if [[ "$AIF_HUB_DNS_POLICY_READY" != "true" ]]; then
-      aif_error "Hub/spoke requires the central private-DNS policy before deployment." >&2
-      aif_info "See documentation/v2/10-19/14-networking-privateDNS.md." >&2
-      exit 1
-    fi
   fi
 
   aif_section "02 / Azure scope and naming"
@@ -346,6 +404,11 @@ aif_collect_answers() {
   fi
   if [[ "$AIF_TOPOLOGY" == "hs" ]] && ! aif_validate_guid "$AIF_HUB_SUBSCRIPTION_ID"; then
     aif_error "Hub subscription ID must be a GUID." >&2
+    exit 1
+  fi
+  if [[ "$AIF_ACCESS_HUB_MODE" == "e" ]] &&
+     ! aif_validate_guid "$AIF_ACCESS_HUB_SUBSCRIPTION_ID"; then
+    aif_error "External access-hub subscription ID must be a GUID." >&2
     exit 1
   fi
 
@@ -366,10 +429,28 @@ aif_collect_answers() {
   printf -v AIF_SCALESET_SUFFIX '%03d' "$((10#$AIF_SCALESET_SUFFIX))"
   printf -v AIF_PROJECT_NUMBER '%03d' "$((10#$AIF_PROJECT_NUMBER))"
   AIF_SCALESET_SUFFIX_DASH="-$AIF_SCALESET_SUFFIX"
+  if [[ "$AIF_ACCESS_HUB_MODE" == "e" ]]; then
+    AIF_ACCESS_HUB_MODE="external"
+    AIF_HUB_SUBSCRIPTION_ID="$AIF_ACCESS_HUB_SUBSCRIPTION_ID"
+    AIF_HUB_RESOURCE_GROUP="$AIF_ACCESS_HUB_RESOURCE_GROUP"
+    AIF_HUB_VNET_RESOURCE_GROUP="$AIF_ACCESS_HUB_RESOURCE_GROUP"
+    AIF_HUB_VNET_NAME="${AIF_ACCESS_HUB_VNET_NAME:-vnet-aifactory-access-hub-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}}"
+  elif [[ "$AIF_ACCESS_HUB_MODE" == "integrated" ]]; then
+    AIF_HUB_SUBSCRIPTION_ID="$AIF_DEV_SUBSCRIPTION_ID"
+    AIF_HUB_RESOURCE_GROUP="${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"
+    AIF_HUB_VNET_RESOURCE_GROUP="$AIF_HUB_RESOURCE_GROUP"
+    AIF_HUB_VNET_NAME="vnt-esmlcmn-${AIF_LOCATION_SHORT}-dev-001"
+    AIF_ACCESS_HUB_VNET_CIDR="$AIF_DEV_VNET_CIDR"
+    AIF_VPN_CLIENT_CIDR="${AIF_VPN_CLIENT_CIDR:-172.31.240.0/24}"
+    if ! aif_validate_network_plan "$AIF_DEV_VNET_CIDR" "$AIF_VPN_CLIENT_CIDR"; then
+      aif_error "Integrated DEV and VPN client CIDRs must not overlap." >&2
+      exit 1
+    fi
+  fi
 
   local prefix_compact="${AIF_PREFIX//-/}"
-  AIF_BOOTSTRAP_RESOURCE_GROUP="${AIF_BOOTSTRAP_RESOURCE_GROUP:-rg-${AIF_PREFIX%-}bootstrap-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}}"
-  AIF_DEPLOYMENT_IDENTITY_NAME="${AIF_DEPLOYMENT_IDENTITY_NAME:-id-${AIF_PREFIX%-}deploy-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}}"
+  AIF_BOOTSTRAP_RESOURCE_GROUP="${AIF_BOOTSTRAP_RESOURCE_GROUP:-rg-${AIF_PREFIX%-}-bootstrap-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}}"
+  AIF_DEPLOYMENT_IDENTITY_NAME="${AIF_DEPLOYMENT_IDENTITY_NAME:-id-${AIF_PREFIX%-}-deploy-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}}"
   AIF_SEEDING_RESOURCE_GROUP="${AIF_SEEDING_RESOURCE_GROUP:-$AIF_BOOTSTRAP_RESOURCE_GROUP}"
   AIF_SEEDING_KEYVAULT_NAME="${AIF_SEEDING_KEYVAULT_NAME:-kv${prefix_compact}${AIF_LOCATION_SHORT}${AIF_SCALESET_SUFFIX}}"
   AIF_SEEDING_KEYVAULT_NAME="${AIF_SEEDING_KEYVAULT_NAME:0:24}"
@@ -404,6 +485,8 @@ aif_collect_answers() {
     ADO_REPOSITORY_NAME="${ADO_REPOSITORY_NAME:-$current_repo}"
     ADO_TENANT="${ADO_TENANT:-$AIF_TENANT_ID}"
     ADO_AUTH_METHOD="${ADO_AUTH_METHOD:-aad}"
+    ADO_RUNNER_MODE="${ADO_RUNNER_MODE:-}"
+    ADO_AGENT_POOL="${ADO_AGENT_POOL:-Default}"
     AZURE_DEVOPS_EXT_PAT="${AZURE_DEVOPS_EXT_PAT:-}"
     ADO_SERVICE_CONNECTION_NAME="${ADO_SERVICE_CONNECTION_NAME:-sc-${AIF_PREFIX%-}dev-${AIF_SCALESET_SUFFIX}}"
     aif_prompt_value ADO_ORGANIZATION "Azure DevOps organization name or URL" ""
@@ -420,12 +503,26 @@ aif_collect_answers() {
     fi
     aif_prompt_value ADO_SERVICE_CONNECTION_NAME "Azure DevOps service connection name" \
       "$ADO_SERVICE_CONNECTION_NAME"
+    aif_prompt_choice ADO_RUNNER_MODE \
+      "Project build agent: self-hosted admin VM (s) or Microsoft-hosted (h)" \
+      "h" "s h"
+    if [[ "$ADO_RUNNER_MODE" == "s" ]]; then
+      aif_prompt_value ADO_AGENT_POOL "Azure DevOps agent pool" "Default"
+      AIF_RUNNER_MODE="self-hosted"
+      ADO_AGENT_NAME="dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001"
+    else
+      AIF_RUNNER_MODE="microsoft-hosted"
+      ADO_AGENT_NAME=""
+    fi
     case "$ADO_ORGANIZATION" in
       http://*|https://*) ;;
       *) ADO_ORGANIZATION="https://dev.azure.com/$ADO_ORGANIZATION" ;;
     esac
     ADO_ORGANIZATION="${ADO_ORGANIZATION%/}"
   else
+    AIF_RUNNER_MODE="github-hosted"
+    ADO_AGENT_POOL=""
+    ADO_AGENT_NAME=""
     local github_owner=""
     github_owner="$(gh api user --jq .login 2>/dev/null || true)"
     GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-$current_repo}"
@@ -483,6 +580,7 @@ aif_confirm_summary() {
   aif_value "Prefix" "$AIF_PREFIX"
   aif_value "Scale set" "$AIF_SCALESET_SUFFIX_DASH"
   aif_value "Project" "$AIF_PROJECT_NUMBER"
+  aif_value "Build runner" "$AIF_RUNNER_MODE"
   aif_value "Team group" "$AIF_TEAM_GROUP_NAME"
   aif_value "Seeding vault" "$AIF_SEEDING_KEYVAULT_NAME"
   if [[ "$AIF_YES" == "true" ]]; then
@@ -501,7 +599,13 @@ aif_ensure_azure_login() {
   local current_tenant
   current_tenant="$(az account show --query tenantId --output tsv 2>/dev/null || true)"
   if [[ "$current_tenant" != "$AIF_TENANT_ID" ]]; then
-    aif_mutate az login --tenant "$AIF_TENANT_ID" --allow-no-subscriptions
+    if az account show \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --output none 2>/dev/null; then
+      az account set --subscription "$AIF_DEV_SUBSCRIPTION_ID"
+    else
+      aif_mutate az login --tenant "$AIF_TENANT_ID" --allow-no-subscriptions
+    fi
   fi
   if [[ "$AIF_DRY_RUN" != "true" ]]; then
     az account show --subscription "$AIF_DEV_SUBSCRIPTION_ID" --output none
@@ -517,18 +621,39 @@ aif_ensure_ado_auth() {
   if [[ "$ADO_AUTH_METHOD" == "pat" ]]; then
     return 0
   fi
+  ADO_CONTEXT_SUBSCRIPTION_ID="$(az account list --all \
+    --query "[?tenantId=='$ADO_TENANT'] | [0].id" \
+    --output tsv)"
+  if [[ -n "$ADO_CONTEXT_SUBSCRIPTION_ID" ]]; then
+    az account set --subscription "$ADO_CONTEXT_SUBSCRIPTION_ID"
+  fi
   if az account get-access-token \
     --resource "$AIF_ADO_RESOURCE" \
     --tenant "$ADO_TENANT" \
     --output none 2>/dev/null; then
-    return 0
-  fi
-  if [[ "$AIF_NON_INTERACTIVE" == "true" ]]; then
+    :
+  elif [[ "$AIF_NON_INTERACTIVE" == "true" ]]; then
     aif_error "No Microsoft Entra token is available for Azure DevOps tenant '$ADO_TENANT'." >&2
     aif_info "Sign in first or rerun with ADO_AUTH_METHOD=pat and AZURE_DEVOPS_EXT_PAT." >&2
     exit 1
+  else
+    aif_mutate az login --tenant "$ADO_TENANT" --allow-no-subscriptions
+    ADO_CONTEXT_SUBSCRIPTION_ID="$(az account list --all \
+      --query "[?tenantId=='$ADO_TENANT'] | [0].id" \
+      --output tsv)"
   fi
-  aif_mutate az login --tenant "$ADO_TENANT" --allow-no-subscriptions
+}
+
+aif_use_ado_tenant() {
+  if [[ "$AIF_ROUTE" == "ado" &&
+        "$ADO_AUTH_METHOD" != "pat" &&
+        -n "${ADO_CONTEXT_SUBSCRIPTION_ID:-}" ]]; then
+    az account set --subscription "$ADO_CONTEXT_SUBSCRIPTION_ID"
+  fi
+}
+
+aif_use_azure_tenant() {
+  az account set --subscription "$AIF_DEV_SUBSCRIPTION_ID"
 }
 
 aif_register_resource_providers() {
@@ -559,7 +684,8 @@ aif_register_resource_providers() {
   local required=(
     Microsoft.Resources Microsoft.Network Microsoft.Storage Microsoft.KeyVault
     Microsoft.ManagedIdentity Microsoft.CognitiveServices
-    Microsoft.MachineLearningServices Microsoft.Search Microsoft.DocumentDB
+    Microsoft.MachineLearningServices Microsoft.Databricks
+    Microsoft.Search Microsoft.DocumentDB
     Microsoft.ContainerRegistry Microsoft.App Microsoft.BotService
     Microsoft.AppConfiguration Microsoft.Web
     Microsoft.OperationalInsights microsoft.insights
@@ -587,6 +713,142 @@ aif_register_resource_providers() {
         --only-show-errors
     done
   fi
+}
+
+aif_ensure_first_party_enterprise_apps() {
+  local aml_app_id="0736f41a-0425-4b46-bdb5-1563eff02385"
+  local databricks_app_id="2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
+  AIF_AZURE_ML_PRINCIPAL_ID="$(az ad sp show \
+    --id "$aml_app_id" \
+    --query id \
+    --output tsv 2>/dev/null || true)"
+  AIF_DATABRICKS_PRINCIPAL_ID="$(az ad sp show \
+    --id "$databricks_app_id" \
+    --query id \
+    --output tsv 2>/dev/null || true)"
+  if [[ -n "$AIF_AZURE_ML_PRINCIPAL_ID" &&
+        -n "$AIF_DATABRICKS_PRINCIPAL_ID" ]]; then
+    aif_success "Azure Machine Learning and Azure Databricks enterprise applications exist."
+    return
+  fi
+  if [[ "$AIF_DRY_RUN" == "true" ]]; then
+    AIF_AZURE_ML_PRINCIPAL_ID="00000000-0000-0000-0000-000000000006"
+    AIF_DATABRICKS_PRINCIPAL_ID="00000000-0000-0000-0000-000000000007"
+    aif_info "DRY-RUN: create temporary Azure ML and Databricks workspaces, materialize both enterprise applications, then delete the temporary resources."
+    return
+  fi
+
+  aif_section "09 / First-party enterprise applications"
+  local timestamp bootstrap_rg managed_rg aml_name databricks_name
+  timestamp="$(date -u +%H%M%S)"
+  bootstrap_rg="rg-${AIF_PREFIX%-}app-bootstrap-${AIF_LOCATION_SHORT}-${timestamp}"
+  managed_rg="rg-${AIF_PREFIX%-}dbx-managed-${AIF_LOCATION_SHORT}-${timestamp}"
+  aml_name="aml-${AIF_PREFIX%-}bootstrap-${timestamp}"
+  databricks_name="dbx-${AIF_PREFIX%-}bootstrap-${timestamp}"
+
+  az group create \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --name "$bootstrap_rg" \
+    --location "$AIF_LOCATION" \
+    --tags Purpose=AIFactoryEnterpriseAppBootstrap \
+    --output none
+  AIF_TEMP_BOOTSTRAP_RG="$bootstrap_rg"
+  AIF_TEMP_MANAGED_RG="$managed_rg"
+
+  local bootstrap_status=0
+  if [[ -z "$AIF_AZURE_ML_PRINCIPAL_ID" ]]; then
+    if ! az extension show --name ml >/dev/null 2>&1; then
+      az extension add --name ml --only-show-errors
+    fi
+    aif_info "Creating temporary Azure ML workspace '$aml_name'."
+    if ! az ml workspace create \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --resource-group "$bootstrap_rg" \
+      --name "$aml_name" \
+      --location "$AIF_LOCATION" \
+      --public-network-access Enabled \
+      --output none; then
+      aif_warn "Temporary Azure ML workspace deployment returned an error; checking whether it materialized the enterprise application."
+    fi
+  fi
+
+  if [[ -z "$AIF_DATABRICKS_PRINCIPAL_ID" ]]; then
+    local databricks_body="$AIF_STATE_DIR/databricks-bootstrap.json"
+    "${AIF_PYTHON[@]}" - \
+      "$databricks_body" "$AIF_LOCATION" \
+      "/subscriptions/$AIF_DEV_SUBSCRIPTION_ID/resourceGroups/$managed_rg" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "w", encoding="utf-8") as output:
+    json.dump(
+        {
+            "location": sys.argv[2],
+            "sku": {"name": "standard"},
+            "properties": {
+                "managedResourceGroupId": sys.argv[3],
+                "publicNetworkAccess": "Enabled",
+                "requiredNsgRules": "AllRules",
+            },
+        },
+        output,
+    )
+PY
+    aif_info "Creating temporary Azure Databricks workspace '$databricks_name'."
+    if ! az rest \
+      --method put \
+      --url "https://management.azure.com/subscriptions/$AIF_DEV_SUBSCRIPTION_ID/resourceGroups/$bootstrap_rg/providers/Microsoft.Databricks/workspaces/$databricks_name?api-version=2024-05-01" \
+      --body "@$databricks_body" \
+      --output none; then
+      aif_warn "Temporary Databricks workspace deployment returned an error; checking whether it materialized the enterprise application."
+    fi
+  fi
+
+  local attempt
+  for attempt in {1..60}; do
+    AIF_AZURE_ML_PRINCIPAL_ID="$(az ad sp show \
+      --id "$aml_app_id" \
+      --query id \
+      --output tsv 2>/dev/null || true)"
+    AIF_DATABRICKS_PRINCIPAL_ID="$(az ad sp show \
+      --id "$databricks_app_id" \
+      --query id \
+      --output tsv 2>/dev/null || true)"
+    if [[ -n "$AIF_AZURE_ML_PRINCIPAL_ID" &&
+          -n "$AIF_DATABRICKS_PRINCIPAL_ID" ]]; then
+      break
+    fi
+    sleep 10
+  done
+  if [[ -z "$AIF_AZURE_ML_PRINCIPAL_ID" ||
+        -z "$AIF_DATABRICKS_PRINCIPAL_ID" ]]; then
+    bootstrap_status=1
+  fi
+
+  aif_info "Removing temporary enterprise-application bootstrap resources."
+  az group delete \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --name "$bootstrap_rg" \
+    --yes \
+    --output none || bootstrap_status=1
+  if [[ "$(az group exists \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --name "$managed_rg" \
+    --output tsv)" == "true" ]]; then
+    az group delete \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --name "$managed_rg" \
+      --yes \
+      --output none || bootstrap_status=1
+  fi
+
+  if [[ "$bootstrap_status" -ne 0 ]]; then
+    aif_error "Could not materialize and clean up both first-party enterprise applications." >&2
+    exit 1
+  fi
+  AIF_TEMP_BOOTSTRAP_RG=""
+  AIF_TEMP_MANAGED_RG=""
+  aif_success "Azure ML and Databricks enterprise applications are materialized; temporary resources were removed."
 }
 
 aif_ensure_role_assignment() {
@@ -631,6 +893,7 @@ aif_ensure_target_repository() {
   fi
 
   if [[ "$AIF_ROUTE" == "ado" ]]; then
+    aif_use_ado_tenant
     if ! az extension show --name azure-devops >/dev/null 2>&1; then
       aif_mutate az extension add --name azure-devops --only-show-errors
     fi
@@ -874,6 +1137,13 @@ print(value["name"])
     aif_ensure_role_assignment \
       "$AIF_IDENTITY_PRINCIPAL_ID" ServicePrincipal "$role" "$scope"
   done
+  if [[ "$AIF_TOPOLOGY" == "hs" || "$AIF_ACCESS_HUB_MODE" == "external" ]]; then
+    aif_ensure_role_assignment \
+      "$AIF_IDENTITY_PRINCIPAL_ID" \
+      ServicePrincipal \
+      "Private DNS Zone Contributor" \
+      "/subscriptions/$AIF_HUB_SUBSCRIPTION_ID/resourceGroups/$AIF_HUB_RESOURCE_GROUP"
+  fi
   aif_success "Deployment identity is ready."
 }
 
@@ -946,6 +1216,7 @@ aif_ensure_team_group() {
     aif_info "DRY-RUN: create/verify group '$AIF_TEAM_GROUP_NAME' and add '$AIF_TEAM_MEMBER_EMAIL'."
     return
   fi
+  aif_use_azure_tenant
   local group_ids_output
   group_ids_output="$(az ad group list \
     --filter "displayName eq '$AIF_TEAM_GROUP_NAME'" \
@@ -1064,50 +1335,22 @@ aif_seed_optional_project_sp() {
 }
 
 aif_prepare_hub_dns() {
-  [[ "$AIF_TOPOLOGY" == "hs" ]] || return 0
+  [[ "$AIF_TOPOLOGY" == "hs" || "$AIF_ACCESS_HUB_MODE" == "external" ]] || return 0
   aif_section "12 / Hub private DNS"
+  AIF_PRIVATE_DNS_CONFIG="$AIF_STATE_DIR/private-dns-config.json"
+  "${AIF_PYTHON[@]}" \
+    "$AIF_SCALESET_LIB_DIR/aifactory_private_dns.py" \
+    --subscription-id "$AIF_HUB_SUBSCRIPTION_ID" \
+    --resource-group "$AIF_HUB_RESOURCE_GROUP" \
+    --location "$AIF_LOCATION" \
+    --location-short "$AIF_LOCATION_SHORT" \
+    --output "$AIF_PRIVATE_DNS_CONFIG"
   local private_dns_zones
-  private_dns_zones="$("${AIF_PYTHON[@]}" - "$AIF_LOCATION" <<'PY'
+  private_dns_zones="$("${AIF_PYTHON[@]}" -c '
 import json
 import sys
-
-location = sys.argv[1]
-names = [
-    "privatelink.blob.core.windows.net",
-    "privatelink.file.core.windows.net",
-    "privatelink.dfs.core.windows.net",
-    "privatelink.queue.core.windows.net",
-    "privatelink.table.core.windows.net",
-    "privatelink.azurecr.io",
-    f"{location}.data.privatelink.azurecr.io",
-    "privatelink.vaultcore.azure.net",
-    "privatelink.api.azureml.ms",
-    "privatelink.notebooks.azure.net",
-    "privatelink.datafactory.azure.net",
-    "privatelink.adf.azure.com",
-    "privatelink.openai.azure.com",
-    "privatelink.search.windows.net",
-    "privatelink.azurewebsites.net",
-    "privatelink.documents.azure.com",
-    "privatelink.cognitiveservices.azure.com",
-    "privatelink.azuredatabricks.net",
-    "privatelink.servicebus.windows.net",
-    "privatelink.eventgrid.azure.net",
-    "privatelink.monitor.azure.com",
-    "privatelink.oms.opinsights.azure.com",
-    "privatelink.ods.opinsights.azure.com",
-    "privatelink.agentsvc.azure-automation.net",
-    "privatelink.services.ai.azure.com",
-    f"privatelink.{location}.azurecontainerapps.io",
-    "privatelink.redis.cache.windows.net",
-    "privatelink.postgres.database.azure.com",
-    "privatelink.database.windows.net",
-    "privatelink.mongo.cosmos.azure.com",
-    "privatelink.azure-api.net",
-]
-print(json.dumps([{"name": name} for name in names], separators=(",", ":")))
-PY
-)"
+print(json.dumps(json.load(open(sys.argv[1], encoding="utf-8"))["zones"], separators=(",", ":")))
+' "$AIF_PRIVATE_DNS_CONFIG")"
   if [[ "$AIF_DRY_RUN" != "true" ]]; then
     az provider register \
       --namespace Microsoft.Network \
@@ -1142,10 +1385,385 @@ PY
     --output none
 }
 
+aif_ensure_private_dns_policy_assignment() {
+  [[ "$AIF_TOPOLOGY" == "hs" || "$AIF_ACCESS_HUB_MODE" == "external" ]] || return 0
+  aif_section "13 / Spoke private-DNS policy"
+  if [[ "$AIF_DRY_RUN" == "true" ]]; then
+    aif_info "DRY-RUN: deploy the regional private-DNS initiative in DEV and assign its managed identity access to central DNS."
+    return 0
+  fi
+  local spoke_scope="/subscriptions/$AIF_DEV_SUBSCRIPTION_ID"
+  local definition_id="$spoke_scope/providers/Microsoft.Authorization/policySetDefinitions/Deploy-Private-DNS-Zones"
+  local assignment_name="aifactory-central-private-dns"
+  local assignment_params="$AIF_STATE_DIR/private-dns-assignment-parameters.json"
+  "${AIF_PYTHON[@]}" - "$AIF_PRIVATE_DNS_CONFIG" "$assignment_params" <<'PY'
+import json
+import sys
+
+value = json.load(open(sys.argv[1], encoding="utf-8"))
+with open(sys.argv[2], "w", encoding="utf-8") as output:
+    json.dump(value["assignmentParameters"], output, indent=2)
+PY
+
+  aif_use_azure_tenant
+  az deployment sub create \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --name "aifactory-private-dns-initiative" \
+    --location "$AIF_LOCATION" \
+    --template-file "$AIF_REPO_ROOT/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep" \
+    --parameters \
+      location="$AIF_LOCATION" \
+      scope="$spoke_scope" \
+      includeCostOptimization=false \
+    --output none
+
+  if az policy assignment show \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --scope "$spoke_scope" \
+    --name "$assignment_name" \
+    --output none 2>/dev/null; then
+    local actual_definition
+    actual_definition="$(az policy assignment show \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --scope "$spoke_scope" \
+      --name "$assignment_name" \
+      --query policyDefinitionId \
+      --output tsv)"
+    if [[ "${actual_definition,,}" != "${definition_id,,}" ]]; then
+      aif_error "Policy assignment '$assignment_name' targets '$actual_definition', not '$definition_id'." >&2
+      exit 1
+    fi
+    az policy assignment update \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --scope "$spoke_scope" \
+      --name "$assignment_name" \
+      --params "@$assignment_params" \
+      --enforcement-mode Default \
+      --output none
+  else
+    az policy assignment create \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --scope "$spoke_scope" \
+      --name "$assignment_name" \
+      --display-name "AI Factory - configure central private DNS zone groups" \
+      --policy-set-definition "$definition_id" \
+      --location "$AIF_LOCATION" \
+      --mi-system-assigned \
+      --identity-scope "/subscriptions/$AIF_HUB_SUBSCRIPTION_ID" \
+      --role "Network Contributor" \
+      --params "@$assignment_params" \
+      --enforcement-mode Default \
+      --output none
+  fi
+  local policy_principal_id
+  policy_principal_id="$(az policy assignment show \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --scope "$spoke_scope" \
+    --name "$assignment_name" \
+    --query identity.principalId \
+    --output tsv)"
+  if [[ -z "$policy_principal_id" ]]; then
+    aif_error "Private-DNS policy assignment has no system-assigned managed identity." >&2
+    exit 1
+  fi
+  aif_ensure_role_assignment \
+    "$policy_principal_id" ServicePrincipal "Network Contributor" "$spoke_scope"
+  aif_ensure_role_assignment \
+    "$policy_principal_id" ServicePrincipal "Network Contributor" \
+    "/subscriptions/$AIF_HUB_SUBSCRIPTION_ID"
+  az policy state trigger-scan \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --no-wait
+  AIF_PRIVATE_DNS_POLICY_ASSIGNMENT_NAME="$assignment_name"
+  aif_success "Private-DNS initiative is assigned to the DEV spoke subscription."
+}
+
+aif_last_subnet() {
+  "${AIF_PYTHON[@]}" - "$1" "$2" <<'PY'
+import ipaddress
+import sys
+
+network = ipaddress.ip_network(sys.argv[1], strict=True)
+print(list(network.subnets(new_prefix=int(sys.argv[2])))[-1])
+PY
+}
+
+aif_resolver_subnet() {
+  "${AIF_PYTHON[@]}" - "$1" "$2" <<'PY'
+import ipaddress
+import sys
+
+network = ipaddress.ip_network(sys.argv[1], strict=True)
+subnets = list(network.subnets(new_prefix=28))
+index = 16 if sys.argv[2] == "integrated" else 0
+if len(subnets) <= index:
+    raise SystemExit(f"{network} is too small for the DNS resolver subnet")
+print(subnets[index])
+PY
+}
+
+aif_ensure_dns_private_resolver() {
+  local mode="$1" hub_subscription="$2" hub_resource_group="$3"
+  local hub_vnet="$4" hub_cidr="$5"
+  local resolver_subnet resolver_name inbound_name
+  resolver_subnet="$(aif_resolver_subnet "$hub_cidr" "$mode")"
+  resolver_name="dnspr-aifactory-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"
+  inbound_name="inbound-aifactory-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"
+  if ! az network vnet subnet show \
+    --subscription "$hub_subscription" \
+    --resource-group "$hub_resource_group" \
+    --vnet-name "$hub_vnet" \
+    --name snet-dns-private-resolver \
+    --output none 2>/dev/null; then
+    az network vnet subnet create \
+      --subscription "$hub_subscription" \
+      --resource-group "$hub_resource_group" \
+      --vnet-name "$hub_vnet" \
+      --name snet-dns-private-resolver \
+      --address-prefixes "$resolver_subnet" \
+      --delegations Microsoft.Network/dnsResolvers \
+      --output none
+  fi
+  local vnet_id subnet_id resolver_url inbound_url resolver_body inbound_body
+  vnet_id="$(az network vnet show \
+    --subscription "$hub_subscription" \
+    --resource-group "$hub_resource_group" \
+    --name "$hub_vnet" \
+    --query id \
+    --output tsv)"
+  subnet_id="$vnet_id/subnets/snet-dns-private-resolver"
+  resolver_url="https://management.azure.com/subscriptions/$hub_subscription/resourceGroups/$hub_resource_group/providers/Microsoft.Network/dnsResolvers/$resolver_name"
+  inbound_url="$resolver_url/inboundEndpoints/$inbound_name"
+  resolver_body="$AIF_STATE_DIR/dns-resolver.json"
+  inbound_body="$AIF_STATE_DIR/dns-resolver-inbound.json"
+  "${AIF_PYTHON[@]}" - \
+    "$resolver_body" "$inbound_body" "$AIF_LOCATION" "$vnet_id" "$subnet_id" <<'PY'
+import json
+import sys
+
+json.dump(
+    {
+        "location": sys.argv[3],
+        "properties": {"virtualNetwork": {"id": sys.argv[4]}},
+    },
+    open(sys.argv[1], "w", encoding="utf-8"),
+)
+json.dump(
+    {
+        "location": sys.argv[3],
+        "properties": {
+            "ipConfigurations": [
+                {
+                    "privateIpAllocationMethod": "Dynamic",
+                    "subnet": {"id": sys.argv[5]},
+                }
+            ]
+        },
+    },
+    open(sys.argv[2], "w", encoding="utf-8"),
+)
+PY
+  az rest \
+    --method put \
+    --url "$resolver_url?api-version=2025-05-01" \
+    --body "@$resolver_body" \
+    --output none
+  az rest \
+    --method put \
+    --url "$inbound_url?api-version=2025-05-01" \
+    --body "@$inbound_body" \
+    --output none
+
+  local inbound_state="" inbound_ip="" attempt
+  for attempt in {1..90}; do
+    read -r inbound_state inbound_ip < <(az rest \
+      --method get \
+      --url "$inbound_url?api-version=2025-05-01" \
+      --query '[properties.provisioningState, properties.ipConfigurations[0].privateIpAddress]' \
+      --output tsv 2>/dev/null || true)
+    [[ "$inbound_state" != "Failed" ]] ||
+      { aif_error "DNS Private Resolver inbound endpoint failed."; exit 1; }
+    [[ "$inbound_state" == "Succeeded" && -n "$inbound_ip" ]] && break
+    sleep 10
+  done
+  if [[ "$inbound_state" != "Succeeded" || -z "$inbound_ip" ]]; then
+    aif_error "DNS Private Resolver inbound endpoint did not become ready." >&2
+    exit 1
+  fi
+  az network vnet update \
+    --subscription "$hub_subscription" \
+    --resource-group "$hub_resource_group" \
+    --name "$hub_vnet" \
+    --dns-servers "$inbound_ip" \
+    --output none
+  AIF_DNS_RESOLVER_INBOUND_IP="$inbound_ip"
+  aif_success "DNS Private Resolver inbound endpoint is available at $inbound_ip."
+}
+
+aif_ensure_vpn_access_hub() {
+  local mode="$1"
+  local hub_subscription hub_resource_group hub_vnet hub_cidr
+  hub_subscription="$AIF_HUB_SUBSCRIPTION_ID"
+  hub_resource_group="$AIF_HUB_RESOURCE_GROUP"
+  hub_vnet="$AIF_HUB_VNET_NAME"
+  hub_cidr="$AIF_ACCESS_HUB_VNET_CIDR"
+  local gateway_subnet gateway_name public_ip_name
+  gateway_subnet="$(aif_last_subnet "$hub_cidr" 27)"
+  gateway_name="vpngw-aifactory-access-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"
+  public_ip_name="${gateway_name}-pip"
+
+  aif_use_azure_tenant
+  az provider register \
+    --namespace Microsoft.Network \
+    --subscription "$hub_subscription" \
+    --wait \
+    --output none \
+    --only-show-errors
+  az group create \
+    --subscription "$hub_subscription" \
+    --name "$hub_resource_group" \
+    --location "$AIF_LOCATION" \
+    --tags Purpose=AIFactoryConnectivity \
+    --output none
+
+  if [[ "$mode" == "external" ]]; then
+    if ! az network vnet show \
+      --subscription "$hub_subscription" \
+      --resource-group "$hub_resource_group" \
+      --name "$hub_vnet" \
+      --output none 2>/dev/null; then
+      az network vnet create \
+        --subscription "$hub_subscription" \
+        --resource-group "$hub_resource_group" \
+        --name "$hub_vnet" \
+        --location "$AIF_LOCATION" \
+        --address-prefixes "$hub_cidr" \
+        --tags Purpose=AIFactoryConnectivity \
+        --output none
+    fi
+  else
+    az network vnet show \
+      --subscription "$hub_subscription" \
+      --resource-group "$hub_resource_group" \
+      --name "$hub_vnet" \
+      --output none
+  fi
+  local actual_hub_prefixes
+  actual_hub_prefixes="$(az network vnet show \
+    --subscription "$hub_subscription" \
+    --resource-group "$hub_resource_group" \
+    --name "$hub_vnet" \
+    --query 'addressSpace.addressPrefixes' \
+    --output tsv)"
+  if ! grep -qxF "$hub_cidr" <<< "$actual_hub_prefixes"; then
+    aif_error "Access-hub VNet '$hub_vnet' does not contain configured CIDR '$hub_cidr'." >&2
+    exit 1
+  fi
+
+  if ! az network vnet subnet show \
+    --subscription "$hub_subscription" \
+    --resource-group "$hub_resource_group" \
+    --vnet-name "$hub_vnet" \
+    --name GatewaySubnet \
+    --output none 2>/dev/null; then
+    az network vnet subnet create \
+      --subscription "$hub_subscription" \
+      --resource-group "$hub_resource_group" \
+      --vnet-name "$hub_vnet" \
+      --name GatewaySubnet \
+      --address-prefixes "$gateway_subnet" \
+      --output none
+  fi
+  local actual_gateway_subnet
+  actual_gateway_subnet="$(az network vnet subnet show \
+    --subscription "$hub_subscription" \
+    --resource-group "$hub_resource_group" \
+    --vnet-name "$hub_vnet" \
+    --name GatewaySubnet \
+    --query addressPrefix \
+    --output tsv)"
+  if [[ "$actual_gateway_subnet" != "$gateway_subnet" ]]; then
+    aif_error "GatewaySubnet is '$actual_gateway_subnet'; expected '$gateway_subnet'." >&2
+    exit 1
+  fi
+  aif_ensure_dns_private_resolver \
+    "$mode" \
+    "$hub_subscription" \
+    "$hub_resource_group" \
+    "$hub_vnet" \
+    "$hub_cidr"
+
+  if ! az network public-ip show \
+    --subscription "$hub_subscription" \
+    --resource-group "$hub_resource_group" \
+    --name "$public_ip_name" \
+    --output none 2>/dev/null; then
+    az network public-ip create \
+      --subscription "$hub_subscription" \
+      --resource-group "$hub_resource_group" \
+      --name "$public_ip_name" \
+      --location "$AIF_LOCATION" \
+      --allocation-method Static \
+      --sku Standard \
+      --version IPv4 \
+      --output none
+  fi
+
+  if ! az network vnet-gateway show \
+    --subscription "$hub_subscription" \
+    --resource-group "$hub_resource_group" \
+    --name "$gateway_name" \
+    --output none 2>/dev/null; then
+    aif_info "Creating VPN gateway '$gateway_name'. This normally takes 30-45 minutes."
+    az network vnet-gateway create \
+      --subscription "$hub_subscription" \
+      --resource-group "$hub_resource_group" \
+      --name "$gateway_name" \
+      --location "$AIF_LOCATION" \
+      --vnet "$hub_vnet" \
+      --gateway-type Vpn \
+      --vpn-type RouteBased \
+      --sku VpnGw1AZ \
+      --vpn-gateway-generation Generation1 \
+      --public-ip-addresses "$public_ip_name" \
+      --no-wait
+  fi
+  az network vnet-gateway wait \
+    --subscription "$hub_subscription" \
+    --resource-group "$hub_resource_group" \
+    --name "$gateway_name" \
+    --created \
+    --interval 30 \
+    --timeout 5400
+  az network vnet-gateway update \
+    --subscription "$hub_subscription" \
+    --resource-group "$hub_resource_group" \
+    --name "$gateway_name" \
+    --address-prefixes "$AIF_VPN_CLIENT_CIDR" \
+    --client-protocol OpenVPN \
+    --vpn-auth-type AAD \
+    --aad-tenant "https://login.microsoftonline.com/$AIF_TENANT_ID" \
+    --aad-audience "c632b3df-fb67-4d84-bdcf-b95ad541b5c8" \
+    --aad-issuer "https://sts.windows.net/$AIF_TENANT_ID/" \
+    --output none
+  AIF_VPN_GATEWAY_NAME="$gateway_name"
+  aif_success "Point-to-site VPN gateway '$gateway_name' is ready."
+}
+
+aif_prepare_external_access_hub() {
+  [[ "$AIF_ACCESS_HUB_MODE" == "external" ]] || return 0
+  aif_section "12 / External AI Factory access hub"
+  if [[ "$AIF_DRY_RUN" == "true" ]]; then
+    aif_info "DRY-RUN: create/reconcile external VNet, GatewaySubnet, VpnGw1AZ, and Entra-authenticated P2S configuration."
+    return 0
+  fi
+  aif_ensure_vpn_access_hub external
+}
+
 aif_write_state_and_configure() {
   local state_file="$AIF_STATE_DIR/config.json"
   "${AIF_PYTHON[@]}" - "$state_file" \
-    "$AIF_TOPOLOGY" "$AIF_NETWORK_MODE" "$AIF_TENANT_ID" \
+    "$AIF_TOPOLOGY" "$AIF_ACCESS_HUB_MODE" "$AIF_NETWORK_MODE" "$AIF_TENANT_ID" \
     "$AIF_DEV_SUBSCRIPTION_ID" "$AIF_STAGE_SUBSCRIPTION_ID" "$AIF_PROD_SUBSCRIPTION_ID" \
     "$AIF_LOCATION" "$AIF_LOCATION_SHORT" "$AIF_DEV_VNET_CIDR" \
     "$AIF_PREFIX" "$AIF_SCALESET_SUFFIX_DASH" "$AIF_PROJECT_NUMBER" \
@@ -1155,14 +1773,15 @@ aif_write_state_and_configure() {
     "$AIF_ENABLE_PUBLIC_PERIMETER" "$AIF_ADD_BASTION" \
     "$AIF_HUB_SUBSCRIPTION_ID" "$AIF_HUB_RESOURCE_GROUP" \
     "$AIF_PROJECT_SP_APP_SECRET" "$AIF_PROJECT_SP_OID_SECRET" "$AIF_PROJECT_SP_SECRET_SECRET" \
-    "${AIF_AZURE_ML_PRINCIPAL_ID:-}" \
+    "${AIF_AZURE_ML_PRINCIPAL_ID:-}" "${AIF_DATABRICKS_PRINCIPAL_ID:-}" \
     "${ADO_TENANT:-}" "${ADO_SERVICE_CONNECTION_NAME:-}" \
-    "${GITHUB_REPOSITORY:-}" "${AIF_OIDC_CLIENT_ID:-}" <<'PY'
+    "${GITHUB_REPOSITORY:-}" "${AIF_OIDC_CLIENT_ID:-}" \
+    "$AIF_RUNNER_MODE" "${ADO_AGENT_POOL:-}" "${ADO_AGENT_NAME:-}" <<'PY'
 import json
 import sys
 
 keys = (
-    "topology", "network_mode", "tenant_id",
+    "topology", "access_hub_mode", "network_mode", "tenant_id",
     "dev_subscription_id", "stage_subscription_id", "prod_subscription_id",
     "location", "location_short", "dev_vnet_cidr",
     "prefix", "scaleset_suffix", "project_number",
@@ -1172,8 +1791,10 @@ keys = (
     "enable_public_perimeter", "add_bastion",
     "hub_subscription_id", "hub_resource_group",
     "project_sp_app_secret", "project_sp_oid_secret", "project_sp_secret_secret",
-    "azure_ml_principal_id", "ado_tenant_id", "ado_service_connection",
+    "azure_ml_principal_id", "databricks_principal_id",
+    "ado_tenant_id", "ado_service_connection",
     "github_repository", "oidc_client_id",
+    "runner_mode", "ado_agent_pool", "ado_agent_name",
 )
 values = dict(zip(keys, sys.argv[2:]))
 values["dev_service_connection"] = values["ado_service_connection"]
@@ -1546,7 +2167,7 @@ aif_run_ado_pipeline() {
   local pipeline_id="$1" kind="$2" project_encoded body="$AIF_STATE_DIR/run-$kind.json"
   [[ "$AIF_DRY_RUN" != "true" ]] || { aif_info "DRY-RUN: dispatch ADO $kind pipeline."; return 0; }
   project_encoded="$(aif_urlencode "$ADO_PROJECT")"
-  "${AIF_PYTHON[@]}" - "$body" "$kind" <<'PY'
+  "${AIF_PYTHON[@]}" - "$body" "$kind" "$AIF_RUNNER_MODE" <<'PY'
 import json, sys
 kind = sys.argv[2]
 request = {
@@ -1556,7 +2177,7 @@ request = {
 if kind == "project":
     request["templateParameters"] = {
         "configFile": "aifactory/variables.json",
-        "runnerSelection": "microsoft-hosted",
+        "runnerSelection": sys.argv[3],
         "useJsonConfigOverride": True,
     }
 json.dump(request, open(sys.argv[1], "w"))
@@ -1577,6 +2198,7 @@ print(value["id"], value.get("_links", {}).get("web", {}).get("href", ""))
 
 aif_configure_ado() {
   aif_section "13 / Azure DevOps automation"
+  aif_use_ado_tenant
   aif_ensure_ado_service_connection
 }
 
@@ -1817,16 +2439,426 @@ aif_run_github_workflow() {
   fi
 }
 
+aif_ensure_ado_self_hosted_agent() {
+  [[ "$AIF_RUNNER_MODE" == "self-hosted" ]] || return 0
+  aif_section "16 / Self-hosted Azure Pipelines agent"
+
+  local pool_encoded pools_file pool_id agent_encoded agents_file
+  pool_encoded="$(aif_urlencode "$ADO_AGENT_POOL")"
+  pools_file="$AIF_STATE_DIR/agent-pools.json"
+  aif_ado_api GET \
+    "$ADO_ORGANIZATION/_apis/distributedtask/pools?poolName=$pool_encoded&actionFilter=manage&api-version=7.1" \
+    > "$pools_file"
+  pool_id="$("${AIF_PYTHON[@]}" - "$pools_file" "$ADO_AGENT_POOL" <<'PY'
+import json
+import sys
+
+value = json.load(open(sys.argv[1], encoding="utf-8"))
+pools = value.get("value", [])
+if len(pools) != 1:
+    raise SystemExit(
+        f"Expected one manageable Azure DevOps agent pool named {sys.argv[2]!r}; "
+        f"found {len(pools)}"
+    )
+if pools[0].get("isHosted"):
+    raise SystemExit(f"Agent pool {sys.argv[2]!r} is Microsoft-hosted")
+print(pools[0]["id"])
+PY
+)"
+  agent_encoded="$(aif_urlencode "$ADO_AGENT_NAME")"
+  agents_file="$AIF_STATE_DIR/agents.json"
+  aif_ado_api GET \
+    "$ADO_ORGANIZATION/_apis/distributedtask/pools/$pool_id/agents?agentName=$agent_encoded&includeCapabilities=true&api-version=7.1" \
+    > "$agents_file"
+  if "${AIF_PYTHON[@]}" - "$agents_file" <<'PY'
+import json
+import sys
+
+agents = json.load(open(sys.argv[1], encoding="utf-8")).get("value", [])
+raise SystemExit(0 if len(agents) == 1 and agents[0].get("enabled") and agents[0].get("status") == "online" else 1)
+PY
+  then
+    aif_success "Azure Pipelines agent '$ADO_AGENT_NAME' is already online in '$ADO_AGENT_POOL'."
+    return
+  fi
+
+  local common_rg="${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"
+  aif_use_azure_tenant
+  az vm show \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --resource-group "$common_rg" \
+    --name "$ADO_AGENT_NAME" \
+    --output none
+  local power_state
+  power_state="$(az vm get-instance-view \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --resource-group "$common_rg" \
+    --name "$ADO_AGENT_NAME" \
+    --query "instanceView.statuses[?starts_with(code, 'PowerState/')].code | [0]" \
+    --output tsv)"
+  if [[ "$power_state" != "PowerState/running" ]]; then
+    az vm start \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --resource-group "$common_rg" \
+      --name "$ADO_AGENT_NAME" \
+      --output none
+  fi
+
+  local packages_file package_url ado_token script_file run_command_body
+  packages_file="$AIF_STATE_DIR/agent-packages.json"
+  aif_ado_api GET \
+    "$ADO_ORGANIZATION/_apis/distributedtask/packages/agent?platform=win-x64&top=1&api-version=7.1" \
+    > "$packages_file"
+  package_url="$("${AIF_PYTHON[@]}" - "$packages_file" <<'PY'
+import json
+import sys
+
+packages = json.load(open(sys.argv[1], encoding="utf-8")).get("value", [])
+if not packages:
+    raise SystemExit("Azure DevOps returned no Windows x64 agent package")
+print(packages[0]["downloadUrl"])
+PY
+)"
+  if [[ "$ADO_AUTH_METHOD" == "pat" ]]; then
+    ado_token="$AZURE_DEVOPS_EXT_PAT"
+  else
+    ado_token="$(az account get-access-token \
+      --resource "$AIF_ADO_RESOURCE" \
+      --tenant "$ADO_TENANT" \
+      --query accessToken \
+      --output tsv)"
+  fi
+  script_file="$AIF_STATE_DIR/register-ado-agent.ps1"
+  run_command_body="$AIF_STATE_DIR/agent-run-command.json"
+  cat > "$script_file" <<'POWERSHELL'
+param(
+  [Parameter(Mandatory = $true)][string] $AdoToken,
+  [Parameter(Mandatory = $true)][string] $AdoUrl,
+  [Parameter(Mandatory = $true)][string] $AgentPool,
+  [Parameter(Mandatory = $true)][string] $AgentName,
+  [Parameter(Mandatory = $true)][string] $PackageUrl
+)
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$agentRoot = 'C:\aifactory-agent'
+$archive = Join-Path $env:TEMP 'azure-pipelines-agent.zip'
+
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+New-Item -ItemType Directory -Path $agentRoot -Force | Out-Null
+$configured = Test-Path (Join-Path $agentRoot '.agent')
+if ($configured) {
+  Get-Service -Name 'vstsagent*' -ErrorAction SilentlyContinue |
+    Stop-Service -Force -ErrorAction SilentlyContinue
+  Push-Location $agentRoot
+  & .\config.cmd remove --unattended --auth pat --token $AdoToken
+  if ($LASTEXITCODE -ne 0) {
+    throw "Existing Azure Pipelines agent removal failed with exit code $LASTEXITCODE."
+  }
+  Pop-Location
+  Get-ChildItem -LiteralPath $agentRoot -Force | Remove-Item -Recurse -Force
+}
+
+Invoke-WebRequest -Uri $PackageUrl -OutFile $archive -UseBasicParsing
+Expand-Archive -LiteralPath $archive -DestinationPath $agentRoot -Force
+Remove-Item -LiteralPath $archive -Force
+
+$env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
+  [Environment]::GetEnvironmentVariable('Path', 'User')
+$missing = @('az', 'bash', 'git', 'python') | Where-Object {
+  -not (Get-Command $_ -ErrorAction SilentlyContinue)
+}
+if ($missing -and (Get-Command choco -ErrorAction SilentlyContinue)) {
+  if ($missing -contains 'git' -or $missing -contains 'bash') {
+    choco install git -y --no-progress
+  }
+  if ($missing -contains 'az') {
+    choco install azure-cli -y --no-progress
+  }
+  if ($missing -contains 'python') {
+    choco install python -y --no-progress
+  }
+  $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
+    [Environment]::GetEnvironmentVariable('Path', 'User')
+}
+$missing = @('az', 'bash', 'git', 'python') | Where-Object {
+  -not (Get-Command $_ -ErrorAction SilentlyContinue)
+}
+if ($missing) {
+  throw "Required agent commands are missing: $($missing -join ', ')."
+}
+
+Push-Location $agentRoot
+& .\config.cmd `
+  --unattended `
+  --url $AdoUrl `
+  --auth pat `
+  --token $AdoToken `
+  --pool $AgentPool `
+  --agent $AgentName `
+  --replace `
+  --runAsService `
+  --windowsLogonAccount 'NT AUTHORITY\SYSTEM' `
+  --work '_work'
+if ($LASTEXITCODE -ne 0) {
+  throw "Azure Pipelines agent configuration failed with exit code $LASTEXITCODE."
+}
+Get-Service -Name 'vstsagent*' | Start-Service
+Pop-Location
+POWERSHELL
+  ADO_TOKEN_FOR_VM="$ado_token" "${AIF_PYTHON[@]}" - \
+    "$run_command_body" "$script_file" "$AIF_LOCATION" \
+    "$ADO_ORGANIZATION" "$ADO_AGENT_POOL" "$ADO_AGENT_NAME" "$package_url" <<'PY'
+import json
+import os
+import sys
+
+with open(sys.argv[2], encoding="utf-8") as script_file:
+    script = script_file.read()
+body = {
+    "location": sys.argv[3],
+    "properties": {
+        "source": {"script": script},
+        "parameters": [
+            {"name": "AdoUrl", "value": sys.argv[4]},
+            {"name": "AgentPool", "value": sys.argv[5]},
+            {"name": "AgentName", "value": sys.argv[6]},
+            {"name": "PackageUrl", "value": sys.argv[7]},
+        ],
+        "protectedParameters": [
+            {"name": "AdoToken", "value": os.environ["ADO_TOKEN_FOR_VM"]}
+        ],
+        "asyncExecution": False,
+        "timeoutInSeconds": 1800,
+        "treatFailureAsDeploymentFailure": True,
+    },
+}
+with open(sys.argv[1], "w", encoding="utf-8") as output:
+    json.dump(body, output)
+PY
+  unset ado_token
+  chmod 600 "$run_command_body"
+
+  local run_command_url
+  run_command_url="https://management.azure.com/subscriptions/$AIF_DEV_SUBSCRIPTION_ID/resourceGroups/$common_rg/providers/Microsoft.Compute/virtualMachines/$ADO_AGENT_NAME/runCommands/register-aifactory-ado-agent"
+  az rest \
+    --method put \
+    --url "$run_command_url?api-version=2023-03-01" \
+    --body "@$run_command_body" \
+    --output none
+  rm -f -- "$run_command_body"
+
+  local execution_state="" exit_code=""
+  for attempt in {1..180}; do
+    read -r execution_state exit_code < <(az rest \
+      --method get \
+      --url "$run_command_url?api-version=2023-03-01&%24expand=instanceView" \
+      --query '[properties.instanceView.executionState, properties.instanceView.exitCode]' \
+      --output tsv 2>/dev/null || true)
+    case "$execution_state" in
+      Succeeded) break ;;
+      Failed|Canceled|TimedOut)
+        aif_error "Agent registration Run Command ended as $execution_state with exit code ${exit_code:-unknown}." >&2
+        exit 1
+        ;;
+    esac
+    sleep 10
+  done
+  if [[ "$execution_state" != "Succeeded" || "$exit_code" != "0" ]]; then
+    aif_error "Agent registration Run Command did not complete successfully." >&2
+    exit 1
+  fi
+
+  for attempt in {1..60}; do
+    aif_ado_api GET \
+      "$ADO_ORGANIZATION/_apis/distributedtask/pools/$pool_id/agents?agentName=$agent_encoded&includeCapabilities=true&api-version=7.1" \
+      > "$agents_file"
+    if "${AIF_PYTHON[@]}" - "$agents_file" <<'PY'
+import json
+import sys
+
+agents = json.load(open(sys.argv[1], encoding="utf-8")).get("value", [])
+raise SystemExit(0 if len(agents) == 1 and agents[0].get("enabled") and agents[0].get("status") == "online" else 1)
+PY
+    then
+      az rest \
+        --method delete \
+        --url "$run_command_url?api-version=2023-03-01" \
+        --output none
+      aif_success "Azure Pipelines agent '$ADO_AGENT_NAME' is online in '$ADO_AGENT_POOL'."
+      return
+    fi
+    sleep 10
+  done
+  aif_error "Azure Pipelines agent '$ADO_AGENT_NAME' did not become online." >&2
+  exit 1
+}
+
+aif_ensure_private_network_access() {
+  local common_rg common_vnet common_subnet
+  common_rg="${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"
+  common_vnet="vnt-esmlcmn-${AIF_LOCATION_SHORT}-dev-001"
+  common_subnet="snet-esml-cmn-001"
+  aif_use_azure_tenant
+  local spoke_vnet_id
+  spoke_vnet_id="$(az network vnet show \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --resource-group "$common_rg" \
+    --name "$common_vnet" \
+    --query id \
+    --output tsv)"
+
+  if [[ "$AIF_TOPOLOGY" == "hs" || "$AIF_ACCESS_HUB_MODE" == "external" ]]; then
+    local hub_vnet_id
+    hub_vnet_id="$(az network vnet show \
+      --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+      --resource-group "$AIF_HUB_VNET_RESOURCE_GROUP" \
+      --name "$AIF_HUB_VNET_NAME" \
+      --query id \
+      --output tsv)"
+
+    if az network vnet peering show \
+      --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+      --resource-group "$AIF_HUB_VNET_RESOURCE_GROUP" \
+      --vnet-name "$AIF_HUB_VNET_NAME" \
+      --name "hub-to-${AIF_PREFIX%-}-dev-${AIF_SCALESET_SUFFIX}" \
+      --output none 2>/dev/null; then
+      az network vnet peering update \
+        --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+        --resource-group "$AIF_HUB_VNET_RESOURCE_GROUP" \
+        --vnet-name "$AIF_HUB_VNET_NAME" \
+        --name "hub-to-${AIF_PREFIX%-}-dev-${AIF_SCALESET_SUFFIX}" \
+        --allow-vnet-access true \
+        --allow-forwarded-traffic true \
+        --allow-gateway-transit true \
+        --output none
+    else
+      az network vnet peering create \
+        --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+        --resource-group "$AIF_HUB_VNET_RESOURCE_GROUP" \
+        --vnet-name "$AIF_HUB_VNET_NAME" \
+        --name "hub-to-${AIF_PREFIX%-}-dev-${AIF_SCALESET_SUFFIX}" \
+        --remote-vnet "$spoke_vnet_id" \
+        --allow-vnet-access true \
+        --allow-forwarded-traffic true \
+        --allow-gateway-transit true \
+        --output none
+    fi
+    if az network vnet peering show \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --resource-group "$common_rg" \
+      --vnet-name "$common_vnet" \
+      --name "spoke-to-aifactory-access-hub" \
+      --output none 2>/dev/null; then
+      az network vnet peering update \
+        --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+        --resource-group "$common_rg" \
+        --vnet-name "$common_vnet" \
+        --name "spoke-to-aifactory-access-hub" \
+        --allow-vnet-access true \
+        --allow-forwarded-traffic true \
+        --use-remote-gateways true \
+        --output none
+    else
+      az network vnet peering create \
+        --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+        --resource-group "$common_rg" \
+        --vnet-name "$common_vnet" \
+        --name "spoke-to-aifactory-access-hub" \
+        --remote-vnet "$hub_vnet_id" \
+        --allow-vnet-access true \
+        --allow-forwarded-traffic true \
+        --use-remote-gateways true \
+        --output none
+    fi
+
+    local zone link_name
+    link_name="link-${AIF_PREFIX%-}-dev-${AIF_SCALESET_SUFFIX}"
+    while IFS= read -r zone; do
+      [[ -n "$zone" ]] || continue
+      if ! az network private-dns link vnet show \
+        --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+        --resource-group "$AIF_HUB_RESOURCE_GROUP" \
+        --zone-name "$zone" \
+        --name "$link_name" \
+        --output none 2>/dev/null; then
+        az network private-dns link vnet create \
+          --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+          --resource-group "$AIF_HUB_RESOURCE_GROUP" \
+          --zone-name "$zone" \
+          --name "$link_name" \
+          --virtual-network "$spoke_vnet_id" \
+          --registration-enabled false \
+          --output none
+      fi
+    done < <(az network private-dns zone list \
+      --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+      --resource-group "$AIF_HUB_RESOURCE_GROUP" \
+      --query '[].name' \
+      --output tsv)
+  elif [[ "$AIF_ACCESS_HUB_MODE" == "integrated" ]]; then
+    aif_ensure_vpn_access_hub integrated
+  fi
+
+  local seeding_kv_id seeding_pe_name zone_id
+  seeding_kv_id="/subscriptions/$AIF_DEV_SUBSCRIPTION_ID/resourceGroups/$AIF_SEEDING_RESOURCE_GROUP/providers/Microsoft.KeyVault/vaults/$AIF_SEEDING_KEYVAULT_NAME"
+  seeding_pe_name="pend-${AIF_SEEDING_KEYVAULT_NAME}-to-${common_vnet}"
+  if ! az network private-endpoint show \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --resource-group "$common_rg" \
+    --name "$seeding_pe_name" \
+    --output none 2>/dev/null; then
+    az network private-endpoint create \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --resource-group "$common_rg" \
+      --name "$seeding_pe_name" \
+      --location "$AIF_LOCATION" \
+      --vnet-name "$common_vnet" \
+      --subnet "$common_subnet" \
+      --private-connection-resource-id "$seeding_kv_id" \
+      --group-id vault \
+      --connection-name "${seeding_pe_name}-connection" \
+      --output none
+  fi
+  if [[ "$AIF_TOPOLOGY" == "hs" || "$AIF_ACCESS_HUB_MODE" == "external" ]]; then
+    zone_id="/subscriptions/$AIF_HUB_SUBSCRIPTION_ID/resourceGroups/$AIF_HUB_RESOURCE_GROUP/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net"
+  else
+    zone_id="/subscriptions/$AIF_DEV_SUBSCRIPTION_ID/resourceGroups/$common_rg/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net"
+  fi
+  if ! az network private-endpoint dns-zone-group show \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --resource-group "$common_rg" \
+    --endpoint-name "$seeding_pe_name" \
+    --name aifactory-seeding-keyvault \
+    --output none 2>/dev/null; then
+    az network private-endpoint dns-zone-group create \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --resource-group "$common_rg" \
+      --endpoint-name "$seeding_pe_name" \
+      --name aifactory-seeding-keyvault \
+      --zone-name vaultcore \
+      --private-dns-zone "$zone_id" \
+      --output none
+  fi
+  az keyvault update \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --resource-group "$AIF_SEEDING_RESOURCE_GROUP" \
+    --name "$AIF_SEEDING_KEYVAULT_NAME" \
+    --public-network-access Disabled \
+    --output none
+  aif_success "Private VPN, peering, DNS links, and seeding Key Vault access are ready."
+}
+
 aif_deploy_ado() {
+  aif_use_ado_tenant
   local common_pipeline project_pipeline
   for environment_name in Dev Stage Prod; do
     aif_ensure_ado_environment "$environment_name"
   done
   common_pipeline="$(aif_ensure_ado_pipeline \
-    infra-aifactory-common \
+    "infra-aifactory-common-${AIF_PREFIX%-}-${AIF_SCALESET_SUFFIX}" \
     aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-common/infra-aifactory-common.yaml)"
   project_pipeline="$(aif_ensure_ado_pipeline \
-    infra-project-genai \
+    "infra-project-genai-${AIF_PREFIX%-}-${AIF_SCALESET_SUFFIX}" \
     aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-genai.yaml)"
   aif_authorize_ado_pipeline "$common_pipeline"
   aif_authorize_ado_pipeline "$project_pipeline"
@@ -1836,6 +2868,8 @@ aif_deploy_ado() {
     return 0
   fi
   aif_verify_common_resource_group
+  aif_ensure_private_network_access
+  aif_ensure_ado_self_hosted_agent
   aif_run_ado_pipeline "$project_pipeline" project
 }
 
@@ -1849,6 +2883,7 @@ aif_deploy_github() {
     return 0
   fi
   aif_verify_common_resource_group
+  aif_ensure_private_network_access
   aif_run_github_workflow infra-project.yml project \
     --raw-field environment=dev \
     --raw-field config_file=aifactory/variables.json \
@@ -1917,13 +2952,14 @@ aif_scaleset_main() {
   aif_require_command bash
   aif_require_command git
   aif_require_command az
+  aif_require_command realpath
   [[ "$AIF_ROUTE" != "gha" ]] || aif_require_command gh
   aif_python
   aif_resolve_repo_root
   local state_parent="$HOME/.aifactory-create-state"
   mkdir -p "$state_parent"
   AIF_STATE_DIR="$(mktemp -d "$state_parent/run.XXXXXX")"
-  trap 'rm -rf -- "$AIF_STATE_DIR"' EXIT
+  trap aif_cleanup EXIT INT TERM
   aif_value "Target repo" "$AIF_REPO_ROOT"
 
   aif_collect_answers
@@ -1933,22 +2969,15 @@ aif_scaleset_main() {
   aif_ensure_target_repository
   aif_sync_submodule_and_templates
   aif_register_resource_providers "$AIF_DEV_SUBSCRIPTION_ID"
+  aif_use_azure_tenant
+  aif_ensure_first_party_enterprise_apps
+  aif_prepare_external_access_hub
+  aif_prepare_hub_dns
   aif_ensure_bootstrap_identity
   aif_ensure_seeding_keyvault
   aif_ensure_team_group
   aif_seed_optional_project_sp
-  aif_prepare_hub_dns
-  if [[ "$AIF_DRY_RUN" != "true" ]]; then
-    if ! AIF_AZURE_ML_PRINCIPAL_ID="$(az ad sp show \
-      --id 0736f41a-0425-4b46-bdb5-1563eff02385 \
-      --query id \
-      --output tsv 2>/dev/null)"; then
-      AIF_AZURE_ML_PRINCIPAL_ID=""
-      aif_warn "Azure Machine Learning enterprise application is not materialized in this tenant. Continuing because the baseline project keeps Azure ML disabled."
-    fi
-  else
-    AIF_AZURE_ML_PRINCIPAL_ID=""
-  fi
+  aif_ensure_private_dns_policy_assignment
   if [[ "$AIF_ROUTE" == "ado" ]]; then
     aif_configure_ado
   else

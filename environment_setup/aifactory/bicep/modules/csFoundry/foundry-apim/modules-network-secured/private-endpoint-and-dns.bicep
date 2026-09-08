@@ -229,7 +229,7 @@ resource apiManagementDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZon
 }
 */
 
-resource privateEndpointDnsGroupAPIM 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && !empty(apiManagementName)) {
+resource privateEndpointDnsGroupAPIM 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!empty(apiManagementName)) {
   name: '${apiManagementPrivateEndpoint.name}DnsZone'
   parent: apiManagementPrivateEndpoint
   properties:{
@@ -244,7 +244,7 @@ resource privateEndpointDnsGroupAPIM 'Microsoft.Network/privateEndpoints/private
   }
 }
 
-resource privateEndpointDnsGroupAIF 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub) {
+resource privateEndpointDnsGroupAIF 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
   name: '${pendCogServiceAIF.name}DnsZone'
   parent: pendCogServiceAIF
   properties:{
@@ -270,4 +270,3 @@ resource privateEndpointDnsGroupAIF 'Microsoft.Network/privateEndpoints/privateD
     ]
   }
 }
-

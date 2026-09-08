@@ -233,7 +233,9 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
     plan = subnet_plan(state["dev_vnet_cidr"])
     group_id = state["team_group_id"]
     project_sp = state.get("project_sp_secret_names") or {}
-    hub = state["topology"] == "hs"
+    hub = state["topology"] == "hs" or state.get("access_hub_mode") == "external"
+    self_hosted = state.get("runner_mode") == "self-hosted"
+    enable_admin_vm = self_hosted or state["add_bastion"] == "true"
     return {
         "admin_location": state["location"],
         "admin_locationSuffix": state["location_short"],
@@ -249,6 +251,7 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
         "prod_admin_bicep_kv_fw_rg": state["seeding_resource_group"],
         "prod_admin_bicep_kv_fw": state["seeding_keyvault_name"],
         "azure_machinelearning_sp_oid": state.get("azure_ml_principal_id", ""),
+        "databricksOID": state.get("databricks_principal_id", ""),
         "use_ad_groups": "true",
         "centralDnsZoneByPolicyInHub": "true" if hub else "false",
         "privDnsSubscription_param": state.get("hub_subscription_id", ""),
@@ -261,7 +264,11 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
         "allowPublicAccessWhenBehindVnet": state["allow_public_access_behind_vnet"],
         "enablePublicAccessWithPerimeter": state["enable_public_perimeter"],
         "addBastionHost": state["add_bastion"],
-        "enableAdminVM": state["add_bastion"],
+        "enableAdminVM": "true" if enable_admin_vm else "false",
+        "useSelfHostedBuildAgent": "true" if self_hosted else "false",
+        "adminVMBuildAgentPool": state.get("ado_agent_pool", "Default"),
+        "adminVMBuildAgentName": state.get("ado_agent_name", ""),
+        "disable_whitelisting_for_build_agents": "true" if self_hosted else "false",
         "BYO_subnets": "false",
         "vnetResourceGroup_param": "",
         "vnetNameFull_param": "",
@@ -329,7 +336,9 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
     common = common_values(state)
     project_sp = state.get("project_sp_secret_names") or {}
     plan = subnet_plan(state["dev_vnet_cidr"])
-    hub = state["topology"] == "hs"
+    hub = state["topology"] == "hs" or state.get("access_hub_mode") == "external"
+    self_hosted = state.get("runner_mode") == "self-hosted"
+    enable_admin_vm = self_hosted or state["add_bastion"] == "true"
     env_values = {
         "GITHUB_USERNAME": state["github_repository"].split("/", maxsplit=1)[0],
         "GITHUB_NEW_REPO": state["github_repository"],
@@ -345,6 +354,7 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         "AIFACTORY_SEEDING_KEYVAULT_NAME": state["seeding_keyvault_name"],
         "AIFACTORY_SEEDING_KEYVAULT_RG": state["seeding_resource_group"],
         "TENANT_AZUREML_OID": state.get("azure_ml_principal_id", ""),
+        "DATABRICKS_OID": state.get("databricks_principal_id", ""),
         "USE_AD_GROUPS": "true",
         "DEV_SUBSCRIPTION_ID": state["dev_subscription_id"],
         "STAGE_SUBSCRIPTION_ID": state["stage_subscription_id"],
@@ -364,7 +374,9 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         "ENABLE_PUBLIC_GENAI_ACCESS": state["enable_public_genai_access"],
         "ENABLE_PUBLIC_ACCESS_WITH_PERIMETER": state["enable_public_perimeter"],
         "ADD_BASTION_HOST": state["add_bastion"],
-        "ENABLE_ADMIN_VM": state["add_bastion"],
+        "ENABLE_ADMIN_VM": "true" if enable_admin_vm else "false",
+        "USE_SELF_HOSTED_BUILD_AGENT": "true" if self_hosted else "false",
+        "DISABLE_WHITELISTING_FOR_BUILD_AGENTS": "true" if self_hosted else "false",
         "BYO_SUBNETS": "false",
         "VNET_RESOURCE_GROUP_PARAM": "",
         "VNET_NAME_FULL_PARAM": "",
