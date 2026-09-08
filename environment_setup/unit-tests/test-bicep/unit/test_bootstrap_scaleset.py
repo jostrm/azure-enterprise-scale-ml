@@ -329,6 +329,24 @@ class TestScaleSetConfiguration(unittest.TestCase):
 
 
 class TestScaleSetWorkflowContracts(unittest.TestCase):
+    def test_role_assignment_lookup_does_not_require_graph(self) -> None:
+        script = (
+            BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"
+        ).read_text(encoding="utf-8")
+        role_assignment = script[
+            script.index("aif_ensure_role_assignment()")
+            : script.index("aif_ensure_target_repository()")
+        ]
+        self.assertNotIn('--assignee "$principal_id"', role_assignment)
+        self.assertIn(
+            '--assignee-object-id "$principal_id"',
+            role_assignment,
+        )
+        self.assertIn(
+            "length([?principalId=='$principal_id'])",
+            role_assignment,
+        )
+
     def test_ado_federation_subject_is_not_converted_to_a_windows_path(self) -> None:
         script = (
             BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"
