@@ -2493,7 +2493,8 @@ aif_ensure_ado_pipeline() {
 }
 
 aif_authorize_ado_pipeline() {
-  local pipeline_id="$1" project_encoded body="$AIF_STATE_DIR/permission-$pipeline_id.json"
+  local pipeline_id="$1" project_encoded body
+  body="$AIF_STATE_DIR/permission-$pipeline_id.json"
   [[ "$AIF_DRY_RUN" != "true" ]] || return 0
   project_encoded="$(aif_urlencode "$ADO_PROJECT")"
   "${AIF_PYTHON[@]}" - "$body" "$pipeline_id" <<'PY'
@@ -2528,7 +2529,8 @@ print(value.get("state") or value.get("status") or "", value.get("result") or ""
 }
 
 aif_run_ado_pipeline() {
-  local pipeline_id="$1" kind="$2" project_encoded body="$AIF_STATE_DIR/run-$kind.json"
+  local pipeline_id="$1" kind="$2" project_encoded body
+  body="$AIF_STATE_DIR/run-$kind.json"
   [[ "$AIF_DRY_RUN" != "true" ]] || { aif_info "DRY-RUN: dispatch ADO $kind pipeline."; return 0; }
   project_encoded="$(aif_urlencode "$ADO_PROJECT")"
   "${AIF_PYTHON[@]}" - "$body" "$kind" "$AIF_RUNNER_MODE" <<'PY'
