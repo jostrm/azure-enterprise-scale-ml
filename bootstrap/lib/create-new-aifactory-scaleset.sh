@@ -289,8 +289,12 @@ aif_collect_answers() {
   current_tenant="$(az account show --query tenantId --output tsv 2>/dev/null || true)"
   current_subscription="$(az account show --query id --output tsv 2>/dev/null || true)"
   current_user="$(az account show --query user.name --output tsv 2>/dev/null || true)"
+  current_tenant="${current_tenant//$'\r'/}"
+  current_subscription="${current_subscription//$'\r'/}"
+  current_user="${current_user//$'\r'/}"
   [[ "$current_user" == *@* ]] || current_user=""
   current_repo="$(aif_current_origin_slug)"
+  current_repo="${current_repo//$'\r'/}"
 
   AIF_TOPOLOGY="${AIF_TOPOLOGY:-}"
   AIF_NETWORK_MODE="${AIF_NETWORK_MODE:-}"
@@ -599,6 +603,7 @@ aif_ensure_azure_login() {
   aif_section "06 / Azure access"
   local current_tenant
   current_tenant="$(az account show --query tenantId --output tsv 2>/dev/null || true)"
+  current_tenant="${current_tenant//$'\r'/}"
   if [[ "$current_tenant" != "$AIF_TENANT_ID" ]]; then
     if az account show \
       --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
@@ -625,6 +630,7 @@ aif_ensure_ado_auth() {
   ADO_CONTEXT_SUBSCRIPTION_ID="$(az account list --all \
     --query "[?tenantId=='$ADO_TENANT'] | [0].id" \
     --output tsv)"
+  ADO_CONTEXT_SUBSCRIPTION_ID="${ADO_CONTEXT_SUBSCRIPTION_ID//$'\r'/}"
   if [[ -n "$ADO_CONTEXT_SUBSCRIPTION_ID" ]]; then
     az account set --subscription "$ADO_CONTEXT_SUBSCRIPTION_ID"
   fi
@@ -642,6 +648,7 @@ aif_ensure_ado_auth() {
     ADO_CONTEXT_SUBSCRIPTION_ID="$(az account list --all \
       --query "[?tenantId=='$ADO_TENANT'] | [0].id" \
       --output tsv)"
+    ADO_CONTEXT_SUBSCRIPTION_ID="${ADO_CONTEXT_SUBSCRIPTION_ID//$'\r'/}"
   fi
 }
 
@@ -729,6 +736,8 @@ aif_ensure_first_party_enterprise_apps() {
     --id "$databricks_app_id" \
     --query id \
     --output tsv 2>/dev/null || true)"
+  AIF_AZURE_ML_PRINCIPAL_ID="${AIF_AZURE_ML_PRINCIPAL_ID//$'\r'/}"
+  AIF_DATABRICKS_PRINCIPAL_ID="${AIF_DATABRICKS_PRINCIPAL_ID//$'\r'/}"
   if [[ -n "$AIF_AZURE_ML_PRINCIPAL_ID" &&
         -n "$AIF_DATABRICKS_PRINCIPAL_ID" ]]; then
     aif_success "Azure Machine Learning and Azure Databricks enterprise applications exist."
@@ -817,6 +826,8 @@ PY
       --id "$databricks_app_id" \
       --query id \
       --output tsv 2>/dev/null || true)"
+    AIF_AZURE_ML_PRINCIPAL_ID="${AIF_AZURE_ML_PRINCIPAL_ID//$'\r'/}"
+    AIF_DATABRICKS_PRINCIPAL_ID="${AIF_DATABRICKS_PRINCIPAL_ID//$'\r'/}"
     if [[ -n "$AIF_AZURE_ML_PRINCIPAL_ID" &&
           -n "$AIF_DATABRICKS_PRINCIPAL_ID" ]]; then
       break
@@ -867,6 +878,7 @@ aif_ensure_role_assignment() {
     --role "$role" \
     --query 'length(@)' \
     --output tsv)"
+  existing="${existing//$'\r'/}"
   if [[ "$existing" == "0" ]]; then
     local attempt error_output=""
     for attempt in 1 2 3 4 5; do
@@ -930,6 +942,7 @@ aif_ensure_target_repository() {
         --repository "$ADO_REPOSITORY_NAME" \
         --query remoteUrl \
         --output tsv)"
+      AIF_REMOTE_URL="${AIF_REMOTE_URL//$'\r'/}"
     else
       AIF_REMOTE_URL="$ADO_ORGANIZATION/$ADO_PROJECT/_git/$ADO_REPOSITORY_NAME"
     fi
@@ -1105,6 +1118,7 @@ print(value["id"].split("/")[2])
 print(value["resourceGroup"])
 print(value["name"])
 ')"
+      identity_fields_output="${identity_fields_output//$'\r'/}"
       mapfile -t identity_fields <<< "$identity_fields_output"
       AIF_IDENTITY_SUBSCRIPTION_ID="${identity_fields[0]}"
       AIF_IDENTITY_RESOURCE_GROUP="${identity_fields[1]}"
@@ -1116,6 +1130,7 @@ print(value["name"])
     AIF_IDENTITY_CLIENT_ID="$AIF_SP_CLIENT_ID"
     if [[ "$AIF_DRY_RUN" != "true" ]]; then
       AIF_IDENTITY_PRINCIPAL_ID="$(az ad sp show --id "$AIF_SP_CLIENT_ID" --query id --output tsv)"
+      AIF_IDENTITY_PRINCIPAL_ID="${AIF_IDENTITY_PRINCIPAL_ID//$'\r'/}"
     else
       AIF_IDENTITY_PRINCIPAL_ID="00000000-0000-0000-0000-000000000001"
     fi
@@ -1126,8 +1141,10 @@ print(value["name"])
         --ids "$AIF_MI_RESOURCE_ID" \
         --query '[clientId,principalId]' \
         --output tsv)"
+      identity_values_output="${identity_values_output//$'\r'/}"
       mapfile -t identity_values <<< "$identity_values_output"
-      read -r AIF_IDENTITY_CLIENT_ID AIF_IDENTITY_PRINCIPAL_ID <<< "${identity_values[0]}"
+      AIF_IDENTITY_CLIENT_ID="${identity_values[0]}"
+      AIF_IDENTITY_PRINCIPAL_ID="${identity_values[1]}"
     else
       AIF_IDENTITY_CLIENT_ID="00000000-0000-0000-0000-000000000002"
       AIF_IDENTITY_PRINCIPAL_ID="00000000-0000-0000-0000-000000000003"
@@ -1225,6 +1242,7 @@ aif_ensure_team_group() {
     --filter "displayName eq '$AIF_TEAM_GROUP_NAME'" \
     --query '[].id' \
     --output tsv)"
+  group_ids_output="${group_ids_output//$'\r'/}"
   mapfile -t group_ids <<< "$group_ids_output"
   if [[ -z "$group_ids_output" ]]; then
     group_ids=()
@@ -1243,9 +1261,11 @@ aif_ensure_team_group() {
       --description "AI Factory scale set $AIF_SCALESET_SUFFIX project $AIF_PROJECT_NUMBER team" \
       --query id \
       --output tsv)"
+    AIF_TEAM_GROUP_ID="${AIF_TEAM_GROUP_ID//$'\r'/}"
   fi
   local member_id
   member_id="$(az ad user show --id "$AIF_TEAM_MEMBER_EMAIL" --query id --output tsv)"
+  member_id="${member_id//$'\r'/}"
   if [[ "$(az ad group member check \
     --group "$AIF_TEAM_GROUP_ID" \
     --member-id "$member_id" \
@@ -1302,6 +1322,7 @@ aif_seed_optional_project_sp() {
   fi
   local signed_in_user kv_scope sp_json app_id password object_id
   signed_in_user="$(az ad signed-in-user show --query id --output tsv)"
+  signed_in_user="${signed_in_user//$'\r'/}"
   kv_scope="/subscriptions/$AIF_DEV_SUBSCRIPTION_ID/resourceGroups/$AIF_SEEDING_RESOURCE_GROUP/providers/Microsoft.KeyVault/vaults/$AIF_SEEDING_KEYVAULT_NAME"
   if [[ "$(az keyvault show \
     --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
@@ -1327,6 +1348,7 @@ aif_seed_optional_project_sp() {
   app_id="$(printf '%s' "$sp_json" | "${AIF_PYTHON[@]}" -c 'import json,sys; print(json.load(sys.stdin)["appId"])')"
   password="$(printf '%s' "$sp_json" | "${AIF_PYTHON[@]}" -c 'import json,sys; print(json.load(sys.stdin)["password"])')"
   object_id="$(az ad sp show --id "$app_id" --query id --output tsv)"
+  object_id="${object_id//$'\r'/}"
   aif_set_keyvault_secret "$AIF_PROJECT_SP_APP_SECRET" value "$app_id"
   aif_set_keyvault_secret "$AIF_PROJECT_SP_OID_SECRET" value "$object_id"
   local secret_file="$AIF_STATE_DIR/project-sp-secret"
@@ -1354,6 +1376,7 @@ import json
 import sys
 print(json.dumps(json.load(open(sys.argv[1], encoding="utf-8"))["zones"], separators=(",", ":")))
 ' "$AIF_PRIVATE_DNS_CONFIG")"
+  private_dns_zones="${private_dns_zones//$'\r'/}"
   if [[ "$AIF_DRY_RUN" != "true" ]]; then
     az provider register \
       --namespace Microsoft.Network \
@@ -1432,6 +1455,7 @@ PY
       --name "$assignment_name" \
       --query policyDefinitionId \
       --output tsv)"
+    actual_definition="${actual_definition//$'\r'/}"
     if [[ "${actual_definition,,}" != "${definition_id,,}" ]]; then
       aif_error "Policy assignment '$assignment_name' targets '$actual_definition', not '$definition_id'." >&2
       exit 1
@@ -1465,6 +1489,7 @@ PY
     --name "$assignment_name" \
     --query identity.principalId \
     --output tsv)"
+  policy_principal_id="${policy_principal_id//$'\r'/}"
   if [[ -z "$policy_principal_id" ]]; then
     aif_error "Private-DNS policy assignment has no system-assigned managed identity." >&2
     exit 1
@@ -1482,7 +1507,7 @@ PY
 }
 
 aif_last_subnet() {
-  "${AIF_PYTHON[@]}" - "$1" "$2" <<'PY'
+  "${AIF_PYTHON[@]}" - "$1" "$2" <<'PY' | tr -d '\r'
 import ipaddress
 import sys
 
@@ -1492,7 +1517,7 @@ PY
 }
 
 aif_resolver_subnet() {
-  "${AIF_PYTHON[@]}" - "$1" "$2" <<'PY'
+  "${AIF_PYTHON[@]}" - "$1" "$2" <<'PY' | tr -d '\r'
 import ipaddress
 import sys
 
@@ -1534,6 +1559,7 @@ aif_ensure_dns_private_resolver() {
     --name "$hub_vnet" \
     --query id \
     --output tsv)"
+  vnet_id="${vnet_id//$'\r'/}"
   subnet_id="$vnet_id/subnets/snet-dns-private-resolver"
   resolver_url="https://management.azure.com/subscriptions/$hub_subscription/resourceGroups/$hub_resource_group/providers/Microsoft.Network/dnsResolvers/$resolver_name"
   inbound_url="$resolver_url/inboundEndpoints/$inbound_name"
@@ -1579,11 +1605,14 @@ PY
 
   local inbound_state="" inbound_ip="" attempt
   for attempt in {1..90}; do
-    read -r inbound_state inbound_ip < <(az rest \
+    local -a inbound_values=()
+    mapfile -t inbound_values < <(az rest \
       --method get \
       --url "$inbound_url?api-version=2025-05-01" \
       --query '[properties.provisioningState, properties.ipConfigurations[0].privateIpAddress]' \
-      --output tsv 2>/dev/null || true)
+      --output tsv 2>/dev/null | tr -d '\r' || true)
+    inbound_state="${inbound_values[0]:-}"
+    inbound_ip="${inbound_values[1]:-}"
     [[ "$inbound_state" != "Failed" ]] ||
       { aif_error "DNS Private Resolver inbound endpoint failed."; exit 1; }
     [[ "$inbound_state" == "Succeeded" && -n "$inbound_ip" ]] && break
@@ -1658,6 +1687,7 @@ aif_ensure_vpn_access_hub() {
     --name "$hub_vnet" \
     --query 'addressSpace.addressPrefixes' \
     --output tsv)"
+  actual_hub_prefixes="${actual_hub_prefixes//$'\r'/}"
   if ! grep -qxF "$hub_cidr" <<< "$actual_hub_prefixes"; then
     aif_error "Access-hub VNet '$hub_vnet' does not contain configured CIDR '$hub_cidr'." >&2
     exit 1
@@ -1685,6 +1715,7 @@ aif_ensure_vpn_access_hub() {
     --name GatewaySubnet \
     --query addressPrefix \
     --output tsv)"
+  actual_gateway_subnet="${actual_gateway_subnet//$'\r'/}"
   if [[ "$actual_gateway_subnet" != "$gateway_subnet" ]]; then
     aif_error "GatewaySubnet is '$actual_gateway_subnet'; expected '$gateway_subnet'." >&2
     exit 1
@@ -1825,7 +1856,8 @@ PY
 
 aif_urlencode() {
   "${AIF_PYTHON[@]}" -c \
-    'import sys; from urllib.parse import quote; print(quote(sys.argv[1], safe=""))' "$1"
+    'import sys; from urllib.parse import quote; print(quote(sys.argv[1], safe=""))' "$1" |
+    tr -d '\r'
 }
 
 aif_ado_api() {
@@ -1844,6 +1876,7 @@ print("Basic " + base64.b64encode((":" + os.environ["AZURE_DEVOPS_EXT_PAT"]).enc
       --tenant "$ADO_TENANT" \
       --query accessToken \
       --output tsv)"
+    token="${token//$'\r'/}"
     auth_header="Bearer $token"
   fi
   ADO_AUTH_HEADER="$auth_header" "${AIF_PYTHON[@]}" - "$method" "$url" "$input_file" <<'PY'
@@ -1886,7 +1919,11 @@ aif_ensure_ado_federated_credential() {
     --query '[issuer,subject]' \
     --output tsv 2>/dev/null)"; then
     local existing_issuer existing_subject
-    read -r existing_issuer existing_subject <<< "$existing_values"
+    local -a existing_federation=()
+    existing_values="${existing_values//$'\r'/}"
+    mapfile -t existing_federation <<< "$existing_values"
+    existing_issuer="${existing_federation[0]:-}"
+    existing_subject="${existing_federation[1]:-}"
     if [[ "$existing_issuer" != "$issuer" || "$existing_subject" != "$subject" ]]; then
       aif_error "Federated credential '$credential_name' exists with a different issuer or subject." >&2
       exit 1
@@ -1920,6 +1957,7 @@ aif_ensure_ado_service_connection() {
     --project "$ADO_PROJECT" \
     --query id \
     --output tsv)"
+  AIF_ADO_PROJECT_ID="${AIF_ADO_PROJECT_ID//$'\r'/}"
   aif_ado_api GET \
     "$ADO_ORGANIZATION/$project_encoded/_apis/serviceendpoint/endpoints?endpointNames=$endpoint_name_encoded&api-version=7.1" \
     > "$endpoints_file"
@@ -1964,6 +2002,7 @@ if values:
     print(parameters.get("workloadIdentityFederationSubject", ""))
 PY
 )"
+  existing_endpoint_values="${existing_endpoint_values//$'\r'/}"
   mapfile -t existing_endpoint <<< "$existing_endpoint_values"
   AIF_ADO_ENDPOINT_ID="${existing_endpoint[0]:-}"
   if [[ -n "$AIF_ADO_ENDPOINT_ID" ]]; then
@@ -1985,6 +2024,7 @@ PY
     --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
     --query name \
     --output tsv)"
+  subscription_name="${subscription_name//$'\r'/}"
   ENDPOINT_SECRET="${AIF_SP_CLIENT_SECRET:-}" "${AIF_PYTHON[@]}" - \
     "$endpoint_file" "$AIF_DEV_SUBSCRIPTION_ID" "$subscription_name" \
     "$AIF_TENANT_ID" "$AIF_IDENTITY_CLIENT_ID" "$ADO_SERVICE_CONNECTION_NAME" \
@@ -2048,6 +2088,7 @@ print(parameters.get("workloadIdentityFederationIssuer", ""))
 print(parameters.get("workloadIdentityFederationSubject", ""))
 PY
 )"
+  endpoint_values_output="${endpoint_values_output//$'\r'/}"
   mapfile -t endpoint_values <<< "$endpoint_values_output"
   AIF_ADO_ENDPOINT_ID="${endpoint_values[0]}"
   if [[ "$AIF_IDENTITY_MODE" != "sp" ]]; then
@@ -2128,6 +2169,7 @@ PY
       --query id \
       --output tsv)"
   fi
+  pipeline_id="${pipeline_id//$'\r'/}"
   echo "$pipeline_id"
 }
 
@@ -2468,6 +2510,7 @@ if pools[0].get("isHosted"):
 print(pools[0]["id"])
 PY
 )"
+  pool_id="${pool_id//$'\r'/}"
   agent_encoded="$(aif_urlencode "$ADO_AGENT_NAME")"
   agents_file="$AIF_STATE_DIR/agents.json"
   aif_ado_api GET \
@@ -2499,6 +2542,7 @@ PY
     --name "$ADO_AGENT_NAME" \
     --query "instanceView.statuses[?starts_with(code, 'PowerState/')].code | [0]" \
     --output tsv)"
+  power_state="${power_state//$'\r'/}"
   if [[ "$power_state" != "PowerState/running" ]]; then
     az vm start \
       --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
@@ -2522,6 +2566,7 @@ if not packages:
 print(packages[0]["downloadUrl"])
 PY
 )"
+  package_url="${package_url//$'\r'/}"
   if [[ "$ADO_AUTH_METHOD" == "pat" ]]; then
     ado_token="$AZURE_DEVOPS_EXT_PAT"
   else
@@ -2530,6 +2575,7 @@ PY
       --tenant "$ADO_TENANT" \
       --query accessToken \
       --output tsv)"
+    ado_token="${ado_token//$'\r'/}"
   fi
   script_file="$AIF_STATE_DIR/register-ado-agent.ps1"
   run_command_body="$AIF_STATE_DIR/agent-run-command.json"
@@ -2652,11 +2698,14 @@ PY
 
   local execution_state="" exit_code=""
   for attempt in {1..180}; do
-    read -r execution_state exit_code < <(az rest \
+    local -a execution_values=()
+    mapfile -t execution_values < <(az rest \
       --method get \
       --url "$run_command_url?api-version=2023-03-01&%24expand=instanceView" \
       --query '[properties.instanceView.executionState, properties.instanceView.exitCode]' \
-      --output tsv 2>/dev/null || true)
+      --output tsv 2>/dev/null | tr -d '\r' || true)
+    execution_state="${execution_values[0]:-}"
+    exit_code="${execution_values[1]:-}"
     case "$execution_state" in
       Succeeded) break ;;
       Failed|Canceled|TimedOut)
@@ -2709,6 +2758,7 @@ aif_ensure_private_network_access() {
     --name "$common_vnet" \
     --query id \
     --output tsv)"
+  spoke_vnet_id="${spoke_vnet_id//$'\r'/}"
 
   if [[ "$AIF_TOPOLOGY" == "hs" || "$AIF_ACCESS_HUB_MODE" == "external" ]]; then
     local hub_vnet_id
@@ -2718,6 +2768,7 @@ aif_ensure_private_network_access() {
       --name "$AIF_HUB_VNET_NAME" \
       --query id \
       --output tsv)"
+    hub_vnet_id="${hub_vnet_id//$'\r'/}"
 
     if az network vnet peering show \
       --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
