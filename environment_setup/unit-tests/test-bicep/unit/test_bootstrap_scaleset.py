@@ -7,6 +7,7 @@ import json
 import shutil
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -14,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[4]
 BOOTSTRAP = ROOT / "bootstrap"
 CONFIG_HELPER = BOOTSTRAP / "lib/aifactory_scaleset_config.py"
 DNS_HELPER = BOOTSTRAP / "lib/aifactory_private_dns.py"
+VPN_HELPER = BOOTSTRAP / "lib/aifactory_vpn_profile.py"
 ADO_VARIABLES = (
     ROOT
     / "environment_setup/aifactory/bicep/copy_to_local_settings"
@@ -46,6 +48,13 @@ DNS_SPEC = importlib.util.spec_from_file_location("aifactory_private_dns", DNS_H
 assert DNS_SPEC and DNS_SPEC.loader
 DNS = importlib.util.module_from_spec(DNS_SPEC)
 DNS_SPEC.loader.exec_module(DNS)
+VPN_SPEC = importlib.util.spec_from_file_location(
+    "aifactory_vpn_profile",
+    VPN_HELPER,
+)
+assert VPN_SPEC and VPN_SPEC.loader
+VPN = importlib.util.module_from_spec(VPN_SPEC)
+VPN_SPEC.loader.exec_module(VPN)
 
 
 def state() -> dict[str, object]:
@@ -91,6 +100,46 @@ def state() -> dict[str, object]:
 
 
 class TestScaleSetConfiguration(unittest.TestCase):
+    def test_vpn_profile_adds_name_dns_and_private_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.xml"
+            output = root / "output.xml"
+            source.write_text(
+                '<?xml version="1.0"?>'
+                '<azvpnprofile xmlns:i="http://www.w3.org/2001/XMLSchema-instance">'
+                '<clientconfig i:nil="true" />'
+                '<name>VNet</name>'
+                '</azvpnprofile>',
+                encoding="utf-8",
+            )
+            VPN.prepare_profile(
+                source,
+                output,
+                "AI Factory spider-001",
+                "10.240.0.4",
+                ["172.16.0.0/18", "10.240.0.0/22", "172.16.0.0/18"],
+            )
+            profile = ET.parse(output).getroot()
+            self.assertEqual(profile.findtext("name"), "AI Factory spider-001")
+            client = profile.find("clientconfig")
+            self.assertIsNotNone(client)
+            assert client is not None
+            self.assertFalse(client.attrib)
+            self.assertEqual(
+                client.findtext("dnsservers/dnsserver"),
+                "10.240.0.4",
+            )
+            routes = {
+                (route.findtext("destination"), route.findtext("mask"))
+                for route in client.findall("includeroutes/route")
+            }
+            self.assertEqual(
+                routes,
+                {("172.16.0.0", "18"), ("10.240.0.0", "22")},
+            )
+            self.assertEqual(len(client.findall("includeroutes/route")), 2)
+
     def test_subnet_plan_uses_first_four_26_networks(self) -> None:
         plan = CONFIG.subnet_plan("172.16.0.0/18")
         self.assertEqual(plan["common_subnet_cidr"], "172.16.0.0/26")
@@ -265,6 +314,22 @@ class TestScaleSetWorkflowContracts(unittest.TestCase):
             '      "$hub_subscription" \\\n'
             '      "$hub_resource_group" \\\n'
             '      "$public_ip_name"',
+            script,
+        )
+        self.assertIn(
+            "winget.exe install",
+            script,
+        )
+        self.assertIn(
+            "vnet-gateway vpn-client generate",
+            script,
+        )
+        self.assertIn(
+            "--updated",
+            script,
+        )
+        self.assertIn(
+            'AzureVpn.exe -i "$profile_basename" -f',
             script,
         )
 

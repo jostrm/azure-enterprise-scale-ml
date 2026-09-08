@@ -35,6 +35,7 @@ Common non-interactive variables:
   AIF_PROJECT_NUMBER=001
   AIF_TEAM_GROUP_NAME=acme-ai-prj001-team
   AIF_TEAM_MEMBER_EMAIL=jostrm@microsoft.com
+  AIF_CONFIGURE_VPN_CLIENT=y|n
   ADO_RUNNER_MODE=s|h
 EOF
 }
@@ -56,6 +57,13 @@ aif_require_command() {
     aif_error "Required command '$1' is not available." >&2
     exit 1
   fi
+}
+
+aif_is_windows() {
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 aif_cleanup() {
@@ -315,6 +323,7 @@ aif_collect_answers() {
   AIF_ACCESS_HUB_VNET_NAME="${AIF_ACCESS_HUB_VNET_NAME:-}"
   AIF_ACCESS_HUB_VNET_CIDR="${AIF_ACCESS_HUB_VNET_CIDR:-}"
   AIF_VPN_CLIENT_CIDR="${AIF_VPN_CLIENT_CIDR:-}"
+  AIF_CONFIGURE_VPN_CLIENT="${AIF_CONFIGURE_VPN_CLIENT:-}"
   AIF_SEEDING_MODE="${AIF_SEEDING_MODE:-}"
   AIF_SEEDING_RESOURCE_GROUP="${AIF_SEEDING_RESOURCE_GROUP:-}"
   AIF_SEEDING_KEYVAULT_NAME="${AIF_SEEDING_KEYVAULT_NAME:-}"
@@ -385,6 +394,13 @@ aif_collect_answers() {
     else
       AIF_ACCESS_HUB_MODE="integrated"
     fi
+    local configure_vpn_client_default="n"
+    aif_is_windows && configure_vpn_client_default="y"
+    aif_prompt_yes_no AIF_CONFIGURE_VPN_CLIENT \
+      "Install and configure Azure VPN Client on this computer? (Y/n)" \
+      "$configure_vpn_client_default"
+  else
+    AIF_CONFIGURE_VPN_CLIENT="false"
   fi
 
   AIF_HUB_SUBSCRIPTION_ID="${AIF_HUB_SUBSCRIPTION_ID:-}"
@@ -586,6 +602,9 @@ aif_confirm_summary() {
   aif_value "Scale set" "$AIF_SCALESET_SUFFIX_DASH"
   aif_value "Project" "$AIF_PROJECT_NUMBER"
   aif_value "Build runner" "$AIF_RUNNER_MODE"
+  if [[ "$AIF_TOPOLOGY" == "s" ]]; then
+    aif_value "Configure VPN client" "$AIF_CONFIGURE_VPN_CLIENT"
+  fi
   aif_value "Team group" "$AIF_TEAM_GROUP_NAME"
   aif_value "Seeding vault" "$AIF_SEEDING_KEYVAULT_NAME"
   if [[ "$AIF_YES" == "true" ]]; then
@@ -1876,8 +1895,147 @@ aif_ensure_vpn_access_hub() {
     --aad-audience "c632b3df-fb67-4d84-bdcf-b95ad541b5c8" \
     --aad-issuer "https://sts.windows.net/$AIF_TENANT_ID/" \
     --output none
+  az network vnet-gateway wait \
+    --subscription "$hub_subscription" \
+    --resource-group "$hub_resource_group" \
+    --name "$gateway_name" \
+    --updated \
+    --interval 30 \
+    --timeout 3600
   AIF_VPN_GATEWAY_NAME="$gateway_name"
   aif_success "Point-to-site VPN gateway '$gateway_name' is ready."
+}
+
+aif_configure_windows_vpn_client() {
+  [[ "$AIF_CONFIGURE_VPN_CLIENT" == "true" ]] || return 0
+  if ! aif_is_windows; then
+    aif_error "Azure VPN Client installation and profile import are supported only from Windows Git Bash." >&2
+    exit 1
+  fi
+
+  aif_section "16 / Azure VPN Client"
+  if ! powershell.exe -NoProfile -NonInteractive -Command \
+    "if (Get-AppxPackage -Name Microsoft.AzureVpn -ErrorAction SilentlyContinue) { exit 0 }; exit 1"; then
+    if ! command -v winget.exe >/dev/null 2>&1; then
+      aif_error "Azure VPN Client is missing and winget.exe is not available." >&2
+      exit 1
+    fi
+    aif_info "Installing Microsoft Azure VPN Client for the current Windows user."
+    winget.exe install \
+      --id Microsoft.AzureVPNClient \
+      --exact \
+      --source winget \
+      --silent \
+      --accept-package-agreements \
+      --accept-source-agreements \
+      --disable-interactivity
+  fi
+  if ! powershell.exe -NoProfile -NonInteractive -Command \
+    "if (Get-AppxPackage -Name Microsoft.AzureVpn -ErrorAction SilentlyContinue) { exit 0 }; exit 1"; then
+    aif_error "Microsoft Azure VPN Client installation could not be verified." >&2
+    exit 1
+  fi
+
+  local profile_url="" attempt
+  for ((attempt = 0; attempt < 30; attempt++)); do
+    profile_url="$(az network vnet-gateway vpn-client generate \
+      --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+      --resource-group "$AIF_HUB_RESOURCE_GROUP" \
+      --name "$AIF_VPN_GATEWAY_NAME" \
+      --processor-architecture Amd64 \
+      --output tsv 2>/dev/null || true)"
+    profile_url="${profile_url//$'\r'/}"
+    [[ "$profile_url" == https://* ]] && break
+    sleep 10
+  done
+  if [[ "$profile_url" != https://* ]]; then
+    aif_error "Azure did not generate a VPN client configuration package." >&2
+    exit 1
+  fi
+
+  local package_path="$AIF_STATE_DIR/vpn-client.zip"
+  local extract_path="$AIF_STATE_DIR/vpn-client"
+  local source_profile="$AIF_STATE_DIR/source-azurevpnconfig.xml"
+  local prepared_profile="$AIF_STATE_DIR/aifactory-azurevpnconfig.xml"
+  curl --fail --location --silent --show-error \
+    "$profile_url" \
+    --output "$package_path"
+  "${AIF_PYTHON[@]}" - "$package_path" "$extract_path" "$source_profile" <<'PY'
+import pathlib
+import shutil
+import sys
+import zipfile
+
+archive = pathlib.Path(sys.argv[1])
+destination = pathlib.Path(sys.argv[2])
+output = pathlib.Path(sys.argv[3])
+destination.mkdir(parents=True, exist_ok=True)
+with zipfile.ZipFile(archive) as package:
+    root = destination.resolve()
+    for item in package.infolist():
+        target = (destination / item.filename).resolve()
+        if root not in target.parents and target != root:
+            raise SystemExit(f"Unsafe path in VPN client package: {item.filename}")
+    package.extractall(destination)
+
+profiles = sorted(
+    path
+    for path in destination.rglob("azurevpnconfig*.xml")
+    if path.parent.name.lower() == "azurevpn"
+)
+if not profiles:
+    raise SystemExit("The VPN client package has no Azure VPN Client profile.")
+preferred = next(
+    (path for path in profiles if "aad" in path.name.lower()),
+    profiles[0],
+)
+shutil.copy2(preferred, output)
+PY
+
+  local profile_name="AI Factory ${AIF_PREFIX%-}-${AIF_SCALESET_SUFFIX}"
+  "${AIF_PYTHON[@]}" \
+    "$AIF_SCALESET_LIB_DIR/aifactory_vpn_profile.py" \
+    --input "$source_profile" \
+    --output "$prepared_profile" \
+    --name "$profile_name" \
+    --dns-server "$AIF_DNS_RESOLVER_INBOUND_IP" \
+    --route "$AIF_DEV_VNET_CIDR" \
+    --route "$AIF_ACCESS_HUB_VNET_CIDR"
+
+  local local_state_windows local_state profile_file profile_basename pbk
+  local_state_windows="$(powershell.exe -NoProfile -NonInteractive -Command \
+    "[Environment]::ExpandEnvironmentVariables('%LOCALAPPDATA%\Packages\Microsoft.AzureVpn_8wekyb3d8bbwe\LocalState')")"
+  local_state_windows="${local_state_windows//$'\r'/}"
+  local_state="$(cygpath -u "$local_state_windows")"
+  mkdir -p "$local_state"
+  profile_basename="aifactory-${AIF_PREFIX%-}-${AIF_SCALESET_SUFFIX}.xml"
+  profile_file="$local_state/$profile_basename"
+  pbk="$local_state/rasphone.pbk"
+  if [[ -f "$profile_file" && -f "$pbk" ]] &&
+     cmp -s -- "$prepared_profile" "$profile_file" &&
+     grep -Fqx "[$profile_name]" "$pbk"; then
+    aif_success "Azure VPN Client profile '$profile_name' is already current."
+    return 0
+  fi
+  cp -f -- "$prepared_profile" "$profile_file"
+
+  if ! command -v AzureVpn.exe >/dev/null 2>&1; then
+    aif_error "The AzureVpn.exe application alias is unavailable after installation." >&2
+    exit 1
+  fi
+  (
+    cd "$local_state"
+    AzureVpn.exe -i "$profile_basename" -f
+  )
+  for ((attempt = 0; attempt < 30; attempt++)); do
+    if [[ -f "$pbk" ]] && grep -Fqx "[$profile_name]" "$pbk"; then
+      aif_success "Azure VPN Client profile '$profile_name' is configured."
+      return 0
+    fi
+    sleep 2
+  done
+  aif_error "Azure VPN Client did not persist profile '$profile_name'." >&2
+  exit 1
 }
 
 aif_prepare_external_access_hub() {
@@ -2995,6 +3153,7 @@ aif_ensure_private_network_access() {
     --name "$AIF_SEEDING_KEYVAULT_NAME" \
     --public-network-access Disabled \
     --output none
+  aif_configure_windows_vpn_client
   aif_success "Private VPN, peering, DNS links, and seeding Key Vault access are ready."
 }
 
