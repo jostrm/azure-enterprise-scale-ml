@@ -339,6 +339,24 @@ class TestScaleSetWorkflowContracts(unittest.TestCase):
             script,
         )
 
+    def test_ado_pipeline_binding_avoids_locale_encoded_json(self) -> None:
+        script = (
+            BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "--query '[id,repository.name,process.yamlFilename,"
+            "repository.defaultBranch]'",
+            script,
+        )
+        self.assertIn(
+            'local pipeline_id="" pipeline_values_output=""',
+            script,
+        )
+        self.assertIn(
+            "Azure DevOps did not return an ID for pipeline",
+            script,
+        )
+
     def test_vpn_public_ip_recovers_from_required_subscription_feature(self) -> None:
         script = (
             BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"
