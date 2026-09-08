@@ -6,7 +6,7 @@ readonly AIF_SUBMODULE_URL="https://github.com/jostrm/azure-enterprise-scale-ml"
 readonly AIF_SUBMODULE_BRANCH="${AIF_SUBMODULE_BRANCH:-release/v1.24}"
 readonly AIF_ADO_RESOURCE="https://app.vssps.visualstudio.com/"
 readonly AIF_SCALESET_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export MSYS2_ARG_CONV_EXCL="${MSYS2_ARG_CONV_EXCL:+$MSYS2_ARG_CONV_EXCL;}/subscriptions/;/providers/;scope=/subscriptions/;privateLinksDnsZones="
+export MSYS2_ARG_CONV_EXCL="${MSYS2_ARG_CONV_EXCL:+$MSYS2_ARG_CONV_EXCL;}/subscriptions/;/providers/;/eid1/;scope=/subscriptions/;privateLinksDnsZones="
 
 aif_scaleset_usage() {
   cat <<'EOF'
@@ -2240,8 +2240,16 @@ aif_ensure_ado_federated_credential() {
     existing_issuer="${existing_federation[0]:-}"
     existing_subject="${existing_federation[1]:-}"
     if [[ "$existing_issuer" != "$issuer" || "$existing_subject" != "$subject" ]]; then
-      aif_error "Federated credential '$credential_name' exists with a different issuer or subject." >&2
-      exit 1
+      aif_warn "Reconciling federated credential '$credential_name' with the current Azure DevOps service connection."
+      az identity federated-credential update \
+        --subscription "$AIF_IDENTITY_SUBSCRIPTION_ID" \
+        --resource-group "$AIF_IDENTITY_RESOURCE_GROUP" \
+        --identity-name "$AIF_IDENTITY_NAME" \
+        --name "$credential_name" \
+        --issuer "$issuer" \
+        --subject "$subject" \
+        --audiences api://AzureADTokenExchange \
+        --output none
     fi
     return
   fi

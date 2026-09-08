@@ -329,6 +329,16 @@ class TestScaleSetConfiguration(unittest.TestCase):
 
 
 class TestScaleSetWorkflowContracts(unittest.TestCase):
+    def test_ado_federation_subject_is_not_converted_to_a_windows_path(self) -> None:
+        script = (
+            BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn("/eid1/", script.splitlines()[8])
+        self.assertIn(
+            "az identity federated-credential update",
+            script,
+        )
+
     def test_vpn_public_ip_recovers_from_required_subscription_feature(self) -> None:
         script = (
             BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"
