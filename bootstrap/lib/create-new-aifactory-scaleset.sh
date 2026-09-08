@@ -903,10 +903,9 @@ aif_ensure_role_assignment() {
   fi
   local existing
   existing="$(az role assignment list \
-    --assignee "$principal_id" \
     --scope "$scope" \
     --role "$role" \
-    --query 'length(@)' \
+    --query "length([?principalId=='$principal_id'])" \
     --output tsv)"
   existing="${existing//$'\r'/}"
   if [[ "$existing" == "0" ]]; then
