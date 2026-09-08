@@ -823,6 +823,7 @@ module aiFoundry2025NoAvmV22 '../modules/csFoundry/aiFoundry2025AvmOffApim.bicep
     servicePrincipalIds: spAndMiArray
     useAdGroups: useAdGroups
     extraModelDeployments: extraModelDeploymentsV22
+    deployDefaultModel: hasModelDeploymentsV22
     modelName: defaultModelNameV22
     modelFormat: defaultModelFormatV22
     modelVersion: defaultModelVersionV22

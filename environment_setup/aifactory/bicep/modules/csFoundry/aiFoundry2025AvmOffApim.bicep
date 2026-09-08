@@ -97,6 +97,9 @@ param useAdGroups bool = true
 @description('Optional list of additional model deployments to create. Expected shape matches Microsoft.CognitiveServices/accounts/deployments properties.')
 param extraModelDeployments array = []
 
+@description('Deploy the default model. Disable this when no model deployment was requested.')
+param deployDefaultModel bool = true
+
 @description('Model name for the default deployment.')
 param modelName string = 'gpt-4o'
 
@@ -364,7 +367,7 @@ resource aiAccountUpdateWithCMK 'Microsoft.CognitiveServices/accounts@2025-04-01
 // Use the CMK-updated account if CMK is enabled, otherwise use the existing reference
 var aiAccountResourceId = foundryV22AccountOnly ? aiAccountCreate.id : (cmk ? aiAccountUpdateWithCMK.id : aiAccountExisting.id)
 
-resource aiAccountDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01-preview' = {
+resource aiAccountDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01-preview' = if (deployDefaultModel) {
   name: '${aiAccountName}/${defaultDeploymentName}'
   properties: {
     model: {
@@ -398,7 +401,7 @@ resource aiAccountDeploymentsAdditional 'Microsoft.CognitiveServices/accounts/de
   dependsOn: [
     // Wait for account to be ready based on deployment scenario
     ...(foundryV22AccountOnly ? [aiAccountCreate] : (cmk ? [aiAccountUpdateWithCMK] : [aiAccountExisting]))
-    aiAccountDeployment
+    ...(deployDefaultModel ? [aiAccountDeployment] : [])
   ]
 }]
 
