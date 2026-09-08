@@ -1,5 +1,10 @@
 {
   "dev": {
+    "GITHUB_USERNAME": "",
+    "GITHUB_USE_SSH": "false",
+    "GITHUB_TEMPLATE_REPO": "azure/enterprise-scale-aifactory",
+    "GITHUB_NEW_REPO": "",
+    "GITHUB_NEW_REPO_VISIBILITY": "public",
     "aifactory-dash-01": "",
     "aifactory_version_major": "1",
     "aifactory_version_minor": "24",
