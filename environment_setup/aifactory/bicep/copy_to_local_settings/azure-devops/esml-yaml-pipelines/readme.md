@@ -34,7 +34,11 @@ naming, deployment identity, seeding Key Vault, team group, and Azure DevOps
 project/repository. It prefers a user-assigned managed identity with workload
 identity federation, creates the Azure DevOps service connection and YAML
 pipelines, commits the generated automation, runs the common pipeline, verifies
-the common resource group, and then runs the first project pipeline. Use
+the common resource group, and then runs the first project pipeline. For
+private-only ADO environments, select the self-hosted option: the common
+pipeline creates the admin DSVM and the launcher registers it in the selected
+Azure Pipelines pool before the project pipeline starts. Standalone mode can
+create either an integrated or external VPN/DNS access hub. Use
 `--dry-run` to review the plan or `--prepare-only` to stop before deployment.
 
 1) Add or Update the submodule to your repo (to get the bootstrap files)

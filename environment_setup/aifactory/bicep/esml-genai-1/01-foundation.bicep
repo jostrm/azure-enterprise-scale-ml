@@ -519,11 +519,6 @@ var privateLinksDnsZonesArray = [
     exists: true
   }
   {
-    name: privateLinksDnsZones.registryregion.name
-    id: privateLinksDnsZones.registryregion.id
-    exists: true
-  }
-  {
     name: privateLinksDnsZones.vault.name
     id: privateLinksDnsZones.vault.id
     exists: true

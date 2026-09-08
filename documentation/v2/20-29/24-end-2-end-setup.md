@@ -43,6 +43,12 @@ identity, create or validate the required seeding Key Vault, create the initial
 Entra team group, configure and commit the automation, deploy the common
 environment, and then deploy project 001.
 
+Private-only standalone deployments can use an integrated access hub in the
+DEV common network or an external `aifactory-connectivity` subscription. The
+external option creates central private DNS zones, assigns the DNS initiative
+to the spoke, deploys an Entra-authenticated Point-to-Site VPN gateway and DNS
+Private Resolver, and peers each AI Factory environment VNet to the access hub.
+
 ![AI Factory Configuration Wizard](../../../environment_setup/install_config_wizard/images/aifactory-config-wizard-01.png)
 
 > **Two common workflows**

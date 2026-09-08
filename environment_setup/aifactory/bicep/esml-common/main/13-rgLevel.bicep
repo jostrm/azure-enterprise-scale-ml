@@ -255,10 +255,6 @@ var privateLinksDnsZones = {
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.azurecr.io' // privatelink.${environment().suffixes.acrLoginServer}' // # E
     name:'privatelink.azurecr.io'
   }
-  registryregion: {
-    id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/${location}.data.privatelink.azurecr.io' // privatelink.${environment().suffixes.acrLoginServer}' // # E
-    name:'${location}.data.privatelink.azurecr.io'
-  }
   vault: { // privatelink.vault.azure.net
     id: '/subscriptions/${privDnsSubscription}/resourceGroups/${privDnsResourceGroupName}/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net'
     name:'privatelink.vaultcore.azure.net'
@@ -389,10 +385,6 @@ var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.registry.name
     id: privateLinksDnsZones.registry.id
-  }
-  {
-    name: privateLinksDnsZones.registryregion.name
-    id: privateLinksDnsZones.registryregion.id
   }
   {
     name: privateLinksDnsZones.vault.name

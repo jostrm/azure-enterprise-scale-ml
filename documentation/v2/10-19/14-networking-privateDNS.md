@@ -73,7 +73,7 @@ There is an automation script in the AI Factory accelerator to [create these Pri
 1|Azure Datafactory |ESML|privatelink.adf.azure.com |adf.azure.com | dataFactory |-|
 2|Azure Datafactory |ESML|privatelink.datafactory.azure.net |datafactory.azure.net| portal |-|
 3,4|Azure Machine Learning |ESML,ESGenAI|privatelink.api.azureml.ms <br> privatelink.notebooks.azure.net |api.azureml.ms<br>notebooks.azure.net<br>instances.azureml.ms<br>aznbcontent.net<br>inference.ml.azure.com | amlworkspace |-|
-5|Azure Container registry|ESML, ESGenAI|privatelink.azurecr.io<br> `{regionName}.data.privatelink.azurecr.io` |azurecr.io <br>{regionName}.data.azurecr.io |registry| Dependency: Azure Machine Learning, AI studio|
+5|Azure Container registry|ESML, ESGenAI|privatelink.azurecr.io |azurecr.io <br>{regionName}.data.azurecr.io |registry| Regional data records belong in the `privatelink.azurecr.io` zone; do not create a separate child zone. Dependency: Azure Machine Learning, AI studio|
 6|`Azure Kubernetes Service` |ESML, ESGenAI| privatelink.{regionName}.azmk8s.io <br> `{subzone}.privatelink.{regionName}.azmk8s.io` |{regionName}.azmk8s.io |management|-|
 7|Azure Databricks |ESML| privatelink.azuredatabricks.net |azuredatabricks.net|databricks_ui_api <br> browser_authentication|-|
 8|Azure Databricks |ESML| `privatelink.databricks.azure.us` |databricks.azure.us|databricks_ui_api <br> browser_authentication|-|
@@ -105,7 +105,10 @@ Note: Default behaviour of Microsoft Private DNS, they are registered in global.
 --> 
 
 A) If you run the AIFactory in isolated mode (for DEMO purposes) which is default, they are created automatically via BICEP. <br>
-B) If you run the AIFactory in production mode, peered to your HUB, which is the recommended way, you need to ensure/create the Private DNS zones manually, e.g. no automation in ESML AIFactory yet).
+B) If you run the AIFactory with central DNS, the private DNS zones live in the
+connectivity/access-hub subscription. The scale-set launchers can create the
+access hub, zones, spoke policy assignment, DNS Private Resolver, VPN gateway,
+and peering.
 - Script: [Create these Private DNS zones](../../../environment_setup/aifactory/bicep/esml-util/27-create-private-dns-zones.ps1)
 
 # How many AIFactory projects can you have per AI Factory scale set? 
@@ -257,8 +260,10 @@ Read more:
         - Denies the creation of a private DNS in the current scope (the application landingzones), to ensure only having zones in the Hub
         - Cnfigures private DNS zone group to override the DNS resolution for PaaS services private endpoint. See https://aka.ms/pepdnszones for more.
         - Audit private endpoints that are created in other subscriptions and/or tenants for Azure Machine Learning.
-    - 2a) Define the Azure policy's and assigne the Azure Policy Initiative on the Sopkes subscriptions, e.g. AIFactory DEV, TEST, PROD. 
-        - Not to be assined on the Hub. But the Initative have a Managed Identity (see portal UI) that needs to have the RBAC roles on the HUB's private DNS Zones in the HUB.
+    - 2a) Define the Azure policies and assign the Azure Policy Initiative on the spoke subscriptions, e.g. AIFactory DEV, TEST, PROD.
+        - Do not assign it on the Hub. Its managed identity needs network access
+          to the central DNS scope, while the assignment evaluates private
+          endpoints in each spoke/application subscription.
         - You can create them by runnig the below two BICEP files under the _esml-util folder, and assign them via the portal "Policy" UI
             - Mandatory:
                 - Online link [esml-util/28-Initiatives.bicep](../../../environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep)
@@ -270,7 +275,10 @@ Read more:
                     - Roadmap in ESML AIFactory, is to provision the AKS cluuster with CUSTOM_PRIVATE_DNS_ZONE_RESOURCE_ID. But Azure Machine Learning does not handle that well right now.programmatically-create#create-and-assign-a-policy-definition).
         - Policy Initiative _Configure Azure PaaS services to use private DNS zones_
             - Also set all parameters on the initative assignment, Private DNS Id's.
-            - Also set roles: _Network Contributor,Private DNS Zone Contributor,Contributor_ for the initiative MI, to have access to the HUB's Private DNS Zones
+            - Assign _Network Contributor_ to the initiative managed identity
+              on the spoke evaluation scope and the central connectivity/DNS
+              scope. Scope it more narrowly with an equivalent custom role when
+              your organization requires least-privilege policy identities.
         - ![](./images/13-setup-aifactory-policy-assignment-4-roles.png)
 
     - The below is the 4 separate policys, and the initiative_ with 58 policy's in its policy set that we need to defined and assing to the subscriptions: Dev, Test, Prod application landingzones of the AIFactory:
@@ -289,6 +297,12 @@ For more information about the policy's see [https://github.com/Azure/Enterprise
         - Read the `red boxes`. And tables for servies, such as Azure Machine Learning: 
             - **Private DNS zone name:** privatelink.api.azureml.ms, privatelink.notebooks.azure.net
             - **Public DNS zone forwarder:** api.azureml.ms, notebooks.azure.net, instances.azureml.ms, aznbcontent.net, inference.ml.azure.com
+
+For Point-to-Site VPN, use an inbound DNS Private Resolver endpoint. The hub
+VNet must advertise that routable inbound IP as its custom DNS server; P2S
+clients cannot query Azure's host-node resolver `168.63.129.16` directly.
+Private zones must be linked to the access-hub VNet and every spoke VNet that
+contains clients or private endpoints.
 
 ### Peering of Spookes to Hub
 When setting up a peering from a spoke to a hub in an Azure Enterprise Scale environment, you should configure the following settings:
@@ -347,5 +361,3 @@ If a deployment fails with NSG validation errors, check your rule **descriptions
 - A: You can also run diagnostics on your workspace from Azure Machine Learning studio or the Python SDK. After diagnostics run, a list of any detected problems is returned. This list includes links to possible solutions. For more information, see [How to use workspace diagnostics](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-workspace-diagnostic-api?view=azureml-api-2)
 
 [Go here for more related FAQ](../40-49/41-FAQ-01.md)
-
-

@@ -13,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[4]
 BOOTSTRAP = ROOT / "bootstrap"
 CONFIG_HELPER = BOOTSTRAP / "lib/aifactory_scaleset_config.py"
+DNS_HELPER = BOOTSTRAP / "lib/aifactory_private_dns.py"
 ADO_VARIABLES = (
     ROOT
     / "environment_setup/aifactory/bicep/copy_to_local_settings"
@@ -23,16 +24,34 @@ GHA_ROOT = (
     / "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions"
 )
 VARIABLES_JSON = ROOT / "environment_setup/aifactory/variables.json"
+PRIVATE_DNS_POLICY_SET = (
+    ROOT
+    / "environment_setup/aifactory/bicep/esml-util/policyset"
+    / "Deploy-Private-DNS-Zones.json"
+)
+PRIVATE_DNS_INITIATIVE = (
+    ROOT / "environment_setup/aifactory/bicep/esml-util/28-Initiatives.bicep"
+)
+FOUNDRY_PRIVATE_DNS = (
+    ROOT
+    / "environment_setup/aifactory/bicep/modules/csFoundry/foundry-apim"
+    / "modules-network-secured/private-endpoint-and-dns.bicep"
+)
 
 SPEC = importlib.util.spec_from_file_location("aifactory_scaleset_config", CONFIG_HELPER)
 assert SPEC and SPEC.loader
 CONFIG = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CONFIG)
+DNS_SPEC = importlib.util.spec_from_file_location("aifactory_private_dns", DNS_HELPER)
+assert DNS_SPEC and DNS_SPEC.loader
+DNS = importlib.util.module_from_spec(DNS_SPEC)
+DNS_SPEC.loader.exec_module(DNS)
 
 
 def state() -> dict[str, object]:
     return {
         "topology": "s",
+        "access_hub_mode": "external",
         "network_mode": "priv",
         "tenant_id": "11111111-1111-1111-1111-111111111111",
         "dev_subscription_id": "22222222-2222-2222-2222-222222222222",
@@ -58,12 +77,16 @@ def state() -> dict[str, object]:
         "hub_resource_group": "",
         "project_sp_secret_names": {"app_id": "", "object_id": "", "secret": ""},
         "azure_ml_principal_id": "44444444-4444-4444-4444-444444444444",
+        "databricks_principal_id": "66666666-6666-6666-6666-666666666666",
         "ado_tenant_id": "11111111-1111-1111-1111-111111111111",
         "dev_service_connection": "sc-acme-dev-001",
         "stage_service_connection": "sc-acme-dev-001",
         "prod_service_connection": "sc-acme-dev-001",
         "github_repository": "contoso/acme-aifactory-001",
         "oidc_client_id": "55555555-5555-5555-5555-555555555555",
+        "runner_mode": "self-hosted",
+        "ado_agent_pool": "Default",
+        "ado_agent_name": "dsvm-cmn-sdc-dev-001",
     }
 
 
@@ -76,6 +99,43 @@ class TestScaleSetConfiguration(unittest.TestCase):
         self.assertEqual(plan["common_bastion_subnet_cidr"], "172.16.0.192/26")
         with self.assertRaises(ValueError):
             CONFIG.subnet_plan("172.16.0.0/19")
+
+    def test_private_dns_configuration_is_central_and_regional(self) -> None:
+        config = DNS.configuration(
+            "77777777-7777-7777-7777-777777777777",
+            "aifactory-connectivity",
+            "swedencentral",
+            "sdc",
+        )
+        parameters = config["assignmentParameters"]
+        zones = {item["name"] for item in config["zones"]}
+        self.assertEqual(
+            parameters["azureCognitiveServicesPrivateDnsZoneId"]["value"],
+            "/subscriptions/77777777-7777-7777-7777-777777777777"
+            "/resourceGroups/aifactory-connectivity/providers/"
+            "Microsoft.Network/privateDnsZones/"
+            "privatelink.cognitiveservices.azure.com",
+        )
+        self.assertIn("privatelink.sdc.backup.windowsazure.com", zones)
+        self.assertIn("privatelink.services.ai.azure.com", zones)
+        self.assertNotIn(
+            "swedencentral.data.privatelink.azurecr.io",
+            zones,
+        )
+        self.assertEqual(
+            parameters["azureIotDeviceupdatePrivateDnsZoneId"]["value"].rsplit(
+                "/",
+                maxsplit=1,
+            )[-1],
+            "privatelink.api.adu.microsoft.com",
+        )
+        policy_set = json.loads(PRIVATE_DNS_POLICY_SET.read_text(encoding="utf-8"))
+        expected_parameters = {
+            name
+            for name in policy_set["properties"]["parameters"]
+            if "privatednszoneid" in name.lower()
+        }
+        self.assertEqual(set(parameters), expected_parameters)
 
     def test_ado_configuration_has_no_service_principal_placeholders(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -103,6 +163,21 @@ class TestScaleSetConfiguration(unittest.TestCase):
                 yaml,
             )
             self.assertIn('enableAdminVM: "true"', yaml)
+            self.assertIn('useSelfHostedBuildAgent: "true"', yaml)
+            self.assertIn('adminVMBuildAgentPool: "Default"', yaml)
+            self.assertIn(
+                'adminVMBuildAgentName: "dsvm-cmn-sdc-dev-001"',
+                yaml,
+            )
+            self.assertIn(
+                'disable_whitelisting_for_build_agents: "true"',
+                yaml,
+            )
+            self.assertIn('centralDnsZoneByPolicyInHub: "true"', yaml)
+            self.assertIn(
+                'databricksOID: "66666666-6666-6666-6666-666666666666"',
+                yaml,
+            )
 
     def test_template_merges_preserve_values_and_add_new_settings(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -149,6 +224,10 @@ class TestScaleSetConfiguration(unittest.TestCase):
             )
             self.assertIn(
                 'TENANT_AZUREML_OID="44444444-4444-4444-4444-444444444444"',
+                env,
+            )
+            self.assertIn(
+                'DATABRICKS_OID="66666666-6666-6666-6666-666666666666"',
                 env,
             )
             self.assertIn(
@@ -203,12 +282,38 @@ class TestScaleSetWorkflowContracts(unittest.TestCase):
             "aif_ensure_seeding_keyvault",
             "aif_ensure_team_group",
             "aif_verify_common_resource_group",
+            "aif_ensure_first_party_enterprise_apps",
+            "aif_ensure_ado_self_hosted_agent",
+            "aif_ensure_private_dns_policy_assignment",
+            "aif_ensure_vpn_access_hub",
         ):
             self.assertIn(required_flow, shared)
         self.assertNotIn("Cross-tenant Azure DevOps requires PAT", shared)
         self.assertIn(
-            "Azure Machine Learning enterprise application is not materialized",
+            "temporary Azure ML and Databricks workspaces",
             shared,
+        )
+        self.assertIn('"protectedParameters"', shared)
+        self.assertIn(
+            "Project build agent: self-hosted admin VM (s) or Microsoft-hosted (h)",
+            shared,
+        )
+        self.assertIn("aif_ensure_dns_private_resolver", shared)
+
+    def test_central_dns_policy_and_foundry_contracts(self) -> None:
+        initiative = PRIVATE_DNS_INITIATIVE.read_text(encoding="utf-8")
+        foundry_dns = FOUNDRY_PRIVATE_DNS.read_text(encoding="utf-8")
+        self.assertIn("param scope string = subscription().id", initiative)
+        self.assertIn("param includeCostOptimization bool = false", initiative)
+        self.assertIn(
+            "replace(replace(content, templateVars.scope, scope), "
+            "templateVars.defaultDeploymentLocation, deploymentLocation)",
+            initiative,
+        )
+        self.assertIn(
+            "resource privateEndpointDnsGroupAIF "
+            "'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {",
+            foundry_dns,
         )
 
 
