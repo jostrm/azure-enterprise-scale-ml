@@ -2071,10 +2071,8 @@ PY
   profile_basename="azurevpnconfig.xml"
   profile_file="$local_state/$profile_basename"
   pbk="$local_state/rasphone.pbk"
-  if [[ -f "$profile_file" && -f "$pbk" ]] &&
-     cmp -s -- "$prepared_profile" "$profile_file" &&
-     grep -Fqx "[$profile_name]" "$pbk"; then
-    aif_success "Azure VPN Client profile '$profile_name' is already current."
+  if [[ -f "$pbk" ]] && grep -Fqx "[$profile_name]" "$pbk"; then
+    aif_success "Azure VPN Client profile '$profile_name' is already configured."
     return 0
   fi
   cp -f -- "$prepared_profile" "$profile_file"
