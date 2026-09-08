@@ -255,6 +255,11 @@ class TestScaleSetWorkflowContracts(unittest.TestCase):
             "--name AllowBringYourOwnPublicIpAddress",
             script,
         )
+        self.assertEqual(script.count("--zone 1 2 3"), 2)
+        self.assertIn(
+            "with availability zones required by the AZ gateway SKU",
+            script,
+        )
         self.assertIn(
             'aif_create_vpn_public_ip \\\n'
             '      "$hub_subscription" \\\n'
