@@ -12,6 +12,8 @@ from typing import Any
 
 
 VARIABLE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# Configuration keys can differ from the shell-safe runtime name.
+VARIABLE_ALIASES = {"aifactory-dash-01": "AIFACTORY_DASHBOARD_URL"}
 RESERVED_PREFIXES = {
     "azure-devops": ("AGENT_", "BUILD_", "RELEASE_", "SYSTEM_"),
     "github": ("ACTIONS_", "GITHUB_", "RUNNER_"),
@@ -87,9 +89,13 @@ def selected_values(config: dict[str, Any], environment: str) -> tuple[dict[str,
     values = read_object(config.get(section, {}), section)
     serialized: dict[str, str] = {}
     for name, value in values.items():
-        if not VARIABLE_NAME.fullmatch(name):
+        runtime_name = VARIABLE_ALIASES.get(name, name)
+        if not VARIABLE_NAME.fullmatch(runtime_name):
             fail(f"'{name}' is not a valid pipeline variable name.")
-        serialized[name] = serialize(value, name)
+        serialized_value = serialize(value, name)
+        if runtime_name in serialized and serialized[runtime_name] != serialized_value:
+            fail(f"Conflicting configuration values map to pipeline variable '{runtime_name}'.")
+        serialized[runtime_name] = serialized_value
     return serialized, section
 
 
