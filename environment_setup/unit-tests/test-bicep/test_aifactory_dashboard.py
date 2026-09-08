@@ -2,11 +2,16 @@
 from __future__ import annotations
 
 import importlib.util
+import io
+import itertools
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -60,6 +65,178 @@ def environment() -> dict[str, str]:
         "DASHBOARD_PROD_SUBSCRIPTION_ID": PROD_SUB,
         "DASHBOARD_TEMPLATE_FILE": str(TEMPLATE),
     }
+
+
+class TestDashboardCliLauncher(unittest.TestCase):
+    def test_native_cli_is_resolved_on_path(self) -> None:
+        executable = str(Path("Azure CLI") / "az")
+        result = response({"azure-cli": "test"})
+        with (
+            patch.object(module.shutil, "which", return_value=executable),
+            patch.object(module.sys, "platform", "linux"),
+            patch.object(module.subprocess, "run", return_value=result) as run,
+        ):
+            self.assertIs(result, module.az_cli("version", "--output", "json"))
+        self.assertEqual([executable, "version", "--output", "json"], run.call_args.args[0])
+        self.assertFalse(run.call_args.kwargs.get("shell", False))
+        self.assertFalse(run.call_args.kwargs["check"])
+
+    def test_windows_batch_launcher_uses_cli_python_and_literal_arguments(self) -> None:
+        arguments = (
+            "rest", "--url", "https://management.azure.com/resource?api-version=1&$skiptoken=a",
+            "--headers", 'If-Match="etag"', "--body", "@C:\\dashboard files\\body.json",
+        )
+        installs = (
+            Path("Program Files") / "Microsoft SDKs" / "Azure" / "CLI2",
+            Path("Program Files (x86)") / "Microsoft SDKs" / "Azure" / "CLI2",
+            Path("Self Hosted Tools") / "Azure CLI",
+        )
+        for install_path, extension in itertools.product(installs, (".cmd", ".CMD", ".bat")):
+            with self.subTest(install=install_path, extension=extension), tempfile.TemporaryDirectory() as folder:
+                install = Path(folder) / install_path
+                (install / "wbin").mkdir(parents=True)
+                cli_python = install / "python.exe"
+                cli_python.touch()
+                with (
+                    patch.object(module.shutil, "which", return_value=str(install / "wbin" / f"az{extension}")),
+                    patch.object(module.sys, "platform", "win32"),
+                    patch.object(module.subprocess, "run", return_value=response()) as run,
+                ):
+                    module.az_cli(*arguments)
+                self.assertEqual(
+                    [str(cli_python), "-X", "utf8", "-IBm", "azure.cli", *arguments],
+                    run.call_args.args[0],
+                )
+                self.assertFalse(run.call_args.kwargs.get("shell", False))
+                self.assertEqual("utf-8", run.call_args.kwargs["encoding"])
+                # Preserve the task's authenticated AZURE_CONFIG_DIR and environment.
+                self.assertNotIn("env", run.call_args.kwargs)
+
+    def test_windows_native_executable_does_not_require_bundled_python(self) -> None:
+        with (
+            patch.object(module.shutil, "which", return_value="az.exe"),
+            patch.object(module.sys, "platform", "win32"),
+            patch.object(module.subprocess, "run", return_value=response()) as run,
+        ):
+            module.az_cli("version")
+        self.assertEqual(["az.exe", "version"], run.call_args.args[0])
+
+    def test_missing_cli_is_an_explicit_error(self) -> None:
+        with (
+            patch.object(module.shutil, "which", return_value=None),
+            patch.object(module.subprocess, "run") as run,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "not found on PATH"):
+                module.az_cli("version")
+        run.assert_not_called()
+
+    def test_missing_windows_cli_runtime_does_not_fall_back_to_cmd(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            with (
+                patch.object(module.shutil, "which", return_value=str(Path(folder) / "wbin" / "az.cmd")),
+                patch.object(module.sys, "platform", "win32"),
+                patch.object(module.subprocess, "run") as run,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "Windows Azure CLI Python runtime"):
+                    module.az_cli("version")
+            run.assert_not_called()
+
+    def test_launch_failure_has_context_instead_of_raw_traceback(self) -> None:
+        with (
+            patch.object(module.shutil, "which", return_value="az.exe"),
+            patch.object(module.subprocess, "run", side_effect=FileNotFoundError("missing executable")),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Unable to launch Azure CLI"):
+                module.az_cli("version")
+
+    def test_cli_failure_is_returned_to_reconciliation(self) -> None:
+        result = response(error="authorization failed")
+        with (
+            patch.object(module.shutil, "which", return_value="az.exe"),
+            patch.object(module.subprocess, "run", return_value=result),
+        ):
+            self.assertIs(result, module.az_cli("rest"))
+
+    def test_main_reports_launch_failure_and_keeps_nonzero_exit(self) -> None:
+        with (
+            patch.dict(os.environ, environment(), clear=True),
+            patch.object(module.shutil, "which", return_value=None),
+            patch("sys.stderr", new_callable=io.StringIO) as stderr,
+            patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            self.assertEqual(1, module.main())
+        self.assertIn("not found on PATH", stderr.getvalue())
+        self.assertNotIn("reconciled with", stdout.getvalue())
+
+
+class TestDashboardAdoFailureHandling(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        content = ADO_JOB.read_text(encoding="utf-8-sig")
+        cls.task = re.search(
+            r"(?ms)^- task: AzureCLI@2\n  displayName: '10b_reconcile_aifactory_dashboard'\n.*?(?=^- task:|\Z)",
+            content,
+        ).group(0)
+        cls.script = textwrap.dedent(
+            cls.task.split("    inlineScript: |\n", 1)[1].split("  env:\n", 1)[0]
+        )
+
+    def test_optional_task_cannot_propagate_native_exit_or_stderr(self) -> None:
+        self.assertIn("  continueOnError: true\n", self.task)
+        self.assertIn("    powerShellIgnoreLASTEXITCODE: true\n", self.task)
+        self.assertIn("    failOnStandardError: false\n", self.task)
+        self.assertIn("exit 0", self.script)
+
+    def test_actual_powershell_wrapper_handles_success_and_all_failure_paths(self) -> None:
+        pwsh = shutil.which("pwsh")
+        if not pwsh:
+            self.skipTest("PowerShell Core is required to execute the ADO wrapper")
+        cases = (
+            ("windows-2022 python on PATH", 0, False, False, False),
+            ("reconciliation error", 37, False, False, False),
+            ("unhandled Python error", None, False, False, False),
+            ("Python absent", 0, True, False, False),
+            ("Python launch failure", 0, False, True, False),
+            ("self-hosted python3 fallback", 0, False, False, True),
+        )
+        for label, returncode, missing, launch_failure, fallback in cases:
+            with self.subTest(case=label), tempfile.TemporaryDirectory() as folder:
+                stub = Path(folder) / "dashboard stub.py"
+                stub.write_text(
+                    "raise RuntimeError('simulated dashboard exception')\n"
+                    if returncode is None else
+                    f"import sys\nprint('dashboard stub ran')\nsys.exit({returncode})\n",
+                    encoding="utf-8",
+                )
+                executable = str(Path(folder) / "missing-python.exe") if launch_failure else sys.executable
+                quoted_executable = executable.replace("'", "''")
+                discovery = (
+                    "function Get-Command { param($Name, $CommandType, $ErrorAction)\n"
+                    + ("return $null\n" if missing else
+                       ("if ($Name -eq 'python') { return $null }\n" if fallback else
+                        "if ($Name -eq 'python3') { throw 'Use python.exe on windows-2022' }\n")
+                       + f"return [pscustomobject]@{{Source='{quoted_executable}'}}\n")
+                    + "}\n"
+                )
+                target = (
+                    "$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/"
+                    "environment_setup/aifactory/bicep/scripts/deploy-aifactory-dashboard.py"
+                )
+                quoted_stub = str(stub).replace("`", "``").replace("$", "`$").replace('"', '`"')
+                script = self.script.replace(target, quoted_stub)
+                self.assertNotIn("$(System.DefaultWorkingDirectory)", script)
+                result = subprocess.run(
+                    [pwsh, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", discovery + script],
+                    capture_output=True, text=True, encoding="utf-8", errors="replace",
+                    check=False, timeout=30,
+                )
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                if returncode != 0 or missing or launch_failure:
+                    self.assertIn("##vso[task.logissue type=warning]", result.stdout)
+                    self.assertIn("Continuing the pipeline.", result.stdout)
+                else:
+                    self.assertIn("dashboard stub ran", result.stdout)
+                    self.assertNotIn("task.logissue", result.stdout)
 
 
 class FakeAz:

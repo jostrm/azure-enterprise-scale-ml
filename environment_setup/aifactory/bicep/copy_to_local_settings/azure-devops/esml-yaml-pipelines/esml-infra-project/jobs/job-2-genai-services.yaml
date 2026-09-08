@@ -5522,18 +5522,29 @@ steps:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: pscore
     scriptLocation: inlineScript
+    powerShellIgnoreLASTEXITCODE: true
+    failOnStandardError: false
     inlineScript: |
-      $python = Get-Command python3 -ErrorAction SilentlyContinue
-      if (-not $python) {
-        $python = Get-Command python -ErrorAction SilentlyContinue
+      $ErrorActionPreference = 'Stop'
+      $PSNativeCommandUseErrorActionPreference = $false
+      try {
+        # windows-2022 exposes Python as python.exe; self-hosted agents may use python3.
+        $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+        if (-not $python) {
+          $python = Get-Command python3 -CommandType Application -ErrorAction SilentlyContinue
+        }
+        if (-not $python) {
+          throw 'Python is required to reconcile the AI Factory dashboard.'
+        }
+        Write-Host "Dashboard Python: $($python.Source)"
+        & $python.Source -X utf8 "$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-aifactory-dashboard.py"
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "##vso[task.logissue type=warning]AI Factory dashboard reconciliation failed with exit code $LASTEXITCODE. Continuing the pipeline."
+        }
+      } catch {
+        Write-Host "##vso[task.logissue type=warning]AI Factory dashboard reconciliation could not complete: $($_.Exception.Message). Continuing the pipeline."
       }
-      if (-not $python) {
-        throw 'Python is required to reconcile the AI Factory dashboard.'
-      }
-      & $python.Source "$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-aifactory-dashboard.py"
-      if ($LASTEXITCODE -ne 0) {
-        throw "AI Factory dashboard reconciliation failed with exit code $LASTEXITCODE."
-      }
+      exit 0
   env:
     DASHBOARD_CURRENT_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
     DASHBOARD_CURRENT_ENV: $(dev_test_prod)
