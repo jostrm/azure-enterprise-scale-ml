@@ -417,9 +417,6 @@ aif_collect_answers() {
     if [[ "$ADO_AUTH_METHOD" == "pat" ]]; then
       aif_prompt_secret AZURE_DEVOPS_EXT_PAT "Azure DevOps PAT"
       export AZURE_DEVOPS_EXT_PAT
-    elif [[ "${ADO_TENANT,,}" != "${AIF_TENANT_ID,,}" ]]; then
-      aif_error "Cross-tenant Azure DevOps requires PAT authentication." >&2
-      exit 1
     fi
     aif_prompt_value ADO_SERVICE_CONNECTION_NAME "Azure DevOps service connection name" \
       "$ADO_SERVICE_CONNECTION_NAME"
@@ -1942,10 +1939,13 @@ aif_scaleset_main() {
   aif_seed_optional_project_sp
   aif_prepare_hub_dns
   if [[ "$AIF_DRY_RUN" != "true" ]]; then
-    AIF_AZURE_ML_PRINCIPAL_ID="$(az ad sp show \
+    if ! AIF_AZURE_ML_PRINCIPAL_ID="$(az ad sp show \
       --id 0736f41a-0425-4b46-bdb5-1563eff02385 \
       --query id \
-      --output tsv)"
+      --output tsv 2>/dev/null)"; then
+      AIF_AZURE_ML_PRINCIPAL_ID=""
+      aif_warn "Azure Machine Learning enterprise application is not materialized in this tenant. Continuing because the baseline project keeps Azure ML disabled."
+    fi
   else
     AIF_AZURE_ML_PRINCIPAL_ID=""
   fi

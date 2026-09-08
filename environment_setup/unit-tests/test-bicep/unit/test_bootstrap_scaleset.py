@@ -205,6 +205,11 @@ class TestScaleSetWorkflowContracts(unittest.TestCase):
             "aif_verify_common_resource_group",
         ):
             self.assertIn(required_flow, shared)
+        self.assertNotIn("Cross-tenant Azure DevOps requires PAT", shared)
+        self.assertIn(
+            "Azure Machine Learning enterprise application is not materialized",
+            shared,
+        )
 
 
 if __name__ == "__main__":
