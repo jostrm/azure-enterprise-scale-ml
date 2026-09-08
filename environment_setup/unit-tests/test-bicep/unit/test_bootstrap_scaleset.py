@@ -367,6 +367,16 @@ class TestScaleSetWorkflowContracts(unittest.TestCase):
             script,
         )
         self.assertIn(
+            'local pipeline_id="$1" project_encoded body\n'
+            '  body="$AIF_STATE_DIR/permission-$pipeline_id.json"',
+            script,
+        )
+        self.assertIn(
+            'local pipeline_id="$1" kind="$2" project_encoded body\n'
+            '  body="$AIF_STATE_DIR/run-$kind.json"',
+            script,
+        )
+        self.assertIn(
             'local pipeline_id="" pipeline_values_output=""',
             script,
         )
