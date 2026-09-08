@@ -20,6 +20,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Copy the update-and-run helpers to the parent repository root.
 cp "$SCRIPT_DIR/bootstrap/ADO-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/../ADO-update-aifactory-and-run-project.sh"
 cp "$SCRIPT_DIR/bootstrap/GH-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/../GH-update-aifactory-and-run-project.sh"
+cp "$SCRIPT_DIR/bootstrap/ADO-create-new-aifactory-scaleset.sh" "$SCRIPT_DIR/../ADO-create-new-aifactory-scaleset.sh"
+cp "$SCRIPT_DIR/bootstrap/GHA-create-new-aifactory-scaleset.sh" "$SCRIPT_DIR/../GHA-create-new-aifactory-scaleset.sh"
 
 gh_ok() {
     if ! command -v gh >/dev/null 2>&1; then
@@ -100,7 +102,8 @@ if [[ "$orchestrator" == "a" ]]; then
     cp "$SCRIPT_DIR/bootstrap/11-ESML-upload-lake-structure.sh" "$SCRIPT_DIR/../11-ESML-upload-lake-structure.sh"
     
     aif_success "Finished!"
-    aif_info "Next step: Run 01-aif-copy-aifactory-templates.sh"
+    aif_info "New setup: Run ADO-create-new-aifactory-scaleset.sh"
+    aif_info "Manual setup: Run 01-aif-copy-aifactory-templates.sh"
 
     # Check if the directory exists, if not, create it
     if [ -d "$SCRIPT_DIR/../.github/workflows/" ]; then
@@ -141,7 +144,8 @@ elif [[ "$orchestrator" == "g" ]]; then
     #cp "$SCRIPT_DIR/bootstrap/13-ESML-update-ip-rule-ux.sh" "$SCRIPT_DIR/../13-ESML-update-ip-rule-ux.sh"
 
     aif_success "Finished!"
-    aif_info "Next step 1st time: Run 01-aif-copy-aifactory-templates.sh"
+    aif_info "New setup: Run GHA-create-new-aifactory-scaleset.sh"
+    aif_info "Manual setup: Run 01-aif-copy-aifactory-templates.sh"
     aif_info "Next step 2nd time: If this is not your first time, you may Run ADO-update-aifactory-and-run-project.sh, if you already have a common and project repository, and want to run the IaC pipelines automatically."
     
 else

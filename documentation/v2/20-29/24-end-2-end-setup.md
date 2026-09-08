@@ -29,6 +29,20 @@ Use the [**AI Factory Configuration Wizard**](../../../environment_setup/install
 ## Setup options: 
 Whether you want to use Azure DevOps or GitHub, we recommend using the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md) to configure the AI Factory and its first project initially. The wizard provides a guided, form-based UI that validates your inputs and generates a correctly populated configuration file — significantly reducing the risk of misconfiguration on first deployment.
 
+For a DEV-first automated setup from an existing subscription, use one of the
+new launchers from the parent repository:
+
+```bash
+bash ./ADO-create-new-aifactory-scaleset.sh
+# or
+bash ./GHA-create-new-aifactory-scaleset.sh
+```
+
+They register resource providers, create or reuse a federated deployment
+identity, create or validate the required seeding Key Vault, create the initial
+Entra team group, configure and commit the automation, deploy the common
+environment, and then deploy project 001.
+
 ![AI Factory Configuration Wizard](../../../environment_setup/install_config_wizard/images/aifactory-config-wizard-01.png)
 
 > **Two common workflows**
@@ -118,4 +132,3 @@ https://`webapp-prj003-your-web-app-name-001`.azurewebsites.net/.auth/login/aad/
     - No new features will be added for this option. Use YAML option instead.
     - Very detailed setup info with screenshots (Azure Devops classic)
         - [Setup AIFactory - Infra Automation (AzureDevops classic + BICEP)](../10-19/13-setup-aifactory.md)
-

@@ -14,7 +14,11 @@ on:
       deploy_prod:
         type: boolean
         default: false
-        description: Run Prod after Stage/Dev (ADO manual prod)
+        description: Run Prod after Stage/Dev
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   common-dev:
@@ -39,6 +43,7 @@ jobs:
       admin_bicep_kv_fw: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_NAME }}"
       admin_bicep_kv_fw_rg: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}"
       tenantId: "${{ secrets.TENANT_ID }}"
+      AZURE_CLIENT_ID: "${{ secrets.AZURE_CLIENT_ID }}"
       technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS != '-' && secrets.PROJECT_MEMBERS_IP_ADDRESS || '' }}"
       technical_admins_ad_object_id: "${{ secrets.PROJECT_MEMBERS }}"
       technical_admins_email: "${{ vars.PROJECT_MEMBERS_EMAILS }}"
@@ -102,7 +107,16 @@ jobs:
         with:
           submodules: true
 
-      - name: Azure Login
+      - name: Azure Login with OIDC
+        if: ${{ env.AZURE_CLIENT_ID != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure Login with service-principal credentials
+        if: ${{ env.AZURE_CLIENT_ID == '' }}
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -392,6 +406,7 @@ jobs:
       admin_bicep_kv_fw: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_NAME }}"
       admin_bicep_kv_fw_rg: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}"
       tenantId: "${{ secrets.TENANT_ID }}"
+      AZURE_CLIENT_ID: "${{ secrets.AZURE_CLIENT_ID }}"
       technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS != '-' && secrets.PROJECT_MEMBERS_IP_ADDRESS || '' }}"
       technical_admins_ad_object_id: "${{ secrets.PROJECT_MEMBERS }}"
       technical_admins_email: "${{ vars.PROJECT_MEMBERS_EMAILS }}"
@@ -455,7 +470,16 @@ jobs:
         with:
           submodules: true
 
-      - name: Azure Login
+      - name: Azure Login with OIDC
+        if: ${{ env.AZURE_CLIENT_ID != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure Login with service-principal credentials
+        if: ${{ env.AZURE_CLIENT_ID == '' }}
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -744,6 +768,7 @@ jobs:
       admin_bicep_kv_fw: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_NAME }}"
       admin_bicep_kv_fw_rg: "${{ vars.AIFACTORY_SEEDING_KEYVAULT_RG }}"
       tenantId: "${{ secrets.TENANT_ID }}"
+      AZURE_CLIENT_ID: "${{ secrets.AZURE_CLIENT_ID }}"
       technical_admins_bastion_IP_whitelist: "${{ secrets.PROJECT_MEMBERS_IP_ADDRESS != '-' && secrets.PROJECT_MEMBERS_IP_ADDRESS || '' }}"
       technical_admins_ad_object_id: "${{ secrets.PROJECT_MEMBERS }}"
       technical_admins_email: "${{ vars.PROJECT_MEMBERS_EMAILS }}"
@@ -807,7 +832,16 @@ jobs:
         with:
           submodules: true
 
-      - name: Azure Login
+      - name: Azure Login with OIDC
+        if: ${{ env.AZURE_CLIENT_ID != '' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure Login with service-principal credentials
+        if: ${{ env.AZURE_CLIENT_ID == '' }}
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}

@@ -82,6 +82,12 @@ After all pre-requisites are verified - [go to the SETUP page and choose your pr
 - **Mandatory: Yes**
 - [How-to guide: Create & Use the AIFactory seeding keyvault](./12-seeding-keyvault.md)
 
+> [!NOTE]
+> The Key Vault resource remains mandatory in v1.24, but its historical
+> common/project service-principal secrets are optional for a GenAI-first
+> deployment that uses workload-federated managed identity. Leave the related
+> secret-name variables empty when those service principals are not required.
+
 ## 🌐 Step 4) Networking: Allocate vNet ranges in your IP-plan: 3 vNets with /16 CIDR size (at least /20)
 - **Purpose:** To be able to peer the AIFactory later. 
 - **Role needed:** Network team within Central IT / Cloud Team
@@ -96,6 +102,11 @@ After all pre-requisites are verified - [go to the SETUP page and choose your pr
 
 
 ## 👤 Step 5) EntraID: Create 3 service principals, and store info(appid, ObjectId, Secret) in the seeding keyvault [(see step 3)](#step-3-create-an-azure-keyvault-for-the-admin-of-microsoft-entra-id-the-so-called-seeding-keyvault-iac-purpose-and-created-service-principals)
+
+This remains applicable when DataOps/MLOps automation or application
+authentication needs those identities. The automated scale-set launchers use a
+federated managed identity for infrastructure deployment by default and do not
+create the optional project automation SP unless requested.
 
 > **TIP: How to create service principals for PROJECTS, and add to SEEDING KEYVAULT**
 > 1) Copy this file to your local computer, e.g. under your "aifactory" folder
@@ -456,5 +467,4 @@ The AI Factory automation supports intelligent CRUD: Create Update Delete of res
 |2022-10  |ESML MLOps |ESML MLOps v3 advanced mode, support for Spark steps ( Databricks notebooks / DatabrickStep )|-|
 
 </details>
-
 
