@@ -47,6 +47,11 @@ jobs:
     environment: ${{ inputs.environment }}
     env:
       AIFACTORY_CONFIG_JSON: ${{ secrets.AIFACTORY_CONFIG_JSON }}
+      AIFACTORY_REPORT_JOB: configure
+      admin_location: ${{ vars.AIFACTORY_LOCATION }}
+      dev_test_prod_sub_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      tenantId: ${{ secrets.TENANT_ID }}
+      dev_test_prod: ${{ inputs.environment }}
     outputs:
       runs_on: ${{ steps.runner.outputs.runs_on }}
       use_self_hosted: ${{ steps.runner.outputs.use_self_hosted }}
@@ -128,6 +133,28 @@ jobs:
 
           print(f"Runner selection: {'self-hosted/' + runner_label if use_self_hosted else 'ubuntu-latest'}")
           PY
+
+      - name: Report final pipeline job result (offline)
+        if: always()
+        shell: bash
+        env:
+          AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}
+          AIFACTORY_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/configure
+        run: |
+          helper="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/write-pipeline-region-report.sh"
+          if [ -f "$helper" ]; then bash "$helper"; else
+            echo "WARNING: AI Factory region report helper is unavailable (checkout may have failed)."
+          fi
+
+      - name: Publish AI Factory region reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: aifactory-region-reports-configure-${{ inputs.environment }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/configure/*.json
+          if-no-files-found: warn
+          retention-days: 14
 
   deploy_infrastructure:
     name: Project (Networking + Services)

@@ -30,6 +30,59 @@ git config --system core.longpaths true
 
 ## START
 
+### Last-run region reports (GitHub Actions and Azure DevOps)
+
+The common, project networking/services, and Foundry templates publish
+`aifactory-region-reports-*` artifacts even when a started job fails. Download the
+JSON files from the pipeline run and import them into the AI Factory Admin UX.
+Artifacts are **not** automatically synchronized to a local folder, including on
+self-hosted runners. GitHub retains these artifacts for 14 days; Azure DevOps uses
+the run's retention settings.
+
+Update the central submodule **and re-copy the pipeline templates** for future
+runs to include these hooks. Existing yellow repositories/copies and historical
+runs are not modified. The existing Azure DevOps bootstrap copy includes the shared
+`esml-infra-common/jobs/region-report-steps.yaml` template.
+
+Each JSON file uses schema version 1 with `region`, `subscription_id`, `tenant_id`,
+`environment` (`dev`, `stage`, `prod`, or empty), `source: pipeline_artifact`,
+`run_id`, `run_url`, an actual UTC `observed_at`, and `observations`. Each observation
+has `check_id`, `kind`, `service`, nullable `sku`, `status`, and a sanitized `message`.
+ADO's `test` environment is normalized to `stage`.
+
+- Preflight FAIL findings remain failed in the report even with `--warn-only`.
+  `PREFLIGHT_REPORT_DIR` opts standalone preflight into reporting; supply
+  `tenantId`/`TENANT_ID` (or `AIFACTORY_REPORT_TENANT_ID`) plus the normal target
+  subscription, environment, and location arguments. All existing exit codes
+  are preserved. `--skip` reports unknown, never a successful capacity check.
+- Search reports use the service ID `microsoft.search/searchservices`.
+  `search_sku_availability` records whether the tested SKU is listed in the regional
+  usage catalogue: discovery evidence, **not a live allocation probe**.
+  Malformed/transient quota responses are unknown, not unavailable capacity.
+  `search_sku_quota` headroom and catalogue success never clear a
+  `search_sku_capacity` allocation failure or prove another Search tier is available.
+  Only an explicit pass for the same check, service, SKU and target can clear its
+  earlier failure; overall job success does not create SKU capacity passes.
+- `pipeline-job:<job>` reports only that job's failed/passed/unknown result.
+  A successful job does not clear a different job or prove service/SKU capacity.
+  Cancellation, skipping, partial success, and unavailable statuses are unknown.
+- Final reporting does not fetch logs or call Azure/pipeline APIs. The default
+  failure reason is “Pipeline job failed; see linked run logs.” No raw logs,
+  passwords, configuration values, or remediation command dumps are included.
+
+For an **already captured, single tested Search command** error, the optional
+`region_report.py pipeline --command-error-file <file>` accepts a local envelope
+such as `{"service":"microsoft.search/searchservices","sku":"basic","error":{"code":"SkuNotAvailable"}}`.
+Only recognized capacity/allocation codes create a capacity observation; generic
+deployment errors, quota errors, unrelated services, and untested SKUs do not.
+The standard hooks do not manufacture this envelope or infer it from a full job
+log. Do not pass unrelated multi-service deployment errors as Search errors.
+
+Reporting requires Python and a successful helper checkout. Invalid/missing
+region, subscription, tenant, or environment metadata produces a warning and no
+malformed JSON, without changing the deployment exit status. A job that never
+starts, loses its runner, or cannot check out the helpers may have no artifact.
+
 1) Add or Update the submodule to your repo (to get the bootstrap files)
 
     ADD, if you are the first developer to checkin the code. Run from your repo root location:

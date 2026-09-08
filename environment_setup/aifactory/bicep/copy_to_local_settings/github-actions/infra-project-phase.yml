@@ -31,6 +31,7 @@ jobs:
       run:
         shell: pwsh
     env:
+      AIFACTORY_REPORT_JOB: deploy-project-${{ inputs.phase }}
       AIFACTORY_CONFIG_JSON: ${{ secrets.AIFACTORY_CONFIG_JSON }}
       dev_test_prod: ${{ vars.AZURE_ENV_NAME }}
       dev_test_prod_sub_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
@@ -407,6 +408,11 @@ jobs:
       debug_disable_10_aifactory_dashboards: ${{ vars.DEBUG_DISABLE_10_AIFACTORY_DASHBOARDS || 'true' }}
 
     steps:
+      - name: 00_Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
       - name: Validate self-hosted runner
         if: ${{ inputs.use_self_hosted == 'true' }}
         shell: pwsh
@@ -429,11 +435,6 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: 00_Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: true
 
       - name: 00_Materialize_Protected_JSON_Config
         if: ${{ inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
@@ -471,6 +472,7 @@ jobs:
         shell: bash
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
+          PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/deploy-project-${{ inputs.phase }}
           admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
         run: |
           set -uo pipefail
@@ -4120,3 +4122,25 @@ jobs:
               --resource-group "${{ env.admin_bicep_kv_fw_rg }}" \
               --name "${{ env.admin_bicep_kv_fw }}" \
               --ip-address "${{ env.runner_ip }}" || true
+
+      - name: Report final pipeline job result (offline)
+        if: always()
+        shell: bash
+        env:
+          AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}
+          AIFACTORY_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/deploy-project-${{ inputs.phase }}
+        run: |
+          helper="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/write-pipeline-region-report.sh"
+          if [ -f "$helper" ]; then bash "$helper"; else
+            echo "WARNING: AI Factory region report helper is unavailable (checkout may have failed)."
+          fi
+
+      - name: Publish AI Factory region reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: aifactory-region-reports-deploy-project-${{ inputs.phase }}-${{ inputs.environment }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/deploy-project-${{ inputs.phase }}/*.json
+          if-no-files-found: warn
+          retention-days: 14
