@@ -2745,7 +2745,7 @@ aif_wait_ado_run() {
 import json, sys
 value = json.load(sys.stdin)
 print(value.get("state") or value.get("status") or "", value.get("result") or "")
-')
+' | tr -d '\r')
     [[ "$status" == "completed" ]] || { sleep 20; continue; }
     if [[ "$result" != "succeeded" ]]; then
       aif_error "Azure DevOps run $run_id completed with result: ${result:-unknown}." >&2
