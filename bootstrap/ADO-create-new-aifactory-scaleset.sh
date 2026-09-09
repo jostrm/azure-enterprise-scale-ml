@@ -15,4 +15,5 @@ fi
 
 # shellcheck source=lib/create-new-aifactory-scaleset.sh
 source "$LIBRARY"
-aif_scaleset_main ado "${BASH_SOURCE[0]}" "$@"
+readonly AIF_SCALESET_ROUTE="ado"
+aif_scaleset_main "$AIF_SCALESET_ROUTE" "${BASH_SOURCE[0]}" "$@"

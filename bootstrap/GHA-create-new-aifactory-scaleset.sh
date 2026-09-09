@@ -15,4 +15,5 @@ fi
 
 # shellcheck source=lib/create-new-aifactory-scaleset.sh
 source "$LIBRARY"
-aif_scaleset_main gha "${BASH_SOURCE[0]}" "$@"
+readonly AIF_SCALESET_ROUTE="gha"
+aif_scaleset_main "$AIF_SCALESET_ROUTE" "${BASH_SOURCE[0]}" "$@"
