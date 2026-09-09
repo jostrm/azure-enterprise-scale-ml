@@ -103,6 +103,18 @@ def state() -> dict[str, object]:
 
 
 class TestScaleSetConfiguration(unittest.TestCase):
+    def test_ado_agent_registration_installs_pwsh_and_prefers_git_bash(self) -> None:
+        source = (
+            BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn("choco install powershell-core -y --no-progress", source)
+        self.assertIn("$gitBash = Join-Path $gitBin 'bash.exe'", source)
+        self.assertIn(
+            "[Environment]::SetEnvironmentVariable('Path', $machinePath, 'Machine')",
+            source,
+        )
+        self.assertIn("$machinePath = (@($gitBin, $gitCmd) + $pathParts)", source)
+
     def test_vpn_profile_changes_only_the_connection_name(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

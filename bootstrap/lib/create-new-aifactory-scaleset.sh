@@ -3298,11 +3298,16 @@ Remove-Item -LiteralPath $archive -Force
 
 $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
   [Environment]::GetEnvironmentVariable('Path', 'User')
-$missing = @('az', 'bash', 'git', 'python') | Where-Object {
+$gitRoot = Join-Path $env:ProgramFiles 'Git'
+$gitBin = Join-Path $gitRoot 'bin'
+$gitCmd = Join-Path $gitRoot 'cmd'
+$gitBash = Join-Path $gitBin 'bash.exe'
+$missing = @('az', 'git', 'python', 'pwsh') | Where-Object {
   -not (Get-Command $_ -ErrorAction SilentlyContinue)
 }
-if ($missing -and (Get-Command choco -ErrorAction SilentlyContinue)) {
-  if ($missing -contains 'git' -or $missing -contains 'bash') {
+if (($missing -or -not (Test-Path -LiteralPath $gitBash -PathType Leaf)) -and
+    (Get-Command choco -ErrorAction SilentlyContinue)) {
+  if ($missing -contains 'git' -or -not (Test-Path -LiteralPath $gitBash -PathType Leaf)) {
     choco install git -y --no-progress
   }
   if ($missing -contains 'az') {
@@ -3311,13 +3316,25 @@ if ($missing -and (Get-Command choco -ErrorAction SilentlyContinue)) {
   if ($missing -contains 'python') {
     choco install python -y --no-progress
   }
-  $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
-    [Environment]::GetEnvironmentVariable('Path', 'User')
+  if ($missing -contains 'pwsh') {
+    choco install powershell-core -y --no-progress
+  }
 }
-$missing = @('az', 'bash', 'git', 'python') | Where-Object {
+
+$machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+$pathParts = @($machinePath -split ';' | Where-Object {
+  $_ -and $_ -ne $gitBin -and $_ -ne $gitCmd
+})
+$machinePath = (@($gitBin, $gitCmd) + $pathParts) -join ';'
+[Environment]::SetEnvironmentVariable('Path', $machinePath, 'Machine')
+$env:Path = $machinePath + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
+$missing = @('az', 'git', 'python', 'pwsh') | Where-Object {
   -not (Get-Command $_ -ErrorAction SilentlyContinue)
 }
-if ($missing) {
+if ($missing -or -not (Test-Path -LiteralPath $gitBash -PathType Leaf)) {
+  if (-not (Test-Path -LiteralPath $gitBash -PathType Leaf)) {
+    $missing = @($missing) + 'Git Bash'
+  }
   throw "Required agent commands are missing: $($missing -join ', ')."
 }
 

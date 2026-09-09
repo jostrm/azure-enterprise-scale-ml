@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Apply a non-secret AI Factory JSON configuration override to a CI pipeline."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import os

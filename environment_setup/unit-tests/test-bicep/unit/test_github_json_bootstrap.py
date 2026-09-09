@@ -116,6 +116,12 @@ def test_all_canonical_templates_include_default_false_hub_intent():
         assert f'"{env_key}"' in upload
 
 
+def test_json_override_consumer_defers_annotations_for_python_39():
+    path = ROOT / "environment_setup" / "aifactory" / "bicep" / "scripts" / "apply-json-config-overrides.py"
+    source = path.read_text(encoding="utf-8")
+    assert "from __future__ import annotations" in source.splitlines()[:10]
+
+
 def test_pipeline_consumer_ignores_wizard_metadata_and_reserved_github_identity(tmp_path, monkeypatch):
     path = ROOT / "environment_setup" / "aifactory" / "bicep" / "scripts" / "apply-json-config-overrides.py"
     spec = importlib.util.spec_from_file_location("json_overrides", path)
