@@ -144,7 +144,7 @@
     "aksAzureFirewallPrivateIp": "",
     "skuStorageAccountDev": "Standard_LRS",
     "skuStorageAccountStageProd": "Standard_LRS",
-    "skuAISearchDev": "standard",
+    "skuAISearchDev": "basic",
     "skuAISearchStageProd": "standard",
     "skuAIServicesDev": "S0",
     "skuAIServicesStageProd": "S0",

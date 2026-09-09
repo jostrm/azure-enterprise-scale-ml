@@ -176,7 +176,7 @@ def test_preset_exports_preserve_aliases_types_costs_and_private_flags(tmp_path,
             "ENABLE_FOUNDRY_CAPHOST": "true", "ENABLE_COSMOS_DB": "true",
             "DEPLOY_MODEL_GPT_X": "false",
             "DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE": "false",
-            "SKU_AISEARCH_DEV": "standard", "GITHUB_NEW_REPO_VISIBILITY": "private",
+            "SKU_AISEARCH_DEV": "basic", "GITHUB_NEW_REPO_VISIBILITY": "private",
             "COMMON_VNET_CIDR": "172.16.XX.0/20", "DEV_CIDR_RANGE": "0",
             "STAGE_CIDR_RANGE": "16", "PROD_CIDR_RANGE": "32",
         }.items():

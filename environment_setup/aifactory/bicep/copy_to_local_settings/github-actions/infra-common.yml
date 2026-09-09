@@ -134,7 +134,7 @@ jobs:
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
           PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-dev
-          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'basic' }}
           enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
           enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
           enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
@@ -500,7 +500,7 @@ jobs:
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
           PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-stage
-          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'basic' }}
           enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
           enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
           enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
@@ -865,7 +865,7 @@ jobs:
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
           PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/common-prod
-          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'basic' }}
           enableAISearch: ${{ vars.ENABLE_AI_SEARCH || 'true' }}
           enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
           enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}

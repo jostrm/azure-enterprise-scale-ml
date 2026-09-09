@@ -277,7 +277,7 @@ variables:
   skuStorageAccountDev: "Standard_LRS" # Project Storage Account SKU Dev ['Standard_LRS','Standard_GRS','Standard_RAGRS','Standard_ZRS','Premium_LRS','Premium_ZRS','Standard_GZRS','Standard_RAGZRS']
   skuStorageAccountStageProd: "Standard_LRS" # Project Storage Account SKU Stage/Prod
   # --- Cognitive Services (03) ---
-  skuAISearchDev: "standard" # AI Search SKU Dev ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] ('free' not allowed with private endpoints)
+  skuAISearchDev: "basic" # AI Search SKU Dev ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] ('free' not allowed with private endpoints)
   skuAISearchStageProd: "standard" # AI Search SKU Stage/Prod
   skuAIServicesDev: "S0" # Azure AI Services (multi-service account) SKU Dev
   skuAIServicesStageProd: "S0" # Azure AI Services (multi-service account) SKU Stage/Prod

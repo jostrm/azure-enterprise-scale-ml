@@ -141,7 +141,7 @@ jobs:
       skuAksStageProd: ${{ vars.SKU_AKS_STAGEPROD || '' }}
       skuStorageAccountDev: ${{ vars.SKU_STORAGEACCOUNT_DEV || 'Standard_LRS' }}
       skuStorageAccountStageProd: ${{ vars.SKU_STORAGEACCOUNT_STAGEPROD || 'Standard_LRS' }}
-      skuAISearchDev: ${{ vars.SKU_AISEARCH_DEV || vars.ADMIN_AISEARCH_TIER || 'standard' }}
+      skuAISearchDev: ${{ vars.SKU_AISEARCH_DEV || vars.ADMIN_AISEARCH_TIER || 'basic' }}
       skuAISearchStageProd: ${{ vars.SKU_AISEARCH_STAGEPROD || vars.ADMIN_AISEARCH_TIER || 'standard' }}
       skuAIServicesDev: ${{ vars.SKU_AISERVICES_DEV || 'S0' }}
       skuAIServicesStageProd: ${{ vars.SKU_AISERVICES_STAGEPROD || 'S0' }}
@@ -538,7 +538,7 @@ jobs:
         env:
           PREFLIGHT_SKIP: ${{ vars.PREFLIGHT_SKIP || 'false' }}
           PREFLIGHT_REPORT_DIR: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/deploy-project-${{ inputs.phase }}
-          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'standard' }}
+          admin_aiSearchTier: ${{ vars.ADMIN_AISEARCH_TIER || 'basic' }}
         run: |
           set -uo pipefail
           PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
