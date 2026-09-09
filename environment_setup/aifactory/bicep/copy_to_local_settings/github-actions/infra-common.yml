@@ -82,6 +82,7 @@ jobs:
       byoAseAppServicePlanResourceId: "${{ vars.BYO_ASE_APP_SERVICE_PLAN_RESOURCE_ID }}"
       addBastionHost: "${{ vars.ADD_BASTION_HOST }}"
       enableAdminVM: "${{ vars.ENABLE_ADMIN_VM }}"
+      adminVMSize: "${{ vars.ADMIN_VM_SIZE || 'Standard_D2s_v5' }}"
       centralDnsZoneByPolicyInHub: "${{ vars.CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB }}"
       privDnsSubscription_param: "${{ vars.PRIV_DNS_SUBSCRIPTION_PARAM }}"
       privDnsResourceGroup_param: "${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM }}"
@@ -323,6 +324,7 @@ jobs:
             --parameters tenantId="${{ env.tenantId }}" \
             --parameters databricksOID="${{ env.databricksOID }}" \
             --parameters enableAdminVM="${{ env.enableAdminVM }}" \
+            --parameters adminVMSize="${{ env.adminVMSize }}" \
             --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_param }}" \
             --parameters vnetNameFull_param="${{ env.vnetNameFull_param }}" \
             --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
@@ -445,6 +447,7 @@ jobs:
       byoAseAppServicePlanResourceId: "${{ vars.BYO_ASE_APP_SERVICE_PLAN_RESOURCE_ID }}"
       addBastionHost: "${{ vars.ADD_BASTION_HOST }}"
       enableAdminVM: "${{ vars.ENABLE_ADMIN_VM }}"
+      adminVMSize: "${{ vars.ADMIN_VM_SIZE || 'Standard_D2s_v5' }}"
       centralDnsZoneByPolicyInHub: "${{ vars.CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB }}"
       privDnsSubscription_param: "${{ vars.PRIV_DNS_SUBSCRIPTION_PARAM }}"
       privDnsResourceGroup_param: "${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM }}"
@@ -683,6 +686,7 @@ jobs:
             --parameters tenantId="${{ env.tenantId }}" \
             --parameters databricksOID="${{ env.databricksOID }}" \
             --parameters enableAdminVM="${{ env.enableAdminVM }}" \
+            --parameters adminVMSize="${{ env.adminVMSize }}" \
             --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_param }}" \
             --parameters vnetNameFull_param="${{ env.vnetNameFull_param }}" \
             --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
@@ -807,6 +811,7 @@ jobs:
       byoAseAppServicePlanResourceId: "${{ vars.BYO_ASE_APP_SERVICE_PLAN_RESOURCE_ID }}"
       addBastionHost: "${{ vars.ADD_BASTION_HOST }}"
       enableAdminVM: "${{ vars.ENABLE_ADMIN_VM }}"
+      adminVMSize: "${{ vars.ADMIN_VM_SIZE || 'Standard_D2s_v5' }}"
       centralDnsZoneByPolicyInHub: "${{ vars.CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB }}"
       privDnsSubscription_param: "${{ vars.PRIV_DNS_SUBSCRIPTION_PARAM }}"
       privDnsResourceGroup_param: "${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM }}"
@@ -1045,6 +1050,7 @@ jobs:
             --parameters tenantId="${{ env.tenantId }}" \
             --parameters databricksOID="${{ env.databricksOID }}" \
             --parameters enableAdminVM="${{ env.enableAdminVM }}" \
+            --parameters adminVMSize="${{ env.adminVMSize }}" \
             --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_param }}" \
             --parameters vnetNameFull_param="${{ env.vnetNameFull_param }}" \
             --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \

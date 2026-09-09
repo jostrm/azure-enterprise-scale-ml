@@ -107,6 +107,7 @@ variables:
   bastion_subscription_resource_group: "" # <optional>Bastion resource group override for common RG RBAC<default>''<keep-as-is> Empty uses the common resource group.
   bastion_custom_name: "" # <optional>Bastion name override for common RG RBAC<default>''<keep-as-is> Empty uses the standard Bastion naming convention.
   enableAdminVM: "false" # <optional>Enable Admin VM in common RG<default>false<keep-as-is>
+  adminVMSize: "Standard_D2s_v5" # <optional>Admin VM size<default>Standard_D2s_v5<keep-as-is> Override when the regional SKU is unavailable.
   useSelfHostedBuildAgent: "false" # <optional>Use a self-hosted build agent/runner<default>false<keep-as-is> ADO uses adminVMBuildAgentPool/adminVMBuildAgentName; GHA uses selfHostedRunnerLabel.
   selfHostedRunnerLabel: "aifactory-admin-vm" # <optional>GitHub self-hosted runner label<default>aifactory-admin-vm<keep-as-is>
   adminVMBuildAgentPool: "Default" # <optional>Azure DevOps pool hosting the admin VM agent<default>Default<keep-as-is> Change only when the agent is registered in a custom pool.

@@ -12,6 +12,7 @@ aif_scaleset_usage() {
   cat <<'EOF'
 Usage: ADO-create-new-aifactory-scaleset.sh [options]
        GHA-create-new-aifactory-scaleset.sh [options]
+       ALL-create-new-aifactory-scaleset.sh --orchestrator ado|gha [options]
 
 Options:
   --repo-root PATH     Target AI Factory repository root.
@@ -35,10 +36,28 @@ Common non-interactive variables:
   AIF_PROJECT_NUMBER=001
   AIF_TEAM_GROUP_NAME=acme-ai-prj001-team
   AIF_TEAM_MEMBER_EMAIL=jostrm@microsoft.com
+  AIF_ADMIN_VM_SIZE=Standard_D2s_v5
   AIF_SETUP_HUB_ACCESS=y|n
   AIF_CONFIGURE_VPN_CLIENT=y|n
+  AIF_SIMPLE_MODE=true   Opt in to private-ai-foundation-v1 (GHA, DEV only).
+  AIF_COST_CENTER=123456 Simple Mode common and project cost-center tags.
+EOF
+  if [[ "${AIF_ROUTE:-}" == "gha" ]]; then
+    cat <<'EOF'
+
+GitHub Actions route:
+  GITHUB_REPOSITORY=owner/repository
+EOF
+  else
+    cat <<'EOF'
+
+Azure DevOps route:
+  ADO_ORGANIZATION=https://dev.azure.com/organization
+  ADO_PROJECT=project
+  ADO_REPOSITORY_NAME=repository
   ADO_RUNNER_MODE=s|h
 EOF
+  fi
 }
 
 aif_shell_quote() {
@@ -336,6 +355,7 @@ aif_collect_answers() {
   AIF_MI_RESOURCE_ID="${AIF_MI_RESOURCE_ID:-}"
   AIF_SP_CLIENT_ID="${AIF_SP_CLIENT_ID:-}"
   AIF_SP_CLIENT_SECRET="${AIF_SP_CLIENT_SECRET:-}"
+  AIF_ADMIN_VM_SIZE="${AIF_ADMIN_VM_SIZE:-Standard_D2s_v5}"
 
   aif_section "01 / Architecture and networking"
   aif_prompt_choice AIF_TOPOLOGY \
@@ -544,6 +564,9 @@ aif_collect_answers() {
       "h" "s h"
     if [[ "$ADO_RUNNER_MODE" == "s" ]]; then
       aif_prompt_value ADO_AGENT_POOL "Azure DevOps agent pool" "Default"
+      aif_prompt_value AIF_ADMIN_VM_SIZE \
+        "Self-hosted admin VM size" \
+        "$AIF_ADMIN_VM_SIZE"
       AIF_RUNNER_MODE="self-hosted"
       ADO_AGENT_NAME="dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001"
     else
@@ -612,6 +635,8 @@ aif_confirm_summary() {
   aif_value "Scale set" "$AIF_SCALESET_SUFFIX_DASH"
   aif_value "Project" "$AIF_PROJECT_NUMBER"
   aif_value "Build runner" "$AIF_RUNNER_MODE"
+  [[ "$AIF_RUNNER_MODE" != "self-hosted" ]] ||
+    aif_value "Admin VM size" "$AIF_ADMIN_VM_SIZE"
   if [[ "$AIF_TOPOLOGY" == "s" ]]; then
     aif_value "Hub VPN + DEV Bastion" "$AIF_SETUP_HUB_ACCESS"
     aif_value "Configure VPN client" "$AIF_CONFIGURE_VPN_CLIENT"
@@ -650,6 +675,24 @@ aif_ensure_azure_login() {
     fi
   fi
   aif_success "Azure tenant and subscription access confirmed."
+}
+
+aif_validate_admin_vm_size() {
+  [[ "$AIF_RUNNER_MODE" == "self-hosted" ]] || return 0
+  [[ "$AIF_DRY_RUN" != "true" ]] || return 0
+  local supported
+  supported="$(az vm list-sizes \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --location "$AIF_LOCATION" \
+    --query "[?name=='$AIF_ADMIN_VM_SIZE'] | length(@)" \
+    --output tsv \
+    --only-show-errors)"
+  supported="${supported//$'\r'/}"
+  if [[ "$supported" != "1" ]]; then
+    aif_error "Admin VM size '$AIF_ADMIN_VM_SIZE' is not supported in '$AIF_LOCATION'. Set AIF_ADMIN_VM_SIZE to a supported size." >&2
+    exit 1
+  fi
+  aif_success "Admin VM size '$AIF_ADMIN_VM_SIZE' is supported in '$AIF_LOCATION'."
 }
 
 aif_ensure_ado_auth() {
@@ -1053,6 +1096,7 @@ aif_sync_submodule_and_templates() {
   cp azure-enterprise-scale-ml/bootstrap/GH-update-aifactory-and-run-project.sh .
   cp azure-enterprise-scale-ml/bootstrap/ADO-create-new-aifactory-scaleset.sh .
   cp azure-enterprise-scale-ml/bootstrap/GHA-create-new-aifactory-scaleset.sh .
+  cp azure-enterprise-scale-ml/bootstrap/ALL-create-new-aifactory-scaleset.sh .
   chmod +x ./*.sh
 
   if [[ ! -d aifactory ]]; then
@@ -1661,6 +1705,19 @@ PY
   aif_success "DNS Private Resolver inbound endpoint is available at $inbound_ip."
 }
 
+aif_ensure_hub_dns_forwarder() {
+  local mode="$1"
+  aif_section "12a / Hub DNS forwarder"
+  aif_info "The hub DNS forwarder gives VPN clients and peered AI Factory VNets a routable DNS endpoint for central private DNS zones."
+  aif_info "It uses an Azure DNS Private Resolver inbound endpoint; clients must not use Azure's non-routable 168.63.129.16 address or a hosts file."
+  aif_ensure_dns_private_resolver \
+    "$mode" \
+    "$AIF_HUB_SUBSCRIPTION_ID" \
+    "$AIF_HUB_RESOURCE_GROUP" \
+    "$AIF_HUB_VNET_NAME" \
+    "$AIF_ACCESS_HUB_VNET_CIDR"
+}
+
 aif_create_vpn_public_ip() {
   local subscription="$1"
   local resource_group="$2"
@@ -1828,13 +1885,6 @@ aif_ensure_vpn_access_hub() {
     aif_error "GatewaySubnet is '$actual_gateway_subnet'; expected '$gateway_subnet'." >&2
     exit 1
   fi
-  aif_ensure_dns_private_resolver \
-    "$mode" \
-    "$hub_subscription" \
-    "$hub_resource_group" \
-    "$hub_vnet" \
-    "$hub_cidr"
-
   if az network public-ip show \
     --subscription "$hub_subscription" \
     --resource-group "$hub_resource_group" \
@@ -2097,12 +2147,14 @@ aif_prepare_external_access_hub() {
   aif_section "12 / External AI Factory access hub"
   if [[ "$AIF_DRY_RUN" == "true" ]]; then
     aif_info "DRY-RUN: create/reconcile the external access-hub VNet."
+    aif_info "DRY-RUN: create/reconcile the hub Azure DNS Private Resolver inbound endpoint used as the private-DNS forwarder."
     if [[ "$AIF_SETUP_HUB_ACCESS" == "true" ]]; then
       aif_info "DRY-RUN: create/reconcile GatewaySubnet, VpnGw1AZ, and Entra-authenticated P2S configuration."
     fi
     return 0
   fi
   aif_ensure_access_hub_vnet external
+  aif_ensure_hub_dns_forwarder external
   if [[ "$AIF_SETUP_HUB_ACCESS" == "true" ]]; then
     aif_ensure_vpn_access_hub external
   fi
@@ -2124,7 +2176,8 @@ aif_write_state_and_configure() {
     "${AIF_AZURE_ML_PRINCIPAL_ID:-}" "${AIF_DATABRICKS_PRINCIPAL_ID:-}" \
     "${ADO_TENANT:-}" "${ADO_SERVICE_CONNECTION_NAME:-}" \
     "${GITHUB_REPOSITORY:-}" "${AIF_OIDC_CLIENT_ID:-}" \
-    "$AIF_RUNNER_MODE" "${ADO_AGENT_POOL:-}" "${ADO_AGENT_NAME:-}" <<'PY'
+    "$AIF_RUNNER_MODE" "${ADO_AGENT_POOL:-}" "${ADO_AGENT_NAME:-}" \
+    "$AIF_ADMIN_VM_SIZE" <<'PY'
 import json
 import sys
 
@@ -2142,7 +2195,7 @@ keys = (
     "azure_ml_principal_id", "databricks_principal_id",
     "ado_tenant_id", "ado_service_connection",
     "github_repository", "oidc_client_id",
-    "runner_mode", "ado_agent_pool", "ado_agent_name",
+    "runner_mode", "ado_agent_pool", "ado_agent_name", "admin_vm_size",
 )
 values = dict(zip(keys, sys.argv[2:]))
 values["dev_service_connection"] = values["ado_service_connection"]
@@ -2440,6 +2493,52 @@ PY
   fi
 }
 
+aif_authorize_ado_environment() {
+  local name="$1"
+  shift
+  [[ "$AIF_DRY_RUN" != "true" ]] || return 0
+  local project_encoded name_encoded response environment_id body
+  project_encoded="$(aif_urlencode "$ADO_PROJECT")"
+  name_encoded="$(aif_urlencode "$name")"
+  response="$(aif_ado_api GET \
+    "$ADO_ORGANIZATION/$project_encoded/_apis/distributedtask/environments?name=$name_encoded&api-version=7.1")"
+  environment_id="$(printf '%s' "$response" | "${AIF_PYTHON[@]}" -c '
+import json
+import sys
+
+expected = sys.argv[1].lower()
+matches = [
+    item for item in json.load(sys.stdin).get("value", [])
+    if str(item.get("name", "")).lower() == expected
+]
+if len(matches) != 1:
+    raise SystemExit(
+        f"Expected one Azure DevOps environment named {sys.argv[1]!r}; "
+        f"found {len(matches)}"
+    )
+print(matches[0]["id"])
+' "$name")"
+  environment_id="${environment_id//$'\r'/}"
+  body="$AIF_STATE_DIR/environment-permission-$environment_id.json"
+  "${AIF_PYTHON[@]}" - "$body" "$@" <<'PY'
+import json
+import sys
+
+json.dump(
+    {
+        "pipelines": [
+            {"id": int(pipeline_id), "authorized": True}
+            for pipeline_id in sys.argv[2:]
+        ]
+    },
+    open(sys.argv[1], "w", encoding="utf-8"),
+)
+PY
+  aif_ado_api PATCH \
+    "$ADO_ORGANIZATION/$project_encoded/_apis/pipelines/pipelinePermissions/environment/$environment_id?api-version=7.1-preview.1" \
+    "$body" >/dev/null
+}
+
 aif_ensure_ado_pipeline() {
   local name="$1" yaml_path="$2"
   if [[ "$AIF_DRY_RUN" == "true" ]]; then
@@ -2732,6 +2831,7 @@ aif_commit_and_push() {
     GH-update-aifactory-and-run-project.sh
     ADO-create-new-aifactory-scaleset.sh
     GHA-create-new-aifactory-scaleset.sh
+    ALL-create-new-aifactory-scaleset.sh
   )
   local existing=() path
   for path in "${paths[@]}"; do
@@ -3170,9 +3270,11 @@ aif_ensure_private_network_access() {
       --resource-group "$AIF_HUB_RESOURCE_GROUP" \
       --query '[].name' \
       --output tsv)
-  elif [[ "$AIF_ACCESS_HUB_MODE" == "integrated" &&
-          "$AIF_SETUP_HUB_ACCESS" == "true" ]]; then
-    aif_ensure_vpn_access_hub integrated
+  elif [[ "$AIF_ACCESS_HUB_MODE" == "integrated" ]]; then
+    aif_ensure_hub_dns_forwarder integrated
+    if [[ "$AIF_SETUP_HUB_ACCESS" == "true" ]]; then
+      aif_ensure_vpn_access_hub integrated
+    fi
   fi
   aif_ensure_bastion_developer \
     "$AIF_DEV_SUBSCRIPTION_ID" \
@@ -3243,6 +3345,12 @@ aif_deploy_ado() {
     aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-genai.yaml)"
   aif_authorize_ado_pipeline "$common_pipeline"
   aif_authorize_ado_pipeline "$project_pipeline"
+  for environment_name in Dev Stage Prod; do
+    aif_authorize_ado_environment \
+      "$environment_name" \
+      "$common_pipeline" \
+      "$project_pipeline"
+  done
   aif_run_ado_pipeline "$common_pipeline" common
   if [[ "$AIF_NO_WAIT" == "true" ]]; then
     aif_warn "Common deployment was dispatched. Re-run without --no-wait to verify it and start the project."
@@ -3346,7 +3454,8 @@ aif_scaleset_main() {
   aif_collect_answers
   aif_confirm_summary
   aif_ensure_azure_login
-  aif_ensure_ado_auth
+  aif_validate_admin_vm_size
+  [[ "$AIF_ROUTE" != "ado" ]] || aif_ensure_ado_auth
   aif_ensure_target_repository
   aif_sync_submodule_and_templates
   aif_register_resource_providers "$AIF_DEV_SUBSCRIPTION_ID"

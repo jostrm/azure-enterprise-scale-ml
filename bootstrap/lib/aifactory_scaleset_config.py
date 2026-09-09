@@ -236,6 +236,7 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
     hub = state["topology"] == "hs" or state.get("access_hub_mode") == "external"
     self_hosted = state.get("runner_mode") == "self-hosted"
     enable_admin_vm = self_hosted or state["add_bastion"] == "true"
+    lake_prefix = re.sub(r"[^a-z0-9]", "", state["prefix"].lower())[:8]
     return {
         "admin_location": state["location"],
         "admin_locationSuffix": state["location_short"],
@@ -265,6 +266,7 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
         "enablePublicAccessWithPerimeter": state["enable_public_perimeter"],
         "addBastionHost": state["add_bastion"],
         "enableAdminVM": "true" if enable_admin_vm else "false",
+        "adminVMSize": state.get("admin_vm_size", "Standard_D2s_v5"),
         "useSelfHostedBuildAgent": "true" if self_hosted else "false",
         "adminVMBuildAgentPool": state.get("ado_agent_pool", "Default"),
         "adminVMBuildAgentName": state.get("ado_agent_name", ""),
@@ -273,6 +275,7 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
         "vnetResourceGroup_param": "",
         "vnetNameFull_param": "",
         "commonResourceGroup_param": "",
+        "commonLakeNamePrefixMax8chars": lake_prefix or "aifactory",
         "dev_sub_id": state["dev_subscription_id"],
         "test_sub_id": state["stage_subscription_id"],
         "prod_sub_id": state["prod_subscription_id"],
@@ -375,6 +378,7 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         "ENABLE_PUBLIC_ACCESS_WITH_PERIMETER": state["enable_public_perimeter"],
         "ADD_BASTION_HOST": state["add_bastion"],
         "ENABLE_ADMIN_VM": "true" if enable_admin_vm else "false",
+        "ADMIN_VM_SIZE": state.get("admin_vm_size", "Standard_D2s_v5"),
         "USE_SELF_HOSTED_BUILD_AGENT": "true" if self_hosted else "false",
         "DISABLE_WHITELISTING_FOR_BUILD_AGENTS": "true" if self_hosted else "false",
         "BYO_SUBNETS": "false",
