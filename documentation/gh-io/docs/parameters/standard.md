@@ -99,15 +99,19 @@ These are the **names** of secrets in the seeding Key Vault that hold the projec
 
 | Variable | Default | Guidance | Description |
 |---|---|---|---|
-| `ENABLE_AI_FOUNDRY` | `true` | **recommended** keep `true` for enterprise-grade private networking | Deploy AI Foundry Hub and default project with private endpoints |
+| `ENABLE_AI_FOUNDRY` | `true` | **required** for the standard private Foundry baseline | Deploy the Foundry account and default project with private endpoints |
+| `ENABLE_FOUNDRY_CAPHOST` | `true` | **required; cannot be disabled** for this standard private-agent architecture | Bind the project capability host to Storage, AI Search, and Cosmos DB |
+| `ENABLE_AI_SEARCH` | `true` | **required** with private Foundry capability host | Capability-host vector-store connection |
+| `ENABLE_COSMOS_DB` | `true` | **required** with private Foundry capability host | Capability-host thread and agent-history store |
 | `ADMIN_AI_SEARCH_TIER` | `basic` | **ensure** `free` is **not allowed** when using private endpoints | AI Search SKU tier for the project |
 | `ADMIN_SEMANTIC_SEARCH_TIER` | `free` | keep-as-is | Semantic search tier. Options: `disabled`, `free`, `standard` |
+
+This requirement is specific to the AI Factory's standard private-agent/BYO data-resource architecture. Microsoft documents the project capability host with `storageConnections`, `vectorStoreConnections` (AI Search), and `threadStorageConnections` (Cosmos DB). Capability hosts are not required for every unrelated Foundry or hosted-agent architecture. See [Foundry capability hosts](https://learn.microsoft.com/azure/foundry/agents/concepts/capability-hosts) and [Use your own resources](https://learn.microsoft.com/azure/foundry/agents/how-to/use-your-own-resources).
 
 ---
 
 !!! success "That's all you need for a first deployment"
-    Once Groups 1–7 are filled in, run the pipeline. The AI Factory calculates networking, deploys all Bicep modules, and configures RBAC automatically — producing a working **AI Foundry + AI Search + private networking** baseline in ~10 minutes.
+    Once Groups 1–7 are filled in, run the pipeline. The AI Factory calculates networking, deploys all Bicep modules, and configures RBAC automatically — producing a working **private Foundry + capability host + Storage + AI Search + Cosmos DB** baseline.
 
 !!! info "Want to enable more services?"
-    All optional services (Cosmos DB, AKS, Container Apps, ML Studio, Databricks, models, BYO networking, etc.) are in [Advanced Mode](advanced.md).
-
+    Other optional services (AKS, Container Apps, ML Studio, Databricks, models, BYO networking, etc.) are in [Advanced Mode](advanced.md). Cosmos DB is part of the required private Foundry capability-host bundle, not an optional database in this architecture.

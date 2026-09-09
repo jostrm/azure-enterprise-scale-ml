@@ -292,9 +292,11 @@ ONLY_DEV="$(getval aifactory_common_only_dev_environment AIFACTORY_COMMON_ONLY_D
 ENABLE_AI_SEARCH="$(getval enableAISearch ENABLE_AI_SEARCH true)"
 AI_SEARCH_TIER="$(getval admin_aiSearchTier ADMIN_AI_SEARCH_TIER basic)"
 ENABLE_AI_FOUNDRY="$(getval enableAIFoundry ENABLE_AI_FOUNDRY true)"
+ENABLE_FOUNDRY_CAPHOST="$(getval enableAFoundryCaphost ENABLE_FOUNDRY_CAPHOST true)"
 ENABLE_AOAI="$(getval enableAzureOpenAI ENABLE_AZURE_OPENAI false)"
 ENABLE_COSMOS="$(getval enableCosmosDB ENABLE_COSMOS_DB false)"
 ENABLE_ELASTIC="$(getval enableElasticsearch ENABLE_ELASTICSEARCH false)"
+ENABLE_PUBLIC_GENAI="$(getval enablePublicGenAIAccess ENABLE_PUBLIC_GENAI_ACCESS true)"
 
 # Model deployments
 DEPLOY_GPTX="$(getval deployModel_gpt_X DEPLOY_MODEL_GPT_X false)"
@@ -406,6 +408,25 @@ fi
 # 7. Check functions (all read-only)
 # -----------------------------------------------------------------------------
 norm_loc() { printf '%s' "$(lc "${1:-}" | tr -cd 'a-z0-9')"; }
+
+check_private_foundry_capability_host() {
+  if ! is_true "$ENABLE_AI_FOUNDRY" || is_true "$ENABLE_PUBLIC_GENAI"; then
+    return 0
+  fi
+  local missing=()
+  is_true "$ENABLE_FOUNDRY_CAPHOST" || missing+=("capability host")
+  is_true "$ENABLE_AI_SEARCH" || missing+=("Azure AI Search")
+  is_true "$ENABLE_COSMOS" || missing+=("Azure Cosmos DB")
+  if [ "${#missing[@]}" -gt 0 ]; then
+    local joined
+    joined="$(IFS=', '; printf '%s' "${missing[*]}")"
+    add_finding FAIL PRIVATE_FOUNDRY_CAPABILITY_HOST_REQUIRED \
+      "Private Foundry standard agents require: $joined." \
+      "Enable capability host, AI Search, and Cosmos DB; project Storage is always included by the AI Factory project baseline."
+    return 1
+  fi
+  echo "  [OK] Private Foundry standard-agent bundle: capability host + Storage + AI Search + Cosmos DB."
+}
 
 # Run an `az` command with retries on TRANSIENT failures (GatewayTimeout, 429,
 # 5xx, throttling, connection resets). On success: AZ_OUT holds stdout and
@@ -1045,7 +1066,7 @@ echo "   AI Factory PREFLIGHT"
 echo "   region            : $LOCATION"
 echo "   only-dev          : $ONLY_DEV"
 echo "   AI Search         : enabled=$ENABLE_AI_SEARCH tier=$AI_SEARCH_TIER"
-echo "   AI Foundry        : $ENABLE_AI_FOUNDRY   Azure OpenAI: $ENABLE_AOAI"
+echo "   AI Foundry        : $ENABLE_AI_FOUNDRY   capability host: $ENABLE_FOUNDRY_CAPHOST"
 echo "   Cosmos DB         : $ENABLE_COSMOS       Elasticsearch: $ENABLE_ELASTIC"
 echo "   model deployments : ${#MODELS[@]} -> ${MODELS[*]:-none}"
 echo "   target envs       : ${TARGETS[*]:-none}"
@@ -1055,6 +1076,10 @@ echo "============================================================"
 echo ""
 echo "=== Config: variables.yaml placeholders ==="
 check_config_placeholders
+if ! check_private_foundry_capability_host; then
+  echo "preflight FAILED: the private Foundry capability-host bundle cannot be deselected."
+  exit 1
+fi
 echo ""
 echo "=== BYO: subnets & App Service Environment ==="
 check_byo_subnets

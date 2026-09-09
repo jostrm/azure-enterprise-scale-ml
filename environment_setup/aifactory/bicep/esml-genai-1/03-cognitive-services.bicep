@@ -51,8 +51,8 @@ var csDocIntelligenceSKU = env == 'dev' ? skuDocIntelligenceDev : skuDocIntellig
 // PARAMETERS - Core Configuration
 // ============================================================================
 
-@description('Enable AI Foundry Caphost feature')
-param enableAFoundryCaphost bool = false
+@description('Enable the Foundry capability host. Required for the private standard-agent architecture.')
+param enableAFoundryCaphost bool = true
 @description('Enable AI Foundry V2.1')
 param enableAIFoundry bool = false
 param enableAISearchSharedPrivateLink bool = true
@@ -187,6 +187,8 @@ param default_model_sku string = 'DataZoneStandard'
 
 // Security and networking
 param enablePublicGenAIAccess bool = false
+
+var privateFoundryStandardAgents = enableAIFoundry && !enablePublicGenAIAccess
 param enablePublicAccessWithPerimeter bool = false
 param enablePublicNetworkAccessForCognitive bool = true
 param disableLocalAuth bool = true
@@ -331,7 +333,7 @@ var defaultSubnet = namingConvention.outputs.defaultSubnet
 var genaiSubnetName = namingConvention.outputs.genaiSubnetName
 var genaiName = namingConvention.outputs.genaiName
 var aoaiName = namingConvention.outputs.aoaiName
-var needsAISearch = enableAISearch || (enableAFoundryCaphost && enableAIFoundry)
+var needsAISearch = enableAISearch || privateFoundryStandardAgents
 var safeNameAISearchOrg = needsAISearch ? namingConvention.outputs.safeNameAISearch : ''
 var aiServicesName = namingConvention.outputs.aiServicesName
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name
@@ -419,7 +421,7 @@ var var_csDocIntelligence_dnsConfig = csDocIntelligence.outputs.dnsConfig
 var var_csAzureOpenAI_dnsConfig = csAzureOpenAI.outputs.dnsConfig
 
 #disable-next-line BCP318
-var var_aiSearchService_dnsConfig = (enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) ? (!empty(aiSearchService.outputs.dnsConfig[0].name) ? aiSearchService.outputs.dnsConfig : []) : []
+var var_aiSearchService_dnsConfig = needsAISearch ? (!empty(aiSearchService.outputs.dnsConfig[0].name) ? aiSearchService.outputs.dnsConfig : []) : []
 
 #disable-next-line BCP318
 var var_sa4AIsearch_dnsConfig = sa4AIsearch.outputs.dnsConfig
@@ -689,7 +691,7 @@ var sharedPrivateLinksForAISearch = enableAISearchSharedPrivateLink ? [
 // that stale config forever. The deployment is idempotent for a stable name +
 // SKU, so re-running safely re-enforces publicNetworkAccess='Disabled' (private)
 // whenever enablePublicGenAIAccess and enablePublicAccessWithPerimeter are false.
-module aiSearchService '../modules/aiSearch.bicep' = if (enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) {
+module aiSearchService '../modules/aiSearch.bicep' = if (needsAISearch) {
   name: take('03-AzureAISearch4${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -796,14 +798,14 @@ module getAISearchInfo '../modules/get-aisearch-info.bicep' = {
   params: {
     aiSearchName: safeNameAISearch
     aiSearchExists: aiSearchExists
-    aiSearchEnabled: enableAISearch || (enableAFoundryCaphost && enableAIFoundry)
+    aiSearchEnabled: needsAISearch
   }
 }
 
 // CMK RBAC: Assign Key Vault Crypto Service Encryption User role to AI Search System-Assigned MI
 // Only runs when AI Search is newly deployed (!aiSearchExists) and CMK is enabled for AI Search
 #disable-next-line BCP073
-module aiSearchCmkRbac '../modules/kvRbacSingleAssignment.bicep' = if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) && cmkForAISearch) {
+module aiSearchCmkRbac '../modules/kvRbacSingleAssignment.bicep' = if (!aiSearchExists && needsAISearch && cmkForAISearch) {
   name: take('03-aiSearchCmkRbac-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg)
   params: {
@@ -929,7 +931,7 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(!openaiExists &&
 }
 
 // AI Search Service Private DNS
-module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!aiSearchExists && !centralDnsZoneByPolicyInHub && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry))) {
+module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!aiSearchExists && !centralDnsZoneByPolicyInHub && needsAISearch) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-privDnsAISearch${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1042,7 +1044,7 @@ module docIntelligenceDiagnostics '../modules/diagnostics/cognitiveServicesDiagn
 }
 
 // AI Search Diagnostic Settings
-module aiSearchDiagnostics '../modules/diagnostics/aiSearchDiagnostics.bicep' = if ((enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) && !skipDiagAISearch) {
+module aiSearchDiagnostics '../modules/diagnostics/aiSearchDiagnostics.bicep' = if (needsAISearch && !skipDiagAISearch) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('03-diagAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

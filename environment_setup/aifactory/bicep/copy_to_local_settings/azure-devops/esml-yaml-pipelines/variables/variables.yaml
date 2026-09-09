@@ -230,7 +230,7 @@ variables:
   enableAIFoundry: "true" # <mandatory>Enable AI Foundry<default>true<recommended> AI Foundry with default project; enterprise-grade private networking, BYOvNet, existing infra. GA.
   updateAIFoundry: "false" # <optional>Update AI Foundry properties<default>false<keep-as-is> <otherwise> true, re-run to update AI Foundry properties and RBAC.
   addAIFoundry: "false" # <optional>Add new AI Foundry instance with new name<default>false<keep-as-is> <otherwise> true, provisions a new AI Foundry with a new random name (for debugging or re-run) to get a fresh start. Still you should delete the old instance.
-  enableAFoundryCaphost: "true" # <optional>AI Foundry capability host<default>true<recommended> ensures agents metadata and history/threads are saved in your subscription using CosmosDB, Storage, AI Search.
+  enableAFoundryCaphost: "true" # <mandatory>Required for this private Foundry standard-agent architecture. Cannot be disabled; binds Cosmos DB thread storage, AI Search vector storage, and project Storage.
   cleanFoundryCaphost: "false" # <optional>Clean up capability host on deletion<default>true<keep-as-is> <otherwise> false, leaves capability host and its resources (such as VMs) in place when deleting the Foundry project.
   foundryDeploymentType: "2" # <deprecated>Retained for configuration compatibility. AI Foundry now always uses the second-option account deployment.
   enableAIFactoryCreatedDefaultProjectForAIFv2: "true" # <optional>AI Factory default project for AIFv2<default>true<keep-as-is> <otherwise> false, Azure creates a default project with additional CosmosDB, Storage, AI Search, and connections.
@@ -332,7 +332,7 @@ variables:
 
   enableDatabricks: "false" # <optional>Deploy Databricks workspace<default>false<keep-as-is>
   # === Cognitive Services ===
-  enableAISearch: "true" # <mandatory>Deploy Azure AI Search<default>true<recommended> required for RAG and Agents scenarios.
+  enableAISearch: "true" # <mandatory>Required capability-host vector store for private Foundry standard agents.
   addAISearch: "false" # <optional>Add new AI Search instance<default>true<keep-as-is> <otherwise> false, CreateIfNotExists logic.
   enableAISearchSharedPrivateLink: "true" # <optional>AI Search shared private link<default>true<recommended> <otherwise> false, creates a private endpoint in the project vNet.
   # Note: Basic tier and higher: Shared private links are supported from Basic tier, BUT for indexers with skillsets (e.g., AI enrichment or embedding skills), the minimum tier is Standard 1 (S1)
@@ -346,7 +346,7 @@ variables:
   bingCustomSearchSku: "G2" # <optional>Bing Custom Search SKU<default>G2<keep-as-is> ['G2'] G2 is custom search with grounding.
   enableContentSafety: "false" # <optional>Deploy Azure AI Content Safety<default>false<keep-as-is>
   # === Databases ===
-  enableCosmosDB: "false" # <optional>Deploy Azure Cosmos DB<default>false<keep-as-is> Required if enableAFoundryCaphost:'true'.
+  enableCosmosDB: "true" # <mandatory>Required capability-host thread and agent-history store for private Foundry standard agents.
   cosmosKind: "GlobalDocumentDB" # <optional>Cosmos DB kind<default>GlobalDocumentDB<keep-as-is> <otherwise> "MongoDB".
   enablePostgreSQL: "false" # <optional>Deploy Azure PostgreSQL<default>false<keep-as-is>
   postGresAdminEmails: "email_adress_only" # <optional>PostgreSQL admin emails<default>email_adress_only<mandatory> if enablePostgreSQL:'true' <ensure> valid comma-separated email addresses.
