@@ -47,9 +47,9 @@ param default_gpt_capacity int = 40
 param default_model_sku string = 'Standard'
 // GPT X
 param deployModel_gpt_X bool = false
-param modelGPTXName string = ''
-param modelGPTXVersion string = '1'// If your region doesn't support this version, please change it.
-param modelGPTXSku string = 'Standard'
+param modelGPTXName string = 'gpt-5.4-mini'
+param modelGPTXVersion string = '2026-03-17'
+param modelGPTXSku string = 'GlobalStandard'
 param modelGPTXCapacity int = 30
 
 var nameCleaned = toLower(replace(cognitiveName, '-', ''))

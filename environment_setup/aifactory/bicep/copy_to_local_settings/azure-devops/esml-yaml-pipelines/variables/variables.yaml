@@ -421,9 +421,9 @@ variables:
   # OPTIONAL: GENAI: Default Models to start with.
   # ============================================================================
   deployModel_gpt_X: "true" # <optional>Deploy custom GPT-X model<default>false<keep-as-is> <otherwise> true, deploy the model defined in modelGPTXName.
-  modelGPTXName: "gpt-5.1" # <optional>GPT-X model name<default>gpt-5-mini<keep-as-is> <ensure> model is available in your Azure region with sufficient quota.
-  modelGPTXVersion: "" # <optional>GPT-X model version<default>""<keep-as-is> <otherwise> pin to a specific version string.
-  modelGPTXSku: "DataZoneStandard" # <optional>GPT-X deployment SKU<default>DataZoneStandard<keep-as-is> ['Standard','DataZoneStandard','GlobalStandard']
+  modelGPTXName: "gpt-5.4-mini" # <optional>GPT-X model name<default>gpt-5.4-mini<keep-as-is> <ensure> model is available in your Azure region with sufficient quota.
+  modelGPTXVersion: "2026-03-17" # <optional>GPT-X model version<default>2026-03-17<keep-as-is> <ensure> update the version when selecting a different model.
+  modelGPTXSku: "GlobalStandard" # <optional>GPT-X deployment SKU<default>GlobalStandard<keep-as-is> Global processing; use a supported DataZoneStandard or Standard override when required for data residency.
   modelGPTXCapacity: 30 # <optional>GPT-X TPM capacity (K)<default>30<keep-as-is> 30 = 30K tokens per minute.
 
   deployModel_text_embedding_ada_002: "false" # <optional>Deploy text-embedding-ada-002<default>false<keep-as-is>

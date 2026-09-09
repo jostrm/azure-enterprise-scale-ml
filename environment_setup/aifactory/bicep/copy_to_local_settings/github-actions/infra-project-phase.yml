@@ -309,9 +309,9 @@ jobs:
 
       # Model deployment defaults
       deployModel_gpt_X: ${{ vars.DEPLOY_MODEL_GPT_X || 'false' }}
-      modelGPTXName: ${{ vars.MODEL_GPTX_NAME || 'gpt-5-mini' }}
-      modelGPTXVersion: ${{ vars.MODEL_GPTX_VERSION || '' }}
-      modelGPTXSku: ${{ vars.MODEL_GPTX_SKU || 'DataZoneStandard' }}
+      modelGPTXName: ${{ vars.MODEL_GPTX_NAME || 'gpt-5.4-mini' }}
+      modelGPTXVersion: ${{ vars.MODEL_GPTX_VERSION || '2026-03-17' }}
+      modelGPTXSku: ${{ vars.MODEL_GPTX_SKU || 'GlobalStandard' }}
       modelGPTXCapacity: ${{ vars.MODEL_GPTX_CAPACITY || '30' }}
       deployModel_text_embedding_ada_002: ${{ vars.DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002 || 'false' }}
       deployModel_text_embedding_3_large: ${{ vars.DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE || 'true' }}

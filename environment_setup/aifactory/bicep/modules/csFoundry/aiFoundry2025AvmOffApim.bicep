@@ -101,13 +101,13 @@ param extraModelDeployments array = []
 param deployDefaultModel bool = true
 
 @description('Model name for the default deployment.')
-param modelName string = 'gpt-4o'
+param modelName string = 'gpt-5.4-mini'
 
 @description('Model provider format for the default deployment.')
 param modelFormat string = 'OpenAI'
 
 @description('Model version for the default deployment.')
-param modelVersion string = '2024-11-20'
+param modelVersion string = '2026-03-17'
 
 @description('Model SKU for the default deployment.')
 param modelSkuName string = 'GlobalStandard'

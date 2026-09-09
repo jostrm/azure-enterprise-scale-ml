@@ -272,9 +272,9 @@ This page lists **all parameters** — both mandatory (**M**) and optional (**O*
 | `DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002` | `false` | O | keep-as-is (legacy) | Deploy text-embedding-ada-002 (older model) |
 | `DEFAULT_EMBEDDING_CAPACITY` | `25` | O | keep-as-is (= 25 K TPM) | Capacity for all embedding models |
 | `DEPLOY_MODEL_GPT_X` | `false` | O | keep-as-is | Deploy a custom or future GPT model |
-| `MODEL_GPTX_NAME` | `gpt-5-mini` | O | keep-as-is | Custom model name (used when `DEPLOY_MODEL_GPT_X=true`) |
-| `MODEL_GPTX_VERSION` | `""` | O | keep-as-is (empty = latest available) | Custom model version |
-| `MODEL_GPTX_SKU` | `DataZoneStandard` | O | keep-as-is | Custom model SKU |
+| `MODEL_GPTX_NAME` | `gpt-5.4-mini` | O | keep-as-is | Custom model name (used when `DEPLOY_MODEL_GPT_X=true`) |
+| `MODEL_GPTX_VERSION` | `2026-03-17` | O | Update together with the model name | Pinned custom model version |
+| `MODEL_GPTX_SKU` | `GlobalStandard` | O | Global processing; override for data residency | Custom model SKU; confirm model/SKU availability and subscription quota |
 | `MODEL_GPTX_CAPACITY` | `30` | O | keep-as-is (= 30 K TPM) | Custom model capacity |
 | `DEFAULT_MODEL_SKU` | `Standard` | O | keep-as-is | Default SKU for all model deployments |
 
