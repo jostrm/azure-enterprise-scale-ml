@@ -90,14 +90,17 @@ param enableSQLDatabase bool = false
 @description('Enable Elasticsearch deployment')
 param enableElasticsearch bool = false
 
-@description('Enable AI Foundry Caphost feature')
-param enableAFoundryCaphost bool = false
+@description('Enable the Foundry capability host. Required for the private standard-agent architecture.')
+param enableAFoundryCaphost bool = true
 
 @description('Enable AI Foundry V2.1')
 param enableAIFoundry bool = false
 
 // Security and networking
 param enablePublicGenAIAccess bool = false
+
+var privateFoundryStandardAgents = enableAIFoundry && !enablePublicGenAIAccess
+var needsCosmosDB = enableCosmosDB || privateFoundryStandardAgents
 param enablePublicAccessWithPerimeter bool = false
 param centralDnsZoneByPolicyInHub bool = false
 
@@ -377,7 +380,7 @@ var cmkKvBaseUri = cmk && endsWith(cmkKvBaseUriRaw, '/') ? substring(cmkKvBaseUr
 var cmkKvUri = cmk ? '${cmkKvBaseUri}/keys/${cmkKeyName}' : ''
 // ============== COSMOS DB ==============
 
-module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExists && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundry))) {
+module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExists && needsCosmosDB) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-CosmosDB4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -409,7 +412,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
       ...( !empty(genaiSubnetId) ? [genaiSubnetId] : [] )
       ...( !empty(aksSubnetId) ? [aksSubnetId] : [] )
     ]
-    kind: (enableAFoundryCaphost && enableAIFoundry) ? 'GlobalDocumentDB' : cosmosKind
+    kind: privateFoundryStandardAgents ? 'GlobalDocumentDB' : cosmosKind
     minimalTlsVersion: cosmosMinimalTlsVersion
     tags: tagsProject
     corsRules: [
@@ -469,7 +472,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
   ]
 }
 
-module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!cosmosDBExists && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundry))) {
+module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!cosmosDBExists && needsCosmosDB) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-cosmosRbac${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -483,7 +486,7 @@ module cosmosdbRbac '../modules/databases/cosmosdb/cosmosRbac.bicep' = if(!cosmo
   ]
 }
 
-module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !centralDnsZoneByPolicyInHub && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundry)) && !enablePublicAccessWithPerimeter) {
+module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !centralDnsZoneByPolicyInHub && needsCosmosDB && !enablePublicAccessWithPerimeter) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-privDnsCosmos${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -715,7 +718,7 @@ module elasticDiagnostics '../modules/diagnostics/elasticDiagnostics.bicep' = if
 }
 
 // Cosmos DB Diagnostic Settings
-module cosmosDbDiagnostics '../modules/diagnostics/cosmosDbDiagnostics.bicep' = if (!cosmosDBExists && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundry))) {
+module cosmosDbDiagnostics '../modules/diagnostics/cosmosDbDiagnostics.bicep' = if (!cosmosDBExists && needsCosmosDB) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('04-diagCosmosDB-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -776,7 +779,7 @@ module sqlDatabaseDiagnostics '../modules/diagnostics/sqlDatabaseDiagnostics.bic
 // Resource information should be retrieved through Azure CLI queries after deployment
 
 @description('Cosmos DB deployment status')
-output cosmosDBDeployed bool = (!cosmosDBExists && (enableCosmosDB || (enableAFoundryCaphost && enableAIFoundry)))
+output cosmosDBDeployed bool = (!cosmosDBExists && needsCosmosDB)
 
 @description('PostgreSQL deployment status')
 output postgreSQLDeployed bool = (!postgreSQLExists && enablePostgreSQL)

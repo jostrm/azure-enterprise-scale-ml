@@ -58,6 +58,8 @@ steps:
     admin_aiSearchTier: $(admin_aiSearchTier)
     enableAISearch: $(enableAISearch)
     enableAIFoundry: $(enableAIFoundry)
+    enableAFoundryCaphost: $(enableAFoundryCaphost)
+    enablePublicGenAIAccess: $(enablePublicGenAIAccess)
     enableAzureOpenAI: $(enableAzureOpenAI)
     enableCosmosDB: $(enableCosmosDB)
     enableElasticsearch: $(enableElasticsearch)

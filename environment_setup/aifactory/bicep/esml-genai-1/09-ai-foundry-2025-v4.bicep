@@ -69,8 +69,8 @@ param cmkKeyName string = ''
 @description('Version of the Customer Managed Key in Key Vault')
 param cmkKeyVersion string = ''
 
-@description('Enable Cosmos DB integration')
-param enableCosmosDB bool = false
+@description('Enable Cosmos DB integration. Required for the private Foundry standard-agent capability host.')
+param enableCosmosDB bool = true
 
 // AI Models deployment parameters
 @description('Whether to deploy GPT-X model')
@@ -167,6 +167,11 @@ param useAdGroups bool = true
 
 param IPwhiteList string = ''
 param enablePublicGenAIAccess bool = false
+
+var privateFoundryStandardAgents = enableAIFoundry && !enablePublicGenAIAccess
+var effectiveEnableCaphost = enableCaphost || privateFoundryStandardAgents
+var effectiveEnableAISearch = enableAISearch || privateFoundryStandardAgents
+var effectiveEnableCosmosDB = enableCosmosDB || privateFoundryStandardAgents
 param allowPublicAccessWhenBehindVnet bool = false
 @description('Disable agent network injection even when agentSubnetResourceId is provided.')
 param disableAgentNetworkInjection bool = false
@@ -204,7 +209,7 @@ var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${randomSalt}'
 // Cosmos DB is required for AI Foundry/Project when agent network injection is enabled
 // OR when Capability Host is enabled (caphost needs Cosmos for thread storage).
 // Reference: microsoft-foundry/foundry-samples/15-private-network-standard-agent-setup
-var useCosmosForFoundry = enableCosmosDB && (!disableAgentNetworkInjection || enableCaphost)
+var useCosmosForFoundry = effectiveEnableCosmosDB && (!disableAgentNetworkInjection || effectiveEnableCaphost)
 
 // Subnet calculations
 var commonSubnetPends = subnetCommon != '' ? replace(subnetCommon, '<network_env>', network_env) : common_subnet_name
@@ -457,7 +462,7 @@ output rbacSecurityPhaseCompleted bool = true
 
 
 var cleanRandomValue2 = take(namingConvention.outputs.randomSalt,2)
-var needsAISearch = enableAISearch || (enableCaphost && enableAIFoundry && enableAISearchSharedPrivateLink)
+var needsAISearch = effectiveEnableAISearch
 var safeNameAISearchOrg = needsAISearch ? namingConvention.outputs.safeNameAISearch: ''
 var safeNameAISearchBase = (needsAISearch && !empty(safeNameAISearchOrg))
   ? take(safeNameAISearchOrg, max(length(safeNameAISearchOrg) - 3, 0))
@@ -599,7 +604,7 @@ var aiFoundryDefinitionBase = {
   aiFoundryConfiguration: {
     accountName: aifV2Name
     allowProjectManagement: true
-    createCapabilityHosts: enableCaphost
+    createCapabilityHosts: effectiveEnableCaphost
     location: location
     disableLocalAuth: disableLocalAuth
     networking: aiFoundryNetworkingConfig
@@ -1040,7 +1045,7 @@ module assignCognitiveServicesRoles '../modules/csFoundry/aiFoundry2025rbac.bice
   ]
 }
 
-module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module rbacPreCaphost '../modules/csFoundry/aiFoundry2025caphostRbac1.bicep' = if(effectiveEnableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && effectiveEnableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_RBACpreCH_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1137,7 +1142,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
 // so we create it explicitly. When networkInjection IS enabled the platform auto-provisions it;
 // deploying it explicitly would conflict and cause a timeout. The YAML pipeline includes a
 // wait task (69-wait-account-caphost) that polls until the auto-provisioned caphost reaches Succeeded.
-module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphost.bicep' = if(enableCaphost && disableAgentNetworkInjection && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphost.bicep' = if(effectiveEnableCaphost && disableAgentNetworkInjection && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_AccCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1159,7 +1164,7 @@ module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphos
 // - If disableAgentNetworkInjection=true: Create in same deployment (account caphost created explicitly)
 // - If disableAgentNetworkInjection=false AND aiFoundryV2Exists=false: SKIP (first deployment, wait for auto-provision)
 // - If aiFoundryV2Exists=true: Create (second deployment, account caphost already exists)
-module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists && (disableAgentNetworkInjection || aiFoundryV2Exists)) {
+module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(effectiveEnableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && effectiveEnableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists && (disableAgentNetworkInjection || aiFoundryV2Exists)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1183,7 +1188,7 @@ module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep
   ]
 }
 
-module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists && (disableAgentNetworkInjection || aiFoundryV2Exists)) {
+module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(effectiveEnableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && effectiveEnableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists && (disableAgentNetworkInjection || aiFoundryV2Exists)) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjWID_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1198,7 +1203,7 @@ module formatProjectWorkspaceId '../modules/formatWorkspaceId2Guid.bicep' = if(e
 // START CAPHOST RBAC: Explicit RBAC for COSMOS, STORAGE & AI SEARCH needed when caphost is DISABLED.
 // When enableCaphost=true, Azure auto-provisions these same role assignments during capability host creation.
 // Running this module WITH caphost enabled causes RoleAssignmentExists conflicts (different GUIDs, same principal+role+scope).
-module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(!enableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && enableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module rbacPostCaphost '../modules/csFoundry/aiFoundry2025caphostRbac2.bicep' = if(!effectiveEnableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && effectiveEnableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
   name: take('09-AifV21_RBACpostCH_${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
