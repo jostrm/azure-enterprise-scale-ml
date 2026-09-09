@@ -1160,6 +1160,9 @@ jobs:
             }
             suffixStandard="${{ env.admin_prjResourceSuffix }}"
             suffixStandardNoDash="${suffixStandard#-}"
+            # Both storage slots share a prefix; distinguish slot, resource suffix and env like ADO.
+            suffixStorage1="1${suffixStandardNoDash}${envName}"
+            suffixStorage2="2${suffixStandardNoDash}${envName}"
             suffixAppServicePlan="${suffixStandard}-plan"
             twoNumbers="${suffixStandard: -2}"
             
@@ -1291,8 +1294,8 @@ jobs:
             set_env "keyvaultExists"         "$(resource_exists_fuzzy "$targetRG" "Microsoft.KeyVault/vaults" "$keyvaultName" "$twoNumbers")"
             set_env "miACAExists"            "$(resource_exists_identity "$targetRG" "$miACAPrefix")"
             set_env "miPrjExists"            "$(resource_exists_identity "$targetRG" "$miPrjPrefix")"
-            set_env "storageAccount1001Exists" "$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "")"
-            set_env "storageAccount2001Exists" "$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name" "")"
+            set_env "storageAccount1001Exists" "$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "$suffixStorage1")"
+            set_env "storageAccount2001Exists" "$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name" "$suffixStorage2")"
             set_env "databricksExists"       "$(resource_exists_fuzzy "$targetRG" "Microsoft.Databricks/workspaces" "$databricksName" "$suffixStandard")"
             set_env "redisExists"            "$(resource_exists_fuzzy "$targetRG" "Microsoft.Cache/Redis" "$redisName" "$suffixStandardNoDash")"
             set_env "cosmosDBExists"         "$(resource_exists_fuzzy "$targetRG" "Microsoft.DocumentDB/databaseAccounts" "$cosmosDbAccountName" "$suffixStandard")"
