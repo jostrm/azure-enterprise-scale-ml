@@ -76,11 +76,11 @@ param enableCosmosDB bool = false
 @description('Whether to deploy GPT-X model')
 param deployModel_gpt_X bool = false
 @description('GPT-X model name if deploying')
-param modelGPTXName string = 'gpt-5-mini'
+param modelGPTXName string = 'gpt-5.4-mini'
 @description('GPT-X model version if deploying')
-param modelGPTXVersion string = '1'
+param modelGPTXVersion string = '2026-03-17'
 @allowed(['Standard','DataZoneStandard','GlobalStandard'])
-param modelGPTXSku string = 'DataZoneStandard'
+param modelGPTXSku string = 'GlobalStandard'
 @description('TPM:Tokens per Minute Rate Limit in K=1000) 30 meaning 30K')
 param modelGPTXCapacity int = 30
 
@@ -558,15 +558,16 @@ var customerManagedKey = cmkForFoundry ? {
 } : null
 
 var hasModelDeploymentsV22 = length(aiFoundryDeployments) > 0
+// Compatibility values only: an empty selection still passes deployDefaultModel=false.
 var defaultModelDeploymentV22 = hasModelDeploymentsV22 ? aiFoundryDeployments[0] : {
-  name: 'gpt-4o'
+  name: 'gpt-5.4-mini'
   model: {
-    name: 'gpt-4o'
+    name: 'gpt-5.4-mini'
     format: 'OpenAI'
-    version: default_gpt_4o_version
+    version: '2026-03-17'
   }
   sku: {
-    name: default_model_sku
+    name: 'GlobalStandard'
     capacity: default_gpt_capacity
   }
   raiPolicyName: 'Microsoft.DefaultV2'

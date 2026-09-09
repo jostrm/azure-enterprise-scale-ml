@@ -291,8 +291,8 @@ ENABLE_ELASTIC="$(getval enableElasticsearch ENABLE_ELASTICSEARCH false)"
 
 # Model deployments
 DEPLOY_GPTX="$(getval deployModel_gpt_X DEPLOY_MODEL_GPT_X false)"
-GPTX_NAME="$(getval modelGPTXName MODEL_GPTX_NAME gpt-4o)"
-GPTX_SKU="$(getval modelGPTXSku MODEL_GPTX_SKU DataZoneStandard)"
+GPTX_NAME="$(getval modelGPTXName MODEL_GPTX_NAME gpt-5.4-mini)"
+GPTX_SKU="$(getval modelGPTXSku MODEL_GPTX_SKU GlobalStandard)"
 GPTX_CAP="$(getval modelGPTXCapacity MODEL_GPTX_CAPACITY 30)"
 
 DEPLOY_GPT4O="$(getval deployModel_gpt_4o DEPLOY_MODEL_GPT_4O false)"
