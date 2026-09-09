@@ -241,8 +241,8 @@ function az {
   Write-Host "AZ:$call"
   if ($call -match 'private-dns|dns-zone-group') { throw 'DNS_CONTROL_PLANE_REACHED' }
   if ($call -match '^keyvault show') { return '{"id":"/subscriptions/sub/resourceGroups/seed/providers/Microsoft.KeyVault/vaults/seed"}' }
-  if ($call -match '^network private-endpoint-connection list') {
-    return '[{"privateLinkServiceConnectionState":{"status":"Approved"},"privateEndpoint":{"id":"/subscriptions/sub/resourceGroups/pe/providers/Microsoft.Network/privateEndpoints/seed"}}]'
+  if ($call -match '^rest --method get --url .+api-version=2023-07-01') {
+    return '{"properties":{"privateEndpointConnections":[{"properties":{"privateLinkServiceConnectionState":{"status":"Approved"},"privateEndpoint":{"id":"/subscriptions/sub/resourceGroups/pe/providers/Microsoft.Network/privateEndpoints/seed"}}}]}}'
   }
   if ($call -match '^network private-endpoint show') {
     return '{"subnet":{"id":"/subscriptions/sub/resourceGroups/network/providers/Microsoft.Network/virtualNetworks/vnet/subnets/pe"},"networkInterfaces":[{"id":"/subscriptions/sub/resourceGroups/pe/providers/Microsoft.Network/networkInterfaces/seed"}]}'
@@ -272,6 +272,12 @@ function az {
                 else:
                     self.assertNotEqual(0, code)
                     self.assertIn("DNS_CONTROL_PLANE_REACHED", stderr)
+
+    def test_seeding_helper_uses_key_vault_arm_property_not_fragile_generic_cli(self):
+        content = KV_HELPER.read_text(encoding="utf-8")
+        self.assertIn("'rest',", content)
+        self.assertIn("?api-version=2023-07-01", content)
+        self.assertNotIn("'private-endpoint-connection', 'list'", content)
 
     def test_seeding_dns_wait_succeeds_or_reports_real_resolution_failure(self):
         content = KV_HELPER.read_text(encoding="utf-8")

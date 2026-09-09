@@ -97,10 +97,16 @@ $vault = Invoke-AzJson -Operation 'Read seeding Key Vault' -Arguments @(
     '--resource-group', $VaultResourceGroup,
     '--name', $VaultName
 )
-$privateEndpointConnections = @(Invoke-AzJson -Operation 'List seeding Key Vault private endpoint connections' -Arguments @(
-    'network', 'private-endpoint-connection', 'list',
-    '--id', $vault.id
-))
+function Get-KeyVaultPrivateEndpointConnections {
+    $resource = Invoke-AzJson -Operation 'Read seeding Key Vault private endpoint connections' -Arguments @(
+        'rest',
+        '--method', 'get',
+        '--url', "$($vault.id)?api-version=2023-07-01"
+    )
+    return @($resource.properties.privateEndpointConnections)
+}
+
+$privateEndpointConnections = @(Get-KeyVaultPrivateEndpointConnections)
 
 $approvedConnection = $privateEndpointConnections |
     Where-Object {
@@ -134,10 +140,7 @@ if ($null -eq $approvedConnection) {
             '--id', $pendingConnection.id,
             '--description', 'Approved for the AI Factory private build agent'
         )
-        $privateEndpointConnections = @(Invoke-AzJson -Operation 'Refresh seeding Key Vault private endpoint connections' -Arguments @(
-            'network', 'private-endpoint-connection', 'list',
-            '--id', $vault.id
-        ))
+        $privateEndpointConnections = @(Get-KeyVaultPrivateEndpointConnections)
         $approvedConnection = $privateEndpointConnections |
             Where-Object {
                 $state = if ($null -ne $_.privateLinkServiceConnectionState) {
