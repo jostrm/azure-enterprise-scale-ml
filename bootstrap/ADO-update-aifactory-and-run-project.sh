@@ -939,7 +939,53 @@ fi
 rm -f "$VARIABLES_TEMPLATE_FILE" "$CONFIG_TEMPLATE_FILE"
 fi
 
+validate_pipeline_preview() {
+  local request_file="$1"
+  local response_file="$2"
+  ado_request \
+    POST \
+    "$ado_api_base/pipelines/$pipeline_id/runs?api-version=7.1" \
+    "$request_file" \
+    > "$response_file"
+  "${PYTHON[@]}" - "$response_file" <<'PY'
+import json
+import sys
+
+response = json.loads(open(sys.argv[1], encoding="utf-8-sig").read())
+if not response.get("finalYaml"):
+    raise SystemExit("Azure DevOps preview did not return compiled YAML.")
+PY
+}
+
 if [[ "$project_only" == "false" ]]; then
+remote_templates_available=true
+while IFS= read -r template_path; do
+  if ! git cat-file -e "origin/$BRANCH:$template_path" 2>/dev/null; then
+    remote_templates_available=false
+    aif_info "Deferring full preview until publish because this template is new: $template_path"
+  fi
+done < <("${PYTHON[@]}" - "$PIPELINE_YAML_PATH" <<'PY'
+import posixpath
+import re
+import sys
+from pathlib import PurePosixPath
+
+pipeline = PurePosixPath(sys.argv[1].replace("\\", "/"))
+pattern = re.compile(r"^\s*-\s+template:\s*['\"]?([^'\"\s]+)")
+seen = set()
+for line in open(sys.argv[1], encoding="utf-8-sig"):
+    match = pattern.match(line)
+    if not match or "@" in match.group(1) or "${{" in match.group(1):
+        continue
+    path = posixpath.normpath(str(pipeline.parent / match.group(1)))
+    if path not in seen:
+        seen.add(path)
+        print(path)
+PY
+)
+
+aif_section "05 / Validate pipeline"
+if [[ "$remote_templates_available" == "true" ]]; then
 "${PYTHON[@]}" - "$state_dir/preview-request.json" "$BRANCH" "$CONFIG_FILE" "$RUNNER_SELECTION" "$use_json_override" "$PIPELINE_YAML_PATH" <<'PY'
 import json
 import sys
@@ -968,22 +1014,12 @@ request = {
 Path(sys.argv[1]).write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
 PY
 
-aif_section "05 / Validate pipeline"
 aif_info "Compiling the pipeline before commit and push..."
-ado_request \
-  POST \
-  "$ado_api_base/pipelines/$pipeline_id/runs?api-version=7.1" \
-  "$state_dir/preview-request.json" \
-  > "$state_dir/preview-response.json"
-"${PYTHON[@]}" - "$state_dir/preview-response.json" <<'PY'
-import json
-import sys
-
-response = json.loads(open(sys.argv[1], encoding="utf-8-sig").read())
-if not response.get("finalYaml"):
-    raise SystemExit("Azure DevOps preview did not return compiled YAML.")
-PY
+validate_pipeline_preview "$state_dir/preview-request.json" "$state_dir/preview-response.json"
 aif_success "Azure DevOps pipeline validation succeeded."
+else
+  aif_warn "Pre-publish ADO compilation cannot resolve new template files. The exact pushed branch will be compiled before deployment."
+fi
 
 cp "$state_dir/ADO-update-aifactory-and-run-project.sh" "$REPO_ROOT/ADO-update-aifactory-and-run-project.sh"
 chmod +x "$REPO_ROOT/ADO-update-aifactory-and-run-project.sh"
@@ -1003,6 +1039,38 @@ if ! git diff --cached --quiet; then
 else
   aif_info "No tracked template changes required a commit."
 fi
+
+"${PYTHON[@]}" - "$state_dir/published-preview-request.json" "$BRANCH" "$CONFIG_FILE" "$RUNNER_SELECTION" "$use_json_override" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+request = {
+    "previewRun": True,
+    "resources": {
+        "repositories": {
+            "self": {
+                "refName": f"refs/heads/{sys.argv[2]}",
+            }
+        }
+    },
+    "templateParameters": {
+        "configFile": sys.argv[3],
+        "runnerSelection": sys.argv[4],
+        "useJsonConfigOverride": sys.argv[5] == "true",
+    },
+    "stagesToSkip": [
+        "Stage_GenAI_Project",
+        "Prod_GenAI_Project",
+    ],
+}
+Path(sys.argv[1]).write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
+PY
+
+aif_section "06b / Validate published pipeline"
+aif_info "Compiling the exact pushed branch before deployment..."
+validate_pipeline_preview "$state_dir/published-preview-request.json" "$state_dir/published-preview-response.json"
+aif_success "Published Azure DevOps pipeline validation succeeded."
 fi
 
 "${PYTHON[@]}" - "$state_dir/run-request.json" "$BRANCH" "$CONFIG_FILE" "$RUNNER_SELECTION" "$use_json_override" <<'PY'

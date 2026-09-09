@@ -398,3 +398,14 @@ def test_root_contract_is_opt_in_and_stable_helper_is_copied():
         assert '"$helper_path" --route' in source
         assert 'helper_state_dir="$(cygpath -m "$helper_state_dir")"' in source
         assert "--project-only" in source
+
+
+def test_ado_update_defers_new_template_preview_and_validates_published_branch():
+    source = (ROOT / "bootstrap" / "ADO-update-aifactory-and-run-project.sh").read_text(encoding="utf-8")
+    push = source.index('git push origin "$BRANCH"')
+    published_preview = source.index('published-preview-request.json')
+    deployment = source.index('"$state_dir/run-request.json"')
+    assert 'git cat-file -e "origin/$BRANCH:$template_path"' in source
+    assert "Pre-publish ADO compilation cannot resolve new template files" in source
+    assert push < published_preview < deployment
+    assert 'validate_pipeline_preview "$state_dir/published-preview-request.json"' in source
