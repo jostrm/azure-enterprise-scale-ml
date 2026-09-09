@@ -1,4 +1,6 @@
 name: infra-project
+# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
+run-name: infra-project ${{ inputs.environment }} [${{ inputs.deployment_id || 'manual' }}]
 
 on:
   workflow_dispatch:
@@ -17,6 +19,26 @@ on:
         required: false
         default: 'aifactory/variables.json'
         type: string
+      config_secret:
+        description: Environment secret containing this run's immutable configuration
+        type: string
+        required: false
+        default: AIFACTORY_CONFIG_JSON
+      deployment_id:
+        description: Unique reviewed deployment correlation UUID
+        type: string
+        required: false
+        default: ''
+      project_number:
+        description: Reviewed project identity (empty preserves legacy behavior)
+        type: string
+        required: false
+        default: ''
+      config_hash:
+        description: SHA256 of the reviewed configuration
+        type: string
+        required: false
+        default: ''
       runner_selection:
         description: Build runner selection
         required: false
@@ -47,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     env:
-      AIFACTORY_CONFIG_JSON: ${{ secrets.AIFACTORY_CONFIG_JSON }}
+      AIFACTORY_CONFIG_JSON: ${{ secrets[inputs.config_secret] }}
       AIFACTORY_REPORT_JOB: configure
       admin_location: ${{ vars.AIFACTORY_LOCATION }}
       dev_test_prod_sub_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
@@ -72,6 +94,41 @@ jobs:
           set -euo pipefail
           mkdir -p "$(dirname "$CONFIG_FILE")"
           printf '%s' "$AIFACTORY_CONFIG_JSON" > "$CONFIG_FILE"
+
+      - name: Validate reviewed project and target
+        if: ${{ inputs.deployment_id != '' }}
+        shell: bash
+        env:
+          PROJECT_NUMBER: ${{ inputs.project_number }}
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          CONFIG_HASH: ${{ inputs.config_hash }}
+          CONFIG_FILE: ${{ inputs.config_file }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          EXPECTED_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          EXPECTED_TENANT: ${{ secrets.TENANT_ID }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, uuid
+          from pathlib import Path
+          uuid.UUID(os.environ["DEPLOYMENT_ID"])
+          path = Path(os.environ["CONFIG_FILE"])
+          if path.as_posix() != "aifactory/.reviewed-project-config.json":
+              raise SystemExit("Reviewed deployment configuration path mismatch")
+          raw = path.read_bytes()
+          if hashlib.sha256(raw).hexdigest() != os.environ["CONFIG_HASH"]:
+              raise SystemExit("Reviewed deployment configuration hash mismatch")
+          payload = json.loads(raw)
+          target = os.environ["TARGET_ENVIRONMENT"]
+          values = payload["dev" if target == "dev" else "stage_prod"]
+          if str(values.get("project_number_000", "")).zfill(3) != os.environ["PROJECT_NUMBER"]:
+              raise SystemExit("Reviewed deployment project mismatch")
+          guid = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
+          subscription = values.get({"dev":"dev_sub_id","stage":"test_sub_id","prod":"prod_sub_id"}[target], "")
+          if not re.fullmatch(guid, str(subscription)) or not re.fullmatch(guid, str(values.get("tenantId", ""))):
+              raise SystemExit("Exact target subscription and tenant required; Dev fallback forbidden")
+          if str(subscription).lower() != os.environ["EXPECTED_SUBSCRIPTION"].lower() or str(values["tenantId"]).lower() != os.environ["EXPECTED_TENANT"].lower():
+              raise SystemExit("GitHub environment subscription/tenant does not match the reviewed target")
+          PY
 
       - name: Resolve runner from workflow input and JSON
         id: runner
@@ -158,6 +215,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Remove run-specific reviewed configuration
+        if: ${{ always() && inputs.deployment_id != '' }}
+        shell: bash
+        run: python3 -c 'from pathlib import Path; Path("aifactory/.reviewed-project-config.json").unlink(missing_ok=True)'
+
   deploy_infrastructure:
     name: Project (Networking + Services)
     needs: configure
@@ -165,6 +227,9 @@ jobs:
     with:
       environment: ${{ inputs.environment }}
       config_file: ${{ inputs.config_file }}
+      config_secret: ${{ inputs.config_secret }}
+      deployment_id: ${{ inputs.deployment_id }}
+      config_hash: ${{ inputs.config_hash }}
       phase: infra
       runs_on: ${{ needs.configure.outputs.runs_on }}
       use_self_hosted: ${{ needs.configure.outputs.use_self_hosted }}
@@ -181,6 +246,9 @@ jobs:
     with:
       environment: ${{ inputs.environment }}
       config_file: ${{ inputs.config_file }}
+      config_secret: ${{ inputs.config_secret }}
+      deployment_id: ${{ inputs.deployment_id }}
+      config_hash: ${{ inputs.config_hash }}
       phase: foundry
       runs_on: ${{ needs.configure.outputs.runs_on }}
       use_self_hosted: ${{ needs.configure.outputs.use_self_hosted }}

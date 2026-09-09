@@ -17,6 +17,26 @@ bash ./GH-update-aifactory-and-run-project.sh
 
 These scripts replace the manual feature-update steps below. They protect existing work, update the AI Factory submodule and templates, merge the existing configuration into the latest templates, commit and push the changes, start the project pipeline or workflow, and monitor the run until it finishes.
 
+### Add a project without updating AI Factory
+
+When the existing submodule, templates, and pipeline are already the versions you
+want, use `--project-only` to skip all update work and trigger the existing
+project pipeline or workflow:
+
+```bash
+# Azure DevOps
+bash ./ADO-update-aifactory-and-run-project.sh --project-only
+
+# GitHub Actions
+bash ./GH-update-aifactory-and-run-project.sh --project-only
+```
+
+This mode does not pull the repository or submodule, refresh or merge templates,
+sync GitHub variables, create a commit, push, or run the Azure DevOps preview.
+It preserves the normal authentication and optional `variables.json` override
+flow, then dispatches the project deployment. For unattended execution, set
+`AIFACTORY_PROJECT_ONLY=true`.
+
 Both scripts ask `Do you want to override with variables.json? [y/N]` before starting the update. Enter `y` to pass `aifactory/variables.json` as the deployment override. Enter `n`, or press Enter, to pass an empty configuration path: Azure DevOps then uses `variables.yaml`, while GitHub Actions uses its configured variables and secrets without applying `variables.json`.
 
 `useAdminVMBuildAgent` has been removed. Existing configurations must use `useSelfHostedBuildAgent` instead. The update scripts remove the deprecated key while merging configuration templates.
@@ -32,6 +52,76 @@ On the first Azure DevOps run, the ADO script prompts for your organization name
 `azureDevOpsTenantId` is the **Microsoft Entra ID directory connected to the Azure DevOps organization**. It can differ from `tenantId`, which is used for Azure deployments. The script generates a direct link using the organization name: `https://dev.azure.com/<organization>/_settings/organizationAad`. That link opens the Microsoft Entra settings directly. Alternatively, open the Azure DevOps organization, click **Organization settings** in the lower-left corner, then click **Microsoft Entra** in the left menu. Copy the **Directory (tenant) ID** into `azureDevOpsTenantId`. Tenant-specific values and PATs are never embedded in the script.
 
 ## Prerequisites: An existing AI Factory
+
+### Reviewed single-project Stage/Prod deployment
+
+The updated root launchers declare `# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1`.
+Without the following opt-in inputs, their existing Dev/default and full-promotion
+behavior is unchanged. A reviewed deployment supplies **all three**:
+
+- `AIFACTORY_PROJECT_NUMBER`: selected three-digit project, for example `017`;
+- `AIFACTORY_TARGET_ENVIRONMENT`: exactly `dev`, `stage`, or `prod`;
+- `AIFACTORY_PROJECT_CONFIG`: absolute selected JSON export, or a factory/project/
+  target-bound Windows current-user-DPAPI artifact produced by the local API.
+
+`AIFACTORY_REPO_ROOT` identifies the consumer repository immediately above
+`aifactory`. The MAUI/API confirmation supplies these values explicitly. Do not
+set only a target on an old launcher: it cannot safely select isolated Stage/Prod.
+
+The opt-in helper validates project identity and the exact target subscription
+and tenant, with **no Dev fallback**. Stage uses `stage_prod.test_sub_id` and the
+ADO `test` environment alias; Prod uses `stage_prod.prod_sub_id`. Deletion flags
+are rejected. Existing GitHub environment authentication and ADO service
+connections must match the selected target. The API currently blocks an ADO
+organization tenant different from the Azure target tenant.
+
+The helper snapshots reviewed code/configuration before refresh, restores the
+reviewed launcher/helper and pipeline templates afterwards, and uses the selected
+configuration in memory. Its interactive commit prompt stages only allowlisted
+deployment code and the submodule pointer, never project exports. Declining
+returns a nonzero result without dispatch. `--project-only` skips update/publish;
+the reviewed workflow must already be installed and published on `main`.
+
+GitHub receives a unique per-run environment secret; dispatch includes a UUID
+in the workflow run name. The helper matches that UUID and the published commit,
+watches the exact run, verifies its conclusion, and deletes the secret after
+verified completion. If dispatch/completion is uncertain, it retains the secret
+and fails for manual reconciliation rather than retrying or watching another run.
+ADO receives the JSON as a protected per-run variable and watches the exact
+returned run ID. Isolated Stage permits **skipped**, not failed/canceled, Dev;
+isolated Prod permits skipped Dev and Stage. The legacy promotion DAG is unchanged.
+Selected-project network/runner settings control ADO job scheduling even when
+another project's export is currently loaded.
+
+Pipeline jobs materialize the protected JSON only in their agent workspace and
+remove it with always-run cleanup. A forcibly lost agent still needs workspace
+review. The local API's derived artifact remains encrypted on disk/SQLite and
+is decrypted only in process memory; raw interactive terminal output is RAM-only.
+Pipeline completion is reported as submitted until Azure inventory confirms Active;
+failed/interrupted jobs require reconciliation even when a partial resource group exists.
+
+#### Files to install together in an existing consumer
+
+Copy only through your normal reviewed local installation process. This source
+change does not automatically modify a consumer or publish its repository.
+
+| Canonical shared source | Consumer destination |
+|---|---|
+| `bootstrap/GH-update-aifactory-and-run-project.sh` | Root `GH-update-aifactory-and-run-project.sh` for GitHub |
+| `bootstrap/ADO-update-aifactory-and-run-project.sh` | Root `ADO-update-aifactory-and-run-project.sh` for ADO |
+| `bootstrap/lib/project_deployment.py` | Root `lib/project_deployment.py` |
+| `environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project.yml` | `.github/workflows/infra-project.yml` |
+| Same GitHub template directory: `infra-project-phase.yml` | `.github/workflows/infra-project-phase.yml` |
+| `environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/infra-project-genai.yaml` | `aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-genai.yaml` |
+| Same ADO template directory: `jobs/job-0-reviewed-project-config.yaml` | Same consumer pipeline directory: `jobs/job-0-reviewed-project-config.yaml` |
+
+Keep the existing root `ui/terminal.sh` and normal bootstrap dependencies installed.
+Install the helper plus both pipeline files for the selected provider; adding only
+the marker is not sufficient. The confirmation blocks missing/stale capabilities.
+The helper can publish the reviewed allowlisted code only after its explicit
+terminal commit/push prompt. No deployment launcher should be run merely to test
+this installation; use the offline contract fixtures.
+
 [Prerequisites - End-to-end setup](./24-end-2-end-setup.md)
 
 

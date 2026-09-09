@@ -1,4 +1,4 @@
-#
+# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
 #Dev_GenAI_Project:
 #✅ Runs automatically on CI triggers (release/project* branches) if you uncomment code, and remove "none" value
 #✅ Runs on manual triggers
@@ -14,6 +14,20 @@
 #✅ Can be manually triggered from any branch
 
 parameters:
+  - name: deploymentTarget
+    displayName: Reviewed single-environment target (empty preserves promotion flow)
+    type: string
+    default: ''
+    values: ['', dev, stage, prod]
+  - name: deploymentProjectNumber
+    type: string
+    default: ''
+  - name: deploymentConfigHash
+    type: string
+    default: ''
+  - name: deploymentSettings
+    type: object
+    default: {}
   - name: configFile
     displayName: Canonical AI Factory JSON configuration file
     type: string
@@ -37,9 +51,29 @@ trigger: none
       # - release/project*
 variables:
   - template: ../variables/variables.yaml
+  - ${{ if ne(parameters.deploymentTarget, '') }}:
+    - name: runNetworkingVar
+      value: ${{ parameters.deploymentSettings.runNetworkingVar }}
+    - name: BYO_subnets
+      value: ${{ parameters.deploymentSettings.BYO_subnets }}
+    - name: useSelfHostedBuildAgent
+      value: ${{ parameters.deploymentSettings.useSelfHostedBuildAgent }}
+    - name: adminVMBuildAgentPool
+      value: ${{ parameters.deploymentSettings.adminVMBuildAgentPool }}
+    - name: adminVMBuildAgentName
+      value: ${{ parameters.deploymentSettings.adminVMBuildAgentName }}
+    - name: admin_locationSuffix
+      value: ${{ parameters.deploymentSettings.admin_locationSuffix }}
+    - name: admin_commonResourceSuffix
+      value: ${{ parameters.deploymentSettings.admin_commonResourceSuffix }}
+    - name: deleteAllForProject
+      value: 'false'
+    - name: deleteAllServicesForProject
+      value: 'false'
 stages:
 - stage: Dev_GenAI_Project
   displayName: Dev GenAI Project
+  condition: and(succeeded(), or(eq('${{ parameters.deploymentTarget }}', ''), eq('${{ parameters.deploymentTarget }}', 'dev')))
   variables:
     dev_test_prod: "dev"
     ${{ if eq(parameters.useJsonConfigOverride, true) }}:
@@ -77,10 +111,20 @@ stages:
                 submodules: recursive
                 fetchDepth: 0
                 displayName: 'Checkout with submodules'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  project: ${{ parameters.deploymentProjectNumber }}
+                  configFile: ${{ parameters.configFile }}
+                  configHash: ${{ parameters.deploymentConfigHash }}
               - template: ./jobs/job-1-genai-networking.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  cleanup: true
     - deployment: ESGenAI_Services
       condition: or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
       dependsOn: ESGenAI_Networking
@@ -105,11 +149,21 @@ stages:
                 submodules: recursive
                 fetchDepth: 0
                 displayName: 'Checkout with submodules'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  project: ${{ parameters.deploymentProjectNumber }}
+                  configFile: ${{ parameters.configFile }}
+                  configHash: ${{ parameters.deploymentConfigHash }}
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
                   phase: 'infra'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  cleanup: true
     # AI Foundry runs in its own deployment job. The phase parameter excludes all infra
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
     # dynamic network parameters, resource detection, and salt) are re-created.
@@ -137,14 +191,24 @@ stages:
                 submodules: recursive
                 fetchDepth: 0
                 displayName: 'Checkout with submodules'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  project: ${{ parameters.deploymentProjectNumber }}
+                  configFile: ${{ parameters.configFile }}
+                  configHash: ${{ parameters.deploymentConfigHash }}
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
                   phase: 'foundry'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  cleanup: true
 - stage: Stage_GenAI_Project
   displayName: Stage GenAI Project
-  condition: and(eq(variables['Build.Reason'], 'Manual'), in(dependencies.Dev_GenAI_Project.result, 'Succeeded'))
+  condition: and(not(canceled()), eq(variables['Build.Reason'], 'Manual'), or(and(eq('${{ parameters.deploymentTarget }}', ''), eq(dependencies.Dev_GenAI_Project.result, 'Succeeded')), and(eq('${{ parameters.deploymentTarget }}', 'stage'), eq(dependencies.Dev_GenAI_Project.result, 'Skipped'))))
   dependsOn: Dev_GenAI_Project
   variables:
     dev_test_prod: "test"
@@ -183,10 +247,20 @@ stages:
                 submodules: recursive
                 fetchDepth: 0
                 displayName: 'Checkout with submodules'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  project: ${{ parameters.deploymentProjectNumber }}
+                  configFile: ${{ parameters.configFile }}
+                  configHash: ${{ parameters.deploymentConfigHash }}
               - template: ./jobs/job-1-genai-networking.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
                   serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  cleanup: true
     - deployment: ESGenAI_Services
       condition: or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
       dependsOn: ESGenAI_Networking
@@ -211,11 +285,21 @@ stages:
                 submodules: recursive
                 fetchDepth: 0
                 displayName: 'Checkout with submodules'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  project: ${{ parameters.deploymentProjectNumber }}
+                  configFile: ${{ parameters.configFile }}
+                  configHash: ${{ parameters.deploymentConfigHash }}
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
                   serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
                   phase: 'infra'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  cleanup: true
     # AI Foundry runs in its own deployment job. The phase parameter excludes all infra
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
     # dynamic network parameters, resource detection, and salt) are re-created.
@@ -243,14 +327,24 @@ stages:
                 submodules: recursive
                 fetchDepth: 0
                 displayName: 'Checkout with submodules'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  project: ${{ parameters.deploymentProjectNumber }}
+                  configFile: ${{ parameters.configFile }}
+                  configHash: ${{ parameters.deploymentConfigHash }}
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
                   serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
                   phase: 'foundry'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  cleanup: true
 - stage: Prod_GenAI_Project
   displayName: Prod GenAI Project
-  condition: and(eq(variables['Build.Reason'], 'Manual'), eq(dependencies.Dev_GenAI_Project.result, 'Succeeded'), eq(dependencies.Stage_GenAI_Project.result, 'Succeeded'))
+  condition: and(not(canceled()), eq(variables['Build.Reason'], 'Manual'), or(and(eq('${{ parameters.deploymentTarget }}', ''), eq(dependencies.Dev_GenAI_Project.result, 'Succeeded'), eq(dependencies.Stage_GenAI_Project.result, 'Succeeded')), and(eq('${{ parameters.deploymentTarget }}', 'prod'), eq(dependencies.Dev_GenAI_Project.result, 'Skipped'), eq(dependencies.Stage_GenAI_Project.result, 'Skipped'))))
   dependsOn: 
     - Stage_GenAI_Project
     - Dev_GenAI_Project
@@ -291,10 +385,20 @@ stages:
                 submodules: recursive
                 fetchDepth: 0
                 displayName: 'Checkout with submodules'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  project: ${{ parameters.deploymentProjectNumber }}
+                  configFile: ${{ parameters.configFile }}
+                  configHash: ${{ parameters.deploymentConfigHash }}
               - template: ./jobs/job-1-genai-networking.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
                   serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  cleanup: true
     - deployment: ESGenAI_Services
       condition: or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
       dependsOn: ESGenAI_Networking
@@ -319,11 +423,21 @@ stages:
                 submodules: recursive
                 fetchDepth: 0
                 displayName: 'Checkout with submodules'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  project: ${{ parameters.deploymentProjectNumber }}
+                  configFile: ${{ parameters.configFile }}
+                  configHash: ${{ parameters.deploymentConfigHash }}
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
                   serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
                   phase: 'infra'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  cleanup: true
     # AI Foundry runs in its own deployment job. The phase parameter excludes all infra
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
     # dynamic network parameters, resource detection, and salt) are re-created.
@@ -351,8 +465,18 @@ stages:
                 submodules: recursive
                 fetchDepth: 0
                 displayName: 'Checkout with submodules'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  project: ${{ parameters.deploymentProjectNumber }}
+                  configFile: ${{ parameters.configFile }}
+                  configHash: ${{ parameters.deploymentConfigHash }}
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
                   serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
                   phase: 'foundry'
+              - template: ./jobs/job-0-reviewed-project-config.yaml
+                parameters:
+                  target: ${{ parameters.deploymentTarget }}
+                  cleanup: true

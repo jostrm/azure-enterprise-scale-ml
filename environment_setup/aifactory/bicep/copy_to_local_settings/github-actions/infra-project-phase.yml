@@ -1,4 +1,5 @@
 name: infra-project-phase
+# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
 
 on:
   workflow_call:
@@ -9,6 +10,18 @@ on:
       config_file:
         required: true
         type: string
+      config_secret:
+        required: false
+        type: string
+        default: AIFACTORY_CONFIG_JSON
+      deployment_id:
+        required: false
+        type: string
+        default: ''
+      config_hash:
+        required: false
+        type: string
+        default: ''
       phase:
         required: true
         type: string
@@ -36,9 +49,9 @@ jobs:
         shell: pwsh
     env:
       AIFACTORY_REPORT_JOB: deploy-project-${{ inputs.phase }}
-      AIFACTORY_CONFIG_JSON: ${{ secrets.AIFACTORY_CONFIG_JSON }}
+      AIFACTORY_CONFIG_JSON: ${{ secrets[inputs.config_secret] }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      dev_test_prod: ${{ vars.AZURE_ENV_NAME }}
+      dev_test_prod: ${{ inputs.deployment_id != '' && (inputs.environment == 'stage' && 'test' || inputs.environment) || vars.AZURE_ENV_NAME }}
       dev_test_prod_sub_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       # Single source of truth for environment (matches ADO): dev_test_prod drives everything
       # network_env uses per-environment repo vars when provided, falls back to shared NETWORK_ENV or AZURE_ENV_NAME
@@ -251,6 +264,7 @@ jobs:
       aksAzureFirewallPrivateIp: ${{ vars.AKS_AZURE_FIREWALL_PRIVATE_IP || '' }}
       enableContainerApps: ${{ vars.ENABLE_CONTAINER_APPS || 'false' }}
       enableAppInsightsDashboard: ${{ vars.ENABLE_APPINSIGHTS_DASHBOARD || 'false' }}
+      enableApplicationInsights: ${{ vars.ENABLE_APPLICATION_INSIGHTS || 'true' }}
       enableFunction: ${{ vars.ENABLE_FUNCTION || 'false' }}
       functionRuntime: ${{ vars.FUNCTION_RUNTIME || 'dotnet' }}
       functionVersion: ${{ vars.FUNCTION_VERSION || 'v7.0' }}
@@ -436,6 +450,29 @@ jobs:
           $azureConfig = Join-Path $HOME '.azure'
           New-Item -ItemType Directory -Force -Path $azureConfig | Out-Null
 
+      - name: 00_Validate_Reviewed_Target
+        if: ${{ inputs.deployment_id != '' }}
+        shell: bash
+        env:
+          CONFIG_HASH: ${{ inputs.config_hash }}
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re
+          raw = os.environ.get("AIFACTORY_CONFIG_JSON", "")
+          if not raw or hashlib.sha256(raw.encode("utf-8")).hexdigest() != os.environ["CONFIG_HASH"]:
+              raise SystemExit("Run-specific configuration missing or changed")
+          target = os.environ["TARGET_ENVIRONMENT"]
+          values = json.loads(raw)["dev" if target == "dev" else "stage_prod"]
+          key = {"dev":"dev_sub_id","stage":"test_sub_id","prod":"prod_sub_id"}[target]
+          if str(values.get(key, "")).lower() != os.environ["dev_test_prod_sub_id"].lower() or str(values.get("tenantId", "")).lower() != os.environ["tenantId"].lower():
+              raise SystemExit("GitHub environment identity differs from the reviewed target")
+          for key, value in values.items():
+              if re.search(r"secret|password|token", key, re.I) and isinstance(value, str) and len(value) > 3:
+                  escaped = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                  print("::add-mask::" + escaped)
+          PY
+
       - name: 00_Azure_Login_OIDC
         if: ${{ env.AZURE_CLIENT_ID != '' }}
         uses: azure/login@v2
@@ -449,6 +486,20 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: 00_Verify_Authenticated_Reviewed_Target
+        if: ${{ inputs.deployment_id != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          REVIEWED_AZURE_ACCOUNT="$(az account show --output json)"
+          export REVIEWED_AZURE_ACCOUNT
+          python3 - <<'PY'
+          import json, os
+          account = json.loads(os.environ["REVIEWED_AZURE_ACCOUNT"])
+          if account["id"].lower() != os.environ["dev_test_prod_sub_id"].lower() or account["tenantId"].lower() != os.environ["tenantId"].lower():
+              raise SystemExit("Authenticated pipeline identity differs from the reviewed target")
+          PY
 
       - name: 00_Materialize_Protected_JSON_Config
         if: ${{ inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
@@ -2134,6 +2185,7 @@ jobs:
               --parameters skuStorageAccountDev="${{ env.skuStorageAccountDev }}" \
               --parameters skuStorageAccountStageProd="${{ env.skuStorageAccountStageProd }}" \
               --parameters enableProjectVM="${{ env.enableProjectVM }}" \
+              --parameters enableApplicationInsights="${{ env.enableApplicationInsights }}" \
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
               --parameters updateKeyvaultRbac="${{ env.updateKeyvaultRbac }}" \
               --parameters enableLogicApps="${{ env.enableLogicApps }}"
@@ -4209,3 +4261,8 @@ jobs:
           path: ${{ runner.temp }}/aifactory-region-reports/${{ github.run_id }}-${{ github.run_attempt }}/deploy-project-${{ inputs.phase }}/*.json
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Remove run-specific reviewed configuration
+        if: ${{ always() && inputs.deployment_id != '' }}
+        shell: bash
+        run: python3 -c 'from pathlib import Path; Path("aifactory/.reviewed-project-config.json").unlink(missing_ok=True)'
