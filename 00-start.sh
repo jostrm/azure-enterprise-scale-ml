@@ -22,6 +22,7 @@ cp "$SCRIPT_DIR/bootstrap/ADO-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/
 cp "$SCRIPT_DIR/bootstrap/GH-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/../GH-update-aifactory-and-run-project.sh"
 cp "$SCRIPT_DIR/bootstrap/ADO-create-new-aifactory-scaleset.sh" "$SCRIPT_DIR/../ADO-create-new-aifactory-scaleset.sh"
 cp "$SCRIPT_DIR/bootstrap/GHA-create-new-aifactory-scaleset.sh" "$SCRIPT_DIR/../GHA-create-new-aifactory-scaleset.sh"
+cp "$SCRIPT_DIR/bootstrap/ALL-create-new-aifactory-scaleset.sh" "$SCRIPT_DIR/../ALL-create-new-aifactory-scaleset.sh"
 
 gh_ok() {
     if ! command -v gh >/dev/null 2>&1; then
