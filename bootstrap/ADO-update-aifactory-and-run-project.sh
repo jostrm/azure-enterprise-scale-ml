@@ -15,7 +15,7 @@ fi
 source "$AIF_UI_LIBRARY"
 readonly REPO_ROOT="${AIFACTORY_REPO_ROOT:-$SCRIPT_DIR}"
 readonly SUBMODULE_PATH="azure-enterprise-scale-ml"
-readonly SUBMODULE_BRANCH="release/v1.24"
+readonly SUBMODULE_BRANCH="main"
 readonly BRANCH="${ADO_BRANCH:-main}"
 readonly PIPELINE_NAME="${ADO_PIPELINE_NAME:-infra-project-genai}"
 readonly PIPELINE_YAML_PATH="aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-genai.yaml"

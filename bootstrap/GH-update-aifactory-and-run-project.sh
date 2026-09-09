@@ -15,7 +15,7 @@ fi
 source "$AIF_UI_LIBRARY"
 readonly REPO_ROOT="${AIFACTORY_REPO_ROOT:-C:/code/code_py_25/002_demo/azure-enterprise-scale-byor-110}"
 readonly SUBMODULE_PATH="azure-enterprise-scale-ml"
-readonly SUBMODULE_BRANCH="release/v1.24"
+readonly SUBMODULE_BRANCH="main"
 readonly WORKFLOW_FILE="infra-project.yml"
 readonly CONFIG_FILE="aifactory/variables.json"
 readonly CONFIG_TEMPLATE_FILE="aifactory/variables-template.json"

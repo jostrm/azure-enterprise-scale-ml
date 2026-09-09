@@ -62,6 +62,13 @@ def test_exact_target_identity_and_no_fallback(target):
         pd.validate_config(broken, "017", target)
 
 
+@pytest.mark.parametrize("route", ["ADO", "GH"])
+def test_update_launchers_refresh_main(route):
+    script = (ROOT / "bootstrap" / f"{route}-update-aifactory-and-run-project.sh").read_text(encoding="utf-8")
+    assert 'readonly SUBMODULE_BRANCH="main"' in script
+    assert 'readonly SUBMODULE_BRANCH="release/v1.24"' not in script
+
+
 @pytest.mark.parametrize("kind", ["project", "section", "tenant", "delete"])
 def test_invalid_configuration_fails_before_commands(kind):
     data = document()

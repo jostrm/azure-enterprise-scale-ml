@@ -17,6 +17,9 @@ bash ./GH-update-aifactory-and-run-project.sh
 
 These scripts replace the manual feature-update steps below. They protect existing work, update the AI Factory submodule and templates, merge the existing configuration into the latest templates, commit and push the changes, start the project pipeline or workflow, and monitor the run until it finishes.
 
+Both launchers now refresh the shared submodule from `main`. Project-only mode
+leaves the installed submodule and templates unchanged.
+
 ### Add a project without updating AI Factory
 
 When the existing submodule, templates, and pipeline are already the versions you
