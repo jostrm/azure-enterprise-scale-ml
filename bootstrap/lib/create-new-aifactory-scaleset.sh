@@ -7,6 +7,7 @@ readonly AIF_SUBMODULE_BRANCH="${AIF_SUBMODULE_BRANCH:-release/v1.24}"
 readonly AIF_ADO_RESOURCE="https://app.vssps.visualstudio.com/"
 readonly AIF_SCALESET_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export MSYS2_ARG_CONV_EXCL="${MSYS2_ARG_CONV_EXCL:+$MSYS2_ARG_CONV_EXCL;}/subscriptions/;/providers/;/eid1/;scope=/subscriptions/;privateLinksDnsZones="
+readonly AIF_SIMPLE_MODE_CONTRACT_VERSION=1
 
 aif_scaleset_usage() {
   cat <<'EOF'
@@ -181,11 +182,48 @@ aif_prompt_choice() {
 aif_prompt_yes_no() {
   local variable_name="$1" prompt="$2" default_value="$3"
   local -n output="$variable_name"
-  aif_prompt_choice "$variable_name" "$prompt" "$default_value" "y yes n no"
+  aif_prompt_choice "$variable_name" "$prompt" "$default_value" "y yes n no true false"
   case "$output" in
-    y|yes) output="true" ;;
+    y|yes|true) output="true" ;;
     *) output="false" ;;
   esac
+}
+
+aif_simple_mode_defaults() {
+  AIF_SIMPLE_MODE="${AIF_SIMPLE_MODE:-false}"
+  if [[ "$AIF_SIMPLE_MODE" != "true" && "$AIF_SIMPLE_MODE" != "false" ]]; then
+    aif_error "AIF_SIMPLE_MODE must be true or false." >&2
+    exit 1
+  fi
+  [[ "$AIF_SIMPLE_MODE" == "true" ]] || return 0
+  if [[ "$AIF_ROUTE" != "gha" || "$AIF_NO_WAIT" == "true" ||
+        "$AIF_PREPARE_ONLY" == "true" || "$AIF_DRY_RUN" == "true" ]]; then
+    aif_error "Simple Mode requires the GHA full DEV chain with default waiting; use the Python manifest for an offline preview." >&2
+    exit 1
+  fi
+  if [[ -n "${AIF_SP_CLIENT_SECRET:-}" || -n "${AIF_SP_CLIENT_ID:-}" ||
+        -n "${AIF_MI_RESOURCE_ID:-}" ]]; then
+    aif_error "Simple Mode creates managed identity/OIDC and accepts no service-principal credentials." >&2
+    exit 1
+  fi
+  local binding name expected
+  for binding in \
+    AIF_TOPOLOGY=s AIF_NETWORK_MODE=priv AIF_ACCESS_HUB_MODE=i \
+    AIF_IDENTITY_MODE=c AIF_SEEDING_MODE=c AIF_SEED_PROJECT_SP=false \
+    AIF_SETUP_HUB_ACCESS=true AIF_CONFIGURE_VPN_CLIENT=false \
+    AIF_DEV_VNET_CIDR=172.16.0.0/20 AIF_PROJECT_NUMBER=001; do
+    name="${binding%%=*}"; expected="${binding#*=}"
+    if [[ -n "${!name:-}" && "${!name}" != "$expected" ]]; then
+      aif_error "Simple Mode requires $binding; use Advanced Mode for other settings." >&2
+      exit 1
+    fi
+    printf -v "$name" '%s' "$expected"
+  done
+  AIF_COST_CENTER="${AIF_COST_CENTER:-123456}"
+  if [[ ! "$AIF_COST_CENTER" =~ ^[A-Za-z0-9_-]{1,64}$ ]]; then
+    aif_error "Cost center must be 1-64 letters, digits, underscores or hyphens." >&2
+    exit 1
+  fi
 }
 
 aif_validate_guid() {
@@ -202,7 +240,7 @@ import ipaddress
 import sys
 
 network = ipaddress.ip_network(sys.argv[1], strict=True)
-if network.version != 4 or network.prefixlen > 18:
+if network.version != 4 or network.prefixlen > 20:
     raise SystemExit(1)
 PY
 }
@@ -385,9 +423,9 @@ aif_collect_answers() {
       exit 1
       ;;
   esac
-  aif_prompt_value AIF_DEV_VNET_CIDR "DEV vNet CIDR (/16 or /18)" "172.16.0.0/18"
+  aif_prompt_value AIF_DEV_VNET_CIDR "DEV vNet CIDR (canonical IPv4 /20 or larger; no XX placeholder)" "172.16.0.0/18"
   if ! aif_validate_cidr "$AIF_DEV_VNET_CIDR"; then
-    aif_error "DEV vNet CIDR must be a canonical IPv4 /16-/18 range." >&2
+    aif_error "DEV vNet CIDR must be a canonical IPv4 /20 or larger range; resolve XX to the DEV octet first." >&2
     exit 1
   fi
 
@@ -417,7 +455,7 @@ aif_collect_answers() {
       AIF_ACCESS_HUB_MODE="integrated"
     fi
     aif_info "Standalone with its own access hub can be reached through Azure VPN Gateway or Azure Bastion."
-    aif_info "The recommended setup enables an Entra-authenticated P2S VPN gateway in the hub and the free Bastion Developer SKU for the DEV admin VM."
+    aif_info "The recommended setup enables an Entra-authenticated P2S VPN gateway and Bastion Developer. This does not create an admin VM."
     if [[ "$AIF_ACCESS_HUB_MODE" == "external" || "$AIF_ACCESS_HUB_MODE" == "e" ]]; then
       aif_info "Bastion Developer cannot traverse peering, so with an external hub it is placed in the DEV common VNet; with an integrated hub, that VNet is the hub."
     fi
@@ -469,9 +507,15 @@ aif_collect_answers() {
   fi
 
   aif_prompt_value AIF_PREFIX "AI Factory naming prefix" "aif-"
+  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" && ! "$AIF_PREFIX" =~ ^[a-z0-9-]{2,16}$ ]]; then
+    aif_error "Simple Mode prefix must be 2-16 lowercase letters, digits or hyphens." >&2
+    exit 1
+  fi
   AIF_PREFIX="${AIF_PREFIX,,}"
   [[ "$AIF_PREFIX" == *- ]] || AIF_PREFIX="${AIF_PREFIX}-"
-  if [[ ! "$AIF_PREFIX" =~ ^[a-z0-9-]{2,16}$ ]]; then
+  local prefix_max=16
+  [[ "${AIF_SIMPLE_MODE:-false}" != "true" ]] || prefix_max=17
+  if [[ ! "$AIF_PREFIX" =~ ^[a-z0-9-]{2,${prefix_max}}$ ]]; then
     aif_error "Prefix must contain only lowercase letters, digits, and hyphens." >&2
     exit 1
   fi
@@ -665,11 +709,22 @@ aif_ensure_azure_login() {
       --output none 2>/dev/null; then
       az account set --subscription "$AIF_DEV_SUBSCRIPTION_ID"
     else
+      if [[ "$AIF_NON_INTERACTIVE" == "true" ]]; then
+        aif_error "No Azure sign-in is available for the selected tenant/subscription. Sign in explicitly before Create." >&2
+        exit 1
+      fi
       aif_mutate az login --tenant "$AIF_TENANT_ID" --allow-no-subscriptions
     fi
   fi
   if [[ "$AIF_DRY_RUN" != "true" ]]; then
-    az account show --subscription "$AIF_DEV_SUBSCRIPTION_ID" --output none
+    local selected_tenant
+    selected_tenant="$(az account show --subscription "$AIF_DEV_SUBSCRIPTION_ID" --query tenantId --output tsv)"
+    selected_tenant="${selected_tenant//$'\r'/}"
+    if [[ "${selected_tenant,,}" != "${AIF_TENANT_ID,,}" ]]; then
+      aif_error "Selected subscription does not belong to the requested Azure tenant." >&2
+      exit 1
+    fi
+    az account get-access-token --subscription "$AIF_DEV_SUBSCRIPTION_ID" --output none
     if [[ "$AIF_TOPOLOGY" == "hs" ]]; then
       az account show --subscription "$AIF_HUB_SUBSCRIPTION_ID" --output none
     fi
@@ -771,6 +826,15 @@ aif_register_resource_providers() {
     Microsoft.AppConfiguration Microsoft.Web
     Microsoft.OperationalInsights microsoft.insights
   )
+  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
+    required=(
+      Microsoft.Resources Microsoft.Network Microsoft.Storage Microsoft.KeyVault
+      Microsoft.ManagedIdentity Microsoft.CognitiveServices Microsoft.Search
+      Microsoft.ContainerRegistry Microsoft.OperationalInsights microsoft.insights
+      Microsoft.PolicyInsights Microsoft.App
+    )
+    providers=("${required[@]}")
+  fi
   local provider provider_error
   aif_info "Registering AI Factory resource providers in $subscription_id."
   for provider in "${providers[@]}"; do
@@ -799,6 +863,12 @@ aif_register_resource_providers() {
 }
 
 aif_ensure_first_party_enterprise_apps() {
+  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
+    AIF_AZURE_ML_PRINCIPAL_ID=""
+    AIF_DATABRICKS_PRINCIPAL_ID=""
+    aif_info "Simple Mode disables ML/Databricks/legacy Foundry Hub; no temporary workspaces or first-party apps are needed."
+    return 0
+  fi
   local aml_app_id="0736f41a-0425-4b46-bdb5-1563eff02385"
   local databricks_app_id="2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
   AIF_AZURE_ML_PRINCIPAL_ID="$(az ad sp show \
@@ -1085,6 +1155,11 @@ aif_sync_submodule_and_templates() {
   aif_mutate git -C azure-enterprise-scale-ml fetch origin "$AIF_SUBMODULE_BRANCH"
   aif_mutate git -C azure-enterprise-scale-ml checkout "$AIF_SUBMODULE_BRANCH"
   aif_mutate git -C azure-enterprise-scale-ml pull --ff-only origin "$AIF_SUBMODULE_BRANCH"
+
+  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
+    "${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/aifactory_scaleset_config.py" \
+      --verify-simple-mode-source "$AIF_REPO_ROOT/azure-enterprise-scale-ml"
+  fi
 
   if [[ "$AIF_DRY_RUN" == "true" ]]; then
     aif_info "DRY-RUN: synchronize initial route templates."
@@ -1433,7 +1508,8 @@ aif_seed_optional_project_sp() {
 }
 
 aif_prepare_hub_dns() {
-  [[ "$AIF_TOPOLOGY" == "hs" || "$AIF_ACCESS_HUB_MODE" == "external" ]] || return 0
+  [[ "$AIF_TOPOLOGY" == "hs" || "$AIF_ACCESS_HUB_MODE" == "external" ||
+     "${AIF_SIMPLE_COMMON_READY:-false}" == "true" ]] || return 0
   aif_section "12 / Hub private DNS"
   AIF_PRIVATE_DNS_CONFIG="$AIF_STATE_DIR/private-dns-config.json"
   "${AIF_PYTHON[@]}" \
@@ -1485,7 +1561,8 @@ print(json.dumps(json.load(open(sys.argv[1], encoding="utf-8"))["zones"], separa
 }
 
 aif_ensure_private_dns_policy_assignment() {
-  [[ "$AIF_TOPOLOGY" == "hs" || "$AIF_ACCESS_HUB_MODE" == "external" ]] || return 0
+  [[ "$AIF_TOPOLOGY" == "hs" || "$AIF_ACCESS_HUB_MODE" == "external" ||
+     "${AIF_SIMPLE_COMMON_READY:-false}" == "true" ]] || return 0
   aif_section "13 / Spoke private-DNS policy"
   if [[ "$AIF_DRY_RUN" == "true" ]]; then
     aif_info "DRY-RUN: deploy the regional private-DNS initiative in DEV and assign its managed identity access to central DNS."
@@ -1608,6 +1685,9 @@ aif_ensure_dns_private_resolver() {
   local hub_vnet="$4" hub_cidr="$5"
   local resolver_subnet resolver_name inbound_name
   resolver_subnet="$(aif_resolver_subnet "$hub_cidr" "$mode")"
+  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" && "$mode" == "integrated" ]]; then
+    resolver_subnet="$AIF_SIMPLE_RESOLVER_SUBNET"
+  fi
   resolver_name="dnspr-aifactory-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"
   inbound_name="inbound-aifactory-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"
   if ! az network vnet subnet show \
@@ -1853,6 +1933,9 @@ aif_ensure_vpn_access_hub() {
   hub_cidr="$AIF_ACCESS_HUB_VNET_CIDR"
   local gateway_subnet gateway_name public_ip_name
   gateway_subnet="$(aif_last_subnet "$hub_cidr" 27)"
+  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" && "$mode" == "integrated" ]]; then
+    gateway_subnet="$AIF_SIMPLE_GATEWAY_SUBNET"
+  fi
   gateway_name="vpngw-aifactory-access-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"
   public_ip_name="${gateway_name}-pip"
 
@@ -1999,7 +2082,7 @@ aif_ensure_bastion_developer() {
     return 0
   fi
 
-  az network bastion create \
+  if ! az network bastion create \
     --subscription "$subscription" \
     --resource-group "$resource_group" \
     --name "$bastion_name" \
@@ -2007,7 +2090,10 @@ aif_ensure_bastion_developer() {
     --sku Developer \
     --vnet-name "$vnet_name" \
     --no-wait \
-    --output none
+    --output none; then
+    aif_error "Bastion Developer could not be created in '$AIF_LOCATION'. No paid SKU fallback was attempted; select a supported region or use Advanced Mode." >&2
+    exit 1
+  fi
   az network bastion wait \
     --subscription "$subscription" \
     --resource-group "$resource_group" \
@@ -2015,37 +2101,39 @@ aif_ensure_bastion_developer() {
     --created \
     --interval 10 \
     --timeout 900
-  aif_success "Azure Bastion Developer '$bastion_name' is ready for the DEV admin VM."
+  aif_success "Azure Bastion Developer '$bastion_name' is ready. No admin VM is included unless separately enabled."
 }
 
 aif_configure_windows_vpn_client() {
-  [[ "$AIF_CONFIGURE_VPN_CLIENT" == "true" ]] || return 0
-  if ! aif_is_windows; then
-    aif_error "Azure VPN Client installation and profile import are supported only from Windows Git Bash." >&2
-    exit 1
-  fi
-
-  aif_section "16 / Azure VPN Client"
-  if ! powershell.exe -NoProfile -NonInteractive -Command \
-    "if (Get-AppxPackage -Name Microsoft.AzureVpn -ErrorAction SilentlyContinue) { exit 0 }; exit 1"; then
-    if ! command -v winget.exe >/dev/null 2>&1; then
-      aif_error "Azure VPN Client is missing and winget.exe is not available." >&2
+  [[ "$AIF_CONFIGURE_VPN_CLIENT" == "true" || "${AIF_SIMPLE_MODE:-false}" == "true" ]] || return 0
+  if [[ "$AIF_CONFIGURE_VPN_CLIENT" == "true" ]]; then
+    if ! aif_is_windows; then
+      aif_error "Azure VPN Client installation and profile import are supported only from Windows Git Bash." >&2
       exit 1
     fi
-    aif_info "Installing Microsoft Azure VPN Client for the current Windows user."
-    winget.exe install \
-      --id Microsoft.AzureVPNClient \
-      --exact \
-      --source winget \
-      --silent \
-      --accept-package-agreements \
-      --accept-source-agreements \
-      --disable-interactivity
-  fi
-  if ! powershell.exe -NoProfile -NonInteractive -Command \
-    "if (Get-AppxPackage -Name Microsoft.AzureVpn -ErrorAction SilentlyContinue) { exit 0 }; exit 1"; then
-    aif_error "Microsoft Azure VPN Client installation could not be verified." >&2
-    exit 1
+
+    aif_section "16 / Azure VPN Client"
+    if ! powershell.exe -NoProfile -NonInteractive -Command \
+      "if (Get-AppxPackage -Name Microsoft.AzureVpn -ErrorAction SilentlyContinue) { exit 0 }; exit 1"; then
+      if ! command -v winget.exe >/dev/null 2>&1; then
+        aif_error "Azure VPN Client is missing and winget.exe is not available." >&2
+        exit 1
+      fi
+      aif_info "Installing Microsoft Azure VPN Client for the current Windows user."
+      winget.exe install \
+        --id Microsoft.AzureVPNClient \
+        --exact \
+        --source winget \
+        --silent \
+        --accept-package-agreements \
+        --accept-source-agreements \
+        --disable-interactivity
+    fi
+    if ! powershell.exe -NoProfile -NonInteractive -Command \
+      "if (Get-AppxPackage -Name Microsoft.AzureVpn -ErrorAction SilentlyContinue) { exit 0 }; exit 1"; then
+      aif_error "Microsoft Azure VPN Client installation could not be verified." >&2
+      exit 1
+    fi
   fi
 
   local profile_url="" attempt
@@ -2110,6 +2198,16 @@ PY
     --input "$source_profile" \
     --output "$prepared_profile" \
     --name "$profile_name"
+
+  if [[ "$AIF_CONFIGURE_VPN_CLIENT" != "true" ]]; then
+    local artifact_dir="$AIF_REPO_ROOT/.aifactory-access"
+    mkdir -p "$artifact_dir"
+    chmod 700 "$artifact_dir"
+    cp -- "$prepared_profile" "$artifact_dir/azurevpnconfig.xml"
+    chmod 600 "$artifact_dir/azurevpnconfig.xml"
+    aif_success "VPN profile saved to .aifactory-access/azurevpnconfig.xml (git-ignored). Install/import/connect manually; no VPN client was installed."
+    return 0
+  fi
 
   local local_state_windows local_state profile_file profile_basename pbk
   local_state_windows="$(powershell.exe -NoProfile -NonInteractive -Command \
@@ -2177,7 +2275,8 @@ aif_write_state_and_configure() {
     "${ADO_TENANT:-}" "${ADO_SERVICE_CONNECTION_NAME:-}" \
     "${GITHUB_REPOSITORY:-}" "${AIF_OIDC_CLIENT_ID:-}" \
     "$AIF_RUNNER_MODE" "${ADO_AGENT_POOL:-}" "${ADO_AGENT_NAME:-}" \
-    "$AIF_ADMIN_VM_SIZE" <<'PY'
+    "$AIF_ADMIN_VM_SIZE" "${AIF_SIMPLE_MODE:-false}" "${AIF_COST_CENTER:-}" \
+    "$AIF_TEAM_MEMBER_EMAIL" <<'PY'
 import json
 import sys
 
@@ -2196,6 +2295,7 @@ keys = (
     "ado_tenant_id", "ado_service_connection",
     "github_repository", "oidc_client_id",
     "runner_mode", "ado_agent_pool", "ado_agent_name", "admin_vm_size",
+    "simple_mode", "cost_center", "team_member_email",
 )
 values = dict(zip(keys, sys.argv[2:]))
 values["dev_service_connection"] = values["ado_service_connection"]
@@ -2219,6 +2319,10 @@ PY
     --route "$AIF_ROUTE" \
     --repo-root "$AIF_REPO_ROOT" \
     --state-file "$state_file"
+  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
+    grep -Fqx '/.aifactory-access/' "$AIF_REPO_ROOT/.gitignore" 2>/dev/null ||
+      printf '\n/.aifactory-access/\n' >> "$AIF_REPO_ROOT/.gitignore"
+  fi
 }
 
 aif_urlencode() {
@@ -3166,6 +3270,46 @@ PY
   exit 1
 }
 
+aif_validate_simple_new_scope() {
+  [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]] || return 0
+  local resource_group
+  for resource_group in "$AIF_BOOTSTRAP_RESOURCE_GROUP" \
+    "${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"; do
+    if [[ "$(az group exists --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --name "$resource_group" --output tsv | tr -d '\r')" == "true" ]]; then
+      aif_error "Simple Mode requires a fresh scale set; '$resource_group' already exists. Use Advanced Mode to inspect/resume, or choose a new prefix." >&2
+      exit 1
+    fi
+  done
+}
+
+aif_prepare_simple_integrated_subnets() {
+  local existing_file="$AIF_STATE_DIR/simple-existing-subnets.json" plan
+  az network vnet subnet list \
+    --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+    --resource-group "$AIF_HUB_RESOURCE_GROUP" \
+    --vnet-name "$AIF_HUB_VNET_NAME" \
+    --output json > "$existing_file"
+  plan="$("${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/aifactory_scaleset_config.py" \
+    --simple-mode-hub-subnets "$existing_file")"
+  AIF_SIMPLE_GATEWAY_SUBNET="$("${AIF_PYTHON[@]}" -c 'import json,sys; print(json.loads(sys.argv[1])["GatewaySubnet"])' "$plan" | tr -d '\r')"
+  AIF_SIMPLE_RESOLVER_SUBNET="$("${AIF_PYTHON[@]}" -c 'import json,sys; print(json.loads(sys.argv[1])["snet-dns-private-resolver"])' "$plan" | tr -d '\r')"
+}
+
+aif_ensure_simple_hub_artifacts() {
+  AIF_SIMPLE_COMMON_READY="true"
+  aif_prepare_hub_dns
+  aif_ensure_private_dns_policy_assignment
+  az network ip-group create \
+    --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+    --resource-group "$AIF_HUB_RESOURCE_GROUP" \
+    --name "ipg-aifactory-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}" \
+    --location "$AIF_LOCATION" \
+    --ip-addresses "$AIF_DEV_VNET_CIDR" "$AIF_VPN_CLIENT_CIDR" \
+    --tags CostCenter="$AIF_COST_CENTER" Purpose=AIFactoryAccessInventory \
+    --output none
+}
+
 aif_ensure_private_network_access() {
   local common_rg common_vnet common_subnet
   common_rg="${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"
@@ -3271,15 +3415,22 @@ aif_ensure_private_network_access() {
       --query '[].name' \
       --output tsv)
   elif [[ "$AIF_ACCESS_HUB_MODE" == "integrated" ]]; then
+    if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
+      aif_prepare_simple_integrated_subnets
+      aif_ensure_bastion_developer "$AIF_DEV_SUBSCRIPTION_ID" "$common_rg" "$common_vnet"
+      aif_ensure_simple_hub_artifacts
+    fi
     aif_ensure_hub_dns_forwarder integrated
     if [[ "$AIF_SETUP_HUB_ACCESS" == "true" ]]; then
       aif_ensure_vpn_access_hub integrated
     fi
   fi
-  aif_ensure_bastion_developer \
-    "$AIF_DEV_SUBSCRIPTION_ID" \
-    "$common_rg" \
-    "$common_vnet"
+  if [[ "${AIF_SIMPLE_MODE:-false}" != "true" ]]; then
+    aif_ensure_bastion_developer \
+      "$AIF_DEV_SUBSCRIPTION_ID" \
+      "$common_rg" \
+      "$common_vnet"
+  fi
 
   local seeding_kv_id seeding_pe_name zone_id
   seeding_kv_id="/subscriptions/$AIF_DEV_SUBSCRIPTION_ID/resourceGroups/$AIF_SEEDING_RESOURCE_GROUP/providers/Microsoft.KeyVault/vaults/$AIF_SEEDING_KEYVAULT_NAME"
@@ -3328,7 +3479,7 @@ aif_ensure_private_network_access() {
     --public-network-access Disabled \
     --output none
   aif_configure_windows_vpn_client
-  aif_success "Private VPN, peering, DNS links, and seeding Key Vault access are ready."
+  aif_success "Private access infrastructure and seeding Key Vault endpoint are ready. VPN connection is a separate user action."
 }
 
 aif_deploy_ado() {
@@ -3444,7 +3595,19 @@ aif_scaleset_main() {
   aif_require_command realpath
   [[ "$AIF_ROUTE" != "gha" ]] || aif_require_command gh
   aif_python
+  aif_simple_mode_defaults
+  if [[ "$AIF_ROUTE" == "gha" && "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
+    if ! gh auth status >/dev/null 2>&1; then
+      aif_error "GitHub CLI is not authenticated. Sign in explicitly before Create." >&2
+      exit 1
+    fi
+  fi
   aif_resolve_repo_root
+  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" && -d "$AIF_REPO_ROOT" &&
+        -n "$(find "$AIF_REPO_ROOT" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+    aif_error "Simple Mode requires a new empty target folder; existing repositories are never modified." >&2
+    exit 1
+  fi
   local state_parent="$HOME/.aifactory-create-state"
   mkdir -p "$state_parent"
   AIF_STATE_DIR="$(mktemp -d "$state_parent/run.XXXXXX")"
@@ -3458,6 +3621,7 @@ aif_scaleset_main() {
   [[ "$AIF_ROUTE" != "ado" ]] || aif_ensure_ado_auth
   aif_ensure_target_repository
   aif_sync_submodule_and_templates
+  aif_validate_simple_new_scope
   aif_register_resource_providers "$AIF_DEV_SUBSCRIPTION_ID"
   aif_use_azure_tenant
   aif_ensure_first_party_enterprise_apps

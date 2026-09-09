@@ -20,7 +20,9 @@ param(
 
     [string] $DnsZoneSubscription = $VnetSubscription,
 
-    [string] $DnsZoneResourceGroup = $VnetResourceGroup
+    [string] $DnsZoneResourceGroup = $VnetResourceGroup,
+
+    [switch] $DnsManagedByPolicy
 )
 
 $ErrorActionPreference = 'Stop'
@@ -60,6 +62,30 @@ function Invoke-AzCommand {
     if ($LASTEXITCODE -ne 0) {
         throw "$Operation failed: $($output -join [Environment]::NewLine)"
     }
+}
+
+function Wait-KeyVaultPrivateDns {
+    param([string] $HostName, [string] $ExpectedIp)
+
+    for ($attempt = 1; $attempt -le 18; $attempt++) {
+        if (Get-Command Clear-DnsClientCache -ErrorAction SilentlyContinue) {
+            Clear-DnsClientCache -ErrorAction SilentlyContinue
+        }
+        $resolvedAddresses = @()
+        try {
+            $resolvedAddresses = @([System.Net.Dns]::GetHostAddresses($HostName) |
+                ForEach-Object { $_.IPAddressToString })
+        } catch [System.Net.Sockets.SocketException] {
+            Write-Host "DNS lookup for '$HostName' is not ready: $($_.Exception.Message)"
+        }
+        Write-Host "Key Vault private DNS check $attempt/18: expected=$ExpectedIp resolved=$($resolvedAddresses -join ',')"
+        if ($resolvedAddresses -contains $ExpectedIp) {
+            Write-Host "Key Vault '$HostName' resolves to approved private endpoint IP '$ExpectedIp'."
+            return
+        }
+        Start-Sleep -Seconds 10
+    }
+    throw "Key Vault '$HostName' did not resolve to private endpoint IP '$ExpectedIp'. Have the DNS/policy owner check record provisioning, existing VNet links and the runner's DNS forwarding; this does not require granting the deployment identity access to the private DNS resource group."
 }
 
 $dnsZoneName = 'privatelink.vaultcore.azure.net'
@@ -162,7 +188,7 @@ if (-not [string]::IsNullOrWhiteSpace($privateEndpointSubnetId)) {
         $effectiveVnetSubscription = $subnetIdParts[2]
         $effectiveVnetResourceGroup = $subnetIdParts[4]
         $effectiveVnetName = $subnetIdParts[8]
-        Write-Host "Using the private endpoint VNet '$effectiveVnetSubscription/$effectiveVnetResourceGroup/$effectiveVnetName' for DNS linkage."
+        Write-Host "Private endpoint VNet: '$effectiveVnetSubscription/$effectiveVnetResourceGroup/$effectiveVnetName'."
     }
 }
 $privateEndpointNicId = @($privateEndpoint.networkInterfaces)[0].id
@@ -177,6 +203,12 @@ $privateEndpointNic = Invoke-AzJson -Operation 'Read private endpoint network in
 $privateEndpointIp = @($privateEndpointNic.ipConfigurations)[0].privateIPAddress
 if ([string]::IsNullOrWhiteSpace($privateEndpointIp)) {
     throw "Private endpoint '$privateEndpointId' has no private IP address."
+}
+
+if ($DnsManagedByPolicy) {
+    Write-Host 'Central DNS is policy-managed: no DNS subscription, zone, link, record or zone-group API access.'
+    Wait-KeyVaultPrivateDns -HostName $vaultHostName -ExpectedIp $privateEndpointIp
+    return
 }
 
 $vnet = Invoke-AzJson -Operation 'Read build-agent VNet' -Arguments @(

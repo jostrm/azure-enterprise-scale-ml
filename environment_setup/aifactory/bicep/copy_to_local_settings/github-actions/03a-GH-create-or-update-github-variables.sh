@@ -296,6 +296,7 @@ service_and_byo_vars=(
 # Repo-scoped variables to reduce env variable count (applied once per repo)
 repo_level_vars=(
   # === Global AI Factory settings ===
+  "SCALING_MODE"
   "AIFACTORY_LOCATION"
   "AIFACTORY_LOCATION_SHORT"
   "AIFACTORY_SUFFIX"
@@ -353,6 +354,7 @@ repo_level_vars=(
   "ENABLE_ADMIN_VM"
   "ADMIN_VM_SIZE"
   "CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB"
+  "ENABLE_AI_FACTORY_HUB"
   "PRIV_DNS_SUBSCRIPTION_PARAM"
   "PRIV_DNS_RESOURCE_GROUP_PARAM"
   "ENABLE_PUBLIC_GENAI_ACCESS"

@@ -8,10 +8,83 @@ The prerequisite knowledge to gain value of this readme page: foundational knowl
 
 ## Network topology - Hub & Spoke & DNS Zones
 
+### Azure VPN Client and the optional hosts inventory
+
+Connecting Azure VPN Client to Azure VPN Gateway does **not** normally require a hosts
+file. The client needs routes to the private endpoint networks and a reachable DNS
+server that can resolve the private endpoint names. Use an Azure DNS Private Resolver
+inbound endpoint, or your approved DNS forwarder, with the required private DNS zones
+linked to its VNet. Do not point a VPN client directly at Azure's `168.63.129.16`.
+
+Configure/import the VPN profile with the reachable DNS server and appropriate routes.
+With Entra ID authentication, Azure VPN Client uses NRPT; inspect
+`Get-DnsClientNrptPolicy` as well as resolution through Windows applications.
+A private endpoint being Approved does not prove DNS or VPN reachability.
+
+The Foundry-phase `101_generate_hosts_file_info` task exports two files in the
+**AI Factory hosts inventory** pipeline artifact:
+
+- `hosts.fragment.txt`: optional, reviewable IP-to-hostname mappings.
+- `private-endpoints.json`: inspected endpoint IDs, subnets, source mappings, and warnings.
+
+The generator is read-only. It scans the configured project and common resource groups,
+plus relevant endpoints in the BYO VNet resource group. It reads Azure's
+`customDnsConfigs` and each endpoint NIC's per-IP FQDN mappings, including multiple
+Foundry hostnames and ACR data endpoints. It never guesses names from salts, generates
+wildcards, edits the client's system hosts file, or changes cloud networking.
+Unapproved endpoints and ambiguous hostnames with different IPs are omitted.
+An inaccessible scope or missing mapping is reported explicitly; partial inventories
+are marked `partial` and are not proof that all resources are reachable.
+
+Prefer fixing DNS. If you temporarily use the fragment, merge only reviewed entries
+into your client's existing hosts file and remove/refresh them when endpoint IPs change.
+A hosts file fixes neither VPN routes nor firewall/RBAC restrictions, and it does not
+change server-side Foundry agent DNS. `nslookup` queries DNS rather than proving a
+hosts-file override; validate fallback entries using an application connection over VPN.
+Treat the artifact as internal infrastructure information and share it accordingly.
+
+References: [Azure VPN Client DNS and routes](https://learn.microsoft.com/en-us/azure/vpn-gateway/azure-vpn-client-optional-configurations)
+and [Private Endpoint DNS integration](https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-dns-integration).
+
 You can choose to have Private DNS Zones Centrally in HUB (recommended) or in the AIFactory spoke, in its common resource group (default):
 - Option A (Recommended to try out the AIFactory):  Run the AI Factory standalone with its own Private DNS Zone. Default behaviour, no change needed
 - Option B (Recommended for productional use): Create a policy to create the private DNS zones in your HUB, and set the AIFactory config flag `centralDnsZoneByPolicyInHub` to `true`
     - The flag `centralDnsZoneByPolicyInHub` can be seen in [this AIFactory config file:e](../../../environment_setup/aifactory/parameters/10-esml-globals-4-13_21_22.json)
+
+### Project deployment ownership with central DNS
+
+`centralDnsZoneByPolicyInHub: true` means AI Factory does not own the hub DNS;
+the customer's platform policy owns private endpoint DNS zone-group association and
+A records. The project deployment still creates the
+private endpoints, but must not create their DNS zone groups or inspect/repair the
+central zones, VNet links or A records. This applies even when the zones are in another
+subscription; the project deployment identity does not need DNS RG permissions for
+these operations. The policy identity needs its own appropriate permissions.
+
+`centralDnsZoneByPolicyInHub: false` means AI Factory owns DNS, either in its own
+AI Factory hub or in the common resource group. DNS management remains enabled
+in both of these configurations.
+
+`BYO_subnets: true` implies both BYO VNet and BYO subnets. Setting both
+`vnetResourceGroup_param` and `vnetNameFull_param` also selects a BYO VNet independently
+of that flag. For customer-owned networking, the customer/platform team must already
+provide the required DNS VNet links and forwarding. BYO settings do not override
+`centralDnsZoneByPolicyInHub` or authorize the project pipeline to repair central DNS.
+
+| DNS mode | Project pipeline behavior |
+|---|---|
+| `centralDnsZoneByPolicyInHub: true` | Creates service private endpoints; leaves DNS associations, records and links to policy/platform ownership. |
+| `centralDnsZoneByPolicyInHub: false` | Retains DNS discovery, zone/link creation and endpoint DNS association in the AI Factory-owned hub or common RG. |
+
+The ADO project tasks `02b_az_prepare_seeding_keyvault_private_dns`,
+`05a_Check if Private DNS Zones exist` and
+`69-pre-account-ensure-AISearch-private-DNS-reachable` honor this boundary, as do their
+GitHub equivalents and the Foundry/APIM Bicep endpoint modules. In policy mode, the
+seeding Key Vault preparation reads the vault/endpoint/NIC and waits for the runner
+to resolve the expected private IP, without accessing DNS ARM APIs. If resolution
+fails, fix policy provisioning, links or forwarding rather than granting the project
+identity access to the central DNS RG. Runner resolution does not prove that a
+Foundry agent's runtime network can resolve or reach the same endpoint.
 
 ## AIFactory - 4 Access modes (Hub-connected VS Standalone)
 

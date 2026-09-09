@@ -128,7 +128,7 @@ param modelFormat string = 'OpenAI'
 param modelVersion string = '2026-03-17'
 
 @description('Model SKU for the default deployment.')
-param modelSkuName string = 'GlobalStandard'
+param modelSkuName string = 'DataZoneStandard'
 
 @description('Tokens per minute capacity for the default model deployment.')
 param modelCapacity int = 30

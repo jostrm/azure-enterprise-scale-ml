@@ -44,12 +44,12 @@ param deployModel_gpt_54_mini bool = false // gpt-5.4-mini
 param default_gpt_54_mini_version string = '2026-03-17'
 param default_embedding_capacity int = 25
 param default_gpt_capacity int = 40
-param default_model_sku string = 'Standard'
+param default_model_sku string = 'DataZoneStandard'
 // GPT X
 param deployModel_gpt_X bool = false
 param modelGPTXName string = 'gpt-5.4-mini'
 param modelGPTXVersion string = '2026-03-17'
-param modelGPTXSku string = 'GlobalStandard'
+param modelGPTXSku string = 'DataZoneStandard'
 param modelGPTXCapacity int = 30
 
 var nameCleaned = toLower(replace(cognitiveName, '-', ''))

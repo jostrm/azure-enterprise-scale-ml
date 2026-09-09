@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import importlib.util
+import ipaddress
 import json
 import shutil
+import sys
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -184,7 +187,65 @@ class TestScaleSetConfiguration(unittest.TestCase):
         self.assertEqual(plan["common_pbi_subnet_cidr"], "172.16.0.128/26")
         self.assertEqual(plan["common_bastion_subnet_cidr"], "172.16.0.192/26")
         with self.assertRaises(ValueError):
-            CONFIG.subnet_plan("172.16.0.0/19")
+            CONFIG.subnet_plan("172.16.0.0/21")
+
+    def test_own_subscriptions_subnet_plan_accepts_only_canonical_ipv4(self) -> None:
+        script = (BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh").read_text(encoding="utf-8")
+        validation = script.split("aif_validate_cidr() {", 1)[1].split("<<'PY'\n", 1)[1].split("\nPY", 1)[0]
+        for cidr in ("172.16.0.0/16", "172.16.0.0/18", "172.16.0.0/19",
+                     "172.16.0.0/20", "172.16.16.0/20", "172.16.32.0/20"):
+            with self.subTest(cidr=cidr):
+                plan = CONFIG.subnet_plan(cidr)
+                network = ipaddress.ip_network(cidr)
+                subnets = [ipaddress.ip_network(value) for key, value in plan.items()
+                           if key not in {"common_vnet_cidr", "cidr_selector"}]
+                self.assertEqual(len(subnets), 4)
+                self.assertTrue(all(subnet.subnet_of(network) and subnet.prefixlen == 26
+                                    for subnet in subnets))
+                self.assertFalse(any(a.overlaps(b) for index, a in enumerate(subnets)
+                                     for b in subnets[index + 1:]))
+                with patch.object(sys, "argv", ["validate", cidr]):
+                    exec(compile(validation, str(BOOTSTRAP), "exec"), {})
+        for cidr in ("172.16.0.0/21", "172.16.0.0/24", "172.16.1.0/20",
+                     "172.16.XX.0/20", "::/20", "not-a-network"):
+            with self.subTest(cidr=cidr):
+                with self.assertRaises(ValueError):
+                    CONFIG.subnet_plan(cidr)
+                with patch.object(sys, "argv", ["validate", cidr]):
+                    with self.assertRaises((ValueError, SystemExit)):
+                        exec(compile(validation, str(BOOTSTRAP), "exec"), {})
+
+    def test_own_subscriptions_bootstrap_exports_preserve_mode(self) -> None:
+        for route in ("ado", "gha"):
+            with self.subTest(route=route), tempfile.TemporaryDirectory() as directory:
+                repo = Path(directory)
+                json_target = repo / "aifactory/variables.json"
+                json_target.parent.mkdir(parents=True)
+                json_target.write_text(
+                    '{"dev":{"scaling-mode":"own-subscriptions"},'
+                    '"stage_prod":{"scaling-mode":"own-subscriptions","custom":"keep"}}',
+                    encoding="utf-8",
+                )
+                settings = state()
+                settings["dev_vnet_cidr"] = "172.16.16.0/20"
+                if route == "ado":
+                    target = repo / "aifactory/esml-infra/azure-devops/bicep/yaml/variables/variables.yaml"
+                    target.parent.mkdir(parents=True)
+                    target.write_text('variables:\n  scaling-mode: "own-subscriptions"\n', encoding="utf-8")
+                    CONFIG.apply_ado(repo, settings)
+                    self.assertIn('common_vnet_cidr: "172.16.16.0/20"', target.read_text(encoding="utf-8"))
+                    self.assertIn('scaling-mode: "own-subscriptions"', target.read_text(encoding="utf-8"))
+                else:
+                    target = repo / ".env"
+                    target.write_text('SCALING_MODE="own-subscriptions"\n', encoding="utf-8")
+                    CONFIG.apply_gha(repo, settings)
+                    self.assertIn('COMMON_VNET_CIDR="172.16.16.0/20"', target.read_text(encoding="utf-8"))
+                    self.assertIn('SCALING_MODE="own-subscriptions"', target.read_text(encoding="utf-8"))
+                payload = json.loads(json_target.read_text(encoding="utf-8"))
+                self.assertEqual(payload["dev"]["scaling-mode"], "own-subscriptions")
+                self.assertEqual(payload["dev"]["common_vnet_cidr"], "172.16.16.0/20")
+                self.assertEqual(payload["dev"]["common_subnet_cidr"], "172.16.16.0/26")
+                self.assertEqual(payload["stage_prod"], {"scaling-mode": "own-subscriptions", "custom": "keep"})
 
     def test_private_dns_configuration_is_central_and_regional(self) -> None:
         config = DNS.configuration(
@@ -505,7 +566,8 @@ class TestScaleSetWorkflowContracts(unittest.TestCase):
         )
         self.assertIn(
             "resource privateEndpointDnsGroupAIF "
-            "'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {",
+            "'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' "
+            "= if (!centralDnsZoneByPolicyInHub) {",
             foundry_dns,
         )
 

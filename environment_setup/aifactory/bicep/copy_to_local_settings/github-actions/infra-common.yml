@@ -365,6 +365,7 @@ jobs:
 
       - name: Report final pipeline job result (offline)
         if: always()
+        continue-on-error: true
         shell: bash
         env:
           AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}
@@ -727,6 +728,7 @@ jobs:
 
       - name: Report final pipeline job result (offline)
         if: always()
+        continue-on-error: true
         shell: bash
         env:
           AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}
@@ -1090,6 +1092,7 @@ jobs:
             --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"
       - name: Report final pipeline job result (offline)
         if: always()
+        continue-on-error: true
         shell: bash
         env:
           AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}

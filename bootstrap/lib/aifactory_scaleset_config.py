@@ -11,6 +11,210 @@ from pathlib import Path
 from typing import Any
 
 
+AIF_SIMPLE_MODE_CONTRACT_VERSION = 1
+SIMPLE_MODE_PRESET_NAME = "private-ai-foundation-v1"
+# These trees must be published together; the launcher must not copy dirty PURPLE
+# files into a consumer to make an unpublished feature appear deployable.
+SIMPLE_MODE_REQUIRED_SOURCE_PATHS = ("bootstrap", "environment_setup/aifactory")
+SIMPLE_MODE_DISABLED = (
+    "enableAzureMachineLearning", "addAzureMachineLearning", "enableDatabricks",
+    "enableAIFoundryHub", "addAIFoundryHub", "enableAksForAzureML", "enableAKS",
+    "enableAFoundryCaphost", "cleanFoundryCaphost", "enableDatafactory",
+    "enableDatafactoryCommon", "enableAIServices", "enableAzureOpenAI",
+    "enableAzureAIVision", "enableAzureSpeech", "enableAIDocIntelligence",
+    "enableBing", "enableBingCustomSearch", "enableContentSafety", "enableCosmosDB",
+    "enablePostgreSQL", "enableRedisCache", "enableSQLDatabase", "enableElasticsearch",
+    "enableFunction", "enableWebApp", "enableContainerApps", "enableLogicApps",
+    "enableEventHubs", "enableBotService", "enableAppInsightsDashboard",
+    "enableDefenderforAISubLevel", "enableDefenderforAIResourceLevel",
+    "serviceSettingDeployProjectVM", "enableAdminVM", "addBastionHost",
+    "useSelfHostedBuildAgent", "enableDeleteForDisabledResources",
+    "deleteAllServicesForProject", "deleteKeyvaultAlso", "deleteAllForProject",
+    "deployModel_gpt_X", "deployModel_gpt_4", "deployModel_gpt_4o",
+    "deployModel_gpt_54_mini", "deployModel_text_embedding_ada_002",
+    "deployModel_text_embedding_3_large", "deployModel_text_embedding_3_small",
+    "ENABLE_APIM", "ENABLE_KONG",
+)
+
+
+def simple_mode_enabled(state: dict[str, Any]) -> bool:
+    return str(state.get("simple_mode", "false")).lower() == "true"
+
+
+def simple_mode_values(cost_center: str = "123456") -> dict[str, Any]:
+    """Canonical secretless Dev foundation without model deployments."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", cost_center):
+        raise ValueError("Cost center must be 1-64 letters, digits, underscores or hyphens")
+    return {
+        **{key: "false" for key in SIMPLE_MODE_DISABLED},
+        "scaling-mode": "own-subscriptions",
+        "centralDnsZoneByPolicyInHub": False,
+        "enableAIFactoryHub": True,
+        "enablePublicGenAIAccess": "false",
+        "allowPublicAccessWhenBehindVnet": "false",
+        "enablePublicAccessWithPerimeter": "false",
+        "disableLocalAuth": "true",
+        "enableAIFoundry": "true",
+        "foundryDeploymentType": "2",
+        "enableAIFactoryCreatedDefaultProjectForAIFv2": "true",
+        "disableAgentNetworkInjection": "false",
+        "enableAISearch": "true",
+        "enableAISearchSharedPrivateLink": "true",
+        "updateAIFoundry": "false",
+        "addAIFoundry": "false",
+        "addAISearch": "false",
+        "enableAMPLS": "false",
+        "cmk": "false",
+        "useCommonACR": "true",
+        "useCommonACR_override": "true",
+        "acr_SKU": "Premium",
+        "acr_adminUserEnabled": "false",
+        "skuStorageAccountDev": "Standard_LRS",
+        "admin_aiSearchTier": "standard",
+        "skuAISearchDev": "standard",
+        "admin_semanticSearchTier": "free",
+        "skuAIServicesDev": "S0",
+        "skuOpenAIDev": "S0",
+        "project_number_000": "001",
+        "tag_costceter_common": cost_center,
+        "tag_costcenter": cost_center,
+        "common_vnet_cidr": "172.16.XX.0/20",
+        "common_subnet_cidr": "172.16.XX.0/26",
+        "common_subnet_scoring_cidr": "172.16.XX.64/26",
+        "common_pbi_subnet_cidr": "172.16.XX.128/26",
+        "common_bastion_subnet_cidr": "172.16.XX.192/26",
+        "dev_cidr_range": "0",
+        "test_cidr_range": "16",
+        "prod_cidr_range": "32",
+        "network_env_dev": "dev",
+        "network_env_stage": "test",
+        "network_env_prod": "prod",
+        "GITHUB_NEW_REPO_VISIBILITY": "private",
+    }
+
+
+def simple_mode_manifest() -> dict[str, Any]:
+    """Read-only UI/CLI preview; no credentials, cloud discovery or mutations."""
+    return {
+        "contractVersion": AIF_SIMPLE_MODE_CONTRACT_VERSION,
+        "preset": SIMPLE_MODE_PRESET_NAME,
+        "requiredSourcePaths": list(SIMPLE_MODE_REQUIRED_SOURCE_PATHS),
+        "environment": "dev",
+        "futureEnvironments": ["stage", "prod"],
+        "futureSubscriptionReferences": "Dev placeholders only; configure before future use",
+        "limitations": [
+            "No model deployments or agent capability host; add these after quota validation",
+            "AMPLS is disabled: canonical Application Insights/Log Analytics networking is not private-only",
+            "Azure/GitHub sign-in and region availability must be validated before deployment",
+        ],
+        "configuration": simple_mode_values(),
+        "services": {
+            "Foundry": "S0 account and project; no model or agent capability host",
+            "AI Search": "standard",
+            "Storage": "Standard_LRS",
+            "Key Vault": "standard",
+            "Application Insights": "workspace-based",
+            "Log Analytics": "PerGB2018",
+            "Common Container Registry": "Premium (private-link requirement)",
+        },
+        "hub": {
+            "mode": "standalone-integrated",
+            "vpnGateway": "VpnGw1AZ (billable), Entra-authenticated P2S",
+            "bastion": "Developer; fail if unavailable, no paid fallback",
+            "adminVM": False,
+            "dns": "private zones, links and DNS Private Resolver inbound endpoint (billable)",
+            "policy": "private DNS initiative assigned to the Dev subscription",
+            "ipGroup": "Dev VNet and VPN client pool; inventory, not firewall enforcement",
+            "vpnClient": "profile artifact only; manual install/import/connect",
+        },
+        "deploymentIdentityRoles": ["Contributor", "User Access Administrator",
+                                    "Key Vault Secrets User"],
+        "policyIdentityRoles": ["Network Contributor (Dev subscription)"],
+    }
+
+
+def simple_mode_hub_subnets(cidr: str, existing: list[dict[str, Any]]) -> dict[str, str]:
+    """Reserve both low-address blocks before either is created; never move subnets."""
+    network = ipaddress.ip_network(cidr, strict=True)
+    if str(network) != "172.16.0.0/20":
+        raise ValueError("Simple Mode contract v1 requires Dev VNet 172.16.0.0/20")
+    planned = {"GatewaySubnet": "172.16.1.0/27",
+               "snet-dns-private-resolver": "172.16.1.32/28"}
+    for subnet in existing:
+        name = subnet["name"]
+        prefixes = subnet.get("addressPrefixes") or [subnet.get("addressPrefix")]
+        if name in planned and prefixes != [planned[name]]:
+            raise ValueError(f"{name} already has another range; use Advanced Mode or a fresh scale set")
+        for prefix in prefixes:
+            allocated = ipaddress.ip_network(prefix, strict=True)
+            if not allocated.subnet_of(network):
+                raise ValueError("Existing subnet is outside the Simple Mode Dev VNet")
+            for planned_name, planned_prefix in planned.items():
+                if name != planned_name and allocated.overlaps(ipaddress.ip_network(planned_prefix)):
+                    raise ValueError(f"{name} overlaps reserved {planned_name}; use a fresh scale set")
+    occupied = [ipaddress.ip_network(value) for value in planned.values()]
+    occupied.extend(ipaddress.ip_network(prefix) for subnet in existing
+                    for prefix in (subnet.get("addressPrefixes") or [subnet.get("addressPrefix")]))
+    cursor = max(int(subnet.broadcast_address) for subnet in occupied) + 1
+    # subnetCalc_v2 appends largest-first after the highest subnet. Account for
+    # alignment, not just the total address budget.
+    for prefix in (23, 23, 24, 25, 26, 26, 26, 27):
+        size = 1 << (32 - prefix)
+        cursor = ((cursor + size - 1) // size) * size + size
+    if cursor - 1 > int(network.broadcast_address):
+        raise ValueError("Existing subnets leave no room for the full Simple Mode project; use a fresh scale set")
+    return planned
+
+
+def verify_simple_mode_source(expected_root: Path, checkout_root: Path) -> None:
+    """Reject an old or divergent checkout before any Azure resources are changed."""
+    relative_helper = Path("bootstrap/lib/aifactory_scaleset_config.py")
+    helper = checkout_root / relative_helper
+    if not helper.is_file() or not re.search(
+        rf"^AIF_SIMPLE_MODE_CONTRACT_VERSION = {AIF_SIMPLE_MODE_CONTRACT_VERSION}$",
+        helper.read_text(encoding="utf-8-sig"), re.MULTILINE,
+    ):
+        raise ValueError("Published accelerator lacks Simple Mode contract v1; publish PURPLE first")
+    for relative_tree in SIMPLE_MODE_REQUIRED_SOURCE_PATHS:
+        for source in (expected_root / relative_tree).rglob("*"):
+            if not source.is_file() or "__pycache__" in source.parts or source.suffix == ".pyc":
+                continue
+            relative = source.relative_to(expected_root)
+            target = checkout_root / relative
+            if not target.is_file() or source.read_bytes().replace(b"\r\n", b"\n") != target.read_bytes().replace(b"\r\n", b"\n"):
+                raise ValueError(f"Published accelerator differs at {relative}; publish required PURPLE source first")
+
+
+def simple_mode_env_values(values: dict[str, Any]) -> dict[str, Any]:
+    """Reuse the authoritative workflow bindings rather than invent casing aliases."""
+    source_root = Path(__file__).resolve().parents[2]
+    workflow_root = source_root / "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions"
+    aliases: dict[str, set[str]] = {}
+    for name in ("infra-common.yml", "infra-project-phase.yml"):
+        for line in (workflow_root / name).read_text(encoding="utf-8-sig").splitlines():
+            match = re.match(r"^\s{6}(\w+):\s+[\"']?\$\{\{", line)
+            if match:
+                aliases.setdefault(match[1], set()).update(re.findall(r"vars\.([A-Z][A-Z0-9_]*)", line))
+    result = {alias: value for key, value in values.items() for alias in aliases.get(key, ())}
+    result.update({
+        "SCALING_MODE": values["scaling-mode"],
+        "ENABLE_AI_FACTORY_HUB": values["enableAIFactoryHub"],
+        "TAG_COSTCETER_COMMON": values["tag_costceter_common"],
+        "TAG_COSTCENTER": values["tag_costcenter"],
+        "AISEARCH_SEMANTIC_TIER": values["admin_semanticSearchTier"],
+        "ADMIN_SEMANTIC_SEARCH_TIER": values["admin_semanticSearchTier"],
+        "ENABLE_AMPLS": values["enableAMPLS"],
+        "ENABLE_APIM": "false", "ENABLE_KONG": "false",
+        "SERVICE_SETTING_DEPLOY_PROJECT_VM": "false",
+        "DEV_CIDR_RANGE": values["dev_cidr_range"],
+        "STAGE_CIDR_RANGE": values["test_cidr_range"],
+        "PROD_CIDR_RANGE": values["prod_cidr_range"],
+        "DEV_NETWORK_ENV": "dev", "STAGE_NETWORK_ENV": "test", "PROD_NETWORK_ENV": "prod",
+        "GITHUB_NEW_REPO_VISIBILITY": "private",
+    })
+    return result
+
+
 YAML_ASSIGNMENT = re.compile(
     r"^(?P<indent>\s{2})(?P<key>[A-Za-z_][A-Za-z0-9_-]*):(?P<spacing>\s*)(?P<rest>.*)$"
 )
@@ -213,8 +417,8 @@ def subnet_plan(cidr: str) -> dict[str, str]:
     network = ipaddress.ip_network(cidr, strict=True)
     if network.version != 4:
         raise ValueError("Only IPv4 CIDR ranges are supported")
-    if network.prefixlen > 18:
-        raise ValueError("The AI Factory vNet must be /18 or larger; /16 is recommended")
+    if network.prefixlen > 20:
+        raise ValueError("The AI Factory vNet must be /20 or larger; /16 is recommended")
 
     subnets = list(network.subnets(new_prefix=26))
     if len(subnets) < 4:
@@ -237,7 +441,7 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
     self_hosted = state.get("runner_mode") == "self-hosted"
     enable_admin_vm = self_hosted or state["add_bastion"] == "true"
     lake_prefix = re.sub(r"[^a-z0-9]", "", state["prefix"].lower())[:8]
-    return {
+    values = {
         "admin_location": state["location"],
         "admin_locationSuffix": state["location_short"],
         "admin_aifactoryPrefixRG": state["prefix"],
@@ -293,6 +497,20 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
         "groups_project_members_genai_1": ",".join([group_id] * 5),
         "groups_coreteam_members": ",".join([group_id] * 3),
     }
+    if state.get("cost_center"):
+        values.update({"tag_costceter_common": state["cost_center"], "tag_costcenter": state["cost_center"]})
+    if simple_mode_enabled(state):
+        if state["dev_vnet_cidr"] != "172.16.0.0/20":
+            raise ValueError("Simple Mode contract v1 requires Dev VNet 172.16.0.0/20")
+        values.update(simple_mode_values(state.get("cost_center") or "123456"))
+        values["technical_admins_email"] = state.get("team_member_email") or state["team_group_name"]
+        # GHA passes tags directly to ARM, so resolve the cost center rather than
+        # exporting ADO's $(...) expressions into GitHub Actions.
+        tags = {"CostCenter": values["tag_costcenter"], "AIF-Scaleset": state["scaleset_suffix"],
+                "AIF-Environment": "dev", "AIF-Project Owners": values["technical_admins_email"]}
+        values["tags"] = json.dumps({**tags, "Description": "AI Factory common"})
+        values["tagsProject"] = json.dumps({**tags, "AIFactory project": "001"})
+    return values
 
 
 def apply_ado(repo_root: Path, state: dict[str, Any]) -> None:
@@ -407,17 +625,37 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         "COMMON_PBI_SUBNET_CIDR": plan["common_pbi_subnet_cidr"],
         "COMMON_BASTION_SUBNET_CIDR": plan["common_bastion_subnet_cidr"],
     }
+    if simple_mode_enabled(state):
+        env_values.update(simple_mode_env_values(common))
+        env_values["TAGS"] = common["tags"]
+        env_values["TAGS_PROJECT"] = common["tagsProject"]
+        env_values["PROJECT_MEMBERS_EMAILS"] = common["technical_admins_email"]
     update_env(env_path, env_values)
     update_json(json_path, common)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--route", choices=("ado", "gha"), required=True)
-    parser.add_argument("--repo-root", type=Path, required=True)
-    parser.add_argument("--state-file", type=Path, required=True)
+    parser.add_argument("--simple-mode-manifest", action="store_true")
+    parser.add_argument("--verify-simple-mode-source", type=Path)
+    parser.add_argument("--simple-mode-hub-subnets", type=Path)
+    parser.add_argument("--route", choices=("ado", "gha"))
+    parser.add_argument("--repo-root", type=Path)
+    parser.add_argument("--state-file", type=Path)
     args = parser.parse_args()
 
+    if args.simple_mode_manifest:
+        print(json.dumps(simple_mode_manifest(), indent=2))
+        return 0
+    if args.verify_simple_mode_source:
+        verify_simple_mode_source(Path(__file__).resolve().parents[2], args.verify_simple_mode_source)
+        return 0
+    if args.simple_mode_hub_subnets:
+        existing = json.loads(args.simple_mode_hub_subnets.read_text(encoding="utf-8-sig"))
+        print(json.dumps(simple_mode_hub_subnets("172.16.0.0/20", existing)))
+        return 0
+    if not all((args.route, args.repo_root, args.state_file)):
+        parser.error("--route, --repo-root and --state-file are required")
     state = json.loads(args.state_file.read_text(encoding="utf-8"))
     if args.route == "ado":
         apply_ado(args.repo_root, state)
