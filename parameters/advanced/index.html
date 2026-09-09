@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/logo.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -630,6 +630,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#maui-simple-mode-bootstrap-contract-v2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MAUI Simple Mode bootstrap contract v2
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MAUI Simple Mode bootstrap contract v2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-private-https-application-gateway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required private HTTPS Application Gateway
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#group-1-github-bootstrap" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -854,6 +882,17 @@
     <span class="md-ellipsis">
       
         Group 21 — BYO Subnets &amp; VNet Overrides
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hub-configuration-intent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hub configuration intent
       
     </span>
   </a>
@@ -1552,6 +1591,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#maui-simple-mode-bootstrap-contract-v2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MAUI Simple Mode bootstrap contract v2
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MAUI Simple Mode bootstrap contract v2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required-private-https-application-gateway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required private HTTPS Application Gateway
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#group-1-github-bootstrap" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1782,6 +1849,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#hub-configuration-intent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hub configuration intent
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1812,6 +1890,188 @@
 <li>Source file: <code>environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/.env.template</code></li>
 </ul>
 </div>
+<hr />
+<h2 id="maui-simple-mode-bootstrap-contract-v2">MAUI Simple Mode bootstrap contract v2<a class="headerlink" href="#maui-simple-mode-bootstrap-contract-v2" title="Permanent link">&para;</a></h2>
+<p>Simple Mode is an explicit <code>AIF_SIMPLE_MODE=true</code> opt-in to the existing root
+<code>GHA-create-new-aifactory-scaleset.sh</code> entrypoint, not an alternative deployment
+engine. Invoke it with <code>--non-interactive --yes --repo-root &lt;new-empty-folder&gt;</code>.
+Default waiting is required: common deployment must finish, then bootstrap
+configures private access, deploys project <code>001</code>, then deploys and health-checks
+the private Application Gateway. Do not use <code>--no-wait</code>,
+<code>--prepare-only</code>, or the full bootstrap's <code>--dry-run</code> as a Simple Mode preview.
+The <strong>offline, read-only</strong> preview is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python bootstrap/lib/aifactory_scaleset_config.py --simple-mode-manifest
+</code></pre></div>
+<p>Required inputs are <code>AIF_TENANT_ID</code>, <code>AIF_DEV_SUBSCRIPTION_ID</code>, <code>AIF_LOCATION</code>,
+<code>AIF_PREFIX</code> (2–16 lowercase letters/digits/hyphens), <code>GITHUB_REPOSITORY</code>
+(<code>owner/repo</code>), and <code>AIF_TEAM_MEMBER_EMAIL</code> (derived from the authenticated user).
+<code>AIF_TEAM_GROUP_NAME</code> can be derived; <code>AIF_SCALESET_SUFFIX</code> defaults to <code>001</code>.
+The launcher must use existing Azure/GitHub authentication: missing sign-in
+fails without opening a login browser. <code>GITHUB_REPOSITORY_VISIBILITY=private|public</code>
+defaults to <strong>private</strong>, independently of Azure networking. An absent repository
+is created with that visibility. An existing repository must be empty and have
+the requested visibility; its visibility is never changed automatically.
+No password, PAT, or service-principal secret is requested.</p>
+<p>For a public repository, generated code and non-secret configuration metadata
+may be public. Persistent <code>.gitignore</code> exclusions protect <code>.env</code> files,
+<code>variables*.json</code>/YAML snapshots and backups, certificate/private-key files,
+and VPN artifacts before staging. Populated deployment JSON is sent as a
+GitHub environment secret, not committed. Review any additional files before
+publishing; these exclusions do not sanitize arbitrary user-authored content.</p>
+<p>Fixed bootstrap inputs are <code>AIF_NETWORK_MODE=priv</code>, <code>AIF_TOPOLOGY=s</code>,
+<code>AIF_ACCESS_HUB_MODE=i</code>, <code>AIF_IDENTITY_MODE=c</code>, <code>AIF_SEEDING_MODE=c</code>,
+<code>AIF_SEED_PROJECT_SP=false</code>, <code>AIF_SETUP_HUB_ACCESS=true</code>,
+<code>AIF_CONFIGURE_VPN_CLIENT=false</code>, <code>AIF_DEV_VNET_CIDR=172.16.0.0/20</code>, and
+<code>AIF_PROJECT_NUMBER=001</code>. <code>AIF_COST_CENTER=123456</code> is the default for both common
+and project tags (canonical aliases <code>tag_costceter_common</code> / <code>TAG_COSTCETER_COMMON</code>
+and <code>tag_costcenter</code> / <code>TAG_COSTCENTER</code>).</p>
+<p>The named <strong>private-ai-foundation-v2</strong> preset writes <code>scaling-mode=own-subscriptions</code>,
+<code>enableAIFactoryHub=true</code> / <code>ENABLE_AI_FACTORY_HUB=true</code>,
+<code>centralDnsZoneByPolicyInHub=false</code>, and all three public-access flags false.
+Its literal <code>SIMPLE_MODE_RESOURCE_CATALOG</code> (manifest <code>resourceCatalog</code>) has three sections:</p>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Required resources</th>
+<th>Default-selected optional resources</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hub</td>
+<td>Integrated VNet, Application Gateway WAF_v2, VPN/P2S, Bastion Developer, private DNS/resolver/policy/IP-group</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Common</td>
+<td>LRS Storage, standard common/seeding Key Vaults, Premium ACR, PerGB2018 Log Analytics, deployment identity/OIDC/team</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Project</td>
+<td>LRS Storage, standard Key Vault, managed identities</td>
+<td>Foundry S0 account/project, AI Search standard, Application Insights</td>
+</tr>
+</tbody>
+</table>
+<p><code>AIF_SIMPLE_PROJECT_RESOURCES_JSON</code> defaults to
+<code>["foundry","ai-search","application-insights"]</code>. An explicit <code>[]</code> disables
+all three optional project resources; storage, Key Vault and managed identities
+remain locked on. Catalog entries contain <code>id</code>, <code>label</code>, <code>description</code>,
+<code>required</code>, <code>default_selected</code>, and <code>dependencies</code>. Application Insights depends
+on the required <strong>common</strong> Log Analytics workspace; it has a separate
+<code>enableApplicationInsights</code> / <code>ENABLE_APPLICATION_INSIGHTS</code> toggle.
+Foundry/Search shared private links are enabled only when both are selected.
+Optional ML/Databricks/legacy Foundry
+Hub, databases, application hosting, model deployments and agent capability
+hosts are disabled; temporary ML/Databricks bootstrap workspaces are not created.
+This is a private foundation, <strong>not a preloaded model or runnable agent demo</strong>.
+Regional service availability and subscription limits still apply.
+AMPLS remains disabled: the canonical Application Insights and Log Analytics
+telemetry endpoints are <strong>not guaranteed private-only</strong> by these three flags.
+Use Advanced Mode to configure private monitoring.</p>
+<p>The integrated access hub adds billable <strong>VpnGw1AZ</strong>, a Standard public IP
+for VPN transport (not public Azure service access),
+billable DNS Private Resolver inbound endpoint, private DNS zones/links,
+a private-DNS initiative assigned to the Dev subscription, and an IP group
+listing the Dev VNet and VPN pool (inventory, not firewall enforcement).
+Bastion <strong>Developer</strong> is created only where available; failure stops the chain
+without silently selecting a paid SKU. <strong>No admin VM is created.</strong>
+GatewaySubnet <code>172.16.1.0/27</code>, resolver subnet <code>172.16.1.32/28</code>, and dedicated
+Application Gateway subnet <code>172.16.2.0/24</code> are reserved before project allocation.
+The dedicated gateway subnet is delegated to <code>Microsoft.Network/applicationGateways</code>.
+The full project profile still fits in the /20, starting at aligned <code>172.16.4.0/23</code>.
+Existing conflicting allocations
+are rejected, never moved or deleted. The VPN profile is saved to the git-ignored
+<code>.aifactory-access/azurevpnconfig.xml</code>; the user installs/imports/connects
+manually. Do not publish this connection artifact.</p>
+<h3 id="required-private-https-application-gateway">Required private HTTPS Application Gateway<a class="headerlink" href="#required-private-https-application-gateway" title="Permanent link">&para;</a></h3>
+<p>Three additional inputs are mandatory before execution; a preview can show them
+as blockers, but no empty gateway or self-signed certificate is substituted:</p>
+<table>
+<thead>
+<tr>
+<th>Environment variable</th>
+<th>API field</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AIF_APP_GATEWAY_HOSTNAME</code></td>
+<td><code>app_gateway_hostname</code></td>
+<td>Custom frontend FQDN covered by the certificate DNS SAN</td>
+</tr>
+<tr>
+<td><code>AIF_APP_GATEWAY_BACKEND_FQDN</code></td>
+<td><code>app_gateway_backend_fqdn</code></td>
+<td>Distinct private RFC1918 HTTPS backend, reachable from the new VNet, trusted TLS certificate, unauthenticated <code>GET /</code> returning 200–399</td>
+</tr>
+<tr>
+<td><code>AIF_APP_GATEWAY_CERT_SECRET_ID</code></td>
+<td><code>app_gateway_certificate_secret_id</code></td>
+<td>Versionless <code>https://&lt;vault&gt;.vault.azure.net/secrets/&lt;name&gt;</code> URI of an existing valid, enabled, exportable PFX certificate in an RBAC-enabled Dev-subscription vault</td>
+</tr>
+</tbody>
+</table>
+<p>The certificate URI is a reference, not a secret value. Read-only preflight
+checks the selected subscription/tenant, vault, certificate metadata/SAN/expiry,
+and an already <strong>Registered</strong> <code>Microsoft.Network/EnableApplicationGatewayNetworkIsolation</code>
+feature. The caller needs certificate metadata read access and permission to
+create the private endpoint and scoped role assignment on that existing vault.
+No feature registration, certificate creation or modification of the existing
+vault's network settings is automatic. Bootstrap reads metadata, never secret
+values; Application Gateway subsequently resolves the certificate reference
+using its managed identity.</p>
+<p>The gateway uses <strong>WAF_v2</strong>, WAF Prevention, TLS 1.2+, HTTPS only, autoscale
+minimum 1 / maximum 2, private frontend <strong>172.16.2.10</strong>, and no public IP.
+Its dedicated managed identity receives Key Vault Secrets User only at the
+certificate vault, reached through an approved private endpoint and private DNS.
+An exact-host private DNS zone with an apex A record avoids shadowing the
+backend's parent DNS zone. The subnet NSG permits private HTTPS egress and DNS,
+then denies other outbound traffic: public backend DNS resolution cannot cause
+a public-route fallback. The frontend accepts Dev/VPN traffic only.</p>
+<p>The gateway is finalized after the project workflow. Completion requires a
+healthy backend probe; provisioned-but-unhealthy is <strong>not</strong> successful completion.
+Failed runs may leave billable resources; automatic rollback/deletion is not
+performed. This foundation does not create an application backend or certificate
+for you; prepare these prerequisites or use Advanced Mode.</p>
+<p>Only the supplied <strong>Dev subscription</strong> is deployed. The peerable future network
+templates use <code>172.16.XX.0/20</code>, four common /26s, and selectors Dev=0,
+Stage=16, Prod=32. Stage/Prod subscription IDs remain Dev reference placeholders;
+this creates <strong>neither subscriptions nor Stage/Prod environments</strong>. Configure
+those references explicitly before any future deployment.</p>
+<p>The deployment managed identity receives Contributor and User Access
+Administrator on Dev, plus Key Vault Secrets User on the seeding vault.
+The DNS-policy identity receives Network Contributor on Dev.
+The interactive user needs corresponding Azure role-assignment permissions and
+Entra group creation/membership permissions. The seeding vault is created
+without project-SP credentials, then private endpoint access is configured.</p>
+<p>Before enabling Create, the launcher must verify that required PURPLE source
+under <strong><code>bootstrap</code> and <code>environment_setup/aifactory</code> is committed and published</strong>
+on the selected release branch. It must supply the verified 40-character commit
+SHA as <code>AIF_SUBMODULE_REF</code>; bootstrap fetches that exact commit, checks out
+detached HEAD, and verifies HEAD before using the templates. A branch advancing
+after preview therefore cannot silently change the deployment source.
+The fetched accelerator is checked for
+<code>AIF_SIMPLE_MODE_CONTRACT_VERSION=2</code> and matching source content before Azure
+resource mutations. A local, unpublished fix is not deployable by remote
+GitHub Actions. Never copy dirty PURPLE files into a consumer submodule.
+The pure helper exposes <code>simple_mode_manifest_sha256()</code> (sorted compact JSON)
+and <code>simple_mode_source_sha256()</code> (sorted paths and LF-normalized content) for
+binding a preview/confirmation to immutable preset and source fingerprints.
+For machine-safe progress, the Simple Mode script emits only these stage
+records: <code>AIF_SIMPLE_STAGE=preflight</code>, <code>repository</code>, <code>identity</code>, <code>common</code>, <code>hub</code>,
+<code>project</code>, and <code>completed</code> (each value has the same <code>AIF_SIMPLE_STAGE=</code> prefix).
+The API should persist only exact allowlisted records, not raw CLI output or
+error text. Completion is emitted only after the waited project workflow and
+Application Gateway health verification succeed; failed runs retain their last
+stage. On Windows, Git Bash can use
+the native Azure CLI installation's <code>az.cmd</code> from PATH, including child Bash
+scripts, without creating a shim file.
+Existing advanced bootstrap settings remain unchanged unless Simple Mode is
+explicitly selected.</p>
 <hr />
 <h2 id="group-1-github-bootstrap">Group 1 — GitHub Bootstrap<a class="headerlink" href="#group-1-github-bootstrap" title="Permanent link">&para;</a></h2>
 <table>
@@ -2413,6 +2673,13 @@
 <td>O</td>
 <td>keep-as-is. <strong>otherwise</strong> <code>true</code> if a hub manages all private DNS zones centrally</td>
 <td>Use central hub private DNS instead of per-spoke DNS zones</td>
+</tr>
+<tr>
+<td><code>ENABLE_AI_FACTORY_HUB</code></td>
+<td><code>false</code></td>
+<td>O</td>
+<td>Configuration intent only; central DNS true takes precedence</td>
+<td>Standalone with own Hub when true and central DNS is false; does not deploy resources</td>
 </tr>
 <tr>
 <td><code>PRIV_DNS_SUBSCRIPTION_PARAM</code></td>
@@ -3062,24 +3329,24 @@
 </tr>
 <tr>
 <td><code>MODEL_GPTX_NAME</code></td>
-<td><code>gpt-5-mini</code></td>
+<td><code>gpt-5.4-mini</code></td>
 <td>O</td>
 <td>keep-as-is</td>
 <td>Custom model name (used when <code>DEPLOY_MODEL_GPT_X=true</code>)</td>
 </tr>
 <tr>
 <td><code>MODEL_GPTX_VERSION</code></td>
-<td><code>""</code></td>
+<td><code>2026-03-17</code></td>
 <td>O</td>
-<td>keep-as-is (empty = latest available)</td>
-<td>Custom model version</td>
+<td>Update together with the model name</td>
+<td>Pinned custom model version</td>
 </tr>
 <tr>
 <td><code>MODEL_GPTX_SKU</code></td>
 <td><code>DataZoneStandard</code></td>
 <td>O</td>
-<td>keep-as-is</td>
-<td>Custom model SKU</td>
+<td>keep-as-is (data-zone processing)</td>
+<td>Custom model SKU; confirm model/SKU availability and subscription quota</td>
 </tr>
 <tr>
 <td><code>MODEL_GPTX_CAPACITY</code></td>
@@ -3090,10 +3357,10 @@
 </tr>
 <tr>
 <td><code>DEFAULT_MODEL_SKU</code></td>
-<td><code>Standard</code></td>
+<td><code>DataZoneStandard</code></td>
 <td>O</td>
-<td>keep-as-is</td>
-<td>Default SKU for all model deployments</td>
+<td>keep-as-is (data-zone processing)</td>
+<td>Default SKU for all model deployments; confirm model/SKU availability and subscription quota</td>
 </tr>
 </tbody>
 </table>
@@ -3324,6 +3591,14 @@
 <p>All parameters above map directly to variables in:
 <code>environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/.env.template</code></p>
 </div>
+<h2 id="hub-configuration-intent">Hub configuration intent<a class="headerlink" href="#hub-configuration-intent" title="Permanent link">&para;</a></h2>
+<p><code>centralDnsZoneByPolicyInHub</code> and <code>enableAIFactoryHub</code> default to false in the
+canonical templates. Both false means Standalone; DNS false and own Hub true
+means Standalone with own Hub; DNS true means external Hub. Imported true/true
+pairs are preserved, with external Hub authoritative. These are configuration
+intent, not a deployment command. YAML uses <code>variables.enableAIFactoryHub</code>,
+JSON uses <code>dev.enableAIFactoryHub</code> (or an existing <code>stage_prod</code> override), and
+GitHub <code>.env</code> uses <code>ENABLE_AI_FACTORY_HUB</code>. No new <code>stage_prod</code> baseline is required.</p>
 
 
 
@@ -3411,7 +3686,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

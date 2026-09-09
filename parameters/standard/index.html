@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/logo.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1823,8 +1823,26 @@
 <tr>
 <td><code>ENABLE_AI_FOUNDRY</code></td>
 <td><code>true</code></td>
-<td><strong>recommended</strong> keep <code>true</code> for enterprise-grade private networking</td>
-<td>Deploy AI Foundry Hub and default project with private endpoints</td>
+<td><strong>required</strong> for the standard private Foundry baseline</td>
+<td>Deploy the Foundry account and default project with private endpoints</td>
+</tr>
+<tr>
+<td><code>ENABLE_FOUNDRY_CAPHOST</code></td>
+<td><code>true</code></td>
+<td><strong>required; cannot be disabled</strong> for this standard private-agent architecture</td>
+<td>Bind the project capability host to Storage, AI Search, and Cosmos DB</td>
+</tr>
+<tr>
+<td><code>ENABLE_AI_SEARCH</code></td>
+<td><code>true</code></td>
+<td><strong>required</strong> with private Foundry capability host</td>
+<td>Capability-host vector-store connection</td>
+</tr>
+<tr>
+<td><code>ENABLE_COSMOS_DB</code></td>
+<td><code>true</code></td>
+<td><strong>required</strong> with private Foundry capability host</td>
+<td>Capability-host thread and agent-history store</td>
 </tr>
 <tr>
 <td><code>ADMIN_AI_SEARCH_TIER</code></td>
@@ -1840,14 +1858,15 @@
 </tr>
 </tbody>
 </table>
+<p>This requirement is specific to the AI Factory's standard private-agent/BYO data-resource architecture. Microsoft documents the project capability host with <code>storageConnections</code>, <code>vectorStoreConnections</code> (AI Search), and <code>threadStorageConnections</code> (Cosmos DB). Capability hosts are not required for every unrelated Foundry or hosted-agent architecture. See <a href="https://learn.microsoft.com/azure/foundry/agents/concepts/capability-hosts">Foundry capability hosts</a> and <a href="https://learn.microsoft.com/azure/foundry/agents/how-to/use-your-own-resources">Use your own resources</a>.</p>
 <hr />
 <div class="admonition success">
 <p class="admonition-title">That's all you need for a first deployment</p>
-<p>Once Groups 1–7 are filled in, run the pipeline. The AI Factory calculates networking, deploys all Bicep modules, and configures RBAC automatically — producing a working <strong>AI Foundry + AI Search + private networking</strong> baseline in ~10 minutes.</p>
+<p>Once Groups 1–7 are filled in, run the pipeline. The AI Factory calculates networking, deploys all Bicep modules, and configures RBAC automatically — producing a working <strong>private Foundry + capability host + Storage + AI Search + Cosmos DB</strong> baseline.</p>
 </div>
 <div class="admonition info">
 <p class="admonition-title">Want to enable more services?</p>
-<p>All optional services (Cosmos DB, AKS, Container Apps, ML Studio, Databricks, models, BYO networking, etc.) are in <a href="../advanced/">Advanced Mode</a>.</p>
+<p>Other optional services (AKS, Container Apps, ML Studio, Databricks, models, BYO networking, etc.) are in <a href="../advanced/">Advanced Mode</a>. Cosmos DB is part of the required private Foundry capability-host bundle, not an optional database in this architecture.</p>
 </div>
 
 
@@ -1936,7 +1955,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
