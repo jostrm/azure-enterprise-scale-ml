@@ -37,6 +37,9 @@ Common non-interactive variables:
   AIF_PROJECT_NUMBER=001
   AIF_TEAM_GROUP_NAME=acme-ai-prj001-team
   AIF_TEAM_MEMBER_EMAIL=jostrm@microsoft.com
+  AIF_TEAM_GROUP_ID=<existing-group-object-id>
+  AIF_AZURE_ML_PRINCIPAL_ID=<existing-enterprise-app-object-id>
+  AIF_DATABRICKS_PRINCIPAL_ID=<existing-enterprise-app-object-id>
   AIF_ADMIN_VM_SIZE=Standard_D2s_v5
   AIF_SETUP_HUB_ACCESS=y|n
   AIF_CONFIGURE_VPN_CLIENT=y|n
@@ -374,6 +377,9 @@ aif_collect_answers() {
   AIF_PROJECT_NUMBER="${AIF_PROJECT_NUMBER:-}"
   AIF_TEAM_GROUP_NAME="${AIF_TEAM_GROUP_NAME:-}"
   AIF_TEAM_MEMBER_EMAIL="${AIF_TEAM_MEMBER_EMAIL:-}"
+  AIF_TEAM_GROUP_ID="${AIF_TEAM_GROUP_ID:-}"
+  AIF_AZURE_ML_PRINCIPAL_ID="${AIF_AZURE_ML_PRINCIPAL_ID:-}"
+  AIF_DATABRICKS_PRINCIPAL_ID="${AIF_DATABRICKS_PRINCIPAL_ID:-}"
   AIF_IP_ALLOWLIST="${AIF_IP_ALLOWLIST:-}"
   AIF_ACCESS_HUB_MODE="${AIF_ACCESS_HUB_MODE:-}"
   AIF_ACCESS_HUB_SUBSCRIPTION_ID="${AIF_ACCESS_HUB_SUBSCRIPTION_ID:-}"
@@ -869,6 +875,16 @@ aif_ensure_first_party_enterprise_apps() {
     aif_info "Simple Mode disables ML/Databricks/legacy Foundry Hub; no temporary workspaces or first-party apps are needed."
     return 0
   fi
+  if [[ -n "$AIF_AZURE_ML_PRINCIPAL_ID" ||
+        -n "$AIF_DATABRICKS_PRINCIPAL_ID" ]]; then
+    if ! aif_validate_guid "$AIF_AZURE_ML_PRINCIPAL_ID" ||
+       ! aif_validate_guid "$AIF_DATABRICKS_PRINCIPAL_ID"; then
+      aif_error "Provide both existing Azure ML and Databricks enterprise-app object IDs as GUIDs." >&2
+      exit 1
+    fi
+    aif_success "Using supplied Azure ML and Databricks enterprise-app object IDs; redundant Graph discovery was skipped."
+    return 0
+  fi
   local aml_app_id="0736f41a-0425-4b46-bdb5-1563eff02385"
   local databricks_app_id="2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"
   AIF_AZURE_ML_PRINCIPAL_ID="$(az ad sp show \
@@ -939,7 +955,7 @@ with open(sys.argv[1], "w", encoding="utf-8") as output:
     json.dump(
         {
             "location": sys.argv[2],
-            "sku": {"name": "standard"},
+            "sku": {"name": "premium"},
             "properties": {
                 "managedResourceGroupId": sys.argv[3],
                 "publicNetworkAccess": "Enabled",
@@ -1379,6 +1395,14 @@ aif_ensure_seeding_keyvault() {
 
 aif_ensure_team_group() {
   aif_section "11 / Entra team"
+  if [[ -n "$AIF_TEAM_GROUP_ID" ]]; then
+    if ! aif_validate_guid "$AIF_TEAM_GROUP_ID"; then
+      aif_error "AIF_TEAM_GROUP_ID must be an existing Entra group object-ID GUID." >&2
+      exit 1
+    fi
+    aif_success "Using supplied Entra team group '$AIF_TEAM_GROUP_ID'; redundant Graph discovery and membership mutation were skipped."
+    return 0
+  fi
   if [[ "$AIF_DRY_RUN" == "true" ]]; then
     AIF_TEAM_GROUP_ID="00000000-0000-0000-0000-000000000004"
     aif_info "DRY-RUN: create/verify group '$AIF_TEAM_GROUP_NAME' and add '$AIF_TEAM_MEMBER_EMAIL'."

@@ -148,6 +148,27 @@ class TestAllScaleSetDispatcher(unittest.TestCase):
             config,
         )
 
+    def test_rerun_can_reuse_existing_entra_object_ids(self) -> None:
+        shared = SHARED.read_text(encoding="utf-8")
+        self.assertIn("AIF_TEAM_GROUP_ID=<existing-group-object-id>", shared)
+        self.assertIn(
+            "AIF_AZURE_ML_PRINCIPAL_ID=<existing-enterprise-app-object-id>",
+            shared,
+        )
+        self.assertIn(
+            "AIF_DATABRICKS_PRINCIPAL_ID=<existing-enterprise-app-object-id>",
+            shared,
+        )
+        self.assertIn(
+            "redundant Graph discovery and membership mutation were skipped",
+            shared,
+        )
+        self.assertIn(
+            "redundant Graph discovery was skipped",
+            shared,
+        )
+        self.assertIn('"sku": {"name": "premium"}', shared)
+
 
 if __name__ == "__main__":
     unittest.main()
