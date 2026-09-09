@@ -109,6 +109,8 @@ class TestScaleSetConfiguration(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("choco install powershell-core -y --no-progress", source)
         self.assertIn("$gitBash = Join-Path $gitBin 'bash.exe'", source)
+        self.assertIn("@('Az.Accounts', 'Az.Network')", source)
+        self.assertIn("Install-Module -Name $name", source)
         self.assertIn(
             "[Environment]::SetEnvironmentVariable('Path', $machinePath, 'Machine')",
             source,

@@ -3338,6 +3338,20 @@ if ($missing -or -not (Test-Path -LiteralPath $gitBash -PathType Leaf)) {
   throw "Required agent commands are missing: $($missing -join ', ')."
 }
 
+$azModuleScript = @'
+$ErrorActionPreference = 'Stop'
+Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+foreach ($name in @('Az.Accounts', 'Az.Network')) {
+  if (-not (Get-Module -ListAvailable -Name $name)) {
+    Install-Module -Name $name -Repository PSGallery -Scope AllUsers -Force -AllowClobber
+  }
+}
+'@
+& pwsh -NoLogo -NoProfile -NonInteractive -Command $azModuleScript
+if ($LASTEXITCODE -ne 0) {
+  throw "Required Azure PowerShell module installation failed with exit code $LASTEXITCODE."
+}
+
 Push-Location $agentRoot
 & .\config.cmd `
   --unattended `
