@@ -66,6 +66,8 @@ param vnetNameBase string
 param location string
 @description('Specifies if private VM  - access via Bastion or Azure VPN')
 param enableAdminVM bool = false
+@description('Admin VM size. Override this when the default SKU is unavailable in the target region.')
+param adminVMSize string = 'Standard_D2s_v5'
 @description('true if Bastion Host should be created')
 param addBastionHost bool
 @description('Common default subnet')
@@ -960,7 +962,7 @@ module vmPrivate '../../modules/virtualMachinePrivate.bicep' = if(enableAdminVM 
     adminUsername: adminUsername
     adminPassword: adminPassword
     hybridBenefit:hybridBenefit
-    vmSize: vmSKU[0] //["Standard_E2s_v3","Standard_D4s_v3"]
+    vmSize: adminVMSize
     location: location
     vmName: 'dsvm-${cmnName}-${locationSuffix}-${env}${commonResourceSuffix}'
     subnetName: defaultSubnet

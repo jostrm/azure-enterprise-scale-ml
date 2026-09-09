@@ -221,6 +221,7 @@ steps:
      --parameters tenantId="$(tenantId)" \
      --parameters databricksOID="$(databricksOID)" \
      --parameters enableAdminVM="$(enableAdminVM)" \
+     --parameters adminVMSize="$(adminVMSize)" \
      --parameters vnetResourceGroup_param="$(vnetResourceGroup_param)" \
      --parameters vnetNameFull_param="$(vnetNameFull_param)" \
      --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
