@@ -2992,6 +2992,7 @@ steps:
      --parameters enableAISearch="$(enableAISearch)" \
      --parameters skuAISearchDev="$(skuAISearchDev)" \
      --parameters skuAISearchStageProd="$(skuAISearchStageProd)" \
+     --parameters aiSearchLocation="$(aiSearchLocation)" \
      --parameters skuAIServicesDev="$(skuAIServicesDev)" \
      --parameters skuAIServicesStageProd="$(skuAIServicesStageProd)" \
      --parameters skuOpenAIDev="$(skuOpenAIDev)" \

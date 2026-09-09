@@ -146,6 +146,7 @@
     "skuStorageAccountStageProd": "Standard_LRS",
     "skuAISearchDev": "basic",
     "skuAISearchStageProd": "standard",
+    "aiSearchLocation": "",
     "skuAIServicesDev": "S0",
     "skuAIServicesStageProd": "S0",
     "skuOpenAIDev": "S0",

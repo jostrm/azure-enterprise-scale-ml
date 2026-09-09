@@ -184,6 +184,22 @@ class TestPrivateFoundryCapabilityHost(unittest.TestCase):
             job,
         )
 
+    def test_search_can_use_an_alternate_region_without_moving_private_endpoint(self) -> None:
+        cognitive = FOUNDRY_TEMPLATES[0].read_text(encoding="utf-8")
+        search_module = (BICEP / "modules/aiSearch.bicep").read_text(encoding="utf-8")
+        ado_job = ADO_PROJECT_JOB.read_text(encoding="utf-8")
+        gha = GHA_PROJECT.read_text(encoding="utf-8")
+        self.assertIn("param aiSearchLocation string = ''", cognitive)
+        self.assertIn("location: effectiveAISearchLocation", cognitive)
+        self.assertIn("privateEndpointLocation: location", cognitive)
+        self.assertIn("param privateEndpointLocation string = location", search_module)
+        self.assertIn("location: privateEndpointLocation", search_module)
+        self.assertIn('--parameters aiSearchLocation="$(aiSearchLocation)"', ado_job)
+        self.assertIn('--parameters aiSearchLocation="${{ env.aiSearchLocation }}"', gha)
+        self.assertIn("AI_SEARCH_LOCATION=\"\"", GHA_ENV.read_text(encoding="utf-8"))
+        baseline = json.loads(BASELINE_JSON.read_text(encoding="utf-8"))["dev"]
+        self.assertEqual(baseline["aiSearchLocation"], "")
+
 
 if __name__ == "__main__":
     unittest.main()

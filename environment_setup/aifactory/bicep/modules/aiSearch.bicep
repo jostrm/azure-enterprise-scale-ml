@@ -4,6 +4,7 @@ param aiSearchName string
 param subnetName string
 param tags object
 param location string
+param privateEndpointLocation string = location
 param enableSharedPrivateLink bool
 param acrNameDummy string = ''
 
@@ -25,7 +26,7 @@ param aiServicesNameForSharedLink string = ''
 //])
 
 @allowed(['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2'])
-param skuName string = 'standard' 
+param skuName string = 'standard'
 @allowed([
   'Default'
   'HighDensity'
@@ -104,15 +105,15 @@ resource aiSearch 'Microsoft.Search/searchServices@2025-05-01' = {
       bypass: 'AzureServices'
       ipRules: ipRules // [{value: 'ip'}], .e.g. only IP addresses. Not also "action: 'Allow'"
     }:null
-    
+
     semanticSearch: semanticSearchTier
-    
+
     // Customer-Managed Key enforcement policy (per-object keys are set on indexes/indexers)
     encryptionWithCmk: cmk ? {
       enforcement: 'Enabled'
     } : null
   }
-  
+
   @batchSize(1)
   resource sharedPrivateLinkResource 'sharedPrivateLinkResources@2025-05-01' = [for (sharedPL, i) in (enableSharedPrivateLink ? sharedPrivateLinks : []): {
     name: '${aiSearchName}-shared-pe-${i}'
@@ -122,7 +123,7 @@ resource aiSearch 'Microsoft.Search/searchServices@2025-05-01' = {
 
 resource pendAISearch 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enablePublicAccessWithPerimeter) {
   name: privateEndpointName
-  location: location
+  location: privateEndpointLocation
   tags: tags
   properties: {
     subnet: {
@@ -146,7 +147,7 @@ resource pendAISearch 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enab
       }
     ]
   }
-  
+
 }
 
 var hostName = 'https://${aiSearch.name}.search.windows.net'

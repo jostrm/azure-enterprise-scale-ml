@@ -114,8 +114,11 @@ var bingCustomSearchSku = env == 'dev' ? skuBingDev : skuBingStageProd
 @description('Project number (e.g., "005")')
 param projectNumber string
 
-@description('Location for all resources')
+@description('Location for project resources and private endpoints')
 param location string
+@description('Optional AI Search region override. Empty deploys Search in the project region.')
+param aiSearchLocation string = ''
+var effectiveAISearchLocation = empty(aiSearchLocation) ? location : aiSearchLocation
 
 @description('Location suffix (e.g., "weu", "swc")')
 param locationSuffix string
@@ -696,7 +699,8 @@ module aiSearchService '../modules/aiSearch.bicep' = if (needsAISearch) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     aiSearchName: safeNameAISearch
-    location: location
+    location: effectiveAISearchLocation
+    privateEndpointLocation: location
     replicaCount: aiSearchReplicaCount
     partitionCount: aiSearchPartitionCount
     privateEndpointName: '${safeNameAISearch}-pend'

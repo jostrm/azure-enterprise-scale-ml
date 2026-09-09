@@ -193,6 +193,7 @@ def simple_mode_values(cost_center: str = "123456", project_resources: str | lis
         "skuStorageAccountDev": "Standard_LRS",
         "admin_aiSearchTier": "basic",
         "skuAISearchDev": "basic",
+        "aiSearchLocation": "",
         "admin_semanticSearchTier": "free",
         "skuAIServicesDev": "S0",
         "skuOpenAIDev": "S0",

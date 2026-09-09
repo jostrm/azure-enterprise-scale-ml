@@ -22,6 +22,7 @@ ALIASES = {
     "admin_aifactoryPrefixRG": "AIFACTORY_PREFIX",
     "admin_aifactorySuffixRG": "AIFACTORY_SUFFIX",
     "admin_aiSearchTier": "ADMIN_AISEARCH_TIER",
+    "aiSearchLocation": "AI_SEARCH_LOCATION",
     "admin_semanticSearchTier": "AISEARCH_SEMANTIC_TIER",
     "admin_keyvaultSoftDeleteDays": "KEYVAULT_SOFT_DELETE",
     "aifactory_salt": "AIFACTORY_SALT",

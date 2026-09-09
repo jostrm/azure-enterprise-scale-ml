@@ -143,6 +143,7 @@ jobs:
       skuStorageAccountStageProd: ${{ vars.SKU_STORAGEACCOUNT_STAGEPROD || 'Standard_LRS' }}
       skuAISearchDev: ${{ vars.SKU_AISEARCH_DEV || vars.ADMIN_AISEARCH_TIER || 'basic' }}
       skuAISearchStageProd: ${{ vars.SKU_AISEARCH_STAGEPROD || vars.ADMIN_AISEARCH_TIER || 'standard' }}
+      aiSearchLocation: ${{ vars.AI_SEARCH_LOCATION || '' }}
       skuAIServicesDev: ${{ vars.SKU_AISERVICES_DEV || 'S0' }}
       skuAIServicesStageProd: ${{ vars.SKU_AISERVICES_STAGEPROD || 'S0' }}
       skuOpenAIDev: ${{ vars.SKU_OPENAI_DEV || 'S0' }}
@@ -2234,6 +2235,7 @@ jobs:
               --parameters enableAISearch="${{ env.enableAISearch }}" \
               --parameters skuAISearchDev="${{ env.skuAISearchDev }}" \
               --parameters skuAISearchStageProd="${{ env.skuAISearchStageProd }}" \
+              --parameters aiSearchLocation="${{ env.aiSearchLocation }}" \
               --parameters skuAIServicesDev="${{ env.skuAIServicesDev }}" \
               --parameters skuAIServicesStageProd="${{ env.skuAIServicesStageProd }}" \
               --parameters skuOpenAIDev="${{ env.skuOpenAIDev }}" \
