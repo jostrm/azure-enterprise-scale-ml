@@ -367,6 +367,13 @@ def test_ado_stage_only_preserves_genuine_failure_dependencies_and_legacy_flow()
     assert stage["variables"]["dev_test_prod"] == "test"
 
 
+def test_ado_deployment_target_keeps_empty_legacy_default_without_invalid_enum():
+    pipeline = yaml.safe_load((ADO / "infra-project-genai.yaml").read_text(encoding="utf-8"))
+    target = next(item for item in pipeline["parameters"] if item["name"] == "deploymentTarget")
+    assert target["default"] == ""
+    assert "values" not in target
+
+
 def test_workflows_keep_legacy_defaults_and_forward_run_specific_secret():
     main = yaml.safe_load((GHA / "infra-project.yml").read_text(encoding="utf-8"))
     phase = yaml.safe_load((GHA / "infra-project-phase.yml").read_text(encoding="utf-8"))

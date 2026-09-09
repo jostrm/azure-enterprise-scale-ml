@@ -18,7 +18,6 @@ parameters:
     displayName: Reviewed single-environment target (empty preserves promotion flow)
     type: string
     default: ''
-    values: ['', dev, stage, prod]
   - name: deploymentProjectNumber
     type: string
     default: ''
