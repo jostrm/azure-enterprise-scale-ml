@@ -4,6 +4,7 @@ import copy
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -96,6 +97,25 @@ def test_source_template_contains_only_generic_github_identity():
     assert "_wizard" not in values
 
 
+def test_all_canonical_templates_include_default_false_hub_intent():
+    base = ROOT / "environment_setup" / "aifactory"
+    document = json.loads((base / "variables.json").read_text(encoding="utf-8"))
+    assert set(document) == {"dev"}
+    assert document["dev"]["enableAIFactoryHub"] is False
+    assert document["dev"]["centralDnsZoneByPolicyInHub"] is False
+    templates = base / "bicep" / "copy_to_local_settings"
+    yaml_text = (templates / "azure-devops" / "esml-yaml-pipelines" /
+                 "variables" / "variables.yaml").read_text(encoding="utf-8")
+    env_text = (templates / "github-actions" / ".env.template").read_text(encoding="utf-8")
+    upload = (templates / "github-actions" /
+              "03a-GH-create-or-update-github-variables.sh").read_text(encoding="utf-8")
+    for key, env_key in (("enableAIFactoryHub", "ENABLE_AI_FACTORY_HUB"),
+                         ("centralDnsZoneByPolicyInHub", "CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB")):
+        assert re.search(r"^\s+" + key + r': "false"', yaml_text, re.M)
+        assert re.search(r"^" + env_key + r'="false"', env_text, re.M)
+        assert f'"{env_key}"' in upload
+
+
 def test_pipeline_consumer_ignores_wizard_metadata_and_reserved_github_identity(tmp_path, monkeypatch):
     path = ROOT / "environment_setup" / "aifactory" / "bicep" / "scripts" / "apply-json-config-overrides.py"
     spec = importlib.util.spec_from_file_location("json_overrides", path)
@@ -123,6 +143,31 @@ def json_override_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+@pytest.mark.parametrize("dns,own", [(False, False), (False, True), (True, False), (True, True)])
+@pytest.mark.parametrize("pipeline_format", ["github", "azure-devops"])
+@pytest.mark.parametrize("environment,section", [("dev", "dev"), ("prod", "stage_prod")])
+def test_hub_pair_uses_existing_camel_keys_without_dropping_flags(
+        json_override_module, tmp_path, monkeypatch, capsys, dns, own,
+        pipeline_format, environment, section):
+    original = {section: {"centralDnsZoneByPolicyInHub": dns, "enableAIFactoryHub": own}}
+    config = copy.deepcopy(original)
+    values, selected = json_override_module.selected_values(config, environment)
+    assert selected == section
+    assert values == {key: str(value).lower() for key, value in original[section].items()}
+    output = tmp_path / "github-env"
+    monkeypatch.setenv("GITHUB_ENV", str(output))
+    applied, skipped = json_override_module.apply(values, pipeline_format, None)
+    assert applied == 2 and skipped == []
+    text = output.read_text(encoding="utf-8") if pipeline_format == "github" else capsys.readouterr().out
+    for key, value in original[section].items():
+        if pipeline_format == "github":
+            assert f"{key}<<" in text
+            assert f"\n{str(value).lower()}\n" in text
+        else:
+            assert f"##vso[task.setvariable variable={key}]{str(value).lower()}" in text
+    assert config == original
 
 
 @pytest.mark.parametrize("value", ["", "https://portal.azure.com/#dashboard/private/example"])
@@ -158,7 +203,8 @@ def test_dashboard_alias_does_not_relax_variable_name_validation(json_override_m
 
 
 @pytest.mark.parametrize("pipeline_format", ["github", "azure-devops"])
-def test_full_canonical_template_applies_with_dashboard_key_offline(tmp_path, pipeline_format):
+@pytest.mark.parametrize("deployment_environment", ["dev", "stage", "test", "prod"])
+def test_full_canonical_template_applies_with_dashboard_key_offline(tmp_path, pipeline_format, deployment_environment):
     consumer = ROOT / "environment_setup" / "aifactory" / "bicep" / "scripts" / "apply-json-config-overrides.py"
     template = ROOT / "environment_setup" / "aifactory" / "variables.json"
     original = template.read_bytes()
@@ -166,7 +212,7 @@ def test_full_canonical_template_applies_with_dashboard_key_offline(tmp_path, pi
     github_env = tmp_path / "github-env"
     environment["GITHUB_ENV"] = str(github_env)
     result = subprocess.run(
-        [sys.executable, str(consumer), "--file", str(template), "--environment", "dev",
+        [sys.executable, str(consumer), "--file", str(template), "--environment", deployment_environment,
          "--format", pipeline_format],
         env=environment, capture_output=True, text=True, timeout=30, check=False,
     )
@@ -174,9 +220,152 @@ def test_full_canonical_template_applies_with_dashboard_key_offline(tmp_path, pi
     assert "Applied " in result.stdout
     if pipeline_format == "github":
         assert "AIFACTORY_DASHBOARD_URL<<" in github_env.read_text(encoding="utf-8")
+        assert "SCALING_MODE<<" in github_env.read_text(encoding="utf-8")
+        assert "\nshared-subscriptions\n" in github_env.read_text(encoding="utf-8")
+        assert "scaling-mode<<" not in github_env.read_text(encoding="utf-8")
     else:
         assert "##vso[task.setvariable variable=AIFACTORY_DASHBOARD_URL]" in result.stdout
+        assert "##vso[task.setvariable variable=SCALING_MODE]shared-subscriptions" in result.stdout
+        assert "variable=scaling-mode" not in result.stdout
     assert template.read_bytes() == original
+
+
+@pytest.mark.parametrize("mode", ["own-subscriptions", "shared-subscriptions"])
+@pytest.mark.parametrize("environment,section", [
+    ("dev", "dev"), ("stage", "stage_prod"), ("test", "stage_prod"), ("prod", "stage_prod"),
+])
+@pytest.mark.parametrize("pipeline_format", ["github", "azure-devops"])
+def test_full_template_scaling_mode_alias(json_override_module, tmp_path, monkeypatch, capsys,
+                                        mode, environment, section, pipeline_format):
+    template = ROOT / "environment_setup" / "aifactory" / "variables.json"
+    config = json.loads(template.read_text(encoding="utf-8"))
+    config[section] = {**config["dev"], "scaling-mode": mode}
+    values, selected = json_override_module.selected_values(config, environment)
+    assert selected == section
+    assert values["SCALING_MODE"] == mode
+    assert "scaling-mode" not in values
+    assert values["common_vnet_cidr"] == config[section]["common_vnet_cidr"]
+    output = tmp_path / "github-env"
+    monkeypatch.setenv("GITHUB_ENV", str(output))
+    json_override_module.apply(values, pipeline_format, None)
+    if pipeline_format == "github":
+        text = output.read_text(encoding="utf-8")
+        assert "SCALING_MODE<<" in text
+        assert f"\n{mode}\n" in text
+    else:
+        assert f"##vso[task.setvariable variable=SCALING_MODE]{mode}" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("name", ["scaling-mode", "SCALING_MODE"])
+@pytest.mark.parametrize("value", ["", "own", "shared", "Own-subscriptions",
+                                  " own-subscriptions", "shared-subscriptions\n",
+                                  None, True, 1, [], {}])
+def test_invalid_scaling_modes_are_rejected(json_override_module, name, value):
+    with pytest.raises(SystemExit):
+        json_override_module.selected_values({"dev": {name: value}}, "dev")
+
+
+@pytest.mark.parametrize("names", [
+    ("scaling-mode", "SCALING_MODE"), ("SCALING_MODE", "scaling-mode"),
+])
+def test_scaling_alias_conflicts_are_rejected(json_override_module, capsys, names):
+    with pytest.raises(SystemExit):
+        json_override_module.selected_values({"dev": {
+            names[0]: "own-subscriptions", names[1]: "shared-subscriptions",
+        }}, "dev")
+    assert "Conflicting configuration values" in capsys.readouterr().err
+    values, _ = json_override_module.selected_values({
+        "dev": dict.fromkeys(names, "own-subscriptions"),
+    }, "dev")
+    assert values == {"SCALING_MODE": "own-subscriptions"}
+
+
+def test_canonical_scaling_templates_and_github_upload_use_safe_names():
+    templates = ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings"
+    env_text = (templates / "github-actions/.env.template").read_text(encoding="utf-8")
+    yaml_text = (templates / "azure-devops/esml-yaml-pipelines/variables/variables.yaml").read_text(encoding="utf-8")
+    upload_text = (templates / "github-actions/03a-GH-create-or-update-github-variables.sh").read_text(encoding="utf-8")
+    assert re.search(r'^SCALING_MODE="shared-subscriptions"', env_text, re.MULTILINE)
+    assert re.search(r'^  scaling-mode: "shared-subscriptions"', yaml_text, re.MULTILINE)
+    assert '"SCALING_MODE"' in upload_text.split("repo_level_vars=(", 1)[1].split("\n)", 1)[0]
+
+
+@pytest.mark.parametrize("current_mode", [None, "own-subscriptions", "shared-subscriptions"])
+def test_update_env_backfills_scaling_mode_without_overwriting_user_value(tmp_path, monkeypatch,
+                                                                          current_mode):
+    marker = '"${PYTHON[@]}" - ".env" ".env.template" "$RUNNER_LABEL" <<\'PY\'\n'
+    code = LAUNCHER.read_text(encoding="utf-8").split(marker, 1)[1].split("\nPY", 1)[0]
+    active = tmp_path / "active.env"
+    template = tmp_path / "template.env"
+    active.write_text(
+        f'SCALING_MODE="{current_mode}"\n' if current_mode is not None else "",
+        encoding="utf-8",
+    )
+    source = ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/.env.template"
+    template.write_bytes(source.read_bytes())
+    original = active.read_bytes()
+    monkeypatch.setattr("sys.argv", ["merge", str(active), str(template), "unit-runner"])
+    exec(compile(code, str(LAUNCHER), "exec"), {"__name__": "__main__"})
+    assert f'SCALING_MODE="{current_mode or "shared-subscriptions"}"' in template.read_text(encoding="utf-8")
+    assert active.read_bytes() == original
+
+
+@pytest.mark.parametrize("cidr,octet", [
+    ("172.16.XX.0/20", "0"),
+    ("172.16.XX.0/20", "16"),
+    ("172.16.XX.0/20", "32"),
+    ("172.16.0.0/18", "15"),
+    ("172.16.0.0/18", "20"),
+    ("172.16.0.0/18", "25"),
+    ("172.16.0.0/16", "61"),
+])
+def test_preflight_substitutes_vnet_and_subnet_templates_offline(bash_executable, cidr, octet):
+    preflight = ROOT / "environment_setup/aifactory/bicep/scripts/preflight.sh"
+    text = preflight.read_text(encoding="utf-8")
+    substitution = re.search(r"(?m)^sub_xx\(\).*?$", text).group(0)
+    validation = text.split("  local out _cidr_data\n", 1)[1].split('  local had=""', 1)[0]
+    script = (
+        "set -euo pipefail\n" + substitution + "\nvalidate() {\n" + validation +
+        '\nprintf "%s" "$out"\n}\nvalidate\n'
+    )
+    environment = {key: value for key, value in os.environ.items()
+                   if key not in {"BASH_ENV", "ENV", "SHELLOPTS"}}
+    environment.update({
+        "PYBIN": Path(sys.executable).as_posix(),
+        "COMMON_VNET_CIDR": cidr,
+        "DEV_CIDR_RANGE": octet,
+        "COMMON_SUBNET_CIDR": "172.16.XX.0/26",
+        "COMMON_SUBNET_SCORING_CIDR": "172.16.XX.64/26",
+        "COMMON_PBI_SUBNET_CIDR": "172.16.XX.128/26",
+        "COMMON_BASTION_SUBNET_CIDR": "172.16.XX.192/26",
+    })
+    result = subprocess.run(
+        [bash_executable, "--noprofile", "--norc", "-c", script],
+        env=environment, capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize("current_mode", [None, "own-subscriptions", "shared-subscriptions"])
+def test_scaleset_template_merge_preserves_mode_in_all_formats(tmp_path, current_mode):
+    helper = ROOT / "bootstrap/lib/aifactory_scaleset_config.py"
+    spec = importlib.util.spec_from_file_location("scaling_bootstrap_config", helper)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    formats = {
+        "env": ('SCALING_MODE="{}"\n', module.merge_env_template),
+        "yaml": ('variables:\n  scaling-mode: "{}"\n', module.merge_yaml_template),
+        "json": ('{{"dev":{{"scaling-mode":"{}"}}}}', module.merge_json_template),
+    }
+    for extension, (pattern, merge) in formats.items():
+        active = tmp_path / f"active.{extension}"
+        template = tmp_path / f"template.{extension}"
+        empty = '{"dev":{}}' if extension == "json" else "variables:\n" if extension == "yaml" else ""
+        active.write_text(pattern.format(current_mode) if current_mode else empty, encoding="utf-8")
+        template.write_text(pattern.format("shared-subscriptions"), encoding="utf-8")
+        merge(template, active)
+        assert (current_mode or "shared-subscriptions") in active.read_text(encoding="utf-8")
 
 
 @pytest.fixture

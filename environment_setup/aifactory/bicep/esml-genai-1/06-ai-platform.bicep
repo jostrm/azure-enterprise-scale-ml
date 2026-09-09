@@ -56,7 +56,7 @@ param modelGPTXName string = 'gpt-5.4-mini'
 @description('GPT-X model version if deploying')
 param modelGPTXVersion string = '2026-03-17'
 @allowed(['Standard','DataZoneStandard','GlobalStandard'])
-param modelGPTXSku string = 'GlobalStandard'
+param modelGPTXSku string = 'DataZoneStandard'
 @description('TPM:Tokens per Minute Rate Limit in K=1000) 30 meaning 30K')
 param modelGPTXCapacity int = 30
 
@@ -80,7 +80,7 @@ param default_gpt_54_mini_version string = '2026-03-17'
 
 @description('Default SKU for models')
 @allowed(['Standard','DataZoneStandard','GlobalStandard'])
-param default_model_sku string = 'Standard'
+param default_model_sku string = 'DataZoneStandard'
 
 @description('Keyvault seeding configuration')
 param inputKeyvault string

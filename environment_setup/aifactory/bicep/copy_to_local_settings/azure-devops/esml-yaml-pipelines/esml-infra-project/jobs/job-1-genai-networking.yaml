@@ -603,7 +603,10 @@ steps:
        -VnetResourceGroup $vnetResourceGroup `
        -VnetName $vnetName `
        -DnsZoneSubscription $dnsZoneSubscription `
-       -DnsZoneResourceGroup $dnsZoneResourceGroup
+       -DnsZoneResourceGroup $dnsZoneResourceGroup `
+       -DnsManagedByPolicy:($env:DNS_MANAGED_BY_POLICY -eq 'true')
+  env:
+    DNS_MANAGED_BY_POLICY: $(centralDnsZoneByPolicyInHub)
 - task: AzureKeyVault@2  
   displayName: '03_az_download_seeding_keyvault'
   inputs:

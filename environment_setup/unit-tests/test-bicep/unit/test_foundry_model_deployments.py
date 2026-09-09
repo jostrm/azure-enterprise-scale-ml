@@ -24,7 +24,7 @@ FOUNDRY_TEMPLATES = (
 GPTX_DEFAULTS = {
     "modelGPTXName": ("MODEL_GPTX_NAME", "gpt-5.4-mini"),
     "modelGPTXVersion": ("MODEL_GPTX_VERSION", "2026-03-17"),
-    "modelGPTXSku": ("MODEL_GPTX_SKU", "GlobalStandard"),
+    "modelGPTXSku": ("MODEL_GPTX_SKU", "DataZoneStandard"),
 }
 GPTX_TEMPLATES = (
     *FOUNDRY_TEMPLATES,
@@ -83,7 +83,9 @@ class TestFoundryModelDeployments(unittest.TestCase):
         }
         cases = (
             ({}, []),
-            ({"DEPLOY_MODEL_GPT_X": "true"}, ["gpt-5.4-mini|GlobalStandard|30"]),
+            ({"DEPLOY_MODEL_GPT_X": "true"}, ["gpt-5.4-mini|DataZoneStandard|30"]),
+            ({"DEPLOY_MODEL_GPT_4O": "true"}, ["gpt-4o|DataZoneStandard|40"]),
+            ({"DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE": "true"}, ["text-embedding-3-large|DataZoneStandard|25"]),
             ({
                 "DEPLOY_MODEL_GPT_X": "true", "MODEL_GPTX_NAME": "gpt-5.1",
                 "MODEL_GPTX_SKU": "DataZoneStandard", "MODEL_GPTX_CAPACITY": "10",
@@ -115,7 +117,7 @@ class TestFoundryModelDeployments(unittest.TestCase):
                     ("modelName", "gpt-5.4-mini"),
                     ("modelVersion", "2026-03-17"),
                     ("modelFormat", "OpenAI"),
-                    ("modelSkuName", "GlobalStandard"),
+                    ("modelSkuName", "DataZoneStandard"),
                 ):
                     self.assertIn(f"param {parameter} string = '{expected}'", content)
 
@@ -129,8 +131,30 @@ class TestFoundryModelDeployments(unittest.TestCase):
                 self.assertIn("hasModelDeploymentsV22 ? aiFoundryDeployments[0] : {", placeholder)
                 self.assertEqual(2, placeholder.count("name: 'gpt-5.4-mini'"))
                 self.assertIn("version: '2026-03-17'", placeholder)
-                self.assertIn("name: 'GlobalStandard'", placeholder)
+                self.assertIn("name: 'DataZoneStandard'", placeholder)
                 self.assertNotIn("gpt-4o", placeholder)
+
+    def test_general_model_sku_is_data_zone_on_every_configuration_route(self) -> None:
+        baseline = json.loads((ROOT / "environment_setup/aifactory/variables.json").read_text(encoding="utf-8"))
+        self.assertEqual("DataZoneStandard", yaml_defaults()["default_model_sku"])
+        self.assertEqual("DataZoneStandard", env_defaults()["DEFAULT_MODEL_SKU"])
+        self.assertEqual("DataZoneStandard", baseline["dev"]["default_model_sku"])
+        workflow = (BICEP / "copy_to_local_settings/github-actions/infra-project-phase.yml").read_text(encoding="utf-8")
+        self.assertIn("default_model_sku: ${{ vars.DEFAULT_MODEL_SKU || 'DataZoneStandard' }}", workflow)
+        for path in GPTX_TEMPLATES:
+            with self.subTest(template=path.name):
+                self.assertIn("param default_model_sku string = 'DataZoneStandard'", path.read_text(encoding="utf-8"))
+
+    def test_apim_route_cannot_default_to_global_standard(self) -> None:
+        path = BICEP / "modules/csFoundry/foundry-apim"
+        self.assertIn(
+            "param modelSkuName string = 'DataZoneStandard'",
+            (path / "main.bicep").read_text(encoding="utf-8"),
+        )
+        for name in ("main.json", "azuredeploy.json"):
+            with self.subTest(template=name):
+                arm = json.loads((path / name).read_text(encoding="utf-8"))
+                self.assertEqual("DataZoneStandard", arm["parameters"]["modelSkuName"]["defaultValue"])
 
     def test_explicit_gpt_4o_selection_is_preserved(self) -> None:
         for path in FOUNDRY_TEMPLATES:

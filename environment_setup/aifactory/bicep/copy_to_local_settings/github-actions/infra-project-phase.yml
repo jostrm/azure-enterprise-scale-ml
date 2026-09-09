@@ -311,7 +311,7 @@ jobs:
       deployModel_gpt_X: ${{ vars.DEPLOY_MODEL_GPT_X || 'false' }}
       modelGPTXName: ${{ vars.MODEL_GPTX_NAME || 'gpt-5.4-mini' }}
       modelGPTXVersion: ${{ vars.MODEL_GPTX_VERSION || '2026-03-17' }}
-      modelGPTXSku: ${{ vars.MODEL_GPTX_SKU || 'GlobalStandard' }}
+      modelGPTXSku: ${{ vars.MODEL_GPTX_SKU || 'DataZoneStandard' }}
       modelGPTXCapacity: ${{ vars.MODEL_GPTX_CAPACITY || '30' }}
       deployModel_text_embedding_ada_002: ${{ vars.DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002 || 'false' }}
       deployModel_text_embedding_3_large: ${{ vars.DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE || 'true' }}
@@ -323,7 +323,7 @@ jobs:
       deployModel_gpt_54_mini: ${{ vars.DEPLOY_MODEL_GPT_54_MINI || 'false' }}
       default_gpt_54_mini_version: ${{ vars.DEFAULT_GPT_54_MINI_VERSION || '2024-07-18' }}
       default_gpt_capacity: ${{ vars.DEFAULT_GPT_CAPACITY || '40' }}
-      default_model_sku: ${{ vars.DEFAULT_MODEL_SKU || 'Standard' }}
+      default_model_sku: ${{ vars.DEFAULT_MODEL_SKU || 'DataZoneStandard' }}
 
       # Diagnostics / tags
       diagnosticSettingLevel: ${{ vars.DIAGNOSTIC_SETTING_LEVEL || 'gold' }}
@@ -698,6 +698,8 @@ jobs:
       - name: 02b_Prepare_Seeding_KeyVault_Private_DNS
         if: env.disable_whitelisting_for_build_agents == 'true'
         shell: pwsh
+        env:
+          DNS_MANAGED_BY_POLICY: ${{ env.centralDnsZoneByPolicyInHub }}
         run: |
           $dnsZoneSubscription = if ('${{ env.centralDnsZoneByPolicyInHub }}' -eq 'true') {
             '${{ env.privDnsSubscription_param }}'
@@ -717,7 +719,8 @@ jobs:
             -VnetResourceGroup "${{ env.vnetResourceGroup_resolved }}" `
             -VnetName "${{ env.vnetNameFull_resolved }}" `
             -DnsZoneSubscription $dnsZoneSubscription `
-            -DnsZoneResourceGroup $dnsZoneResourceGroup
+            -DnsZoneResourceGroup $dnsZoneResourceGroup `
+            -DnsManagedByPolicy:($env:DNS_MANAGED_BY_POLICY -eq 'true')
 
       - name: 03_Download_Secrets_From_Seeding_KeyVault
         shell: bash
@@ -1102,8 +1105,17 @@ jobs:
 
       - name: 15_Check_Private_DNS_Zones
         shell: bash
+        env:
+          DNS_MANAGED_BY_POLICY: ${{ env.centralDnsZoneByPolicyInHub }}
         run: |
             set -e
+            if [ "${DNS_MANAGED_BY_POLICY,,}" = "true" ]; then
+              echo "Central DNS is policy-managed; skipping DNS subscription/zone/link inspection."
+              for key in zoneazurecontainerapps zoneredis zonepostgres zonesql zoneMongo zoneServicesAi zoneAPIM; do
+                echo "${key}Exists=false" >> "$GITHUB_ENV"
+              done
+              exit 0
+            fi
             if [ "${{ env.centralDnsZoneByPolicyInHub }}" = "true" ]; then
               privDnsSubscription="${{ env.privDnsSubscription_param }}"
               privDnsRg="${{ env.privDnsResourceGroup_param }}"
@@ -3100,9 +3112,16 @@ jobs:
           env.disableAgentNetworkInjection != 'true'
         continue-on-error: true
         shell: bash
+        env:
+          DNS_MANAGED_BY_POLICY: ${{ env.centralDnsZoneByPolicyInHub }}
         run: |
             #!/bin/bash
             set +e
+
+            if [ "${DNS_MANAGED_BY_POLICY,,}" = "true" ]; then
+              echo "Central DNS is policy-managed; skipping AI Search DNS repair. Policy owns A records/zone groups and the BYO VNet links are preconfigured."
+              exit 0
+            fi
 
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
 
@@ -3979,23 +3998,51 @@ jobs:
             echo "=== Agent creation task completed ==="
 
       - name: 101_generate_hosts_file_info
+        id: hosts_inventory
         if: inputs.phase == 'foundry' && (success() && env.deleteAllServicesForProject != 'true')
-        shell: bash
+        continue-on-error: true
+        shell: pwsh
+        env:
+          HOSTS_SUBSCRIPTION_ID: ${{ env.dev_test_prod_sub_id }}
+          HOSTS_RG_PREFIX: ${{ env.admin_aifactoryPrefixRG }}
+          HOSTS_PROJECT_NUMBER: ${{ env.project_number_000 }}
+          HOSTS_LOCATION_SUFFIX: ${{ env.admin_locationSuffix }}
+          HOSTS_ENVIRONMENT: ${{ env.dev_test_prod }}
+          HOSTS_RG_SUFFIX: ${{ env.admin_aifactorySuffixRG }}
+          HOSTS_PROJECT_PREFIX: ${{ env.projectPrefix }}
+          HOSTS_PROJECT_SUFFIX: ${{ env.projectSuffix }}
+          HOSTS_COMMON_NAME: ${{ env.vnetResourceGroupBase }}
+          HOSTS_COMMON_RESOURCE_GROUP: ${{ env.commonResourceGroup_param }}
+          HOSTS_VNET_SUBSCRIPTION_ID: ${{ env.dev_test_prod_sub_id }}
+          HOSTS_VNET_RESOURCE_GROUP: ${{ env.vnetResourceGroup_resolved }}
+          HOSTS_OUTPUT_DIR: ${{ runner.temp }}/aifactory-hosts/${{ github.run_id }}-${{ github.run_attempt }}/${{ inputs.phase }}
         run: |
-            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-            bash "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/70_generate_hosts_file_info.sh" \
-              "${{ env.dev_test_prod_sub_id }}" \
-              "${{ env.admin_aifactoryPrefixRG }}" \
-              "${{ env.project_number_000 }}" \
-              "${{ env.admin_locationSuffix }}" \
-              "${{ env.dev_test_prod }}" \
-              "${{ env.admin_aifactorySuffixRG }}" \
-              "${{ env.admin_prjResourceSuffix }}" \
-              "${{ env.AIFACTORY_SALT }}" \
-              "${{ env.aifactory_salt_random }}" \
-              "${{ env.deployment_random_value }}" \
-              "${{ env.projectPrefix }}" \
-              "${{ env.projectSuffix }}"
+            $ErrorActionPreference = 'Stop'
+            $PSNativeCommandUseErrorActionPreference = $false
+            try {
+              $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+              if (-not $python) { $python = Get-Command python3 -CommandType Application -ErrorAction SilentlyContinue }
+              if (-not $python) { throw 'Python is required for the hosts inventory.' }
+              $script = Join-Path $env:GITHUB_WORKSPACE 'azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/generate_hosts_file_info.py'
+              & $python.Source -X utf8 $script
+              if ($LASTEXITCODE -ne 0) { Write-Host '::warning::Hosts inventory is unavailable or incomplete; review the preceding diagnostics.' }
+              if (Test-Path -LiteralPath (Join-Path $env:HOSTS_OUTPUT_DIR 'private-endpoints.json')) {
+                'ready=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              }
+            } catch {
+              Write-Host "::warning::Hosts inventory could not complete: $($_.Exception.Message)"
+            }
+            exit 0
+
+      - name: Publish AI Factory hosts inventory
+        if: always() && steps.hosts_inventory.outputs.ready == 'true'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: aifactory-hosts-${{ inputs.environment }}-${{ inputs.phase }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/aifactory-hosts/${{ github.run_id }}-${{ github.run_attempt }}/${{ inputs.phase }}/
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: 10-aifactory-dashboards
         # Deploys the AI Factory monitoring dashboards. Disabled by default
@@ -4142,6 +4189,7 @@ jobs:
 
       - name: Report final pipeline job result (offline)
         if: always()
+        continue-on-error: true
         shell: bash
         env:
           AIFACTORY_REPORT_JOB_STATUS: ${{ job.status }}

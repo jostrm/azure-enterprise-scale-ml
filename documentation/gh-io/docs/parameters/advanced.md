@@ -9,6 +9,86 @@ This page lists **all parameters** — both mandatory (**M**) and optional (**O*
 
 ---
 
+## MAUI Simple Mode bootstrap contract v1
+
+Simple Mode is an explicit `AIF_SIMPLE_MODE=true` opt-in to the existing root
+`GHA-create-new-aifactory-scaleset.sh` entrypoint, not an alternative deployment
+engine. Invoke it with `--non-interactive --yes --repo-root <new-empty-folder>`.
+Default waiting is required: common deployment must finish, then bootstrap
+configures private access, then deploys project `001`. Do not use `--no-wait`,
+`--prepare-only`, or the full bootstrap's `--dry-run` as a Simple Mode preview.
+The **offline, read-only** preview is:
+
+```text
+python bootstrap/lib/aifactory_scaleset_config.py --simple-mode-manifest
+```
+
+Required inputs are `AIF_TENANT_ID`, `AIF_DEV_SUBSCRIPTION_ID`, `AIF_LOCATION`,
+`AIF_PREFIX` (2–16 lowercase letters/digits/hyphens), `GITHUB_REPOSITORY`
+(`owner/repo`), and `AIF_TEAM_MEMBER_EMAIL` (derived from the authenticated user).
+`AIF_TEAM_GROUP_NAME` can be derived; `AIF_SCALESET_SUFFIX` defaults to `001`.
+The launcher must use existing Azure/GitHub authentication: missing sign-in
+fails without opening a login browser. The repository is created **private**
+when absent. No password, PAT, or service-principal secret is requested.
+
+Fixed bootstrap inputs are `AIF_NETWORK_MODE=priv`, `AIF_TOPOLOGY=s`,
+`AIF_ACCESS_HUB_MODE=i`, `AIF_IDENTITY_MODE=c`, `AIF_SEEDING_MODE=c`,
+`AIF_SEED_PROJECT_SP=false`, `AIF_SETUP_HUB_ACCESS=true`,
+`AIF_CONFIGURE_VPN_CLIENT=false`, `AIF_DEV_VNET_CIDR=172.16.0.0/20`, and
+`AIF_PROJECT_NUMBER=001`. `AIF_COST_CENTER=123456` is the default for both common
+and project tags (canonical aliases `tag_costceter_common` / `TAG_COSTCETER_COMMON`
+and `tag_costcenter` / `TAG_COSTCENTER`).
+
+The named **private-ai-foundation-v1** preset writes `scaling-mode=own-subscriptions`,
+`enableAIFactoryHub=true` / `ENABLE_AI_FACTORY_HUB=true`,
+`centralDnsZoneByPolicyInHub=false`, and all three public-access flags false.
+It enables Foundry S0 account/project, AI Search **standard**, LRS Storage,
+Key Vault, Application Insights and Log Analytics. Common **Premium ACR** is
+also created by the canonical foundation. Optional ML/Databricks/legacy Foundry
+Hub, databases, application hosting, model deployments and agent capability
+hosts are disabled; temporary ML/Databricks bootstrap workspaces are not created.
+This is a private foundation, **not a preloaded model or runnable agent demo**.
+Regional service availability and subscription limits still apply.
+AMPLS remains disabled: the canonical Application Insights and Log Analytics
+telemetry endpoints are **not guaranteed private-only** by these three flags.
+Use Advanced Mode to configure private monitoring.
+
+The integrated access hub adds billable **VpnGw1AZ**, a Standard public IP,
+billable DNS Private Resolver inbound endpoint, private DNS zones/links,
+a private-DNS initiative assigned to the Dev subscription, and an IP group
+listing the Dev VNet and VPN pool (inventory, not firewall enforcement).
+Bastion **Developer** is created only where available; failure stops the chain
+without silently selecting a paid SKU. **No admin VM is created.**
+GatewaySubnet `172.16.1.0/27` and resolver subnet `172.16.1.32/28` leave room for
+the full project subnet profile in the /20. Existing conflicting allocations
+are rejected, never moved or deleted. The VPN profile is saved to the git-ignored
+`.aifactory-access/azurevpnconfig.xml`; the user installs/imports/connects
+manually. Do not publish this connection artifact.
+
+Only the supplied **Dev subscription** is deployed. The peerable future network
+templates use `172.16.XX.0/20`, four common /26s, and selectors Dev=0,
+Stage=16, Prod=32. Stage/Prod subscription IDs remain Dev reference placeholders;
+this creates **neither subscriptions nor Stage/Prod environments**. Configure
+those references explicitly before any future deployment.
+
+The deployment managed identity receives Contributor and User Access
+Administrator on Dev, plus Key Vault Secrets User on the seeding vault.
+The DNS-policy identity receives Network Contributor on Dev.
+The interactive user needs corresponding Azure role-assignment permissions and
+Entra group creation/membership permissions. The seeding vault is created
+without project-SP credentials, then private endpoint access is configured.
+
+Before enabling Create, the launcher must verify that required PURPLE source
+under **`bootstrap` and `environment_setup/aifactory` is committed and published**
+on the selected release branch. The fetched accelerator is checked for
+`AIF_SIMPLE_MODE_CONTRACT_VERSION=1` and matching source content before Azure
+resource mutations. A local, unpublished fix is not deployable by remote
+GitHub Actions. Never copy dirty PURPLE files into a consumer submodule.
+Existing advanced bootstrap settings remain unchanged unless Simple Mode is
+explicitly selected.
+
+---
+
 ## Group 1 — GitHub Bootstrap
 
 | Variable | Default | M/O | Guidance | Description |
@@ -136,6 +216,7 @@ This page lists **all parameters** — both mandatory (**M**) and optional (**O*
 | `ENABLE_PUBLIC_GENAI_ACCESS` | `true` | O | **recommended** `false` for a fully private deployment | Enable public access to GenAI endpoints |
 | `ENABLE_PUBLIC_ACCESS_WITH_PERIMETER` | `true` | O | **recommended** `false` for a fully private deployment | Enable public access via network perimeter policy |
 | `CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB` | `false` | O | keep-as-is. **otherwise** `true` if a hub manages all private DNS zones centrally | Use central hub private DNS instead of per-spoke DNS zones |
+| `ENABLE_AI_FACTORY_HUB` | `false` | O | Configuration intent only; central DNS true takes precedence | Standalone with own Hub when true and central DNS is false; does not deploy resources |
 | `PRIV_DNS_SUBSCRIPTION_PARAM` | `<todo>` | O | **ensure** mandatory if `CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB=true` | Subscription ID containing the central private DNS zones |
 | `PRIV_DNS_RESOURCE_GROUP_PARAM` | `<todo>` | O | **ensure** mandatory if `CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB=true` | Resource group containing the central private DNS zones |
 
@@ -274,9 +355,9 @@ This page lists **all parameters** — both mandatory (**M**) and optional (**O*
 | `DEPLOY_MODEL_GPT_X` | `false` | O | keep-as-is | Deploy a custom or future GPT model |
 | `MODEL_GPTX_NAME` | `gpt-5.4-mini` | O | keep-as-is | Custom model name (used when `DEPLOY_MODEL_GPT_X=true`) |
 | `MODEL_GPTX_VERSION` | `2026-03-17` | O | Update together with the model name | Pinned custom model version |
-| `MODEL_GPTX_SKU` | `GlobalStandard` | O | Global processing; override for data residency | Custom model SKU; confirm model/SKU availability and subscription quota |
+| `MODEL_GPTX_SKU` | `DataZoneStandard` | O | keep-as-is (data-zone processing) | Custom model SKU; confirm model/SKU availability and subscription quota |
 | `MODEL_GPTX_CAPACITY` | `30` | O | keep-as-is (= 30 K TPM) | Custom model capacity |
-| `DEFAULT_MODEL_SKU` | `Standard` | O | keep-as-is | Default SKU for all model deployments |
+| `DEFAULT_MODEL_SKU` | `DataZoneStandard` | O | keep-as-is (data-zone processing) | Default SKU for all model deployments; confirm model/SKU availability and subscription quota |
 
 ---
 
@@ -334,3 +415,13 @@ This page lists **all parameters** — both mandatory (**M**) and optional (**O*
 !!! info "Source file"
     All parameters above map directly to variables in:
     `environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/.env.template`
+
+## Hub configuration intent
+
+`centralDnsZoneByPolicyInHub` and `enableAIFactoryHub` default to false in the
+canonical templates. Both false means Standalone; DNS false and own Hub true
+means Standalone with own Hub; DNS true means external Hub. Imported true/true
+pairs are preserved, with external Hub authoritative. These are configuration
+intent, not a deployment command. YAML uses `variables.enableAIFactoryHub`,
+JSON uses `dev.enableAIFactoryHub` (or an existing `stage_prod` override), and
+GitHub `.env` uses `ENABLE_AI_FACTORY_HUB`. No new `stage_prod` baseline is required.

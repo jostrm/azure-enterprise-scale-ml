@@ -60,7 +60,8 @@ resource pendCogServiceAIF 'Microsoft.Network/privateEndpoints@2024-05-01' = if(
   }
 }
 
-resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (createPrivateEndpointsAIFactoryWay) {
+// Policy owns zone-group association and A records in central DNS mode, not the deployment identity.
+resource privateEndpointDns 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && createPrivateEndpointsAIFactoryWay) {
   name: '${pendCogServiceAIF.name}DnsZone'
   parent: pendCogServiceAIF
   properties:{
@@ -117,7 +118,7 @@ resource privateEndpointApiManagement 'Microsoft.Network/privateEndpoints@2024-0
     pendCogServiceAIF
   ]
 }
-resource privateEndpointDnsAPIM 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (apiManagementProvided && createPrivateEndpointsAIFactoryWay) {
+resource privateEndpointDnsAPIM 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!centralDnsZoneByPolicyInHub && apiManagementProvided && createPrivateEndpointsAIFactoryWay) {
   name: '${privateEndpointApiManagement.name}DnsZone'
   parent: privateEndpointApiManagement
   properties:{

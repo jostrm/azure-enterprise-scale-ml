@@ -29,6 +29,8 @@ The resources that can be added in packages of configs, such as **ARCHITECTURES*
 - **Supports both Github Actions or Azure Devops** as orchestrator to kick-off network calculation and the IaC (BICEP)
 - [**AI Factory Configuration Wizard**](./environment_setup/install_config_wizard/readme.md) Setup in minutes, intelligent workflow-drivern setup Wizard.
 
+The wizard's `scaling-mode` accepts `own-subscriptions` (`172.16.XX.0/20`, Dev/Stage/Prod `0/16/32`) or `shared-subscriptions` (default: `172.16.XX.0/18`, `0/64/128`). Each environment resolves to a network-aligned, non-overlapping VNet so the address ranges permit peering. Consecutive `61/62/63` works for `/24`, not `/18`. JSON/YAML use `scaling-mode`; environment/pipeline exports use `SCALING_MODE`. Canonical templates use the peerable shared defaults; existing user configurations are not migrated. Preflight rejects overlapping or misaligned ranges. “Up to 8 projects” is an address-budget target: the current allocator fits seven full profiles per `/18` with common subnets first, or one per own `/20`. Changing draft configuration never provisions subscriptions or moves deployed subnets. The separate scale-set CLI accepts a resolved `/20` through `AIF_DEV_VNET_CIDR`, not an `XX` template or a wizard-config import. Its integrated VPN places GatewaySubnet at the VNet end before project deployment, blocking the append-only allocator even when space remains; use an external access hub or resolve that allocator limitation before choosing this topology.
+
 [How-to UPDATE AI factory](./documentation/v2/20-29/26-update-AIFactory.md) - When a new feature arrives, or fix for breaking changes in a product?
 - See RELEASES - for Latest, recommended version.
 

@@ -166,6 +166,13 @@ write_preflight_report() {
     report_python="${PYBIN:-$(command -v python3 2>/dev/null || command -v python 2>/dev/null || true)}"
     report_script="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/region_report.py"
     if [ -n "$report_python" ] && [ -f "$report_script" ]; then
+      # Keep ARM argument conversion disabled, but pass a native path to Windows Python.
+      if command -v cygpath >/dev/null 2>&1; then
+        if ! report_script="$(cygpath -m "$report_script")"; then
+          echo "WARNING: AI Factory preflight report path could not be converted; original exit status is unchanged." >&2
+          return "$original_status"
+        fi
+      fi
       export PF_REPORT_REGION="${LOCATION:-${OVERRIDE_LOCATION:-${admin_location:-${AIFACTORY_LOCATION:-}}}}"
       export PF_REPORT_ENVIRONMENT="${ONLY_ENV:-}"
       export PF_REPORT_SUBSCRIPTION_ID="${OVERRIDE_SUB:-}"
@@ -292,14 +299,14 @@ ENABLE_ELASTIC="$(getval enableElasticsearch ENABLE_ELASTICSEARCH false)"
 # Model deployments
 DEPLOY_GPTX="$(getval deployModel_gpt_X DEPLOY_MODEL_GPT_X false)"
 GPTX_NAME="$(getval modelGPTXName MODEL_GPTX_NAME gpt-5.4-mini)"
-GPTX_SKU="$(getval modelGPTXSku MODEL_GPTX_SKU GlobalStandard)"
+GPTX_SKU="$(getval modelGPTXSku MODEL_GPTX_SKU DataZoneStandard)"
 GPTX_CAP="$(getval modelGPTXCapacity MODEL_GPTX_CAPACITY 30)"
 
 DEPLOY_GPT4O="$(getval deployModel_gpt_4o DEPLOY_MODEL_GPT_4O false)"
 DEPLOY_EMB3L="$(getval deployModel_text_embedding_3_large DEPLOY_MODEL_TEXT_EMBEDDING_3_LARGE false)"
 DEPLOY_EMB3S="$(getval deployModel_text_embedding_3_small DEPLOY_MODEL_TEXT_EMBEDDING_3_SMALL false)"
 DEPLOY_ADA="$(getval deployModel_text_embedding_ada_002 DEPLOY_MODEL_TEXT_EMBEDDING_ADA_002 false)"
-DEFAULT_SKU="$(getval default_model_sku DEFAULT_MODEL_SKU Standard)"
+DEFAULT_SKU="$(getval default_model_sku DEFAULT_MODEL_SKU DataZoneStandard)"
 DEFAULT_GPT_CAP="$(getval default_gpt_capacity DEFAULT_GPT_CAPACITY 40)"
 DEFAULT_EMB_CAP="$(getval default_embedding_capacity DEFAULT_EMBEDDING_CAPACITY 25)"
 
@@ -312,14 +319,14 @@ is_true "$DEPLOY_EMB3S" && MODELS+=("text-embedding-3-small|$DEFAULT_SKU|$DEFAUL
 is_true "$DEPLOY_ADA"   && MODELS+=("text-embedding-ada-002|$DEFAULT_SKU|$DEFAULT_EMB_CAP")
 
 # --- Networking CIDRs (common vNet + subnets; XX is substituted per environment) ---
-COMMON_VNET_CIDR="$(getval common_vnet_cidr COMMON_VNET_CIDR 172.16.0.0/16)"
+COMMON_VNET_CIDR="$(getval common_vnet_cidr COMMON_VNET_CIDR 172.16.XX.0/18)"
 COMMON_SUBNET_CIDR="$(getval common_subnet_cidr COMMON_SUBNET_CIDR 172.16.XX.0/26)"
 COMMON_SUBNET_SCORING_CIDR="$(getval common_subnet_scoring_cidr COMMON_SUBNET_SCORING_CIDR 172.16.XX.64/26)"
 COMMON_PBI_SUBNET_CIDR="$(getval common_pbi_subnet_cidr COMMON_PBI_SUBNET_CIDR 172.16.XX.128/26)"
 COMMON_BASTION_SUBNET_CIDR="$(getval common_bastion_subnet_cidr COMMON_BASTION_SUBNET_CIDR 172.16.XX.192/26)"
-DEV_CIDR_RANGE="$(getval dev_cidr_range DEV_CIDR_RANGE 61)"
-TEST_CIDR_RANGE="$(getval test_cidr_range TEST_CIDR_RANGE 62)"
-PROD_CIDR_RANGE="$(getval prod_cidr_range PROD_CIDR_RANGE 63)"
+DEV_CIDR_RANGE="$(getval dev_cidr_range DEV_CIDR_RANGE 0)"
+TEST_CIDR_RANGE="$(getval test_cidr_range STAGE_CIDR_RANGE "${TEST_CIDR_RANGE:-64}")"
+PROD_CIDR_RANGE="$(getval prod_cidr_range PROD_CIDR_RANGE 128)"
 
 # --- BYO subnets ---
 BYO_SUBNETS="$(getval BYO_subnets BYO_SUBNETS false)"
@@ -803,64 +810,69 @@ check_byo_ase() {
 
 # --- Networking: CIDR sanity for the common vNet + subnets and the per-env octet ranges.
 check_cidr_sanity() {
-  # 1) dev/test/prod octet ranges must be distinct integers 0-255.
-  local r bad_range=""
-  for r in "$DEV_CIDR_RANGE" "$TEST_CIDR_RANGE" "$PROD_CIDR_RANGE"; do
-    case "$r" in ''|*[!0-9]*) bad_range="$bad_range $r";; *) [ "$r" -ge 0 ] && [ "$r" -le 255 ] || bad_range="$bad_range $r";; esac
-  done
-  if [ -n "$bad_range" ]; then
-    add_finding FAIL CIDR_RANGE_INVALID "dev/test/prod_cidr_range must be integers 0-255 (bad:$bad_range)." \
-      "Set each *_cidr_range to a distinct octet value 0-255."
-  elif [ "$DEV_CIDR_RANGE" = "$TEST_CIDR_RANGE" ] || [ "$DEV_CIDR_RANGE" = "$PROD_CIDR_RANGE" ] || [ "$TEST_CIDR_RANGE" = "$PROD_CIDR_RANGE" ]; then
-    add_finding FAIL CIDR_RANGE_CONFLICT \
-      "dev/test/prod_cidr_range must be distinct (dev=$DEV_CIDR_RANGE test=$TEST_CIDR_RANGE prod=$PROD_CIDR_RANGE)." \
-      "Pick non-conflicting octet values per environment."
-  else
-    echo "  [OK] dev/test/prod_cidr_range are distinct ($DEV_CIDR_RANGE/$TEST_CIDR_RANGE/$PROD_CIDR_RANGE)."
-  fi
-
-  # 2) common vNet + subnets (substituting XX with the DEV octet) must be valid,
-  #    inside the vNet, non-overlapping, and meet Azure minimum sizes.
+  # Pure address-intent check for every configured environment; no Azure calls.
   local out _cidr_data
-  _cidr_data="$(printf 'VNET|%s\ncommon|%s|28\nscoring|%s|28\npbi|%s|28\nbastion|%s|26\n' \
-      "$COMMON_VNET_CIDR" \
-      "$(sub_xx "$COMMON_SUBNET_CIDR" "$DEV_CIDR_RANGE")" \
-      "$(sub_xx "$COMMON_SUBNET_SCORING_CIDR" "$DEV_CIDR_RANGE")" \
-      "$(sub_xx "$COMMON_PBI_SUBNET_CIDR" "$DEV_CIDR_RANGE")" \
-      "$(sub_xx "$COMMON_BASTION_SUBNET_CIDR" "$DEV_CIDR_RANGE")")"
+  _cidr_data="$(printf 'ENV|Dev|%s\nENV|Stage|%s\nENV|Prod|%s\nVNET|%s\ncommon|%s|28\nscoring|%s|28\npbi|%s|28\nbastion|%s|26\n' \
+      "$DEV_CIDR_RANGE" "$TEST_CIDR_RANGE" "$PROD_CIDR_RANGE" "$COMMON_VNET_CIDR" \
+      "$COMMON_SUBNET_CIDR" "$COMMON_SUBNET_SCORING_CIDR" "$COMMON_PBI_SUBNET_CIDR" \
+      "$COMMON_BASTION_SUBNET_CIDR")"
   out="$(PF_CIDR="$_cidr_data" "$PYBIN" - <<'PY' 2>/dev/null
-import os, sys, ipaddress
+import os, re, ipaddress
+from itertools import combinations
 vnet = None
 subs = []
+environments = []
 for line in os.environ.get("PF_CIDR", "").splitlines():
     line = line.strip()
     if not line:
         continue
     p = line.split('|')
+    if p[0] == 'ENV':
+        environments.append((p[1], p[2])); continue
     if p[0] == 'VNET':
         vnet = p[1]; continue
     minp = int(p[2]) if len(p) > 2 and p[2] else None
     subs.append((p[0], p[1], minp))
 def emit(sev, code, msg): print(sev + '\t' + code + '\t' + msg)
-try:
-    vn = ipaddress.ip_network(vnet, strict=False)
-except Exception:
-    emit('FAIL', 'CIDR_VNET_BAD', 'common_vnet_cidr is not a valid CIDR: ' + str(vnet)); sys.exit(0)
-nets = []
-for role, cidr, minp in subs:
+repair = 'Use network-aligned XX /18 starts 0/64/128 or /20 starts 0/16/32; 61/62/63 needs /24, which cannot fit a full project.'
+def network(template, octet):
+    if not isinstance(template, str) or not re.fullmatch(
+        r'[0-9]{1,3}\.[0-9]{1,3}\.(?:XX|[0-9]{1,3})\.[0-9]{1,3}/[0-9]{1,2}', template
+    ):
+        raise ValueError('Use an IPv4 CIDR with XX only in the third octet')
+    return ipaddress.IPv4Network(template.replace('XX', octet), strict=True)
+vnets = []
+for label, octet in environments:
+    if not octet and label != 'Dev':
+        continue
+    if not re.fullmatch(r'[0-9]{1,3}', octet) or int(octet) > 255:
+        emit('FAIL', 'CIDR_RANGE_INVALID', 'Cannot peer: ' + label + ' range must be an IPv4 third octet (0-255). ' + repair)
+        continue
     try:
-        n = ipaddress.ip_network(cidr, strict=False)
-    except Exception:
-        emit('FAIL', 'CIDR_SUBNET_BAD', role + ' subnet is not a valid CIDR: ' + cidr); continue
-    nets.append((role, n, cidr))
-    if not n.subnet_of(vn):
-        emit('FAIL', 'CIDR_SUBNET_OUTSIDE', role + ' (' + cidr + ') is not inside common_vnet_cidr (' + vnet + ').')
-    if minp is not None and n.prefixlen > minp:
-        emit('FAIL', 'CIDR_SUBNET_TOO_SMALL', role + ' (' + cidr + ') is /' + str(n.prefixlen) + '; Azure needs at least /' + str(minp) + ' here.')
-for i in range(len(nets)):
-    for j in range(i+1, len(nets)):
-        if nets[i][1].overlaps(nets[j][1]):
-            emit('FAIL', 'CIDR_SUBNET_OVERLAP', nets[i][0] + ' (' + nets[i][2] + ') overlaps ' + nets[j][0] + ' (' + nets[j][2] + ').')
+        vn = network(vnet, octet)
+    except ValueError as error:
+        emit('FAIL', 'CIDR_VNET_BAD', 'Cannot peer: ' + label + ' common_vnet_cidr (' + str(vnet).replace('XX', octet) + ') invalid or not network-aligned: ' + str(error) + '. ' + repair)
+        continue
+    vnets.append((label, vn))
+    nets = []
+    for role, template, minp in subs:
+        cidr = template.replace('XX', octet)
+        try:
+            n = network(template, octet)
+        except ValueError:
+            emit('FAIL', 'CIDR_SUBNET_BAD', label + ' ' + role + ' subnet invalid or not network-aligned: ' + cidr); continue
+        nets.append((role, n))
+        if not n.subnet_of(vn):
+            emit('FAIL', 'CIDR_SUBNET_OUTSIDE', label + ' ' + role + ' (' + cidr + ') is not inside common_vnet_cidr (' + str(vn) + ').')
+        if minp is not None and n.prefixlen > minp:
+            emit('FAIL', 'CIDR_SUBNET_TOO_SMALL', label + ' ' + role + ' (' + cidr + ') is /' + str(n.prefixlen) + '; Azure needs at least /' + str(minp) + ' here.')
+    for (left_role, left), (right_role, right) in combinations(nets, 2):
+        if left.overlaps(right):
+            emit('FAIL', 'CIDR_SUBNET_OVERLAP', label + ' ' + left_role + ' (' + str(left) + ') overlaps ' + right_role + ' (' + str(right) + ').')
+for (left_label, left), (right_label, right) in combinations(vnets, 2):
+    if left.overlaps(right):
+        fixed = ' A fixed common_vnet_cidr ignores XX environment ranges for the VNet.' if 'XX' not in vnet else ''
+        emit('FAIL', 'CIDR_VNET_OVERLAP', 'Cannot peer: ' + left_label + ' (' + str(left) + ') overlaps ' + right_label + ' (' + str(right) + ').' + fixed + ' ' + repair)
 PY
 )"
   local had=""
@@ -871,7 +883,7 @@ PY
   done <<EOF
 $out
 EOF
-  [ -z "$had" ] && echo "  [OK] common vNet/subnets valid, inside vNet, non-overlapping, sized OK (DEV octet $DEV_CIDR_RANGE)."
+  [ -z "$had" ] && echo "  [OK] Configured environment VNets/subnets are aligned and non-overlapping; address ranges permit peering, actual peering not verified."
 }
 
 # --- Networking: AKS with userDefinedRouting requires a firewall IP and a

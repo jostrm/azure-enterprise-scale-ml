@@ -229,6 +229,7 @@ class PipelineTemplateTests(unittest.TestCase):
                     self.assertNotIn("runner.temp", str(job.get("env", {})))
                     writer, upload = job["steps"][-2:]
                     self.assertEqual(writer["if"], "always()")
+                    self.assertTrue(writer["continue-on-error"])
                     self.assertEqual(writer["env"]["AIFACTORY_REPORT_JOB_STATUS"], "${{ job.status }}")
                     self.assertEqual(upload["if"], "always()")
                     self.assertEqual(upload["uses"], "actions/upload-artifact@v4")
@@ -372,6 +373,72 @@ if command -v cygpath >/dev/null; then export TMPDIR="$(cygpath -u "$PF_TEST_ROO
         self.assertEqual(reports, [])
         self.assertEqual(blocker.read_text(), "existing file")
         self.assertIn("no report written", result.stderr)
+
+    def run_pipeline_report(self, status, directory, **overrides):
+        env = os.environ.copy()
+        env.update({
+            "BASH_ENV": str(self.mock), "PF_TEST_ROOT": str(self.work),
+            "PF_TEST_PYTHON": sys.executable, "PF_TEST_AZ_CALLS": str(self.work / "az-calls.txt"),
+            "MSYS_NO_PATHCONV": "1", "MSYS2_ARG_CONV_EXCL": "*",
+            "AIFACTORY_REPORT_REGION": "", "AIFACTORY_REPORT_SUBSCRIPTION_ID": "",
+            "AIFACTORY_REPORT_TENANT_ID": "", "AIFACTORY_REPORT_ENVIRONMENT": "",
+            "admin_location": "eastus2", "dev_test_prod_sub_id": SUB,
+            "tenantId": TENANT, "dev_test_prod": "dev",
+            "AIFACTORY_REPORT_JOB": "deploy-project-infra",
+            "AIFACTORY_REPORT_JOB_STATUS": status, "AIFACTORY_REPORT_DIR": str(directory),
+        })
+        env.update(overrides)
+        return subprocess.run(
+            [self.bash, str(SCRIPTS / "write-pipeline-region-report.sh")],
+            cwd=self.work, env=env, capture_output=True, text=True, timeout=30,
+        )
+
+    def test_preflight_report_with_disabled_msys_conversion_preserves_exit_status(self):
+        with patch.dict(os.environ, {"MSYS_NO_PATHCONV": "1", "MSYS2_ARG_CONV_EXCL": "*"}):
+            for option, expected in (("--warn-only", 0), ("--no-warn-only", 1)):
+                with self.subTest(option=option):
+                    result, reports = self.run_preflight(
+                        option, report_directory=self.work / f"native reports {expected}",
+                    )
+                    self.assertEqual(expected, result.returncode, result.stdout + result.stderr)
+                    self.assertEqual(1, len(reports), result.stdout + result.stderr)
+                    self.assertNotIn("can't open file", result.stderr)
+                    self.assertNotIn("preflight report unavailable", result.stderr)
+                    self.assertEqual(reports[0]["observations"][0]["status"], "failed")
+
+    def test_pipeline_wrapper_with_disabled_msys_path_conversion(self):
+        for status, expected in (("success", "passed"), ("failure", "failed"), ("cancelled", "unknown")):
+            with self.subTest(status=status):
+                directory = self.work / f"reports with spaces {status}"
+                result = self.run_pipeline_report(status, directory)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(result.stderr, "")
+                files = list(directory.glob("*.json"))
+                self.assertEqual(len(files), 1, result.stdout + result.stderr)
+                payload = json.loads(files[0].read_text(encoding="utf-8"))
+                self.assertEqual(payload["region"], "eastus2")
+                self.assertEqual(payload["subscription_id"], SUB)
+                self.assertEqual(payload["tenant_id"], TENANT)
+                self.assertEqual(payload["environment"], "dev")
+                self.assertEqual(payload["observations"][0]["status"], expected)
+                self.assertEqual(payload["observations"][0]["check_id"], "pipeline-job:deploy-project-infra")
+        self.assertFalse((self.work / "az-calls.txt").exists())
+
+    def test_pipeline_wrapper_report_errors_are_visible_and_best_effort(self):
+        directory = self.work / "invalid-metadata"
+        result = self.run_pipeline_report("success", directory, dev_test_prod_sub_id="<invalid>")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("no report written", result.stderr)
+        self.assertFalse(directory.exists())
+
+        blocker = self.work / "not-a-directory"
+        blocker.write_text("existing file", encoding="utf-8")
+        result = self.run_pipeline_report("failure", blocker)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("no report written", result.stderr)
+        self.assertEqual(blocker.read_text(encoding="utf-8"), "existing file")
+        self.assertFalse(list(self.work.rglob("*.json")))
+        self.assertFalse((self.work / "az-calls.txt").exists())
 
     def test_pipeline_wrapper_and_ado_artifact_detection_without_cloud_access(self):
         import yaml

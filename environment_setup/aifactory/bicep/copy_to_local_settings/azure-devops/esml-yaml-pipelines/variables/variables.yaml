@@ -1,5 +1,6 @@
 variables:
   aifactory-dash-01: "" # <optional>Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard.<default>""
+  scaling-mode: "shared-subscriptions" # <optional>Wizard network preset: own-subscriptions or shared-subscriptions. Does not provision subscriptions or resize existing networks.<default>shared-subscriptions
   # ============================================================f================  
   # MANDATORY(CHANGE ONCE) - UPDATING submodule RELEASE version
   # If you want to upgrade the AIFactory (Long Term Support branches exists)
@@ -60,6 +61,7 @@ variables:
   adminUsername: "esmladmin" # <optional>VM admin username<default>esmladmin<keep-as-is>
   # Standalone AI Factory, or centralized private DNS zones by Azure Policy in Hub.
   centralDnsZoneByPolicyInHub: "false" # <optional>Centralized DNS via Hub policy<default>false<keep-as-is> <otherwise> true, uses central private DNS zones in HUB resource group managed by Azure Policy.
+  enableAIFactoryHub: "false" # <optional>Own AI Factory Hub intent<default>false Both flags false: standalone; central DNS true: external Hub takes precedence. Configuration only, no deployment.
   privDnsSubscription_param: "<todo>_SubscriptionID" # <optional>Hub DNS subscription ID<default><todo>_SubscriptionID<mandatory> if centralDnsZoneByPolicyInHub:'true' <ensure> Hub connectivity subscription ID where central private DNS zones are deployed.
   privDnsResourceGroup_param: "<todo>_ResourceGroup_name" # <optional>Hub DNS resource group<default><todo>_ResourceGroup_name<mandatory> if centralDnsZoneByPolicyInHub:'true' <ensure> Hub connectivity resource group where central private DNS zones are deployed.
   tenantId: "<todo>_TenantId" # <mandatory>Azure tenant ID<default><todo>_TenantId<ensure> find in Azure Portal > Entra ID > Overview (Directory ID).
@@ -143,7 +145,7 @@ variables:
       # 192.x.x.x  (/16) is less commonly used in large-scale Azure deployments due to its smaller address space.
       # WAF AI Factory Recommended: 172.16.0.0/16
       # Don't use the 172.17.0.0/16 IP address range for your virtual network. This range is the default subnet range used by the Docker bridge network on-premises.
-  common_vnet_cidr: "172.16.0.0/16" # <mandatory>Common vNet CIDR range<default>172.16.0.0/16<keep-as-is> Standalone AI Factory. <otherwise> <ensure> get a vNet range from your networking team for Hub peering.
+  common_vnet_cidr: "172.16.XX.0/18" # <mandatory>Common vNet CIDR<default>172.16.XX.0/18<keep-as-is> XX is the network-aligned per-environment octet; Dev/Stage/Prod must not overlap. Address intent only, not actual peering.
 
   common_subnet_cidr: "172.16.XX.0/26" # <mandatory>Common subnet CIDR<default>172.16.XX.0/26<keep-as-is> XX replaced by dev_cidr_range. <ensure> within common_vnet_cidr.
   common_subnet_scoring_cidr: "172.16.XX.64/26" # <mandatory>Scoring subnet CIDR<default>172.16.XX.64/26<keep-as-is> XX replaced by dev_cidr_range. <ensure> within common_vnet_cidr.
@@ -155,13 +157,13 @@ variables:
   common_bastion_subnet_cidr: "172.16.XX.192/26" # <mandatory>Bastion subnet CIDR<default>172.16.XX.192/26<keep-as-is> XX replaced by dev_cidr_range. <ensure> within common_vnet_cidr.
 
 ## HELP for CIDR RANGE============================================================================
-  # If vnet (common_vnet_cidr) of size /16 you may have subnets (such as common_subnet_cidr) within: 0–255
-  # If vnet of size /18 you may have subnets within: 0–63
-  # If vnet of size /19 you may have subnets within: 0–31
-  # If vnet of size /20 you may have subnets within: 0–15
-  dev_cidr_range: "61" # <mandatory>DEV vNet CIDR substitution value<default>61<keep-as-is> Replaces XX in CIDR templates (e.g. 172.16.61.0/26). <otherwise> choose 0-255 not conflicting with other environments.
-  test_cidr_range: "62" # <mandatory>STAGE vNet CIDR substitution value<default>62<keep-as-is> Replaces XX in CIDR templates (e.g. 172.16.62.0/26). <otherwise> choose 0-255 not conflicting with other environments.
-  prod_cidr_range: "63" # <mandatory>PROD vNet CIDR substitution value<default>63<keep-as-is> Replaces XX in CIDR templates (e.g. 172.16.63.0/26). <otherwise> choose 0-255 not conflicting with other environments.
+  # XX replaces the third octet in BOTH the VNet and common subnet templates.
+  # Shared /18: aligned starts 0/64/128; own /20: 0/16/32. Four /26s occupy each first /24.
+  # Consecutive 61/62/63 is valid for /24, not /18 or /16; /24 cannot fit a full project.
+  # A fixed /16 ignores these ranges for the VNet and overlaps across environments.
+  dev_cidr_range: "0" # <mandatory>DEV network-aligned XX value<default>0<keep-as-is> VNet 172.16.0.0/18.
+  test_cidr_range: "64" # <mandatory>STAGE network-aligned XX value<default>64<keep-as-is> VNet 172.16.64.0/18.
+  prod_cidr_range: "128" # <mandatory>PROD network-aligned XX value<default>128<keep-as-is> VNet 172.16.128.0/18.
 ## HELP for CIDR RANGE ============================================================================
 
 ## ============================================================================
@@ -424,7 +426,7 @@ variables:
   deployModel_gpt_X: "true" # <optional>Deploy custom GPT-X model<default>false<keep-as-is> <otherwise> true, deploy the model defined in modelGPTXName.
   modelGPTXName: "gpt-5.4-mini" # <optional>GPT-X model name<default>gpt-5.4-mini<keep-as-is> <ensure> model is available in your Azure region with sufficient quota.
   modelGPTXVersion: "2026-03-17" # <optional>GPT-X model version<default>2026-03-17<keep-as-is> <ensure> update the version when selecting a different model.
-  modelGPTXSku: "GlobalStandard" # <optional>GPT-X deployment SKU<default>GlobalStandard<keep-as-is> Global processing; use a supported DataZoneStandard or Standard override when required for data residency.
+  modelGPTXSku: "DataZoneStandard" # <optional>GPT-X deployment SKU<default>DataZoneStandard<keep-as-is> Keep inference within the selected data zone; confirm model/SKU availability and quota.
   modelGPTXCapacity: 30 # <optional>GPT-X TPM capacity (K)<default>30<keep-as-is> 30 = 30K tokens per minute.
 
   deployModel_text_embedding_ada_002: "false" # <optional>Deploy text-embedding-ada-002<default>false<keep-as-is>
@@ -439,7 +441,7 @@ variables:
   default_gpt_4o_version: "2024-11-20" # <optional>gpt-4o version<default>2024-11-20<keep-as-is> <otherwise> "2024-08-06".
 
   default_gpt_capacity: 40 # <optional>GPT model TPM capacity (K)<default>40<keep-as-is> 40 = 40K tokens per minute.
-  default_model_sku: "Standard"  # <optional>Default GPT deployment SKU<default>Standard<keep-as-is> ['Standard','DataZoneStandard','GlobalStandard']
+  default_model_sku: "DataZoneStandard"  # <optional>Default model deployment SKU<default>DataZoneStandard<keep-as-is> Keep inference within the selected data zone; confirm model/SKU availability and quota.
   # ============================================================================
   # OPTIONAL: Change if you want to create new resources. Keeps old.
   # ============================================================================

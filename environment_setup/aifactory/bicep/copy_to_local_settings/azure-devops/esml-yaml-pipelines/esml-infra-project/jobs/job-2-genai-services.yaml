@@ -628,6 +628,18 @@ steps:
     inlineScript: |
      $ErrorActionPreference = 'Stop'
 
+     if ($env:DNS_MANAGED_BY_POLICY -eq 'true') {
+       & "$env:SYSTEM_DEFAULTWORKINGDIRECTORY/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/prepareSeedingKeyVaultPrivateDns.ps1" `
+         -VaultSubscription "$(admin_bicep_input_keyvault_subscription)" `
+         -VaultResourceGroup "$(admin_bicep_kv_fw_rg)" `
+         -VaultName "$(admin_bicep_kv_fw)" `
+         -VnetSubscription "$(dev_test_prod_sub_id)" `
+         -VnetResourceGroup "$(vnetResourceGroup_resolved)" `
+         -VnetName "$(vnetNameFull_resolved)" `
+         -DnsManagedByPolicy
+       exit 0
+     }
+
      function Invoke-AzJson {
        param(
          [Parameter(Mandatory = $true)]
@@ -884,6 +896,8 @@ steps:
      }
 
      throw "Key Vault '$vaultHostName' did not resolve to private endpoint IP '$privateEndpointIp'. Verify the '$dnsZoneName' zone link and private endpoint DNS zone group."
+  env:
+    DNS_MANAGED_BY_POLICY: $(centralDnsZoneByPolicyInHub)
 - task: AzureKeyVault@2
   displayName: '03_az_download_seeding_keyvault'
   inputs:
@@ -1055,6 +1069,14 @@ steps:
     inlineScript: |
       $ErrorActionPreference = 'Stop'
       $centralDnsByPolicy = "$(centralDnsZoneByPolicyInHub)"
+      if ($centralDnsByPolicy -eq 'true') {
+        Write-Host 'Central DNS is policy-managed; skipping DNS subscription/zone/link inspection. Existing BYO VNet links remain customer-managed.'
+        # False means not detected here, not absent. Bicep must gate zone creation on policy ownership.
+        foreach ($key in @('zoneazurecontainerapps', 'zoneredis', 'zonepostgres', 'zonesql', 'zoneMongo', 'zoneServicesAi', 'zoneAPIM')) {
+          Write-Host "##vso[task.setvariable variable=$($key)Exists]false"
+        }
+        exit 0
+      }
       $unexpandedPrivDnsSubscription = '$' + '(privDnsSubscription_param)'
       $unexpandedPrivDnsResourceGroup = '$' + '(privDnsResourceGroup_param)'
       $unexpandedCommonResourceGroup = '$' + '(commonResourceGroup_param)'
@@ -4048,7 +4070,8 @@ steps:
   # (2) ensures the 'privatelink.search.windows.net' private DNS zone is LINKED to the
   # exact agent injection VNet (parsed from aca2SubnetId in dynamicNetworkParams.json),
   # and (3) ensures an A-record <search> -> <search private IP> exists in that zone.
-  # It is idempotent and non-fatal (continueOnError) — it only ADDS DNS records/links.
+  # Central DNS is owned by policy; this task must not inspect or mutate its control plane.
+  # Standalone repair is non-fatal (continueOnError).
   #
   # NOTE: This fixes the "private path not reachable" class of failure. If the platform
   # instead validates the AI Search connection via its PUBLIC endpoint at the control
@@ -4063,6 +4086,10 @@ steps:
     inlineScript: |
       #!/bin/bash
       set -e
+      if [ "${DNS_MANAGED_BY_POLICY,,}" = "true" ]; then
+        echo "Central DNS is policy-managed; skipping AI Search DNS repair. Policy owns A records/zone groups and the BYO VNet links are preconfigured."
+        exit 0
+      fi
       # Prevent Git-for-Windows (MSYS) from mangling /subscriptions/... ARM paths.
       export MSYS_NO_PATHCONV=1
 
@@ -4208,6 +4235,8 @@ steps:
       echo ""
       echo "✅ AI Search private reachability wiring complete (PE approved + zone linked to agent VNet + A-record present)."
       echo "   The Foundry account (next task) can now reach AI Search privately; no public fallback required."
+  env:
+    DNS_MANAGED_BY_POLICY: $(centralDnsZoneByPolicyInHub)
 - task: AzureCLI@2
   displayName: '69a-aifoundry-2025-2ndOption-Account'
   condition: and(eq('${{ parameters.phase }}', 'foundry'), succeeded(), eq(variables['enableAIFoundry'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_69_aifoundry_2025'], 'true'), ne(variables['aiFoundryV2Exists'], 'true'))
@@ -5339,13 +5368,56 @@ steps:
 - task: AzureCLI@2
   displayName: '101_generate_hosts_file_info'
   condition: and(eq('${{ parameters.phase }}', 'foundry'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
+  continueOnError: true
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: scriptPath
-    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/ado/70_generate_hosts_file_info.sh'
-    arguments: $(dev_test_prod_sub_id) $(admin_aifactoryPrefixRG) $(project_number_000) $(admin_locationSuffix) $(dev_test_prod) $(admin_aifactorySuffixRG) $(admin_prjResourceSuffix) $(aifactory_salt) $(aifactory_salt_random) $(deployment_random_value) $(projectPrefix) $(projectSuffix)
+    scriptType: pscore
+    scriptLocation: inlineScript
+    powerShellIgnoreLASTEXITCODE: true
+    failOnStandardError: false
+    inlineScript: |
+      $ErrorActionPreference = 'Stop'
+      $PSNativeCommandUseErrorActionPreference = $false
+      Write-Host "##vso[task.setvariable variable=aifactoryHostsInventoryReady]false"
+      try {
+        $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+        if (-not $python) { $python = Get-Command python3 -CommandType Application -ErrorAction SilentlyContinue }
+        if (-not $python) { throw 'Python is required for the hosts inventory.' }
+        $script = Join-Path $env:SYSTEM_DEFAULTWORKINGDIRECTORY 'azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/generate_hosts_file_info.py'
+        & $python.Source -X utf8 $script
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "##vso[task.logissue type=warning]Hosts inventory is unavailable or incomplete; review the preceding diagnostics."
+        }
+        if (Test-Path -LiteralPath (Join-Path $env:HOSTS_OUTPUT_DIR 'private-endpoints.json')) {
+          Write-Host "##vso[task.setvariable variable=aifactoryHostsInventoryReady]true"
+        }
+      } catch {
+        Write-Host "##vso[task.logissue type=warning]Hosts inventory could not complete: $($_.Exception.Message)"
+      }
+      exit 0
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+  env:
+    HOSTS_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
+    HOSTS_RG_PREFIX: $(admin_aifactoryPrefixRG)
+    HOSTS_PROJECT_NUMBER: $(project_number_000)
+    HOSTS_LOCATION_SUFFIX: $(admin_locationSuffix)
+    HOSTS_ENVIRONMENT: $(dev_test_prod)
+    HOSTS_RG_SUFFIX: $(admin_aifactorySuffixRG)
+    HOSTS_PROJECT_PREFIX: $(projectPrefix)
+    HOSTS_PROJECT_SUFFIX: $(projectSuffix)
+    HOSTS_COMMON_NAME: $(vnetResourceGroupBase)
+    HOSTS_COMMON_RESOURCE_GROUP: $(commonResourceGroup_param)
+    HOSTS_VNET_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
+    HOSTS_VNET_RESOURCE_GROUP: $(vnetResourceGroup_resolved)
+    HOSTS_OUTPUT_DIR: $(Build.ArtifactStagingDirectory)/aifactory-hosts/$(System.JobId)-$(System.JobAttempt)
+- task: PublishPipelineArtifact@1
+  displayName: 'Publish AI Factory hosts inventory'
+  condition: and(always(), eq(variables['aifactoryHostsInventoryReady'], 'true'))
+  continueOnError: true
+  inputs:
+    targetPath: $(Build.ArtifactStagingDirectory)/aifactory-hosts/$(System.JobId)-$(System.JobAttempt)
+    artifact: aifactory-hosts-$(System.JobId)-$(System.JobAttempt)
+    publishLocation: pipeline
 - task: AzureCLI@2
   displayName: '110_Cleanup_CapabilityHosts_Before_AccountDeletion'
   continueOnError: true
