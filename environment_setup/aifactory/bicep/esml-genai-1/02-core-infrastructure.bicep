@@ -57,6 +57,8 @@ param storageAccount1001Exists bool = false
 param storageAccount2001Exists bool = false
 param acrProjectExists bool = false
 param applicationInsightExists bool = false
+@description('Deploy workspace-based project Application Insights. Defaults to the existing advanced behavior.')
+param enableApplicationInsights bool = true
 param vmExists bool = false
 param miACAExists bool = false
 param miPrjExists bool = false
@@ -349,7 +351,7 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09
 
 // ============== APPLICATION INSIGHTS ==============
 
-module applicationInsights '../modules/applicationInsightsRGmode.bicep' = {
+module applicationInsights '../modules/applicationInsightsRGmode.bicep' = if (enableApplicationInsights) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('02-AppInsightsSWC4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -942,7 +944,7 @@ module amplsIntegration '../modules/monitoring/amplsIntegration.bicep' = if (ena
     hubVnetResourceGroup: vnetResourceGroupName
     monitoringSubnetName: hubMonitoringSubnetName
     existingLogAnalyticsWorkspaceIds: union(existingAmplsLogAnalyticsWorkspaceIds, [logAnalyticsWorkspace.id])
-    existingApplicationInsightsIds: union(existingAmplsApplicationInsightsIds, [applicationInsights.outputs.ainsId])
+    existingApplicationInsightsIds: union(existingAmplsApplicationInsightsIds, enableApplicationInsights ? [applicationInsights!.outputs.ainsId] : [])
     ingestionAccessMode: 'PrivateOnly'
     queryAccessMode: 'PrivateOnly'
     deployToHubResourceGroup: true
@@ -984,7 +986,7 @@ output storageAccount1001Deployed bool = !storageAccount1001Exists
 output containerRegistryDeployed bool = (!acrProjectExists && useCommonACR == false)
 
 @description('Application Insights deployment status')
-output applicationInsightsDeployed bool = !applicationInsightExists
+output applicationInsightsDeployed bool = enableApplicationInsights && !applicationInsightExists
 
 @description('Virtual Machine deployment status')
 output virtualMachineDeployed bool = (!vmExists && enableProjectVM)

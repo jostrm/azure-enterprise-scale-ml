@@ -1,0 +1,86 @@
+# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
+parameters:
+  - name: cleanup
+    type: boolean
+    default: false
+  - name: target
+    type: string
+    default: ''
+  - name: project
+    type: string
+    default: ''
+  - name: configFile
+    type: string
+    default: ''
+  - name: configHash
+    type: string
+    default: ''
+steps:
+  - ${{ if and(ne(parameters.target, ''), eq(parameters.cleanup, true)) }}:
+    - pwsh: |
+        $path = Join-Path $env:BUILD_SOURCESDIRECTORY 'aifactory/.reviewed-project-config.json'
+        if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
+      condition: always()
+      displayName: Remove run-specific reviewed configuration from this agent workspace
+  - ${{ if and(ne(parameters.target, ''), eq(parameters.cleanup, false)) }}:
+    - pwsh: |
+        $ErrorActionPreference = 'Stop'
+        if ($env:AIFACTORY_CONFIG_FILE -ne 'aifactory/.reviewed-project-config.json') {
+          throw 'Reviewed configuration path mismatch'
+        }
+        $json = $env:AIFACTORY_CONFIG_JSON
+        if ([string]::IsNullOrWhiteSpace($json) -or $json.StartsWith('$(')) {
+          throw 'The protected per-run configuration variable is required'
+        }
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        $hash = [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-','').ToLowerInvariant()
+        if ($hash -ne $env:AIFACTORY_CONFIG_HASH) { throw 'Reviewed configuration hash mismatch' }
+        $document = $json | ConvertFrom-Json -AsHashtable
+        $section = if ($env:AIFACTORY_TARGET -eq 'dev') { 'dev' } else { 'stage_prod' }
+        $values = $document[$section]
+        if (!$values -or "$($values.project_number_000)".PadLeft(3,'0') -ne $env:AIFACTORY_PROJECT) {
+          throw 'Reviewed project identity mismatch'
+        }
+        $key = @{ dev='dev_sub_id'; stage='test_sub_id'; prod='prod_sub_id' }[$env:AIFACTORY_TARGET]
+        $subscription = [guid]::Empty
+        $tenant = [guid]::Empty
+        if (![guid]::TryParse("$($values[$key])", [ref]$subscription) -or
+            ![guid]::TryParse("$($values.tenantId)", [ref]$tenant)) {
+          throw 'Exact target subscription/tenant required; no Dev fallback'
+        }
+        foreach ($entry in $values.GetEnumerator()) {
+          if ($entry.Key -match '(?i)secret|password|token' -and $entry.Value -is [string] -and $entry.Value.Length -gt 3) {
+            $masked = $entry.Value.Replace('%','%AZP25').Replace("`r",'%0D').Replace("`n",'%0A')
+            Write-Host "##vso[task.setsecret]$masked"
+          }
+        }
+        $path = Join-Path $env:BUILD_SOURCESDIRECTORY $env:AIFACTORY_CONFIG_FILE
+        [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($path)) | Out-Null
+        [IO.File]::WriteAllBytes($path, $bytes)
+      displayName: Validate and materialize protected reviewed project configuration
+      env:
+        AIFACTORY_CONFIG_JSON: $(AIFACTORY_CONFIG_JSON)
+        AIFACTORY_CONFIG_FILE: ${{ parameters.configFile }}
+        AIFACTORY_CONFIG_HASH: ${{ parameters.configHash }}
+        AIFACTORY_PROJECT: ${{ parameters.project }}
+        AIFACTORY_TARGET: ${{ parameters.target }}
+    - task: AzureCLI@2
+      displayName: Verify service connection matches reviewed target before deployment
+      inputs:
+        azureSubscription: ${{ iif(eq(parameters.target, 'dev'), variables.dev_service_connection, iif(eq(parameters.target, 'stage'), variables.test_service_connection, variables.prod_service_connection)) }}
+        scriptType: pscore
+        scriptLocation: inlineScript
+        inlineScript: |
+          $ErrorActionPreference = 'Stop'
+          $document = Get-Content -LiteralPath $env:AIFACTORY_CONFIG_FILE -Raw | ConvertFrom-Json -AsHashtable
+          $section = if ($env:AIFACTORY_TARGET -eq 'dev') { 'dev' } else { 'stage_prod' }
+          $values = $document[$section]
+          $key = @{ dev='dev_sub_id'; stage='test_sub_id'; prod='prod_sub_id' }[$env:AIFACTORY_TARGET]
+          $account = az account show --output json | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $account.id -ne $values[$key] -or $account.tenantId -ne $values.tenantId) {
+            throw 'Pipeline service connection differs from the reviewed subscription/tenant'
+          }
+      env:
+        AIFACTORY_CONFIG_FILE: ${{ parameters.configFile }}
+        AIFACTORY_TARGET: ${{ parameters.target }}

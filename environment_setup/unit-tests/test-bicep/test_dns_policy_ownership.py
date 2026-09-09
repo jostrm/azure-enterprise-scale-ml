@@ -5,6 +5,7 @@ import itertools
 import os
 from pathlib import Path
 import re
+import runpy
 import shlex
 import shutil
 import subprocess
@@ -98,16 +99,99 @@ class PipelineDnsOwnershipTests(unittest.TestCase):
 
     def test_github_zone_inspection_policy_guard_avoids_az(self):
         step = task(GHA, "15_Check_Private_DNS_Zones")
-        setup = """
-export DNS_MANAGED_BY_POLICY=true
+        for central in ("true", "True", "false"):
+            with self.subTest(central=central):
+                values = {
+                    "centralDnsZoneByPolicyInHub": central,
+                    "dev_test_prod_sub_id": "project-sub",
+                    "vnetResourceGroup_resolved": "byo-network-rg",
+                    "privDnsSubscription_param": "forbidden-hub-sub",
+                    "privDnsResourceGroup_param": "forbidden-hub-rg",
+                }
+                binding = substitute(step["env"]["DNS_MANAGED_BY_POLICY"], values)
+                setup = f"export DNS_MANAGED_BY_POLICY={shlex.quote(binding)}\n" + """
 GITHUB_ENV="$(mktemp)"
-trap 'rm -f "$GITHUB_ENV"' EXIT
-az() { echo AZ_CALLED; exit 37; }
+trap 'cat "$GITHUB_ENV"; rm -f "$GITHUB_ENV"' EXIT
+az() { echo "AZ_CALLED:$*"; }
 """
-        code, stdout, stderr = self.run_shell("bash", setup + substitute(step["run"], {}))
-        self.assertEqual(0, code, stdout + stderr)
-        self.assertNotIn("AZ_CALLED", stdout)
-        self.assertIn("policy-managed", stdout)
+                code, stdout, stderr = self.run_shell("bash", setup + substitute(step["run"], values))
+                self.assertEqual(0, code, stdout + stderr)
+                self.assertNotIn("forbidden-hub", stdout + stderr)
+                if central.lower() == "true":
+                    self.assertNotIn("AZ_CALLED", stdout)
+                    self.assertIn("policy-managed", stdout)
+                    expected = "false"
+                else:
+                    self.assertIn("AZ_CALLED:account set --subscription project-sub", stdout)
+                    expected = "true"
+                for key in ("zoneazurecontainerapps", "zoneredis", "zonepostgres", "zonesql", "zoneMongo", "zoneServicesAi", "zoneAPIM"):
+                    self.assertIn(f"{key}Exists={expected}", stdout)
+
+    def test_github_seeding_step_binds_policy_switch_without_dns_apis(self):
+        step = task(GHA, "02b_Prepare_Seeding_KeyVault_Private_DNS")
+        for central in ("true", "True", "false"):
+            with self.subTest(central=central):
+                values = {"centralDnsZoneByPolicyInHub": central}
+                source = substitute(step["run"], values).replace(
+                    '"${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/prepareSeedingKeyVaultPrivateDns.ps1"',
+                    "Invoke-TestHelper",
+                )
+                setup = """
+$ErrorActionPreference = 'Stop'
+function Invoke-TestHelper {
+  param([switch] $DnsManagedByPolicy)
+  Write-Host "POLICY_SWITCH:$DnsManagedByPolicy"
+}
+function az { throw 'Seeding wrapper must not call DNS APIs' }
+"""
+                code, stdout, stderr = self.run_shell(
+                    "pwsh", setup + source,
+                    {"DNS_MANAGED_BY_POLICY": substitute(step["env"]["DNS_MANAGED_BY_POLICY"], values)},
+                )
+                self.assertEqual(0, code, stdout + stderr)
+                self.assertIn(f"POLICY_SWITCH:{central.lower() == 'true'}", stdout)
+
+    def test_github_configuration_preserves_central_dns_and_byo_values(self):
+        helper = runpy.run_path(str(BICEP / "scripts/apply-json-config-overrides.py"))
+        mappings = helper["github_runtime_names"](str(GHA))
+        expected = {
+            "CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB": "centralDnsZoneByPolicyInHub",
+            "BYO_SUBNETS": "BYO_subnets",
+            "VNET_RESOURCE_GROUP_PARAM": "vnetResourceGroup_param",
+            "VNET_NAME_FULL_PARAM": "vnetNameFull_param",
+        }
+        for source, target in expected.items():
+            self.assertIn(target, mappings[source])
+        for central, byo in itertools.product((True, False), (True, False)):
+            values, _ = helper["selected_values"](
+                {"dev": {"centralDnsZoneByPolicyInHub": central, "BYO_subnets": byo,
+                         "vnetResourceGroup_param": "byo-rg", "vnetNameFull_param": "byo-vnet"}},
+                "dev",
+            )
+            self.assertEqual(str(central).lower(), values["centralDnsZoneByPolicyInHub"])
+            self.assertEqual(str(byo).lower(), values["BYO_subnets"])
+            self.assertEqual("byo-rg", values["vnetResourceGroup_param"])
+            self.assertEqual("byo-vnet", values["vnetNameFull_param"])
+
+    def test_github_both_phases_use_policy_aware_shared_bicep(self):
+        wrapper = yaml.safe_load((GHA.parent / "infra-project.yml").read_text(encoding="utf-8"))
+        for name, phase in (("deploy_infrastructure", "infra"), ("deploy_foundry", "foundry")):
+            job = wrapper["jobs"][name]
+            self.assertEqual("./.github/workflows/infra-project-phase.yml", job["uses"])
+            self.assertEqual(phase, job["with"]["phase"])
+            self.assertEqual("${{ inputs.config_file }}", job["with"]["config_file"])
+        for name in ("61-foundation", "69a-aifoundry-2025-2ndOption-Account",
+                     "69b-aifoundry-2025-2ndOption-AccountUpdate"):
+            step = task(GHA, name)
+            self.assertIn(
+                '--parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}"',
+                step["run"],
+            )
+            if name.startswith("69"):
+                self.assertIn("/09-ai-foundry-2025-v4.bicep", step["run"])
+                self.assertIn('--parameters useAVMFoundry="false"', step["run"])
+        networking = task(GHA, "07_Deploy_Subnet_IfNotExists")
+        self.assertIn("env.BYO_subnets != 'true'", networking["if"])
 
     def test_all_seeding_routes_pass_policy_ownership_to_shared_helper(self):
         cases = (

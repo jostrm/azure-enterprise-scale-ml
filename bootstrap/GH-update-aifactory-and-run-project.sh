@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
 
 set -euo pipefail
 
@@ -18,10 +19,18 @@ readonly SUBMODULE_BRANCH="release/v1.24"
 readonly WORKFLOW_FILE="infra-project.yml"
 readonly CONFIG_FILE="aifactory/variables.json"
 readonly CONFIG_TEMPLATE_FILE="aifactory/variables-template.json"
-readonly ENVIRONMENT="dev"
+readonly ENVIRONMENT="${AIFACTORY_TARGET_ENVIRONMENT:-dev}"
 readonly RUNNER_LABEL="aifactory-admin-vm"
 
 cd "$REPO_ROOT"
+
+reviewed_project=false
+if [[ -n "${AIFACTORY_TARGET_ENVIRONMENT:-}${AIFACTORY_PROJECT_NUMBER:-}${AIFACTORY_PROJECT_CONFIG:-}" ]]; then
+  reviewed_project=true
+  export AIFACTORY_USE_JSON_OVERRIDE=yes
+  export AIFACTORY_REPO_ROOT="$REPO_ROOT"
+  umask 077
+fi
 
 if [[ "${AIFACTORY_LAUNCHER_STABLE:-}" != "1" ]]; then
   state_dir="$HOME/.aifactory-update-state/gh-$$"
@@ -30,6 +39,15 @@ if [[ "${AIFACTORY_LAUNCHER_STABLE:-}" != "1" ]]; then
   mkdir -p "$state_dir/ui"
   cp "$AIF_UI_LIBRARY" "$state_dir/ui/terminal.sh"
   cp "${BASH_SOURCE[0]}" "$stable_launcher"
+  if [[ "$reviewed_project" == "true" ]]; then
+    deployment_helper="$SCRIPT_DIR/lib/project_deployment.py"
+    if [[ ! -f "$deployment_helper" ]]; then
+      deployment_helper="$REPO_ROOT/azure-enterprise-scale-ml/bootstrap/lib/project_deployment.py"
+    fi
+    [[ -f "$deployment_helper" ]] || { aif_error "Install lib/project_deployment.py for reviewed project deployment."; exit 1; }
+    mkdir -p "$state_dir/lib"
+    cp "$deployment_helper" "$state_dir/lib/project_deployment.py"
+  fi
   chmod +x "$stable_launcher"
   export AIFACTORY_LAUNCHER_STABLE=1
   export AIFACTORY_LAUNCHER_STATE_DIR="$state_dir"
@@ -39,7 +57,44 @@ fi
 
 state_dir="${AIFACTORY_LAUNCHER_STATE_DIR:?Stable launcher state directory is missing.}"
 trap 'rm -rf -- "$state_dir"' EXIT
-aif_banner "GITHUB / UPDATE + RUN" "Preserve configuration. Refresh templates. Deploy with intent."
+project_only=false
+resume_after_bootstrap=false
+for argument in "$@"; do
+  case "$argument" in
+    --project-only)
+      project_only=true
+      ;;
+    --resume-after-bootstrap)
+      resume_after_bootstrap=true
+      ;;
+    --help|-h)
+      printf 'Usage: %s [--project-only]\n' "$(basename "$0")"
+      printf '  --project-only  Skip all AI Factory and template updates; dispatch the project workflow only.\n'
+      exit 0
+      ;;
+    *)
+      aif_error "Unsupported argument: $argument. Use --project-only or --help." >&2
+      exit 1
+      ;;
+  esac
+done
+case "${AIFACTORY_PROJECT_ONLY:-false}" in
+  true|TRUE|1|yes|YES)
+    project_only=true
+    ;;
+  false|FALSE|0|no|NO|"")
+    ;;
+  *)
+    aif_error "AIFACTORY_PROJECT_ONLY must be true or false." >&2
+    exit 1
+    ;;
+esac
+
+if [[ "$project_only" == "true" ]]; then
+  aif_banner "GITHUB / PROJECT ONLY" "Skip AI Factory updates. Dispatch the existing project workflow."
+else
+  aif_banner "GITHUB / UPDATE + RUN" "Preserve configuration. Refresh templates. Deploy with intent."
+fi
 aif_value "Repository" "$REPO_ROOT"
 aif_value "Environment" "$ENVIRONMENT"
 aif_section "01 / Configuration"
@@ -134,30 +189,52 @@ else
   aif_error "A working Python 3 interpreter is required." >&2
   exit 1
 fi
+if [[ "$reviewed_project" == "true" ]]; then
+  export AIFACTORY_PROJECT_ONLY="$project_only"
+  helper_path="$SCRIPT_DIR/lib/project_deployment.py"
+  helper_state_dir="$state_dir"
+  if command -v cygpath >/dev/null 2>&1; then
+    helper_path="$(cygpath -m "$helper_path")"
+    helper_state_dir="$(cygpath -m "$helper_state_dir")"
+    export AIFACTORY_REPO_ROOT="$(cygpath -m "$REPO_ROOT")"
+    if [[ -n "${AIFACTORY_PROJECT_CONFIG:-}" ]]; then
+      export AIFACTORY_PROJECT_CONFIG="$(cygpath -m "$AIFACTORY_PROJECT_CONFIG")"
+    fi
+  fi
+  "${PYTHON[@]}" "$helper_path" --route gha --state-dir "$helper_state_dir"
+  exit "$?"
+fi
 aif_section "02 / GitHub connection"
 gh auth status >/dev/null
 
 backup_dir="$HOME/.aifactory-backups/$(basename "$REPO_ROOT")/$(date -u +%Y%m%dT%H%M%SZ)"
-mkdir -p "$backup_dir"
-
-if [[ -f .env ]]; then
-  cp .env "$state_dir/current.env"
-fi
-if [[ "$use_json_override" == "true" && -f "$CONFIG_FILE" ]]; then
-  cp "$CONFIG_FILE" "$state_dir/variables.json"
-fi
-if [[ -f .env.bak ]]; then
-  cp .env.bak "$backup_dir/.env.bak"
-fi
-
-resume_after_bootstrap=false
-aif_section "03 / Protect local work and refresh templates"
-if [[ "${1:-}" == "--resume-after-bootstrap" ]]; then
-  resume_after_bootstrap=true
-fi
 stash_created=false
 submodule_stash_created=false
-if [[ "$resume_after_bootstrap" == "false" ]]; then
+if [[ "$project_only" == "true" ]]; then
+  aif_section "03 / Project-only mode"
+  aif_info "Skipping submodule pull, template refresh, configuration merge, GitHub variable synchronization, and Git commit/push."
+  if [[ ! -f .env ]]; then
+    aif_error ".env is required to resolve the GitHub repository in project-only mode." >&2
+    exit 1
+  fi
+  if [[ "$use_json_override" == "true" && ! -f "$CONFIG_FILE" ]]; then
+    aif_error "Active JSON configuration file is missing: $CONFIG_FILE" >&2
+    exit 1
+  fi
+else
+  mkdir -p "$backup_dir"
+  if [[ -f .env ]]; then
+    cp .env "$state_dir/current.env"
+  fi
+  if [[ "$use_json_override" == "true" && -f "$CONFIG_FILE" ]]; then
+    cp "$CONFIG_FILE" "$state_dir/variables.json"
+  fi
+  if [[ -f .env.bak ]]; then
+    cp .env.bak "$backup_dir/.env.bak"
+  fi
+
+  aif_section "03 / Protect local work and refresh templates"
+  if [[ "$resume_after_bootstrap" == "false" ]]; then
   if [[ -n "$(git status --porcelain)" ]]; then
     stash_message="Before AI Factory template update $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     git stash push --include-untracked --message "$stash_message" >/dev/null
@@ -182,27 +259,29 @@ if [[ "$resume_after_bootstrap" == "false" ]]; then
 
   printf 'g\n' | bash "$SUBMODULE_PATH/00-start.sh"
   bash "01-aif-copy-aifactory-templates.sh"
-  bash "03-GH-bootstrap-files-no-env-overwrite.sh"
+    bash "03-GH-bootstrap-files-no-env-overwrite.sh"
+  fi
 fi
 
-if [[ "$use_json_override" == "true" && -f "$state_dir/variables.json" ]]; then
-  cp "$state_dir/variables.json" "$CONFIG_FILE"
-fi
+if [[ "$project_only" == "false" ]]; then
+  if [[ "$use_json_override" == "true" && -f "$state_dir/variables.json" ]]; then
+    cp "$state_dir/variables.json" "$CONFIG_FILE"
+  fi
 
-if [[ ! -f .env.template ]]; then
-  aif_error ".env.template was not generated." >&2
-  exit 1
-fi
-if [[ "$use_json_override" == "true" && ! -f "$state_dir/variables.json" ]]; then
-  aif_error "Active JSON configuration file is missing: $CONFIG_FILE" >&2
-  exit 1
-fi
-if [[ "$use_json_override" == "true" && ! -f "$CONFIG_TEMPLATE_FILE" ]]; then
-  aif_error "JSON configuration template was not generated: $CONFIG_TEMPLATE_FILE" >&2
-  exit 1
-fi
+  if [[ ! -f .env.template ]]; then
+    aif_error ".env.template was not generated." >&2
+    exit 1
+  fi
+  if [[ "$use_json_override" == "true" && ! -f "$state_dir/variables.json" ]]; then
+    aif_error "Active JSON configuration file is missing: $CONFIG_FILE" >&2
+    exit 1
+  fi
+  if [[ "$use_json_override" == "true" && ! -f "$CONFIG_TEMPLATE_FILE" ]]; then
+    aif_error "JSON configuration template was not generated: $CONFIG_TEMPLATE_FILE" >&2
+    exit 1
+  fi
 
-aif_section "04 / Configuration changes"
+  aif_section "04 / Configuration changes"
 "${PYTHON[@]}" - \
   "$state_dir/current.env" \
   ".env.template" \
@@ -500,13 +579,16 @@ if [[ -f .env ]]; then
 fi
 mv -f .env.template .env
 rm -f "$CONFIG_TEMPLATE_FILE"
+fi
 
 aif_section "05 / Synchronize GitHub configuration"
 if [[ "$use_json_override" == "true" ]]; then
   aif_info "JSON override supplies deployment variables; bulk .env synchronization is optional."
   aif_info "The JSON file will still be uploaded as one AIFACTORY_CONFIG_JSON secret. Existing authentication secrets must already be configured."
 fi
-if [[ "$use_json_override" != "true" ]] || confirm_update_github_variables; then
+if [[ "$project_only" == "true" ]]; then
+  aif_info "Skipped GitHub variable and secret synchronization in project-only mode."
+elif [[ "$use_json_override" != "true" ]] || confirm_update_github_variables; then
   printf 'd\n\n\nn\n' | bash "10-GH-create-or-update-github-variables.sh"
 else
   aif_info "Skipped bulk GitHub variable/secret updates from .env. The workflow will use JSON override: $config_override_file"
@@ -538,33 +620,35 @@ if [[ "$use_json_override" == "true" ]]; then
     < "$CONFIG_FILE"
 fi
 
-grep -q 'AIFACTORY_CONFIG_JSON' ".github/workflows/$WORKFLOW_FILE"
-grep -q 'runner_selection' ".github/workflows/$WORKFLOW_FILE"
+if [[ "$project_only" == "false" ]]; then
+  grep -q 'AIFACTORY_CONFIG_JSON' ".github/workflows/$WORKFLOW_FILE"
+  grep -q 'runner_selection' ".github/workflows/$WORKFLOW_FILE"
 
-exclude_file="$(git rev-parse --git-path info/exclude)"
-mkdir -p "$(dirname "$exclude_file")"
-grep -qxF "/$CONFIG_FILE" "$exclude_file" 2>/dev/null || printf '/%s\n' "$CONFIG_FILE" >> "$exclude_file"
+  exclude_file="$(git rev-parse --git-path info/exclude)"
+  mkdir -p "$(dirname "$exclude_file")"
+  grep -qxF "/$CONFIG_FILE" "$exclude_file" 2>/dev/null || printf '/%s\n' "$CONFIG_FILE" >> "$exclude_file"
 
-cp "$state_dir/GH-update-aifactory-and-run-project.sh" "$REPO_ROOT/GH-update-aifactory-and-run-project.sh"
-chmod +x "$REPO_ROOT/GH-update-aifactory-and-run-project.sh"
+  cp "$state_dir/GH-update-aifactory-and-run-project.sh" "$REPO_ROOT/GH-update-aifactory-and-run-project.sh"
+  chmod +x "$REPO_ROOT/GH-update-aifactory-and-run-project.sh"
 
-aif_section "06 / Review and publish"
-git add -A
-git rm --cached --ignore-unmatch .env.bak >/dev/null
-git restore --staged -- .env 2>/dev/null || true
-git restore --staged -- "$CONFIG_FILE" 2>/dev/null || true
-if ! git diff --cached --quiet; then
-  if ! confirm_commit_and_continue; then
-    git restore --staged -- .
-    aif_warn "Commit declined. Changes remain in the working tree; no push or workflow run was started."
-    exit 0
+  aif_section "06 / Review and publish"
+  git add -A
+  git rm --cached --ignore-unmatch .env.bak >/dev/null
+  git restore --staged -- .env 2>/dev/null || true
+  git restore --staged -- "$CONFIG_FILE" 2>/dev/null || true
+  if ! git diff --cached --quiet; then
+    if ! confirm_commit_and_continue; then
+      git restore --staged -- .
+      aif_warn "Commit declined. Changes remain in the working tree; no push or workflow run was started."
+      exit 0
+    fi
+    git commit \
+      -m "Update AI Factory templates and GitHub workflow" \
+      -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+    git push origin main
+  else
+    aif_info "No tracked template changes required a commit."
   fi
-  git commit \
-    -m "Update AI Factory templates and GitHub workflow" \
-    -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
-  git push origin main
-else
-  aif_info "No tracked template changes required a commit."
 fi
 
 dispatch_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)

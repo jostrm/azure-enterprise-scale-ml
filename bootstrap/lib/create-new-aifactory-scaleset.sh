@@ -7,7 +7,8 @@ readonly AIF_SUBMODULE_BRANCH="${AIF_SUBMODULE_BRANCH:-release/v1.24}"
 readonly AIF_ADO_RESOURCE="https://app.vssps.visualstudio.com/"
 readonly AIF_SCALESET_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export MSYS2_ARG_CONV_EXCL="${MSYS2_ARG_CONV_EXCL:+$MSYS2_ARG_CONV_EXCL;}/subscriptions/;/providers/;/eid1/;scope=/subscriptions/;privateLinksDnsZones="
-readonly AIF_SIMPLE_MODE_CONTRACT_VERSION=1
+readonly AIF_SIMPLE_MODE_CONTRACT_VERSION=2
+readonly AIF_SUBMODULE_REF="${AIF_SUBMODULE_REF:-}"
 
 aif_scaleset_usage() {
   cat <<'EOF'
@@ -45,6 +46,7 @@ Common non-interactive variables:
   AIF_CONFIGURE_VPN_CLIENT=y|n
   AIF_SIMPLE_MODE=true   Opt in to private-ai-foundation-v1 (GHA, DEV only).
   AIF_COST_CENTER=123456 Simple Mode common and project cost-center tags.
+  AIF_SUBMODULE_REF=<sha> Verified published commit (required for Simple Mode).
 EOF
   if [[ "${AIF_ROUTE:-}" == "gha" ]]; then
     cat <<'EOF'
@@ -88,6 +90,20 @@ aif_is_windows() {
     MINGW*|MSYS*|CYGWIN*) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+aif_resolve_azure_cli() {
+  if command -v az >/dev/null 2>&1; then
+    return 0
+  fi
+  if aif_is_windows && command -v az.cmd >/dev/null 2>&1; then
+    AIF_AZURE_CLI_CMD="$(command -v az.cmd)"
+    az() { "$AIF_AZURE_CLI_CMD" "$@"; }
+    export AIF_AZURE_CLI_CMD
+    export -f az
+    return 0
+  fi
+  aif_require_command az
 }
 
 aif_cleanup() {
@@ -199,6 +215,10 @@ aif_simple_mode_defaults() {
     exit 1
   fi
   [[ "$AIF_SIMPLE_MODE" == "true" ]] || return 0
+  if [[ ! "${AIF_SUBMODULE_REF:-}" =~ ^[0-9a-f]{40}$ ]]; then
+    aif_error "Simple Mode requires AIF_SUBMODULE_REF: the verified published 40-character commit SHA from preview." >&2
+    exit 1
+  fi
   if [[ "$AIF_ROUTE" != "gha" || "$AIF_NO_WAIT" == "true" ||
         "$AIF_PREPARE_ONLY" == "true" || "$AIF_DRY_RUN" == "true" ]]; then
     aif_error "Simple Mode requires the GHA full DEV chain with default waiting; use the Python manifest for an offline preview." >&2
@@ -223,10 +243,109 @@ aif_simple_mode_defaults() {
     printf -v "$name" '%s' "$expected"
   done
   AIF_COST_CENTER="${AIF_COST_CENTER:-123456}"
+  GITHUB_REPOSITORY_VISIBILITY="${GITHUB_REPOSITORY_VISIBILITY:-private}"
+  case "$GITHUB_REPOSITORY_VISIBILITY" in
+    public|private) ;;
+    *) aif_error "GITHUB_REPOSITORY_VISIBILITY must be public or private." >&2; exit 1 ;;
+  esac
+  if [[ -z "${AIF_SIMPLE_PROJECT_RESOURCES_JSON+x}" ]]; then
+    AIF_SIMPLE_PROJECT_RESOURCES_JSON='["foundry","foundry-capability-host","ai-search","cosmos-db","application-insights"]'
+  fi
   if [[ ! "$AIF_COST_CENTER" =~ ^[A-Za-z0-9_-]{1,64}$ ]]; then
     aif_error "Cost center must be 1-64 letters, digits, underscores or hyphens." >&2
     exit 1
   fi
+}
+
+aif_simple_stage() {
+  [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]] || return 0
+  case "$1" in
+    preflight|repository|identity|common|hub|project|completed)
+      printf 'AIF_SIMPLE_STAGE=%s\n' "$1"
+      ;;
+    *)
+      aif_error "Invalid Simple Mode stage." >&2
+      return 1
+      ;;
+  esac
+}
+
+aif_simple_gateway_config() {
+  local extra=()
+  [[ -z "${1:-}" ]] || extra=(--certificate-metadata "$1")
+  "${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/aifactory_scaleset_config.py" \
+    --simple-gateway-inputs \
+    --project-resources "$AIF_SIMPLE_PROJECT_RESOURCES_JSON" \
+    --repository-visibility "$GITHUB_REPOSITORY_VISIBILITY" \
+    --app-gateway-hostname "${AIF_APP_GATEWAY_HOSTNAME:-}" \
+    --app-gateway-backend-fqdn "${AIF_APP_GATEWAY_BACKEND_FQDN:-}" \
+    --app-gateway-certificate-secret-id "${AIF_APP_GATEWAY_CERT_SECRET_ID:-}" \
+    "${extra[@]}"
+}
+
+aif_validate_simple_gateway_prerequisites() {
+  [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]] || return 0
+  local feature vault_name certificate_name
+  feature="$(az feature show --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --namespace Microsoft.Network --name EnableApplicationGatewayNetworkIsolation \
+    --query properties.state --output tsv 2>/dev/null)" || feature=""
+  if [[ "${feature//$'\r'/}" != "Registered" ]]; then
+    aif_error "Private Application Gateway requires Microsoft.Network/EnableApplicationGatewayNetworkIsolation already Registered in Dev; no registration or public fallback is automatic." >&2
+    exit 1
+  fi
+  vault_name="${AIF_APP_GATEWAY_CERT_SECRET_ID#https://}"
+  vault_name="${vault_name%%.vault.azure.net/*}"
+  certificate_name="${AIF_APP_GATEWAY_CERT_SECRET_ID##*/}"
+  az keyvault show --subscription "$AIF_DEV_SUBSCRIPTION_ID" --name "$vault_name" \
+    --query '{id:id,tenantId:properties.tenantId,rbac:properties.enableRbacAuthorization}' \
+    --output json > "$AIF_STATE_DIR/appgw-vault.json"
+  AIF_APP_GATEWAY_CERT_VAULT_ID="$("${AIF_PYTHON[@]}" - "$AIF_STATE_DIR/appgw-vault.json" \
+    "$AIF_DEV_SUBSCRIPTION_ID" "$AIF_TENANT_ID" <<'PY'
+import json, sys
+from pathlib import Path
+vault = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8-sig"))
+if (not str(vault.get("id", "")).lower().startswith("/subscriptions/" + sys.argv[2].lower() + "/")
+        or str(vault.get("tenantId", "")).lower() != sys.argv[3].lower() or vault.get("rbac") is not True):
+    raise SystemExit("Certificate vault must be RBAC-enabled in the selected Dev subscription and tenant.")
+print(vault["id"])
+PY
+)" || return 1
+  AIF_APP_GATEWAY_CERT_VAULT_ID="${AIF_APP_GATEWAY_CERT_VAULT_ID//$'\r'/}"
+  az keyvault certificate show --vault-name "$vault_name" --name "$certificate_name" \
+    --query '{attributes:attributes,policy:policy,sid:sid}' --output json \
+    > "$AIF_STATE_DIR/appgw-certificate-metadata.json"
+  aif_simple_gateway_config "$AIF_STATE_DIR/appgw-certificate-metadata.json" >/dev/null
+}
+
+aif_ensure_simple_github_repository() {
+  local details
+  if details="$(gh repo view "$GITHUB_REPOSITORY" --json visibility,isEmpty 2>/dev/null)"; then
+    "${AIF_PYTHON[@]}" - "$details" "$GITHUB_REPOSITORY_VISIBILITY" <<'PY'
+import json, sys
+repo = json.loads(sys.argv[1])
+if str(repo.get("visibility", "")).lower() != sys.argv[2]:
+    raise SystemExit("Existing repository visibility differs from the requested visibility; it will not be changed.")
+if repo.get("isEmpty") is not True:
+    raise SystemExit("Simple Mode requires an empty GitHub repository; existing content is never replaced.")
+PY
+  elif [[ "$GITHUB_REPOSITORY_VISIBILITY" == "public" ]]; then
+    aif_mutate gh repo create "$GITHUB_REPOSITORY" --public
+  else
+    aif_mutate gh repo create "$GITHUB_REPOSITORY" --private
+  fi
+}
+
+aif_protect_simple_generated_files() {
+  [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]] || return 0
+  grep -qxF '# Simple Mode local configuration and access artifacts' "$AIF_REPO_ROOT/.gitignore" 2>/dev/null ||
+    printf '\n# Simple Mode local configuration and access artifacts\n' >> "$AIF_REPO_ROOT/.gitignore"
+  local pattern
+  for pattern in '.env*' '*variables*.json*' '*variables*.yaml*' '*variables*.yml*' \
+    '*.bak' '*.bak.*' '/.aifactory-access/' '/.aifactory-create-state/' \
+    '*vpnconfig*' '*.pfx' '*.p12' '*.key'; do
+    grep -qxF "$pattern" "$AIF_REPO_ROOT/.gitignore" 2>/dev/null ||
+      printf '%s\n' "$pattern" >> "$AIF_REPO_ROOT/.gitignore"
+  done
 }
 
 aif_validate_guid() {
@@ -1106,7 +1225,9 @@ aif_ensure_target_repository() {
     fi
   else
     gh auth status >/dev/null
-    if ! gh repo view "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+    if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
+      aif_ensure_simple_github_repository
+    elif ! gh repo view "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
       aif_mutate gh repo create "$GITHUB_REPOSITORY" --private
     fi
     AIF_REMOTE_URL="https://github.com/$GITHUB_REPOSITORY.git"
@@ -1168,9 +1289,20 @@ aif_sync_submodule_and_templates() {
     aif_mutate git submodule add -b "$AIF_SUBMODULE_BRANCH" \
       "$AIF_SUBMODULE_URL" azure-enterprise-scale-ml
   fi
-  aif_mutate git -C azure-enterprise-scale-ml fetch origin "$AIF_SUBMODULE_BRANCH"
-  aif_mutate git -C azure-enterprise-scale-ml checkout "$AIF_SUBMODULE_BRANCH"
-  aif_mutate git -C azure-enterprise-scale-ml pull --ff-only origin "$AIF_SUBMODULE_BRANCH"
+  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
+    aif_mutate git -C azure-enterprise-scale-ml fetch origin "$AIF_SUBMODULE_REF"
+    aif_mutate git -C azure-enterprise-scale-ml checkout --detach "$AIF_SUBMODULE_REF"
+    local actual_ref
+    actual_ref="$(git -C azure-enterprise-scale-ml rev-parse HEAD | tr -d '\r')"
+    if [[ "$actual_ref" != "$AIF_SUBMODULE_REF" ]]; then
+      aif_error "Accelerator checkout does not match the verified Simple Mode commit; no Azure resources were changed." >&2
+      exit 1
+    fi
+  else
+    aif_mutate git -C azure-enterprise-scale-ml fetch origin "$AIF_SUBMODULE_BRANCH"
+    aif_mutate git -C azure-enterprise-scale-ml checkout "$AIF_SUBMODULE_BRANCH"
+    aif_mutate git -C azure-enterprise-scale-ml pull --ff-only origin "$AIF_SUBMODULE_BRANCH"
+  fi
 
   if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
     "${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/aifactory_scaleset_config.py" \
@@ -2300,7 +2432,8 @@ aif_write_state_and_configure() {
     "${GITHUB_REPOSITORY:-}" "${AIF_OIDC_CLIENT_ID:-}" \
     "$AIF_RUNNER_MODE" "${ADO_AGENT_POOL:-}" "${ADO_AGENT_NAME:-}" \
     "$AIF_ADMIN_VM_SIZE" "${AIF_SIMPLE_MODE:-false}" "${AIF_COST_CENTER:-}" \
-    "$AIF_TEAM_MEMBER_EMAIL" <<'PY'
+    "$AIF_TEAM_MEMBER_EMAIL" "${AIF_SIMPLE_PROJECT_RESOURCES_JSON:-}" \
+    "${GITHUB_REPOSITORY_VISIBILITY:-private}" <<'PY'
 import json
 import sys
 
@@ -2320,6 +2453,7 @@ keys = (
     "github_repository", "oidc_client_id",
     "runner_mode", "ado_agent_pool", "ado_agent_name", "admin_vm_size",
     "simple_mode", "cost_center", "team_member_email",
+    "simple_project_resources_json", "github_repository_visibility",
 )
 values = dict(zip(keys, sys.argv[2:]))
 values["dev_service_connection"] = values["ado_service_connection"]
@@ -2850,6 +2984,7 @@ PY
 aif_publish_github_configuration() {
   [[ "$AIF_DRY_RUN" != "true" ]] || return 0
   cd "$AIF_REPO_ROOT"
+  aif_protect_simple_generated_files
   printf 'd\n\n\nn\n' | bash ./10-GH-create-or-update-github-variables.sh
   gh secret set AIFACTORY_CONFIG_JSON \
     --repo "$GITHUB_REPOSITORY" \
@@ -2948,6 +3083,7 @@ aif_commit_and_push() {
     return
   fi
   cd "$AIF_REPO_ROOT"
+  aif_protect_simple_generated_files
   local paths=(
     .gitmodules .gitignore azure-enterprise-scale-ml aifactory
     aifactory-usecase-code .github
@@ -3334,6 +3470,56 @@ aif_ensure_simple_hub_artifacts() {
     --output none
 }
 
+aif_prepare_simple_application_gateway() {
+  local gateway_name="agw-${AIF_PREFIX}${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}" principal_id status
+  local common_rg="${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"
+  az deployment group create --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --resource-group "$common_rg" --name simple-appgw-network \
+    --template-file "$AIF_REPO_ROOT/azure-enterprise-scale-ml/bootstrap/lib/simple-app-gateway-network.bicep" \
+    --parameters gatewayName="$gateway_name" vnetName="vnt-esmlcmn-${AIF_LOCATION_SHORT}-dev-001" \
+    vpnClientCidr="$AIF_VPN_CLIENT_CIDR" certificateVaultId="$AIF_APP_GATEWAY_CERT_VAULT_ID" \
+    vaultDnsZoneId="/subscriptions/$AIF_HUB_SUBSCRIPTION_ID/resourceGroups/$AIF_HUB_RESOURCE_GROUP/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net" \
+    costCenter="$AIF_COST_CENTER" --output none
+  status="$(az network private-endpoint show --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --resource-group "$common_rg" --name "pe-${gateway_name}-certificate" \
+    --query 'privateLinkServiceConnections[0].privateLinkServiceConnectionState.status' --output tsv)"
+  if [[ "${status//$'\r'/}" != "Approved" ]]; then
+    aif_error "The gateway certificate vault private endpoint needs owner approval; deployment has stopped." >&2
+    exit 1
+  fi
+  principal_id="$(az identity show --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --resource-group "$common_rg" --name "mi-${gateway_name}" --query principalId --output tsv)"
+  principal_id="${principal_id//$'\r'/}"
+  aif_ensure_role_assignment "$principal_id" ServicePrincipal "Key Vault Secrets User" "$AIF_APP_GATEWAY_CERT_VAULT_ID"
+}
+
+aif_deploy_simple_application_gateway() {
+  [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]] || return 0
+  local gateway_name="agw-${AIF_PREFIX}${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"
+  local common_rg="${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"
+  az deployment group create --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --resource-group "$common_rg" --name simple-appgw \
+    --template-file "$AIF_REPO_ROOT/azure-enterprise-scale-ml/bootstrap/lib/simple-app-gateway.bicep" \
+    --parameters gatewayName="$gateway_name" vnetName="vnt-esmlcmn-${AIF_LOCATION_SHORT}-dev-001" \
+    hostname="$AIF_APP_GATEWAY_HOSTNAME" backendFqdn="$AIF_APP_GATEWAY_BACKEND_FQDN" \
+    certificateSecretId="$AIF_APP_GATEWAY_CERT_SECRET_ID" costCenter="$AIF_COST_CENTER" --output none
+  local attempt
+  for attempt in {1..20}; do
+    if az network application-gateway show-backend-health --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+        --resource-group "$common_rg" --name "$gateway_name" --output json \
+        > "$AIF_STATE_DIR/appgw-health.json" 2>/dev/null &&
+       "${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/aifactory_scaleset_config.py" \
+        --gateway-health "$AIF_STATE_DIR/appgw-health.json" \
+        --app-gateway-backend-fqdn "$AIF_APP_GATEWAY_BACKEND_FQDN" >/dev/null 2>&1; then
+      aif_success "Private HTTPS Application Gateway is provisioned and its backend probe is healthy."
+      return 0
+    fi
+    sleep 30
+  done
+  aif_error "Application Gateway is provisioned but not healthy. Check private DNS/routing, trusted HTTPS backend certificate and unauthenticated GET / returning 200-399. No public fallback was enabled; the scale set is not marked complete." >&2
+  return 1
+}
+
 aif_ensure_private_network_access() {
   local common_rg common_vnet common_subnet
   common_rg="${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"
@@ -3443,6 +3629,7 @@ aif_ensure_private_network_access() {
       aif_prepare_simple_integrated_subnets
       aif_ensure_bastion_developer "$AIF_DEV_SUBSCRIPTION_ID" "$common_rg" "$common_vnet"
       aif_ensure_simple_hub_artifacts
+      aif_prepare_simple_application_gateway
     fi
     aif_ensure_hub_dns_forwarder integrated
     if [[ "$AIF_SETUP_HUB_ACCESS" == "true" ]]; then
@@ -3538,6 +3725,7 @@ aif_deploy_ado() {
 }
 
 aif_deploy_github() {
+  aif_simple_stage common
   aif_run_github_workflow infra-common.yml common \
     --raw-field deploy_dev=true \
     --raw-field deploy_stage=false \
@@ -3547,12 +3735,15 @@ aif_deploy_github() {
     return 0
   fi
   aif_verify_common_resource_group
+  aif_simple_stage hub
   aif_ensure_private_network_access
+  aif_simple_stage project
   aif_run_github_workflow infra-project.yml project \
     --raw-field environment=dev \
     --raw-field config_file=aifactory/variables.json \
     --raw-field runner_selection=github-hosted \
     --raw-field self_hosted_runner_label=
+  aif_deploy_simple_application_gateway
 }
 
 aif_verify_common_resource_group() {
@@ -3613,13 +3804,17 @@ aif_scaleset_main() {
   aif_banner "${AIF_ROUTE^^} / CREATE AI FACTORY SCALE SET" \
     "Prepare subscription, identity, access, automation, common resources, and project."
 
+  aif_simple_stage preflight
   aif_require_command bash
   aif_require_command git
-  aif_require_command az
+  aif_resolve_azure_cli
   aif_require_command realpath
   [[ "$AIF_ROUTE" != "gha" ]] || aif_require_command gh
   aif_python
   aif_simple_mode_defaults
+  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
+    aif_simple_gateway_config >/dev/null
+  fi
   if [[ "$AIF_ROUTE" == "gha" && "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
     if ! gh auth status >/dev/null 2>&1; then
       aif_error "GitHub CLI is not authenticated. Sign in explicitly before Create." >&2
@@ -3641,11 +3836,14 @@ aif_scaleset_main() {
   aif_collect_answers
   aif_confirm_summary
   aif_ensure_azure_login
+  aif_validate_simple_gateway_prerequisites
   aif_validate_admin_vm_size
   [[ "$AIF_ROUTE" != "ado" ]] || aif_ensure_ado_auth
+  aif_simple_stage repository
   aif_ensure_target_repository
   aif_sync_submodule_and_templates
   aif_validate_simple_new_scope
+  aif_simple_stage identity
   aif_register_resource_providers "$AIF_DEV_SUBSCRIPTION_ID"
   aif_use_azure_tenant
   aif_ensure_first_party_enterprise_apps
@@ -3680,5 +3878,6 @@ aif_scaleset_main() {
   if [[ "$AIF_STASH_CREATED" == "true" ]]; then
     aif_warn "Pre-existing work remains protected in the latest target-repository stash."
   fi
+  aif_simple_stage completed
   aif_complete "AI Factory DEV scale set and project deployment completed."
 }

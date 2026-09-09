@@ -229,6 +229,7 @@
     "aseSkuWorkers": 1,
     "enableContainerApps": "false",
     "enableAppInsightsDashboard": "false",
+    "enableApplicationInsights": "true",
     "aca_w_registry_image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
     "enableLogicApps": "false",
     "enableEventHubs": "false",

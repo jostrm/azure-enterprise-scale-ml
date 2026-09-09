@@ -9,13 +9,14 @@ This page lists **all parameters** — both mandatory (**M**) and optional (**O*
 
 ---
 
-## MAUI Simple Mode bootstrap contract v1
+## MAUI Simple Mode bootstrap contract v2
 
 Simple Mode is an explicit `AIF_SIMPLE_MODE=true` opt-in to the existing root
 `GHA-create-new-aifactory-scaleset.sh` entrypoint, not an alternative deployment
 engine. Invoke it with `--non-interactive --yes --repo-root <new-empty-folder>`.
 Default waiting is required: common deployment must finish, then bootstrap
-configures private access, then deploys project `001`. Do not use `--no-wait`,
+configures private access, deploys project `001`, then deploys and health-checks
+the private Application Gateway. Do not use `--no-wait`,
 `--prepare-only`, or the full bootstrap's `--dry-run` as a Simple Mode preview.
 The **offline, read-only** preview is:
 
@@ -28,8 +29,18 @@ Required inputs are `AIF_TENANT_ID`, `AIF_DEV_SUBSCRIPTION_ID`, `AIF_LOCATION`,
 (`owner/repo`), and `AIF_TEAM_MEMBER_EMAIL` (derived from the authenticated user).
 `AIF_TEAM_GROUP_NAME` can be derived; `AIF_SCALESET_SUFFIX` defaults to `001`.
 The launcher must use existing Azure/GitHub authentication: missing sign-in
-fails without opening a login browser. The repository is created **private**
-when absent. No password, PAT, or service-principal secret is requested.
+fails without opening a login browser. `GITHUB_REPOSITORY_VISIBILITY=private|public`
+defaults to **private**, independently of Azure networking. An absent repository
+is created with that visibility. An existing repository must be empty and have
+the requested visibility; its visibility is never changed automatically.
+No password, PAT, or service-principal secret is requested.
+
+For a public repository, generated code and non-secret configuration metadata
+may be public. Persistent `.gitignore` exclusions protect `.env` files,
+`variables*.json`/YAML snapshots and backups, certificate/private-key files,
+and VPN artifacts before staging. Populated deployment JSON is sent as a
+GitHub environment secret, not committed. Review any additional files before
+publishing; these exclusions do not sanitize arbitrary user-authored content.
 
 Fixed bootstrap inputs are `AIF_NETWORK_MODE=priv`, `AIF_TOPOLOGY=s`,
 `AIF_ACCESS_HUB_MODE=i`, `AIF_IDENTITY_MODE=c`, `AIF_SEEDING_MODE=c`,
@@ -39,12 +50,26 @@ Fixed bootstrap inputs are `AIF_NETWORK_MODE=priv`, `AIF_TOPOLOGY=s`,
 and project tags (canonical aliases `tag_costceter_common` / `TAG_COSTCETER_COMMON`
 and `tag_costcenter` / `TAG_COSTCENTER`).
 
-The named **private-ai-foundation-v1** preset writes `scaling-mode=own-subscriptions`,
+The named **private-ai-foundation-v2** preset writes `scaling-mode=own-subscriptions`,
 `enableAIFactoryHub=true` / `ENABLE_AI_FACTORY_HUB=true`,
 `centralDnsZoneByPolicyInHub=false`, and all three public-access flags false.
-It enables Foundry S0 account/project, AI Search **standard**, LRS Storage,
-Key Vault, Application Insights and Log Analytics. Common **Premium ACR** is
-also created by the canonical foundation. Optional ML/Databricks/legacy Foundry
+Its literal `SIMPLE_MODE_RESOURCE_CATALOG` (manifest `resourceCatalog`) has three sections:
+
+| Section | Required resources | Default-selected optional resources |
+|---|---|---|
+| Hub | Integrated VNet, Application Gateway WAF_v2, VPN/P2S, Bastion Developer, private DNS/resolver/policy/IP-group | None |
+| Common | LRS Storage, standard common/seeding Key Vaults, Premium ACR, PerGB2018 Log Analytics, deployment identity/OIDC/team | None |
+| Project | LRS Storage, standard Key Vault, managed identities | Foundry S0 account/project, AI Search standard, Application Insights |
+
+`AIF_SIMPLE_PROJECT_RESOURCES_JSON` defaults to
+`["foundry","ai-search","application-insights"]`. An explicit `[]` disables
+all three optional project resources; storage, Key Vault and managed identities
+remain locked on. Catalog entries contain `id`, `label`, `description`,
+`required`, `default_selected`, and `dependencies`. Application Insights depends
+on the required **common** Log Analytics workspace; it has a separate
+`enableApplicationInsights` / `ENABLE_APPLICATION_INSIGHTS` toggle.
+Foundry/Search shared private links are enabled only when both are selected.
+Optional ML/Databricks/legacy Foundry
 Hub, databases, application hosting, model deployments and agent capability
 hosts are disabled; temporary ML/Databricks bootstrap workspaces are not created.
 This is a private foundation, **not a preloaded model or runnable agent demo**.
@@ -53,17 +78,57 @@ AMPLS remains disabled: the canonical Application Insights and Log Analytics
 telemetry endpoints are **not guaranteed private-only** by these three flags.
 Use Advanced Mode to configure private monitoring.
 
-The integrated access hub adds billable **VpnGw1AZ**, a Standard public IP,
+The integrated access hub adds billable **VpnGw1AZ**, a Standard public IP
+for VPN transport (not public Azure service access),
 billable DNS Private Resolver inbound endpoint, private DNS zones/links,
 a private-DNS initiative assigned to the Dev subscription, and an IP group
 listing the Dev VNet and VPN pool (inventory, not firewall enforcement).
 Bastion **Developer** is created only where available; failure stops the chain
 without silently selecting a paid SKU. **No admin VM is created.**
-GatewaySubnet `172.16.1.0/27` and resolver subnet `172.16.1.32/28` leave room for
-the full project subnet profile in the /20. Existing conflicting allocations
+GatewaySubnet `172.16.1.0/27`, resolver subnet `172.16.1.32/28`, and dedicated
+Application Gateway subnet `172.16.2.0/24` are reserved before project allocation.
+The dedicated gateway subnet is delegated to `Microsoft.Network/applicationGateways`.
+The full project profile still fits in the /20, starting at aligned `172.16.4.0/23`.
+Existing conflicting allocations
 are rejected, never moved or deleted. The VPN profile is saved to the git-ignored
 `.aifactory-access/azurevpnconfig.xml`; the user installs/imports/connects
 manually. Do not publish this connection artifact.
+
+### Required private HTTPS Application Gateway
+
+Three additional inputs are mandatory before execution; a preview can show them
+as blockers, but no empty gateway or self-signed certificate is substituted:
+
+| Environment variable | API field | Requirement |
+|---|---|---|
+| `AIF_APP_GATEWAY_HOSTNAME` | `app_gateway_hostname` | Custom frontend FQDN covered by the certificate DNS SAN |
+| `AIF_APP_GATEWAY_BACKEND_FQDN` | `app_gateway_backend_fqdn` | Distinct private RFC1918 HTTPS backend, reachable from the new VNet, trusted TLS certificate, unauthenticated `GET /` returning 200–399 |
+| `AIF_APP_GATEWAY_CERT_SECRET_ID` | `app_gateway_certificate_secret_id` | Versionless `https://<vault>.vault.azure.net/secrets/<name>` URI of an existing valid, enabled, exportable PFX certificate in an RBAC-enabled Dev-subscription vault |
+
+The certificate URI is a reference, not a secret value. Read-only preflight
+checks the selected subscription/tenant, vault, certificate metadata/SAN/expiry,
+and an already **Registered** `Microsoft.Network/EnableApplicationGatewayNetworkIsolation`
+feature. The caller needs certificate metadata read access and permission to
+create the private endpoint and scoped role assignment on that existing vault.
+No feature registration, certificate creation or modification of the existing
+vault's network settings is automatic. Bootstrap reads metadata, never secret
+values; Application Gateway subsequently resolves the certificate reference
+using its managed identity.
+
+The gateway uses **WAF_v2**, WAF Prevention, TLS 1.2+, HTTPS only, autoscale
+minimum 1 / maximum 2, private frontend **172.16.2.10**, and no public IP.
+Its dedicated managed identity receives Key Vault Secrets User only at the
+certificate vault, reached through an approved private endpoint and private DNS.
+An exact-host private DNS zone with an apex A record avoids shadowing the
+backend's parent DNS zone. The subnet NSG permits private HTTPS egress and DNS,
+then denies other outbound traffic: public backend DNS resolution cannot cause
+a public-route fallback. The frontend accepts Dev/VPN traffic only.
+
+The gateway is finalized after the project workflow. Completion requires a
+healthy backend probe; provisioned-but-unhealthy is **not** successful completion.
+Failed runs may leave billable resources; automatic rollback/deletion is not
+performed. This foundation does not create an application backend or certificate
+for you; prepare these prerequisites or use Advanced Mode.
 
 Only the supplied **Dev subscription** is deployed. The peerable future network
 templates use `172.16.XX.0/20`, four common /26s, and selectors Dev=0,
@@ -80,10 +145,26 @@ without project-SP credentials, then private endpoint access is configured.
 
 Before enabling Create, the launcher must verify that required PURPLE source
 under **`bootstrap` and `environment_setup/aifactory` is committed and published**
-on the selected release branch. The fetched accelerator is checked for
-`AIF_SIMPLE_MODE_CONTRACT_VERSION=1` and matching source content before Azure
+on the selected release branch. It must supply the verified 40-character commit
+SHA as `AIF_SUBMODULE_REF`; bootstrap fetches that exact commit, checks out
+detached HEAD, and verifies HEAD before using the templates. A branch advancing
+after preview therefore cannot silently change the deployment source.
+The fetched accelerator is checked for
+`AIF_SIMPLE_MODE_CONTRACT_VERSION=2` and matching source content before Azure
 resource mutations. A local, unpublished fix is not deployable by remote
 GitHub Actions. Never copy dirty PURPLE files into a consumer submodule.
+The pure helper exposes `simple_mode_manifest_sha256()` (sorted compact JSON)
+and `simple_mode_source_sha256()` (sorted paths and LF-normalized content) for
+binding a preview/confirmation to immutable preset and source fingerprints.
+For machine-safe progress, the Simple Mode script emits only these stage
+records: `AIF_SIMPLE_STAGE=preflight`, `repository`, `identity`, `common`, `hub`,
+`project`, and `completed` (each value has the same `AIF_SIMPLE_STAGE=` prefix).
+The API should persist only exact allowlisted records, not raw CLI output or
+error text. Completion is emitted only after the waited project workflow and
+Application Gateway health verification succeed; failed runs retain their last
+stage. On Windows, Git Bash can use
+the native Azure CLI installation's `az.cmd` from PATH, including child Bash
+scripts, without creating a shim file.
 Existing advanced bootstrap settings remain unchanged unless Simple Mode is
 explicitly selected.
 

@@ -4,18 +4,47 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import ipaddress
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 
-AIF_SIMPLE_MODE_CONTRACT_VERSION = 1
-SIMPLE_MODE_PRESET_NAME = "private-ai-foundation-v1"
+AIF_SIMPLE_MODE_CONTRACT_VERSION = 2
+SIMPLE_MODE_PRESET_NAME = "private-ai-foundation-v2"
 # These trees must be published together; the launcher must not copy dirty PURPLE
 # files into a consumer to make an unpublished feature appear deployable.
 SIMPLE_MODE_REQUIRED_SOURCE_PATHS = ("bootstrap", "environment_setup/aifactory")
+SIMPLE_MODE_RESOURCE_CATALOG = {
+    "hub": [
+        {"id": "virtual-network", "label": "Private virtual network", "description": "Integrated Dev /20 with dedicated access subnets.", "required": True, "default_selected": True, "dependencies": []},
+        {"id": "application-gateway", "label": "Application Gateway WAF_v2", "description": "Billable, autoscale 1-2 instances. Private HTTPS frontend, WAF Prevention, TLS 1.2+, no public IP. Requires hostname, private HTTPS backend and existing Key Vault certificate.", "required": True, "default_selected": True, "dependencies": ["virtual-network", "private-dns"]},
+        {"id": "vpn-gateway", "label": "VPN Gateway VpnGw1AZ", "description": "Billable Entra-authenticated P2S; Standard public IP for VPN transport only. Manual client connection.", "required": True, "default_selected": True, "dependencies": ["virtual-network"]},
+        {"id": "bastion", "label": "Bastion Developer", "description": "No admin VM; region must support Developer, no paid fallback.", "required": True, "default_selected": True, "dependencies": ["virtual-network"]},
+        {"id": "private-dns", "label": "Private DNS and DNS Private Resolver", "description": "Zones, links, billable inbound resolver, scoped DNS policy and access IP-group inventory.", "required": True, "default_selected": True, "dependencies": ["virtual-network"]},
+    ],
+    "common": [
+        {"id": "common-storage", "label": "Common Storage Standard_LRS", "description": "Shared foundation storage and private endpoints.", "required": True, "default_selected": True, "dependencies": ["virtual-network"]},
+        {"id": "common-key-vault", "label": "Common and seeding Key Vaults", "description": "Standard vaults; no project service-principal password required.", "required": True, "default_selected": True, "dependencies": ["private-dns"]},
+        {"id": "common-registry", "label": "Common Container Registry Premium", "description": "Canonical shared registry; Premium is required for Private Link.", "required": True, "default_selected": True, "dependencies": ["virtual-network"]},
+        {"id": "log-analytics", "label": "Common Log Analytics PerGB2018", "description": "Shared diagnostic workspace, also required by optional project Application Insights. AMPLS is not enabled.", "required": True, "default_selected": True, "dependencies": []},
+        {"id": "deployment-identity", "label": "Deployment managed identity and OIDC", "description": "Federated GitHub deployment identity, Entra team and role assignments.", "required": True, "default_selected": True, "dependencies": []},
+    ],
+    "project": [
+        {"id": "storage", "label": "Project Storage Standard_LRS", "description": "Required project storage accounts and private endpoints.", "required": True, "default_selected": True, "dependencies": ["private-dns"]},
+        {"id": "key-vault", "label": "Project Key Vault Standard", "description": "Required project Key Vault and private endpoint.", "required": True, "default_selected": True, "dependencies": ["private-dns"]},
+        {"id": "managed-identities", "label": "Project managed identities", "description": "Required project/platform identities and baseline RBAC.", "required": True, "default_selected": True, "dependencies": []},
+        {"id": "foundry", "label": "Microsoft Foundry S0", "description": "Required private Foundry account and default project; model deployments remain optional.", "required": True, "default_selected": True, "dependencies": ["storage", "key-vault", "managed-identities"]},
+        {"id": "foundry-capability-host", "label": "Foundry capability host", "description": "Required standard private-agent data plane; binds thread, vector-store, and file-storage connections.", "required": True, "default_selected": True, "dependencies": ["foundry", "storage", "ai-search", "cosmos-db"]},
+        {"id": "ai-search", "label": "AI Search Standard", "description": "Required capability-host vector-store connection with private networking.", "required": True, "default_selected": True, "dependencies": ["managed-identities", "private-dns"]},
+        {"id": "cosmos-db", "label": "Azure Cosmos DB", "description": "Required capability-host thread and agent-history store with a private endpoint.", "required": True, "default_selected": True, "dependencies": ["managed-identities", "private-dns"]},
+        {"id": "application-insights", "label": "Application Insights", "description": "Optional workspace-based project telemetry; not private-only without AMPLS.", "required": False, "default_selected": True, "dependencies": ["log-analytics"]},
+    ],
+}
 SIMPLE_MODE_DISABLED = (
     "enableAzureMachineLearning", "addAzureMachineLearning", "enableDatabricks",
     "enableAIFoundryHub", "addAIFoundryHub", "enableAksForAzureML", "enableAKS",
@@ -41,10 +70,99 @@ def simple_mode_enabled(state: dict[str, Any]) -> bool:
     return str(state.get("simple_mode", "false")).lower() == "true"
 
 
-def simple_mode_values(cost_center: str = "123456") -> dict[str, Any]:
+def simple_mode_project_resources(selection: str | list[str] | None = None) -> list[str]:
+    catalog = SIMPLE_MODE_RESOURCE_CATALOG["project"]
+    if selection is None:
+        selection = [item["id"] for item in catalog if item["default_selected"]]
+    elif isinstance(selection, str):
+        try:
+            selection = json.loads(selection)
+        except ValueError as error:
+            raise ValueError("Project resources must be a JSON array of resource IDs") from error
+    if not isinstance(selection, list) or any(not isinstance(item, str) for item in selection):
+        raise ValueError("Project resources must be a JSON array of resource IDs")
+    allowed = {item["id"] for item in catalog}
+    if set(selection) - allowed:
+        raise ValueError("Project resources contain unsupported IDs")
+    return [item["id"] for item in catalog if item["required"] or item["id"] in selection]
+
+
+def simple_mode_gateway_inputs(hostname: str, backend_fqdn: str, certificate_secret_id: str) -> dict[str, str]:
+    missing = [name for name, value in (
+        ("AIF_APP_GATEWAY_HOSTNAME", hostname), ("AIF_APP_GATEWAY_BACKEND_FQDN", backend_fqdn),
+        ("AIF_APP_GATEWAY_CERT_SECRET_ID", certificate_secret_id)) if not value]
+    if missing:
+        raise ValueError("Private HTTPS Application Gateway requires: " + ", ".join(missing))
+    dns = re.compile(r"(?=^.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}$")
+    hostname, backend_fqdn = hostname.lower(), backend_fqdn.lower()
+    if not dns.fullmatch(hostname) or hostname.count(".") < 2 or ".privatelink." in hostname:
+        raise ValueError("Application Gateway hostname must be a custom FQDN with a host and domain")
+    if (not dns.fullmatch(backend_fqdn) or hostname == backend_fqdn
+            or backend_fqdn.endswith("." + hostname)):
+        raise ValueError("Application Gateway backend must be an HTTPS backend FQDN, not an IP or URL")
+    parsed = urlparse(certificate_secret_id)
+    if (parsed.scheme != "https" or not re.fullmatch(r"[a-z0-9-]{3,24}\.vault\.azure\.net", parsed.netloc)
+            or not re.fullmatch(r"/secrets/[A-Za-z0-9-]{1,127}", parsed.path)
+            or parsed.query or parsed.fragment):
+        raise ValueError("Certificate must be a versionless https://<vault>.vault.azure.net/secrets/<name> URI")
+    if hostname == parsed.netloc:
+        raise ValueError("Gateway frontend hostname cannot replace the certificate vault's DNS name")
+    return {"hostname": hostname, "backend_fqdn": backend_fqdn, "certificate_secret_id": certificate_secret_id,
+            "certificate_vault_name": parsed.netloc.split(".")[0], "certificate_name": parsed.path.split("/")[-1],
+            "dns_zone": hostname, "dns_record": "@"}
+
+
+def validate_simple_gateway_certificate(gateway: dict[str, str], certificate: dict[str, Any]) -> None:
+    """Validate metadata only; private certificate/secret values are never requested."""
+    policy = certificate.get("policy") or {}
+    attributes = certificate.get("attributes") or {}
+    names = (policy.get("x509CertificateProperties") or {}).get("subjectAlternativeNames", {}).get("dnsNames") or []
+    hostname = gateway["hostname"]
+    matches = any(name.lower() == hostname or (
+        name.startswith("*.") and hostname.split(".", 1)[1] == name[2:].lower()) for name in names)
+    def timestamp(value: Any) -> float:
+        if isinstance(value, (int, float)):
+            return float(value)
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
+    now = datetime.now(timezone.utc).timestamp()
+    try:
+        valid = (attributes.get("enabled") is True and timestamp(attributes["expires"]) > now
+                 and (not attributes.get("notBefore") or timestamp(attributes["notBefore"]) <= now))
+    except (KeyError, ValueError, TypeError):
+        valid = False
+    sid = str(certificate.get("sid", ""))
+    if (not valid or not matches or not sid.startswith(gateway["certificate_secret_id"] + "/")
+            or (policy.get("keyProperties") or {}).get("exportable") is not True
+            or (policy.get("secretProperties") or {}).get("contentType") != "application/x-pkcs12"):
+        raise ValueError("Gateway certificate must be enabled, valid, exportable PFX and cover the frontend hostname in its DNS SAN metadata")
+
+
+def simple_mode_gateway_healthy(health: dict[str, Any], backend_fqdn: str) -> bool:
+    servers = [server for pool in health.get("backendAddressPools", [])
+               for settings in pool.get("backendHttpSettingsCollection", [])
+               for server in settings.get("servers", [])]
+    private_ranges = [ipaddress.ip_network(value) for value in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")]
+    for server in servers:
+        if server.get("health") != "Healthy":
+            return False
+        address = str(server.get("address", ""))
+        try:
+            if not any(ipaddress.ip_address(address) in network for network in private_ranges):
+                return False
+        except ValueError:
+            if address.rstrip(".").lower() != backend_fqdn.rstrip(".").lower():
+                return False
+    return bool(servers)
+
+
+def simple_mode_values(cost_center: str = "123456", project_resources: str | list[str] | None = None,
+                       repository_visibility: str = "private") -> dict[str, Any]:
     """Canonical secretless Dev foundation without model deployments."""
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", cost_center):
         raise ValueError("Cost center must be 1-64 letters, digits, underscores or hyphens")
+    if repository_visibility not in {"public", "private"}:
+        raise ValueError("GitHub repository visibility must be public or private")
+    selected = simple_mode_project_resources(project_resources)
     return {
         **{key: "false" for key in SIMPLE_MODE_DISABLED},
         "scaling-mode": "own-subscriptions",
@@ -62,6 +180,7 @@ def simple_mode_values(cost_center: str = "123456") -> dict[str, Any]:
         "enableAISearch": "true",
         "enableAISearchSharedPrivateLink": "true",
         "enableCosmosDB": "true",
+        "enableApplicationInsights": str("application-insights" in selected).lower(),
         "updateAIFoundry": "false",
         "addAIFoundry": "false",
         "addAISearch": "false",
@@ -91,7 +210,7 @@ def simple_mode_values(cost_center: str = "123456") -> dict[str, Any]:
         "network_env_dev": "dev",
         "network_env_stage": "test",
         "network_env_prod": "prod",
-        "GITHUB_NEW_REPO_VISIBILITY": "private",
+        "GITHUB_NEW_REPO_VISIBILITY": repository_visibility,
     }
 
 
@@ -101,6 +220,23 @@ def simple_mode_manifest() -> dict[str, Any]:
         "contractVersion": AIF_SIMPLE_MODE_CONTRACT_VERSION,
         "preset": SIMPLE_MODE_PRESET_NAME,
         "requiredSourcePaths": list(SIMPLE_MODE_REQUIRED_SOURCE_PATHS),
+        "sourcePinEnvironment": "AIF_SUBMODULE_REF",
+        "sourcePinFormat": "40-character lowercase Git commit SHA",
+        "resourceCatalog": SIMPLE_MODE_RESOURCE_CATALOG,
+        "appGatewayInputs": {
+            "app_gateway_backend_fqdn": "AIF_APP_GATEWAY_BACKEND_FQDN",
+            "app_gateway_hostname": "AIF_APP_GATEWAY_HOSTNAME",
+            "app_gateway_certificate_secret_id": "AIF_APP_GATEWAY_CERT_SECRET_ID",
+        },
+        "repositoryVisibility": {"environment": "GITHUB_REPOSITORY_VISIBILITY", "default": "private", "allowed": ["private", "public"]},
+        "projectResourcesEnvironment": "AIF_SIMPLE_PROJECT_RESOURCES_JSON",
+        "requiredInputs": [
+            {"environment": "AIF_APP_GATEWAY_HOSTNAME", "name": "app_gateway_hostname", "description": "Custom HTTPS frontend FQDN covered by the certificate."},
+            {"environment": "AIF_APP_GATEWAY_BACKEND_FQDN", "name": "app_gateway_backend_fqdn", "description": "Private RFC1918 HTTPS backend reachable from the new VNet, trusted certificate and GET / returning 200-399."},
+            {"environment": "AIF_APP_GATEWAY_CERT_SECRET_ID", "name": "app_gateway_certificate_secret_id", "description": "Existing versionless Key Vault certificate-secret URI; exportable PFX, valid SAN and RBAC vault in Dev subscription."},
+        ],
+        "stagePrefix": "AIF_SIMPLE_STAGE=",
+        "stages": ["preflight", "repository", "identity", "common", "hub", "project", "completed"],
         "environment": "dev",
         "futureEnvironments": ["stage", "prod"],
         "futureSubscriptionReferences": "Dev placeholders only; configure before future use",
@@ -108,6 +244,8 @@ def simple_mode_manifest() -> dict[str, Any]:
             "No model deployments; add models only after quota validation",
             "AMPLS is disabled: canonical Application Insights/Log Analytics networking is not private-only",
             "Azure/GitHub sign-in and region availability must be validated before deployment",
+            "Private Application Gateway requires an existing certificate/private HTTPS backend and registered EnableApplicationGatewayNetworkIsolation feature",
+            "Public GitHub visibility does not enable public Azure services; generated code and non-secret metadata are public",
         ],
         "configuration": simple_mode_values(),
         "services": {
@@ -122,6 +260,7 @@ def simple_mode_manifest() -> dict[str, Any]:
         },
         "hub": {
             "mode": "standalone-integrated",
+            "applicationGateway": "Required WAF_v2, private frontend 172.16.2.10, HTTPS/TLS 1.2+, WAF Prevention; no public IP",
             "vpnGateway": "VpnGw1AZ (billable), Entra-authenticated P2S",
             "bastion": "Developer; fail if unavailable, no paid fallback",
             "adminVM": False,
@@ -132,17 +271,38 @@ def simple_mode_manifest() -> dict[str, Any]:
         },
         "deploymentIdentityRoles": ["Contributor", "User Access Administrator",
                                     "Key Vault Secrets User"],
+        "gatewayIdentityRoles": ["Key Vault Secrets User (certificate vault only)"],
         "policyIdentityRoles": ["Network Contributor (Dev subscription)"],
     }
 
 
+def simple_mode_manifest_sha256() -> str:
+    payload = json.dumps(simple_mode_manifest(), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def simple_mode_source_sha256(root: Path | None = None) -> str:
+    """Stable cross-platform digest of the same source trees checked at launch."""
+    root = Path(root) if root is not None else Path(__file__).resolve().parents[2]
+    files = [path for tree in SIMPLE_MODE_REQUIRED_SOURCE_PATHS
+             for path in (root / tree).rglob("*")
+             if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"]
+    digest = hashlib.sha256()
+    for path in sorted(files, key=lambda item: item.relative_to(root).as_posix()):
+        digest.update(path.relative_to(root).as_posix().encode("utf-8") + b"\0")
+        digest.update(hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).digest())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
 def simple_mode_hub_subnets(cidr: str, existing: list[dict[str, Any]]) -> dict[str, str]:
-    """Reserve both low-address blocks before either is created; never move subnets."""
+    """Reserve the access blocks before creation; never move existing subnets."""
     network = ipaddress.ip_network(cidr, strict=True)
     if str(network) != "172.16.0.0/20":
-        raise ValueError("Simple Mode contract v1 requires Dev VNet 172.16.0.0/20")
+        raise ValueError("Simple Mode contract v2 requires Dev VNet 172.16.0.0/20")
     planned = {"GatewaySubnet": "172.16.1.0/27",
-               "snet-dns-private-resolver": "172.16.1.32/28"}
+               "snet-dns-private-resolver": "172.16.1.32/28",
+               "snet-application-gateway": "172.16.2.0/24"}
     for subnet in existing:
         name = subnet["name"]
         prefixes = subnet.get("addressPrefixes") or [subnet.get("addressPrefix")]
@@ -177,7 +337,7 @@ def verify_simple_mode_source(expected_root: Path, checkout_root: Path) -> None:
         rf"^AIF_SIMPLE_MODE_CONTRACT_VERSION = {AIF_SIMPLE_MODE_CONTRACT_VERSION}$",
         helper.read_text(encoding="utf-8-sig"), re.MULTILINE,
     ):
-        raise ValueError("Published accelerator lacks Simple Mode contract v1; publish PURPLE first")
+        raise ValueError("Published accelerator lacks Simple Mode contract v2; publish PURPLE first")
     for relative_tree in SIMPLE_MODE_REQUIRED_SOURCE_PATHS:
         for source in (expected_root / relative_tree).rglob("*"):
             if not source.is_file() or "__pycache__" in source.parts or source.suffix == ".pyc":
@@ -213,7 +373,7 @@ def simple_mode_env_values(values: dict[str, Any]) -> dict[str, Any]:
         "STAGE_CIDR_RANGE": values["test_cidr_range"],
         "PROD_CIDR_RANGE": values["prod_cidr_range"],
         "DEV_NETWORK_ENV": "dev", "STAGE_NETWORK_ENV": "test", "PROD_NETWORK_ENV": "prod",
-        "GITHUB_NEW_REPO_VISIBILITY": "private",
+        "GITHUB_NEW_REPO_VISIBILITY": values["GITHUB_NEW_REPO_VISIBILITY"],
     })
     return result
 
@@ -510,8 +670,10 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
         values.update({"tag_costceter_common": state["cost_center"], "tag_costcenter": state["cost_center"]})
     if simple_mode_enabled(state):
         if state["dev_vnet_cidr"] != "172.16.0.0/20":
-            raise ValueError("Simple Mode contract v1 requires Dev VNet 172.16.0.0/20")
-        values.update(simple_mode_values(state.get("cost_center") or "123456"))
+            raise ValueError("Simple Mode contract v2 requires Dev VNet 172.16.0.0/20")
+        values.update(simple_mode_values(
+            state.get("cost_center") or "123456", state.get("simple_project_resources_json"),
+            state.get("github_repository_visibility") or "private"))
         values["technical_admins_email"] = state.get("team_member_email") or state["team_group_name"]
         # GHA passes tags directly to ARM, so resolve the cost center rather than
         # exporting ADO's $(...) expressions into GitHub Actions.
@@ -654,6 +816,14 @@ def main() -> int:
     parser.add_argument("--simple-mode-manifest", action="store_true")
     parser.add_argument("--verify-simple-mode-source", type=Path)
     parser.add_argument("--simple-mode-hub-subnets", type=Path)
+    parser.add_argument("--simple-gateway-inputs", action="store_true")
+    parser.add_argument("--project-resources")
+    parser.add_argument("--repository-visibility", default="private")
+    parser.add_argument("--app-gateway-hostname", default="")
+    parser.add_argument("--app-gateway-backend-fqdn", default="")
+    parser.add_argument("--app-gateway-certificate-secret-id", default="")
+    parser.add_argument("--certificate-metadata", type=Path)
+    parser.add_argument("--gateway-health", type=Path)
     parser.add_argument("--route", choices=("ado", "gha"))
     parser.add_argument("--repo-root", type=Path)
     parser.add_argument("--state-file", type=Path)
@@ -669,6 +839,17 @@ def main() -> int:
         existing = json.loads(args.simple_mode_hub_subnets.read_text(encoding="utf-8-sig"))
         print(json.dumps(simple_mode_hub_subnets("172.16.0.0/20", existing)))
         return 0
+    if args.simple_gateway_inputs:
+        simple_mode_values(project_resources=args.project_resources, repository_visibility=args.repository_visibility)
+        gateway = simple_mode_gateway_inputs(args.app_gateway_hostname, args.app_gateway_backend_fqdn,
+                                             args.app_gateway_certificate_secret_id)
+        if args.certificate_metadata:
+            validate_simple_gateway_certificate(gateway, json.loads(args.certificate_metadata.read_text(encoding="utf-8-sig")))
+        print(json.dumps(gateway))
+        return 0
+    if args.gateway_health:
+        health = json.loads(args.gateway_health.read_text(encoding="utf-8-sig"))
+        return 0 if simple_mode_gateway_healthy(health, args.app_gateway_backend_fqdn) else 1
     if not all((args.route, args.repo_root, args.state_file)):
         parser.error("--route, --repo-root and --state-file are required")
     state = json.loads(args.state_file.read_text(encoding="utf-8"))
