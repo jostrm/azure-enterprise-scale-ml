@@ -1,0 +1,15 @@
+{
+  "description": "Pinned, locally bundled MIT-licensed terminal assets; no runtime npm or network dependency.",
+  "downloadNote": "The official npm registry TLS handshake was unavailable. Exact published npm package files were obtained from the unpkg.com npm mirror and all five SHA256 hashes independently matched the jsdelivr npm mirror; they are bundled locally, never fetched at runtime.",
+  "sha256": {
+    "xterm.js": "1F991AC3B4B283EBF96E60AE23A00A52765DD3A2E46FA6FDDA9F1AAB032F7495",
+    "xterm.css": "BA8E6985669488981CCF40C0CEFE3ABA80722CB6C92DE7AD628B0BD717FAF2B6",
+    "xterm.LICENSE": "B569F629D00F2626A8100DF2A1798210535621E42164DFD426A6FE5AAC7B0CCD",
+    "addon-fit.js": "BDAEFA370B1BFC42EE88D46FE6072400902A4D4B2D45CD93438DDA9B23C97089",
+    "addon-fit.LICENSE": "E256F01188AF527E4D06D21D06FBF785AE9C50D4B328BF03CBE0BA7F0AA4228F"
+  },
+  "packages": [
+    { "name": "@xterm/xterm", "version": "5.5.0", "registry": "https://registry.npmjs.org", "license": "MIT", "files": ["xterm.js", "xterm.css", "xterm.LICENSE"] },
+    { "name": "@xterm/addon-fit", "version": "0.10.0", "registry": "https://registry.npmjs.org", "license": "MIT", "files": ["addon-fit.js", "addon-fit.LICENSE"] }
+  ]
+}

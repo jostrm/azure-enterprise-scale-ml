@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView x:Class="ESAIF.ConfigWizard.Controls.VNetFormatHelpView"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls">
+    <Border Padding="12" Margin="0,0,0,8" StrokeShape="RoundRectangle 10"
+            BackgroundColor="{DynamicResource SurfaceSelected}" StrokeThickness="0" AutomationId="VNetFormatHelp">
+        <VerticalStackLayout Spacing="8">
+            <Label Text="Supported VNet formats" FontSize="14" FontAttributes="Bold" />
+            <Grid ColumnDefinitions="70,*,*" ColumnSpacing="10">
+                <Label Text="Mode" FontSize="12" FontAttributes="Bold" />
+                <Label Grid.Column="1" Text="VNet template" FontSize="12" FontAttributes="Bold" />
+                <Label Grid.Column="2" Text="Dev / Stage / Prod" FontSize="12" FontAttributes="Bold" />
+            </Grid>
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding FormatExamples}" Spacing="5">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnDefinitions="70,*,*" ColumnSpacing="10">
+                            <controls:TechnicalLabel Caption="Mode" Value="{Binding Mode}" FontSize="12" />
+                            <controls:TechnicalLabel Caption="Template" Grid.Column="1" Value="{Binding Template}" FontSize="12" />
+                            <controls:TechnicalLabel Caption="Ranges" Grid.Column="2" Value="{Binding Ranges}" FontSize="12" />
+                        </Grid>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding FormatNotes}" Spacing="7">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate>
+                        <controls:TechnicalLabel Caption="" Value="{Binding .}" FontSize="12" LineBreakMode="WordWrap" />
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+    </Border>
+</ContentView>

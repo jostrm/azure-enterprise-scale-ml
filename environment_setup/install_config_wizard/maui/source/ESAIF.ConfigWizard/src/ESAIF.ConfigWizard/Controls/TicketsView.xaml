@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    x:Class="ESAIF.ConfigWizard.Controls.TicketsView"
+    x:Name="TicketContent"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls">
+    <ScrollView>
+        <VerticalStackLayout Padding="24,0,24,24" Spacing="12" MaximumWidthRequest="1250">
+            <Label Text="Paste a project resource group to identify its factory. Severity is separate from ticket type." FontSize="13" />
+            <Label Text="Azure sign-in is required to save tickets. Name extraction needs only the connected API; no local factory folder is required. External sync remains manual." FontSize="13" />
+            <controls:TechnicalLabel Caption="Owner" Value="{Binding Owner, StringFormat='Owner: {0}'}" FontSize="13" FontAttributes="Bold" />
+            <FlexLayout Direction="Row" Wrap="Wrap" IsEnabled="{Binding IsNotBusy}">
+                <Button Text="Reload my tickets" Command="{Binding ReloadCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,10,4" />
+                <Button Text="Manage ticket connections" Command="{Binding ManageConnectionsCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,10,4" />
+            </FlexLayout>
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            <controls:TechnicalLabel Caption="Status Message" Value="{Binding StatusMessage}" FontSize="13" />
+            <controls:TechnicalLabel Caption="Warning" Value="{Binding Warning}" FontSize="13" TextColor="{DynamicResource Warning}" />
+            <controls:TechnicalLabel Caption="Error Message" Value="{Binding ErrorMessage}" FontSize="13" TextColor="{DynamicResource Danger}" AutomationId="TicketsError" />
+
+            <Border Style="{StaticResource CardBorder}" IsEnabled="{Binding IsNotBusy}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="New ticket" Style="{StaticResource SectionTitle}" />
+                    <controls:TechnicalLabel Caption="Draft Context Hint" Value="{Binding DraftContextHint}" FontSize="13" AutomationId="TicketDraftContext" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Type" FontSize="13" />
+                            <controls:TechnicalPicker ItemsSource="{Binding Types}" SelectedItem="{Binding TicketType}" FontSize="13"
+                                    SemanticProperties.Description="Ticket type" AutomationId="TicketType" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="3">
+                            <Label Text="Severity" FontSize="13" />
+                            <controls:TechnicalPicker ItemsSource="{Binding Severities}" SelectedItem="{Binding Severity}" FontSize="13"
+                                    SemanticProperties.Description="Ticket severity" AutomationId="TicketSeverity" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Label Text="Project resource-group name" FontSize="13" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <controls:TechnicalEntry Caption="Resource Group" Text="{Binding ResourceGroup}" Placeholder="mrvel-1-project011-sdc-dev-007" FontSize="13"
+                               ReturnCommand="{Binding ExtractResourceGroupCommand}" AutomationId="TicketResourceGroup"
+                               SemanticProperties.Description="Project resource-group name" />
+                        <Button Grid.Column="1" Text="Extract details" Command="{Binding ExtractResourceGroupCommand}"
+                                Style="{StaticResource SecondaryButton}" FontSize="12" Padding="10,5" MinimumHeightRequest="36"
+                                AutomationId="ExtractTicketResourceGroup" />
+                    </Grid>
+                    <Border IsVisible="{Binding HasResourceIdentity}" Padding="10" StrokeShape="RoundRectangle 10"
+                            BackgroundColor="{DynamicResource SurfaceSelected}" StrokeThickness="0">
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="Extracted by the API · read-only" FontSize="12" FontAttributes="Bold" />
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                                <controls:TechnicalLabel Caption="Environment" Value="{Binding Environment, StringFormat='Environment: {0}'}" FontSize="12" AutomationId="TicketEnvironment" />
+                                <controls:TechnicalLabel Caption="Project Number" Grid.Column="1" Value="{Binding ProjectNumber, StringFormat='Project number: {0}'}" FontSize="12" AutomationId="TicketProjectNumber" />
+                                <controls:TechnicalLabel Caption="Region" Grid.Column="2" Value="{Binding Region, StringFormat='Region: {0}'}" FontSize="12" AutomationId="TicketRegion" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <controls:TechnicalLabel Caption="Ai Factory Prefix" Value="{Binding AiFactoryPrefix, StringFormat='AI Factory prefix: {0}'}" FontSize="12" AutomationId="TicketFactoryPrefix" />
+                                <controls:TechnicalLabel Caption="Ai Factory Suffix" Grid.Column="1" Value="{Binding AiFactorySuffix, StringFormat='AI Factory suffix / scale set: {0}'}" FontSize="12" AutomationId="TicketFactorySuffix" />
+                            </Grid>
+                            <Label Text="test is normalized to stage. These are naming details, not proof of deployment or access." FontSize="11" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Label Text="Title" FontSize="13" />
+                    <controls:TechnicalEntry Caption="Title" Text="{Binding Title}" Placeholder="Short, descriptive title" FontSize="13" />
+                    <Label Text="Description" FontSize="13" />
+                    <controls:TechnicalEntry IsMultiline="True" Caption="Description" Text="{Binding Description}" Placeholder="Describe the request, bug, or blocker" MinimumHeightRequest="100" FontSize="13" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="Cost center (optional)" FontSize="13" />
+                            <controls:TechnicalEntry Caption="Cost Center" Text="{Binding CostCenter}" Placeholder="12345" FontSize="13" MaxLength="128" AutomationId="TicketCostCenter" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="3">
+                            <Label Text="Department name (optional)" FontSize="13" />
+                            <controls:TechnicalEntry Caption="Department Name" Text="{Binding DepartmentName}" Placeholder="hr" FontSize="13" MaxLength="128" AutomationId="TicketDepartmentName" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Label Text="Requested Azure service (required for Request Azure service tickets)" FontSize="13" />
+                    <controls:TechnicalEntry Caption="Requested Service" Text="{Binding RequestedService}" Placeholder="Service name; leave empty if not applicable" FontSize="13" />
+                    <Label Text="The resource-group name identifies this ticket's factory, not the folder open in the wizard. Owner is your Azure identity. Creating a ticket sends nothing to external connectors." FontSize="12" />
+                    <Button Text="Create ticket" Command="{Binding CreateCommand}" HorizontalOptions="Start" AutomationId="CreateTicket" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Label Text="My tickets · all factories" Style="{StaticResource SectionTitle}" />
+            <controls:TechnicalLabel Caption="Counts Label" Value="{Binding CountsLabel}" FontSize="13" />
+            <Label Text="No tickets loaded. Reload after signing in, or create your first ticket. Check any error above." IsVisible="{Binding IsEmpty}" FontSize="13" />
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Tickets}" Spacing="8" IsEnabled="{Binding IsNotBusy}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource CardBorder}">
+                            <VerticalStackLayout Spacing="5">
+                                <controls:TechnicalLabel Caption="Title" Value="{Binding Title}" FontSize="13" FontAttributes="Bold" />
+                                <controls:TechnicalLabel Caption="Identifier" Value="{Binding Id, StringFormat='Ticket: {0}'}" FontSize="13" />
+                                <FlexLayout Direction="Row" Wrap="Wrap">
+                                    <controls:TechnicalLabel Caption="Status" Value="{Binding Status, StringFormat='Status: {0}'}" FontSize="13" Margin="0,0,16,0" />
+                                    <controls:TechnicalLabel Caption="Type" Value="{Binding Type, StringFormat='Type: {0}'}" FontSize="13" Margin="0,0,16,0" />
+                                    <controls:TechnicalLabel Caption="Severity" Value="{Binding Severity, StringFormat='Severity: {0}'}" FontSize="13" FontAttributes="Bold" />
+                                </FlexLayout>
+                                <controls:TechnicalLabel Caption="Owner" Value="{Binding Owner, StringFormat='Owner: {0}'}" FontSize="13" />
+                                <controls:TechnicalLabel Caption="Resource Group" Value="{Binding ResourceGroup, StringFormat='Resource group: {0}'}" FontSize="13" />
+                                <FlexLayout Direction="Row" Wrap="Wrap">
+                                    <controls:TechnicalLabel Caption="Ai Factory Prefix" Value="{Binding AiFactoryPrefix, StringFormat='Factory prefix: {0}'}" FontSize="12" Margin="0,0,16,0" />
+                                    <controls:TechnicalLabel Caption="Ai Factory Suffix" Value="{Binding AiFactorySuffix, StringFormat='Suffix / scale set: {0}'}" FontSize="12" />
+                                </FlexLayout>
+                                <FlexLayout Direction="Row" Wrap="Wrap">
+                                    <controls:TechnicalLabel Caption="Environment" Value="{Binding Environment, StringFormat='Environment: {0}'}" FontSize="12" Margin="0,0,16,0" />
+                                    <controls:TechnicalLabel Caption="Region" Value="{Binding Region, StringFormat='Region: {0}'}" FontSize="12" />
+                                </FlexLayout>
+                                <controls:TechnicalLabel Caption="Project Number" Value="{Binding ProjectNumber, TargetNullValue='Not specified', StringFormat='Project: {0}'}" FontSize="13" />
+                                <FlexLayout Direction="Row" Wrap="Wrap">
+                                    <controls:TechnicalLabel Caption="Cost Center" Value="{Binding CostCenter, StringFormat='Cost center: {0}'}" FontSize="12" Margin="0,0,16,0" />
+                                    <controls:TechnicalLabel Caption="Department Name" Value="{Binding DepartmentName, StringFormat='Department: {0}'}" FontSize="12" />
+                                </FlexLayout>
+                                <controls:TechnicalLabel Caption="Description" Value="{Binding Description}" FontSize="13" />
+                                <controls:TechnicalLabel Caption="Requested Service" Value="{Binding RequestedService, TargetNullValue='Not specified', StringFormat='Requested service: {0}'}" FontSize="13" />
+                                <controls:TechnicalLabel Caption="Updated At" Value="{Binding UpdatedAt, StringFormat='Updated: {0}'}" FontSize="13" />
+                                <controls:TechnicalLabel Caption="Sync State" Value="{Binding SyncState, TargetNullValue='Not synced', StringFormat='Sync: {0}'}" FontSize="13" />
+                                <controls:TechnicalLabel Caption="External Url" Value="{Binding ExternalUrl, TargetNullValue='None', StringFormat='External URL: {0}'}" FontSize="13" />
+                                <Button Text="Select for status, severity / manual sync" Style="{StaticResource SecondaryButton}" HorizontalOptions="Start"
+                                        Command="{Binding Source={x:Reference TicketContent}, Path=BindingContext.SelectTicketCommand}" CommandParameter="{Binding .}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+            <Border Style="{StaticResource CardBorder}" IsVisible="{Binding HasSelection}" IsEnabled="{Binding IsNotBusy}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Selected ticket" Style="{StaticResource SectionTitle}" />
+                    <controls:TechnicalLabel Caption="Title" Value="{Binding SelectedTicket.Title}" FontSize="13" FontAttributes="Bold" />
+                    <controls:TechnicalLabel Caption="Owner" Value="{Binding SelectedTicket.Owner, StringFormat='Owner: {0}'}" FontSize="13" />
+                    <controls:TechnicalLabel Caption="Resource Group" Value="{Binding SelectedTicket.ResourceGroup, StringFormat='Resource group: {0}'}" FontSize="13" />
+                    <controls:TechnicalLabel Caption="Project Number" Value="{Binding SelectedTicket.ProjectNumber, TargetNullValue='Not specified', StringFormat='Project: {0}'}" FontSize="13" />
+                    <Label Text="Status" FontSize="13" />
+                    <controls:TechnicalPicker Title="New / Active / Solved" ItemsSource="{Binding Statuses}" SelectedItem="{Binding SelectedStatus}" FontSize="13" />
+                    <Label Text="Severity" FontSize="13" />
+                    <controls:TechnicalPicker ItemsSource="{Binding Severities}" SelectedItem="{Binding SelectedSeverity}" FontSize="13"
+                            SemanticProperties.Description="Selected ticket severity" />
+                    <Button Text="Save status and severity" Command="{Binding SaveStatusCommand}" HorizontalOptions="Start" />
+                    <Label Text="Connector profile for a one-time manual sync" FontSize="13" />
+                    <controls:TechnicalPicker Title="Choose Jira or ServiceNow profile" ItemsSource="{Binding Connections}"
+                            ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedConnection}" FontSize="13" />
+                    <controls:TechnicalLabel Caption="Provider" Value="{Binding SelectedConnection.Provider, StringFormat='Provider: {0}'}" FontSize="13" />
+                    <controls:TechnicalLabel Caption="Base Url" Value="{Binding SelectedConnection.BaseUrl, StringFormat='Connector: {0}'}" FontSize="13" />
+                    <Label Text="Preview does not send. Profiles are not tested. Review the actual recipient and exact payload below before any external communication." FontSize="13" />
+                    <Button Text="Preview external sync — no send" Command="{Binding PreviewSyncCommand}" HorizontalOptions="Start"
+                            Style="{StaticResource SecondaryButton}" AutomationId="PreviewTicketSync" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource CardBorder}" IsVisible="{Binding HasPreview}" IsEnabled="{Binding IsNotBusy}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Review disclosure before sending" Style="{StaticResource SectionTitle}" />
+                    <Label Text="WARNING: this may disclose private factory, project, owner, and description data to the external recipient. Confirm only if you are authorized to share ALL content below." FontSize="13" FontAttributes="Bold" TextColor="{DynamicResource Warning}" />
+                    <Label Text="WHO receives this" FontSize="13" FontAttributes="Bold" />
+                    <controls:TechnicalLabel Caption="Preview Recipient" Value="{Binding PreviewRecipient}" FontSize="13" AutomationId="TicketSyncRecipient" />
+                    <Label Text="Exact CONTENT" FontSize="13" FontAttributes="Bold" />
+                    <controls:TechnicalLabel Caption="Preview Content" Value="{Binding PreviewContent}" FontSize="13" LineBreakMode="WordWrap" AutomationId="TicketSyncContent" />
+                    <FlexLayout Direction="Row" Wrap="Wrap">
+                        <Button Text="Confirm and send this exact content" Command="{Binding ConfirmSyncCommand}" Margin="0,0,10,4" AutomationId="ConfirmTicketSync" />
+                        <Button Text="Cancel — do not send" Command="{Binding CancelPreviewCommand}" Style="{StaticResource SecondaryButton}" />
+                    </FlexLayout>
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentView>

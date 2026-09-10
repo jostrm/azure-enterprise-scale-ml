@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView x:Class="ESAIF.ConfigWizard.Controls.NetworkModeEditor"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls">
+    <VerticalStackLayout Spacing="8">
+        <RadioButton x:Name="PrivateRadio" Content="Private - Private UI + private backend (Bastion / VPN required)"
+                     IsEnabled="{Binding CanSelectPrivate}"
+                     AutomationId="NetworkModePrivate" />
+        <RadioButton x:Name="HybridRadio" Content="Hybrid - Public UI (IP-whitelisted) + private backend"
+                     IsEnabled="{Binding CanSelectHybrid}"
+                     AutomationId="NetworkModeHybrid" />
+        <RadioButton x:Name="PublicRadio" Content="Public - Public UI + private backend with perimeter access"
+                     IsEnabled="{Binding CanSelectPublic}"
+                     AutomationId="NetworkModePublic" />
+        <BoxView HeightRequest="1" Color="{DynamicResource Border}" Margin="0,4" />
+        <Label Text="Resulting flag values (read-only)" FontAttributes="Bold" />
+        <controls:TechnicalLabel Caption="Allow Public Access" Value="{Binding AllowPublicAccess, StringFormat='allowPublicAccessWhenBehindVnet: {0}'}"
+               AutomationId="NetworkFlagBehindVnet" FontSize="12" />
+        <controls:TechnicalLabel Caption="Public Gen AIAccess" Value="{Binding PublicGenAIAccess, StringFormat='enablePublicGenAIAccess: {0}'}"
+               AutomationId="NetworkFlagGenAI" FontSize="12" />
+        <controls:TechnicalLabel Caption="Public Perimeter Access" Value="{Binding PublicPerimeterAccess, StringFormat='enablePublicAccessWithPerimeter: {0}'}"
+               AutomationId="NetworkFlagPerimeter" FontSize="12" />
+        <controls:TechnicalLabel Caption="Selection Message" Value="{Binding SelectionMessage}" Style="{StaticResource MutedLabel}" />
+    </VerticalStackLayout>
+</ContentView>

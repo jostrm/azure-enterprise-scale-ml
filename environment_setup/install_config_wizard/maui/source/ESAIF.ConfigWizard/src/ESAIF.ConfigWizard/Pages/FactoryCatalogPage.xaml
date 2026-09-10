@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="ESAIF.ConfigWizard.Pages.FactoryCatalogPage"
+             x:Name="Root"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls"
+             Title="Manage factories" Shell.NavBarIsVisible="False">
+    <Grid Padding="24" RowDefinitions="Auto,Auto,*" RowSpacing="12">
+        <controls:AppHeader Title="Manage factories"
+                            Subtitle="Select a logical factory and exact placement. Every change requires a server preview and explicit consent." />
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <VerticalStackLayout Spacing="4">
+                <controls:TechnicalLabel Caption="Catalog root" Value="{Binding Folder}" />
+                <controls:TechnicalLabel Caption="Catalog revision" Value="{Binding Revision}" />
+                <controls:TechnicalLabel Caption="Catalog status" Value="{Binding StatusMessage}" />
+                <controls:TechnicalLabel Caption="Operation failure" Value="{Binding ErrorMessage}" TextColor="{DynamicResource Danger}" />
+            </VerticalStackLayout>
+            <Button Grid.Column="1" Text="Reload catalog" Command="{Binding RefreshCommand}"
+                    IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
+        </Grid>
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Spacing="16">
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="8">
+                        <controls:TechnicalLabel Caption="Catalog scope" Value="{Binding ScopeMessage}" LineBreakMode="WordWrap" />
+                        <controls:TechnicalLabel Caption="Navigation scope" Value="{Binding NavigationNotice}" LineBreakMode="WordWrap" />
+                        <controls:TechnicalLabel Caption="Catalog warnings" Value="{Binding Warning}" />
+                        <Button Text="Continue in legacy configuration wizard" Clicked="OnLegacyClicked"
+                                IsVisible="{Binding IsLegacy}" Style="{StaticResource SecondaryButton}" />
+                    </VerticalStackLayout>
+                </Border>
+                <Label Text="Logical factories" Style="{StaticResource SectionTitle}" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Factories}" Spacing="8">
+                    <BindableLayout.EmptyView>
+                        <Label Text="No catalog factories loaded. Legacy files are not migrated automatically." Style="{StaticResource MutedLabel}" />
+                    </BindableLayout.EmptyView>
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource CardBorder}">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <VerticalStackLayout Spacing="4">
+                                        <controls:TechnicalLabel Caption="Factory" Value="{Binding Display}" FontSize="20" FontAttributes="Bold" />
+                                        <controls:TechnicalLabel Caption="Factory status" Value="{Binding Summary}" />
+                                        <controls:TechnicalLabel Caption="Factory identity" Value="{Binding Details}" />
+                                    </VerticalStackLayout>
+                                    <Button Grid.Column="1" Text="Select factory" Command="{Binding Source={x:Reference Root}, Path=BindingContext.SelectFactoryCommand}"
+                                            CommandParameter="{Binding .}" Style="{StaticResource SecondaryButton}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Exact operation scope" Style="{StaticResource SectionTitle}" />
+                        <controls:TechnicalLabel Caption="Selected factory and scale set" Value="{Binding SelectionLabel}" FontAttributes="Bold" />
+                        <controls:TechnicalLabel Caption="Selected identity and subscription" Value="{Binding SelectionDetails}" />
+                        <Label Text="Scale sets · select the intended environment and suffix" FontAttributes="Bold" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding ScaleSets}" Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Padding="8">
+                                        <VerticalStackLayout Spacing="3">
+                                            <controls:TechnicalLabel Caption="Scale set" Value="{Binding Display}" FontAttributes="Bold" />
+                                            <controls:TechnicalLabel Caption="Scale set status" Value="{Binding Summary}" />
+                                            <controls:TechnicalLabel Caption="Exact environment, suffix, subscription and tenant" Value="{Binding Details}" />
+                                        </VerticalStackLayout>
+                                        <Button Grid.Column="1" Text="Select scale set" Command="{Binding Source={x:Reference Root}, Path=BindingContext.SelectScaleSetCommand}"
+                                                CommandParameter="{Binding .}" Style="{StaticResource SecondaryButton}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Label Text="Projects · explicit placements" FontAttributes="Bold" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Projects}" Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Padding="8">
+                                        <VerticalStackLayout Spacing="3">
+                                            <controls:TechnicalLabel Caption="Project" Value="{Binding Display}" FontAttributes="Bold" />
+                                            <controls:TechnicalLabel Caption="Project placement status" Value="{Binding Summary}" />
+                                            <controls:TechnicalLabel Caption="Project and scale-set identities" Value="{Binding Details}" />
+                                        </VerticalStackLayout>
+                                        <Button Grid.Column="1" Text="Select project" Command="{Binding Source={x:Reference Root}, Path=BindingContext.SelectProjectCommand}"
+                                                CommandParameter="{Binding .}" Style="{StaticResource SecondaryButton}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Label Text="Pipeline bindings · configuration is not runtime verification" FontAttributes="Bold" />
+                        <controls:TechnicalLabel Caption="Selected existing project" Value="{Binding SelectedProjectLabel}" FontAttributes="Bold" />
+                        <controls:TechnicalLabel Caption="Selected project identity and placements" Value="{Binding SelectedProjectDetails}" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Bindings}" Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <VerticalStackLayout Spacing="3" Padding="8">
+                                        <controls:TechnicalLabel Caption="Pipeline route" Value="{Binding Display}" FontAttributes="Bold" />
+                                        <controls:TechnicalLabel Caption="Binding status" Value="{Binding Status}" />
+                                        <controls:TechnicalLabel Caption="Saved binding details" Value="{Binding Details}" Conceal="True" />
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Prepare a change" Style="{StaticResource SectionTitle}" />
+                        <controls:TechnicalPicker Title="Action" ItemsSource="{Binding Actions}" SelectedItem="{Binding Action}"
+                                                  ItemDisplayBinding="{Binding Display}" />
+                        <controls:TechnicalLabel Caption="Operation scope" Value="{Binding OperationScope}" FontAttributes="Bold" />
+                        <controls:TechnicalLabel Caption="Capabilities" Value="{Binding CapabilityMessage}" LineBreakMode="WordWrap" Style="{StaticResource MutedLabel}" />
+                        <VerticalStackLayout IsVisible="{Binding ShowsTarget}" Spacing="8">
+                            <Label Text="Destination prefix and region (source files will not be overwritten)" />
+                            <controls:TechnicalEntry Caption="Destination prefix" Text="{Binding TargetPrefix}" Placeholder="For example dc" />
+                            <controls:TechnicalPicker Title="Destination Azure region" ItemsSource="{Binding RegionChoices}"
+                                                      SelectedItem="{Binding TargetRegionChoice}" ItemDisplayBinding="{Binding Display}" />
+                            <controls:TechnicalLabel Caption="Canonical destination region" Value="{Binding TargetRegion}" />
+                            <controls:TechnicalLabel Caption="Source factory saved version" Value="{Binding SavedFactoryVersion}" IsVisible="{Binding IsClone}" />
+                            <controls:TechnicalEntry Caption="Saved factory release version" Text="{Binding LocalFactoryVersion}"
+                                                     Placeholder="New: 124 by default; clone: blank inherits source" />
+                            <controls:TechnicalLabel Caption="Saved version behavior" Value="{Binding LocalVersionGuidance}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout IsVisible="{Binding IsClone}" Spacing="8">
+                            <Label Text="Clone project configurations" />
+                            <controls:TechnicalPicker Title="Projects to clone" ItemsSource="{Binding ProjectInclusions}"
+                                                      SelectedItem="{Binding IncludeProjects}" ItemDisplayBinding="{Binding Display}" />
+                            <Label Text="Configuration only. No deployments or resource ownership are copied." Style="{StaticResource MutedLabel}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout IsVisible="{Binding ShowsScaleSetDraft}" Spacing="8">
+                            <Label Text="Explicit new scale-set placement" FontAttributes="Bold" />
+                            <Label Text="A new scale set stays in the selected factory's region. Dev is never mapped to Stage or Prod." Style="{StaticResource MutedLabel}" />
+                            <controls:TechnicalPicker Title="Select environment" ItemsSource="{Binding Environments}"
+                                                      SelectedItem="{Binding EnvironmentChoice}" ItemDisplayBinding="{Binding Display}" />
+                            <controls:TechnicalEntry Caption="New scale-set suffix" Text="{Binding Suffix}" Placeholder="001, 002, 003…" />
+                            <controls:TechnicalEntry Caption="Exact subscription ID" Text="{Binding SubscriptionId}" Placeholder="Subscription GUID" />
+                            <controls:TechnicalEntry Caption="Exact tenant ID" Text="{Binding TenantId}" Placeholder="Tenant GUID" />
+                            <controls:TechnicalPicker Title="Select pipeline route" ItemsSource="{Binding Orchestrators}"
+                                                      SelectedItem="{Binding OrchestratorChoice}" ItemDisplayBinding="{Binding Display}" />
+                            <controls:TechnicalEntry Caption="VNet CIDR" Text="{Binding VnetCidr}" Placeholder="Explicit VNet CIDR" />
+                            <controls:TechnicalEntry Caption="Maximum projects" Text="{Binding MaxProjects}" Placeholder="1 through 8" Keyboard="Numeric" />
+                            <HorizontalStackLayout Spacing="8">
+                                <CheckBox IsChecked="{Binding UseCustomCommonSubnets}" />
+                                <Label Text="Specify all common subnet CIDRs instead of server allocation." VerticalOptions="Center" />
+                            </HorizontalStackLayout>
+                            <VerticalStackLayout IsVisible="{Binding UseCustomCommonSubnets}" Spacing="8">
+                                <controls:TechnicalEntry Caption="Common subnet CIDR" Text="{Binding CommonSubnet}" />
+                                <controls:TechnicalEntry Caption="Scoring subnet CIDR" Text="{Binding ScoringSubnet}" />
+                                <controls:TechnicalEntry Caption="Power BI subnet CIDR" Text="{Binding PowerbiSubnet}" />
+                                <controls:TechnicalEntry Caption="Bastion subnet CIDR" Text="{Binding BastionSubnet}" />
+                                <Label Text="All four are explicit overrides. The server validates containment, overlap and actual remaining project capacity. Existing scale-set networks are not changed."
+                                       Style="{StaticResource MutedLabel}" />
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout IsVisible="{Binding ShowsProjectDraft}" Spacing="10">
+                            <Label Text="Explicit project placements" Style="{StaticResource SectionTitle}" />
+                            <VerticalStackLayout IsVisible="{Binding IsNewProject}" Spacing="8">
+                                <controls:TechnicalEntry Caption="New project number" Text="{Binding ProjectEditor.Number}" Placeholder="001 through 999, for example 002" />
+                                <controls:TechnicalEntry Caption="Readable project name" Text="{Binding ProjectEditor.DisplayName}" Placeholder="For example Forecasting" />
+                            </VerticalStackLayout>
+                            <Label Text="For existing projects, select the exact project in the list above. Existing placements are immutable here; only new environments can be added. No Dev-to-Stage mapping or Azure deployment occurs."
+                                   Style="{StaticResource MutedLabel}" />
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding ProjectEditor.Environments}" Spacing="10">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate>
+                                        <VerticalStackLayout Spacing="6">
+                                            <controls:TechnicalLabel Caption="Project environment" Value="{Binding Display}" FontAttributes="Bold" />
+                                            <controls:TechnicalLabel Caption="Existing placement" Value="{Binding ExistingDescription}" IsVisible="{Binding IsExisting}" />
+                                            <controls:TechnicalLabel Caption="Retained scale-set identity" Value="{Binding ExistingDetails}" IsVisible="{Binding IsExisting}" />
+                                            <controls:TechnicalPicker Title="Choose the exact scale set or no additional placement"
+                                                                      ItemsSource="{Binding Choices}" SelectedItem="{Binding Selected}"
+                                                                      ItemDisplayBinding="{Binding Display}" ItemDetailsBinding="{Binding Details}" IsVisible="{Binding CanAdd}" />
+                                        </VerticalStackLayout>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                            <Label Text="Project-number uniqueness and configured capacity are checked per physical scale set. The server also validates actual allocator capacity before consent." Style="{StaticResource MutedLabel}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout IsVisible="{Binding ShowsSettingsDraft}" Spacing="10">
+                            <Label Text="Scoped configuration settings" Style="{StaticResource SectionTitle}" />
+                            <controls:TechnicalPicker Title="Settings target scope" ItemsSource="{Binding SettingsScopes}"
+                                                      SelectedItem="{Binding SettingsScope}" ItemDisplayBinding="{Binding Display}" />
+                            <controls:TechnicalLabel Caption="Settings scope" Value="{Binding SettingsScopeLabel}" FontAttributes="Bold" />
+                            <controls:TechnicalLabel Caption="Exact settings identities" Value="{Binding SettingsScopeDetails}" />
+                            <Button Text="Load or reload scoped settings" Clicked="OnLoadSettingsClicked"
+                                    IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
+                            <controls:TechnicalLabel Caption="Settings form status" Value="{Binding SettingsEditor.Status}" />
+                            <controls:TechnicalLabel Caption="Loaded settings revision" Value="{Binding SettingsEditor.Revision}" />
+                            <Label Text="Only server-whitelisted non-secret fields are editable. Only changed scalar values are saved; untouched values keep their inheritance. Project settings apply across its placements. Wizard edits, credentials, identity, version and network addresses are not changed here."
+                                   Style="{StaticResource MutedLabel}" />
+                            <controls:TechnicalEntry Caption="Find an allowed setting" Text="{Binding SettingsEditor.Filter}" Placeholder="Name or API field key" />
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding SettingsEditor.VisibleFields}"
+                                                 IsEnabled="{Binding SettingsEditor.IsEditable}" Spacing="6">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate>
+                                        <controls:ConfigFieldCard />
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                        <VerticalStackLayout IsVisible="{Binding ShowsBindingDraft}" Spacing="10">
+                            <Label Text="Pipeline binding and distributed lock enrollment" Style="{StaticResource SectionTitle}" />
+                            <controls:TechnicalLabel Caption="Binding target" Value="{Binding BindingEditor.SelectedTarget}" FontAttributes="Bold" />
+                            <controls:TechnicalLabel Caption="Binding target identity" Value="{Binding BindingEditor.ScopeDetails}" />
+                            <controls:TechnicalLabel Caption="Binding draft status" Value="{Binding BindingEditor.Status}" />
+                            <Button Text="Reload saved binding into form" Clicked="OnReloadBindingClicked" Style="{StaticResource SecondaryButton}" />
+                            <Label Text="Repository and lock enrollment are shared by this route. Writer, identity and runner defaults can be overridden together for the selected scale set. Other targets are preserved."
+                                   Style="{StaticResource MutedLabel}" />
+                            <VerticalStackLayout IsVisible="{Binding BindingEditor.IsUnreadable}" Spacing="8">
+                                <Label Text="The saved route binding is unreadable. Its target list cannot be preserved automatically. Full replacement is a separate explicit decision." />
+                                <HorizontalStackLayout Spacing="8">
+                                    <CheckBox IsChecked="{Binding BindingEditor.AllowUnreadableReplacement}" />
+                                    <Label Text="I want to replace the unreadable route binding with the complete reviewed configuration." VerticalOptions="Center" />
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                            <Label Text="Consumer repository and physical writer" FontAttributes="Bold" />
+                            <controls:TechnicalEntry Caption="Physical writer ID" Text="{Binding BindingEditor.WriterId}" Placeholder="Stable enrolled writer ID" />
+                            <controls:TechnicalEntry Caption="Consumer repository URL" Text="{Binding BindingEditor.Repository}" Placeholder="HTTPS GitHub or Azure DevOps repository URL for this route" />
+                            <controls:TechnicalEntry Caption="Consumer repository ref" Text="{Binding BindingEditor.ConsumerRef}" Placeholder="refs/heads/main" />
+                            <Label Text="This consumer ref is independent of the pinned AI Factory source release." Style="{StaticResource MutedLabel}" />
+                            <HorizontalStackLayout Spacing="8">
+                                <CheckBox IsChecked="{Binding BindingEditor.SharedRemote}" />
+                                <Label Text="This binding uses the enrolled shared remote coordination contract." VerticalOptions="Center" />
+                            </HorizontalStackLayout>
+                            <Label Text="Namespaced execution identity" FontAttributes="Bold" />
+                            <controls:TechnicalEntry Caption="Authentication namespace" Text="{Binding BindingEditor.AuthNamespace}" Placeholder="Existing isolated authentication namespace" />
+                            <controls:TechnicalEntry Caption="Deployment object ID" Text="{Binding BindingEditor.DeploymentObjectId}" Placeholder="Enrolled principal object GUID" />
+                            <Label Text="Provide both identity fields together. Saving references does not sign in, create credentials, or grant permissions." Style="{StaticResource MutedLabel}" />
+                            <Label Text="Explicit Linux execution worker" FontAttributes="Bold" />
+                            <controls:TechnicalPicker Title="Choose the runtime runner" ItemsSource="{Binding BindingEditor.RunnerChoices}"
+                                                      SelectedItem="{Binding BindingEditor.RunnerChoice}" ItemDisplayBinding="{Binding Display}" />
+                            <Label Text="No runtime worker is inferred. CI execution is Linux-only; the Windows desktop remains supported. Only fields for the selected worker type are submitted."
+                                   Style="{StaticResource MutedLabel}" />
+                            <VerticalStackLayout IsVisible="{Binding BindingEditor.ShowsHostedRunner}" Spacing="8">
+                                <controls:TechnicalPicker Title="Choose the hosted Ubuntu image" ItemsSource="{Binding BindingEditor.HostedImages}"
+                                                          SelectedItem="{Binding BindingEditor.RunnerImage}" ItemDisplayBinding="{Binding Display}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout IsVisible="{Binding BindingEditor.ShowsGithubRunner}" Spacing="8">
+                                <controls:TechnicalEntry Caption="GitHub self-hosted labels · one per line" Text="{Binding BindingEditor.RunnerLabels}"
+                                                         IsMultiline="True" Placeholder="Include self-hosted and linux explicitly" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout IsVisible="{Binding BindingEditor.ShowsAdoRunner}" Spacing="8">
+                                <controls:TechnicalEntry Caption="Azure DevOps Linux agent pool" Text="{Binding BindingEditor.RunnerPool}" />
+                                <controls:TechnicalEntry Caption="Optional Azure DevOps agent name" Text="{Binding BindingEditor.RunnerAgentName}" />
+                            </VerticalStackLayout>
+                            <Label Text="Existing distributed lock enrollment" FontAttributes="Bold" />
+                            <controls:TechnicalEntry Caption="Lock storage account URL" Text="{Binding BindingEditor.LockAccountUrl}" Placeholder="https://account.blob.core.windows.net" />
+                            <controls:TechnicalEntry Caption="Lock container" Text="{Binding BindingEditor.LockContainer}" Placeholder="Existing enrolled container" />
+                            <controls:TechnicalEntry Caption="Coordination document blob" Text="{Binding BindingEditor.CoordinationBlob}" Placeholder="Existing coordination document blob name" />
+                            <controls:TechnicalEntry Caption="Coordination SHA-256 hash" Text="{Binding BindingEditor.CoordinationHash}" Placeholder="Exact 64-character lowercase SHA-256" />
+                            <controls:TechnicalEntry Caption="Coordination revision" Text="{Binding BindingEditor.CoordinationRevision}" Keyboard="Numeric" />
+                            <Label Text="Lock storage and the coordination document must already be provisioned and enrolled. This reviewed configuration save stores references only; runtime preview verifies them."
+                                   Style="{StaticResource MutedLabel}" />
+                            <Label Text="Exact selected scale-set target scopes" FontAttributes="Bold" />
+                            <controls:TechnicalEntry Caption="Writable resource-group ARM IDs · one per line"
+                                                     Text="{Binding BindingEditor.ResourceGroupIds}" IsMultiline="True" />
+                            <controls:TechnicalEntry Caption="Read-only shared dependency resource-group ARM IDs · one per line"
+                                                     Text="{Binding BindingEditor.CommonDependencyIds}" IsMultiline="True" />
+                            <HorizontalStackLayout Spacing="8">
+                                <CheckBox IsChecked="{Binding BindingEditor.UseTargetExecution}" />
+                                <Label Text="Use a separate execution identity and Linux runner for this exact scale set." VerticalOptions="Center" />
+                            </HorizontalStackLayout>
+                            <Label Text="Overrides require Shared remote above. Disabling this override deliberately restores the shared route defaults for this target only; review the entire binding before saving."
+                                   Style="{StaticResource MutedLabel}" />
+                            <VerticalStackLayout IsVisible="{Binding BindingEditor.UseTargetExecution}" Spacing="8">
+                                <controls:TechnicalEntry Caption="Scale-set execution writer ID" Text="{Binding BindingEditor.TargetWriterId}" />
+                                <controls:TechnicalEntry Caption="Scale-set authentication namespace" Text="{Binding BindingEditor.TargetAuthNamespace}" />
+                                <controls:TechnicalEntry Caption="Scale-set deployment object ID" Text="{Binding BindingEditor.TargetDeploymentObjectId}" />
+                                <controls:TechnicalPicker Title="Explicit scale-set Linux runner" ItemsSource="{Binding BindingEditor.TargetRunner.Choices}"
+                                                          SelectedItem="{Binding BindingEditor.TargetRunner.Choice}" ItemDisplayBinding="{Binding Display}" />
+                                <controls:TechnicalPicker Title="Scale-set hosted Ubuntu image" ItemsSource="{Binding BindingEditor.TargetRunner.Images}"
+                                                          SelectedItem="{Binding BindingEditor.TargetRunner.Image}" ItemDisplayBinding="{Binding Display}"
+                                                          IsVisible="{Binding BindingEditor.TargetRunner.ShowsHosted}" />
+                                <controls:TechnicalEntry Caption="Scale-set GitHub labels · one per line" Text="{Binding BindingEditor.TargetRunner.Labels}"
+                                                         IsMultiline="True" IsVisible="{Binding BindingEditor.TargetRunner.ShowsGithub}" />
+                                <VerticalStackLayout IsVisible="{Binding BindingEditor.TargetRunner.ShowsAdo}" Spacing="8">
+                                    <controls:TechnicalEntry Caption="Scale-set Azure DevOps Linux pool" Text="{Binding BindingEditor.TargetRunner.Pool}" />
+                                    <controls:TechnicalEntry Caption="Optional scale-set Azure DevOps agent" Text="{Binding BindingEditor.TargetRunner.AgentName}" />
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
+                            <Label Text="No wildcard/name filter grants ownership. The server validates physical writer ownership and the enrolled resource-group scopes." Style="{StaticResource MutedLabel}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout IsVisible="{Binding IsDeploy}" Spacing="8">
+                            <HorizontalStackLayout Spacing="8">
+                                <CheckBox IsChecked="{Binding DeploySelectedProject}" />
+                                <Label Text="Deploy exactly the selected project in the selected scale set (otherwise common only)." VerticalOptions="Center" />
+                            </HorizontalStackLayout>
+                            <controls:TechnicalLabel Caption="Explicit project deployment selection" Value="{Binding SelectedProjectLabel}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout IsVisible="{Binding UsesRuntimeVersion}" Spacing="8">
+                            <Label Text="AI Factory release version · explicit before runtime confirmation" FontAttributes="Bold" />
+                            <controls:TechnicalLabel Caption="Selected factory saved release" Value="{Binding SavedFactoryVersion}" />
+                            <controls:TechnicalPicker Title="Runtime release selection" ItemsSource="{Binding VersionModes}"
+                                                      SelectedItem="{Binding VersionMode}" ItemDisplayBinding="{Binding Display}" />
+                            <controls:TechnicalEntry Caption="Explicit AI Factory version override" Text="{Binding VersionRef}"
+                                                     IsVisible="{Binding ShowsRuntimeVersionOverride}" Placeholder="For example 124, 125 or main" />
+                            <Label Text="Inheritance submits no runtime override. The server resolves the selected factory's saved release; unresolved legacy versions require an explicit release choice. Inspect the exact release and any blockers in the review."
+                                   Style="{StaticResource MutedLabel}" />
+                            <Label Text="The server resolves and pins the exact commit in the review. No code selector changes at confirmation." Style="{StaticResource MutedLabel}" />
+                        </VerticalStackLayout>
+                        <controls:TechnicalLabel Caption="Configuration version behavior" Value="{Binding ConfigurationVersionNotice}" Style="{StaticResource MutedLabel}" />
+                        <Button Text="Prepare review — no changes yet" Command="{Binding PrepareCommand}" IsEnabled="{Binding CanPrepare}" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Style="{StaticResource CardBorder}" IsVisible="{Binding HasPreview}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Server preview" Style="{StaticResource SectionTitle}" />
+                        <controls:TechnicalLabel Caption="Preview summary" Value="{Binding PreviewSummary}" />
+                        <controls:TechnicalLabel Caption="Preview warnings" Value="{Binding PreviewWarnings}" />
+                        <controls:TechnicalLabel Caption="Setup and capability blockers" Value="{Binding PreviewBlockers}" />
+                        <controls:TechnicalLabel Caption="Confirmation readiness" Value="{Binding ConsentStatus}" />
+                        <Button Text="Review exact scope, revision, version, effects and resource manifest"
+                                Clicked="OnReviewClicked" Style="{StaticResource SecondaryButton}" />
+                        <HorizontalStackLayout Spacing="8">
+                            <CheckBox IsChecked="{Binding Accepted}" />
+                            <Label Text="I reviewed and accept this exact server plan." VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <VerticalStackLayout IsVisible="{Binding IsDelete}" Spacing="8">
+                            <Label Text="Deletion is irreversible. Name and region are filters, not resource ownership authority." />
+                            <controls:TechnicalLabel Caption="Required typed confirmation phrase" Value="{Binding RequiredPhrase}" />
+                            <controls:TechnicalEntry Caption="Type the exact deletion phrase" Text="{Binding TypedPhrase}" />
+                        </VerticalStackLayout>
+                        <Button Text="Confirm reviewed plan" Clicked="OnConfirmClicked" IsEnabled="{Binding CanConfirm}" />
+                        <Label Text="Only the server receipt is submitted. Changed or expired consent is blocked; transport failures are never retried automatically."
+                               Style="{StaticResource MutedLabel}" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Operation jobs" Style="{StaticResource SectionTitle}" />
+                        <Button Text="Reload jobs" Command="{Binding ReloadJobsCommand}" IsEnabled="{Binding IsNotBusy}"
+                                Style="{StaticResource SecondaryButton}" />
+                        <Label Text="Server-owned jobs only. Reload explicitly to see progress. A disabled terminal action means this job has no terminal available."
+                               LineBreakMode="WordWrap" Style="{StaticResource MutedLabel}" />
+                        <controls:TechnicalLabel Caption="Terminal capability" Value="{Binding TerminalCapabilityMessage}" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Jobs}" Spacing="8">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate>
+                                    <VerticalStackLayout Spacing="3">
+                                        <controls:TechnicalLabel Caption="Job action" Value="{Binding Action}" FontAttributes="Bold" />
+                                        <controls:TechnicalLabel Caption="Job status" Value="{Binding Status}" />
+                                        <controls:TechnicalLabel Caption="Job outcome" Value="{Binding Message}" />
+                                        <controls:TechnicalLabel Caption="Job ID" Value="{Binding Id}" />
+                                        <controls:TechnicalLabel Caption="Exit code" Value="{Binding ExitCode}" />
+                                        <controls:TechnicalLabel Caption="Canonical source version" Value="{Binding SourceVersion.RequestedVersion}" />
+                                        <controls:TechnicalLabel Caption="Server version input echo" Value="{Binding SourceVersion.FactoryVersion}" />
+                                        <controls:TechnicalLabel Caption="Source branch" Value="{Binding SourceVersion.Branch}" Conceal="True" />
+                                        <controls:TechnicalLabel Caption="Pinned source commit" Value="{Binding SourceVersion.ResolvedRef}" Conceal="True" />
+                                        <Button Text="Open interactive terminal" IsEnabled="{Binding TerminalAvailable}"
+                                                Command="{Binding Source={x:Reference Root}, Path=BindingContext.OpenTerminalCommand}"
+                                                CommandParameter="{Binding .}" Style="{StaticResource SecondaryButton}" />
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

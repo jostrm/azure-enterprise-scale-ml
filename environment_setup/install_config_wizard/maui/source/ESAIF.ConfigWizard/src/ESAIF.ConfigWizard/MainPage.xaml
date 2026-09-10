@@ -1,0 +1,405 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="ESAIF.ConfigWizard.MainPage"
+    x:Name="Root"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls"
+    Title="Configuration wizard"
+    Shell.NavBarIsVisible="False">
+
+    <Grid
+        Padding="20"
+        RowDefinitions="Auto,Auto,*,Auto"
+        RowSpacing="14">
+        <controls:AppHeader
+            Grid.Row="0"
+            Title="AI Factory configuration"
+            Subtitle="Schema-driven setup powered by your local Python API"
+            TrailingText="{Binding ApiVersion, StringFormat='API {0}'}" />
+
+        <Border
+            Grid.Row="1"
+            Padding="16"
+            BackgroundColor="{DynamicResource Surface}"
+            Stroke="{DynamicResource Border}"
+            StrokeShape="RoundRectangle 18">
+            <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                <Grid
+                    Grid.Row="0"
+                    ColumnDefinitions="Auto,*,Auto"
+                    ColumnSpacing="10">
+                    <VerticalStackLayout WidthRequest="145" VerticalOptions="Center" Spacing="1">
+                        <Label Text="Quick setup" FontAttributes="Bold" FontSize="16" />
+                        <Label Text="AI Factory folder" Style="{StaticResource MutedLabel}" />
+                    </VerticalStackLayout>
+                    <Border Grid.Column="1" Style="{StaticResource InputBorder}">
+                        <controls:TechnicalEntry Caption="Factory folder" Conceal="True"
+                            Placeholder="Select the local aifactory root folder"
+                            Text="{Binding AiFactoryFolder, Mode=TwoWay}" />
+                    </Border>
+                    <Button
+                        Grid.Column="2"
+                        Text="Browse..."
+                        Command="{Binding BrowseFolderCommand}"
+                        Style="{StaticResource SecondaryButton}" />
+                </Grid>
+
+                <FlexLayout
+                    Grid.Row="1"
+                    Direction="Row"
+                    Wrap="Wrap"
+                    AlignItems="Center">
+                    <Button
+                        Margin="0,0,8,6"
+                        Text="Import (.yaml | .env | .json)"
+                        Command="{Binding ImportCommand}"
+                        Style="{StaticResource SecondaryButton}" />
+                    <Button
+                        Margin="0,0,8,6"
+                        Text="Export variable file (.yaml | .env | .json)"
+                        Clicked="OnQuickExportClicked"
+                        Style="{StaticResource SecondaryButton}" />
+                    <Button
+                        Margin="0,0,8,6"
+                        Text="Recent projects / ADO"
+                        Clicked="OnRecentAdoClicked"
+                        Style="{StaticResource GhostButton}" />
+                    <Button
+                        Margin="0,0,8,6"
+                        Text="Recent projects / GHA"
+                        Clicked="OnRecentGhaClicked"
+                        Style="{StaticResource GhostButton}" />
+                    <Button
+                        Margin="0,0,0,6"
+                        Text="Create ticket"
+                        Clicked="OnCreateTicketClicked"
+                        IsEnabled="{Binding IsNotBusy}"
+                        AutomationId="CreateTicketForCurrentProject"
+                        ToolTipProperties.Text="Open an unsaved ticket for the current project's resource group."
+                        Style="{StaticResource SecondaryButton}" />
+                </FlexLayout>
+                <FlexLayout Grid.Row="2" Direction="Row" Wrap="Wrap" AlignItems="Center">
+                    <controls:StatusLight Margin="0,0,18,0"
+                        Label="{Binding Identity.ProjectLabel}"
+                        IsPulsing="{Binding Identity.HasProject}"
+                        LightColor="#22BBD0" />
+                    <controls:StatusLight
+                        Label="{Binding Identity.ScaleSetLabel}"
+                        IsPulsing="{Binding Identity.HasScaleSet}"
+                        LightColor="#22BBD0" />
+                    <Label Margin="16,0,0,0" Text="Configuration selection · not deployment health"
+                        Style="{StaticResource MutedLabel}" VerticalOptions="Center" />
+                </FlexLayout>
+            </Grid>
+        </Border>
+
+        <Grid
+            x:Name="WorkspaceGrid"
+            Grid.Row="2"
+            ColumnDefinitions="250,*"
+            ColumnSpacing="14">
+            <Border
+                x:Name="StepsRail"
+                Grid.Column="0"
+                Style="{StaticResource CardBorder}"
+                Padding="12">
+                <ScrollView>
+                    <VerticalStackLayout
+                        BindableLayout.ItemsSource="{Binding Steps}"
+                        Spacing="4">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate>
+                                <controls:TechnicalButton
+                                    Padding="12,11"
+                                    BackgroundColor="Transparent"
+                                    Command="{Binding Source={x:Reference Root}, Path=BindingContext.SelectStepCommand}"
+                                    CommandParameter="{Binding .}"
+                                    Value="{Binding Title}"
+                                    TextColor="{DynamicResource Text}">
+                                    <Button.Triggers>
+                                        <DataTrigger
+                                            TargetType="Button"
+                                            Binding="{Binding IsSelected}"
+                                            Value="True">
+                                            <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceSelected}" />
+                                            <Setter Property="TextColor" Value="{DynamicResource PrimaryStrong}" />
+                                        </DataTrigger>
+                                    </Button.Triggers>
+                                </controls:TechnicalButton>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </ScrollView>
+            </Border>
+
+            <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
+                <controls:TechnicalPicker
+                    x:Name="CompactStepPicker"
+                    Grid.Row="0"
+                    IsVisible="False"
+                    ItemDisplayBinding="{Binding Title}"
+                    ItemsSource="{Binding Steps}"
+                    SelectedItem="{Binding CurrentStep}" />
+
+                <SearchBar Grid.Row="1" Placeholder="Search by label or API field"
+                           AutomationId="GlobalWizardSearch" Text="{Binding SearchText}"
+                           SemanticProperties.Description="Search by label or API field across all sections" />
+
+                <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="18,14">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                        <VerticalStackLayout Spacing="3">
+                            <controls:TechnicalLabel Caption="Current Title" Value="{Binding CurrentTitle}" Style="{StaticResource SectionTitle}" />
+                            <controls:TechnicalLabel Caption="Current Description"
+                                Value="{Binding CurrentDescription}"
+                                Style="{StaticResource MutedLabel}"
+                                LineBreakMode="WordWrap" />
+                        </VerticalStackLayout>
+                        <ActivityIndicator
+                            Grid.Column="1"
+                            IsRunning="{Binding IsBusy}"
+                            IsVisible="{Binding IsBusy}"
+                            VerticalOptions="Center" />
+                        <ProgressBar
+                            Grid.Row="1"
+                            Grid.ColumnSpan="2"
+                            Margin="0,12,0,0"
+                            Progress="{Binding Progress}" />
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="3">
+                    <Grid
+                        IsVisible="{Binding HasFields}">
+                        <ScrollView x:Name="FieldsScroll">
+                            <VerticalStackLayout Spacing="0">
+                                <ContentView IsVisible="{Binding CurrentStep.HasNetworkFormatHelp}">
+                                    <controls:VNetFormatHelpView BindingContext="{Binding CurrentStep.NetworkFormatHelp}" />
+                                </ContentView>
+                                <VerticalStackLayout BindableLayout.ItemsSource="{Binding VisibleFields}">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate>
+                                            <controls:ConfigFieldCard />
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                    <BindableLayout.EmptyView>
+                                        <Label Margin="18" Text="No settings match this search." TextColor="{DynamicResource Muted}" />
+                                    </BindableLayout.EmptyView>
+                                </VerticalStackLayout>
+                            </VerticalStackLayout>
+                        </ScrollView>
+                    </Grid>
+
+                    <Grid
+                        IsVisible="{Binding IsSkuStep}"
+                        RowDefinitions="Auto,*"
+                        RowSpacing="9">
+                        <Border
+                            Grid.Row="0"
+                            Padding="5"
+                            BackgroundColor="{DynamicResource SurfaceMuted}"
+                            Stroke="{DynamicResource Border}"
+                            StrokeShape="RoundRectangle 14">
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="5">
+                                <Button
+                                    Grid.Column="0"
+                                    Text="Dev"
+                                    Command="{Binding SelectDevSkuCommand}"
+                                    BackgroundColor="Transparent"
+                                    TextColor="{DynamicResource Muted}">
+                                    <Button.Triggers>
+                                        <DataTrigger
+                                            TargetType="Button"
+                                            Binding="{Binding IsDevSkuTab}"
+                                            Value="True">
+                                            <Setter Property="BackgroundColor" Value="{DynamicResource Surface}" />
+                                            <Setter Property="TextColor" Value="{DynamicResource PrimaryStrong}" />
+                                        </DataTrigger>
+                                    </Button.Triggers>
+                                </Button>
+                                <Button
+                                    Grid.Column="1"
+                                    Text="Stage &amp; Prod"
+                                    Command="{Binding SelectStageProdSkuCommand}"
+                                    BackgroundColor="Transparent"
+                                    TextColor="{DynamicResource Muted}">
+                                    <Button.Triggers>
+                                        <DataTrigger
+                                            TargetType="Button"
+                                            Binding="{Binding IsStageProdSkuTab}"
+                                            Value="True">
+                                            <Setter Property="BackgroundColor" Value="{DynamicResource Surface}" />
+                                            <Setter Property="TextColor" Value="{DynamicResource PrimaryStrong}" />
+                                        </DataTrigger>
+                                    </Button.Triggers>
+                                </Button>
+                            </Grid>
+                        </Border>
+                        <CollectionView
+                            Grid.Row="1"
+                            ItemsSource="{Binding VisibleSkuFields}"
+                            SelectionMode="None">
+                            <CollectionView.EmptyView>
+                                <Label
+                                    Margin="18"
+                                    Text="No SKU settings match this search."
+                                    TextColor="{DynamicResource Muted}" />
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <controls:ConfigFieldCard />
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </Grid>
+
+                    <Grid IsVisible="{Binding IsSearching}" RowDefinitions="Auto,*" RowSpacing="8">
+                        <controls:TechnicalLabel Caption="Search Summary" Value="{Binding SearchSummary}" Style="{StaticResource MutedLabel}" />
+                        <CollectionView Grid.Row="1" ItemsSource="{Binding SearchResults}" SelectionMode="None">
+                            <CollectionView.EmptyView>
+                                <Label Text="No settings match this search across any section." Margin="18"
+                                       TextColor="{DynamicResource Muted}" />
+                            </CollectionView.EmptyView>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <VerticalStackLayout Spacing="5">
+                                        <controls:TechnicalLabel Caption="Section Title" Value="{Binding SectionTitle, StringFormat='Section: {0}'}"
+                                               FontSize="12" FontAttributes="Bold"
+                                               TextColor="{DynamicResource PrimaryStrong}" />
+                                        <controls:ConfigFieldCard BindingContext="{Binding Field}" />
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </Grid>
+
+                    <ScrollView IsVisible="{Binding IsReviewStep}">
+                        <VerticalStackLayout Spacing="12">
+                            <Border Style="{StaticResource CardBorder}">
+                                <VerticalStackLayout Spacing="12">
+                                    <Label Text="Validate and persist" Style="{StaticResource SectionTitle}" />
+                                    <Label
+                                        Text="Validation and file rendering stay in Python. The MAUI client sends the current state and displays the authoritative result."
+                                        Style="{StaticResource MutedLabel}" />
+                                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                                        <Button
+                                            Grid.Column="0"
+                                            Text="Validate"
+                                            Command="{Binding ValidateCommand}" />
+                                        <Button
+                                            Grid.Column="1"
+                                            Text="Save project"
+                                            Command="{Binding SaveProjectCommand}" />
+                                        <Button
+                                            Grid.Column="2"
+                                            Text="Save scale set"
+                                            Command="{Binding SaveScaleSetCommand}"
+                                            Style="{StaticResource SecondaryButton}" />
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                        <Switch IsToggled="{Binding WritePipelineVariables}" />
+                                        <Label
+                                            Grid.Column="1"
+                                            Text="Also write variables.yaml or .env for the pipeline"
+                                            VerticalOptions="Center" />
+                                    </Grid>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <Border Style="{StaticResource CardBorder}">
+                                <VerticalStackLayout Spacing="10">
+                                    <Label Text="Import, load, or reset" Style="{StaticResource SectionTitle}" />
+                                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                                        <Button
+                                            Grid.Column="0"
+                                            Text="Import file"
+                                            Command="{Binding ImportCommand}"
+                                            Style="{StaticResource SecondaryButton}" />
+                                        <Button
+                                            Grid.Column="1"
+                                            Text="Load folder"
+                                            Command="{Binding LoadStartupCommand}"
+                                            Style="{StaticResource SecondaryButton}" />
+                                        <Button
+                                            Grid.Column="2"
+                                            Text="Reset defaults"
+                                            Command="{Binding ResetCommand}"
+                                            Style="{StaticResource GhostButton}" />
+                                    </Grid>
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <Border Style="{StaticResource CardBorder}">
+                                <VerticalStackLayout Spacing="10">
+                                    <Label Text="Export configuration" Style="{StaticResource SectionTitle}" />
+                                    <Grid ColumnDefinitions="150,*" ColumnSpacing="8">
+                                        <Border Style="{StaticResource InputBorder}">
+                                            <controls:TechnicalPicker
+                                                ItemsSource="{Binding ExportFormats}"
+                                                SelectedItem="{Binding SelectedExportFormat}" />
+                                        </Border>
+                                        <Border Grid.Column="1" Style="{StaticResource InputBorder}">
+                                            <controls:TechnicalEntry Caption="Export destination" Conceal="True"
+                                                Placeholder="Optional server-local destination path"
+                                                Text="{Binding ExportDestinationPath}" />
+                                        </Border>
+                                    </Grid>
+                                    <Button
+                                        Text="Export"
+                                        Command="{Binding ExportCommand}"
+                                        HorizontalOptions="Start" />
+                                </VerticalStackLayout>
+                            </Border>
+
+                            <Border
+                                IsVisible="{Binding HasValidationIssues}"
+                                Style="{StaticResource CardBorder}">
+                                <VerticalStackLayout
+                                    BindableLayout.ItemsSource="{Binding ValidationIssues}"
+                                    Spacing="6">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate>
+                                            <controls:TechnicalLabel Caption="Field"
+                                                Value="{Binding Field, StringFormat='{0}: value contains &lt;todo&gt;'}"
+                                                TextColor="{DynamicResource Danger}" />
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
+                            </Border>
+                        </VerticalStackLayout>
+                    </ScrollView>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <Border
+            Grid.Row="3"
+            Padding="12,9"
+            BackgroundColor="{DynamicResource Surface}"
+            Stroke="{DynamicResource Border}"
+            StrokeShape="RoundRectangle 14">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+                <Button
+                    Text="Back"
+                    Command="{Binding PreviousCommand}"
+                    IsEnabled="{Binding CanGoBack}"
+                    Style="{StaticResource SecondaryButton}" />
+                <controls:TechnicalLabel Caption="Status Message"
+                    Grid.Column="1"
+                    Value="{Binding StatusMessage}"
+                    TextColor="{DynamicResource Muted}"
+                    VerticalOptions="Center"
+                    LineBreakMode="TailTruncation" />
+                <controls:StatusLight Grid.Column="2"
+                    Label="{Binding Connection.Label}"
+                    LightColor="{Binding Connection.ColorHex}"
+                    IsPulsing="{Binding Connection.IsConnected}" />
+                <Button
+                    Grid.Column="3"
+                    Text="Next"
+                    Command="{Binding NextCommand}"
+                    IsEnabled="{Binding CanGoNext}" />
+            </Grid>
+        </Border>
+    </Grid>
+</ContentPage>

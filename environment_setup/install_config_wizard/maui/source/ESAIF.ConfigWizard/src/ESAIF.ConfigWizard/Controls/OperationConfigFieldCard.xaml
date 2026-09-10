@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    x:Class="ESAIF.ConfigWizard.Controls.OperationConfigFieldCard"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls"
+    IsVisible="{Binding IsVisible}">
+    <Border Style="{StaticResource CardBorder}" Margin="0,0,8,6" Padding="12,8">
+        <VerticalStackLayout Spacing="4">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <controls:TechnicalLabel Caption="Label" Value="{Binding Label}" FontAttributes="Bold" FontSize="13"
+                       VerticalOptions="Center" ToolTipProperties.Text="{Binding Description}" />
+                <Border Grid.Column="1" Padding="6,2" StrokeThickness="0"
+                        StrokeShape="RoundRectangle 8" BackgroundColor="{DynamicResource SurfaceMuted}"
+                        VerticalOptions="Center" ToolTipProperties.Text="{Binding Description}">
+                    <controls:TechnicalLabel Caption="Key" Value="{Binding Key}" FontSize="9" TextColor="{DynamicResource Muted}" />
+                </Border>
+            </Grid>
+            <Border IsVisible="{Binding IsText}" Style="{StaticResource InputBorder}">
+                <controls:TechnicalEntry Caption="{Binding Label}" Context="{Binding Key}" Text="{Binding Value, Mode=TwoWay}" FontSize="13" MinimumHeightRequest="36"
+                       HorizontalTextAlignment="Start" SemanticProperties.Description="{Binding Label}" />
+            </Border>
+            <Border IsVisible="{Binding IsNumber}" Style="{StaticResource InputBorder}">
+                <controls:TechnicalEntry Caption="{Binding Label}" Context="{Binding Key}" Text="{Binding Value, Mode=TwoWay}" Keyboard="Numeric" FontSize="13" MinimumHeightRequest="36"
+                       HorizontalTextAlignment="Start" SemanticProperties.Description="{Binding Label}" />
+            </Border>
+            <Border IsVisible="{Binding IsChoice}" Style="{StaticResource InputBorder}">
+                <controls:TechnicalPicker
+                    ItemsSource="{Binding Choices}"
+                    SelectedItem="{Binding SelectedChoice, Mode=TwoWay}"
+                    FontSize="13" MinimumHeightRequest="36" HorizontalTextAlignment="Start"
+                    SemanticProperties.Description="{Binding Label}" />
+            </Border>
+            <Grid IsVisible="{Binding IsBoolean}" ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <Switch IsToggled="{Binding BooleanValue, Mode=TwoWay}" />
+                <controls:TechnicalLabel Caption="Value" Grid.Column="1" Value="{Binding Value}" VerticalOptions="Center" FontSize="13" />
+            </Grid>
+            <Border IsVisible="{Binding IsMultiline}" Style="{StaticResource InputBorder}">
+                <controls:TechnicalEntry IsMultiline="True" Caption="{Binding Label}" Context="{Binding Key}"
+                    Text="{Binding Value, Mode=TwoWay}"
+                    FontSize="13" SemanticProperties.Description="{Binding Label}"
+                    MinimumHeightRequest="80" />
+            </Border>
+            <controls:TechnicalLabel Caption="Validation Message"
+                IsVisible="{Binding IsInvalid}"
+                Value="{Binding ValidationMessage}"
+                TextColor="{DynamicResource Danger}"
+                FontSize="12" />
+        </VerticalStackLayout>
+    </Border>
+</ContentView>

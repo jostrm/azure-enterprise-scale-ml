@@ -1,0 +1,141 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\src\ESAIF.ConfigWizard\MainPage.xaml.cs"
+          Link="Assets\Disclosure\MainPage.xaml.cs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Services\BundledApiHost.cs"
+          Link="Assets\BundledApiHost.cs" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\src\ESAIF.ConfigWizard\MainPage.xaml;..\..\src\ESAIF.ConfigWizard\Pages\*.xaml;..\..\src\ESAIF.ConfigWizard\Controls\*.xaml;..\..\src\ESAIF.ConfigWizard\Controls\Technical*.cs;..\..\src\ESAIF.ConfigWizard\Controls\DeploymentTerminalFooter.cs;..\..\src\ESAIF.ConfigWizard\Pages\MessageDetailsPage.cs"
+          Link="Assets\Disclosure\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Pages\SimpleFactoryPage.xaml"
+          Link="Assets\SimpleFactoryPage.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Pages\SimpleFactoryPage.xaml.cs"
+          Link="Assets\SimpleFactoryPage.xaml.cs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Resources\Images\world_map.svg"
+          Link="Assets\world_map.svg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Controls\ConfigFieldCard.xaml"
+          Link="Assets\ConfigFieldCard.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Controls\OperationConfigFieldCard.xaml"
+          Link="Assets\OperationConfigFieldCard.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Pages\TicketsPage.xaml"
+          Link="Assets\TicketsPage.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Pages\ProjectsPage.xaml"
+          Link="Assets\ProjectsPage.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Pages\ProjectsPage.xaml.cs"
+          Link="Assets\ProjectsPage.xaml.cs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Controls\TicketsView.xaml"
+          Link="Assets\TicketsView.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Controls\TicketConnectionsView.xaml"
+          Link="Assets\TicketConnectionsView.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\AppShell.cs"
+          Link="Assets\AppShell.cs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Pages\NavigationMenuPage.cs"
+          Link="Assets\NavigationMenuPage.cs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\build-windows.ps1"
+          Link="Assets\build-windows.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\MainPage.xaml"
+          Link="Assets\MainPage.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Controls\ScalingModeEditor.xaml"
+          Link="Assets\ScalingModeEditor.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Controls\ProjectEnvironmentCardView.xaml"
+          Link="Assets\ProjectEnvironmentCardView.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ESAIF.ConfigWizard\Pages\AiFactoryPage.xaml"
+          Link="Assets\AiFactoryPage.xaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\ESAIF.BaseLayer\src\ESAIF.BaseLayer\ESAIF.BaseLayer.csproj" />
+    <ProjectReference Include="..\..\..\ESAIF.DomainLayer\src\ESAIF.DomainLayer\ESAIF.DomainLayer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\TechnicalValuePresentation.cs" Link="Services\TechnicalValuePresentation.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\SimpleFactoryAccountPresentation.cs" Link="Services\SimpleFactoryAccountPresentation.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\ApiConnectionState.cs" Link="Services\ApiConnectionState.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\ConnectionTrackingTransport.cs" Link="Services\ConnectionTrackingTransport.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\StatusPresentation.cs" Link="Services\StatusPresentation.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\StatusLightMotionPolicy.cs" Link="Services\StatusLightMotionPolicy.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\IDeploymentTerminalSession.cs" Link="Services\IDeploymentTerminalSession.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\TerminalOutputFilter.cs" Link="Services\TerminalOutputFilter.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\TerminalFailurePolicy.cs" Link="Services\TerminalFailurePolicy.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\WizardIdentity.cs" Link="Services\WizardIdentity.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\ProjectDeploymentPresentation.cs" Link="Services\ProjectDeploymentPresentation.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\ProjectResourceGroupLink.cs" Link="Services\ProjectResourceGroupLink.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\ProjectTicketContext.cs" Link="Services\ProjectTicketContext.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\ProjectTicketLauncher.cs" Link="Services\ProjectTicketLauncher.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\ScaleSetResourceGroupLinks.cs" Link="Services\ScaleSetResourceGroupLinks.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\SavedConfigurationVerifier.cs" Link="Services\SavedConfigurationVerifier.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\WarningToastState.cs" Link="Services\WarningToastState.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\SavedConfigurationItemViewModel.cs" Link="ViewModels\SavedConfigurationItemViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\IConnectionSettingsService.cs" Link="Services\IConnectionSettingsService.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\IBundledApiHost.cs" Link="Services\IBundledApiHost.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\BundledApiHost.cs" Link="Services\BundledApiHost.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\OperationsPresentation.cs" Link="Services\OperationsPresentation.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\OperationsSession.cs" Link="Services\OperationsSession.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\PostAzureLoginRefresh.cs" Link="Services\PostAzureLoginRefresh.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\AzureRefreshCoordinator.cs" Link="Services\AzureRefreshCoordinator.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\FactoryNetworkSession.cs" Link="Services\FactoryNetworkSession.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\FactoryCatalogSession.cs" Link="Services\FactoryCatalogSession.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\FactoryTerminalRouter.cs" Link="Services\FactoryTerminalRouter.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\DeploymentTerminalSession.cs" Link="Services\DeploymentTerminalSession.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\FactoryCatalogPresentation.cs" Link="Services\FactoryCatalogPresentation.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\FactoryCatalogViewModel.cs" Link="ViewModels\FactoryCatalogViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\CatalogBindingEditor.cs" Link="ViewModels\CatalogBindingEditor.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\CatalogProjectEditor.cs" Link="ViewModels\CatalogProjectEditor.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\CatalogSettingsEditor.cs" Link="ViewModels\CatalogSettingsEditor.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\CatalogRunnerDraft.cs" Link="ViewModels\CatalogRunnerDraft.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\AzureAuthenticationMonitor.cs" Link="Services\AzureAuthenticationMonitor.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\ProjectsViewModel.cs" Link="ViewModels\ProjectsViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\ScaleSetsViewModel.cs" Link="ViewModels\ScaleSetsViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\RegionMapPresentation.cs" Link="Services\RegionMapPresentation.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\RegionPipelinePresentation.cs" Link="Services\RegionPipelinePresentation.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\AzureDashboardLink.cs" Link="Services\AzureDashboardLink.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\ThemePaletteCatalog.cs" Link="Services\ThemePaletteCatalog.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\WizardFieldCatalog.cs" Link="Services\WizardFieldCatalog.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\WizardFieldSearch.cs" Link="Services\WizardFieldSearch.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\ConfigurationStateEditing.cs" Link="Services\ConfigurationStateEditing.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\ScalingModeConfiguration.cs" Link="Services\ScalingModeConfiguration.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\ScalingModeViewModel.cs" Link="ViewModels\ScalingModeViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\NetworkModeViewModel.cs" Link="ViewModels\NetworkModeViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\HubTopologyViewModel.cs" Link="ViewModels\HubTopologyViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\RunnerConfigurationViewModel.cs" Link="ViewModels\RunnerConfigurationViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\WizardSession.cs" Link="Services\WizardSession.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\WizardViewModel.cs" Link="ViewModels\WizardViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\IAiFactoryFolderPickerService.cs" Link="Services\IAiFactoryFolderPickerService.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\Services\IConfigurationFileService.cs" Link="Services\IConfigurationFileService.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\ConfigFieldViewModel.cs" Link="ViewModels\ConfigFieldViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\FactoryConfigurationViewModel.cs" Link="ViewModels\FactoryConfigurationViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\AzureAuthenticationViewModel.cs" Link="ViewModels\AzureAuthenticationViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\ConnectionViewModel.cs" Link="ViewModels\ConnectionViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\OperationViewModel.cs" Link="ViewModels\OperationViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\SimpleFactoryViewModel.cs" Link="ViewModels\SimpleFactoryViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\SimpleFactoryResourceChoice.cs" Link="ViewModels\SimpleFactoryResourceChoice.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\CurrentFactoryAnalyticsViewModel.cs" Link="ViewModels\CurrentFactoryAnalyticsViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\TicketsViewModel.cs" Link="ViewModels\TicketsViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\TicketConnectionsViewModel.cs" Link="ViewModels\TicketConnectionsViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\TicketTabsViewModel.cs" Link="ViewModels\TicketTabsViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\OperationConfigFormFactory.cs" Link="ViewModels\OperationConfigFormFactory.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\ProjectEnvironmentCardViewModel.cs" Link="ViewModels\ProjectEnvironmentCardViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\AiFactoryViewModel.cs" Link="ViewModels\AiFactoryViewModel.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\RecentProjectChoice.cs" Link="ViewModels\RecentProjectChoice.cs" />
+    <Compile Include="..\..\src\ESAIF.ConfigWizard\ViewModels\WizardStepViewModel.cs" Link="ViewModels\WizardStepViewModel.cs" />
+  </ItemGroup>
+
+</Project>

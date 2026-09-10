@@ -24,7 +24,9 @@
         ```` 
 ### Prerequisite (Optional But Highly Recommended) - AI Factory Configuration Wizard
 
-Use the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md)
+For Windows 11, use the [**AI Factory Configuration Wizard (MAUI) installer and quick start**](../../../environment_setup/install_config_wizard/maui/readme.md).
+The installer includes the local Python API; a separate Python installation is not needed.
+The [classic Tkinter wizard](../../../environment_setup/install_config_wizard/readme.md) remains available for Windows, macOS, and Linux.
 
 ## Setup options: 
 Whether you want to use Azure DevOps or GitHub, we recommend using the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md) to configure the AI Factory and its first project initially. The wizard provides a guided, form-based UI that validates your inputs and generates a correctly populated configuration file — significantly reducing the risk of misconfiguration on first deployment.

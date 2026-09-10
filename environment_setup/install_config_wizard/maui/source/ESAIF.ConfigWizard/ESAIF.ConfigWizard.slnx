@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ESAIF.ConfigWizard/ESAIF.ConfigWizard.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ESAIF.ConfigWizard.Tests/ESAIF.ConfigWizard.Tests.csproj" />
+  </Folder>
+  <Project Path="../ESAIF.BaseLayer/src/ESAIF.BaseLayer/ESAIF.BaseLayer.csproj" />
+  <Project Path="../ESAIF.BaseLayer/tests/ESAIF.BaseLayer.Tests/ESAIF.BaseLayer.Tests.csproj" />
+  <Project Path="../ESAIF.DomainLayer/src/ESAIF.DomainLayer/ESAIF.DomainLayer.csproj" />
+  <Project Path="../ESAIF.DomainLayer/tests/ESAIF.DomainLayer.Tests/ESAIF.DomainLayer.Tests.csproj" />
+</Solution>

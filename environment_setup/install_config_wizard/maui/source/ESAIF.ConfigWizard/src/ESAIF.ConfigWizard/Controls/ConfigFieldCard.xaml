@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    x:Class="ESAIF.ConfigWizard.Controls.ConfigFieldCard"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls">
+    <Border
+        Margin="0,0,0,6"
+        Padding="12,8"
+        BackgroundColor="{DynamicResource Surface}"
+        Stroke="{DynamicResource Border}"
+        StrokeShape="RoundRectangle 15">
+        <Border.Triggers>
+            <DataTrigger
+                TargetType="Border"
+                Binding="{Binding IsInvalid}"
+                Value="True">
+                <Setter Property="Stroke" Value="{DynamicResource Danger}" />
+                <Setter Property="StrokeThickness" Value="2" />
+            </DataTrigger>
+        </Border.Triggers>
+        <Grid
+            ColumnDefinitions="*,Auto"
+            RowDefinitions="Auto,Auto,Auto"
+            ColumnSpacing="8"
+            RowSpacing="4">
+            <controls:TechnicalLabel Caption="Label"
+                FontAttributes="Bold"
+                FontSize="13"
+                Value="{Binding Label}"
+                VerticalOptions="Center"
+                ToolTipProperties.Text="{Binding Description}" />
+            <Border
+                Grid.Column="1"
+                Padding="6,2"
+                BackgroundColor="{DynamicResource SurfaceMuted}"
+                StrokeThickness="0"
+                StrokeShape="RoundRectangle 8"
+                VerticalOptions="Center"
+                ToolTipProperties.Text="{Binding Description}">
+                <controls:TechnicalLabel Caption="Key"
+                    FontSize="9"
+                    Value="{Binding Key}"
+                    TextColor="{DynamicResource Muted}" />
+            </Border>
+            <Border
+                Grid.Row="1"
+                Grid.ColumnSpan="2"
+                IsVisible="{Binding IsText}"
+                Style="{StaticResource InputBorder}">
+                <controls:TechnicalEntry Caption="{Binding Label}" Context="{Binding Key}" Text="{Binding Value, Mode=TwoWay}"
+                       FontSize="13" MinimumHeightRequest="36"
+                       HorizontalTextAlignment="Start"
+                       SemanticProperties.Description="{Binding Label}" />
+            </Border>
+            <Border
+                Grid.Row="1"
+                Grid.ColumnSpan="2"
+                IsVisible="{Binding IsChoice}"
+                Style="{StaticResource InputBorder}">
+                <controls:TechnicalPicker
+                    ItemsSource="{Binding DisplayOptions}"
+                    SelectedItem="{Binding SelectedDisplayOption, Mode=TwoWay}"
+                    FontSize="13" MinimumHeightRequest="36"
+                    HorizontalTextAlignment="Start"
+                    SemanticProperties.Description="{Binding Label}" />
+            </Border>
+            <Grid
+                Grid.Row="1"
+                Grid.ColumnSpan="2"
+                IsVisible="{Binding IsBoolean}"
+                ColumnDefinitions="Auto,*"
+                ColumnSpacing="10">
+                <Switch IsToggled="{Binding BooleanValue, Mode=TwoWay}" />
+                <controls:TechnicalLabel Caption="Value"
+                    Grid.Column="1"
+                    Value="{Binding Value}"
+                    VerticalOptions="Center"
+                    TextColor="{DynamicResource Muted}" FontSize="13" />
+            </Grid>
+            <ContentView x:Name="SpecializedEditor" Grid.Row="1" Grid.ColumnSpan="2" IsVisible="False" />
+            <controls:TechnicalLabel Caption="Issue Message"
+                Grid.Row="2"
+                Grid.ColumnSpan="2"
+                IsVisible="{Binding IsInvalid}"
+                Value="{Binding IssueMessage}"
+                TextColor="{DynamicResource Danger}"
+                FontSize="12" />
+        </Grid>
+    </Border>
+</ContentView>

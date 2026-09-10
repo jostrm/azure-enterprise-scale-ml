@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    x:Class="ESAIF.ConfigWizard.Controls.ProjectEnvironmentCardView"
+    x:Name="CardRoot"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls">
+    <ContentView.Resources>
+        <Style x:Key="CompactAction" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="MinimumHeightRequest" Value="30" />
+            <Setter Property="CornerRadius" Value="7" />
+        </Style>
+    </ContentView.Resources>
+    <Grid>
+        <Border IsVisible="{Binding IsPlaceholder}" Stroke="{DynamicResource Muted}" StrokeThickness="1.5" Opacity="0.65"
+                StrokeDashArray="2,4" StrokeShape="RoundRectangle 12" BackgroundColor="Transparent"
+                MinimumHeightRequest="100" InputTransparent="True"
+                SemanticProperties.Description="{Binding PlaceholderDescription}"
+                ToolTipProperties.Text="{Binding PlaceholderDescription}" AutomationId="UndeployedEnvironmentPlaceholder" />
+        <controls:GlowCard IsVisible="{Binding HasCard}" IsSelected="{Binding IsSelected}" CornerRadius="12">
+        <Border Style="{StaticResource CardBorder}" Padding="12,10"
+                StrokeShape="RoundRectangle 12" AutomationId="DeployedEnvironmentCard">
+            <Border.GestureRecognizers>
+                <TapGestureRecognizer Command="{Binding Source={x:Reference CardRoot}, Path=SelectCommand}" CommandParameter="{Binding .}" />
+            </Border.GestureRecognizers>
+            <Border.Triggers>
+                <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceSelected}" />
+                </DataTrigger>
+                <DataTrigger TargetType="Border" Binding="{Binding IsDraft}" Value="True">
+                    <Setter Property="BackgroundColor" Value="#303238" />
+                    <Setter Property="Stroke" Value="#626873" />
+                </DataTrigger>
+            </Border.Triggers>
+            <VerticalStackLayout Spacing="5">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <controls:TechnicalButton Value="{Binding ProjectLabel}" FontSize="15" FontAttributes="Bold" TextColor="{DynamicResource PrimaryStrong}"
+                            Style="{StaticResource GhostButton}" Padding="0" MinimumHeightRequest="28"
+                            HorizontalOptions="Start" Command="{Binding Source={x:Reference CardRoot}, Path=SelectCommand}"
+                            CommandParameter="{Binding .}" ToolTipProperties.Text="Select this project card without loading or changing its configuration."
+                            AutomationId="SelectEnvironmentProject">
+                        <Button.Triggers>
+                            <DataTrigger TargetType="Button" Binding="{Binding IsDraft}" Value="True">
+                                <Setter Property="TextColor" Value="#FFFFFF" />
+                            </DataTrigger>
+                        </Button.Triggers>
+                    </controls:TechnicalButton>
+                    <controls:StatusLight Grid.Column="1" Label="{Binding Status}" LightColor="{Binding StatusColor}"
+                                          IsActive="{Binding IsStatusLit}" IsPulsing="{Binding IsStatusPulsing}"
+                                          ToolTipProperties.Text="{Binding ActivityDescription}" AutomationId="ProjectEnvironmentActivity" />
+                </Grid>
+                <Label Text="Template version" FontSize="11" />
+                <controls:TechnicalEntry Caption="Factory version" Text="{Binding FactoryVersion, Mode=TwoWay}"
+                         Placeholder="Inherit saved version" IsEnabled="{Binding CanEditPatch}" FontSize="12"
+                         AutomationId="ProjectFactoryVersion"
+                         SemanticProperties.Description="AI Factory template version for this deployment or update" />
+                <controls:TechnicalLabel Caption="Version guidance" Value="{Binding VersionGuidance}" FontSize="10"
+                         TextColor="{DynamicResource Muted}" />
+                <controls:TechnicalLabel Caption="Saved template branch" Value="{Binding SavedTemplateBranch, StringFormat='Saved branch: {0}'}"
+                         FontSize="10" />
+                <controls:TechnicalLabel Caption="Saved template reference" Value="{Binding SavedTemplateRef}" Conceal="True"
+                         FontSize="10" />
+                <VerticalStackLayout IsVisible="{Binding HasDeploymentDetails}" Spacing="8" AutomationId="DraftEnvironmentCard">
+                    <VerticalStackLayout.Resources>
+                        <Style TargetType="Label" ApplyToDerivedTypes="True">
+                            <Setter Property="TextColor" Value="{DynamicResource Text}" />
+                            <Style.Triggers>
+                                <DataTrigger TargetType="Label" Binding="{Binding IsDraft}" Value="True">
+                                    <Setter Property="TextColor" Value="#E3E6ED" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </VerticalStackLayout.Resources>
+                    <controls:TechnicalLabel Caption="Deployment status" Value="{Binding Status, StringFormat='Status: {0}'}" IsVisible="{Binding IsDraft}"
+                           FontSize="11" FontAttributes="Bold" AutomationId="PlannedEnvironmentStatus" />
+                    <controls:TechnicalLabel Caption="Draft Description" Value="{Binding DraftDescription}" FontSize="12" />
+                    <controls:TechnicalLabel Caption="Draft Route" Value="{Binding DraftRoute}" FontSize="11" />
+                    <controls:TechnicalLabel Caption="Draft Message" Value="{Binding DraftMessage}" FontSize="11" />
+                    <Button Text="Open terminal" IsVisible="{Binding HasTerminal}"
+                            Style="{StaticResource CompactAction}"
+                            Command="{Binding Source={x:Reference CardRoot}, Path=OpenTerminalCommand}" CommandParameter="{Binding .}"
+                            AutomationId="OpenProjectDeploymentTerminal" />
+                    <Button Text="Review outcome" IsVisible="{Binding CanReviewOutcome}"
+                            Style="{StaticResource CompactAction}"
+                            Command="{Binding Source={x:Reference CardRoot}, Path=ReviewOutcomeCommand}" CommandParameter="{Binding .}"
+                            ToolTipProperties.Text="Review partial local/cloud changes before acknowledging the failure. Does not retry."
+                            AutomationId="ReviewProjectDeploymentOutcome" />
+                    <Label Text="Outcome acknowledged. Failure is retained; no retry or rollback was performed."
+                           IsVisible="{Binding IsOutcomeReviewed}" FontSize="11" />
+                </VerticalStackLayout>
+                <VerticalStackLayout IsVisible="{Binding IsDeployed}" Spacing="5">
+                <controls:TechnicalLabel Caption="Owner" Value="{Binding Owner, StringFormat='Owner: {0}'}" FontSize="11"
+                       LineBreakMode="TailTruncation" ToolTipProperties.Text="{Binding Owner}" />
+                <controls:TechnicalLabel Caption="Deployment Environments" Value="{Binding DeploymentEnvironments, StringFormat='Status: {0}'}" FontAttributes="Bold" FontSize="11" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <controls:TechnicalLabel Caption="Region" Value="{Binding Region}" FontSize="11" TextColor="{DynamicResource Muted}" />
+                    <controls:TechnicalLabel Caption="Resource Count" Grid.Column="1" Value="{Binding ResourceCount, StringFormat='{0} resources'}" FontSize="11" TextColor="{DynamicResource Muted}" />
+                </Grid>
+                <controls:TechnicalLabel Caption="Resource Group" Value="{Binding ResourceGroup}" FontSize="10" TextColor="{DynamicResource Muted}"
+                       LineBreakMode="TailTruncation" ToolTipProperties.Text="{Binding ResourceGroup}" />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <Button Text="Link to project RG" Clicked="OnOpenResourceGroupClicked"
+                            IsEnabled="{Binding HasResourceGroupLink}" ToolTipProperties.Text="{Binding ResourceGroupLinkHint}"
+                            Style="{StaticResource CompactAction}" />
+                    <controls:TechnicalButton Grid.Column="1" Value="{Binding DeployButtonText}" IsVisible="{Binding CanDeploy}"
+                            Command="{Binding Source={x:Reference CardRoot}, Path=DeployCommand}" CommandParameter="{Binding .}"
+                            Style="{StaticResource CompactAction}"
+                            ToolTipProperties.Text="Save a forward-deployment plan only. Azure resources are not changed." />
+                </Grid>
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="4">
+                    <Button Text="DataOps" Style="{StaticResource CompactAction}"
+                            SemanticProperties.Description="Configure DataOps"
+                            Command="{Binding Source={x:Reference CardRoot}, Path=ConfigureDataOpsCommand}" CommandParameter="{Binding .}" />
+                    <Button Grid.Column="1" Text="MLOps" Style="{StaticResource CompactAction}"
+                            SemanticProperties.Description="Configure MLOps"
+                            Command="{Binding Source={x:Reference CardRoot}, Path=ConfigureMLOpsCommand}" CommandParameter="{Binding .}" />
+                    <Button Grid.Row="1" Text="RAG" Style="{StaticResource CompactAction}"
+                            SemanticProperties.Description="Configure GenAIOps RAG"
+                            Command="{Binding Source={x:Reference CardRoot}, Path=ConfigureRagCommand}" CommandParameter="{Binding .}" />
+                    <Button Grid.Row="1" Grid.Column="1" Text="Fine-tuning" Style="{StaticResource CompactAction}"
+                            SemanticProperties.Description="Configure GenAIOps fine-tuning"
+                            Command="{Binding Source={x:Reference CardRoot}, Path=ConfigureFineTuningCommand}" CommandParameter="{Binding .}" />
+                </Grid>
+                </VerticalStackLayout>
+                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="4"
+                      HorizontalOptions="Start" AutomationId="ProjectDeploymentActions">
+                    <Button Text="Planning options" Clicked="OnPlanningOptionsClicked" IsVisible="{Binding IsDeployed}"
+                            Style="{StaticResource CompactAction}" BackgroundColor="Transparent"
+                            VerticalOptions="Center" AutomationId="ProjectPlanningOptions"
+                            ToolTipProperties.Text="Show or hide non-deploying planning switches." />
+                    <Grid Grid.Column="1">
+                        <Button Text="Update" IsVisible="{Binding IsDeployed}" IsEnabled="{Binding CanUpdate}"
+                                Style="{StaticResource CompactAction}" BackgroundColor="Transparent" VerticalOptions="Center"
+                                Command="{Binding Source={x:Reference CardRoot}, Path=UpdateCommand}" CommandParameter="{Binding .}"
+                                ToolTipProperties.Text="Review an update of this existing project in the same environment, using the selected Patch choice."
+                                AutomationId="UpdateProjectDeployment" />
+                        <Button Text="Deploy" IsVisible="{Binding IsDraft}" IsEnabled="{Binding ShowDeployButton}"
+                                Style="{StaticResource CompactAction}" BackgroundColor="Transparent" VerticalOptions="Center"
+                                Command="{Binding Source={x:Reference CardRoot}, Path=DeployCommand}" CommandParameter="{Binding .}"
+                                ToolTipProperties.Text="Review and confirm the route-specific repository deployment script before starting."
+                                AutomationId="DeployEnvironmentDraft" />
+                    </Grid>
+                    <CheckBox Grid.Column="2" IsChecked="{Binding Patch, Mode=TwoWay}" IsEnabled="{Binding CanEditPatch}"
+                              Color="#409EFF" VerticalOptions="Center"
+                              SemanticProperties.Description="Patch shared templates before deployment"
+                              AutomationId="ProjectPatchCheckbox" />
+                    <Label Grid.Column="3" Text="Patch" FontSize="12" VerticalOptions="Center"
+                           ToolTipProperties.Text="{Binding PatchDescription}">
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label" Binding="{Binding IsDraft}" Value="True">
+                                <Setter Property="TextColor" Value="#E3E6ED" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+                </Grid>
+                <controls:TechnicalLabel Caption="Patch Description" Value="{Binding PatchDescription}" FontSize="10" TextColor="{DynamicResource Muted}">
+                    <Label.Triggers>
+                        <DataTrigger TargetType="Label" Binding="{Binding IsDraft}" Value="True">
+                            <Setter Property="TextColor" Value="#BFC8D8" />
+                        </DataTrigger>
+                    </Label.Triggers>
+                </controls:TechnicalLabel>
+                <VerticalStackLayout IsVisible="{Binding ShowPlanningOptions}" Spacing="0">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Delete project (planning)" FontSize="11" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding DeleteAllForProject}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Delete services (planning)" FontSize="11" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" IsToggled="{Binding DeleteAllServices}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+        </controls:GlowCard>
+    </Grid>
+</ContentView>

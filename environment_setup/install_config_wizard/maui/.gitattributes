@@ -1,0 +1,4 @@
+# Preserve the source snapshot bytes recorded in source-manifest.json.
+source/** -text
+*.exe -text
+*.bin -text

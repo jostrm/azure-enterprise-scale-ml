@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="ESAIF.ConfigWizard.Pages.FactoryConfigurationPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls"
+    Title="{Binding Title}">
+    <Grid Padding="24" RowDefinitions="Auto,Auto,*" RowSpacing="12" MaximumWidthRequest="1250">
+        <controls:AppHeader Title="{Binding Title}" Subtitle="Configuration only. Nothing is deployed, copied, or deleted in Azure." TrailingText="SETUP" />
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="16">
+            <Button Text="Back" Clicked="OnBackClicked" Style="{StaticResource SecondaryButton}" />
+            <controls:TechnicalLabel Caption="Status Message" Grid.Column="1" Value="{Binding StatusMessage}" VerticalOptions="Center" LineBreakMode="WordWrap" />
+            <controls:TechnicalButton Grid.Column="2" Value="{Binding SaveLabel}" Clicked="OnSaveClicked"
+                    IsEnabled="{Binding CanSave}" IsVisible="{Binding IsPrepared}"
+                    AutomationId="SaveFactoryConfiguration" Style="{StaticResource FactoryActionButton}" />
+            <ActivityIndicator Grid.Column="3" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+        </Grid>
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Spacing="12">
+                <Border Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10">
+                        <controls:TechnicalLabel Caption="Target Region" Value="{Binding TargetRegion, StringFormat='Target Azure region: {0}'}" Style="{StaticResource SectionTitle}" />
+                        <controls:TechnicalLabel Caption="Source factory folder" Conceal="True" Value="{Binding SourceFolder, StringFormat='Source AI Factory folder: {0}'}"
+                               IsVisible="{Binding HasSource}" LineBreakMode="WordWrap" />
+                        <controls:TechnicalLabel Caption="Guidance" Value="{Binding Guidance}" LineBreakMode="WordWrap" />
+                        <Label Text="Destination AI Factory folder" FontAttributes="Bold" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" IsEnabled="{Binding CanEdit}">
+                            <Border Style="{StaticResource InputBorder}">
+                                <controls:TechnicalEntry Caption="Destination folder" Conceal="True" Text="{Binding DestinationFolder, Mode=TwoWay}" IsReadOnly="{Binding IsScaleSet}"
+                                       AutomationId="FactoryDestinationFolder" Placeholder="Full path to a new or empty folder" />
+                            </Border>
+                            <Button Grid.Column="1" Text="Browse" Clicked="OnBrowseClicked" IsVisible="{Binding IsNewFolder}"
+                                    Style="{StaticResource SecondaryButton}" />
+                        </Grid>
+                        <Label Text="Add and Clone require a new or empty destination. Adding a scale set writes only a new scale-set file in the source factory; existing files are never overwritten."
+                               Style="{StaticResource MutedLabel}" />
+                    </VerticalStackLayout>
+                </Border>
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Fields}" IsEnabled="{Binding CanEdit}">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate>
+                            <controls:ConfigFieldCard />
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+                <Border IsVisible="{Binding IsSaved}" Style="{StaticResource CardBorder}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Configuration saved" Style="{StaticResource SectionTitle}" />
+                        <controls:TechnicalLabel Caption="Saved configuration file" Conceal="True" Value="{Binding SavedPath}" LineBreakMode="WordWrap" />
+                        <Label Text="Azure is unchanged. You can open this configuration in the existing wizard to review all settings and export deployment variables." />
+                        <Button Text="Open saved configuration" Clicked="OnOpenClicked" Style="{StaticResource FactoryActionButton}" />
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

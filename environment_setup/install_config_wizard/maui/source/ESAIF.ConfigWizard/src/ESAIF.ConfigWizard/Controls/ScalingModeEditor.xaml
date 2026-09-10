@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView x:Class="ESAIF.ConfigWizard.Controls.ScalingModeEditor"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls">
+    <VerticalStackLayout Spacing="5">
+        <RadioButton x:Name="OwnRadio" Content="A) Own subscriptions per project"
+                     FontSize="13" AutomationId="ScalingModeOwn" />
+        <RadioButton x:Name="SharedRadio" Content="B) Common subscriptions for up to 8 projects"
+                     FontSize="13" AutomationId="ScalingModeShared" />
+        <controls:TechnicalLabel Caption="Description" Value="{Binding Description}" FontSize="12" />
+        <controls:TechnicalLabel Caption="Current Ranges" Value="{Binding CurrentRanges}" FontSize="12" AutomationId="ScalingModeCurrentRanges" />
+        <controls:TechnicalLabel Caption="Peering Status" Value="{Binding PeeringStatus}" FontSize="12" FontAttributes="Bold" AutomationId="ScalingModePeeringStatus" />
+        <controls:TechnicalLabel Caption="Capacity Description" Value="{Binding CapacityDescription}" FontSize="12" AutomationId="ScalingModeCapacity" />
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+            <controls:TechnicalLabel Caption="Default Cidr" Value="{Binding DefaultCidr, StringFormat='Mode default: {0}'}" FontSize="12" FontAttributes="Bold" AutomationId="ScalingModeDefaultCidr" />
+            <controls:TechnicalLabel Caption="Current Cidr" Grid.Column="1" Value="{Binding CurrentCidr, StringFormat='Current VNet: {0}'}" FontSize="12" AutomationId="ScalingModeCurrentCidr" />
+        </Grid>
+        <controls:TechnicalLabel Caption="Preservation Message" Value="{Binding PreservationMessage}" FontSize="11" TextColor="{DynamicResource Muted}" />
+        <HorizontalStackLayout Spacing="8">
+            <Button Text="Apply network defaults" Clicked="OnApplyDefaultsClicked" IsEnabled="{Binding CanApplyDefaults}"
+                    Style="{StaticResource SecondaryButton}" FontSize="12" Padding="10,5" MinimumHeightRequest="32"
+                    ToolTipProperties.Text="Replace draft VNet and common-subnet addressing with the selected mode's preset, after confirmation."
+                    AutomationId="ApplyScalingNetworkDefaults" />
+            <Button Text="Optimize space" Clicked="OnOptimizeSpaceClicked" IsEnabled="{Binding CanOptimize}"
+                    Style="{StaticResource SecondaryButton}" FontSize="12" Padding="10,5" MinimumHeightRequest="32"
+                    ToolTipProperties.Text="{Binding OptimizationDescription}"
+                    AutomationId="OptimizeNetworkSpace" />
+            <ActivityIndicator IsRunning="{Binding IsGuidanceLoading}" IsVisible="{Binding IsGuidanceLoading}" WidthRequest="20" />
+        </HorizontalStackLayout>
+        <Label Text="Configuration only: no subscriptions are created, no deployed subnets are moved, and Azure is unchanged."
+               FontSize="11" TextColor="{DynamicResource Muted}" />
+    </VerticalStackLayout>
+</ContentView>

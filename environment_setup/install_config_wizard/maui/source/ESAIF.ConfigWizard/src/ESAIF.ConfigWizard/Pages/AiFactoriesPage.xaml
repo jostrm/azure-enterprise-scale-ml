@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="ESAIF.ConfigWizard.Pages.AiFactoriesPage"
+    x:Name="Root"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls"
+    Title="AI Factories"
+    Shell.NavBarIsVisible="False">
+    <Grid Padding="24" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
+        <controls:AppHeader
+            Grid.Row="0"
+            Title="AI Factories"
+            Subtitle="Explore legacy regions. Manage catalog factories through exact identity selection and reviewed plans."
+            TrailingText="{Binding SourceLabel}" />
+
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+            <Border
+                Padding="11,6"
+                BackgroundColor="{DynamicResource SurfaceSelected}"
+                Stroke="{DynamicResource Primary}"
+                StrokeShape="RoundRectangle 12">
+                <controls:TechnicalLabel Caption="Source Label" Value="{Binding SourceLabel}" FontAttributes="Bold" TextColor="{DynamicResource PrimaryStrong}" />
+            </Border>
+            <controls:TechnicalLabel Caption="Status Message"
+                Grid.Column="1"
+                Value="{Binding StatusMessage}"
+                Style="{StaticResource MutedLabel}"
+                VerticalOptions="Center"
+                LineBreakMode="TailTruncation" />
+            <Button Grid.Column="2" Text="Import run report" Command="{Binding ImportPipelineReportCommand}"
+                    Style="{StaticResource SecondaryButton}"
+                    ToolTipProperties.Text="Import a downloaded AI Factory pre-flight or pipeline region-report JSON artifact." />
+        </Grid>
+
+        <VerticalStackLayout Grid.Row="2" Spacing="8">
+            <Border Style="{StaticResource CardBorder}">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <controls:TechnicalLabel Caption="Catalog scope" Value="{Binding CatalogScopeNotice}" LineBreakMode="WordWrap" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="Manage factories" Command="{Binding ManageFactoriesCommand}" />
+                </Grid>
+            </Border>
+            <Border IsVisible="{Binding IsMissingFolder}" Style="{StaticResource CardBorder}">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <controls:TechnicalLabel Caption="Missing Folder Message" Value="{Binding MissingFolderMessage}" VerticalOptions="Center" />
+                    <Button
+                        Grid.Column="1"
+                        Text="Open Configuration wizard"
+                        Command="{Binding OpenWizardCommand}" />
+                </Grid>
+            </Border>
+        </VerticalStackLayout>
+
+        <Grid Grid.Row="3" IsVisible="{Binding HasOverview}">
+            <controls:WorldMapView
+                x:Name="WorldMap"
+                MinimumHeightRequest="420"
+                ItemsSource="{Binding Regions}"
+                SelectedRegion="{Binding SelectedRegion, Mode=TwoWay}"
+                PrimaryCommand="{Binding SelectRegionCommand}"
+                RegionSecondaryTapped="OnRegionSecondaryTapped" />
+
+            <Border
+                x:Name="DetailsPane"
+                WidthRequest="340"
+                HorizontalOptions="End"
+                IsVisible="False"
+                Style="{StaticResource CardBorder}">
+                <Grid RowDefinitions="*,Auto" RowSpacing="12">
+                <ScrollView>
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Text="Region details" Style="{StaticResource SectionTitle}" />
+                            <Button
+                                Grid.Column="1"
+                                Text="Close"
+                                Style="{StaticResource GhostButton}"
+                                Command="{Binding CloseDetailsCommand}"
+                                SemanticProperties.Description="Close region details" />
+                        </Grid>
+                        <controls:TechnicalLabel Caption="Display Name" Value="{Binding SelectedRegion.DisplayName}" FontSize="24" FontAttributes="Bold" />
+                        <controls:TechnicalLabel Caption="Name" Value="{Binding SelectedRegion.Name}" TextColor="{DynamicResource PrimaryStrong}" />
+                        <Border IsVisible="{Binding HasPipelineFindings}" Stroke="#FF7185"
+                                BackgroundColor="#29151D" StrokeShape="RoundRectangle 12" Padding="12">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="Recorded pipeline issue" TextColor="#FFB0BB" FontAttributes="Bold" />
+                                <Button Text="View / copy findings" Clicked="OnPipelineFindingsClicked"
+                                        AutomationId="RegionPipelineFindings"
+                                        BackgroundColor="#42232E" TextColor="#FFE4E8" BorderColor="#FF7185" BorderWidth="1" />
+                                <controls:TechnicalLabel Caption="Pipeline Finding Details" Value="{Binding PipelineFindingDetails}" TextColor="#FFE4E8"
+                                       FontSize="12" LineBreakMode="WordWrap" />
+                            </VerticalStackLayout>
+                        </Border>
+                        <controls:TechnicalLabel Caption="Geography" Value="{Binding SelectedRegion.Geography, StringFormat='Geography: {0}'}" />
+                        <controls:TechnicalLabel Caption="Physical Location" Value="{Binding SelectedRegion.PhysicalLocation, StringFormat='Location: {0}'}" />
+                        <controls:TechnicalLabel Caption="Status" Value="{Binding SelectedRegion.Status, StringFormat='Status: {0}'}" />
+                        <Label Text="Regional coordinates are approximate. Red means a recorded pipeline issue, not live Azure service health or capacity."
+                               Style="{StaticResource MutedLabel}" />
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                            <Border Style="{StaticResource CardBorder}" Padding="10">
+                                <VerticalStackLayout>
+                                    <controls:TechnicalLabel Caption="Factory Count" Value="{Binding SelectedRegion.FactoryCount}" FontSize="20" FontAttributes="Bold" />
+                                    <Label Text="Known factories" Style="{StaticResource MutedLabel}" />
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="1" Style="{StaticResource CardBorder}" Padding="10">
+                                <VerticalStackLayout>
+                                    <controls:TechnicalLabel Caption="Project Count Label" Value="{Binding SelectedRegion.ProjectCountLabel}" FontSize="16" FontAttributes="Bold" />
+                                    <Label Text="Projects" Style="{StaticResource MutedLabel}" />
+                                </VerticalStackLayout>
+                            </Border>
+                            <Border Grid.Column="2" Style="{StaticResource CardBorder}" Padding="10">
+                                <VerticalStackLayout>
+                                    <controls:TechnicalLabel Caption="Resource Count Label" Value="{Binding SelectedRegion.ResourceCountLabel}" FontSize="16" FontAttributes="Bold" />
+                                    <Label Text="Resources" Style="{StaticResource MutedLabel}" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </Grid>
+                        <controls:TechnicalLabel Caption="Count Details" Value="{Binding SelectedRegion.CountDetails}" Style="{StaticResource MutedLabel}"
+                               AutomationId="RegionInventoryScopeDetails" LineBreakMode="WordWrap" />
+                        <BoxView HeightRequest="1" Color="{DynamicResource Border}" />
+                        <Label Text="Current legacy factory" FontAttributes="Bold" />
+                        <controls:TechnicalLabel Caption="Name" Value="{Binding Factory.Name, StringFormat='Name: {0}'}" />
+                        <controls:TechnicalLabel Caption="Orchestrator" Value="{Binding Factory.Orchestrator, StringFormat='Orchestrator: {0}'}" />
+                        <controls:TechnicalLabel Caption="Primary Region" Value="{Binding Factory.PrimaryRegion, StringFormat='Source configuration region: {0}'}"
+                               Style="{StaticResource MutedLabel}" />
+                        <controls:TechnicalLabel Caption="Monitoring scope" Value="{Binding MonitoringScope}" Style="{StaticResource MutedLabel}" />
+                        <Label Text="Subscriptions" Style="{StaticResource MutedLabel}" />
+                        <controls:TechnicalLabel Caption="Subscription ids" Value="{Binding Subscriptions}" LineBreakMode="WordWrap" />
+                    </VerticalStackLayout>
+                </ScrollView>
+                    <VerticalStackLayout Grid.Row="1" Spacing="10">
+                        <Button Text="Open AI Factory" Clicked="OnOpenFactoryClicked"
+                                IsEnabled="{Binding CanOpenFactory}" AutomationId="OpenAiFactoryDashboard"
+                                ToolTipProperties.Text="{Binding DashboardHint}"
+                                Style="{StaticResource FactoryActionButton}" />
+                        <Button Text="Add AI Factory" Command="{Binding AddFactoryCommand}"
+                                IsEnabled="{Binding CanConfigureSelected}"
+                                Style="{StaticResource FactoryActionButton}" />
+                        <Button
+                            Text="Add AI Factory scale set"
+                            Command="{Binding AddScaleSetCommand}"
+                            IsVisible="{Binding CanAddScaleSet}"
+                            Style="{StaticResource FactoryActionButton}" />
+                        <Button
+                            Text="Clone AI Factory"
+                            Command="{Binding CloneFactoryCommand}"
+                            IsVisible="{Binding CanCloneSelected}"
+                            Style="{StaticResource FactoryActionButton}" />
+                        <Button Text="Review factory deletion" Command="{Binding DeleteFactoryCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                SemanticProperties.Description="Open catalog identity selection. No deletion happens without a server preview and explicit confirmation." />
+                        <Label
+                            Text="Opens Manage factories. A region is not authority to clone, deploy or delete. Select exact factory and scale-set identities; review and confirm the server plan."
+                            Style="{StaticResource MutedLabel}" />
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</ContentPage>

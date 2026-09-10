@@ -1,0 +1,4 @@
+ae091d1078d033f68a63b4e4fd892d8e7ad9492b80304c2fe2464f55012cd7bc  ESAIF.ConfigWizard-1.0.0-win-x64-setup-1.bin
+37298a16e7704fb6f4e04a41cfc4333592825b082ba251ea7deac164bde8be04  ESAIF.ConfigWizard-1.0.0-win-x64-setup-2.bin
+9fa6844e5b076c1232bfc350ac523c8b3624b43f83308514c775312f67ab39d0  ESAIF.ConfigWizard-1.0.0-win-x64-setup-3.bin
+e7ab51c641545783364d962f1f5176078af93a6e3883e65509c9ad25b7560a1a  ESAIF.ConfigWizard-1.0.0-win-x64-setup.exe

@@ -1,0 +1,22 @@
+aifactory-config
+aifactory-config.exe
+dist/
+
+# Ignore build artefacts but keep the shell scripts and release archives
+build/**
+!build/release_v*.md
+!build/windows/
+!build/windows/*.zip
+!build/linux/
+!build/linux/build-linux.sh
+!build/linux/*.tar.gz
+!build/macos/
+!build/macos/build-macos.sh
+!build/macos/*.tar.gz
+
+*.spec
+!aifactory-api.spec
+__pycache__/
+*.pyc
+output/*.yaml
+output/.env

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="ESAIF.ConfigWizard.Pages.ProjectsPage"
+    x:Name="Root"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls"
+    Title="Projects"
+    Shell.NavBarIsVisible="False">
+    <Grid Padding="24" RowDefinitions="Auto,Auto,Auto,Auto,*" RowSpacing="10">
+        <controls:AppHeader
+            Grid.Row="0"
+            Title="Saved projects"
+            Subtitle="Saved configurations with verified Azure resource group access." />
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
+            <Label
+                Text="Project snapshots"
+                Style="{StaticResource SectionTitle}"
+                VerticalOptions="Center" />
+            <Button
+                Grid.Column="1"
+                Text="Show saved"
+                Command="{Binding RefreshCommand}"
+                Style="{StaticResource SecondaryButton}" />
+        </Grid>
+        <FlexLayout Grid.Row="2" Direction="Row" Wrap="Wrap" AlignItems="Center">
+            <Label Text="AI Factory scale set" FontSize="12" Margin="0,0,10,0" VerticalOptions="Center" />
+            <controls:TechnicalPicker Title="All AI Factories" ItemsSource="{Binding FactoryChoices}" SelectedItem="{Binding SelectedFactory}"
+                    WidthRequest="220" Margin="0,0,16,0" AutomationId="ProjectsFactoryFilter" />
+            <ContentView x:Name="EnvironmentFilterHost">
+            <HorizontalStackLayout Spacing="12">
+                <RadioButton x:Name="AllRadio" Content="All" AutomationId="ProjectsEnvironmentAll" />
+                <RadioButton x:Name="DevRadio" Content="Dev" AutomationId="ProjectsEnvironmentDev" />
+                <RadioButton x:Name="StageRadio" Content="Stage" AutomationId="ProjectsEnvironmentStage" />
+                <RadioButton x:Name="ProdRadio" Content="Prod" AutomationId="ProjectsEnvironmentProd" />
+            </HorizontalStackLayout>
+            </ContentView>
+        </FlexLayout>
+        <controls:TechnicalLabel Caption="Status Message" Grid.Row="3" Value="{Binding StatusMessage}" TextColor="{DynamicResource Muted}" />
+        <CollectionView Grid.Row="4" ItemsSource="{Binding Projects}" SelectionMode="Single"
+                        SelectedItem="{Binding SelectedProject, Mode=TwoWay}" AutomationId="ProjectsList">
+            <CollectionView.EmptyView>
+                <Label Margin="18" Text="No projects match these filters. Choose All, or load configurations and Refresh Azure." TextColor="{DynamicResource Muted}" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <controls:GlowCard IsSelected="{Binding IsHighlighted}">
+                    <VisualStateManager.VisualStateGroups>
+                        <VisualStateGroup Name="CommonStates">
+                            <VisualState Name="Normal"><VisualState.Setters><Setter Property="BackgroundColor" Value="Transparent" /></VisualState.Setters></VisualState>
+                            <VisualState Name="Selected"><VisualState.Setters><Setter Property="BackgroundColor" Value="Transparent" /></VisualState.Setters></VisualState>
+                        </VisualStateGroup>
+                    </VisualStateManager.VisualStateGroups>
+                    <Border Style="{StaticResource CardBorder}">
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border" Binding="{Binding IsHighlighted}" Value="True">
+                                <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceSelected}" />
+                            </DataTrigger>
+                        </Border.Triggers>
+                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
+                            <HorizontalStackLayout Spacing="10">
+                                <controls:TechnicalLabel Caption="Label" Value="{Binding Label}" FontAttributes="Bold" FontSize="17" VerticalOptions="Center" />
+                                <controls:StatusLight Label="{Binding VerificationLabel}" LightColor="{Binding VerificationColor}"
+                                    IsPulsing="{Binding IsResourceGroupVerified}" ToolTipProperties.Text="{Binding VerificationDetails}" />
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Grid.Column="1" Grid.RowSpan="4" Spacing="10" VerticalOptions="Center">
+                            <Button Text="Link to RG" Clicked="OnOpenResourceGroupClicked"
+                                    CommandParameter="{Binding .}" IsEnabled="{Binding HasResourceGroupLink}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    ToolTipProperties.Text="{Binding ResourceGroupLinkHint}" />
+                            <Button Text="Create ticket" Clicked="OnCreateTicketClicked"
+                                    CommandParameter="{Binding .}" AutomationId="ProjectCreateTicket"
+                                    Style="{StaticResource SecondaryButton}"
+                                    ToolTipProperties.Text="Open an unsaved ticket draft for this project. Nothing is created or sent." />
+                            <Button
+                                Text="Load"
+                                Command="{Binding Source={x:Reference Root}, Path=BindingContext.LoadProjectCommand}"
+                                CommandParameter="{Binding .}"
+                                VerticalOptions="Center" />
+                            <Button Text="Delete config" Clicked="OnDeleteConfigurationClicked"
+                                    CommandParameter="{Binding .}"
+                                    IsEnabled="{Binding Source={x:Reference Root}, Path=BindingContext.IsNotBusy}"
+                                    Style="{StaticResource SecondaryButton}"
+                                    ToolTipProperties.Text="Delete this saved configuration snapshot only. Azure resources and exported variable files are unchanged." />
+                            </HorizontalStackLayout>
+                            <FlexLayout Grid.Row="1" Direction="Row" Wrap="Wrap">
+                                <controls:TechnicalLabel Caption="Owner" Value="{Binding Owner, StringFormat='Owner: {0}'}" Margin="0,0,18,0" FontSize="12" />
+                                <controls:TechnicalLabel Caption="Environment Status" Value="{Binding EnvironmentStatus, StringFormat='Status: {0}'}" FontAttributes="Bold" FontSize="12" />
+                            </FlexLayout>
+                            <controls:TechnicalLabel Caption="Factory folder" Conceal="True"
+                                Grid.Row="2"
+                                Value="{Binding Folder}"
+                                Style="{StaticResource MutedLabel}"
+                                ToolTipProperties.Text="{Binding Folder}"
+                                LineBreakMode="TailTruncation" />
+                            <controls:TechnicalLabel Caption="Configuration file" Conceal="True"
+                                Grid.Row="3"
+                                Value="{Binding Path}"
+                                Style="{StaticResource MutedLabel}"
+                                LineBreakMode="TailTruncation" />
+                        </Grid>
+                    </Border>
+                    </controls:GlowCard>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="ESAIF.ConfigWizard.Pages.AboutPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls"
+    Title="About"
+    Shell.NavBarIsVisible="False">
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="14" MaximumWidthRequest="900">
+            <controls:AppHeader
+                Title="Enterprise Scale AI Factory"
+                Subtitle="Configuration Wizard for .NET MAUI" />
+            <Border Style="{StaticResource CardBorder}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Architecture" Style="{StaticResource SectionTitle}" />
+                    <Label Text="Application" FontAttributes="Bold" TextColor="{DynamicResource Primary}" />
+                    <Label Text=".NET MAUI owns presentation, navigation, device storage, and file selection." />
+                    <Label Text="Domain" FontAttributes="Bold" TextColor="{DynamicResource Primary}" />
+                    <Label Text="ESAIF.DomainLayer owns the typed AIFactory API contract and domain-facing operations." />
+                    <Label Text="Foundation" FontAttributes="Bold" TextColor="{DynamicResource Primary}" />
+                    <Label Text="ESAIF.BaseLayer owns reusable HTTP transport and MVVM primitives." />
+                    <Label
+                        Text="The Python API remains the single source of truth for defaults, mappings, validation, import/export, projects, and scale sets."
+                        Style="{StaticResource MutedLabel}" />
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

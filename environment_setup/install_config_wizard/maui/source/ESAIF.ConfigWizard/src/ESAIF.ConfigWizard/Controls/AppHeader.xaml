@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    x:Class="ESAIF.ConfigWizard.Controls.AppHeader"
+    x:Name="Header"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls">
+    <Border
+        Padding="18"
+        Background="{DynamicResource HeroBrush}"
+        StrokeThickness="0"
+        StrokeShape="RoundRectangle 20">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="15">
+            <Grid HeightRequest="44" WidthRequest="44">
+                <Border
+                    BackgroundColor="#20FFFFFF"
+                    Stroke="#48FFFFFF"
+                    StrokeShape="RoundRectangle 12"
+                    InputTransparent="True">
+                    <Grid
+                        Padding="11,12"
+                        RowDefinitions="2,5,2,5,2">
+                        <BoxView Grid.Row="0" Color="White" CornerRadius="1" />
+                        <BoxView Grid.Row="2" Color="White" CornerRadius="1" />
+                        <BoxView Grid.Row="4" Color="White" CornerRadius="1" />
+                    </Grid>
+                </Border>
+                <Button
+                    AutomationId="OpenNavigationMenu"
+                    BackgroundColor="Transparent"
+                    Clicked="OnMenuClicked"
+                    Opacity="0.01"
+                    SemanticProperties.Description="Open navigation menu" />
+            </Grid>
+
+            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                <controls:TechnicalLabel Caption="Source"
+                    Value="{Binding Source={x:Reference Header}, Path=Title}"
+                    FontAttributes="Bold"
+                    FontSize="25"
+                    TextColor="White" />
+                <controls:TechnicalLabel Caption="Source"
+                    Value="{Binding Source={x:Reference Header}, Path=Subtitle}"
+                    FontSize="13"
+                    TextColor="#E8FFFFFF"
+                    LineBreakMode="WordWrap" />
+            </VerticalStackLayout>
+
+            <Border
+                x:Name="TrailingBadge"
+                Grid.Column="2"
+                Padding="11,6"
+                BackgroundColor="#24FFFFFF"
+                Stroke="#48FFFFFF"
+                StrokeShape="RoundRectangle 13"
+                VerticalOptions="Center">
+                <HorizontalStackLayout Spacing="3">
+                    <controls:StatusLight
+                        IsVisible="{Binding Source={x:Reference Header}, Path=ShowStatusLight}"
+                        LightColor="{Binding Source={x:Reference Header}, Path=StatusLightColor}"
+                        IsPulsing="{Binding Source={x:Reference Header}, Path=IsStatusPulsing}" />
+                    <controls:TechnicalLabel Caption="Source"
+                        Value="{Binding Source={x:Reference Header}, Path=TrailingText}"
+                        FontAttributes="Bold"
+                        FontSize="10"
+                        VerticalOptions="Center"
+                        TextColor="White" />
+                </HorizontalStackLayout>
+            </Border>
+        </Grid>
+    </Border>
+</ContentView>

@@ -1,0 +1,11 @@
+{
+  "template": "environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v4.bicep",
+  "compiler": "Bicep CLI 0.44.1 (28275db947)",
+  "compilation": "build --stdout --no-restore; local only",
+  "source_repository": "https://github.com/jostrm/azure-enterprise-scale-ml",
+  "source_sha256": "4e2cc54b23a597756b635c3110ebc97dca23331a5660b2038e10b8aeeceedabc",
+  "compiled_sha256": "ca74ee00c1439d87007408d9434a7bb7f32a50fa51a6cb93cb8d98ddd15287d4",
+  "compiled_bytes": 2513937,
+  "parameter_count": 84,
+  "fixture": "foundry-v4-compiled.json.gz"
+}

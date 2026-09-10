@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    x:Class="ESAIF.ConfigWizard.Controls.WorldMapView"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls">
+    <Border BackgroundColor="#080E1B" Stroke="#304565" StrokeShape="RoundRectangle 18" Padding="18">
+        <Grid x:Name="MapScene" RowDefinitions="Auto,*,Auto" RowSpacing="10" SizeChanged="OnCanvasSizeChanged">
+            <Grid x:Name="MapHeader" ColumnDefinitions="*,Auto" ColumnSpacing="12" SizeChanged="OnCanvasSizeChanged">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="GLOBAL OPERATIONS" TextColor="#70E0EF" FontSize="11"
+                           CharacterSpacing="3" FontAttributes="Bold" />
+                    <Label Text="Azure AI Factory network" TextColor="#ECF6FF" FontSize="23"
+                           FontAttributes="Bold" />
+                </VerticalStackLayout>
+                <Border Grid.Column="1" Padding="12,8" BackgroundColor="#14243A"
+                        Stroke="#365270" StrokeShape="RoundRectangle 10" VerticalOptions="Start">
+                    <Label x:Name="RegionCountLabel" Text="NO REGIONS LOADED" TextColor="#79DCED"
+                           FontSize="10" CharacterSpacing="1" FontAttributes="Bold" />
+                </Border>
+            </Grid>
+
+            <AbsoluteLayout x:Name="MapCanvas" Grid.Row="1"
+                            SizeChanged="OnCanvasSizeChanged">
+                <Grid x:Name="MapSurface">
+                    <Image Source="world_map.png" Aspect="Fill" InputTransparent="True"
+                           SemanticProperties.Description="World map with realistic coastlines and country borders" />
+                    <GraphicsView x:Name="LeaderLines" InputTransparent="True" />
+                    <AbsoluteLayout x:Name="MarkerLayer" />
+                </Grid>
+            </AbsoluteLayout>
+
+            <VerticalStackLayout x:Name="MapLegend" Grid.Row="2" Spacing="9" SizeChanged="OnCanvasSizeChanged">
+                <FlexLayout Wrap="Wrap" AlignItems="Center">
+                    <Label Text="●  LAST-RUN FAILURE" TextColor="#FF7185" FontSize="10" Margin="0,0,18,4" />
+                    <Label Text="●  CONFIGURED FACTORY" TextColor="#61F3B1" FontSize="10" Margin="0,0,18,4" />
+                    <Label Text="●  AZURE REGION" TextColor="#79DCED" FontSize="10" Margin="0,0,18,4" />
+                    <Label Text="◎  SELECTED" TextColor="#FFD48A" FontSize="10" Margin="0,0,18,4" />
+                    <Label Text="Hover or select for findings. Not live capacity or health." TextColor="#A0B5D0" FontSize="10" />
+                </FlexLayout>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <Border Stroke="#365270" BackgroundColor="#14243A" StrokeShape="RoundRectangle 10" Padding="8,0">
+                        <controls:TechnicalPicker x:Name="RegionPicker" Title="Locate a region"
+                                ItemDisplayBinding="{Binding DisplayName}" SelectedIndexChanged="OnRegionPickerChanged"
+                                TextColor="#ECF6FF" TitleColor="#A0B5D0"
+                                SemanticProperties.Description="Select any Azure region, including clustered map locations" />
+                    </Border>
+                    <HorizontalStackLayout Grid.Column="1" Spacing="5" VerticalOptions="Center">
+                        <Label Text="Motion" TextColor="#A0B5D0" FontSize="11" VerticalOptions="Center" />
+                        <Switch x:Name="MapMotionSwitch" IsToggled="True" Toggled="OnMapMotionChanged"
+                                OnColor="#197A8C" ThumbColor="#ECF6FF"
+                                SemanticProperties.Description="Animate map region lights" />
+                    </HorizontalStackLayout>
+                </Grid>
+                <controls:TechnicalLabel x:Name="CoordinateLabel" Caption="Region details" Value="Select a light for details. Right-click for region actions."
+                       TextColor="#A0B5D0" FontSize="11" LineBreakMode="WordWrap" />
+                <Label Text="© 2026 Joakim Åström. All Rights Reserved • Linked in: joakimastrom"
+                       TextColor="#748FAF" FontSize="9" />
+            </VerticalStackLayout>
+        </Grid>
+    </Border>
+</ContentView>

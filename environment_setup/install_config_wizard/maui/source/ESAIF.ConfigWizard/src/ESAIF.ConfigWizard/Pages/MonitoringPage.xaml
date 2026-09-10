@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="ESAIF.ConfigWizard.Pages.MonitoringPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls"
+    xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.Maui;assembly=LiveChartsCore.SkiaSharpView.Maui"
+    Title="Monitoring"
+    Shell.NavBarIsVisible="False">
+    <ScrollView>
+        <VerticalStackLayout Padding="24" Spacing="14" MaximumWidthRequest="1450">
+            <controls:AppHeader
+                Title="Operations monitoring"
+                Subtitle="Read-only snapshots. Each metric shows its own source; rings never mean streaming updates."
+                TrailingText="{Binding SourceLabel}"
+                ShowStatusLight="True"
+                StatusLightColor="{Binding SourceLightColor}"
+                IsStatusPulsing="{Binding IsSourcePulsing}" />
+
+            <FlexLayout Direction="Row" Wrap="Wrap">
+                <Button Text="Current AI Factory" Command="{Binding ShowCurrentFactoryCommand}"
+                        IsEnabled="{Binding IsOverviewTab}" Style="{StaticResource SecondaryButton}" Margin="0,0,10,4"
+                        AutomationId="CurrentFactoryTab" />
+                <Button Text="Overview" Command="{Binding ShowOverviewCommand}"
+                        IsEnabled="{Binding IsCurrentFactoryTab}" Style="{StaticResource SecondaryButton}"
+                        AutomationId="MonitoringOverviewTab" />
+            </FlexLayout>
+            <VerticalStackLayout IsVisible="{Binding IsCurrentFactoryTab}">
+                <controls:CurrentFactoryAnalyticsView BindingContext="{Binding CurrentFactory}" />
+            </VerticalStackLayout>
+            <VerticalStackLayout IsVisible="{Binding IsOverviewTab}" Spacing="14">
+            <controls:TechnicalLabel Caption="Error Message" Value="{Binding ErrorMessage}" FontSize="13" TextColor="{DynamicResource Danger}" />
+            <Border Style="{StaticResource CardBorder}" BindingContext="{Binding CurrentFactory}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="My tickets · current factory" Style="{StaticResource SectionTitle}" />
+                    <controls:TechnicalLabel Caption="Ticket Owner" Value="{Binding TicketOwner, StringFormat='Owner: {0}'}" FontSize="13" />
+                    <controls:TechnicalLabel Caption="Factory folder" Conceal="True" Value="{Binding Folder, StringFormat='Factory: {0}'}" FontSize="13" />
+                    <controls:TechnicalLabel Caption="Ticket Source" Value="{Binding TicketSource, StringFormat='Source: {0}'}" FontSize="13" />
+                    <FlexLayout Direction="Row" Wrap="Wrap">
+                        <controls:TechnicalLabel Caption="New Tickets" Value="{Binding NewTickets, StringFormat='New: {0}'}" FontSize="13" FontAttributes="Bold" Margin="0,0,24,4" />
+                        <controls:TechnicalLabel Caption="Active Tickets" Value="{Binding ActiveTickets, StringFormat='Active: {0}'}" FontSize="13" FontAttributes="Bold" Margin="0,0,24,4" />
+                        <controls:TechnicalLabel Caption="Solved Tickets" Value="{Binding SolvedTickets, StringFormat='Solved: {0}'}" FontSize="13" FontAttributes="Bold" />
+                    </FlexLayout>
+                    <controls:TechnicalLabel Caption="Ticket Warning" Value="{Binding TicketWarning}" FontSize="13" TextColor="{DynamicResource Warning}" />
+                    <controls:TechnicalLabel Caption="Ticket Error" Value="{Binding TicketError}" FontSize="13" TextColor="{DynamicResource Danger}" />
+                    <FlexLayout Direction="Row" Wrap="Wrap">
+                        <Button Text="Create / manage tickets" Command="{Binding OpenTicketsCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,10,4" />
+                        <Button Text="Reload counts" Command="{Binding ReloadCommand}" IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" />
+                    </FlexLayout>
+                </VerticalStackLayout>
+            </Border>
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                <Border
+                    Padding="11,6"
+                    BackgroundColor="{DynamicResource SurfaceSelected}"
+                    Stroke="{DynamicResource Primary}"
+                    StrokeShape="RoundRectangle 12">
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="Source" Style="{StaticResource MutedLabel}" VerticalOptions="Center" />
+                        <controls:StatusLight Label="{Binding SourceLabel}"
+                            LightColor="{Binding SourceLightColor}" IsPulsing="{Binding IsSourcePulsing}" />
+                    </HorizontalStackLayout>
+                </Border>
+                <controls:TechnicalLabel Caption="Status Message"
+                    Grid.Column="1"
+                    Value="{Binding StatusMessage}"
+                    Style="{StaticResource MutedLabel}"
+                    VerticalOptions="Center"
+                    LineBreakMode="TailTruncation" />
+                <Button
+                    Grid.Column="2"
+                    Text="Explore prompts"
+                    Command="{Binding ExplorePromptsCommand}"
+                    Style="{StaticResource SecondaryButton}" />
+            </Grid>
+
+            <Label IsVisible="{Binding HasMockData}"
+                   Text="Source: Mock for missing data. Demonstration charts are not actual usage; available real data is labeled separately."
+                   FontSize="12" TextColor="{DynamicResource Warning}" AutomationId="MonitoringMockSource" />
+
+            <FlexLayout Direction="Row" Wrap="Wrap" AlignItems="Center">
+                <Label Text="Inventory:" Style="{StaticResource MutedLabel}" VerticalOptions="Center" />
+                <controls:StatusLight Margin="0,0,16,0" Label="{Binding InventorySource.Label}"
+                    LightColor="{Binding InventorySource.ColorHex}" IsPulsing="{Binding IsInventoryPulsing}" />
+                <Label Text="Prompt metrics:" Style="{StaticResource MutedLabel}" VerticalOptions="Center" />
+                <controls:StatusLight Label="{Binding PromptSource.Label}" LightColor="{Binding PromptSource.ColorHex}" />
+            </FlexLayout>
+
+            <Border IsVisible="{Binding IsMissingFolder}" Style="{StaticResource CardBorder}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="AI Factory folder required" Style="{StaticResource SectionTitle}" />
+                    <controls:TechnicalLabel Caption="Missing Folder Message" Value="{Binding MissingFolderMessage}" Style="{StaticResource MutedLabel}" />
+                    <Button
+                        Text="Open Configuration wizard"
+                        Command="{Binding OpenWizardCommand}"
+                        HorizontalOptions="Start" />
+                </VerticalStackLayout>
+            </Border>
+
+            <VerticalStackLayout IsVisible="{Binding HasOverview}" Spacing="14">
+                <FlexLayout
+                    Direction="Row"
+                    Wrap="Wrap"
+                    JustifyContent="SpaceBetween"
+                    AlignItems="Stretch">
+                    <Border Style="{StaticResource CardBorder}" WidthRequest="200" Margin="0,0,8,8">
+                        <VerticalStackLayout>
+                            <Label Text="Requests" Style="{StaticResource MutedLabel}" />
+                            <controls:TechnicalLabel Caption="Requests" Value="{Binding Requests}" FontSize="25" FontAttributes="Bold" />
+                            <controls:StatusLight Label="{Binding PromptSource.Label}" LightColor="{Binding PromptSource.ColorHex}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Style="{StaticResource CardBorder}" WidthRequest="200" Margin="0,0,8,8">
+                        <VerticalStackLayout>
+                            <Label Text="Input tokens" Style="{StaticResource MutedLabel}" />
+                            <controls:TechnicalLabel Caption="Input Tokens" Value="{Binding InputTokens}" FontSize="25" FontAttributes="Bold" />
+                            <controls:StatusLight Label="{Binding PromptSource.Label}" LightColor="{Binding PromptSource.ColorHex}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Style="{StaticResource CardBorder}" WidthRequest="200" Margin="0,0,8,8">
+                        <VerticalStackLayout>
+                            <Label Text="Cached input" Style="{StaticResource MutedLabel}" />
+                            <controls:TechnicalLabel Caption="Cached Tokens" Value="{Binding CachedTokens}" FontSize="25" FontAttributes="Bold" />
+                            <controls:StatusLight Label="{Binding PromptSource.Label}" LightColor="{Binding PromptSource.ColorHex}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Style="{StaticResource CardBorder}" WidthRequest="200" Margin="0,0,8,8">
+                        <VerticalStackLayout>
+                            <Label Text="Output tokens" Style="{StaticResource MutedLabel}" />
+                            <controls:TechnicalLabel Caption="Output Tokens" Value="{Binding OutputTokens}" FontSize="25" FontAttributes="Bold" />
+                            <controls:StatusLight Label="{Binding PromptSource.Label}" LightColor="{Binding PromptSource.ColorHex}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Style="{StaticResource CardBorder}" WidthRequest="200" Margin="0,0,8,8">
+                        <VerticalStackLayout>
+                            <Label Text="Success rate" Style="{StaticResource MutedLabel}" />
+                            <controls:TechnicalLabel Caption="Success Rate" Value="{Binding SuccessRate}" FontSize="25" FontAttributes="Bold" />
+                            <controls:StatusLight Label="{Binding PromptSource.Label}" LightColor="{Binding PromptSource.ColorHex}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Style="{StaticResource CardBorder}" WidthRequest="200" Margin="0,0,0,8">
+                        <VerticalStackLayout>
+                            <controls:TechnicalLabel Caption="Secondary Kpi Label" Value="{Binding SecondaryKpiLabel}" Style="{StaticResource MutedLabel}" />
+                            <controls:TechnicalLabel Caption="Secondary Kpi Value" Value="{Binding SecondaryKpiValue}" FontSize="25" FontAttributes="Bold" />
+                            <controls:StatusLight Label="{Binding SecondaryKpiSource.Label}" LightColor="{Binding SecondaryKpiSource.ColorHex}" />
+                        </VerticalStackLayout>
+                    </Border>
+                </FlexLayout>
+
+                <Grid
+                    x:Name="ChartsGrid"
+                    ColumnDefinitions="*,*"
+                    RowDefinitions="Auto,Auto,Auto,Auto"
+                    ColumnSpacing="14"
+                    RowSpacing="14">
+                    <Border x:Name="TokensChartCard" Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Tokens over time" Style="{StaticResource SectionTitle}" />
+                            <controls:StatusLight Label="{Binding TokensSource.Label}" LightColor="{Binding TokensSource.ColorHex}" />
+                            <lvc:CartesianChart
+                                HeightRequest="260"
+                                LegendTextPaint="{Binding ChartTextPaint}"
+                                Series="{Binding TokensOverTimeSeries}"
+                                XAxes="{Binding TokensOverTimeXAxes}"
+                                YAxes="{Binding TokensOverTimeYAxes}"
+                                LegendPosition="Bottom"
+                                TooltipPosition="Top" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border x:Name="RequestsChartCard" Grid.Column="1" Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Requests over time" Style="{StaticResource SectionTitle}" />
+                            <controls:StatusLight Label="{Binding RequestsSource.Label}" LightColor="{Binding RequestsSource.ColorHex}" />
+                            <lvc:CartesianChart
+                                HeightRequest="260"
+                                LegendTextPaint="{Binding ChartTextPaint}"
+                                Series="{Binding RequestsOverTimeSeries}"
+                                XAxes="{Binding RequestsOverTimeXAxes}"
+                                YAxes="{Binding RequestsOverTimeYAxes}"
+                                LegendPosition="Bottom"
+                                TooltipPosition="Top" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border x:Name="TokenMixChartCard" Grid.Row="1" Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Token mix" Style="{StaticResource SectionTitle}" />
+                            <controls:StatusLight Label="{Binding PromptSource.Label}" LightColor="{Binding PromptSource.ColorHex}" />
+                            <lvc:PieChart
+                                HeightRequest="260"
+                                LegendTextPaint="{Binding ChartTextPaint}"
+                                Series="{Binding TokenMixSeries}"
+                                LegendPosition="Bottom"
+                                TooltipPosition="Top" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border x:Name="ModelsChartCard" Grid.Row="1" Grid.Column="1" Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Requests by model" Style="{StaticResource SectionTitle}" />
+                            <controls:StatusLight Label="{Binding ModelsSource.Label}" LightColor="{Binding ModelsSource.ColorHex}" />
+                            <lvc:CartesianChart
+                                HeightRequest="260"
+                                LegendTextPaint="{Binding ChartTextPaint}"
+                                Series="{Binding RequestsByModelSeries}"
+                                XAxes="{Binding RequestsByModelXAxes}"
+                                YAxes="{Binding RequestsByModelYAxes}"
+                                LegendPosition="Bottom"
+                                TooltipPosition="Top" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border x:Name="SuccessChartCard" Grid.Row="2" Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Success and errors" Style="{StaticResource SectionTitle}" />
+                            <controls:StatusLight Label="{Binding PromptSource.Label}" LightColor="{Binding PromptSource.ColorHex}" />
+                            <lvc:PieChart
+                                HeightRequest="260"
+                                LegendTextPaint="{Binding ChartTextPaint}"
+                                Series="{Binding SuccessErrorSeries}"
+                                LegendPosition="Bottom"
+                                TooltipPosition="Top" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border x:Name="LatencyChartCard" Grid.Row="2" Grid.Column="1" Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Latency trend" Style="{StaticResource SectionTitle}" />
+                            <controls:StatusLight Label="{Binding LatencySource.Label}" LightColor="{Binding LatencySource.ColorHex}" />
+                            <lvc:CartesianChart
+                                HeightRequest="260"
+                                LegendTextPaint="{Binding ChartTextPaint}"
+                                Series="{Binding LatencySeries}"
+                                XAxes="{Binding LatencyXAxes}"
+                                YAxes="{Binding LatencyYAxes}"
+                                LegendPosition="Bottom"
+                                TooltipPosition="Top" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border x:Name="ServicesChartCard" Grid.Row="3" Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Resources by service" Style="{StaticResource SectionTitle}" />
+                            <controls:StatusLight Label="{Binding ServicesSource.Label}" LightColor="{Binding ServicesSource.ColorHex}" />
+                            <lvc:PieChart
+                                HeightRequest="260"
+                                LegendTextPaint="{Binding ChartTextPaint}"
+                                Series="{Binding ResourceServicesSeries}"
+                                LegendPosition="Bottom"
+                                TooltipPosition="Top" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border x:Name="EnvironmentsChartCard" Grid.Row="3" Grid.Column="1" Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Resources by environment" Style="{StaticResource SectionTitle}" />
+                            <controls:StatusLight Label="{Binding EnvironmentsSource.Label}" LightColor="{Binding EnvironmentsSource.ColorHex}" />
+                            <lvc:CartesianChart
+                                HeightRequest="260"
+                                LegendTextPaint="{Binding ChartTextPaint}"
+                                Series="{Binding EnvironmentsSeries}"
+                                XAxes="{Binding EnvironmentsXAxes}"
+                                YAxes="{Binding EnvironmentsYAxes}"
+                                LegendPosition="Bottom"
+                                TooltipPosition="Top" />
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+            </VerticalStackLayout>
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

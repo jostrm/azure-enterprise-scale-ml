@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/artifacts/
+**/.vs/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/build/
+**/dist/
+**/output/
+**/saved-projects/
+**/*.pyc
+**/*.user
+!source/ESAIF.ConfigWizard/src/ESAIF.ConfigWizard/Platforms/Windows/app.manifest
+!source/python-api/template-files/.env

@@ -1,0 +1,2654 @@
+{
+  "applicationVersion": "1.0.0",
+  "builtAtUtc": "2026-09-10T07:37:21.7671777Z",
+  "runtimeIdentifier": "win-x64",
+  "selfContainedDotNet": true,
+  "selfContainedWindowsAppSdk": true,
+  "dotNetRuntime": [
+    {
+      "name": "Microsoft.NETCore.App",
+      "version": "10.0.11"
+    }
+  ],
+  "apiExecutableSha256": "DD87A5209C7CFA9CD157F949BEED8BF49D69D7C87172C311846E39D3BFFD78EF",
+  "acceleratorSource": "explicit-local-snapshot",
+  "acceleratorHasGitMetadata": true,
+  "acceleratorFiles": [
+    {
+      "sha256": "0E80C38B4A4F40054D0AB054FE4944850FA0F84D19B8DDF33FDC023BA653F351",
+      "path": ".github\\workflows\\deploy-docs.yml"
+    },
+    {
+      "sha256": "0467B936666334CB0803EFDCDA53D1BAABA681D877A714259308D26BB41E1E55",
+      "path": ".github\\workflows\\verify-aifactory-dev.yml"
+    },
+    {
+      "sha256": "AD35EB9861981340EDA97ACF6E5F1703812CF07A6B385578A23B03FC7B9ED7D2",
+      "path": ".github\\workflows\\verify-aifactory-prod.yml"
+    },
+    {
+      "sha256": "DF9E81668B76ED3D2785EB7AEB08DC41CE99A700A9BCD0C24C2C9A21B93BD995",
+      "path": ".github\\workflows\\verify-aifactory-stage.yml"
+    },
+    {
+      "sha256": "88D79073FB1EE2164809EB24EE28EAA30F7D43194CED4D5B580A2EDD0D0454F8",
+      "path": "00-start.sh"
+    },
+    {
+      "sha256": "564C809517A8DDF816BCEA5810520457AFBD30C886BBBA64B542DE480AA220E8",
+      "path": "bootstrap\\.gitignore.template"
+    },
+    {
+      "sha256": "9F09E9D67452105915D825F95FA7C8108C152D741119ECE18C3D092E3962405A",
+      "path": "bootstrap\\00-aif-add-submodule.sh"
+    },
+    {
+      "sha256": "5F0D0FCF87F8CD0A27D2D8C7ABA4443690710FAFE9B095CED318F9778D211EC9",
+      "path": "bootstrap\\01-aif-copy-aifactory-templates.sh"
+    },
+    {
+      "sha256": "71A699AF742E997620CDD92C1736D1D19D18560766E478B4B62ADE9894D3FECF",
+      "path": "bootstrap\\02a-GH-bootstrap-files.sh"
+    },
+    {
+      "sha256": "5252A76D7D7DFA0D5CC76B9BD0C2B3D4470F200BC9911940AF0C46BD6EEC6830",
+      "path": "bootstrap\\02b-ADO-YAML-bootstrap-files.sh"
+    },
+    {
+      "sha256": "94FB30CE0C3C6DC0250B9A764EFA74F7015A4F9B5E5C5E1E3D464450DA6DF7A7",
+      "path": "bootstrap\\03a-GH-bootstrap-files-no-env-overwrite.sh"
+    },
+    {
+      "sha256": "D30A3F859440E6544B13C9838D1C229BC9D57ED1DFA7728B567D5C3FFBCB52AC",
+      "path": "bootstrap\\03b-ADO-YAML-bootstrap-files-no-var-overwrite.sh"
+    },
+    {
+      "sha256": "14416535892AE03BE83AE8D042C01253A57A6A1901377F6FA130333F29A7B94B",
+      "path": "bootstrap\\11-ESML-upload-lake-structure.sh"
+    },
+    {
+      "sha256": "4C0FCAFCCAC35DC9222A3305724C801E5D1EEE717485D655EE35ACA8DDDBFB06",
+      "path": "bootstrap\\12-GENAI-update-ip-rule-ux.sh"
+    },
+    {
+      "sha256": "EA313E3F58E02FD9BB711056FA2A0BF6518B03CEA22A831DC0B60B45358ADF32",
+      "path": "bootstrap\\13-ESML-update-ip-rule-ux.sh"
+    },
+    {
+      "sha256": "EF65B6AECAC1AD83D452A0B7BA9BE2FF5572F002AA3871A4CB7136B35DF388BC",
+      "path": "bootstrap\\20-genai-agentic-post-bicep.sh"
+    },
+    {
+      "sha256": "079C1B13916CA9065162CB3910770DB379A1A23A00910825D4B31F93CD152052",
+      "path": "bootstrap\\ADO-create-new-aifactory-scaleset.sh"
+    },
+    {
+      "sha256": "1BCD032FDD159B07393FD7A8DEEC143D36160FF32700E82753C82A710D28696F",
+      "path": "bootstrap\\ADO-update-aifactory-and-run-project.sh"
+    },
+    {
+      "sha256": "00112AC447713185C47EBA0CF7EEB30DA470E227AC67E840324F3ED4CA2BF11A",
+      "path": "bootstrap\\AIFactory-lifecycle.sh"
+    },
+    {
+      "sha256": "43602D2909EEC6D1023B5F20892E1FD1F0E221F37FEC2AD902B3A9537E95BBC7",
+      "path": "bootstrap\\ALL-create-new-aifactory-scaleset.sh"
+    },
+    {
+      "sha256": "C9078E36EE9E0F7ECF302B3D26EEA01E5217D8C3C4A5C8DB0D8AF49665A753EB",
+      "path": "bootstrap\\GH-update-aifactory-and-run-project.sh"
+    },
+    {
+      "sha256": "E38B404B385A9204A40AA3500AFF1BF701BA36CD56E2DE8506B57219CFDC15A5",
+      "path": "bootstrap\\GHA-create-new-aifactory-scaleset.sh"
+    },
+    {
+      "sha256": "69A1820A6633575F9B3FFF9E8FA03949C319EFB405CDCD3A1071DAC2D6AD0B19",
+      "path": "bootstrap\\GHA-update-aifactory-and-run-project.sh"
+    },
+    {
+      "sha256": "9DFB69D057B9859E8D029E97225DCF1651D37489C99103F5A2B661012367012C",
+      "path": "bootstrap\\lib\\aifactory_private_dns.py"
+    },
+    {
+      "sha256": "962F77131F7C958064C49F7CB6063CF933198E3BCAB0AF7FB0F91906F2E5DF01",
+      "path": "bootstrap\\lib\\aifactory_scaleset_config.py"
+    },
+    {
+      "sha256": "C4D1F8FF762121624727C1099663887A3E67C3F889EC4F39D823C07E1E2F27F8",
+      "path": "bootstrap\\lib\\aifactory_vpn_profile.py"
+    },
+    {
+      "sha256": "F04F523D7B41444E35F623B1DF7C7EE6AD26B3A691F084F6F2C5A0B4A19456FF",
+      "path": "bootstrap\\lib\\create-new-aifactory-scaleset.sh"
+    },
+    {
+      "sha256": "1C3A9BE690857FCB38D38C1A804C046861F4308F696070E3C6DC68F6328AA29E",
+      "path": "bootstrap\\lib\\factory_lifecycle_contract.txt"
+    },
+    {
+      "sha256": "B136C67E2D086631F2437A3F05663677205C6CCA3A16E4788107ECD644AA10E3",
+      "path": "bootstrap\\lib\\factory_lifecycle.py"
+    },
+    {
+      "sha256": "CB8B298D2C1B49351405B05E29F00707A483E962128F94D744546DE55751FFDB",
+      "path": "bootstrap\\lib\\project_deployment.py"
+    },
+    {
+      "sha256": "3FB7D2AD6D5928BF6643BCF50CBF51F9564DAE789AD94FFE465AFBCF0B113F96",
+      "path": "bootstrap\\lib\\release_version.py"
+    },
+    {
+      "sha256": "55833B23B70EC38E2066FA2DE532ECC4434440D0AF5F031C424A24F53A642642",
+      "path": "bootstrap\\lib\\release_version.sh"
+    },
+    {
+      "sha256": "07910BE9357EDDCF8DF240B46F4785A4EFE5FA08F75320DEA760AA11CEE3737A",
+      "path": "bootstrap\\lib\\simple-app-gateway-network.bicep"
+    },
+    {
+      "sha256": "BB0E16203B3F8761E14624A2F6398C85B0BFCB9B316F513222C18FB72F28BCFE",
+      "path": "bootstrap\\lib\\simple-app-gateway.bicep"
+    },
+    {
+      "sha256": "1E79DC420E118203DD76852EBAD91C07108AB793E17432FB1C850E4ECB2A2EAC",
+      "path": "bootstrap\\templates\\factory-lifecycle-ado.yml"
+    },
+    {
+      "sha256": "2C9E1976511F8E6D88B70638F452363A94E5454488F4C7F30802B9FCFDA49D3B",
+      "path": "bootstrap\\templates\\factory-lifecycle-gha.yml"
+    },
+    {
+      "sha256": "72EF65C9D8BDA1D74B66F7A2C8D4381F8FD0841CDE074DF1DEE406C59A51A026",
+      "path": "bootstrap\\ui\\terminal.sh"
+    },
+    {
+      "sha256": "B8FF08A5013A051882EEE04CE9A76869917692D8D1F389924CB3FFF9E19299EE",
+      "path": "environment_setup\\aifactory\\azure_dashboards\\ESML-AIFactory-1.json"
+    },
+    {
+      "sha256": "D8C1C0CFF52EB5B222ABA2A61C33088BB118B3872BC3DBF7EF8C02E567B54A3D",
+      "path": "environment_setup\\aifactory\\azure_dashboards\\ESML-AIFactory-Dev-v2.json"
+    },
+    {
+      "sha256": "A84467E6545BEFB37212BA7866ACBD5F1D60C2258CC728BAA7DA30BFFA34AAEC",
+      "path": "environment_setup\\aifactory\\azure_dashboards\\ESML-AIFactory-DEV.json"
+    },
+    {
+      "sha256": "12DB23A6432A278CB2321CD95A8D598EFFF58AE73939731CD6D53F18605AC95E",
+      "path": "environment_setup\\aifactory\\azure_dashboards\\ESML-AIFactory-v2.json"
+    },
+    {
+      "sha256": "9922D80B62FE04FFA8D97D51E106253F1DBBBC1A889E133C491C15041A008EDA",
+      "path": "environment_setup\\aifactory\\bicep\\.gitignore"
+    },
+    {
+      "sha256": "4EFF7B48CD8F85C6ECA64FB6BBA18CEE47CA5B5E066DCB128649CBFECE784B3A",
+      "path": "environment_setup\\aifactory\\bicep\\bicepconfig.json"
+    },
+    {
+      "sha256": "0D2FE09A9B638491A2CA2ED8FF209AB44F081359EA781D3643BB5C46CA3A68F2",
+      "path": "environment_setup\\aifactory\\bicep\\cleanup-role-assignments.ps1"
+    },
+    {
+      "sha256": "8845D1FE9425A414CBF14A783EB3627983E971DF318224D90FFDA04A7568AF17",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\logicapps\\aimodel-throttling-via-networkrule\\bicep\\main.bicep"
+    },
+    {
+      "sha256": "6305AD2BBE056521D0DD644481C1322A4F1B289C40F2C42C1C57DC98EE11272C",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\logicapps\\aimodel-throttling-via-networkrule\\bicep\\main.bicepparam"
+    },
+    {
+      "sha256": "FBF43C88687FBD38E67CB1D345F0A040092F7AE9EA3E5B7F698A895E0247E195",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\logicapps\\aimodel-throttling-via-networkrule\\bicep\\modules\\actionGroup.bicep"
+    },
+    {
+      "sha256": "017FBF39450D2655900EC4441A4803CC88B924E8CA32BA254ED3D8C5C8E01F86",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\logicapps\\aimodel-throttling-via-networkrule\\bicep\\modules\\budget.resourcegroup.bicep"
+    },
+    {
+      "sha256": "7C50B4BFED85D1E40698587C586B0B1B1B88DAFD422286E8977C07D1F46ACCC7",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\logicapps\\aimodel-throttling-via-networkrule\\bicep\\modules\\budget.subscription.bicep"
+    },
+    {
+      "sha256": "27B66AD5E9DDA45F78518A3BEF412D305AAC9558FDCC3DCC6E4E8D1800140DE6",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\logicapps\\aimodel-throttling-via-networkrule\\bicep\\modules\\logicApp.throttle.bicep"
+    },
+    {
+      "sha256": "C012885F462DAFE3753F5D27CB7D30BC086E6B10AD9742CD9037D7C91F86A5F3",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\logicapps\\aimodel-throttling-via-networkrule\\bicep\\modules\\roleAssignment.resourcegroup.bicep"
+    },
+    {
+      "sha256": "7F19DC4BE5AA4EAD95BA797D568A1B51983BF78573839DF07A518A0AF8FA77EB",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\logicapps\\aimodel-throttling-via-networkrule\\bicep\\modules\\roleAssignment.subscription.bicep"
+    },
+    {
+      "sha256": "3207AA2ED6B6095F7F9B217575F49B1A6D4178ACC9E45AF0DA66FF3606353FCC",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\logicapps\\aimodel-throttling-via-networkrule\\bicep\\modules\\scheduledQueryAlert.tokens.bicep"
+    },
+    {
+      "sha256": "BC36BE9F4E4C1A844600CF15E641A6D4DA4107B9AAF76CC278AC23580F82F818",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\logicapps\\aimodel-throttling-via-networkrule\\readme.md"
+    },
+    {
+      "sha256": "971B518B61D8B36DA60782AE01F515FC44D9A84C222D95C748278E1FD1D219A2",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\logicapps\\aimodel-throttling-via-networkrule\\scripts\\throttle-genai.ps1"
+    },
+    {
+      "sha256": "07AE2360A418CB95246D840D5ECD4EA94DC0640659F605DA6CEDDF6A10BE3686",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\logicapps\\aimodel-throttling-via-networkrule\\scripts\\throttle-genai.sh"
+    },
+    {
+      "sha256": "A477B6424B1DBA734021E707EDCACA61666491D17F9A28079656D2A6921376D9",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\readme.md"
+    },
+    {
+      "sha256": "B244AF5FE3CF17BC056AB2C3A71FAA08795D8F0FEF8C337726B2FA7323494213",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\common\\AifFactory.psm1"
+    },
+    {
+      "sha256": "37A5DA7AE19EE1FCD6604874E1266E9326E4307553D7A1F9534FD23AA48E46B1",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\common\\project-config.json"
+    },
+    {
+      "sha256": "D24C20EF518FA16B9AAE3818847D288FEE81E2F4390B2BFF56DBCE7AACD9672F",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\deploy-automation.bicep"
+    },
+    {
+      "sha256": "95DCD005CFADC896B9E4F464578AA8B13E1F455AEF52D8B358B7AB884453998B",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\readme.md"
+    },
+    {
+      "sha256": "8DE7CA434DC8CA3159A0E1227839D2472D3237304E46F495DD683B7CE8AF77CA",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\report-config.json"
+    },
+    {
+      "sha256": "DEEFA393C301325E10E4A1B7EAE84FE5A653A7B8A44DEC9330999693477F74D9",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\run-and-export.ps1"
+    },
+    {
+      "sha256": "CBA170906C50377F0CDD79ED52A8895A5FD4520AEC7DF59836B753EC5C327C71",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\RUNBOOK.md"
+    },
+    {
+      "sha256": "98A544431C21C2F7817B8984772C72A2E50AF4D06755ED2CABE8C9FACA9C7FA1",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\showback\\deploy-automation.bicep"
+    },
+    {
+      "sha256": "EE91422897242E5B7E7BFA05BD2AFEA8E106B743D023FA1007DC1EBA1F0428AB",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\showback\\modules\\automationAccount.bicep"
+    },
+    {
+      "sha256": "95EE41E6246F086FDD5E4D196FBFF1B93F7B6888E252746D7719AB7A833B74EE",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\showback\\readme.md"
+    },
+    {
+      "sha256": "19E7E60071FCFD73E9C034656C8B322BDE3B16CDB4FCD52EEA3A6214EE29C213",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\showback\\report-config.json"
+    },
+    {
+      "sha256": "F40DDF4D3B884996A7B9223452605E619031BF6BD2F6252E8607DAC8F6DDB777",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\showback\\run-and-export.ps1"
+    },
+    {
+      "sha256": "E08E241B94AAF96FEBCECA0748914E1FF1B98402298F3B9264A581EBF0CD330F",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\showback\\RUNBOOK.md"
+    },
+    {
+      "sha256": "79FC2D02D0F18CE81C5E89BC47B6758076989083E1F1734A681DDD34E8798A41",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\showback\\Update-ShowbackReport.ps1"
+    },
+    {
+      "sha256": "7DF37A719845CD98C9E16DBBE4FA4A71FE0CF1E59DC4C2F562EB8D9212EE4BA6",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\coreteam\\finops\\runbooks\\Update-FoundryTokenReport.ps1"
+    },
+    {
+      "sha256": "96AE673E9CE6464D792B23340191D3C0A05D9B8F6EF927D1BA76272E277E43E8",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\projectteam\\foundry-usage\\foundry_usage_report.py"
+    },
+    {
+      "sha256": "18D28B5F924F1C81D53E1C1AED944EF4B7E0C27FC9925A2D2568D1D8C13A6622",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\projectteam\\foundry-usage\\foundry-usage-runbook.bicep"
+    },
+    {
+      "sha256": "9DE68B5984E3010DCDA6880DFD39C51DDB5D52A067FF3F58B4E585C59F765EDB",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\projectteam\\foundry-usage\\Log analytics & Application Insights - How to and queries.md"
+    },
+    {
+      "sha256": "0F7497808E5C19596D17544EED498A1D344E0D8ECC56DE15E0DD6D75D4D08ECF",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\projectteam\\foundry-usage\\readme.md"
+    },
+    {
+      "sha256": "1488CF00AA606E83C5EE8F4E4EE4CE4411BEF15C5378AF6789004D624E53F73D",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\projectteam\\foundry-usage\\requirements.txt"
+    },
+    {
+      "sha256": "A2081699A995AB4EC35F90D268A2CA140EAAEB71225653C33298E248933FBA80",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\projectteam\\foundry-usage\\run-foundry-usage-report.sh"
+    },
+    {
+      "sha256": "D19A9467A0FEDEC76A56BB737D7CCEBAE0B295DBF94911CDADFF76B6085EC414",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\projectteam\\foundry-usage\\save-foundry-usage-queries.sh"
+    },
+    {
+      "sha256": "2441399C9CF91DD43EDC5BA6EF99512AA1AAB90A2D1C249550995AACE322E1D8",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\automation\\projectteam\\foundry-usage\\verify-and-configure-foundry-diagnostics.sh"
+    },
+    {
+      "sha256": "31868D4CFE4AA985DF59FC5A3F600FE4333BCD10EF3B8D224E747CF4A70D0FB6",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\aifactory-governance\\gov-cross-charging.yaml"
+    },
+    {
+      "sha256": "FB23DE89742E17F9C7DD7EBC1B89CE67D7E0E54090E2A31220F0DDD5D6B74800",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\aifactory-governance\\jobs\\job-cross-charging.yaml"
+    },
+    {
+      "sha256": "6E5C168D43872A3297982D14C646647443272441647B1AF9639A0C5DB95FDAE6",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\esml-infra-common\\infra-ai-gateway.md"
+    },
+    {
+      "sha256": "F45E9E69EB791384417E653AFF9835BF9CEAD10F1DF01420303BDE55D995F055",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\esml-infra-common\\infra-ai-gateway.yaml"
+    },
+    {
+      "sha256": "ACF8C72B6B9C7B28C58A70D77C6704EE9B760F0A07A289AF5B45BB87A796233D",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\esml-infra-common\\infra-aifactory-common.yaml"
+    },
+    {
+      "sha256": "9336E1293B12CD9CCAFCD3F0CEC0C99B3084F88A158FA6F9EC9164D9DBA8BB2F",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\esml-infra-common\\jobs\\job-1-aif-cmn.yaml"
+    },
+    {
+      "sha256": "F7FC8199309EF19AB16F4C8F475353EA58B7CDE2DC6C7222C6AE0C7FC49760C9",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\esml-infra-common\\jobs\\job-2-ai-gateway.yaml"
+    },
+    {
+      "sha256": "6116A0A825634113CC9D3B2519642220AD04878B4967ACD2FBBB7F681EB12F2C",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\esml-infra-common\\jobs\\region-report-steps.yaml"
+    },
+    {
+      "sha256": "E3F84ACB0468AA037AEFC1B649DB536F731468672816924B9401C67023A24F61",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\esml-infra-project\\infra-project-genai.yaml"
+    },
+    {
+      "sha256": "84FDDF2214D193025D030EE9F658E238FBB7E83D65BED31BBEDA8C8643D978A1",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\esml-infra-project\\jobs\\job-0-reviewed-project-config.yaml"
+    },
+    {
+      "sha256": "592FB4D830F58F829F7B85E09C50A01D27E51B7376342C159EA367F7A5D4F9BE",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\esml-infra-project\\jobs\\job-1-genai-networking.yaml"
+    },
+    {
+      "sha256": "B495F35F031A02B299130BEEC325E4F6217D4E21E7E1E3552DCFFF14C6BE30AA",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\esml-infra-project\\jobs\\job-2-genai-services.yaml"
+    },
+    {
+      "sha256": "44B4FA8A5CFDC2B0AC2EF4FDC2EB96EF36212B818B15D7A0CD77757D5D02F1DB",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\readme.md"
+    },
+    {
+      "sha256": "5F9FE9442960BF7DD538D9D48D941A20AED192AF7297EFBA7D565837F1045D5D",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\esml-yaml-pipelines\\variables\\variables.yaml"
+    },
+    {
+      "sha256": "093FCDEFE4DD69BFABECF882F53C6382B4A08A74EDAAE6C1ABC287C27DC7C397",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\azure-devops\\readme.md"
+    },
+    {
+      "sha256": "428C4734BC2FA375C6DACFC5252B8EB0BC02CCB3B4727AC0277D3341026800C9",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\github-actions\\.env.template"
+    },
+    {
+      "sha256": "AB2EFDADF251B9E17C568F08B44380E1BA9A855C4739DC26FEDF31E31736B496",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\github-actions\\03a-GH-create-or-update-github-variables.sh"
+    },
+    {
+      "sha256": "E0547A66EA945DADFC1EB8F4C3A0E01536EC983F15166A2DB5E9ECB09E076107",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\github-actions\\infra-ai-gateway.yml"
+    },
+    {
+      "sha256": "F5CB45770F9246FD6F3611D3479DFA2FCB670BBEBD3D24A5177B25E59EFC5AED",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\github-actions\\infra-common.yml"
+    },
+    {
+      "sha256": "3FB365FBBF500AD097DBBF232A60CB8B463823BC7D28B6E0508DD8FF425C38C1",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\github-actions\\infra-project-phase.yml"
+    },
+    {
+      "sha256": "650BD68130653B64854F7E345552E53D69711006940D345FCD537C0BFF2EC4C9",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\github-actions\\infra-project.yml"
+    },
+    {
+      "sha256": "E8CDA61E02511D4DBE13B6A592B93D6369C19DCAD1789EBD3F378BBCDAD4ECC1",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\github-actions\\readme.md"
+    },
+    {
+      "sha256": "7D328C13F3ED438549C87D179BDBA9EEA942E9803D901B559825EFC726F2A1A5",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\lake\\esml_lake.zip"
+    },
+    {
+      "sha256": "1A696273FC05A99E6EEF014B17D61CEC511865EA482EAF7F7335BF99B9417EA7",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\pipeline-config\\readme.md"
+    },
+    {
+      "sha256": "138A506E24BA55E839C807A0116F8F5BAEA0CA47CEA69DB9F58DF62AF82604A4",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\user_connectivity_dsvm\\bicep-addOrUpdate-bastion-nsg-rule\\007-bastionNSGInbound.ps1"
+    },
+    {
+      "sha256": "2282389CA9973E35750A0BDA633206ED8A819429A842E5130D47DD3F2EBCE3FB",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\user_connectivity_dsvm\\bicep-addOrUpdate-bastion-nsg-rule\\007-main-bastionNsg.bicep"
+    },
+    {
+      "sha256": "ED114AB6E18C72818E884E8CB767F1E4F483E227213477CD503BF89F219C580B",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\user_connectivity_dsvm\\esml-cmn\\cmn_dev_connect_RDP_privateIP.azcli"
+    },
+    {
+      "sha256": "4ED187F60CDD5B0F4503E6DADCF2AEBE49FE5A89A8445346CDCDC2FF4BAFDE3B",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\user_connectivity_dsvm\\esml-cmn\\cmn_prod_connect_RDP_privateIP.azcli"
+    },
+    {
+      "sha256": "493AB81C387FD37F9F09CE3B303524B83A3A1060E0BB7994AE2CA287B08903FC",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\user_connectivity_dsvm\\esml-cmn\\cmn_test_connect_RDP_privateIP.azcli"
+    },
+    {
+      "sha256": "E252DB824EE08BDE5AB07B4E53A5AD1E4570C3A814B32FFBD43B3D2C9AD15B05",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\user_connectivity_dsvm\\esml-project\\prj_dev_connect_RDP_privateIP.azcli"
+    },
+    {
+      "sha256": "C443B7F854E068B9B2D0613220EAF2A4989C51931184167BD1577B8858ED4102",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\user_connectivity_dsvm\\esml-project\\prj_prod_connect_RDP_privateIP.azcli"
+    },
+    {
+      "sha256": "8C7E6A23D00CB2203BB0176A460ACCDC00556C4DC26E9B6F7C8FC64545F2A63C",
+      "path": "environment_setup\\aifactory\\bicep\\copy_to_local_settings\\user_connectivity_dsvm\\esml-project\\prj_test_connect_RDP_privateIP.azcli"
+    },
+    {
+      "sha256": "27C40C925918386B49525164F70F4129A0C2FE5A11E61ED87A77522D29020098",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\ai-gateway\\14-add-networking-aigw.bicep"
+    },
+    {
+      "sha256": "43618BD46F190AB99CAF0E02D192E4A480EDC1AB99EB593E0830108E5F478EB7",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\ai-gateway\\apim\\apim-configuration.bicep"
+    },
+    {
+      "sha256": "B4D55B79681B5815B9CD18FF86E5EC74B016887CEA9EDAAA9DE2457669062B98",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\ai-gateway\\apim\\main.bicep"
+    },
+    {
+      "sha256": "078F6789C1A6C7B98A476AFA357E7DB70617229B85B25EA04B6006B4F9D77096",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\ai-gateway\\apim\\openai-role-assignment.bicep"
+    },
+    {
+      "sha256": "4981081443761D3EE39F111FC6301FD2920663D7CED322A4E0419D2E2BCDA0BB",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\ai-gateway\\apim\\policy.xml"
+    },
+    {
+      "sha256": "891B2A53ACC42D4671B98A1D227431AE5B7B40DE975DB948A1440269C922D9E5",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\ai-gateway\\apim\\README.md"
+    },
+    {
+      "sha256": "B1BF98F77A3E45682CA861D8E42948B9793780345136E9554256F80592775AB0",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\main\\11-rgCommon.bicep"
+    },
+    {
+      "sha256": "4A6BEEACCB886EF41D3966E775E6DF1496926A771F8B634916AFDC16A855C9F3",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\main\\12-networkCommon.bicep"
+    },
+    {
+      "sha256": "9DAE3153CCD9FDCB1CB62D46468F37F93D649E37004EC9613E49BF1B34FED024",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\main\\13-rgLevel.bicep"
+    },
+    {
+      "sha256": "59F51CBF7F76E23BB463E112F4892E8956D4C468DA33908F6553908EC92FA4E9",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\avdSessionHost.bicep"
+    },
+    {
+      "sha256": "557C5681E953E72FD3CCB7DD4CFD443B59CA576503E35B9861E1442ACAF049C8",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\bastionHostCommon.bicep"
+    },
+    {
+      "sha256": "B473F2E966E5E9D1B60EE832C841CA3ED84D4F469F81F3DCBE45A3A414B0159D",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\cloudflareTunnelVm.bicep"
+    },
+    {
+      "sha256": "DAF9A8CB53BBC3BC1A7ECD2DB9BBAD1E3AA70FA63497689C53FE6FF8652444A6",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\kvSecretsCmn.bicep"
+    },
+    {
+      "sha256": "A191C849D1046DB604826F85F56A9462587D0C7B015681F3476F7271BC23834B",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\lakeRBAC.bicep"
+    },
+    {
+      "sha256": "01369B9FEC9126BE4EE746F7C6FE0492975363997FBD69A6079B19B4B766B70A",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\nsgAIGateway.bicep"
+    },
+    {
+      "sha256": "2BADEE8967EB4507D8797FF5AA528A3915047F353E2427641F03B577732527F4",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\nsgBastion.bicep"
+    },
+    {
+      "sha256": "2F6441FCC5699E206DB786B17CA7B1FF4784FDC594EEDFE3022FCD1986CEAA7E",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\nsgBastionNoWhitelist.bicep"
+    },
+    {
+      "sha256": "60DC4B52088FAE4F6A9A3A0DC7D0B4281BBF36C45A792D73A672AF910EE4EBE0",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\nsgCommon.bicep"
+    },
+    {
+      "sha256": "FD2723B4E7C60B75FAFCF5E0A57BA5BC01493281CE3026AB9180288EFF530E17",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\nsgCommonScoring.bicep"
+    },
+    {
+      "sha256": "55F199A933B71B9CB85A73F3E07ED8D97263CC2C4FDDA65D15E1B9ADCF081DA2",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\nsgCommonScoring.json"
+    },
+    {
+      "sha256": "9FF9267635C3D46621CD18B35C00E3C6A6E31237ABBBB243637E87435729DDCE",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\nsgFunctionApp.bicep"
+    },
+    {
+      "sha256": "19970AFC091DDB2ACBDB8512C42A18A8FE5EBC6D8872AD5B69E8D69172D395C5",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\nsgPowerBI.bicep"
+    },
+    {
+      "sha256": "41ECB106F6005BDBF06021EAA2DB01D9631E26C8F2062C1FC19FF0FAA6535D8E",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\routeTableAIGateway.bicep"
+    },
+    {
+      "sha256": "334DA0A7B6403EA95E5BE9D3B3FDA63A856BB03279CB3753E5E60AB38EDD8E55",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\modules-common\\vNetCommon.bicep"
+    },
+    {
+      "sha256": "BE42B88542165643DDC622E6B5EC9C3848EC222D98C2403D2B483B0AF0024468",
+      "path": "environment_setup\\aifactory\\bicep\\esml-common\\security\\defender.bicep"
+    },
+    {
+      "sha256": "85667AF04A706B6ECF661E93BB3C78C0B5C7249E8180C0F8C2121983E0AFBD17",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\.bicepignore"
+    },
+    {
+      "sha256": "7C7C35138EA3FAF6762797B1BD8477E402F9286158E04C8349D58835B8DE500D",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\.gitignore"
+    },
+    {
+      "sha256": "8B08944160FEC990C19FFC331C741C366F7BD9B08C19513C96695128445E933C",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\00-debug.bicep"
+    },
+    {
+      "sha256": "DD9038F6C394C25C9EEFB113A7BC26A5C2CB3167EF02E4DADD105430D09E20A9",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\01-foundation.bicep"
+    },
+    {
+      "sha256": "1ADC0DD07C3026421E2F1A74F6D39AB035363759C767528371C44FE57CCF7E76",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\02-core-infrastructure.bicep"
+    },
+    {
+      "sha256": "B828B3EE0CFE748DE1BAA73FD184C96C88FC089E46B1FC252AC7E17682B46C38",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\03-cognitive-services.bicep"
+    },
+    {
+      "sha256": "0CB1F420BBEDC889E459003E96FCD94F9BC9BDBA337E279CE3B1F8BC523797A2",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\04-databases.bicep"
+    },
+    {
+      "sha256": "6D62904B2C08C06A9F5958501AFBFA948A14BF307F29A486EAE9092EE612E734",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\05-compute-services.bicep"
+    },
+    {
+      "sha256": "234FBD9FA7D5EA2D453D3F3446CA331406408D9CDED15B239D1CDB4A269B29E6",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\06-ai-platform.bicep"
+    },
+    {
+      "sha256": "43E5D110D297B44DD54315C0B8990EE7F15210FE667D4E28E416BAC28B6732EA",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\07-ml-data-platform.bicep"
+    },
+    {
+      "sha256": "5FAD0E95AC684AAC08345C563795EFC2326C090927FF458AB714148648D4450C",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\08-rbac-security.bicep"
+    },
+    {
+      "sha256": "3502017AE45CEA019CE1485D24CBC779D64EF5542E888FD2105270E85D645D17",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\08b-rbac-common-rg.bicep"
+    },
+    {
+      "sha256": "66CADA985E31BA7082D6FC0F33101809D109BE89EACFC8A45261B8BBC58A1618",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\09-ai-foundry-2025-v2.bicep"
+    },
+    {
+      "sha256": "AE4DBE1CB6BBE1B9A479ECC010847FC148689775AAA42396CE6D80978ED53967",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\09-ai-foundry-2025-v3.bicep"
+    },
+    {
+      "sha256": "4E2CC54B23A597756B635C3110EBC97DCA23331A5660B2038E10B8AEECEEDABC",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\09-ai-foundry-2025-v4.bicep"
+    },
+    {
+      "sha256": "F178C1A6C86FA5432E3BB1B7473457D7BCBCCC4133B6F609A45A4C2F91A8C7C3",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\1-10-SUMMARY.md"
+    },
+    {
+      "sha256": "7EEE28319E815EDA5B87C02825841228068093989094F2ED5DF93BC066D3E275",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\10-aifactory-dashboards.bicep"
+    },
+    {
+      "sha256": "35724FCBAC493C97134FAA86A23CB74B04AA5422B5FDF44CB03C5A15FC1F0355",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\11-integration.bicep"
+    },
+    {
+      "sha256": "A09A02DD8314B90A0CF8AEA0AB435487CC14348A16E8AF9D855B751F25FB9EB5",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\21-sample-app.bicep"
+    },
+    {
+      "sha256": "D4CE4CF940AD20E349573A8FEAF3924BC4213028BFED0DA0498CBD0EE47E9DD6",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\31-network.bicep"
+    },
+    {
+      "sha256": "A07E25C2A2617463E796B4B9A5C1793F98325A9511FAD55EC1570ADFD71AF157",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\NETWORK-CONFIGURATION-GUIDE.md"
+    },
+    {
+      "sha256": "56B7B46BAF34FA48AF8C09BFA1044B82779DB6C34892EC1F65F68F123EC61561",
+      "path": "environment_setup\\aifactory\\bicep\\esml-genai-1\\RBAC-IMPROVEMENTS-SUMMARY.md"
+    },
+    {
+      "sha256": "22CFC4CD4817F21F1E8B846C682A1BB731C757B177BB9A506628F09ED4EF2A6E",
+      "path": "environment_setup\\aifactory\\bicep\\esml-project\\21-network.bicep"
+    },
+    {
+      "sha256": "053DCB4A0F83D1852B03C801C31AC31EC8030E80922C65878B8457F1643163F4",
+      "path": "environment_setup\\aifactory\\bicep\\esml-project\\22-main.bicep"
+    },
+    {
+      "sha256": "F541F5C033DD8F732F8E03159E668FB733550E2043480FC1CC7B2815AC30B60D",
+      "path": "environment_setup\\aifactory\\bicep\\esml-project\\23-add-dsvm.bicep"
+    },
+    {
+      "sha256": "BB4309F3D2210728AA6AAFBCD4CCBA83D81344C4C24390B34CE25907A7AAD775",
+      "path": "environment_setup\\aifactory\\bicep\\esml-project\\23-add-dsvm.ps1"
+    },
+    {
+      "sha256": "D22D0C8F862714E837741C199F66B05FD3457D32F0507029584A285F82EFBEA6",
+      "path": "environment_setup\\aifactory\\bicep\\esml-project\\24-add-aks.bicep"
+    },
+    {
+      "sha256": "254034CD0ACFCB4403C442546CD5A887CD3D7F9EAA50CAD6835599DBB766629B",
+      "path": "environment_setup\\aifactory\\bicep\\esml-project\\24-add-aks.ps1"
+    },
+    {
+      "sha256": "FE4FFB6034E0417154826A95717E3FA2F5116E9C82B9278654EB0E9D5EF46D39",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\_24-add-aks.ps1"
+    },
+    {
+      "sha256": "B948DFA9FA4A02F666CB89A435FE93F074904BC36FCAAB7FB21DB2B4319A7A80",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\_25-add-users-to-bastion.ps1"
+    },
+    {
+      "sha256": "638BEA4C1966261B56E98923AD9C7287830634F83E84604D694F4421399AB112",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-assign-roles-on-rg.ps1"
+    },
+    {
+      "sha256": "69A6BD4A9B109A3F9148F6C45D7AFEC8A2885E5E9F4B5E80990A6A573DDAEC02",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-assign-roles-on-sub.ps1"
+    },
+    {
+      "sha256": "EF0202661BA0A7E315A3F9413616EC981D067715045F0C58DB0C361D47A2334F",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-assigned-roles-del-on-rg.ps1"
+    },
+    {
+      "sha256": "3DF4884E220BB1B0BE96BB7BBC778D43429367B833078E0B0A77F1F354E845B5",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-cost-from-rg-tag.ps1"
+    },
+    {
+      "sha256": "2627702E0C71CEFE8CF0F814A212733A736B51ED86CE9F1794A761351BF972B3",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-create-compute-instance-in-vnet.sh"
+    },
+    {
+      "sha256": "664444A815EA9F84C7A9E7B3D6CFCB3AF10CA6C2C2E068C79A9ED530B1DB5156",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-delete-subnets-for-project.ps1"
+    },
+    {
+      "sha256": "AEEF302D86AACF88CB8004833AC306924ECDB57EE87661F9110739F53D0729AA",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-deleteCapHost.sh"
+    },
+    {
+      "sha256": "27D8C31F495F1FE6E345413E0CE05F48DB5A20E6581B1B0C732FE6A87B4B7012",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-get_your_own_object_id.ps1"
+    },
+    {
+      "sha256": "F60A98A12ADB78CC2C6D1427DF9B90551EC21C400BB32B187F99D4A8B197E965",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-list-rbac-for-user-on-rg.ps1"
+    },
+    {
+      "sha256": "45A2AA772D4693DAAB1E3EEDD481E07F5C4CE477993221DC41011A2E36C0C80B",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-load-env-file.ps1"
+    },
+    {
+      "sha256": "541AC745377D49A0312C1AA0D616AF9FEDD0AB84C43D6C9CBD9F20FCA9D5495D",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-switch-sub2_dev.ps1"
+    },
+    {
+      "sha256": "BDA064BF34B1919E9AF43D3AD75F47EC4486683D74FEC8CD443E1E776BC05AD8",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-update-az-add-ml-extension.sh"
+    },
+    {
+      "sha256": "9FCB0838353BC52AB4AF92BB56BEF9B50A42A7C1763142F427206F41353D7184",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\000-update-storage-account-access.ps1"
+    },
+    {
+      "sha256": "7283D69F730281588605B5DEB83B11B77483146B4D5C32212ECF9AF6E9583D24",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\001-aml.yml"
+    },
+    {
+      "sha256": "DBB26ED04B6DCE38481A788BE98B24601BD4F1D6FD5F30BA70AC9ABFA5DE544D",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\001-set-owner-on-sub.ps1"
+    },
+    {
+      "sha256": "7F8677295B3B6B35EF8737317E356DD828DEE71EF36B9D72FE5E5EBA834D1178",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\001-set-privateDnsZoneContrib-on-RG.ps1"
+    },
+    {
+      "sha256": "0BC5E7B8E61CD62F7D87B84415FF4B005B80D7A879D94CA93068306B9A034457",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\002-set-accesspolicy-for-sp.ps1"
+    },
+    {
+      "sha256": "E58B736627A1A09A8FE183E7DBDA726D762EB44519B78D06DBF68D261DCD1FC6",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\003-set-BlobDataOwner-to-sp.ps1"
+    },
+    {
+      "sha256": "774615481977AB8ED95F605C733321AEE01CE8F2FA3496CEE1CD642EBB53363C",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\007-main-bastionNsg.bicep"
+    },
+    {
+      "sha256": "8C4605F1682A99BDB32268088B2134DCF7AA5D8968682B3E1C748602D03967BA",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\10-generate-pwd-4-ado.sh"
+    },
+    {
+      "sha256": "39FD04CFAD1F12C8A3BA16596F62A2E5E64823054A76AC737D956B0B6EFCC724",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\100-aml-rbac.bicep"
+    },
+    {
+      "sha256": "13F72142C8D3639F3B2365E2526577C340D5138E5680CEDBFC383B2CB49E14D5",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\100-aml-rbac.ps1"
+    },
+    {
+      "sha256": "041DF5ACFD673B3265C2B623F6A9951AD69BEB14E0FFB742F943F03D445B3912",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\12-GENAI-update-ip-rule-cmd.sh"
+    },
+    {
+      "sha256": "814EF927E233CC3E903F0395ACC742FEA02223E87F98FAA38728B7F4A8AB37FB",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\12-GENAI-update-ip-rule-ux.sh"
+    },
+    {
+      "sha256": "3F8C07F42E12752D15077441C32995BB004D206823B832914E1683CC8AC35FDB",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\13-ESML-update-ip-rule-ux.sh"
+    },
+    {
+      "sha256": "8D8F19FBFDE204F670AE46F9FA8D7F54B920D086DF468C1B7E7521A1361B600B",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\201-az-cli-give-role.ps1"
+    },
+    {
+      "sha256": "160284940C9E18D25444E2335114A8C81B135CBC5BD6DB8B0A3D6D5CB4E69491",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\23-add-dsvm.bicep"
+    },
+    {
+      "sha256": "5A43AC1FAD798D24E9D8470DADC89C99FC1B6E7967F5B97E36DBA89B0C7C9105",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\23-add-dsvm.ps1"
+    },
+    {
+      "sha256": "4B24885E7D254A0CC2C6F2153DDE78ADAC346D768BF2A18A1F9FD6F1D2C7B03A",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\23-install-sdks-on-win11.ps1"
+    },
+    {
+      "sha256": "F115C4C21A23CC939C86F03DFAADEA59E2937A1B8556D69B5F2D5929C28904A6",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\24-add-aks.bicep"
+    },
+    {
+      "sha256": "0EB6B397F718C768C1EC8BD5802E0EE7FD02EDCBC1596951709AC1C035127905",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\25-add-user-to-bastion.bicep"
+    },
+    {
+      "sha256": "30DC4B52A26FB927246CAD7ACAB3D0E125A52C2272B57EA3208C59D293E7896D",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\25-add-users-to-datalake-acl-rbac.ps1"
+    },
+    {
+      "sha256": "7716F549FB2A58BA3BA290A54D411F94AA2CE7CBF9D65752A3F3F04937F50490",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\25-add-users-to-kv-get-list-access-policy.ps1"
+    },
+    {
+      "sha256": "CB2DC279BC68ABB090D2D42705B142F0B0494A9D4E0B015861A6FB87DE556AF0",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\26-add-esml-coreteam-member.ps1"
+    },
+    {
+      "sha256": "05FBCA03683454641F3042FA7C148BA17D9BCB2BBE6B1263DA3FF8C7B0E77167",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\26-add-esml-project-member.ps1"
+    },
+    {
+      "sha256": "3C501A40F9FF010FD62735ACA307D9C35187E2A82EA42516245CB16C6C9B1108",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\26-enable-resource-providers.ps1"
+    },
+    {
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\26-remove-esml-coreteam-member.ps1"
+    },
+    {
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\26-remove-esml-project-member.ps1"
+    },
+    {
+      "sha256": "3300AF92B037F0FB35F189F4E3C9D420BB2A142B50DD5B2E56E2C4978DFB72DC",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\27-create-private-dns-zones.ps1"
+    },
+    {
+      "sha256": "6BA44617B509CCBE1B459714FE3457A8F38EDE8E82197C43C97D3DEEBECFB63A",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\28-Initiatives.bicep"
+    },
+    {
+      "sha256": "26B713B73831FD6FFC7C310F01D5AE5B675C17B81394498962C719631ABAC877",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\28-policy.bicep"
+    },
+    {
+      "sha256": "A3AA0670271F505A6FCBA799F6731F2F0B490DA48A0959593F82283591B8C153",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\29-create-sp-or-update-oid-for-project.sh"
+    },
+    {
+      "sha256": "3DC8A9330BB18438DC5EB8223C60028F5A184B6ED3DA7407021668071CE96776",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\30-vpn-gateway-certificates.ps1"
+    },
+    {
+      "sha256": "2B7E392EA472ECA80BBB710FF94233007E7825D6F5A34D517BEF5A702597898B",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\31-create-priv-dns-zones-if-not-exists.ps1"
+    },
+    {
+      "sha256": "342E4B6D0A5A969B220811BF8A0DB12373EDDD58BB6299E8C3337E05DBD4E24F",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\32-create-azure-groups.sh"
+    },
+    {
+      "sha256": "295DA08724AA55007D49D74CAB8F1013B4A4EB09D18D0D1B83E5D091CA5B6813",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\images\\sp-aifactory-house.png"
+    },
+    {
+      "sha256": "85D86C78C0BD84175F72EC0F8BE1ED1691907849AD353F9F1D9AA25D6AB10F54",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\policy\\Audit-MachineLearning-PrivateEndpointId.json"
+    },
+    {
+      "sha256": "EC9F27712D198DC065F494AA43F3F850EDFC73C157D95FD564946B52BCE88E71",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\policy\\Audit-PrivateLinkDnsZones.json"
+    },
+    {
+      "sha256": "3444AB27E62D5EC2A84839DC6EEB0B2160D4AAFA5BBAF75DCA274CDB7711DDD7",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\policy\\Deny-Private-DNS-Zones.json"
+    },
+    {
+      "sha256": "D83928572665FC83916E4B7C86BA95B4E4B5A7FD9C1C71B5D7B90545016FE262",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\policy\\Deploy-Private-DNS-Generic.json"
+    },
+    {
+      "sha256": "D199FD15FE1C1B522668BE95329CD23B159B7623E9F0662F4FE6D81E0A884B62",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\policy\\Deploy-VNET-HubSpoke.json"
+    },
+    {
+      "sha256": "6EF535E592D87FD80F0539EA034A6496DAF4063ACB8E1F014EDC9258C1164933",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\policyset\\Audit-UnusedResourcesCostOptimization.json"
+    },
+    {
+      "sha256": "4F9F35AF2FA144933120B07390117FAFE5A475DA24D44A1953640A17B118C086",
+      "path": "environment_setup\\aifactory\\bicep\\esml-util\\policyset\\Deploy-Private-DNS-Zones.json"
+    },
+    {
+      "sha256": "0D2D3F2A534A9EB8AD5F245B0099B4BC942919860EE15C9415F118FFFF9EDFC4",
+      "path": "environment_setup\\aifactory\\bicep\\images\\ado\\esml-infra-common-1.png"
+    },
+    {
+      "sha256": "33696A6825B2A67A3C743D9FE56655D38A41C5DCB28C4D249F2C98B1224FA9CF",
+      "path": "environment_setup\\aifactory\\bicep\\images\\ado\\esml-infra-common-2.png"
+    },
+    {
+      "sha256": "D17A7A98162F1EC738FDDF6F18C38634748B3BF5577538BBE2C2EB2AF8B3E38F",
+      "path": "environment_setup\\aifactory\\bicep\\images\\ado\\esml-infra-common-3.png"
+    },
+    {
+      "sha256": "2935ED02B6B5E056C777C2C247F28862009AF6034599D031DEE0454BBD1A7DF6",
+      "path": "environment_setup\\aifactory\\bicep\\images\\ado\\esml-infra-common-4.png"
+    },
+    {
+      "sha256": "B2CC612EBE540ACB04A3ECEB0DA3E9161557E587DCAD15B4EF44693369C69C78",
+      "path": "environment_setup\\aifactory\\bicep\\images\\DSVM-Connectivity-AzureBastion.png"
+    },
+    {
+      "sha256": "3C9E26A0DAC1A5E752813636AB9D3F5615CEC3DF596337C6848BF8EF71A2333D",
+      "path": "environment_setup\\aifactory\\bicep\\images\\esml-architecture.png"
+    },
+    {
+      "sha256": "5E0D053FFE0BA368F787C681E63D88ECD79933D5427A866D9F33AA6ED5462A73",
+      "path": "environment_setup\\aifactory\\bicep\\images\\esml-bicep.png"
+    },
+    {
+      "sha256": "B2F615144672D4DECAD4D041B5425DDF77EF8AE3D92B1A2BE6B7B2699D0EA34F",
+      "path": "environment_setup\\aifactory\\bicep\\images\\esml-security1.png"
+    },
+    {
+      "sha256": "8DF44C35251D1711764F4FAEC46BEB41045CA2E580E41AFF0A2A74C9D518DD6A",
+      "path": "environment_setup\\aifactory\\bicep\\images\\esml-security2.png"
+    },
+    {
+      "sha256": "9CAD6FB9F4CE7CFCEBAC257D3FF30E6C47FE82583AABD4E70E435D44EC29EB1A",
+      "path": "environment_setup\\aifactory\\bicep\\images\\esml-security3.png"
+    },
+    {
+      "sha256": "7C7C35138EA3FAF6762797B1BD8477E402F9286158E04C8349D58835B8DE500D",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\.gitignore"
+    },
+    {
+      "sha256": "D0D12C13661B5A23D29F1C7BCEB50CF0C7B07B56D3218AAD35EBECB4AA69AE74",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\acrRbac.bicep"
+    },
+    {
+      "sha256": "D2A0610FC98AC7700890774C403D62F6031F5CAB93D69429BC44490489C9966C",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\addUserAsCoreteam.bicep"
+    },
+    {
+      "sha256": "79F39B8D141D80C6CEC377B46C87EE3D46D61E0C49358B3A88D10500D1EC19B0",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\addUserAsCoreteamBYOVnet.bicep"
+    },
+    {
+      "sha256": "127D391FE208B3293D06D8833F48DE91615E65ACD774C5FE10D8D600E83E0A56",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\addUserAsProjectMember.bicep"
+    },
+    {
+      "sha256": "273FCBADD2756F26C4DADE46549DA3DCF12CD2A7FD4A0A16EE5E6009BDDE2ABB",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\addUserAsProjectMemberByoVnet.bicep"
+    },
+    {
+      "sha256": "6D66EA9B0A7FEDBB8462FE1027C79B21736E89ABEB3F49188C354AA926FE6334",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\addUserAsProjectMemberByoVnetRGs.bicep"
+    },
+    {
+      "sha256": "B99F3A48881621A76C277C4F5334273E217F33D3914E36C46230E7D6AEFA1060",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aifactory-dash-01.bicep"
+    },
+    {
+      "sha256": "E48838455BDC69CA7E4079AE93D8CF4F4C4F699D408752416279BB6C732AC2D7",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aihubRbacAISearch.bicep"
+    },
+    {
+      "sha256": "AF81B1A1F9EC9D57C5003DF57C1C17C1D8CFDE861E676E2E35D6E0AF8093965E",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aihubRbacAIServices.bicep"
+    },
+    {
+      "sha256": "9D3C53F8BCECDD96FD2EB533393A2F06EECFD7AAC6B619AFAF8D1621A098C9C7",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aihubRbacAmlRG.bicep"
+    },
+    {
+      "sha256": "B68C19FF823ACB02165AF903481D0444C12F7BF85EAE7880146CCB8C070AC213",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aihubRbacDoc.bicep"
+    },
+    {
+      "sha256": "6B923FAB6555A43B637785D3DD91B03AD679F4BF5CCB1A16FE9C1E9A70AAB0C2",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aihubRbacOpenAI.bicep"
+    },
+    {
+      "sha256": "0C7EA1F2172A854FE69C88E91FBAE8D23B3C2AF49B9B145F6B12783E5A4CEFED",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aihubRbacSpeech.bicep"
+    },
+    {
+      "sha256": "9532804A6447F1B2F9B7C191DE120883746F726616BC86CAA2D585C3EF773111",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aihubRbacUsers.bicep"
+    },
+    {
+      "sha256": "620A9FAB82E081562B6D7866D50191FD19C06533DCAD7A1F87CAB784C9E99E4B",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aihubRbacVision.bicep"
+    },
+    {
+      "sha256": "443EF942F07BDBC95C623282CC44424FA810459C08F992721BE571CC32BF7DA3",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aiSearch.bicep"
+    },
+    {
+      "sha256": "B682A7F1D89A51AB5919587D36B0A81E9897BF8CBF93D968DFA0A612016F582F",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aiSearchRbacUsers.bicep"
+    },
+    {
+      "sha256": "66CC37D70BAD6D9CD3954266AFC93A90088AE7C980FFDBA067B62389F536C5C5",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aiSearchSharedPrivateLinkFoundry.bicep"
+    },
+    {
+      "sha256": "8BF9434674AF26874F447C7FDFC475BD5A6D309A29544FA15687B2F17F211B95",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aksCluster.bicep"
+    },
+    {
+      "sha256": "B5401A8D04A4FBC6C7A1984E119788203A24A46B439F33923646DECAC24A446E",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\aksNsg.bicep"
+    },
+    {
+      "sha256": "B52261BD41B93CEAE74BFF04E81697EE0682E975DB3EF7348D9CDB43DD99A6AF",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\amlComputeRbac.bicep"
+    },
+    {
+      "sha256": "AAD1A9BE6BB679C2740B0C4AD2476DB6A9D89DF1294982AB6460C7DDA8DF5C8B",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\appinsights.bicep"
+    },
+    {
+      "sha256": "26146DAC73FEAEFDFB07E3C87EAE5ACE36EDF0E1196E719AA5D466DA6F973777",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\appinsightsDashboard.bicep"
+    },
+    {
+      "sha256": "85E7B581DB34565B9751BFC5D7F9989D03627ED14B7035D2D597F27BEB8F1573",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\applicationInsights.bicep"
+    },
+    {
+      "sha256": "46006CE3B8087098341B27A543832B61D17CB511165BF88DFFAAE07EAD810EF7",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\applicationInsightsRGmode.bicep"
+    },
+    {
+      "sha256": "667B6387B2EFAF3C8A540530F4E8266C358BFB49880B9D9FCEAEAE586D4146DD",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\bing.bicep"
+    },
+    {
+      "sha256": "E1D8750FA34FC129095808F35F0FCA0AE63015FFDE56B9FE2F6CD7F34ACFDB3A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\botService.bicep"
+    },
+    {
+      "sha256": "7854AD38694A65D06C7E554B14098FC9ADC062182F9B398367DEC0DBC7C1C45B",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\common\\CmnAIfactoryNaming.bicep"
+    },
+    {
+      "sha256": "C44EC6C2CB9B0DD425C5ECDAD6BB3B116C154533C20A6157A6D76BFA112156A3",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\common\\CmnPrivateDnsZones.bicep"
+    },
+    {
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\common\\CmnRoleAssignments.bicep"
+    },
+    {
+      "sha256": "3D9633A35E1111781EEA5F02CDE37FD25F21840C53A2FAA6BA14FD21E14DCA9F",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\common\\types.bicep"
+    },
+    {
+      "sha256": "E783EA17A589A554BDB2054ED66079B681867EE0A6605B3047592345C0BDD3E7",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\commonRGRbac.bicep"
+    },
+    {
+      "sha256": "C7A84C14190D5A2E2BC411E36F04B6127E2EBA3C0CE4AD109FF07C67C47CEB89",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\containerapp.bicep"
+    },
+    {
+      "sha256": "92C03CCC1EC17A3E2E499E2C8082DF82D3F49E5677CC3B143D21D7ADE19C9A35",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\containerappApi.bicep"
+    },
+    {
+      "sha256": "DED4B71161698F0250E1B87BC3F3CC332CD0CB626A2674E92DA868E83036DFDB",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\containerappRbac.bicep"
+    },
+    {
+      "sha256": "303F4B334F7350D8BCDC90F3825064796E53ED80831555253AF7AE7A29812A69",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\containerapps.bicep"
+    },
+    {
+      "sha256": "41332D6CA11DD9C311F94738FF1A6E3E3CE6D7286208C1B7FAFE5292895DE7DC",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\containerappsEnv.bicep"
+    },
+    {
+      "sha256": "EAABCD67C6EEF95E0955A3E6E7062412F12A428C099AEF75F19077F94F18F6BF",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\containerappUpsert.bicep"
+    },
+    {
+      "sha256": "0713C59F10196EA1204BFE7F24CF796D43D1BA4DBF13ACA7646E0AB21F6214CA",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\containerappWeb.bicep"
+    },
+    {
+      "sha256": "2176DCF0A436FEF251955D453CE39B8BBC32485C8C58EBD4C42615D7B44CAA21",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\containerRegistry.bicep"
+    },
+    {
+      "sha256": "A7699D6E5D06DBCBEAA0E51B34495F72B817D7E5C4FF41FD4B839BAE7CEB4861",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\contributorRbac.bicep"
+    },
+    {
+      "sha256": "7505231A3B94FDDA0BC8551A145AE9EC43323DBD87F6883E9DB44BD99FCB13BF",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\contributorRbacSimple.bicep"
+    },
+    {
+      "sha256": "48678D7125862755F2AFD99E840AE53F5A33EDCF03C6B5AD92DC9BB67B39269A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\createNewPrivateDnsZonesIfNotExists.bicep"
+    },
+    {
+      "sha256": "803D30EB7B2A39128543D4E0676B3320F0921CBC852266FD46B0EDDA0544853D",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\createPrivateDnsZones.bicep"
+    },
+    {
+      "sha256": "E70AA8B16EDEC137DEBC7C0CEA93B0B1A4E3307947066A5E372A21B83FDF992D",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csAIServices.bicep"
+    },
+    {
+      "sha256": "FBE19FDFF1AC221961D49DAAF97E5863652D54CFA775F5307BFEA228B2F4F86B",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csContentSafety.bicep"
+    },
+    {
+      "sha256": "3EF6ADEE8146EA59E5E48B15F2ED2FC5B26465A2F8A7087CBA37137CC37D235B",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csDocIntelligence-kvSecret.bicep"
+    },
+    {
+      "sha256": "2A55B9DCF396FCE828AEEACE7C271E0F7768DCDB2AB317EB98997619FD833497",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csDocIntelligence.bicep"
+    },
+    {
+      "sha256": "C8567D61EEA97261937D3D023B834419E63ED31ADA3A43FD6E672511E899BA14",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\aiFoundry2025.bicep"
+    },
+    {
+      "sha256": "181C31F5516376857C0F07C88AD1EE5F968BDA1601C8981AAA3D91FE31CC4F51",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\aiFoundry2025AccountCaphost.bicep"
+    },
+    {
+      "sha256": "DED0326C3F4B1BC9A7504E686731C4D2F52FF918BF11EC6DD6B7C8C3C5C70698",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\aiFoundry2025AvmOff.bicep"
+    },
+    {
+      "sha256": "C0FDD064E865D1C08FD5165B16D0B9901BD3F9EDDC3A7D84EC33A60BDC874293",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\aiFoundry2025AvmOffApim.bicep"
+    },
+    {
+      "sha256": "FDA5DFF2CCDDCAC5138C80675C4F643967A553496A587FF8A19E04F508C33BDA",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\aiFoundry2025AvmOffApimAccount.bicep"
+    },
+    {
+      "sha256": "3D46EE3BB2E928D191848B530901A9E76FCA4FFC42A45610B69258B1EDE997E4",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\aiFoundry2025AvmOn.bicep"
+    },
+    {
+      "sha256": "A6C949C5C08F85B17B501CE231896F3BCD13598285F0AC91B80DABC6C862A9E1",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\aiFoundry2025caphost.bicep"
+    },
+    {
+      "sha256": "EE80A22D8DFC8B056CBEF3D567C32B5F5BD83FCC5AA0FB08E68DA6BB59774AE3",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\aiFoundry2025caphostRbac1.bicep"
+    },
+    {
+      "sha256": "8A26C16386FD21ACBA5CBC1947364AAED1C29E5D551131908987E12C7DDEA98F",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\aiFoundry2025caphostRbac2.bicep"
+    },
+    {
+      "sha256": "532EEE58C091309F837A4248A2F723067089D37C3B858AF08F597C2AA7BCBADE",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\aiFoundry2025pend.bicep"
+    },
+    {
+      "sha256": "02A51D5AC6D338A3EE24C91F28B50B143D051960711E12FF8064BCAE3A097935",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\aiFoundry2025project.bicep"
+    },
+    {
+      "sha256": "DA0F2013772A9A070D1B9A1D95F7793F38BFF3195885CC3B9AA1E0B16FFEB23D",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\aiFoundry2025rbac.bicep"
+    },
+    {
+      "sha256": "8FF49FBFC4EE7EA2F4704FF108308DDDA38408CF6131B51FF19D2602EA684152",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\buildRoleAssignments.bicep"
+    },
+    {
+      "sha256": "2FBB069F1AEA56FE2C929D1414AA5E8A550074BDC0BF353C9F10513B06A8AE72",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\cs.bicep"
+    },
+    {
+      "sha256": "474B2F5B5E20F26CEE2A883260AB0144840A9017F0B08C968520EBD665E7009F",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\azuredeploy.json"
+    },
+    {
+      "sha256": "4793A3F007774BCAEE1683B2EDDC616C47F86A77362529FA3647E6545951B444",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\azuredeploy.parameters.json"
+    },
+    {
+      "sha256": "F3CE98F1E4BF6A29C4EF096E9816335B9BD05D41AEF1A952791332CC3D3CFE79",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\deleteAllCapHosts.ps1"
+    },
+    {
+      "sha256": "B509D9275EE5D531D6D0857FE60C30BFB5834BC5ABC9DA767A82B412018390E0",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\deleteCapHost.sh"
+    },
+    {
+      "sha256": "CDD34233914B6E1C8E9DA77AC50E96EE688EAFE09CA0CEE9EA888BFB77C27F0C",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\listCapHosts.ps1"
+    },
+    {
+      "sha256": "BD3FCD2988455896319ED0C94AE48B569C6475037C14F8B7EAF8F078C0DC3C83",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\listCapHosts.sh"
+    },
+    {
+      "sha256": "FCC95BFF332C9519757E4F552F78D36D8F1E290D826B2FFC5096294FB2F98913",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\main.bicep"
+    },
+    {
+      "sha256": "F4B4E9807B0D5BF054255CAFB53B0B816001AE4E17746F978707319B5BAA5A19",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\main.bicepparam"
+    },
+    {
+      "sha256": "1322DE112B2E93126F3D6B65D191D27144D5D4366FD3817280F8A37C4E90D41F",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\main.json"
+    },
+    {
+      "sha256": "3D2584605D8C2A847C2C38895164482C5AAAC5729FAE716CB94EAB1D19DF4938",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\metadata.json"
+    },
+    {
+      "sha256": "0839BA58C1D82ECACEFE25D324AC1921F2002D7642B132B637A45A2D6B642621",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\add-project-capability-host.bicep"
+    },
+    {
+      "sha256": "E2A5B279BCFFDC27698F5930B83B99AC0E5D64E41C58F01ED5F5734D9C7D10BE",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\ai-account-encryption.bicep"
+    },
+    {
+      "sha256": "9989BFE9962073B79FF080BB10F19103D83CAFA519E976E08DD4E0D98CDE3EE4",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\ai-account-identity.bicep"
+    },
+    {
+      "sha256": "65D41B7489093911443BF322DB8F18898A72064A183752AA49BBB24FDA9848D5",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\ai-project-identity.bicep"
+    },
+    {
+      "sha256": "F94835AC28C9B228B9324A2C16DE22BF9DFC0E610BC7EC2271E1B23B4395A04A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\ai-project-identity.json"
+    },
+    {
+      "sha256": "F7FBA74A88F55611102F11DE644FDE0D684309583ADEFCD9E6AF75E00DE03F57",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\ai-search-role-assignments.bicep"
+    },
+    {
+      "sha256": "21974374F925C3222FB3FFEF6F259CF75BB61D37D43AAA8DCF01B7E585051D69",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\azure-storage-account-role-assignment.bicep"
+    },
+    {
+      "sha256": "4B10C54854D5497D4FF8107083BFD1455ED54683D32CE96F34EA4998827B0CBE",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\blob-storage-container-role-assignments.bicep"
+    },
+    {
+      "sha256": "FDBDC938B8539377C499567375997134B530FACA39C217C06784426A40F05375",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\cosmos-container-role-assignments.bicep"
+    },
+    {
+      "sha256": "D568C3ECEA1DA6DEC298CDA1DFDE08CD16B80976D860E52D4E67B63D0D479E8A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\cosmosdb-account-role-assignment.bicep"
+    },
+    {
+      "sha256": "315103F2EE12C047C88B33CD9380B90B78345E439CC481F1B32B457099F63DB2",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\existing-vnet.bicep"
+    },
+    {
+      "sha256": "257EE1DB2C33660F3A66D5ECA78CC2969795EB4E512777244FDA97223A3D8DBE",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\format-project-workspace-id.bicep"
+    },
+    {
+      "sha256": "3D802983D870BAACFDBEB413139540638067ABC3DB85AA32D688296DA428B87D",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\network-agent-vnet.bicep"
+    },
+    {
+      "sha256": "F36579BC37D3153BEE1ACCB64C04E9BA18BB354EC4D8DDB8D6E84B116CF99663",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\private-endpoint-and-dns.bicep"
+    },
+    {
+      "sha256": "10BE29091F45EE21BFDCC39D0702D17E843D29E8577EE2B52FFE6D837399F7E3",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\standard-dependent-resources.bicep"
+    },
+    {
+      "sha256": "C1C69A38472EE6576E572D6BC5036A1DDFF85670A62F008A22D04826875FD95A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\subnet.bicep"
+    },
+    {
+      "sha256": "36925369F1518163FF6763FE46355F3C698A9486D114830697186525A7F4E05F",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\validate-existing-resources.bicep"
+    },
+    {
+      "sha256": "197BFCFC48615D4DD14D5C0BA43335587A678D5DE5D8E69601CC8428F25C0659",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\modules-network-secured\\vnet.bicep"
+    },
+    {
+      "sha256": "108A074DBD59407E99C2B90FFAB0FB8D534CE6D6DAF143A04E48DAFAAE5D3E32",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\foundry-apim\\README.md"
+    },
+    {
+      "sha256": "B316FE88CA75001DC6E06CCCFAC1A71FED45EE522A43B1B90EDCD369EC4ACD04",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\rbacAISearchForAIFv2.bicep"
+    },
+    {
+      "sha256": "4F7C62C26D7C37F09DDAD5D4DB71D96530B47C6ED7296091108D6421765C52FD",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\rbacAISearchOpenAIUserOnFoundry.bicep"
+    },
+    {
+      "sha256": "B7219E60149C65745983754EA08993065097B17133FFBFFD809A8CB0FE825F2D",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\rbacAIStorageAccountsForAIFv2.bicep"
+    },
+    {
+      "sha256": "090EFDA4F8C7E70980B267408EFDA34292C5179FAD10F0D9C0B8CE9CAF0D5738",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csFoundry\\rbacKeyVaultForAgents.bicep"
+    },
+    {
+      "sha256": "FCE1719F4440C7A3E474B79A35EDF8731DAA47EEDDADCD998C7AA6969E46F7D0",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csOpenAI.bicep"
+    },
+    {
+      "sha256": "0C249AAF929B64D055B22C9D1C6707B82EF645DD1EDB1B215D7531E3C329DF10",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csSpeech-kvSecret.bicep"
+    },
+    {
+      "sha256": "3BE74575CF61CBE19054C76CB65CF78D1DD600199DF2FD07A2646EBC1E0B169A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csSpeech.bicep"
+    },
+    {
+      "sha256": "B6B1E6A3A7EEFD1569D765E8F163A6E71287D957BE9A487E8CA6CBB5DDAC343B",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csVision-kvSecret.bicep"
+    },
+    {
+      "sha256": "72F4BEC090AC72EEB5619802B568CC77613012A41C4E4775ABE15D2CD83E9AFB",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\csVision.bicep"
+    },
+    {
+      "sha256": "0D3CD59DB1A3405E7E777CA65FDA61E95263D5326B7E61F15133790FFC3F1814",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databases\\cosmosdb\\cosmosCustomRole.bicep"
+    },
+    {
+      "sha256": "3AC1608CFD2A864DD33EA0E2BF5C6FD2580D56AD1766F45F68D43642B35C136A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databases\\cosmosdb\\cosmosdb.bicep"
+    },
+    {
+      "sha256": "021D2804247FBE97405F28B313B7E992C3714D41AD4432DF492F57B4279E3FE2",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databases\\cosmosdb\\cosmosRbac.bicep"
+    },
+    {
+      "sha256": "3255C7733D5DC06DD9F36C715A3502FE81E17CA3A64E3E66222C535EB705A46E",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databases\\elasticsearch\\elasticsearch-rbac-example.bicep"
+    },
+    {
+      "sha256": "85358FDB0EA6FBE63A05B931B80A9C43A53C0D1FB738948BDD3219618AFFBF8C",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databases\\elasticsearch\\elasticsearch.bicep"
+    },
+    {
+      "sha256": "CEE9F64209FAFB9EA3EC2F2B3323A5F7390E92D8D7DB4CB724CD586D074D99DF",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databases\\postgreSQL\\pgFlexibleServer.bicep"
+    },
+    {
+      "sha256": "D65C680AE0696D625EB513688F4C67ED014546C6FC82290F6EF767210083A31A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databases\\postgreSQL\\pgFlexibleServerRbac.bicep"
+    },
+    {
+      "sha256": "3BE1AEAAE622C577E7A5D1C0E147861370886DD868CC4B95CFAB1A3F03D6B4D4",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databases\\redis\\redis.bicep"
+    },
+    {
+      "sha256": "878EB74576ACFAA42FBF5F7C0901F7E306321386B571197258E293703C88BA23",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databases\\redis\\redisRbac.bicep"
+    },
+    {
+      "sha256": "6FEEA5368B6B2E093530CC954090955E3B8CAC63C88CFCCA9C91281A84C10794",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databases\\sqldatabase\\sqldatabase.bicep"
+    },
+    {
+      "sha256": "8D0B633DEEE546B1C7914CEE018A2B7926234F29618953615A86EAEBFED3580A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databases\\sqldatabase\\sqldatabaseRbac.bicep"
+    },
+    {
+      "sha256": "E995CCAE97B15E88CEB9F20DCDFF827F6A266C61C827F725BE7DFB800AEFA0BC",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\dataBricks.bicep"
+    },
+    {
+      "sha256": "874D8A79401AD9BD87A57A9163AE4E4C2DE1F3CE26EAAFA6CAB2D164C08225F6",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databricksAssets.bicep"
+    },
+    {
+      "sha256": "8F8EB4006E5D472A7BBB2C755BCA18B9ACFBB551C7024DFCD20234D8E09A79DF",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databricksManagedIdentityRBAC.bicep"
+    },
+    {
+      "sha256": "B4EFB6E5BED9F43A81F61FBCB56CB8FEF15CDC6F57E9215DE1407D21116EDB9D",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databricksNsg.bicep"
+    },
+    {
+      "sha256": "3341B586615C2BC1ABABF82CB25380ECFA572428582197142C8117FB4B340328",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databricksPrivate.bicep"
+    },
+    {
+      "sha256": "01407DF2E7F4F21EA223FD3CE1CF22383335D845097CC07FE3BAFD0D65824799",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\databricksRBAC.bicep"
+    },
+    {
+      "sha256": "B16642ED205E0EB74315096F78ABE46DEB870840EF72FD66CF22981F211AB843",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\dataFactory.bicep"
+    },
+    {
+      "sha256": "C8ABDB5443CACB10A523546B96B070CA8CD8DA671646E2DF41789E855607C257",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\datafactoryRBAC.bicep"
+    },
+    {
+      "sha256": "64264FE0886EB51EEAF1447DEE5624368C20F6A94F736847FC9EEB0D69FD29D2",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\dataLake.bicep"
+    },
+    {
+      "sha256": "F394A24B2811A37733B2C78694CAEF5B23D9BD81AF7231F4F4ED55055AFB85CD",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\dataLakeVnetRules.bicep"
+    },
+    {
+      "sha256": "3CEAAE13C9D983ADE864C4FDAF7B63CA2B0C3809D9A13105BFAF8E8B8044086F",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\aiSearchDiagnostics.bicep"
+    },
+    {
+      "sha256": "AF10ADE73829FCA9AFF7B15656A039C90FD88E34B37AFF96C71D2D16407B342C",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\azureMachineLearningDiagnostics.bicep"
+    },
+    {
+      "sha256": "AD0CC52658419C16238FE4795C358362F1661EA7BEA6BB493AC5E44428FDA8C8",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\cognitiveServicesDiagnostics.bicep"
+    },
+    {
+      "sha256": "438DE4F0E4D913812A2400A3380F50184E3A3D5ADB606E600B347A9281712A99",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\containerAppsDiagnostics.bicep"
+    },
+    {
+      "sha256": "CD93DAE39CBBD5D8336144F90B703FD5DBBA8EAF6E8189AFA11512D66AACC2BA",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\containerRegistryDiagnostics.bicep"
+    },
+    {
+      "sha256": "FAFCEC904055765F8D3854F8DAF54927DD12778273FBF26833F2A6ABEE713E5E",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\cosmosDbDiagnostics.bicep"
+    },
+    {
+      "sha256": "C2FC24DB6EB75D7D1AA9FFA138A372B3D3950820AD6BDF150354465716C01610",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\dataFactoryDiagnostics.bicep"
+    },
+    {
+      "sha256": "13E5964BC3B596D90015D73D690C3DC2728027B50204A356DBBF58EE3844F6B4",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\elasticDiagnostics.bicep"
+    },
+    {
+      "sha256": "857A7DFF9849D094EF08185020E59A9649A04441E7351E850CE45E54CEFE41A8",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\eventHubDiagnostics.bicep"
+    },
+    {
+      "sha256": "8B25B0D2BBD7932831D7E7ECB312886CF7BAD6201A4E227D2BE367D09E23EED6",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\functionAppsDiagnostics.bicep"
+    },
+    {
+      "sha256": "270EAB48B16C46A407F2B0F8DDFFDBF49183A12BD1BE9681E7B69381DFDA5220",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\keyVaultDiagnostics.bicep"
+    },
+    {
+      "sha256": "88B3E8C48FD1FE928D3A34DE6FDDBBA1A94950C1E9AC81130BDD15884C924C93",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\logAnalyticsWorkspaceDiagnostics.bicep"
+    },
+    {
+      "sha256": "5129896AE29BF0C5235B88EB494CCC9C4DC48EB9AD844EA431E4FFB3C4728F36",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\postgresqlDiagnostics.bicep"
+    },
+    {
+      "sha256": "D0D65F19DFD72BDEF53282382DD92442BECC2102D54AA4DBAE3CDF8ABDDC275D",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\redisCacheDiagnostics.bicep"
+    },
+    {
+      "sha256": "908D3FD328161C1BB4ACDE99ECAC58C3330B287D8720E1DF6D34686388DE83EE",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\sqlDatabaseDiagnostics.bicep"
+    },
+    {
+      "sha256": "FCD007A3CC123F1D26869AA26B10C020A7391E2E9FF3E970FAAE623C4FA6511C",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\storageAccountDiagnostics.bicep"
+    },
+    {
+      "sha256": "A46BB7442F9D51F07F21F0F7D0313B2F4991B6BB803963DFE41B0F10851F76CF",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnostics\\webAppsDiagnostics.bicep"
+    },
+    {
+      "sha256": "CD8362B9E67AF79408925FA4BA292666C877EB999DEB5EBD9116427A28676D5C",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diagnosticSettingCognitive.bicep"
+    },
+    {
+      "sha256": "E48603AA7D4538CD4789F6A255E870980A1F65980736AF27946E3170E2C3F0C2",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\diskEncryptionSet.bicep"
+    },
+    {
+      "sha256": "0C40B2B6D653C55F4C8696A54A5E081749C038C8C2567BB533EF53E9BA8E1D80",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\eventhub.bicep"
+    },
+    {
+      "sha256": "257EE1DB2C33660F3A66D5ECA78CC2969795EB4E512777244FDA97223A3D8DBE",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\formatWorkspaceId2Guid.bicep"
+    },
+    {
+      "sha256": "B75B3A7682FB120A2AD2C483B1C539C157AC1BF3A38F72EDC355E61A2BBFE279",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\function.bicep"
+    },
+    {
+      "sha256": "6D9A6D68DAACED1608FDA30726658963B8BC2E2B4EB9B9C5E5C099D54B1A7DAD",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\functionRbac.bicep"
+    },
+    {
+      "sha256": "21C1354DBF5A1AD6D505D9BDD391183DB1570FA270DF8406DE21F66E3EFCBDA7",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\get-acr-encryption.bicep"
+    },
+    {
+      "sha256": "9052A8ED9274C6237E00480ADE385F2BC47C953A4A3007ECD5113FAFD5EF6704",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\get-acr-ip-rules.bicep"
+    },
+    {
+      "sha256": "BC5EC33B44EDE9AE545FE062E80AF806610E8D6FE3234608BA360F52BD035F7F",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\get-ai-foundry-info.bicep"
+    },
+    {
+      "sha256": "47331DF8074BA3AA46BBEF94C9543D29D5CFAE0D0C7982C4FEA8092284EE825F",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\get-ai-search-info.bicep"
+    },
+    {
+      "sha256": "52455F38489BF90FF152BC71D46CA345D636F1F6D6D8156AFF35C5140255AA7E",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\get-aisearch-info.bicep"
+    },
+    {
+      "sha256": "3603F554877F25C61451DA375DE7F82FF91A93429277B4DE76C66355191BFA34",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\get-appinsights-info.bicep"
+    },
+    {
+      "sha256": "07D6EB842AC40BFAEC426FE7E89866202DA4902D9D6750D5F1E04694887BAC62",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\get-managed-identity-info.bicep"
+    },
+    {
+      "sha256": "535906CE9ECB39D0A75BF094047E51B3F80A47D97690876ECC050F3674867452",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\keyVault.bicep"
+    },
+    {
+      "sha256": "BD91C27620D266E03B727892DDB1F24E505EC5408B13EFFF1113F067C244B3FA",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\keyVaultExport.bicep"
+    },
+    {
+      "sha256": "2674F872E7ED4A09F34307D50CAF37376A9206BCC5E8E3873B4F04CEC1128084",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\keyVaultKey.bicep"
+    },
+    {
+      "sha256": "34EDE4088A794A9F25E000411347C1EEDA6E9ADD383DE87170BAE8E5B44CBF19",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\kvAccessPolicy.bicep"
+    },
+    {
+      "sha256": "727F42595CD27DD5111AE8E1D0DEE4365C144B3F04007261A12DA99890C2E546",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\kvCmnAccessPolicys.bicep"
+    },
+    {
+      "sha256": "464D131051193EF678C5BE95CD94C226837511500A2560C5DB78D73F010D1743",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\kvRbacAIFoundryMI.bicep"
+    },
+    {
+      "sha256": "5483422CCB868FB1B02EEC351677FE17E08E1F8D3F7A196EB5CC928A076F06C7",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\kvRbacAssignments.bicep"
+    },
+    {
+      "sha256": "B7C1039B44761D48E450FCF74CAA603754534F89B45E8BB3DEFD454FEDC3ACDA",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\kvRbacKeyVault.bicep"
+    },
+    {
+      "sha256": "AD9A5B4CF1707D61D108E7E7132D59C0D623D9357DA92571E3E5BBB58506A302",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\kvRbacReaderOnCommon.bicep"
+    },
+    {
+      "sha256": "A7FFB94BD9663C087A27CE1687AA8DC2172AAE20FFD8797F761AA14C65EC9E17",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\kvRbacSingleAssignment.bicep"
+    },
+    {
+      "sha256": "BCFAB1F6FCE576D6794C1230645A0C90ED44B222B7F59B575CC2171493FD9668",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\kvSecretsPrj.bicep"
+    },
+    {
+      "sha256": "E7709457A3B401112A5C799B84576F30CB1126B05FBBC8E922977689B9969FB3",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\logAnalyticsQueries.bicep"
+    },
+    {
+      "sha256": "A410AC79891DD26BE785F06D0A0D898A0852BE2B87E9B8170ABAE15C4ACDEF00",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\logAnalyticsRbacReader.bicep"
+    },
+    {
+      "sha256": "9092833787960B191EAA08DF919750BDAB876EED228C2B6FD6A592E064D5E7A0",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\logAnalyticsWorkspace.bicep"
+    },
+    {
+      "sha256": "5ADAA661F50255FAC5CBDFBD8B986A5F4438F99757EF98E5A469C9EFEC0EF8BF",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\machineLearning.bicep"
+    },
+    {
+      "sha256": "30A7A39F7864D8A6928536295573BD31C5B17DE1CA4FAD61CB7FA9CA59612ABA",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\machineLearningAIHub.bicep"
+    },
+    {
+      "sha256": "018E23343E841B251B8E90174E49D8A5D012397B2E9E5FA2784451F72913B83A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\machineLearningAks.bicep"
+    },
+    {
+      "sha256": "B4459CCAA54A27042C3AC456EC41482FD4A288986476C79E1F9CAA8A005302FA",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\machinelearningNetwork.bicep"
+    },
+    {
+      "sha256": "6D30083A211145DBCBA63C1A6D61215E99C1BC8E9F1A8F38EB8769E4DC8886A6",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\machinelearningRBAC.bicep"
+    },
+    {
+      "sha256": "10260B513395DE6E0420F48FEF7EB30680F4E492658CFF015F41410AC6D3783F",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\machineLearningv2.bicep"
+    },
+    {
+      "sha256": "7ECBFD6D342CD9695CA8119967E0D00B91A525B91A395563ABF37CBF3CE36D4F",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\mi.bicep"
+    },
+    {
+      "sha256": "F63ECBACF592EC3745043B3974E8444F8C9C55626760651EC908F4DF7466B4EA",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\miRbac.bicep"
+    },
+    {
+      "sha256": "A01DF0570E18A9B148C2B69649C74585A485D9903D69F084EEB5B7F0636CDE19",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\monitoring\\ampls.bicep"
+    },
+    {
+      "sha256": "F6CE97642BD1DE5C8EC8AB3EC88C98EA20247B4FBB2599C412FE374C0910466C",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\monitoring\\amplsApplicationInsightsManager.bicep"
+    },
+    {
+      "sha256": "1C0C7C7B737DE49F1CBAA6A7D3CC4DEE4D917EC4454BC315AB1C275F2C44F143",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\monitoring\\amplsHub.bicep"
+    },
+    {
+      "sha256": "DE88CCA7F018C76694D1EED1AB6816C1522E22D479D82F2C960A858BAEFDE302",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\monitoring\\amplsHubSimple.bicep"
+    },
+    {
+      "sha256": "DD8638130E9F7F73F86790E9BF26EAD0BDB9D9D2250BDA4BC41667FD4171C524",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\monitoring\\amplsIntegration.bicep"
+    },
+    {
+      "sha256": "1A7C6E3538DF8C3D347CCA0D415AA8D31796CCAF4DF2A8CBC48CA62B7620A8A7",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\monitoring\\amplsPrivateEndpoint.bicep"
+    },
+    {
+      "sha256": "C179C603EA8F91AF4BE2EC7CD318C7569562812E7B615C7696E2DD22C5B105E4",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\monitoring\\dataCollectionEndpoint.bicep"
+    },
+    {
+      "sha256": "BAC8B9C988E4BD223335C36EE0A4822DDAB9BCBB3C2F599028E976658AE56805",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\monitoring\\Deploy-AMPLS.ps1"
+    },
+    {
+      "sha256": "A6AE23B67BA2E4259B7FE8DD7FD5E0AA4EDD875C6A130AAD6D4C6E93FBD1E95A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\monitoring\\Get-AmplsResources.ps1"
+    },
+    {
+      "sha256": "122AE89C11369F22D7042E3C1BC4073EBA13F7FD53E8E62FCD9F68EF69E93A1B",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\monitoring\\getAmplsApplicationInsights.bicep"
+    },
+    {
+      "sha256": "23467DC260F776B00DB00693A9BC6998ADE7A8E62B09882C2C900F976ECD825B",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\monitoring\\IMPLEMENTATION_SUMMARY.md"
+    },
+    {
+      "sha256": "BF21B910A7A95EB31853B41632C6037D4CA095F4C6E349BCBDEA335FDBB6EF5A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\monitoring\\README.md"
+    },
+    {
+      "sha256": "63889F19570CFA96B3F62D71CB4CEE41F5720674A0B3DF671C2A5C2AA2899402",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\networking\\DNS-FORWARDING-GUIDE.md"
+    },
+    {
+      "sha256": "02E1B412F97AEE5531BA1C996FE26CDD707AC2265729DB3E67D2A42DB252A80A",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\networking\\dnsForwarding.bicep"
+    },
+    {
+      "sha256": "61A78360AFB06CB75C1677FE86166C0BD816F7B520024E02C0FFFE7EE5DED88C",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\nsgGenAI.bicep"
+    },
+    {
+      "sha256": "56832FDAB5082DCB820112945D2EC3260132E90E2B5935ADCEDC40B8365C6588",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\ownerRbac.bicep"
+    },
+    {
+      "sha256": "AC023196F56A5F24F8331D2113D84B230FEB55B99A664485DC0981568E48A538",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\policyExcemptions\\policy-exempt-foundry-subnets.bicep"
+    },
+    {
+      "sha256": "887E283294604169F904F6E56A3BB87A99A87DC8C50EB939D2CE5D1B6637C295",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\privateDns.bicep"
+    },
+    {
+      "sha256": "7599FCA2B1B966C0990CC0D54B242C8BAE4FF4A836651986F7AA6127C5B3994C",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\privateDnsZone.bicep"
+    },
+    {
+      "sha256": "97473445C2C1519D9DF0686DCD1A3AD9F2F620165B8E018F746B314D57E25DBA",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\projectDash01.bicep"
+    },
+    {
+      "sha256": "35DE4B96A44B33535A2B77C12467C48C774F7EE48B742B4BD0A3E65B805B7632",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\rbacBastionExternal.bicep"
+    },
+    {
+      "sha256": "36111DDA22987F8438090D9E024752BCADD6255AD37BC69707472073D1911D18",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\rbacGeneric.bicep"
+    },
+    {
+      "sha256": "C2E490080A9BF6A44FBD93A06AFEA71595A67C7038411ECA73FAE675221986EE",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\rbacRGlevelAml.bicep"
+    },
+    {
+      "sha256": "8E4F337F4AB927E616A43999F701A361EC41823BA73D572BBFF18A60B7B77791",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\rbacStorageAml.bicep"
+    },
+    {
+      "sha256": "1F0B0D9E6BF3B1E4C39C0FC2A86F7493F2D26318D22D186493D46AA32131E6D6",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\readerRbac.bicep"
+    },
+    {
+      "sha256": "A06E3A0D97C949618E95C7C10EE01B92FCA8635BAA4E00B813B018EBA7D785FF",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\resourcegroupManaged.bicep"
+    },
+    {
+      "sha256": "DD34866548F0B727D892D30C27AE11D32F4D15C72C64D0B95197BF2050796D75",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\resourceGroupRbacUsers.bicep"
+    },
+    {
+      "sha256": "C39288B8876CE3C0F5F32ABEAB504B6D5DCAB78BB2327D535D4D9ED34C6E12B8",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\resourcegroupUnmanaged.bicep"
+    },
+    {
+      "sha256": "1FAD50F6FE4357D1A4DF1F13561281DC590F4E5B733F4E60BA8D1F01B03D5A32",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\security\\defender-for-cs.bicep"
+    },
+    {
+      "sha256": "6C2DDB2A6796C6F042E6F50D5D860DE60DB388C3C359935D4DA3B984649B9176",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\spAndMiArray.bicep"
+    },
+    {
+      "sha256": "DA3EBAD35C873098461DDA4CB5D80BD0CB2C81EC91D4A980208264D74414BA74",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\storageAccount.bicep"
+    },
+    {
+      "sha256": "10E2BA5D2D6C1AC3E58CDAE7EF8F8E33FBED95AB98CA4D13F3270DE64BC133F2",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\storagePendReaderToAIProject.bicep"
+    },
+    {
+      "sha256": "5B827B23F020ADC85F28B2F26416E3B40D494830587EEE9CD989315D41FBB05D",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\storageRbacUsers.bicep"
+    },
+    {
+      "sha256": "864C1B51EF5BC345E7466432BBBA6B19442F7B3480BBBA07E6858F0D342A9FE3",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\storageRoleAssignments.bicep"
+    },
+    {
+      "sha256": "95A83D9807FDB4E3ED78C8385C921C56EAAD0F95E941062C2BA641DB96D8FF94",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\subnetDelegation.bicep"
+    },
+    {
+      "sha256": "841D04157EFF0CFEE4F91C4E0A3BF548621AF4CB1355346EEB1E1C15A4A5D82C",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\subnetGetProps.bicep"
+    },
+    {
+      "sha256": "42DB9F849899D65EE380899916F57D089B515CCBD3018094FAE1F416E002A07B",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\subnetRbacNetworkContributor.bicep"
+    },
+    {
+      "sha256": "35A3A2B3A90DB54F7C357ABD1EB55F6B0714459194A15E08C2182177B5DA66CA",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\subnetWithNsg.bicep"
+    },
+    {
+      "sha256": "AADC5A81936F305A7DD00F56F1C85A5033E01942B96E55213C8610D763CEFB59",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\types\\aifactoryNaming.bicep"
+    },
+    {
+      "sha256": "8FB70751A00BD01D4B18231026CC3960123563887AE80D030B72C8C8A07C07AB",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\verify-acr-rbac.bicep"
+    },
+    {
+      "sha256": "176CA464466B5D514DCEDF0F7C96FAD71C14BDD8996725F4B35D538207D505DF",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\virtualMachinePrivate.bicep"
+    },
+    {
+      "sha256": "DA7B5849677C951823D98EFCAB74E2B528BD78E94D337F2EF0FC7B30F5B49BD0",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\virtualMachinePublic.bicep"
+    },
+    {
+      "sha256": "294B9C8DAFA4D3B925BC10FED392841CC6D69FC177279EE61B436608785C3C31",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\vmAdminLoginRbac.bicep"
+    },
+    {
+      "sha256": "108A22C47664F4602BF40C036EF2EA9B7B61817691343A939B72A944C71948A5",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\vnetRBACReader.bicep"
+    },
+    {
+      "sha256": "D592B9D49BB9C77611D39A075E6D8BFB9D5D5EDBC5A0D9C97609887455FAA2CF",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\vnetRBACReaderOnly.bicep"
+    },
+    {
+      "sha256": "7CAAC0C2E0416B79FA292C93315FB9EBC971F88A8AB08B705935B7D205C29778",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\webapp.bicep"
+    },
+    {
+      "sha256": "9B709DC42D707D8C36EDEA2D90A09356DEF34BF36A4BDF2EA4AF4D9433312E13",
+      "path": "environment_setup\\aifactory\\bicep\\modules\\webappRbac.bicep"
+    },
+    {
+      "sha256": "3668A9E8F29F60F12624D36D508A30EE812319DE3BDB732CC2A1E9B823355B63",
+      "path": "environment_setup\\aifactory\\bicep\\README.md"
+    },
+    {
+      "sha256": "19F5047CBD36AE734CFDF8D4860989044DC1B2C1FC36FE38BAA63C0102DECDDF",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\ado\\120_cross_charging.sh"
+    },
+    {
+      "sha256": "B5AD7D9C2206806259EBA77B0C4F90C9B84110622C895893895E824606B0FF10",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\ado\\121_discover_resource_groups.sh"
+    },
+    {
+      "sha256": "B3A00EE7DB6ACE8CCBFD74D6E7BF9F97912F2EB1D81DCC4A0B705A39305E107E",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\ado\\122_collect_cost_data.sh"
+    },
+    {
+      "sha256": "A924833AEAC5161378136647CA31123529E09B1500016B5DFE70CF8CA5633AB1",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\ado\\123_upload_to_datalake.sh"
+    },
+    {
+      "sha256": "C1C515E8D2246EE3CBD052B4167AD089A3BD1893BAC51F946DDFAD0107E175AC",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\ado\\124_send_email_notifications.sh"
+    },
+    {
+      "sha256": "3029939E4CE44EF3D60DFFE4A308F382C78D30AF76B649E383F3FB4225346871",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\ado\\70_generate_hosts_file_info.sh"
+    },
+    {
+      "sha256": "D38E56D31AE744E6F5CCE8ECD9F93BD90E464B304C59632729C6D0D5817CC9FA",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\ado\\71_If_Error_AIFoundryHubAndProject_DeleteIt.sh"
+    },
+    {
+      "sha256": "568C45AB8CC21E79C984FA5DA5DA91E3BFCE3855DA9DA394B42140AC6C4178F4",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\ado\\72_If_Error_AIServices_DeleteIt.sh"
+    },
+    {
+      "sha256": "C46F8C270D31DBAD40C9D2FF92A9F6357DB6C54F270D9D337462FDB7485254F9",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\ado\\73_If_Error_AIFoundryProject_DeleteIt.sh"
+    },
+    {
+      "sha256": "6FBD8012018EFBA3C041C38C751CF797C8FDE1A6C4AB8F88BDA7C4A699670788",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\ado\\74_Cleanup_CapabilityHosts.sh"
+    },
+    {
+      "sha256": "EA05E8ABF9C7EBB445491B8E1098EA1F4CD86D873D6D9EB56AD7D613EB01EB41",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\ado\\79_Purge_If_SoftDeleted_71_72_After5minutes.sh"
+    },
+    {
+      "sha256": "3B7CD611C3FDF36ABC50AD964C6DE89732DEEE19DECE6667F9A7AFF02F75F74C",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\apply-json-config-overrides.py"
+    },
+    {
+      "sha256": "3D6986AAC92B4BE2502C32477CCD0C043B4A084E46689E7CC792C2BDB661D287",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\cleanup-project-orphan-roles.py"
+    },
+    {
+      "sha256": "27C4708FD63A794AC6375087F8D40B385F4595AD4229DD202F0B478CDED1B1B3",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\Copy-PrivateDnsRecords.md"
+    },
+    {
+      "sha256": "F6FDC01A7CF39FE06124E3323CDA8388221341C7B159CB70CD26237F063D420E",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\Copy-PrivateDnsRecords.ps1"
+    },
+    {
+      "sha256": "02886F5434B7F6A56816E3BC1AC2B655B63FDB4DC82084C5042E361875F9BBAB",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\databricks\\deployment\\_pre_cluster_create.sh"
+    },
+    {
+      "sha256": "0FEDBBB7C3A200AA6AAB0F7B49355407E2F72EC6B69B7B151F40C46A85EA3817",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\databricks\\deployment\\create_cluster.sh"
+    },
+    {
+      "sha256": "690D5A5FA89D5B3BB94B8580D5447F4FAC3C4ED3A858AC7C1A6418BEC1C26CE4",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\databricks\\deployment\\create_pat.sh"
+    },
+    {
+      "sha256": "4B8C09341E5C216B8625A5691E24C21AC2231004C7B2876CF696FAD945D65389",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\databricks\\deployment\\create_secret_scope.sh"
+    },
+    {
+      "sha256": "AAAAE8AAD16EB13368ECCC57C446F6990032C95B542E9BB18C12E8CD8DB8897C",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\databricks\\deployment\\post_cluster_create.sh"
+    },
+    {
+      "sha256": "9A170D00A8F51155CE1DD130BAD6E6030C85D8CB3F95E9409F24D9C8F2543B06",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\databricks\\init_scripts\\capture_log_metrics.sh"
+    },
+    {
+      "sha256": "3001D9F14219E4B6F4D0D315DE0E9F0B0367D7C1C8018D9A22CDE16771BB03D3",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\databricks\\jars\\spark-listeners_3.0.1_2.12-1.0.0.jar"
+    },
+    {
+      "sha256": "DC39F9565810B01C01615DE0164C8168CDD5150E04A3A2D05E208988D504DC68",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\databricks\\jars\\spark-listeners-loganalytics_3.0.1_2.12-1.0.0.jar"
+    },
+    {
+      "sha256": "5268288BBA29AAA8A4D049DAA87EFCB2EAFF9EE37187D300D247495CB96D9C06",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\databricks\\notebooks\\azure_runner_docs_example.ipynb"
+    },
+    {
+      "sha256": "1985D0BABAB39F50B32546B82C87202F917233A948C54224F27C5A8B9691D04D",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\databricks\\notebooks\\test-notebook.ipynb"
+    },
+    {
+      "sha256": "871BFA2AD26282349CDDBFC2F802D070C2D3B72FD71152AE4C19DAF483B53FF0",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\databricks\\notebooks\\timezone_test.ipynb"
+    },
+    {
+      "sha256": "FCF9C5556EBA3616E9F7B96627B2F21637AFF8BD3BD6D56747AA20A576087EE2",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\delete-caphost-and-foundry-and-its-subnet.sh"
+    },
+    {
+      "sha256": "BA41BA73676BEC098F0171075F35777D3C0C3449FDB7FDE6A5267580F8EBEBC4",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\delete-capHost-command.sh"
+    },
+    {
+      "sha256": "C3A9E118F35A65305DC9C4651444FC373BA443A3A9E90B500046517E3E3BAD25",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\delete-services-if-disabled.sh"
+    },
+    {
+      "sha256": "870670F7EEB4598D4CECE5D5759010C2CE385DA482FCBE43BB049F030E16877F",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\delete-subnets-for-projects.sh"
+    },
+    {
+      "sha256": "F2C3A1727C11FBF62B1AB98F0DD737ED46E369976126D109A21BD1BC6B833D59",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\deploy-aifactory-dashboard.py"
+    },
+    {
+      "sha256": "3C501A40F9FF010FD62735ACA307D9C35187E2A82EA42516245CB16C6C9B1108",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\enable-resource-providers.ps1"
+    },
+    {
+      "sha256": "7DB61CFBF052AA6F07A762E388EEC277D08328EA4B4DF30CF29BBC29A6FEF4D2",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\enableADDloginPostDeploy.ps1"
+    },
+    {
+      "sha256": "2A043779FE600034DF9AC0301BA2E6A61A5744C77986C204A43D8086B5274FBD",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\genDynamicNetworkParamFile.ps1"
+    },
+    {
+      "sha256": "AE9839F67D2A02486CBEE0AC08663381E3CEA9C745C29E080BC909A10D721028",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\generate_hosts_file_info.py"
+    },
+    {
+      "sha256": "FA91D1336586E6A34F01E427E2527434F50DD935658389C96A4B691C3599D305",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\generateUserParameters.ps1"
+    },
+    {
+      "sha256": "8E514146C46EAF39B5745BFAEF36A39BABE01E35CAF52FA6163155DBBA9786F7",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\modules\\pipelineFunctions.psm1"
+    },
+    {
+      "sha256": "D8BE80D668606CA6D7BB03AD3F1891F5DE40F6ACDFC6E067EDC24A961A643F6B",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\preflight.sh"
+    },
+    {
+      "sha256": "816F84E58AA3B012150B96D4F23C0DBDAC1319000F9E4CD295DF66ECE0E3BD93",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\prepareSeedingKeyVaultPrivateDns.ps1"
+    },
+    {
+      "sha256": "D378A2EC0CCCAE36A41F29D101D02A7205BC4283DDC9DF422C370F41F860CFEF",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\README-Copy-PrivateDnsRecords.md"
+    },
+    {
+      "sha256": "7B2F411AF0CE38934D2323383CA8CF8DB0D84932BE2033525706B471270D07E8",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\region_report.py"
+    },
+    {
+      "sha256": "AA72A4DA38238EC2C93700B517FE2ADA3F773F467936B9ABE6E0FA18858CDF67",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\subnetCalc_v2.ps1"
+    },
+    {
+      "sha256": "296472AB5144FCEB040968B533ABA7413E35319BA828C9FC943188D27503323F",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\test-git-functionality.ps1"
+    },
+    {
+      "sha256": "99C25DF808058BB3A39F5D9AC1CF7BF459C116DCE7695D02232C2D6E4349997E",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\test-submodule-detection.ps1"
+    },
+    {
+      "sha256": "EF5B88AD70A910001CCA208E664085ED354051C13A28D70236D3AE0E42B783AB",
+      "path": "environment_setup\\aifactory\\bicep\\scripts\\write-pipeline-region-report.sh"
+    },
+    {
+      "sha256": "FA5A90E0631018243F9B7D32DB7051B81705EED82BA00ED47A4367A498F056E1",
+      "path": "environment_setup\\aifactory\\dockerfiles\\acaDefault\\Dockerfile"
+    },
+    {
+      "sha256": "32C06A3FB7C78DF9CB991085F1459EF6BD85ECE6C613DADA00CA4A11F0976FAE",
+      "path": "environment_setup\\aifactory\\dockerfiles\\acaDefault\\index.html"
+    },
+    {
+      "sha256": "0A36246DD8F7B560EB90246AE990318EC655B72E552D2899E567105937A24AF3",
+      "path": "environment_setup\\aifactory\\terraform\\copy_to_local_settings\\github-actions\\readme.md"
+    },
+    {
+      "sha256": "AA4226DCF094F05CAE07F491B55D52A162027115D53510A66B1F89273D2ECB69",
+      "path": "environment_setup\\aifactory\\terraform\\readme.md"
+    },
+    {
+      "sha256": "F04CDD242CE5B3E5C8ED830FEA525167F269A722B6A938638B0DBA35609495FB",
+      "path": "environment_setup\\aifactory\\variables.json"
+    },
+    {
+      "sha256": "31ADBFA04D764E07BA3274186D6E17A53D0B0F2C2D580FB2766603C15181A7F6",
+      "path": "environment_setup\\aigateway\\apim\\readme.md"
+    },
+    {
+      "sha256": "14113BC49188B387A18AADBD70AA087DAAE2DF8BFA535A5232CC8DC6715CE2A1",
+      "path": "environment_setup\\aigateway\\kong\\kong.yaml"
+    },
+    {
+      "sha256": "1644CC9DFBFD04F00158B74532556FB5BB11882E8A740D0C8072C003C2D31540",
+      "path": "environment_setup\\aigateway\\kong\\main.bicep"
+    },
+    {
+      "sha256": "F61547135955ED49682F749FD7C1C3EE6FF73F4BD70F5823BA9B79FA6B97172C",
+      "path": "environment_setup\\aigateway\\kong\\modules\\kong-aci.bicep"
+    },
+    {
+      "sha256": "44967495FA1DDE6A8284A549A127110C9D6ED2E970659B9ADD2AFDF65A00DCC7",
+      "path": "environment_setup\\aigateway\\kong\\modules\\kong-networking.bicep"
+    },
+    {
+      "sha256": "1DE509454ED37588649ADFC882A22E8E847E1229E23900018F8019E051D1F99C",
+      "path": "environment_setup\\aigateway\\kong\\modules\\kong-storage.bicep"
+    },
+    {
+      "sha256": "9B4A1FFBC13089C793A334BC17F85EBC4A41D0CF57516CC93223674ED8B45A74",
+      "path": "environment_setup\\aigateway\\kong\\readme.md"
+    },
+    {
+      "sha256": "A6958FF2BB81A6C60CEDF819E59DFC015C8AB4FF1D21A100D4E3F302A3BB22EF",
+      "path": "environment_setup\\aigateway\\kong\\scripts\\restart-kong.ps1"
+    },
+    {
+      "sha256": "26138DAC6310AA284B11730ABB6D7BC37E5AA3388BA398AE528E2F7084D4FB72",
+      "path": "environment_setup\\aigateway\\kong\\scripts\\upload-kong-config.ps1"
+    },
+    {
+      "sha256": "AE126F2E1E9AD646785511147DED626DD7F9FA7A76EC713FCE8358063F7E1B45",
+      "path": "environment_setup\\aigateway\\readme.md"
+    },
+    {
+      "sha256": "74D27BC79458A5654765D57B49A0BB1224A1310F57A865E980F8B77D80A72DFC",
+      "path": "environment_setup\\install_sdk\\build_agent\\linux_for_unattended_mlops_buildagent\\readme.md"
+    },
+    {
+      "sha256": "74D27BC79458A5654765D57B49A0BB1224A1310F57A865E980F8B77D80A72DFC",
+      "path": "environment_setup\\install_sdk\\build_agent\\windows_10_dsvm-cmn-weu-dev-001\\readme.md"
+    },
+    {
+      "sha256": "64FA230FE683AECC351F0913EC8DA54FDDBAE1FDFAC0A6FA3B37F94AF6B128A0",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_45\\automl_env_linux.yml"
+    },
+    {
+      "sha256": "AE5EE3E19A373CCFE02BCA3ABC2FA80C5B8F7B4F857A11423373E251016006A1",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_45\\automl_env_mac.yml"
+    },
+    {
+      "sha256": "C08B67E978F238BC342316C6F87213B80727EE67917F3990383A09A76DA4797D",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_45\\automl_env.yml"
+    },
+    {
+      "sha256": "B83764D626F9DE20977EAB11D5265475CE5087C63B333A6CCFC1389831B5FBF1",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_45\\automl_setup_linux.sh"
+    },
+    {
+      "sha256": "0E6B926E6341E94D29FA63C8F5C2733C1B85BFBD02198698F8721205DF1D9821",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_45\\automl_setup_mac.sh"
+    },
+    {
+      "sha256": "7A007D62F6E2607985D02F8B0878C76F1A99A3C8FCF09EB8A6667F085E20EAE9",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_45\\automl_setup.cmd"
+    },
+    {
+      "sha256": "17BFF2A79BBDC888E688C7A20FB20099494816CCBB5093A0855C243CA3640588",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_45\\check_conda_version.py"
+    },
+    {
+      "sha256": "96844C1D055E53BE3FF3AA2AAF3D8C5F2DBD596899ECC52FC0446084910B0525",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_45\\readme.md"
+    },
+    {
+      "sha256": "1F6BC75C241F8F7605AD896D50D71B19DEF520F97B9A3F23A07153B522232C04",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_47\\automl_env_linux.yml"
+    },
+    {
+      "sha256": "3F6508ACBFAA003EA4D9761B0D80A3ADD8C7EF64E3C8EFF312F3EC65637E91CD",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_47\\automl_env_mac.yml"
+    },
+    {
+      "sha256": "F4429D26E1174765F7F7B734BD05CE697BC98B29074B6606E197ABB49B74F938",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_47\\automl_env.yml"
+    },
+    {
+      "sha256": "76438D409493EF2C0AFACB37742DEEEA7F2E7E9C9E5FACB58134EB2F3021A81D",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_47\\automl_setup_linux.sh"
+    },
+    {
+      "sha256": "291AB72BD056F5FE084AE5A6C238EFBFA85EEAD5F95A5CDBF235DA22BF87473B",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_47\\automl_setup_mac.sh"
+    },
+    {
+      "sha256": "895326D0ED05CC3AA0547D249E936165793390FAD9AFBEE8C63F309E8137B277",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_47\\automl_setup.cmd"
+    },
+    {
+      "sha256": "C343F875340FE9C81483DC1C3018D56C3141B157BE87C4000B5BCE28AC34236A",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_47\\check_conda_version.py"
+    },
+    {
+      "sha256": "B24A0354970118143494FF7257A9C46887BA056232F5269E1B052C14DFE893AC",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_47\\conda_147_v2_kvAdded_NoLake.txt"
+    },
+    {
+      "sha256": "077E8086E302550F01442B1A14559E2376CBE17546514555B3B72654C475ABAF",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\_AzureML_v1_47\\readme.md"
+    },
+    {
+      "sha256": "5FE76B7AC785C7D52866FBEC3B26FACB1CEE6BE907E319B5AC564828355676B6",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_42\\automl_env_linux.yml"
+    },
+    {
+      "sha256": "3A3E5C7EBDE631609B87ADA304811BE8936E92236CD9FACC1A28E77FC9959EA7",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_42\\automl_env_mac.yml"
+    },
+    {
+      "sha256": "E07BE4D66ADCF1A406C2541EF685B6A0CECF65317E6E9F3FFF386679B9797BE0",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_42\\automl_env.yml"
+    },
+    {
+      "sha256": "76438D409493EF2C0AFACB37742DEEEA7F2E7E9C9E5FACB58134EB2F3021A81D",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_42\\automl_setup_linux.sh"
+    },
+    {
+      "sha256": "291AB72BD056F5FE084AE5A6C238EFBFA85EEAD5F95A5CDBF235DA22BF87473B",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_42\\automl_setup_mac.sh"
+    },
+    {
+      "sha256": "EC5701026D5427DA65AA1BF09048D12DA3145A3FCDB5B956B128ED87D414FFCC",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_42\\automl_setup.cmd"
+    },
+    {
+      "sha256": "17BFF2A79BBDC888E688C7A20FB20099494816CCBB5093A0855C243CA3640588",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_42\\check_conda_version.py"
+    },
+    {
+      "sha256": "A77C74DEB938F3AB8E28040BBC46923176720B38813AB2638582FFFDA06FB0AF",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_42\\readme.md"
+    },
+    {
+      "sha256": "CAB035E0071957908A48888173695C0552390EA50A5CBD3A6DF432D4A96528E7",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_43\\automl_env_linux.yml"
+    },
+    {
+      "sha256": "A8EB3798F804EB33375EB3AA617A68739348ACE9AAB631D076EE7A92DD53DAE9",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_43\\automl_env_mac.yml"
+    },
+    {
+      "sha256": "5819924CC5668FEE03D802331091D42919D72C2D01A39449696D31E17C10D505",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_43\\automl_env.yml"
+    },
+    {
+      "sha256": "307CB46FC5B080BBA51A227F47FC1D79A0396C86119CCD1CF820AEF4F9A6E7E5",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_43\\automl_setup_linux.sh"
+    },
+    {
+      "sha256": "FC03563203AEEE0DA06C74EEE6D8F329DFC8F2954B3495035136350D63DE2B1F",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_43\\automl_setup_mac.sh"
+    },
+    {
+      "sha256": "148F81C8CFB4D2933848EE2128A4C154281CF73B137A4908F58F86B0A2773C0C",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_43\\automl_setup.cmd"
+    },
+    {
+      "sha256": "CFCDF2E7D997AE4CF2799B8BA9ED088F5127628684C139809D9F4103C2F8D1F8",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_43\\check_conda_version.py"
+    },
+    {
+      "sha256": "689FBFB3F34FEBB01F6CF50386CF8B07F21541EC84903FDF2CA6F08DC75BA55C",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_43\\readme.md"
+    },
+    {
+      "sha256": "F5179576415A2D618A667639F69B89D4A92686898AF1C67AE9CC15F96CE57066",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_44\\automl_env_linux.yml"
+    },
+    {
+      "sha256": "6AC9F23951F0C0843583C7BC2F4727412BC79D1D86DB01E9E7BF866AD41B1AD9",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_44\\automl_env_mac.yml"
+    },
+    {
+      "sha256": "18658376121A73609964F92B3DB621B9A0502C8F49649A81AB48BEE2656F3F6C",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_44\\automl_env.yml"
+    },
+    {
+      "sha256": "A856B1206F8EBD1AF5524C2A9AE9DE5BB57F7ABCB0336378EB38D80CBDB8F89B",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_44\\automl_setup_linux.sh"
+    },
+    {
+      "sha256": "46CC246079B2AC9468B674C3D3AED3D8006219FFFDB4E2E0AC7D91AD643E0A1D",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_44\\automl_setup_mac.sh"
+    },
+    {
+      "sha256": "EBDB60D39D9A695D235781A84D5F327BE9F6E7A1BD5074D1208B5BD45530D040",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_44\\automl_setup.cmd"
+    },
+    {
+      "sha256": "17BFF2A79BBDC888E688C7A20FB20099494816CCBB5093A0855C243CA3640588",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_44\\check_conda_version.py"
+    },
+    {
+      "sha256": "A433830D65089613FCFEFC67AF1977D06A22B4B7204E51E86D2B7843C26DF7B8",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_44\\readme.md"
+    },
+    {
+      "sha256": "451097D92DB94B0E751099290BC2405E238158EE3BFADD74E38B85243F42A674",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_48\\automl_env_linux.yml"
+    },
+    {
+      "sha256": "75788AA50F96B620EC5AC231CF95F3B4AE7B4147F5A20B6B302ED8B67347CA5C",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_48\\automl_env_mac.yml"
+    },
+    {
+      "sha256": "4E6A766FC3E96FFBB0A734F5E983E72C02657A7064DC70ACDBA777ABB22D79C6",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_48\\automl_env.yml"
+    },
+    {
+      "sha256": "76438D409493EF2C0AFACB37742DEEEA7F2E7E9C9E5FACB58134EB2F3021A81D",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_48\\automl_setup_linux.sh"
+    },
+    {
+      "sha256": "291AB72BD056F5FE084AE5A6C238EFBFA85EEAD5F95A5CDBF235DA22BF87473B",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_48\\automl_setup_mac.sh"
+    },
+    {
+      "sha256": "3F7A0B443590B9A550250AD213C9497853CBA1AF2331E734DDF2E75C00C1F221",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_48\\automl_setup.cmd"
+    },
+    {
+      "sha256": "C343F875340FE9C81483DC1C3018D56C3141B157BE87C4000B5BCE28AC34236A",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_48\\check_conda_version.py"
+    },
+    {
+      "sha256": "7E8F82D2CF81CB1E2DF4B0F5C1E40EFB61F48C38A3003A837D84B40D8158138E",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_48\\readme.md"
+    },
+    {
+      "sha256": "451097D92DB94B0E751099290BC2405E238158EE3BFADD74E38B85243F42A674",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_49\\automl_env_linux.yml"
+    },
+    {
+      "sha256": "75788AA50F96B620EC5AC231CF95F3B4AE7B4147F5A20B6B302ED8B67347CA5C",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_49\\automl_env_mac.yml"
+    },
+    {
+      "sha256": "EE2696C3195466361E6F9776B82AB7B92F61D0F57F041883514ABE573970DD7B",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_49\\automl_env.yml"
+    },
+    {
+      "sha256": "E062473CBE5A9ED9460930A726FCEC1AD7365E5A9AD05A0363C53511AB3FFEE8",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_49\\automl_setup_linux.sh"
+    },
+    {
+      "sha256": "291AB72BD056F5FE084AE5A6C238EFBFA85EEAD5F95A5CDBF235DA22BF87473B",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_49\\automl_setup_mac.sh"
+    },
+    {
+      "sha256": "A7EE24FC2A8B7536E436ABD770479936A6AD2C5F0CD81F9E83E8CF742DFC2971",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_49\\automl_setup.cmd"
+    },
+    {
+      "sha256": "049993022F5EDABF5EE4BD8FB1C166F3BF9E20FEEF4166ECFC45A52D82C6B961",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_49\\check_conda_version.py"
+    },
+    {
+      "sha256": "850C8836B5B84A5A2309FC2DC743EC79B6F29C7494B37C6226AD22DDCC707293",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_49\\readme.md"
+    },
+    {
+      "sha256": "451097D92DB94B0E751099290BC2405E238158EE3BFADD74E38B85243F42A674",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_50\\automl_env_linux.yml"
+    },
+    {
+      "sha256": "75788AA50F96B620EC5AC231CF95F3B4AE7B4147F5A20B6B302ED8B67347CA5C",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_50\\automl_env_mac.yml"
+    },
+    {
+      "sha256": "2B486630D5C66FCF108131E825EAAD8DC0D45CEE3EB7B2E238DC4313DE14C61B",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_50\\automl_env.yml"
+    },
+    {
+      "sha256": "E062473CBE5A9ED9460930A726FCEC1AD7365E5A9AD05A0363C53511AB3FFEE8",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_50\\automl_setup_linux.sh"
+    },
+    {
+      "sha256": "291AB72BD056F5FE084AE5A6C238EFBFA85EEAD5F95A5CDBF235DA22BF87473B",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_50\\automl_setup_mac.sh"
+    },
+    {
+      "sha256": "FC879330DF5F07F72BC7F74CF60EF530AD92D9CBCA7EE14173366B6572CD4DB4",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_50\\automl_setup.cmd"
+    },
+    {
+      "sha256": "0B66FC5EA5AA702A94035296E320D03FC95DEEB3017ED3254B40833E7F1F5584",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_50\\check_conda_version.py"
+    },
+    {
+      "sha256": "E0B8CCAD29EBBBBCA905B377D09C43D7D58880F18E193A6D893F2ECD616C41E8",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\_previous_versions_from_1_45\\AzureML_v1_50\\readme.md"
+    },
+    {
+      "sha256": "56E3135F97D0C3DB81212671A8CA8E711682DB2E7017650AF97D4534E638E022",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\01-install-azureml-sdk-v1+v2.md"
+    },
+    {
+      "sha256": "04566813BC59688CAF9791C4FCB97507B0ACD884CCB53C4C200D473DE9862E13",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55_and_v2_1_15.zip"
+    },
+    {
+      "sha256": "11125B14717102258E8B19B71FD216A9A5AB77D6DEE71431EB421E85E9931B11",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55_and_v2_1_15\\automl_env_linux.yml"
+    },
+    {
+      "sha256": "D859A04749849B52DEA18F55DC34412C96B997E926A4022FA03C92EC3B6B85AA",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55_and_v2_1_15\\automl_env_mac.yml"
+    },
+    {
+      "sha256": "86F3A0D240E822F44102673AC87909A041AA13BF9C4BF4A820139DCC06AB7637",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55_and_v2_1_15\\automl_env.yml"
+    },
+    {
+      "sha256": "D755C2C9F4C41D5757FB500558E9C88ED22CB07433E8CD687F14F33750EEF15B",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55_and_v2_1_15\\automl_setup_linux.sh"
+    },
+    {
+      "sha256": "31BFB0C714228850055A9B3C17311EF2976D695BB21D98A6EFEB01658CF2F945",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55_and_v2_1_15\\automl_setup_mac.sh"
+    },
+    {
+      "sha256": "44FF292B9C5B7AF89CD66523A3564AE5B3B71825A0B8ECA40B8A555A3EBDF65B",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55_and_v2_1_15\\automl_setup.cmd"
+    },
+    {
+      "sha256": "C343F875340FE9C81483DC1C3018D56C3141B157BE87C4000B5BCE28AC34236A",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55_and_v2_1_15\\check_conda_version.py"
+    },
+    {
+      "sha256": "C2EF8C9480E535405E5C51B7E299C9BB272C684165E055C4623F2597D21BD5B3",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55_and_v2_1_15\\README.md"
+    },
+    {
+      "sha256": "EC4C91799680082550EC7EF689F8D38DE2AAF8104809528AA6B560F4C3FB7239",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55\\automl_env_linux.yml"
+    },
+    {
+      "sha256": "8B67473CF552CB90E0503F25898FB7C5BB54305AD20DBD521BE61247724D00EE",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55\\automl_env_mac.yml"
+    },
+    {
+      "sha256": "FB68A9045C9AC477645FEA9841D1F34FBABB85C56BFD81F4E9D892243BE85D82",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55\\automl_env.yml"
+    },
+    {
+      "sha256": "0D505181AB83524FC1DD70CCBA7C4E4BD49A8C3E76DFFE0B99FD72A5E84946E4",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55\\automl_setup_linux.sh"
+    },
+    {
+      "sha256": "1B65E86A3B4E3EB6D437C11853D2857A6A763F5D2ABB026AAC26F7D73250FB91",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55\\automl_setup_mac.sh"
+    },
+    {
+      "sha256": "CB39FC362ECDD10AAECE00909C9293B442553F4BDEC83C5A2BD5E65F0B818C1D",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55\\automl_setup.cmd"
+    },
+    {
+      "sha256": "C343F875340FE9C81483DC1C3018D56C3141B157BE87C4000B5BCE28AC34236A",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55\\check_conda_version.py"
+    },
+    {
+      "sha256": "C2EF8C9480E535405E5C51B7E299C9BB272C684165E055C4623F2597D21BD5B3",
+      "path": "environment_setup\\install_sdk\\user_dev_env_install\\AzureML_v1_55\\README.md"
+    },
+    {
+      "sha256": "A97D4C362AD78728C25A3F1B9DBA80CD217083B654C255E4A8CB446A4EA26ACC",
+      "path": "environment_setup\\unit-tests\\test-bicep\\app\\__init__.py"
+    },
+    {
+      "sha256": "7E1389BDEC56D74872EFEB06808AD6E6FA08BE4E05E7203FD19B6BA33FDE8A23",
+      "path": "environment_setup\\unit-tests\\test-bicep\\app\\lifecycle.py"
+    },
+    {
+      "sha256": "DF43B9271E5B13EE6A9B527D0B70F12CB3E129ED79E4B783AD4BD5A8523E02B1",
+      "path": "environment_setup\\unit-tests\\test-bicep\\base\\__init__.py"
+    },
+    {
+      "sha256": "50F295289612C2206523E2B2B05D4BB545BC34DE9E8F62E7646D139CC6F7769F",
+      "path": "environment_setup\\unit-tests\\test-bicep\\base\\cli.py"
+    },
+    {
+      "sha256": "E682FD6025C3137FC01D76020DA99508F081B41270704511723E265E9BA1D866",
+      "path": "environment_setup\\unit-tests\\test-bicep\\base\\config.py"
+    },
+    {
+      "sha256": "7AD49ED62BE40A60BE2A1272F597514D3538DE2621F607A246E2027C6F8BFD80",
+      "path": "environment_setup\\unit-tests\\test-bicep\\base\\naming.py"
+    },
+    {
+      "sha256": "9E7F2AE71FE3FADEF3BEA9BBBD3E4727BFBDD9EA1B409AF68FDCF83D9F9F73DA",
+      "path": "environment_setup\\unit-tests\\test-bicep\\domain\\__init__.py"
+    },
+    {
+      "sha256": "22F209E6203659B0AB75152085D1EF22C600C69253ACBC143F0976E328E76D02",
+      "path": "environment_setup\\unit-tests\\test-bicep\\domain\\factory.py"
+    },
+    {
+      "sha256": "435BACE332CBF777B4258935494542CD1F5A3053E69D58CC7353E7AABA121409",
+      "path": "environment_setup\\unit-tests\\test-bicep\\domain\\governance.py"
+    },
+    {
+      "sha256": "CB554B3829AA2D05AE876FA0E6BB11E630B252D01FFE1C41947C0C07B6B560B0",
+      "path": "environment_setup\\unit-tests\\test-bicep\\domain\\iac.py"
+    },
+    {
+      "sha256": "BD9FE9066EE16D7F315930956AC07B631337CE0D086A780FDF632F4C930F01CA",
+      "path": "environment_setup\\unit-tests\\test-bicep\\domain\\paas.py"
+    },
+    {
+      "sha256": "18838681E3C07B17AD94D60127A8FE5FFA624934916B53EFAA717392D64CDCBB",
+      "path": "environment_setup\\unit-tests\\test-bicep\\domain\\project.py"
+    },
+    {
+      "sha256": "E5AEC08FAE48D6443F1B208F0B31F463548716036B1A6CFB50F2933B14938230",
+      "path": "environment_setup\\unit-tests\\test-bicep\\domain\\scenarios.py"
+    },
+    {
+      "sha256": "246BEC91D48BFF1AC3B68E9C78231EC8439A321C2D0AEFBDD0E5CA7AE984116D",
+      "path": "environment_setup\\unit-tests\\test-bicep\\integration\\__init__.py"
+    },
+    {
+      "sha256": "2EB611CB024473B6B436F0935E26E172A34F958FC7A55CA9CEE56E0B1DE53F65",
+      "path": "environment_setup\\unit-tests\\test-bicep\\integration\\base_live.py"
+    },
+    {
+      "sha256": "9CA48E720CAED77D8EC406C4FD603CB96099AA734D08A95F23CE5F0354D65F72",
+      "path": "environment_setup\\unit-tests\\test-bicep\\integration\\test_byo_modes.py"
+    },
+    {
+      "sha256": "17C9F6BD27AA337034558DBC4EFE711D2DA63271AAEE29A73253C2033E812639",
+      "path": "environment_setup\\unit-tests\\test-bicep\\integration\\test_deploy_common.py"
+    },
+    {
+      "sha256": "45EC99F5ADED94ED188B798BBFACDDD49286783C8B14869A0C9FD97E5E46A8CD",
+      "path": "environment_setup\\unit-tests\\test-bicep\\integration\\test_iac_build.py"
+    },
+    {
+      "sha256": "11989448CC5C89C8843390B0403B3676271432539BE0E937B3B4EF4E48940196",
+      "path": "environment_setup\\unit-tests\\test-bicep\\integration\\test_network_modes.py"
+    },
+    {
+      "sha256": "179FCE94074291D19495DBD02B61A858E5CF3502E007E88BA3C9AD572BEC60B5",
+      "path": "environment_setup\\unit-tests\\test-bicep\\integration\\test_paas_validation.py"
+    },
+    {
+      "sha256": "52009A78CD43C02056A03358E733F59F64317B515D811D2319FC122A2F2EDCBD",
+      "path": "environment_setup\\unit-tests\\test-bicep\\integration\\test_project_all_disabled.py"
+    },
+    {
+      "sha256": "25F6C73B1FF373EFA65F7859CF092E1D6EFF6C57B60464AE4A1DCC37C7E070E8",
+      "path": "environment_setup\\unit-tests\\test-bicep\\integration\\test_project_all_enabled.py"
+    },
+    {
+      "sha256": "A79C812ECDF4EB248A3AAABD9802A0449185148437B98CFA01FDE6478D923D39",
+      "path": "environment_setup\\unit-tests\\test-bicep\\integration\\test_security_posture.py"
+    },
+    {
+      "sha256": "E1582AA46282C71F61F8F61D899C2D3C9F4323D5E3F894C10908119098052B0F",
+      "path": "environment_setup\\unit-tests\\test-bicep\\pytest.ini"
+    },
+    {
+      "sha256": "002E3A6B29054348A2FECD5B340F381C6A6298811238AF8E2E74767AEDCE9768",
+      "path": "environment_setup\\unit-tests\\test-bicep\\README.md"
+    },
+    {
+      "sha256": "57E064524E2EAA2C232F90F56AC50932F554125F6BDB0A5C900221427582435D",
+      "path": "environment_setup\\unit-tests\\test-bicep\\requirements.txt"
+    },
+    {
+      "sha256": "362C88DD3ABC960D6C345A689FA0929855B129F6FB9AE8DC0746B693C9D0D230",
+      "path": "environment_setup\\unit-tests\\test-bicep\\SUGGESTED_TESTS.md"
+    },
+    {
+      "sha256": "E7F6748AD209DFC9CD342C8EDB9CCCCE7AC811F00EEB10A7FBE1472EC7A31CB9",
+      "path": "environment_setup\\unit-tests\\test-bicep\\test_aifactory_dashboard.py"
+    },
+    {
+      "sha256": "3CCB24747A502B5ED8CE41FDC99551A2D78B3903E6FA19D4CD4D42E37A87DDEE",
+      "path": "environment_setup\\unit-tests\\test-bicep\\test_bootstrap_terminal.py"
+    },
+    {
+      "sha256": "A6EA821FC47C5D17BA600E28DA107D909619345BCF1A5B57827C083779E28894",
+      "path": "environment_setup\\unit-tests\\test-bicep\\test_dns_policy_ownership.py"
+    },
+    {
+      "sha256": "41DC5432C57F19C4CB202DC3F7E7F2E4040EE06B0CCACF33BEE467152DC79602",
+      "path": "environment_setup\\unit-tests\\test-bicep\\test_env_parity.py"
+    },
+    {
+      "sha256": "2F124D8587BD3900D8C9F4B19E176875C6E33E45BFDE26EDF2573A179A930047",
+      "path": "environment_setup\\unit-tests\\test-bicep\\test_hosts_inventory.py"
+    },
+    {
+      "sha256": "47D6BC8AA0D4F725A1D6493C1611493C2FED687B4863379887A294B119A2CD8B",
+      "path": "environment_setup\\unit-tests\\test-bicep\\test_project_orphan_roles.py"
+    },
+    {
+      "sha256": "4F2EA951A3E751B8CBD3062972054BB4AC927D52CB0776C2174C45A7E52D3A16",
+      "path": "environment_setup\\unit-tests\\test-bicep\\test_rbac_common_rg.py"
+    },
+    {
+      "sha256": "C990D67CC1C3CE0C01513D05B6CA05E642FFF472F20CCEF5EED79F2A07755D6C",
+      "path": "environment_setup\\unit-tests\\test-bicep\\test_storage_discovery.py"
+    },
+    {
+      "sha256": "EDCB4C1AA2BB2935A0D4D6F9F4FECA4B83F5FCADB3D051089E34E435F1D0D48B",
+      "path": "environment_setup\\unit-tests\\test-bicep\\test_workflow_parity.py"
+    },
+    {
+      "sha256": "A5E3D5534C59D41E6F69EAEB3C56545BE2F465D0E04DED39F36B9A095DB3F391",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\__init__.py"
+    },
+    {
+      "sha256": "38CB62477A11792875551CDC2058739B56D1639BC03F68E40E5E56CD9BFBD8B3",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_ado_run_output.py"
+    },
+    {
+      "sha256": "B306AA0582C33B2DA955E61BBD56FCB341C7D80098BFCC4753FE81DE2877CA23",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_all_scaleset_dispatcher.py"
+    },
+    {
+      "sha256": "9A950D0BF9AF5BDD29E8E39A1A93D7A329798270D8FD63716825879B7A55E853",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_aml_aks_compute.py"
+    },
+    {
+      "sha256": "77E62E876BEDDDDB24B31E75254E0F6586387DF707771071533891BA51B870FC",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_bootstrap_scaleset.py"
+    },
+    {
+      "sha256": "0BB40ACD2A153F6012F25395366D8D5FA6EB5CE60A1A44B50D604E4D205D08DC",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_bootstrap_scoped_creation_guard.py"
+    },
+    {
+      "sha256": "5BC00B2E661719D673F4D1242324BCD43BC48945CFAEECA9416D5C8ADCE2F225",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_config_integrity.py"
+    },
+    {
+      "sha256": "F5E902D26E9516BCA42C0D75579583E91750681C5BAC4FE05D3C7ED38BC3E3FA",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_config_wizard_parity.py"
+    },
+    {
+      "sha256": "A2B73A847E57960039A86D85ACED55496C309E00615D821B1AFD245771B7A94E",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_diagnostics_telemetry.py"
+    },
+    {
+      "sha256": "C5EF30C3440A5DA49E76E3925EAF7A369CE4B47F63711BDDAE431996FC673CE9",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_domain_impl_mock.py"
+    },
+    {
+      "sha256": "71FE609DC9308095C3ACD96A4469E7324429CBE027BE86680A5145CA8C5EB47E",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_factory_lifecycle.py"
+    },
+    {
+      "sha256": "4F8666C6499021AD51581504B326BCE2BBACD8FEB069459F818A01B307B127CC",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_foundry_model_deployments.py"
+    },
+    {
+      "sha256": "8F166071E475BD876384ED546125B75908E81B751CD9EE4E7A3EDB73C9E13227",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_github_json_bootstrap.py"
+    },
+    {
+      "sha256": "2443D432FE7315E530CB6447AD4EB65B32739982704ADA4ED8D6EBF6F63A50E5",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_iac_build_mock.py"
+    },
+    {
+      "sha256": "34B43D1F25E709B07E53F1E2A1C1592BACE5AA764778DA62EBD834253D568679",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_paas_checks_mock.py"
+    },
+    {
+      "sha256": "F7FAB4469FE21876BD5A56208C81E0A2C5532E44627DA3FCB4383411ECEC398A",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_preflight_peerability.py"
+    },
+    {
+      "sha256": "FE981DBBE83BB6A54AE3E0EB7398648E13C66CB8EB4C16BD22E295D54AE17722",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_private_foundry_capability_host.py"
+    },
+    {
+      "sha256": "319C7A69E174FFBC616DCE29BA0C5C3DF8FBA3E0BD2681A7713517FF538DBA1A",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_project_deployment_contract.py"
+    },
+    {
+      "sha256": "027F9AE06AB70D53805A527547A4E3C595B836DD1B3AB02322CD6AD34B950CE7",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_project_only_launchers.py"
+    },
+    {
+      "sha256": "B91B8686511CBA25C5F132DD97CD785B7B4B6C8010D76E624EDBA347CEB4270E",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_region_reports.py"
+    },
+    {
+      "sha256": "0DE00502B294C7EFE72465E9C20E9665CA6B5535D16B0732074495B91C8967C3",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_release_version.py"
+    },
+    {
+      "sha256": "61F6274BEF1B19697BC470BD6CDCCFB7EEBD8FB796AA687D799A7D533F1572A0",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_scenario_matrix.py"
+    },
+    {
+      "sha256": "68D8B4C412DBEB91811FDA86B4A4B2A9007C17D9BADBA1D486649059E93E6C44",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_security_mock.py"
+    },
+    {
+      "sha256": "F41C8BB9AACFB18BC02EF7CAEC3AB21AF6B1671256F59A91FDABE1CCB406D518",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_simple_bootstrap.py"
+    },
+    {
+      "sha256": "FA5C4ED298794A2097402494A4957DE820D2A40BCB9ECA6FAA53DEEC34F67B89",
+      "path": "environment_setup\\unit-tests\\test-bicep\\unit\\test_subnet_scaling_capacity.py"
+    },
+    {
+      "sha256": "DEA9265341829002E2C23A7372393EB2ED6E26085FB623F38A4BA0AF833F30A6",
+      "path": "LICENSE"
+    }
+  ]
+}

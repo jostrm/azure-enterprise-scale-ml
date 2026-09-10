@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="ESAIF.ConfigWizard.Pages.TicketsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls"
+    Title="Tickets" Shell.NavBarIsVisible="False">
+    <Grid RowDefinitions="Auto,*">
+        <VerticalStackLayout Padding="24,24,24,12" Spacing="12" MaximumWidthRequest="1250">
+            <controls:AppHeader Title="Tickets" Subtitle="Your tickets and connector profiles. External sync is always manual." />
+            <FlexLayout Direction="Row" Wrap="Wrap">
+                <Button Text="Tickets" Command="{Binding ShowTicketsCommand}"
+                        Style="{StaticResource SecondaryButton}" Margin="0,0,10,4"
+                        AutomationId="TicketsTab" SemanticProperties.Description="{Binding TicketsTabDescription}">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsTicketsTab}" Value="True">
+                            <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceSelected}" />
+                            <Setter Property="BorderColor" Value="{DynamicResource PrimaryStrong}" />
+                            <Setter Property="BorderWidth" Value="2" />
+                            <Setter Property="FontAttributes" Value="Bold" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+                <Button Text="Ticket Connections" Command="{Binding ShowConnectionsCommand}"
+                        Style="{StaticResource SecondaryButton}" Margin="0,0,0,4"
+                        AutomationId="TicketConnectionsTab" SemanticProperties.Description="{Binding ConnectionsTabDescription}">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsConnectionsTab}" Value="True">
+                            <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceSelected}" />
+                            <Setter Property="BorderColor" Value="{DynamicResource PrimaryStrong}" />
+                            <Setter Property="BorderWidth" Value="2" />
+                            <Setter Property="FontAttributes" Value="Bold" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+            </FlexLayout>
+        </VerticalStackLayout>
+        <Grid Grid.Row="1" IsVisible="{Binding IsTicketsTab}">
+            <controls:TicketsView BindingContext="{Binding Tickets}" />
+        </Grid>
+        <Grid Grid.Row="1" IsVisible="{Binding IsConnectionsTab}">
+            <controls:TicketConnectionsView BindingContext="{Binding TicketConnections}" />
+        </Grid>
+    </Grid>
+</ContentPage>

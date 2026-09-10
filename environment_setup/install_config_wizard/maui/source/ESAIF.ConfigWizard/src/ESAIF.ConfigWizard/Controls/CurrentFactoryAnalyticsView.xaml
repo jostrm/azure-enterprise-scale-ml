@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    x:Class="ESAIF.ConfigWizard.Controls.CurrentFactoryAnalyticsView"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:ESAIF.ConfigWizard.Controls">
+    <VerticalStackLayout Spacing="12">
+        <controls:TechnicalLabel Caption="Title" Value="{Binding Title}" Style="{StaticResource SectionTitle}" />
+        <controls:TechnicalLabel Caption="Factory folder" Conceal="True" Value="{Binding Folder, StringFormat='Factory: {0}'}" FontSize="13" LineBreakMode="WordWrap" />
+        <FlexLayout Direction="Row" Wrap="Wrap" AlignItems="Center">
+            <Button Text="Reload analytics and counts" Command="{Binding ReloadCommand}"
+                    IsEnabled="{Binding IsNotBusy}" Style="{StaticResource SecondaryButton}" Margin="0,0,12,4" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            <controls:TechnicalLabel Caption="Source" Value="{Binding Source, StringFormat='Source: {0}'}" FontSize="13" Margin="0,0,16,4" />
+            <controls:TechnicalLabel Caption="Generated At" Value="{Binding GeneratedAt, StringFormat='Snapshot: {0}'}" FontSize="13" />
+        </FlexLayout>
+        <Label Text="Configuration evidence and observed deployments, not a live background feed. Unknown means the source does not establish the answer." FontSize="13" />
+        <controls:TechnicalLabel Caption="Warning" Value="{Binding Warning}" FontSize="13" TextColor="{DynamicResource Warning}" />
+        <controls:TechnicalLabel Caption="Error Message" Value="{Binding ErrorMessage}" FontSize="13" TextColor="{DynamicResource Danger}" AutomationId="FactoryAnalyticsError" />
+        <Border IsVisible="{Binding IsMissingFolder}" Style="{StaticResource CardBorder}">
+            <VerticalStackLayout Spacing="8">
+                <Label Text="Choose an AI Factory folder in Configuration wizard to view analytics." FontSize="13" />
+                <Button Text="Open Configuration wizard" Command="{Binding OpenWizardCommand}" HorizontalOptions="Start" />
+            </VerticalStackLayout>
+        </Border>
+        <Label Text="No analytics sections available. Check the source or error above, then Reload."
+               IsVisible="{Binding IsEmpty}" FontSize="13" />
+        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Sections}" Spacing="12">
+            <BindableLayout.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{StaticResource CardBorder}">
+                        <VerticalStackLayout Spacing="8">
+                            <controls:TechnicalLabel Caption="Title" Value="{Binding Title}" Style="{StaticResource SectionTitle}" />
+                            <controls:TechnicalLabel Caption="Description" Value="{Binding Description}" FontSize="13" />
+                            <controls:TechnicalLabel Caption="Source" Value="{Binding Source, StringFormat='Source: {0}'}" FontSize="13" Style="{StaticResource MutedLabel}" />
+                            <Label Text="No rows supplied by this source." IsVisible="{Binding IsEmpty}" FontSize="13" />
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Rows}" Spacing="8">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Padding="10" Stroke="{DynamicResource Border}" StrokeShape="RoundRectangle 8">
+                                            <FlexLayout Direction="Row" Wrap="Wrap" BindableLayout.ItemsSource="{Binding Cells}">
+                                                <BindableLayout.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <VerticalStackLayout Padding="0,0,12,6" FlexLayout.Basis="220" FlexLayout.Grow="1">
+                                                            <controls:TechnicalLabel Caption="Column" Value="{Binding Column}" FontSize="13" FontAttributes="Bold" />
+                                                            <controls:TechnicalLabel Caption="Value" Value="{Binding Value}" FontSize="13" LineBreakMode="WordWrap" />
+                                                        </VerticalStackLayout>
+                                                    </DataTemplate>
+                                                </BindableLayout.ItemTemplate>
+                                            </FlexLayout>
+                                        </Border>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </BindableLayout.ItemTemplate>
+        </VerticalStackLayout>
+    </VerticalStackLayout>
+</ContentView>
