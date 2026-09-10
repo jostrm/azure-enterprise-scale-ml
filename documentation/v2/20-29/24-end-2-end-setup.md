@@ -22,9 +22,14 @@
         ```bash
            gh --version
         ```` 
-### Prerequisite (Optional But Highly Recommended) - AI Factory Configuration Wizard
 
-Use the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md)
+### Prerequisite (Optional But Highly Recommended) - AI Factory Configuration Wizard (Windows 11 users)
+
+Windows users, use the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/maui\readme.md) that calls the AI Factory configuration wizard API, and also included operations & governance views. 
+
+### Prerequisite (Optional But Highly Recommended) - AI Factory Configuration Wizard (Python: Linux, Mac OS, Windows)
+
+Linux and Mac OS users may use the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md) API with simple UX.
 
 ## Setup options: 
 Whether you want to use Azure DevOps or GitHub, we recommend using the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md) to configure the AI Factory and its first project initially. The wizard provides a guided, form-based UI that validates your inputs and generates a correctly populated configuration file — significantly reducing the risk of misconfiguration on first deployment.
@@ -37,6 +42,22 @@ bash ./ADO-create-new-aifactory-scaleset.sh
 # or
 bash ./GHA-create-new-aifactory-scaleset.sh
 ```
+
+Select templates with `--aifactory-version 125` or `AIFACTORY_VERSION=125`.
+The numeric format is one major digit plus two minor digits: `124` means
+`release/v1.24`, `125` means `release/v1.25`. Use explicit dotted values for
+future versions such as `1.100` or `10.2`; `main` is also an explicit choice.
+New factories default to `124`. Existing factories and new scale sets inherit
+their saved version; an unknown existing version blocks rather than downgrades.
+Without an explicit choice, an interactive terminal asks you to accept or change
+the effective default. `--non-interactive` and API execution never prompt for it.
+
+Preview resolves the published branch to an exact commit; execution uses that
+commit, not a newer branch head. Missing branches or incompatible contracts fail
+without fallback. `AIF_SUBMODULE_BRANCH` and `AIF_SUBMODULE_REF` remain supported,
+but conflicting explicit selectors are rejected. The chosen version is saved in
+`aifactory/config-wizard/aifactory-version.json`; consumer/development `main`
+remains separate from the selected template release.
 
 They register resource providers, create or reuse a federated deployment
 identity, create or validate the required seeding Key Vault, create the initial
@@ -55,6 +76,15 @@ Private Resolver, and peers each AI Factory environment VNet to the access hub.
 >
 > - **ITSM-integrated (fully automated):** Many teams integrate the AI Factory pipelines directly with their ITSM system (ServiceNow, Jira Service Management, etc.), so that project teams can "order" an AI Factory project via a self-service ticket — triggering the pipeline with 100% automation and zero manual intervention.
 > - **Core-team managed:** Other teams prefer to route tickets to the AI Factory core team, who then uses the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md) to generate the correct configuration from the ticket information and trigger the pipeline on behalf of the requesting team.
+
+### Naming constraints
+
+Azure deployment names are limited to 64 characters. When configuring prefixes in your `.env` file, keep this in mind:
+- Keep AIFACTORY_PREFIX and PROJECT_PREFIX short (6 characters or less recommended)
+- Environment-specific prefixes (DEV_NETWORK_ENV, STAGE_NETWORK_ENV, PROD_NETWORK_ENV) add to the total length
+- Longer prefixes can cause deployment names to exceed the 64-character limit
+
+The Configuration Wizard validates prefix lengths and warns if deployment names would be truncated. If you configure prefixes manually, use shorter values to ensure all resource names deploy correctly.
 
 ### Option A — Azure DevOps
 
