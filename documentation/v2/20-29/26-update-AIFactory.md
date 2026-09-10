@@ -17,8 +17,32 @@ bash ./GH-update-aifactory-and-run-project.sh
 
 These scripts replace the manual feature-update steps below. They protect existing work, update the AI Factory submodule and templates, merge the existing configuration into the latest templates, commit and push the changes, start the project pipeline or workflow, and monitor the run until it finishes.
 
-Both launchers now refresh the shared submodule from `main`. Project-only mode
-leaves the installed submodule and templates unchanged.
+Both launchers inherit the factory's saved template version. To upgrade, supply
+`--aifactory-version 125` (or `AIFACTORY_VERSION=125`); this maps to `release/v1.25`.
+`124` maps to `release/v1.24`; dotted values such as `1.100` and `10.2` and explicit
+`main` are supported without a mapping table. Consumer `main` is **not** the
+template-version selector.
+
+Preview binds the published exact commit. The selected release must contain the
+reviewed version/project contracts and be fetched locally for read-only validation.
+Install the PURPLE launchers together with `lib/project_deployment.py`,
+`lib/release_version.py`, and `lib/release_version.sh`; old installed scripts are
+blocked, never silently replaced during preview. API creation materializes the
+reviewed Git archive per job, without checking out or changing shared development
+source. Missing/incompatible publication blocks until explicitly corrected.
+
+Project-only mode (Patch unchecked in the app) leaves installed code and templates
+unchanged. Choosing a different version requires Patch or a prior upgrade; it is
+never silently switched. Select the version **before** reviewing confirmation.
+Saved metadata lives in `aifactory/config-wizard/aifactory-version.json`; existing
+raw factory/project configuration values are not overwritten by version selection.
+
+Scoped lifecycle creation uses separate manual-only provider templates and is
+not installed or registered by these project-update launchers. When adopting or
+upgrading that capability, explicitly install the provider file from the same
+selected published commit and review/publish the consumer change before preview,
+as described under [Frozen lifecycle creation](24-end-2-end-setup.md#frozen-lifecycle-creation).
+Neither Patch unchecked nor `--project-only` installs or changes those files.
 
 ### Add a project without updating AI Factory
 

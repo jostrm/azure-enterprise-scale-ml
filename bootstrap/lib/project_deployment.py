@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -19,6 +20,10 @@ from uuid import uuid4
 
 
 CONTRACT = "AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1"
+VERSION_CONTRACT = "AIFACTORY_VERSION_CONTRACT=1"
+_version_spec = importlib.util.spec_from_file_location("aifactory_release_version", Path(__file__).with_name("release_version.py"))
+release_version = importlib.util.module_from_spec(_version_spec)
+_version_spec.loader.exec_module(release_version)
 GUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 ADO_PIPELINE = "aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-genai.yaml"
 ADO_CONFIG_STEP = "aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/jobs/job-0-reviewed-project-config.yaml"
@@ -248,10 +253,31 @@ class Deployment:
         print(f"Reviewed project {project} -> {target}; subscription {self.selected['subscription']}; tenant {self.selected['tenant']}", flush=True)
 
     def update(self, project_only=False):
+        version = release_version.select(saved=release_version.saved_version(self.root), environ=self.environment)
+        if not version["resolved_ref"]:
+            raise ValueError("Resolve and review an exact AI Factory version before running the launcher.")
         if project_only:
+            if version["requested_version"] != release_version.saved_version(self.root):
+                raise ValueError("Selecting another version requires Patch or a prior upgrade.")
+            current = self.command(["git", "-C", "azure-enterprise-scale-ml", "rev-parse", "HEAD"], capture=True)
+            if current != version["resolved_ref"]:
+                raise ValueError("Installed AI Factory commit changed after review.")
             print("Project-only mode: no checkout, pull, template update, commit or push.", flush=True)
             return
         branch = "main"
+        templates = {}
+        for relative in FILES[self.route]:
+            if self.route == "gha":
+                source_path = "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/" + Path(relative).name
+            else:
+                source_path = ("environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/"
+                               + relative.split("/esml-infra-project/", 1)[1])
+            content = self.command(["git", "-C", "azure-enterprise-scale-ml", "show",
+                                    version["resolved_ref"] + ":" + source_path], capture=True)
+            if CONTRACT not in content:
+                raise ValueError("Selected published project pipeline lacks the reviewed contract; no fallback.")
+            templates[relative] = (content + "\n").encode("utf-8")
+        self.templates = templates
         protected = {}
         for relative in (".env", "aifactory/variables.json",
                          "aifactory/esml-infra/azure-devops/bicep/yaml/variables/variables.yaml"):
@@ -270,12 +296,16 @@ class Deployment:
                           ":(exclude)aifactory/esml-infra/azure-devops/bicep/yaml/variables/variables.yaml", *selected_exclusion])
             self.command(["git", "checkout", branch])
             self.command(["git", "pull", "--ff-only", "origin", branch])
-            self.command(["git", "submodule", "update", "--init", "--recursive", "--remote"])
-            self.command(["git", "-C", "azure-enterprise-scale-ml", "checkout", "release/v1.24"])
-            self.command(["git", "-C", "azure-enterprise-scale-ml", "pull", "--ff-only", "origin", "release/v1.24"])
+            self.command(["git", "submodule", "update", "--init", "--recursive"])
+            self.command(["git", "-C", "azure-enterprise-scale-ml", "fetch", "origin", version["resolved_ref"]])
+            self.command(["git", "-C", "azure-enterprise-scale-ml", "checkout", "--detach", version["resolved_ref"]])
+            current = self.command(["git", "-C", "azure-enterprise-scale-ml", "rev-parse", "HEAD"], capture=True)
+            if current != version["resolved_ref"]:
+                raise ValueError("AI Factory checkout differs from the exact reviewed version.")
             self.command(["bash", "azure-enterprise-scale-ml/00-start.sh"], data="g\n" if self.route == "gha" else "a\n")
             self.command(["bash", "01-aif-copy-aifactory-templates.sh"])
             self.command(["bash", bootstrap])
+            release_version.save(self.root, version)
         finally:
             for relative, content in protected.items():
                 path = self.root / relative
@@ -294,7 +324,14 @@ class Deployment:
         helper = self.root / "lib" / "project_deployment.py"
         helper.parent.mkdir(exist_ok=True)
         shutil.copyfile(Path(__file__), helper)
-        paths = [*FILES[self.route], launcher, "lib/project_deployment.py", "azure-enterprise-scale-ml"]
+        for name in ("release_version.py", "release_version.sh"):
+            shutil.copyfile(Path(__file__).with_name(name), helper.with_name(name))
+        paths = [*FILES[self.route], launcher, "lib/project_deployment.py", "lib/release_version.py",
+                 "lib/release_version.sh", "azure-enterprise-scale-ml"]
+        alias = "GHA-update-aifactory-and-run-project.sh"
+        if self.route == "gha" and (self.state_dir / alias).is_file():
+            shutil.copyfile(self.state_dir / alias, self.root / alias)
+            paths.append(alias)
         self.command(["git", "add", "--", *paths])
         staged = self.command(["git", "diff", "--cached", "--name-only"], capture=True).splitlines()
         if any(path not in paths for path in staged):

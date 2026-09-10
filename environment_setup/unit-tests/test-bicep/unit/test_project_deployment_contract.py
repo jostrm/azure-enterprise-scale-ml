@@ -63,10 +63,12 @@ def test_exact_target_identity_and_no_fallback(target):
 
 
 @pytest.mark.parametrize("route", ["ADO", "GH"])
-def test_update_launchers_refresh_main(route):
+def test_update_launchers_keep_consumer_main_and_pin_template_version(route):
     script = (ROOT / "bootstrap" / f"{route}-update-aifactory-and-run-project.sh").read_text(encoding="utf-8")
-    assert 'readonly SUBMODULE_BRANCH="main"' in script
-    assert 'readonly SUBMODULE_BRANCH="release/v1.24"' not in script
+    assert 'aif_version_prepare "$REPO_ROOT" "$project_only"' in script
+    assert 'checkout --detach "$AIF_SUBMODULE_REF"' in script
+    assert "git submodule foreach" not in script
+    assert 'git checkout main' in script or 'readonly BRANCH="${ADO_BRANCH:-main}"' in script
 
 
 @pytest.mark.parametrize("kind", ["project", "section", "tenant", "delete"])
@@ -199,6 +201,9 @@ def test_refresh_preserves_selected_config_and_reviewed_templates(tmp_path):
     deployment.state_dir.mkdir()
     deployment.root.mkdir()
     deployment.prompt = lambda _: "yes"
+    version = {**pd.release_version.select("125", environ={}), "resolved_ref": "b" * 40}
+    deployment.environment = {"AIFACTORY_VERSION": "125", "AIF_SUBMODULE_REF": "b" * 40}
+    pd.release_version.save(deployment.root, version)
     deployment.templates = {}
     for relative in pd.FILES["gha"]:
         path = deployment.root / relative
@@ -206,7 +211,7 @@ def test_refresh_preserves_selected_config_and_reviewed_templates(tmp_path):
         path.write_text("reviewed", encoding="utf-8")
         deployment.templates[relative] = b"reviewed"
     config = deployment.root / "aifactory" / "variables.json"
-    config.parent.mkdir()
+    config.parent.mkdir(exist_ok=True)
     config.write_text("original-current-project", encoding="utf-8")
     (deployment.root / ".env").write_text("protected-env", encoding="utf-8")
     (deployment.state_dir / "GH-update-aifactory-and-run-project.sh").write_text("reviewed-launcher", encoding="utf-8")
@@ -220,12 +225,20 @@ def test_refresh_preserves_selected_config_and_reviewed_templates(tmp_path):
                 (deployment.root / relative).write_text("fetched-old-template", encoding="utf-8")
         if argv[:3] == ["git", "diff", "--cached"]:
             return ".github/workflows/infra-project.yml"
+        if argv[-2:] == ["rev-parse", "HEAD"]:
+            return "b" * 40
+        if len(argv) > 3 and argv[3] == "show":
+            return pd.CONTRACT + "\n# selected published version"
         return ""
 
     deployment.command = command
     deployment.update()
     assert config.read_text(encoding="utf-8") == "original-current-project"
-    assert all((deployment.root / relative).read_bytes() == b"reviewed" for relative in deployment.templates)
+    assert all((deployment.root / relative).read_bytes() == (pd.CONTRACT + "\n# selected published version\n").encode()
+               for relative in deployment.templates)
+    assert ["git", "checkout", "main"] in calls
+    assert ["git", "-C", "azure-enterprise-scale-ml", "checkout", "--detach", "b" * 40] in calls
+    assert not any("--remote" in call for call in calls)
     staged = next(argv for argv in calls if argv[:2] == ["git", "add"])
     assert "-A" not in staged and "aifactory/variables.json" not in staged and ".env" not in staged
     assert json.loads(deployment.config)["stage_prod"]["project_number_000"] == "017"

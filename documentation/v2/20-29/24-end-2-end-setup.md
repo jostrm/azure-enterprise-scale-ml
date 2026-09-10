@@ -38,10 +38,66 @@ bash ./ADO-create-new-aifactory-scaleset.sh
 bash ./GHA-create-new-aifactory-scaleset.sh
 ```
 
-They register resource providers, create or reuse a federated deployment
-identity, create or validate the required seeding Key Vault, create the initial
-Entra team group, configure and commit the automation, deploy the common
-environment, and then deploy project 001.
+Select templates with `--aifactory-version 125` or `AIFACTORY_VERSION=125`.
+The numeric format is one major digit plus two minor digits: `124` means
+`release/v1.24`, `125` means `release/v1.25`. Use explicit dotted values for
+future versions such as `1.100` or `10.2`; `main` is also an explicit choice.
+New factories default to `124`. Existing factories and new scale sets inherit
+their saved version; an unknown existing version blocks rather than downgrades.
+Without an explicit choice, an interactive terminal asks you to accept or change
+the effective default. `--non-interactive` and API execution never prompt for it.
+
+Preview resolves the published branch to an exact commit; execution uses that
+commit, not a newer branch head. Missing branches or incompatible contracts fail
+without fallback. `AIF_SUBMODULE_BRANCH` and `AIF_SUBMODULE_REF` remain supported,
+but conflicting explicit selectors are rejected. The chosen version is saved in
+`aifactory/config-wizard/aifactory-version.json`; consumer/development `main`
+remains separate from the selected template release.
+
+### Frozen lifecycle creation
+
+Use the selected published `bootstrap/AIFactory-lifecycle.sh execute` entrypoint
+with `--stdin-manifest`, `--source-root`, `--execution-root`, and `--receipt` for
+scoped/common-only creation. A trusted backend supplies the complete frozen
+manifest through a protected child stdin pipe; do not put configuration or
+credentials in shell arguments or environment variables.
+
+This is a separate scoped provider path, not a flag that bypasses only the final
+project dispatch in the legacy bootstrap. Empty project lists must remain empty.
+See `bootstrap/lib/factory_lifecycle_contract.txt` for complete configuration,
+publication, authentication, coordination and scope prerequisites. Unsupported
+configuration blocks rather than falling back to project001. The legacy
+creation wrappers reject `AIF_CREATE_PROJECTS` and `AIF_PROJECT_MODE` settings;
+a version-contract marker alone does not advertise scoped creation support.
+
+**Manual provider installation prerequisite:** legacy creation and project-update
+scripts do not install or register the separate lifecycle provider. Before
+preparing a scoped operation, copy the appropriate file byte-for-byte from the
+isolated checkout of the **selected published source commit**, not mutable
+development `main`, into the consumer repository:
+
+| Provider | Selected source file | Consumer destination |
+| --- | --- | --- |
+| GitHub Actions | `bootstrap/templates/factory-lifecycle-gha.yml` | `.github/workflows/factory-lifecycle.yml` |
+| Azure DevOps | `bootstrap/templates/factory-lifecycle-ado.yml` | `aifactory/pipelines/factory-lifecycle.yml` |
+
+The repository owner must review and publish that consumer change separately;
+the lifecycle runtime never copies files into, commits, or pushes the consumer
+repository. Register the ADO YAML pipeline at its destination and select its
+pipeline identity in the reviewed route. For GHA, the dispatchable workflow must
+be available on the repository's default branch. Keep the templates manual-only:
+GHA uses `workflow_dispatch`; ADO has `trigger: none` and `pr: none`.
+
+The frozen route identifies the independently reviewed consumer commit. Its
+provider file and the isolated lifecycle helper must match the selected source
+version. A release without these files is unsupported until published; do not
+copy newer development templates over an older selected release or substitute a
+different consumer commit after confirmation.
+
+The legacy DEV-first flow registers resource providers, creates or reuses a
+federated deployment identity, creates or validates the required seeding Key
+Vault, creates the initial Entra team group, configures and commits automation,
+deploys the common environment, and then deploys project 001.
 
 Private-only standalone deployments can use an integrated access hub in the
 DEV common network or an external `aifactory-connectivity` subscription. The

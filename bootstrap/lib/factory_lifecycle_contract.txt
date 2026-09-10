@@ -1,0 +1,548 @@
+AIFACTORY_LIFECYCLE_CONTRACT=1
+============================
+
+Entrypoint
+----------
+python -B bootstrap/lib/factory_lifecycle.py capabilities
+python -B bootstrap/lib/factory_lifecycle.py inspect --stdin-manifest
+python -B bootstrap/lib/factory_lifecycle.py execute --stdin-manifest \
+  --source-root <separate-clean-published-checkout> \
+  --execution-root <new-isolated-directory> --receipt <directory/receipt.json>
+
+bootstrap/AIFactory-lifecycle.sh is the equivalent shell wrapper.
+Backend code may import validate_manifest, manifest_digest, capabilities,
+execute and execute_cohort. Validation/inspect is local only and never implies Azure readiness.
+There is no cloud "prepare" command: catalog/backend owns preview, frozen
+configuration, published-version resolution, revisions and reconciliation.
+
+Only a protected child stdin pipe or --protected-manifest <file.dpapi> is
+accepted. The DPAPI file contains the manifest JSON itself, encrypted for the
+current Windows user, without additional entropy or a wrapper envelope.
+Never use shell interpolation, JSON command arguments, environment-based
+configuration, or redirected plaintext manifest files. stdin MUST be created
+by the trusted backend; the runtime cannot distinguish an inherited pipe from
+a redirected file. Configuration is never written to the execution directory.
+A successfully consumed .dpapi artifact is removed; failures retain it for
+backend reconciliation. The backend owns the independent protected catalog.
+
+Output is bounded non-secret JSON; exit 0 means successful inspection or
+verified execution, exit 2 means blocked/reconciliation required. CLI stderr,
+tokens, cloud error bodies and raw configuration are not passed through.
+Canonical JSON: UTF-8, sorted keys, no whitespace, ensure_ascii=False,
+nonfinite floats prohibited. Duplicate JSON object keys are rejected.
+
+Frozen manifest schema
+----------------------
+schema: 1
+operation: create-factory | create-scaleset | deploy-project | delete
+run_id: UUID (one shot; never automatically retry)
+manifest_revision: positive integer
+prepared_at / expires_at: timezone-aware ISO timestamps, lifetime <= 3600 sec
+manifest_hash: SHA256(canonical JSON of all fields EXCEPT manifest_hash)
+source:
+  commit: exact lower-case 40-hex published vendor commit
+  ref: refs/tags/<published tag> or refs/heads/<published release>
+  version: displayed published version
+target:
+  factory_id / scaleset_id: explicit logical IDs
+  environment: dev | stage | prod
+  tenant_id / subscription_id: exact GUIDs
+  prefix / region / suffix: exact naming; suffix three digits, not 000
+  project_ids: explicit three-digit IDs; [] is valid for zero-project creation
+identity:
+  object_id: exact authenticated Azure principal object GUID
+  deployment_object_id: exact CI deployment principal GUID (scoped plans only)
+route:
+  kind: gha | ado
+  writer_id: designated writer enrollment key
+  repository: credential-free https GitHub or dev.azure.com repository URL
+  ref / commit: exact consumer ref and reviewed 40-hex commit
+  shared_remote: explicit boolean
+  scoped_contract: 1 (required for scoped GHA/ADO deployment plans)
+  auth_namespace: unique GitHub environment / ADO service-connection name
+  github_user_id: exact authenticated GitHub numeric account ID (GHA only)
+  runner: explicit scoped runner selection:
+    {kind: hosted, os: linux, image: ubuntu-latest|ubuntu-24.04|ubuntu-22.04}
+    or GHA {kind: self-hosted, os: linux, labels: [self-hosted,linux,<label>]}
+    or ADO {kind: self-hosted, os: linux, pool: <pool>, agent_name: <optional>}
+config: complete resolved selected deployment object, never catalog settings
+locks:
+  provider: azure-blob-lease
+  account_url: https://<account>.blob.core.windows.net
+  container / coordination_blob: operator-provisioned enrollment destination
+  coordination_hash: SHA256(canonical enrollment JSON)
+  revision: enrollment revision
+  scopes: nonempty explicit physical resource-group ARM IDs in target subscription
+  common_dependencies: all other physical common/dependency RG ARM IDs
+  inherited_leases: optional {lowercase_physical_rg_id: preselected_lease_UUID}
+
+deploy-project requires one project ID. Its exact dev or stage_prod section
+must contain matching tenantId, dev_sub_id/test_sub_id/prod_sub_id,
+project_number_000, admin_location, admin_aifactoryPrefixRG and
+admin_aifactorySuffixRG (dash plus suffix). No Dev fallback, destructive
+deployment flags, automatic template update, commit/push or settings overwrite.
+
+Deletion adds:
+deletion:
+  inventory_complete: true
+  revision: same as manifest_revision
+  inventory_hash: SHA256(canonical resources array)
+  resources:
+    - id / type / api_version: exact audited ARM leaf identity
+      etag: observed ETag or null when provider has none
+      body_hash: SHA256(canonical full ARM GET response body)
+      owner: factory_id, scaleset_id, optional project_id
+      depends_on: explicit resource IDs in this inventory
+      delete: explicit boolean
+  resource_groups:
+    - id: one entry for every locks.scopes resource group
+      etag: observed ETag or null
+      body_hash: SHA256(canonical full resource-group GET response body)
+      delete: false for leaf deletion; true for complete owned-group deletion
+
+Ownership comes from actual resource tags aifactory.factory_id,
+aifactory.scaleset_id and, for projects, aifactory.project_id. Name/prefix is
+NEVER evidence of ownership. Unknown, unowned, changed, duplicate, nested,
+unlisted and unsupported resources block. Resource listing is fully paged,
+bounded, then compared with the exact allowlist; full resource fingerprints
+and ownership are re-read under leases before EACH mutation. Retained
+resources cannot depend on deleted resources. Deletion is reverse dependency
+order and verifies each exact resource GET returns 404 before advancing.
+No subscription, repository or external hub DELETE is issued. Resource-group
+DELETE requires the complete owned-group contract below, never a prefix match.
+At least one explicitly authorized deletion is required; an empty allowlist
+does not produce a success-shaped no-op. Active or queued GHA/ADO runs in all
+enrolled target/dependency repositories are checked, as are active ARM
+deployments. GHA enrollment requires an existing authenticated gh CLI session
+for read-only run inventory, even when deletion itself uses Azure directly.
+Unreadable or incomplete run inventory blocks. Repository-wide checking is
+deliberately conservative: unrelated active runs in that repository also block.
+
+Required operator setup (runtime NEVER provisions this implicitly)
+----------------------------------------------------------------
+1. Provision a dedicated Azure Storage account/container, Microsoft Entra
+   data-plane access, and the enrollment JSON below. Public Azure endpoints
+   only are currently supported. Do not store configuration or credentials
+   in this container.
+2. Precreate a zero-byte blob for EVERY physical RG and common dependency:
+     locks/<SHA256(UTF-8 lowercase full ARM RG ID)>.lock
+   All environments, users, machines, GHA and ADO writers MUST use this exact
+   account/container/key algorithm. Factory ID, project ID, orchestrator,
+   run UUID, local workspace and catalog paths MUST NOT partition lock keys.
+3. Establish one designated writer per target. Prevent manual/legacy
+   deployment routes from bypassing the lease protocol through operational
+   permissions and orchestration governance. Enrollment is an administrator
+   attestation of actual enforcement, NOT a toggle making legacy workflows
+   magically safe. If this cannot be established, do not enroll the target.
+4. Pin this enrollment's hash and revision into each protected prepared run.
+   The enrollment must list all common dependencies and their enrolled
+   writers; configuration-only self-assertions are not sufficient.
+
+Enrollment example (ARM IDs must be lowercase):
+{
+  "schema": 1,
+  "protocol": "aifactory-physical-lock-v1",
+  "enforcement": "all-writers-exclusive",
+  "revision": 1,
+  "writers": {
+    "factory-a-stage-writer": {
+      "kind": "ado",
+      "repository": "https://dev.azure.com/org/project/_git/repository",
+      "shared_remote": false
+    }
+  },
+  "scopes": {
+    "/subscriptions/<guid>/resourcegroups/<target-rg>": {
+      "writers": ["factory-a-stage-writer"],
+      "scope_kind": "aifactory-owned",
+      "allow_delete": true,
+      "target": {
+        "factory_id": "factory-a",
+        "scaleset_id": "Stage001",
+        "environment": "stage",
+        "tenant_id": "<guid>",
+        "subscription_id": "<guid>",
+        "prefix": "acme-ai-",
+        "region": "eastus2",
+        "suffix": "001"
+      },
+      "common_dependencies": ["/subscriptions/<guid>/resourcegroups/<common-rg>"]
+    },
+    "/subscriptions/<guid>/resourcegroups/<common-rg>": {
+      "writers": ["factory-a-stage-writer"],
+      "common_dependencies": []
+    }
+
+    Every writable scope must bind the exact target object shown above.
+    Deletion additionally requires allow_delete=true and scope_kind=aifactory-owned.
+    External hubs/shared dependencies are lock-only; never enroll them as a
+    writable factory-owned target. Prefix/name resemblance cannot change this.
+  }
+}
+
+Locks use real Azure Blob infinite exclusive leases, checked before every
+mutation. Infinite leases deliberately fail closed on process/machine death:
+they cannot expire while a remote pipeline or ARM DELETE remains in flight.
+No local mutex substitutes for them. Sorted acquisition prevents deadlock;
+partial acquisition releases already acquired leases. The conditional blob
+create runs/<run_id>.json (If-None-Match: *) provides cross-machine replay
+protection. Receipts, not secrets, are persisted there and atomically locally.
+
+Consent is required to be current WHEN CLAIMED, not throughout execution.
+validate_manifest(document) remains strict for new/unclaimed input; its optional
+now argument is an inspection/test aid and is NOT accepted by execute or
+execute_cohort. Neither root execution API accepts approval timestamps,
+skip-expiry flags or caller-provided execution authorization.
+After verified leases are held, claim_run validates the entire frozen manifest
+and current lifetime, conditionally creates runs/<run_id>.json and the immutable
+runs/<run_id>.claim.json, and verifies consent is still current after persistence.
+The claim contains schema, generated claim_id, run_id, manifest_hash, exact
+source, runtime-generated accepted_at and SHA256(canonical lease context).
+The mutable receipt preserves this evidence as execution_claim. These records
+are non-secret; actual lease UUIDs remain in protected transport only.
+
+Only an internal frozen execution-claim value permits post-deadline execution.
+It revalidates immutable manifest content, live immutable claim, active parent
+record, exact original lease-context hash, live physical leases and enrollment.
+Changing and rehashing the manifest after claiming is rejected. No prepared_at
+or expires_at is rewritten. A bare success dictionary, local claim, or timestamp
+echo cannot grant continued authority. Storage write access is a trusted
+operator/runtime prerequisite, not a user-controlled approval input: govern
+claim/receipt writers and prevent out-of-protocol changes.
+
+On uncertain dispatch, timeout, exception after a possible mutation, or
+partial deletion, leases and receipts remain. No blind retry or success.
+An operator/backend must inspect the exact remote run/resource inventory,
+record reconciliation and explicitly break retained leases before preparing
+a fresh revision/run UUID. Never break a lease while an old mutation can
+still run. A secretless terminal receipt is retained after successful release.
+Deletion identity is bound to subscription, tenant and token oid; no login,
+subscription switch or credential fallback occurs. Source validation is
+read-only: clean tracked tree, exact HEAD, trusted vendor origin and published
+ref resolving to exact commit. Consumer files are never touched.
+
+Scoped creation/project deployment: frozen-arm-deployment-plan-v1
+----------------------------------------------------------------
+The new published templates are:
+  bootstrap/templates/factory-lifecycle-gha.yml
+    installed at .github/workflows/factory-lifecycle.yml
+  bootstrap/templates/factory-lifecycle-ado.yml
+    installed at aifactory/pipelines/factory-lifecycle.yml
+Both declare AIFACTORY_SCOPED_DEPLOYMENT_CONTRACT=1. The runtime verifies the
+installed template at the exact consumer commit against the published source
+before dispatch. Installing/publishing templates and provisioning a namespaced
+OIDC environment/service connection are explicit prerequisites, not hidden
+repository/configuration mutations in this runner.
+
+Add this fully frozen deployment object to a create-factory, create-scaleset
+or deploy-project manifest:
+  deployment:
+    contract: 1
+    configuration_hash: SHA256(canonical complete config object)
+    network_mode: managed | byo
+    changes: complete combined ARM what-if allowlist (see below)
+    known_ownership: optional {lowercase_existing_untagged_resource_id:
+      {run_id: prior_worker_UUID, receipt_hash: prior_worker_receipt_SHA256}}
+    steps:
+      - id: unique alphanumeric/underscore/dash ID, max 40, not "factory"
+        kind: common | project
+        project_id: required for project, forbidden for common
+        template: source-relative canonical Bicep path
+        template_hash: SHA256(canonical compiled ARM template)
+        parameters: ALL resolved template parameters, including resolved defaults
+        scope: subscription | resource-group
+        resource_group: exact locked RG ARM ID (resource-group scope only)
+        resource_groups: ALL exact RG ARM IDs this step may modify
+        depends_on: preceding step IDs
+        template_spec_id: optional exact ARM Template Spec version ID
+
+The common template allowlist is esml-common/main/11-rgCommon.bicep,
+12-networkCommon.bicep and 13-rgLevel.bicep under environment_setup/aifactory/bicep.
+Managed-network creation requires all three; BYO requires 11 and 13, with an
+explicit resolved BYO networking configuration. Project templates are the
+canonical esml-genai-1 phases listed in PROJECT_TEMPLATES in the helper.
+The phase/project set must exactly match target.project_ids. [] means actual
+common-only execution: no project prompts, identities, configuration,
+variables, default 001, or project template invocation.
+
+Each step binds env (stage maps to test), location, commonRGNamePrefix,
+aifactorySuffixRG, projectNumber where relevant, and actual ownership tags.
+For the untaggable 08b RBAC template, step.owner supplies explicit
+factory_id/scaleset_id/project_id instead. Only pinned canonical templates
+are compiled. Unknown/missing template parameters block, even if the Bicep
+template has defaults: no runtime invention or silent config-field mapping.
+
+Preparation helper:
+  freeze_deployment_plan(cloud, draft_manifest, pinned_source_root)
+The caller supplies already resolved parameter objects from the selected
+configuration; this helper performs compiler validation and read-only ARM
+what-if, sets exact compiled hashes/config hash and the combined change
+allowlist. It does NOT invent a mapper from partial wizard settings. Source
+resolution, settings-to-parameter compilation and review remain backend
+preparation responsibilities. Missing resolved parameters/what-if evidence is
+an explicit preparation blocker. This helper is never run by inspect/help.
+
+Pure parameter preparation utility:
+  resolve_template_parameters(compiled_template, selected_values, parameter_sources)
+Explicit parameter_sources maps Bicep parameter names to selected config keys.
+The utility resolves only literal published defaults, converts declared scalar
+types, and returns parameters, consumed_configuration_keys,
+unused_configuration_keys and published_defaults. It never defaults identity
+fields/project numbers or credentials, and never evaluates unresolved ARM
+default expressions. Backend must account for unused deployment settings or
+block preparation; unused keys are not silently discarded. Execution still
+requires the complete frozen parameter object.
+
+Each combined change is:
+  resource_id: exact ARM ID in locked writable resource groups
+  change_type: Create | Modify | NoChange
+  before_hash: SHA256(canonical before body), or null when absent
+  after_hash: SHA256(canonical after body), or null when absent
+Delete, Ignore/unsupported, incomplete expansion and out-of-scope changes
+block. The worker repeats the complete combined what-if under the same
+physical leases and compares it exactly before mutation.
+
+All selected phases are combined into one subscription-scoped ARM deployment
+with explicit nested dependencies and secureObject parameter envelopes. This
+lets ARM preview and deploy the common/project dependency graph together;
+it does not compare later phases against an obsolete pre-foundation state.
+Every child deployment is individually verified after the parent succeeds.
+Plans larger than ARM's 4-MiB inline template limit must use prepublished
+Template Spec versions. Each linked specification is re-read, must exactly
+match the frozen compiled template hash, and its artifact RG must be included
+in the common physical lease dependencies. No template publishing or SAS
+creation is performed by this runner.
+
+Additional enrollment writer fields:
+  auth_namespace: exact route.auth_namespace
+  deployment_object_id: exact identity.deployment_object_id
+  runner: exact route.runner descriptor
+No two writers in the same remote/kind may share an auth namespace. Both the
+operator and CI principal need the appropriate Azure Storage lease/receipt
+permissions; the worker verifies the CI principal rather than impersonating
+the operator. Namespaced environment/service-connection credentials are
+preprovisioned. The adapter never overwrites shared root variables or auth.
+New scoped templates support Linux hosted/private self-hosted workers with
+Python 3, Git, Azure CLI and the reviewed Bicep executable installed on PATH.
+The new profiles explicitly use that executable, not a downloaded/default
+compiler from somebody else's Azure CLI profile. Windows
+CI workers are an explicit capability blocker, not silently replaced with
+Ubuntu. Frozen useSelfHostedBuildAgent, runner label/pool/name and BYO_subnets
+choices are checked against route.runner and deployment.network_mode.
+Existing untagged resources require known_ownership evidence matching their
+current full fingerprint before any update. This prevents silently adopting
+a different resource instance at a recycled ID. Successful updates carry the
+verified owner forward into a newly fingerprinted worker receipt.
+
+GHA dispatch creates a unique create-only refs/tags/aifactory-runs/<run_id>
+at the frozen consumer commit. No main/consumer branch or tracked file is
+changed. The new workflow checks workflow_sha AND event SHA before Azure
+authentication, checks the checked-out consumer and vendor commits, and
+executes only the protected manifest. Runtime correlates the UUID run title
+and exact commit. Up to sixteen 32,000-character encrypted run-specific
+environment-secret chunks carry a zlib-compressed, base64 manifest/lease
+envelope; decompression is strictly bounded to 8 MiB. Larger compressed
+payloads block explicitly. Confirmed terminal runs remove these chunks and
+the unchanged run tag. Uncertain dispatch retains them for reconciliation.
+
+ADO uses exact resources.repositories.self.version, a namespaced reviewed
+workload-identity-federation service connection and one per-run secret envelope variable. Its template
+checks consumer/source commits before the AzureCLI task authenticates.
+Both routes execute the same worker via private stdin; no configuration or
+lease secret is placed in command arguments, shell text, logs or local files.
+ADO encrypted variable history remains governed by ADO retention.
+GHA uses a new private, run/attempt-specific Azure CLI profile under its
+ephemeral checkout and removes only that profile in an always-cleanup step.
+ADO explicitly disables global Azure CLI configuration. The worker verifies
+that the connection's selected account itself matches the frozen target;
+it does not silently compensate for a misbound environment/service connection.
+Long-running GHA workers renew the same federated identity through the trusted
+GitHub OIDC endpoint and Entra token endpoint, in memory and without assertions
+in argv. Issuer, audience, repository, run, tag, commit and environment subject
+are checked before exchange; returned Azure tenant/principal are checked too.
+ADO requires a current AzureCLI@2 task supporting keepAzSessionActive for WIF,
+enabled by the new template. It refreshes the same isolated connection rather
+than retrying deployments or falling back to another credential.
+
+The worker shares the coordinator's existing permanent physical leases; it
+cannot reacquire or bypass them. Before accepting even an unexpired envelope it
+reads the parent's immutable claim and active record from the authoritative
+store, verifies the frozen hash/source and live lease context, and rejects missing,
+terminal, changed or replayed authority. Thus a correctly accepted queued job
+may start after consent expiry without trusting timestamps in its envelope.
+It checks the exact clean source checkout and helper against the claimed commit;
+it does not re-resolve a moving published ref after acceptance, fetch, checkout
+another commit, or relax template/configuration/what-if verification.
+It conditionally creates
+runs/<run_id>.worker.json and persists child-deployment/ownership evidence.
+Automatic CI re-runs encounter this one-shot record and cannot repeat writes.
+The coordinator requires BOTH exact remote completion and a matching successful
+worker receipt before releasing locks or reporting success.
+
+Complete owned resource-group deletion: arm-provider-closure-v1
+----------------------------------------------------------------
+Use deletion.inventory_mode="arm-provider-closure-v1", set every reviewed
+resource_group.delete and resource.delete true, and add:
+  deletion.closure: output of collect_resource_closure(cloud, exact_rg_ids)[0]
+  deletion.closure_hash: SHA256(canonical closure)
+  resource_group.owner: exact {factory_id,scaleset_id}
+
+Read-only preparation convenience:
+  freeze_deletion_inventory(cloud, draft_manifest, ownership_records_by_id)
+This collects full closure, uses actual ownership tags where present and
+requires verified deployment-receipt records for untaggable children. It
+extracts cross-RG ARM references from live bodies; runtime rechecks those
+references against declared dependencies. Retained external resource
+dependencies must be covered by common_dependencies locks, never deleted.
+
+The collector returns (fingerprint_closure, in-memory_resource_bodies).
+It fully pages RG resources; fingerprints registered provider schemas; walks
+every registered direct child collection recursively; and enumerates scoped
+role/deny assignments, locks, policy assignments/exemptions and diagnostic settings.
+Resource-group activity-log routing is subscription-scoped, not a diagnostic
+settings child of the resource group; that explicit non-applicability is
+recorded in closure. Resource-level diagnostic settings are enumerated.
+Inherited authorization entries are excluded by actual scope, not name.
+Storage service/default singletons are read explicitly. Key Vault accessPolicy
+operations are inline parent properties, covered by the parent fingerprint.
+Only explicit authoritative unsupported-extension error codes establish
+non-applicability; a generic 404, missing permission, unsupported child list
+endpoint or incomplete result blocks deletion.
+
+Every discovered root, nested and extension resource must appear exactly once
+in deletion.resources with its full body_hash, observed ETag/API version,
+explicit owner and depends_on resource IDs. Names and region are never
+ownership evidence. Tagged resources require exact ownership tags. Untaggable
+children require:
+  ownership_source: deployment-receipt
+  ownership_evidence:
+    run_id: UUID of a previously verified scoped worker deployment
+    receipt_hash: SHA256(canonical persisted successful worker receipt)
+The live storage receipt must explicitly list that exact resource/owner.
+Its recorded full body fingerprint must still match the current instance;
+out-of-band updates or a replaced resource require ownership reconciliation,
+not blind acceptance of an old resource ID.
+Unknown/adopted-by-name children cannot be invented into this ledger.
+
+Complete provider/child/extension closure and ownership are re-read under the
+leases before EACH RG delete. Cross-RG resource dependencies determine group
+deletion order; cyclic dependencies block rather than guessing. Azure performs
+the authorized group's internal dependency-aware cascade. The exact group
+and every approved descendant must subsequently return 404. Failures retain
+partial receipts and all physical locks. No external hub/shared group or
+unrelated child is authorized. Soft-deleted data is not purged by this adapter.
+Managed-resource-group/node-RG cascades must also be explicitly listed, owned
+and locked. An implicit cascade to an external/unlisted managed group blocks
+before mutation. Already-authorized cascaded groups are individually verified
+absent and recorded; they are not blindly deleted again.
+For an untagged managed RG, preparation may record
+ownership_source="managed-parent" and managed_parent_id only when both live
+links agree: RG.managedBy points to an owned, allowlisted managed-service
+resource, and that resource explicitly names this RG as its managed/node RG.
+Every child still requires independently verified ownership. A name or a
+one-way managedBy string alone is insufficient. The preparation helper
+discovers and validates this evidence; conflicting ownership tags block.
+
+This protocol supports full owned factory RG sets, not arbitrary Azure
+resource universes: an unenumerable/custom child or extension needs an audited
+collector before execution. Never claim incomplete provider inventory is
+complete merely because the parent RG has an ownership tag.
+
+Backend orchestration and compatibility
+---------------------------------------
+One manifest executes one explicit scaleset/environment. Whole-factory deletion
+MUST use capability factory_cohort="physical-lease-cohort-v1" and one call:
+
+  execute_cohort(documents, source_root, execution_root, receipt_path)
+
+The optional cloud_factory=Cloud and lock_factory=BlobLocks arguments are
+dependency injection for offline tests, not manifest-controlled privileges.
+The backend decrypts the whole protected DPAPI JSON and independently verifies
+each expected manifest hash before passing the document list. No parent run ID
+is needed. Keep the complete protected catalog authority until the aggregate
+and every child receipt verify success; never remove successful children from
+the authoritative catalog on partial/uncertain cohort failure.
+
+All children must be nonempty, immutable, unexpired delete manifests for the
+same factory and exactly the same source commit/ref/version. Run IDs and writable
+physical RG scopes must be unique. Every child must use the complete owned-group
+closure contract and authorize deletion of every inventoried RG/resource.
+Different environments, subscriptions and ADO/GHA writers are supported.
+Each target identity is independently verified against its existing tenant/
+subscription/principal session; no login or account switch is attempted.
+Disjoint tenants/stores are supported with those explicit sessions/access.
+Shared physical scopes require the SAME authoritative account/container AND
+enrollment blob/hash/revision. Shared scopes spanning target tenants currently
+block with cohort-shared-scope-cross-tenant-auth-unsupported; configure a
+supported explicit authentication/coordination topology instead of assuming
+cross-tenant token access. Source must be an exact separate published checkout.
+
+The runtime validates all input first, acquires the FULL UNION of physical RG
+and common-dependency leases in globally sorted lowercase ARM-ID order, verifies
+ALL live inventories/ownership/identities/enrollments and active-run exclusions,
+then durably claims every child while ALL consent windows remain current.
+No ARM mutation occurs until every claim has been verified. Shared scopes use
+one lease, not repeated acquisitions. Cohort execution owns the union; prepared
+inherited_leases are not accepted for this API. No manifest fields or lease IDs
+are inserted into/rewritten in the approved children.
+
+Child order is reverse dependency order across reviewed resource references and
+enrolled common dependencies, with manifest-hash sorting for independent peers.
+Duplicate writable scopes and cyclic dependencies block before mutations.
+Every child uses its original claim under an internal inherited union lease
+guard; all union leases/enrollments and frozen documents are checked throughout,
+including when later children run past their original consent deadlines.
+Within each child the existing per-resource closure, ownership and deletion
+verification remains unchanged. RG absence polling allows up to 1440 five-second
+polls (two hours); leaf polling remains 120 polls. This bounded operational
+timeout is independent of consent expiry; an unverified timeout retains leases.
+
+Before claiming, a confirmed failure releases acquired leases. Once any claim
+is attempted, partial/uncertain failures conservatively retain the ENTIRE union,
+all child receipts and the aggregate, with no retry, lease break or catalog
+collapse. Success persists every child's verified completion before releasing
+the union once. Failed releases report only still-retained scopes and require
+reconciliation, never success. One-shot child claims prevent cross-machine replay.
+
+Aggregate result and aggregate JSON at receipt_path:
+  {
+    "schema": 1, "operation": "delete-factory",
+    "cohort_hash": SHA256(canonical(sorted(child_manifest_hash_strings))),
+    "factory_id": "<factory>", "source_commit": "<40-hex>",
+    "source_ref": "refs/tags/<reviewed-version>",
+    "status": "succeeded" | "blocked" | "reconciliation-required",
+    "mutation_started": true | false,
+    "lock_retained": true | false, "locks_retained": ["<lowercase-physical-RG-ID>"],
+    "started_at": "<ISO>", "updated_at": "<ISO>", "finished_at": "<ISO>",
+    "error_code": "<stable-code, present only on failure>",
+    "children": [ <child receipts in deterministic dependency-safe order> ]
+  }
+Each child preserves the existing receipt fields schema/run_id/manifest_hash/
+manifest_revision/operation/target/source_commit/status/mutation_started/
+deleted_resources, adding source_ref, cohort_hash, lock_retained, union-wide
+locks_retained and its immutable execution_claim when accepted. Pending deletion
+evidence and error_code are preserved on failure. Child receipts are written to
+<execution_root>/<run_id>.receipt.json and existing runs/<run_id>.json blobs;
+the immutable acceptance evidence is runs/<run_id>.claim.json. As with execute,
+malformed/expired/mixed input or invalid execution paths can raise Blocked before
+an execution directory exists; operational failures return the persisted result.
+Aggregate and child files contain no configuration, bearer tokens or lease IDs.
+
+Creation sequencing remains backend-owned. Existing single-target execute keeps
+its signature and receipt semantics, including optional reviewed inherited
+physical leases; a child never releases inherited leases and reports them in
+parent_locks_retained. Those leases alone do not authorize expired input.
+Whole-factory deletion must not be simulated by sequential independently
+accepted execute calls or a local factory mutex.
+Cloning none/all projects remains local independent-draft catalog work.
+Creation never fabricates project001, or materializes catalog state as root
+deployment files. All non-deployment/metadata settings remain in the frozen
+config hash and must be explicitly accounted for by preparation.
+
+Legacy reviewed ADO project contract=1 remains supported without a deployment
+plan on non-shared remotes. Legacy GHA/root-global bootstrap is not used as a
+fallback. Old published versions lacking these new templates, compiler/runtime
+contracts, complete manifests or actual namespaced auth setup remain blocked.
+The executing adapter must itself exactly match the helper published at the
+selected source commit; a dirty/untracked copied helper cannot manufacture
+capability support in an older release.

@@ -20,6 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Copy the update-and-run helpers to the parent repository root.
 cp "$SCRIPT_DIR/bootstrap/ADO-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/../ADO-update-aifactory-and-run-project.sh"
 cp "$SCRIPT_DIR/bootstrap/GH-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/../GH-update-aifactory-and-run-project.sh"
+cp "$SCRIPT_DIR/bootstrap/GHA-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/../GHA-update-aifactory-and-run-project.sh"
 cp "$SCRIPT_DIR/bootstrap/ADO-create-new-aifactory-scaleset.sh" "$SCRIPT_DIR/../ADO-create-new-aifactory-scaleset.sh"
 cp "$SCRIPT_DIR/bootstrap/GHA-create-new-aifactory-scaleset.sh" "$SCRIPT_DIR/../GHA-create-new-aifactory-scaleset.sh"
 cp "$SCRIPT_DIR/bootstrap/ALL-create-new-aifactory-scaleset.sh" "$SCRIPT_DIR/../ALL-create-new-aifactory-scaleset.sh"

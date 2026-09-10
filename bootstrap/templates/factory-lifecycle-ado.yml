@@ -1,0 +1,81 @@
+# AIFACTORY_SCOPED_DEPLOYMENT_CONTRACT=1
+trigger: none
+pr: none
+
+parameters:
+  - name: runId
+    type: string
+  - name: manifestHash
+    type: string
+  - name: expectedCommit
+    type: string
+  - name: sourceCommit
+    type: string
+  - name: serviceConnection
+    type: string
+  - name: runnerKind
+    type: string
+    values: [hosted, self-hosted]
+  - name: vmImage
+    type: string
+    default: ''
+  - name: agentPool
+    type: string
+    default: ''
+  - name: agentName
+    type: string
+    default: ''
+
+pool:
+  ${{ if eq(parameters.runnerKind, 'hosted') }}:
+    vmImage: ${{ parameters.vmImage }}
+  ${{ else }}:
+    name: ${{ parameters.agentPool }}
+    demands:
+      - Agent.OS -equals Linux
+      - ${{ if ne(parameters.agentName, '') }}:
+        - Agent.Name -equals ${{ parameters.agentName }}
+
+steps:
+  - checkout: self
+    submodules: true
+    persistCredentials: false
+
+  - bash: |
+      set -euo pipefail
+      [[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+      [[ "$BUILD_SOURCEVERSION" == "$EXPECTED_COMMIT" ]]
+      [[ "$(git rev-parse HEAD)" == "$EXPECTED_COMMIT" ]]
+      [[ "$(git -C azure-enterprise-scale-ml rev-parse HEAD)" == "$SOURCE_COMMIT" ]]
+      bicep --version
+    displayName: Verify exact consumer and published source before authentication
+    env:
+      EXPECTED_COMMIT: ${{ parameters.expectedCommit }}
+      SOURCE_COMMIT: ${{ parameters.sourceCommit }}
+
+  - task: AzureCLI@2
+    displayName: Execute protected scoped lifecycle plan
+    inputs:
+      azureSubscription: ${{ parameters.serviceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      visibleAzLogin: false
+      useGlobalConfig: false
+      keepAzSessionActive: true
+      inlineScript: |
+        python3 - <<'PY'
+        import os, subprocess, sys
+        raw = os.environ.pop("AIFACTORY_ENVELOPE_JSON").encode("utf-8")
+        result = subprocess.run([
+            sys.executable, "-B", "azure-enterprise-scale-ml/bootstrap/lib/factory_lifecycle.py",
+            "worker", "--source-root", "azure-enterprise-scale-ml",
+            "--expected-run", os.environ["EXPECTED_RUN"],
+            "--expected-manifest-hash", os.environ["EXPECTED_HASH"],
+        ], input=raw, shell=False)
+        raise SystemExit(result.returncode)
+        PY
+    env:
+      AIFACTORY_ENVELOPE_JSON: $(AIFACTORY_ENVELOPE_JSON)
+      EXPECTED_RUN: ${{ parameters.runId }}
+      EXPECTED_HASH: ${{ parameters.manifestHash }}
+      AZURE_BICEP_USE_BINARY_FROM_PATH: 'true'

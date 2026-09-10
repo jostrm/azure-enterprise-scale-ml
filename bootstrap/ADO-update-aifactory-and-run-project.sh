@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
+# AIFACTORY_VERSION_CONTRACT=1
 
 set -euo pipefail
 
@@ -15,7 +16,6 @@ fi
 source "$AIF_UI_LIBRARY"
 readonly REPO_ROOT="${AIFACTORY_REPO_ROOT:-$SCRIPT_DIR}"
 readonly SUBMODULE_PATH="azure-enterprise-scale-ml"
-readonly SUBMODULE_BRANCH="main"
 readonly BRANCH="${ADO_BRANCH:-main}"
 readonly PIPELINE_NAME="${ADO_PIPELINE_NAME:-infra-project-genai}"
 readonly PIPELINE_YAML_PATH="aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-genai.yaml"
@@ -45,6 +45,10 @@ if [[ "${AIFACTORY_LAUNCHER_STABLE:-}" != "1" ]]; then
   mkdir -p "$state_dir/ui"
   cp "$AIF_UI_LIBRARY" "$state_dir/ui/terminal.sh"
   cp "${BASH_SOURCE[0]}" "$stable_launcher"
+  version_dir="$SCRIPT_DIR/lib"
+  [[ -f "$version_dir/release_version.py" ]] || version_dir="$REPO_ROOT/azure-enterprise-scale-ml/bootstrap/lib"
+  mkdir -p "$state_dir/lib"
+  cp "$version_dir/release_version.py" "$version_dir/release_version.sh" "$state_dir/lib/"
   if [[ "$reviewed_project" == "true" ]]; then
     deployment_helper="$SCRIPT_DIR/lib/project_deployment.py"
     if [[ ! -f "$deployment_helper" ]]; then
@@ -65,8 +69,14 @@ state_dir="${AIFACTORY_LAUNCHER_STATE_DIR:?Stable launcher state directory is mi
 trap 'rm -rf -- "$state_dir"' EXIT
 project_only=false
 resume_after_bootstrap=false
-for argument in "$@"; do
+while (( $# )); do
+  argument="$1"
+  shift
   case "$argument" in
+    --aifactory-version)
+      [[ $# -gt 0 && -n "$1" && -z "${AIF_VERSION_ARGUMENT:-}" ]] || { aif_error "One --aifactory-version value is required."; exit 1; }
+      AIF_VERSION_ARGUMENT="$1"; shift
+      ;;
     --project-only)
       project_only=true
       ;;
@@ -74,7 +84,7 @@ for argument in "$@"; do
       resume_after_bootstrap=true
       ;;
     --help|-h)
-      printf 'Usage: %s [--project-only]\n' "$(basename "$0")"
+      printf 'Usage: %s [--project-only] [--aifactory-version 124|125|1.100|main]\n' "$(basename "$0")"
       printf '  --project-only  Skip all AI Factory and template updates; trigger the project pipeline only.\n'
       exit 0
       ;;
@@ -95,6 +105,9 @@ case "${AIFACTORY_PROJECT_ONLY:-false}" in
     exit 1
     ;;
 esac
+
+source "$SCRIPT_DIR/lib/release_version.sh"
+aif_version_prepare "$REPO_ROOT" "$project_only"
 
 if [[ "$project_only" == "true" ]]; then
   aif_banner "AZURE DEVOPS / PROJECT ONLY" "Skip AI Factory updates. Trigger the existing project pipeline."
@@ -689,8 +702,10 @@ else
 
   git checkout "$BRANCH"
   git pull --ff-only origin "$BRANCH"
-  git submodule update --init --recursive --remote
-  git submodule foreach "git checkout '$SUBMODULE_BRANCH' && git pull --ff-only origin '$SUBMODULE_BRANCH'"
+  git submodule update --init --recursive
+  git -C "$SUBMODULE_PATH" fetch origin "$AIF_SUBMODULE_REF"
+  git -C "$SUBMODULE_PATH" checkout --detach "$AIF_SUBMODULE_REF"
+  aif_version_save "$REPO_ROOT"
 
   printf 'a\n' | bash "$SUBMODULE_PATH/00-start.sh"
   bash "01-aif-copy-aifactory-templates.sh"

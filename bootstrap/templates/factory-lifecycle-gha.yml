@@ -1,0 +1,152 @@
+name: factory-lifecycle
+# AIFACTORY_SCOPED_DEPLOYMENT_CONTRACT=1
+run-name: factory-lifecycle [${{ inputs.run_id }}]
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        required: true
+        type: string
+      manifest_hash:
+        required: true
+        type: string
+      expected_commit:
+        required: true
+        type: string
+      source_commit:
+        required: true
+        type: string
+      auth_namespace:
+        required: true
+        type: string
+      secret_prefix:
+        required: true
+        type: string
+      secret_chunks:
+        required: true
+        type: string
+      runs_on:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  scoped-deployment:
+    runs-on: ${{ fromJSON(inputs.runs_on) }}
+    environment: ${{ inputs.auth_namespace }}
+    env:
+      AZURE_CONFIG_DIR: ${{ github.workspace }}/.aifactory-azure-${{ github.run_id }}-${{ github.run_attempt }}
+      AZURE_LOGIN_POST_CLEANUP: 'false'
+      AZURE_BICEP_USE_BINARY_FROM_PATH: 'true'
+    steps:
+      - name: Reject an unreviewed workflow before authentication
+        shell: bash
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+          WORKFLOW_COMMIT: ${{ github.workflow_sha }}
+          EVENT_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$WORKFLOW_COMMIT" == "$EXPECTED_COMMIT" ]]
+          [[ "$EVENT_COMMIT" == "$EXPECTED_COMMIT" ]]
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_commit }}
+          submodules: true
+          persist-credentials: false
+
+      - name: Create a private run-specific Azure CLI profile
+        id: auth_profile
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          path = Path(os.environ["AZURE_CONFIG_DIR"])
+          if path.parent.resolve() != Path(os.environ["GITHUB_WORKSPACE"]).resolve():
+              raise SystemExit("Invalid authentication profile location")
+          path.mkdir(mode=0o700)
+          PY
+
+      - name: Verify the prepared source and existing compiler
+        shell: bash
+        env:
+          EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$EXPECTED_COMMIT" ]]
+          [[ "$(git -C azure-enterprise-scale-ml rev-parse HEAD)" == "$SOURCE_COMMIT" ]]
+          bicep --version
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Execute only the protected reviewed plan
+        shell: bash
+        env:
+          EXPECTED_RUN: ${{ inputs.run_id }}
+          EXPECTED_HASH: ${{ inputs.manifest_hash }}
+          ENVELOPE_CHUNKS: ${{ inputs.secret_chunks }}
+          AIFACTORY_ENVELOPE_0: ${{ secrets[format('{0}_0', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_1: ${{ secrets[format('{0}_1', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_2: ${{ secrets[format('{0}_2', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_3: ${{ secrets[format('{0}_3', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_4: ${{ secrets[format('{0}_4', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_5: ${{ secrets[format('{0}_5', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_6: ${{ secrets[format('{0}_6', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_7: ${{ secrets[format('{0}_7', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_8: ${{ secrets[format('{0}_8', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_9: ${{ secrets[format('{0}_9', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_10: ${{ secrets[format('{0}_10', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_11: ${{ secrets[format('{0}_11', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_12: ${{ secrets[format('{0}_12', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_13: ${{ secrets[format('{0}_13', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_14: ${{ secrets[format('{0}_14', inputs.secret_prefix)] }}
+          AIFACTORY_ENVELOPE_15: ${{ secrets[format('{0}_15', inputs.secret_prefix)] }}
+        run: |
+          python3 - <<'PY'
+          import base64, os, subprocess, sys, zlib
+          count = int(os.environ.pop("ENVELOPE_CHUNKS"))
+          if not 1 <= count <= 16:
+              raise SystemExit("Invalid protected envelope size")
+          chunks = [os.environ.pop(f"AIFACTORY_ENVELOPE_{i}", "") for i in range(16)]
+          if not all(chunks[:count]) or any(chunks[count:]):
+              raise SystemExit("Protected envelope is incomplete")
+          decoder = zlib.decompressobj()
+          raw = decoder.decompress(base64.b64decode("".join(chunks[:count]), validate=True), 8 * 1024 * 1024 + 1)
+          if len(raw) > 8 * 1024 * 1024 or not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
+              raise SystemExit("Invalid or oversized protected envelope")
+          result = subprocess.run([
+              sys.executable, "-B", "azure-enterprise-scale-ml/bootstrap/lib/factory_lifecycle.py",
+              "worker", "--source-root", "azure-enterprise-scale-ml",
+              "--expected-run", os.environ["EXPECTED_RUN"],
+              "--expected-manifest-hash", os.environ["EXPECTED_HASH"],
+          ], input=raw, shell=False)
+          raise SystemExit(result.returncode)
+          PY
+
+      - name: Remove only this run's Azure CLI profile
+        if: ${{ always() && steps.auth_profile.outcome == 'success' }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, shutil
+          from pathlib import Path
+          path = Path(os.environ["AZURE_CONFIG_DIR"])
+          if path.parent.resolve() != Path(os.environ["GITHUB_WORKSPACE"]).resolve() or not path.name.startswith(".aifactory-azure-"):
+              raise SystemExit("Invalid authentication cleanup scope")
+          if path.is_symlink():
+              path.unlink()
+          elif path.exists():
+              shutil.rmtree(path)
+          PY
