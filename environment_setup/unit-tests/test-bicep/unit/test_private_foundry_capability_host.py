@@ -126,6 +126,20 @@ class TestPrivateFoundryCapabilityHost(unittest.TestCase):
         self.assertIn("vectorStoreConnections", capability_host)
         self.assertIn("storageConnections", capability_host)
 
+    def test_v4_reconciles_capability_hosts_for_existing_projects(self) -> None:
+        content = FOUNDRY_TEMPLATES[3].read_text(encoding="utf-8")
+        project_line = next(
+            line for line in content.splitlines()
+            if line.startswith("module addProjectCapabilityHost ")
+        )
+        account_line = next(
+            line for line in content.splitlines()
+            if line.startswith("module addAccountCapabilityHost ")
+        )
+        self.assertNotIn("aiFoundryV2ProjectExists", project_line)
+        self.assertNotIn("aiFoundryV2Exists", project_line)
+        self.assertNotIn("aiFoundryV2ProjectExists", account_line)
+
     def test_preflight_hard_fails_when_private_bundle_is_disabled(self) -> None:
         git_bash = Path(r"C:\Program Files\Git\bin\bash.exe")
         bash = str(git_bash) if os.name == "nt" and git_bash.is_file() else shutil.which("bash")

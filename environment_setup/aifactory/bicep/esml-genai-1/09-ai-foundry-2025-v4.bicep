@@ -1142,7 +1142,7 @@ module rbacAIStorageAccountsForAIFv21 '../modules/csFoundry/rbacAIStorageAccount
 // so we create it explicitly. When networkInjection IS enabled the platform auto-provisions it;
 // deploying it explicitly would conflict and cause a timeout. The YAML pipeline includes a
 // wait task (69-wait-account-caphost) that polls until the auto-provisioned caphost reaches Succeeded.
-module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphost.bicep' = if(effectiveEnableCaphost && disableAgentNetworkInjection && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists) {
+module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphost.bicep' = if(effectiveEnableCaphost && disableAgentNetworkInjection && enableAIFoundry && !foundryV22AccountOnly) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_AccCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -1161,10 +1161,9 @@ module addAccountCapabilityHost '../modules/csFoundry/aiFoundry2025AccountCaphos
 // Only executes in scenario 2b (non-APIM)
 // CRITICAL: When disableAgentNetworkInjection=false, Azure auto-provisions account caphost (takes 15-60min).
 // Project caphost REQUIRES account caphost to exist first. Therefore:
-// - If disableAgentNetworkInjection=true: Create in same deployment (account caphost created explicitly)
-// - If disableAgentNetworkInjection=false AND aiFoundryV2Exists=false: SKIP (first deployment, wait for auto-provision)
-// - If aiFoundryV2Exists=true: Create (second deployment, account caphost already exists)
-module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(effectiveEnableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && effectiveEnableCosmosDB && enableAIFoundry && !foundryV22AccountOnly && !aiFoundryV2ProjectExists && (disableAgentNetworkInjection || aiFoundryV2Exists)) {
+// The ADO/GitHub orchestration waits for the account host before this phase.
+// Always reconcile the project host, including when the project already exists.
+module addProjectCapabilityHost '../modules/csFoundry/aiFoundry2025caphost.bicep' = if(effectiveEnableCaphost && enableAIFactoryCreatedDefaultProjectForAIFv2 && needsAISearch && effectiveEnableCosmosDB && enableAIFoundry && !foundryV22AccountOnly) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('09-AifV21_PrjCapHost_${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
