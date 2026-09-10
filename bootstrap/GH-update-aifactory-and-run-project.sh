@@ -81,7 +81,8 @@ while (( $# )); do
       resume_after_bootstrap=true
       ;;
     --help|-h)
-      printf 'Usage: %s [--project-only] [--aifactory-version 124|125|1.100|main]\n' "$(basename "$0")"
+      printf 'Usage: %s [--project-only] [--aifactory-version main|124|125|1.100]\n' "$(basename "$0")"
+      printf '  Omitted version defaults normal Update to main; project-only keeps installed code.\n'
       printf '  --project-only  Skip all AI Factory and template updates; dispatch the project workflow only.\n'
       exit 0
       ;;
@@ -104,7 +105,9 @@ case "${AIFACTORY_PROJECT_ONLY:-false}" in
 esac
 
 source "$SCRIPT_DIR/lib/release_version.sh"
-aif_version_prepare "$REPO_ROOT" "$project_only"
+version_default=""
+[[ "$project_only" == "true" ]] || version_default="${AIF_UPDATE_DEFAULT_VERSION:-main}"
+aif_version_prepare "$REPO_ROOT" "$project_only" false "$version_default"
 
 if [[ "$project_only" == "true" ]]; then
   aif_banner "GITHUB / PROJECT ONLY" "Skip AI Factory updates. Dispatch the existing project workflow."

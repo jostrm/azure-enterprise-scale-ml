@@ -3858,7 +3858,7 @@ aif_scaleset_main() {
   [[ "$AIF_ROUTE" != "gha" ]] || aif_require_command gh
   aif_python
   aif_resolve_repo_root
-  aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE" main
+  aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE" "${AIF_CREATE_DEFAULT_VERSION:-main}"
   aif_simple_mode_defaults
   if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
     aif_simple_gateway_config >/dev/null

@@ -50,6 +50,32 @@ def test_existing_unknown_factory_fails_instead_of_downgrading(tmp_path):
         rv.saved_version(tmp_path)
 
 
+def test_update_default_main_and_project_only_inheritance_are_distinct():
+    ado = (ROOT / "bootstrap/ADO-update-aifactory-and-run-project.sh").read_text(
+        encoding="utf-8"
+    )
+    github = (ROOT / "bootstrap/GH-update-aifactory-and-run-project.sh").read_text(
+        encoding="utf-8"
+    )
+    alias = (ROOT / "bootstrap/GHA-update-aifactory-and-run-project.sh").read_text(
+        encoding="utf-8"
+    )
+    for source in (ado, github):
+        assert 'version_default=""' in source
+        assert (
+            '[[ "$project_only" == "true" ]] || '
+            'version_default="${AIF_UPDATE_DEFAULT_VERSION:-main}"'
+            in source
+        )
+        assert (
+            'aif_version_prepare "$REPO_ROOT" "$project_only" false "$version_default"'
+            in source
+        )
+    assert 'AIF_UPDATE_DEFAULT_VERSION="${AIF_UPDATE_DEFAULT_VERSION:-main}"' in alias
+    assert "exec bash" in alias
+    assert "GH-update-aifactory-and-run-project.sh" in alias
+
+
 def test_explicit_main_bypasses_unknown_existing_factory(tmp_path, monkeypatch, capsys):
     (tmp_path / "aifactory").mkdir()
     monkeypatch.setattr(
