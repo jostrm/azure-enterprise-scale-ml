@@ -15,7 +15,9 @@ A native .NET MAUI desktop app with the Python API from the Tkinter wizard inclu
 | [Data part 2](https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_config_wizard/maui/ESAIF.ConfigWizard-1.0.0-win-x64-setup-2.bin) | 96.0 MB |
 | [Data part 3](https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_config_wizard/maui/ESAIF.ConfigWizard-1.0.0-win-x64-setup-3.bin) | 33.3 MB |
 
-The `.bin` files are parts of the same installer, split to stay below GitHub's file-size limit. Do not run them separately. [SHA256SUMS.txt](SHA256SUMS.txt) lists the expected hashes; compare a download with `Get-FileHash .\filename -Algorithm SHA256`.
+**Yes, all three data parts and the Setup EXE are required.** The `.bin` files contain the compressed application and bundled runtimes. They are not optional downloads or your personal data. The installer is split to stay below GitHub's file-size limit.
+
+Keep all four files together with their original filenames, then run **only the Setup EXE**. It reads the three data parts automatically. [SHA256SUMS.txt](SHA256SUMS.txt) lists the expected hashes; compare a download with `Get-FileHash .\filename -Algorithm SHA256`.
 
 **Unsigned preview:** Windows SmartScreen or your organization's application policy may warn or block installation. Verify the download source and hashes. Follow your organization's approval process; do not disable security controls. This is not a Microsoft Store or signed enterprise deployment package.
 
@@ -47,29 +49,6 @@ Internet access is required for sign-in, Azure inventory, source-version checks 
 Close the app and finish or explicitly resolve any active deployment before updating. Run the newer installer to update the same per-user installation. Uninstall through **Settings > Apps > Installed apps > Enterprise Scale AI Factory**.
 
 Your repositories, saved configurations and Azure resources are separate from the app installation. Uninstall is not an Azure cleanup operation.
-
-## Build from the checked-in source
-
-The [`source`](source) folder contains the MAUI app, its BaseLayer/DomainLayer projects, the Python API, assets and tests. `source-manifest.json` records source file SHA-256 hashes. Local developer outputs, sign-in state and saved projects are not shipped.
-
-Build prerequisites: .NET 10 SDK with the Windows MAUI workload/Windows SDK, a Windows x64 Python installation including Tcl/Tk, Git for Windows, and PowerShell 7. The build restores application dependencies and obtains a pinned, signature-checked Inno Setup compiler when one is not supplied.
-
-From this directory:
-
-```powershell
-.\prepare-accelerator.ps1
-python -m venv .\source\python-api\.venv
-.\source\python-api\.venv\Scripts\python.exe -m pip install -r .\source\python-api\requirements.txt
-.\source\ESAIF.ConfigWizard\build-windows.ps1 `
-  -ApiSource "$PWD\source\python-api" `
-  -Python "$PWD\source\python-api\.venv\Scripts\python.exe" `
-  -AcceleratorSource "$PWD\artifacts\accelerator-source" `
-  -SkipApiRestore
-```
-
-Outputs are under `source\ESAIF.ConfigWizard\artifacts\installer`. The accelerator preparation script pins the published source revision and supplies the clean Git objects required for version/readiness checks. It excludes installer files from the runtime working tree, avoiding recursive bundling. Updating that pinned revision is an explicit build decision.
-
-For maintainers importing changes from the separate development directories, `export-source.ps1 -SourceReposRoot <parent-of-ESAIF-projects> -ApiSource <python-api-repo> -Destination <new-empty-folder>` creates a new source snapshot without overwriting an existing one.
 
 ## Screenshots
 

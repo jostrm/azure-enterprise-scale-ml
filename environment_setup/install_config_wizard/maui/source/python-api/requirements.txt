@@ -1,8 +1,0 @@
-pyyaml
-pyinstaller
-sv-ttk
-fastapi
-pydantic>=2.12,<3
-jsonschema>=4.22,<5
-uvicorn
-pywinpty>=3.0.0,<4; sys_platform == "win32"
