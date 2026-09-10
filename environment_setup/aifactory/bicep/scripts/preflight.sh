@@ -296,7 +296,6 @@ ENABLE_FOUNDRY_CAPHOST="$(getval enableAFoundryCaphost ENABLE_FOUNDRY_CAPHOST tr
 ENABLE_AOAI="$(getval enableAzureOpenAI ENABLE_AZURE_OPENAI false)"
 ENABLE_COSMOS="$(getval enableCosmosDB ENABLE_COSMOS_DB false)"
 ENABLE_ELASTIC="$(getval enableElasticsearch ENABLE_ELASTICSEARCH false)"
-ENABLE_PUBLIC_GENAI="$(getval enablePublicGenAIAccess ENABLE_PUBLIC_GENAI_ACCESS true)"
 
 # Model deployments
 DEPLOY_GPTX="$(getval deployModel_gpt_X DEPLOY_MODEL_GPT_X false)"
@@ -409,23 +408,15 @@ fi
 # -----------------------------------------------------------------------------
 norm_loc() { printf '%s' "$(lc "${1:-}" | tr -cd 'a-z0-9')"; }
 
-check_private_foundry_capability_host() {
-  if ! is_true "$ENABLE_AI_FOUNDRY" || is_true "$ENABLE_PUBLIC_GENAI"; then
+resolve_foundry_capability_host_dependencies() {
+  if ! is_true "$ENABLE_AI_FOUNDRY" || ! is_true "$ENABLE_FOUNDRY_CAPHOST"; then
     return 0
   fi
-  local missing=()
-  is_true "$ENABLE_FOUNDRY_CAPHOST" || missing+=("capability host")
-  is_true "$ENABLE_AI_SEARCH" || missing+=("Azure AI Search")
-  is_true "$ENABLE_COSMOS" || missing+=("Azure Cosmos DB")
-  if [ "${#missing[@]}" -gt 0 ]; then
-    local joined
-    joined="$(IFS=', '; printf '%s' "${missing[*]}")"
-    add_finding FAIL PRIVATE_FOUNDRY_CAPABILITY_HOST_REQUIRED \
-      "Private Foundry standard agents require: $joined." \
-      "Enable capability host, AI Search, and Cosmos DB; project Storage is always included by the AI Factory project baseline."
-    return 1
+  if ! is_true "$ENABLE_AI_SEARCH" || ! is_true "$ENABLE_COSMOS"; then
+    echo "  [INFO] Capability host is enabled: including AI Search and Cosmos DB in preflight, matching the Bicep dependency guardrails."
   fi
-  echo "  [OK] Private Foundry standard-agent bundle: capability host + Storage + AI Search + Cosmos DB."
+  ENABLE_AI_SEARCH=true
+  ENABLE_COSMOS=true
 }
 
 # Run an `az` command with retries on TRANSIENT failures (GatewayTimeout, 429,
@@ -1076,10 +1067,7 @@ echo "============================================================"
 echo ""
 echo "=== Config: variables.yaml placeholders ==="
 check_config_placeholders
-if ! check_private_foundry_capability_host; then
-  echo "preflight FAILED: the private Foundry capability-host bundle cannot be deselected."
-  exit 1
-fi
+resolve_foundry_capability_host_dependencies
 echo ""
 echo "=== BYO: subnets & App Service Environment ==="
 check_byo_subnets

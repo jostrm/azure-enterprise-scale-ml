@@ -67,8 +67,8 @@ param cmkKeyName string = ''
 @description('Version of the Customer Managed Key in Key Vault')
 param cmkKeyVersion string = ''
 
-@description('Enable Cosmos DB integration. Required for the private Foundry standard-agent capability host.')
-param enableCosmosDB bool = true
+@description('Enable Cosmos DB integration; also enabled as a dependency when the Foundry capability host is enabled.')
+param enableCosmosDB bool = false
 
 // AI Models deployment parameters
 @description('Whether to deploy GPT-X model')
@@ -164,10 +164,9 @@ param useAdGroups bool = true
 param IPwhiteList string = ''
 param enablePublicGenAIAccess bool = false
 
-var privateFoundryStandardAgents = enableAIFoundry && !enablePublicGenAIAccess
-var effectiveEnableCaphost = enableCaphost || privateFoundryStandardAgents
-var effectiveEnableAISearch = enableAISearch || privateFoundryStandardAgents
-var effectiveEnableCosmosDB = enableCosmosDB || privateFoundryStandardAgents
+var effectiveEnableCaphost = enableCaphost
+var effectiveEnableAISearch = enableAISearch || (enableCaphost && enableAIFoundry)
+var effectiveEnableCosmosDB = enableCosmosDB || (enableCaphost && enableAIFoundry)
 param allowPublicAccessWhenBehindVnet bool = false
 @description('Disable agent network injection even when agentSubnetResourceId is provided.')
 param disableAgentNetworkInjection bool = false

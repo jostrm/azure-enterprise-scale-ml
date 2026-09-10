@@ -278,7 +278,7 @@ jobs:
       logicAppType: ${{ vars.LOGIC_APP_TYPE || 'Standard' }}
       enableEventHubs: ${{ vars.ENABLE_EVENT_HUBS || 'false' }}
       enableBotService: ${{ vars.ENABLE_BOT_SERVICE || 'true' }}
-      enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'true' }}
+      enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
       cosmosKind: ${{ vars.COSMOS_KIND || 'GlobalDocumentDB' }}
       enablePostgreSQL: ${{ vars.ENABLE_POSTGRESQL || 'false' }}
       enableRedisCache: ${{ vars.ENABLE_REDIS_CACHE || 'false' }}

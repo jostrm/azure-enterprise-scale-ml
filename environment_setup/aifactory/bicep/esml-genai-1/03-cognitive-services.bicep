@@ -51,8 +51,8 @@ var csDocIntelligenceSKU = env == 'dev' ? skuDocIntelligenceDev : skuDocIntellig
 // PARAMETERS - Core Configuration
 // ============================================================================
 
-@description('Enable the Foundry capability host. Required for the private standard-agent architecture.')
-param enableAFoundryCaphost bool = true
+@description('Enable the optional Foundry capability host; requires AI Search when Foundry is enabled.')
+param enableAFoundryCaphost bool = false
 @description('Enable AI Foundry V2.1')
 param enableAIFoundry bool = false
 param enableAISearchSharedPrivateLink bool = true
@@ -188,7 +188,6 @@ param default_model_sku string = 'DataZoneStandard'
 // Security and networking
 param enablePublicGenAIAccess bool = false
 
-var privateFoundryStandardAgents = enableAIFoundry && !enablePublicGenAIAccess
 param enablePublicAccessWithPerimeter bool = false
 param enablePublicNetworkAccessForCognitive bool = true
 param disableLocalAuth bool = true
@@ -333,7 +332,7 @@ var defaultSubnet = namingConvention.outputs.defaultSubnet
 var genaiSubnetName = namingConvention.outputs.genaiSubnetName
 var genaiName = namingConvention.outputs.genaiName
 var aoaiName = namingConvention.outputs.aoaiName
-var needsAISearch = enableAISearch || privateFoundryStandardAgents
+var needsAISearch = enableAISearch || (enableAFoundryCaphost && enableAIFoundry)
 var safeNameAISearchOrg = needsAISearch ? namingConvention.outputs.safeNameAISearch : ''
 var aiServicesName = namingConvention.outputs.aiServicesName
 var storageAccount2001Name = namingConvention.outputs.storageAccount2001Name

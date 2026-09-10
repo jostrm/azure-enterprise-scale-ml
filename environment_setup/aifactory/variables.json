@@ -204,7 +204,7 @@
     "enableBingCustomSearch": "false",
     "bingCustomSearchSku": "G2",
     "enableContentSafety": "false",
-    "enableCosmosDB": "true",
+    "enableCosmosDB": "false",
     "cosmosKind": "GlobalDocumentDB",
     "enablePostgreSQL": "false",
     "postGresAdminEmails": "email_adress_only",

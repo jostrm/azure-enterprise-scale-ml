@@ -99,14 +99,21 @@ These are the **names** of secrets in the seeding Key Vault that hold the projec
 
 | Variable | Default | Guidance | Description |
 |---|---|---|---|
-| `ENABLE_AI_FOUNDRY` | `true` | **required** for the standard private Foundry baseline | Deploy the Foundry account and default project with private endpoints |
-| `ENABLE_FOUNDRY_CAPHOST` | `true` | **required; cannot be disabled** for this standard private-agent architecture | Bind the project capability host to Storage, AI Search, and Cosmos DB |
-| `ENABLE_AI_SEARCH` | `true` | **required** with private Foundry capability host | Capability-host vector-store connection |
-| `ENABLE_COSMOS_DB` | `true` | **required** with private Foundry capability host | Capability-host thread and agent-history store |
+| `ENABLE_AI_FOUNDRY` | `true` | **recommended** for the private Foundry baseline | Deploy the Foundry account and default project with private endpoints |
+| `ENABLE_FOUNDRY_CAPHOST` | `true` | **optional**; set `false` to omit the capability host | When enabled with Foundry, requires Storage, AI Search and Cosmos DB |
+| `ENABLE_AI_SEARCH` | `true` | **optional**, or required by an enabled capability host | Search service and capability-host vector-store connection |
+| `ENABLE_COSMOS_DB` | `false` | **optional**, or required by an enabled capability host | Database and capability-host thread/history store |
 | `ADMIN_AI_SEARCH_TIER` | `basic` | **ensure** `free` is **not allowed** when using private endpoints | AI Search SKU tier for the project |
 | `ADMIN_SEMANTIC_SEARCH_TIER` | `free` | keep-as-is | Semantic search tier. Options: `disabled`, `free`, `standard` |
 
-This requirement is specific to the AI Factory's standard private-agent/BYO data-resource architecture. Microsoft documents the project capability host with `storageConnections`, `vectorStoreConnections` (AI Search), and `threadStorageConnections` (Cosmos DB). Capability hosts are not required for every unrelated Foundry or hosted-agent architecture. See [Foundry capability hosts](https://learn.microsoft.com/azure/foundry/agents/concepts/capability-hosts) and [Use your own resources](https://learn.microsoft.com/azure/foundry/agents/how-to/use-your-own-resources).
+The dependency is one-way: enabling the capability host in the config wizard enables
+AI Search and Cosmos DB. Bicep also deploys these dependencies when both Foundry and
+the capability host are enabled, even if their individual service flags are false.
+Disabling the capability host does not disable explicitly selected Search or Cosmos DB.
+With all three flags false, neither service nor the capability host is requested,
+regardless of public/private networking. Preflight uses the same effective dependencies.
+The ADO/JSON capability-host flag is `enableAFoundryCaphost`; Foundry Bicep receives it
+as `enableCaphost`. See [Foundry capability hosts](https://learn.microsoft.com/azure/foundry/agents/concepts/capability-hosts).
 
 ---
 
@@ -114,4 +121,4 @@ This requirement is specific to the AI Factory's standard private-agent/BYO data
     Once Groups 1–7 are filled in, run the pipeline. The AI Factory calculates networking, deploys all Bicep modules, and configures RBAC automatically — producing a working **private Foundry + capability host + Storage + AI Search + Cosmos DB** baseline.
 
 !!! info "Want to enable more services?"
-    Other optional services (AKS, Container Apps, ML Studio, Databricks, models, BYO networking, etc.) are in [Advanced Mode](advanced.md). Cosmos DB is part of the required private Foundry capability-host bundle, not an optional database in this architecture.
+    Other optional services (AKS, Container Apps, ML Studio, Databricks, models, BYO networking, etc.) are in [Advanced Mode](advanced.md). Cosmos DB and AI Search can also be enabled independently of the capability host.

@@ -90,8 +90,8 @@ param enableSQLDatabase bool = false
 @description('Enable Elasticsearch deployment')
 param enableElasticsearch bool = false
 
-@description('Enable the Foundry capability host. Required for the private standard-agent architecture.')
-param enableAFoundryCaphost bool = true
+@description('Enable the optional Foundry capability host; requires Cosmos DB when Foundry is enabled.')
+param enableAFoundryCaphost bool = false
 
 @description('Enable AI Foundry V2.1')
 param enableAIFoundry bool = false
@@ -99,8 +99,7 @@ param enableAIFoundry bool = false
 // Security and networking
 param enablePublicGenAIAccess bool = false
 
-var privateFoundryStandardAgents = enableAIFoundry && !enablePublicGenAIAccess
-var needsCosmosDB = enableCosmosDB || privateFoundryStandardAgents
+var needsCosmosDB = enableCosmosDB || (enableAFoundryCaphost && enableAIFoundry)
 param enablePublicAccessWithPerimeter bool = false
 param centralDnsZoneByPolicyInHub bool = false
 
@@ -412,7 +411,7 @@ module cosmosdb '../modules/databases/cosmosdb/cosmosdb.bicep' = if(!cosmosDBExi
       ...( !empty(genaiSubnetId) ? [genaiSubnetId] : [] )
       ...( !empty(aksSubnetId) ? [aksSubnetId] : [] )
     ]
-    kind: privateFoundryStandardAgents ? 'GlobalDocumentDB' : cosmosKind
+    kind: (enableAFoundryCaphost && enableAIFoundry) ? 'GlobalDocumentDB' : cosmosKind
     minimalTlsVersion: cosmosMinimalTlsVersion
     tags: tagsProject
     corsRules: [
