@@ -103,6 +103,22 @@ def state() -> dict[str, object]:
 
 
 class TestScaleSetConfiguration(unittest.TestCase):
+    def test_create_launcher_defaults_omitted_version_to_main(self) -> None:
+        source = (
+            BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"
+        ).read_text(encoding="utf-8")
+        version_source = (
+            BOOTSTRAP / "lib/release_version.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            'aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE" main',
+            source,
+        )
+        self.assertIn(
+            'version_arguments+=(--aifactory-version "$default_version")',
+            version_source,
+        )
+
     def test_ado_agent_registration_installs_pwsh_and_prefers_git_bash(self) -> None:
         source = (
             BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"

@@ -141,7 +141,15 @@ def main():
     parser.add_argument("--project-only", action="store_true")
     parser.add_argument("--save", action="store_true")
     args = parser.parse_args()
-    selected = select(args.aifactory_version, saved=saved_version(args.root))
+    has_explicit_version = any((
+        args.aifactory_version,
+        os.environ.get("AIFACTORY_VERSION"),
+        os.environ.get("AIF_SUBMODULE_BRANCH"),
+    ))
+    selected = select(
+        args.aifactory_version,
+        saved=None if has_explicit_version else saved_version(args.root),
+    )
     if args.save:
         save(args.root, selected)
         return

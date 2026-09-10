@@ -50,6 +50,41 @@ def test_existing_unknown_factory_fails_instead_of_downgrading(tmp_path):
         rv.saved_version(tmp_path)
 
 
+def test_explicit_main_bypasses_unknown_existing_factory(tmp_path, monkeypatch, capsys):
+    (tmp_path / "aifactory").mkdir()
+    monkeypatch.setattr(
+        rv.sys,
+        "argv",
+        [
+            "release_version.py",
+            "--root",
+            str(tmp_path),
+            "--aifactory-version",
+            "main",
+            "--non-interactive",
+        ],
+    )
+    monkeypatch.setattr(
+        rv,
+        "resolve",
+        lambda selected, read, **kwargs: {
+            **selected,
+            "resolved_ref": "a" * 40,
+        },
+    )
+    monkeypatch.setattr(
+        rv.subprocess,
+        "run",
+        Mock(return_value=type("Result", (), {"stdout": rv.CONTRACT})()),
+    )
+    for key in ("AIFACTORY_VERSION", "AIF_SUBMODULE_BRANCH", "AIF_SUBMODULE_REF"):
+        monkeypatch.delenv(key, raising=False)
+    rv.main()
+    output = capsys.readouterr()
+    assert "export AIFACTORY_VERSION=main" in output.out
+    assert "export AIF_SUBMODULE_BRANCH=main" in output.out
+
+
 def test_resolve_binds_published_exact_ref_and_rejects_conflict():
     read = Mock(return_value="a" * 40 + "\trefs/heads/release/v1.25")
     selected = rv.resolve(rv.select("125", environ={}), read)

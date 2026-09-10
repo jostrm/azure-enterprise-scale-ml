@@ -18,7 +18,7 @@ Usage: ADO-create-new-aifactory-scaleset.sh [options]
 
 Options:
   --repo-root PATH     Target AI Factory repository root.
-  --aifactory-version VERSION  Template version: 124 (default new), 125, 1.100, 10.2, or main.
+  --aifactory-version VERSION  Template version: main (default), 124, 125, 1.100, or 10.2.
   --dry-run            Collect and validate answers without changing anything.
   --prepare-only       Prepare Azure, identity, configuration, and automation only.
   --no-wait            Dispatch pipelines/workflows without waiting for completion.
@@ -27,7 +27,7 @@ Options:
   --help               Show this help.
 
 Common non-interactive variables:
-  AIFACTORY_VERSION=124  Existing factories inherit the saved version when omitted.
+  AIFACTORY_VERSION=main  Optional explicit template version; omitted Create uses main.
   AIF_TOPOLOGY=s|hs
   AIF_NETWORK_MODE=priv|h|pub
   AIF_IDENTITY_MODE=c|mi|sp
@@ -3858,7 +3858,7 @@ aif_scaleset_main() {
   [[ "$AIF_ROUTE" != "gha" ]] || aif_require_command gh
   aif_python
   aif_resolve_repo_root
-  aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE"
+  aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE" main
   aif_simple_mode_defaults
   if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
     aif_simple_gateway_config >/dev/null
