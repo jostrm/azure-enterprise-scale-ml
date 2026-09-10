@@ -12,6 +12,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[4]
 BICEP = ROOT / "environment_setup/aifactory/bicep"
@@ -213,6 +215,28 @@ class TestPrivateFoundryCapabilityHost(unittest.TestCase):
         self.assertIn("AI_SEARCH_LOCATION=\"\"", GHA_ENV.read_text(encoding="utf-8"))
         baseline = json.loads(BASELINE_JSON.read_text(encoding="utf-8"))["dev"]
         self.assertEqual(baseline["aiSearchLocation"], "")
+
+    def test_gha_approves_all_effective_foundry_shared_private_links(self) -> None:
+        workflow = yaml.safe_load(GHA_PROJECT.read_text(encoding="utf-8"))
+        step = next(
+            item
+            for item in workflow["jobs"]["deploy-project"]["steps"]
+            if item.get("name") == "100a_approve_AI_Search_shared_private_links"
+        )
+        condition = step["if"]
+        script = step["run"]
+        self.assertIn("env.enableAIFoundry == 'true' || env.enableAISearch == 'true'", condition)
+        self.assertNotIn("env.enableAFoundryCaphost", condition)
+        self.assertNotIn("continue-on-error", step)
+        self.assertIn("set -euo pipefail", script)
+        self.assertIn("/shared-pe-foundry-(openai|cogsvc|account)$", script)
+        self.assertIn('"2024-10-01"', script)
+        self.assertIn("Expected $expected_count shared private links", script)
+        self.assertIn("unique | length", script)
+        self.assertIn("approval verification timed out", script)
+        self.assertIn('if [ "${{ env.enableAIFoundry }}" = "true" ]', script)
+        self.assertIn("AI Foundry is disabled; skipping Foundry target approval.", script)
+        self.assertIn('if [ "$total_failed" -ne 0 ]', script)
 
 
 if __name__ == "__main__":

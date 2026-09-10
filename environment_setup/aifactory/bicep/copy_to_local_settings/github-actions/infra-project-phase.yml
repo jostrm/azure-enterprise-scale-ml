@@ -3822,11 +3822,10 @@ jobs:
           inputs.phase == 'foundry' &&
           success() && env.deleteAllServicesForProject != 'true' &&
           env.enableAISearchSharedPrivateLink == 'true' &&
-          ((env.enableAIFoundry == 'true' && env.enableAFoundryCaphost == 'true') || env.enableAISearch == 'true')
-        continue-on-error: true
+          (env.enableAIFoundry == 'true' || env.enableAISearch == 'true')
         shell: bash
         run: |
-            set -e
+            set -euo pipefail
             export MSYS_NO_PATHCONV=1
 
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
@@ -3850,53 +3849,118 @@ jobs:
               local resource_type="$1"
               local resource_url="$2"
               local api_version="$3"
+              local expected_pattern="${4:-}"
+              local expected_count="${5:-0}"
 
               echo ""
               echo "--- $resource_type ---"
-              local connections
-              connections=$(az rest --method GET \
-                --url "${resource_url}?api-version=${api_version}" \
-                -o json 2>/dev/null || echo '{"value":[]}')
-
-              local pending
-              pending=$(echo "$connections" | jq -r '.value[] | select(.properties.privateLinkServiceConnectionState.status == "Pending") | .name | split("/") | .[-1]' | tr -d '\r')
-
-              if [ -z "$pending" ]; then
-                echo "  No pending connections found."
-                return
+              local connections matching_count=0
+              for attempt in {1..18}; do
+                if ! connections=$(az rest --method GET \
+                  --url "${resource_url}?api-version=${api_version}" \
+                  -o json); then
+                  echo "::error::Could not list private endpoint connections on $resource_type."
+                  return 1
+                fi
+                matching_count=$(echo "$connections" | jq -r --arg pattern "$expected_pattern" \
+                  '[.value[] | select($pattern == "" or ((.properties.privateEndpoint.id // "") | test($pattern; "i"))) | ((.properties.privateEndpoint.id // .name) | split("/") | .[-1])] | unique | length')
+                if [ "$matching_count" -ge "$expected_count" ]; then
+                  break
+                fi
+                echo "  Waiting for shared private links ($matching_count/$expected_count), attempt $attempt/18..."
+                sleep 10
+              done
+              if [ "$matching_count" -lt "$expected_count" ]; then
+                echo "::error::Expected $expected_count shared private links on $resource_type, found $matching_count."
+                return 1
               fi
 
-              for conn_name in $pending; do
-                echo "  Approving: $conn_name ..."
-                local approve_result rc
-                approve_result=$(az rest --method PUT \
-                  --url "${resource_url}/${conn_name}?api-version=${api_version}" \
-                  --body '{"properties":{"privateLinkServiceConnectionState":{"status":"Approved","description":"Approved by AIFactory pipeline - AI Search shared private link"}}}' \
-                  --headers "Content-Type=application/json" \
-                  -o json 2>&1) && rc=0 || rc=$?
-                if [ $rc -eq 0 ]; then
-                  echo "    Approved: $conn_name"
-                  total_approved=$((total_approved + 1))
-                else
-                  echo "    Failed: $conn_name"
-                  echo "    $approve_result"
-                  total_failed=$((total_failed + 1))
+              local pending
+              pending=$(echo "$connections" | jq -r --arg pattern "$expected_pattern" \
+                '.value[] | select($pattern == "" or ((.properties.privateEndpoint.id // "") | test($pattern; "i"))) | select(.properties.privateLinkServiceConnectionState.status == "Pending") | .name | split("/") | .[-1]' | tr -d '\r')
+
+              local approval_failed=0
+              if [ -z "$pending" ]; then
+                echo "  No pending connections found."
+              else
+                for conn_name in $pending; do
+                  echo "  Approving: $conn_name ..."
+                  local approve_result rc
+                  approve_result=$(az rest --method PUT \
+                    --url "${resource_url}/${conn_name}?api-version=${api_version}" \
+                    --body '{"properties":{"privateLinkServiceConnectionState":{"status":"Approved","description":"Approved by AIFactory pipeline - AI Search shared private link"}}}' \
+                    --headers "Content-Type=application/json" \
+                    -o json 2>&1) && rc=0 || rc=$?
+                  if [ $rc -eq 0 ]; then
+                    echo "    Approved: $conn_name"
+                    total_approved=$((total_approved + 1))
+                  else
+                    echo "    Failed: $conn_name"
+                    echo "    $approve_result"
+                    approval_failed=1
+                  fi
+                done
+              fi
+              if [ "$approval_failed" -ne 0 ]; then
+                return 1
+              fi
+
+              local verification_count=0
+              for attempt in {1..18}; do
+                if ! connections=$(az rest --method GET \
+                  --url "${resource_url}?api-version=${api_version}" \
+                  -o json); then
+                  echo "::error::Could not verify private endpoint connections on $resource_type."
+                  return 1
                 fi
+                if [ "$expected_count" -gt 0 ]; then
+                  verification_count=$(echo "$connections" | jq -r --arg pattern "$expected_pattern" \
+                    '[.value[] | select(((.properties.privateEndpoint.id // "") | test($pattern; "i")) and .properties.privateLinkServiceConnectionState.status == "Approved") | (.properties.privateEndpoint.id | split("/") | .[-1])] | unique | length')
+                  if [ "$verification_count" -ge "$expected_count" ]; then
+                    echo "  Verified $verification_count expected connection(s) are approved."
+                    return 0
+                  fi
+                else
+                  verification_count=$(echo "$connections" | jq -r --arg pattern "$expected_pattern" \
+                    '[.value[] | select($pattern == "" or ((.properties.privateEndpoint.id // "") | test($pattern; "i"))) | select(.properties.privateLinkServiceConnectionState.status == "Pending")] | length')
+                  if [ "$verification_count" -eq 0 ]; then
+                    echo "  Verified no matching connections remain pending."
+                    return 0
+                  fi
+                fi
+                echo "  Waiting for approval propagation, attempt $attempt/18..."
+                sleep 10
               done
+              echo "::error::$resource_type approval verification timed out."
+              echo "$connections" | jq -r --arg pattern "$expected_pattern" \
+                '.value[] | select($pattern == "" or ((.properties.privateEndpoint.id // "") | test($pattern; "i"))) | "\(.name)=\(.properties.privateLinkServiceConnectionState.status)"'
+              return 1
             }
 
             # 1. Approve on AI Foundry account
-            foundry_account_name=$(az cognitiveservices account list \
-              --subscription "${{ env.dev_test_prod_sub_id }}" \
-              --resource-group "$projectResourceGroup" \
-              --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name | [0]" -o tsv 2>/dev/null || echo "")
+            if [ "${{ env.enableAIFoundry }}" = "true" ]; then
+              foundry_account_name=$(az cognitiveservices account list \
+                --subscription "${{ env.dev_test_prod_sub_id }}" \
+                --resource-group "$projectResourceGroup" \
+                --query "[?starts_with(name, 'aif2') && !starts_with(name, 'aif2-p')].name | [0]" -o tsv 2>/dev/null || echo "")
 
-            if [ -n "$foundry_account_name" ]; then
-              echo "AI Foundry account: $foundry_account_name"
-              foundry_pe_url="https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${foundry_account_name}/privateEndpointConnections"
-              approve_pending_connections "AI Foundry account ($foundry_account_name)" "$foundry_pe_url" "2024-10-01"
+              if [ -n "$foundry_account_name" ]; then
+                echo "AI Foundry account: $foundry_account_name"
+                foundry_pe_url="https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${foundry_account_name}/privateEndpointConnections"
+                if ! approve_pending_connections \
+                  "AI Foundry account ($foundry_account_name)" \
+                  "$foundry_pe_url" \
+                  "2024-10-01" \
+                  '/shared-pe-foundry-(openai|cogsvc|account)$' \
+                  3; then
+                  total_failed=$((total_failed + 1))
+                fi
+              else
+                echo "::error::No AI Foundry account found in $projectResourceGroup."
+                total_failed=$((total_failed + 1))
+              fi
             else
-              echo "No AI Foundry account found in $projectResourceGroup. Skipping Foundry approval."
+              echo "AI Foundry is disabled; skipping Foundry target approval."
             fi
 
             # 2. Approve on Storage Account 2001 (blob shared private link)
@@ -3908,13 +3972,19 @@ jobs:
             if [ -n "$storage_2001_name" ]; then
               echo "Storage account 2001: $storage_2001_name"
               storage_pe_url="https://management.azure.com/subscriptions/${{ env.dev_test_prod_sub_id }}/resourceGroups/${projectResourceGroup}/providers/Microsoft.Storage/storageAccounts/${storage_2001_name}/privateEndpointConnections"
-              approve_pending_connections "Storage account ($storage_2001_name)" "$storage_pe_url" "2024-01-01"
+              if ! approve_pending_connections "Storage account ($storage_2001_name)" "$storage_pe_url" "2024-01-01"; then
+                total_failed=$((total_failed + 1))
+              fi
             else
               echo "No storage account with '2001' found in $projectResourceGroup. Skipping storage approval."
             fi
 
             echo ""
             echo "=== Summary: $total_approved approved, $total_failed failed ==="
+            if [ "$total_failed" -ne 0 ]; then
+              echo "::error::One or more shared private link approvals failed."
+              exit 1
+            fi
 
       - name: 100b_create_foundry_agent
         if: inputs.phase == 'foundry' && (success() && env.deleteAllServicesForProject != 'true' && env.enableAIFoundry == 'true')
