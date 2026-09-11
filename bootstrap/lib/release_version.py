@@ -183,6 +183,8 @@ def main():
             source = installed_source
         selected = resolve(selected, read, repository=source if (source / ".git").exists() else None)
         if (source / ".git").exists():
+            # ls-remote resolves the SHA but does not make its objects available for contract inspection.
+            read(["-C", str(source), "fetch", "--no-tags", SOURCE_URL, selected["resolved_ref"]])
             for relative in ("bootstrap/lib/release_version.py", "bootstrap/lib/create-new-aifactory-scaleset.sh"):
                 text = read(["-C", str(source), "show", selected["resolved_ref"] + ":" + relative])
                 if CONTRACT not in text:

@@ -34,6 +34,12 @@ class TestReleaseVersion(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Conflicting"):
             VERSION.select("124", environ={"AIF_SUBMODULE_BRANCH": "main"})
 
+    def test_new_release_objects_are_fetched_before_contract_inspection(self):
+        source = (ROOT / "bootstrap/lib/release_version.py").read_text(encoding="utf-8")
+        fetch = 'read(["-C", str(source), "fetch", "--no-tags", SOURCE_URL, selected["resolved_ref"]])'
+        inspect = 'text = read(["-C", str(source), "show", selected["resolved_ref"] + ":" + relative])'
+        self.assertLess(source.index(fetch), source.index(inspect))
+
     def test_ado_update_pins_ref_and_validates_published_pipeline(self):
         script = (ROOT / "bootstrap/ADO-update-aifactory-and-run-project.sh").read_text(encoding="utf-8")
         self.assertIn(VERSION.CONTRACT, script)
