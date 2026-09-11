@@ -30,6 +30,8 @@ from uuid import uuid4
 
 CONTRACT = 1
 MAX_DOCUMENT = 8 * 1024 * 1024
+RECEIPT_REPLACE_ATTEMPTS = 5
+RECEIPT_REPLACE_RETRY_SECONDS = 0.05
 ARM = "https://management.azure.com"
 SOURCE_ORIGIN = "https://github.com/jostrm/azure-enterprise-scale-ml"
 GUID = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
@@ -2063,7 +2065,14 @@ def write_receipt(path, receipt):
         json.dump(receipt, stream, sort_keys=True, separators=(",", ":"))
         stream.flush()
         os.fsync(stream.fileno())
-    os.replace(staged, path)
+    for attempt in range(RECEIPT_REPLACE_ATTEMPTS):
+        try:
+            os.replace(staged, path)
+            return
+        except PermissionError:
+            if attempt == RECEIPT_REPLACE_ATTEMPTS - 1:
+                raise Blocked("receipt-atomic-replace-failed") from None
+            time.sleep(RECEIPT_REPLACE_RETRY_SECONDS)
 
 
 class _CohortLeases:

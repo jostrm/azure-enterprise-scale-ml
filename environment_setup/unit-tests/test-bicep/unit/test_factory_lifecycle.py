@@ -473,6 +473,25 @@ def test_pre_mutation_failure_releases_locks(monkeypatch, workspace):
     assert list(cloud.runs.values())[0]["status"] == "blocked"
 
 
+def test_receipt_write_retries_transient_windows_file_lock(monkeypatch, workspace):
+    receipt = workspace / "receipt.json"
+    original_replace = fl.os.replace
+    calls = 0
+
+    def replace_once_locked(source, destination):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise PermissionError("transient scanner lock")
+        original_replace(source, destination)
+
+    monkeypatch.setattr(fl.os, "replace", replace_once_locked)
+    fl.write_receipt(receipt, {"status": "blocked"})
+    assert calls == 2
+    assert json.loads(receipt.read_text()) == {"status": "blocked"}
+    assert not receipt.with_name("receipt.json.writing").exists()
+
+
 def test_queued_remote_run_blocks_before_arm_mutation(monkeypatch, workspace):
     source, execution, receipt = setup_execute(monkeypatch, workspace)
     cloud = FakeCloud()
