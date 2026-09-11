@@ -3605,12 +3605,18 @@ steps:
 - task: AzureCLI@2
   displayName: '100-rbac-security'
   condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_100_rbac_security'], 'true'), succeeded())
+  env:
+    RBAC_UPDATE: $(updateRbac)
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
      az account set --subscription "$(dev_test_prod_sub_id)"
+
+     # Older variables.yaml files do not define this legacy storage-RBAC switch.
+     update_rbac="${RBAC_UPDATE:-false}"
+     if [ "$update_rbac" = '$''(updateRbac)' ]; then update_rbac=false; fi
 
      # Compute effective RBAC flags: only true if the feature is enabled AND the resource
      # actually exists. This prevents RBAC Bicep from failing with ResourceNotFound when
@@ -3690,7 +3696,7 @@ steps:
      --parameters aiHubExists="$(aiHubExists)" \
      --parameters aiServicesExists="$(aiServicesExists)" \
      --parameters openaiExists="$(openaiExists)" \
-     --parameters updateRbac="$(updateRbac)" \
+     --parameters updateRbac="$update_rbac" \
      --parameters miPrjExists="$(miPrjExists)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters addAISearch="$(addAISearch)" \
@@ -4326,6 +4332,8 @@ steps:
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
      --parameters contributorRoleId="$(BYOContributorRoleID)" \
+     --parameters disableContributorAccessForUsers="$(disableContributorAccessForUsers)" \
+     --parameters disableRBACAdminOnRGForUsers="$(disableRBACAdminOnRGForUsers)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters vnetNameBase="$(vnetNameBase)" \
@@ -4857,6 +4865,8 @@ steps:
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
      --parameters allowPublicAccessWhenBehindVnet="$(allowPublicAccessWhenBehindVnet)" \
      --parameters contributorRoleId="$(BYOContributorRoleID)" \
+     --parameters disableContributorAccessForUsers="$(disableContributorAccessForUsers)" \
+     --parameters disableRBACAdminOnRGForUsers="$(disableRBACAdminOnRGForUsers)" \
      --parameters IPwhiteList="$(project_IP_whitelist)" \
      --parameters centralDnsZoneByPolicyInHub="$(centralDnsZoneByPolicyInHub)" \
      --parameters vnetNameBase="$(vnetNameBase)" \

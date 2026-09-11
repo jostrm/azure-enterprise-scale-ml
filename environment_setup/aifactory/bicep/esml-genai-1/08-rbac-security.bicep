@@ -635,8 +635,8 @@ module rbacStorageUsers '../modules/storageRbacUsers.bicep' = if (!updateRbac &&
 }
 
 // ============== RBAC MODULES - RESOURCE GROUP (INDEPENDENT) ==============
-// Resource Group RBAC for users, groups, and service principals - runs independently
-module rbacResourceGroupUsers '../modules/resourceGroupRbacUsers.bicep' = if (!updateRbac) {
+// Stable role-assignment IDs allow RG access to be reconciled on both initial and update runs.
+module rbacResourceGroupUsers '../modules/resourceGroupRbacUsers.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('08-rbacRGUsers${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

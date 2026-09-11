@@ -297,10 +297,10 @@ jobs:
       disableLocalAuth: ${{ vars.DISABLE_LOCAL_AUTH || 'true' }}
       updateKeyvaultRbac: ${{ vars.UPDATE_KEYVAULT_RBAC || 'false' }}
       updateRbac: ${{ vars.UPDATE_RBAC || 'false' }}
-      disableContributorAccessForUsers: ${{ vars.DISABLE_CONTRIBUTOR_ACCESS_FOR_USERS || 'false' }}
-      disableRBACAdminOnRGForUsers: ${{ vars.DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS || 'false' }}
+      disableContributorAccessForUsers: ${{ vars.DISABLE_CONTRIBUTOR_ACCESS_FOR_USERS || vars.DISABLE_CONTRIBUTOR_ACCESS_FORUSERS || 'false' }}
+      disableRBACAdminOnRGForUsers: ${{ vars.DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS || vars.DISABLE_RBAC_ADMIN_ON_RG_FORUSERS || 'false' }}
       disableSubnetJoinAction: ${{ vars.DISABLE_SUBNET_JOIN_ACTION || 'false' }}
-      BYO_CONTRIBUTOR_ROLE_ID: ${{ vars.BYO_CONTRIBUTOR_ROLE_ID || 'b24988ac-6180-42a0-ab88-20f7382dd24c' }}
+      BYOContributorRoleID: ${{ vars.BYO_CONTRIBUTOR_ROLE_ID || 'b24988ac-6180-42a0-ab88-20f7382dd24c' }}
       enableDefenderforAISubLevel: ${{ vars.ENABLE_DEFENDER_FOR_AI_SUB_LEVEL || 'false' }}
       enableDefenderforAIResourceLevel: ${{ vars.ENABLE_DEFENDER_FOR_AI_RESOURCE_LEVEL || 'false' }}
 
@@ -2809,7 +2809,7 @@ jobs:
               --parameters enableAIDocIntelligence="${{ env.enableAIDocIntelligence }}" \
               --parameters disableContributorAccessForUsers="${{ env.disableContributorAccessForUsers }}" \
               --parameters disableRBACAdminOnRGForUsers="${{ env.disableRBACAdminOnRGForUsers }}" \
-              --parameters contributorRoleId="${{ env.BYO_CONTRIBUTOR_ROLE_ID }}" \
+              --parameters contributorRoleId="${{ env.BYOContributorRoleID }}" \
               --parameters enableCosmosDB="${{ env.enableCosmosDB }}" \
               --parameters enablePostgreSQL="${{ env.enablePostgreSQL }}" \
               --parameters enableRedisCache="${{ env.enableRedisCache }}" \
@@ -3352,7 +3352,9 @@ jobs:
               --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
               --parameters enablePublicGenAIAccess="${{ env.enablePublicGenAIAccess }}" \
               --parameters allowPublicAccessWhenBehindVnet="${{ env.allowPublicAccessWhenBehindVnet }}" \
-              --parameters contributorRoleId="${{ env.BYO_CONTRIBUTOR_ROLE_ID }}" \
+              --parameters contributorRoleId="${{ env.BYOContributorRoleID }}" \
+              --parameters disableContributorAccessForUsers="${{ env.disableContributorAccessForUsers }}" \
+              --parameters disableRBACAdminOnRGForUsers="${{ env.disableRBACAdminOnRGForUsers }}" \
               --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
               --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
               --parameters vnetNameBase="${{ env.vnetNameBase }}" \
@@ -3653,7 +3655,9 @@ jobs:
               --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
               --parameters enablePublicGenAIAccess="${{ env.enablePublicGenAIAccess }}" \
               --parameters allowPublicAccessWhenBehindVnet="${{ env.allowPublicAccessWhenBehindVnet }}" \
-              --parameters contributorRoleId="${{ env.BYO_CONTRIBUTOR_ROLE_ID }}" \
+              --parameters contributorRoleId="${{ env.BYOContributorRoleID }}" \
+              --parameters disableContributorAccessForUsers="${{ env.disableContributorAccessForUsers }}" \
+              --parameters disableRBACAdminOnRGForUsers="${{ env.disableRBACAdminOnRGForUsers }}" \
               --parameters IPwhiteList="${{ env.project_IP_whitelist }}" \
               --parameters centralDnsZoneByPolicyInHub="${{ env.centralDnsZoneByPolicyInHub }}" \
               --parameters vnetNameBase="${{ env.vnetNameBase }}" \

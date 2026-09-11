@@ -49,6 +49,10 @@ param diagnosticSettingLevel string = 'silver'
 @description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
 param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
 
+@description('Do not assign Contributor or its custom replacement to project users/groups.')
+param disableContributorAccessForUsers bool = false
+@description('Do not assign RBAC Administrator at project RG scope to users/groups.')
+param disableRBACAdminOnRGForUsers bool = true
 
 @description('Enable Capability host for AI Foundry - BYO network and resources for thread, vector, storage')
 param enableCaphost bool = true
@@ -440,6 +444,22 @@ var networkAclsObject = networkAcls
 // ============================================================================
 
 var p011_genai_team_lead_array = namingConvention.outputs.p011_genai_team_lead_array
+
+// Foundry-only and existing-project runs need the same RG access as task 100.
+// Reuse its assignment IDs so running both phases is idempotent.
+module rbacResourceGroupUsers '../modules/resourceGroupRbacUsers.bicep' = if (enableAIFoundry && !foundryV22AccountOnly) {
+  name: take('09-rbacRGUsers-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    resourceGroupId: resourceId(subscriptionIdDevTestProd, 'Microsoft.Resources/resourceGroups', targetResourceGroup)
+    userObjectIds: union(p011_genai_team_lead_array, p011_genai_team_lead_array)
+    servicePrincipleAndMIArray: union(spAndMiArray, spAndMiArray)
+    useAdGroups: useAdGroups
+    disableContributorAccessForUsers: disableContributorAccessForUsers
+    disableRBACAdminOnRGForUsers: disableRBACAdminOnRGForUsers
+    contributorRoleId: contributorRoleId
+  }
+}
 
 // Cognitive Services and OpenAI role definition IDs
 var cognitiveServicesContributorRoleId = '25fbc0a9-bd7c-42a3-aa1a-3b75d497ee68' // Cognitive Services Contributor

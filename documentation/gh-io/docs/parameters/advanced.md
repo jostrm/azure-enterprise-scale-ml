@@ -314,11 +314,31 @@ explicitly selected.
 | `CMK_KEY_VERSION` | `""` | O | keep-as-is (auto-uses latest key version) | CMK key version; empty = always use latest |
 | `UPDATE_KEYVAULT_RBAC` | `false` | O | keep-as-is | Re-apply RBAC policies on the common Key Vault |
 | `BYO_CONTRIBUTOR_ROLE_ID` | `b24988ac-6180-42a0-ab88-20f7382dd24c` | O | keep-as-is (built-in Contributor role) | Custom contributor role ID if your org uses a scoped role |
-| `DISABLE_CONTRIBUTOR_ACCESS_FORUSERS` | `false` | O | **recommended** `true` for production governance | Remove Contributor access from individual users |
-| `DISABLE_RBAC_ADMIN_ON_RG_FORUSERS` | `false` | O | **recommended** `true` for production governance | Remove RBAC Administrator role from individual users on RGs |
+| `DISABLE_CONTRIBUTOR_ACCESS_FORUSERS` | `false` | O | **recommended** `true` for production governance | Skip assigning Contributor/custom Contributor to project users or groups; does not revoke existing assignments |
+| `DISABLE_RBAC_ADMIN_ON_RG_FORUSERS` | `false` | O | **recommended** `true` for production governance | Skip assigning RBAC Administrator to project users or groups on RGs; does not revoke existing assignments |
 | `ENABLE_DELETE_FOR_DISABLED_RESOURCES` | `true` | O | keep-as-is | Delete orphaned or disabled resources on re-runs |
 | `DELETE_ALL_SERVICES_FOR_PROJECT` | `false` | O | keep-as-is. **otherwise** `true` deletes **all** project resources — use with caution | Tear down all services in a project on re-run |
 | `DISABLE_WHITELISTING_FOR_BUILD_AGENTS` | `false` | O | keep-as-is | Skip adding build agent IPs to service firewall rules |
+
+### Project resource-group access, including Foundry-only deployments
+
+`BYOContributorRoleID` in ADO/`variables.json` (GitHub variable
+`BYO_CONTRIBUTOR_ROLE_ID`) selects the role-definition **GUID**, not an assignment
+ID. The role must already exist and be assignable at the project resource group.
+The deployment identity must be allowed to assign that role.
+
+Task `100-rbac-security` and the Foundry project/update deployment both reconcile
+the same resource-group role assignments for configured project users/groups and
+project SP/managed identities. Foundry-only deployments do not require AI Search,
+Cosmos DB, a capability host or a legacy AI Hub to obtain this RG access. Existing
+Foundry projects are included on reruns. The account-only first phase leaves RG
+reconciliation to the project/update phase.
+
+The shared module uses the same scope/role/principal assignment names in both
+routes. User/group Contributor and RBAC-admin opt-outs remain independent; service
+identity assignments retain their existing behavior. The legacy `updateRbac`
+flag does not suppress RG reconciliation. Changing a role or enabling an opt-out
+does not remove an existing assignment; review and revoke old access separately.
 
 ---
 
