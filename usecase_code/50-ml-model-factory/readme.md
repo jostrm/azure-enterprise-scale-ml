@@ -46,3 +46,50 @@ Create each example with Python SDK, and with CLI v2.
 Docs: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-train-model?view=azureml-api-2&tabs=python
 
 Use Responsible AI tooling, on each model scenario: https://learn.microsoft.com/en-us/azure/machine-learning/concept-responsible-ai?view=azureml-api-2
+
+## Model identity and lake-aligned tags
+
+The shared `ml_model_factory.tags` module produces string tags for local MLflow
+artifacts, Azure ML SDK/CLI v2 model registration, and Databricks model versions.
+It uses the new `mlops/v1` storage design; it does not run the legacy lake ZIP
+initializer or rename existing directories.
+
+For the orange target, set `aifactory: spider-001` in project configuration.
+Discovery writes `aifactory`, `project: "001"` and `environment_name: dev` into
+runtime JSON. The model tags use `environment: dev`; runtime `environment` remains
+reserved for an Azure ML environment asset such as `azureml:training-runtime:3`.
+
+Tags include factory/project/environment, training origin, use case, task type,
+training engine/mode, and available dataset/snapshot/run IDs. Lake tags must agree
+with the actual `project001/environments/dev` and use-case/data/run keys. Conflicting
+identities are rejected; cloud submission and registry writes require complete scope. Exploratory
+training can omit unavailable scope, but never invents it.
+
+```powershell
+# Preview only; no model or registry writes:
+python -m ml_model_factory tags --scenario scenarios\diabetes.json --context runtime.local.json --engine azureml --mode automl
+
+# SDK v2 registration after the completed pipeline's evaluation gate:
+python scripts\azureml_sdk.py --runtime runtime.local.json register --job-name <completed-pipeline> --model-name diabetes-classification
+
+# Alternative: same gate/tag builder, followed by CLI v2 model creation:
+python scripts\azureml_cli.py --runtime runtime.local.json --register-job <completed-pipeline> --model-name diabetes-classification
+```
+
+Do not execute both registration alternatives for the same intended version.
+Candidate registration is not automatic production promotion. Keep metrics and
+Responsible AI details in evaluation artifacts, not a large tag collection.
+Local tags are written into `factory.json` and MLflow `MLmodel` metadata before
+publication; completed immutable runs are never edited in place.
+
+Databricks training accepts `model_context` JSON/path alongside `lake_config`.
+Import `databricks/model_tags.py` with the notebook. Its separately invoked
+`register_evaluated` helper verifies finished-run status, quality gate and model
+metadata before creating tagged registry versions. The Azure ML Databricks
+component accepts an optional JSON-file `model_context` input and forwards only
+factory/project/environment identity.
+
+Detailed guides:
+[MLOps and tags](../../documentation/v2/30-39/37-mlops.md#model-identity-tags-one-small-contract),
+[DataOps](../../documentation/v2/30-39/36-dataops.md),
+[lake design](../../documentation/v2/30-39/34-datalake-onboard-data.md).

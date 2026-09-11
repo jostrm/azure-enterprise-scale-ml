@@ -113,6 +113,8 @@ def validate_runtime(value: dict) -> dict:
         setting = value.get(field)
         if not isinstance(setting, str) or not setting.strip() or "<" in setting or "${" in setting:
             raise ValueError(f"runtime.{field} must name an existing resource")
+    from .tags import scope_tags
+    scope_tags(value)
     return value
 
 

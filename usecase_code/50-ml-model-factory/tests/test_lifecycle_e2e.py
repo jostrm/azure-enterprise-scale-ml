@@ -165,9 +165,9 @@ def ingest_generated(definition, raw, output):
     return selected
 
 
-def lake_config(**changes):
+def lake_config(definition, **changes):
     return {
-        "project": "001", "environment": "dev", "use_case": "generated-local-lifecycle",
+        "project": "001", "environment": "dev", "use_case": definition["name"],
         "dataset": "generated-test-fixture", "data_version": "v1",
         "snapshot_id": "snapshot1", "run_id": "train1", "model_version": "model1",
         "serving": "batch", **changes,
@@ -180,7 +180,7 @@ def trained_lifecycle(request):
     with local_workspace() as workspace:
         definition, raw = generated_source(workspace, request.param)
         selected = ingest_generated(definition, raw, workspace / "download")
-        config = lake_config()
+        config = lake_config(definition)
         root = workspace / "lake"
         layout = LakeLayout.from_config(config, definition)
         source = capture_source(definition, layout, selected, root)
@@ -457,7 +457,7 @@ def test_local_bad_generated_training_data_is_quarantined(task, damage, message,
             rows[0]["label"][0]["polygon"] = [[.1, .1, .8, .8, .2]]
         annotations.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
     selected = ingest_generated(definition, raw, workspace / "download")
-    root, config = workspace / "lake", lake_config()
+    root, config = workspace / "lake", lake_config(definition)
     layout = LakeLayout.from_config(config)
     with pytest.raises((ValueError, KeyError), match=message):
         train_in_lake(definition, config, selected, root)
@@ -475,7 +475,7 @@ def test_local_bad_generated_training_data_is_quarantined(task, damage, message,
 def test_local_mutated_source_cannot_reach_training(mutation, workspace):
     definition, raw = generated_source(workspace, "classification")
     selected = ingest_generated(definition, raw, workspace / "download")
-    config, root = lake_config(), workspace / "lake"
+    config, root = lake_config(definition), workspace / "lake"
     layout = LakeLayout.from_config(config)
     source = capture_source(definition, layout, selected, root)
     destination = selected if mutation == "download-checksum" else source
@@ -494,7 +494,7 @@ def test_local_quality_gate_failure_preserves_diagnostics_but_never_commits_mode
     definition, raw = generated_source(workspace, "classification")
     definition["quality"] = {"min_accuracy": 1.1}
     selected = ingest_generated(definition, raw, workspace / "download")
-    config, root = lake_config(), workspace / "lake"
+    config, root = lake_config(definition), workspace / "lake"
     layout = LakeLayout.from_config(config)
     with pytest.raises(ValueError, match="quality gate failed"):
         train_in_lake(definition, config, selected, root)
@@ -521,7 +521,7 @@ def test_local_quality_gate_failure_preserves_diagnostics_but_never_commits_mode
 def test_local_pinned_model_version_cannot_be_rebound_to_another_real_model(workspace):
     definition, raw = generated_source(workspace, "classification")
     selected = ingest_generated(definition, raw, workspace / "download")
-    config, root = lake_config(), workspace / "lake"
+    config, root = lake_config(definition), workspace / "lake"
     first = train_in_lake(definition, config, selected, root)
     incoming = workspace / "requests.csv"
     requests = pd.read_csv(raw / "raw.csv").head(3).drop(columns="label")
@@ -554,7 +554,7 @@ def test_local_pinned_model_version_cannot_be_rebound_to_another_real_model(work
 def test_local_failed_publication_never_exposes_success_or_overwrites(failure, workspace):
     definition, raw = generated_source(workspace, "classification")
     selected = ingest_generated(definition, raw, workspace / "download")
-    root, config = workspace / "lake", lake_config()
+    root, config = workspace / "lake", lake_config(definition)
     layout = LakeLayout.from_config(config)
     capture_source(definition, layout, selected, root)
     before = checksums(root)

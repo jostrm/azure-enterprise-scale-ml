@@ -60,11 +60,19 @@ def main():
     parser.add_argument("--timeout-seconds", type=int, default=3600)
     parser.add_argument("--client-id")
     parser.add_argument("--idempotency-token")
+    parser.add_argument("--model-context-file", type=Path, help="JSON file supplying factory/project/environment identity")
     args = parser.parse_args()
-    run_job(args.host, args.workspace_resource_id, args.job_id, {
+    parameters = {
         "scenario_path": args.scenario_path, "input_path": args.input_uri,
         "artifact_root": args.artifact_root, "experiment_path": args.experiment_path,
-    }, Path(args.output), task_key=args.task_key, timeout_seconds=args.timeout_seconds,
+    }
+    if args.model_context_file:
+        import json
+        from .config import load_json
+        from .tags import scope_tags
+        parameters["model_context"] = json.dumps(scope_tags(load_json(args.model_context_file), require=True))
+    run_job(args.host, args.workspace_resource_id, args.job_id, parameters,
+        Path(args.output), task_key=args.task_key, timeout_seconds=args.timeout_seconds,
         client_id=args.client_id, idempotency_token=args.idempotency_token)
 
 

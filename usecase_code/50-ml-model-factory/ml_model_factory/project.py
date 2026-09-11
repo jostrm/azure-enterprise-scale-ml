@@ -7,6 +7,7 @@ from pathlib import Path
 from uuid import UUID
 
 from .config import boolean, load_json, validate_runtime
+from .tags import scope_tags
 
 
 def azure_cli(*arguments):
@@ -50,6 +51,12 @@ def discover(project_file: Path) -> dict:
     subscription = str(UUID(values[f"{environment}_sub_id"]))
     tenant = str(UUID(values["tenantId"]))
     group = project["resource_group"]
+    model_scope = scope_tags({
+        "aifactory": project.get("aifactory"),
+        "project": values.get("project_number_000"),
+        "environment_name": environment,
+        "lake": project.get("lake", {}),
+    }, require=True)
     account = azure_cli("account", "show", "--subscription", subscription)
     if account["id"].lower() != subscription or account["tenantId"].lower() != tenant:
         raise ValueError("Authenticated subscription/tenant does not match the selected project")
@@ -66,8 +73,12 @@ def discover(project_file: Path) -> dict:
     runtime = {
         "subscription_id": subscription, "tenant_id": tenant, "resource_group": group,
         "workspace_name": workspace["name"], "compute": compute["name"],
+        "aifactory": model_scope["aifactory"], "project": model_scope["project"],
+        "environment_name": model_scope["environment"],
         **{key: project[key] for key in ("input_data", "gpu_compute", "datastore", "serving", "credential", "managed_identity_client_id") if key in project},
     }
+    if project.get("lake"):
+        runtime["lake"] = project["lake"]
     if project.get("environment_asset"):
         runtime["environment"] = project["environment_asset"]
     return validate_runtime(runtime)

@@ -217,7 +217,12 @@ Avoid the legacy `AzureMLExecutePipeline` activity for these v2 job definitions.
 
 The optional notebook activity calls the packaged `databricks\train.py` using
 its actual widgets: `scenario_path`, `input_path`, `artifact_root`,
-`experiment_path`, and optional `lake_config`. The existing linked service,
+`experiment_path`, and optional `lake_config` and `model_context`. The optional
+ADF `modelContext` parameter supplies model identity; alternatively include
+`aifactory` in the lake configuration. Tags use the same project/environment,
+dataset and run identity as the storage layout, and conflicting values are rejected.
+This does not grant registry permissions or automatically register models.
+The existing linked service,
 cluster permissions and storage connectivity must be configured independently.
 ADF credentials are not transferred to the notebook.
 

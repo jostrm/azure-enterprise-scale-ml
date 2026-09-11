@@ -41,6 +41,7 @@ class LakeLayout:
     account_url: str | None = None
     container: str | None = None
     datastore: str | None = None
+    aifactory: str | None = None
 
     @classmethod
     def from_config(cls, config: dict, scenario: dict | None = None):
@@ -89,6 +90,7 @@ class LakeLayout:
             pipeline_id=identifier(config.get("pipeline_id", use_case), "pipeline_id"),
             pipeline_version=identifier(config.get("pipeline_version", "v1"), "pipeline_version"),
             prefix=prefix, account_url=account, container=container, datastore=datastore,
+            aifactory=identifier(config["aifactory"], "aifactory") if config.get("aifactory") else None,
         )
 
     def as_dict(self) -> dict[str, str]:
@@ -152,6 +154,7 @@ def local_key_path(root: Path, key: str) -> Path:
 def lake_manifest(layout: LakeLayout, scenario: dict) -> dict:
     return {
         "schema": "ml-model-factory-lake/v1",
+        **({"aifactory": layout.aifactory} if layout.aifactory else {}),
         "project": layout.project, "environment": layout.environment, "use_case": layout.use_case,
         "dataset": layout.dataset, "data_version": layout.data_version,
         "snapshot_id": layout.snapshot_id, "run_id": layout.run_id,

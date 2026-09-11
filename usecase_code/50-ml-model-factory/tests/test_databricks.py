@@ -57,6 +57,9 @@ NOTEBOOKS = Path(__file__).resolve().parents[1] / "databricks"
 SPEC = importlib.util.spec_from_file_location("lake_utils", NOTEBOOKS / "lake_utils.py")
 lake_utils = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(lake_utils)
+TAG_SPEC = importlib.util.spec_from_file_location("notebook_model_tags", NOTEBOOKS / "model_tags.py")
+model_tags = importlib.util.module_from_spec(TAG_SPEC)
+TAG_SPEC.loader.exec_module(model_tags)
 SCENARIO = {
     "name": "test-case", "task": "classification", "target": "label", "features": ["feature"],
     "dataset": {"provider": "kaggle", "kind": "dataset", "slug": "example/example",
@@ -232,6 +235,7 @@ def execute_training_notebook(tmp_path, config=None):
         "scenario_path": str(scenario), "input_path": "" if config else str(source),
         "artifact_root": "/local_disk0/ml-model-factory", "experiment_path": "/Shared/approved",
         "max_rows": "1000", "lake_config": json.dumps(config) if config else "",
+        "model_context": "",
     }
     dbutils, spark, mlflow = MagicMock(), MagicMock(), MagicMock()
     dbutils.widgets.get.side_effect = lambda name: values[name]
@@ -242,13 +246,15 @@ def execute_training_notebook(tmp_path, config=None):
     def local_path(value):
         return artifact_root if value == values["artifact_root"] else Path(value)
 
-    with patch.dict(sys.modules, {
+    with patch("ml_model_factory.tags.stamp_model") as stamp, patch.dict(sys.modules, {
         "pathlib": SimpleNamespace(Path=local_path), "mlflow": mlflow, "lake_utils": lake_utils,
+        "model_tags": model_tags,
         "ml_model_factory.data": SimpleNamespace(prepare=preparation),
         "ml_model_factory.training": SimpleNamespace(train=training),
         "ml_model_factory.evaluation": SimpleNamespace(evaluate=evaluation),
     }):
         runpy.run_path(str(NOTEBOOKS / "train.py"), init_globals={"dbutils": dbutils, "spark": spark})
+        stamp.assert_called_once()
     return spark, mlflow, preparation, artifact_root
 
 
@@ -256,7 +262,8 @@ def test_legacy_training_notebook_preserves_mlflow_run_artifact_location(tmp_pat
     _, mlflow, preparation, root = execute_training_notebook(tmp_path)
     assert preparation.call_args.args[1] == tmp_path / "legacy.csv"
     assert preparation.call_args.args[2] == root / ("a" * 32) / "prepared"
-    mlflow.log_dict.assert_not_called()
+    assert mlflow.log_dict.call_args.args[1] == "model-tags.json"
+    assert mlflow.set_tags.call_args.args[0]["training_engine"] == "databricks"
 
 
 def test_lake_training_notebook_reads_landing_logs_lineage_and_never_overwrites_snapshot(tmp_path):

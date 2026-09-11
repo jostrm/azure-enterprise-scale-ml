@@ -81,6 +81,9 @@ def deploy(runtime: dict, bundle: Path, model_id: str, kind: str = "online") -> 
         raise ValueError("Registered model scenario does not match this rendered bundle")
     if registered.tags.get("factory_mode") != manifest["mode"]:
         raise ValueError("Registered model training mode does not match this rendered bundle")
+    from .tags import assert_scope, scope_tags
+    if scope_tags(runtime) or (registered.tags or {}).get("tag_schema"):
+        assert_scope(registered.tags or {}, runtime)
     deployment_path = bundle / f"{kind}-deployment.yml"
     if not deployment_path.is_file():
         raise ValueError(f"{kind} serving is not supported for this task/mode; inspect manifest limitations")
@@ -88,6 +91,8 @@ def deploy(runtime: dict, bundle: Path, model_id: str, kind: str = "online") -> 
         endpoint = load_online_endpoint(source=str(bundle / "online-endpoint.yml"))
         deployment = load_online_deployment(source=str(deployment_path))
         deployment.model = registered.id
+        endpoint.tags = {**registered.tags, "lifecycle_stage": "deployment", "serving_pattern": kind}
+        deployment.tags = dict(endpoint.tags)
         client.online_endpoints.begin_create_or_update(endpoint).result()
         client.online_deployments.begin_create_or_update(deployment).result()
         endpoint = client.online_endpoints.get(endpoint.name)
@@ -97,6 +102,8 @@ def deploy(runtime: dict, bundle: Path, model_id: str, kind: str = "online") -> 
         endpoint = load_batch_endpoint(source=str(bundle / "batch-endpoint.yml"))
         deployment = load_model_batch_deployment(deployment_path)
         deployment.model = registered.id
+        endpoint.tags = {**registered.tags, "lifecycle_stage": "deployment", "serving_pattern": kind}
+        deployment.tags = dict(endpoint.tags)
         client.batch_endpoints.begin_create_or_update(endpoint).result()
         client.batch_deployments.begin_create_or_update(deployment).result()
         endpoint = client.batch_endpoints.get(endpoint.name)

@@ -70,4 +70,5 @@ def train(scenario: dict, prepared: Path, model_output: Path) -> None:
         pip_requirements=["mlflow-skinny>=2.22,<3", "pandas>=2.2,<3", "PyYAML>=6,<7", "pyarrow>=18,<24"],
     )
     write_json(Path(model_output) / "factory.json", {"scenario": scenario, "mode": "custom", "baseline": True})
-
+    from .tags import build_tags, stamp_model
+    stamp_model(model_output, build_tags(scenario))

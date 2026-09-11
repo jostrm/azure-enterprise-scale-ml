@@ -29,6 +29,7 @@ class AzureMLTests(unittest.TestCase):
             "quality": {"min_accuracy": 0.6},
         }
         self.runtime = {
+            "aifactory": "fixture-factory", "project": "001", "environment_name": "dev",
             "subscription_id": "00000000-0000-0000-0000-000000000001",
             "tenant_id": "00000000-0000-0000-0000-000000000002",
             "resource_group": "rg-dev", "workspace_name": "ml-dev",
@@ -158,11 +159,9 @@ class AzureMLTests(unittest.TestCase):
         self.runtime["lake"] = self.lake_config()
         for field, value in (("project_number", "002"), ("environment_name", "prod"),
                              ("target_environment", "test"), ("project", "003")):
-            with self.subTest(mismatch=field):
-                self.runtime[field] = value
+            with self.subTest(mismatch=field), patch.dict(self.runtime, {field: value}):
                 with self.assertRaisesRegex(ValueError, "does not match"):
                     self.document()
-                self.runtime.pop(field)
         self.runtime["lake"] = self.lake_config(storage={"datastore": "different"})
         with self.assertRaisesRegex(ValueError, "datastore"):
             self.document()
@@ -419,6 +418,7 @@ class AzureMLTests(unittest.TestCase):
             (path / "quality-gate.json").write_text(json.dumps({"passed": passed}))
             (path / "lineage.json").write_text(json.dumps({
                 "model_output": "model", "scenario": "sample",
+                "task": self.scenario["task"], "mode": "custom",
                 **({"lake": lake, "task": self.scenario["task"]} if lake is not None else {}),
             }))
         client.jobs.download.side_effect = download
@@ -475,11 +475,12 @@ class AzureMLTests(unittest.TestCase):
             import azure.ai.ml
         except ImportError:
             self.skipTest("azure-ai-ml is optional")
-        self.document("custom")
+        paths, _ = self.document("custom")
         client = MagicMock()
         model = types.SimpleNamespace(
             type="mlflow_model", id="azureml:sample:3",
-            tags={"quality_gate": "passed", "pipeline_job": "pipeline-123",
+            tags={**json.loads(Path(paths["manifest"]).read_text())["model_tags"],
+                  "quality_gate": "passed", "pipeline_job": "pipeline-123",
                   "factory_scenario": "sample", "factory_mode": "custom"},
         )
         client.models.get.return_value = model

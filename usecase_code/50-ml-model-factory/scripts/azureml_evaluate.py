@@ -59,6 +59,7 @@ def main():
     for name in ("scenario", "prepared", "model", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--lake-config", type=Path)
+    parser.add_argument("--model-tags", type=Path)
     args = parser.parse_args()
     scenario = json.loads(args.scenario.read_text(encoding="utf-8"))
     lake = None
@@ -86,6 +87,24 @@ def main():
     gate = json.loads((args.output / "quality-gate.json").read_text(encoding="utf-8"))
     if gate.get("passed") is not True:
         raise ValueError("Evaluator did not emit a passing quality gate")
+    model_tags = None
+    if args.model_tags:
+        from ml_model_factory.tags import validate_tags
+        model_tags = validate_tags(json.loads(args.model_tags.read_text(encoding="utf-8")))
+        if (model_tags["use_case"] != scenario["name"] or model_tags["task_type"] != scenario["task"]
+                or model_tags["training_mode"] != args.mode):
+            raise ValueError("Model identity tags disagree with the evaluated scenario/task/mode")
+        if args.mode == "custom":
+            import yaml
+            stored = yaml.safe_load((args.model / "MLmodel").read_text(encoding="utf-8"))
+            if stored.get("metadata", {}).get("model_factory_tags") != model_tags:
+                raise ValueError("Custom model artifact tags disagree with the evaluated job metadata")
+        if lake is not None:
+            if lake["config"].get("aifactory") and model_tags.get("aifactory") != lake["config"]["aifactory"]:
+                raise ValueError("Model factory tag disagrees with evaluated lake scope")
+            for key in ("project", "environment", "use_case", "dataset", "data_version", "snapshot_id", "run_id"):
+                if model_tags.get(key) != lake["config"].get(key):
+                    raise ValueError("Model tags disagree with evaluated lake paths")
     lineage = {
         "scenario": scenario["name"], "task": scenario["task"], "mode": args.mode,
         "model_output": "model",
@@ -96,6 +115,9 @@ def main():
         gate["lake"] = {key: lake["config"][key] for key in LAKE_LINEAGE_FIELDS}
         gate["task"] = scenario["task"]
         write_json(args.output / "quality-gate.json", gate)
+    if model_tags is not None:
+        lineage["model_tags"] = model_tags
+        write_json(args.output / "model-tags.json", model_tags)
     write_json(args.output / "lineage.json", lineage)
 
 

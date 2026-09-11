@@ -8,6 +8,7 @@ dbutils.widgets.text("artifact_root", "")
 dbutils.widgets.text("experiment_path", "")
 dbutils.widgets.text("max_rows", "100000")
 dbutils.widgets.text("lake_config", "")
+dbutils.widgets.text("model_context", "")
 
 # COMMAND ----------
 from pathlib import Path
@@ -16,6 +17,8 @@ from ml_model_factory.config import load_json, validate_scenario
 from ml_model_factory.data import prepare
 from ml_model_factory.training import train
 from ml_model_factory.evaluation import evaluate
+from ml_model_factory.tags import build_tags, stamp_model
+from model_tags import load_model_context
 
 scenario = validate_scenario(load_json(Path(dbutils.widgets.get("scenario_path"))), require_dataset=True)
 if scenario["task"] not in {"classification", "regression", "forecasting"}:
@@ -25,6 +28,8 @@ root_value = dbutils.widgets.get("artifact_root")
 experiment = dbutils.widgets.get("experiment_path")
 max_rows = int(dbutils.widgets.get("max_rows"))
 lake_value = dbutils.widgets.get("lake_config")
+context = load_model_context(dbutils.widgets.get("model_context"), lake_value)
+model_tags = build_tags(scenario, context, engine="databricks")
 lake = None
 if lake_value:
     from lake_utils import landing_file, lineage, load_lake
@@ -45,6 +50,8 @@ if not remote and not source.is_file():
     raise ValueError("input_path must be the labeled CSV/Parquet exported by reviewed Kaggle ingestion")
 mlflow.set_experiment(experiment)
 with mlflow.start_run() as run:
+    mlflow.set_tags(model_tags)
+    mlflow.log_dict(model_tags, "model-tags.json")
     root = Path(root_value).joinpath(*lake.key("training_run").split("/")) if lake else Path(root_value) / run.info.run_id
     if lake:
         root.mkdir(parents=True, exist_ok=False)
@@ -70,6 +77,7 @@ with mlflow.start_run() as run:
         rows.to_parquet(source, index=False)
     prepare(scenario, source, prepared)
     train(scenario, prepared, model)
+    stamp_model(model, model_tags)
     report = evaluate(scenario, prepared, model, evaluation)
     mlflow.log_params({"scenario": scenario["name"], "task": scenario["task"], "source": scenario["dataset"]["slug"]})
     mlflow.log_metrics(report["metrics"])

@@ -106,6 +106,8 @@ def capture_source(scenario: dict, layout: LakeLayout, input_path: Path, root: P
     dataset_root = layout.local_path(root, "dataset_root")
     if dataset_root.exists():
         manifest = verified_manifest(dataset_root)
+        if manifest.get("aifactory") and manifest["aifactory"] != layout.aifactory:
+            raise ValueError("Dataset publication belongs to another AI Factory")
         if manifest.get("source_files") != inventory or manifest.get("declared_source") != scenario["dataset"]:
             raise ValueError("Dataset version already refers to different content or provenance; use a new data_version")
         if manifest.get("source_kind") != ("images" if scenario["task"].startswith("image_") else "tabular"):
@@ -147,6 +149,7 @@ def capture_source(scenario: dict, layout: LakeLayout, input_path: Path, root: P
                 })
             finish(staging, {
                 "kind": "source", "dataset": layout.dataset, "data_version": layout.data_version,
+                **({"aifactory": layout.aifactory} if layout.aifactory else {}),
                 "source_files": inventory, "declared_source": scenario["dataset"],
                 "source_kind": "images" if scenario["task"].startswith("image_") else "tabular",
                 "download_provenance_verified": provenance is not None,
@@ -221,8 +224,11 @@ def prepare_snapshot(scenario: dict, layout: LakeLayout, source: Path, root: Pat
 
 
 def train_in_lake(scenario: dict, config: dict, input_path: Path, root: Path) -> dict:
+    from .tags import build_tags, stamp_model
+
     validate_scenario(scenario)
     layout = LakeLayout.from_config(config, scenario)
+    model_tags = build_tags(scenario, config)
     root = Path(root).resolve()
     if (layout.local_path(root, "training_run").exists() or
             local_key_path(root, layout.key("training_run") + "-rejected").exists()):
@@ -243,6 +249,7 @@ def train_in_lake(scenario: dict, config: dict, input_path: Path, root: Path) ->
             from .evaluation import evaluate
             train(scenario, prepared, staging / "model")
             evaluator = evaluate
+        stamp_model(staging / "model", model_tags)
         try:
             report = evaluator(scenario, prepared, staging / "model", staging / "evaluation")
         except ValueError:
@@ -255,11 +262,14 @@ def train_in_lake(scenario: dict, config: dict, input_path: Path, root: Path) ->
                 shutil.copytree(staging / "evaluation", rejected / "evaluation")
             write_json(rejected / "status.json", {"state": "rejected", "model_promoted": False})
             raise
+        model_tags = {**model_tags, "quality_gate": "passed", "lifecycle_status": "candidate"}
+        stamp_model(staging / "model", model_tags)
         manifest = lake_manifest(layout, scenario)
+        manifest["model_tags"] = model_tags
         manifest["source_snapshot_sha256"] = sha256(layout.local_path(root, "training_snapshot") / "_SUCCESS.json")
         write_json(staging / "lineage.json", manifest)
         finish(staging, {"kind": "training-run", "run_id": layout.run_id,
-                         "snapshot_id": layout.snapshot_id, "scenario": scenario})
+                         "snapshot_id": layout.snapshot_id, "scenario": scenario, "model_tags": model_tags})
     return {
         "state": "committed", "paths": layout.as_dict(),
         "model": str(layout.local_path(root, "training_model")),
@@ -315,6 +325,11 @@ def infer_in_lake(scenario: dict, config: dict, input_path: Path, model_path: Pa
         raise ValueError("Use a model from a committed, quality-gated lake training run")
     if training.get("scenario") != scenario:
         raise ValueError("Model scenario/schema does not match inference configuration")
+    from .tags import scope_tags
+    expected_scope = scope_tags(config)
+    trained_scope = scope_tags(training.get("model_tags", {}))
+    if any(trained_scope.get(key) != value for key, value in expected_scope.items()):
+        raise ValueError("Model identity tags disagree with the inference lake scope")
     binding_key = layout.key("use_case_root") + f"/models/{layout.model_version}/binding"
     binding = local_key_path(root, binding_key)
     expected = {"training_manifest_sha256": sha256(model_path.parent / "_SUCCESS.json")}
@@ -355,11 +370,13 @@ def infer_in_lake(scenario: dict, config: dict, input_path: Path, model_path: Pa
             raise
         write_json(staging / "lineage.json", {
             **lake_manifest(layout, scenario), "model_mlmodel_sha256": sha256(model_path / "MLmodel"),
+            "model_tags": training.get("model_tags", {}),
             "training_run_manifest_sha256": sha256(model_path.parent / "_SUCCESS.json"),
             "input_sha256": sha256(Path(input_path)), "rows": len(features),
         })
         finish(staging, {"kind": "inference-run", "model_version": layout.model_version,
-                         "training_run": training["run_id"], "run_id": layout.run_id})
+                         "training_run": training["run_id"], "run_id": layout.run_id,
+                         "model_tags": training.get("model_tags", {})})
     return {"state": "committed", "rows": len(features), "output": str(layout.local_path(root, "output"))}
 
 

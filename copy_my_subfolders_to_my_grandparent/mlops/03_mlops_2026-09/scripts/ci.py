@@ -115,9 +115,11 @@ def training_runtime(runtime: dict, scenario_path: str, run_id: str | None = Non
 
 
 def train(args) -> None:
+    from ml_model_factory.tags import scope_tags
     if not all(math.isfinite(x) and x > 0 for x in (args.timeout_seconds, args.poll_seconds)):
         raise ValueError("Timeout and polling interval must be finite and positive")
     runtime = json.loads(Path(args.runtime).read_text(encoding="utf-8-sig"))
+    scope_tags(runtime, require=True)
     runtime = training_runtime(runtime, args.scenario, getattr(args, "lake_run_id", None))
     scope = target(runtime)
     az = shutil.which("az")

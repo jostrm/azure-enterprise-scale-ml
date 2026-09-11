@@ -193,6 +193,12 @@ In addition to Copy parameters, pass `notebookPath`, `notebookInputPath`, `artif
 `notebookPath` at that notebook. The activity passes its exact widget names:
 `input_path`, `artifact_root`, `scenario_path`, `experiment_path`, and optional `lake_config`.
 The `lakeConfig` pipeline string defaults to empty; existing callers do not need it.
+The optional `modelContext` string is passed as the `model_context` notebook widget.
+Supply credential-free factory/project/environment identity, or put `aifactory`
+alongside project/environment in `lakeConfig`. The notebook uses the shared tag
+builder and rejects conflicts; full scope is mandatory for its separate registry
+operation. Import both `lake_utils.py` and `model_tags.py` alongside `train.py`.
+No model is registered merely by running the ADF notebook activity.
 
 Set `notebookInputPath` to the copied CSV/Parquet, using a Spark-readable `wasbs://`
 Blob URI or a driver-accessible path. The Databricks cluster must have separately configured

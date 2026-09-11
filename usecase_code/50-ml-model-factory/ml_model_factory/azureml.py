@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from .tags import build_tags, merge_registration_tags, scope_tags
 
 
 SCHEMAS = "https://azuremlschemas.azureedge.net/latest/"
@@ -59,6 +60,9 @@ def _lake_context(scenario: dict, runtime: dict) -> dict | None:
     safe = {key: getattr(layout, key) for key in (
         *LAKE_LINEAGE_FIELDS, "serving", "model_version", "pipeline_id", "pipeline_version", "prefix",
     )}
+    factory = scope_tags(runtime).get("aifactory")
+    if factory:
+        safe["aifactory"] = factory
     storage = {key: getattr(layout, key) for key in ("account_url", "container", "datastore")
                if getattr(layout, key) is not None}
     if storage:
@@ -226,6 +230,7 @@ def render(
         raise ValueError("Render output must be empty to prevent stale submission artifacts")
     # Validate before creating files. No credentials or full repository are uploaded.
     lake = _lake_context(scenario, runtime)
+    model_tags = build_tags(scenario, runtime, mode=mode, engine="azureml")
     raw = _raw_input(str(runtime.get("input_data", "")), runtime.get("datastore"))
     if image:
         raw["type"] = "uri_folder"
@@ -242,6 +247,7 @@ def render(
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".env", ".venv"))
     shutil.copy2(source / "pyproject.toml", code / "pyproject.toml")
     (code / "scenario.json").write_text(json.dumps(scenario, indent=2), encoding="utf-8")
+    (code / "model-tags.json").write_text(json.dumps(model_tags, indent=2), encoding="utf-8")
     (code / "scripts").mkdir(exist_ok=True)
     files: dict[str, str] = {}
     for filename in ("azureml_prepare.py", "azureml_evaluate.py", "azureml_sdk.py", "azureml_cli.py"):
@@ -258,6 +264,7 @@ def render(
         "compute", "gpu_compute", "datastore", "environment", "serving",
         "credential", "managed_identity_client_id", "project", "project_number",
         "environment_name", "target_environment",
+        "aifactory",
     ) if k in runtime}
     if lake is not None:
         safe_runtime["lake"] = lake["config"]
@@ -317,12 +324,14 @@ def render(
         "experiment_name": _name(scenario["name"], 100),
         "inputs": {"raw": raw},
     })
+    standalone_prepare["tags"] = {**model_tags, "lifecycle_stage": "prepare"}
     files["prepare_job"] = _write_yaml(output / "prepare-job.yml", standalone_prepare)
     train = {
         **copy.deepcopy(common),
         "command": install + (
             "python -m ml_model_factory train --scenario scenario.json "
-            '--prepared "${{inputs.prepared}}" --model-output "${{outputs.model}}"'
+            '--prepared "${{inputs.prepared}}" --model-output "${{outputs.model}}" '
+            "--model-tags model-tags.json"
         ),
         "inputs": {"prepared": "${{parent.jobs.prepare.outputs.prepared}}"},
         "outputs": {"model": "${{parent.outputs.model}}"},
@@ -349,6 +358,7 @@ def render(
         model_ref = "${{parent.jobs.train.outputs.model}}"
     if lake is not None:
         standalone["outputs"]["best_model" if mode == "automl" else "model"]["path"] = lake["bindings"]["model"]
+    standalone["tags"] = {**model_tags, "lifecycle_stage": "train"}
     files["training_job"] = _write_yaml(output / "job.yml", standalone)
     files["job"] = files["training_job"]
     pipeline = {
@@ -356,7 +366,7 @@ def render(
         "type": "pipeline",
         "display_name": _name(scenario["name"], 80) + "-" + mode,
         "experiment_name": _name(scenario["name"], 100),
-        "tags": {"factory_quality_gate": "evaluate", "factory_mode": mode,
+        "tags": {**model_tags, "factory_quality_gate": "evaluate", "factory_mode": mode,
                  "factory_task": task, "factory_scenario": scenario["name"]},
         "settings": {"default_compute": _asset(runtime["compute"]),
                      "continue_on_step_failure": False},
@@ -373,6 +383,7 @@ def render(
                     f"python scripts/azureml_evaluate.py --mode {mode} --scenario scenario.json "
                     '--prepared "${{inputs.prepared}}" --model "${{inputs.model}}" '
                     '--output "${{outputs.report}}"'
+                    ' --model-tags model-tags.json'
                 ),
                 "inputs": {"prepared": "${{parent.jobs.prepare.outputs.prepared}}",
                            "model": model_ref},
@@ -400,22 +411,24 @@ def render(
     model_uri = f"azureml:{model_name}:REPLACE_WITH_REGISTERED_VERSION"
     files["online_endpoint"] = _write_yaml(output / "online-endpoint.yml", {
         "$schema": SCHEMAS + "managedOnlineEndpoint.schema.json",
-        "name": endpoint + "-online", "auth_mode": "aad_token",
+        "name": endpoint + "-online", "auth_mode": "aad_token", "tags": model_tags,
     })
     files["online_deployment"] = _write_yaml(output / "online-deployment.yml", {
         "$schema": SCHEMAS + "managedOnlineDeployment.schema.json",
         "name": "blue", "endpoint_name": endpoint + "-online", "model": model_uri,
         "instance_type": serving.get("online_instance_type", "Standard_DS3_v2"),
         "instance_count": serving.get("instance_count", 1),
+        "tags": model_tags,
     })
     files["batch_endpoint"] = _write_yaml(output / "batch-endpoint.yml", {
         "$schema": SCHEMAS + "batchEndpoint.schema.json",
-        "name": endpoint + "-batch", "auth_mode": "aad_token",
+        "name": endpoint + "-batch", "auth_mode": "aad_token", "tags": model_tags,
     })
     batch = {
         "$schema": SCHEMAS + "modelBatchDeployment.schema.json",
         "type": "model", "name": "blue", "endpoint_name": endpoint + "-batch",
         "model": model_uri, "compute": _asset(runtime["compute"]),
+        "tags": model_tags,
         "resources": {"instance_count": serving.get("batch_instance_count", 1)},
         "settings": {"max_concurrency_per_instance": 1, "mini_batch_size": 10,
                      "output_action": "append_row", "output_file_name": "predictions.csv",
@@ -428,6 +441,7 @@ def render(
             Path(files.pop(key)).unlink()
     manifest = {
         "mode": mode, "task": task, "model_name": model_name, "scenario_name": scenario["name"],
+        "model_tags": model_tags,
         "standalone_preparation": "Submit prepare-job.yml; replace REPLACE_WITH_PREPARE_JOB "
         "in job.yml with the completed preparation job name.",
         "registration": "Only a successful generated pipeline containing evaluate and a downloaded "
@@ -477,6 +491,8 @@ def _rai_pipeline(scenario: dict, runtime: dict) -> dict:
     constructor = "${{parent.jobs.construct.outputs.rai_insights_dashboard}}"
     return {
         "$schema": SCHEMAS + "pipelineJob.schema.json", "type": "pipeline",
+        "tags": {**build_tags(scenario, runtime, mode="custom", engine="azureml"),
+                 "lifecycle_stage": "responsible-ai"},
         "experiment_name": _name(scenario["name"], 80) + "-rai",
         "settings": {"default_compute": _asset(runtime["compute"]), "continue_on_step_failure": False},
         "inputs": {
@@ -546,15 +562,17 @@ def submit(job_path: Path, runtime: dict) -> str:
     if "REPLACE_WITH_" in job_path.read_text(encoding="utf-8"):
         raise ValueError("Resolve the REPLACE_WITH_ input/model placeholders before submission")
     job = load_job(source=str(job_path))
+    from .tags import assert_scope
+    assert_scope(job.tags or {}, runtime)
     submitted = _client(runtime).jobs.create_or_update(job)
     return submitted.name
 
 
-def register(pipeline_job_name: str, runtime: dict, model_name: str) -> str:
-    """Register only the named model output of a successful quality-gated pipeline."""
+def registration_definition(pipeline_job_name: str, runtime: dict, model_name: str) -> dict:
+    """Create a v2 model definition only after evaluating the real job's gates."""
     from azure.ai.ml.constants import AssetTypes
-    from azure.ai.ml.entities import Model
 
+    scope_tags(runtime, require=True)
     client = _client(runtime)
     job = client.jobs.get(pipeline_job_name)
     _check_registration_job(job.type, job.status, job.tags, getattr(job, "jobs", None), job.outputs)
@@ -579,14 +597,24 @@ def register(pipeline_job_name: str, runtime: dict, model_name: str) -> str:
                     for key in LAKE_LINEAGE_FIELDS)
                     or lineage.get("task") != (job.tags or {}).get("factory_task")):
                 raise ValueError("Evaluation lake lineage does not match this factory pipeline")
-    model = client.models.create_or_update(Model(
-        name=model_name,
-        path=f"azureml://jobs/{pipeline_job_name}/outputs/model/paths/",
-        type=AssetTypes.MLFLOW_MODEL,
-        tags={"pipeline_job": pipeline_job_name, "quality_gate": "passed",
-              "factory_scenario": lineage["scenario"], "factory_mode": (job.tags or {}).get("factory_mode", ""),
-              **lake_tags, **({"factory_task": lineage["task"]} if lake_tags else {})},
-    ))
+        model_tags = merge_registration_tags(job.tags or {}, lineage, runtime, pipeline_job_name)
+    return {
+        "$schema": SCHEMAS + "model.schema.json", "name": model_name,
+        "path": f"azureml://jobs/{pipeline_job_name}/outputs/model/paths/",
+        "type": AssetTypes.MLFLOW_MODEL,
+        "tags": {**model_tags, "pipeline_job": pipeline_job_name, "quality_gate": "passed",
+                 "factory_scenario": lineage["scenario"], "factory_mode": (job.tags or {}).get("factory_mode", ""),
+                 **lake_tags, "factory_task": model_tags["task_type"]},
+    }
+
+
+def register(pipeline_job_name: str, runtime: dict, model_name: str) -> str:
+    """SDK v2 registration using the same gated definition as CLI v2."""
+    from azure.ai.ml.entities import Model
+
+    definition = registration_definition(pipeline_job_name, runtime, model_name)
+    definition.pop("$schema")
+    model = _client(runtime).models.create_or_update(Model(**definition))
     return model.id
 
 

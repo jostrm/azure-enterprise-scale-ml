@@ -31,6 +31,7 @@ import yaml
 from ml_model_factory import azureml, serving
 from ml_model_factory.config import load_json, validate_scenario
 from ml_model_factory.lake import LakeLayout
+from ml_model_factory.tags import TAG_KEYS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -71,6 +72,7 @@ def scenario_named(name):
 
 def runtime_for(name, pattern="batch"):
     return {
+        "aifactory": "fixture-factory", "project": "001", "environment_name": "dev",
         "subscription_id": "10000000-0000-4000-8000-000000000001",
         "tenant_id": "20000000-0000-4000-8000-000000000002",
         "resource_group": "matrix-rg", "workspace_name": "matrix-workspace",
@@ -397,6 +399,8 @@ class CIService:
         write_json(root / "lineage.json", {
             "model_output": "model", "scenario": self.job.tags["factory_scenario"],
             "task": self.job.tags["factory_task"], "lake": {"config": lake},
+            "mode": self.job.tags["factory_mode"],
+            "model_tags": {key: self.job.tags[key] for key in TAG_KEYS if key in self.job.tags},
         })
 
     def register(self, model):
@@ -534,6 +538,7 @@ def test_automl_vision_standalone_cannot_register_even_when_training_completed(
 
 def registered_model(bundle, **tag_overrides):
     tags = {
+        **bundle.manifest["model_tags"],
         "quality_gate": "passed", "pipeline_job": "reviewed-job-" + uuid4().hex,
         "factory_scenario": bundle.scenario["name"], "factory_mode": bundle.manifest["mode"],
     }

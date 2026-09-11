@@ -25,6 +25,7 @@ def parser() -> argparse.ArgumentParser:
     train.add_argument("--scenario", required=True, type=Path)
     train.add_argument("--prepared", required=True, type=Path)
     train.add_argument("--model-output", required=True, type=Path)
+    train.add_argument("--model-tags", type=Path, help="Validated identity metadata for this custom training execution")
     evaluate = commands.add_parser("evaluate")
     evaluate.add_argument("--scenario", required=True, type=Path)
     evaluate.add_argument("--prepared", required=True, type=Path)
@@ -77,6 +78,12 @@ def parser() -> argparse.ArgumentParser:
     feedback.add_argument("--config", required=True, type=Path)
     feedback.add_argument("--root", required=True, type=Path)
     feedback.add_argument("--input", required=True, type=Path)
+    tags = commands.add_parser("tags", help="Preview the shared model tags without registering or changing models")
+    tags.add_argument("--scenario", required=True, type=Path)
+    tags.add_argument("--context", required=True, type=Path, help="Runtime JSON or standalone lake configuration")
+    tags.add_argument("--mode", choices=("custom", "automl"), default="custom")
+    tags.add_argument("--engine", choices=("local", "azureml", "databricks"), default="azureml")
+    tags.add_argument("--output", type=Path)
     return root
 
 
@@ -97,12 +104,24 @@ def execute(args):
         from .data import prepare
         return prepare(scenario, args.input, args.output)
     if args.command == "train":
+        metadata = None
+        if args.model_tags:
+            from .tags import validate_tags
+            metadata = validate_tags(load_json(args.model_tags))
+            if (metadata.get("use_case") != scenario["name"] or metadata.get("task_type") != scenario["task"]
+                    or metadata.get("training_mode") != "custom"):
+                raise ValueError("Custom training metadata must match the selected scenario and task")
         if scenario["task"].startswith("image_"):
             from .vision import train_vision
-            return train_vision(scenario, args.prepared, args.model_output)
-        from .training import train
-        train(scenario, args.prepared, args.model_output)
-        return {"model": str(args.model_output)}
+            result = train_vision(scenario, args.prepared, args.model_output)
+        else:
+            from .training import train
+            train(scenario, args.prepared, args.model_output)
+            result = {"model": str(args.model_output)}
+        if metadata is not None:
+            from .tags import stamp_model
+            stamp_model(args.model_output, metadata)
+        return result
     if args.command == "evaluate":
         if scenario["task"].startswith("image_"):
             from .vision import evaluate_vision
@@ -153,6 +172,12 @@ def execute(args):
     if args.command == "lake-feedback":
         from .lake_flow import feedback_in_lake
         return feedback_in_lake(scenario, load_json(args.config), args.input, args.root)
+    if args.command == "tags":
+        from .tags import build_tags
+        result = build_tags(scenario, load_json(args.context), args.mode, args.engine, require_scope=True)
+        if args.output:
+            write_json(args.output, result)
+        return result
     raise ValueError(f"Unhandled command: {args.command}")
 
 

@@ -62,3 +62,5 @@ def train(scenario: dict, prepared: Path, model_output: Path) -> None:
     write_json(Path(model_output) / "factory.json", {
         "scenario": scenario, "training_rows": len(frame), "mode": "custom",
     })
+    from .tags import build_tags, stamp_model
+    stamp_model(model_output, build_tags(scenario))

@@ -109,6 +109,21 @@ their manifests or hashes.
 `environments/test` is the test deployment environment. `gold/test` is a held-out
 evaluation split. Neither is an alias for the other.
 
+### Tags agree with the paths
+
+The same scope is recorded on model artifacts and registered model versions:
+`aifactory`, `project`, `environment`, `use_case`, `dataset`, `data_version`,
+`snapshot_id` and `run_id`, plus task and training-engine/mode metadata.
+For example, `project: "001"` and `environment: dev` must agree with
+`projects/project001/environments/dev`. The explicit factory ID is attached to
+the selected account/project context; it does not add a new level to existing paths.
+
+Put `aifactory` in the project configuration, or in the standalone lake configuration
+for local runs. Registry writes require full scope. A conflicting runtime, model
+or lake identity is rejected. Tags are descriptive metadata, not permissions, and
+are written before immutable publication rather than patched into completed runs.
+See [the MLOps tagging contract](37-mlops.md#model-identity-tags-one-small-contract).
+
 ## 2. Medallion stages and the data flow
 
 ```text

@@ -1,4 +1,5 @@
 {
+  "aifactory": "example-factory",
   "project": "001",
   "environment": "dev",
   "use_case": "titanic",

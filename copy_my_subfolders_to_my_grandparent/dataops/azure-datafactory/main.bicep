@@ -343,6 +343,7 @@ resource notebookPipeline 'Microsoft.DataFactory/factories/pipelines@2018-06-01'
       artifactRoot: { type: 'String' }
       scenarioPath: { type: 'String' }
       experimentPath: { type: 'String' }
+      modelContext: { type: 'String', defaultValue: '' }
       lakeConfig: { type: 'String', defaultValue: '' }
     })
     activities: [
@@ -362,6 +363,7 @@ resource notebookPipeline 'Microsoft.DataFactory/factories/pipelines@2018-06-01'
             artifact_root: { value: '@pipeline().parameters.artifactRoot', type: 'Expression' }
             scenario_path: { value: '@pipeline().parameters.scenarioPath', type: 'Expression' }
             experiment_path: { value: '@pipeline().parameters.experimentPath', type: 'Expression' }
+            model_context: { value: '@pipeline().parameters.modelContext', type: 'Expression' }
             lake_config: { value: '@pipeline().parameters.lakeConfig', type: 'Expression' }
           }
         }

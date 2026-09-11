@@ -15,3 +15,7 @@ tests/
 lake-data/
 lake.local.json
 *.local.json
+.test-artifacts/
+.azureml-test-artifacts/
+.orchestration-matrix-artifacts/
+.fixture-validation-*/

@@ -8,7 +8,8 @@
     {"name": "artifact_root", "default": "/local_disk0/tmp/ml-model-factory"},
     {"name": "experiment_path", "default": "<existing-mlflow-experiment>"},
     {"name": "max_rows", "default": "100000"},
-    {"name": "lake_config", "default": ""}
+    {"name": "lake_config", "default": ""},
+    {"name": "model_context", "default": ""}
   ],
   "tasks": [
     {
@@ -22,7 +23,8 @@
           "artifact_root": "{{job.parameters.artifact_root}}",
           "experiment_path": "{{job.parameters.experiment_path}}",
           "max_rows": "{{job.parameters.max_rows}}",
-          "lake_config": "{{job.parameters.lake_config}}"
+          "lake_config": "{{job.parameters.lake_config}}",
+          "model_context": "{{job.parameters.model_context}}"
         }
       },
       "libraries": [

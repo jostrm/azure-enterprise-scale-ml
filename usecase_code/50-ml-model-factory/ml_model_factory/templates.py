@@ -11,6 +11,7 @@ MANIFEST = ".factory-template-manifest.json"
 EXCLUDED = {
     ".git", ".venv", "__pycache__", ".pytest_cache", ".ipynb_checkpoints",
     "data", "outputs", "generated", "mlruns", "build", "dist", "lake-data",
+    ".test-artifacts", ".azureml-test-artifacts", ".orchestration-matrix-artifacts",
 }
 
 
@@ -24,7 +25,8 @@ def instantiate(source: Path, destination: Path) -> dict:
     files = {}
     for file in source.rglob("*"):
         relative = file.relative_to(source)
-        if any(part in EXCLUDED or part.endswith(".egg-info") for part in relative.parts):
+        if any(part in EXCLUDED or part.endswith(".egg-info") or part.startswith(".fixture-validation-")
+               for part in relative.parts):
             continue
         if file.is_symlink():
             raise ValueError(f"Template source contains a symbolic link: {relative}")

@@ -506,6 +506,8 @@ def train_vision(scenario, prepared_dir, model_output) -> dict:
         "limitations": ["Small bounded training is a functional template, not an accuracy claim. Validation is reserved; no tuning uses test data."],
     }
     write_json(destination / "factory.json", result)
+    from .tags import build_tags, stamp_model
+    stamp_model(destination, build_tags(scenario))
     return result
 
 

@@ -239,14 +239,15 @@ def test_vision_training_and_unlabeled_lake_inference(task, tmp_path):
     raw = tmp_path / "raw"
     make_jsonl(raw, task)
     definition = scenario(task, "jsonl")
+    config = {**CONFIG, "use_case": definition["name"]}
     root = tmp_path / "lake"
-    trained = train_in_lake(definition, CONFIG, raw, root)
+    trained = train_in_lake(definition, config, raw, root)
     requests = pd.DataFrame({
         "request_id": ["image-1"],
         "image_base64": [base64.b64encode((raw / "0.png").read_bytes()).decode("ascii")],
     })
     requests.to_parquet(tmp_path / "requests.parquet", index=False)
-    result = infer_in_lake(definition, {**CONFIG, "run_id": "infer1"},
+    result = infer_in_lake(definition, {**config, "run_id": "infer1"},
                            tmp_path / "requests.parquet", Path(trained["model"]), root)
     output = pd.read_parquet(Path(result["output"]) / "predictions.parquet")
     assert len(output) == 1 and output["request_id"].iloc[0] == "image-1"

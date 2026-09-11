@@ -67,6 +67,7 @@ class TrainingTests(unittest.TestCase):
         self.runtime = self.root / "runtime.json"
         self.runtime.write_text(json.dumps({
             "subscription_id": "sub", "resource_group": "rg", "workspace_name": "ws",
+            "aifactory": "fixture-factory", "project": "001", "environment_name": "dev",
         }), encoding="utf-8")
         self.args = SimpleNamespace(
             scenario="scenario.json", runtime=str(self.runtime), output=str(self.root),
@@ -154,6 +155,16 @@ class TrainingTests(unittest.TestCase):
             ci.train(self.args)
         self.run.assert_not_called()
         self.assertEqual(list(self.root.glob("bundle-*")), [])
+
+    def test_missing_factory_identity_fails_before_any_cloud_or_render(self):
+        runtime = json.loads(self.runtime.read_text())
+        runtime.pop("aifactory")
+        self.runtime.write_text(json.dumps(runtime))
+        with self.assertRaisesRegex(ValueError, "requires explicit"):
+            ci.train(self.args)
+        self.run.assert_not_called()
+        self.cli.assert_not_called()
+        self.register.assert_not_called()
 
     def test_failed_job_never_registers_or_keeps_stale_receipt(self):
         self.wait.side_effect = RuntimeError("Failed")

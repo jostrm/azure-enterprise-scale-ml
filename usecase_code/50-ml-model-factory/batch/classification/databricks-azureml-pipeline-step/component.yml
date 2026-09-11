@@ -34,6 +34,9 @@ inputs:
   idempotency_token:
     type: string
     optional: true
+  model_context:
+    type: uri_file
+    optional: true
 outputs:
   result:
     type: uri_folder
@@ -47,3 +50,4 @@ command: >-
   --timeout-seconds ${{inputs.timeout_seconds}} --output "${{outputs.result}}"
   $[[--client-id "${{inputs.client_id}}"]]
   $[[--idempotency-token "${{inputs.idempotency_token}}"]]
+  $[[--model-context-file "${{inputs.model_context}}"]]
