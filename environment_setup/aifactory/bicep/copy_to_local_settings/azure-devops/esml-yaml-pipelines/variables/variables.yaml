@@ -102,6 +102,7 @@ variables:
   disableContributorAccessForUsers: "false" # <optional>Disable Contributor for project users<default>false<recommended> false, enables users to create artifacts (managed online endpoints etc). <otherwise> true, restrict Contributor access.
   disableRBACAdminOnRGForUsers: "true" # <optional>Disable RBAC Admin on RG for project users<default>true<recommended> true, restricts users from assigning RBAC at resource group scope.
   updateRbac: "false" # <optional>Legacy storage-RBAC suppression switch<default>false<keep-as-is> Resource-group RBAC is reconciled regardless of this flag.
+  skipCleanup: "false" # <optional>Skip ADO cleanup, purge, orphan-RBAC and failure-cleanup tasks for a non-destructive verification run.
   disableSubnetJoinAction: "false" # <optional>Disable VNet subnet join RBAC<default>false<recommended> false, grants Network Contributor role for subnet join actions (required for APIM, Container Apps, AKS). <otherwise> true, skip if subnet permissions managed externally.
   # ============================================================================
   # MANDATORY(CHANGE RARELY):Client Access: Services to be added to deployment. CreateIfNotExists logic

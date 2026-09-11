@@ -1775,7 +1775,7 @@ steps:
   # Runs when:
   # - enableAFoundryCaphost=true AND cleanFoundryCaphost=true AND
   # - (deleteAllServicesForProject=true OR (enableDeleteForDisabledResources=true AND enableAIFoundry=false))
-  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['cleanFoundryCaphost'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), and(eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'false'))))
+  condition: and(ne(variables['skipCleanup'], 'true'), eq('${{ parameters.phase }}', 'infra'), succeeded(), eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['cleanFoundryCaphost'], 'true'), or(eq(variables['deleteAllServicesForProject'], 'true'), and(eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'false'))))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1863,7 +1863,7 @@ steps:
     admin_prjResourceSuffix: $(admin_prjResourceSuffix)
 - task: AzureCLI@2
   displayName: '06b_Delete_Service_If_Not_Enabled_And_Exists'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), eq(variables['enableDeleteForDisabledResources'], 'true'))
+  condition: and(ne(variables['skipCleanup'], 'true'), eq('${{ parameters.phase }}', 'infra'), succeeded(), eq(variables['enableDeleteForDisabledResources'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -1953,7 +1953,7 @@ steps:
   # If a purge call fails the pipeline stops here (set -e) — Owner on subscription has purge rights.
   # Emits output variable purgeSoftDeleted.purgeRan (true/false) so 06c2 can skip the subnet-release
   # wait when nothing actually qualified for purge.
-  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'true')))
+  condition: and(ne(variables['skipCleanup'], 'true'), eq('${{ parameters.phase }}', 'infra'), succeeded(), or(eq(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableDeleteForDisabledResources'], 'true'), eq(variables['enableAIFoundry'], 'true')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2378,7 +2378,7 @@ steps:
 - task: AzureCLI@2
   displayName: '06d_Cleanup_Disconnected_SharedPrivateLinks'
   continueOnError: true
-  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableAISearchSharedPrivateLink'], 'true'), eq(variables['aiSearchExists'], 'true'))
+  condition: and(ne(variables['skipCleanup'], 'true'), eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableAISearchSharedPrivateLink'], 'true'), eq(variables['aiSearchExists'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2705,7 +2705,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 - task: AzureCLI@2
   displayName: 'Check and Delete Current Project Orphan Role Assignments'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
+  condition: and(ne(variables['skipCleanup'], 'true'), eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
   env:
     ORPHAN_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
     ORPHAN_RG_PREFIX: $(admin_aifactoryPrefixRG)
@@ -5447,7 +5447,7 @@ steps:
   # If task 62 / 63 / etc. failed BEFORE 69a, the started markers are never set
   # (69a/69b's own conditions require the Foundry phase and succeeded()),
   # so 110 stays skipped and any healthy caphost from a prior run is preserved.
-  condition: and(eq('${{ parameters.phase }}', 'foundry'), or(and(eq(variables['foundry_69a_started'], 'true'), ne(variables['foundry_69a_deployment_succeeded'], 'true')), and(eq(variables['foundry_69b_started'], 'true'), ne(variables['foundry_69b_succeeded'], 'true')), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
+  condition: and(ne(variables['skipCleanup'], 'true'), eq('${{ parameters.phase }}', 'foundry'), or(and(eq(variables['foundry_69a_started'], 'true'), ne(variables['foundry_69a_deployment_succeeded'], 'true')), and(eq(variables['foundry_69b_started'], 'true'), ne(variables['foundry_69b_succeeded'], 'true')), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5457,7 +5457,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '111_If_Error_AIFoundryHubAndProject_DeleteIt'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(ne(variables['skipCleanup'], 'true'), eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5467,7 +5467,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '112_If_Error_AIServices_DeleteIt'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '63-cognitive-services'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(ne(variables['skipCleanup'], 'true'), eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '63-cognitive-services'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5477,7 +5477,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '113_If_Error_AIFoundryProject_DeleteIt'
-  condition: and(eq('${{ parameters.phase }}', 'foundry'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '69-aifoundry-2025'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(ne(variables['skipCleanup'], 'true'), eq('${{ parameters.phase }}', 'foundry'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '69-aifoundry-2025'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5487,7 +5487,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '114_Purge_If_SoftDeleted_111_112_After5minutes'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), eq(variables['debugEnableCleaning'], 'true'), or(eq(variables['71_deleted'], 'true'), eq(variables['72_deleted'], 'true')))
+  condition: and(ne(variables['skipCleanup'], 'true'), eq('${{ parameters.phase }}', 'infra'), eq(variables['debugEnableCleaning'], 'true'), or(eq(variables['71_deleted'], 'true'), eq(variables['72_deleted'], 'true')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash

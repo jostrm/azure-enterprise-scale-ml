@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
+# AIFACTORY_VERSION_CONTRACT=1
 
 set -euo pipefail
 
 readonly AIF_SUBMODULE_URL="https://github.com/jostrm/azure-enterprise-scale-ml"
-readonly AIF_SUBMODULE_BRANCH="${AIF_SUBMODULE_BRANCH:-release/v1.24}"
 readonly AIF_ADO_RESOURCE="https://app.vssps.visualstudio.com/"
 readonly AIF_SCALESET_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export MSYS2_ARG_CONV_EXCL="${MSYS2_ARG_CONV_EXCL:+$MSYS2_ARG_CONV_EXCL;}/subscriptions/;/providers/;/eid1/;scope=/subscriptions/;privateLinksDnsZones="
 readonly AIF_SIMPLE_MODE_CONTRACT_VERSION=2
-readonly AIF_SUBMODULE_REF="${AIF_SUBMODULE_REF:-}"
+source "$AIF_SCALESET_LIB_DIR/release_version.sh"
 
 aif_scaleset_usage() {
   cat <<'EOF'
@@ -18,6 +18,7 @@ Usage: ADO-create-new-aifactory-scaleset.sh [options]
 
 Options:
   --repo-root PATH     Target AI Factory repository root.
+  --aifactory-version VERSION  Template version: 124 (default), 125, main, or major.minor.
   --dry-run            Collect and validate answers without changing anything.
   --prepare-only       Prepare Azure, identity, configuration, and automation only.
   --no-wait            Dispatch pipelines/workflows without waiting for completion.
@@ -1289,9 +1290,12 @@ aif_sync_submodule_and_templates() {
     aif_mutate git submodule add -b "$AIF_SUBMODULE_BRANCH" \
       "$AIF_SUBMODULE_URL" azure-enterprise-scale-ml
   fi
-  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
+  if [[ -n "${AIF_SUBMODULE_REF:-}" ]]; then
     aif_mutate git -C azure-enterprise-scale-ml fetch origin "$AIF_SUBMODULE_REF"
     aif_mutate git -C azure-enterprise-scale-ml checkout --detach "$AIF_SUBMODULE_REF"
+    if [[ "$AIF_DRY_RUN" == "true" ]]; then
+      return
+    fi
     local actual_ref
     actual_ref="$(git -C azure-enterprise-scale-ml rev-parse HEAD | tr -d '\r')"
     if [[ "$actual_ref" != "$AIF_SUBMODULE_REF" ]]; then
@@ -1299,9 +1303,8 @@ aif_sync_submodule_and_templates() {
       exit 1
     fi
   else
-    aif_mutate git -C azure-enterprise-scale-ml fetch origin "$AIF_SUBMODULE_BRANCH"
-    aif_mutate git -C azure-enterprise-scale-ml checkout "$AIF_SUBMODULE_BRANCH"
-    aif_mutate git -C azure-enterprise-scale-ml pull --ff-only origin "$AIF_SUBMODULE_BRANCH"
+    aif_error "Resolve an exact published AI Factory commit before execution." >&2
+    exit 1
   fi
 
   if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
@@ -3777,6 +3780,11 @@ aif_scaleset_main() {
         AIF_REPO_ROOT="$2"
         shift 2
         ;;
+      --aifactory-version)
+        [[ $# -ge 2 && -n "$2" && -z "${AIF_VERSION_ARGUMENT:-}" ]] || { aif_scaleset_usage; exit 1; }
+        AIF_VERSION_ARGUMENT="$2"
+        shift 2
+        ;;
       --dry-run) AIF_DRY_RUN="true"; shift ;;
       --prepare-only) AIF_PREPARE_ONLY="true"; shift ;;
       --no-wait) AIF_NO_WAIT="true"; shift ;;
@@ -3811,6 +3819,8 @@ aif_scaleset_main() {
   aif_require_command realpath
   [[ "$AIF_ROUTE" != "gha" ]] || aif_require_command gh
   aif_python
+  aif_resolve_repo_root
+  aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE" "${AIF_CREATE_DEFAULT_VERSION:-124}"
   aif_simple_mode_defaults
   if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
     aif_simple_gateway_config >/dev/null
@@ -3821,7 +3831,6 @@ aif_scaleset_main() {
       exit 1
     fi
   fi
-  aif_resolve_repo_root
   if [[ "${AIF_SIMPLE_MODE:-false}" == "true" && -d "$AIF_REPO_ROOT" &&
         -n "$(find "$AIF_REPO_ROOT" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
     aif_error "Simple Mode requires a new empty target folder; existing repositories are never modified." >&2
@@ -3862,6 +3871,9 @@ aif_scaleset_main() {
     aif_configure_github_identity
   fi
   aif_write_state_and_configure
+  if [[ "$AIF_DRY_RUN" != "true" ]]; then
+    "${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/release_version.py" --root "$AIF_REPO_ROOT" --save
+  fi
   [[ "$AIF_ROUTE" != "gha" ]] || aif_publish_github_configuration
   aif_commit_and_push
 
