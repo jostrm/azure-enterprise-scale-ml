@@ -1,0 +1,15 @@
+name: model-factory-custom
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - setuptools>=75
+  - pip:
+      - numpy==1.26.4
+      - pandas==2.2.3
+      - scikit-learn==1.5.2
+      - pyarrow==18.1.0
+      - mlflow==2.22.5
+      - azureml-mlflow==1.62.0
+      - PyYAML==6.0.2

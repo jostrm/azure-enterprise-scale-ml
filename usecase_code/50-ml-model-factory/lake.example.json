@@ -1,0 +1,16 @@
+{
+  "project": "001",
+  "environment": "dev",
+  "use_case": "titanic",
+  "dataset": "kaggle-titanic",
+  "data_version": "v1",
+  "snapshot_id": "s001",
+  "run_id": "r001",
+  "serving": "batch",
+  "model_version": "m001",
+  "pipeline_id": "titanic-scoring",
+  "pipeline_version": "v1",
+  "prefix": "mlops/v1",
+  "request_id_column": "request_id",
+  "storage": {}
+}

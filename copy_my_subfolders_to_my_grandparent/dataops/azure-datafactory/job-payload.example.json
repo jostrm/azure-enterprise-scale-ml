@@ -1,0 +1,19 @@
+{
+  "properties": {
+    "jobType": "Command",
+    "displayName": "adf-prepared-input",
+    "experimentName": "model-factory",
+    "command": "python train.py --input ${{inputs.raw}}",
+    "codeId": "/subscriptions/REPLACE/resourceGroups/REPLACE/providers/Microsoft.MachineLearningServices/workspaces/REPLACE/codes/REPLACE/versions/1",
+    "environmentId": "/subscriptions/REPLACE/resourceGroups/REPLACE/providers/Microsoft.MachineLearningServices/workspaces/REPLACE/environments/REPLACE/versions/1",
+    "computeId": "/subscriptions/REPLACE/resourceGroups/REPLACE/providers/Microsoft.MachineLearningServices/workspaces/REPLACE/computes/REPLACE",
+    "identity": { "identityType": "AMLToken" },
+    "inputs": {
+      "raw": {
+        "jobInputType": "uri_folder",
+        "uri": "azureml://datastores/REPLACE/paths/REPLACE/",
+        "mode": "Download"
+      }
+    }
+  }
+}

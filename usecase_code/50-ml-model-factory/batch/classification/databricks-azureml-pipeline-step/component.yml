@@ -1,0 +1,49 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+type: command
+name: model_factory_databricks_training
+version: 1
+display_name: Train and evaluate with an existing Databricks job
+code: ../../..
+environment:
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu22.04:latest
+  conda_file: ../../../environments/azureml-databricks.yml
+inputs:
+  host:
+    type: string
+  workspace_resource_id:
+    type: string
+  job_id:
+    type: integer
+  scenario_path:
+    type: string
+  input_uri:
+    type: string
+  artifact_root:
+    type: string
+  experiment_path:
+    type: string
+  task_key:
+    type: string
+    default: train-evaluate
+  timeout_seconds:
+    type: integer
+    default: 3600
+  client_id:
+    type: string
+    optional: true
+  idempotency_token:
+    type: string
+    optional: true
+outputs:
+  result:
+    type: uri_folder
+command: >-
+  python -m pip install --no-deps --no-build-isolation . &&
+  python -m ml_model_factory.databricks_job
+  --host "${{inputs.host}}" --workspace-resource-id "${{inputs.workspace_resource_id}}"
+  --job-id ${{inputs.job_id}} --scenario-path "${{inputs.scenario_path}}"
+  --input-uri "${{inputs.input_uri}}" --artifact-root "${{inputs.artifact_root}}"
+  --experiment-path "${{inputs.experiment_path}}" --task-key "${{inputs.task_key}}"
+  --timeout-seconds ${{inputs.timeout_seconds}} --output "${{outputs.result}}"
+  $[[--client-id "${{inputs.client_id}}"]]
+  $[[--idempotency-token "${{inputs.idempotency_token}}"]]

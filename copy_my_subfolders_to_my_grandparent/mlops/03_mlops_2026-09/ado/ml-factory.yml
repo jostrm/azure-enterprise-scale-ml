@@ -1,0 +1,161 @@
+# Opt-in stages template. Install a caller with trigger: none and pr: none.
+parameters:
+  - name: action
+    type: string
+    default: validate
+    values: [validate, ingest, train, deploy]
+  - name: poolName
+    type: string
+  - name: agentName
+    type: string
+  - name: serviceConnection
+    type: string
+    default: ''
+  - name: pythonPath
+    type: string
+    default: usecase_code\50-ml-model-factory\.venv\Scripts\python.exe
+  - name: templatePath
+    type: string
+    default: copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09
+  - name: scenario
+    type: string
+  - name: runtime
+    type: string
+    default: ''
+  - name: mode
+    type: string
+    default: custom
+    values: [automl, custom]
+  - name: deploymentEnvironment
+    type: string
+    default: ''
+  - name: modelId
+    type: string
+    default: ''
+  - name: deploymentKind
+    type: string
+    default: online
+    values: [online, batch]
+stages:
+  - stage: Validate
+    jobs:
+      - job: OfflineValidation
+        timeoutInMinutes: 15
+        pool:
+          name: ${{ parameters.poolName }}
+          demands:
+            - Agent.Name -equals ${{ parameters.agentName }}
+        steps:
+          - checkout: self
+            clean: false
+          - pwsh: |
+              if ($env:ACTION -in @('train', 'deploy') -and (-not $env:RUNTIME -or -not $env:SERVICE_CONNECTION)) { throw 'runtime and serviceConnection are required' }
+              if ($env:ACTION -eq 'deploy' -and (-not $env:DEPLOYMENT_ENVIRONMENT -or -not $env:MODEL_ID)) { throw 'Deploy requires modelId and an existing protected environment' }
+              & $env:PYTHON_PATH -m unittest discover -s "$env:TEMPLATE_PATH\tests" -v
+              if ($LASTEXITCODE) { exit $LASTEXITCODE }
+              $extra = @()
+              if ($env:RUNTIME) { $extra = @('--runtime', $env:RUNTIME) }
+              & $env:PYTHON_PATH "$env:TEMPLATE_PATH\scripts\ci.py" validate --scenario $env:SCENARIO @extra
+              if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            displayName: Offline validation (no authentication, installs, or Azure calls)
+            env:
+              ACTION: ${{ parameters.action }}
+              PYTHON_PATH: ${{ parameters.pythonPath }}
+              TEMPLATE_PATH: ${{ parameters.templatePath }}
+              SCENARIO: ${{ parameters.scenario }}
+              RUNTIME: ${{ parameters.runtime }}
+              SERVICE_CONNECTION: ${{ parameters.serviceConnection }}
+              DEPLOYMENT_ENVIRONMENT: ${{ parameters.deploymentEnvironment }}
+              MODEL_ID: ${{ parameters.modelId }}
+  - ${{ if eq(parameters.action, 'ingest') }}:
+    - stage: Ingest
+      dependsOn: Validate
+      condition: succeeded()
+      jobs:
+        - job: ExplicitKaggleIngestion
+          timeoutInMinutes: 30
+          pool:
+            name: ${{ parameters.poolName }}
+            demands:
+              - Agent.Name -equals ${{ parameters.agentName }}
+          steps:
+            - checkout: self
+              clean: false
+            - pwsh: |
+                & $env:PYTHON_PATH "$env:TEMPLATE_PATH\scripts\ci.py" ingest --scenario $env:SCENARIO --output "generated\ingest"
+                if ($LASTEXITCODE) { exit $LASTEXITCODE }
+              env:
+                PYTHON_PATH: ${{ parameters.pythonPath }}
+                TEMPLATE_PATH: ${{ parameters.templatePath }}
+                SCENARIO: ${{ parameters.scenario }}
+                KAGGLE_USERNAME: $(KAGGLE_USERNAME)
+                KAGGLE_KEY: $(KAGGLE_KEY)
+                KAGGLE_API_TOKEN: $(KAGGLE_API_TOKEN)
+  - ${{ if eq(parameters.action, 'train') }}:
+    - stage: Train
+      dependsOn: Validate
+      condition: succeeded()
+      jobs:
+        - job: SubmitAndRegister
+          timeoutInMinutes: 150
+          pool:
+            name: ${{ parameters.poolName }}
+            demands:
+              - Agent.Name -equals ${{ parameters.agentName }}
+          steps:
+            - checkout: self
+              clean: false
+            - task: AzureCLI@2
+              displayName: Train with a fresh optional lake run ID
+              inputs:
+                azureSubscription: ${{ parameters.serviceConnection }}
+                scriptType: pscore
+                scriptLocation: inlineScript
+                inlineScript: |
+                  & $env:PYTHON_PATH "$env:TEMPLATE_PATH\scripts\ci.py" train --scenario $env:SCENARIO --runtime $env:RUNTIME --mode $env:MODE --output generated
+                  if ($LASTEXITCODE) { exit $LASTEXITCODE }
+              env:
+                PYTHON_PATH: ${{ parameters.pythonPath }}
+                TEMPLATE_PATH: ${{ parameters.templatePath }}
+                SCENARIO: ${{ parameters.scenario }}
+                RUNTIME: ${{ parameters.runtime }}
+                MODE: ${{ parameters.mode }}
+                AZURE_EXTENSION_USE_DYNAMIC_INSTALL: 'no'
+            - publish: generated/registered-model.json
+              artifact: evaluated-model-registration
+  - ${{ if eq(parameters.action, 'deploy') }}:
+    - stage: Deploy
+      dependsOn: Validate
+      condition: succeeded()
+      jobs:
+        - deployment: EvaluatedModel
+          environment: ${{ parameters.deploymentEnvironment }}
+          timeoutInMinutes: 90
+          pool:
+            name: ${{ parameters.poolName }}
+            demands:
+              - Agent.Name -equals ${{ parameters.agentName }}
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                  - checkout: self
+                    clean: false
+                  - task: AzureCLI@2
+                    inputs:
+                      azureSubscription: ${{ parameters.serviceConnection }}
+                      scriptType: pscore
+                      scriptLocation: inlineScript
+                      inlineScript: |
+                        & $env:PYTHON_PATH "$env:TEMPLATE_PATH\scripts\ci.py" deploy --scenario $env:SCENARIO --runtime $env:RUNTIME --mode $env:MODE --model-id $env:MODEL_ID --kind $env:DEPLOYMENT_KIND --approval-environment $env:DEPLOYMENT_ENVIRONMENT
+                        if ($LASTEXITCODE) { exit $LASTEXITCODE }
+                    env:
+                      PYTHON_PATH: ${{ parameters.pythonPath }}
+                      TEMPLATE_PATH: ${{ parameters.templatePath }}
+                      RUNTIME: ${{ parameters.runtime }}
+                      MODEL_ID: ${{ parameters.modelId }}
+                      SCENARIO: ${{ parameters.scenario }}
+                      MODE: ${{ parameters.mode }}
+                      DEPLOYMENT_KIND: ${{ parameters.deploymentKind }}
+                      DEPLOYMENT_ENVIRONMENT: ${{ parameters.deploymentEnvironment }}
+                      AZURE_EXTENSION_USE_DYNAMIC_INSTALL: 'no'

@@ -1,0 +1,10 @@
+name: model-factory-databricks-orchestration
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - setuptools>=75
+  - pip:
+      - databricks-sdk>=0.50,<1
+      - PyYAML==6.0.2

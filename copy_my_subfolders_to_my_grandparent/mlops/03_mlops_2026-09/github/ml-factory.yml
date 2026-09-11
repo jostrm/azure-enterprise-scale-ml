@@ -1,0 +1,200 @@
+name: Reusable Azure ML v2 factory
+'on':
+  workflow_call:
+    inputs:
+      action:
+        type: string
+        default: validate
+      runner_label:
+        type: string
+        default: aifactory-admin-vm
+      python_path:
+        type: string
+        default: usecase_code\50-ml-model-factory\.venv\Scripts\python.exe
+      template_path:
+        type: string
+        default: copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09
+      scenario:
+        type: string
+        required: true
+      runtime:
+        type: string
+        default: ''
+      mode:
+        type: string
+        default: custom
+      deployment_environment:
+        type: string
+        default: ''
+      deployment_kind:
+        type: string
+        default: online
+      model_id:
+        type: string
+        default: ''
+    secrets:
+      AZURE_CLIENT_ID:
+        required: false
+      TENANT_ID:
+        required: false
+      AZURE_SUBSCRIPTION_ID:
+        required: false
+      KAGGLE_USERNAME:
+        required: false
+      KAGGLE_KEY:
+        required: false
+      KAGGLE_API_TOKEN:
+        required: false
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Offline validation, explicit data ingestion, cloud training, or approved deployment
+        type: choice
+        options: [validate, ingest, train, deploy]
+        default: validate
+      runner_label:
+        description: Registered self-hosted Windows runner label
+        type: string
+        default: aifactory-admin-vm
+      python_path:
+        description: Preprovisioned factory virtual-environment Python
+        type: string
+        default: usecase_code\50-ml-model-factory\.venv\Scripts\python.exe
+      template_path:
+        description: Installed templates directory
+        type: string
+        default: copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09
+      scenario:
+        description: Factory scenario name or configuration path
+        type: string
+        required: true
+      runtime:
+        description: Runtime JSON path (required for train or deploy)
+        type: string
+        default: ''
+      mode:
+        description: Training mode
+        type: choice
+        options: [automl, custom]
+        default: custom
+      deployment_environment:
+        description: Existing environment with required reviewers (deploy only)
+        type: string
+        default: ''
+      deployment_kind:
+        description: Explicit serving destination type
+        type: choice
+        options: [online, batch]
+        default: online
+      model_id:
+        description: Explicit versioned evaluated model id (deploy only)
+        type: string
+        default: ''
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: pwsh
+env:
+  PYTHON_PATH: ${{ inputs.python_path }}
+  TEMPLATE_PATH: ${{ inputs.template_path }}
+  SCENARIO: ${{ inputs.scenario }}
+  RUNTIME: ${{ inputs.runtime }}
+  MODE: ${{ inputs.mode }}
+  AZURE_EXTENSION_USE_DYNAMIC_INSTALL: 'no'
+jobs:
+  validate:
+    runs-on: [self-hosted, Windows, "${{ inputs.runner_label }}"]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Check explicit action configuration
+        env:
+          ACTION: ${{ inputs.action }}
+          DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment_environment }}
+          MODEL_ID: ${{ inputs.model_id }}
+        run: |
+          if ($env:ACTION -notin @('validate', 'ingest', 'train', 'deploy')) { throw 'Unknown action' }
+          if ($env:MODE -notin @('automl', 'custom')) { throw 'Unknown mode' }
+          if ($env:ACTION -in @('train', 'deploy') -and -not $env:RUNTIME) { throw 'runtime is required' }
+          if ($env:ACTION -eq 'deploy' -and (-not $env:DEPLOYMENT_ENVIRONMENT -or -not $env:MODEL_ID)) { throw 'Deploy requires model_id and an existing protected environment' }
+      - name: Offline validation (no authentication, installs, or Azure calls)
+        run: |
+          & $env:PYTHON_PATH -m unittest discover -s "$env:TEMPLATE_PATH\tests" -v
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $extra = @()
+          if ($env:RUNTIME) { $extra = @('--runtime', $env:RUNTIME) }
+          & $env:PYTHON_PATH "$env:TEMPLATE_PATH\scripts\ci.py" validate --scenario $env:SCENARIO @extra
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+  ingest:
+    if: inputs.action == 'ingest'
+    needs: validate
+    runs-on: [self-hosted, Windows, "${{ inputs.runner_label }}"]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Download explicitly approved Kaggle dataset
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          & $env:PYTHON_PATH "$env:TEMPLATE_PATH\scripts\ci.py" ingest --scenario $env:SCENARIO --output "generated\ingest"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+  train:
+    if: inputs.action == 'train'
+    needs: validate
+    runs-on: [self-hosted, Windows, "${{ inputs.runner_label }}"]
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Authenticate with configured workload identity federation
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Render with a fresh optional lake run ID, submit, poll, verify, register
+        run: |
+          & $env:PYTHON_PATH "$env:TEMPLATE_PATH\scripts\ci.py" train --scenario $env:SCENARIO --runtime $env:RUNTIME --mode $env:MODE --output generated
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evaluated-model-registration
+          path: generated/registered-model.json
+          if-no-files-found: error
+  deploy:
+    if: inputs.action == 'deploy'
+    needs: validate
+    runs-on: [self-hosted, Windows, "${{ inputs.runner_label }}"]
+    environment: ${{ inputs.deployment_environment }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Explicit approved deployment (never runs after train)
+        env:
+          MODEL_ID: ${{ inputs.model_id }}
+          DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment_environment }}
+          DEPLOYMENT_KIND: ${{ inputs.deployment_kind }}
+        run: |
+          & $env:PYTHON_PATH "$env:TEMPLATE_PATH\scripts\ci.py" deploy --scenario $env:SCENARIO --runtime $env:RUNTIME --mode $env:MODE --model-id $env:MODEL_ID --kind $env:DEPLOYMENT_KIND --approval-environment $env:DEPLOYMENT_ENVIRONMENT
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }

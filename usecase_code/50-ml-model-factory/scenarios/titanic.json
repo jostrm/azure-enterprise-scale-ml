@@ -1,0 +1,20 @@
+{
+  "name": "titanic",
+  "task": "classification",
+  "model_name": "titanic-survival",
+  "dataset": {
+    "provider": "kaggle", "kind": "competition", "slug": "titanic",
+    "file": "train.csv", "version": null, "license": "Kaggle competition rules",
+    "source_url": "https://www.kaggle.com/competitions/titanic",
+    "status": "configured",
+    "notes": "Accept competition rules yourself before downloading. Kaggle competitions have no immutable version number: provenance records content hashes. Preparation writes titanic.parquet; Survived is binary classification, never regression."
+  },
+  "features": ["Pclass", "Sex", "Age", "SibSp", "Parch", "Fare", "Embarked"],
+  "target": "Survived",
+  "categorical_features": ["Pclass", "Sex", "Embarked"],
+  "sensitive_features": ["Sex", "Pclass"],
+  "split": {"test_size": 0.2, "validation_size": 0.2, "seed": 42},
+  "automl": {"primary_metric": "accuracy", "limits": {"max_trials": 3, "max_concurrent_trials": 1, "timeout_minutes": 20}},
+  "custom": {"algorithm": "logistic_regression"},
+  "quality": {"min_accuracy": 0.65}
+}

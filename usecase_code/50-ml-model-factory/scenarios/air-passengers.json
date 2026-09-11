@@ -1,0 +1,22 @@
+{
+  "name": "air-passengers",
+  "task": "forecasting",
+  "model_name": "monthly-air-passengers",
+  "dataset": {
+    "provider": "kaggle", "kind": "dataset", "slug": "rakannimer/air-passengers",
+    "file": "AirPassengers.csv", "version": 1,
+    "license": "Database: Open Database, Contents: Database Contents",
+    "source_url": "https://www.kaggle.com/datasets/rakannimer/air-passengers",
+    "status": "configured",
+    "notes": "Monthly passenger counts, not a substitute for the blocked orangejuice scenario. Preserve database attribution. Last two 12-month windows are validation/test; no random temporal splitting."
+  },
+  "features": ["Month"],
+  "target": "#Passengers",
+  "categorical_features": [],
+  "sensitive_features": [],
+  "split": {"test_size": 0.2, "validation_size": 0.2, "seed": 42},
+  "forecast": {"time_column": "Month", "series_columns": [], "frequency": "MS", "horizon": 12},
+  "automl": {"primary_metric": "normalized_root_mean_squared_error", "limits": {"max_trials": 3, "max_concurrent_trials": 1, "timeout_minutes": 20}},
+  "custom": {"algorithm": "seasonal_naive", "seasonal_period": 12},
+  "quality": {"max_rmse": 250}
+}

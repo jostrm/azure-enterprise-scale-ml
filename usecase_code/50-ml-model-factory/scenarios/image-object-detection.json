@@ -1,0 +1,17 @@
+{
+  "name": "image-object-detection",
+  "task": "image_object_detection",
+  "model_name": "car-plate-detection",
+  "dataset": {
+    "provider": "kaggle", "kind": "dataset", "slug": "andrewmvd/car-plate-detection",
+    "file": ".", "version": 1, "license": "CC0: Public Domain",
+    "source_url": "https://www.kaggle.com/datasets/andrewmvd/car-plate-detection",
+    "status": "configured",
+    "notes": "433 images with Pascal VOC bounding boxes. Detection is not OCR or identity recognition. Review privacy and regional representativeness before any production use."
+  },
+  "split": {"test_size": 0.2, "validation_size": 0.2, "seed": 42},
+  "vision": {"format": "pascal_voc", "image_root": "images", "annotations": "annotations", "image_base_uri": null, "pretrained": false, "device": "cpu", "image_size": 128, "max_image_size": 256, "epochs": 1, "batch_size": 1, "max_steps_per_epoch": 2, "max_detections": 30, "learning_rate": 0.001},
+  "automl": {"primary_metric": "mean_average_precision", "limits": {"max_trials": 1, "max_concurrent_trials": 1, "timeout_minutes": 20}},
+  "custom": {"algorithm": "fasterrcnn_resnet50_fpn"},
+  "quality": {}
+}

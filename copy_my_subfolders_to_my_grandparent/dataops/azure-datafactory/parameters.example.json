@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "factoryName": { "value": "REPLACE_EXISTING_FACTORY" },
+    "integrationRuntimeName": { "value": "REPLACE_EXISTING_SELF_HOSTED_IR" },
+    "sourceBlobEndpoint": { "value": "https://REPLACE_SOURCE.blob.core.windows.net/" },
+    "sinkBlobEndpoint": { "value": "https://REPLACE_SINK.blob.core.windows.net/" },
+    "sourceCredentialName": { "value": "" },
+    "sinkCredentialName": { "value": "" },
+    "databricksLinkedServiceName": { "value": "" },
+    "namePrefix": { "value": "ml_factory" }
+  }
+}

@@ -1,0 +1,17 @@
+.git/
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+data/
+outputs/
+generated/
+mlruns/
+runtime*.json
+.env
+kaggle.json
+tests/
+lake-data/
+lake.local.json
+*.local.json

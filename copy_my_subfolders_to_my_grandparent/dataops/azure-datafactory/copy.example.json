@@ -1,0 +1,10 @@
+{
+  "loadMode": "initial",
+  "sourceContainer": "REPLACE_SOURCE_CONTAINER",
+  "sourceFolder": "REPLACE_SOURCE_PREFIX",
+  "sinkContainer": "REPLACE_SINK_CONTAINER",
+  "sinkFolder": "REPLACE_SINK_PREFIX",
+  "filePattern": "*",
+  "watermarkStart": "2026-01-01T00:00:00Z",
+  "watermarkEnd": "2026-01-02T00:00:00Z"
+}

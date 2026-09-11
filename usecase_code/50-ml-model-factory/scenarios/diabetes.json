@@ -1,0 +1,20 @@
+{
+  "name": "diabetes",
+  "task": "classification",
+  "model_name": "diabetes-classification",
+  "dataset": {
+    "provider": "kaggle", "kind": "dataset", "slug": "jamaltariqcheema/pima-indians-diabetes-dataset",
+    "file": "diabetes.csv", "version": 1, "license": "CC0: Public Domain",
+    "source_url": "https://www.kaggle.com/datasets/jamaltariqcheema/pima-indians-diabetes-dataset",
+    "status": "configured",
+    "notes": "Teaching-only classification, not clinical decision support. Historical cohort is not representative of all populations. Physiologically implausible zero values require a reviewed domain-specific missingness policy before production."
+  },
+  "features": ["Pregnancies", "Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI", "DiabetesPedigreeFunction", "Age"],
+  "target": "Outcome",
+  "categorical_features": [],
+  "sensitive_features": ["Age"],
+  "split": {"test_size": 0.2, "validation_size": 0.2, "seed": 42},
+  "automl": {"primary_metric": "accuracy", "limits": {"max_trials": 3, "max_concurrent_trials": 1, "timeout_minutes": 20}},
+  "custom": {"algorithm": "random_forest"},
+  "quality": {"min_accuracy": 0.6}
+}

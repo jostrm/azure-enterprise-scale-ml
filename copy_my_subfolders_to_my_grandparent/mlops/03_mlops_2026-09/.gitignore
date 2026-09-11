@@ -1,0 +1,5 @@
+*.local.json
+generated/
+generated-deploy/
+__pycache__/
+.pytest_cache/

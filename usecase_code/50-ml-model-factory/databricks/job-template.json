@@ -1,0 +1,38 @@
+{
+  "name": "kaggle-model-factory-training",
+  "max_concurrent_runs": 1,
+  "timeout_seconds": 3600,
+  "parameters": [
+    {"name": "scenario_path", "default": "/Workspace/Shared/ml-model-factory/scenarios/titanic.json"},
+    {"name": "input_path", "default": "wasbs://<container>@<storage>.blob.core.windows.net/kaggle/titanic/train.csv"},
+    {"name": "artifact_root", "default": "/local_disk0/tmp/ml-model-factory"},
+    {"name": "experiment_path", "default": "<existing-mlflow-experiment>"},
+    {"name": "max_rows", "default": "100000"},
+    {"name": "lake_config", "default": ""}
+  ],
+  "tasks": [
+    {
+      "task_key": "train-evaluate",
+      "existing_cluster_id": "<existing-cluster-id>",
+      "notebook_task": {
+        "notebook_path": "<workspace-import-path>/train",
+        "base_parameters": {
+          "scenario_path": "{{job.parameters.scenario_path}}",
+          "input_path": "{{job.parameters.input_path}}",
+          "artifact_root": "{{job.parameters.artifact_root}}",
+          "experiment_path": "{{job.parameters.experiment_path}}",
+          "max_rows": "{{job.parameters.max_rows}}",
+          "lake_config": "{{job.parameters.lake_config}}"
+        }
+      },
+      "libraries": [
+        {"whl": "/Workspace/Shared/ml-model-factory/dist/aifactory_ml_model_factory-0.1.0-py3-none-any.whl"}
+      ]
+    }
+  ],
+  "tags": {
+    "purpose": "reviewed-template-not-a-deployment",
+    "dependencies": "Use a reviewed Databricks ML runtime with package train extras installed on all workers",
+    "compute": "Existing cluster only; no cluster provisioning"
+  }
+}
