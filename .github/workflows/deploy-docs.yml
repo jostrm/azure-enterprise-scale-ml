@@ -6,6 +6,10 @@ on:
       - main
     paths:
       - 'documentation/gh-io/**'
+      - 'bootstrap/**'
+      - 'environment_setup/aifactory/variables.json'
+      - 'environment_setup/aifactory/bicep/copy_to_local_settings/**'
+      - 'environment_setup/aifactory/bicep/scripts/preflight.sh'
   workflow_dispatch:
 
 permissions:
@@ -28,6 +32,13 @@ jobs:
       - name: Install MkDocs and Material theme
         run: |
           pip install mkdocs-material
+
+      - name: Check complete parameter reference
+        run: python documentation/gh-io/tools/generate_parameters.py --check
+
+      - name: Build documentation
+        working-directory: documentation/gh-io
+        run: mkdocs build --strict
 
       - name: Deploy documentation to GitHub Pages
         working-directory: documentation/gh-io

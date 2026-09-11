@@ -120,11 +120,11 @@ jobs:
 
       # Optional overrides
       azure_machinelearning_sp_oid: ${{ vars.TENANT_AZUREML_OID }}
-      admin_aks_gpu_sku_dev_override: ${{ vars.ADMIN_AKS_GPU_SKU_DEV_OVERRIDE || 'Standard_B4ms' }}
+      admin_aks_gpu_sku_dev_override: ${{ vars.ADMIN_AKS_GPU_SKU_DEV_OVERRIDE || 'Standard_D4s_v5' }}
       admin_aks_gpu_sku_testProd_override: ${{ vars.ADMIN_AKS_GPU_SKU_TEST_PROD_OVERRIDE || 'Standard_DS13-2_v2' }}
-      admin_aks_nodes_dev_override: ${{ vars.ADMIN_AKS_NODES_DEV_OVERRIDE || '1' }}
+      admin_aks_nodes_dev_override: ${{ vars.ADMIN_AKS_NODES_DEV_OVERRIDE || '2' }}
       admin_aks_nodes_testProd_override: ${{ vars.ADMIN_AKS_NODES_TEST_PROD_OVERRIDE || '3' }}
-      admin_aks_version_override: ${{ vars.ADMIN_AKS_VERSION_OVERRIDE || '1.30.3' }}
+      admin_aks_version_override: ${{ vars.ADMIN_AKS_VERSION_OVERRIDE || '1.35.7' }}
       admin_aml_cluster_maxNodes_dev_override: ${{ vars.ADMIN_AML_CLUSTER_MAX_NODES_DEV_OVERRIDE || '3' }}
       admin_aml_cluster_maxNodes_testProd_override: ${{ vars.ADMIN_AML_CLUSTER_MAX_NODES_TEST_PROD_OVERRIDE || '5' }}
       admin_aml_cluster_sku_dev_override: ${{ vars.ADMIN_AML_CLUSTER_SKU_DEV_OVERRIDE || 'Standard_DS3_v2' }}

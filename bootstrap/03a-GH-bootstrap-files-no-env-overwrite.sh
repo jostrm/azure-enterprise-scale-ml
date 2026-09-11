@@ -9,6 +9,7 @@ if [[ ! -f "$AIF_UI_LIBRARY" ]]; then
     exit 1
 fi
 source "$AIF_UI_LIBRARY"
+aif_require_legacy_workspace "$AIF_UI_DIR" || exit 1
 aif_banner "GITHUB / REFRESH" "Update workflows; preserve your active configuration."
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

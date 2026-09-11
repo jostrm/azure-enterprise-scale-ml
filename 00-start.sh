@@ -6,6 +6,8 @@ if [[ ! -f "$AIF_UI_DIR/bootstrap/ui/terminal.sh" ]]; then
     exit 1
 fi
 source "$AIF_UI_DIR/bootstrap/ui/terminal.sh"
+aif_require_legacy_workspace "$AIF_UI_DIR/.." || exit 1
+aif_require_legacy_workspace "$PWD" || exit 1
 aif_banner "LAUNCH CONTROL" "Your platform. Your orchestrator. One AI Factory."
 
 # Defaults

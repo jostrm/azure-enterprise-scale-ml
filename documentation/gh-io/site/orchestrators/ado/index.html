@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#orchestrator-azure-devops" class="md-skip">
+        <a href="#azure-devops" class="md-skip">
           Skip to content
         </a>
       
@@ -546,7 +546,7 @@
   <span class="md-ellipsis">
     
   
-    Standard Mode (mandatory)
+    Required inputs
   
 
     
@@ -574,7 +574,7 @@
   <span class="md-ellipsis">
     
   
-    Advanced Mode (all)
+    All variables
   
 
     
@@ -1197,10 +1197,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#configuration-file" class="md-nav__link">
+  <a href="#create-a-new-factory-scale-set" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration File
+        Create a new factory scale set
       
     </span>
   </a>
@@ -1208,10 +1208,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#service-connections" class="md-nav__link">
+  <a href="#update-or-run-an-existing-project" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Service Connections
+        Update or run an existing project
       
     </span>
   </a>
@@ -1219,38 +1219,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pipeline-structure" class="md-nav__link">
+  <a href="#tenant-and-service-connection-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pipeline Structure
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Pipeline Structure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#triggering-a-deployment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Triggering a deployment
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#bootstrap-first-time-setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bootstrap (First-time Setup)
+        Tenant and service-connection setup
       
     </span>
   </a>
@@ -1382,10 +1354,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#configuration-file" class="md-nav__link">
+  <a href="#create-a-new-factory-scale-set" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration File
+        Create a new factory scale set
       
     </span>
   </a>
@@ -1393,10 +1365,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#service-connections" class="md-nav__link">
+  <a href="#update-or-run-an-existing-project" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Service Connections
+        Update or run an existing project
       
     </span>
   </a>
@@ -1404,38 +1376,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#pipeline-structure" class="md-nav__link">
+  <a href="#tenant-and-service-connection-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pipeline Structure
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Pipeline Structure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#triggering-a-deployment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Triggering a deployment
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#bootstrap-first-time-setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bootstrap (First-time Setup)
+        Tenant and service-connection setup
       
     </span>
   </a>
@@ -1462,73 +1406,101 @@
   
 
 
-<h1 id="orchestrator-azure-devops">Orchestrator — Azure DevOps<a class="headerlink" href="#orchestrator-azure-devops" title="Permanent link">&para;</a></h1>
-<p>The AI Factory supports <strong>Azure DevOps (ADO)</strong> as a first-class orchestrator for all Bicep deployments.</p>
-<hr />
-<h2 id="configuration-file">Configuration File<a class="headerlink" href="#configuration-file" title="Permanent link">&para;</a></h2>
-<p>When using Azure DevOps, all parameters are defined in:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>environment_setup/aifactory/bicep/copy_to_local_settings/
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  azure-devops/esml-yaml-pipelines/variables/variables.yaml
+<h1 id="azure-devops">Azure DevOps<a class="headerlink" href="#azure-devops" title="Permanent link">&para;</a></h1>
+<p>Use the Azure DevOps consumer repository for this route; it is separate from a
+GitHub repository. Maintain one complete project <code>variables.json</code> with <code>dev</code> and
+<code>stage_prod</code>, or use ADO <code>variables.yaml</code>. See
+<a href="../../parameters/">configuration and API</a> and <a href="../../parameters/advanced/">all variables</a>.</p>
+<h2 id="create-a-new-factory-scale-set">Create a new factory scale set<a class="headerlink" href="#create-a-new-factory-scale-set" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>bash<span class="w"> </span>./ADO-create-new-aifactory-scaleset.sh<span class="w"> </span>--repo-root<span class="w"> </span><span class="s2">"C:/work/my-ado-factory"</span>
 </code></pre></div>
-<p>Copy this file to your own repository and fill in all <code>&lt;todo&gt;</code> placeholders before running any pipeline.</p>
-<hr />
-<h2 id="service-connections">Service Connections<a class="headerlink" href="#service-connections" title="Permanent link">&para;</a></h2>
-<p>Six ADO service connections are required — two per environment:</p>
+<p>The source launcher is under <code>bootstrap/</code>; installed consumer copies may be at
+the repository root. Normal full bootstrap prepares Azure identity, configuration,
+repository/pipeline automation, common infrastructure and an initial project.
+It can create billable resources and publish repository changes.</p>
+<p>Use <code>--help</code> for the selected version. <code>--aifactory-version main</code> is explicit;
+these create wrappers currently default to <code>main</code>. <code>--dry-run</code> collects and
+validates answers without running the normal bootstrap mutations.
+<code>--prepare-only</code> <strong>does change Azure/identity/configuration</strong>; it is not a preview.
+For unattended operation, provide the documented inputs and established
+authentication before using <code>--non-interactive --yes</code>.</p>
+<h2 id="update-or-run-an-existing-project">Update or run an existing project<a class="headerlink" href="#update-or-run-an-existing-project" title="Permanent link">&para;</a></h2>
+<p>From the selected ADO consumer repository:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Refresh AI Factory/templates, then run the selected project pipeline.</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>bash<span class="w"> </span>./ADO-update-aifactory-and-run-project.sh<span class="w"> </span>--aifactory-version<span class="w"> </span>main
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Preserve installed templates and run the project pipeline only.</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>bash<span class="w"> </span>./ADO-update-aifactory-and-run-project.sh<span class="w"> </span>--project-only
+</code></pre></div>
+<p>Normal update defaults to <code>main</code>; project-only uses the installed source.
+Scripts may prompt for configuration, commit/push or authentication. For API
+automation, use the project plan/prepare/start contract, which binds the selected
+project, environment, configuration and source version before execution.
+Default waiting tracks the submitted run; a submitted pipeline is not yet a
+verified deployed environment.</p>
+<h2 id="tenant-and-service-connection-setup">Tenant and service-connection setup<a class="headerlink" href="#tenant-and-service-connection-setup" title="Permanent link">&para;</a></h2>
+<p><code>azureDevOpsTenantId</code> identifies the ADO organization tenant; <code>tenantId</code> identifies
+the Azure deployment tenant. Do not change either ID merely to make them equal.
+Cross-tenant reviewed execution needs the compatible organization-tenant
+authentication helper and access in both contexts. A standard username-prefixed
+ADO clone URL is not a reason to retarget the repository; never embed passwords
+or tokens in its URL.</p>
+<p>Configure service connections for each environment you actually deploy:</p>
 <table>
 <thead>
 <tr>
-<th>Variable</th>
+<th>YAML/JSON variable</th>
 <th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>dev_service_connection</code></td>
-<td>Deploys resources to DEV subscription</td>
+<td>Dev deployment</td>
 </tr>
 <tr>
 <td><code>dev_seeding_kv_service_connection</code></td>
-<td>Reads secrets from DEV seeding Key Vault</td>
+<td>Dev seeding Key Vault access</td>
 </tr>
 <tr>
 <td><code>test_service_connection</code></td>
-<td>Deploys resources to STAGE subscription</td>
+<td>Stage deployment</td>
 </tr>
 <tr>
 <td><code>test_seeding_kv_service_connection</code></td>
-<td>Reads secrets from STAGE seeding Key Vault</td>
+<td>Stage seeding Key Vault access</td>
 </tr>
 <tr>
 <td><code>prod_service_connection</code></td>
-<td>Deploys resources to PROD subscription</td>
+<td>Prod deployment</td>
 </tr>
 <tr>
 <td><code>prod_seeding_kv_service_connection</code></td>
-<td>Reads secrets from PROD seeding Key Vault</td>
+<td>Prod seeding Key Vault access</td>
 </tr>
 </tbody>
 </table>
-<p>All service connections must be <strong>Azure Resource Manager</strong> type, authenticated via a Service Principal.</p>
-<hr />
-<h2 id="pipeline-structure">Pipeline Structure<a class="headerlink" href="#pipeline-structure" title="Permanent link">&para;</a></h2>
-<p>The ADO YAML pipelines are in:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>environment_setup/aifactory/bicep/copy_to_local_settings/
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  azure-devops/esml-yaml-pipelines/
-</code></pre></div>
-<h3 id="triggering-a-deployment">Triggering a deployment<a class="headerlink" href="#triggering-a-deployment" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Copy <code>variables.yaml</code> to your ADO repository.</li>
-<li>Fill in all mandatory parameters (see <a href="../../parameters/standard/">Standard Parameters</a>).</li>
-<li>Run the pipeline — it will calculate networking, deploy all Bicep modules, and configure RBAC automatically.</li>
-</ol>
-<hr />
-<h2 id="bootstrap-first-time-setup">Bootstrap (First-time Setup)<a class="headerlink" href="#bootstrap-first-time-setup" title="Permanent link">&para;</a></h2>
-<p>Use the bootstrap scripts to set up your ADO environment:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>bootstrap/02b-ADO-YAML-bootstrap-files.sh
-</code></pre></div>
-<p>For updates without overwriting existing variable values:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>bootstrap/03b-ADO-YAML-bootstrap-files-no-var-overwrite.sh
-</code></pre></div>
+<p>Connections must match the pipeline's authentication mode, subscription and
+permissions. The same authorized connection may cover compatible duties; six
+names do not necessarily require six distinct principals.
+Local execution also needs Git Bash, Azure CLI with the required ADO extension,
+and host Python.</p>
+<p>The source
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/variables/variables.yaml"><code>variables.yaml</code></a>
+is copied to the consumer's
+<code>aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml</code>.
+Project JSON overrides must use the matching pipeline adapter; do not rename
+JSON keys to GitHub environment names.</p>
+<p>For registered exact-scope operations,
+<code>bootstrap/ADO-azurefactory.sh</code> consumes a trusted, protected reviewed manifest.
+It does not initialize the register or bypass provider publication, service
+connections, target-lock enrollment or approval.</p>
+<div class="admonition warning">
+<p class="admonition-title">Before execution</p>
+<p>Keep launchers, helpers and YAML templates on a compatible published version.
+Protect populated project configuration and credentials. Run-specific secret
+transport is not permission to commit them to the repository.</p>
+</div>
 
 
 

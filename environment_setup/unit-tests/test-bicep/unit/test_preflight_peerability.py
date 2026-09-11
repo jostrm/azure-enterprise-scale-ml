@@ -2,7 +2,10 @@
 
 import contextlib
 import io
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -51,9 +54,9 @@ def test_aligned_disjoint_vnets_pass(monkeypatch, prefix, starts):
     ("172.16.XX.0/18", ("0", "256", "128"), "Stage range must be"),
     ("172.16.XX.0/18", ("000", "64", "128"), "invalid or not network-aligned"),
 ])
-def test_invalid_ranges_and_overlapping_vnets_fail(monkeypatch, vnet, starts, expected):
+def test_invalid_ranges_and_overlapping_vnets_warn(monkeypatch, vnet, starts, expected):
     output = check(monkeypatch, vnet, starts)
-    assert "FAIL" in output and "Cannot peer" in output and expected in output
+    assert "WARN" in output and "FAIL" not in output and "Cannot peer" in output and expected in output
     assert "0/64/128" in output
 
 
@@ -68,6 +71,42 @@ def test_every_environment_subnet_checked_strictly(monkeypatch):
     output = check(monkeypatch, "172.16.XX.0/18", ("0", "64", "128"),
                    {"scoring": ("172.16.XX.0/26", 28)})
     assert output.count("CIDR_SUBNET_OVERLAP") == 3
+
+
+@pytest.mark.parametrize("findings,expected", [
+    ([("FAIL", "CIDR_VNET_OVERLAP")], 0),
+    ([("WARN", "CIDR_SUBNET_BAD"), ("WARN", "CIDR_VNET_BAD")], 0),
+    ([("FAIL", "SEARCH_SKU_UNAVAILABLE")], 1),
+    ([("WARN", "SEARCH_QUOTA_UNVALIDATED")], 2),
+    ([("FAIL", "CIDR_RANGE_INVALID"), ("FAIL", "RP_NOT_REGISTERED")], 1),
+])
+def test_cidr_only_warnings_never_trigger_strict_but_nonnetwork_policy_is_unchanged(findings, expected):
+    bash = (Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin" / "bash.exe"
+            if os.name == "nt" else Path(shutil.which("bash") or "/unavailable"))
+    if not bash.is_file():
+        pytest.skip("Bash is required for the isolated finding/exit-policy test")
+    source = PREFLIGHT.read_text(encoding="utf-8")
+    function = "add_finding() {" + source.split("add_finding() {", 1)[1].split("\n}\n", 1)[0] + "\n}\n"
+    exits = source[source.index('if [ "$FAIL_COUNT" -gt 0 ]; then'):]
+    script = """
+set -u
+STRICT=true
+WARN_ONLY=false
+FAIL_COUNT=0
+WARN_COUNT=0
+CIDR_WARN_COUNT=0
+FINDINGS=()
+record_report_finding() { printf 'REPORT:%s:%s\\n' "$1" "$2"; }
+ci_error() { printf 'ERROR:%s\\n' "$1"; }
+ci_warning() { printf 'WARNING:%s\\n' "$1"; }
+""" + function + "".join(f"add_finding {severity} {code} 'test finding'\n" for severity, code in findings) + exits
+    result = subprocess.run([str(bash), "--noprofile", "--norc", "-c", script],
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == expected, result.stdout + result.stderr
+    for _, code in findings:
+        if code.startswith("CIDR_"):
+            assert f"REPORT:WARN:{code}" in result.stdout
+            assert f"ERROR:[{code}]" not in result.stdout
 
 
 def test_bicep_substitutes_same_environment_octet_in_vnet_and_common_subnets():
@@ -85,3 +124,32 @@ def test_bicep_substitutes_same_environment_octet_in_vnet_and_common_subnets():
     gha = (templates / "github-actions" / "03a-GH-create-or-update-github-variables.sh").read_text(encoding="utf-8")
     for environment in ("dev", "stage", "prod"):
         assert f'create_or_update_variable "{environment}" "CIDR_RANGE" "${environment.upper()}_CIDR_RANGE"' in gha
+
+
+@pytest.mark.parametrize("index", [0, 1, 2])
+def test_bootstrap_address_diagnostic_branches_warn_without_exiting_or_repairing(index):
+    bash = (Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin" / "bash.exe"
+            if os.name == "nt" else Path(shutil.which("bash") or "/unavailable"))
+    if not bash.is_file():
+        pytest.skip("Bash is required for isolated bootstrap address diagnostics")
+    source = (ROOT / "bootstrap" / "lib" / "create-new-aifactory-scaleset.sh").read_text(encoding="utf-8")
+    branches = list(re.finditer(
+        r"(?m)^([ ]*)if ! aif_validate_(?:cidr|access_hub_cidr|network_plan)\b[\s\S]*?^\1fi", source))
+    assert len(branches) == 3
+    script = """
+set -eu
+AIF_DEV_VNET_CIDR=invalid-dev
+AIF_ACCESS_HUB_VNET_CIDR=invalid-hub
+AIF_VPN_CLIENT_CIDR=invalid-vpn
+aif_validate_cidr() { return 1; }
+aif_validate_access_hub_cidr() { return 1; }
+aif_validate_network_plan() { return 1; }
+aif_warn() { printf 'WARNING:%s\\n' "$1"; }
+""" + branches[index].group() + """
+printf 'VALUES:%s:%s:%s\\n' "$AIF_DEV_VNET_CIDR" "$AIF_ACCESS_HUB_VNET_CIDR" "$AIF_VPN_CLIENT_CIDR"
+"""
+    result = subprocess.run([str(bash), "--noprofile", "--norc", "-c", script],
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "WARNING:Address planning:" in result.stdout
+    assert "VALUES:invalid-dev:invalid-hub:invalid-vpn" in result.stdout

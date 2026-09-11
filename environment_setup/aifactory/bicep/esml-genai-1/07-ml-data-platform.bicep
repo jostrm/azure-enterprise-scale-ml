@@ -521,7 +521,7 @@ module amlv2 '../modules/machineLearningv2.bicep' = if(!amlExists && enableAzure
   ]
 }
 
-module amlv2Aks '../modules/machineLearningAks.bicep' = if(!amlExists && enableAzureMachineLearning && enableAksForAzureML) {
+module amlv2Aks '../modules/machineLearningAks.bicep' = if(enableAzureMachineLearning && enableAksForAzureML) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('06-AzureMLAKS${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -555,7 +555,7 @@ module amlv2Aks '../modules/machineLearningAks.bicep' = if(!amlExists && enableA
     kvName: keyvaultName
   }
   dependsOn: [
-    amlv2
+    ...(!amlExists && enableAzureMachineLearning ? [amlv2] : [])
   ]
 }
 

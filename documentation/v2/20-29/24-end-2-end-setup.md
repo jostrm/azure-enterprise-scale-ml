@@ -1,4 +1,178 @@
-# End-2-End setup tutorial (3 steps): AIFactory + 1 ESMLProject
+# End-to-end setup: Azure Factory and AI projects
+
+Use the **Enterprise Scale AI Factory** app or its API to configure factories,
+review and trigger IaC pipelines, monitor Azure resources, promote projects from
+Dev to Stage/Prod, and manage tickets. Configuration, deployment and monitoring
+are separate operations; a saved definition is not a deployed resource.
+
+## Two common workflows
+
+- **ITSM-integrated (fully automated):** Teams order projects through ServiceNow,
+  Jira Service Management or their own cloud portal. A trusted automation runner
+  calls the AI Factory API to prepare the exact configuration, apply the team's
+  approval policy, confirm execution and track the job. With identities,
+  permissions, pipeline bindings and approvals established, this can run without
+  manual intervention. The desktop's local API is not a public ITSM endpoint;
+  use an authenticated integration, not an exposed loopback port.
+- **Core-team managed:** The core team uses the
+  [Enterprise Scale AI Factory app](../../../environment_setup/install_config_wizard/maui/readme.md)
+  to configure from the ticket, review and trigger the pipeline, and follow its
+  progress in the integrated terminal. The API invokes the appropriate reviewed
+  Bash/provider flow underneath; users do not need to compose shell commands.
+  The two scoped Bash entrypoints are `bootstrap/ADO-azurefactory.sh` and
+  `bootstrap/GHA-azurefactory.sh`. Built-in tickets help manage the work; external
+  connector synchronization is explicit, not automatic deployment approval.
+
+## New folder structure
+
+The shared starter is `bootstrap/templates/azurefactory/register.json`: a valid
+version-2 register with **zero factories**, empty configurations and empty bindings.
+It deliberately contains no example IDs, tenant/subscription values, projects,
+pipeline bindings or deployment claims. The following is an **illustrative
+projection after explicit catalog configuration**, not a tree copied by bootstrap:
+
+```text
+azurefactory\
+  register.json
+  factories\
+    ai-spider\
+      factory.json
+      pipelines\
+        ado.json
+      scalesets\
+        001\
+          scaleset_state.json
+          projects\
+            project001\
+              project_state.json
+              variables.json
+```
+
+The **Azure Factory folder** holds multiple AI Factories. The **Azure Factory
+register file**, `register.json`, commits their identities and configuration
+together. Named files below it are readable/generated projections: edit through
+the app/API, not by changing an export. Every project folder lives under its
+scale set and is named `projectXXX`, such as `project001`. There are no
+factory-level project folders or separate Dev/Stage/Prod project copies.
+Each project's `variables.json` retains the existing pipeline format:
+`dev` and `stage_prod` sections, shared/environment-specific settings, all three
+subscription IDs and factory/scale-set naming. Environments are configuration,
+not another folder level. Friendly names are optional metadata. Projects do not
+inherit a new factory-wide settings layer. Keep credentials in protected storage,
+never in these files.
+
+Factory type is explicit. AI deployment is supported; robot/web/app factory types
+are extension points, not additional deployment engines.
+
+### Initialize only the register (offline and no overwrite)
+
+From a checkout of the shared repository, use Python 3:
+
+```powershell
+python .\bootstrap\lib\initialize_azurefactory.py --root "C:\path\consumer\azurefactory"
+```
+
+The parent directory must already exist. Select the **`azurefactory` folder**,
+not its parent repository and not the legacy `aifactory` folder. Initialization
+publishes only `register.json` using atomic no-overwrite creation. Reruns preserve
+an existing register byte-for-byte after storage-envelope checks; full validation
+of populated definitions remains the catalog API's responsibility. Malformed JSON,
+unsupported envelopes, linked paths, mixed layouts and nonempty unregistered
+destinations fail without overwriting user files. No readable projection or
+`variables.json` is manufactured. Add/import real metadata through the catalog
+before expecting the illustrated factory, scale-set and project files.
+
+An existing sibling `aifactory\variables.json`, including a legacy Dev-only
+configuration and a placeholder config-wizard README, is legitimate legacy input.
+The register-only helper leaves it untouched and does **not** register that
+factory. Preview and confirm explicit adoption/migration with the catalog API.
+An existing factory recognized from its legacy folder does not need an empty
+register or migration merely to make it visible.
+Existing legacy launchers intentionally refuse a workspace containing
+`azurefactory\register.json`; keep a separate legacy execution repository when
+continuing to use those launchers. An empty register is neither a deployment
+root nor evidence of deployed infrastructure.
+
+With the updated shared checkout/submodule, normal
+`01-aif-copy-aifactory-templates.sh` invocation (also `--auto`) still copies
+infrastructure/pipeline and use-case templates for the established manual
+`01` → `02` bootstrap. It additionally stages the central zero-factory starter at
+`aifactory-templates\azurefactory\register.json`, preserving that starter on reruns.
+This is an **inactive template**, not a registered/imported factory, project
+configuration or deployed-resource data. It does not activate a consumer-root
+`azurefactory` folder. Default copy refuses mixed/new roots, including any
+consumer-root `azurefactory` folder or active ancestor register, before copying.
+
+Only explicit `--init-azurefactory` initializes a consumer-root register and
+exits **before** template cleanup/copying. Alternatively use the Python helper
+above with a separate `azurefactory` folder. Neither is needed to view a
+recognized legacy factory. The ADO/GHA legacy create/update launchers explicitly
+pass `--legacy-templates`, retaining the original payload without a nested starter
+when creation moves templates into `aifactory`.
+The copier still replaces other template/use-case directories; **do not run it
+merely to initialize a register**. No new configuration wizard is installed, and
+staging/initializing the starter does not change authentication, cloud resources,
+pipelines, root bindings or existing `aifactory\variables.json`.
+
+## Setup in three steps
+
+1. **Prepare access.** Install the
+   [Windows app and prerequisites](../../../environment_setup/install_config_wizard/maui/readme.md).
+   Establish Azure and ADO/GitHub permissions and the reviewed pipeline/provider
+   setup. The app bundles its API; Bash execution still needs the documented
+   host tools. See [deployment prerequisites](../10-19/12-prerequisites-setup.md).
+2. **Configure.** Select an `azurefactory` folder in **Manage factories**. Add an
+   AI Factory, its region, environment/scale sets, pipeline route and projects.
+   **Configure only—do not deploy** saves definitions without creating Azure
+   resources. **Apply network defaults** changes only draft addressing; explicit
+   validation reports current-configuration warnings.
+3. **Review and execute.** Select the exact factory, environment, scale set and
+   project; prepare and confirm the operation. Follow the integrated terminal
+   and job status, then refresh Azure to verify deployment. Adding a Stage
+   placement is planning; its deployment requires a separate execution review.
+   **Full bootstrap** creates common infrastructure and the initial project;
+   it is not the configuration-only action.
+
+The scoped Bash entrypoints accept `inspect` or `execute` with a protected,
+reviewed runtime manifest supplied by trusted automation. They do not initialize
+the register or replace authentication/approval. Use the app/API for normal
+setup; see the [execution contract](../../../bootstrap/lib/factory_lifecycle_contract.txt)
+for runner integration.
+
+GitHub Actions and Azure DevOps may use separate repositories. Runtime adapters
+can generate an isolated `aifactory` execution folder for existing pipelines;
+that does not replace the new register layout.
+
+Existing installations are never migrated automatically. Preview migration into
+a separate empty `azurefactory` folder and confirm it explicitly; the source
+configuration remains unchanged. Use a matching published app/API/provider
+version; updating this guide does not update an installed binary.
+
+Full bootstrap uses a separate empty repository destination. To register that
+result afterward, preview **migration** from its `aifactory` folder into the
+chosen `azurefactory` folder, then confirm. Registration alone does not establish
+Azure ownership or authorize deployment.
+
+[Architecture](../10-19/11-architecture-diagrams.md) ·
+[Factory overview](../10-19/15-aifactory-overview.md) ·
+[Installation and classic wizard](../../../environment_setup/install_config_wizard/readme.md)
+
+<details>
+<summary>LEGACY folder structure &amp; setup</summary>
+
+The instructions below describe existing single-factory repositories rooted at
+`aifactory`. They remain supported; do not rename that folder in place.
+
+```text
+repository\
+  aifactory\
+    variables.json
+    config-wizard\
+      project-001\
+        project_state.json
+```
+
+## Existing single-factory setup
 
 > [!IMPORTANT]
 > See the new bootstrap template repository - even more automated way to setup Enterprise Scale AIFactory's. (This section is still valid and good to read)
@@ -201,7 +375,9 @@ https://`webapp-prj003-your-web-app-name-001`.azurewebsites.net/.auth/login/aad/
 - You can choose to run the WebApp within the subnet: `snet-esml-cmn-001-scoring` 
 
 # Deprecated setup
-- Deprecated 2025-03: [Azure Devops - Classic](../../../environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-ado-pipelines/readme.md)
+- Deprecated 2025-03: [Azure Devops - Classic](../10-19/13-setup-aifactory.md)
     - No new features will be added for this option. Use YAML option instead.
     - Very detailed setup info with screenshots (Azure Devops classic)
         - [Setup AIFactory - Infra Automation (AzureDevops classic + BICEP)](../10-19/13-setup-aifactory.md)
+
+</details>

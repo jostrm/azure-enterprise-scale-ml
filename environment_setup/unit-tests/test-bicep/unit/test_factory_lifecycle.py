@@ -112,6 +112,53 @@ def manifest(operation="delete"):
     return seal(result)
 
 
+@pytest.mark.parametrize("factory_type", ["ai", "data", "integration", "app", "", None])
+def test_register_factory_type_is_not_silently_executed_as_ai(factory_type):
+    document = manifest("deploy-project")
+    document["target"]["factory_type"] = factory_type
+    seal(document)
+    if factory_type == "ai":
+        assert fl.validate_manifest(document) == document
+    else:
+        with pytest.raises(fl.Blocked, match="unsupported-factory-type"):
+            fl.validate_manifest(document)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("admin_location", "swedencentral"), ("test_sub_id", TENANT),
+    ("tenantId", SUB), ("project_number_000", "001"),
+    ("admin_aifactorySuffixRG", "-002"), ("admin_aifactoryPrefixRG", "other-ai-"),
+])
+def test_register_generated_config_matches_scoped_manifest_before_execution(field, value):
+    document = manifest("deploy-project")
+    document["target"]["factory_type"] = "ai"
+    document["config"]["stage_prod"][field] = value
+    with pytest.raises(fl.Blocked, match="config-target-mismatch"):
+        fl.validate_manifest(seal(document))
+
+
+def test_register_export_is_consumed_as_exact_manifest_without_layout_writes(workspace, monkeypatch, capsys):
+    document = manifest("deploy-project")
+    document["target"]["factory_type"] = "ai"
+    leaf = workspace / "azurefactory/factories/ai-marvel/scalesets/stage/001/projects/project017/variables.json"
+    leaf.parent.mkdir(parents=True)
+    export = {"generation": "c" * 64, "factory_id": document["target"]["factory_id"],
+              "project_id": "logical-project-id", "scale_set_id": document["target"]["scaleset_id"],
+              "environment": "stage", "number": "017", "generated": True, "variables": document["config"]}
+    leaf.write_text(json.dumps(export), encoding="utf-8")
+    register = workspace / "azurefactory/register.json"
+    register.write_text('{"schema": 2}', encoding="utf-8")
+    document["config"] = json.loads(leaf.read_text(encoding="utf-8"))["variables"]
+    before = {str(p): p.read_bytes() for p in workspace.rglob("*") if p.is_file()}
+    monkeypatch.setattr(fl.sys, "stdin", SimpleNamespace(
+        isatty=lambda: False, buffer=io.BytesIO(fl.canonical(seal(document)))))
+    assert fl.main(["inspect", "--stdin-manifest"]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["manifest_valid"]
+    assert before == {str(p): p.read_bytes() for p in workspace.rglob("*") if p.is_file()}
+    assert not (workspace / "aifactory").exists()
+
+
 class FakeStorage:
     def __init__(self):
         self.enrollment = enrollment()

@@ -1,6 +1,7 @@
 """Immutable local lake publications and schema-safe train/inference orchestration."""
 
 import json
+from copy import deepcopy
 import shutil
 import tempfile
 from contextlib import contextmanager
@@ -17,7 +18,7 @@ def file_inventory(directory: Path) -> dict[str, str]:
     for path in sorted(directory.rglob("*")):
         if path.is_symlink() or (hasattr(path, "is_junction") and path.is_junction()):
             raise ValueError("Source data and lake artifacts must not contain links")
-        if path.is_file() and path.name != "_SUCCESS.json":
+        if path.is_file() and path != directory / "_SUCCESS.json":
             result[path.relative_to(directory).as_posix()] = sha256(path)
     return result
 
@@ -82,14 +83,21 @@ def record_rejection(root: Path, layout: LakeLayout, area: str, source: str, cod
 
 
 def capture_source(scenario: dict, layout: LakeLayout, input_path: Path, root: Path) -> Path:
-    input_path, root = Path(input_path).resolve(), Path(root).resolve()
+    input_path = Path(input_path).absolute()
+    for path in (input_path, *input_path.parents):
+        if path.is_symlink() or (hasattr(path, "is_junction") and path.is_junction()):
+            raise ValueError("Source data may not traverse symbolic links or junctions")
+    input_path, root = input_path.resolve(), Path(root).resolve()
     if input_path == root or root.is_relative_to(input_path):
         raise ValueError("Lake root must not be inside the source dataset")
     inventory = source_fingerprint(input_path)
     provenance_file = input_path.parent / "provenance.json" if input_path.is_file() else input_path / "provenance.json"
     provenance = load_json(provenance_file) if provenance_file.is_file() else None
     if provenance is not None:
-        if provenance.get("provider") != "kaggle" or provenance.get("slug") != scenario["dataset"].get("slug"):
+        declared = scenario["dataset"]
+        if (provenance.get("provider") != "kaggle" or provenance.get("slug") != declared.get("slug")
+                or provenance.get("kind") != declared.get("kind")
+                or provenance.get("version") != declared.get("version")):
             raise ValueError("Download provenance does not match the configured Kaggle source")
         expected_files = provenance.get("files", {})
         for name, digest in inventory.items():
@@ -110,6 +118,8 @@ def capture_source(scenario: dict, layout: LakeLayout, input_path: Path, root: P
             else:
                 landing.mkdir()
                 shutil.copy2(input_path, landing / input_path.name)
+            if file_inventory(landing) != inventory:
+                raise ValueError("Source changed during capture; no dataset version was published")
             if provenance is not None:
                 write_json(staging / "download-provenance.json", provenance)
             if scenario["task"].startswith("image_"):
@@ -122,7 +132,7 @@ def capture_source(scenario: dict, layout: LakeLayout, input_path: Path, root: P
             else:
                 if not input_path.is_file():
                     raise ValueError("Tabular ingestion requires one explicit CSV or Parquet file")
-                frame = read_frame(input_path)
+                frame = read_frame(landing / input_path.name)
                 if frame.empty or not frame.columns.is_unique:
                     raise ValueError("Source table must be nonempty and have unique columns")
                 (staging / "bronze").mkdir()
@@ -146,17 +156,56 @@ def capture_source(scenario: dict, layout: LakeLayout, input_path: Path, root: P
     return dataset_root / "landing" if scenario["task"].startswith("image_") else dataset_root / "silver" / "data.parquet"
 
 
+def preparation_contract(scenario: dict) -> dict:
+    """Snapshot identity includes data preparation, not model selection or evaluation."""
+    split = scenario.get("split", {})
+    contract = {
+        "schema": "ml-model-factory-preparation/v1",
+        "scenario": scenario["name"], "task": scenario["task"],
+        "features": scenario.get("features", []), "target": scenario.get("target"),
+        "categorical_features": scenario.get("categorical_features", []),
+        "sensitive_features": scenario.get("sensitive_features", []),
+        "split": {
+            "seed": split.get("seed", 42), "test_size": split.get("test_size", 0.2),
+            "validation_size": split.get("validation_size", 0.2),
+            "group_column": split.get("group_column"),
+        },
+    }
+    if scenario["task"] == "forecasting":
+        forecast = scenario["forecast"]
+        contract["forecast"] = {
+            key: forecast.get(key) for key in ("time_column", "frequency", "horizon")
+        } | {"series_columns": forecast.get("series_columns", [])}
+    if scenario["task"].startswith("image_"):
+        vision = scenario["vision"]
+        contract["vision"] = {key: vision[key] for key in (
+            "format", "image_root", "annotations", "image_column", "label_column", "image_base_uri",
+        ) if key in vision}
+    return deepcopy(contract)
+
+
+def snapshot_signature_matches(existing: dict, expected: dict) -> bool:
+    if not isinstance(existing, dict):
+        return False
+    normalized = deepcopy(existing)
+    # Older snapshots included the complete scenario. Compare their preparation
+    # semantics without mutating already-published manifests or their hashes.
+    if "preparation" not in normalized and isinstance(normalized.get("scenario"), dict):
+        normalized["preparation"] = preparation_contract(normalized.pop("scenario"))
+    return normalized == expected
+
+
 def prepare_snapshot(scenario: dict, layout: LakeLayout, source: Path, root: Path) -> Path:
     dataset_root = layout.local_path(root, "dataset_root")
     source_manifest = verified_manifest(dataset_root)
     snapshot = layout.local_path(root, "training_snapshot")
     signature = {
-        "scenario": scenario, "dataset_key": layout.key("dataset_root"),
+        "preparation": preparation_contract(scenario), "dataset_key": layout.key("dataset_root"),
         "source_manifest_sha256": sha256(dataset_root / "_SUCCESS.json"),
     }
     if snapshot.exists():
         existing = verified_manifest(snapshot)
-        if existing.get("signature") != signature:
+        if not snapshot_signature_matches(existing.get("signature"), signature):
             raise ValueError("Snapshot ID already refers to different data or preparation settings")
     else:
         with publication(root, layout.key("training_snapshot")) as staging:
@@ -175,7 +224,8 @@ def train_in_lake(scenario: dict, config: dict, input_path: Path, root: Path) ->
     validate_scenario(scenario)
     layout = LakeLayout.from_config(config, scenario)
     root = Path(root).resolve()
-    if layout.local_path(root, "training_run").exists():
+    if (layout.local_path(root, "training_run").exists() or
+            local_key_path(root, layout.key("training_run") + "-rejected").exists()):
         raise ValueError("Training run ID already exists; use a new run_id")
     try:
         source = capture_source(scenario, layout, input_path, root)
@@ -244,6 +294,12 @@ def normalize_inference(model, frame, scenario):
     return result
 
 
+def validate_request_ids(frame, column: str):
+    if (column not in frame or frame[column].isna().any() or frame[column].duplicated().any()
+            or frame[column].map(lambda value: isinstance(value, str) and not value.strip()).any()):
+        raise ValueError("Requests require a nonempty unique request_id per row for output/feedback joins")
+
+
 def infer_in_lake(scenario: dict, config: dict, input_path: Path, model_path: Path, root: Path) -> dict:
     import mlflow.pyfunc
     import pandas as pd
@@ -277,8 +333,7 @@ def infer_in_lake(scenario: dict, config: dict, input_path: Path, model_path: Pa
         try:
             raw = read_frame(input_path)
             request_column = config.get("request_id_column", "request_id")
-            if request_column not in raw or raw[request_column].isna().any() or raw[request_column].duplicated().any():
-                raise ValueError("Inference requires a nonempty unique request_id per row for output/feedback joins")
+            validate_request_ids(raw, request_column)
             if scenario["task"].startswith("image_"):
                 if scenario.get("target", "label") in raw or "image_base64" not in raw:
                     raise ValueError("Vision inference requires image_base64 requests without training labels")
@@ -324,8 +379,7 @@ def feedback_in_lake(scenario: dict, config: dict, input_path: Path, root: Path)
     required = {request, target, "observed_at"}
     if not required.issubset(labels.columns) or labels.empty or labels[list(required)].isna().any().any():
         raise ValueError("Feedback requires request_id, observed label, and observed_at for every row")
-    if labels[request].duplicated().any():
-        raise ValueError("A feedback version must contain at most one observed label per request")
+    validate_request_ids(labels, request)
     predicted = read_frame(layout.local_path(root, "output") / "predictions.parquet")
     if not set(labels[request]).issubset(set(predicted[request])):
         raise ValueError("Feedback request IDs must belong to this exact inference run")

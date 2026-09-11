@@ -15,6 +15,9 @@ parameters:
   - name: configHash
     type: string
     default: ''
+  - name: serviceConnection
+    type: string
+    default: ''
 steps:
   - ${{ if and(ne(parameters.target, ''), eq(parameters.cleanup, true)) }}:
     - pwsh: |
@@ -68,7 +71,7 @@ steps:
     - task: AzureCLI@2
       displayName: Verify service connection matches reviewed target before deployment
       inputs:
-        azureSubscription: ${{ iif(eq(parameters.target, 'dev'), variables.dev_service_connection, iif(eq(parameters.target, 'stage'), variables.test_service_connection, variables.prod_service_connection)) }}
+        azureSubscription: ${{ parameters.serviceConnection }}
         scriptType: pscore
         scriptLocation: inlineScript
         inlineScript: |

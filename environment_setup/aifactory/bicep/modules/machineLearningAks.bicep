@@ -216,17 +216,12 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     computeLocation: location
     description: 'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
     resourceId: aksResourceId
-    properties: union((env == 'dev') ? {
-      agentCount: 1
-      clusterPurpose: 'DevTest'
-      agentVmSize: aksVmSku_dev
-      loadBalancerType: 'InternalLoadBalancer'
-    } : {
-      agentCount: 3
-      clusterPurpose: 'FastProd'
-      agentVmSize: aksVmSku_testProd
+    properties: union({
+      clusterPurpose: env == 'dev' ? 'DevTest' : 'FastProd'
       loadBalancerType: 'InternalLoadBalancer'
     }, !aksExists ? {
+      agentCount: env == 'dev' ? aksNodes_dev : aksNodes_testProd
+      agentVmSize: env == 'dev' ? aksVmSku_dev : aksVmSku_testProd
       aksNetworkingConfiguration: {
         subnetId: aksSubnetId
         dnsServiceIP: aksDnsServiceIP

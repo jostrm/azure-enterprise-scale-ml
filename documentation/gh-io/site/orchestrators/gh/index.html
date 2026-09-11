@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#orchestrator-github-actions" class="md-skip">
+        <a href="#github-actions" class="md-skip">
           Skip to content
         </a>
       
@@ -546,7 +546,7 @@
   <span class="md-ellipsis">
     
   
-    Standard Mode (mandatory)
+    Required inputs
   
 
     
@@ -574,7 +574,7 @@
   <span class="md-ellipsis">
     
   
-    Advanced Mode (all)
+    All variables
   
 
     
@@ -1225,10 +1225,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#configuration-file" class="md-nav__link">
+  <a href="#create-a-new-factory-scale-set" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration File
+        Create a new factory scale set
       
     </span>
   </a>
@@ -1236,10 +1236,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#authentication" class="md-nav__link">
+  <a href="#update-or-run-an-existing-project" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Authentication
+        Update or run an existing project
       
     </span>
   </a>
@@ -1247,49 +1247,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#workflow-structure" class="md-nav__link">
+  <a href="#authentication-and-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Workflow Structure
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Workflow Structure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#triggering-a-deployment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Triggering a deployment
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#bootstrap-first-time-setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bootstrap (First-time Setup)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#this-documentation-site" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        This Documentation Site
+        Authentication and configuration
       
     </span>
   </a>
@@ -1393,10 +1354,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#configuration-file" class="md-nav__link">
+  <a href="#create-a-new-factory-scale-set" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration File
+        Create a new factory scale set
       
     </span>
   </a>
@@ -1404,10 +1365,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#authentication" class="md-nav__link">
+  <a href="#update-or-run-an-existing-project" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Authentication
+        Update or run an existing project
       
     </span>
   </a>
@@ -1415,49 +1376,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#workflow-structure" class="md-nav__link">
+  <a href="#authentication-and-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Workflow Structure
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Workflow Structure">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#triggering-a-deployment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Triggering a deployment
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#bootstrap-first-time-setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bootstrap (First-time Setup)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#this-documentation-site" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        This Documentation Site
+        Authentication and configuration
       
     </span>
   </a>
@@ -1484,74 +1406,90 @@
   
 
 
-<h1 id="orchestrator-github-actions">Orchestrator — GitHub Actions<a class="headerlink" href="#orchestrator-github-actions" title="Permanent link">&para;</a></h1>
-<p>The AI Factory supports <strong>GitHub Actions (GHA)</strong> as a first-class orchestrator for all Bicep deployments, equivalent in functionality to the Azure DevOps option.</p>
-<hr />
-<h2 id="configuration-file">Configuration File<a class="headerlink" href="#configuration-file" title="Permanent link">&para;</a></h2>
-<p>When using GitHub Actions, all parameters are defined in:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>environment_setup/aifactory/bicep/copy_to_local_settings/
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  github-actions/.env.template
+<h1 id="github-actions">GitHub Actions<a class="headerlink" href="#github-actions" title="Permanent link">&para;</a></h1>
+<p>Use the GitHub consumer repository for this route; it is separate from an Azure
+DevOps repository. Maintain one complete project <code>variables.json</code> with <code>dev</code> and
+<code>stage_prod</code>, or use the route's <code>.env</code> settings. See
+<a href="../../parameters/">configuration and API</a> and <a href="../../parameters/advanced/">all variables</a>.</p>
+<h2 id="create-a-new-factory-scale-set">Create a new factory scale set<a class="headerlink" href="#create-a-new-factory-scale-set" title="Permanent link">&para;</a></h2>
+<p>Run the current published create launcher, supplying a separate destination:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>bash<span class="w"> </span>./GHA-create-new-aifactory-scaleset.sh<span class="w"> </span>--repo-root<span class="w"> </span><span class="s2">"C:/work/my-gha-factory"</span>
 </code></pre></div>
-<p>Copy this file to your own repository as <code>.env</code> (or use GitHub Actions environment secrets/variables) and fill in all <code>&lt;todo&gt;</code> placeholders.</p>
-<hr />
-<h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h2>
-<p>GitHub Actions uses <strong>federated credentials</strong> (OIDC) or Service Principal credentials stored as GitHub secrets:</p>
+<p>The source copy is under <code>bootstrap/</code>; installed consumer copies may be at the
+repository root. The normal bootstrap prepares the repository, identity,
+configuration, common infrastructure and initial project. It can create billable
+resources and publish repository changes. Read its summary before accepting.</p>
 <table>
 <thead>
 <tr>
-<th>Secret</th>
-<th>Description</th>
+<th>Option</th>
+<th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>AZURE_CLIENT_ID</code></td>
-<td>Service principal App ID</td>
+<td><code>--aifactory-version main</code></td>
+<td>Explicit template selection; these create wrappers currently default to <code>main</code></td>
 </tr>
 <tr>
-<td><code>AZURE_CLIENT_SECRET</code></td>
-<td>Service principal secret (from seeding KV)</td>
+<td><code>--dry-run</code></td>
+<td>Collect/validate answers without executing the normal full-bootstrap mutations</td>
 </tr>
 <tr>
-<td><code>AZURE_TENANT_ID</code></td>
-<td>Azure tenant ID</td>
+<td><code>--non-interactive --yes</code></td>
+<td>Use documented <code>AIF_*</code> inputs and accept execution; authentication must already be available</td>
 </tr>
 <tr>
-<td><code>AZURE_SUBSCRIPTION_ID_DEV</code></td>
-<td>DEV subscription ID</td>
+<td><code>--prepare-only</code></td>
+<td>Prepares Azure/identity/configuration/automation; <strong>not</strong> a read-only preview</td>
 </tr>
 <tr>
-<td><code>AZURE_SUBSCRIPTION_ID_TEST</code></td>
-<td>STAGE subscription ID</td>
-</tr>
-<tr>
-<td><code>AZURE_SUBSCRIPTION_ID_PROD</code></td>
-<td>PROD subscription ID</td>
+<td><code>--no-wait</code></td>
+<td>Dispatch without waiting; does not prove deployment success</td>
 </tr>
 </tbody>
 </table>
-<hr />
-<h2 id="workflow-structure">Workflow Structure<a class="headerlink" href="#workflow-structure" title="Permanent link">&para;</a></h2>
-<p>GitHub Actions workflows are in:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>.github/workflows/
+<p>The specialized <code>AIF_SIMPLE_MODE=true</code> contract has its own fixed inputs and
+preview restrictions; see <a href="../../parameters/advanced/">the full reference</a>.</p>
+<h2 id="update-or-run-an-existing-project">Update or run an existing project<a class="headerlink" href="#update-or-run-an-existing-project" title="Permanent link">&para;</a></h2>
+<p>From the selected consumer repository:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Refresh AI Factory/templates, then run the project workflow.</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>bash<span class="w"> </span>./GH-update-aifactory-and-run-project.sh<span class="w"> </span>--aifactory-version<span class="w"> </span>main
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Run the existing project pipeline without refreshing templates.</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>bash<span class="w"> </span>./GH-update-aifactory-and-run-project.sh<span class="w"> </span>--project-only
 </code></pre></div>
-<h3 id="triggering-a-deployment">Triggering a deployment<a class="headerlink" href="#triggering-a-deployment" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Copy <code>.env.template</code> to your GHA repository and configure all mandatory parameters.</li>
-<li>Add required secrets to your GitHub repository or environment.</li>
-<li>Trigger the workflow manually (<code>workflow_dispatch</code>) or via a push to the designated branch.</li>
-</ol>
-<hr />
-<h2 id="bootstrap-first-time-setup">Bootstrap (First-time Setup)<a class="headerlink" href="#bootstrap-first-time-setup" title="Permanent link">&para;</a></h2>
-<p>Use the bootstrap scripts to set up your GitHub Actions environment:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>bootstrap/02a-GH-bootstrap-files.sh
-</code></pre></div>
-<p>For updates without overwriting existing variable values:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>bootstrap/03a-GH-bootstrap-files-no-env-overwrite.sh
-</code></pre></div>
-<hr />
-<h2 id="this-documentation-site">This Documentation Site<a class="headerlink" href="#this-documentation-site" title="Permanent link">&para;</a></h2>
-<p>This MkDocs documentation site is itself deployed via GitHub Actions. See the workflow at <code>.github/workflows/deploy-docs.yml</code>.</p>
+<p><code>GHA-update-aifactory-and-run-project.sh</code> is the equivalent alias. Default update
+uses <code>main</code>; <code>--project-only</code> preserves the installed source. Scripts can prompt
+for configuration, commit/push or authentication; they are not automatically
+unattended merely because they are invoked from another program.</p>
+<p>API-reviewed runs bind <code>AIFACTORY_TARGET_ENVIRONMENT</code>, <code>AIFACTORY_PROJECT_NUMBER</code>
+and <code>AIFACTORY_PROJECT_CONFIG</code> to the selected target. Use the API prepare/start
+flow for those runs; do not reuse an old confirmation for another project.
+The configuration is transported through protected per-run configuration, not
+committed as a public JSON file.</p>
+<h2 id="authentication-and-configuration">Authentication and configuration<a class="headerlink" href="#authentication-and-configuration" title="Permanent link">&para;</a></h2>
+<p>Local execution needs Git Bash, Azure CLI, GitHub CLI, host Python and access to
+the intended repository and Azure subscriptions. Pipeline authentication uses
+the configured OIDC/federated identity or the supported service-principal route.
+Keep credentials in the required secret stores, never in <code>.env.template</code> or docs.</p>
+<p>The route template is
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/.env.template"><code>github-actions/.env.template</code></a>.
+It uses uppercase names; JSON/YAML often use different names. Do not mechanically
+uppercase JSON keys. Workflow files run under <code>.github/workflows</code>; use the
+documented entrypoint and verify the exact workflow/run, rather than assuming
+every push deploys.</p>
+<p>For a registered exact-scope lifecycle operation, the additional
+<code>bootstrap/GHA-azurefactory.sh</code> wrapper consumes a trusted, protected reviewed
+manifest. It does not replace full bootstrap or initialize a register. It requires
+a published compatible provider, authentication and target-lock enrollment.</p>
+<div class="admonition note">
+<p class="admonition-title">Source versions</p>
+<p>Use a matching published release of scripts, helpers and pipeline templates.
+<code>125</code> means <code>release/v1.25</code>; <code>main</code> is an explicit moving branch whose reviewed
+commit is pinned for execution. Local unpublished changes are not available
+to a remote workflow until separately published.</p>
+</div>
 
 
 

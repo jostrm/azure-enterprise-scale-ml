@@ -1,0 +1,22 @@
+{
+  "source_url": "https://www.kaggle.com/datasets/dkhundley/sample-rag-knowledge-item-dataset",
+  "version": "1",
+  "license": "MIT",
+  "verified_public_download_date": "2026-09-11",
+  "bytes": 43111,
+  "raw_sha256": "c48e1db2f7d1da20f7c66935f707d4b7caddbc9e898a0d0838f68aaff0f85ce7",
+  "raw_md5_base64": "IFNWpmC6OiCSv0l31Akzuw==",
+  "row_count": 10,
+  "documents": [
+    {"id": "06ccb3cbd150d9fd24c4ed1cf08d4257e797ee0a972e41788a675c8332387409", "topic": "Configuring Email on an Android Device", "content_sha256": "aaf23634b54ab7c0a159360cdebf8ed837e52dee67001efd5e873584173f90a0"},
+    {"id": "369b4d76f8631eab487017117dae62afc06baa108b711f865a6a80ed905b5d08", "topic": "Resetting a Jammed Printer", "content_sha256": "14dda18859ec3aaf79f47209500f1440c4ec85c0f6e5651ca706e6359e3df04c"},
+    {"id": "42b80a420a219a0efd476e48daaae9a0f6c8f080661e62a3fa77e8f8b15e49b0", "topic": "Setting Up a Conference Call on Cisco Webex", "content_sha256": "804fdf9cde981b3f85d435091f0388e7bc69866146eff1536ed2324dc3176974"},
+    {"id": "5dc2136d9622b034771a9e46141989652801399af00fa3f4bac20299d151fd01", "topic": "Setting Up a Secure Wireless Network", "content_sha256": "f3bdd1c0cee166a35fb2f9d31f996bfdc90a1e506e837f610ef0218eec8f0fb1"},
+    {"id": "83f184b7c22af3636af2b996d735864cb97330e95222307a6e6277bf0d4e131a", "topic": "Creating a Backup of Important Files", "content_sha256": "76d3cb2eeaab4ef3c089078e0bfef2f2f16356ae243846bc48f070717f2e8576"},
+    {"id": "8febc1bfc24f08ad5155fadc981b6e10a7c1a32b2b08de28651d5cb1017fbd1d", "topic": "Troubleshooting Issues with Microsoft Office", "content_sha256": "12826ee9a5f0c8db60c1b5450cf3401140aa66052852d8281e42b7a74e78f890"},
+    {"id": "9ebccd2e15b6b8c52f27ece7bd30f05130e19c0f34c837611dfd1c9ecd2c5ab3", "topic": "Configuring VPN Access for Remote Workers", "content_sha256": "30c9fa5430a3299e5e8c59297a54b2bb391efd38b5c003f937928752162377b5"},
+    {"id": "a5e1858985ff021b1262b097adf93927e276f6bcb3856414fb7723f1d78adb7f", "topic": "Resetting a Forgotten PIN", "content_sha256": "3e94da3db79ca95b2fd8119f428e26083075c956483ca707a918f5a665ffa971"},
+    {"id": "befff9c3af5b32cc4037b6865e30ae977f3f65d9592da6185404c19c5922e285", "topic": "Setting Up a Mobile Device for Company Email", "content_sha256": "0bdf280d90de1927ffa8d51252474be6bc2312ae48e79fc6548ac6cd971a7d1f"},
+    {"id": "d28634067a7204171904a4a1107093d09a77337b0192e6fcccffda09d623d368", "topic": "Troubleshooting Issues with Company-Issued Tablets", "content_sha256": "a8288517a148680726618b351ac5c77834cc0fd1bdbd3c6a7f34891ae3967d7b"}
+  ]
+}

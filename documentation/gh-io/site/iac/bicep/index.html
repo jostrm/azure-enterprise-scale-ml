@@ -546,7 +546,7 @@
   <span class="md-ellipsis">
     
   
-    Standard Mode (mandatory)
+    Required inputs
   
 
     
@@ -574,7 +574,7 @@
   <span class="md-ellipsis">
     
   
-    Advanced Mode (all)
+    All variables
   
 
     
@@ -1455,7 +1455,7 @@
 <hr />
 <h2 id="why-bicep">Why Bicep?<a class="headerlink" href="#why-bicep" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>GA technology</strong> — used per WAF recommendation (avoids AZD/AVM preview tooling in production).</li>
+<li><strong>Declarative Azure infrastructure</strong> — compiled and deployed through Azure CLI and the selected pipeline.</li>
 <li><strong>Modular</strong> — each Azure service is a separate Bicep module, reused across project types.</li>
 <li><strong>Auditable</strong> — all deployments are logged in Azure Deployment history.</li>
 <li><strong>Incremental</strong> — Bicep deployments are idempotent; re-runs only update changed resources.</li>
@@ -1470,6 +1470,10 @@
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│       └── .env.template                                  # GHA parameters
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>└── modules/                                               # Bicep modules
 </code></pre></div>
+<p>The complete project JSON template is <code>environment_setup/aifactory/variables.json</code>.
+Its <code>dev</code> and <code>stage_prod</code> sections retain shared and environment-specific values.
+See <a href="../../parameters/">Configuration and API</a> for input formats, validation,
+and the distinction between a preview and execution.</p>
 <hr />
 <h2 id="key-modules">Key Modules<a class="headerlink" href="#key-modules" title="Permanent link">&para;</a></h2>
 <table>

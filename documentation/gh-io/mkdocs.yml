@@ -59,9 +59,9 @@ plugins:
 nav:
   - Overview: index.md
   - Parameters:
-      - parameters/index.md
-      - Standard Mode (mandatory): parameters/standard.md
-      - Advanced Mode (all): parameters/advanced.md
+      - Configuration and API: parameters/index.md
+      - Required inputs: parameters/standard.md
+      - All variables: parameters/advanced.md
   - AI Factory Concepts:
       - concepts/index.md
       - AI Factory Intelligence: concepts/intelligence.md

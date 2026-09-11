@@ -9,6 +9,50 @@ if [[ ! -f "$AIF_UI_LIBRARY" ]]; then
     exit 1
 fi
 source "$AIF_UI_LIBRARY"
+
+# New storage initialization never enters the legacy copier (which replaces folders).
+layout_mode="${1:---auto}"
+if [[ "$#" -gt 1 || ( "$layout_mode" != "--auto" && "$layout_mode" != "--legacy-templates" &&
+                     "$layout_mode" != "--init-azurefactory" ) ]]; then
+    aif_error "Usage: $0 [--auto|--init-azurefactory|--legacy-templates]" >&2
+    exit 2
+fi
+if [[ "$layout_mode" != "--init-azurefactory" ]]; then
+    aif_require_legacy_workspace "$PWD" || exit 1
+    if [[ -e "$PWD/azurefactory" || -L "$PWD/azurefactory" ]]; then
+        aif_error "An azurefactory folder exists. Template copy refuses mixed/new roots; use a separate legacy workspace." >&2
+        exit 2
+    fi
+fi
+if [[ "$layout_mode" != "--legacy-templates" ]]; then
+    for initializer in "$AIF_UI_DIR/lib/initialize_azurefactory.py" \
+                       "$AIF_UI_DIR/azure-enterprise-scale-ml/bootstrap/lib/initialize_azurefactory.py"; do
+        [[ ! -f "$initializer" ]] || break
+    done
+    if [[ ! -f "$initializer" ]]; then
+        aif_error "azurefactory/register.json initializer is missing. Update the shared bootstrap/lib and bootstrap/templates together." >&2
+        exit 1
+    fi
+    if [[ -n "${AIFACTORY_PYTHON:-}" ]]; then
+        python_command=("$AIFACTORY_PYTHON")
+    elif command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then
+        python_command=(python3)
+    elif command -v python >/dev/null 2>&1 && python --version >/dev/null 2>&1; then
+        python_command=(python)
+    elif command -v py >/dev/null 2>&1 && py -3 --version >/dev/null 2>&1; then
+        python_command=(py -3)
+    else
+        aif_error "Python 3 is required to initialize azurefactory/register.json safely." >&2
+        exit 1
+    fi
+    if [[ "$layout_mode" == "--init-azurefactory" ]]; then
+        exec "${python_command[@]}" "$initializer" --root "$PWD/azurefactory"
+    fi
+fi
+if [[ -L "$PWD/aifactory" || ( -e "$PWD/aifactory" && ! -d "$PWD/aifactory" ) ]]; then
+    aif_error "A symbolic-link or non-directory aifactory is not a legacy bootstrap destination." >&2
+    exit 1
+fi
 aif_banner "TEMPLATE SYNC" "Infrastructure / Automation / Use-case code"
 
 ################### VARIABLES ###################
@@ -22,9 +66,20 @@ aif_section "01 / Prepare template destination"
 current_dir=$(pwd)
 aif_dir="$current_dir/aifactory-templates"
 
-# Create the temporary directory
-rm -rf "$aif_dir"
-mkdir -p "$aif_dir"
+# Keep the inactive starter intact on template-sync reruns.
+if [[ "$layout_mode" == "--auto" ]]; then
+    mkdir -p "$aif_dir" || exit 1
+    "${python_command[@]}" "$initializer" --stage-template --root "$aif_dir/azurefactory" || exit 1
+    for template_path in "$aif_dir"/* "$aif_dir"/.[!.]* "$aif_dir"/..?*; do
+        [[ -e "$template_path" || -L "$template_path" ]] || continue
+        [[ "${template_path##*/}" != "azurefactory" ]] || continue
+        rm -rf -- "$template_path"
+    done
+else
+    # Legacy create moves this directory to aifactory; do not nest catalog storage there.
+    rm -rf "$aif_dir"
+    mkdir -p "$aif_dir"
+fi
 
 # Copy template files
 start_dir="azure-enterprise-scale-ml"

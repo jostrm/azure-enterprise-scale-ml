@@ -1,6 +1,7 @@
-# AI Factory Configuration Wizard for Windows 11
+# Enterprise Scale AI Factory for Windows 11
 
-A native .NET MAUI desktop app with the Python API from the Tkinter wizard included.
+A native .NET MAUI desktop app with its Python API included: configuration,
+reviewed IaC execution, Azure monitoring, project operations and tickets.
 
 ## Install
 
@@ -37,12 +38,31 @@ Internet access is required for sign-in, Azure inventory, source-version checks 
 
 ## First use
 
-- Choose **Configuration wizard** to open or create your configuration; point it at your consumer repository's `aifactory` folder, not this accelerator source repository.
-- Use **Connection** if you need to inspect the API connection or intentionally connect to a separately hosted API.
-- On **AI Factory**, **Plan to Stage** saves a Stage card with **Status: Not deployed**. Planning does not deploy resources.
-- Use **Deploy** for a planned environment and **Update** for an observed deployment. Both open an explicit review before a script starts. **Patch** unchecked passes `--project-only`; checked refreshes the shared templates as well.
-- The launcher is in the parent of `aifactory`: `ADO-update-aifactory-and-run-project.sh` or `GHA-update-aifactory-and-run-project.sh`. Keep your consumer launchers and templates current.
-- The main menu retains the current page's project-style gradient highlight. **Manage factories** handles the newer factory catalog; legacy views can redirect there when a catalog root is selected.
+1. Follow the [end-to-end setup guide](../../../documentation/v2/20-29/24-end-2-end-setup.md).
+   New multi-factory setups use an `azurefactory` folder and **Manage factories**.
+   **Configure only—do not deploy** saves the selected definitions; execution is separate.
+2. Select the exact AI Factory, environment, scale set and project. Prepare and
+   confirm a deployment, then follow the terminal/job status and refresh Azure.
+   Planning a later environment does not deploy it.
+3. Use **Projects**, **AI Factories**, monitoring and **Tickets** for day-to-day
+   work. **Full bootstrap** is the separate common-infrastructure-plus-first-project
+   creation flow. **Connection** shows the local API connection.
+
+The new layout requires a release containing the matching app/API support;
+downloaded older installers do not gain it by changing folder names.
+
+<details>
+<summary>LEGACY folder structure &amp; setup</summary>
+
+Open an existing consumer repository's `aifactory` folder in **Configuration
+wizard**. **Plan to Stage** creates a draft; **Deploy** or **Review update**
+prepares execution. **Patch** off preserves installed templates; on refreshes
+them. The root launchers are `ADO-update-aifactory-and-run-project.sh` and
+`GHA-update-aifactory-and-run-project.sh` (alias of `GH-update-aifactory-and-run-project.sh`).
+Keep scripts/templates matched to the selected published version. Migration to
+an Azure Factory register is explicit and preserves the source.
+
+</details>
 
 ## Updates and uninstall
 

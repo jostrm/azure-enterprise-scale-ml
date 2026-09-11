@@ -98,10 +98,13 @@ training run can reuse a matching snapshot. Changed data or preparation settings
 require a new snapshot. Reusing an identifier for different content is rejected
 by the local publication workflow.
 
-The current local snapshot signature includes the full scenario configuration.
-Consequently, changing an algorithm or quality-gate setting also requires a new
-snapshot ID, even when the underlying source and split rules are unchanged.
-This conservative restriction does not require duplicating the shared source.
+Snapshot identity includes source hashes and a versioned preparation contract:
+features, labels, typing, split/group rules, forecasting windows and image
+annotation settings. It excludes algorithms, AutoML trial budgets, model names
+and quality thresholds. Those model variants can reuse the same unchanged gold
+snapshot while writing separate training runs and evaluations. Older snapshots
+whose signature included the full scenario are read compatibly without rewriting
+their manifests or hashes.
 
 `environments/test` is the test deployment environment. `gold/test` is a held-out
 evaluation split. Neither is an alias for the other.
@@ -342,3 +345,34 @@ Implementation references:
 [`LakeLayout`](../../../usecase_code/50-ml-model-factory/ml_model_factory/lake.py),
 [local lifecycle](../../../usecase_code/50-ml-model-factory/ml_model_factory/lake_flow.py),
 [example configuration](../../../usecase_code/50-ml-model-factory/lake.example.json).
+
+## 8. Validate the complete lifecycle
+
+From the model-factory root, using its configured Python environment:
+
+```powershell
+python -m pytest tests ..\..\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09\tests ..\..\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory\tests --junitxml=outputs\validation\lifecycle-results.xml -q
+```
+
+Treat validation evidence as three different levels:
+
+| Level | What it demonstrates | What it does not demonstrate |
+| --- | --- | --- |
+| Local lifecycle execution | Real preparation, model fitting, MLflow reload, held-out evaluation, inference and feedback artifacts | Azure or Databricks service execution |
+| Orchestration contract/service simulation | ADF initial/delta inputs, SDK/CLI definitions, CI decisions, output bindings and failure gates | Live permissions, capacity, connectivity or AutoML accuracy |
+| Live integration | Actual Kaggle access and Azure/Databricks jobs/endpoints using the intended identities | Universal support for combinations not executed |
+
+Use generated fixtures for deterministic tests; a simulated Kaggle download is
+not evidence of a live download. Test both successful and rejected flows: altered
+source hashes, mismatched dataset versions, missing labels, entity overlap,
+quality-gate failure, duplicate request IDs, invalid feedback joins and reused
+publication IDs. A failure must not create a successful model/registration receipt.
+
+Different algorithms and quality thresholds must reuse a matching gold snapshot
+without rerunning preparation. Changes to features, split seeds/groups, forecast
+horizons or annotation mappings must reject that reuse.
+
+Keep unsupported combinations explicit. AutoML image training-only templates,
+missing inference adapters and incompatible ADF image-directory bindings are
+expected limitations, not successfully executed end-to-end cases. Cloud failures
+remain failures even when every local unit test passes.

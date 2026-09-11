@@ -508,6 +508,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#configure-create-and-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure, create and update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#main-purpose" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -674,7 +685,7 @@
   <span class="md-ellipsis">
     
   
-    Standard Mode (mandatory)
+    Required inputs
   
 
     
@@ -702,7 +713,7 @@
   <span class="md-ellipsis">
     
   
-    Advanced Mode (all)
+    All variables
   
 
     
@@ -1410,6 +1421,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#configure-create-and-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure, create and update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#main-purpose" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1515,8 +1537,24 @@
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Since the Well-Architected Framework does not recommend using Azure Developer CLI (<code>azd</code>) for production, this project uses GA <code>Azure CLI</code> with orchestrator pipelines in GitHub Actions or Azure DevOps Pipelines.</p>
+<p>This project uses Azure CLI, Bicep, and GitHub Actions or Azure DevOps pipelines.
+Choose the supported entrypoint and authentication setup for your selected release.</p>
 </div>
+<h2 id="configure-create-and-update">Configure, create and update<a class="headerlink" href="#configure-create-and-update" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Keep one project's complete <strong><code>variables.json</code></strong> with <code>dev</code> and <code>stage_prod</code>
+  settings, including the three environment subscriptions. YAML and <code>.env</code> routes
+  remain supported. See <a href="parameters/">Configuration and API</a>.</li>
+<li>Create a scale set with <strong><code>ADO-create-new-aifactory-scaleset.sh</code></strong> or
+  <strong><code>GHA-create-new-aifactory-scaleset.sh</code></strong>.</li>
+<li>Update/run a project with <strong><code>ADO-update-aifactory-and-run-project.sh</code></strong> or
+  <strong><code>GH-update-aifactory-and-run-project.sh</code></strong> (<code>GHA-...</code> is an alias).</li>
+<li>Integrate a trusted ITSM/portal runner through the <strong>API layer</strong>:
+  validate, prepare, approve, execute and track the exact job. Preparation alone
+  does not deploy.</li>
+</ul>
+<p>Use the <a href="parameters/advanced/">complete variable reference</a> for current
+JSON/YAML/GitHub names, defaults and conditional requirements.</p>
 <hr />
 <h2 id="main-purpose">Main Purpose<a class="headerlink" href="#main-purpose" title="Permanent link">&para;</a></h2>
 <ol>
@@ -1534,7 +1572,7 @@
 <li>The AI Factory wraps multiple environments together: Dev, Stage, Prod, per team, called <code>AI Factory project</code>.</li>
 <li>The AI Factory sets up 1 to 3 AI Application Landing Zones per <code>AI Factory project</code> and <code>project team</code> (a team assigned to a project)</li>
 <li>The AI Factory scales with Azure Subscriptions, called <code>AI Factory scale sets</code>, each team their own scaleset (3 Subscriptions = Application Landingzones)</li>
-<li>Each AI Factory project (landingzone) is divided in two parts: COMMON &amp; PROJECT specific, on resource group level - since required to align with WAF &amp; CAF: <ul>
+<li>Each AI Factory project (landingzone) is divided in two parts: COMMON &amp; PROJECT specific, on resource group level - since required to align with WAF &amp; CAF:<ul>
 <li><code>WAF Cost optimization</code>: Reuse networking and common artifacts, across services in an architecture used by the <code>use case</code> and team</li>
 <li><code>WAF Security</code>: <code>Least privileged access</code> since the end-users does not need to have access on certain networking resources and other artifacts. <code>Granular security</code></li>
 <li><code>Operations</code>: <code>Reusing</code> common artifacts also makes it easier to operate, such as <code>Centralized Monitoring &amp; Logging</code>, <code>Common security</code> separated from granular <code>Role Specific Access</code>.</li>
@@ -1546,8 +1584,8 @@
         - Full AI: Both GenAI (Foundry) and Machine Learning (Azure Machine Learning, Azure Databricks)
         - Front-End (UI, Caching)
         - Back-End (Databases)
-        - Integration (LogicApps, APIM, Eventhubs) 
-        - Soveregnity: On-premises link via Azure Arc to Azure Machine Learning, Kubernetes, for Sovereign Cloud purposes. </li>
+        - Integration (LogicApps, APIM, Eventhubs)
+        - Soveregnity: On-premises link via Azure Arc to Azure Machine Learning, Kubernetes, for Sovereign Cloud purposes.</li>
 </ul>
 <hr />
 <h2 id="architectures">Architectures<a class="headerlink" href="#architectures" title="Permanent link">&para;</a></h2>
@@ -1623,7 +1661,7 @@
 <tbody>
 <tr>
 <td>Setup Guide</td>
-<td><a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/20-29/24-end-2-end-setup.md">How-to set up AI Factory</a></td>
+<td><a href="parameters/">Configuration and API</a>, <a href="orchestrators/gh/">GitHub Actions</a>, <a href="orchestrators/ado/">Azure DevOps</a></td>
 </tr>
 <tr>
 <td>Update Guide</td>

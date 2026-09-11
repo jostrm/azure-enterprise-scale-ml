@@ -1,7 +1,9 @@
 """Offline tests only: no launcher, Git mutation, cloud CLI or deployment is run."""
 
 import ast
+import base64
 import copy
+import hashlib
 import importlib.util
 import json
 import sys
@@ -28,7 +30,7 @@ TENANT = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 
 def document():
     values = {
-        "project_number_000": "017", "tenantId": TENANT,
+        "project_number_000": "017", "tenantId": TENANT, "azureDevOpsTenantId": TENANT,
         "dev_sub_id": SUBS["dev"], "test_sub_id": SUBS["stage"], "prod_sub_id": SUBS["prod"],
         "GITHUB_NEW_REPO": "org/consumer", "servicePrincipalSecret": "synthetic-secret-not-a-real-credential",
     }
@@ -47,6 +49,7 @@ def instance(route):
     result.selected = pd.validate_config(document(), "017", "stage")
     result.config = pd.canonical_json(document())
     result.repository = "org/consumer" if route == "gha" else "consumer"
+    result.environment = {}
     result.sleep = Mock()
     return result
 
@@ -87,6 +90,23 @@ def test_invalid_configuration_fails_before_commands(kind):
         pd.validate_config(data, "017", "stage")
 
 
+def test_legacy_helper_cannot_use_global_export_in_register_repository(tmp_path):
+    root = tmp_path / "consumer"
+    (root / "azurefactory").mkdir(parents=True)
+    (root / "azurefactory/register.json").write_text('{"schema":2}', encoding="utf-8")
+    (root / "aifactory").mkdir()
+    (root / ".git").mkdir()
+    config = root / "aifactory/variables.json"
+    config.write_text(json.dumps(document()), encoding="utf-8")
+    deployment = object.__new__(pd.Deployment)
+    deployment.root = root
+    deployment.command = Mock(side_effect=AssertionError("No commands before scope review"))
+    with pytest.raises(ValueError, match="scoped lifecycle"):
+        deployment.prepare("017", "stage", config)
+    deployment.command.assert_not_called()
+    assert json.loads(config.read_text(encoding="utf-8")) == document()
+
+
 @pytest.mark.parametrize("target,skip", [
     ("dev", ["Stage_GenAI_Project", "Prod_GenAI_Project"]),
     ("stage", ["Dev_GenAI_Project", "Prod_GenAI_Project"]),
@@ -101,7 +121,47 @@ def test_ado_request_is_exact_target_and_per_run_secret(target, skip):
     assert request["templateParameters"]["deploymentProjectNumber"] == "017"
     assert request["variables"]["AIFACTORY_CONFIG_JSON"] == {"value": encoded, "isSecret": True}
     assert request["templateParameters"]["configFile"] == "aifactory/.reviewed-project-config.json"
-    assert "servicePrincipalSecret" not in request["templateParameters"]["deploymentSettings"]
+    settings_json = request["templateParameters"]["deploymentSettings"]
+    assert isinstance(settings_json, str)
+    assert "servicePrincipalSecret" not in json.loads(settings_json)
+
+
+def test_ado_transport_preserves_literal_macros_and_matches_hash():
+    data = document()
+    data["dev"]["tags"] = '{"project":"$(project_number_000)","literal":"$5"}'
+    data["dev"]["tagsProject"] = "$(Build.BuildId)"
+    original = pd.canonical_json(data)
+    request = pd.run_request("main", original, pd.validate_config(data, "017", "dev"))
+    transported = request["variables"]["AIFACTORY_CONFIG_JSON"]["value"]
+    assert "$(" not in transported
+    assert json.loads(transported) == data
+    assert request["templateParameters"]["deploymentConfigHash"] == hashlib.sha256(transported.encode("utf-8")).hexdigest()
+    assert transported != original
+    repeated = pd.run_request("main", transported, pd.validate_config(data, "017", "dev"))
+    assert repeated["variables"]["AIFACTORY_CONFIG_JSON"]["value"] == transported
+
+
+def test_reviewed_preflight_receives_explicit_environment_service_connection():
+    pipeline = yaml.safe_load((ADO / "infra-project-genai.yaml").read_text(encoding="utf-8"))
+    expected = {
+        "Dev_GenAI_Project": "${{ variables.dev_service_connection }}",
+        "Stage_GenAI_Project": "${{ variables.test_service_connection }}",
+        "Prod_GenAI_Project": "${{ variables.prod_service_connection }}",
+    }
+    count = 0
+    for stage in pipeline["stages"]:
+        for job in stage["jobs"]:
+            for step in job["strategy"]["runOnce"]["deploy"]["steps"]:
+                if (step.get("template") == "./jobs/job-0-reviewed-project-config.yaml"
+                        and "configHash" in step.get("parameters", {})):
+                    assert step["parameters"]["serviceConnection"] == expected[stage["stage"]]
+                    count += 1
+    assert count == 9
+    preflight = yaml.safe_load((ADO / "jobs/job-0-reviewed-project-config.yaml").read_text(encoding="utf-8"))
+    tasks = [step for block in preflight["steps"] for steps in block.values() for step in steps
+             if step.get("task") == "AzureCLI@2"]
+    assert len(tasks) == 1
+    assert tasks[0]["inputs"]["azureSubscription"] == "${{ parameters.serviceConnection }}"
 
 
 def test_ado_scheduling_uses_selected_project_not_other_loaded_export():
@@ -109,7 +169,7 @@ def test_ado_scheduling_uses_selected_project_not_other_loaded_export():
     config["stage_prod"].update(runNetworkingVar=False, BYO_subnets=True, useSelfHostedBuildAgent=True,
                                adminVMBuildAgentPool="reviewed-pool", adminVMBuildAgentName="reviewed-agent")
     selected = pd.validate_config(config, "017", "stage")
-    settings = pd.run_request("main", pd.canonical_json(config), selected)["templateParameters"]["deploymentSettings"]
+    settings = json.loads(pd.run_request("main", pd.canonical_json(config), selected)["templateParameters"]["deploymentSettings"])
     assert settings["runNetworkingVar"] == "false" and settings["BYO_subnets"] == "true"
     assert settings["adminVMBuildAgentPool"] == "reviewed-pool"
     assert settings["adminVMBuildAgentName"] == "reviewed-agent"
@@ -195,8 +255,10 @@ def test_ado_uses_returned_run_id_and_watches_completion(result):
     assert request_body["templateParameters"]["deploymentTarget"] == "stage"
 
 
-def test_refresh_preserves_selected_config_and_reviewed_templates(tmp_path):
-    deployment = instance("gha")
+@pytest.mark.parametrize("route", ["gha", "ado"])
+def test_refresh_preserves_selected_config_and_reviewed_templates(tmp_path, route):
+    deployment = instance(route)
+    deployment.origin = "https://dev.azure.com/org/project/_git/consumer"
     deployment.root = tmp_path / "consumer"
     deployment.state_dir = tmp_path / "state"
     deployment.state_dir.mkdir()
@@ -206,7 +268,7 @@ def test_refresh_preserves_selected_config_and_reviewed_templates(tmp_path):
     deployment.environment = {"AIFACTORY_VERSION": "125", "AIF_SUBMODULE_REF": "b" * 40}
     pd.release_version.save(deployment.root, version)
     deployment.templates = {}
-    for relative in pd.FILES["gha"]:
+    for relative in pd.FILES[route]:
         path = deployment.root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("reviewed", encoding="utf-8")
@@ -215,7 +277,8 @@ def test_refresh_preserves_selected_config_and_reviewed_templates(tmp_path):
     config.parent.mkdir(exist_ok=True)
     config.write_text("original-current-project", encoding="utf-8")
     (deployment.root / ".env").write_text("protected-env", encoding="utf-8")
-    (deployment.state_dir / "GH-update-aifactory-and-run-project.sh").write_text("reviewed-launcher", encoding="utf-8")
+    launcher = ("GH" if route == "gha" else "ADO") + "-update-aifactory-and-run-project.sh"
+    (deployment.state_dir / launcher).write_text("reviewed-launcher", encoding="utf-8")
     calls = []
 
     def command(argv, **kwargs):
@@ -225,7 +288,7 @@ def test_refresh_preserves_selected_config_and_reviewed_templates(tmp_path):
             for relative in deployment.templates:
                 (deployment.root / relative).write_text("fetched-old-template", encoding="utf-8")
         if argv[:3] == ["git", "diff", "--cached"]:
-            return ".github/workflows/infra-project.yml"
+            return pd.FILES[route][0]
         if argv[-2:] == ["rev-parse", "HEAD"]:
             return "b" * 40
         if len(argv) > 3 and argv[3] == "show":
@@ -238,6 +301,9 @@ def test_refresh_preserves_selected_config_and_reviewed_templates(tmp_path):
     assert all((deployment.root / relative).read_bytes() == (pd.CONTRACT + "\n# selected published version\n").encode()
                for relative in deployment.templates)
     assert ["git", "checkout", "main"] in calls
+    if route == "ado":
+        assert ["git", "pull", "--ff-only", deployment.origin, "main"] in calls
+        assert ["git", "push", deployment.origin, "main"] in calls
     assert ["git", "-C", "azure-enterprise-scale-ml", "checkout", "--detach", "b" * 40] in calls
     assert not any("--remote" in call for call in calls)
     staged = next(argv for argv in calls if argv[:2] == ["git", "add"])
@@ -270,6 +336,7 @@ def test_prepare_validates_selected_export_templates_and_target_before_mutation(
     deployment.read_json = Mock(side_effect=lambda argv: {"id": 17} if argv[:2] == ["gh", "api"] else {
         "id": SUBS["stage"], "tenantId": TENANT, "user": {"name": "synthetic-test-owner"},
     })
+    deployment.ado = Mock(return_value={"id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "name": "consumer", "project": {"name": "project"}})
     deployment.prepare("017", "stage", str(config))
     assert deployment.selected["subscription"] == SUBS["stage"]
     assert deployment.config == pd.canonical_json(document())
@@ -423,3 +490,123 @@ def test_ado_update_defers_new_template_preview_and_validates_published_branch()
     assert "Pre-publish ADO compilation cannot resolve new template files" in source
     assert push < published_preview < deployment
     assert 'validate_pipeline_preview "$state_dir/published-preview-request.json"' in source
+
+
+ORG_TENANT = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+ORG_OID = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+REPO_ID = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+
+
+def ado_token(tenant=ORG_TENANT, **changes):
+    claims = {"tid": tenant, "oid": ORG_OID, "exp": 1900000000,
+              "aud": "499b84ac-1321-427f-aa17-267ca6975798"}
+    claims.update(changes)
+    encoded = base64.urlsafe_b64encode(json.dumps(claims).encode()).decode().rstrip("=")
+    return {"tenant": tenant, "accessToken": "header." + encoded + ".synthetic"}
+
+
+@pytest.mark.parametrize("username", ["", "user@", "user%40example.com@", "token-as-username@"])
+def test_ado_clone_url_discards_userinfo(username):
+    parsed = pd.ado_origin("https://" + username + "dev.azure.com/org/Some%20Project/_git/repo/")
+    assert parsed == {"origin": "https://dev.azure.com/org/Some%20Project/_git/repo",
+                      "organization": "https://dev.azure.com/org", "project": "Some Project", "repository": "repo"}
+    if username:
+        assert username not in json.dumps(parsed)
+
+
+@pytest.mark.parametrize("remote", [
+    "https://user:secret@dev.azure.com/org/project/_git/repo",
+    "https://user:@dev.azure.com/org/project/_git/repo",
+    "https://user%3asecret@dev.azure.com/org/project/_git/repo",
+    "https://dev.azure.com:443/org/project/_git/repo",
+    "https://dev.azure.com/org/project/_git/repo?secret",
+    "https://dev.azure.com/org/project/_git/repo#secret",
+    "https://dev.azure.com/org/project/_git/repo?",
+    "https://dev.azure.com/org/%2E%2E/_git/repo",
+    "https://dev.azure.com/org/part%2Fproject/_git/repo",
+    "https://dev.azure.com/org/project/_git/repo\n",
+    "https://user@other@dev.azure.com/org/project/_git/repo",
+    "https://[dev.azure.com/org/project/_git/repo",
+    "https://github.com/org/repo",
+])
+def test_ado_unsupported_origins_do_not_echo_credentials(remote):
+    with pytest.raises(ValueError) as error:
+        pd.ado_origin(remote)
+    assert remote not in str(error.value)
+    assert "secret" not in str(error.value)
+
+
+@pytest.mark.parametrize("tenant", [TENANT, ORG_TENANT])
+def test_reviewed_ado_prepare_uses_org_tenant_and_canonical_origin(tmp_path, monkeypatch, tenant):
+    deployment = instance("ado")
+    deployment.root = tmp_path
+    deployment.environment = {"ADO_TENANT": tenant, "ADO_AUTHENTICATED_IDENTITY": f"azure:{tenant}:{ORG_OID}",
+                              "ADO_REPOSITORY_ID": REPO_ID}
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "aifactory").mkdir()
+    for relative in pd.FILES["ado"]:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(pd.CONTRACT, encoding="utf-8")
+    config = tmp_path / "aifactory" / "selected.json"
+    config.write_text(json.dumps(document()), encoding="utf-8")
+    deployment.command = Mock(return_value="https://never-persist-this-user@dev.azure.com/org/project/_git/consumer")
+    issued = ado_token(tenant)
+
+    def read(argv):
+        if argv[:3] == ["az", "account", "get-access-token"]:
+            assert argv[3:] == ["--tenant", tenant, "--resource", "https://app.vssps.visualstudio.com/", "--output", "json"]
+            return issued
+        assert argv == ["az", "account", "show", "--subscription", SUBS["stage"], "--output", "json"]
+        return {"id": SUBS["stage"], "tenantId": TENANT, "user": {"name": "synthetic-owner"}}
+
+    deployment.read_json = Mock(side_effect=read)
+    deployment.opener = Mock()
+    deployment.opener.open.return_value.__enter__ = Mock(return_value=SimpleNamespace(
+        read=lambda _: json.dumps({"id": REPO_ID, "name": "consumer", "project": {"name": "project"}}).encode()))
+    deployment.opener.open.return_value.__exit__ = Mock(return_value=False)
+    monkeypatch.setattr(pd.time, "time", lambda: 1800000000)
+    before = {str(p): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    deployment.prepare("017", "stage", str(config))
+    assert deployment.ado_tenant == tenant
+    assert deployment.selected["tenant"] == TENANT
+    assert deployment.origin == "https://dev.azure.com/org/project/_git/consumer"
+    assert deployment.ado_identity == f"azure:{tenant}:{ORG_OID}"
+    request = deployment.opener.open.call_args.args[0]
+    assert request.method == "GET"
+    assert request.full_url == "https://dev.azure.com/org/project/_apis/git/repositories/consumer?api-version=7.1"
+    assert issued["accessToken"] not in str(deployment.read_json.call_args_list)
+    assert before == {str(p): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    deployment.command.assert_called_once_with(["git", "remote", "get-url", "origin"], capture=True)
+    issued.update(ado_token(tenant, oid="dddddddd-dddd-dddd-dddd-dddddddddddd"))
+    deployment.opener.open.reset_mock()
+    with pytest.raises(ValueError, match="identity changed"):
+        deployment.verify_ado_repository()
+    deployment.opener.open.assert_not_called()
+
+
+@pytest.mark.parametrize("changes", [
+    {"tid": TENANT}, {"aud": "https://management.azure.com/"}, {"exp": 1799999999},
+    {"exp": float("inf")}, {"nbf": 1800000061}, {"oid": "wrong"},
+])
+def test_ado_token_validation_before_request(changes):
+    with pytest.raises(ValueError, match="organization tenant"):
+        pd.ado_token_identity(ado_token(**changes), ORG_TENANT, 1800000000)
+
+
+@pytest.mark.parametrize("tenant", ["", "<todo>", "example.com"])
+def test_ado_missing_or_invalid_org_tenant_does_not_fall_back(tmp_path, tenant):
+    deployment = instance("ado")
+    deployment.root = tmp_path
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "aifactory").mkdir()
+    data = document()
+    data["dev"]["azureDevOpsTenantId"] = tenant
+    config = tmp_path / "aifactory" / "selected.json"
+    config.write_text(json.dumps(data), encoding="utf-8")
+    deployment.command = Mock()
+    deployment.read_json = Mock()
+    with pytest.raises(ValueError, match="not a fallback"):
+        deployment.prepare("017", "stage", str(config))
+    deployment.command.assert_not_called()
+    deployment.read_json.assert_not_called()

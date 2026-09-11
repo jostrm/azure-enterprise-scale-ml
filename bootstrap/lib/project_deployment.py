@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import re
 import shutil
@@ -21,6 +23,7 @@ from uuid import uuid4
 
 CONTRACT = "AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1"
 VERSION_CONTRACT = "AIFACTORY_VERSION_CONTRACT=1"
+ADO_AUTH_CONTRACT = "AIFACTORY_ADO_AUTH_CONTRACT=2"
 _version_spec = importlib.util.spec_from_file_location("aifactory_release_version", Path(__file__).with_name("release_version.py"))
 release_version = importlib.util.module_from_spec(_version_spec)
 _version_spec.loader.exec_module(release_version)
@@ -32,6 +35,62 @@ FILES = {
     "ado": (ADO_PIPELINE, ADO_CONFIG_STEP),
 }
 RUNTIME_CONFIG = "aifactory/.reviewed-project-config.json"
+
+
+def ado_origin(remote):
+    """Discard username-only clone hints; never treat userinfo as authentication."""
+    try:
+        if (not isinstance(remote, str) or len(remote) > 2048
+                or any(ord(char) <= 32 or ord(char) == 127 for char in remote)
+                or any(char in remote for char in "\\?#")
+                or re.search(r"%(?![0-9a-fA-F]{2})", remote)):
+            raise ValueError
+        parsed = urlsplit(remote)
+        match = re.fullmatch(r"/([^/]+)/([^/]+)/_git/([^/]+)/?", parsed.path)
+        if (parsed.scheme != "https" or parsed.netloc.rsplit("@", 1)[-1].lower() != "dev.azure.com"
+                or parsed.password is not None or parsed.netloc.count("@") > 1 or not match):
+            raise ValueError
+        if parsed.username is not None:
+            username = unquote(parsed.username)
+            if (not username or any(ord(char) <= 32 or ord(char) == 127 for char in username)
+                    or any(char in username for char in ":/\\?#")):
+                raise ValueError
+        parts = [unquote(part) for part in match.groups()]
+        if any(not re.fullmatch(r"[A-Za-z0-9_. -]{1,128}", part)
+               or part in (".", "..") or part != part.strip() for part in parts):
+            raise ValueError
+    except (ValueError, TypeError):
+        raise ValueError(
+            "ADO requires an HTTPS dev.azure.com organization/project/_git/repository origin; "
+            "passwords, ports, queries, fragments and unsupported identifiers are not allowed.") from None
+    organization, project, repository = parts
+    base = "https://dev.azure.com/" + quote(organization, safe="")
+    return {"organization": base, "project": project, "repository": repository,
+            "origin": base + "/" + quote(project, safe="") + "/_git/" + quote(repository, safe="")}
+
+
+def ado_token_identity(token, tenant, now):
+    try:
+        value = token["accessToken"]
+        if (not re.fullmatch(GUID, tenant) or token["tenant"].lower() != tenant
+                or not isinstance(value, str) or len(value) > 32768 or len(value.split(".")) != 3):
+            raise ValueError
+        encoded = value.split(".")[1]
+        claims = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
+        oid = claims["oid"].lower()
+        expiry, not_before = float(claims["exp"]), float(claims.get("nbf", 0))
+        if (not re.fullmatch(GUID, oid) or claims["tid"].lower() != tenant
+                or not math.isfinite(expiry) or not math.isfinite(not_before)
+                or expiry <= now or not_before > now + 60
+                or claims["aud"] not in {"499b84ac-1321-427f-aa17-267ca6975798",
+                                         "https://app.vssps.visualstudio.com",
+                                         "https://app.vssps.visualstudio.com/"}):
+            raise ValueError
+        return f"azure:{tenant}:{oid}"
+    except (ValueError, TypeError, KeyError, AttributeError, OverflowError):
+        raise ValueError(
+            "Could not verify an unexpired Azure DevOps CLI identity in the configured organization tenant. "
+            "Authenticate that tenant explicitly outside this launcher; no login or account switch was performed.") from None
 
 
 def validate_config(document, project, target):
@@ -107,6 +166,9 @@ def load_config(path, root, project, target):
 
 
 def run_request(branch, config, selected):
+    # Secret variable values still undergo ADO $(...) expansion. JSON escaping
+    # preserves the reviewed values while keeping the transported bytes stable.
+    config = config.replace("$", "\\u0024")
     values = selected["values"]
     settings = {key: str(values.get(key, default)).lower() if isinstance(default, bool)
                 else str(values.get(key, default)) for key, default in {
@@ -121,7 +183,8 @@ def run_request(branch, config, selected):
             "runnerSelection": "from-config", "deploymentTarget": selected["target"],
             "deploymentProjectNumber": selected["project"],
             "deploymentConfigHash": hashlib.sha256(config.encode("utf-8")).hexdigest(),
-            "deploymentSettings": settings,
+            # The Runs API requires JSON text for this object-valued template parameter.
+            "deploymentSettings": canonical_json(settings),
         },
         "variables": {"AIFACTORY_CONFIG_JSON": {"value": config, "isSecret": True}},
         "stagesToSkip": [
@@ -185,11 +248,13 @@ class Deployment:
 
     def ado(self, method, endpoint, data=None):
         token = self.read_json([
-            "az", "account", "get-access-token", "--tenant", self.selected["tenant"],
+            "az", "account", "get-access-token", "--tenant", self.ado_tenant,
             "--resource", "https://app.vssps.visualstudio.com/", "--output", "json",
         ])
-        if token.get("tenant", "").lower() != self.selected["tenant"] or not token.get("accessToken"):
-            raise ValueError("Azure DevOps token tenant does not match the reviewed target.")
+        identity = ado_token_identity(token, self.ado_tenant, time.time())
+        if self.ado_identity and self.ado_identity != identity:
+            raise ValueError("Azure DevOps authenticated organization identity changed after review.")
+        self.ado_identity = identity
         request = Request(
             self.ado_base + endpoint, method=method,
             data=json.dumps(data).encode("utf-8") if data is not None else None,
@@ -204,7 +269,22 @@ class Deployment:
         except (HTTPError, URLError):
             raise ValueError("Azure DevOps request failed; no redirect or credential fallback was permitted.") from None
 
+    def verify_ado_repository(self):
+        repository = self.ado("GET", "/git/repositories/" + quote(self.repository, safe="") + "?api-version=7.1")
+        if (not isinstance(repository, dict) or not isinstance(repository.get("id"), str)
+                or not re.fullmatch(GUID, repository["id"]) or repository.get("isDisabled")
+                or not isinstance(repository.get("name"), str) or repository["name"].casefold() != self.repository.casefold()
+                or not isinstance(repository.get("project"), dict) or not isinstance(repository["project"].get("name"), str)
+                or repository["project"]["name"].casefold() != self.ado_project.casefold()):
+            raise ValueError("Azure DevOps CLI access to the selected repository could not be verified.")
+        if self.repository_id and self.repository_id != repository["id"]:
+            raise ValueError("Azure DevOps repository identity changed after review.")
+        self.repository_id = repository["id"]
+
     def prepare(self, project, target, config_path):
+        if (self.root / "azurefactory" / "register.json").exists():
+            raise ValueError("azurefactory/register.json requires the catalog scoped lifecycle provider "
+                             "or AIFactory-lifecycle.sh with a reviewed manifest; legacy project refresh is forbidden.")
         if not (self.root / ".git").exists() or not (self.root / "aifactory").is_dir():
             raise ValueError("Selected root must be the consumer Git repository immediately above aifactory.")
         document = load_config(config_path, self.root, project, target)
@@ -213,9 +293,11 @@ class Deployment:
         self.config = canonical_json(document)
         self.config_path = path
         if self.route == "ado":
-            organization_tenant = str(document.get("dev", {}).get("azureDevOpsTenantId", "")).strip()
-            if organization_tenant and organization_tenant.lower() != self.selected["tenant"]:
-                raise ValueError("Cross-tenant Azure DevOps organization authentication is not supported by this reviewed contract.")
+            self.ado_tenant = str(self.environment.get("ADO_TENANT") or document.get("dev", {}).get("azureDevOpsTenantId", "")).strip().lower()
+            if not re.fullmatch(GUID, self.ado_tenant):
+                raise ValueError("A valid azureDevOpsTenantId or reviewed ADO_TENANT is required; target tenantId is not a fallback.")
+            self.ado_identity = self.environment.get("ADO_AUTHENTICATED_IDENTITY", "")
+            self.repository_id = self.environment.get("ADO_REPOSITORY_ID", "")
         self.templates = {}
         for relative in FILES[self.route]:
             installed = self.root / relative
@@ -241,15 +323,15 @@ class Deployment:
             if type(self.github_identity) is not int:
                 raise ValueError("GitHub authenticated identity could not be bound.")
         else:
-            parsed = urlsplit(self.origin)
-            match = re.fullmatch(r"/([^/]+)/([^/]+)/_git/([^/]+)", parsed.path.rstrip("/"))
-            if parsed.scheme != "https" or parsed.hostname != "dev.azure.com" or parsed.username or parsed.password or not match:
-                raise ValueError("A credential-free dev.azure.com organization/project/_git/repository origin is required.")
-            org, project_name, repository = (unquote(item) for item in match.groups())
-            if any(not re.fullmatch(r"[A-Za-z0-9_. -]{1,128}", value) for value in (org, project_name, repository)):
-                raise ValueError("Unsupported Azure DevOps destination identifiers.")
-            self.repository = repository
-            self.ado_base = "https://dev.azure.com/" + quote(org, safe="") + "/" + quote(project_name, safe="") + "/_apis"
+            context = ado_origin(self.origin)
+            self.origin = context["origin"]
+            for key, field in (("ADO_ORGANIZATION", "organization"), ("ADO_PROJECT", "project"),
+                               ("ADO_REPOSITORY_NAME", "repository")):
+                if self.environment.get(key, context[field]) != context[field]:
+                    raise ValueError("Azure DevOps destination differs from the reviewed environment.")
+            self.repository, self.ado_project = context["repository"], context["project"]
+            self.ado_base = context["organization"] + "/" + quote(self.ado_project, safe="") + "/_apis"
+            self.verify_ado_repository()
         print(f"Reviewed project {project} -> {target}; subscription {self.selected['subscription']}; tenant {self.selected['tenant']}", flush=True)
 
     def update(self, project_only=False):
@@ -295,7 +377,7 @@ class Deployment:
                           ":(exclude).env", ":(exclude)aifactory/variables.json", ":(exclude)aifactory/config-wizard/**",
                           ":(exclude)aifactory/esml-infra/azure-devops/bicep/yaml/variables/variables.yaml", *selected_exclusion])
             self.command(["git", "checkout", branch])
-            self.command(["git", "pull", "--ff-only", "origin", branch])
+            self.command(["git", "pull", "--ff-only", self.origin if self.route == "ado" else "origin", branch])
             self.command(["git", "submodule", "update", "--init", "--recursive"])
             self.command(["git", "-C", "azure-enterprise-scale-ml", "fetch", "origin", version["resolved_ref"]])
             self.command(["git", "-C", "azure-enterprise-scale-ml", "checkout", "--detach", version["resolved_ref"]])
@@ -342,7 +424,7 @@ class Deployment:
                 raise ValueError("Commit declined. No pipeline was dispatched; local changes remain for review.")
             self.command(["git", "commit", "-m", "Update reviewed AI Factory project deployment templates",
                           "-m", "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"])
-            self.command(["git", "push", "origin", branch])
+            self.command(["git", "push", self.origin if self.route == "ado" else "origin", branch])
 
     def github(self):
         correlation = str(uuid4())
@@ -422,12 +504,13 @@ def main():
         if not all(os.environ.get(name) for name in required):
             raise ValueError("All reviewed project, target, config and repository inputs are required.")
         if args.route == "ado" and (os.environ.get("ADO_BRANCH", "main") != "main" or os.environ.get("ADO_AUTH_METHOD", "aad") != "aad"):
-            raise ValueError("The reviewed ADO contract supports main and explicit same-tenant Entra authentication only.")
+            raise ValueError("The reviewed ADO contract supports main and explicit organization-tenant Entra authentication only.")
         deployment = Deployment(args.route, os.environ["AIFACTORY_REPO_ROOT"], args.state_dir)
         deployment.prepare(os.environ["AIFACTORY_PROJECT_NUMBER"], os.environ["AIFACTORY_TARGET_ENVIRONMENT"],
                            os.environ["AIFACTORY_PROJECT_CONFIG"])
         deployment.update(os.environ.get("AIFACTORY_PROJECT_ONLY", "false").lower() in ("true", "yes", "1"))
-        if deployment.command(["git", "remote", "get-url", "origin"], capture=True) != deployment.origin:
+        origin = deployment.command(["git", "remote", "get-url", "origin"], capture=True)
+        if (ado_origin(origin)["origin"] if args.route == "ado" else origin) != deployment.origin:
             raise ValueError("Repository origin changed during refresh.")
         account = deployment.read_json(["az", "account", "show", "--subscription", deployment.selected["subscription"], "--output", "json"])
         if {key: account.get(key) for key in ("id", "tenantId", "user")} != deployment.account:
@@ -437,6 +520,7 @@ def main():
                 raise ValueError("GitHub authenticated identity changed during refresh.")
             deployment.github()
         else:
+            deployment.verify_ado_repository()
             deployment.azure_devops()
         print("Selected project pipeline completed successfully. Refresh Azure inventory to verify Active.", flush=True)
         return 0

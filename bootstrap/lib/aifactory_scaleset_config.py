@@ -8,6 +8,8 @@ import hashlib
 import ipaddress
 import json
 import re
+import shlex
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -15,6 +17,28 @@ from urllib.parse import urlparse
 
 
 AIF_SIMPLE_MODE_CONTRACT_VERSION = 2
+PROJECT_ORGANIZATION_FIELDS = {"org-department-name": 200, "org-department-id": 128}
+PROJECT_ORGANIZATION_ENV = {"org-department-name": "ORG_DEPARTMENT_NAME", "org-department-id": "ORG_DEPARTMENT_ID"}
+
+
+def project_organization_values(*sources: dict[str, Any]) -> dict[str, str]:
+    values = {}
+    for source in sources:
+        if not isinstance(source, dict):
+            raise ValueError("Project organizational metadata requires an object.")
+        for key, limit in PROJECT_ORGANIZATION_FIELDS.items():
+            if key not in source:
+                continue
+            value = source[key]
+            if not isinstance(value, str) or len(value) > limit or any(
+                    unicodedata.category(char) in ("Cc", "Cs", "Zl", "Zp") for char in value):
+                raise ValueError(f"{key} must be optional plain text, at most {limit} characters, without control characters.")
+            if key in values and values[key] != value:
+                raise ValueError(f"Conflicting {key}: project ownership must agree across dev and stage_prod.")
+            values[key] = value
+    return values
+
+
 SIMPLE_MODE_PRESET_NAME = "private-ai-foundation-v2"
 # These trees must be published together; the launcher must not copy dirty PURPLE
 # files into a consumer to make an unpublished feature appear deployable.
@@ -415,6 +439,7 @@ def quote(value: Any) -> str:
 
 
 def update_yaml(path: Path, values: dict[str, Any]) -> None:
+    project_organization_values(values)
     lines = path.read_text(encoding="utf-8-sig").splitlines()
     found: set[str] = set()
     result: list[str] = []
@@ -438,6 +463,10 @@ def update_yaml(path: Path, values: dict[str, Any]) -> None:
 
 
 def update_env(path: Path, values: dict[str, Any]) -> None:
+    organization = project_organization_values({
+        key: values[env] for key, env in PROJECT_ORGANIZATION_ENV.items() if env in values})
+    encoded = {env: shlex.quote(organization[key]) for key, env in PROJECT_ORGANIZATION_ENV.items()
+               if key in organization}
     lines = path.read_text(encoding="utf-8-sig").splitlines()
     found: set[str] = set()
     result: list[str] = []
@@ -450,24 +479,29 @@ def update_env(path: Path, values: dict[str, Any]) -> None:
         _, comment = split_comment(match.group("rest"))
         suffix = f" {comment}" if comment else ""
         result.append(
-            f"{match.group('prefix')}{key}{match.group('spacing')}={quote(values[key])}{suffix}"
+            f"{match.group('prefix')}{key}{match.group('spacing')}={encoded.get(key, quote(values[key]))}{suffix}"
         )
         found.add(key)
 
     missing = sorted(set(values) - found)
     if missing:
         result.extend(["", "# Values added by create-new-aifactory-scaleset"])
-        result.extend(f"{key}={quote(values[key])}" for key in missing)
+        result.extend(f"{key}={encoded.get(key, quote(values[key]))}" for key in missing)
     path.write_text("\n".join(result) + "\n", encoding="utf-8")
 
 
 def update_json(path: Path, values: dict[str, Any]) -> None:
+    organization = project_organization_values(values)
     document = json.loads(path.read_text(encoding="utf-8-sig"))
     dev = document.setdefault("dev", {})
     if not isinstance(dev, dict):
         raise ValueError(f"{path}: dev must be an object")
     for key, value in values.items():
         dev[key] = value
+    for section in ("dev", "stage_prod"):
+        if section in document:
+            document[section].update(organization)
+    project_organization_values(*(document[key] for key in ("dev", "stage_prod") if key in document))
     path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
 
@@ -571,8 +605,13 @@ def merge_json_template(template_path: Path, active_path: Path) -> None:
             return merged
         return active_value
 
+    organization = project_organization_values(*(active[key] for key in ("dev", "stage_prod") if key in active))
+    merged = merge(template, active)
+    for section in ("dev", "stage_prod"):
+        if section in merged:
+            merged[section].update(organization)
     active_path.write_text(
-        json.dumps(merge(template, active), indent=2) + "\n",
+        json.dumps(merged, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -669,6 +708,7 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
     }
     if state.get("cost_center"):
         values.update({"tag_costceter_common": state["cost_center"], "tag_costcenter": state["cost_center"]})
+    values.update(project_organization_values(state))
     if simple_mode_enabled(state):
         if state["dev_vnet_cidr"] != "172.16.0.0/20":
             raise ValueError("Simple Mode contract v2 requires Dev VNet 172.16.0.0/20")
@@ -682,6 +722,17 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
                 "AIF-Environment": "dev", "AIF-Project Owners": values["technical_admins_email"]}
         values["tags"] = json.dumps({**tags, "Description": "AI Factory common"})
         values["tagsProject"] = json.dumps({**tags, "AIFactory project": "001"})
+    return values
+
+
+def selected_project_organization(json_path: Path, state: dict[str, Any]) -> dict[str, str]:
+    """Do not carry the active project's ownership when bootstrap selects another project."""
+    document = json.loads(json_path.read_text(encoding="utf-8-sig"))
+    existing = project_organization_values(*(document[key] for key in ("dev", "stage_prod") if key in document))
+    selected = str(state["project_number"]).zfill(3)
+    declared = str(document.get("dev", {}).get("project_number_000", "")).zfill(3)
+    values = {key: "" for key in existing} if declared != selected else {}
+    values.update(project_organization_values(state))
     return values
 
 
@@ -700,6 +751,7 @@ def apply_ado(repo_root: Path, state: dict[str, Any]) -> None:
         merge_json_template(json_template_path, json_path)
         json_template_path.unlink()
     values = common_values(state)
+    values.update(selected_project_organization(json_path, state))
     values.update(
         {
             "azureDevOpsTenantId": state["ado_tenant_id"],
@@ -727,6 +779,7 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         merge_json_template(json_template_path, json_path)
         json_template_path.unlink()
     common = common_values(state)
+    common.update(selected_project_organization(json_path, state))
     project_sp = state.get("project_sp_secret_names") or {}
     plan = subnet_plan(state["dev_vnet_cidr"])
     hub = state["topology"] == "hs" or state.get("access_hub_mode") == "external"
@@ -808,6 +861,7 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         env_values["TAGS"] = common["tags"]
         env_values["TAGS_PROJECT"] = common["tagsProject"]
         env_values["PROJECT_MEMBERS_EMAILS"] = common["technical_admins_email"]
+    env_values.update({env: common[key] for key, env in PROJECT_ORGANIZATION_ENV.items() if key in common})
     update_env(env_path, env_values)
     update_json(json_path, common)
 

@@ -29,6 +29,7 @@ readonly ADO_SETTINGS_FILE="${ADO_SETTINGS_FILE:-$HOME/.aifactory-ado-settings.j
 auth_method="${ADO_AUTH_METHOD:-aad}"
 
 cd "$REPO_ROOT"
+aif_require_legacy_workspace "$REPO_ROOT" || exit 1
 
 reviewed_project=false
 if [[ -n "${AIFACTORY_TARGET_ENVIRONMENT:-}${AIFACTORY_PROJECT_NUMBER:-}${AIFACTORY_PROJECT_CONFIG:-}" ]]; then
@@ -711,7 +712,7 @@ else
   aif_version_save "$REPO_ROOT"
 
   printf 'a\n' | bash "$SUBMODULE_PATH/00-start.sh"
-  bash "01-aif-copy-aifactory-templates.sh"
+  bash "01-aif-copy-aifactory-templates.sh" --legacy-templates
     bash "03-ADO-YAML-bootstrap-files-no-var-overwrite.sh"
   fi
 fi

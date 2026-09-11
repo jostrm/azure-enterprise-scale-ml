@@ -6,7 +6,7 @@ All AI Factory infrastructure is defined in **Azure Bicep** — Microsoft's doma
 
 ## Why Bicep?
 
-- **GA technology** — used per WAF recommendation (avoids AZD/AVM preview tooling in production).
+- **Declarative Azure infrastructure** — compiled and deployed through Azure CLI and the selected pipeline.
 - **Modular** — each Azure service is a separate Bicep module, reused across project types.
 - **Auditable** — all deployments are logged in Azure Deployment history.
 - **Incremental** — Bicep deployments are idempotent; re-runs only update changed resources.
@@ -24,6 +24,11 @@ environment_setup/aifactory/bicep/
 │       └── .env.template                                  # GHA parameters
 └── modules/                                               # Bicep modules
 ```
+
+The complete project JSON template is `environment_setup/aifactory/variables.json`.
+Its `dev` and `stage_prod` sections retain shared and environment-specific values.
+See [Configuration and API](../parameters/index.md) for input formats, validation,
+and the distinction between a preview and execution.
 
 ---
 

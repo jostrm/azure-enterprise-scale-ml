@@ -10,6 +10,13 @@ python -B bootstrap/lib/factory_lifecycle.py execute --stdin-manifest \
   --execution-root <new-isolated-directory> --receipt <directory/receipt.json>
 
 bootstrap/AIFactory-lifecycle.sh is the equivalent shell wrapper.
+bootstrap/ADO-azurefactory.sh and bootstrap/GHA-azurefactory.sh expose inspect
+and execute with the reviewed route fixed to ado or gha respectively. They
+accept the same protected input and execution options. A route mismatch blocks
+before authentication or execution; neither script initializes register storage.
+New configuration uses the authenticated catalog UI/API create-factory
+prepare/confirm flow. Legacy copy registration uses action=migrate with an
+explicit source_folder and separate empty azurefactory destination.
 Backend code may import validate_manifest, manifest_digest, capabilities,
 execute and execute_cohort. Validation/inspect is local only and never implies Azure readiness.
 There is no cloud "prepare" command: catalog/backend owns preview, frozen
@@ -45,6 +52,7 @@ source:
   version: displayed published version
 target:
   factory_id / scaleset_id: explicit logical IDs
+  factory_type: ai (optional for legacy manifests; other factory types are blocked)
   environment: dev | stage | prod
   tenant_id / subscription_id: exact GUIDs
   prefix / region / suffix: exact naming; suffix three digits, not 000

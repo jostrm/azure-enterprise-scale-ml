@@ -211,6 +211,13 @@ snapshot IDs can be reused only if their content and preparation contract match.
 Every separate training or scoring execution needs a new run ID. For multiple models
 in one use case, model-version identifiers must distinguish those exact artifacts.
 
+The snapshot signature excludes model algorithms, AutoML search budgets, model names
+and evaluation thresholds. Different model variants reuse the same source and gold
+snapshot, but produce separate model/evaluation runs. Data-preparation changes
+(features, typing, splits/groups, forecast horizon/frequency, image annotations or
+image URIs) require a new snapshot. Older full-scenario signatures are compared
+compatibly without changing the already-published snapshot.
+
 ### What the medallion stages actually do
 
 The local tabular flow preserves the original bytes in landing, parses CSV/Parquet into
@@ -290,3 +297,18 @@ The yellow repository is reference material only. Its tenant is scheduled for re
 on September 16, 2026. Inventory and migrate any required datasets, access grants,
 identities, checkpoints and registrations before removal; no tenant data migration has
 been performed by these changes.
+
+### Lifecycle validation
+
+Run the model-factory and orchestration tests together from this folder:
+
+```powershell
+python -m pytest tests ..\..\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09\tests ..\..\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory\tests --junitxml=outputs\validation\lifecycle-results.xml -q
+```
+
+The suite distinguishes real local training/inference from service-boundary simulations
+and definition checks. Generated fixtures do not establish live Kaggle access; mocked
+Azure/ADF/Databricks calls do not establish cloud execution. Explicitly unsupported
+task/serving combinations must fail their promotion path rather than generate success
+receipts. Source corruption, failed gates, invalid inference/feedback and reused run IDs
+are tested alongside successful lifecycles.

@@ -1,117 +1,89 @@
-# Parameters — Standard Mode
+# Parameters — Standard checklist
 
-Standard Mode lists only the **mandatory** parameters — the minimum set you must configure before running the AI Factory pipeline for the first time.
+Start with the inputs needed for your **selected route and environment**.
+This is a concise mandatory/conditional checklist, not the complete inventory
+or a guarantee that a subscription is ready to deploy.
+See [Advanced reference](advanced.md) for exact defaults, aliases, every public
+template key, bootstrap inputs and CLI/API options.
 
-For every parameter including optional ones, see [Advanced Mode](advanced.md).
+**M** = mandatory in context; **C** = required only when its condition applies.
+Defaults can satisfy mandatory settings. Replace placeholders and verify
+permissions, service availability, quota, DNS and private network reachability.
 
-!!! tip
-    Search this page with **Ctrl+F**. Every variable name matches exactly the key in `.env.template` (GitHub Actions) or `variables.yaml` (Azure DevOps).
+## Scope, naming and project
 
----
-
-## How to read the tables
-
-| Column | Meaning |
-|---|---|
-| **Variable** | The exact key name to set in `.env.template` / `variables.yaml` |
-| **Default** | Value already in the file — what you get without editing |
-| **Guidance** | `ensure` = look up from external source · `keep-as-is` = no change needed · `recommended` = production best practice |
-| **Description** | What the variable controls
-
----
-
-## Group 1 — GitHub Bootstrap *(GitHub Actions only)*
-
-| Variable | Default | Guidance | Description |
+| M/C | YAML / JSON key | GitHub Actions key | What to review |
 |---|---|---|---|
-| `GITHUB_USERNAME` | `<todo>` | **ensure** your GitHub username or organisation name | GitHub username or org that owns the new repository |
-| `GITHUB_NEW_REPO` | `<todo>/<todo>azure-enterprise-scale-aifactory-001` | **ensure** format must be `<org>/<repo-name>` | Full path of the new GitHub repository to create |
-| `TENANT_ID` | `<todo>` | **ensure** Azure Portal → Entra ID → Overview → Directory (tenant) ID | Azure tenant ID |
-| `TENANT_AZUREML_OID` | `<todo>` | **ensure** Entra ID → Enterprise Apps → search `Azure Machine Learning` (AppId: `0736f41a-0425-4b46-bdb5-1563eff02385`) → Object ID. Not needed if `ENABLE_AI_FOUNDRY=false` | Azure Machine Learning service principal Object ID |
+| M | `tenantId` | `TENANT_ID` | Azure deployment tenant |
+| M | `dev_sub_id` | `DEV_SUBSCRIPTION_ID` | Dev subscription and deployment identity permissions |
+| M | `admin_location`, `admin_locationSuffix` | `AIFACTORY_LOCATION`, `AIFACTORY_LOCATION_SHORT` | Template region `eastus2`, suffix `eus2`; change together |
+| M | `admin_aifactorySuffixRG` | `AIFACTORY_SUFFIX` | Template scale-set suffix `-001`; select the intended factory |
+| M | `project_number_000` | `PROJECT_NUMBER` | Three-digit project number, initially `001` |
+| M | `technical_admins_ad_object_id` | `PROJECT_MEMBERS` | Entra object IDs; use group IDs when `use_ad_groups` / `USE_AD_GROUPS=true` |
+| M | `runNetworkingVar` | `RUN_JOB1_NETWORKING` | Defaults `true`; skip only after confirming existing project networking |
+| C | `test_sub_id`, `prod_sub_id` | `STAGE_SUBSCRIPTION_ID`, `PROD_SUBSCRIPTION_ID` | Required for the environments you actually deploy; review isolation rather than blindly reuse Dev |
 
----
+Also review the optional resource-name prefix before creation:
+YAML/JSON `admin_aifactoryPrefixRG` defaults to `mrvel-1-`, while
+GHA `AIFACTORY_PREFIX` defaults to `acme-ai`. These are not identical templates.
 
-## Group 2 — AI Factory Globals
+## Orchestrator and identity
 
-| Variable | Default | Guidance | Description |
-|---|---|---|---|
-| `AIFACTORY_LOCATION` | `eastus2` | keep-as-is or change to your preferred region | Primary Azure region for all AI Factory resources |
-| `AIFACTORY_LOCATION_SHORT` | `eus2` | keep-as-is or update to match `AIFACTORY_LOCATION` (e.g. `weu`, `neu`, `swe`) | Short region suffix used in resource names |
-| `ADMIN_AISEARCH_TIER` | `basic` | **ensure** `free` is **not allowed** when using private endpoints | AI Search SKU. Options: `free`, `basic`, `standard`, `standard2`, `standard3`, `storage_optimized_l1`, `storage_optimized_l2` |
-| `AISEARCH_SEMANTIC_TIER` | `free` | keep-as-is | Semantic search tier. Options: `disabled`, `free`, `standard` |
-| `AIFACTORY_SUFFIX` | `-001` | keep-as-is for the first scale set. **otherwise** increment to `-002`, `-003` for additional scale sets | AI Factory scale set suffix — appended to resource group names |
-| `AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID` | `<todo>` | **ensure** subscription where the DEV seeding Key Vault exists | Subscription ID of the DEV seeding Key Vault |
-| `AIFACTORY_SEEDING_KEYVAULT_NAME` | `<todo>` | **ensure** Key Vault must already exist and contain the SP secrets | Name of the DEV seeding Key Vault |
-| `AIFACTORY_SEEDING_KEYVAULT_RG` | `<todo>` | **ensure** resource group must already exist | Resource group of the DEV seeding Key Vault |
-| `COMMON_SERVICE_PRINCIPAL_KV_S_NAME_APPID` | `esml-common-sp-id` | **ensure** secret name must match exactly what is stored in the seeding Key Vault | Secret name in seeding KV holding the common Service Principal App ID |
-| `COMMON_SERVICE_PRINCIPAL_KV_S_NAME_SECRET` | `esml-common-sp-secret` | **ensure** secret name must match exactly what is stored in the seeding Key Vault | Secret name in seeding KV holding the common Service Principal secret |
+| M/C | Inputs | Condition / guidance |
+|---|---|---|
+| C | `GITHUB_USERNAME`, `GITHUB_NEW_REPO` | GHA repository setup; use `owner/repo`. Generic template visibility is public; inspect it before creation |
+| C | `azureDevOpsTenantId`, `dev_service_connection` | ADO route; organization tenant may differ from Azure deployment tenant |
+| C | `test_service_connection`, `prod_service_connection` and corresponding `*_seeding_kv_service_connection` | Only for deployed environments; use the actual authorized service-connection names |
+| M | `dev_admin_bicep_input_keyvault_subscription`, `dev_admin_bicep_kv_fw_rg`, `dev_admin_bicep_kv_fw` | Dev seeding-vault coordinates; GHA uses `AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID`, `AIFACTORY_SEEDING_KEYVAULT_RG`, `AIFACTORY_SEEDING_KEYVAULT_NAME` |
+| C | Corresponding `test_admin_bicep_*` / `prod_admin_bicep_*` vault coordinates | Stage/Prod when deployed; GHA environment overrides are not separate template names |
+| C | `azure_machinelearning_sp_oid` / `TENANT_AZUREML_OID` and `AZURE_MACHINELEARNING_SP_OID` | Required by the applicable Foundry/ML path; enterprise-application object ID, not application/client ID |
+| C | `databricksOID` / `DATABRICKS_OID` | Databricks enabled |
+| C | Common/project service-principal **secret-name** fields | Existing-SP/seeding route only. Federated managed-identity bootstrap can leave legacy secret references empty |
 
----
+`AZURE_CLIENT_ID` selects a federated GHA deployment identity when configured.
+Do not put client secrets, PATs or certificate material into committed
+configuration. An existing seeding vault and valid secret names are different
+prerequisites from creating an identity through bootstrap.
 
-## Group 3 — Azure Subscriptions & CIDR Ranges
+## Network and service dependencies
 
-!!! note
-    `STAGE_SUBSCRIPTION_ID` and `PROD_SUBSCRIPTION_ID` are optional but strongly recommended — use separate subscriptions from DEV.
+| M/C | Inputs | Condition / guidance |
+|---|---|---|
+| M | `common_vnet_cidr`, common subnet CIDRs; `dev_cidr_range`, `test_cidr_range`, `prod_cidr_range` | Shared templates use `172.16.XX.0/18` with aligned `0` / `64` / `128`; GHA uses `COMMON_*_CIDR` and `DEV_CIDR_RANGE` / `STAGE_CIDR_RANGE` / `PROD_CIDR_RANGE` |
+| C | `privDnsSubscription_param`, `privDnsResourceGroup_param` | Required when `centralDnsZoneByPolicyInHub=true`; GHA uses `PRIV_DNS_SUBSCRIPTION_PARAM`, `PRIV_DNS_RESOURCE_GROUP_PARAM` |
+| C | Existing VNet/subnet identifiers | Required when `BYO_subnets` / `BYO_SUBNETS=true`, and for each enabled service's subnet |
+| C | `project_IP_whitelist` / `PROJECT_MEMBERS_IP_ADDRESS` | IP-allowlist access mode; not a substitute for private connectivity |
+| C | `cmkKeyName` / `CMK_KEY_NAME`, vault protection and permissions | CMK enabled; review the relevant service's CMK exclusions |
+| C | `admin_aiSearchTier`, `admin_semanticSearchTier` | AI Search enabled; defaults `basic` and `free`. Search SKU `free` is incompatible with Private Link |
+| C | Foundry + capability host + Storage + AI Search + Cosmos DB | Required together for the standard private-agent/BYO-data-resource architecture, not for every possible Foundry architecture |
 
-| Variable | Default | Guidance | Description |
-|---|---|---|---|
-| `DEV_SUBSCRIPTION_ID` | `<todo>` | **ensure** subscription exists and the common SP has Contributor access | DEV Azure subscription ID |
-| `DEV_CIDR_RANGE` | `61` | keep-as-is. Replaces `XX` in CIDR templates (e.g. `172.16.61.0/26`). **otherwise** choose any `0–255` value not conflicting with other environments or existing subnets | CIDR substitution value for DEV environment subnets |
-| `STAGE_CIDR_RANGE` | `62` | keep-as-is. Must differ from `DEV_CIDR_RANGE` and `PROD_CIDR_RANGE` | CIDR substitution value for STAGE environment subnets |
-| `PROD_CIDR_RANGE` | `63` | keep-as-is. Must differ from `DEV_CIDR_RANGE` and `STAGE_CIDR_RANGE` | CIDR substitution value for PROD environment subnets |
+For that private-agent architecture, review
+`enableAIFoundry` / `ENABLE_AI_FOUNDRY`,
+`enableAFoundryCaphost` / `ENABLE_FOUNDRY_CAPHOST`,
+`enableAISearch` / `ENABLE_AI_SEARCH`, and
+`enableCosmosDB` / `ENABLE_COSMOS_DB` together.
+Other deployment paths have different dependencies. Template feature defaults
+and the simple-mode preset are not interchangeable.
 
----
+Both DNS flags false mean standalone intent; `enableAIFactoryHub=true` means
+own-hub intent unless central DNS is enabled, which takes precedence.
+Flags do not establish peering. Public-access flags do not govern GitHub
+repository visibility or guarantee private-only monitoring.
 
-## Group 4 — Common Service Principal (Secret Names in Seeding KV)
+## If using the create bootstrap instead
 
-| Variable | Default | Guidance | Description |
-|---|---|---|---|
-| `AZURE_MACHINELEARNING_SP_OID` | `<todo>` | **ensure** Entra ID → Enterprise Apps → `Azure Machine Learning` (AppId: `0736f41a-0425-4b46-bdb5-1563eff02385`) → Object ID. Not needed if `ENABLE_AI_FOUNDRY=false` | Azure Machine Learning service principal Object ID |
-| `INPUT_COMMON_SPID_KEY` | `esml-common-sp-id` | **ensure** must match the secret name in your seeding Key Vault | Secret name holding the common SP App ID |
-| `INPUT_COMMON_SP_SECRET_KEY` | `esml-common-sp-secret` | **ensure** must match the secret name in your seeding Key Vault | Secret name holding the common SP secret |
-| `COMMON_SERVICE_PRINCIPLE_OID_KEY` | `esml-common-sp-oid` | **ensure** must match the secret name in your seeding Key Vault | Secret name holding the common SP Object ID |
+Supply the route's public `AIF_*`, `GITHUB_REPOSITORY` or `ADO_*` inputs rather
+than assuming the generated `.env` is the input schema. The general create
+prompt currently defaults to `swedencentral` and accepts private networking
+only; this differs from the shared templates. Simple mode fixes additional
+settings and requires three private HTTPS gateway inputs.
 
----
+Follow the [bootstrap contract and full input tables](advanced.md#bash-create-and-update-contract).
+Before dispatch, review the exact factory/project/environment, resolved
+configuration, networking dependencies, authentication and destructive flags.
 
-## Group 5 — Project Setup
-
-| Variable | Default | Guidance | Description |
-|---|---|---|---|
-| `PROJECT_NUMBER` | `001` | keep-as-is for the first project. **otherwise** increment to `002`, `003`, etc. for additional projects | Project number — used in resource group names and subnet naming |
-| `PROJECT_MEMBERS` | `<todo>` | **ensure** comma-separated Entra ID Object IDs of users or AD security groups (when `USE_AD_GROUPS=true`) | Entra ID Object IDs of the project team members |
-| `RUN_JOB1_NETWORKING` | `true` | keep-as-is when creating or updating a project. **otherwise** set `false` to skip networking on service-only re-runs | Whether to run subnet/IP calculation and networking deployment |
-
----
-
-## Group 6 — Project Service Principals (Secret Names in Seeding KV)
-
-These are the **names** of secrets in the seeding Key Vault that hold the project team's service principal credentials. They must exist before running the pipeline.
-
-| Variable | Default | Guidance | Description |
-|---|---|---|---|
-| `PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID` | `esml-project001-sp-id` | **ensure** must match the secret name in your seeding Key Vault | Secret name for the project SP App ID |
-| `PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_OID` | `esml-project001-sp-oid` | **ensure** must match the secret name in your seeding Key Vault | Secret name for the project SP Object ID |
-| `PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_S` | `esml-project001-sp-secret` | **ensure** must match the secret name in your seeding Key Vault | Secret name for the project SP secret |
-
----
-
-## Group 7 — Core Service Flags
-
-| Variable | Default | Guidance | Description |
-|---|---|---|---|
-| `ENABLE_AI_FOUNDRY` | `true` | **required** for the standard private Foundry baseline | Deploy the Foundry account and default project with private endpoints |
-| `ENABLE_FOUNDRY_CAPHOST` | `true` | **required; cannot be disabled** for this standard private-agent architecture | Bind the project capability host to Storage, AI Search, and Cosmos DB |
-| `ENABLE_AI_SEARCH` | `true` | **required** with private Foundry capability host | Capability-host vector-store connection |
-| `ENABLE_COSMOS_DB` | `true` | **required** with private Foundry capability host | Capability-host thread and agent-history store |
-| `ADMIN_AI_SEARCH_TIER` | `basic` | **ensure** `free` is **not allowed** when using private endpoints | AI Search SKU tier for the project |
-| `ADMIN_SEMANTIC_SEARCH_TIER` | `free` | keep-as-is | Semantic search tier. Options: `disabled`, `free`, `standard` |
-
-This requirement is specific to the AI Factory's standard private-agent/BYO data-resource architecture. Microsoft documents the project capability host with `storageConnections`, `vectorStoreConnections` (AI Search), and `threadStorageConnections` (Cosmos DB). Capability hosts are not required for every unrelated Foundry or hosted-agent architecture. See [Foundry capability hosts](https://learn.microsoft.com/azure/foundry/agents/concepts/capability-hosts) and [Use your own resources](https://learn.microsoft.com/azure/foundry/agents/how-to/use-your-own-resources).
-
----
-
-!!! success "That's all you need for a first deployment"
-    Once Groups 1–7 are filled in, run the pipeline. The AI Factory calculates networking, deploys all Bicep modules, and configures RBAC automatically — producing a working **private Foundry + capability host + Storage + AI Search + Cosmos DB** baseline.
-
-!!! info "Want to enable more services?"
-    Other optional services (AKS, Container Apps, ML Studio, Databricks, models, BYO networking, etc.) are in [Advanced Mode](advanced.md). Cosmos DB is part of the required private Foundry capability-host bundle, not an optional database in this architecture.
+For backend-generated Azure Factory v2 projects, the project's single
+`variables.json` has direct top-level **`dev` and `stage_prod`** sections, each
+retaining full configuration and separate subscription/SKU values. This differs
+from the raw shared consumer template's current `dev`-only shape; see
+[the two JSON contracts](advanced.md#scope-and-authoritative-sources).

@@ -25,7 +25,8 @@
 # Exit codes:
 #   0  no FAIL findings (deploy may proceed)            -> pipeline continues
 #   1  one or more FAIL findings                        -> pipeline ABORTS
-#   2  warnings only AND --strict was supplied          -> pipeline ABORTS
+#   2  non-CIDR warnings AND --strict was supplied      -> pipeline ABORTS
+# Address-planning CIDR_* findings are always advisory, including under --strict.
 #
 # Portability: pure bash, runs on Linux agents AND Git Bash on Windows agents.
 # All `az` calls are addressed by name / use https:// URLs only, so Git Bash
@@ -66,7 +67,7 @@ Usage: preflight.sh [options]
   --environment <env>      Check only one of: dev | test | prod
   --subscription <id>      Check only this subscription id (single env)
   --location <region>      Override Azure region (e.g. eastus2)
-  --strict                 Treat WARN-only result as failure (exit 2)
+  --strict                 Treat non-CIDR WARN-only result as failure (exit 2)
   --warn-only              Report FAILs but never abort the task (exit 0) [default]
   --no-warn-only           Enforce hard failures: any FAIL aborts (exit 1)
   --skip-azure-lookups     Skip every check that needs an 'az' call (config-only)
@@ -131,6 +132,7 @@ ci_warning() {
 # -----------------------------------------------------------------------------
 FAIL_COUNT=0
 WARN_COUNT=0
+CIDR_WARN_COUNT=0
 FINDINGS=()   # "SEVERITY|CODE|MESSAGE|HINT"
 REPORT_FINDINGS=() # NUL-delimited at EXIT; preserve each finding's subscription.
 REPORT_COMPLETED="false"
@@ -146,6 +148,12 @@ record_report_finding() {
 }
 
 add_finding() { # $1 sev  $2 code  $3 msg  $4 hint
+  # Address planning stays advisory even under --strict; other checks keep their policy.
+  case "$2" in CIDR_*)
+    set -- WARN "$2" "$3" "${4:-}"
+    CIDR_WARN_COUNT=$((CIDR_WARN_COUNT + 1))
+    ;;
+  esac
   FINDINGS+=("$1|$2|$3|${4:-}")
   record_report_finding "$1" "$2" "$3"
   case "$1" in
@@ -867,12 +875,12 @@ for label, octet in environments:
     if not octet and label != 'Dev':
         continue
     if not re.fullmatch(r'[0-9]{1,3}', octet) or int(octet) > 255:
-        emit('FAIL', 'CIDR_RANGE_INVALID', 'Cannot peer: ' + label + ' range must be an IPv4 third octet (0-255). ' + repair)
+        emit('WARN', 'CIDR_RANGE_INVALID', 'Cannot peer: ' + label + ' range must be an IPv4 third octet (0-255). ' + repair)
         continue
     try:
         vn = network(vnet, octet)
     except ValueError as error:
-        emit('FAIL', 'CIDR_VNET_BAD', 'Cannot peer: ' + label + ' common_vnet_cidr (' + str(vnet).replace('XX', octet) + ') invalid or not network-aligned: ' + str(error) + '. ' + repair)
+        emit('WARN', 'CIDR_VNET_BAD', 'Cannot peer: ' + label + ' common_vnet_cidr (' + str(vnet).replace('XX', octet) + ') invalid or not network-aligned: ' + str(error) + '. ' + repair)
         continue
     vnets.append((label, vn))
     nets = []
@@ -881,19 +889,19 @@ for label, octet in environments:
         try:
             n = network(template, octet)
         except ValueError:
-            emit('FAIL', 'CIDR_SUBNET_BAD', label + ' ' + role + ' subnet invalid or not network-aligned: ' + cidr); continue
+            emit('WARN', 'CIDR_SUBNET_BAD', label + ' ' + role + ' subnet invalid or not network-aligned: ' + cidr); continue
         nets.append((role, n))
         if not n.subnet_of(vn):
-            emit('FAIL', 'CIDR_SUBNET_OUTSIDE', label + ' ' + role + ' (' + cidr + ') is not inside common_vnet_cidr (' + str(vn) + ').')
+            emit('WARN', 'CIDR_SUBNET_OUTSIDE', label + ' ' + role + ' (' + cidr + ') is not inside common_vnet_cidr (' + str(vn) + ').')
         if minp is not None and n.prefixlen > minp:
-            emit('FAIL', 'CIDR_SUBNET_TOO_SMALL', label + ' ' + role + ' (' + cidr + ') is /' + str(n.prefixlen) + '; Azure needs at least /' + str(minp) + ' here.')
+            emit('WARN', 'CIDR_SUBNET_TOO_SMALL', label + ' ' + role + ' (' + cidr + ') is /' + str(n.prefixlen) + '; Azure needs at least /' + str(minp) + ' here.')
     for (left_role, left), (right_role, right) in combinations(nets, 2):
         if left.overlaps(right):
-            emit('FAIL', 'CIDR_SUBNET_OVERLAP', label + ' ' + left_role + ' (' + str(left) + ') overlaps ' + right_role + ' (' + str(right) + ').')
+            emit('WARN', 'CIDR_SUBNET_OVERLAP', label + ' ' + left_role + ' (' + str(left) + ') overlaps ' + right_role + ' (' + str(right) + ').')
 for (left_label, left), (right_label, right) in combinations(vnets, 2):
     if left.overlaps(right):
         fixed = ' A fixed common_vnet_cidr ignores XX environment ranges for the VNet.' if 'XX' not in vnet else ''
-        emit('FAIL', 'CIDR_VNET_OVERLAP', 'Cannot peer: ' + left_label + ' (' + str(left) + ') overlaps ' + right_label + ' (' + str(right) + ').' + fixed + ' ' + repair)
+        emit('WARN', 'CIDR_VNET_OVERLAP', 'Cannot peer: ' + left_label + ' (' + str(left) + ') overlaps ' + right_label + ' (' + str(right) + ').' + fixed + ' ' + repair)
 PY
 )"
   local had=""
@@ -1171,11 +1179,11 @@ if [ "$FAIL_COUNT" -gt 0 ]; then
   echo "preflight FAILED with $FAIL_COUNT blocking finding(s). Aborting deployment."
   exit 1
 fi
-if [ "$WARN_COUNT" -gt 0 ] && [ "$STRICT" = "true" ]; then
+if [ "$((WARN_COUNT - CIDR_WARN_COUNT))" -gt 0 ] && [ "$STRICT" = "true" ]; then
   echo ""
   echo "preflight: warnings present and --strict set. Aborting deployment."
   exit 2
 fi
 echo ""
-echo "preflight passed. Deployment may proceed."
+echo "preflight completed. Deployment may proceed; address warnings do not establish network validity or peering."
 exit 0

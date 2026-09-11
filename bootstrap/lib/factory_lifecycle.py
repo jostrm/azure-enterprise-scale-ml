@@ -172,6 +172,7 @@ def _validate_manifest(document):
     for name in ("target", "identity", "route", "source", "config", "locks"):
         require(isinstance(document.get(name), dict), "missing-" + name)
     target, source, route = document["target"], document["source"], document["route"]
+    require(target.get("factory_type", "ai") == "ai", "unsupported-factory-type")
     for name in ("factory_id", "scaleset_id", "prefix", "region"):
         require(isinstance(target.get(name), str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", target[name]),
                 "invalid-target-" + name)
@@ -2426,6 +2427,8 @@ def main(argv=None):
         inputs = subparser.add_mutually_exclusive_group(required=True)
         inputs.add_argument("--stdin-manifest", action="store_true")
         inputs.add_argument("--protected-manifest")
+        subparser.add_argument("--expected-orchestrator", choices=("ado", "gha"),
+                               help="Require the reviewed manifest to use this orchestrator; never rewrite its route.")
         if name == "execute":
             subparser.add_argument("--source-root", required=True)
             subparser.add_argument("--execution-root", required=True)
@@ -2440,6 +2443,8 @@ def main(argv=None):
                                            args.expected_run, args.expected_manifest_hash)
         else:
             document = validate_manifest(read_manifest(args))
+            if args.expected_orchestrator:
+                require(document["route"]["kind"] == args.expected_orchestrator, "orchestrator-mismatch")
             if args.command == "inspect":
                 blockers = operation_blockers(document)
                 output = {"contract": CONTRACT, "run_id": document["run_id"], "manifest_valid": True,

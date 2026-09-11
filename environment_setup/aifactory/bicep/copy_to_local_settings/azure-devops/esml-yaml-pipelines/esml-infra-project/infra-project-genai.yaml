@@ -116,6 +116,7 @@ stages:
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
+                  serviceConnection: ${{ variables.dev_service_connection }}
               - template: ./jobs/job-1-genai-networking.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
@@ -154,6 +155,7 @@ stages:
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
+                  serviceConnection: ${{ variables.dev_service_connection }}
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
@@ -196,6 +198,7 @@ stages:
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
+                  serviceConnection: ${{ variables.dev_service_connection }}
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.dev_service_connection }}
@@ -252,6 +255,7 @@ stages:
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
+                  serviceConnection: ${{ variables.test_service_connection }}
               - template: ./jobs/job-1-genai-networking.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
@@ -290,6 +294,7 @@ stages:
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
+                  serviceConnection: ${{ variables.test_service_connection }}
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
@@ -332,6 +337,7 @@ stages:
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
+                  serviceConnection: ${{ variables.test_service_connection }}
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.test_service_connection }}
@@ -390,6 +396,7 @@ stages:
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
+                  serviceConnection: ${{ variables.prod_service_connection }}
               - template: ./jobs/job-1-genai-networking.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
@@ -428,6 +435,7 @@ stages:
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
+                  serviceConnection: ${{ variables.prod_service_connection }}
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}
@@ -470,6 +478,7 @@ stages:
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
+                  serviceConnection: ${{ variables.prod_service_connection }}
               - template: ./jobs/job-2-genai-services.yaml
                 parameters:
                   serviceConnection: ${{ variables.prod_service_connection }}

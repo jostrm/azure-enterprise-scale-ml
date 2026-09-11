@@ -6,6 +6,7 @@ import importlib.util
 import ipaddress
 import json
 import shutil
+import shlex
 import sys
 import tempfile
 import unittest
@@ -422,6 +423,119 @@ class TestScaleSetConfiguration(unittest.TestCase):
                 payload["dev"]["project_service_principal_OID_seeding_kv_name"],
                 "",
             )
+
+
+class TestProjectOrganization(unittest.TestCase):
+    values = {"org-department-name": '研发 O\'Brien "A" #1 \\ $HOME $(noop) `noop`',
+              "org-department-id": "部门/0007-α"}
+
+    def test_shared_templates_default_to_empty_with_exact_keys(self):
+        document = json.loads(VARIABLES_JSON.read_text(encoding="utf-8"))
+        for key in self.values:
+            self.assertEqual(document["dev"][key], "")
+            self.assertIn(f'  {key}: ""', ADO_VARIABLES.read_text(encoding="utf-8"))
+            env = CONFIG.PROJECT_ORGANIZATION_ENV[key]
+            self.assertIn(f'{env}=""', (GHA_ROOT / ".env.template").read_text(encoding="utf-8"))
+        self.assertNotIn("org-department-name", document["dev"]["tagsProject"])
+
+    def test_apply_and_update_preserve_project_values_and_empty_clears(self):
+        for route in ("ado", "gha"):
+            with self.subTest(route=route), tempfile.TemporaryDirectory() as directory:
+                repo = Path(directory)
+                json_path = repo / "aifactory" / "variables.json"
+                json_path.parent.mkdir()
+                base = {"project_number_000": "001", **self.values}
+                json_path.write_text(json.dumps({"dev": base, "stage_prod": base}), encoding="utf-8")
+                if route == "ado":
+                    path = repo / "aifactory/esml-infra/azure-devops/bicep/yaml/variables/variables.yaml"
+                    path.parent.mkdir(parents=True)
+                    path.write_text("variables:\n", encoding="utf-8")
+                    CONFIG.update_yaml(path, self.values)
+                    apply = CONFIG.apply_ado
+                else:
+                    path = repo / ".env"
+                    path.write_text("", encoding="utf-8")
+                    CONFIG.update_env(path, {CONFIG.PROJECT_ORGANIZATION_ENV[key]: value
+                                             for key, value in self.values.items()})
+                    apply = CONFIG.apply_gha
+                apply(repo, state())
+                for section in json.loads(json_path.read_text(encoding="utf-8")).values():
+                    self.assertEqual({key: section[key] for key in self.values}, self.values)
+                if route == "gha":
+                    assignments = dict(shlex.split(line, comments=True)[0].split("=", 1)
+                                       for line in path.read_text(encoding="utf-8").splitlines()
+                                       if line.startswith("ORG_DEPARTMENT_"))
+                    for key, value in self.values.items():
+                        self.assertEqual(assignments[CONFIG.PROJECT_ORGANIZATION_ENV[key]], value)
+                else:
+                    for line in path.read_text(encoding="utf-8").splitlines():
+                        if line.strip().startswith("org-department-"):
+                            key, raw = line.strip().split(":", 1)
+                            self.assertEqual(json.loads(raw), self.values[key])
+                apply(repo, {**state(), **{key: "" for key in self.values}})
+                for section in json.loads(json_path.read_text(encoding="utf-8")).values():
+                    self.assertTrue(all(section[key] == "" for key in self.values))
+
+    def test_bootstrap_switching_projects_does_not_copy_previous_department(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            path = repo / "aifactory" / "variables.json"
+            path.parent.mkdir()
+            path.write_text(json.dumps({"dev": {"project_number_000": "001", **self.values}}), encoding="utf-8")
+            (repo / ".env").write_text("", encoding="utf-8")
+            CONFIG.apply_gha(repo, {**state(), "project_number": "002"})
+            values = json.loads(path.read_text(encoding="utf-8"))["dev"]
+            self.assertTrue(all(values[key] == "" for key in self.values))
+
+    def test_template_merge_preserves_absence_and_unknown_legacy_values(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            active = folder / "variables.json"
+            template = folder / "variables-template.json"
+            template.write_text(json.dumps({"dev": {key: "" for key in self.values}}), encoding="utf-8")
+            active.write_text(json.dumps({"dev": {"legacy": "keep", **self.values},
+                                          "stage_prod": {"legacy": "stage", **self.values}}), encoding="utf-8")
+            CONFIG.merge_json_template(template, active)
+            CONFIG.update_json(active, {"unrelated": "new"})
+            values = json.loads(active.read_text(encoding="utf-8"))
+            self.assertEqual(values["stage_prod"]["legacy"], "stage")
+            for section in values.values():
+                self.assertTrue(all(section[key] == value for key, value in self.values.items()))
+            for extension, update, merge, keys in (
+                    ("yaml", CONFIG.update_yaml, CONFIG.merge_yaml_template, self.values),
+                    ("env", CONFIG.update_env, CONFIG.merge_env_template,
+                     {CONFIG.PROJECT_ORGANIZATION_ENV[key]: value for key, value in self.values.items()})):
+                active_file = folder / ("active." + extension)
+                template_file = folder / ("template." + extension)
+                active_file.write_text("variables:\n" if extension == "yaml" else "", encoding="utf-8")
+                update(active_file, {**keys, "LEGACY": "keep"})
+                template_file.write_text("variables:\n" if extension == "yaml" else "", encoding="utf-8")
+                update(template_file, {key: "" for key in keys})
+                merge(template_file, active_file)
+                text = active_file.read_text(encoding="utf-8")
+                self.assertIn("LEGACY", text)
+                for key, value in keys.items():
+                    self.assertIn(shlex.quote(value) if extension == "env" else CONFIG.quote(value), text)
+
+    def test_metadata_validation_and_conflicting_sections(self):
+        for value in (None, 42, "line\nbreak", "control\x85", "x" * 201):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                CONFIG.project_organization_values({"org-department-name": value})
+        with self.assertRaises(ValueError):
+            CONFIG.project_organization_values({"org-department-id": "x" * 129})
+        self.assertEqual(CONFIG.project_organization_values({"org-department-id": "0000123"}),
+                         {"org-department-id": "0000123"})
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "variables.json"
+            path.write_text(json.dumps({"dev": {"org-department-name": "研发"},
+                                        "stage_prod": {"org-department-name": "Finance"}}), encoding="utf-8")
+            before = path.read_bytes()
+            with self.assertRaisesRegex(ValueError, "Conflicting"):
+                CONFIG.update_json(path, {"unrelated": "new"})
+            self.assertEqual(path.read_bytes(), before)
+            CONFIG.update_json(path, {"org-department-name": ""})
+            self.assertTrue(all(section["org-department-name"] == ""
+                                for section in json.loads(path.read_text()).values()))
 
 
 class TestScaleSetWorkflowContracts(unittest.TestCase):

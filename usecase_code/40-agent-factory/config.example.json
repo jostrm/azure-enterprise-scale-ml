@@ -1,0 +1,15 @@
+{
+  "agent_prefix": "aif",
+  "targets": [
+    {
+      "key": "project001-dev",
+      "variables_file": "../variables.json",
+      "environment": "dev",
+      "selection": {}
+    }
+  ],
+  "model_overrides": {},
+  "ingestion": {
+    "mode": "datafactory"
+  }
+}

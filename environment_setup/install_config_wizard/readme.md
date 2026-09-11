@@ -1,4 +1,13 @@
-# AI Factory Configuration Wizard
+# Enterprise Scale AI Factory
+
+For new Windows setups, use the [Enterprise Scale AI Factory app](maui/readme.md)
+and the [new-first end-to-end setup guide](../../documentation/v2/20-29/24-end-2-end-setup.md).
+The app includes configuration, an API, reviewed pipeline execution, Azure
+monitoring, project operations and tickets. New multi-factory configurations use
+an **Azure Factory register**; existing single-`aifactory` repositories remain
+supported without automatic migration.
+
+The classic cross-platform Tkinter configuration wizard is documented below.
 
 The **AI Factory Configuration Wizard** is a guided, form-based desktop tool that simplifies the initial setup of an Enterprise Scale AI Factory. Instead of manually editing configuration files, the wizard walks you through every required parameter, validates your inputs in real time, and generates a correctly populated `.env.template` (GitHub Actions) or `variables.yaml` (Azure DevOps) file — ready to be used directly in your CI/CD pipeline.
 
@@ -249,5 +258,4 @@ bash 10-GH-create-or-update-github-variables.sh
 > **TODO** — detailed scaleset wizard screenshots and field-by-field guidance to be added.
 
 ---
-
 

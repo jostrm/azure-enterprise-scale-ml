@@ -17,7 +17,7 @@ Usage: ADO-create-new-aifactory-scaleset.sh [options]
        ALL-create-new-aifactory-scaleset.sh --orchestrator ado|gha [options]
 
 Options:
-  --repo-root PATH     Target AI Factory repository root.
+  --repo-root PATH     Legacy AI Factory repository root (not azurefactory/register.json).
   --aifactory-version VERSION  Template version: main (default), 124, 125, 1.100, or 10.2.
   --dry-run            Collect and validate answers without changing anything.
   --prepare-only       Prepare Azure, identity, configuration, and automation only.
@@ -49,6 +49,10 @@ Common non-interactive variables:
   AIF_SIMPLE_MODE=true   Opt in to private-ai-foundation-v1 (GHA, DEV only).
   AIF_COST_CENTER=123456 Simple Mode common and project cost-center tags.
   AIF_SUBMODULE_REF=<sha> Verified published commit (required for Simple Mode).
+
+These launchers create legacy aifactory files; they do not initialize or update
+azurefactory/register.json. For register-managed targets use the catalog UI/API
+or AIFactory-lifecycle.sh with a reviewed, exact-target manifest.
 EOF
   if [[ "${AIF_ROUTE:-}" == "gha" ]]; then
     cat <<'EOF'
@@ -552,8 +556,7 @@ aif_collect_answers() {
   esac
   aif_prompt_value AIF_DEV_VNET_CIDR "DEV vNet CIDR (canonical IPv4 /20 or larger; no XX placeholder)" "172.16.0.0/18"
   if ! aif_validate_cidr "$AIF_DEV_VNET_CIDR"; then
-    aif_error "DEV vNet CIDR must be a canonical IPv4 /20 or larger range; resolve XX to the DEV octet first." >&2
-    exit 1
+    aif_warn "Address planning: DEV vNet CIDR should be canonical IPv4 /20 or larger; resolve XX explicitly. No value was changed; subnet generation still requires a valid allocation."
   fi
 
   if [[ "$AIF_TOPOLOGY" == "s" ]]; then
@@ -575,8 +578,7 @@ aif_collect_answers() {
            "$AIF_DEV_VNET_CIDR" \
            "$AIF_ACCESS_HUB_VNET_CIDR" \
            "$AIF_VPN_CLIENT_CIDR"; then
-        aif_error "DEV, access-hub, and VPN client CIDRs must be valid, non-overlapping IPv4 ranges." >&2
-        exit 1
+        aif_warn "Address planning: DEV, access-hub, and VPN client CIDRs should be valid, non-overlapping IPv4 ranges. No values were changed."
       fi
     else
       AIF_ACCESS_HUB_MODE="integrated"
@@ -670,8 +672,7 @@ aif_collect_answers() {
     AIF_ACCESS_HUB_VNET_CIDR="$AIF_DEV_VNET_CIDR"
     AIF_VPN_CLIENT_CIDR="${AIF_VPN_CLIENT_CIDR:-172.31.240.0/24}"
     if ! aif_validate_network_plan "$AIF_DEV_VNET_CIDR" "$AIF_VPN_CLIENT_CIDR"; then
-      aif_error "Integrated DEV and VPN client CIDRs must not overlap." >&2
-      exit 1
+      aif_warn "Address planning: integrated DEV and VPN client CIDRs should not overlap. No values were changed."
     fi
   fi
 
@@ -1330,7 +1331,7 @@ aif_sync_submodule_and_templates() {
   if [[ ! -d aifactory ]]; then
     local existing_gitignore="$AIF_STATE_DIR/existing.gitignore"
     [[ ! -f .gitignore ]] || cp .gitignore "$existing_gitignore"
-    bash ./01-aif-copy-aifactory-templates.sh
+    bash ./01-aif-copy-aifactory-templates.sh --legacy-templates
     if [[ -f "$existing_gitignore" ]]; then
       "${AIF_PYTHON[@]}" - "$existing_gitignore" .gitignore <<'PY'
 import sys
@@ -3853,11 +3854,12 @@ aif_scaleset_main() {
   aif_simple_stage preflight
   aif_require_command bash
   aif_require_command git
-  aif_resolve_azure_cli
   aif_require_command realpath
+  aif_resolve_repo_root
+  aif_require_legacy_workspace "$AIF_REPO_ROOT" || return 1
+  aif_resolve_azure_cli
   [[ "$AIF_ROUTE" != "gha" ]] || aif_require_command gh
   aif_python
-  aif_resolve_repo_root
   aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE" "${AIF_CREATE_DEFAULT_VERSION:-main}"
   aif_simple_mode_defaults
   if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then

@@ -23,6 +23,7 @@ readonly ENVIRONMENT="${AIFACTORY_TARGET_ENVIRONMENT:-dev}"
 readonly RUNNER_LABEL="aifactory-admin-vm"
 
 cd "$REPO_ROOT"
+aif_require_legacy_workspace "$REPO_ROOT" || exit 1
 
 reviewed_project=false
 if [[ -n "${AIFACTORY_TARGET_ENVIRONMENT:-}${AIFACTORY_PROJECT_NUMBER:-}${AIFACTORY_PROJECT_CONFIG:-}" ]]; then
@@ -279,7 +280,7 @@ else
   aif_version_save "$REPO_ROOT"
 
   printf 'g\n' | bash "$SUBMODULE_PATH/00-start.sh"
-  bash "01-aif-copy-aifactory-templates.sh"
+  bash "01-aif-copy-aifactory-templates.sh" --legacy-templates
     bash "03-GH-bootstrap-files-no-env-overwrite.sh"
   fi
 fi
