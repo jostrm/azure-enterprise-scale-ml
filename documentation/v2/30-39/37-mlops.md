@@ -1,55 +1,264 @@
-# HOWTO - Quickstart: MLOps with Azure Machine Learning and Databricks
+# MLOps: Machine learning model factory
 
-# Prerequisites
+Use the [Machine learning model factory](../../../usecase_code/50-ml-model-factory/readme.md)
+for configurable Kaggle-backed training, evaluation, registration and inference.
+Azure Machine Learning is the primary engine, with **AutoML and custom training**.
+Azure Databricks provides additional custom tabular/forecasting and Spark examples.
+All Azure ML control-plane examples use **Python SDK v2 and CLI v2**.
 
-[HOWTO - install AzureML SDK v1+v2 and ESML accelerator library](../v2/30-39/33-install-azureml-sdk-v1+v2.md)
+Start with [data onboarding and lake design](34-datalake-onboard-data.md) and
+[DataOps orchestration](36-dataops.md). Reusable CI templates are in
+[`mlops/03_mlops_2026-09`](../../../copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md).
 
-[HOWTO - Supported use cases & Accelerated use cases](../v2/30-39/33-install-azureml-sdk-v1+v2.md)
+## 1. Workspace and model hierarchy
 
-# Context and pipeline outputs: MLOps in relation to DataOps
+The following is a **project example, not a hardcoded template configuration**.
+Resource names must be resolved from each project's configuration and Azure inventory.
 
-- ![](./images/39-end-2-end-dataops-mlops.png)
+**Orange project 001 / Dev, observed September 11, 2026:** the Azure ML workspace,
+CPU compute and Databricks workspace exist. The Azure ML model registry was empty
+at the latest inventory read. Names below are configured model names and notebook
+coverage, **not a list of registered or deployed models**. Databricks registry
+contents were not inventoried.
 
-# 1) Configure & Run ESML template Notebooks
-
-1) Configure the lake_settings
-- See section "3 Getting started: Notebooks" in: [HOWTO - install AzureML SDK v1+v2 and ESML accelerator library](../v2/30-39/33-install-azureml-sdk-v1+v2.md)
-2) Run the 3 notebooks of your choice to genereate the Azure ML Pipelines: 
-- Example: If you want to work with Databricks and pyspark, for batch deployment: 1 + 2b + 3b
-- Example: If you want to use Azure ML compute and AutoML, for online deployment AND/OR batch deployment: 1 + 2a + 3b and/or 3c
-
-![](./images/33-setup-notebook-templates.png)
-
-**Output:**
-- 2 Azure Machine Learning pipelines for: Training and Inference
-- 1 Online endpoint
-
-# 2) CI/CD (Python): Configure the ESML MLOps template, to use your project, model, pipelines
-
-1)  Configure the inline python parameters in the file `21-train_in_2_gold_train_pipeline.py`
-
-![](./images/37-mlops-python-files.png)
-
-**Parameters to configure** in `21-train_in_2_gold_train_pipeline.py` at line 49, 50
-
-```python
-
-advanced_mode = False # ADVANCED MODE (DatabricksSteps also) + Manual ML (or AutoML if defined in Databricks notebook)
-use_automl = True # SIMPLE MODE + AutoMLStep (if True)Manual ML Step (if False)
-
+```text
+Orange project 001 / Dev
+|
++-- Azure Machine Learning
+|   +-- Workspace: aml-001-sdc-dev-bltsc-001
+|       +-- CPU compute: p001-m01sdc-dev
+|       +-- Classification
+|       |   +-- titanic-survival
+|       |   +-- diabetes-classification
+|       |   +-- telco-churn
+|       +-- Regression
+|       |   +-- insurance-charges
+|       +-- Forecasting
+|       |   +-- monthly-air-passengers
+|       |   +-- delhi-temperature
+|       |   +-- orangejuice-sales
+|       +-- Computer vision
+|           +-- Multi-class: scene-classification
+|           +-- Multi-label: fruit-multilabel
+|           +-- Object detection: car-plate-detection
+|           +-- Instance segmentation: sar-ship-instance-segmentation
+|
++-- Azure Databricks
+    +-- Workspace: dbx-001-sdc-dev-bltsc-001
+        +-- Custom classification notebook coverage
+        |   +-- titanic-survival
+        |   +-- diabetes-classification
+        |   +-- telco-churn
+        +-- Custom regression notebook coverage
+        |   +-- insurance-charges
+        +-- Custom forecasting notebook coverage
+            +-- monthly-air-passengers
+            +-- delhi-temperature
+            +-- orangejuice-sales
 ```
 
-# 3) Import & Configre the GHA/ADO ESML Azure Devops pipeline
+The same logical model names can describe experiments on different engines.
+That does not imply a shared registry or automatic cross-platform model copying.
+Record the source engine, immutable model version, run and artifact location.
 
-1) Import Pipeline from from template - [Template location ](../../../copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/azure_devops)
-- Point the pipeline to your project and models branch, such as "project001_M11_dev_branch"
-2) Configure the Variables in Azure Devops / Github Actions
+### Scenario-to-model mapping
 
-![](./images/37-mlops-ado-vars.png)
+The [scenario JSON files](../../../usecase_code/50-ml-model-factory/scenarios)
+are the source of truth for these names and task settings.
 
+| Scenario | Model name | Type | Source/access notes |
+| --- | --- | --- | --- |
+| `titanic` | `titanic-survival` | Classification | Kaggle competition authentication and accepted rules required |
+| `diabetes` | `diabetes-classification` | Classification | Educational diabetes classification, not clinical decision support |
+| `churn` | `telco-churn` | Classification | Dataset license review required |
+| `insurance-regression` | `insurance-charges` | Regression | Continuous charges target; review attribution and intended use |
+| `air-passengers` | `monthly-air-passengers` | Forecasting | Monthly series; preserve dataset attribution |
+| `delhi-weather` | `delhi-temperature` | Forecasting | Daily series; unknown future weather covariates are excluded |
+| `orangejuice` | `orangejuice-sales` | Forecasting | Suitable Kaggle chronological sales dataset still required |
+| `image-multiclass` | `scene-classification` | Multi-class images | Dataset license review required |
+| `image-multilabel` | `fruit-multilabel` | Multi-label images | Annotation conversion required |
+| `image-object-detection` | `car-plate-detection` | Object detection | Pascal VOC annotation adapter |
+| `image-instance-segmentation` | `sar-ship-instance-segmentation` | Instance segmentation | Supported COCO polygon annotations; crowd/RLE needs another adapter |
 
+Diabetes presence and customer churn with categorical labels are classification
+tasks even when a model produces probabilities. They are not regression simply
+because a risk score is numeric.
 
+## 2. Technology and serving coverage
 
+| Type | Azure ML AutoML | Azure ML custom | Databricks examples |
+| --- | --- | --- | --- |
+| Classification/regression | v2 training/pipeline definitions and gated evaluation/registration | scikit-learn training and MLflow models | Shared custom training, Spark batch/streaming examples |
+| Forecasting | v2 forecasting; evaluator supports compatible sklearn-flavor models exposing `forecast()` | Seasonal-naive baseline with an explicit supported horizon | Shared custom forecasting and applicable Spark integration |
+| All four computer vision tasks | Standalone v2 training definitions; full evaluation/promotion adapter is not implemented | Bounded torchvision training, task-specific evaluation and MLflow export | No packaged end-to-end vision training notebook |
 
+The factory includes **11 scenarios and 22 Jupyter notebooks**, one custom and one
+AutoML notebook per scenario. A template's presence does not establish dataset
+access, successful training or deployment.
 
+Serving is a separate dimension from model type:
 
+```text
+One evaluated model version
+    +-- Batch       File/table input -> predictions persisted to storage
+    +-- Online      REST request -> near-real-time response
+    +-- Streaming   Event Hubs -> Structured Streaming -> results/checkpoints
+```
+
+Support is operation-specific. Current Azure serving helpers generate tabular
+MLflow batch/online deployments and custom-vision online deployments where supported.
+They do not generate image batch deployments or AutoML forecasting deployments.
+AutoML image models cannot pass the factory's gated registration/deployment route
+until a suitable evaluation adapter exists. Databricks streaming examples do not
+prove that every task/model flavor supports a Spark UDF or live stream.
+
+## 3. DataOps-to-MLOps lifecycle
+
+```text
+DataOps
+  Kaggle ingestion -> landing -> validation/preparation -> gold snapshot
+                                                           |
+MLOps                                                     v
+  validate config -> train -> held-out evaluation + Responsible AI
+                                    |
+                             quality gate passes
+                                    |
+                       register exact evaluated artifact
+                                    |
+                         separate deployment approval
+                                    |
+                    batch / online / streaming inference
+                                    |
+                    observed feedback -> explicit review
+                                    |
+                            new training snapshot
+```
+
+Source versions are shared within a project/environment. Gold snapshots belong
+to a use case; model and evaluation artifacts belong to individual runs.
+Snapshot identity includes source hashes and preparation settings, not algorithms,
+AutoML budgets or quality thresholds. Different model variants can reuse unchanged
+gold while producing separate evaluations. Changed features, split/group rules,
+forecast horizons or annotation mappings require a new snapshot.
+
+Use immutable model versions. Keep inference requests unlabeled and retain request,
+model and run identifiers in results. Store observed labels separately from
+predictions; feedback is not automatically training-eligible.
+See the [visual lake hierarchy](34-datalake-onboard-data.md#1-the-design-at-a-glance).
+
+## 4. SDK v2 and CLI v2 execution
+
+Run from the model-factory root after configuring its declared dependencies,
+scenario JSON and a resolved runtime JSON. Runtime names existing resources;
+rendering does not provision a workspace, compute or datastore.
+
+```powershell
+python -m ml_model_factory validate --scenario scenarios\titanic.json --runtime runtime.local.json
+python -m ml_model_factory render --scenario scenarios\titanic.json --runtime runtime.local.json --mode automl --output generated\titanic-automl
+```
+
+Choose **one** submission route for a rendered job:
+
+```powershell
+# Python SDK v2 through the shared factory entry point:
+python -m ml_model_factory submit --runtime runtime.local.json --job generated\titanic-automl\pipeline.yml
+
+# Alternative CLI v2 entry point; do not also submit the same job above:
+python scripts\azureml_cli.py --runtime runtime.local.json --job generated\titanic-automl\pipeline.yml
+```
+
+Use `--mode custom` for custom training. Render into a new empty directory.
+Resolve standalone preparation/model placeholders before submitting; image
+AutoML uses `job.yml`, not an evaluated end-to-end `pipeline.yml`.
+Submission incurs compute charges.
+
+Registration is explicit and requires a completed factory pipeline plus its
+downloaded passing quality gate and matching lineage:
+
+```powershell
+python scripts\azureml_sdk.py --runtime runtime.local.json register --job-name <completed-pipeline-name> --model-name titanic-survival
+```
+
+Do not substitute a raw model registration command that bypasses this gate.
+Use the [factory guide](../../../usecase_code/50-ml-model-factory/readme.md)
+for local lake execution, deployment helpers and Databricks job parameters.
+
+## 5. Azure DevOps and GitHub Actions
+
+Both providers call the same `scripts\ci.py` in the
+[current MLOps template folder](../../../copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md).
+Reuse the existing AI Factory self-hosted runner/agent, private connectivity and
+authentication configuration. Preprovision dependencies; workflows do not install
+tools or silently switch to a hosted runner.
+
+| Action | Behavior |
+| --- | --- |
+| `validate` | Offline configuration and contract validation; no Azure login or submission |
+| `ingest` | Explicit Kaggle download; credentials stay in secret providers, rules are not accepted automatically |
+| `train` | Fresh bundle, CLI v2 submission, bounded status polling, evaluated-model registration |
+| `deploy` | Separate action with immutable model ID, target, serving kind and an approved environment |
+
+Azure ML job success is normally `Completed`; failed, canceled, unknown or missing
+statuses must not produce a success receipt. A timeout does not cancel the cloud
+job automatically. Inspect its recorded job ID before retrying.
+
+When `runtime.lake` is enabled, CI generates a fresh execution ID without rewriting
+the source runtime or snapshot ID. Azure preparation uses a run-scoped working
+area; direct output URI bindings do not provide immutable storage locks.
+Shared snapshot publication remains explicit.
+
+Azure DevOps uses configured service connections; GitHub uses configured workload
+identity federation. Required reviewers and protected environments must be set up
+separately: an environment name alone is not an approval policy.
+There is no automatic production-promotion stage.
+
+## 6. Responsible AI and validation evidence
+
+Every implemented evaluation route records task-appropriate diagnostics and
+limitations. Local reports include held-out errors, relevant cohorts and
+explanations where applicable; vision and forecasting use their own task metrics.
+These reports are not automatically Azure Responsible AI dashboards.
+
+Compatible custom tabular models also have a separate optional `rai-pipeline.yml`
+using Azure Responsible AI components. Review model-flavor, environment and
+component compatibility before submission; do not claim universal dashboard support.
+
+Validation must distinguish:
+
+| Evidence | Meaning |
+| --- | --- |
+| Real local lifecycle | Actual preparation, custom fitting, MLflow reload, inference and feedback on local data |
+| Contract/service simulation | SDK/CLI schemas, ADF parameters and CI/registration/deployment decisions with service boundaries simulated |
+| Live cloud integration | Actual jobs, model registrations and endpoint responses under the intended identities |
+
+The test suites cover seven task types, three serving-path variants, custom/AutoML
+definitions, both CI providers, ADF initial/delta bindings and rejected flows.
+Selecting a serving path in a local test does not run an online endpoint or
+streaming engine. Generated fixtures and simulated Kaggle downloads are explicitly
+distinguished from real Kaggle data.
+
+Run the combined suite from the model-factory root:
+
+```powershell
+python -m pytest tests ..\..\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09\tests ..\..\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory\tests --junitxml=outputs\validation\lifecycle-results.xml -q
+```
+
+At the September 11, 2026 project snapshot, real local Kaggle classification,
+regression and forecasting runs had completed. Full live cloud validation remained
+incomplete: AKS recovery failed on the subscription feature
+`Microsoft.Network/AllowBringYourOwnPublicIpAddress`, and the platform retry had
+not completed. This does not invalidate local results, but neither do local
+results establish cloud deployment success.
+
+## 7. Legacy ESML workflows
+
+Older ESML notebook flows and
+[`02_cicd-ado-gha_mlops`](../../../copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/azure_devops)
+remain legacy references. Their `AutoMLStep`, `DatabricksStep` and published-pipeline
+patterns are not the implementation contract for this SDK/CLI v2 model factory.
+Do not mix the old execution APIs or lake paths into new templates without an
+explicit migration plan.
+
+Related guidance: [supported use cases](32-use_cases-where_to_start.md),
+[legacy SDK/ESML setup](33-install-azureml-sdk-v1+v2.md),
+[data onboarding](34-datalake-onboard-data.md), and [DataOps](36-dataops.md).
