@@ -29,7 +29,7 @@
     
     
       
-        <title>Parameters - Enterprise Scale AI Factory</title>
+        <title>Configuration and API - Enterprise Scale AI Factory</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#parameters" class="md-skip">
+        <a href="#configuration-and-api" class="md-skip">
           Skip to content
         </a>
       
@@ -115,7 +115,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Parameters
+              Configuration and API
             
           </span>
         </div>
@@ -549,7 +549,7 @@
   <span class="md-ellipsis">
     
   
-    Standard Mode (mandatory)
+    Required inputs
   
 
     
@@ -577,7 +577,7 @@
   <span class="md-ellipsis">
     
   
-    Advanced Mode (all)
+    All variables
   
 
     
@@ -1274,10 +1274,38 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#ai-factory-configuration-wizard" class="md-nav__link">
+  <a href="#one-project-all-environments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        AI Factory Configuration Wizard
+        One project, all environments
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="One project, all environments">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-project-organizational-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional project organizational ownership
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API layer
       
     </span>
   </a>
@@ -1285,10 +1313,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#comment-tag-system" class="md-nav__link">
+  <a href="#two-common-workflows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Comment Tag System
+        Two common workflows
       
     </span>
   </a>
@@ -1296,21 +1324,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#choose-your-view" class="md-nav__link">
+  <a href="#template-guidance" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Choose Your View
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#source-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Source Files
+        Template guidance
       
     </span>
   </a>
@@ -1337,108 +1354,182 @@
   
 
 
-<h1 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h1>
-<p>All AI Factory deployments are configured through a single flat file — <code>.env.template</code> (GitHub Actions) or <code>variables.yaml</code> (Azure DevOps). Both files use the same tag-based comment system to describe every variable.</p>
-<hr />
-<h2 id="ai-factory-configuration-wizard">AI Factory Configuration Wizard<a class="headerlink" href="#ai-factory-configuration-wizard" title="Permanent link">&para;</a></h2>
-<p>We recommend using the <strong>AI Factory Configuration Wizard</strong> to configure the AI Factory and its first project initially. The wizard provides a guided, form-based UI that validates your inputs and generates a correctly populated configuration file — significantly reducing the risk of misconfiguration on first deployment.</p>
-<div class="admonition info">
-<p class="admonition-title">Two common workflows</p>
-<ul>
-<li><strong>ITSM-integrated (fully automated):</strong> Many teams integrate the AI Factory pipelines directly with their ITSM system (ServiceNow, Jira Service Management, etc.), so that project teams can "order" an AI Factory project via a self-service ticket — triggering the pipeline with 100% automation and zero manual intervention.</li>
-<li><strong>Core-team managed:</strong> Other teams prefer to route tickets to the AI Factory core team, who then uses the <strong>AI Factory Configuration Wizard</strong> to generate the correct configuration from the ticket information and trigger the pipeline on behalf of the requesting team.</li>
-</ul>
-</div>
-<p>Download the Configuration Wizard for your platform:</p>
-<ul>
-<li><a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/install_config_wizard/aifactory-config-windows.zip"><strong>Download AI Factory Configuration Wizard — Windows</strong></a></li>
-<li><a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/install_config_wizard/aifactory-config-linux.zip"><strong>Download AI Factory Configuration Wizard — Linux</strong></a></li>
-<li><a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/install_config_wizard/aifactory-config-macos.zip"><strong>Download AI Factory Configuration Wizard — macOS</strong></a></li>
-</ul>
-<p><img alt="AI Factory Configuration Wizard" src="https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_config_wizard/images/aifactory-config-wizard-01.png" /></p>
-<hr />
-<h2 id="comment-tag-system">Comment Tag System<a class="headerlink" href="#comment-tag-system" title="Permanent link">&para;</a></h2>
-<p>Each variable line carries a structured comment that tells you exactly what to do:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>VARIABLE="default_value"  # &lt;mandatory|optional&gt;Title&lt;default&gt;value&lt;keep-as-is|recommended|ensure&gt; detail &lt;otherwise&gt; alternative
+<h1 id="configuration-and-api">Configuration and API<a class="headerlink" href="#configuration-and-api" title="Permanent link">&para;</a></h1>
+<p>Keep each project's complete configuration together. The current JSON format has
+two sections: <strong><code>dev</code></strong> and <strong><code>stage_prod</code></strong>. It includes shared settings,
+environment-specific choices, all three subscription IDs, and factory/project
+naming. GitHub Actions <code>.env</code> and Azure DevOps <code>variables.yaml</code> remain supported;
+their names are not always identical.</p>
+<table>
+<thead>
+<tr>
+<th>Reference</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="standard/">Standard parameters</a></td>
+<td>Required and conditional setup inputs</td>
+</tr>
+<tr>
+<td><a href="advanced/">All variables</a></td>
+<td>Current configuration keys, route-specific names, defaults and guidance</td>
+</tr>
+<tr>
+<td><a href="../orchestrators/gh/">GitHub Actions</a></td>
+<td>Create/update scripts and workflow configuration</td>
+</tr>
+<tr>
+<td><a href="../orchestrators/ado/">Azure DevOps</a></td>
+<td>Create/update scripts and service connections</td>
+</tr>
+</tbody>
+</table>
+<h2 id="one-project-all-environments">One project, all environments<a class="headerlink" href="#one-project-all-environments" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>project006\
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  project_state.json
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  variables.json
 </code></pre></div>
+<p><code>project_state.json</code> is the configuration API's saved editor state.
+<code>variables.json</code> is the pipeline configuration. Do not pass editor-only state keys
+directly to a pipeline. The following is a <strong>structural excerpt</strong>, not a complete
+deployable configuration:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"dev"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">"project_number_000"</span><span class="p">:</span><span class="w"> </span><span class="s2">"006"</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">"admin_aifactoryPrefixRG"</span><span class="p">:</span><span class="w"> </span><span class="s2">"team-"</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">"admin_aifactorySuffixRG"</span><span class="p">:</span><span class="w"> </span><span class="s2">"-001"</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">"dev_sub_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;dev-subscription-id&gt;"</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">"test_sub_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;stage-subscription-id&gt;"</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">"prod_sub_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;prod-subscription-id&gt;"</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="nt">"stage_prod"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">"project_number_000"</span><span class="p">:</span><span class="w"> </span><span class="s2">"006"</span><span class="p">,</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">"admin_aifactoryPrefixRG"</span><span class="p">:</span><span class="w"> </span><span class="s2">"team-"</span><span class="p">,</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nt">"admin_aifactorySuffixRG"</span><span class="p">:</span><span class="w"> </span><span class="s2">"-001"</span><span class="p">,</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="nt">"dev_sub_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;dev-subscription-id&gt;"</span><span class="p">,</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="nt">"test_sub_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;stage-subscription-id&gt;"</span><span class="p">,</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="nt">"prod_sub_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;prod-subscription-id&gt;"</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="p">}</span>
+</code></pre></div>
+<p>Dev execution selects <code>dev</code>; Stage and Prod select <code>stage_prod</code> and their
+respective subscription. The shared Stage/Prod section must represent both
+environments consistently. Changing a subscription reference does not create or
+move a subscription. Changing networking in a file does not migrate a deployed VNet.</p>
+<p>Use the full <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/variables.json">JSON template</a>
+as the field reference and preserve its property names and value types. That
+raw source template currently contains only <code>dev</code>; generated project configuration
+has both sections. See <a href="advanced/#scope-and-authoritative-sources">the exact format distinction</a>.
+Route adapters translate JSON
+into the pipeline's expected variables. Updating <code>.env</code>, YAML and JSON separately
+can leave conflicting settings: choose the intended input explicitly for each run.
+Never commit populated credentials, protected artifacts or private configuration.</p>
+<h3 id="optional-project-organizational-ownership">Optional project organizational ownership<a class="headerlink" href="#optional-project-organizational-ownership" title="Permanent link">&para;</a></h3>
+<p><code>org-department-name</code> and <code>org-department-id</code> are optional project metadata, both
+defaulting to <code>""</code>. Keep the same values in <code>dev</code> and <code>stage_prod</code> within that
+project's full <code>variables.json</code>; conflicting values require explicit correction.
+Older configurations without either key remain supported. Neither field inherits
+from the factory or another project, and neither changes cost center, identity,
+authentication or authorization. The name accepts Unicode plain text (up to 200
+characters); the ID is a string (up to 128 characters), not necessarily a GUID.
+Control characters are not allowed.</p>
+<p>JSON and YAML retain these exact hyphenated keys. Shell <code>.env</code> uses
+<code>ORG_DEPARTMENT_NAME</code> and <code>ORG_DEPARTMENT_ID</code>; quote values as shell literals.
+These fields are configuration metadata only, not automatically written to Azure
+resource tags. Existing cost-center tags and department tag aliases remain separate.</p>
+<h2 id="api-layer">API layer<a class="headerlink" href="#api-layer" title="Permanent link">&para;</a></h2>
+<p>An API-enabled installation exposes configuration, validation and reviewed
+operations independently of the calling application. The default local endpoint
+is <code>http://127.0.0.1:8765</code>; deployed host ports may differ.</p>
 <table>
 <thead>
 <tr>
-<th>Tag</th>
-<th>Meaning</th>
+<th>Endpoint</th>
+<th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>&lt;mandatory&gt;</code></td>
-<td><strong>Must be set</strong> before the pipeline can run</td>
+<td><code>GET /health</code></td>
+<td>Public process health; not Azure deployment status</td>
 </tr>
 <tr>
-<td><code>&lt;optional&gt;</code></td>
-<td>Safe to leave at its default value for standard deployments</td>
+<td><code>GET /docs</code> and <code>/openapi.json</code></td>
+<td>Running API's interactive reference and exact request schemas</td>
 </tr>
 <tr>
-<td><code>&lt;default&gt;value</code></td>
-<td>The value already set in the file — what you get if you don't change it</td>
+<td><code>GET /api/v1/schema</code></td>
+<td>Configuration keys, defaults and choices; not the OpenAPI document</td>
 </tr>
 <tr>
-<td><code>&lt;keep-as-is&gt;</code></td>
-<td>Default is correct for most deployments — no action needed</td>
+<td><code>POST /api/v1/import</code></td>
+<td>Import JSON, YAML or <code>.env</code> into configuration state</td>
 </tr>
 <tr>
-<td><code>&lt;recommended&gt;</code></td>
-<td>Not the default, but Microsoft's recommended value for production</td>
+<td><code>POST /api/v1/validation</code></td>
+<td>Validate supplied current-project state without saving or deploying</td>
 </tr>
 <tr>
-<td><code>&lt;ensure&gt;</code></td>
-<td>You must look up or verify a value from an external source (e.g. Azure Portal)</td>
+<td><code>POST /api/v1/export</code></td>
+<td>Render JSON, YAML or <code>.env</code>; a requested output path writes a file</td>
 </tr>
 <tr>
-<td><code>&lt;otherwise&gt;</code></td>
-<td>What to do in the non-standard / non-recommended scenario</td>
+<td><code>POST /api/v1/projects/save</code></td>
+<td>Save project configuration; pipeline-variable writes are explicit</td>
+</tr>
+<tr>
+<td><code>GET /api/v1/creation/capabilities</code></td>
+<td>Supported create launchers and typed bootstrap fields</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/creation/bootstrap/prepare</code></td>
+<td>Review common-infrastructure plus initial-project creation</td>
+</tr>
+<tr>
+<td><code>POST /api/v1/creation/bootstrap/start</code></td>
+<td>Execute the reviewed bootstrap confirmation</td>
+</tr>
+<tr>
+<td><code>/api/v1/operations/project-deployments/plan</code>, <code>/prepare</code>, <code>/start</code></td>
+<td>Save a deployment draft, review it, then explicitly execute</td>
 </tr>
 </tbody>
 </table>
-<hr />
-<h2 id="choose-your-view">Choose Your View<a class="headerlink" href="#choose-your-view" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>View</th>
-<th>Who it's for</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="standard/"><strong>Standard Mode</strong></a></td>
-<td>First-time setup — only the mandatory parameters you <strong>must</strong> change</td>
-</tr>
-<tr>
-<td><a href="advanced/"><strong>Advanced Mode</strong></a></td>
-<td>Full reference — every parameter, grouped by category</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="source-files">Source Files<a class="headerlink" href="#source-files" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Orchestrator</th>
-<th>File to edit</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>GitHub Actions</td>
-<td><code>environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/.env.template</code></td>
-</tr>
-<tr>
-<td>Azure DevOps</td>
-<td><code>environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/variables/variables.yaml</code></td>
-</tr>
-</tbody>
-</table>
+<p>All <code>/api/v1/*</code> requests require <code>X-API-Key</code>, configured on the host through
+<code>AIFACTORY_API_KEY</code>. Execution additionally requires the appropriate host identity,
+permissions, tools and current published scripts. Use the live OpenAPI schemas:
+configuration <code>state</code>, a bootstrap <code>config</code>, and a pipeline <code>variables.json</code> are
+different request formats, not interchangeable objects.</p>
+<p>Preparation is not execution. Keep the returned confirmation tied to its exact
+factory, project, environment and version; changed or expired inputs need a fresh
+review. Poll the returned job ID rather than blindly retrying a start request.
+Address-planning findings are advisory; authentication, identity, schema and
+execution prerequisites remain separate.</p>
+<h2 id="two-common-workflows">Two common workflows<a class="headerlink" href="#two-common-workflows" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>ITSM-integrated:</strong> ServiceNow, Jira Service Management or an internal portal
+  can call the API through a trusted automation runner: import/configure,
+  validate, prepare, apply the organization's approval policy, execute and track
+  the job. Unattended execution requires pre-established authentication and all
+  required inputs; an incoming ticket alone is not deployment authorization.</li>
+<li><strong>Core-team managed:</strong> The core team maintains the project configuration and
+  runs the appropriate <a href="../orchestrators/gh/">GHA</a> or
+  <a href="../orchestrators/ado/">ADO</a> create/update Bash launcher on the team's behalf.</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">API access</p>
+<p>The local API is loopback-scoped, not a public ITSM endpoint. Do not expose
+its port or put API keys in URLs. Use an authenticated integration on the
+intended execution host, with protected secret storage and least privilege.</p>
+</div>
+<h2 id="template-guidance">Template guidance<a class="headerlink" href="#template-guidance" title="Permanent link">&para;</a></h2>
+<p>Source comments use <code>&lt;mandatory&gt;</code>, <code>&lt;optional&gt;</code>, <code>&lt;default&gt;</code>, <code>&lt;ensure&gt;</code>,
+<code>&lt;recommended&gt;</code>, <code>&lt;keep-as-is&gt;</code> and <code>&lt;otherwise&gt;</code> tags. Requirements can be
+conditional on a selected feature; template defaults are not proof of deployment
+readiness. Consult the generated <a href="advanced/">complete reference</a> for the exact
+source values and differences between formats.</p>
 
 
 
