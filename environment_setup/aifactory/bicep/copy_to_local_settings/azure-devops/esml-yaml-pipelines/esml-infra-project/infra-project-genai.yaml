@@ -18,7 +18,7 @@ parameters:
     displayName: Reviewed single-environment target (empty preserves promotion flow)
     type: string
     default: ''
-    values: ['', dev, stage, prod]
+    # ADO rejects empty entries in values; job-0 validates non-empty reviewed targets.
   - name: deploymentProjectNumber
     type: string
     default: ''
