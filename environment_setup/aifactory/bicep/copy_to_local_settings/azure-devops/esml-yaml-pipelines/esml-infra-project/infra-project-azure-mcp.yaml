@@ -4,11 +4,6 @@ parameters:
     displayName: Reviewed single-environment target
     type: string
     default: ''
-    values:
-      - ''
-      - dev
-      - stage
-      - prod
   - name: deploymentProjectNumber
     type: string
     default: ''
@@ -50,13 +45,37 @@ variables:
       value: ${{ parameters.deploymentSettings.admin_commonResourceSuffix }}
 
 stages:
-# Deliberately reject an unreviewed run during template expansion, before any job.
-- ${{ if or(notIn(parameters.deploymentTarget, 'dev', 'stage', 'prod'), eq(trim(parameters.deploymentProjectNumber), ''), eq(trim(parameters.deploymentConfigHash), ''), ne(parameters.useJsonConfigOverride, true), ne(parameters.configFile, 'aifactory/.reviewed-project-config.json')) }}:
-  - MCP_requires_reviewed_target_project_hash_and_JSON_configuration: error
+- stage: Validate_MCP_Request
+  displayName: Validate reviewed MCP-only request
+  jobs:
+    - job: Validate
+      pool:
+        ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
+          name: $(adminVMBuildAgentPool)
+        ${{ else }}:
+          vmImage: windows-2022
+      steps:
+        - checkout: none
+        - pwsh: |
+            $ErrorActionPreference = 'Stop'
+            if ($env:MCP_TARGET -cnotin @('dev', 'stage', 'prod') -or
+                $env:MCP_PROJECT -notmatch '^\d{3}$' -or
+                $env:MCP_CONFIG_HASH -notmatch '^[a-f0-9]{64}$' -or
+                $env:MCP_JSON_OVERRIDE -ne 'true' -or
+                $env:MCP_CONFIG_FILE -cne 'aifactory/.reviewed-project-config.json') {
+              throw 'MCP requires an explicit reviewed target, project, hash and JSON configuration.'
+            }
+          displayName: Reject incomplete or unreviewed requests before deployment
+          env:
+            MCP_TARGET: ${{ parameters.deploymentTarget }}
+            MCP_PROJECT: ${{ parameters.deploymentProjectNumber }}
+            MCP_CONFIG_HASH: ${{ parameters.deploymentConfigHash }}
+            MCP_JSON_OVERRIDE: ${{ parameters.useJsonConfigOverride }}
+            MCP_CONFIG_FILE: ${{ parameters.configFile }}
 - stage: Dev_GenAI_Project
   displayName: Dev private Azure MCP only
-  dependsOn: []
-  condition: and(not(canceled()), eq('${{ parameters.deploymentTarget }}', 'dev'))
+  dependsOn: Validate_MCP_Request
+  condition: and(succeeded(), eq('${{ parameters.deploymentTarget }}', 'dev'))
   variables:
     dev_test_prod: dev
     dev_test_prod_sub_id: $(dev_sub_id)
@@ -73,8 +92,8 @@ stages:
         runnerSelection: ${{ parameters.runnerSelection }}
 - stage: Stage_GenAI_Project
   displayName: Stage private Azure MCP only
-  dependsOn: []
-  condition: and(not(canceled()), eq('${{ parameters.deploymentTarget }}', 'stage'))
+  dependsOn: Validate_MCP_Request
+  condition: and(succeeded(), eq('${{ parameters.deploymentTarget }}', 'stage'))
   variables:
     dev_test_prod: test
     dev_test_prod_sub_id: $(test_sub_id)
@@ -91,8 +110,8 @@ stages:
         runnerSelection: ${{ parameters.runnerSelection }}
 - stage: Prod_GenAI_Project
   displayName: Prod private Azure MCP only
-  dependsOn: []
-  condition: and(not(canceled()), eq('${{ parameters.deploymentTarget }}', 'prod'))
+  dependsOn: Validate_MCP_Request
+  condition: and(succeeded(), eq('${{ parameters.deploymentTarget }}', 'prod'))
   variables:
     dev_test_prod: prod
     dev_test_prod_sub_id: $(prod_sub_id)

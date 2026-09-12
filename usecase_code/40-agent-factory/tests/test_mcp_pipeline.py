@@ -41,7 +41,7 @@ class McpPipelineTests(unittest.TestCase):
         cls.pipeline = yaml.safe_load(PIPELINE.read_text(encoding="utf-8"))
         cls.job = yaml.safe_load(JOB.read_text(encoding="utf-8"))
         cls.review = yaml.safe_load(REVIEW.read_text(encoding="utf-8"))
-        cls.stages = [stage for stage in cls.pipeline["stages"] if "stage" in stage]
+        cls.stages = [stage for stage in cls.pipeline["stages"] if stage["stage"].endswith("_GenAI_Project")]
         cls.deployment = cls.job["jobs"][0]
         cls.steps = cls.deployment["strategy"]["runOnce"]["deploy"]["steps"]
 
@@ -58,7 +58,7 @@ class McpPipelineTests(unittest.TestCase):
         for name in ("deploymentTarget", "deploymentProjectNumber", "deploymentConfigHash"):
             self.assertEqual("", parameters[name]["default"])
             self.assertEqual("string", parameters[name]["type"])
-        self.assertEqual(["", "dev", "stage", "prod"], parameters["deploymentTarget"]["values"])
+        self.assertNotIn("values", parameters["deploymentTarget"])
         self.assertEqual("object", parameters["deploymentSettings"]["type"])
         self.assertEqual(REVIEWED_FILE, parameters["configFile"]["default"])
         self.assertEqual("boolean", parameters["useJsonConfigOverride"]["type"])
@@ -68,30 +68,22 @@ class McpPipelineTests(unittest.TestCase):
         self.assertEqual("none", self.pipeline["pr"])
         self.assertIn("AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1", PIPELINE.read_text())
 
-    def test_incomplete_or_unreviewed_runs_fail_template_expansion(self):
-        guards = [stage for stage in self.pipeline["stages"] if "stage" not in stage]
+    def test_incomplete_or_unreviewed_runs_fail_before_deployment(self):
+        guards = [stage for stage in self.pipeline["stages"] if stage["stage"] == "Validate_MCP_Request"]
         self.assertEqual(1, len(guards))
-        expression, failure = next(iter(guards[0].items()))
-        self.assertEqual(
-            "${{ if or(notIn(parameters.deploymentTarget, 'dev', 'stage', 'prod'), "
-            "eq(trim(parameters.deploymentProjectNumber), ''), "
-            "eq(trim(parameters.deploymentConfigHash), ''), "
-            "ne(parameters.useJsonConfigOverride, true), "
-            f"ne(parameters.configFile, '{REVIEWED_FILE}')) }}}}",
-            expression,
-        )
-        self.assertEqual(
-            [{"MCP_requires_reviewed_target_project_hash_and_JSON_configuration": "error"}],
-            failure,
-        )
+        steps = guards[0]["jobs"][0]["steps"]
+        self.assertEqual({"checkout": "none"}, steps[0])
+        for check in ("MCP_TARGET", "MCP_PROJECT", "MCP_CONFIG_HASH", "MCP_JSON_OVERRIDE", "MCP_CONFIG_FILE"):
+            self.assertIn("$env:" + check, steps[1]["pwsh"])
+        self.assertIn("throw 'MCP requires", steps[1]["pwsh"])
 
     def test_stages_are_independent_and_select_exactly_one_environment(self):
         self.assertEqual([row[1] for row in TARGETS], [stage["stage"] for stage in self.stages])
         for stage, (target, _, code, prefix, environment) in zip(self.stages, TARGETS):
             with self.subTest(target=target):
-                self.assertEqual([], stage["dependsOn"])
+                self.assertEqual("Validate_MCP_Request", stage["dependsOn"])
                 self.assertEqual(
-                    "and(not(canceled()), eq('${{ parameters.deploymentTarget }}', "
+                    "and(succeeded(), eq('${{ parameters.deploymentTarget }}', "
                     f"'{target}'))",
                     stage["condition"],
                 )
