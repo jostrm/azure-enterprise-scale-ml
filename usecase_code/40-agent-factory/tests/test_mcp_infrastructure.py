@@ -11,6 +11,8 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[3]
+if not (ROOT / "environment_setup" / "aifactory" / "bicep" / "esml-genai-1" / "08-azure-mcp.bicep").is_file():
+    ROOT = ROOT / "azure-enterprise-scale-ml"
 BICEP = ROOT / "environment_setup" / "aifactory" / "bicep"
 ENTRY = BICEP / "esml-genai-1" / "08-azure-mcp.bicep"
 MODULE = BICEP / "modules" / "azureMcpServer.bicep"

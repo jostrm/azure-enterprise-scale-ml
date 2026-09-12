@@ -16,6 +16,8 @@ except ImportError:
 
 
 ROOT = Path(__file__).resolve().parents[3]
+if not (ROOT / "environment_setup" / "aifactory" / "bicep" / "esml-genai-1" / "08-azure-mcp.bicep").is_file():
+    ROOT = ROOT / "azure-enterprise-scale-ml"
 PIPELINES = (
     ROOT / "environment_setup" / "aifactory" / "bicep" / "copy_to_local_settings"
     / "azure-devops" / "esml-yaml-pipelines"
