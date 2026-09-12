@@ -343,7 +343,7 @@ class McpInfrastructureCompiledTests(unittest.TestCase):
         self.assertEqual(OUTPUTS, set(self.entry["outputs"]))
         self.assertEqual(OUTPUTS, set(self.module["outputs"]))
         self.assertEqual(
-            "[format('https://{0}/mcp', reference('app').configuration.ingress.fqdn)]",
+            "[format('https://{0}', reference('app').configuration.ingress.fqdn)]",
             self.module["outputs"]["mcpUrl"]["value"],
         )
         for output, member in (("defaultDomain", "defaultDomain"), ("staticIp", "staticIp")):

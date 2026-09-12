@@ -20,6 +20,7 @@ from .config import Target, identifier, required
 GRAPH = "https://graph.microsoft.com"
 NETWORK_API = "2024-05-01"
 CONTAINER_APP_API = "2025-01-01"
+ENVIRONMENT_API = "2025-07-01"
 MANAGED_BY = "40-agent-factory"
 OWNER_TAG = f"aifactory-managed-by:{MANAGED_BY}"
 ARM_OWNER_KEY = "aifactory.managed_by"
@@ -64,6 +65,10 @@ def _guid(value, label: str) -> str:
 
 def _same(left, right) -> bool:
     return isinstance(left, str) and isinstance(right, str) and left.casefold() == right.casefold()
+
+
+def _same_location(left, right) -> bool:
+    return isinstance(left, str) and isinstance(right, str) and left.replace(" ", "").casefold() == right.replace(" ", "").casefold()
 
 
 def _target(target: Target) -> None:
@@ -161,7 +166,7 @@ def _owned_arm(resource: dict, target: Target) -> None:
     if (tags.get(ARM_OWNER_KEY) != MANAGED_BY
             or not _same(tags.get(ARM_PROJECT_KEY), target.project_id)):
         raise RuntimeError("Existing ACA resource collision: managed_by/project ownership tags do not match.")
-    if not _same(resource.get("location"), target.location):
+    if not _same_location(resource.get("location"), target.location):
         raise RuntimeError("Existing ACA resource region does not match the selected target.")
 
 
@@ -172,7 +177,8 @@ def _subnet_properties(resource: dict) -> dict:
     return properties
 
 
-def _check_infrastructure(subnet: dict, environment_id: str | None) -> None:
+def _check_infrastructure(subnet: dict, environment_id: str | None,
+                          managed_resource_group_id: str | None = None) -> None:
     properties = _subnet_properties(subnet)
     prefixes = properties.get("addressPrefixes") or [properties.get("addressPrefix")]
     try:
@@ -192,8 +198,25 @@ def _check_infrastructure(subnet: dict, environment_id: str | None) -> None:
         for entry in entries:
             details = entry.get("properties") or {}
             references = [details.get(field) for field in ("link", "linkedResourceId", "linkedResource")]
-            if not environment_id or not any(_same(value, environment_id) for value in references):
-                raise ValueError(f"Infrastructure subnet {key} is in use outside the owned ACA environment.")
+            if environment_id and any(_same(value, environment_id) for value in references):
+                continue
+            if environment_id and managed_resource_group_id and key == "ipConfigurations":
+                prefix = managed_resource_group_id.casefold() + "/providers/microsoft.network/"
+                resource_id = entry.get("id", "").casefold()
+                if resource_id.startswith(prefix) and re.fullmatch(
+                    r"(?:loadbalancers/[^/]+/frontendipconfigurations/[^/]+|networkinterfaces/[^/]+/ipconfigurations/[^/]+)",
+                    resource_id[len(prefix):],
+                ):
+                    continue
+            if environment_id and key == "serviceAssociationLinks":
+                subnet_id = subnet["id"].casefold()
+                if (details.get("linkedResourceType", "").casefold() == "microsoft.app/environments"
+                        and _same(entry.get("id"), subnet_id + "/serviceAssociationLinks/legionservicelink")
+                        and str(details.get("link", "")).casefold() in {
+                            subnet_id, subnet_id.replace("/providers/microsoft.network", ""),
+                        }):
+                    continue
+            raise ValueError(f"Infrastructure subnet {key} is in use outside the owned ACA environment.")
 
 
 def preflight_mcp(session: AzureSession, target: Target, plan: dict) -> dict:
@@ -201,7 +224,7 @@ def preflight_mcp(session: AzureSession, target: Target, plan: dict) -> dict:
     plan = validate_mcp_plan(target, plan)
     _session_target(session, target)
     project = _arm_read(session, target.project_id, "2025-06-01")
-    if not _same(project.get("location"), target.location):
+    if not _same_location(project.get("location"), target.location):
         raise RuntimeError("Project region does not match the selected target.")
     identity = project.get("identity") or {}
     principal_id = _guid(identity.get("principalId"), "Project identity.principalId")
@@ -209,12 +232,13 @@ def preflight_mcp(session: AzureSession, target: Target, plan: dict) -> dict:
         raise RuntimeError("Project managed identity belongs to another tenant.")
     vnet_id = plan["infrastructure_subnet_id"][:plan["infrastructure_subnet_id"].lower().rfind("/subnets/")]
     vnet = _arm_read(session, vnet_id, NETWORK_API)
-    if not _same(vnet.get("location"), target.location):
+    if not _same_location(vnet.get("location"), target.location):
         raise RuntimeError("VNet region does not match the selected target.")
     environment_id = f"{target.group_id}/providers/Microsoft.App/managedEnvironments/{plan['environment_name']}"
     app_id = f"{target.group_id}/providers/Microsoft.App/containerApps/{plan['name']}"
-    environment = _arm_read(session, environment_id, CONTAINER_APP_API, optional=True)
+    environment = _arm_read(session, environment_id, ENVIRONMENT_API, optional=True)
     app = _arm_read(session, app_id, CONTAINER_APP_API, optional=True)
+    managed_group_id = None
     if environment:
         _owned_arm(environment, target)
         properties = environment.get("properties") or {}
@@ -223,6 +247,9 @@ def preflight_mcp(session: AzureSession, target: Target, plan: dict) -> dict:
             raise RuntimeError("Existing public ACA environment cannot be converted in place.")
         if not _same(network.get("infrastructureSubnetId"), plan["infrastructure_subnet_id"]):
             raise RuntimeError("Existing ACA environment belongs to another infrastructure subnet.")
+        if properties.get("infrastructureResourceGroup"):
+            managed_group = identifier(properties["infrastructureResourceGroup"], "ACA managed resource group")
+            managed_group_id = f"/subscriptions/{target.subscription_id}/resourceGroups/{managed_group}"
     if app:
         _owned_arm(app, target)
         properties = app.get("properties") or {}
@@ -232,7 +259,7 @@ def preflight_mcp(session: AzureSession, target: Target, plan: dict) -> dict:
             raise RuntimeError("Existing ACA app belongs to another or missing environment.")
     infrastructure = _arm_read(session, plan["infrastructure_subnet_id"], NETWORK_API)
     endpoint = _arm_read(session, plan["private_endpoint_subnet_id"], NETWORK_API)
-    _check_infrastructure(infrastructure, environment_id if environment else None)
+    _check_infrastructure(infrastructure, environment_id if environment else None, managed_group_id)
     if _subnet_properties(endpoint).get("delegations"):
         raise ValueError("Private endpoint subnet must not be delegated.")
     _arm_read(session, plan["private_dns_zone_id"], "2020-06-01")

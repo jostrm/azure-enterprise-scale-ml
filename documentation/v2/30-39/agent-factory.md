@@ -66,7 +66,8 @@ No client secret, shared project UAMI or public endpoint is used.
 
 Use an immutable official image digest, not `latest`. The initial implementation
 was checked against Azure MCP 2.0.5: it exposes only the selected inventory tool
-and rejects unselected tools. This release does not support the newer
+and rejects unselected tools. Its HTTP MCP endpoint is the application root URL,
+not `/mcp`. This release does not support the newer
 `--disable-proxy-tools` flag; do not add unsupported flags copied from main-branch
 documentation. Upgrades require reviewing the actual `tools/list` response.
 
@@ -96,6 +97,10 @@ For an existing project, register `infra-project-azure-mcp.yaml` as a dedicated
 Azure DevOps pipeline for the consumer repository. Its three environment stages
 accept the existing reviewed-project contract, but execute **only** MCP deployment:
 they do not recreate networking, Foundry capability hosts, ML, AKS or Databricks.
+Define `AIFACTORY_CONFIG_JSON` as a secret pipeline variable with **Settable at queue
+time** enabled. Authorize only this pipeline to use the selected existing service
+connection, build pool and environment; do not enable access for all pipelines.
+The validation stage rejects missing reviewed inputs before resource deployment.
 Run the consumer launcher with:
 
 ```powershell
@@ -112,7 +117,11 @@ separate operator step; the pipeline does not receive directory-write permission
 After deployment, from the Agent Factory starter directory:
 
 ```powershell
+python -m agent_factory repair-azure-mcp-dns --config $config
+# Only if the selected policy-owned hub-zone association is missing:
+python -m agent_factory repair-azure-mcp-dns --config $config --apply
 python -m agent_factory configure-azure-mcp --config $config --apply
+python -m agent_factory verify-azure-mcp --config $config
 python -m agent_factory deploy --config $config --apply
 # Select each supported hosted agent explicitly; Claude still needs its own model.
 python -m agent_factory deploy --config $config --agent aif-helpdesk-team --apply
@@ -121,10 +130,15 @@ python -m agent_factory deploy --config $config --agent aif-helpdesk-team --appl
 Connection setup checks the live image, flags, identity, private network,
 project-scoped Reader assignment and unauthenticated HTTP 401 challenge before
 creating the project-MI connection. Hub-policy DNS ownership is preserved; missing
-private DNS is a blocker, not a reason to enable public access. Infrastructure
-verification alone is not proof of a successful managed-identity tool call:
-exercise `group_resource_list` and confirm its actual results before calling
-the expansion operational.
+private DNS is a blocker, not a reason to enable public access. The explicit DNS
+repair command can create the missing association on this owned, approved private
+endpoint only, using the existing regional hub zone. It does not replace conflicting
+associations or change the hub policy flag.
+
+Infrastructure verification alone is not proof of a successful managed-identity
+tool call. `verify-azure-mcp` validates the actual `group_resource_list` arguments,
+successful output and resource-ID scope, and records that proof. Expanded agent
+deployment requires verification for the exact current connection.
 
 ## Anthropic template
 

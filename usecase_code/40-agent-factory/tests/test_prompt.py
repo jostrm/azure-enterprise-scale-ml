@@ -18,7 +18,7 @@ class PromptTests(unittest.TestCase):
         )
         azure_tool = {
             "type": "mcp", "server_label": "azure-project-inventory",
-            "server_url": "https://app.environment.swedencentral.azurecontainerapps.io/mcp",
+            "server_url": "https://app.environment.swedencentral.azurecontainerapps.io",
             "allowed_tools": ["group_resource_list"], "require_approval": "never",
             "project_connection_id": "aif-azure-mcp",
         }
@@ -36,6 +36,7 @@ class PromptTests(unittest.TestCase):
             {**azure_tool, "allowed_tools": ["group_delete"]},
             {**azure_tool, "server_url": "https://other.example/mcp"},
             {**azure_tool, "project_connection_id": "other-connection"},
+            {**azure_tool, "server_url": azure_tool["server_url"] + "/mcp"},
         ):
             with self.subTest(tool=bad), self.assertRaises(ValueError):
                 deploy_prompt(self.project, target, spec, azure_tool=bad)

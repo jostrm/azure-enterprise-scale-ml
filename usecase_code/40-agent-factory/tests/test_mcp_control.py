@@ -247,6 +247,32 @@ class PlanTests(unittest.TestCase):
 
 
 class PreflightTests(unittest.TestCase):
+    def test_owned_environment_network_attachments_are_reusable_but_foreign_nics_are_not(self):
+        self.session.owned_environment()
+        environment_id = f"{self.target.group_id}/providers/Microsoft.App/managedEnvironments/{self.plan['environment_name']}"
+        self.session.resources[environment_id]["properties"]["infrastructureResourceGroup"] = "ME_owned"
+        subnet_id = self.plan["infrastructure_subnet_id"]
+        self.subnet["ipConfigurations"] = [{
+            "id": f"/subscriptions/{SUB}/resourceGroups/ME_owned/providers/Microsoft.Network/loadBalancers/lb/frontendIPConfigurations/frontend",
+        }]
+        self.subnet["serviceAssociationLinks"] = [{
+            "id": subnet_id + "/serviceAssociationLinks/legionservicelink",
+            "properties": {"linkedResourceType": "Microsoft.App/environments",
+                           "link": subnet_id.replace("/providers/Microsoft.Network", "")},
+        }]
+        self.assertTrue(mcp.preflight_mcp(self.session, self.target, self.plan)["environment_exists"])
+        self.subnet["ipConfigurations"][0]["id"] = self.subnet["ipConfigurations"][0]["id"].replace("ME_owned", "foreign")
+        with self.assertRaisesRegex(ValueError, "outside"):
+            mcp.preflight_mcp(self.session, self.target, self.plan)
+
+    def test_existing_environment_read_uses_api_that_returns_public_network_access(self):
+        self.session.owned_environment()
+        with patch.object(self.session, "arm", wraps=self.session.arm) as read:
+            mcp.preflight_mcp(self.session, self.target, self.plan)
+        calls = [call for call in read.call_args_list if "/managedEnvironments/" in call.args[1]]
+        self.assertEqual(1, len(calls))
+        self.assertEqual("2025-07-01", calls[0].kwargs["api_version"])
+
     def setUp(self):
         self.target = target()
         self.plan = mcp.build_mcp_plan(self.target, settings())

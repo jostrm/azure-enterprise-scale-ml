@@ -69,6 +69,8 @@ def parser() -> argparse.ArgumentParser:
         "start-datafactory", "poll-datafactory", "verify-datafactory",
         "approve-datafactory-link",
         "configure-azure-mcp",
+        "repair-azure-mcp-dns",
+        "verify-azure-mcp",
     ])
     result.add_argument("--config", type=Path, required=True)
     result.add_argument("--target")
@@ -119,8 +121,14 @@ def run(args: argparse.Namespace) -> dict | list:
             dns_resource_group=values["privDnsResourceGroup_param"], apply=args.apply,
         )
     state = args.config.parent / ".agent-factory" / target.account_name / target.project_name
+    if args.command == "repair-azure-mcp-dns":
+        from .mcp_control import build_mcp_plan
+        from .mcp_connection import repair_mcp_dns
+        return repair_mcp_dns(
+            session, target, build_mcp_plan(target, settings.get("azure_mcp", {})), apply=args.apply,
+        )
     azure_tool = None
-    if args.command == "configure-azure-mcp" or (args.command == "deploy" and tool_profile == "expanded-readonly"):
+    if args.command in {"configure-azure-mcp", "verify-azure-mcp"} or (args.command == "deploy" and tool_profile == "expanded-readonly"):
         from .mcp_control import build_mcp_plan
         from .mcp_connection import configure_mcp_connection
         identity = json.loads((args.config.parent / "azure-mcp-identity.json").read_text(encoding="utf-8"))
@@ -133,6 +141,27 @@ def run(args: argparse.Namespace) -> dict | list:
             return mcp
         if not mcp["connection_ready"]:
             raise RuntimeError("Run configure-azure-mcp --apply before deploying expanded agents.")
+        if args.command == "verify-azure-mcp":
+            from .prompt import project_client
+            from .mcp_connection import verify_mcp_tool_response
+            with project_client(session, target) as project, project.get_openai_client(timeout=180, max_retries=0) as client:
+                response = client.responses.create(
+                    model=target.model_deployment, tools=[mcp["tool"]], store=False, max_output_tokens=2048,
+                    input=(
+                        f"Call group_resource_list exactly once with subscription {target.subscription_id}, "
+                        f"resource-group {target.resource_group}, tenant {target.tenant_id}, "
+                        "Credential authentication and retry-max-retries 0. "
+                        "After the tool returns, reply with only the number of resources. Do not retry or change scope."
+                    ),
+                )
+            mcp.update(verify_mcp_tool_response(response, target))
+            write_json(state / "azure-mcp-connection.json", mcp)
+            return mcp
+        verification = json.loads((state / "azure-mcp-connection.json").read_text(encoding="utf-8"))
+        if (verification.get("tool_call_verified") is not True
+                or verification.get("connection_id") != mcp["connection_id"]
+                or verification.get("tool") != mcp["tool"]):
+            raise RuntimeError("Run verify-azure-mcp for this exact connection before deploying expanded agents.")
         azure_tool = mcp["tool"]
     if args.command == "approve-datafactory-link":
         from .datafactory import approve_storage_connection

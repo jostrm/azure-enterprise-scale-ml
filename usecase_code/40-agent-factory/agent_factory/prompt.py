@@ -83,7 +83,7 @@ def deploy_prompt(project, target: Target, spec: dict, knowledge_tool: dict | No
         if (azure_tool.get("type") != "mcp" or endpoint.scheme != "https" or endpoint.username
                 or endpoint.password or endpoint.port or endpoint.query or endpoint.fragment
                 or not (endpoint.hostname or "").endswith(".azurecontainerapps.io")
-                or endpoint.path != "/mcp"
+                or endpoint.path not in ("", "/")
                 or azure_tool.get("allowed_tools") != ["group_resource_list"]
                 or azure_tool.get("server_label") != "azure-project-inventory"
                 or azure_tool.get("require_approval") != "never"

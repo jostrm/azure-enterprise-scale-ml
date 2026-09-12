@@ -5,6 +5,7 @@ from dataclasses import replace
 import io
 import json
 import unittest
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urlsplit
@@ -74,7 +75,7 @@ class FakeAzure:
         guid = uuid5(UUID("11fb06fb-712d-4ddd-98c7-e71bbd588830"), "-".join((target.group_id, self.app_id, role_id)))
         self.assignment_id = target.group_id + "/providers/Microsoft.Authorization/roleAssignments/" + str(guid)
         domain = "private-123.swedencentral.azurecontainerapps.io"
-        self.url = f"https://{plan['name']}.{domain}/mcp"
+        self.url = f"https://{plan['name']}.{domain}"
         env = {
             "AZURE_TOKEN_CREDENTIALS": "managedidentitycredential",
             "AZURE_MCP_INCLUDE_PRODUCTION_CREDENTIALS": "true",
@@ -180,6 +181,12 @@ class FakeAzure:
 
 
 class ConnectionTests(unittest.TestCase):
+    def test_arm_region_display_names_match_the_selected_canonical_region(self):
+        self.azure.resources[self.azure.environment_id]["location"] = "Sweden Central"
+        self.azure.resources[self.azure.app_id]["location"] = "Sweden Central"
+        self.azure.resources[self.azure.app_id]["properties"]["configuration"]["ingress"]["transport"] = "Http"
+        self.assertTrue(self.configure()["infrastructure_verified"])
+
     def setUp(self):
         self.target, self.plan, self.identity = fixture()
         self.azure = FakeAzure(self.target, self.plan)
@@ -535,9 +542,72 @@ class ConnectionTests(unittest.TestCase):
         self.assertEqual([], self.azure.writes)
 
 
+class ToolVerificationTests(unittest.TestCase):
+    def test_actual_scoped_inventory_is_required(self):
+        target, _, _ = fixture()
+        call = SimpleNamespace(
+            type="mcp_call", name="group_resource_list", server_label="azure-project-inventory", error=None,
+            arguments=json.dumps({"subscription": target.subscription_id, "resource-group": target.resource_group}),
+            output=json.dumps({"status": 200, "results": {"resources": [
+                {"id": target.group_id + "/providers/Microsoft.Search/searchServices/search"},
+            ]}}),
+        )
+        response = SimpleNamespace(status="completed", output=[call], id="response")
+        self.assertEqual(1, connection.verify_mcp_tool_response(response, target)["verified_resource_count"])
+        call.output = json.dumps({"status": 403, "results": {"resources": []}})
+        with self.assertRaises(RuntimeError):
+            connection.verify_mcp_tool_response(response, target)
+        call.output = json.dumps({"status": 200, "results": {"resources": [{"id": "/other-scope"}]}})
+        with self.assertRaisesRegex(RuntimeError, "outside"):
+            connection.verify_mcp_tool_response(response, target)
+        response.status = "incomplete"
+        with self.assertRaisesRegex(RuntimeError, "did not complete"):
+            connection.verify_mcp_tool_response(response, target)
+
+
+class DnsRepairTests(unittest.TestCase):
+    def setUp(self):
+        self.target, self.plan, _ = fixture()
+        self.azure = FakeAzure(self.target, self.plan)
+        self.azure.resources[self.plan["private_dns_zone_id"]] = {"id": self.plan["private_dns_zone_id"]}
+        self.collection = self.azure.endpoint_id + "/privateDnsZoneGroups"
+        self.azure.resources[self.collection] = {"value": []}
+
+    def test_dns_plan_never_writes(self):
+        result = connection.repair_mcp_dns(self.azure, self.target, self.plan)
+        self.assertEqual("missing-association", result["status"])
+        self.assertEqual([], self.azure.writes)
+
+    def test_missing_association_create_is_concurrency_protected_and_scoped(self):
+        calls = []
+
+        def create(method, url, body, *, audience, headers):
+            calls.append((method, url, body, headers))
+            group_id = self.collection + "/deployedByPolicy"
+            self.azure.resources[group_id] = {"id": group_id, **deepcopy(body)}
+            return self.azure.resources[group_id]
+
+        with patch.object(self.azure, "request", side_effect=create):
+            result = connection.repair_mcp_dns(self.azure, self.target, self.plan, apply=True)
+        self.assertTrue(result["applied"])
+        self.assertEqual("PUT", calls[0][0])
+        self.assertEqual({"If-None-Match": "*"}, calls[0][3])
+        self.assertEqual(self.plan["private_dns_zone_id"],
+                         calls[0][2]["properties"]["privateDnsZoneConfigs"][0]["properties"]["privateDnsZoneId"])
+
+    def test_conflicting_associations_or_unapproved_pe_are_not_changed(self):
+        self.azure.resources[self.collection]["value"] = [{
+            "id": self.collection + "/other",
+            "properties": {"privateDnsZoneConfigs": [{"properties": {"privateDnsZoneId": "/other-zone"}}]},
+        }]
+        with self.assertRaisesRegex(RuntimeError, "refusing replacement"):
+            connection.repair_mcp_dns(self.azure, self.target, self.plan, apply=True)
+        self.assertEqual([], self.azure.writes)
+
+
 class PrivateProbeTests(unittest.TestCase):
     def setUp(self):
-        self.url = "https://mcp-project.private-123.swedencentral.azurecontainerapps.io/mcp"
+        self.url = "https://mcp-project.private-123.swedencentral.azurecontainerapps.io"
         self.dns = patch("agent_factory.data.socket.getaddrinfo", return_value=[
             (2, 1, 6, "", ("10.8.0.5", 443)),
         ]).start()
@@ -597,9 +667,10 @@ class PrivateProbeTests(unittest.TestCase):
 
     def test_noncanonical_endpoints_are_rejected_before_network(self):
         for url in [
+            self.url + "/mcp",
             self.url.replace("https:", "http:"), self.url + "?api-key=secret", self.url + "#x",
-            self.url.replace("/mcp", "/other"), self.url.replace("https://", "https://user:secret@"),
-            self.url.replace(".io/mcp", ".io:443/mcp"), "https://evil.example/mcp",
+            self.url + "/other", self.url.replace("https://", "https://user:secret@"),
+            self.url.replace(".io", ".io:443"), "https://evil.example/mcp",
         ]:
             with self.subTest(url=url), self.assertRaises(ValueError):
                 connection.verify_private_mcp_endpoint(url)

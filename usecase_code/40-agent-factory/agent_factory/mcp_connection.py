@@ -7,6 +7,7 @@ unauthenticated challenge; successful project-MI tool invocation is a later step
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import socket
 from urllib.error import HTTPError, URLError
@@ -18,14 +19,13 @@ from .azure import ARM, AzureError, AzureSession
 from .config import Target
 from .data import require_private_endpoint
 from .mcp_control import (
-    ARM_OWNER_KEY, ARM_PROJECT_KEY, CONTAINER_APP_API, MANAGED_BY, NETWORK_API,
-    _arm_read, _guid, _owned_arm, _same, _session_target,
+    ARM_OWNER_KEY, ARM_PROJECT_KEY, CONTAINER_APP_API, ENVIRONMENT_API, MANAGED_BY, NETWORK_API,
+    _arm_read, _guid, _owned_arm, _same, _same_location, _session_target,
     build_mcp_parameters, validate_mcp_plan,
 )
 
 CONNECTION_API = "2025-10-01-preview"
 CONNECTION_NAME = "aif-azure-mcp"
-ENVIRONMENT_API = "2025-07-01"
 ROLE_API = "2022-04-01"
 READER_ROLE = "acdd72a7-3385-48ef-bd42-f606fba81ae7"
 SERVER_ARGS = [
@@ -122,7 +122,7 @@ def _verify_app(app: dict, environment_id: str, target: Target, plan: dict, iden
         raise RuntimeError("Azure MCP environment differs: MI-only credentials and exact inbound Entra auth are required.")
     ingress = configuration.get("ingress") or {}
     if (ingress.get("allowInsecure") is not False or ingress.get("external") is not True
-            or ingress.get("targetPort") != 8080 or ingress.get("transport") != "http"
+            or ingress.get("targetPort") != 8080 or not _same(ingress.get("transport"), "http")
             or ingress.get("customDomains")):
         raise RuntimeError("Azure MCP must use the standard ACA TLS endpoint without custom domains.")
     traffic = ingress.get("traffic") or []
@@ -143,7 +143,7 @@ def _canonical_url(app: dict, environment: dict, target: Target, plan: dict) -> 
     fqdn = (_properties(app).get("configuration") or {}).get("ingress", {}).get("fqdn")
     if fqdn != f"{plan['name']}.{domain}":
         raise RuntimeError("Azure MCP FQDN must exactly match the app name and owned environment defaultDomain.")
-    return f"https://{fqdn}/mcp"
+    return f"https://{fqdn}"
 
 
 def _verify_private_endpoint(endpoint: dict, environment_id: str, plan: dict) -> None:
@@ -233,8 +233,8 @@ def verify_private_mcp_endpoint(url: str) -> None:
     parsed = urlsplit(url)
     if (parsed.scheme != "https" or not parsed.hostname
             or not re.fullmatch(rf"(?:{_DNS_LABEL}\.){{3}}azurecontainerapps\.io", parsed.netloc)
-            or parsed.path != "/mcp" or parsed.query or parsed.fragment):
-        raise ValueError("Only the canonical standard ACA HTTPS /mcp endpoint can be probed.")
+            or parsed.path not in ("", "/") or parsed.query or parsed.fragment):
+        raise ValueError("Only the canonical standard ACA HTTPS root MCP endpoint can be probed.")
     try:
         require_private_endpoint(url)
         with socket.create_connection((parsed.hostname, 443), timeout=10):
@@ -306,7 +306,7 @@ def configure_mcp_connection(
     build_mcp_parameters(target, plan, identity, central_dns_zone_by_policy_in_hub=True)
     project = _arm_read(session, target.project_id, "2025-06-01")
     caller = project.get("identity") or {}
-    if (not _same(project.get("location"), target.location)
+    if (not _same_location(project.get("location"), target.location)
             or caller.get("type") != "SystemAssigned" or caller.get("userAssignedIdentities")
             or not _same(caller.get("principalId"), identity["project_principal_id"])
             or not _same(caller.get("tenantId"), target.tenant_id)):
@@ -351,4 +351,92 @@ def configure_mcp_connection(
         "resource_group": target.resource_group,
         "infrastructure_verified": True, "tool_call_verified": False,
         "connection_ready": current is not None or apply,
+    }
+
+
+def repair_mcp_dns(session: AzureSession, target: Target, plan: dict, *, apply: bool = False) -> dict:
+    """Bind only the owned, approved MCP PE to its existing hub zone when policy has not done so."""
+    if type(apply) is not bool:
+        raise ValueError("apply must be an explicit boolean.")
+    plan = validate_mcp_plan(target, plan)
+    _session_target(session, target)
+    environment_id = f"{target.group_id}/providers/Microsoft.App/managedEnvironments/{plan['environment_name']}"
+    endpoint_id = f"{target.group_id}/providers/Microsoft.Network/privateEndpoints/{plan['name']}-pe"
+    environment = _arm_read(session, environment_id, ENVIRONMENT_API)
+    endpoint = _arm_read(session, endpoint_id, NETWORK_API)
+    for resource in (environment, endpoint):
+        _owned_arm(resource, target)
+    properties = _succeeded(environment)
+    if properties.get("publicNetworkAccess") != "Disabled" or properties.get("vnetConfiguration", {}).get("internal") is not True:
+        raise RuntimeError("DNS repair requires the owned private-only MCP environment.")
+    _verify_private_endpoint(endpoint, environment_id, plan)
+    _arm_read(session, plan["private_dns_zone_id"], "2020-06-01")
+    groups = session.arm("GET", endpoint_id + "/privateDnsZoneGroups", api_version=NETWORK_API).get("value")
+    if not isinstance(groups, list) or len(groups) > 1:
+        raise RuntimeError("MCP DNS zone groups are unavailable or ambiguous.")
+    if groups:
+        group = groups[0]
+        configs = _properties(group).get("privateDnsZoneConfigs") or []
+        if len(configs) != 1 or not _same(
+            configs[0].get("properties", {}).get("privateDnsZoneId"), plan["private_dns_zone_id"],
+        ):
+            raise RuntimeError("Existing MCP DNS associations differ from the selected hub zone; refusing replacement.")
+        return {"resource_id": group["id"], "applied": False, "status": "already-associated"}
+    group_id = endpoint_id + "/privateDnsZoneGroups/deployedByPolicy"
+    if apply:
+        session.request(
+            "PUT", f"{ARM}{group_id}?{urlencode({'api-version': NETWORK_API})}",
+            {"properties": {"privateDnsZoneConfigs": [{
+                "name": "azure-mcp", "properties": {"privateDnsZoneId": plan["private_dns_zone_id"]},
+            }]}},
+            audience=ARM, headers={"If-None-Match": "*"},
+        )
+        verified = _arm_read(session, group_id, NETWORK_API)
+        configs = _properties(verified).get("privateDnsZoneConfigs") or []
+        if len(configs) != 1 or not _same(
+            configs[0].get("properties", {}).get("privateDnsZoneId"), plan["private_dns_zone_id"],
+        ):
+            raise RuntimeError("MCP DNS association was not persisted as requested.")
+    return {
+        "resource_id": group_id, "applied": apply,
+        "status": "associated" if apply else "missing-association",
+        "policy_note": "The hub DNS policy owner must retain this association; policy ownership settings are unchanged.",
+    }
+
+
+def verify_mcp_tool_response(response, target: Target) -> dict:
+    """Accept actual successful inventory output, not merely an LLM claim that a tool ran."""
+    if response.status != "completed":
+        raise RuntimeError("Azure MCP verification response did not complete.")
+    calls = [
+        item for item in response.output
+        if item.type == "mcp_call" and item.name == "group_resource_list"
+        and item.server_label == "azure-project-inventory"
+    ]
+    if len(calls) != 1 or calls[0].error:
+        raise RuntimeError("Azure MCP verification requires one successful inventory tool call.")
+    try:
+        arguments = json.loads(calls[0].arguments)
+        output = json.loads(calls[0].output)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("Azure MCP returned invalid tool arguments or output JSON.") from exc
+    if (not isinstance(arguments, dict)
+            or not _same(arguments.get("subscription"), target.subscription_id)
+            or not _same(arguments.get("resource-group"), target.resource_group)
+            or not _same(arguments.get("tenant", target.tenant_id), target.tenant_id)
+            or not _same(arguments.get("auth-method", "Credential"), "Credential")):
+        raise RuntimeError("Azure MCP verification used an unexpected scope or authentication method.")
+    results = output.get("results") if isinstance(output, dict) else None
+    rows = results.get("resources") if isinstance(results, dict) else None
+    if not isinstance(output, dict) or output.get("status") != 200 or not isinstance(rows, list) or not rows:
+        raise RuntimeError("Azure MCP did not return a successful, nonempty resource inventory.")
+    prefix = target.group_id.casefold() + "/providers/"
+    if any(not isinstance(row, dict) or not isinstance(row.get("id"), str)
+           or not row["id"].casefold().startswith(prefix) for row in rows):
+        raise RuntimeError("Azure MCP inventory contains resources outside the selected project.")
+    ids = sorted(row["id"].casefold() for row in rows)
+    return {
+        "tool_call_verified": True, "verification_response_id": response.id,
+        "verified_resource_count": len(rows),
+        "inventory_ids_sha256": hashlib.sha256(json.dumps(ids).encode("utf-8")).hexdigest(),
     }
