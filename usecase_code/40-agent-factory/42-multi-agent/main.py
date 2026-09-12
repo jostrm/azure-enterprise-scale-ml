@@ -10,7 +10,10 @@ async def run(spec, messages):
             for member in spec["members"]:
                 async with project.get_openai_client(timeout=60, max_retries=1) as client:
                     findings.append(
-                        await consult_member(client, member, with_evidence(messages, findings))
+                        await consult_member(
+                            client, member, with_evidence(messages, findings),
+                            private_tools=spec.get("private_tools"),
+                        )
                     )
             synthesis_input = with_evidence(messages, findings)
             async with project.get_openai_client(timeout=60, max_retries=1) as client:

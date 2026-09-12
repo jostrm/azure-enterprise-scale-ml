@@ -11,6 +11,35 @@ from agent_factory.prompt import deploy_prompt
 
 
 class PromptTests(unittest.TestCase):
+    def test_expanded_docs_adds_only_reviewed_tools_and_trusted_azure_scope(self):
+        target = SimpleNamespace(
+            model_deployment="model", subscription_id="subscription", resource_group="project-rg",
+            tenant_id="tenant",
+        )
+        azure_tool = {
+            "type": "mcp", "server_label": "azure-project-inventory",
+            "server_url": "https://app.environment.swedencentral.azurecontainerapps.io/mcp",
+            "allowed_tools": ["group_resource_list"], "require_approval": "never",
+            "project_connection_id": "aif-azure-mcp",
+        }
+        spec = agent_catalog(expanded_tools=True)[2]
+        deploy_prompt(self.project, target, spec, azure_tool=azure_tool)
+        definition = self.project.agents.create_version.call_args.kwargs["definition"]
+        self.assertEqual(2, len(definition.tools))
+        self.assertEqual("always", definition.tools[0].require_approval)
+        self.assertEqual(
+            ["microsoft_docs_search", "microsoft_docs_fetch", "microsoft_code_sample_search"],
+            definition.tools[0].allowed_tools,
+        )
+        self.assertIn("subscription subscription, resource group project-rg, tenant tenant", definition.instructions)
+        for bad in (
+            {**azure_tool, "allowed_tools": ["group_delete"]},
+            {**azure_tool, "server_url": "https://other.example/mcp"},
+            {**azure_tool, "project_connection_id": "other-connection"},
+        ):
+            with self.subTest(tool=bad), self.assertRaises(ValueError):
+                deploy_prompt(self.project, target, spec, azure_tool=bad)
+
     def setUp(self):
         self.project = Mock()
         self.project.agents.get.side_effect = ResourceNotFoundError("missing")

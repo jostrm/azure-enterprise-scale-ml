@@ -376,6 +376,7 @@ variables:
   aseSkuWorkers: 1 # <optional>App Service Environment worker count<default>1<keep-as-is>
   # === Container Apps ===
   enableContainerApps: "false" # <optional>Deploy Azure Container Apps<default>false<keep-as-is>
+  enableAzureMcpServer: "false" # Private, read-only MCP deployment; requires prepared project-scoped configuration.
   enableAppInsightsDashboard: "false" # <optional>Deploy Application Insights dashboard<default>false<keep-as-is>
   # aca_a_registry_image: "containerapps-default:latest"
   aca_w_registry_image: "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" # <optional>Container Apps default image<default>mcr.microsoft.com/azuredocs/containerapps-helloworld:latest<keep-as-is> <otherwise> replace with your own ACR image.

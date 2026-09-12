@@ -127,6 +127,13 @@ does not fabricate connected-agent tools to make the map look connected.
 
 ## Scope and prerequisites
 
+The optional `expanded-readonly` tool profile adds a private, project-scoped
+Azure MCP inventory service and role-appropriate evidence tools. See
+[the Agent Factory tool reference](../../documentation/v2/30-39/agent-factory.md#optional-expanded-read-only-profile)
+for the identity boundary, pinned image, MCP-only pipeline and approval behavior.
+Use `44-azure-mcp/deploy.py plan` before identity preparation or deployment;
+`configure-azure-mcp` must verify live private infrastructure before agent rollout.
+
 No infrastructure SKU, model deployment, service-enable flag, shared VM identity,
 or role assignment is changed implicitly. If infrastructure is missing, update
 the consumer's reviewed `enable...` values and use its

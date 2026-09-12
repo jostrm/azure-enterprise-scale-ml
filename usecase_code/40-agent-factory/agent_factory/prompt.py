@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from urllib.parse import urlsplit
 
 from .azure import AzureSession
 from .catalog import OWNER, validate_agent_name
@@ -49,13 +50,14 @@ def route_version(project, name: str, version: str) -> None:
     )
 
 
-def deploy_prompt(project, target: Target, spec: dict, knowledge_tool: dict | None = None) -> dict:
+def deploy_prompt(project, target: Target, spec: dict, knowledge_tool: dict | None = None,
+                  azure_tool: dict | None = None) -> dict:
     from azure.ai.projects.models import MCPTool, PromptAgentDefinition
     from azure.core.exceptions import ResourceNotFoundError
 
     name = validate_agent_name(spec["name"])
     tools = []
-    if spec.get("grounding"):
+    if spec.get("grounding") or spec.get("knowledge_tool"):
         if not knowledge_tool:
             raise ValueError(f"{name} requires successfully ingested and configured Foundry IQ knowledge.")
         if (knowledge_tool.get("type") != "mcp"
@@ -68,11 +70,34 @@ def deploy_prompt(project, target: Target, spec: dict, knowledge_tool: dict | No
         tools.append({
             "type": "mcp", "server_label": "microsoft-learn",
             "server_url": "https://learn.microsoft.com/api/mcp",
-            "allowed_tools": ["microsoft_docs_search", "microsoft_docs_fetch"],
+            "allowed_tools": ["microsoft_docs_search", "microsoft_docs_fetch"] + (
+                ["microsoft_code_sample_search"] if spec.get("code_samples") else []
+            ),
             "require_approval": "always",
         })
+    instructions = spec["instructions"]
+    if spec.get("azure_inventory"):
+        if not azure_tool:
+            raise ValueError("Azure inventory requires verified private MCP infrastructure and its project connection.")
+        endpoint = urlsplit(azure_tool.get("server_url", ""))
+        if (azure_tool.get("type") != "mcp" or endpoint.scheme != "https" or endpoint.username
+                or endpoint.password or endpoint.port or endpoint.query or endpoint.fragment
+                or not (endpoint.hostname or "").endswith(".azurecontainerapps.io")
+                or endpoint.path != "/mcp"
+                or azure_tool.get("allowed_tools") != ["group_resource_list"]
+                or azure_tool.get("server_label") != "azure-project-inventory"
+                or azure_tool.get("require_approval") != "never"
+                or azure_tool.get("project_connection_id") != "aif-azure-mcp"):
+            raise ValueError("Azure inventory must use the reviewed private project-MI MCP tool.")
+        tools.append(azure_tool)
+        instructions += (
+            f" Azure inventory is restricted to subscription {target.subscription_id}, "
+            f"resource group {target.resource_group}, tenant {target.tenant_id}. "
+            "Pass these exact subscription and resource-group arguments to group_resource_list. "
+            "Refuse requests for other scopes. Use Credential authentication only."
+        )
     definition = {"kind": "prompt", "model": spec.get("model") or target.model_deployment,
-                  "instructions": spec["instructions"], "tools": tools}
+                  "instructions": instructions, "tools": tools}
     desired_metadata = {
         **spec["metadata"], "aifactory.execution_kind": "prompt",
         "aifactory.definition_hash": definition_hash({

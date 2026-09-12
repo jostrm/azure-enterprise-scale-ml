@@ -12,7 +12,7 @@ from .discovery import discover, select_one
 from .network import private_endpoint_checks, repair_foundry_dns
 
 
-def load_selection(path: Path, key: str | None) -> tuple[dict, FactoryConfig, dict]:
+def load_selection(path: Path, key: str | None, *, variables_file: Path | None = None) -> tuple[dict, FactoryConfig, dict]:
     settings = json.loads(path.read_text(encoding="utf-8-sig"))
     targets = settings.get("targets")
     if not isinstance(targets, list) or not targets:
@@ -24,7 +24,7 @@ def load_selection(path: Path, key: str | None) -> tuple[dict, FactoryConfig, di
     if len(candidates) != 1:
         raise ValueError(f"Select exactly one --target from: {', '.join(keys)}. Fleet-wide writes are disabled.")
     selected = candidates[0]
-    variables = (path.parent / selected["variables_file"]).resolve()
+    variables = variables_file.resolve() if variables_file is not None else (path.parent / selected["variables_file"]).resolve()
     environment = selected.get("environment", "dev")
     config = FactoryConfig.load(variables, environment, selected.get("selection"))
     document = json.loads(variables.read_text(encoding="utf-8-sig"))
@@ -49,7 +49,10 @@ def summarize_response(response, spec: dict) -> dict:
         if getattr(item, "error", None):
             raise RuntimeError("An agent MCP tool failed; the response is not accepted as successful grounding.")
         calls.append({"name": item.name, "server_label": item.server_label})
-    if spec.get("grounding") and not any(item["name"] == "knowledge_base_retrieve" for item in calls):
+    accepted = {"knowledge_base_retrieve"}
+    if spec.get("azure_inventory"):
+        accepted.add("group_resource_list")
+    if spec.get("grounding") and not any(item["name"] in accepted for item in calls):
         raise RuntimeError("The grounded agent answered without a successful Foundry IQ tool call.")
     return {"agent": spec["name"], "response_id": response.id, "text": response.output_text,
             "tool_calls": calls}
@@ -62,6 +65,7 @@ def parser() -> argparse.ArgumentParser:
         "configure-knowledge", "deploy", "invoke", "configure-datafactory",
         "start-datafactory", "poll-datafactory", "verify-datafactory",
         "approve-datafactory-link",
+        "configure-azure-mcp",
     ])
     result.add_argument("--config", type=Path, required=True)
     result.add_argument("--target")
@@ -80,7 +84,10 @@ def parser() -> argparse.ArgumentParser:
 
 def run(args: argparse.Namespace) -> dict | list:
     settings, config, values = load_selection(args.config.resolve(), args.target)
-    catalog = agent_catalog(settings.get("agent_prefix", "aif"))
+    tool_profile = settings.get("tool_profile", "default")
+    if tool_profile not in {"default", "expanded-readonly"}:
+        raise ValueError("tool_profile must be default or expanded-readonly.")
+    catalog = agent_catalog(settings.get("agent_prefix", "aif"), expanded_tools=tool_profile == "expanded-readonly")
     for item in catalog:
         model = settings.get("model_overrides", {}).get(item["framework"])
         if model:
@@ -96,6 +103,7 @@ def run(args: argparse.Namespace) -> dict | list:
         "ingest", "configure-knowledge", "deploy", "configure-datafactory",
         "start-datafactory", "poll-datafactory",
         "approve-datafactory-link",
+        "configure-azure-mcp",
     } and not args.apply:
         raise ValueError(f"{args.command} requires --apply. Use plan/discover/preflight first.")
     session = AzureSession(config.subscription_id, config.tenant_id)
@@ -108,6 +116,21 @@ def run(args: argparse.Namespace) -> dict | list:
             dns_resource_group=values["privDnsResourceGroup_param"], apply=args.apply,
         )
     state = args.config.parent / ".agent-factory" / target.account_name / target.project_name
+    azure_tool = None
+    if args.command == "configure-azure-mcp" or (args.command == "deploy" and tool_profile == "expanded-readonly"):
+        from .mcp_control import build_mcp_plan
+        from .mcp_connection import configure_mcp_connection
+        identity = json.loads((args.config.parent / "azure-mcp-identity.json").read_text(encoding="utf-8"))
+        mcp = configure_mcp_connection(
+            session, target, build_mcp_plan(target, settings.get("azure_mcp", {})), identity,
+            apply=args.command == "configure-azure-mcp",
+        )
+        if args.command == "configure-azure-mcp":
+            write_json(state / "azure-mcp-connection.json", mcp)
+            return mcp
+        if not mcp["connection_ready"]:
+            raise RuntimeError("Run configure-azure-mcp --apply before deploying expanded agents.")
+        azure_tool = mcp["tool"]
     if args.command == "approve-datafactory-link":
         from .datafactory import approve_storage_connection
         if not args.connection_id or not args.private_endpoint_id:
@@ -196,7 +219,7 @@ def run(args: argparse.Namespace) -> dict | list:
                         if item["kind"] == "prompt" or args.include_hosted or args.agent]
             knowledge_path = state / "knowledge.json"
             knowledge = json.loads(knowledge_path.read_text(encoding="utf-8")) if knowledge_path.exists() else {}
-            if any(spec.get("grounding") for spec in selected):
+            if any(spec.get("grounding") or spec.get("knowledge_tool") for spec in selected):
                 if not knowledge.get("retrieval_verified") or not str(knowledge.get("connection_id", "")).startswith(
                     target.project_id + "/connections/"
                 ):
@@ -209,7 +232,7 @@ def run(args: argparse.Namespace) -> dict | list:
             results = []
             for spec in selected:
                 if spec["kind"] == "prompt":
-                    result = deploy_prompt(project, target, spec, knowledge.get("tool"))
+                    result = deploy_prompt(project, target, spec, knowledge.get("tool"), azure_tool)
                 else:
                     from .hosted import deploy_hosted
                     result = deploy_hosted(project, target, spec, output_dir=state / "packages",
@@ -226,6 +249,9 @@ def run(args: argparse.Namespace) -> dict | list:
 
 
 def main() -> int:
+    if sys.argv[1:2] == ["monitoring-export"]:
+        from .monitoring import main as monitoring_main
+        return monitoring_main(sys.argv[2:])
     args = parser().parse_args()
     result = run(args)
     if args.output:

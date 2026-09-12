@@ -1,0 +1,109 @@
+# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
+parameters:
+  - name: deploymentTarget
+    displayName: Reviewed single-environment target
+    type: string
+    default: ''
+    values:
+      - ''
+      - dev
+      - stage
+      - prod
+  - name: deploymentProjectNumber
+    type: string
+    default: ''
+  - name: deploymentConfigHash
+    type: string
+    default: ''
+  - name: deploymentSettings
+    type: object
+    default: {}
+  - name: configFile
+    type: string
+    default: 'aifactory/.reviewed-project-config.json'
+  - name: useJsonConfigOverride
+    type: boolean
+    default: true
+  - name: runnerSelection
+    type: string
+    default: microsoft-hosted
+    values:
+      - from-config
+      - microsoft-hosted
+      - self-hosted
+
+trigger: none
+pr: none
+
+variables:
+  - template: ../variables/variables.yaml
+  - ${{ if ne(parameters.deploymentTarget, '') }}:
+    - name: useSelfHostedBuildAgent
+      value: ${{ parameters.deploymentSettings.useSelfHostedBuildAgent }}
+    - name: adminVMBuildAgentPool
+      value: ${{ parameters.deploymentSettings.adminVMBuildAgentPool }}
+    - name: adminVMBuildAgentName
+      value: ${{ parameters.deploymentSettings.adminVMBuildAgentName }}
+    - name: admin_locationSuffix
+      value: ${{ parameters.deploymentSettings.admin_locationSuffix }}
+    - name: admin_commonResourceSuffix
+      value: ${{ parameters.deploymentSettings.admin_commonResourceSuffix }}
+
+stages:
+# Deliberately reject an unreviewed run during template expansion, before any job.
+- ${{ if or(notIn(parameters.deploymentTarget, 'dev', 'stage', 'prod'), eq(trim(parameters.deploymentProjectNumber), ''), eq(trim(parameters.deploymentConfigHash), ''), ne(parameters.useJsonConfigOverride, true), ne(parameters.configFile, 'aifactory/.reviewed-project-config.json')) }}:
+  - MCP_requires_reviewed_target_project_hash_and_JSON_configuration: error
+- stage: Dev_GenAI_Project
+  displayName: Dev private Azure MCP only
+  dependsOn: []
+  condition: and(not(canceled()), eq('${{ parameters.deploymentTarget }}', 'dev'))
+  variables:
+    dev_test_prod: dev
+    dev_test_prod_sub_id: $(dev_sub_id)
+    configOverrideFile: ${{ parameters.configFile }}
+  jobs:
+    - template: ./jobs/stage-private-azure-mcp.yaml
+      parameters:
+        environment: Dev
+        serviceConnection: ${{ variables.dev_service_connection }}
+        deploymentTarget: ${{ parameters.deploymentTarget }}
+        deploymentProjectNumber: ${{ parameters.deploymentProjectNumber }}
+        deploymentConfigHash: ${{ parameters.deploymentConfigHash }}
+        configFile: ${{ parameters.configFile }}
+        runnerSelection: ${{ parameters.runnerSelection }}
+- stage: Stage_GenAI_Project
+  displayName: Stage private Azure MCP only
+  dependsOn: []
+  condition: and(not(canceled()), eq('${{ parameters.deploymentTarget }}', 'stage'))
+  variables:
+    dev_test_prod: test
+    dev_test_prod_sub_id: $(test_sub_id)
+    configOverrideFile: ${{ parameters.configFile }}
+  jobs:
+    - template: ./jobs/stage-private-azure-mcp.yaml
+      parameters:
+        environment: Stage
+        serviceConnection: ${{ variables.test_service_connection }}
+        deploymentTarget: ${{ parameters.deploymentTarget }}
+        deploymentProjectNumber: ${{ parameters.deploymentProjectNumber }}
+        deploymentConfigHash: ${{ parameters.deploymentConfigHash }}
+        configFile: ${{ parameters.configFile }}
+        runnerSelection: ${{ parameters.runnerSelection }}
+- stage: Prod_GenAI_Project
+  displayName: Prod private Azure MCP only
+  dependsOn: []
+  condition: and(not(canceled()), eq('${{ parameters.deploymentTarget }}', 'prod'))
+  variables:
+    dev_test_prod: prod
+    dev_test_prod_sub_id: $(prod_sub_id)
+    configOverrideFile: ${{ parameters.configFile }}
+  jobs:
+    - template: ./jobs/stage-private-azure-mcp.yaml
+      parameters:
+        environment: Prod
+        serviceConnection: ${{ variables.prod_service_connection }}
+        deploymentTarget: ${{ parameters.deploymentTarget }}
+        deploymentProjectNumber: ${{ parameters.deploymentProjectNumber }}
+        deploymentConfigHash: ${{ parameters.deploymentConfigHash }}
+        configFile: ${{ parameters.configFile }}
+        runnerSelection: ${{ parameters.runnerSelection }}

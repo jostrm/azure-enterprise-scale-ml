@@ -1,0 +1,29 @@
+# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
+parameters:
+  - name: serviceConnection
+    type: string
+  - name: phase
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    displayName: '70-private-azure-mcp'
+    condition: and(succeeded(), eq('${{ parameters.phase }}', 'foundry'), eq(variables['enableAzureMcpServer'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'))
+    inputs:
+      azureSubscription: ${{ parameters.serviceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
+        python "$MCP_REPOSITORY/usecase_code/40-agent-factory/44-azure-mcp/deploy.py" deploy \
+          --config "$MCP_CONFIG" --repository-root "$MCP_REPOSITORY" \
+          --expected-subscription "$MCP_SUBSCRIPTION" --expected-project "$MCP_PROJECT" \
+          --expected-environment "$MCP_ENVIRONMENT" --variables-file "$MCP_VARIABLES" --apply
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+    env:
+      MCP_REPOSITORY: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml'
+      MCP_CONFIG: '$(System.DefaultWorkingDirectory)/aifactory/agent-factory/config.json'
+      MCP_SUBSCRIPTION: '$(dev_test_prod_sub_id)'
+      MCP_PROJECT: '$(project_number_000)'
+      MCP_ENVIRONMENT: '$(dev_test_prod)'
+      MCP_VARIABLES: '$(configOverrideFile)'

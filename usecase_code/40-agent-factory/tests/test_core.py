@@ -57,6 +57,18 @@ class ConfigurationTests(unittest.TestCase):
 
 
 class SafetyTests(unittest.TestCase):
+    def test_expanded_tools_are_opt_in_and_role_scoped(self):
+        self.assertFalse(any(item.get("azure_inventory") for item in agent_catalog()))
+        expanded = agent_catalog(expanded_tools=True)
+        for item in expanded:
+            if item["kind"] == "prompt":
+                self.assertTrue(item["azure_inventory"])
+            else:
+                self.assertEqual(["knowledge_base_retrieve", "group_resource_list"], item["private_tools"])
+        self.assertTrue(expanded[1]["knowledge_tool"])
+        self.assertTrue(expanded[2]["code_samples"])
+        self.assertFalse(expanded[0].get("microsoft_docs", False))
+
     def test_knowledge_scope_gate_excludes_conditional_workarounds(self):
         knowledge = next(item for item in agent_catalog() if item.get("grounding"))
         self.assertIn("Do not include procedural steps", knowledge["instructions"])

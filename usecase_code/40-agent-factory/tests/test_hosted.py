@@ -273,6 +273,30 @@ common = load_module("hosted_common_test", hosted.HOSTED_ROOT / "hosted_common.p
 
 
 class ConversationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_inventory_grounding_requires_explicit_private_tool_profile(self):
+        response = SimpleNamespace(status="completed", output_text="Resource inventory", output=[
+            SimpleNamespace(type="mcp_call", name="group_resource_list", error=None),
+        ])
+
+        async def create(**kwargs):
+            return response
+
+        client = SimpleNamespace(responses=SimpleNamespace(create=create))
+        member = {"name": "knowledge", "role": "knowledge"}
+        with self.assertRaisesRegex(RuntimeError, "without Foundry IQ"):
+            await common.consult_member(client, member, [])
+        finding = await common.consult_member(
+            client, member, [], private_tools=["knowledge_base_retrieve", "group_resource_list"],
+        )
+        self.assertEqual("Resource inventory", finding["answer"])
+        with self.assertRaises(ValueError):
+            await common.consult_member(client, member, [], private_tools=["group_delete"])
+        response.output[0].error = "Access denied"
+        with self.assertRaisesRegex(RuntimeError, "tool failure"):
+            await common.consult_member(
+                client, member, [], private_tools=["knowledge_base_retrieve", "group_resource_list"],
+            )
+
     async def test_copilot_uses_temporary_storage_not_readonly_app_directory(self):
         path = hosted.HOSTED_ROOT / "github-copilot-sdk" / "main.py"
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -441,12 +465,28 @@ class SdkContractTests(unittest.IsolatedAsyncioTestCase):
         from openai import AsyncOpenAI
 
         requests = []
+        instructions = "Use only the supplied evidence; do not invent product applicability."
+        conversation = [
+            {"role": "user", "content": "How do I reset a Windows Hello PIN?"},
+            {"role": "user", "content": "Evidence: Windows Hello is not documented in the knowledge base."},
+        ]
 
         def transport(request):
             self.assertTrue(str(request.url).startswith(target().project_endpoint))
             body = json.loads(request.content)
             self.assertEqual(body["model"], "gpt-deployment")
             self.assertFalse(body.get("store", True))
+            self.assertEqual(body["instructions"], instructions)
+            actual_messages = [
+                {
+                    "role": item["role"],
+                    "content": item["content"] if isinstance(item["content"], str) else "".join(
+                        part["text"] for part in item["content"] if part["type"] == "input_text"
+                    ),
+                }
+                for item in body["input"]
+            ]
+            self.assertEqual(actual_messages, conversation)
             requests.append(body)
             return httpx2.Response(200, json=self.response())
 
@@ -461,7 +501,7 @@ class SdkContractTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(framework=framework):
                 module = self.adapter(framework)
                 with patch.object(module, "openai_client", side_effect=client):
-                    result = await module.run(spec(framework), [{"role": "user", "content": "Hello"}])
+                    result = await module.run(spec(framework, instructions=instructions), conversation)
                 self.assertEqual(result, "Offline answer")
         self.assertEqual(len(requests), 4)
 

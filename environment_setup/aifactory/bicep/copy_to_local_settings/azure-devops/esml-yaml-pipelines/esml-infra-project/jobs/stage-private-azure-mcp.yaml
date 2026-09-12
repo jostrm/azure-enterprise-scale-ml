@@ -1,0 +1,75 @@
+# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
+parameters:
+  - name: environment
+    type: string
+  - name: serviceConnection
+    type: string
+  - name: deploymentTarget
+    type: string
+  - name: deploymentProjectNumber
+    type: string
+  - name: deploymentConfigHash
+    type: string
+  - name: configFile
+    type: string
+  - name: runnerSelection
+    type: string
+
+jobs:
+  - deployment: Private_Azure_MCP
+    displayName: Deploy only the private Azure MCP service
+    timeoutInMinutes: 120
+    cancelTimeoutInMinutes: 5
+    pool:
+      ${{ if or(eq(parameters.runnerSelection, 'self-hosted'), and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true'))) }}:
+        name: $(adminVMBuildAgentPool)
+        demands:
+          - ${{ if ne(variables.adminVMBuildAgentName, '') }}:
+            - Agent.Name -equals $(adminVMBuildAgentName)
+          - ${{ else }}:
+            - Agent.Name -equals dsvm-cmn-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)
+      ${{ else }}:
+        vmImage: windows-2022
+    environment: ${{ parameters.environment }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - checkout: self
+              submodules: recursive
+              fetchDepth: 0
+              displayName: Checkout with submodules
+            - template: ./job-0-reviewed-project-config.yaml
+              parameters:
+                target: ${{ parameters.deploymentTarget }}
+                project: ${{ parameters.deploymentProjectNumber }}
+                configFile: ${{ parameters.configFile }}
+                configHash: ${{ parameters.deploymentConfigHash }}
+                serviceConnection: ${{ parameters.serviceConnection }}
+            - task: PythonScript@0
+              displayName: Apply reviewed JSON configuration
+              inputs:
+                scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py'
+                arguments: '--file "$(configOverrideFile)" --environment "$(dev_test_prod)" --format azure-devops'
+                workingDirectory: '$(System.DefaultWorkingDirectory)'
+            - pwsh: |
+                $ErrorActionPreference = 'Stop'
+                if ($env:MCP_ENABLED -cne 'true') {
+                  throw 'The reviewed configuration must explicitly enable enableAzureMcpServer.'
+                }
+                if ($env:MCP_DELETE_ALL -eq 'true' -or $env:MCP_DELETE_SERVICES -eq 'true') {
+                  throw 'An MCP-only deployment cannot use project deletion settings.'
+                }
+              displayName: Require enabled MCP and reject project deletion
+              env:
+                MCP_ENABLED: $(enableAzureMcpServer)
+                MCP_DELETE_ALL: $(deleteAllForProject)
+                MCP_DELETE_SERVICES: $(deleteAllServicesForProject)
+            - template: ./job-private-azure-mcp.yaml
+              parameters:
+                serviceConnection: ${{ parameters.serviceConnection }}
+                phase: foundry
+            - template: ./job-0-reviewed-project-config.yaml
+              parameters:
+                target: ${{ parameters.deploymentTarget }}
+                cleanup: true

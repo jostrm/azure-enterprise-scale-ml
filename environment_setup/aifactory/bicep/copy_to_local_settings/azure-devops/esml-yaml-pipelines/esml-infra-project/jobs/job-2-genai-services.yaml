@@ -5752,4 +5752,9 @@ steps:
         echo "No registry name found - skipping public access disable"
       fi
 
+- template: job-private-azure-mcp.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    phase: ${{ parameters.phase }}
+
 - template: ../../esml-infra-common/jobs/region-report-steps.yaml

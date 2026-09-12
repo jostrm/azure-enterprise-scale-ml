@@ -44,7 +44,7 @@ def _canonical(value) -> bytes:
 def _normalize(spec: dict) -> dict:
     allowed = {
         "name", "kind", "framework", "instructions", "description",
-        "metadata", "model", "members",
+        "metadata", "model", "members", "private_tools",
     }
     if not isinstance(spec, dict) or spec.keys() - allowed:
         raise ValueError("Only documented hosted spec fields are accepted; never supply credentials or env.")
@@ -95,10 +95,14 @@ def _normalize(spec: dict) -> dict:
         raise HostedPrerequisiteError("multi-agent requires at least two separately persisted prompt agents.")
     if framework == "anthropic-agents" and not model.strip():
         raise HostedPrerequisiteError("Anthropic requires an explicit deployed compatible Claude model in spec.model.")
+    private_tools = spec.get("private_tools", ["knowledge_base_retrieve"])
+    if private_tools not in (["knowledge_base_retrieve"], ["knowledge_base_retrieve", "group_resource_list"]):
+        raise ValueError("private_tools must contain only reviewed Foundry IQ and optional Azure inventory tools.")
     return {
         "name": name, "kind": "hosted", "framework": framework, "instructions": instructions,
         "description": description, "metadata": metadata, "model": model.strip(),
         "members": normalized_members,
+        "private_tools": list(private_tools),
     }
 
 

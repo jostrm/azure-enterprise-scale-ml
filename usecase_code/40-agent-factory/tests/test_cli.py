@@ -40,6 +40,15 @@ class CliTests(unittest.TestCase):
             load_selection(self.path, None)
         self.assertEqual("001", load_selection(self.path, "two")[1].project_number)
 
+    def test_explicit_reviewed_variables_override_ambient_root_config(self):
+        document = json.loads((self.root / "variables.json").read_text(encoding="utf-8"))
+        document["dev"]["enableAzureMcpServer"] = "true"
+        reviewed = self.root / "reviewed.json"
+        reviewed.write_text(json.dumps(document), encoding="utf-8")
+        _, _, values = load_selection(self.path, None, variables_file=reviewed)
+        self.assertEqual("true", values["enableAzureMcpServer"])
+        self.assertNotIn("enableAzureMcpServer", load_selection(self.path, None)[2])
+
     def test_mutation_requires_apply_before_any_discovery(self):
         args = parser().parse_args(["deploy", "--config", str(self.path)])
         with patch("agent_factory.cli.discover") as discover:

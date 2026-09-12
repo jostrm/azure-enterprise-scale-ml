@@ -37,7 +37,7 @@ def metadata(framework: str, *, role: str = "specialist", multi_agent: bool = Fa
     }
 
 
-def agent_catalog(prefix: str = "aif") -> list[dict]:
+def agent_catalog(prefix: str = "aif", *, expanded_tools: bool = False) -> list[dict]:
     def item(suffix: str, framework: str, description: str, instructions: str, **options) -> dict:
         role = options.pop("role", "specialist")
         multi = framework == "multi-agent"
@@ -90,4 +90,27 @@ def agent_catalog(prefix: str = "aif") -> list[dict]:
         role="orchestrator",
         members=[{"name": knowledge_name, "role": "knowledge"}, {"name": reviewer_name, "role": "reviewer"}],
     ))
+    if expanded_tools:
+        for agent in agents:
+            agent["metadata"]["aifactory.tool_profile"] = "expanded-readonly"
+            if agent["kind"] == "prompt":
+                agent["azure_inventory"] = True
+                agent["instructions"] += (
+                    " For live Azure inventory, call the private Azure inventory tool, not the "
+                    "synthetic helpdesk knowledge base. Never infer deployed resources from training "
+                    "knowledge. Azure inventory grants no permission to modify resources or read secrets. "
+                    "Keep private Azure data out of public documentation queries."
+                )
+                if agent["name"] == reviewer_name:
+                    agent["knowledge_tool"] = True
+                if agent.get("microsoft_docs"):
+                    agent["code_samples"] = True
+            else:
+                agent["private_tools"] = ["knowledge_base_retrieve", "group_resource_list"]
+                agent["instructions"] += (
+                    " The knowledge participant can retrieve synthetic helpdesk evidence or inspect "
+                    "live Azure inventory. Use its actual tool results, and do not mistake Azure "
+                    "inventory for helpdesk policy. Public documentation requires a separate "
+                    "approval-gated call to the documentation agent."
+                )
     return agents

@@ -29,6 +29,7 @@ release_version = importlib.util.module_from_spec(_version_spec)
 _version_spec.loader.exec_module(release_version)
 GUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 ADO_PIPELINE = "aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-genai.yaml"
+ADO_MCP_PIPELINE = "aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-azure-mcp.yaml"
 ADO_CONFIG_STEP = "aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/jobs/job-0-reviewed-project-config.yaml"
 FILES = {
     "gha": (".github/workflows/infra-project.yml", ".github/workflows/infra-project-phase.yml"),
@@ -221,6 +222,25 @@ class Deployment:
         self.environment = dict(os.environ)
         self.opener = build_opener(NoRedirect)
 
+    @property
+    def deployment_scope(self):
+        scope = self.environment.get("AIFACTORY_PROJECT_DEPLOYMENT_SCOPE", "project")
+        if scope not in {"project", "azure-mcp"} or (scope == "azure-mcp" and self.route != "ado"):
+            raise ValueError("Deployment scope must be project, or azure-mcp for the ADO route.")
+        return scope
+
+    @property
+    def ado_pipeline(self):
+        return ADO_MCP_PIPELINE if self.deployment_scope == "azure-mcp" else ADO_PIPELINE
+
+    @property
+    def files(self):
+        return FILES[self.route] if self.deployment_scope == "project" else (
+            ADO_MCP_PIPELINE, ADO_CONFIG_STEP,
+            ADO_MCP_PIPELINE.rsplit("/", 1)[0] + "/jobs/stage-private-azure-mcp.yaml",
+            ADO_MCP_PIPELINE.rsplit("/", 1)[0] + "/jobs/job-private-azure-mcp.yaml",
+        )
+
     def command(self, argv, *, capture=False, data=None, check=True):
         command = list(argv)
         if command[0] == "az" and sys.platform == "win32":
@@ -299,7 +319,7 @@ class Deployment:
             self.ado_identity = self.environment.get("ADO_AUTHENTICATED_IDENTITY", "")
             self.repository_id = self.environment.get("ADO_REPOSITORY_ID", "")
         self.templates = {}
-        for relative in FILES[self.route]:
+        for relative in self.files:
             installed = self.root / relative
             text = installed.read_text(encoding="utf-8-sig")
             if CONTRACT not in text:
@@ -348,7 +368,7 @@ class Deployment:
             return
         branch = "main"
         templates = {}
-        for relative in FILES[self.route]:
+        for relative in self.files:
             if self.route == "gha":
                 source_path = "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/" + Path(relative).name
             else:
@@ -408,7 +428,7 @@ class Deployment:
         shutil.copyfile(Path(__file__), helper)
         for name in ("release_version.py", "release_version.sh"):
             shutil.copyfile(Path(__file__).with_name(name), helper.with_name(name))
-        paths = [*FILES[self.route], launcher, "lib/project_deployment.py", "lib/release_version.py",
+        paths = [*self.files, launcher, "lib/project_deployment.py", "lib/release_version.py",
                  "lib/release_version.sh", "azure-enterprise-scale-ml"]
         alias = "GHA-update-aifactory-and-run-project.sh"
         if self.route == "gha" and (self.state_dir / alias).is_file():
@@ -469,7 +489,7 @@ class Deployment:
             raise ValueError("Pipeline inventory is too large to establish an unambiguous definition safely.")
         matches = [row for row in definitions
                    if str(row.get("repository", {}).get("name", "")).lower() == self.repository.lower()
-                   and str(row.get("process", {}).get("yamlFilename", "")).replace("\\", "/").lstrip("/").lower() == ADO_PIPELINE.lower()
+                   and str(row.get("process", {}).get("yamlFilename", "")).replace("\\", "/").lstrip("/").lower() == self.ado_pipeline.lower()
                    and row.get("queueStatus", "enabled") == "enabled"]
         if len(matches) != 1:
             raise ValueError("The exact repository/YAML Azure DevOps pipeline is missing or ambiguous.")

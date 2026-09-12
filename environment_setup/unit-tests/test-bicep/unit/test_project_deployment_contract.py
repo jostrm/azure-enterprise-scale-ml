@@ -54,6 +54,25 @@ def instance(route):
     return result
 
 
+def test_mcp_scope_selects_only_the_exact_mcp_pipeline_and_templates():
+    deployment = instance("ado")
+    assert deployment.ado_pipeline == pd.ADO_PIPELINE
+    assert deployment.files == pd.FILES["ado"]
+    deployment.environment["AIFACTORY_PROJECT_DEPLOYMENT_SCOPE"] = "azure-mcp"
+    assert deployment.ado_pipeline == pd.ADO_MCP_PIPELINE
+    assert pd.ADO_PIPELINE not in deployment.files
+    assert pd.ADO_CONFIG_STEP in deployment.files
+    assert len(deployment.files) == 4
+
+
+@pytest.mark.parametrize("route,scope", [("gha", "azure-mcp"), ("ado", "arbitrary-pipeline")])
+def test_mcp_scope_rejects_unsupported_routes_and_pipeline_overrides(route, scope):
+    deployment = instance(route)
+    deployment.environment["AIFACTORY_PROJECT_DEPLOYMENT_SCOPE"] = scope
+    with pytest.raises(ValueError, match="Deployment scope"):
+        _ = deployment.files
+
+
 @pytest.mark.parametrize("target", ["dev", "stage", "prod"])
 def test_exact_target_identity_and_no_fallback(target):
     result = pd.validate_config(document(), "017", target)

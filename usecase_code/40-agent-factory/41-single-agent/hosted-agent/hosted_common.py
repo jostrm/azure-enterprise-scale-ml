@@ -98,7 +98,11 @@ def messages(current: str, history: list) -> list[dict[str, str]]:
     return result
 
 
-async def consult_member(client, member: dict, conversation: list[dict[str, str]]) -> dict:
+async def consult_member(client, member: dict, conversation: list[dict[str, str]], *,
+                         private_tools: list[str] | None = None) -> dict:
+    accepted_tools = private_tools if private_tools is not None else ["knowledge_base_retrieve"]
+    if accepted_tools not in (["knowledge_base_retrieve"], ["knowledge_base_retrieve", "group_resource_list"]):
+        raise ValueError("Only reviewed private grounding tools can satisfy participant evidence requirements.")
     result = await client.responses.create(
         input=conversation, store=False, max_output_tokens=2048,
         extra_body={"agent_reference": {"type": "agent_reference", "name": member["name"]}},
@@ -108,8 +112,8 @@ async def consult_member(client, member: dict, conversation: list[dict[str, str]
     calls = [item for item in result.output if item.type == "mcp_call"]
     if any(getattr(item, "error", None) for item in calls):
         raise RuntimeError(f"Participant {member['name']} reported a tool failure.")
-    if member["role"] == "knowledge" and not any(item.name == "knowledge_base_retrieve" for item in calls):
-        raise RuntimeError(f"Participant {member['name']} answered without Foundry IQ grounding.")
+    if member["role"] == "knowledge" and not any(item.name in accepted_tools for item in calls):
+        raise RuntimeError(f"Participant {member['name']} answered without Foundry IQ or an enabled private grounding tool.")
     sources = []
     for item in result.output:
         if item.type != "message":
@@ -163,7 +167,9 @@ async def execute(run, spec: dict, conversation: list[dict[str, str]]) -> str:
     if spec["framework"] == "multi-agent" or not spec.get("members"):
         return await run(spec, conversation)
     async with credential() as identity, openai_client(identity) as client:
-        findings = [await consult_member(client, member, conversation) for member in spec["members"]]
+        findings = [await consult_member(
+            client, member, conversation, private_tools=spec.get("private_tools"),
+        ) for member in spec["members"]]
     grounded_spec = {
         **spec,
         "instructions": spec["instructions"] + (

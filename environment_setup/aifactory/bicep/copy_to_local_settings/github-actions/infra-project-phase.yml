@@ -264,6 +264,7 @@ jobs:
       aksPrivateDNSZone: ${{ vars.AKS_PRIVATE_DNS_ZONE || 'system' }}
       aksAzureFirewallPrivateIp: ${{ vars.AKS_AZURE_FIREWALL_PRIVATE_IP || '' }}
       enableContainerApps: ${{ vars.ENABLE_CONTAINER_APPS || 'false' }}
+      enableAzureMcpServer: ${{ vars.ENABLE_AZURE_MCP_SERVER || 'false' }}
       enableAppInsightsDashboard: ${{ vars.ENABLE_APPINSIGHTS_DASHBOARD || 'false' }}
       enableApplicationInsights: ${{ vars.ENABLE_APPLICATION_INSIGHTS || 'true' }}
       enableFunction: ${{ vars.ENABLE_FUNCTION || 'false' }}
@@ -4310,6 +4311,23 @@ jobs:
               --resource-group "${{ env.admin_bicep_kv_fw_rg }}" \
               --name "${{ env.admin_bicep_kv_fw }}" \
               --ip-address "${{ env.runner_ip }}" || true
+
+      - name: Deploy private Azure MCP
+        if: success() && inputs.phase == 'foundry' && env.enableAzureMcpServer == 'true' && env.deleteAllServicesForProject != 'true'
+        shell: bash
+        env:
+          MCP_REPOSITORY: ${{ github.workspace }}/azure-enterprise-scale-ml
+          MCP_CONFIG: ${{ github.workspace }}/aifactory/agent-factory/config.json
+          MCP_SUBSCRIPTION: ${{ env.dev_test_prod_sub_id }}
+          MCP_PROJECT: ${{ env.project_number_000 }}
+          MCP_ENVIRONMENT: ${{ env.dev_test_prod }}
+          MCP_VARIABLES: ${{ inputs.config_file }}
+        run: |
+          set -euo pipefail
+          python3 "$MCP_REPOSITORY/usecase_code/40-agent-factory/44-azure-mcp/deploy.py" deploy \
+            --config "$MCP_CONFIG" --repository-root "$MCP_REPOSITORY" \
+            --expected-subscription "$MCP_SUBSCRIPTION" --expected-project "$MCP_PROJECT" \
+            --expected-environment "$MCP_ENVIRONMENT" --variables-file "$MCP_VARIABLES" --apply
 
       - name: Report final pipeline job result (offline)
         if: always()
