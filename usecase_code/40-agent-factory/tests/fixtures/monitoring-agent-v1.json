@@ -1,0 +1,58 @@
+{
+  "schema": "aifactory.monitoring/v1",
+  "source": "agent-factory",
+  "scope": {
+    "aifactory": "fixture-factory",
+    "project": "001",
+    "environment": "dev"
+  },
+  "subject": {
+    "kind": "agent",
+    "name": "fixture-knowledge",
+    "version": "1",
+    "task_type": "agent"
+  },
+  "generated_at": "2026-09-12T01:06:00Z",
+  "window": {
+    "start": "2026-09-12T01:00:00Z",
+    "end": "2026-09-12T01:05:00Z"
+  },
+  "expires_at": "2026-09-13T01:05:00Z",
+  "summary": {
+    "status": "healthy",
+    "data_drift": "not_supported",
+    "concept_drift": "not_supported"
+  },
+  "metrics": [
+    {
+      "name": "document_count",
+      "value": 19,
+      "unit": "count",
+      "status": "unknown"
+    },
+    {
+      "name": "reference_count",
+      "value": 2,
+      "unit": "count",
+      "status": "unknown"
+    }
+  ],
+  "details": {
+    "source_format": "knowledge",
+    "aggregates": {
+      "document_count": 19,
+      "reference_count": 2
+    },
+    "checks": {
+      "retrieval_verified": true
+    }
+  },
+  "limitations": [
+    "Recorded observations only; this exporter performs no live checks or Azure writes.",
+    "Agent health and grounding checks are not data drift or concept drift; both are not_supported.",
+    "Health describes only supplied checks, not all agents or ongoing availability.",
+    "Missing latency, token, error, sample-count and evaluation metrics are not inferred.",
+    "Raw prompts, responses, tool arguments, identities, endpoints and credentials are not exported.",
+    "Knowledge counts and retrieval checks describe the selected shared grounding service."
+  ]
+}

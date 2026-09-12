@@ -1,0 +1,14 @@
+name: model-factory-monitoring
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - setuptools>=75
+      - wheel
+      - PyYAML>=6.0.2,<7
+      - pandas>=2.2,<3
+      - numpy>=1.26,<3
+      - pyarrow>=18,<24
+      - Pillow>=11,<13

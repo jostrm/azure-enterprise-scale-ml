@@ -59,7 +59,10 @@ def summarize_response(response, spec: dict) -> dict:
 
 
 def parser() -> argparse.ArgumentParser:
-    result = argparse.ArgumentParser(description="OAuth-only, single-target AI Factory agent provisioning.")
+    result = argparse.ArgumentParser(
+        description="OAuth-only, single-target AI Factory agent provisioning.",
+        epilog="Offline reports: python -m agent_factory monitoring-export --help (no --config required).",
+    )
     result.add_argument("command", choices=[
         "plan", "discover", "preflight", "repair-dns", "ingest",
         "configure-knowledge", "deploy", "invoke", "configure-datafactory",

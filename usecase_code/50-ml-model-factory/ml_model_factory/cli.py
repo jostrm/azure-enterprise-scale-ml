@@ -84,6 +84,17 @@ def parser() -> argparse.ArgumentParser:
     tags.add_argument("--mode", choices=("custom", "automl"), default="custom")
     tags.add_argument("--engine", choices=("local", "azureml", "databricks"), default="azureml")
     tags.add_argument("--output", type=Path)
+    monitoring = commands.add_parser("monitor", help="Compare observed reference/current data and optional labeled performance")
+    for field in ("scenario", "context", "config", "reference", "current", "output"):
+        monitoring.add_argument("--" + field, type=Path, required=True)
+    monitoring.add_argument("--reference-outcomes", type=Path)
+    monitoring.add_argument("--predictions", type=Path)
+    monitoring.add_argument("--labels", type=Path)
+    monitoring.add_argument("--evaluation-metrics", type=Path, help="Optional numeric metrics.json from model evaluation")
+    publish_monitor = commands.add_parser("monitor-publish", help="Preview or explicitly publish a scoped model monitoring report")
+    publish_monitor.add_argument("--report", type=Path, required=True)
+    publish_monitor.add_argument("--runtime", type=Path)
+    publish_monitor.add_argument("--execute", action="store_true")
     return root
 
 
@@ -178,6 +189,35 @@ def execute(args):
         if args.output:
             write_json(args.output, result)
         return result
+    if args.command == "monitor":
+        from .data import read_frame, sha256
+        from .monitoring import monitor
+        from .monitoring_export import add_evaluation_metrics, summary_tags
+        report = monitor(
+            scenario, load_json(args.context), read_frame(args.reference), read_frame(args.current),
+            load_json(args.config),
+            reference_outcomes=read_frame(args.reference_outcomes) if args.reference_outcomes else None,
+            predictions=read_frame(args.predictions) if args.predictions else None,
+            labels=read_frame(args.labels) if args.labels else None,
+        )
+        report["input_hashes"] = {field: sha256(getattr(args, field)) for field in (
+            "reference", "current", "reference_outcomes", "predictions", "labels", "evaluation_metrics",
+        ) if getattr(args, field)}
+        if args.evaluation_metrics:
+            add_evaluation_metrics(report, load_json(args.evaluation_metrics))
+        if args.output.exists() and any(args.output.iterdir()):
+            raise ValueError("Monitoring output must be a new empty directory; preserve earlier windows")
+        write_json(args.output / "report.json", report)
+        write_json(args.output / "tags.json", summary_tags(report))
+        return {"report": str(args.output / "report.json"), "summary": report["summary"]}
+    if args.command == "monitor-publish":
+        from .monitoring_export import publish_model_report, summary_tags
+        if not args.execute:
+            return {"preview_only": True, "model": load_json(args.report)["subject"],
+                    "tags": summary_tags(load_json(args.report))}
+        if not args.runtime:
+            raise ValueError("--runtime is required for explicit monitoring publication")
+        return publish_model_report(args.report, validate_runtime(load_json(args.runtime)))
     raise ValueError(f"Unhandled command: {args.command}")
 
 

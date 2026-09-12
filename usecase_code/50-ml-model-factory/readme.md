@@ -93,3 +93,118 @@ Detailed guides:
 [MLOps and tags](../../documentation/v2/30-39/37-mlops.md#model-identity-tags-one-small-contract),
 [DataOps](../../documentation/v2/30-39/36-dataops.md),
 [lake design](../../documentation/v2/30-39/34-datalake-onboard-data.md).
+
+## Data and concept-drift monitoring
+
+`ml_model_factory.monitoring` compares explicit observed reference/current windows.
+It does not predict future drift, and distribution drift is not proof that a
+model has become inaccurate.
+
+| Signal | Method | Required evidence |
+| --- | --- | --- |
+| Numeric data drift | Reference-quantile Population Stability Index (PSI), fixed additive smoothing | Comparable numeric features and enough rows |
+| Categorical data drift | Jensen-Shannon divergence over reference categories, plus unseen values | Comparable categorical features |
+| Data quality | Change in missing-value fraction | Reference and current observations |
+| Classification concept signal | Increase in labeled error rate, bootstrap interval | Same model version, disjoint reference/current request IDs, observed outcomes |
+| Regression/forecasting concept signal | Increase in normalized MAE, with MAE/RMSE/R2 details | Same-model predictions and observed continuous targets |
+| Vision data drift | Explicit fixed features/embeddings or `image_statistics: true` | Comparable representations; image statistics use color/dimensions, not semantic embeddings |
+| Vision concept signal | Multi-class label/prediction comparison only | Other vision tasks need task-specific matched annotation adapters and report `not_supported` |
+
+The concept signal is **observed performance degradation**, not mathematical proof
+of a change in `P(y|x)`. Its bootstrap assumes independent observations; correlated
+time series need domain-specific block/bootstrap analysis. Thresholds are configurable
+operational heuristics, not universal guarantees. A lower warning threshold can
+highlight an observed change before the drift threshold is crossed; it is not a forecast.
+
+Create a private config from `monitoring.example.json`, replacing its model version
+and timestamp windows with actual observed windows. Default feature selection uses
+scenario features; images require explicit `features` or `image_statistics`.
+Reference data must remain fixed for the comparison.
+
+```powershell
+python -m ml_model_factory monitor --scenario scenarios\diabetes.json `
+  --context runtime.local.json --config monitoring.local.json `
+  --reference reference.parquet --current current.parquet `
+  --reference-outcomes reference-outcomes.parquet `
+  --predictions current-predictions.parquet --labels observed-labels.parquet `
+  --output outputs\monitoring\window-001
+```
+
+Reference outcomes contain `request_id`, `actual`, `prediction`, `model_version`.
+Current predictions contain `request_id`, `prediction`, `model_version`.
+Observed labels contain `request_id`, the scenario's target column, and `observed_at`.
+Requests must match the exact current set, IDs must be unique, baseline/current IDs
+must not overlap, and both sets of predictions must name the monitored model version.
+Do not fabricate outcomes from model predictions. Omit outcome inputs when labels
+have not arrived: the concept signal will be `unknown`, not healthy.
+
+The command writes bounded `report.json` and compact `tags.json`. Reports expose
+every calculated feature/performance metric and limitations, without raw rows.
+Use `--evaluation-metrics <metrics.json>` to include all numeric model-evaluation
+metrics as `evaluation_reference.*`; these are reference artifact values, not
+claims about current-window health.
+Statuses are `healthy`, `warning`, `drift`, `insufficient_data`, `not_supported`,
+`stale`, or `unknown`. Expiration is based on the observation window end, not
+when someone regenerates the report. Reusing old inputs cannot make them fresh.
+
+### Config Wizard contract and model tags
+
+Both this factory and `40-agent-factory` export `aifactory.monitoring/v1`:
+scope (`aifactory`, `project`, `environment`), subject kind/name/version/task,
+generation/window/expiry timestamps, summary states, metric records, details and
+limitations. Wire environments are `dev`, `test`, `prod`; the Config Wizard displays
+`test` as **Stage**.
+
+Summary model tags are `mon_schema`, `mon_source`, `mon_kind`, `mon_subject_version`,
+`mon_status`, `mon_data_drift`, `mon_concept_drift`, `mon_checked_at`,
+`mon_window_end`, `mon_expires_at`, and optional score/report-URI fields.
+Full metrics remain in the JSON report; the tags are not a substitute for it.
+Data scores from different metric families are not directly comparable.
+
+```powershell
+# Preview only:
+python -m ml_model_factory monitor-publish --report outputs\monitoring\window-001\report.json
+
+# Explicit Azure write, only after reviewing target, identity, report and permissions:
+python -m ml_model_factory monitor-publish --report outputs\monitoring\window-001\report.json `
+  --runtime runtime.local.json --execute
+```
+
+Publication requires an existing registered model version and an existing project
+Blob container from `runtime.lake`. It validates factory/project/environment/use case,
+uploads immutable JSON under
+`usecases/<use-case>/monitoring/models/<version>/reports/<sha256>.json`, then changes
+only `mon_*` summary tags while preserving model identity and quality-gate metadata.
+It rejects a report older than the published window. Use one publisher per model
+version: the SDK tag update is read-modify-write, not a cross-service transaction
+or a distributed lock. No container, identity, permission or schedule is created
+by a preview.
+
+Agent reports expose recorded counts and curated numeric aggregates, not fabricated
+latency/tokens/cost. Agent data/concept drift is `not_supported`; agent-health checks
+are a different signal. See the
+[agent monitoring exporter](../40-agent-factory/readme.md#offline-monitoring-ml-reports).
+
+### Scheduling
+
+Use the v2 monitoring job/schedule renderer in `scripts\monitoring_job.py`.
+For example, after resolving the three credential-free Azure data URIs:
+
+```powershell
+python scripts\monitoring_job.py render --runtime runtime.local.json --scenario scenarios\diabetes.json `
+  --config-uri <current-window-config-uri> --reference-uri <fixed-baseline-uri> `
+  --current-uri <current-features-uri> --output outputs\monitoring-schedule --interval-hours 24
+python scripts\monitoring_job.py create --runtime runtime.local.json --schedule outputs\monitoring-schedule\schedule.yml
+```
+
+The second command previews by default; only `create --execute` or an explicit
+`az ml schedule create` enables recurring jobs. Add `render --publish` only when
+the compute identity may update the selected existing model version and write
+the report container. Optional outcomes, predictions, labels and evaluation
+metrics have matching `--*-uri` inputs. Each job downloads the supplied
+current-window config; it never replaces old observation dates with its wall clock.
+Recurring jobs must read a current-window configuration and data supplied by DataOps,
+and keep the reference baseline fixed. The renderer does not deploy schedules by
+default. Model-tag publication must be explicitly enabled and use an authorized
+managed identity. Updating tags, uploading reports and scheduling Azure jobs incur
+external side effects; they are not performed by unit tests or local report generation.

@@ -114,6 +114,104 @@ An error after a partial deployment leaves the completed records for diagnosis.
 
 ## Agent Map / Map Agents To Departments
 
+### Offline Monitoring ML reports
+
+`monitoring-export` projects **recorded** results into `aifactory.monitoring/v1`.
+It makes no Azure calls, writes only the requested local report/tag files, and
+never deploys agents, publishes artifacts, or updates Azure tags. The standalone
+entry point `python -m agent_factory.monitoring` accepts the same flags.
+
+```powershell
+python -m agent_factory monitoring-export `
+  --input .\knowledge-result.json --source-format knowledge `
+  --output .\monitoring-agent.json --tags-output .\monitoring-agent-tags.json `
+  --aifactory my-factory --project 001 --environment dev `
+  --subject aif-knowledge --version 1 `
+  --window-start 2026-09-11T10:00:00Z --window-end 2026-09-11T10:05:00Z
+```
+
+Supply the actual factory identifier, three-digit project, environment, agent
+name/version and **observation** window from your explicitly selected target.
+These are never inferred from endpoints, resource names, ambient Azure context,
+or an arbitrary first configured target. Existing `FactoryConfig` exposes
+`project_number` and `environment`, but no authoritative factory identifier;
+provide that explicitly. `stage` normalizes to `test`; `stage_prod` is a variables
+section, not a valid environment. All three environments are supported.
+If the input includes `scope`/`subject`, they must match the explicit selection.
+Shared-service observations are attributed by the operator, not automatically
+represented as per-agent measurements.
+
+Supported source formats select narrow allowlists from existing JSON outputs:
+
+| `--source-format` | Exported observations |
+| --- | --- |
+| `preflight` | `agent_count_on_page`, observed endpoint check/private/reachable counts, `foundry_access` and private endpoint check result |
+| `knowledge` | `document_count`, `reference_count`, `retrieval_verified` |
+| `ingestion` | `row_count`, `document_count`, `evaluation_count`, `blob_integrity.{raw,knowledge,evaluation}.bytes`, `corpus_sha256_verified` |
+| `invocation` | Count of recorded `tool_calls`; never answer text, response IDs, or tool arguments |
+| `deployment` | No measured agent metrics: lifecycle states such as active/created are not health checks |
+| `metrics-only` | Every numeric/null leaf in a deliberately curated aggregate `metrics` object, with stable dotted names |
+
+Example `metrics-only` input shape (illustrative values, **not live telemetry**):
+
+```json
+{
+  "metrics": {
+    "sample_count": 12,
+    "error_count": 1,
+    "latency": {"p95_ms": 420},
+    "usage": {"input_tokens": 1200, "output_tokens": 300}
+  },
+  "units": {
+    "sample_count": "count",
+    "error_count": "count",
+    "latency.p95_ms": "ms",
+    "usage.input_tokens": "tokens",
+    "usage.output_tokens": "tokens"
+  },
+  "checks": {"invocation_completed": true}
+}
+```
+
+Only supply measurements already produced by your evaluation/usage/performance
+collector. Current invocation/hosted summaries do **not** persist token usage or
+latency, and ingestion evaluation counts are corpus sizes, not quality scores.
+No sample counts, errors, durations, costs or scores are invented. Infrastructure
+MCP/deployment details and raw SDK/tracing/billing payloads are not automatically
+flattened: first select aggregate numeric fields into `metrics-only`. This
+explicit coverage boundary avoids exporting prompts, responses, credentials,
+user data, identifiers and arbitrary dimensions. Its only allowed top-level
+keys are `metrics`, `units`, `checks`, and optional matching `scope`/`subject`.
+Use stable aggregate names without embedded identifiers; do not put sensitive
+numeric data into the curated metrics object.
+
+Checks must be recorded booleans named `invocation_completed`,
+`grounding_verified`, `retrieval_verified`, `foundry_access`,
+`private_endpoints`, or `corpus_sha256_verified`. No checks means health
+`unknown`, including when error count is zero. Failed checks mean `warning`,
+never concept drift. Data drift and concept drift are always `not_supported`.
+Metric status is `unknown` without a metric-specific assessment; null means
+`insufficient_data`. Missing units are `unknown`; accepted units are `count`,
+`ms`, `s`, `tokens`, `bytes`, `percent`, `ratio`, `USD`, `unitless`, `unknown`.
+
+Inputs are bounded to 1 MiB, 128 metrics, six nested levels, and numeric/null
+leaves only. Invalid names, duplicate keys, non-finite values and unsafe integers
+are rejected rather than silently dropped. `details` contains only the projected
+numeric aggregates and allowlisted checks. The report never copies raw input.
+Timestamps require timezones and serialize to UTC `Z`; future observations and
+inverted windows are rejected. `--generated-at` is optional; expiration is based
+on **window end**, using `--ttl-hours` (default 24, maximum 720), not regeneration
+time. Old observations remain `stale`.
+
+`--tags-output` creates compact `mon_*` tags plus explicit
+`aifactory`/`project`/`environment` identity. Optionally add `--report-uri` for an
+**already published** credential-free Azure Blob or
+`azureml://jobs/<job>/outputs/<output>/paths/<report>` artifact URI. Signed links,
+queries, fragments and userinfo are rejected; no upload/tag write is performed.
+The local contract fixture `tests/fixtures/monitoring-agent-v1.json` is generated
+from fixture data, not Azure measurements. Run offline tests with
+`python -m unittest discover -s tests -p test_monitoring.py`.
+
 Every independently mappable participant is a persisted Foundry agent with a
 stable name. Register the factory scope in the Config Wizard and refresh live
 inventory in "Map Agents To Departments"; these examples do not alter local

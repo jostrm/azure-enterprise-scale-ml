@@ -345,7 +345,39 @@ incomplete: AKS recovery failed on the subscription feature
 not completed. This does not invalidate local results, but neither do local
 results establish cloud deployment success.
 
-## 7. Legacy ESML workflows
+## 7. Monitoring ML: data drift and labeled concept-change signals
+
+The Config Wizard's **Monitoring - ML** view consumes the shared
+`aifactory.monitoring/v1` contract from both
+[`50-ml-model-factory`](../../../usecase_code/50-ml-model-factory/readme.md#data-and-concept-drift-monitoring)
+and [`40-agent-factory`](../../../usecase_code/40-agent-factory/readme.md#offline-monitoring-ml-reports).
+Reports and model-version summary tags are isolated by factory, project, environment
+and model/agent version. Dev/Stage/Prod are displayed independently; the wire value
+for Stage is `test`.
+
+Data drift compares feature distributions and missingness. The concept-change
+indicator measures degradation against observed labels for the same model version;
+it is not proof of conditional concept drift or a prediction of future problems.
+Without enough labels it is unknown/insufficient, never implicitly healthy.
+Image statistics can monitor input shifts; object detection, multilabel and
+segmentation performance need separate annotation-aware monitoring adapters.
+
+Compact `mon_*` tags expose statuses, observation time, expiry, model version and
+an optional immutable report link. Full feature/performance/agent metrics remain
+in the report. The UI must surface expired, missing, inaccessible or mismatched
+reports instead of substituting a healthy status.
+
+The model factory supplies local `monitor`, preview-first `monitor-publish`, and
+Azure ML v2 job/schedule definitions. Enable publication/scheduling only after
+configuring data-window production, baseline data, label feedback, existing
+storage, registered models and managed-identity permissions. No live monitoring
+schedule or Azure tag update is implied by the availability of these templates.
+
+Agent monitoring reports describe recorded checks and numeric aggregates; they
+do not claim agent data/concept drift. Raw prompts, responses and secrets must
+not be placed into monitoring reports.
+
+## 8. Legacy ESML workflows
 
 Older ESML notebook flows and
 [`02_cicd-ado-gha_mlops`](../../../copy_my_subfolders_to_my_grandparent/mlops/02_cicd-ado-gha_mlops/azure_devops)
