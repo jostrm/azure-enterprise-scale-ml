@@ -101,10 +101,17 @@ Define `AIFACTORY_CONFIG_JSON` as a secret pipeline variable with **Settable at 
 time** enabled. Authorize only this pipeline to use the selected existing service
 connection, build pool and environment; do not enable access for all pipelines.
 The validation stage rejects missing reviewed inputs before resource deployment.
-Run the consumer launcher with:
+For project 001 DEV with an already-installed `main` revision, run the consumer
+launcher with the explicit reviewed selection below. Substitute your actual
+project, environment and installed version; this does not perform an upgrade.
 
 ```powershell
 $env:AIFACTORY_PROJECT_DEPLOYMENT_SCOPE = "azure-mcp"
+$env:AIFACTORY_TARGET_ENVIRONMENT = "dev"
+$env:AIFACTORY_PROJECT_NUMBER = "001"
+$env:AIFACTORY_PROJECT_CONFIG = (Resolve-Path ".\aifactory\variables.json").Path
+$env:AIFACTORY_VERSION = "main"
+$env:AIF_SUBMODULE_REF = git -C ".\azure-enterprise-scale-ml" rev-parse HEAD
 & "C:\Program Files\Git\bin\bash.exe" ".\ADO-update-aifactory-and-run-project.sh" --project-only
 ```
 

@@ -31,6 +31,17 @@ auth_method="${ADO_AUTH_METHOD:-aad}"
 cd "$REPO_ROOT"
 aif_require_legacy_workspace "$REPO_ROOT" || exit 1
 
+if [[ "${AIFACTORY_PROJECT_DEPLOYMENT_SCOPE:-project}" == "azure-mcp" ]]; then
+  if [[ -z "${AIFACTORY_TARGET_ENVIRONMENT:-}" || -z "${AIFACTORY_PROJECT_NUMBER:-}" || -z "${AIFACTORY_PROJECT_CONFIG:-}" ]]; then
+    aif_error "MCP-only deployment requires explicit target environment, project number and project configuration."
+    exit 1
+  fi
+  export AIFACTORY_PROJECT_ONLY=true
+elif [[ "${AIFACTORY_PROJECT_DEPLOYMENT_SCOPE:-project}" != "project" ]]; then
+  aif_error "Unsupported project deployment scope."
+  exit 1
+fi
+
 reviewed_project=false
 if [[ -n "${AIFACTORY_TARGET_ENVIRONMENT:-}${AIFACTORY_PROJECT_NUMBER:-}${AIFACTORY_PROJECT_CONFIG:-}" ]]; then
   reviewed_project=true

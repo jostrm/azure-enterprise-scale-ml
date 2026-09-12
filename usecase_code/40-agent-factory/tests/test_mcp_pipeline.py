@@ -36,6 +36,15 @@ TARGETS = (
 
 @unittest.skipIf(yaml is None, "Install-free YAML contracts require an existing PyYAML")
 class McpPipelineTests(unittest.TestCase):
+    def test_mcp_launcher_cannot_fall_back_to_the_full_pipeline(self):
+        source = (ROOT / "bootstrap" / "ADO-update-aifactory-and-run-project.sh").read_text()
+        gate = source.split('reviewed_project=false', 1)[0]
+        self.assertIn('AIFACTORY_PROJECT_DEPLOYMENT_SCOPE:-project', gate)
+        self.assertIn('export AIFACTORY_PROJECT_ONLY=true', gate)
+        self.assertIn('MCP-only deployment requires explicit', gate)
+        for name in ("AIFACTORY_TARGET_ENVIRONMENT", "AIFACTORY_PROJECT_NUMBER", "AIFACTORY_PROJECT_CONFIG"):
+            self.assertIn('-z "${' + name + ':-}"', gate)
+
     @classmethod
     def setUpClass(cls):
         cls.pipeline = yaml.safe_load(PIPELINE.read_text(encoding="utf-8"))
