@@ -308,7 +308,7 @@ def test_real_render_sdk_and_cli_entrypoints_share_yaml_and_scope(
     sdk_entry.main()
     submitted = client.jobs.create_or_update.call_args.args[0]
     assert submitted.type == ("automl" if train_only else "pipeline")
-    credential.assert_called_once_with(tenant_id=runtime["tenant_id"])
+    credential.assert_called_once_with(tenant_id=runtime["tenant_id"], process_timeout=60)
     constructor.assert_called_once_with(
         credential.return_value, runtime["subscription_id"],
         runtime["resource_group"], runtime["workspace_name"],

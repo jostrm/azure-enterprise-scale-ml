@@ -376,7 +376,7 @@ class AzureMLTests(unittest.TestCase):
     def test_client_binds_cli_credential_to_selected_tenant(self):
         with patch("azure.identity.AzureCliCredential") as credential, patch("azure.ai.ml.MLClient") as client:
             _client(self.runtime)
-        credential.assert_called_once_with(tenant_id=self.runtime["tenant_id"])
+        credential.assert_called_once_with(tenant_id=self.runtime["tenant_id"], process_timeout=60)
         self.assertEqual(client.call_args.args[1:], (
             self.runtime["subscription_id"], self.runtime["resource_group"], self.runtime["workspace_name"],
         ))

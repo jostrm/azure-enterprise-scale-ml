@@ -546,7 +546,7 @@ def _client(runtime: dict):
         raise ValueError(f"Missing Azure ML runtime settings: {', '.join(missing)}")
     mode = runtime.get("credential", "azure_cli")
     if mode == "azure_cli":
-        credential = AzureCliCredential(tenant_id=runtime["tenant_id"])
+        credential = AzureCliCredential(tenant_id=runtime["tenant_id"], process_timeout=60)
     elif mode == "managed_identity":
         credential = ManagedIdentityCredential(client_id=runtime.get("managed_identity_client_id"))
     else:

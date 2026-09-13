@@ -203,6 +203,30 @@ the compute identity may update the selected existing model version and write
 the report container. Optional outcomes, predictions, labels and evaluation
 metrics have matching `--*-uri` inputs. Each job downloads the supplied
 current-window config; it never replaces old observation dates with its wall clock.
+
+### Dev activation prerequisites
+
+`scripts\activate_monitoring.py` previews an idempotent, Dev-only control-plane setup:
+an existing private project's `ml-model-factory` container, credentialless
+`ml_model_factory` datastore, container-scoped compute/workspace data access, and a
+workspace-scoped custom role limited to model-version metadata read/write.
+It does not create jobs, registered models, inference endpoints or schedules.
+It never changes firewalls, public access, networking or subscription features.
+
+```powershell
+python scripts\activate_monitoring.py --runtime runtime.local.json `
+  --storage-account <existing-project-storage2001> --output runtime-monitoring.local.json
+# Add --execute only after approving the printed target and role assignments.
+```
+
+Existing conflicting roles, public containers or credential-bearing datastores
+are not silently overwritten. The actual Azure-assigned custom-role ID is used;
+container/role setup can be resumed after a partial failure. Control-plane setup
+alone does not prove Blob data-plane connectivity. Use the configured private
+network/runner for data uploads and training, and sign into the selected tenant.
+Do not enable recurring jobs until registered model versions and truthful current
+observation inputs exist. Validation traffic must be labelled as validation,
+not production monitoring.
 Recurring jobs must read a current-window configuration and data supplied by DataOps,
 and keep the reference baseline fixed. The renderer does not deploy schedules by
 default. Model-tag publication must be explicitly enabled and use an authorized
