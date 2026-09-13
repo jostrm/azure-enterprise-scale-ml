@@ -264,6 +264,11 @@ def train_in_lake(scenario: dict, config: dict, input_path: Path, root: Path) ->
             raise
         model_tags = {**model_tags, "quality_gate": "passed", "lifecycle_status": "candidate"}
         stamp_model(staging / "model", model_tags)
+        from .selection import build_evidence
+        write_json(staging / "evaluation" / "comparison.json", build_evidence(
+            scenario, prepared, staging / "model", load_json(staging / "evaluation" / "metrics.json"),
+            load_json(staging / "evaluation" / "quality-gate.json"),
+        ))
         manifest = lake_manifest(layout, scenario)
         manifest["model_tags"] = model_tags
         manifest["source_snapshot_sha256"] = sha256(layout.local_path(root, "training_snapshot") / "_SUCCESS.json")

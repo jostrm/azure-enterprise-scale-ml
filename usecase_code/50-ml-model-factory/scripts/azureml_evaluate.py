@@ -119,6 +119,15 @@ def main():
         lineage["model_tags"] = model_tags
         write_json(args.output / "model-tags.json", model_tags)
     write_json(args.output / "lineage.json", lineage)
+    from ml_model_factory.selection import build_evidence
+    from ml_model_factory.tags import scope_tags
+    evidence = build_evidence(
+        scenario, args.prepared, args.model,
+        json.loads((args.output / "metrics.json").read_text(encoding="utf-8")), gate,
+    )
+    if model_tags is not None:
+        evidence["scope"] = scope_tags(model_tags, require=True)
+    write_json(args.output / "comparison.json", evidence)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
+import hashlib
 import json
 import math
 import os
@@ -87,15 +88,22 @@ def wait_for_job(az: str, scope: list[str], name: str, timeout: float,
         sleep(min(interval, remaining))
 
 
-def register_evaluated(name: str, runtime: dict, output: Path) -> dict:
+def register_evaluated(name: str, runtime: dict, output: Path, *, selection: dict | None = None) -> dict:
     from ml_model_factory.azureml import register
 
     manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
     model_name = manifest.get("model_name")
     if not isinstance(model_name, str) or not model_name:
         raise ValueError("Rendered manifest must contain model_name")
-    # The core downloads the report, verifies its gate and lineage, then registers.
-    return {"id": register(name, runtime, model_name), "job": name, "outcome": "Succeeded"}
+    kwargs = {}
+    if selection is not None:
+        kwargs = {
+            "selection_policy": selection["policy"], "champion_evaluation": selection["champion"],
+            "no_champion": selection["provenance"]["no_champion"],
+            "decision_path": output.parent / "registration-selection-decision.json",
+        }
+    # Recheck selection together with the server-side quality/lineage gate and stamp winner tags.
+    return {"id": register(name, runtime, model_name, **kwargs), "job": name, "outcome": "Succeeded"}
 
 
 def training_runtime(runtime: dict, scenario_path: str, run_id: str | None = None) -> dict:
@@ -114,12 +122,142 @@ def training_runtime(runtime: dict, scenario_path: str, run_id: str | None = Non
     return effective
 
 
+def selection_settings(args, runtime: dict) -> dict | None:
+    """Resolve an opt-in configuration; absence of a champion is never inferred."""
+    policy_arg = getattr(args, "selection_policy", None)
+    champion_arg = getattr(args, "champion_evaluation", None)
+    no_champion_arg = getattr(args, "no_champion", False)
+    if policy_arg is not None or champion_arg is not None or no_champion_arg:
+        if not policy_arg:
+            raise ValueError("--champion-evaluation/--no-champion requires --selection-policy")
+        config = {"policy": policy_arg}
+        if champion_arg is not None:
+            config["champion_evaluation"] = champion_arg
+        if no_champion_arg:
+            config["no_champion"] = True
+    elif "model_selection" in runtime:
+        config = runtime["model_selection"]
+    else:
+        return None
+    if not isinstance(config, dict) or set(config) - {"policy", "champion_evaluation", "no_champion"}:
+        raise ValueError("runtime.model_selection must contain policy and champion_evaluation or no_champion")
+    if "no_champion" in config and config["no_champion"] is not True:
+        raise ValueError("model_selection.no_champion must be explicitly true, or omitted")
+    if ("champion_evaluation" in config) == ("no_champion" in config):
+        raise ValueError("Model selection requires exactly one explicit champion_evaluation or no_champion:true")
+    base = Path(args.runtime).resolve().parent
+
+    def read_setting(key):
+        value = config.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"model_selection.{key} must be a nonempty JSON file path")
+        path = (base / value).resolve()
+        try:
+            content = path.read_bytes()
+        except OSError as exc:
+            raise ValueError(f"Cannot read model_selection.{key} at {path}; supply an existing file") from exc
+        document = json.loads(content.decode("utf-8-sig"))
+        if not isinstance(document, dict):
+            raise ValueError(f"model_selection.{key} must contain a JSON object")
+        return document, str(path), hashlib.sha256(content).hexdigest()
+
+    from ml_model_factory.selection import validate_policy
+
+    policy, policy_path, policy_hash = read_setting("policy")
+    validate_policy(policy)
+    result = {"policy": policy, "champion": None, "provenance": {
+        "policy_path": policy_path, "policy_sha256": policy_hash,
+        "no_champion": "no_champion" in config,
+    }}
+    if "champion_evaluation" in config:
+        champion, champion_path, champion_hash = read_setting("champion_evaluation")
+        result["champion"] = champion
+        result["provenance"].update(champion_evaluation_path=champion_path,
+                                    champion_evaluation_sha256=champion_hash)
+    return result
+
+
+def select_evaluated(name: str, runtime: dict, scenario_path: str, output: Path,
+                     settings: dict) -> dict:
+    from azure.core.exceptions import AzureError
+    from ml_model_factory.azureml import _client
+    from ml_model_factory.config import load_json, write_json
+    from ml_model_factory.selection import compare
+    from ml_model_factory.tags import scope_tags
+
+    provenance = {**settings["provenance"], "pipeline_job": name, "output_name": "report"}
+    try:
+        # Only this job's named report, downloaded into a fresh directory, supplies evidence.
+        download = output / ("selection-report-" + uuid4().hex)
+        download.mkdir()
+        _client(runtime).jobs.download(name=name, download_path=str(download), output_name="report")
+        reports = list(download.rglob("comparison.json"))
+        if len(reports) != 1:
+            raise ValueError("Named pipeline report output must contain exactly one comparison.json")
+        report = reports[0]
+        if not report.resolve().is_relative_to(download.resolve()) or report.is_symlink():
+            raise ValueError("comparison.json must belong to the downloaded pipeline report")
+        content = report.read_bytes()
+        candidate = json.loads(content.decode("utf-8-sig"))
+        provenance.update(candidate_evaluation_path=str(report),
+                          candidate_evaluation_sha256=hashlib.sha256(content).hexdigest())
+        if not isinstance(candidate, dict):
+            raise ValueError("Downloaded comparison.json must contain a JSON object")
+        if candidate.get("scope") != scope_tags(runtime, require=True):
+            raise ValueError("Candidate evaluation scope does not match the runtime factory/project/environment")
+        scenario = load_json(Path(scenario_path))
+        if candidate.get("use_case") != scenario.get("name") or candidate.get("task_type") != scenario.get("task"):
+            raise ValueError("Candidate evaluation use_case/task_type does not match the submitted scenario")
+        source = candidate.get("source_context", {})
+        if not isinstance(source, dict):
+            raise ValueError("Candidate source_context must be an object")
+        for key in ("pipeline_job", "pipeline_job_name"):
+            if key in source and source[key] != name:
+                raise ValueError(f"Candidate source_context.{key} does not match submitted job {name}")
+        decision = compare(settings["policy"], candidate, settings["champion"])
+        if (not isinstance(decision, dict)
+                or decision.get("schema") != "aifactory.model-selection/v1"
+                or decision.get("decision") not in {"candidate_wins", "champion_kept", "blocked"}
+                or decision.get("promotion_allowed") is not (decision["decision"] == "candidate_wins")):
+            raise ValueError("Model selection returned an invalid or inconsistent decision")
+    except (ValueError, OSError, RuntimeError, AzureError) as exc:
+        decision = {"schema": "aifactory.model-selection/v1", "decision": "blocked",
+                    "promotion_allowed": False, "winner_id": None, "reasons": [str(exc)], "comparisons": []}
+    decision["provenance"] = provenance
+    write_json(output / "selection-decision.json", decision)
+    if decision["decision"] == "blocked":
+        raise ValueError("Model selection blocked registration; inspect selection-decision.json: "
+                         + json.dumps(decision.get("reasons", [])))
+    return decision
+
+
 def train(args) -> None:
+    from azure.core.exceptions import AzureError
+    from ml_model_factory.config import write_json
+
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    for filename in ("registered-model.json", "selection-decision.json", "registration-selection-decision.json",
+                     "submitted-job.json", "training-status.json"):
+        (output / filename).unlink(missing_ok=True)
+    write_json(output / "training-status.json", {"outcome": "Running", "registration": "not_attempted"})
+    try:
+        _train(args, output)
+    except (ValueError, OSError, RuntimeError, subprocess.SubprocessError, AzureError) as exc:
+        write_json(output / "training-status.json", {
+            "outcome": "Failed", "registration": "not_confirmed", "reason": str(exc),
+        })
+        raise
+
+
+def _train(args, output: Path) -> None:
+    from ml_model_factory.config import write_json
     from ml_model_factory.tags import scope_tags
     if not all(math.isfinite(x) and x > 0 for x in (args.timeout_seconds, args.poll_seconds)):
         raise ValueError("Timeout and polling interval must be finite and positive")
     runtime = json.loads(Path(args.runtime).read_text(encoding="utf-8-sig"))
     scope_tags(runtime, require=True)
+    selection = selection_settings(args, runtime)
     runtime = training_runtime(runtime, args.scenario, getattr(args, "lake_run_id", None))
     scope = target(runtime)
     az = shutil.which("az")
@@ -130,11 +268,7 @@ def train(args) -> None:
     extension = run([az, "extension", "show", "--name", "ml", "--query", "version", "-o", "tsv"])
     if extension != args.ml_extension_version:
         raise RuntimeError(f"Expected ml extension {args.ml_extension_version}, found {extension}")
-    output = Path(args.output)
-    output.mkdir(parents=True, exist_ok=True)
-    # A stale receipt must never be mistaken for this run's successful registration.
     receipt = output / "registered-model.json"
-    receipt.unlink(missing_ok=True)
     bundle = output / ("bundle-" + uuid4().hex)
     runtime_path = args.runtime
     if "lake" in runtime:
@@ -154,10 +288,40 @@ def train(args) -> None:
     (output / "submitted-job.json").write_text(
         json.dumps({"name": name, "bundle": str(bundle)}) + "\n", encoding="utf-8")
     wait_for_job(az, scope, name, args.timeout_seconds, args.poll_seconds)
-    registered = register_evaluated(name, runtime, bundle)
+    def keep_champion(decision):
+        outcome = {"job": name, "outcome": "Succeeded", "decision": "champion_kept",
+                   "promotion_allowed": False, "registration": "skipped",
+                   "winner_id": decision.get("winner_id")}
+        write_json(output / "training-status.json", outcome)
+        print(json.dumps(outcome))
+
+    if selection is not None:
+        decision = select_evaluated(name, runtime, args.scenario, output, selection)
+        if decision["decision"] == "champion_kept":
+            keep_champion(decision)
+            return
+        from ml_model_factory.azureml import ModelSelectionRejected
+        try:
+            registered = register_evaluated(name, runtime, bundle, selection=selection)
+        except ModelSelectionRejected as exc:
+            decision = {**exc.decision, "provenance": {
+                **selection["provenance"], "pipeline_job": name, "output_name": "report",
+                "stage": "registration_recheck",
+            }}
+            write_json(output / "selection-decision.json", decision)
+            if decision.get("decision") == "champion_kept" and decision.get("promotion_allowed") is False:
+                keep_champion(decision)
+                return
+            raise
+    else:
+        registered = register_evaluated(name, runtime, bundle)
     if not isinstance(registered, dict) or not registered.get("id"):
         raise RuntimeError("Register did not return a model resource id; refusing success receipt")
     receipt.write_text(json.dumps(registered, indent=2) + "\n", encoding="utf-8")
+    write_json(output / "training-status.json", {
+        "job": name, "outcome": "Succeeded", "registration": "registered", "id": registered["id"],
+        "decision": "candidate_wins" if selection is not None else "selection_disabled",
+    })
     print(json.dumps(registered))
 
 
@@ -196,6 +360,12 @@ def main() -> int:
     training.add_argument("--poll-seconds", type=float, default=30)
     training.add_argument("--lake-run-id",
                           help="Intentional new lake execution ID; default generates a unique ID for every invocation")
+    training.add_argument("--selection-policy",
+                          help="Opt-in policy JSON; relative selection paths resolve beside runtime JSON")
+    champion = training.add_mutually_exclusive_group()
+    champion.add_argument("--champion-evaluation", help="Reviewed champion comparison.json")
+    champion.add_argument("--no-champion", action="store_true",
+                          help="Explicit bootstrap selection (still subject to policy and evaluation gates)")
     deployment = sub.add_parser("deploy")
     deployment.add_argument("--scenario", required=True)
     deployment.add_argument("--runtime", required=True)

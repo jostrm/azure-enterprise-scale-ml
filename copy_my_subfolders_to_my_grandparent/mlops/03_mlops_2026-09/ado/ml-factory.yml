@@ -105,8 +105,16 @@ stages:
           steps:
             - checkout: self
               clean: false
+            - pwsh: |
+                New-Item -ItemType Directory -Force generated | Out-Null
+                foreach ($name in @('registered-model.json', 'selection-decision.json', 'registration-selection-decision.json', 'submitted-job.json', 'training-status.json')) {
+                  if (Test-Path "generated\$name") { Remove-Item "generated\$name" -ErrorAction Stop }
+                }
+                if (Test-Path 'generated\ci-artifacts') { Remove-Item 'generated\ci-artifacts' -Recurse -Force -ErrorAction Stop }
+                '{"outcome":"NotStarted","registration":"not_attempted"}' | Set-Content 'generated\training-status.json'
+              displayName: Clear stale receipts before authentication
             - task: AzureCLI@2
-              displayName: Train with a fresh optional lake run ID
+              displayName: Train and apply optional runtime.model_selection before registration
               inputs:
                 azureSubscription: ${{ parameters.serviceConnection }}
                 scriptType: pscore
@@ -121,8 +129,21 @@ stages:
                 RUNTIME: ${{ parameters.runtime }}
                 MODE: ${{ parameters.mode }}
                 AZURE_EXTENSION_USE_DYNAMIC_INSTALL: 'no'
+            - pwsh: |
+                New-Item -ItemType Directory -Force 'generated\ci-artifacts' | Out-Null
+                foreach ($name in @('training-status.json', 'selection-decision.json', 'registration-selection-decision.json', 'submitted-job.json')) {
+                  if (Test-Path "generated\$name" -PathType Leaf) { Copy-Item "generated\$name" 'generated\ci-artifacts' }
+                }
+                $present = (Test-Path 'generated\registered-model.json' -PathType Leaf).ToString().ToLowerInvariant()
+                Write-Host "##vso[task.setvariable variable=registrationReceiptPresent]$present"
+              displayName: Collect status and decision without runtime credentials or model data
+              condition: always()
+            - publish: generated/ci-artifacts
+              artifact: model-training-outcome
+              condition: always()
             - publish: generated/registered-model.json
               artifact: evaluated-model-registration
+              condition: and(succeeded(), eq(variables['registrationReceiptPresent'], 'true'))
   - ${{ if eq(parameters.action, 'deploy') }}:
     - stage: Deploy
       dependsOn: Validate

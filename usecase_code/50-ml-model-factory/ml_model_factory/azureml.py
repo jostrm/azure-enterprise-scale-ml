@@ -568,10 +568,30 @@ def submit(job_path: Path, runtime: dict) -> str:
     return submitted.name
 
 
-def registration_definition(pipeline_job_name: str, runtime: dict, model_name: str) -> dict:
+class ModelSelectionRejected(ValueError):
+    def __init__(self, decision: dict):
+        self.decision = decision
+        super().__init__("Model registration selection: " + "; ".join(decision["reasons"]))
+
+
+def registration_definition(
+    pipeline_job_name: str, runtime: dict, model_name: str, *,
+    selection_policy: dict | None = None, champion_evaluation: dict | None = None,
+    no_champion: bool = False, decision_path: Path | None = None,
+) -> dict:
     """Create a v2 model definition only after evaluating the real job's gates."""
     from azure.ai.ml.constants import AssetTypes
+    from .selection import compare, validate_policy
 
+    if selection_policy is None and "model_selection" in runtime:
+        raise ValueError("Runtime requests model selection; pass the resolved selection_policy and champion choice "
+                         "(CI resolves runtime-relative file paths automatically)")
+    if selection_policy is None and (champion_evaluation is not None or no_champion):
+        raise ValueError("Champion selection requires an explicit selection_policy")
+    if selection_policy is not None:
+        validate_policy(selection_policy)
+        if type(no_champion) is not bool or (champion_evaluation is None) != no_champion:
+            raise ValueError("Selection requires exactly one champion_evaluation or explicit no_champion=True")
     scope_tags(runtime, require=True)
     client = _client(runtime)
     job = client.jobs.get(pipeline_job_name)
@@ -598,6 +618,25 @@ def registration_definition(pipeline_job_name: str, runtime: dict, model_name: s
                     or lineage.get("task") != (job.tags or {}).get("factory_task")):
                 raise ValueError("Evaluation lake lineage does not match this factory pipeline")
         model_tags = merge_registration_tags(job.tags or {}, lineage, runtime, pipeline_job_name)
+        if selection_policy is not None:
+            from .config import load_json, write_json
+            from .tags import assert_scope
+            candidate = load_json(reports[0].parent / "comparison.json")
+            assert_scope(candidate.get("scope", {}), runtime)
+            if (candidate.get("use_case") != lineage["scenario"]
+                    or candidate.get("task_type") != model_tags["task_type"]
+                    or candidate.get("quality_gate") != gate
+                    or candidate.get("metrics") != load_json(reports[0].parent / "metrics.json")
+                    or candidate.get("model_manifest_sha256") != lineage.get("mlmodel_sha256")):
+                raise ValueError("Selection evidence differs from the downloaded job's model, metrics or evaluation lineage")
+            decision = compare(selection_policy, candidate, champion_evaluation)
+            decision["source_run_id"] = pipeline_job_name
+            if decision_path is not None:
+                write_json(decision_path, decision)
+            if not decision["promotion_allowed"]:
+                raise ModelSelectionRejected(decision)
+            model_tags.update(selection_status="winner", selection_policy_sha256=decision["policy_sha256"],
+                              selection_evidence_sha256=decision["candidate_evidence_sha256"])
     return {
         "$schema": SCHEMAS + "model.schema.json", "name": model_name,
         "path": f"azureml://jobs/{pipeline_job_name}/outputs/model/paths/",
@@ -608,11 +647,19 @@ def registration_definition(pipeline_job_name: str, runtime: dict, model_name: s
     }
 
 
-def register(pipeline_job_name: str, runtime: dict, model_name: str) -> str:
+def register(
+    pipeline_job_name: str, runtime: dict, model_name: str, *,
+    selection_policy: dict | None = None, champion_evaluation: dict | None = None,
+    no_champion: bool = False, decision_path: Path | None = None,
+) -> str:
     """SDK v2 registration using the same gated definition as CLI v2."""
     from azure.ai.ml.entities import Model
 
-    definition = registration_definition(pipeline_job_name, runtime, model_name)
+    selection = {}
+    if selection_policy is not None or champion_evaluation is not None or no_champion:
+        selection = {"selection_policy": selection_policy, "champion_evaluation": champion_evaluation,
+                     "no_champion": no_champion, "decision_path": decision_path}
+    definition = registration_definition(pipeline_job_name, runtime, model_name, **selection)
     definition.pop("$schema")
     model = _client(runtime).models.create_or_update(Model(**definition))
     return model.id

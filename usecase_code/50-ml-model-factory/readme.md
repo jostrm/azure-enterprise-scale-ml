@@ -47,6 +47,29 @@ Docs: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-train-mode
 
 Use Responsible AI tooling, on each model scenario: https://learn.microsoft.com/en-us/azure/machine-learning/concept-responsible-ai?view=azureml-api-2
 
+## Winning-model comparison
+
+[`model-selection.json`](model-selection.json) defines the winning model with
+per-task selected metrics, maximize/minimize direction, signed improvement
+thresholds and absolute/relative comparison. All chosen metrics must pass; ties
+keep the champion by default. Classification includes AUC, accuracy, F1 and MCC;
+regression includes RMSE, R2 and Spearman; forecasting and all four vision tasks
+have separate profiles.
+
+```powershell
+python -m ml_model_factory compare-models --policy model-selection.json `
+  --candidate outputs\candidate\comparison.json --champion outputs\champion\comparison.json `
+  --output outputs\selection-decision.json
+```
+
+Use `--no-champion` instead of `--champion` only for an explicit initial-model
+decision. Reports must describe the same scoped held-out benchmark. Missing
+metrics, probabilities, labels or compatible evaluation evidence cannot win.
+The command never deploys or registers. Azure ML SDK/CLI v2 registration and
+MLOps CI can apply this same opt-in gate before registry writes.
+
+See [policy semantics, metric availability and SDK/CLI examples](../../documentation/v2/30-39/37-mlops.md#define-the-winning-model-in-json).
+
 ## Model identity and lake-aligned tags
 
 The shared `ml_model_factory.tags` module produces string tags for local MLflow

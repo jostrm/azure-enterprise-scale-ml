@@ -1,0 +1,66 @@
+{
+  "schema": "aifactory.model-selection-policy/v1",
+  "description": "All selected metric rules must pass. Positive min_delta requires improvement; negative min_delta allows a bounded regression. Absolute delta uses metric units; relative delta is a fraction of the champion's absolute score.",
+  "on_no_champion": "candidate_if_qualified",
+  "profiles": {
+    "classification": {
+      "on_tie": "keep_champion",
+      "require_any_improvement": true,
+      "metrics": [
+        {"metric": "auc_weighted", "direction": "maximize", "min_delta": 0.02, "delta_mode": "absolute"},
+        {"metric": "accuracy", "direction": "maximize", "min_delta": -0.0001, "delta_mode": "absolute"},
+        {"metric": "f1_weighted", "direction": "maximize", "min_delta": -0.0001, "delta_mode": "absolute"},
+        {"metric": "matthews_correlation", "direction": "maximize", "min_delta": 0.0, "delta_mode": "absolute"}
+      ]
+    },
+    "regression": {
+      "on_tie": "keep_champion",
+      "require_any_improvement": true,
+      "metrics": [
+        {"metric": "rmse", "direction": "minimize", "min_delta": 0.02, "delta_mode": "relative"},
+        {"metric": "r2", "direction": "maximize", "min_delta": -0.001, "delta_mode": "absolute"},
+        {"metric": "spearman_correlation", "direction": "maximize", "min_delta": -0.001, "delta_mode": "absolute"}
+      ]
+    },
+    "forecasting": {
+      "on_tie": "keep_champion",
+      "require_any_improvement": true,
+      "metrics": [
+        {"metric": "rmse", "direction": "minimize", "min_delta": 0.02, "delta_mode": "relative"},
+        {"metric": "mae", "direction": "minimize", "min_delta": 0.0, "delta_mode": "absolute"}
+      ]
+    },
+    "image_classification": {
+      "on_tie": "keep_champion",
+      "require_any_improvement": true,
+      "metrics": [
+        {"metric": "accuracy", "direction": "maximize", "min_delta": 0.005, "delta_mode": "absolute"},
+        {"metric": "f1_weighted", "direction": "maximize", "min_delta": 0.0, "delta_mode": "absolute"}
+      ]
+    },
+    "image_classification_multilabel": {
+      "on_tie": "keep_champion",
+      "require_any_improvement": true,
+      "metrics": [
+        {"metric": "f1_weighted", "direction": "maximize", "min_delta": 0.005, "delta_mode": "absolute"},
+        {"metric": "hamming_loss", "direction": "minimize", "min_delta": 0.0, "delta_mode": "absolute"}
+      ]
+    },
+    "image_object_detection": {
+      "on_tie": "keep_champion",
+      "require_any_improvement": true,
+      "metrics": [
+        {"metric": "map", "direction": "maximize", "min_delta": 0.005, "delta_mode": "absolute"},
+        {"metric": "map_50", "direction": "maximize", "min_delta": 0.0, "delta_mode": "absolute"}
+      ]
+    },
+    "image_instance_segmentation": {
+      "on_tie": "keep_champion",
+      "require_any_improvement": true,
+      "metrics": [
+        {"metric": "map", "direction": "maximize", "min_delta": 0.005, "delta_mode": "absolute"},
+        {"metric": "map_50", "direction": "maximize", "min_delta": 0.0, "delta_mode": "absolute"}
+      ]
+    }
+  }
+}

@@ -95,6 +95,12 @@ def parser() -> argparse.ArgumentParser:
     publish_monitor.add_argument("--report", type=Path, required=True)
     publish_monitor.add_argument("--runtime", type=Path)
     publish_monitor.add_argument("--execute", action="store_true")
+    selection = commands.add_parser("compare-models", help="Select a winner using explicit JSON rules; never deploys")
+    for field in ("policy", "candidate", "output"):
+        selection.add_argument("--" + field, type=Path, required=True)
+    champion = selection.add_mutually_exclusive_group(required=True)
+    champion.add_argument("--champion", type=Path, help="Champion comparison.json from the same held-out benchmark")
+    champion.add_argument("--no-champion", action="store_true", help="Explicit first-model comparison")
     return root
 
 
@@ -218,6 +224,12 @@ def execute(args):
         if not args.runtime:
             raise ValueError("--runtime is required for explicit monitoring publication")
         return publish_model_report(args.report, validate_runtime(load_json(args.runtime)))
+    if args.command == "compare-models":
+        from .selection import compare
+        result = compare(load_json(args.policy), load_json(args.candidate),
+                         load_json(args.champion) if args.champion else None)
+        write_json(args.output, result)
+        return result
     raise ValueError(f"Unhandled command: {args.command}")
 
 
@@ -230,4 +242,6 @@ def main(argv=None) -> int:
         return 1
     if result is not None:
         print(json.dumps(result, indent=2, default=str, allow_nan=False))
+        if args.command == "compare-models" and result["decision"] == "blocked":
+            return 2
     return 0

@@ -249,7 +249,11 @@ class AzureMLTests(unittest.TestCase):
         model.mkdir()
         (model / "MLmodel").write_text("artifact_path: model")
         manifest_path = prepared / "manifest.json"
-        manifest = {"scenario": self.scenario["name"], "task": self.scenario["task"], "lake": lake}
+        manifest = {"scenario": self.scenario["name"], "task": self.scenario["task"], "lake": lake,
+                    "split_rows": {"test": 1}}
+        import pandas as pd
+        (prepared / "test").mkdir()
+        pd.DataFrame({"age": [40], "income": [100], "label": [1]}).to_parquet(prepared / "test" / "data.parquet")
         args = ["azureml_evaluate.py", "--mode", "custom", "--scenario", str(scenario_path),
                 "--lake-config", str(lake_path), "--prepared", str(prepared),
                 "--model", str(model), "--output", str(report)]
@@ -271,6 +275,7 @@ class AzureMLTests(unittest.TestCase):
         def evaluate(*unused, **kwargs):
             report.mkdir()
             (report / "quality-gate.json").write_text(json.dumps({"passed": True}))
+            (report / "metrics.json").write_text(json.dumps({"accuracy": 1.0}))
         with patch.object(sys, "argv", args), patch.object(azureml_evaluate.subprocess, "run", side_effect=evaluate):
             azureml_evaluate.main()
         gate = json.loads((report / "quality-gate.json").read_text())

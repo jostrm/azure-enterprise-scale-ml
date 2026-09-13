@@ -236,6 +236,130 @@ See the [visual lake hierarchy](34-datalake-onboard-data.md#1-the-design-at-a-gl
 
 ## 4. SDK v2 and CLI v2 execution
 
+### Define the winning model in JSON
+
+Edit [`model-selection.json`](../../../usecase_code/50-ml-model-factory/model-selection.json)
+in your orange model-factory copy. It replaces the ESML v1 comparison controller
+with a small shared Python/CLI policy, not a weighted sum of unrelated units.
+Use a different policy file per use case/environment when requirements differ.
+
+The supplied profiles cover classification, regression, forecasting and all four
+vision tasks. For example, classification selects:
+
+```json
+{
+  "on_tie": "keep_champion",
+  "require_any_improvement": true,
+  "metrics": [
+    {"metric": "auc_weighted", "direction": "maximize", "min_delta": 0.02, "delta_mode": "absolute"},
+    {"metric": "accuracy", "direction": "maximize", "min_delta": -0.0001, "delta_mode": "absolute"},
+    {"metric": "f1_weighted", "direction": "maximize", "min_delta": -0.0001, "delta_mode": "absolute"},
+    {"metric": "matthews_correlation", "direction": "maximize", "min_delta": 0.0, "delta_mode": "absolute"}
+  ]
+}
+```
+
+This is a **profile excerpt**, nested under `profiles.classification` in the full
+versioned policy. AUC must improve by at least 0.02; accuracy/F1 may decrease by at
+most 0.0001; MCC must not decrease. All selected rules must pass.
+
+| Setting | Meaning |
+|---|---|
+| `direction` | `maximize` for accuracy/AUC/F1/MCC/R2/Spearman/mAP; `minimize` for errors, log loss and Hamming loss |
+| `min_delta > 0` | Required improvement, inclusive at the threshold |
+| `min_delta = 0` | No regression on that metric |
+| `min_delta < 0` | Explicitly tolerated regression; not a weighting coefficient |
+| `delta_mode: absolute` | Score-unit change: accuracy +0.02 is two percentage points |
+| `delta_mode: relative` | Directed change divided by the absolute champion score; 0.02 means 2%, not two score units |
+| `require_any_improvement` | Defaults true; at least one selected metric must strictly improve |
+| `on_tie` | Defaults `keep_champion`; `candidate` is an explicit override when all selected scores tie and all rules pass |
+| `on_no_champion` | `block`, or `candidate_if_qualified` after an explicit first-model acknowledgement |
+
+For minimizing RMSE, improvement is `champion - candidate`, not the reverse.
+The regression template requires a 2% RMSE reduction while tolerating at most
+0.001 absolute loss in R2 and Spearman. A zero champion denominator blocks relative
+comparison; use an absolute rule rather than an invented epsilon.
+
+Available tabular metrics include `accuracy`, `auc_weighted`, `precision_weighted`,
+`recall_weighted`, `f1_weighted`, `matthews_correlation`, `log_loss`, `rmse`, `mae`,
+`mape`, `r2` and `spearman_correlation`, as appropriate to the task. AUC/log loss
+require actual class-aligned probabilities; hard predictions are never converted
+into pretend probabilities. Undefined metrics are omitted with availability
+reasons. MAPE uses fractions, not percentages, and is undefined with zero actuals;
+Spearman is undefined for constant ranks. Unsupported selected metrics block
+selection rather than being ignored. The old screenshot's
+`Matthews_promote_weight2` reference is a typo, not an accepted metric alias.
+These metrics are not silently normalized to the legacy SDK v1 metric units.
+
+Evaluation emits `comparison.json` alongside the existing metrics, Responsible AI
+and quality-gate reports. Candidate and champion must have the same
+factory/project/environment, use case, task, held-out data fingerprint, preparation
+contract, row count and evaluator. Forecast fingerprints also include validation
+history used during prediction. The model identity is content-bound, not a mutable
+`latest` alias. Preserve the champion's evidence as a versioned artifact; when the
+benchmark changes, explicitly re-evaluate both models against the new benchmark.
+Do not compare historical scores from different test datasets or repeatedly tune
+on the final test set. Unscoped old reports need re-evaluation, not fabricated tags.
+
+```powershell
+# Offline decision only: does not register, deploy, or change endpoint traffic.
+python -m ml_model_factory compare-models --policy model-selection.json `
+  --candidate outputs\candidate\comparison.json --champion outputs\champion\comparison.json `
+  --output outputs\selection-decision.json
+
+# Explicit first-model case; absolute quality and all selected metrics remain required.
+python -m ml_model_factory compare-models --policy model-selection.json `
+  --candidate outputs\candidate\comparison.json --no-champion `
+  --output outputs\initial-selection.json
+```
+
+The decision is `candidate_wins`, `champion_kept`, or `blocked`, with each rule's
+scores/delta/result and policy/evidence hashes. Keeping the champion is a valid
+training outcome, not a failed training job. A blocked offline comparison exits 2.
+
+SDK v2 registration can apply the **same** policy directly:
+
+```python
+from pathlib import Path
+from ml_model_factory.azureml import register
+from ml_model_factory.config import load_json
+
+model_id = register(
+    "completed-pipeline-job", load_json(Path("runtime.local.json")), "diabetes-classification",
+    selection_policy=load_json(Path("model-selection.json")),
+    champion_evaluation=load_json(Path(r"outputs\champion\comparison.json")),
+    decision_path=Path(r"outputs\selection-decision.json"),
+)
+```
+
+The equivalent CLI v2 route is:
+
+```powershell
+python scripts\azureml_cli.py --runtime runtime.local.json `
+  --register-job completed-pipeline-job --model-name diabetes-classification `
+  --selection-policy model-selection.json --champion-evaluation outputs\champion\comparison.json `
+  --selection-output outputs\selection-decision.json
+```
+
+For an initial model, replace the champion argument with `no_champion=True` (SDK)
+or `--no-champion` (CLI). Registration downloads the **actual completed job's**
+report, checks its quality/metrics/model lineage, then compares; it never accepts
+a disconnected candidate score file as registration authority.
+Winners receive `selection_status=winner`, `selection_policy_sha256` and
+`selection_evidence_sha256` tags while retaining `lifecycle_status=candidate`:
+winning a comparison is **not deployment approval**. A rejected SDK registration
+raises `ModelSelectionRejected` with its decision; CLI prints a kept-champion
+decision without creating a model. No endpoint, registry champion alias, monitoring
+schedule, or Dev/Stage/Prod promotion is changed by the comparison.
+
+Selection is opt-in for compatibility: calls without a policy retain the existing
+absolute-quality registration gate. AutoML vision remains blocked by the missing
+evaluation adapter; adding selection does not make unsupported evaluation work.
+The policy API is engine-neutral, but automatic registry gating here is wired to
+Azure ML SDK/CLI v2, not the separate Databricks model-version registration helper.
+
+### Submit and register
+
 Run from the model-factory root after configuring its declared dependencies,
 scenario JSON and a resolved runtime JSON. Runtime names existing resources;
 rendering does not provision a workspace, compute or datastore.
@@ -290,12 +414,38 @@ tools or silently switch to a hosted runner.
 | --- | --- |
 | `validate` | Offline configuration and contract validation; no Azure login or submission |
 | `ingest` | Explicit Kaggle download; credentials stay in secret providers, rules are not accepted automatically |
-| `train` | Fresh bundle, CLI v2 submission, bounded status polling, evaluated-model registration |
+| `train` | Fresh bundle, CLI v2 submission, bounded polling, optional winning-model selection, gated registration |
 | `deploy` | Separate action with immutable model ID, target, serving kind and an approved environment |
 
 Azure ML job success is normally `Completed`; failed, canceled, unknown or missing
 statuses must not produce a success receipt. A timeout does not cancel the cloud
 job automatically. Inspect its recorded job ID before retrying.
+
+Enable the shared selection gate through environment-specific runtime JSON:
+
+```json
+{
+  "model_selection": {
+    "policy": "..\\..\\aifactory-usecase-code\\50-ml-model-factory\\model-selection.json",
+    "champion_evaluation": "champions\\diabetes\\v3\\comparison.json"
+  }
+}
+```
+
+Merge this object with existing runtime settings, not as a replacement runtime.
+Paths resolve beside the original runtime JSON; this example assumes orange's
+`aifactory\ml-model-factory` configuration folder. Both CI providers use the same
+settings and existing runner. For the first model, explicitly replace
+`champion_evaluation` with `"no_champion": true`; a missing file never implies
+bootstrap. Direct SDK/CLI registration uses the explicit policy arguments shown
+above and refuses to silently ignore a runtime that requests selection.
+
+CI keeps `training-status.json`, `selection-decision.json` and, when reached,
+`registration-selection-decision.json` as audit artifacts. A kept champion
+finishes successfully **without** `registered-model.json`; a blocked comparison
+fails without registering. Workflow artifact steps handle both cases and clear
+stale receipts before authentication so an earlier run cannot masquerade as the
+current result.
 
 When `runtime.lake` is enabled, CI generates a fresh execution ID without rewriting
 the source runtime or snapshot ID. Azure preparation uses a run-scoped working

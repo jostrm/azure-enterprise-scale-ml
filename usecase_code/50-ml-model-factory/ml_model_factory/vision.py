@@ -609,4 +609,8 @@ def evaluate_vision(scenario, prepared_dir, model_dir, output_dir) -> dict:
         write_json(output / "quality-gate.json", {"passed": False, "reason": str(exc)})
         raise
     write_json(output / "quality-gate.json", {"passed": True, "limits": scenario.get("quality", {})})
+    from .selection import build_evidence
+    write_json(output / "comparison.json", build_evidence(
+        scenario, Path(prepared_dir), Path(model_dir), metrics, load_json(output / "quality-gate.json"),
+    ))
     return report
