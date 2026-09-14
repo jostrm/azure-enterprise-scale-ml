@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "esml_build"
+backend-path = ["."]
+
+[project]
+name = "azure-esml-sdk"
+version = "0.3.0"
+description = "Lake-connected Enterprise Scale ML pipeline factory for Azure ML SDK v2 and CLI v2"
+readme = {text = "ESML v2 provides lake-mapped dynamic Azure ML pipelines, explicit data assets, and SDK/CLI adapters. Source and migration documentation: https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/esml-v2", content-type = "text/plain"}
+requires-python = ">=3.10,<3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["PyYAML>=6.0.2,<7", "azure-ai-ml>=1.30,<2", "azure-identity>=1.25,<2"]
+
+[project.optional-dependencies]
+train = ["pandas>=2.2,<3", "numpy>=1.26,<3", "pyarrow>=18,<24", "deltalake>=1.0,<2", "scikit-learn>=1.5,<1.8", "mlflow-skinny>=2.22,<3"]
+delta = ["pandas>=2.2,<3", "pyarrow>=18,<24", "deltalake>=1.0,<2"]
+storage = ["azure-storage-blob>=12.25,<13"]
+databricks = ["databricks-sdk>=0.50,<1", "azure-storage-blob>=12.25,<13"]
+dataops = ["azure-functions>=1.21,<2"]
+kaggle = ["kagglehub>=0.3.13,<1"]
+vision = ["torch>=2.6,<3", "torchvision>=0.21,<1", "Pillow>=11,<13", "torchmetrics>=1.6,<2", "pycocotools>=2.0.8"]
+dev = ["pytest>=8,<10", "nbformat>=5.10,<6", "tomli>=2; python_version<'3.11'"]
+
+[project.scripts]
+esml = "azure_esml.cli:main"
+
+[project.urls]
+Source = "https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/esml-v2"
+Documentation = "https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/30-39/37-mlops.md"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["azure_esml*", "ml_model_factory*"]
+
+[tool.setuptools.package-data]
+azure_esml = ["resources/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "../usecase_code/50-ml-model-factory"]

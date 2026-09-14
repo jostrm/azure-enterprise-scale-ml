@@ -10,6 +10,192 @@ Start with [data onboarding and lake design](34-datalake-onboard-data.md) and
 [DataOps orchestration](36-dataops.md). Reusable CI templates are in
 [`mlops/03_mlops_2026-09`](../../../copy_my_subfolders_to_my_grandparent/mlops/03_mlops_2026-09/readme.md).
 
+## ESML v2: the pip-installable pipeline factory
+
+The rebuilt SDK lives in [`esml-v2`](../../../esml-v2), with distribution name
+**`azure-esml-sdk`** and Python import **`azure_esml`**. It uses only
+`azure.ai.ml` (Azure ML SDK v2) and `az ml` CLI v2. The Python SDK distribution
+itself uses `1.x` version numbers; that does not mean it is the retired SDK v1
+package `azureml-core`.
+
+The legacy `esml`, `esmlrt`, `esmlfac`, and quickstart notebooks remain untouched.
+This is a new API, not an import-compatible v1 shim. Start with the new
+[pipeline notebook](../../../esml-v2/examples/app_layer/01_pipeline_factory.ipynb)
+and [data/inference notebook](../../../esml-v2/examples/app_layer/02_data_assets_and_inference.ipynb).
+
+### Installation and package boundary
+
+From the repository root:
+
+```powershell
+pip install ".\esml-v2[train,storage]"
+```
+
+Or install the built wheel from `esml-v2\dist`. The intended public-index command
+is `pip install azure-esml-sdk`, but **PyPI publication is a separate release
+action**: building a wheel or pushing GitHub does not make that command available.
+Do not claim an index release until it has actually been published.
+
+The package build includes the existing v2 `ml_model_factory` engines from their
+canonical source in `usecase_code\50-ml-model-factory`. A temporary build staging
+directory creates a self-contained wheel and source archive. Installed consumers
+do not need that repository path, an editable checkout, or an unpublished second
+package. There is no second maintained copy of training/evaluation/selection code.
+Use a clean consumer environment rather than installing both this distribution
+and the older `aifactory-ml-model-factory` distribution over the same import package.
+
+| Layer | Responsibility |
+|---|---|
+| `azure_esml.base_layer` | Generic `MLBackend` and `IFolderCatalog` abstract contracts; injected SDK/CLI transports, explicit credentials, credentialless datastore bindings, data/model/job operations |
+| `azure_esml.domain_layer` | ESML lake settings, naming, request validation, pipeline factory, step-map abstraction, DataOps contract and adapters to the shared v2 engines |
+| `examples/app_layer` | Customer configuration, Python composition, notebooks, optional HTTP/Databricks examples |
+
+Dependencies point from AppLayer to DomainLayer to BaseLayer. BaseLayer has no
+ESML project naming or customer configuration dependencies. Configuration reads
+do not log in, provision compute, alter default datastores, or change global
+working directories. Authentication is injected or explicitly selected; there
+is no credential fallback through unrelated tenants.
+
+### One line creates the mapped pipeline
+
+```python
+from pathlib import Path
+from azure_esml import ESMLProject, PipelineRequest, PipelineType
+
+project = ESMLProject.from_json(Path("lake_settings.json"))
+request = PipelineRequest(data_date_utc="2026-09-13", run_id="training-001")
+plan = project.create_pipeline(PipelineType.IN_2_GOLD_TRAINING_AUTOML, request, output=Path("generated"))
+```
+
+The final line creates the complete graph, code bundle, v2 YAML and lineage/asset
+manifest. It does **not** submit. `plan.to_sdk()` loads the same document with
+SDK v2; `az ml job create --file generated\pipeline.yml` uses CLI v2.
+Use `project.execute_pipeline(plan)` with an explicitly injected backend for the
+scoped facade, including model-scope validation.
+
+```powershell
+esml render --settings lake_settings.json --type IN_2_GOLD_INFERENCE `
+  --date 2026-09-13 --model-version 7 --run-id inference-001 --output generated
+esml submit --settings lake_settings.json --pipeline generated\pipeline.yml --backend sdk
+# Alternative transport for the same job, not a second submission:
+# esml submit --settings lake_settings.json --pipeline generated\pipeline.yml --backend cli
+```
+
+| Pipeline type | Graph |
+|---|---|
+| `IN_2_GOLD` | One refinement branch per dataset, then a gold merge |
+| `IN_2_GOLD_INFERENCE` | Refinement branches, gold merge, inference |
+| `IN_2_GOLD_INFERENCE_DBX` | The same graph with explicitly mapped Databricks components for every required step |
+| `GOLD_INFERENCE` | Prepared gold input directly to inference |
+| `IN_2_GOLD_TRAINING_AUTOML` | Refinement, merge, leakage-aware split, native AutoML node, held-out evaluation |
+| `IN_2_GOLD_TRAINING_MANUAL` | Refinement, merge, split, custom estimator, held-out evaluation |
+
+Public steps use `IN_2_BRONZE`, `BRONZE_2_SILVER`, `IN_2_SILVER`,
+`SILVER_MERGED_2_GOLD`, `INFERENCE_GOLD`, `TRAINING_AUTOML`, `TRAINING_MANUAL`,
+`TRAINING_SPLIT_AND_REGISTER`, and `EVALUATE`. The historical split-step name
+is retained with the requested `TRAINING` spelling, but registry writes are an
+explicit post-success operation rather than hidden inside data splitting.
+
+### Lake mapping, dynamic inputs, and names
+
+The [AppLayer lake_settings.json](../../../esml-v2/examples/app_layer/lake_settings.json)
+retains the recognizable `project_number`, `project_folder_name`, `active_model`,
+`models`, `model_number`, `model_folder_name`, `model_short_alias`,
+`dataset_folder_names`, `label`, `ml_type`, and `ml_metric` fields.
+It adds explicit factory, storage, runtime, feature, merge and split settings.
+The old mapping file alone is not enough to establish v2 connectivity.
+
+One source folder produces one input/refinement branch. Two or twelve folders
+produce two or twelve branches, without copying pipeline Python. Explicit
+`discover_datasets` plus an injected folder catalog reads direct child folders
+under a selected prefix; an empty or invalid discovery does not create a fake
+successful pipeline. There is no unbounded scan of the whole storage account.
+Adding/removing datasets changes the component's graph and requires regeneration.
+
+Names follow the mapping: for example,
+`project001_11_diabetes_classification_pipe_IN_2_GOLD_INFERENCE` and
+`M11_ds01_diabetes_inference_SILVER_dev`. Long Azure names receive a stable hash
+suffix rather than ambiguous truncation. Factory/project/environment/use-case
+tags accompany jobs and versioned assets; Stage uses wire value `test`.
+
+New output locations follow `mlops/v1/projects/project001/environments/dev`.
+Shared dataset source versions remain separate from model-specific training
+runs and inference model/run outputs. Pipeline working silver/gold/splits are
+run-specific: generating a pipeline does not overwrite a published gold snapshot
+or guarantee storage-enforced immutability. Explicit source path templates can
+read legacy locations, but new outputs never rewrite the legacy hierarchy.
+
+### Customization, lifecycle, and limits
+
+New configurations default to `bronze: true`, preserving source bytes before
+silver validation. `bronze: false` explicitly selects the combined IN-to-SILVER
+fast path. Neither skips the separate gold representation, including when there
+is only one dataset. Silver validation does not claim to infer customer
+cleaning rules. Concatenation requires compatible schemas; relational joins
+require explicit keys and cardinality constraints. Implement `IPipelineStepMap`
+or use `DictionaryStepMap`/`StepOverride` to replace individual components or
+select different existing CPU/GPU compute. No cluster is automatically created.
+
+New silver and canonical gold use `table_format: "delta"` by default.
+`aml_table_format` follows that setting for the training/validation/test MLTable
+ports, using a pinned Delta snapshot. Set either explicitly to `"parquet"` for a
+documented compatibility path. The custom Python estimator/evaluation engine
+uses a verified Parquet projection of gold-derived splits internally. It never
+trains directly from raw or reusable silver data. Dataset-specific gold is under
+the project/use case, with the merged table and split tables in non-overlapping
+`gold/table` and `gold/splits/<split>` paths.
+
+An explicitly selected shared silver reference can bypass repeated raw refinement
+while still feeding the gold merge. Dataset settings carry `source_stage: "silver"`,
+an exact `input_path`, `format`, and `delta_version` for Delta. Resolve and validate
+the producer/variation/release through `SilverShareback` before creating that
+binding. The same URI/file-folder contract works against the configured common
+Gen2 or project storage; permissions and source retention remain prerequisites.
+See [Delta and shareback details](36-dataops.md#delta-interoperability-and-shareback).
+
+The built-in tabular worker supports classification, regression and forecasting;
+it reuses the existing leakage-aware preparation and MLflow evaluation engines.
+The four vision scenarios remain available in `50-ml-model-factory`; they are
+not automatically treated as tabular rows by this pipeline builder.
+Databricks uses an explicit Jobs bridge/custom component, not the v1
+`DatabricksStep`, which has no direct v2 replacement.
+
+`DatabricksStepMap` maps dataset/stage keys to existing job IDs and notebook task
+keys. Its bridge uploads the actual named input files to a project-scoped
+transfer prefix, invokes the job with managed identity, waits within a bound,
+verifies the notebook's exact output receipt and downloads real output files into
+AML output mounts. Downstream nodes receive data, not a JSON file masquerading
+as a dataset. The [Databricks AppLayer example](../../../esml-v2/examples/app_layer/databricks_notebook.py)
+implements driver-sized conversion, merge and MLflow inference; distributed Spark
+processing and Databricks training replacements remain explicit customer notebooks.
+The Azure ML and Databricks environments must install the SDK and their required
+`train`/`databricks` extras beforehand. Transfer retention is customer-managed;
+the library does not erase transfer data automatically.
+
+`allow_reuse` maps to pipeline rerun/component determinism controls. Reuse is
+conditional on Azure's inputs/code/settings comparison; new request metadata
+or external mutable data can prevent reuse. No percentage cost saving or runtime
+is promised. Databricks side-effect components are nondeterministic.
+
+Use `project.wait_for_completion()` for bounded polling, `register_outputs()` for
+explicit successful-job data asset registration, `get_dataset(name, version)` for
+scoped access, and `register_model()` for the existing quality/lineage and optional
+winning-model policy gates. Successful training is not automatic deployment or
+cross-environment promotion. Missing labels, unsupported metrics and failed jobs
+never become a successful quality result.
+
+`publish_pipeline()` explicitly registers a pipeline component and batch
+deployment without changing endpoint default traffic. The published record binds
+the reviewed plan; `invoke_pipeline()` refuses a different plan. For daily or
+historical dates, the [DataOps adapter](36-dataops.md#esml-v2-dataops-request-contract)
+rebuilds concrete input/output/model bindings from the same small request contract.
+It does not send legacy v1 published-pipeline IDs to ADF.
+
+Compute provisioning, networking/RBAC changes, online/AKS canary deployment,
+cross-workspace promotion, schedules, public package publication and live cloud
+execution are separate explicit operations, not side effects of creating a
+pipeline.
+
 ## 1. Workspace and model hierarchy
 
 The following is a **project example, not a hardcoded template configuration**.

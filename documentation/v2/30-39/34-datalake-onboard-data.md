@@ -12,6 +12,72 @@ storage contracts; adopting the new one does not automatically migrate old data.
 
 ## 1. The design at a glance
 
+### Current medallion and format policy
+
+For new ESML v2 pipelines, **bronze preserves original source bytes**, silver is a
+validated reusable analytical table, and gold is a separate use-case-specific
+table even when a single silver input has identical rows and columns. Training
+receives only splits derived from gold, never a direct bronze/silver input.
+Bronze can contain unrefined data; its presence is not a quality certification.
+
+New silver/gold tables default to **real Delta Lake**, including `_delta_log`.
+Set `table_format: "parquet"` explicitly for a consumer that cannot use the
+supported Delta profile. A missing Delta dependency raises an actionable error,
+not an undisclosed format change. Existing published Parquet releases remain
+unchanged and readable. The original directory examples below also describe those
+earlier Parquet releases; they are not a promise that every new table has a
+single `data.parquet` file.
+
+Delta-backed Azure ML `MLTable` definitions pin `read_delta_lake.version_as_of`.
+The AutoML-facing split representation is selectable with `aml_table_format`;
+the default follows `table_format`. The custom Python training/evaluation adapter
+retains a hash-bound Parquet projection of the same gold splits, explicitly under
+a compatibility/prepared location. This is a model-runtime boundary, not training
+from silver, and it does not replace the authoritative Delta gold.
+
+Silver shareback has a **producer and variation identity**:
+
+```text
+mlops/v1/master/environments/dev/products/<dataset>/
+  producers/project003/variations/<variation>/versions/<release>/
+  producers/project004/variations/<variation>/versions/<release>/
+```
+
+The default shareback publishes an immutable metadata reference to a verified
+producer project's silver table, recording its content/schema, Delta transaction
+version (when applicable), source manifest hash, owner and approved consumers.
+Projects explicitly choose producer, variation and release. It is not a `latest`
+pointer and not a symbolic link. Copy materialization is an explicit alternative
+when independent retention or storage/access boundaries require it.
+
+Delta alone does not remove physical copies. Zero-copy comes from references or
+platform shortcuts; the source table/version must remain available. Retain pinned
+files/history before `VACUUM` or source deletion. A JSON approval list grants no
+Azure access, and the consumer must still have suitable RBAC/ACL permissions.
+See [service-specific Delta support and shareback usage](36-dataops.md#delta-interoperability-and-shareback).
+
+### Common Gen2 lake and organization-wide reuse
+
+The [shared-lake extension in ESML v2](36-dataops.md#shared-common-lake-master-to-project-in)
+adds `mlops/v1/master/environments/<env>` for source releases, governed silver
+products and independently versioned image annotations. Projects pin those
+releases into `datasets/<dataset>/versions/<version>/in`; configure
+`storage.input_area: "in"` to use that import convention. Existing `landing`
+consumers below remain compatible and are not renamed.
+
+Master-to-project initial/file-delta/row-CDC loading, cross-project product
+contracts and preview-first Azure publication are implemented separately from
+model training. Shared storage makes reuse possible, but it does not grant
+access: Gen2 ACLs/RBAC must reflect product owners and approved project identities.
+Use independent identities and environment scopes; never expose the whole
+enterprise lake to a project simply to make a sample work.
+
+RAG corpus/chunk/index manifests, fine-tuning snapshots, versioned image labels,
+streaming checkpoints/dead letters and online capture are separate from tabular
+gold. Read [the extended hierarchy and format semantics](36-dataops.md#shared-common-lake-master-to-project-in)
+before onboarding those workloads. Parquet releases and Delta table transactions
+have different publication contracts; model training must pin one explicitly.
+
 ```text
 Existing storage account / container
 |

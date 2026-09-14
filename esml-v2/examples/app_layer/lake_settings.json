@@ -1,0 +1,56 @@
+{
+  "schema": "esml.lake-settings/v2",
+  "aifactory": "example-factory",
+  "project_number": 1,
+  "project_folder_name": "project001",
+  "active_model": 11,
+  "storage": {
+    "datastore": "esml_lake",
+    "type": "azure_blob",
+    "account_name": "exampleesmlstorage",
+    "container": "lake3",
+    "prefix": "mlops/v1"
+  },
+  "runtime": {
+    "tenant_id": "00000000-0000-0000-0000-000000000001",
+    "subscription_id": "00000000-0000-0000-0000-000000000002",
+    "resource_group": "example-project001-dev",
+    "workspace_name": "example-ml-dev",
+    "environment_name": "dev",
+    "compute": "cpu-cluster",
+    "environment": "azureml:esml-runtime:1"
+  },
+  "models": [
+    {
+      "model_number": 11,
+      "model_folder_name": "11_diabetes_classification",
+      "model_short_alias": "M11",
+      "use_case": "diabetes",
+      "model_name": "diabetes-classification",
+      "dataset_folder_names": ["ds01_diabetes", "ds02_diabetes"],
+      "input_format": "csv",
+      "label": "Outcome",
+      "ml_type": "classification",
+      "ml_metric": "AUC_weighted",
+      "features": ["Pregnancies", "Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI", "DiabetesPedigreeFunction", "Age"],
+      "source": {
+        "provider": "kaggle",
+        "kind": "dataset",
+        "slug": "jamaltariqcheema/pima-indians-diabetes-dataset",
+        "file": "diabetes.csv",
+        "version": 1,
+        "license": "CC0: Public Domain"
+      },
+      "merge": {"mode": "concat"},
+      "split": {"test_size": 0.2, "validation_size": 0.2, "seed": 42},
+      "automl": {"primary_metric": "AUC_weighted", "limits": {"max_trials": 3, "max_concurrent_trials": 1, "timeout_minutes": 20}},
+      "custom": {"algorithm": "logistic_regression"},
+      "quality": {"min_accuracy": 0.6},
+      "bronze": true,
+      "bronze_mode": "raw",
+      "table_format": "delta",
+      "aml_table_format": "delta",
+      "discover_datasets": false
+    }
+  ]
+}

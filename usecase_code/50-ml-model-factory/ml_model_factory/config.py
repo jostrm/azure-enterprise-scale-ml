@@ -45,14 +45,17 @@ def safe_relative(value: str) -> Path:
 
 
 def validate_scenario(value: dict, *, require_dataset: bool = False) -> dict:
-    if not re.fullmatch(r"[a-z][a-z0-9_-]{1,62}", value.get("name", "")):
+    dataset = value.get("dataset", {})
+    name_pattern = r"[a-z0-9][a-z0-9_-]{1,62}" if dataset.get("provider") == "lake" else r"[a-z][a-z0-9_-]{1,62}"
+    if not re.fullmatch(name_pattern, value.get("name", "")):
         raise ValueError("Scenario name must be a lowercase identifier of 2-63 characters")
     task = value.get("task")
     if task not in TASKS:
         raise ValueError(f"Unsupported task: {task!r}")
-    dataset = value.get("dataset", {})
-    if dataset.get("provider") != "kaggle":
-        raise ValueError("Training dataset provider must be 'kaggle'")
+    if dataset.get("provider") not in ("kaggle", "lake"):
+        raise ValueError("Training dataset provider must be 'kaggle' or an explicitly mapped 'lake'")
+    if require_dataset and dataset.get("provider") != "kaggle":
+        raise ValueError("Kaggle ingestion requires provider='kaggle'; mapped lake data is supplied directly")
     if dataset.get("kind") not in ("dataset", "competition"):
         raise ValueError("dataset.kind must be 'dataset' or 'competition'")
     if dataset.get("file"):

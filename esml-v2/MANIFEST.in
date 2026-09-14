@@ -1,0 +1,7 @@
+include esml_build.py LICENSE pyproject.toml
+recursive-include azure_esml *.py *.json py.typed
+recursive-include ml_model_factory *.py
+recursive-include examples *.py *.json *.ipynb
+recursive-include tests *.py
+global-exclude *.pyc
+prune **/__pycache__

@@ -211,7 +211,9 @@ def render(
     if task not in TASK_SCHEMAS:
         raise ValueError(f"Unsupported task: {task}")
     image = task.startswith("image_")
-    if image and not runtime.get("gpu_compute"):
+    cpu_vision = image and mode == "custom" and scenario.get("vision", {}).get("device") == "cpu"
+    image_compute = runtime.get("compute") if cpu_vision else runtime.get("gpu_compute")
+    if image and not image_compute:
         raise ValueError("runtime.gpu_compute is required for image training")
     if not runtime.get("compute"):
         raise ValueError("runtime.compute must identify an existing Azure ML compute")
@@ -337,7 +339,7 @@ def render(
         "outputs": {"model": "${{parent.outputs.model}}"},
     }
     if image:
-        train["compute"] = _asset(runtime["gpu_compute"])
+        train["compute"] = _asset(image_compute)
     if mode == "automl":
         train = automl
         train["outputs"]["best_model"] = "${{parent.outputs.model}}"
@@ -347,7 +349,7 @@ def render(
         standalone = copy.deepcopy(train)
         standalone.update({
             "$schema": SCHEMAS + "commandJob.schema.json",
-            "compute": _asset(runtime["gpu_compute"] if image else runtime["compute"]),
+            "compute": _asset(image_compute if image else runtime["compute"]),
             "experiment_name": _name(scenario["name"], 100),
             "inputs": {"prepared": {
                 "type": "uri_folder",
@@ -378,7 +380,7 @@ def render(
             "evaluate": {
                 **copy.deepcopy(common),
                 "environment": _environment(runtime, "automl") if mode == "automl" else environment,
-                **({"compute": _asset(runtime["gpu_compute"])} if image else {}),
+                **({"compute": _asset(image_compute)} if image else {}),
                 "command": install + (
                     f"python scripts/azureml_evaluate.py --mode {mode} --scenario scenario.json "
                     '--prepared "${{inputs.prepared}}" --model "${{inputs.model}}" '
@@ -577,7 +579,7 @@ class ModelSelectionRejected(ValueError):
 def registration_definition(
     pipeline_job_name: str, runtime: dict, model_name: str, *,
     selection_policy: dict | None = None, champion_evaluation: dict | None = None,
-    no_champion: bool = False, decision_path: Path | None = None,
+    no_champion: bool = False, decision_path: Path | None = None, client=None,
 ) -> dict:
     """Create a v2 model definition only after evaluating the real job's gates."""
     from azure.ai.ml.constants import AssetTypes
@@ -593,7 +595,7 @@ def registration_definition(
         if type(no_champion) is not bool or (champion_evaluation is None) != no_champion:
             raise ValueError("Selection requires exactly one champion_evaluation or explicit no_champion=True")
     scope_tags(runtime, require=True)
-    client = _client(runtime)
+    client = _client(runtime) if client is None else client
     job = client.jobs.get(pipeline_job_name)
     _check_registration_job(job.type, job.status, job.tags, getattr(job, "jobs", None), job.outputs)
     with tempfile.TemporaryDirectory(prefix="model-factory-registration-") as temporary:

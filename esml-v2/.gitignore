@@ -1,0 +1,14 @@
+__pycache__/
+.pytest_cache/
+.pytest-*/
+tests/.pytest-*/
+tests/.pipeline-runs/
+*.pyc
+*.egg-info/
+.venv/
+dist/
+build/
+outputs/
+generated/
+mlruns/
+*.local.json

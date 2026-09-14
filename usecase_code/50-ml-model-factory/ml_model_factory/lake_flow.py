@@ -4,6 +4,8 @@ import json
 from copy import deepcopy
 import shutil
 import tempfile
+import logging
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from uuid import uuid4
@@ -46,7 +48,15 @@ def publication(root: Path, key: str):
             raise ValueError("Publication did not produce a completion manifest")
         if destination.exists():
             raise ValueError("Another writer created the lake destination")
-        staging.rename(destination)
+        for attempt in range(5):
+            try:
+                staging.rename(destination)
+                break
+            except PermissionError as exc:
+                if getattr(exc, "winerror", None) not in (5, 32) or destination.exists() or attempt == 4:
+                    raise
+                logging.getLogger(__name__).warning("Publication rename is temporarily blocked; retrying (%s/4)", attempt + 1)
+                time.sleep(0.1 * (attempt + 1))
     finally:
         if staging.exists():
             shutil.rmtree(staging)
