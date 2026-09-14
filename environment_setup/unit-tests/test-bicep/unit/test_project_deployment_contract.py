@@ -190,6 +190,12 @@ def test_all_project_deployment_jobs_stop_after_pipeline_cancellation():
     assert all("not(canceled())" in job["condition"] for job in jobs)
 
 
+def test_account_capability_host_poll_uses_live_supported_api():
+    services = (ADO / "jobs/job-2-genai-services.yaml").read_text(encoding="utf-8")
+    assert "capabilityHosts?api-version=2025-04-01-preview" in services
+    assert "capabilityHosts?api-version=2025-07-01-preview" not in services
+
+
 def test_ado_scheduling_uses_selected_project_not_other_loaded_export():
     config = document()
     config["stage_prod"].update(runNetworkingVar=False, BYO_subnets=True, useSelfHostedBuildAgent=True,

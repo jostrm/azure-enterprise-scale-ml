@@ -4760,7 +4760,7 @@ steps:
      # name that we cannot guess. We therefore LIST capabilityHosts on the
      # account and accept any entry that reaches Succeeded. This is what
      # actually unblocks the project caphost in 69b.
-     list_url="https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts?api-version=2025-07-01-preview"
+     list_url="https://management.azure.com/subscriptions/$(dev_test_prod_sub_id)/resourceGroups/${projectResourceGroup}/providers/Microsoft.CognitiveServices/accounts/${account_name}/capabilityHosts?api-version=2025-04-01-preview"
 
      max_attempts=60   # 60 x 20s = 20 min
      prov_state="NotFound"
