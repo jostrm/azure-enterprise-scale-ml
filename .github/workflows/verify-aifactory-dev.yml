@@ -46,6 +46,11 @@ jobs:
           python-version: "3.12"
       - name: Install test dependencies
         run: python -m pip install -r environment_setup/unit-tests/test-bicep/requirements.txt
+      - name: Restore declared public Bicep module dependencies
+        run: |
+          python environment_setup/unit-tests/test-bicep/run_bicep_matrix.py \
+            --prepare-cache --bicep "$(command -v bicep)" \
+            --report "$RUNNER_TEMP/iac-results/bicep-dependencies.json"
       - name: "Run unit tests"
         run: python environment_setup/unit-tests/test-bicep/run_ci.py --phase unit --require-ci-tools --results-dir "$RUNNER_TEMP/iac-results"
       - name: Upload unit results
