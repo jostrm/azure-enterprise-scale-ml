@@ -2257,9 +2257,11 @@ they are not supported substitutes for a scoped lifecycle manifest.</p>
 <h2 id="simple-mode-technical-contract">Simple-mode technical contract<a class="headerlink" href="#simple-mode-technical-contract" title="Permanent link">&para;</a></h2>
 <p><code>AIF_SIMPLE_MODE=true</code> opts the GHA create entrypoint into contract v2,
 <code>private-ai-foundation-v2</code>. Use <code>--non-interactive --yes --repo-root PATH</code> and
-wait for the full common → access hub → project → private HTTPS gateway chain.
+wait for the full common → access hub → project chain, followed by the private
+HTTPS gateway only when its deployment is enabled.
 Use the following <strong>offline, read-only</strong> preview instead of a deployment dry run:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python<span class="w"> </span>bootstrap/lib/aifactory_scaleset_config.py<span class="w"> </span>--simple-mode-manifest
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python<span class="w"> </span>bootstrap/lib/aifactory_scaleset_config.py<span class="w"> </span>--simple-mode-manifest<span class="w"> </span>--enable-application-gateway<span class="w"> </span><span class="nb">false</span>
 </code></pre></div>
 <p>Provide tenant/subscription, region, prefix, repository and initial team identity
 inputs, plus a published <code>AIF_SUBMODULE_REF</code>. Existing Azure/GitHub authentication
@@ -2270,12 +2272,53 @@ The default suffix is <code>001</code>; the cost-center default is <code>123456<
 <code>AIF_SEED_PROJECT_SP=false</code>, <code>AIF_SETUP_HUB_ACCESS=true</code>,
 <code>AIF_CONFIGURE_VPN_CLIENT=false</code>, <code>AIF_DEV_VNET_CIDR=172.16.0.0/20</code>,
 and <code>AIF_PROJECT_NUMBER=001</code>.</p>
-<p>The current schema keeps project Storage, Key Vault, managed identities,
-Foundry, its capability host, <strong>Basic AI Search</strong> and Cosmos DB required.
-<code>AIF_SIMPLE_PROJECT_RESOURCES_JSON=[]</code> removes optional Application Insights,
-<strong>not</strong> those required dependencies. Model deployment toggles remain off.
-This is not a preloaded-model or runnable-agent guarantee.</p>
-<p>Gateway inputs are all required for this contract:</p>
+<p>Only project Storage, Key Vault and managed identities are always required.
+Foundry is optional and selected by default, together with its capability host,
+<strong>Basic AI Search</strong>, Cosmos DB and Application Insights. Selecting Foundry requires
+all three dependencies; its capability host cannot be selected without Foundry.
+The UI clears those three when Foundry is unchecked, after which Search and Cosmos DB
+can be selected independently. Explicit <code>AIF_SIMPLE_PROJECT_RESOURCES_JSON=[]</code>
+deploys only the baseline project foundation. Omitting the selection preserves the
+default Foundry bundle. Explicit incomplete dependencies are rejected before Azure
+mutations, not silently re-enabled; valid selections are ordered by the catalog.</p>
+<p>Additional optional IDs are <code>azure-machine-learning</code>, <code>aks-for-azure-ml</code>, <code>aks</code>,
+<code>databricks</code>, <code>datafactory</code>, <code>event-hubs</code>, <code>postgresql</code> and <code>container-apps</code>.
+<code>aks-for-azure-ml</code> requires <code>azure-machine-learning</code>; standalone <code>aks</code> is independent.
+AML and Container Apps also require their linked Application Insights; this is a
+conditional dependency, not a globally required service. Include that dependency
+in explicit CLI selections (for example <code>["azure-machine-learning","application-insights"]</code>).
+All selected services map to the existing pipeline flags, with canonical baseline
+SKUs (Event Hubs Standard is required for Private Link). Resource-provider
+registration follows the selection. ML/Databricks materialize only their selected
+first-party enterprise applications, never temporary public workspaces; a tenant
+administrator may need to provision those applications or supply their object IDs.
+Foundry-specific deployment and capability-host checks skip when Foundry is off;
+agent network injection is disabled, while the common, networking, project, data
+and ML phases still run.</p>
+<p>The additive literal <code>projectResourceSelection</code> manifest contract has version 1
+and strict dependency validation. Publish the matching source before using it.
+All model deployment toggles remain off and model SKU defaults stay
+<code>DataZoneStandard</code>. This is not a preloaded-model or runnable-agent guarantee.</p>
+<p>Deploying a <strong>new Application Gateway is optional</strong>, not a prerequisite for private
+Foundry agents. New UI selections default off. Set
+<code>AIF_ENABLE_APPLICATION_GATEWAY=false</code> to avoid deploying a second billable gateway
+when a customer already has a central gateway, or when no application ingress is
+needed. This does not adopt, integrate with, or modify that existing gateway.
+The environment accepts only lowercase <code>true</code> or <code>false</code>; empty/noncanonical
+values fail before cloud operations. <strong>Omitting it preserves legacy enabled
+behavior</strong> for existing automation.</p>
+<p>When false, gateway hostname/backend/certificate inputs may be blank and all
+gateway-specific feature/certificate checks, subnet reservation, NSG, identity,
+certificate role grant/private endpoint, frontend DNS, deployment and backend
+health checks are skipped. VPN, DNS Private Resolver, required private DNS zones
+and the selected project workloads remain enabled. No environment, including Prod,
+universally requires a new Application Gateway.</p>
+<p>This is an additive v2 capability (<code>AIF_SIMPLE_OPTIONAL_GATEWAY_CONTRACT=1</code>), not
+a replacement for v2. The manifest's literal <code>appGatewayDeployment</code> advertises
+<code>default: false</code>, <code>omittedDefault: true</code>, and <code>supported: [false, true]</code>.
+Publish the matching bootstrap and infrastructure source together and use the
+verified published commit before deploying; updating only the UI/API is insufficient.</p>
+<p>Gateway inputs below are required <strong>only when deploying a new gateway</strong>:</p>
 <table>
 <thead>
 <tr>
@@ -2285,6 +2328,11 @@ This is not a preloaded-model or runnable-agent guarantee.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>AIF_ENABLE_APPLICATION_GATEWAY</code></td>
+<td><code>--enable-application-gateway</code> / <code>enable_application_gateway</code></td>
+<td><code>true</code> or <code>false</code>; new UI false, omitted legacy true</td>
+</tr>
 <tr>
 <td><code>AIF_APP_GATEWAY_HOSTNAME</code></td>
 <td><code>--app-gateway-hostname</code> / <code>app_gateway_hostname</code></td>
@@ -2302,10 +2350,12 @@ This is not a preloaded-model or runnable-agent guarantee.</p>
 </tr>
 </tbody>
 </table>
-<p>No certificate secret value is embedded in these inputs. The private-network
-Application Gateway subscription feature must already be registered.
-Gateway/resolver/application subnets are reserved before project allocation:
-<code>172.16.1.0/27</code>, <code>172.16.1.32/28</code>, <code>172.16.2.0/24</code>. Conflicting existing
+<p>No certificate secret value is embedded in these inputs. When gateway deployment
+is enabled, the private-network Application Gateway subscription feature must
+already be registered; existing secure HTTPS validation and readiness checks remain.
+VPN gateway/resolver subnets are reserved before project allocation:
+<code>172.16.1.0/27</code>, <code>172.16.1.32/28</code>. The Application Gateway block <code>172.16.2.0/24</code>
+is reserved only when its deployment is enabled. Conflicting existing
 allocations are rejected, not moved or deleted.</p>
 <p>The access hub includes billable VPN Gateway and DNS Private Resolver resources.
 VPN transport uses a public IP; Azure service access remains independently
@@ -2344,19 +2394,19 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">342</td>
+<td style="text-align: right;">344</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">341</td>
+<td style="text-align: right;">342</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
-<td style="text-align: right;">78</td>
+<td style="text-align: right;">79</td>
 </tr>
 <tr>
 <td><code>helper</code></td>
-<td style="text-align: right;">14</td>
+<td style="text-align: right;">17</td>
 </tr>
 <tr>
 <td><code>state</code></td>
@@ -2370,9 +2420,9 @@ reported, not silently represented as multiple settings.</p>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 130, 363; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 131, 364; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 365, 389; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 130, 364; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 131, 365; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 366, 390; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -2732,11 +2782,11 @@ reported, not silently represented as multiple settings.</p>
 <td>Deploy Application Insights dashboard</td>
 </tr>
 <tr>
-<td><!-- parameter json.dev:enableApplicationInsights --><code>enableApplicationInsights</code></td>
+<td><!-- parameter yaml:enableApplicationInsights --><!-- parameter json.dev:enableApplicationInsights --><code>enableApplicationInsights</code></td>
 <td><code>ENABLE_APPLICATION_INSIGHTS</code></td>
 <td>O</td>
-<td>Y: absent<br>J.dev: <code>"true"</code></td>
-<td>Workspace-based project Application Insights</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Deploy project Application Insights</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableAzureAIVision --><!-- parameter json.dev:enableAzureAIVision --><code>enableAzureAIVision</code></td>
@@ -2751,6 +2801,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
 <td>Deploy Azure ML workspace</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:enableAzureMcpServer --><code>enableAzureMcpServer</code></td>
+<td><code>ENABLE_AZURE_MCP_SERVER</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: absent</td>
+<td>Private, read-only MCP deployment; requires prepared project-scoped configuration.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableAzureOpenAI --><!-- parameter json.dev:enableAzureOpenAI --><code>enableAzureOpenAI</code></td>
@@ -5765,6 +5822,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Enable Azure Machine Learning</td>
 </tr>
 <tr>
+<td><!-- parameter env:ENABLE_AZURE_MCP_SERVER --><code>ENABLE_AZURE_MCP_SERVER</code></td>
+<td><code>enableAzureMcpServer</code></td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>Enable the private, read-only Azure MCP server after its project configuration is prepared</td>
+</tr>
+<tr>
 <td><!-- parameter env:ENABLE_AZURE_OPENAI --><code>ENABLE_AZURE_OPENAI</code></td>
 <td><code>enableAzureOpenAI</code></td>
 <td>O</td>
@@ -7530,6 +7594,12 @@ reported, not silently represented as multiple settings.</p>
 <td>Reviewed project JSON file; required together with explicit target environment, project number and repository root.</td>
 </tr>
 <tr>
+<td><!-- parameter bootstrap:AIFACTORY_PROJECT_DEPLOYMENT_SCOPE --><code>AIFACTORY_PROJECT_DEPLOYMENT_SCOPE</code></td>
+<td>O</td>
+<td><code>"project"</code></td>
+<td>ADO update scope: project or azure-mcp.</td>
+</tr>
+<tr>
 <td><!-- parameter bootstrap:AIFACTORY_PROJECT_NUMBER --><code>AIFACTORY_PROJECT_NUMBER</code></td>
 <td>C</td>
 <td><code>""</code></td>
@@ -7952,6 +8022,12 @@ reported, not silently represented as multiple settings.</p>
 <td>Local certificate metadata JSON; validates metadata only, not private key material.</td>
 </tr>
 <tr>
+<td><!-- parameter helper:--enable-application-gateway --><code>--enable-application-gateway</code></td>
+<td>C</td>
+<td><code>null</code></td>
+<td>Enable application gateway; choices: true, false</td>
+</tr>
+<tr>
 <td><!-- parameter helper:--gateway-health --><code>--gateway-health</code></td>
 <td>C</td>
 <td><code>null</code></td>
@@ -7998,6 +8074,18 @@ reported, not silently represented as multiple settings.</p>
 <td>C</td>
 <td><code>false</code></td>
 <td>Offline read-only contract/preset preview.</td>
+</tr>
+<tr>
+<td><!-- parameter helper:--simple-project-providers --><code>--simple-project-providers</code></td>
+<td>C</td>
+<td><code>false</code></td>
+<td>Simple project providers</td>
+</tr>
+<tr>
+<td><!-- parameter helper:--simple-project-selected --><code>--simple-project-selected</code></td>
+<td>C</td>
+<td><code>null</code></td>
+<td>Simple project selected; choices: storage, key-vault, managed-identities, foundry, foundry-capability-host, ai-search, cosmos-db, application-insights, azure-machine-learning, aks-for-azure-ml, aks, databricks, datafactory, event-hubs, postgresql, container-apps</td>
 </tr>
 <tr>
 <td><!-- parameter helper:--state-file --><code>--state-file</code></td>
