@@ -56,6 +56,7 @@ ALIASES = {
     "policyExemptionAssignmentIds": "POLICY_EXEMPTION_ASSIGNMENT_IDS",
     "policyExemptionDefinitionReferenceIds": "POLICY_EXEMPTION_DEFINITION_REFERENCE_IDS",
     "enableAKS": "ENABLE_AKS",
+    "enableAzureMcpServer": "ENABLE_AZURE_MCP_SERVER",
     "aksSkuName": "AKS_SKU_NAME",
     "aksSkuTier": "AKS_SKU_TIER",
     "aksEnablePrivateCluster": "AKS_ENABLE_PRIVATE_CLUSTER",

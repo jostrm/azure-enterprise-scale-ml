@@ -201,6 +201,7 @@ def test_dynamic_production_entrypoints_include_common_genai_and_both_gateways()
     registry_modules = set()
     reachable = reachable_templates(paths, config.REPO_ROOT, registry_modules)
     assert set(paths) < set(reachable)
+    assert "br/public:avm/utl/types/avm-common-types:0.5.1" in registry_modules
 
 
 def test_reachable_module_inventory_ignores_comments_and_requires_explicit_registry_inventory():
@@ -212,12 +213,17 @@ def test_reachable_module_inventory_ignores_comments_and_requires_explicit_regis
                         "/* module skip2 './missing.bicep' = {} */\n"
                         "module child './child.bicep' = {name: 'child'}\n", encoding="utf-8")
         assert set(reachable_templates([root], work)) == {root, child}
-        root.write_text("module external 'br:example.invalid/x:v1' = {}\n", encoding="utf-8")
+        root.write_text(
+            "module external 'br:example.invalid/x:v1' = {}\n"
+            "import { typeOne } from 'br:example.invalid/types:v1'\n",
+            encoding="utf-8",
+        )
         with pytest.raises(MatrixError, match="explicitly inventoried"):
             reachable_templates([root], work)
         registry_modules = set()
         assert reachable_templates([root], work, registry_modules) == [root]
-        assert registry_modules == {"br:example.invalid/x:v1"}
+        assert registry_modules == {
+            "br:example.invalid/x:v1", "br:example.invalid/types:v1"}
     assert not work.exists()
 
 

@@ -284,18 +284,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 343 |
-| `env` | 341 |
-| `bootstrap` | 78 |
-| `helper` | 14 |
+| `yaml` | 344 |
+| `env` | 342 |
+| `bootstrap` | 79 |
+| `helper` | 17 |
 | `state` | 42 |
 | `json.dev` | 347 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 130, 363; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 131, 364; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 365, 389; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 130, 364; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 131, 365; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 366, 390; one reference row.
 
 ## YAML and variables.json reference
 
@@ -357,6 +357,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:enableApplicationInsights --><!-- parameter json.dev:enableApplicationInsights -->`enableApplicationInsights` | `ENABLE_APPLICATION_INSIGHTS` | O | Y: `"true"`<br>J.dev: `"true"` | Deploy project Application Insights |
 | <!-- parameter yaml:enableAzureAIVision --><!-- parameter json.dev:enableAzureAIVision -->`enableAzureAIVision` | `ENABLE_AZURE_AI_VISION` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure AI Vision |
 | <!-- parameter yaml:enableAzureMachineLearning --><!-- parameter json.dev:enableAzureMachineLearning -->`enableAzureMachineLearning` | `ENABLE_AZURE_MACHINE_LEARNING` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure ML workspace |
+| <!-- parameter yaml:enableAzureMcpServer -->`enableAzureMcpServer` | `ENABLE_AZURE_MCP_SERVER` | O | Y: `"false"`<br>J.dev: absent | Private, read-only MCP deployment; requires prepared project-scoped configuration. |
 | <!-- parameter yaml:enableAzureOpenAI --><!-- parameter json.dev:enableAzureOpenAI -->`enableAzureOpenAI` | `ENABLE_AZURE_OPENAI` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy standalone Azure OpenAI |
 | <!-- parameter yaml:enableAzureSpeech --><!-- parameter json.dev:enableAzureSpeech -->`enableAzureSpeech` | `ENABLE_AZURE_SPEECH` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure AI Speech |
 | <!-- parameter yaml:enableBing --><!-- parameter json.dev:enableBing -->`enableBing` | `ENABLE_BING` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Bing Search |
@@ -815,6 +816,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ENABLE_APPLICATION_INSIGHTS -->`ENABLE_APPLICATION_INSIGHTS` | `enableApplicationInsights` | O | `"true"` | Workspace-based project Application Insights |
 | <!-- parameter env:ENABLE_AZURE_AI_VISION -->`ENABLE_AZURE_AI_VISION` | `enableAzureAIVision` | O | `"false"` | Enable Azure AI Vision |
 | <!-- parameter env:ENABLE_AZURE_MACHINE_LEARNING -->`ENABLE_AZURE_MACHINE_LEARNING` | `enableAzureMachineLearning` | O | `"false"` | Enable Azure Machine Learning |
+| <!-- parameter env:ENABLE_AZURE_MCP_SERVER -->`ENABLE_AZURE_MCP_SERVER` | `enableAzureMcpServer` | O | `"false"` | Enable the private, read-only Azure MCP server after its project configuration is prepared |
 | <!-- parameter env:ENABLE_AZURE_OPENAI -->`ENABLE_AZURE_OPENAI` | `enableAzureOpenAI` | O | `"false"` | Enable Azure OpenAI standalone account otherwise: true, deploy a standalone Azure OpenAI resource (separate from AI Foundry). |
 | <!-- parameter env:ENABLE_AZURE_SPEECH -->`ENABLE_AZURE_SPEECH` | `enableAzureSpeech` | O | `"false"` | Enable Azure AI Speech |
 | <!-- parameter env:ENABLE_BING -->`ENABLE_BING` | `enableBing` | O | `"false"` | Enable Bing Search |
@@ -1097,6 +1099,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:ADO_TENANT -->`ADO_TENANT` | C | `"$AIF_TENANT_ID"` | Azure DevOps connected tenant ID |
 | <!-- parameter bootstrap:AIFACTORY_COMMIT_CHANGES -->`AIFACTORY_COMMIT_CHANGES` | O | `""` | Update confirmation y/yes or n/no; default No. Choosing Yes authorizes the launcher's commit/continue path. |
 | <!-- parameter bootstrap:AIFACTORY_PROJECT_CONFIG -->`AIFACTORY_PROJECT_CONFIG` | C | `""` | Reviewed project JSON file; required together with explicit target environment, project number and repository root. |
+| <!-- parameter bootstrap:AIFACTORY_PROJECT_DEPLOYMENT_SCOPE -->`AIFACTORY_PROJECT_DEPLOYMENT_SCOPE` | O | `"project"` | ADO update scope: project or azure-mcp. |
 | <!-- parameter bootstrap:AIFACTORY_PROJECT_NUMBER -->`AIFACTORY_PROJECT_NUMBER` | C | `""` | Reviewed update/project target number; required together with target environment, project configuration and repository root. |
 | <!-- parameter bootstrap:AIFACTORY_PROJECT_ONLY -->`AIFACTORY_PROJECT_ONLY` | O | `"false"` | Update launcher equivalent of --project-only. |
 | <!-- parameter bootstrap:AIFACTORY_REPO_ROOT -->`AIFACTORY_REPO_ROOT` | O | `""` | Repository root; --repo-root overrides it. |
@@ -1111,10 +1114,9 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIF_ACCESS_HUB_VNET_NAME -->`AIF_ACCESS_HUB_VNET_NAME` | C | `""` | Aif access hub vnet name override; see create launcher. |
 | <!-- parameter bootstrap:AIF_ADD_BASTION -->`AIF_ADD_BASTION` | O | `""` | Compatibility input; collection resets this to false. Access-hub Bastion is controlled separately. |
 | <!-- parameter bootstrap:AIF_ADMIN_VM_SIZE -->`AIF_ADMIN_VM_SIZE` | O | `"Standard_D2s_v5"` | Self-hosted admin VM size |
-| <!-- parameter bootstrap:AIF_APP_GATEWAY_BACKEND_FQDN -->`AIF_APP_GATEWAY_BACKEND_FQDN` | C | `""` | Only when new gateway enabled: distinct private HTTPS backend; trusted TLS and unauthenticated GET / returning 200-399. |
-| <!-- parameter bootstrap:AIF_APP_GATEWAY_CERT_SECRET_ID -->`AIF_APP_GATEWAY_CERT_SECRET_ID` | C | `""` | Only when new gateway enabled: versionless Key Vault PFX certificate-secret URI, not a secret value. |
-| <!-- parameter bootstrap:AIF_APP_GATEWAY_HOSTNAME -->`AIF_APP_GATEWAY_HOSTNAME` | C | `""` | Only when new gateway enabled: custom frontend FQDN covered by certificate DNS SAN. |
-| <!-- parameter bootstrap:AIF_ENABLE_APPLICATION_GATEWAY -->`AIF_ENABLE_APPLICATION_GATEWAY` | O | `"true"` | Optional new Simple-mode gateway; only lowercase true/false. Omitted preserves legacy on; new UI defaults off. |
+| <!-- parameter bootstrap:AIF_APP_GATEWAY_BACKEND_FQDN -->`AIF_APP_GATEWAY_BACKEND_FQDN` | C | `""` | Simple-mode distinct private HTTPS backend; trusted TLS and unauthenticated GET / returning 200-399. |
+| <!-- parameter bootstrap:AIF_APP_GATEWAY_CERT_SECRET_ID -->`AIF_APP_GATEWAY_CERT_SECRET_ID` | C | `""` | Simple-mode versionless Key Vault PFX certificate-secret URI, not a secret value. |
+| <!-- parameter bootstrap:AIF_APP_GATEWAY_HOSTNAME -->`AIF_APP_GATEWAY_HOSTNAME` | C | `""` | Simple-mode custom frontend FQDN covered by certificate DNS SAN. |
 | <!-- parameter bootstrap:AIF_AZURE_ML_PRINCIPAL_ID -->`AIF_AZURE_ML_PRINCIPAL_ID` | O | `""` | Existing Azure Machine Learning enterprise-application object ID; otherwise discovered/ensured. |
 | <!-- parameter bootstrap:AIF_BOOTSTRAP_RESOURCE_GROUP -->`AIF_BOOTSTRAP_RESOURCE_GROUP` | O | `"rg-${AIF_PREFIX%-}-bootstrap-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"` | Aif bootstrap resource group override; see create launcher. |
 | <!-- parameter bootstrap:AIF_CONFIGURE_VPN_CLIENT -->`AIF_CONFIGURE_VPN_CLIENT` | O | `"$configure_vpn_client_default"` | Install and configure Azure VPN Client on this computer? (Y/n) |
@@ -1173,6 +1175,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter helper:--app-gateway-certificate-secret-id -->`--app-gateway-certificate-secret-id` | C | `""` | App gateway certificate secret id |
 | <!-- parameter helper:--app-gateway-hostname -->`--app-gateway-hostname` | C | `""` | App gateway hostname |
 | <!-- parameter helper:--certificate-metadata -->`--certificate-metadata` | C | `null` | Local certificate metadata JSON; validates metadata only, not private key material. |
+| <!-- parameter helper:--enable-application-gateway -->`--enable-application-gateway` | C | `null` | Enable application gateway; choices: true, false |
 | <!-- parameter helper:--gateway-health -->`--gateway-health` | C | `null` | Local gateway backend-health JSON; exit status indicates health. |
 | <!-- parameter helper:--project-resources -->`--project-resources` | C | `null` | JSON array of simple-mode project resource IDs; required dependencies are retained. |
 | <!-- parameter helper:--repo-root -->`--repo-root` | C | `null` | Consumer root containing the generated .env/YAML/JSON configuration. |
@@ -1181,6 +1184,8 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter helper:--simple-gateway-inputs -->`--simple-gateway-inputs` | C | `false` | Validate gateway input strings and print normalized JSON; no deployment. |
 | <!-- parameter helper:--simple-mode-hub-subnets -->`--simple-mode-hub-subnets` | C | `null` | Validate existing subnet JSON and print reserved simple-mode subnets. |
 | <!-- parameter helper:--simple-mode-manifest -->`--simple-mode-manifest` | C | `false` | Offline read-only contract/preset preview. |
+| <!-- parameter helper:--simple-project-providers -->`--simple-project-providers` | C | `false` | Simple project providers |
+| <!-- parameter helper:--simple-project-selected -->`--simple-project-selected` | C | `null` | Simple project selected; choices: storage, key-vault, managed-identities, foundry, foundry-capability-host, ai-search, cosmos-db, application-insights, azure-machine-learning, aks-for-azure-ml, aks, databricks, datafactory, event-hubs, postgresql, container-apps |
 | <!-- parameter helper:--state-file -->`--state-file` | C | `null` | Bootstrap state JSON, not variables.json; consumed by the selected route writer. |
 | <!-- parameter helper:--verify-simple-mode-source -->`--verify-simple-mode-source` | C | `null` | Compare supplied checkout with the required shared source trees. |
 

@@ -486,6 +486,13 @@ if command -v cygpath >/dev/null; then export TMPDIR="$(cygpath -u "$PF_TEST_ROO
     def test_pipeline_wrapper_and_ado_artifact_detection_without_cloud_access(self):
         import yaml
 
+        checkout_scripts = (
+            self.work / "azure-enterprise-scale-ml" /
+            "environment_setup/aifactory/bicep/scripts"
+        )
+        checkout_scripts.mkdir(parents=True)
+        for name in ("write-pipeline-region-report.sh", "region_report.py"):
+            shutil.copy2(SCRIPTS / name, checkout_scripts / name)
         env = os.environ.copy()
         env.update({
             "BASH_ENV": str(self.mock), "PF_TEST_ROOT": str(self.work),
@@ -493,7 +500,7 @@ if command -v cygpath >/dev/null; then export TMPDIR="$(cygpath -u "$PF_TEST_ROO
             "AIFACTORY_REPORT_REGION": "eastus2", "AIFACTORY_REPORT_SUBSCRIPTION_ID": SUB,
             "AIFACTORY_REPORT_TENANT_ID": TENANT, "AIFACTORY_REPORT_ENVIRONMENT": "dev",
             "AIFACTORY_REPORT_JOB_STATUS": "Failed", "AIFACTORY_REPORT_DIR": str(self.work / "reports"),
-            "SYSTEM_DEFAULTWORKINGDIRECTORY": str(ROOT.parent),
+            "SYSTEM_DEFAULTWORKINGDIRECTORY": str(self.work),
         })
         template = TEMPLATES / "azure-devops/esml-yaml-pipelines/esml-infra-common/jobs/region-report-steps.yaml"
         script = yaml.safe_load(template.read_text())["steps"][0]["inputs"]["script"]

@@ -48,10 +48,24 @@ jobs:
         if: matrix.phase == 'bicep'
         run: bash environment_setup/unit-tests/test-bicep/ci/install-bicep.sh "$RUNNER_TEMP/iac-bicep"
       - name: Restore declared public Bicep module dependencies
-        if: matrix.phase == 'bicep'
+        if: matrix.phase == 'bicep' || matrix.phase == 'unit'
+        shell: bash
+        env:
+          TEST_PHASE: ${{ matrix.phase }}
         run: |
+          BICEP_COMPILER="$RUNNER_TEMP/iac-bicep/bicep"
+          if [[ "$TEST_PHASE" == "unit" ]]; then
+            BICEP_COMPILER="$(command -v bicep || true)"
+            if [[ -z "$BICEP_COMPILER" ]]; then
+              echo "No Bicep compiler is present; compiler-specific unit tests will skip."
+              exit 0
+            fi
+            if command -v cygpath >/dev/null 2>&1; then
+              BICEP_COMPILER="$(cygpath -w "$BICEP_COMPILER")"
+            fi
+          fi
           python environment_setup/unit-tests/test-bicep/run_bicep_matrix.py \
-            --prepare-cache --bicep "$RUNNER_TEMP/iac-bicep/bicep" \
+            --prepare-cache --bicep "$BICEP_COMPILER" \
             --report "$RUNNER_TEMP/iac-results/bicep-dependencies.json"
       - name: Run credential-free checks
         env:

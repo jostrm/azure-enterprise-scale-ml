@@ -307,6 +307,7 @@ def bootstrap_inventory():
         "AIFACTORY_PROJECT_CONFIG": ("", "Reviewed project JSON file; required together with explicit target environment, project number and repository root."),
         "AIFACTORY_PROJECT_NUMBER": ("", "Reviewed update/project target number; required together with target environment, project configuration and repository root."),
         "AIFACTORY_PROJECT_ONLY": ("false", "Update launcher equivalent of --project-only."),
+        "AIFACTORY_PROJECT_DEPLOYMENT_SCOPE": ("project", "ADO update scope: project or azure-mcp."),
         "AIFACTORY_COMMIT_CHANGES": ("", "Update confirmation y/yes or n/no; default No. Choosing Yes authorizes the launcher's commit/continue path."),
         "AIFACTORY_UPDATE_GITHUB_VARIABLES": ("", "GHA update confirmation y/yes or n/no for synchronization from .env; default No."),
         "AIFACTORY_USE_JSON_OVERRIDE": ("", "y/yes enables variables.json overrides; blank/n/no disables. Explicit reviewed project inputs force this to yes."),
@@ -372,15 +373,52 @@ def bootstrap_requirement(key):
     return "O"
 
 
+def static_expression(node, assignments, bindings=None, resolving=()):
+    bindings = bindings or {}
+    if isinstance(node, ast.Name):
+        if node.id in bindings:
+            return bindings[node.id]
+        if node.id not in assignments:
+            raise ValueError(f"Unsupported static name: {node.id}")
+        if node.id in resolving:
+            raise ValueError(f"Cyclic static expression: {' -> '.join((*resolving, node.id))}")
+        return static_expression(
+            assignments[node.id], assignments, bindings, (*resolving, node.id))
+    if isinstance(node, ast.Subscript):
+        return static_expression(node.value, assignments, bindings, resolving)[
+            static_expression(node.slice, assignments, bindings, resolving)]
+    if isinstance(node, ast.ListComp):
+        if len(node.generators) != 1 or node.generators[0].ifs:
+            raise ValueError("Static list comprehensions require one unfiltered generator")
+        generator = node.generators[0]
+        if generator.is_async or not isinstance(generator.target, ast.Name):
+            raise ValueError("Unsupported static list-comprehension target")
+        values = static_expression(generator.iter, assignments, bindings, resolving)
+        return [
+            static_expression(
+                node.elt, assignments,
+                {**bindings, generator.target.id: value}, resolving)
+            for value in values
+        ]
+    return ast.literal_eval(node)
+
+
 def api_inventory():
     tree = ast.parse(SCHEMA.read_text(encoding="utf-8-sig"))
+    assignments = {
+        target.id: node.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    }
     entries = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "add_argument":
             key = ast.literal_eval(node.args[0])
             kwargs = {item.arg: item.value for item in node.keywords}
-            default = ast.literal_eval(kwargs["default"]) if "default" in kwargs else False if "action" in kwargs else None
-            choices = ast.literal_eval(kwargs["choices"]) if "choices" in kwargs else None
+            default = static_expression(kwargs["default"], assignments) if "default" in kwargs else False if "action" in kwargs else None
+            choices = static_expression(kwargs["choices"], assignments) if "choices" in kwargs else None
             entries[key] = (default, choices)
     return entries
 

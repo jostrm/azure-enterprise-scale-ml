@@ -70,6 +70,13 @@ class ParameterDocumentationTests(unittest.TestCase):
         self.assertIn("Source duplicate:", self.generated)
         self.assertIn("J.dev: `false`", self.generated)
 
+    def test_api_choices_support_catalog_derived_static_expressions(self):
+        choices = generator.api_inventory()["--simple-project-selected"][1]
+        self.assertEqual(
+            [item["id"] for item in self.schema.SIMPLE_MODE_RESOURCE_CATALOG["project"]],
+            choices,
+        )
+
     def test_aliases_preserve_fallbacks_without_condition_collisions(self):
         mapping = generator.aliases(set(self.yaml), self.schema)
         self.assertIn("SKU_AISEARCH_STAGEPROD", mapping["skuAISearchStageProd"])

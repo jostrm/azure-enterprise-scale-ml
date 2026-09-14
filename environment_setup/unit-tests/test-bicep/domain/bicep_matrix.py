@@ -154,6 +154,18 @@ def reachable_templates(
             if not match or ":" in match[1] or "${" in match[1]:
                 raise MatrixError(f"Unsupported non-local module in {path}: {declaration}")
             pending.append(path.parent / match[1])
+        imports = re.findall(
+            r"(?ms)^\s*import\b.*?\bfrom\s+'([^']+)'", source)
+        for reference in imports:
+            if reference.startswith(("br:", "br/")) and "${" not in reference:
+                if registry_modules is None:
+                    raise MatrixError(
+                        f"Registry import must be explicitly inventoried: {reference}")
+                registry_modules.add(reference)
+                continue
+            if ":" in reference or "${" in reference:
+                raise MatrixError(f"Unsupported non-local import in {path}: {reference}")
+            pending.append(path.parent / reference)
     return sorted(visited)
 
 
