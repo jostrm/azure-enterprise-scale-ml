@@ -81,6 +81,57 @@ az monitor log-analytics workspace show \
 
 Use `--debug-json ./foundry-usage.json` only for troubleshooting or data validation; it contains aggregate report values.
 
+### Monitoring API: reviewed local execution
+
+The Monitoring integration calls this Python script directly with `--automation-json <owned-output.json>`,
+`--tenant-id <selected-tenant-id>`, and `--expected-object-id <confirmed-Azure-object-id>`, together with the
+explicit selected subscription, project resource group, common workspace customer ID, UTC dates and local
+PDF destinations. It does not run the diagnostics/saved-query utilities above. The API snapshots and hashes
+the selected script/configuration before confirmation; older unpatched code is not executed. The API host can
+explicitly set `AIFACTORY_REPORT_SOURCE` to the canonical `automation` directory (or inject
+`canonical_automation_root` when constructing its service). It copies only the reviewed report allowlist into
+an identity/folder-owned runtime and also hashes the selected orange files. Orange itself is never changed.
+
+This mode uses only `AzureCliCredential` scoped to the selected subscription/tenant and checks the object ID
+on every acquired token. It never signs in, switches the CLI account, falls back to another credential, changes
+diagnostics/network rules, sends mail, uploads artifacts or creates schedules. It runs on the API host, which
+may differ from the MAUI device. The default interpreter is the API's Python. To avoid adding report packages
+to the API environment, create a dedicated report venv, install this directory's `requirements.txt` into it,
+and set `AIFACTORY_REPORT_PYTHON` to that venv's absolute Python executable (or inject `report_python` into
+`AutomationReportService`). Options/prepare perform a bounded import check and explain missing packages;
+nothing is installed automatically or globally, and no sample data is substituted.
+
+The `aifactory.aggregate-report.v1` JSON contains explicit scope/window/generation timestamps and daily
+resource/deployment metric aggregates only. Query failures and partial telemetry fail execution. Missing
+metrics remain absent, PDF tables say `Unknown`, and chart gaps are not filled with zero. Strict request/token
+totals use Azure Metrics; legacy telemetry's defaulted-zero request/token fields are not promoted to observations.
+Session activity remains an aggregate sum of hourly distinct counts, never a period-wide unique-user count.
+No raw prompts, response bodies, session/user IDs, dimensions, credentials or SDK errors are exported.
+
+The API requires a separate administrator-approved mapping and published-content hash before offering an
+existing Azure Runbook. The network-throttling Logic App is not a report integration and must never be invoked.
+For packaged API hosts, `AIFACTORY_REPORT_RUNBOOKS` can point to an absolute local JSON file containing an
+object keyed by report ID (`foundry-usage`, `foundry-token`, `showback`). Each value must contain exactly
+`resource_id` (an existing ARM automation-account/runbook ID), `content_sha256` (reviewed published UTF-8
+content hash), and `contract` (`aifactory.aggregate-report.v1`). Invalid, unreadable or changed configuration
+explicitly blocks cloud reporting; no mapping is inferred or written automatically. Restart the service after
+an intentional administrator mapping change, then prepare and confirm again.
+
+The existing `Update-FoundryTokenReport.ps1` and `showback/Update-ShowbackReport.ps1` now expose a separate
+`-MonitoringRequest` / `-MonitoringPython` entry point. It exits before legacy config loading, Az login/context
+changes or uploads, using the shared `common/monitoring_report.py` adapter:
+
+- **Foundry token usage:** observed input/output/cached/total-token metrics using the same pinned CLI identity.
+  Legacy PAYGO/PTU estimates are explicitly not calculated.
+- **Selected-project showback:** daily Azure Cost Management `ActualCost` for the exact selected project RG
+  and reviewed window. Currency comes from Azure, not the sample configuration. Negative credits are retained.
+  Pagination, mixed currencies and malformed observations fail instead of producing partial or sample data.
+  No forecasts, subscription-wide allocation, cost-center/owner exports, billing transfers or uploads occur.
+
+These PowerShell entry points require PowerShell 7 but no Az modules in strict Monitoring mode. Showback uses
+only Python's standard library and the existing Azure CLI; usage/token reports require the report packages.
+Daily showback is limited to 31 days to avoid Azure's silent truncation of longer daily queries.
+
 ## Azure Automation runbook
 
 Azure Automation Python runbooks require their third-party packages to be available in the selected runtime environment. Import the packages from `requirements.txt` into that runtime, or use a Hybrid Runbook Worker with the dependencies installed. Use the same managed identity permissions listed above. Set the Automation variables below, then invoke the runbook with the corresponding arguments:

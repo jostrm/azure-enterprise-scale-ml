@@ -1113,7 +1113,7 @@ module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (enableCo
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('05rbacACAMI${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
-    aiSearchName: aiSearchName
+    aiSearchName: enableAISearch ? aiSearchName : ''
     appInsightsName: applicationInsightName
     principalIdMI: miAcaPrincipalId // Using the variable instead of module output
     resourceGroupId: existingTargetRG.id

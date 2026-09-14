@@ -19,6 +19,8 @@ VARIABLE_ALIASES = {
     "aifactory-dash-01": "AIFACTORY_DASHBOARD_URL",
     "scaling-mode": "SCALING_MODE",
 }
+# Project ownership metadata is not a deployment input or runtime variable.
+METADATA_KEYS = frozenset({"org-department-name", "org-department-id"})
 SCALING_MODES = ("own-subscriptions", "shared-subscriptions")
 RESERVED_PREFIXES = {
     "azure-devops": ("AGENT_", "BUILD_", "RELEASE_", "SYSTEM_"),
@@ -95,6 +97,8 @@ def selected_values(config: dict[str, Any], environment: str) -> tuple[dict[str,
     values = read_object(config.get(section, {}), section)
     serialized: dict[str, str] = {}
     for name, value in values.items():
+        if name in METADATA_KEYS:
+            continue
         runtime_name = VARIABLE_ALIASES.get(name, name)
         if not VARIABLE_NAME.fullmatch(runtime_name):
             fail(f"'{name}' is not a valid pipeline variable name.")

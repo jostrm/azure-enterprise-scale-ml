@@ -21,11 +21,18 @@ def test_project_only_flag_skips_update_and_publish_operations() -> None:
             1,
         )[1].split("\nelse\n", 1)[0]
         assert 'if [[ "$project_only" == "false" ]]; then' in source
-        assert "git submodule update --init --recursive --remote" in source
+        pinned_update = (
+            "git submodule update --init --recursive",
+            'git -C "$SUBMODULE_PATH" fetch origin "$AIF_SUBMODULE_REF"',
+            'git -C "$SUBMODULE_PATH" checkout --detach "$AIF_SUBMODULE_REF"',
+            'aif_version_save "$REPO_ROOT"',
+        )
+        assert "\n  ".join(pinned_update) in source
+        assert "git submodule update --init --recursive --remote" not in source
         assert "git pull --ff-only origin" in source
         assert 'aif_info "Skipping submodule pull, template refresh' in source
         for operation in (
-            "git submodule update --init --recursive --remote",
+            *pinned_update,
             "git pull --ff-only origin",
             "01-aif-copy-aifactory-templates.sh",
             "03-GH-bootstrap-files-no-env-overwrite.sh",

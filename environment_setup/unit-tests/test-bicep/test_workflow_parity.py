@@ -45,11 +45,11 @@ class TestWorkflowParity(unittest.TestCase):
         self.assertIsNotNone(net, msg="infra-common.yml missing network_env")
 
     def test_project_has_single_network_env(self) -> None:
-        content = _read_text(GHA_PROJECT)
+        content = _read_text(GHA_PROJECT_PHASE)
         forbidden = _contains_forbidden_network_keys(content)
-        self.assertFalse(forbidden, msg=f"infra-project.yml contains forbidden keys: {forbidden}")
+        self.assertFalse(forbidden, msg=f"infra-project-phase.yml contains forbidden keys: {forbidden}")
         net = _env_value(content, "network_env")
-        self.assertIsNotNone(net, msg="infra-project.yml missing network_env")
+        self.assertIsNotNone(net, msg="infra-project-phase.yml missing network_env")
 
     def test_env_names_match_job_env_common(self) -> None:
         content = _read_text(GHA_COMMON)
@@ -58,9 +58,9 @@ class TestWorkflowParity(unittest.TestCase):
             self.assertIn(f"dev_test_prod: {expected}", content, msg=f"infra-common.yml missing dev_test_prod {expected}")
 
     def test_env_names_project_present(self) -> None:
-        content = _read_text(GHA_PROJECT)
+        content = _read_text(GHA_PROJECT_PHASE)
         # env block should expose dev_test_prod
-        self.assertIn("dev_test_prod:", content, msg="infra-project.yml missing dev_test_prod")
+        self.assertIn("dev_test_prod:", content, msg="infra-project-phase.yml missing dev_test_prod")
 
     def test_orphan_cleanup_is_project_owned_in_both_rgs_and_fail_safe(self) -> None:
         cases = (

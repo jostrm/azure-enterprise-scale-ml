@@ -1,0 +1,85 @@
+name: iac-tests-$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  batch: true
+  branches:
+    include:
+      - "*"
+pr:
+  autoCancel: true
+  branches:
+    include:
+      - "*"
+
+pool:
+  vmImage: $(imageName)
+
+jobs:
+  - job: OfflineInfrastructure
+    displayName: Credential-free infrastructure tests
+    timeoutInMinutes: 30
+    strategy:
+      matrix:
+        UnitLinux:
+          testPhase: unit
+          imageName: ubuntu-22.04
+        UnitWindows:
+          testPhase: unit
+          imageName: windows-2022
+        Syntax:
+          testPhase: syntax
+          imageName: ubuntu-22.04
+        Bicep:
+          testPhase: bicep
+          imageName: ubuntu-22.04
+    steps:
+      - checkout: self
+        persistCredentials: false
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: "3.12"
+        displayName: Use Python 3.12
+      - bash: python -m pip install -r environment_setup/unit-tests/test-bicep/requirements.txt
+        displayName: Install test dependencies
+      - bash: bash environment_setup/unit-tests/test-bicep/ci/install-bicep.sh "$BICEP_DIRECTORY"
+        displayName: Install pinned Bicep compiler
+        condition: and(succeeded(), eq(variables['testPhase'], 'bicep'))
+        env:
+          BICEP_DIRECTORY: $(Agent.TempDirectory)/iac-bicep
+      - bash: |
+          python environment_setup/unit-tests/test-bicep/run_bicep_matrix.py \
+            --prepare-cache --bicep "$BICEP_DIRECTORY/bicep" \
+            --report "$RESULTS_DIRECTORY/bicep-dependencies.json"
+        displayName: Restore declared public Bicep module dependencies
+        condition: and(succeeded(), eq(variables['testPhase'], 'bicep'))
+        env:
+          BICEP_DIRECTORY: $(Agent.TempDirectory)/iac-bicep
+          RESULTS_DIRECTORY: $(Agent.TempDirectory)/iac-results
+      - bash: |
+          python environment_setup/unit-tests/test-bicep/run_ci.py \
+            --phase "$TEST_PHASE" \
+            --require-ci-tools \
+            --bicep "$BICEP_DIRECTORY/bicep" \
+            --results-dir "$RESULTS_DIRECTORY"
+        displayName: Run credential-free checks
+        env:
+          TEST_PHASE: $(testPhase)
+          BICEP_DIRECTORY: $(Agent.TempDirectory)/iac-bicep
+          RESULTS_DIRECTORY: $(Agent.TempDirectory)/iac-results
+          LIVE_AZURE: "0"
+          PYTHONUTF8: "1"
+      - task: PublishTestResults@2
+        displayName: Publish unit-test results
+        condition: and(succeededOrFailed(), eq(variables['testPhase'], 'unit'))
+        inputs:
+          testResultsFormat: JUnit
+          testResultsFiles: $(Agent.TempDirectory)/iac-results/unit-tests.xml
+          failTaskOnFailedTests: true
+          failTaskOnMissingResultsFile: true
+          testRunTitle: AI Factory offline unit tests
+      - task: PublishPipelineArtifact@1
+        displayName: Publish check reports
+        condition: succeededOrFailed()
+        inputs:
+          targetPath: $(Agent.TempDirectory)/iac-results
+          artifact: iac-$(testPhase)-$(imageName)-results

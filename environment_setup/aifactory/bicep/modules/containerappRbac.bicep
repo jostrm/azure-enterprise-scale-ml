@@ -15,7 +15,7 @@ var aiHubProjectDataScientistRoleId = 'f6c7c914-8db3-469d-8ca1-694a8f32e121' // 
 var monitoringMetricsPublisherRoleId = '3913510d-42f4-4e42-8a64-420c390055eb' // User, SP, AI Services, etc -> App Insights
 var monitoringReaderRoleId = '43d0d8ad-25c7-4714-9337-8ba259a9fe05' // User, SP, AI Services, etc -> App Insights
 
-resource existingAiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = {
+resource existingAiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' existing = if (!empty(aiSearchName)) {
   name: aiSearchName
 }
 resource existingAppInsights 'Microsoft.Insights/components@2020-02-02' existing = if (!empty(appInsightsName)){
@@ -23,7 +23,7 @@ resource existingAppInsights 'Microsoft.Insights/components@2020-02-02' existing
 }
 
 // Search
-resource searchIndexDataContributorMI 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource searchIndexDataContributorMI 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(aiSearchName)) {
   name: guid(existingAiSearch.id, searchIndexDataContributorRoleId, principalIdMI)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchIndexDataContributorRoleId)
@@ -33,7 +33,7 @@ resource searchIndexDataContributorMI 'Microsoft.Authorization/roleAssignments@2
   }
   scope:existingAiSearch
 }
-resource searchServiceContributorRoleIdMI 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource searchServiceContributorRoleIdMI 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(aiSearchName)) {
   name: guid(existingAiSearch.id, searchServiceContributorRoleId, principalIdMI)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', searchServiceContributorRoleId)

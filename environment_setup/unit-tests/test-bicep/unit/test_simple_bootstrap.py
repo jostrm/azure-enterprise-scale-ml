@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 import pytest
@@ -52,8 +53,12 @@ def function(name):
     return SCRIPT[start:end if end != -1 else None]
 
 
-def bash(code, *names, cwd=None):
-    executable = shutil.which("bash")
+def bash(code, *names, cwd=None, timeout=15):
+    if os.name == "nt":
+        candidate = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git/bin/bash.exe"
+        executable = str(candidate) if candidate.is_file() else None
+    else:
+        executable = shutil.which("bash")
     if not executable:
         pytest.skip("Git Bash required for isolated function tests")
     # All external cloud commands are overridden by failing mocks.
@@ -63,9 +68,12 @@ aif_error() { printf '%s\\n' "$*" >&2; }
 az() { echo UNEXPECTED_AZ >&2; return 91; }
 gh() { echo UNEXPECTED_GH >&2; return 92; }
 """
+    environment = {key: value for key, value in os.environ.items()
+                   if key not in {"BASH_ENV", "ENV", "SHELLOPTS"}}
     return subprocess.run(
-        [executable, "-c", prefix + "\n".join(function(name) for name in names) + "\n" + code],
-        capture_output=True, text=True, timeout=15, cwd=cwd,
+        [executable, "--noprofile", "--norc", "-s"],
+        input=prefix + "\n".join(function(name) for name in names) + "\n" + code,
+        capture_output=True, text=True, timeout=timeout, cwd=cwd, env=environment,
     )
 
 
@@ -305,24 +313,46 @@ def test_simple_mode_requires_an_immutable_published_commit(ref):
 
 
 @pytest.mark.parametrize("matches", [True, False])
-def test_simple_checkout_uses_exact_commit_and_checks_head(tmp_path, matches):
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_simple_checkout_uses_exact_commit_and_checks_head(tmp_path, matches, dry_run):
     sha = "a" * 40
     actual = sha if matches else "b" * 40
     code = f"""AIF_SIMPLE_MODE=true; AIF_SUBMODULE_REF={sha}; AIF_SUBMODULE_BRANCH=release/v1.24
-AIF_SUBMODULE_URL=https://example.invalid/accelerator; AIF_REPO_ROOT=.; AIF_DRY_RUN=true
-AIF_SCALESET_LIB_DIR=unused; AIF_PYTHON=(true)
+AIF_SUBMODULE_URL=https://example.invalid/accelerator; AIF_REPO_ROOT=.; AIF_DRY_RUN={str(dry_run).lower()}
+AIF_SCALESET_LIB_DIR=unused; AIF_PYTHON=(verify_source)
 aif_mutate() {{ printf '%s\\n' "$*"; }}
-git() {{ if [[ "$*" == *"rev-parse HEAD" ]]; then echo {actual}; else return 1; fi; }}
+git() {{
+  if [[ "$*" == "-C azure-enterprise-scale-ml rev-parse HEAD" ]]; then
+    printf '%s\\n' "$*" >> git-reads.log
+    echo {actual}
+  else
+    echo UNEXPECTED_GIT >&2; return 93
+  fi
+}}
+# Stop at source verification, before copying or executing any bootstrap templates.
+verify_source() {{
+  [[ "$*" == "unused/aifactory_scaleset_config.py --verify-simple-mode-source ./azure-enterprise-scale-ml" ]] || exit 94
+  echo SOURCE_VERIFIED
+  exit 0
+}}
 aif_sync_submodule_and_templates
 """
     result = bash(code, "aif_sync_submodule_and_templates", cwd=tmp_path)
     assert f"fetch origin {sha}" in result.stdout
     assert f"checkout --detach {sha}" in result.stdout
     assert "pull --ff-only" not in result.stdout
-    if matches:
+    assert "UNEXPECTED_" not in result.stderr
+    reads = tmp_path / "git-reads.log"
+    assert reads.exists() is not dry_run
+    assert ("SOURCE_VERIFIED" in result.stdout) is (matches and not dry_run)
+    if matches or dry_run:
         assert result.returncode == 0, result.stderr
     else:
         assert result.returncode != 0 and "does not match" in result.stderr
+    if not dry_run:
+        assert reads.read_text(encoding="utf-8").splitlines() == [
+            "-C azure-enterprise-scale-ml rev-parse HEAD",
+        ]
 
 
 def test_manifest_and_source_hashes_are_stable_and_sensitive_to_changes(tmp_path):
@@ -360,8 +390,10 @@ aif_ensure_azure_login
 
 
 def test_disabled_first_party_services_do_not_materialize_workspaces():
-    result = bash("AIF_SIMPLE_MODE=true; aif_ensure_first_party_enterprise_apps",
-                  "aif_ensure_first_party_enterprise_apps")
+    result = bash(f"""AIF_SIMPLE_MODE=true; AIF_PYTHON=('{sys.executable}')
+AIF_SCALESET_LIB_DIR='{LIB}'
+aif_ensure_first_party_enterprise_apps
+""", "aif_simple_project_config", "aif_ensure_first_party_enterprise_apps")
     assert result.returncode == 0, result.stderr
     assert "UNEXPECTED_" not in result.stderr
 
@@ -445,10 +477,10 @@ def test_resource_catalog_is_literal_scoped_and_dependency_complete():
     assert len(all_ids) == sum(map(len, catalog.values()))
     assert all(set(item["dependencies"]) <= all_ids for entries in catalog.values() for item in entries)
     assert {item["id"] for item in catalog["project"] if item["required"]} == {
-        "storage", "key-vault", "managed-identities", "foundry",
-        "foundry-capability-host", "ai-search", "cosmos-db"}
+        "storage", "key-vault", "managed-identities"}
     assert {item["id"] for item in catalog["common"]} >= {"log-analytics", "common-registry"}
-    assert next(item for item in catalog["hub"] if item["id"] == "application-gateway")["required"]
+    gateway = next(item for item in catalog["hub"] if item["id"] == "application-gateway")
+    assert gateway["required"] is False and gateway["default_selected"] is False
     manifest_function = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
                              and node.name == "simple_mode_manifest")
     returned = next(node.value for node in manifest_function.body if isinstance(node, ast.Return))
@@ -460,19 +492,31 @@ def test_resource_catalog_is_literal_scoped_and_dependency_complete():
         "app_gateway_hostname": "AIF_APP_GATEWAY_HOSTNAME",
         "app_gateway_certificate_secret_id": "AIF_APP_GATEWAY_CERT_SECRET_ID",
     }
+    assert ast.literal_eval(values["appGatewayDeployment"]) == {
+        "environment": "AIF_ENABLE_APPLICATION_GATEWAY", "default": False,
+        "omittedDefault": True, "supported": [False, True],
+    }
+    marker = next(node.value for node in tree.body if isinstance(node, ast.Assign)
+                  and any(isinstance(target, ast.Name) and target.id == "AIF_SIMPLE_OPTIONAL_GATEWAY_CONTRACT"
+                          for target in node.targets))
+    assert ast.literal_eval(marker) == CONFIG.AIF_SIMPLE_OPTIONAL_GATEWAY_CONTRACT == 1
+    assert "readonly AIF_SIMPLE_OPTIONAL_GATEWAY_CONTRACT=1" in SCRIPT
+    for item in ast.literal_eval(values["requiredInputs"]):
+        assert item["requiredWhen"] == {
+            "environment": "AIF_ENABLE_APPLICATION_GATEWAY", "equals": True, "omittedDefault": True,
+        }
 
 
 @pytest.mark.parametrize("selection", [[], ["application-insights"]])
 def test_optional_selections_drive_every_linked_flag(selection):
     selected = CONFIG.simple_mode_project_resources(json.dumps(selection))
-    required = {"storage", "key-vault", "managed-identities", "foundry",
-                "foundry-capability-host", "ai-search", "cosmos-db"}
+    required = {"storage", "key-vault", "managed-identities"}
     assert set(selected) == set(selection) | required
     values = CONFIG.simple_mode_values(project_resources=json.dumps(selection), repository_visibility="public")
     for flag in ("enableAIFoundry", "enableAFoundryCaphost", "enableAISearch",
                  "enableAISearchSharedPrivateLink", "enableCosmosDB",
                  "enableAIFactoryCreatedDefaultProjectForAIFv2"):
-        assert values[flag] == "true"
+        assert values[flag] == "false"
     assert values["enableApplicationInsights"] == str("application-insights" in selection).lower()
     assert all(values[flag] == "false" for flag in ("addAIFoundry", "updateAIFoundry", "addAISearch"))
     assert values["GITHUB_NEW_REPO_VISIBILITY"] == "public"
@@ -486,7 +530,7 @@ def test_project_resource_input_rejects_invalid_shape_and_unknown_ids(selection)
         CONFIG.simple_mode_project_resources(selection)
 
 
-def test_empty_selection_keeps_required_private_foundry_bundle(tmp_path):
+def test_empty_selection_keeps_only_required_private_project_foundation(tmp_path):
     (tmp_path / "aifactory").mkdir()
     shutil.copyfile(ROOT / "environment_setup/aifactory/variables.json", tmp_path / "aifactory/variables.json")
     (tmp_path / ".env").write_text("", encoding="utf-8")
@@ -495,12 +539,12 @@ def test_empty_selection_keeps_required_private_foundry_bundle(tmp_path):
     values = json.loads((tmp_path / "aifactory/variables.json").read_text())["dev"]
     assert values["enableApplicationInsights"] == "false"
     for key in ("enableAIFoundry", "enableAFoundryCaphost", "enableAISearch", "enableCosmosDB"):
-        assert values[key] == "true"
+        assert values[key] == "false"
     env = (tmp_path / ".env").read_text()
     assert 'ENABLE_APPLICATION_INSIGHTS="false"' in env
-    assert 'ENABLE_FOUNDRY_CAPHOST="true"' in env
-    assert 'ENABLE_AI_SEARCH="true"' in env
-    assert 'ENABLE_COSMOS_DB="true"' in env
+    assert 'ENABLE_FOUNDRY_CAPHOST="false"' in env
+    assert 'ENABLE_AI_SEARCH="false"' in env
+    assert 'ENABLE_COSMOS_DB="false"' in env
     assert 'GITHUB_NEW_REPO_VISIBILITY="public"' in env
     assert 'ENABLE_PUBLIC_GENAI_ACCESS="false"' in env
     assert '"simple_project_resources_json"' in function("aif_write_state_and_configure")
@@ -538,7 +582,7 @@ def test_public_staging_excludes_configs_snapshots_keys_and_vpn_profiles(tmp_pat
     git = shutil.which("git")
     if not git:
         pytest.skip("Local Git required for isolated staging verification")
-    subprocess.run([git, "init", "--quiet", str(tmp_path)], check=True, capture_output=True)
+    subprocess.run([git, "init", "--quiet", str(tmp_path)], check=True, capture_output=True, timeout=15)
     files = [".env", ".env.backup", "aifactory/variables.json", "aifactory/variables.snapshot.json",
              "aifactory/2026-variables.json.bak", "aifactory/variables.yaml", ".aifactory-access/azurevpnconfig.xml",
              "aifactory/azurevpnconfig.xml", "aifactory/certificate.pfx", "aifactory/private.key"]
@@ -550,9 +594,9 @@ def test_public_staging_excludes_configs_snapshots_keys_and_vpn_profiles(tmp_pat
     result = bash("AIF_SIMPLE_MODE=true; AIF_REPO_ROOT=.; aif_protect_simple_generated_files",
                   "aif_protect_simple_generated_files", cwd=tmp_path)
     assert result.returncode == 0, result.stderr
-    subprocess.run([git, "-C", str(tmp_path), "add", "."], check=True, capture_output=True)
+    subprocess.run([git, "-C", str(tmp_path), "add", "."], check=True, capture_output=True, timeout=15)
     staged = subprocess.run([git, "-C", str(tmp_path), "diff", "--cached", "--name-only"],
-                            check=True, capture_output=True, text=True).stdout.splitlines()
+                            check=True, capture_output=True, text=True, timeout=15).stdout.splitlines()
     assert set(staged) == {".gitignore", "aifactory/app.py", ".github/workflows/infra.yml"}
     assert "user-private\n" in (tmp_path / ".gitignore").read_text()
     commit = function("aif_commit_and_push")
@@ -698,3 +742,172 @@ aif_validate_simple_gateway_prerequisites
     assert (result.returncode == 0) is success, result.stderr
     assert "MUTATION" not in result.stderr
     assert uri not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("selection,expected", [(None, True), ("true", True), ("false", False)])
+def test_gateway_selection_preserves_omitted_legacy_default(selection, expected):
+    code = ("AIF_SIMPLE_MODE=true; AIF_ROUTE=gha; AIF_NO_WAIT=false; "
+            "AIF_PREPARE_ONLY=false; AIF_DRY_RUN=false;\n"
+            f"AIF_SUBMODULE_REF={'a' * 40};\n")
+    code += ("unset AIF_ENABLE_APPLICATION_GATEWAY\n" if selection is None
+             else f"AIF_ENABLE_APPLICATION_GATEWAY={selection}\n")
+    result = bash(code + 'aif_simple_mode_defaults; echo "$AIF_ENABLE_APPLICATION_GATEWAY"',
+                  "aif_simple_mode_defaults")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == str(expected).lower()
+    assert CONFIG.simple_mode_application_gateway_enabled(
+        *([] if selection is None else [selection])) is expected
+    assert CONFIG.simple_mode_application_gateway_enabled(expected) is expected
+
+
+@pytest.mark.parametrize("selection", ["", "TRUE", "False", "yes", "no", "1", "0", " false", "false "])
+def test_gateway_noncanonical_selection_fails_before_cloud(selection, monkeypatch):
+    result = bash(f"AIF_ENABLE_APPLICATION_GATEWAY='{selection}'; aif_simple_mode_defaults",
+                  "aif_simple_mode_defaults")
+    assert result.returncode != 0 and "AIF_ENABLE_APPLICATION_GATEWAY must be true or false" in result.stderr
+    assert "UNEXPECTED_" not in result.stderr
+    with pytest.raises(ValueError, match="must be true or false"):
+        CONFIG.simple_mode_application_gateway_enabled(selection)
+    monkeypatch.setenv("AIF_ENABLE_APPLICATION_GATEWAY", selection)
+    monkeypatch.setattr(sys, "argv", ["config", "--simple-mode-manifest"])
+    with pytest.raises(SystemExit) as error:
+        CONFIG.main()
+    assert error.value.code == 2
+    main = function("aif_scaleset_main")
+    assert main.index("aif_simple_mode_defaults") < main.index("aif_version_prepare")
+    assert main.index("aif_simple_mode_defaults") < main.index("aif_resolve_azure_cli")
+
+
+@pytest.mark.parametrize("selection", [None, True, False, "true", "false"])
+def test_gateway_subnet_is_reserved_only_when_enabled(selection):
+    args = [] if selection is None else [selection]
+    enabled = selection not in (False, "false")
+    plan = CONFIG.simple_mode_hub_subnets("172.16.0.0/20", [], *args)
+    assert ("snet-application-gateway" in plan) is enabled
+    assert plan["GatewaySubnet"] == "172.16.1.0/27"
+    assert plan["snet-dns-private-resolver"] == "172.16.1.32/28"
+    existing = [{"name": "customer-subnet", "addressPrefix": "172.16.2.0/24"}]
+    if enabled:
+        with pytest.raises(ValueError, match="overlaps reserved snet-application-gateway"):
+            CONFIG.simple_mode_hub_subnets("172.16.0.0/20", existing, *args)
+    else:
+        assert CONFIG.simple_mode_hub_subnets("172.16.0.0/20", existing, *args) == plan
+
+
+@pytest.mark.parametrize("fields", ["", "not-a-host"])
+def test_gateway_off_skips_all_cloud_prerequisites_resources_and_health(tmp_path, fields):
+    result = bash(f"""AIF_SIMPLE_MODE=true; AIF_ENABLE_APPLICATION_GATEWAY=false
+AIF_PYTHON=('{sys.executable}'); AIF_SCALESET_LIB_DIR='{LIB}'
+AIF_SIMPLE_PROJECT_RESOURCES_JSON='[]'; GITHUB_REPOSITORY_VISIBILITY=private
+AIF_APP_GATEWAY_HOSTNAME='{fields}'; AIF_APP_GATEWAY_BACKEND_FQDN='{fields}'
+AIF_APP_GATEWAY_CERT_SECRET_ID='{fields}'
+aif_ensure_role_assignment() {{ echo UNEXPECTED_ROLE >&2; return 93; }}
+aif_simple_gateway_config never-created-certificate.json
+aif_validate_simple_gateway_prerequisites
+aif_prepare_simple_application_gateway
+aif_deploy_simple_application_gateway
+""", "aif_simple_gateway_config", "aif_validate_simple_gateway_prerequisites",
+                  "aif_prepare_simple_application_gateway", "aif_deploy_simple_application_gateway", cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"enabled": False}
+    assert result.stderr == ""
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("selection", [None, "true", "false"])
+def test_gateway_helper_cli_selection_and_preview_are_offline(selection, monkeypatch, capsys):
+    monkeypatch.delenv("AIF_ENABLE_APPLICATION_GATEWAY", raising=False)
+    args = [] if selection is None else ["--enable-application-gateway", selection]
+    monkeypatch.setattr(sys, "argv", ["config", "--simple-gateway-inputs",
+                                     "--certificate-metadata", "does-not-exist.json", *args])
+    if selection == "false":
+        assert CONFIG.main() == 0
+        assert json.loads(capsys.readouterr().out) == {"enabled": False}
+        monkeypatch.setattr(sys, "argv", ["config", "--gateway-health", "does-not-exist.json", *args])
+        assert CONFIG.main() == 0
+    else:
+        with pytest.raises(ValueError, match="AIF_APP_GATEWAY_HOSTNAME"):
+            CONFIG.main()
+    monkeypatch.setattr(sys, "argv", ["config", "--simple-mode-manifest", *args])
+    assert CONFIG.main() == 0
+    manifest = json.loads(capsys.readouterr().out)
+    ids = {item["id"] for item in manifest["resourceCatalog"]["hub"]}
+    assert {"vpn-gateway", "private-dns", "virtual-network", "bastion"} <= ids
+    assert ("application-gateway" in ids) is (selection != "false")
+    if selection == "false":
+        assert manifest["requiredInputs"] == [] and manifest["gatewayIdentityRoles"] == []
+    assert manifest["configuration"]["enableAFoundryCaphost"] == "true"
+    assert manifest["configuration"]["enableCosmosDB"] == "true"
+    assert manifest["configuration"]["enableAISearch"] == "true"
+
+
+def test_gateway_off_environment_reaches_subnet_planner_and_preserves_vpn_dns(tmp_path):
+    result = bash(f"""AIF_ENABLE_APPLICATION_GATEWAY=false
+AIF_PYTHON=('{sys.executable}'); AIF_SCALESET_LIB_DIR='{LIB}'; AIF_STATE_DIR=.
+AIF_HUB_SUBSCRIPTION_ID=sub; AIF_HUB_RESOURCE_GROUP=rg; AIF_HUB_VNET_NAME=vnet
+az() {{
+  [[ "$1 $2 $3 $4" == 'network vnet subnet list' ]] || {{ echo UNEXPECTED >&2; return 91; }}
+  printf '%s\\n' '[{{"name":"customer-subnet","addressPrefix":"172.16.2.0/24"}}]'
+}}
+aif_prepare_simple_integrated_subnets
+printf '%s\\n' "$AIF_SIMPLE_GATEWAY_SUBNET" "$AIF_SIMPLE_RESOLVER_SUBNET"
+""", "aif_prepare_simple_integrated_subnets", cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == ["172.16.1.0/27", "172.16.1.32/28"]
+
+
+def test_gateway_off_access_branch_still_prepares_vpn_bastion_dns():
+    access = function("aif_ensure_private_network_access")
+    branch = access.split('elif [[ "$AIF_ACCESS_HUB_MODE" == "integrated" ]]; then\n', 1)[1]
+    branch = branch.split('\n  fi\n  if [[ "${AIF_SIMPLE_MODE:-false}" != "true" ]]', 1)[0]
+    result = bash("""AIF_SIMPLE_MODE=true; AIF_ENABLE_APPLICATION_GATEWAY=false
+AIF_DEV_SUBSCRIPTION_ID=sub; common_rg=rg; common_vnet=vnet; AIF_SETUP_HUB_ACCESS=true
+aif_prepare_simple_integrated_subnets() { echo SUBNETS; }
+aif_ensure_bastion_developer() { echo BASTION; }
+aif_ensure_simple_hub_artifacts() { echo PRIVATE_DNS_POLICY; }
+aif_ensure_hub_dns_forwarder() { echo DNS_RESOLVER; }
+aif_ensure_vpn_access_hub() { echo VPN; }
+""" + branch, "aif_prepare_simple_application_gateway")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == ["SUBNETS", "BASTION", "PRIVATE_DNS_POLICY", "DNS_RESOLVER", "VPN"]
+    assert "UNEXPECTED_" not in result.stderr
+
+
+def test_gateway_off_deployment_still_runs_common_and_private_foundry_project():
+    result = bash("""AIF_SIMPLE_MODE=true; AIF_ENABLE_APPLICATION_GATEWAY=false; AIF_NO_WAIT=false
+aif_run_github_workflow() { echo "$1"; }
+aif_verify_common_resource_group() { echo COMMON_READY; }
+aif_ensure_private_network_access() { echo PRIVATE_ACCESS; }
+aif_deploy_github
+""", "aif_simple_stage", "aif_deploy_github", "aif_deploy_simple_application_gateway")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == ["AIF_SIMPLE_STAGE=common", "infra-common.yml", "COMMON_READY",
+                                         "AIF_SIMPLE_STAGE=hub", "PRIVATE_ACCESS", "AIF_SIMPLE_STAGE=project",
+                                         "infra-project.yml"]
+
+
+@pytest.mark.parametrize("selection", [None, "true"])
+@pytest.mark.parametrize("healthy", [True, False])
+def test_gateway_enabled_and_legacy_still_require_secure_backend_health(tmp_path, selection, healthy):
+    payload = json.dumps({"backendAddressPools": [{"backendHttpSettingsCollection": [{"servers": [
+        {"address": "172.16.4.10", "health": "Healthy" if healthy else "Unhealthy"}]}]}]})
+    result = bash(f"""AIF_SIMPLE_MODE=true; AIF_PREFIX=acme-; AIF_LOCATION_SHORT=sdc
+AIF_SCALESET_SUFFIX=001; AIF_SCALESET_SUFFIX_DASH=-001; AIF_DEV_SUBSCRIPTION_ID=sub
+AIF_REPO_ROOT=.; AIF_STATE_DIR=.; AIF_COST_CENTER=123456
+AIF_APP_GATEWAY_HOSTNAME=api.factory.example; AIF_APP_GATEWAY_BACKEND_FQDN=backend.factory.example
+AIF_APP_GATEWAY_CERT_SECRET_ID=https://kv-private.vault.azure.net/secrets/tls
+AIF_PYTHON=('{sys.executable}'); AIF_SCALESET_LIB_DIR='{LIB}'
+{"unset AIF_ENABLE_APPLICATION_GATEWAY" if selection is None else "AIF_ENABLE_APPLICATION_GATEWAY=true"}
+az() {{
+  if [[ "$1 $2 $3" == 'deployment group create' ]]; then echo DEPLOY >&2
+  elif [[ "$1 $2 $3" == 'network application-gateway show-backend-health' ]]; then printf '%s\\n' '{payload}'
+  else echo UNEXPECTED_AZ >&2; return 91
+  fi
+}}
+sleep() {{ :; }}
+aif_deploy_simple_application_gateway
+""", "aif_deploy_simple_application_gateway", cwd=tmp_path, timeout=60)
+    assert (result.returncode == 0) is healthy, result.stderr
+    assert result.stderr.count("DEPLOY") == 1 and "UNEXPECTED_" not in result.stderr
+    if not healthy:
+        assert "not marked complete" in result.stderr

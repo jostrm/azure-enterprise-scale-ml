@@ -9,6 +9,7 @@ packages in requirements.txt are available in the Automation runtime.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import re
@@ -21,7 +22,7 @@ from typing import Any, Iterable, Optional
 from zoneinfo import ZoneInfo
 
 from azure.core.exceptions import HttpResponseError
-from azure.identity import DefaultAzureCredential
+from azure.identity import AzureCliCredential, DefaultAzureCredential
 from azure.mgmt.monitor import MonitorManagementClient
 from azure.mgmt.resource import ResourceManagementClient
 from azure.monitor.query import LogsQueryClient
@@ -48,6 +49,15 @@ INPUT_TOKEN_PATTERN = re.compile(r"(input|prompt).*token", re.IGNORECASE)
 OUTPUT_TOKEN_PATTERN = re.compile(r"(output|completion).*token", re.IGNORECASE)
 CACHE_TOKEN_PATTERN = re.compile(r"(cache|cached|context).*token", re.IGNORECASE)
 TOKEN_PATTERN = re.compile(r"token", re.IGNORECASE)
+AUTOMATION_REPORT_CONTRACT = "aifactory.aggregate-report.v1"
+COUNT_METRICS = {
+    "requests": ("ModelRequests", "AzureOpenAIRequests"),
+    "input_tokens": ("InputTokens", "ProcessedPromptTokens"),
+    "output_tokens": ("OutputTokens", "GeneratedTokens"),
+    "cached_tokens": ("cacheReadInputTokens",),
+    "tokens": ("TotalTokens", "TokenTransaction", "Tokens"),
+    "search_requests": ("SearchRequests", "SearchQueryCount"),
+}
 
 
 @dataclass(frozen=True)
@@ -78,7 +88,7 @@ class TelemetryPoint:
     input_tokens: float
     output_tokens: float
     cached_tokens: float
-    sessions: float
+    sessions: Optional[float]
 
 
 def parse_args() -> argparse.Namespace:
@@ -136,13 +146,21 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional Foundry token chart PDF path.",
     )
+    parser.add_argument("--automation-json", help="Strict, scoped aggregate report for the Monitoring API.")
+    parser.add_argument("--tenant-id", help="Use only this tenant's Azure CLI identity; required for --automation-json.")
+    parser.add_argument("--expected-object-id", help="Required signed-in object ID for --automation-json.")
     args = parser.parse_args()
     if not args.subscription_id or not args.resource_group:
         parser.error("--subscription-id and --resource-group are required.")
     if args.days < 1 or args.days > 90:
         parser.error("--days must be between 1 and 90.")
+    if args.automation_json and not all((args.tenant_id, args.expected_object_id, args.workspace_id)):
+        parser.error("--automation-json requires --tenant-id, --expected-object-id and --workspace-id.")
+    if args.automation_json and args.time_zone != "UTC":
+        parser.error("--automation-json requires UTC buckets.")
     try:
-        ZoneInfo(args.time_zone)
+        if args.time_zone != "UTC":
+            ZoneInfo(args.time_zone)
     except Exception as error:
         parser.error(f"Invalid --time-zone '{args.time_zone}': {error}")
     if args.as_of_date:
@@ -154,7 +172,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def report_period(args: argparse.Namespace) -> tuple[datetime, datetime, date, ZoneInfo]:
-    report_tz = ZoneInfo(args.time_zone)
+    report_tz = timezone.utc if args.time_zone == "UTC" else ZoneInfo(args.time_zone)
     as_of = date.fromisoformat(args.as_of_date) if args.as_of_date else datetime.now(report_tz).date()
     first_day = as_of - timedelta(days=args.days - 1)
     start = datetime.combine(first_day, time.min, report_tz).astimezone(timezone.utc)
@@ -204,9 +222,11 @@ def collect_metric_points(
     resource: Resource,
     start: datetime,
     end: datetime,
+    strict: bool = False,
+    warnings: Optional[list[str]] = None,
 ) -> list[MetricPoint]:
     definitions = list(monitor_client.metric_definitions.list(resource.id))
-    metric_names = [
+    metric_names = select_count_metrics(definitions, resource.type) if strict else [
         definition.name.value
         for definition in definitions
         if definition.name and definition.name.value
@@ -231,11 +251,17 @@ def collect_metric_points(
                 aggregation="Total",
             )
         except HttpResponseError as error:
+            if strict:
+                raise RuntimeError("A scoped metrics query failed; no complete report was produced.") from None
+            if warnings is not None:
+                warnings.append(f"Metrics query failed for {resource.name}; missing measurements are unavailable, not zero.")
             print(f"Warning: could not read metrics for {resource.name}: {error}", file=sys.stderr)
             continue
 
         for metric in result.value or []:
             metric_name = metric.name.value if metric.name else "Unknown"
+            if strict and metric_name not in metric_names:
+                raise RuntimeError("Azure returned a metric outside the reviewed additive counter selection.")
             for series in metric.timeseries or []:
                 dimension_values = {
                     value.name.value: value.value
@@ -268,6 +294,25 @@ def collect_metric_points(
                         )
                     )
     return points
+
+
+def select_count_metrics(definitions, resource_type):
+    """Never add overlapping aliases, gauges, latency or rate metrics as usage."""
+    available = {}
+    for definition in definitions:
+        unit = str(getattr(definition.unit, "value", definition.unit)).casefold()
+        aggregations = {str(getattr(value, "value", value)).casefold()
+                        for value in (definition.supported_aggregation_types or [])}
+        if unit == "count" and "total" in aggregations and definition.name and definition.name.value:
+            available[definition.name.value.casefold()] = definition.name.value
+    selected = []
+    for category, candidates in COUNT_METRICS.items():
+        if (resource_type.lower() == SEARCH_SERVICE_TYPE) != (category == "search_requests"):
+            continue
+        name = next((available[value.casefold()] for value in candidates if value.casefold() in available), None)
+        if name:
+            selected.append(name)
+    return selected
 
 
 def telemetry_query(resource_ids: list[str], start: datetime, end: datetime) -> str:
@@ -316,7 +361,8 @@ union isfuzzy=true withsource=SourceTable
     InputTokens = sum(InputTokens),
     OutputTokens = sum(OutputTokens),
     CachedTokens = sum(CachedTokens),
-    UniqueSessions = dcountif(Session, isnotempty(Session))
+    UniqueSessions = dcountif(Session, isnotempty(Session)),
+    ObservedSessions = countif(isnotempty(Session))
     by Hour = bin(TimeGenerated, 1h), ResourceId, Deployment
 | order by Hour asc
 """
@@ -328,6 +374,8 @@ def collect_telemetry(
     resources: list[Resource],
     start: datetime,
     end: datetime,
+    strict: bool = False,
+    warnings: Optional[list[str]] = None,
 ) -> list[TelemetryPoint]:
     if not resources:
         return []
@@ -338,14 +386,24 @@ def collect_telemetry(
             timespan=(start, end),
         )
     except HttpResponseError as error:
+        if strict:
+            raise RuntimeError("The scoped aggregate telemetry query failed.") from None
+        if warnings is not None:
+            warnings.append("Log Analytics telemetry query failed; session and telemetry measurements are unavailable.")
         print(f"Warning: Log Analytics telemetry query failed: {error}", file=sys.stderr)
+        return []
+    if str(getattr(response, "status", "")).casefold().endswith("partial") or getattr(response, "partial_error", None):
+        if strict:
+            raise RuntimeError("The scoped aggregate telemetry query returned partial data.")
+        if warnings is not None:
+            warnings.append("Log Analytics returned partial data; telemetry measurements are unavailable.")
         return []
     if not response.tables:
         return []
 
     points: list[TelemetryPoint] = []
     for row in response.tables[0].rows:
-        values = dict(zip((column.name for column in response.tables[0].columns), row))
+        values = dict(zip((getattr(column, "name", column) for column in response.tables[0].columns), row))
         timestamp = values.get("Hour")
         if not isinstance(timestamp, datetime):
             continue
@@ -363,7 +421,8 @@ def collect_telemetry(
                 input_tokens=float(values.get("InputTokens") or 0),
                 output_tokens=float(values.get("OutputTokens") or 0),
                 cached_tokens=float(values.get("CachedTokens") or 0),
-                sessions=float(values.get("UniqueSessions") or 0),
+                sessions=(None if strict and not values.get("ObservedSessions")
+                          else float(values.get("UniqueSessions") or 0)),
             )
         )
     return points
@@ -375,11 +434,12 @@ def local_bucket(timestamp: datetime, report_tz: ZoneInfo, granularity: str) -> 
 
 
 def summarize_metrics(
-    points: Iterable[MetricPoint], report_tz: ZoneInfo, granularity: str
+    points: Iterable[MetricPoint], report_tz: ZoneInfo, granularity: str, strict: bool = False
 ) -> dict[tuple[str, str, str], dict[str, float]]:
     summary: dict[tuple[str, str, str], dict[str, float]] = defaultdict(lambda: defaultdict(float))
     for point in points:
-        category = metric_category(point.metric, point.resource_type)
+        category = (next((key for key, names in COUNT_METRICS.items() if point.metric in names), None)
+                    if strict else metric_category(point.metric, point.resource_type))
         if not category:
             continue
         summary[(local_bucket(point.timestamp, report_tz, granularity), point.resource, point.deployment)][
@@ -400,11 +460,13 @@ def summarize_telemetry(
         values["input_tokens"] += point.input_tokens
         values["output_tokens"] += point.output_tokens
         values["cached_tokens"] += point.cached_tokens
-        session_values[key].append(point.sessions)
+        if point.sessions is not None:
+            session_values[key].append(point.sessions)
     for key, values in summary.items():
         # dcount is non-additive. Per-hour values are summed only to show activity,
         # never represented as a true period-wide distinct-session total.
-        values["sessions"] = sum(session_values[key])
+        if key in session_values:
+            values["sessions"] = sum(session_values[key])
     return summary
 
 
@@ -466,24 +528,36 @@ def daily_service_values(
     cognitive_resources: list[Resource],
     day_labels: list[str],
     categories: list[str],
+    preserve_missing: bool = False,
 ) -> dict[str, list[float]]:
     resource_groups = {resource.name: service_group(resource) for resource in cognitive_resources}
     daily_values = {
-        "Foundry": {day_label: 0.0 for day_label in day_labels},
-        "OpenAI": {day_label: 0.0 for day_label in day_labels},
+        "Foundry": {day_label: None if preserve_missing else 0.0 for day_label in day_labels},
+        "OpenAI": {day_label: None if preserve_missing else 0.0 for day_label in day_labels},
     }
     for (day_label, resource, _), values in combined_daily.items():
         group = resource_groups.get(resource)
         if group and day_label in daily_values[group]:
             if categories == ["token_usage"]:
-                component_total = (
-                    values["input_tokens"] + values["output_tokens"] + values["cached_tokens"]
-                )
-                daily_values[group][day_label] += (
-                    component_total if component_total else values["tokens"]
-                )
+                components = ("input_tokens", "output_tokens", "cached_tokens")
+                if preserve_missing:
+                    if "tokens" in values:
+                        value = values["tokens"]
+                    elif "input_tokens" in values and "output_tokens" in values:
+                        value = values["input_tokens"] + values["output_tokens"]
+                    else:
+                        continue
+                    daily_values[group][day_label] = (daily_values[group][day_label] or 0) + value
+                    continue
+                if preserve_missing and not any(key in values for key in (*components, "tokens")):
+                    continue
+                component_total = sum(values.get(key, 0) for key in components)
+                value = component_total if component_total else values.get("tokens", 0)
             else:
-                daily_values[group][day_label] += sum(values[category] for category in categories)
+                if preserve_missing and not any(category in values for category in categories):
+                    continue
+                value = sum(values.get(category, 0) for category in categories)
+            daily_values[group][day_label] = (daily_values[group][day_label] or 0) + value
     return {
         group: [daily_values[group][day_label] for day_label in day_labels]
         for group in ("Foundry", "OpenAI")
@@ -502,7 +576,7 @@ def line_chart(
     chart_width = 21.7 * cm
     chart_height = 8.2 * cm
     drawing = Drawing(drawing_width, drawing_height)
-    visible_values = [value for values in series.values() for value in values]
+    visible_values = [value for values in series.values() for value in values if value is not None]
     maximum = max(visible_values, default=0.0)
     y_maximum = maximum if maximum > 0 else 1.0
     palette = {"Foundry": colors.HexColor("#0078D4"), "OpenAI": colors.HexColor("#E66C37")}
@@ -547,16 +621,19 @@ def line_chart(
         drawing.add(String(legend_x + 0.6 * cm, legend_y - 3, series_name, fontSize=8, fillColor=colors.HexColor("#111827")))
         legend_x += 3.1 * cm
         points = [
-            (
+            None if value is None else (
                 left + (chart_width * index / max(1, len(values) - 1)),
                 bottom + (chart_height * value / y_maximum),
             )
             for index, value in enumerate(values)
         ]
-        for (x1, y1), (x2, y2) in zip(points, points[1:]):
-            drawing.add(Line(x1, y1, x2, y2, strokeColor=color, strokeWidth=1.6))
-        for x, y in points:
-            drawing.add(Rect(x - 1.2, y - 1.2, 2.4, 2.4, strokeColor=color, fillColor=color))
+        for first, second in zip(points, points[1:]):
+            if first is not None and second is not None:
+                drawing.add(Line(*first, *second, strokeColor=color, strokeWidth=1.6))
+        for point in points:
+            if point is not None:
+                x, y = point
+                drawing.add(Rect(x - 1.2, y - 1.2, 2.4, 2.4, strokeColor=color, fillColor=color))
     return drawing
 
 
@@ -651,6 +728,10 @@ def write_pdf(
     ]
 
     totals: dict[tuple[str, str], dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    def display(values, *categories):
+        if (getattr(args, "automation_json", None) or getattr(args, "tenant_id", None)) and not any(key in values for key in categories):
+            return "Unknown"
+        return number(sum(values.get(key, 0) for key in categories))
     for (_, resource, deployment), values in combined_daily.items():
         for category, value in values.items():
             totals[(resource, deployment)][category] += value
@@ -659,11 +740,11 @@ def write_pdf(
         summary_rows.append([
             resource,
             deployment,
-            number(values["requests"] + values["search_requests"]),
-            number(values["input_tokens"]),
-            number(values["output_tokens"]),
-            number(values["cached_tokens"]),
-            number(values["sessions"]),
+            display(values, "requests", "search_requests"),
+            display(values, "input_tokens"),
+            display(values, "output_tokens"),
+            display(values, "cached_tokens"),
+            display(values, "sessions"),
         ])
     if len(summary_rows) == 1:
         summary_rows.append(["No supported metrics or telemetry were returned.", "", "", "", "", "", ""])
@@ -682,11 +763,11 @@ def write_pdf(
                 bucket,
                 resource,
                 deployment,
-                number(values["requests"] + values["search_requests"]),
-                number(values["input_tokens"]),
-                number(values["output_tokens"]),
-                number(values["cached_tokens"]),
-                number(values["sessions"]),
+                display(values, "requests", "search_requests"),
+                display(values, "input_tokens"),
+                display(values, "output_tokens"),
+                display(values, "cached_tokens"),
+                display(values, "sessions"),
             ])
         if len(rows) == 1:
             rows.append(["No data returned.", "", "", "", "", "", "", ""])
@@ -695,6 +776,30 @@ def write_pdf(
             story.append(PageBreak())
 
     document.build(story)
+
+
+class ScopedCliCredential:
+    """Use only the selected CLI identity, without changing its global account."""
+
+    def __init__(self, subscription_id: str, tenant_id: str, object_id: str):
+        self.tenant_id, self.object_id = tenant_id.lower(), object_id.lower()
+        # CLI rejects get-access-token with both --tenant and --subscription.
+        # The explicit subscription selects its tenant; every token is pinned below.
+        self.credential = AzureCliCredential(subscription=subscription_id)
+
+    def get_token(self, *scopes, **kwargs):
+        requested_tenant = kwargs.pop("tenant_id", None)
+        if requested_tenant and requested_tenant.lower() != self.tenant_id:
+            raise RuntimeError("Token request tenant differs from the reviewed report.")
+        token = self.credential.get_token(*scopes, **kwargs)
+        try:
+            encoded = token.token.split(".")[1]
+            claims = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
+            if claims.get("tid", "").lower() != self.tenant_id or claims.get("oid", "").lower() != self.object_id:
+                raise ValueError
+        except (ValueError, IndexError, TypeError, AttributeError):
+            raise RuntimeError("Azure CLI identity changed after report confirmation.") from None
+        return token
 
 
 def main() -> int:
@@ -711,7 +816,18 @@ def main() -> int:
         args.foundry_token_output
         or output.parent / f"Foundry-Token-report-{as_of.isoformat()}.pdf"
     )
-    credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
+    strict = bool(args.automation_json)
+    scoped_report = strict or bool(args.tenant_id)
+    if strict:
+        credential = ScopedCliCredential(args.subscription_id, args.tenant_id, args.expected_object_id)
+    elif args.tenant_id:
+        credential = AzureCliCredential(subscription=args.subscription_id, tenant_id=args.tenant_id)
+    else:
+        credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
+    warnings: list[str] = []
+    query_options = {"strict": strict}
+    if not strict:
+        query_options["warnings"] = warnings
     resource_client = ResourceManagementClient(credential, args.subscription_id)
     monitor_client = MonitorManagementClient(credential, args.subscription_id)
     cognitive_resources, search_resources, application_insights_resources = discover_resources(
@@ -721,7 +837,7 @@ def main() -> int:
 
     metric_points: list[MetricPoint] = []
     for resource in all_resources:
-        metric_points.extend(collect_metric_points(monitor_client, resource, start, end))
+        metric_points.extend(collect_metric_points(monitor_client, resource, start, end, **query_options))
 
     telemetry_points: list[TelemetryPoint] = []
     if args.workspace_id:
@@ -731,16 +847,36 @@ def main() -> int:
             cognitive_resources + application_insights_resources,
             start,
             end,
+            **query_options,
         )
     else:
         print("Info: --workspace-id not supplied; session telemetry is not collected.", file=sys.stderr)
+        warnings.append("No Log Analytics workspace configured; session telemetry is unavailable.")
+    if args.workspace_id and not telemetry_points:
+        warnings.append("No session telemetry returned; missing sessions are unavailable, not zero.")
+    if not metric_points:
+        warnings.append("No Azure Monitor measurements returned; missing usage is unavailable, not zero.")
 
-    metrics_daily = summarize_metrics(metric_points, report_tz, "day")
-    metrics_hourly = summarize_metrics(metric_points, report_tz, "hour")
+    metrics_daily = summarize_metrics(metric_points, report_tz, "day", strict=strict)
+    metrics_hourly = summarize_metrics(metric_points, report_tz, "hour", strict=strict)
     telemetry_daily = summarize_telemetry(telemetry_points, report_tz, "day")
     telemetry_hourly = summarize_telemetry(telemetry_points, report_tz, "hour")
+    if scoped_report:
+        # Legacy KQL coalesces absent token/request fields to zero. Do not publish
+        # those as measured zeroes; strict reports use Metrics for these totals.
+        telemetry_daily = {key: {"sessions": values["sessions"]} for key, values in telemetry_daily.items()
+                           if "sessions" in values}
+        telemetry_hourly = {key: {"sessions": values["sessions"]} for key, values in telemetry_hourly.items()
+                            if "sessions" in values}
     combined_daily = combine_summaries(metrics_daily, telemetry_daily)
     combined_hourly = combine_summaries(metrics_hourly, telemetry_hourly)
+    aggregates = {
+        "daily": {"|".join(key): dict(value) for key, value in combined_daily.items()},
+        "hourly": {"|".join(key): dict(value) for key, value in combined_hourly.items()},
+        "warnings": warnings,
+        "period": {"start": start.isoformat(), "end": end.isoformat(), "days": args.days},
+        "sessions_available": bool(telemetry_points),
+    }
 
     write_pdf(
         output,
@@ -761,7 +897,7 @@ def main() -> int:
         model_requests_output,
         "Model Requests Report",
         "Requests",
-        daily_service_values(combined_daily, cognitive_resources, day_labels, ["requests"]),
+        daily_service_values(combined_daily, cognitive_resources, day_labels, ["requests"], preserve_missing=scoped_report),
         day_labels,
         args,
         as_of,
@@ -775,6 +911,7 @@ def main() -> int:
             cognitive_resources,
             day_labels,
             ["token_usage"],
+            preserve_missing=scoped_report,
         ),
         day_labels,
         args,
@@ -783,14 +920,31 @@ def main() -> int:
     if args.debug_json:
         Path(args.debug_json).write_text(
             json.dumps(
-                {
-                    "daily": {"|".join(key): value for key, value in combined_daily.items()},
-                    "hourly": {"|".join(key): value for key, value in combined_hourly.items()},
-                },
+                aggregates,
                 indent=2,
             ),
             encoding="utf-8",
         )
+    if args.automation_json:
+        # No raw telemetry, dimensions, session IDs, prompt bodies or SDK errors.
+        # Missing categories remain absent rather than being filled with fake zeroes.
+        allowed = {"requests", "search_requests", "input_tokens", "output_tokens", "cached_tokens", "tokens", "sessions"}
+        Path(args.automation_json).write_text(json.dumps({
+            "contract": AUTOMATION_REPORT_CONTRACT,
+            "report_id": "foundry-usage",
+            "subscription_id": args.subscription_id,
+            "resource_group": args.resource_group,
+            "workspace_id": args.workspace_id,
+            "window_start": start.isoformat(),
+            "window_end": end.isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "daily": [{"timestamp": bucket + "T00:00:00+00:00", "resource": resource,
+                       "deployment": deployment,
+                       "metrics": {key: value for key, value in values.items() if key in allowed}}
+                      for (bucket, resource, deployment), values in sorted(combined_daily.items())],
+            "warnings": (["no_data"] if not combined_daily else []) + [
+                "session_activity_not_distinct", "telemetry_sessions_only", "additive_counter_selection"],
+        }, allow_nan=False), encoding="utf-8")
     print(f"Created table report: {output.resolve()}")
     print(f"Created request chart: {model_requests_output.resolve()}")
     print(f"Created token chart: {foundry_token_output.resolve()}")

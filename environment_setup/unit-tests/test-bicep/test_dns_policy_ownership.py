@@ -10,6 +10,7 @@ import shlex
 import shutil
 import subprocess
 import unittest
+from uuid import uuid4
 
 import yaml
 
@@ -99,8 +100,13 @@ class PipelineDnsOwnershipTests(unittest.TestCase):
 
     def test_github_zone_inspection_policy_guard_avoids_az(self):
         step = task(GHA, "15_Check_Private_DNS_Zones")
+        work = ROOT / f".test-dns-policy-{uuid4().hex}"
+        work.mkdir()
+        self.addCleanup(shutil.rmtree, work)
+        github_env = work / "github-env"
         for central in ("true", "True", "false"):
             with self.subTest(central=central):
+                github_env.write_text("", encoding="utf-8")
                 values = {
                     "centralDnsZoneByPolicyInHub": central,
                     "dev_test_prod_sub_id": "project-sub",
@@ -110,11 +116,16 @@ class PipelineDnsOwnershipTests(unittest.TestCase):
                 }
                 binding = substitute(step["env"]["DNS_MANAGED_BY_POLICY"], values)
                 setup = f"export DNS_MANAGED_BY_POLICY={shlex.quote(binding)}\n" + """
-GITHUB_ENV="$(mktemp)"
-trap 'cat "$GITHUB_ENV"; rm -f "$GITHUB_ENV"' EXIT
+GITHUB_ENV="$DNS_TEST_GITHUB_ENV"
+if command -v cygpath >/dev/null; then GITHUB_ENV="$(cygpath -u "$GITHUB_ENV")"; fi
+export GITHUB_ENV
+trap 'cat "$GITHUB_ENV"' EXIT
 az() { echo "AZ_CALLED:$*"; }
 """
-                code, stdout, stderr = self.run_shell("bash", setup + substitute(step["run"], values))
+                code, stdout, stderr = self.run_shell(
+                    "bash", setup + substitute(step["run"], values),
+                    {"DNS_TEST_GITHUB_ENV": str(github_env)},
+                )
                 self.assertEqual(0, code, stdout + stderr)
                 self.assertNotIn("forbidden-hub", stdout + stderr)
                 if central.lower() == "true":

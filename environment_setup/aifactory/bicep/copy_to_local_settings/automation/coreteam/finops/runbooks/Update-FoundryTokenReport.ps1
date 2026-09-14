@@ -22,8 +22,12 @@
 #>
 
 param(
+    # aifactory.aggregate-report.v1: isolated local reporting, never the legacy Az login/output path.
+    [string]$MonitoringRequest,
+    [string]$MonitoringPython,
     # --- Identity / scope ---
     [string]$SubscriptionId,
+    [string]$TenantId,
     # User-Assigned MI client id (the project 'mi-prj*' UAMI). If empty, discovered in project RG; else System MI.
     [string]$UamiClientId,
     [string]$ProjectNumber,
@@ -42,10 +46,13 @@ param(
     [string]$FoundryAccountName,
 
     # --- Reporting window ---
-    [int]$LookbackDays = 30,
+    [ValidateRange(1,90)] [int]$LookbackDays = 30,
 
     # --- Config + output ---
     [string]$ConfigPath = "$PSScriptRoot/report-config.json",
+    [string]$ConfigJson,
+    [ValidateSet('Markdown','Json')] [string]$ReportFormat = 'Markdown',
+    [switch]$NoUpload,
     # Where naming variables come from: 'github' (.env) or 'ado' (variables.yaml). Default 'config' uses report-config.json.
     [ValidateSet('github','ado','config')] [string]$Source = 'config',
     # Path to the .env (github) or variables.yaml (ado). Defaults to repo root .env / variables.yaml.
@@ -63,6 +70,35 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+if ($MonitoringRequest) {
+    if (-not $MonitoringPython) { throw 'The reviewed Monitoring Python runtime is required.' }
+    & $MonitoringPython -I -B "$PSScriptRoot/common/monitoring_report.py" --request $MonitoringRequest
+    exit $LASTEXITCODE
+}
+if ($ReportFormat -eq 'Json') {
+    $WarningPreference = 'SilentlyContinue'
+    $ProgressPreference = 'SilentlyContinue'
+    $InformationPreference = 'SilentlyContinue'
+}
+$reportWarnings = [System.Collections.Generic.List[string]]::new()
+$reportFailure = 'Report configuration or target is invalid.'
+trap {
+    if ($MonitoringRequest) { throw }
+    if ($ReportFormat -eq 'Json') {
+        [ordered]@{
+            schema_version=1; report_type='foundry-tokens'; source=$(if ($DryRun) {'sample'} else {'live'})
+            generated_at=[datetime]::UtcNow.ToString('o'); period=@{days=$LookbackDays}
+            target=@{subscription_id=$SubscriptionId; project_resource_group=$ProjectResourceGroup; common_resource_group=$CommonResourceGroup; environment=$Env}
+            status='failed'; warnings=@($reportFailure); tables=@(); charts=@(); output="# Foundry token report`n`n$reportFailure"
+        } | ConvertTo-Json -Depth 12 -Compress | Write-Output
+        exit 1
+    }
+    Write-Error $reportFailure
+    exit 1
+}
+function Write-ReportInfo([string]$Message) {
+    if ($ReportFormat -eq 'Json') { Write-Verbose $Message } else { Write-Output $Message }
+}
 
 function Get-Config {
     param([string]$Path)
@@ -109,12 +145,12 @@ function Resolve-Naming {
 }
 
 # ---- Load config and resolve effective settings (param > github/ado source > config.naming) ----
-$cfg = Get-Config -Path $ConfigPath
+$cfg = if ($ConfigJson) { $ConfigJson | ConvertFrom-Json } else { Get-Config -Path $ConfigPath }
 $n = $cfg.naming
 if ($Source -ne 'config') {
     $path = if ($SettingsPath) { $SettingsPath } elseif ($Source -eq 'github') { "$PSScriptRoot/../../../.env" } else { "$PSScriptRoot/../../esml-infra/azure-devops/bicep/yaml/variables/variables.yaml" }
     if (-not (Test-Path $path)) { throw "Settings file for source '$Source' not found: $path" }
-    Write-Output "Reading naming from '$Source': $path"
+    Write-ReportInfo "Reading naming from '$Source': $path"
     $settings = if ($Source -eq 'github') { Get-EnvSettings $path } else { Get-AdoSettings $path }
     $n = Resolve-Naming -Source $Source -s $settings
 }
@@ -140,18 +176,21 @@ $inputTokens=0.0; $outputTokens=0.0; $requests=0.0
 $activeWindowMinutes = $LookbackDays * 24 * 60
 
 if ($DryRun) {
-    Write-Output "DRY-RUN: skipping Azure login + live queries; using sample telemetry from config."
+    Write-ReportInfo "DRY-RUN: skipping Azure login + live queries; using sample telemetry from config."
+    $reportWarnings.Add('Sample telemetry only; no Azure authentication or queries were performed.')
     if (-not $FoundryAccountName) { $FoundryAccountName = 'aif2<discovered>004dev' }
-    Write-Output "Project RG   : $projectRg"
-    Write-Output "Common RG    : $commonRg"
+    Write-ReportInfo "Project RG   : $projectRg"
+    Write-ReportInfo "Common RG    : $commonRg"
     $inputTokens  = ($cfg.totalUsersWithAccess * 1.3) * $activeWindowMinutes
     $outputTokens = $inputTokens * 0.011
     $requests     = 84 * $activeWindowMinutes
 } else {
 
-Write-Output "Connecting with Managed Identity..."
+$reportFailure = 'Azure authentication or selected subscription/tenant validation failed.'
+Disable-AzContextAutosave -Scope Process | Out-Null
+Write-ReportInfo "Connecting with Managed Identity..."
 if ($UseCurrentLogin) {
-    Write-Output "Using existing Az PowerShell login."
+    Write-ReportInfo "Using existing Az PowerShell login."
 } elseif ($UamiClientId) {
     Connect-AzAccount -Identity -AccountId $UamiClientId | Out-Null   # project UAMI (mi-prj*)
 } else {
@@ -159,16 +198,18 @@ if ($UseCurrentLogin) {
 }
 if ($SubscriptionId) { Select-AzSubscription -SubscriptionId $SubscriptionId | Out-Null }
 $ctx = Get-AzContext
+if (-not $ctx -or ($TenantId -and $ctx.Tenant.Id -ne $TenantId) -or ($SubscriptionId -and $ctx.Subscription.Id -ne $SubscriptionId)) { throw $reportFailure }
 $SubscriptionId = $ctx.Subscription.Id
-Write-Output "Subscription : $SubscriptionId"
-Write-Output "Project RG   : $projectRg"
-Write-Output "Common RG    : $commonRg"
+Write-ReportInfo "Subscription : $SubscriptionId"
+Write-ReportInfo "Project RG   : $projectRg"
+Write-ReportInfo "Common RG    : $commonRg"
+$reportFailure = 'Foundry account or Log Analytics workspace discovery failed for the selected resource groups.'
 
 # Discover the project UAMI (mi-prj*) for reference/logging if not explicitly passed
 if (-not $UamiClientId) {
     $uami = Get-AzResource -ResourceGroupName $projectRg -ResourceType 'Microsoft.ManagedIdentity/userAssignedIdentities' -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -like 'mi-prj*' } | Select-Object -First 1
-    if ($uami) { Write-Output "Project UAMI : $($uami.Name)" }
+    if ($uami) { Write-ReportInfo "Project UAMI : $($uami.Name)" }
 }
 
 # ---- Discover Foundry (CognitiveServices) + Log Analytics by type ----
@@ -181,7 +222,7 @@ if (-not $FoundryAccountName) {
 } else {
     $foundryResourceId = (Get-AzResource -ResourceGroupName $projectRg -Name $FoundryAccountName -ResourceType 'Microsoft.CognitiveServices/accounts').ResourceId
 }
-Write-Output "Foundry acct : $FoundryAccountName"
+Write-ReportInfo "Foundry acct : $FoundryAccountName"
 
 if (-not $LogAnalyticsWorkspaceName) {
     $law = Get-AzOperationalInsightsWorkspace -ResourceGroupName $commonRg -ErrorAction SilentlyContinue |
@@ -192,7 +233,7 @@ if (-not $LogAnalyticsWorkspaceName) {
     $law = Get-AzOperationalInsightsWorkspace -ResourceGroupName $commonRg -Name $LogAnalyticsWorkspaceName
 }
 $workspaceId = $law.CustomerId
-Write-Output "Log Analytics: $($law.Name) ($workspaceId)"
+Write-ReportInfo "Log Analytics: $($law.Name) ($workspaceId)"
 
 # ---- KQL: token + request rates from CognitiveServices metrics piped to Log Analytics ----
 $kql = @"
@@ -204,7 +245,13 @@ AzureMetrics
 "@
 
 try {
+    $reportFailure = 'Log Analytics token query failed or returned incomplete telemetry; zero usage cannot be inferred.'
     $r = Invoke-AzOperationalInsightsQuery -WorkspaceId $workspaceId -Query $kql
+    if (($r.PSObject.Properties['Error'] -and $r.Error) -or -not @($r.Results).Count) { throw $reportFailure }
+    $metricNames = @($r.Results | ForEach-Object { $_.MetricName })
+    foreach ($required in @('ProcessedPromptTokens','GeneratedTokens','TotalCalls')) {
+        if ($required -notin $metricNames) { throw $reportFailure }
+    }
     foreach ($row in $r.Results) {
         switch ($row.MetricName) {
             'ProcessedPromptTokens' { $inputTokens  = [double]$row.total }
@@ -212,7 +259,7 @@ try {
             'TotalCalls'            { $requests     = [double]$row.total }
         }
     }
-} catch { Write-Warning "Log Analytics query failed: $_" }
+} catch { throw $reportFailure }
 
 }
 
@@ -222,6 +269,8 @@ $rpm       = if ($activeWindowMinutes) { [math]::Round($requests/$activeWindowMi
 $totalTokens = $inputTokens + $outputTokens
 
 # ---- Discount + cost derivation ----
+$reportFailure = 'Pricing configuration could not be used to calculate the estimate.'
+$reportWarnings.Add('PAYGO/PTU estimates use configured model rates, discount, cache rate and capacity assumptions; they are not verified actual billing or per-model measured utilization.')
 $d = $cfg.discountAndAdjustments
 $model = $cfg.models[0]
 $inputRate  = $model.inputCostPerMTokens  * (1 - $d.eaDiscount)
@@ -242,6 +291,9 @@ $md = @"
 
 ## Reports: Foundry models and token
 Model: $($model.name) — RG ``$projectRg`` — window ${LookbackDays}d — generated $(Get-Date -Format 'yyyy-MM-dd HH:mm')
+
+> $(if ($DryRun) {'SAMPLE DATA — not live usage.'} else {'Live account-level aggregate telemetry; not per-model measured usage.'})
+> Pricing, cache rate, users with access and PTU sizing use configuration assumptions, not verified actual billing.
 
 ### 2) Current workload telemetry (from logs)
 
@@ -279,11 +331,35 @@ Model: $($model.name) — RG ``$projectRg`` — window ${LookbackDays}d — gene
 | AI Gateway loadbalancer | $($d.aiGatewayLoadBalancerExists) | |
 "@
 
-Write-Output $md
-
-if ($OutputBlobStorageAccount) {
-    $tmp = New-TemporaryFile; $md | Out-File -FilePath $tmp -Encoding utf8
-    $sctx = (Get-AzStorageAccount -ResourceGroupName $projectRg -Name $OutputBlobStorageAccount).Context
-    Set-AzStorageBlobContent -File $tmp -Container $OutputBlobContainer -Blob $OutputBlobName -Context $sctx -Force | Out-Null
-    Write-Output "Report written: $OutputBlobContainer/$OutputBlobName"
+if (-not $NoUpload -and -not $DryRun -and $OutputBlobStorageAccount) {
+    $reportFailure = 'Report generated, but the requested blob upload failed.'
+    $tmp = Join-Path $PWD ("aif-report-" + [guid]::NewGuid() + ".txt")
+    try {
+        $md | Out-File -FilePath $tmp -Encoding utf8
+        $sctx = (Get-AzStorageAccount -ResourceGroupName $projectRg -Name $OutputBlobStorageAccount).Context
+        Set-AzStorageBlobContent -File $tmp -Container $OutputBlobContainer -Blob $OutputBlobName -Context $sctx -Force | Out-Null
+        Write-ReportInfo "Report written: $OutputBlobContainer/$OutputBlobName"
+    } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+}
+if ($ReportFormat -eq 'Json') {
+    [ordered]@{
+        schema_version=1; report_type='foundry-tokens'; source=$(if ($DryRun) {'sample'} else {'live'})
+        generated_at=[datetime]::UtcNow.ToString('o')
+        period=@{days=$LookbackDays; start=[datetime]::UtcNow.AddDays(-$LookbackDays).ToString('o'); end=[datetime]::UtcNow.ToString('o')}
+        target=@{subscription_id=$SubscriptionId; project_resource_group=$projectRg; common_resource_group=$commonRg; environment=$env}
+        status='warning'; warnings=@($reportWarnings)
+        tables=@(
+            @{title='Account telemetry'; columns=@('Metric','Value','Unit'); rows=@(
+                @('Input tokens',$inputTokens,'tokens'), @('Output tokens',$outputTokens,'tokens'), @('Requests',$requests,'requests'),
+                @('Input TPM',$inputTpm,'TPM'), @('Output TPM',$outputTpm,'TPM'), @('Requests per minute',$rpm,'RPM')
+            )},
+            @{title='Configured pricing estimates (not actual billing)'; columns=@('Estimate','Value','Unit'); rows=@(
+                @('Monthly PAYGO',[math]::Round($monthCost,2),'USD'), @('Average PTUs',$ptu,'PTUs')
+            )}
+        )
+        charts=@(@{title='Account token totals'; labels=@('Input','Output'); series=@(@{name='Tokens'; values=@($inputTokens,$outputTokens)})})
+        output=$md
+    } | ConvertTo-Json -Depth 12 -Compress | Write-Output
+} else {
+    Write-Output $md
 }

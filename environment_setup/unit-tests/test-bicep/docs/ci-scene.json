@@ -1,0 +1,1479 @@
+{
+  "schemaVersion": 1,
+  "title": "PURPLE offline infrastructure CI",
+  "provenance": {
+    "library": "AsomRecordsAB.VisualLearner",
+    "targetFramework": "net10.0",
+    "normalization": "VisualLearnerPresentation.Normalize",
+    "motion": "VisualLearnerMotion.FlowAt",
+    "coordinateSystem": "Schematic pixels only: Longitude -\u003E x, Latitude -\u003E y. NOT geographic; NOT Azure locations.",
+    "phaseMapping": [
+      {
+        "libraryPhase": "Ingestion",
+        "ciCaption": "Push / PR"
+      },
+      {
+        "libraryPhase": "DataOps",
+        "ciCaption": "Configuration"
+      },
+      {
+        "libraryPhase": "Training",
+        "ciCaption": "Unit \u002B syntax"
+      },
+      {
+        "libraryPhase": "Inference",
+        "ciCaption": "Bicep matrix"
+      },
+      {
+        "libraryPhase": "Agent",
+        "ciCaption": "Review evidence"
+      }
+    ],
+    "explanation": "Portable scene and motion are real library outputs. Enum names are adapted to CI captions; no training, inference or agent execution is implied. Web/SVG rendering uses the cp theme, not the MAUI adapter."
+  },
+  "snapshot": {
+    "status": "passed",
+    "mode": "offline-validation",
+    "reportFile": "bicep-matrix.json",
+    "reportSha256": "2f9231063312a799e64d20e1627a953c89788c09dae04db04e69f8f737e91f2d",
+    "bicepVersion": "Bicep CLI version 0.44.1 (28275db947)",
+    "counts": {
+      "entrypoints": 18,
+      "reachableSourceTemplates": 179,
+      "flagOccurrences": 383,
+      "boundCases": 592,
+      "pairStates": 22072
+    },
+    "limits": [
+      "Scope: literal --template-file entrypoints in the committed GHA/ADO pipeline templates and every reachable local Bicep/ARM module; not orphaned/retired templates. Registry module references are reported and require a pre-populated Bicep cache; --no-restore fails when a dependency is absent.",
+      "Flags: all entrypoint bool parameters and true/false-string parameters. The flags count is template/parameter occurrences, not distinct names. Nested object properties and module-only inputs are not varied.",
+      "All-off/all-on mean false/true INPUTS, including disable flags, not all Azure features disabled/enabled. Cases are type-valid bindings, not certified deployments.",
+      "Coverage is baseline, individual flips, and all four input states of every pair within each entrypoint; not every 2**N assignment or cross-entrypoint pairs.",
+      "Baseline uses real Bicep defaults; required flags use committed ADO defaults, with a separate GHA-required-defaults case. Expression defaults support only parameters(), not(), and boolean literals; other expressions fail explicitly.",
+      "Every case explicitly binds all flags; derived flag defaults are resolved only for the baseline and are intentionally overridden in variations.",
+      "Bicep compiles source once per entrypoint; build-params validates every case against its exact emitted ARM JSON. No Azure login, restore, validation, what-if, deployment, or evaluation of ARM resource conditions/dependsOn occurs.",
+      "Required non-flag inputs use synthetic type/constraint-valid placeholders. Azure names, credentials, quotas, existence, RBAC and service dependencies (for example AKS/ML or private-network prerequisites) are not verified."
+    ],
+    "templates": [
+      {
+        "file": "environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/main.bicep",
+        "flags": 1,
+        "cases": 4,
+        "pairStates": 0
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-common/main/11-rgCommon.bicep",
+        "flags": 5,
+        "cases": 14,
+        "pairStates": 40
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-common/main/12-networkCommon.bicep",
+        "flags": 6,
+        "cases": 15,
+        "pairStates": 60
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-common/main/13-rgLevel.bicep",
+        "flags": 18,
+        "cases": 32,
+        "pairStates": 612
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/01-foundation.bicep",
+        "flags": 44,
+        "cases": 59,
+        "pairStates": 3784
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/02-core-infrastructure.bicep",
+        "flags": 27,
+        "cases": 40,
+        "pairStates": 1404
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/03-cognitive-services.bicep",
+        "flags": 41,
+        "cases": 56,
+        "pairStates": 3280
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/04-databases.bicep",
+        "flags": 20,
+        "cases": 33,
+        "pairStates": 760
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/05-compute-services.bicep",
+        "flags": 32,
+        "cases": 45,
+        "pairStates": 1984
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/06-ai-platform.bicep",
+        "flags": 22,
+        "cases": 35,
+        "pairStates": 924
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/07-ml-data-platform.bicep",
+        "flags": 20,
+        "cases": 33,
+        "pairStates": 760
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/08-rbac-security.bicep",
+        "flags": 38,
+        "cases": 53,
+        "pairStates": 2812
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/08b-rbac-common-rg.bicep",
+        "flags": 10,
+        "cases": 21,
+        "pairStates": 180
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v4.bicep",
+        "flags": 31,
+        "cases": 44,
+        "pairStates": 1860
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/10-aifactory-dashboards.bicep",
+        "flags": 37,
+        "cases": 52,
+        "pairStates": 2664
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/11-integration.bicep",
+        "flags": 19,
+        "cases": 32,
+        "pairStates": 684
+      },
+      {
+        "file": "environment_setup/aifactory/bicep/esml-genai-1/31-network.bicep",
+        "flags": 12,
+        "cases": 23,
+        "pairStates": 264
+      },
+      {
+        "file": "environment_setup/aigateway/kong/main.bicep",
+        "flags": 0,
+        "cases": 1,
+        "pairStates": 0
+      }
+    ]
+  },
+  "phases": [
+    {
+      "id": "push",
+      "label": "Push / PR",
+      "title": "Trigger the checks",
+      "detail": "A local commit does not run remote CI. Push the commit to GitHub, open or update a pull request, or dispatch the workflow manually. GitHub checks all branches. ADO must first be registered from its YAML.",
+      "number": "01",
+      "shortDetail": "Repository event"
+    },
+    {
+      "id": "config",
+      "label": "Configuration",
+      "title": "Follow the contracts",
+      "detail": "The unit suite inventories 44 public ENABLE_* settings: 41 mapped contracts and three explicit exceptions. AMPLS and RETRIES have no GHA forwarding; AI_FACTORY_HUB records configuration intent only. These are not deployable-feature claims.",
+      "number": "02",
+      "shortDetail": "Inventory \u002B wiring"
+    },
+    {
+      "id": "unit",
+      "label": "Unit \u002B syntax",
+      "title": "Check both operating systems",
+      "detail": "Unit tests run on ubuntu-22.04 and windows-2022; syntax checks run on Linux. JUnit records actual tests, failures and platform skips. YAML duplicate keys, Python syntax and Bash -n are checked without executing deployment scripts.",
+      "number": "03",
+      "shortDetail": "Linux \u002B Windows"
+    },
+    {
+      "id": "bicep",
+      "label": "Bicep matrix",
+      "title": "Compile and bind inputs",
+      "detail": "Install checksum-verified Bicep 0.44.1 and explicitly prepare declared public AVM dependencies. The validation step is then offline with --no-restore: compile real entrypoints and bind baseline, individual flips and all four states of every flag pair.",
+      "number": "04",
+      "shortDetail": "Compile \u002B schema bind"
+    },
+    {
+      "id": "review",
+      "label": "Review evidence",
+      "title": "Read the limits before merging",
+      "detail": "Inspect JSON and JUnit artifacts, failures and skips. Pairwise input coverage does not evaluate ARM conditions or certify deployment. Configure GitHub required checks or Azure Repos Build validation separately; this change does neither automatically.",
+      "number": "05",
+      "shortDetail": "Artifacts \u002B policies"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "push",
+      "name": "Push / PR",
+      "region": "Schematic CI lane - not an Azure region",
+      "latitude": 136,
+      "longitude": 110,
+      "phase": "Ingestion",
+      "health": "Ready",
+      "detail": "A local commit does not run remote CI. Push the commit to GitHub, open or update a pull request, or dispatch the workflow manually. GitHub checks all branches. ADO must first be registered from its YAML."
+    },
+    {
+      "id": "config",
+      "name": "Configuration",
+      "region": "Schematic CI lane - not an Azure region",
+      "latitude": 108,
+      "longitude": 350,
+      "phase": "DataOps",
+      "health": "Attention",
+      "detail": "The unit suite inventories 44 public ENABLE_* settings: 41 mapped contracts and three explicit exceptions. AMPLS and RETRIES have no GHA forwarding; AI_FACTORY_HUB records configuration intent only. These are not deployable-feature claims."
+    },
+    {
+      "id": "unit",
+      "name": "Unit \u002B syntax",
+      "region": "Schematic CI lane - not an Azure region",
+      "latitude": 136,
+      "longitude": 590,
+      "phase": "Training",
+      "health": "Ready",
+      "detail": "Unit tests run on ubuntu-22.04 and windows-2022; syntax checks run on Linux. JUnit records actual tests, failures and platform skips. YAML duplicate keys, Python syntax and Bash -n are checked without executing deployment scripts."
+    },
+    {
+      "id": "bicep",
+      "name": "Bicep matrix",
+      "region": "Schematic CI lane - not an Azure region",
+      "latitude": 108,
+      "longitude": 830,
+      "phase": "Inference",
+      "health": "Ready",
+      "detail": "Install checksum-verified Bicep 0.44.1 and explicitly prepare declared public AVM dependencies. The validation step is then offline with --no-restore: compile real entrypoints and bind baseline, individual flips and all four states of every flag pair."
+    },
+    {
+      "id": "review",
+      "name": "Review evidence",
+      "region": "Schematic CI lane - not an Azure region",
+      "latitude": 136,
+      "longitude": 1070,
+      "phase": "Agent",
+      "health": "Attention",
+      "detail": "Inspect JSON and JUnit artifacts, failures and skips. Pairwise input coverage does not evaluate ARM conditions or certify deployment. Configure GitHub required checks or Azure Repos Build validation separately; this change does neither automatically."
+    }
+  ],
+  "cycleSeconds": 8,
+  "motionSamples": [
+    {
+      "seconds": 0,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0,
+      "x": 110,
+      "y": 136
+    },
+    {
+      "seconds": 0.0625,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.03125,
+      "x": 117.5,
+      "y": 135.125
+    },
+    {
+      "seconds": 0.125,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.0625,
+      "x": 125,
+      "y": 134.25
+    },
+    {
+      "seconds": 0.1875,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.09375,
+      "x": 132.5,
+      "y": 133.375
+    },
+    {
+      "seconds": 0.25,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.125,
+      "x": 140,
+      "y": 132.5
+    },
+    {
+      "seconds": 0.3125,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.15625,
+      "x": 147.5,
+      "y": 131.625
+    },
+    {
+      "seconds": 0.375,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.1875,
+      "x": 155,
+      "y": 130.75
+    },
+    {
+      "seconds": 0.4375,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.21875,
+      "x": 162.5,
+      "y": 129.875
+    },
+    {
+      "seconds": 0.5,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.25,
+      "x": 170,
+      "y": 129
+    },
+    {
+      "seconds": 0.5625,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.28125,
+      "x": 177.5,
+      "y": 128.125
+    },
+    {
+      "seconds": 0.625,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.3125,
+      "x": 185,
+      "y": 127.25
+    },
+    {
+      "seconds": 0.6875,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.34375,
+      "x": 192.5,
+      "y": 126.375
+    },
+    {
+      "seconds": 0.75,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.375,
+      "x": 200,
+      "y": 125.5
+    },
+    {
+      "seconds": 0.8125,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.40625,
+      "x": 207.5,
+      "y": 124.625
+    },
+    {
+      "seconds": 0.875,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.4375,
+      "x": 215,
+      "y": 123.75
+    },
+    {
+      "seconds": 0.9375,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.46875,
+      "x": 222.5,
+      "y": 122.875
+    },
+    {
+      "seconds": 1,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.5,
+      "x": 230,
+      "y": 122
+    },
+    {
+      "seconds": 1.0625,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.53125,
+      "x": 237.5,
+      "y": 121.125
+    },
+    {
+      "seconds": 1.125,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.5625,
+      "x": 245,
+      "y": 120.25
+    },
+    {
+      "seconds": 1.1875,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.59375,
+      "x": 252.5,
+      "y": 119.375
+    },
+    {
+      "seconds": 1.25,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.625,
+      "x": 260,
+      "y": 118.5
+    },
+    {
+      "seconds": 1.3125,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.65625,
+      "x": 267.5,
+      "y": 117.625
+    },
+    {
+      "seconds": 1.375,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.6875,
+      "x": 275,
+      "y": 116.75
+    },
+    {
+      "seconds": 1.4375,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.71875,
+      "x": 282.5,
+      "y": 115.875
+    },
+    {
+      "seconds": 1.5,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.75,
+      "x": 290,
+      "y": 115
+    },
+    {
+      "seconds": 1.5625,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.78125,
+      "x": 297.5,
+      "y": 114.125
+    },
+    {
+      "seconds": 1.625,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.8125,
+      "x": 305,
+      "y": 113.25
+    },
+    {
+      "seconds": 1.6875,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.84375,
+      "x": 312.5,
+      "y": 112.375
+    },
+    {
+      "seconds": 1.75,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.875,
+      "x": 320,
+      "y": 111.5
+    },
+    {
+      "seconds": 1.8125,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.90625,
+      "x": 327.5,
+      "y": 110.625
+    },
+    {
+      "seconds": 1.875,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.9375,
+      "x": 335,
+      "y": 109.75
+    },
+    {
+      "seconds": 1.9375,
+      "from": "push",
+      "to": "config",
+      "libraryPhase": "DataOps",
+      "progress": 0.96875,
+      "x": 342.5,
+      "y": 108.875
+    },
+    {
+      "seconds": 2,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0,
+      "x": 350,
+      "y": 108
+    },
+    {
+      "seconds": 2.0625,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.03125,
+      "x": 357.5,
+      "y": 108.875
+    },
+    {
+      "seconds": 2.125,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.0625,
+      "x": 365,
+      "y": 109.75
+    },
+    {
+      "seconds": 2.1875,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.09375,
+      "x": 372.5,
+      "y": 110.625
+    },
+    {
+      "seconds": 2.25,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.125,
+      "x": 380,
+      "y": 111.5
+    },
+    {
+      "seconds": 2.3125,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.15625,
+      "x": 387.5,
+      "y": 112.375
+    },
+    {
+      "seconds": 2.375,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.1875,
+      "x": 395,
+      "y": 113.25
+    },
+    {
+      "seconds": 2.4375,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.21875,
+      "x": 402.5,
+      "y": 114.125
+    },
+    {
+      "seconds": 2.5,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.25,
+      "x": 410,
+      "y": 115
+    },
+    {
+      "seconds": 2.5625,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.28125,
+      "x": 417.5,
+      "y": 115.875
+    },
+    {
+      "seconds": 2.625,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.3125,
+      "x": 425,
+      "y": 116.75
+    },
+    {
+      "seconds": 2.6875,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.34375,
+      "x": 432.5,
+      "y": 117.625
+    },
+    {
+      "seconds": 2.75,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.375,
+      "x": 440,
+      "y": 118.5
+    },
+    {
+      "seconds": 2.8125,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.40625,
+      "x": 447.5,
+      "y": 119.375
+    },
+    {
+      "seconds": 2.875,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.4375,
+      "x": 455,
+      "y": 120.25
+    },
+    {
+      "seconds": 2.9375,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.46875,
+      "x": 462.5,
+      "y": 121.125
+    },
+    {
+      "seconds": 3,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.5,
+      "x": 470,
+      "y": 122
+    },
+    {
+      "seconds": 3.0625,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.53125,
+      "x": 477.5,
+      "y": 122.875
+    },
+    {
+      "seconds": 3.125,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.5625,
+      "x": 485,
+      "y": 123.75
+    },
+    {
+      "seconds": 3.1875,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.59375,
+      "x": 492.5,
+      "y": 124.625
+    },
+    {
+      "seconds": 3.25,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.625,
+      "x": 500,
+      "y": 125.5
+    },
+    {
+      "seconds": 3.3125,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.65625,
+      "x": 507.5,
+      "y": 126.375
+    },
+    {
+      "seconds": 3.375,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.6875,
+      "x": 515,
+      "y": 127.25
+    },
+    {
+      "seconds": 3.4375,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.71875,
+      "x": 522.5,
+      "y": 128.125
+    },
+    {
+      "seconds": 3.5,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.75,
+      "x": 530,
+      "y": 129
+    },
+    {
+      "seconds": 3.5625,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.78125,
+      "x": 537.5,
+      "y": 129.875
+    },
+    {
+      "seconds": 3.625,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.8125,
+      "x": 545,
+      "y": 130.75
+    },
+    {
+      "seconds": 3.6875,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.84375,
+      "x": 552.5,
+      "y": 131.625
+    },
+    {
+      "seconds": 3.75,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.875,
+      "x": 560,
+      "y": 132.5
+    },
+    {
+      "seconds": 3.8125,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.90625,
+      "x": 567.5,
+      "y": 133.375
+    },
+    {
+      "seconds": 3.875,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.9375,
+      "x": 575,
+      "y": 134.25
+    },
+    {
+      "seconds": 3.9375,
+      "from": "config",
+      "to": "unit",
+      "libraryPhase": "Training",
+      "progress": 0.96875,
+      "x": 582.5,
+      "y": 135.125
+    },
+    {
+      "seconds": 4,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0,
+      "x": 590,
+      "y": 136
+    },
+    {
+      "seconds": 4.0625,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.03125,
+      "x": 597.5,
+      "y": 135.125
+    },
+    {
+      "seconds": 4.125,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.0625,
+      "x": 605,
+      "y": 134.25
+    },
+    {
+      "seconds": 4.1875,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.09375,
+      "x": 612.5,
+      "y": 133.375
+    },
+    {
+      "seconds": 4.25,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.125,
+      "x": 620,
+      "y": 132.5
+    },
+    {
+      "seconds": 4.3125,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.15625,
+      "x": 627.5,
+      "y": 131.625
+    },
+    {
+      "seconds": 4.375,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.1875,
+      "x": 635,
+      "y": 130.75
+    },
+    {
+      "seconds": 4.4375,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.21875,
+      "x": 642.5,
+      "y": 129.875
+    },
+    {
+      "seconds": 4.5,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.25,
+      "x": 650,
+      "y": 129
+    },
+    {
+      "seconds": 4.5625,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.28125,
+      "x": 657.5,
+      "y": 128.125
+    },
+    {
+      "seconds": 4.625,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.3125,
+      "x": 665,
+      "y": 127.25
+    },
+    {
+      "seconds": 4.6875,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.34375,
+      "x": 672.5,
+      "y": 126.375
+    },
+    {
+      "seconds": 4.75,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.375,
+      "x": 680,
+      "y": 125.5
+    },
+    {
+      "seconds": 4.8125,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.40625,
+      "x": 687.5,
+      "y": 124.625
+    },
+    {
+      "seconds": 4.875,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.4375,
+      "x": 695,
+      "y": 123.75
+    },
+    {
+      "seconds": 4.9375,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.46875,
+      "x": 702.5,
+      "y": 122.875
+    },
+    {
+      "seconds": 5,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.5,
+      "x": 710,
+      "y": 122
+    },
+    {
+      "seconds": 5.0625,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.53125,
+      "x": 717.5,
+      "y": 121.125
+    },
+    {
+      "seconds": 5.125,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.5625,
+      "x": 725,
+      "y": 120.25
+    },
+    {
+      "seconds": 5.1875,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.59375,
+      "x": 732.5,
+      "y": 119.375
+    },
+    {
+      "seconds": 5.25,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.625,
+      "x": 740,
+      "y": 118.5
+    },
+    {
+      "seconds": 5.3125,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.65625,
+      "x": 747.5,
+      "y": 117.625
+    },
+    {
+      "seconds": 5.375,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.6875,
+      "x": 755,
+      "y": 116.75
+    },
+    {
+      "seconds": 5.4375,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.71875,
+      "x": 762.5,
+      "y": 115.875
+    },
+    {
+      "seconds": 5.5,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.75,
+      "x": 770,
+      "y": 115
+    },
+    {
+      "seconds": 5.5625,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.78125,
+      "x": 777.5,
+      "y": 114.125
+    },
+    {
+      "seconds": 5.625,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.8125,
+      "x": 785,
+      "y": 113.25
+    },
+    {
+      "seconds": 5.6875,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.84375,
+      "x": 792.5,
+      "y": 112.375
+    },
+    {
+      "seconds": 5.75,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.875,
+      "x": 800,
+      "y": 111.5
+    },
+    {
+      "seconds": 5.8125,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.90625,
+      "x": 807.5,
+      "y": 110.625
+    },
+    {
+      "seconds": 5.875,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.9375,
+      "x": 815,
+      "y": 109.75
+    },
+    {
+      "seconds": 5.9375,
+      "from": "unit",
+      "to": "bicep",
+      "libraryPhase": "Inference",
+      "progress": 0.96875,
+      "x": 822.5,
+      "y": 108.875
+    },
+    {
+      "seconds": 6,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0,
+      "x": 830,
+      "y": 108
+    },
+    {
+      "seconds": 6.0625,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.03125,
+      "x": 837.5,
+      "y": 108.875
+    },
+    {
+      "seconds": 6.125,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.0625,
+      "x": 845,
+      "y": 109.75
+    },
+    {
+      "seconds": 6.1875,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.09375,
+      "x": 852.5,
+      "y": 110.625
+    },
+    {
+      "seconds": 6.25,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.125,
+      "x": 860,
+      "y": 111.5
+    },
+    {
+      "seconds": 6.3125,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.15625,
+      "x": 867.5,
+      "y": 112.375
+    },
+    {
+      "seconds": 6.375,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.1875,
+      "x": 875,
+      "y": 113.25
+    },
+    {
+      "seconds": 6.4375,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.21875,
+      "x": 882.5,
+      "y": 114.125
+    },
+    {
+      "seconds": 6.5,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.25,
+      "x": 890,
+      "y": 115
+    },
+    {
+      "seconds": 6.5625,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.28125,
+      "x": 897.5,
+      "y": 115.875
+    },
+    {
+      "seconds": 6.625,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.3125,
+      "x": 905,
+      "y": 116.75
+    },
+    {
+      "seconds": 6.6875,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.34375,
+      "x": 912.5,
+      "y": 117.625
+    },
+    {
+      "seconds": 6.75,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.375,
+      "x": 920,
+      "y": 118.5
+    },
+    {
+      "seconds": 6.8125,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.40625,
+      "x": 927.5,
+      "y": 119.375
+    },
+    {
+      "seconds": 6.875,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.4375,
+      "x": 935,
+      "y": 120.25
+    },
+    {
+      "seconds": 6.9375,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.46875,
+      "x": 942.5,
+      "y": 121.125
+    },
+    {
+      "seconds": 7,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.5,
+      "x": 950,
+      "y": 122
+    },
+    {
+      "seconds": 7.0625,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.53125,
+      "x": 957.5,
+      "y": 122.875
+    },
+    {
+      "seconds": 7.125,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.5625,
+      "x": 965,
+      "y": 123.75
+    },
+    {
+      "seconds": 7.1875,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.59375,
+      "x": 972.5,
+      "y": 124.625
+    },
+    {
+      "seconds": 7.25,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.625,
+      "x": 980,
+      "y": 125.5
+    },
+    {
+      "seconds": 7.3125,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.65625,
+      "x": 987.5,
+      "y": 126.375
+    },
+    {
+      "seconds": 7.375,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.6875,
+      "x": 995,
+      "y": 127.25
+    },
+    {
+      "seconds": 7.4375,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.71875,
+      "x": 1002.5,
+      "y": 128.125
+    },
+    {
+      "seconds": 7.5,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.75,
+      "x": 1010,
+      "y": 129
+    },
+    {
+      "seconds": 7.5625,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.78125,
+      "x": 1017.5,
+      "y": 129.875
+    },
+    {
+      "seconds": 7.625,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.8125,
+      "x": 1025,
+      "y": 130.75
+    },
+    {
+      "seconds": 7.6875,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.84375,
+      "x": 1032.5,
+      "y": 131.625
+    },
+    {
+      "seconds": 7.75,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.875,
+      "x": 1040,
+      "y": 132.5
+    },
+    {
+      "seconds": 7.8125,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.90625,
+      "x": 1047.5,
+      "y": 133.375
+    },
+    {
+      "seconds": 7.875,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.9375,
+      "x": 1055,
+      "y": 134.25
+    },
+    {
+      "seconds": 7.9375,
+      "from": "bicep",
+      "to": "review",
+      "libraryPhase": "Agent",
+      "progress": 0.96875,
+      "x": 1062.5,
+      "y": 135.125
+    }
+  ],
+  "staticFlow": {
+    "from": {
+      "id": "config",
+      "name": "Configuration",
+      "region": "Schematic CI lane - not an Azure region",
+      "latitude": 108,
+      "longitude": 350,
+      "phase": "DataOps",
+      "health": "Attention",
+      "detail": "The unit suite inventories 44 public ENABLE_* settings: 41 mapped contracts and three explicit exceptions. AMPLS and RETRIES have no GHA forwarding; AI_FACTORY_HUB records configuration intent only. These are not deployable-feature claims."
+    },
+    "to": {
+      "id": "unit",
+      "name": "Unit \u002B syntax",
+      "region": "Schematic CI lane - not an Azure region",
+      "latitude": 136,
+      "longitude": 590,
+      "phase": "Training",
+      "health": "Ready",
+      "detail": "Unit tests run on ubuntu-22.04 and windows-2022; syntax checks run on Linux. JUnit records actual tests, failures and platform skips. YAML duplicate keys, Python syntax and Bash -n are checked without executing deployment scripts."
+    },
+    "phase": "Training",
+    "progress": 0.375
+  },
+  "pairDemo": {
+    "file": "environment_setup/aifactory/bicep/esml-genai-1/01-foundation.bicep",
+    "firstFlag": "enableDebugging",
+    "secondFlag": "DEBUG_BYO_subnets",
+    "flagCount": 44,
+    "generatedCases": 59,
+    "fullAssignments": "17592186044416",
+    "examples": [
+      {
+        "state": 0,
+        "first": false,
+        "second": false,
+        "caseName": "baseline",
+        "matchingCases": 46
+      },
+      {
+        "state": 1,
+        "first": false,
+        "second": true,
+        "caseName": "toggle_DEBUG_BYO_subnets",
+        "matchingCases": 5
+      },
+      {
+        "state": 2,
+        "first": true,
+        "second": false,
+        "caseName": "toggle_enableDebugging",
+        "matchingCases": 5
+      },
+      {
+        "state": 3,
+        "first": true,
+        "second": true,
+        "caseName": "all_on",
+        "matchingCases": 3
+      }
+    ]
+  }
+}

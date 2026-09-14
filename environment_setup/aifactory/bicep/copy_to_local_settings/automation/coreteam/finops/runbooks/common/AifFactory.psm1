@@ -39,7 +39,7 @@ function Resolve-ProjectNaming {
         return (Get-Content -Raw $ConfigPath | ConvertFrom-Json).naming
     }
     if (-not (Test-Path $SettingsPath)) { throw "Settings file for source '$Source' not found: $SettingsPath" }
-    Write-Output "Reading naming from '$Source': $SettingsPath"
+    Write-Verbose "Reading naming from '$Source': $SettingsPath"
     if ($Source -eq 'github') {
         $s = Get-EnvSettings $SettingsPath
         return @{ aifactoryPrefix=$s.AIFACTORY_PREFIX; aifactorySuffix=$s.AIFACTORY_SUFFIX; projectPrefix=$s.PROJECT_PREFIX;
@@ -63,12 +63,17 @@ function Get-AifResourceGroups {
 }
 
 function Connect-Aif {
-    param([string]$SubscriptionId,[string]$UamiClientId,[switch]$UseCurrentLogin)
-    if ($UseCurrentLogin)      { Write-Output 'Using existing Az PowerShell login.' }
+    param([string]$SubscriptionId,[string]$UamiClientId,[switch]$UseCurrentLogin,[string]$TenantId)
+    Disable-AzContextAutosave -Scope Process | Out-Null
+    if ($UseCurrentLogin)      { Write-Verbose 'Using existing Az PowerShell login.' }
     elseif ($UamiClientId)     { Connect-AzAccount -Identity -AccountId $UamiClientId | Out-Null }
     else                       { Connect-AzAccount -Identity | Out-Null }
     if ($SubscriptionId) { Select-AzSubscription -SubscriptionId $SubscriptionId | Out-Null }
-    return (Get-AzContext).Subscription.Id
+    $context = Get-AzContext
+    if (-not $context -or ($TenantId -and $context.Tenant.Id -ne $TenantId) -or ($SubscriptionId -and $context.Subscription.Id -ne $SubscriptionId)) {
+        throw 'Azure context does not match the selected subscription and tenant.'
+    }
+    return $context.Subscription.Id
 }
 
 function Get-ProjectUami {

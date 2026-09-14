@@ -1,0 +1,6 @@
+# Bash entrypoints must also run on Linux CI and Linux deployment agents.
+00-start.sh text eol=lf
+bootstrap/*.sh text eol=lf
+bootstrap/**/*.sh text eol=lf
+environment_setup/aifactory/bicep/**/*.sh text eol=lf
+environment_setup/unit-tests/**/*.sh text eol=lf

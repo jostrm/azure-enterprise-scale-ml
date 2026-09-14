@@ -8,6 +8,7 @@ readonly AIF_ADO_RESOURCE="https://app.vssps.visualstudio.com/"
 readonly AIF_SCALESET_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export MSYS2_ARG_CONV_EXCL="${MSYS2_ARG_CONV_EXCL:+$MSYS2_ARG_CONV_EXCL;}/subscriptions/;/providers/;/eid1/;scope=/subscriptions/;privateLinksDnsZones="
 readonly AIF_SIMPLE_MODE_CONTRACT_VERSION=2
+readonly AIF_SIMPLE_OPTIONAL_GATEWAY_CONTRACT=1
 source "$AIF_SCALESET_LIB_DIR/release_version.sh"
 
 aif_scaleset_usage() {
@@ -46,7 +47,10 @@ Common non-interactive variables:
   AIF_ADMIN_VM_SIZE=Standard_D2s_v5
   AIF_SETUP_HUB_ACCESS=y|n
   AIF_CONFIGURE_VPN_CLIENT=y|n
-  AIF_SIMPLE_MODE=true   Opt in to private-ai-foundation-v1 (GHA, DEV only).
+  AIF_SIMPLE_MODE=true   Opt in to private-ai-foundation-v2 (GHA, DEV only).
+  AIF_ENABLE_APPLICATION_GATEWAY=true|false  Optional new gateway; omitted means true for legacy compatibility.
+                        New UI defaults false; false skips all gateway inputs/resources.
+                        Existing customer gateways are never adopted or modified.
   AIF_COST_CENTER=123456 Simple Mode common and project cost-center tags.
   AIF_SUBMODULE_REF=<sha> Verified published commit (required for Simple Mode).
 
@@ -215,6 +219,11 @@ aif_prompt_yes_no() {
 }
 
 aif_simple_mode_defaults() {
+  AIF_ENABLE_APPLICATION_GATEWAY="${AIF_ENABLE_APPLICATION_GATEWAY-true}"
+  case "$AIF_ENABLE_APPLICATION_GATEWAY" in
+    true|false) ;;
+    *) aif_error "AIF_ENABLE_APPLICATION_GATEWAY must be true or false." >&2; exit 1 ;;
+  esac
   AIF_SIMPLE_MODE="${AIF_SIMPLE_MODE:-false}"
   if [[ "$AIF_SIMPLE_MODE" != "true" && "$AIF_SIMPLE_MODE" != "false" ]]; then
     aif_error "AIF_SIMPLE_MODE must be true or false." >&2
@@ -281,6 +290,7 @@ aif_simple_gateway_config() {
   [[ -z "${1:-}" ]] || extra=(--certificate-metadata "$1")
   "${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/aifactory_scaleset_config.py" \
     --simple-gateway-inputs \
+    --enable-application-gateway "${AIF_ENABLE_APPLICATION_GATEWAY-true}" \
     --project-resources "$AIF_SIMPLE_PROJECT_RESOURCES_JSON" \
     --repository-visibility "$GITHUB_REPOSITORY_VISIBILITY" \
     --app-gateway-hostname "${AIF_APP_GATEWAY_HOSTNAME:-}" \
@@ -289,8 +299,18 @@ aif_simple_gateway_config() {
     "${extra[@]}"
 }
 
+aif_simple_project_config() {
+  local selection=()
+  if [[ -n "${AIF_SIMPLE_PROJECT_RESOURCES_JSON+x}" ]]; then
+    selection=(--project-resources "$AIF_SIMPLE_PROJECT_RESOURCES_JSON")
+  fi
+  "${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/aifactory_scaleset_config.py" \
+    "${selection[@]}" "$@"
+}
+
 aif_validate_simple_gateway_prerequisites() {
   [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]] || return 0
+  [[ "${AIF_ENABLE_APPLICATION_GATEWAY-true}" == "true" ]] || return 0
   local feature vault_name certificate_name
   feature="$(az feature show --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
     --namespace Microsoft.Network --name EnableApplicationGatewayNetworkIsolation \
@@ -815,6 +835,9 @@ aif_confirm_summary() {
   fi
   aif_value "Team group" "$AIF_TEAM_GROUP_NAME"
   aif_value "Seeding vault" "$AIF_SEEDING_KEYVAULT_NAME"
+  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
+    aif_value "Deploy a new Application Gateway" "${AIF_ENABLE_APPLICATION_GATEWAY-true}"
+  fi
   if [[ "$AIF_YES" == "true" ]]; then
     return
   fi
@@ -955,12 +978,10 @@ aif_register_resource_providers() {
     Microsoft.OperationalInsights microsoft.insights
   )
   if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
-    required=(
-      Microsoft.Resources Microsoft.Network Microsoft.Storage Microsoft.KeyVault
-      Microsoft.ManagedIdentity Microsoft.CognitiveServices Microsoft.Search
-      Microsoft.ContainerRegistry Microsoft.OperationalInsights microsoft.insights
-      Microsoft.PolicyInsights Microsoft.App
-    )
+    local selected_providers
+    selected_providers="$(aif_simple_project_config --simple-project-providers)" || return 1
+    selected_providers="${selected_providers//$'\r'/}"
+    mapfile -t required <<< "$selected_providers"
     providers=("${required[@]}")
   fi
   local provider provider_error
@@ -992,9 +1013,35 @@ aif_register_resource_providers() {
 
 aif_ensure_first_party_enterprise_apps() {
   if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
-    AIF_AZURE_ML_PRINCIPAL_ID=""
-    AIF_DATABRICKS_PRINCIPAL_ID=""
-    aif_info "Simple Mode disables ML/Databricks/legacy Foundry Hub; no temporary workspaces or first-party apps are needed."
+    local binding resource variable app_id selected principal
+    for binding in \
+      azure-machine-learning:AIF_AZURE_ML_PRINCIPAL_ID:0736f41a-0425-4b46-bdb5-1563eff02385 \
+      databricks:AIF_DATABRICKS_PRINCIPAL_ID:2ff814a6-3304-4ab8-85cb-cd0e6f879c1d; do
+      IFS=: read -r resource variable app_id <<< "$binding"
+      selected="$(aif_simple_project_config --simple-project-selected "$resource")" || return 1
+      if [[ "${selected//$'\r'/}" != "true" ]]; then
+        printf -v "$variable" '%s' ""
+        continue
+      fi
+      principal="${!variable:-}"
+      if [[ -z "$principal" ]]; then
+        principal="$(az ad sp show --id "$app_id" --query id --output tsv 2>/dev/null)" || principal=""
+        if [[ -z "${principal//$'\r'/}" ]]; then
+          # Materialize only the selected first-party principal, never a public temporary workspace.
+          principal="$(az ad sp create --id "$app_id" --query id --output tsv)" || {
+            aif_error "Ask a tenant administrator to provision the $resource enterprise application or supply its object ID." >&2
+            return 1
+          }
+        fi
+      fi
+      principal="${principal//$'\r'/}"
+      if ! aif_validate_guid "$principal"; then
+        aif_error "The selected $resource enterprise-app object ID must be a GUID." >&2
+        return 1
+      fi
+      printf -v "$variable" '%s' "$principal"
+    done
+    aif_info "Selected workload enterprise applications are ready; no temporary workspaces were created."
     return 0
   fi
   if [[ -n "$AIF_AZURE_ML_PRINCIPAL_ID" ||
@@ -2439,7 +2486,7 @@ aif_write_state_and_configure() {
     "$AIF_RUNNER_MODE" "${ADO_AGENT_POOL:-}" "${ADO_AGENT_NAME:-}" \
     "$AIF_ADMIN_VM_SIZE" "${AIF_SIMPLE_MODE:-false}" "${AIF_COST_CENTER:-}" \
     "$AIF_TEAM_MEMBER_EMAIL" "${AIF_SIMPLE_PROJECT_RESOURCES_JSON:-}" \
-    "${GITHUB_REPOSITORY_VISIBILITY:-private}" <<'PY'
+    "${GITHUB_REPOSITORY_VISIBILITY:-private}" "${AIF_ENABLE_APPLICATION_GATEWAY-true}" <<'PY'
 import json
 import sys
 
@@ -2460,6 +2507,7 @@ keys = (
     "runner_mode", "ado_agent_pool", "ado_agent_name", "admin_vm_size",
     "simple_mode", "cost_center", "team_member_email",
     "simple_project_resources_json", "github_repository_visibility",
+    "enable_application_gateway",
 )
 values = dict(zip(keys, sys.argv[2:]))
 values["dev_service_connection"] = values["ado_service_connection"]
@@ -3489,7 +3537,8 @@ aif_prepare_simple_integrated_subnets() {
     --vnet-name "$AIF_HUB_VNET_NAME" \
     --output json > "$existing_file"
   plan="$("${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/aifactory_scaleset_config.py" \
-    --simple-mode-hub-subnets "$existing_file")"
+    --simple-mode-hub-subnets "$existing_file" \
+    --enable-application-gateway "${AIF_ENABLE_APPLICATION_GATEWAY-true}")"
   AIF_SIMPLE_GATEWAY_SUBNET="$("${AIF_PYTHON[@]}" -c 'import json,sys; print(json.loads(sys.argv[1])["GatewaySubnet"])' "$plan" | tr -d '\r')"
   AIF_SIMPLE_RESOLVER_SUBNET="$("${AIF_PYTHON[@]}" -c 'import json,sys; print(json.loads(sys.argv[1])["snet-dns-private-resolver"])' "$plan" | tr -d '\r')"
 }
@@ -3509,6 +3558,8 @@ aif_ensure_simple_hub_artifacts() {
 }
 
 aif_prepare_simple_application_gateway() {
+  [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]] || return 0
+  [[ "${AIF_ENABLE_APPLICATION_GATEWAY-true}" == "true" ]] || return 0
   local gateway_name="agw-${AIF_PREFIX}${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}" principal_id status
   local common_rg="${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"
   az deployment group create --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
@@ -3533,6 +3584,7 @@ aif_prepare_simple_application_gateway() {
 
 aif_deploy_simple_application_gateway() {
   [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]] || return 0
+  [[ "${AIF_ENABLE_APPLICATION_GATEWAY-true}" == "true" ]] || return 0
   local gateway_name="agw-${AIF_PREFIX}${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"
   local common_rg="${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"
   az deployment group create --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
@@ -3852,6 +3904,7 @@ aif_scaleset_main() {
     "Prepare subscription, identity, access, automation, common resources, and project."
 
   aif_simple_stage preflight
+  aif_simple_mode_defaults
   aif_require_command bash
   aif_require_command git
   aif_require_command realpath
@@ -3861,7 +3914,6 @@ aif_scaleset_main() {
   [[ "$AIF_ROUTE" != "gha" ]] || aif_require_command gh
   aif_python
   aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE" "${AIF_CREATE_DEFAULT_VERSION:-main}"
-  aif_simple_mode_defaults
   if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
     aif_simple_gateway_config >/dev/null
   fi

@@ -1,6 +1,7 @@
 """Offline contract tests for Foundry, Azure OpenAI, and AI Search telemetry."""
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
@@ -59,13 +60,21 @@ class TestDiagnosticsTelemetry(unittest.TestCase):
         self.assertIn("category: 'OperationLogs'", self.search_diagnostics)
         self.assertIn("category: 'AllMetrics'", self.search_diagnostics)
         self.assertIn(
-            "if ((enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) && !skipDiagAISearch)",
+            "var privateFoundryStandardAgents = enableAIFoundry && !enablePublicGenAIAccess",
             self.cognitive_services,
         )
-        self.assertNotIn(
-            "if (!aiSearchExists && (enableAISearch || (enableAFoundryCaphost && enableAIFoundry)) && !skipDiagAISearch)",
+        self.assertIn(
+            "var needsAISearch = enableAISearch || privateFoundryStandardAgents",
             self.cognitive_services,
         )
+        condition = re.search(
+            r"module\s+aiSearchDiagnostics\s+'[^']+'\s*=\s*if\s*\((.*?)\)\s*\{",
+            self.cognitive_services,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(condition, "AI Search diagnostics must have an explicit condition")
+        self.assertEqual(re.sub(r"\s+", "", condition.group(1)), "needsAISearch&&!skipDiagAISearch")
+        self.assertNotIn("aiSearchExists", condition.group(1))
 
 
 if __name__ == "__main__":

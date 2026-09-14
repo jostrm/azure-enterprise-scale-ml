@@ -155,11 +155,13 @@ they are not supported substitutes for a scoped lifecycle manifest.
 
 `AIF_SIMPLE_MODE=true` opts the GHA create entrypoint into contract v2,
 `private-ai-foundation-v2`. Use `--non-interactive --yes --repo-root PATH` and
-wait for the full common → access hub → project → private HTTPS gateway chain.
+wait for the full common → access hub → project chain, followed by the private
+HTTPS gateway only when its deployment is enabled.
 Use the following **offline, read-only** preview instead of a deployment dry run:
 
 ```bash
 python bootstrap/lib/aifactory_scaleset_config.py --simple-mode-manifest
+python bootstrap/lib/aifactory_scaleset_config.py --simple-mode-manifest --enable-application-gateway false
 ```
 
 Provide tenant/subscription, region, prefix, repository and initial team identity
@@ -173,24 +175,73 @@ Fixed settings are `AIF_TOPOLOGY=s`, `AIF_NETWORK_MODE=priv`,
 `AIF_CONFIGURE_VPN_CLIENT=false`, `AIF_DEV_VNET_CIDR=172.16.0.0/20`,
 and `AIF_PROJECT_NUMBER=001`.
 
-The current schema keeps project Storage, Key Vault, managed identities,
-Foundry, its capability host, **Basic AI Search** and Cosmos DB required.
-`AIF_SIMPLE_PROJECT_RESOURCES_JSON=[]` removes optional Application Insights,
-**not** those required dependencies. Model deployment toggles remain off.
-This is not a preloaded-model or runnable-agent guarantee.
+Only project Storage, Key Vault and managed identities are always required.
+Foundry is optional and selected by default, together with its capability host,
+**Basic AI Search**, Cosmos DB and Application Insights. Selecting Foundry requires
+all three dependencies; its capability host cannot be selected without Foundry.
+The UI clears those three when Foundry is unchecked, after which Search and Cosmos DB
+can be selected independently. Explicit `AIF_SIMPLE_PROJECT_RESOURCES_JSON=[]`
+deploys only the baseline project foundation. Omitting the selection preserves the
+default Foundry bundle. Explicit incomplete dependencies are rejected before Azure
+mutations, not silently re-enabled; valid selections are ordered by the catalog.
 
-Gateway inputs are all required for this contract:
+Additional optional IDs are `azure-machine-learning`, `aks-for-azure-ml`, `aks`,
+`databricks`, `datafactory`, `event-hubs`, `postgresql` and `container-apps`.
+`aks-for-azure-ml` requires `azure-machine-learning`; standalone `aks` is independent.
+AML and Container Apps also require their linked Application Insights; this is a
+conditional dependency, not a globally required service. Include that dependency
+in explicit CLI selections (for example `["azure-machine-learning","application-insights"]`).
+All selected services map to the existing pipeline flags, with canonical baseline
+SKUs (Event Hubs Standard is required for Private Link). Resource-provider
+registration follows the selection. ML/Databricks materialize only their selected
+first-party enterprise applications, never temporary public workspaces; a tenant
+administrator may need to provision those applications or supply their object IDs.
+Foundry-specific deployment and capability-host checks skip when Foundry is off;
+agent network injection is disabled, while the common, networking, project, data
+and ML phases still run.
+
+The additive literal `projectResourceSelection` manifest contract has version 1
+and strict dependency validation. Publish the matching source before using it.
+All model deployment toggles remain off and model SKU defaults stay
+`DataZoneStandard`. This is not a preloaded-model or runnable-agent guarantee.
+
+Deploying a **new Application Gateway is optional**, not a prerequisite for private
+Foundry agents. New UI selections default off. Set
+`AIF_ENABLE_APPLICATION_GATEWAY=false` to avoid deploying a second billable gateway
+when a customer already has a central gateway, or when no application ingress is
+needed. This does not adopt, integrate with, or modify that existing gateway.
+The environment accepts only lowercase `true` or `false`; empty/noncanonical
+values fail before cloud operations. **Omitting it preserves legacy enabled
+behavior** for existing automation.
+
+When false, gateway hostname/backend/certificate inputs may be blank and all
+gateway-specific feature/certificate checks, subnet reservation, NSG, identity,
+certificate role grant/private endpoint, frontend DNS, deployment and backend
+health checks are skipped. VPN, DNS Private Resolver, required private DNS zones
+and the selected project workloads remain enabled. No environment, including Prod,
+universally requires a new Application Gateway.
+
+This is an additive v2 capability (`AIF_SIMPLE_OPTIONAL_GATEWAY_CONTRACT=1`), not
+a replacement for v2. The manifest's literal `appGatewayDeployment` advertises
+`default: false`, `omittedDefault: true`, and `supported: [false, true]`.
+Publish the matching bootstrap and infrastructure source together and use the
+verified published commit before deploying; updating only the UI/API is insufficient.
+
+Gateway inputs below are required **only when deploying a new gateway**:
 
 | Environment input | Helper/API input | Constraint |
 |---|---|---|
+| `AIF_ENABLE_APPLICATION_GATEWAY` | `--enable-application-gateway` / `enable_application_gateway` | `true` or `false`; new UI false, omitted legacy true |
 | `AIF_APP_GATEWAY_HOSTNAME` | `--app-gateway-hostname` / `app_gateway_hostname` | Custom frontend FQDN covered by certificate DNS SAN |
 | `AIF_APP_GATEWAY_BACKEND_FQDN` | `--app-gateway-backend-fqdn` / `app_gateway_backend_fqdn` | Distinct private RFC1918 HTTPS backend, reachable from the new VNet, trusted TLS, unauthenticated `GET /` returns 200–399 |
 | `AIF_APP_GATEWAY_CERT_SECRET_ID` | `--app-gateway-certificate-secret-id` / `app_gateway_certificate_secret_id` | Versionless `https://<vault>.vault.azure.net/secrets/<name>` URI of an enabled, valid, exportable PFX certificate in an RBAC-enabled Dev-subscription vault |
 
-No certificate secret value is embedded in these inputs. The private-network
-Application Gateway subscription feature must already be registered.
-Gateway/resolver/application subnets are reserved before project allocation:
-`172.16.1.0/27`, `172.16.1.32/28`, `172.16.2.0/24`. Conflicting existing
+No certificate secret value is embedded in these inputs. When gateway deployment
+is enabled, the private-network Application Gateway subscription feature must
+already be registered; existing secure HTTPS validation and readiness checks remain.
+VPN gateway/resolver subnets are reserved before project allocation:
+`172.16.1.0/27`, `172.16.1.32/28`. The Application Gateway block `172.16.2.0/24`
+is reserved only when its deployment is enabled. Conflicting existing
 allocations are rejected, not moved or deleted.
 
 The access hub includes billable VPN Gateway and DNS Private Resolver resources.
@@ -233,7 +284,7 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 342 |
+| `yaml` | 343 |
 | `env` | 341 |
 | `bootstrap` | 78 |
 | `helper` | 14 |
@@ -303,7 +354,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:enableAdminVM --><!-- parameter json.dev:enableAdminVM -->`enableAdminVM` | `ENABLE_ADMIN_VM` | O | Y: `"false"`<br>J.dev: `"false"` | Enable Admin VM in common RG |
 | <!-- parameter yaml:enableAksForAzureML --><!-- parameter json.dev:enableAksForAzureML -->`enableAksForAzureML` | `ENABLE_AKS_FOR_AZURE_ML` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy AKS for Azure ML inference |
 | <!-- parameter yaml:enableAppInsightsDashboard --><!-- parameter json.dev:enableAppInsightsDashboard -->`enableAppInsightsDashboard` | `ENABLE_APPINSIGHTS_DASHBOARD` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Application Insights dashboard |
-| <!-- parameter json.dev:enableApplicationInsights -->`enableApplicationInsights` | `ENABLE_APPLICATION_INSIGHTS` | O | Y: absent<br>J.dev: `"true"` | Workspace-based project Application Insights |
+| <!-- parameter yaml:enableApplicationInsights --><!-- parameter json.dev:enableApplicationInsights -->`enableApplicationInsights` | `ENABLE_APPLICATION_INSIGHTS` | O | Y: `"true"`<br>J.dev: `"true"` | Deploy project Application Insights |
 | <!-- parameter yaml:enableAzureAIVision --><!-- parameter json.dev:enableAzureAIVision -->`enableAzureAIVision` | `ENABLE_AZURE_AI_VISION` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure AI Vision |
 | <!-- parameter yaml:enableAzureMachineLearning --><!-- parameter json.dev:enableAzureMachineLearning -->`enableAzureMachineLearning` | `ENABLE_AZURE_MACHINE_LEARNING` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure ML workspace |
 | <!-- parameter yaml:enableAzureOpenAI --><!-- parameter json.dev:enableAzureOpenAI -->`enableAzureOpenAI` | `ENABLE_AZURE_OPENAI` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy standalone Azure OpenAI |
@@ -1060,9 +1111,10 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIF_ACCESS_HUB_VNET_NAME -->`AIF_ACCESS_HUB_VNET_NAME` | C | `""` | Aif access hub vnet name override; see create launcher. |
 | <!-- parameter bootstrap:AIF_ADD_BASTION -->`AIF_ADD_BASTION` | O | `""` | Compatibility input; collection resets this to false. Access-hub Bastion is controlled separately. |
 | <!-- parameter bootstrap:AIF_ADMIN_VM_SIZE -->`AIF_ADMIN_VM_SIZE` | O | `"Standard_D2s_v5"` | Self-hosted admin VM size |
-| <!-- parameter bootstrap:AIF_APP_GATEWAY_BACKEND_FQDN -->`AIF_APP_GATEWAY_BACKEND_FQDN` | C | `""` | Simple-mode distinct private HTTPS backend; trusted TLS and unauthenticated GET / returning 200-399. |
-| <!-- parameter bootstrap:AIF_APP_GATEWAY_CERT_SECRET_ID -->`AIF_APP_GATEWAY_CERT_SECRET_ID` | C | `""` | Simple-mode versionless Key Vault PFX certificate-secret URI, not a secret value. |
-| <!-- parameter bootstrap:AIF_APP_GATEWAY_HOSTNAME -->`AIF_APP_GATEWAY_HOSTNAME` | C | `""` | Simple-mode custom frontend FQDN covered by certificate DNS SAN. |
+| <!-- parameter bootstrap:AIF_APP_GATEWAY_BACKEND_FQDN -->`AIF_APP_GATEWAY_BACKEND_FQDN` | C | `""` | Only when new gateway enabled: distinct private HTTPS backend; trusted TLS and unauthenticated GET / returning 200-399. |
+| <!-- parameter bootstrap:AIF_APP_GATEWAY_CERT_SECRET_ID -->`AIF_APP_GATEWAY_CERT_SECRET_ID` | C | `""` | Only when new gateway enabled: versionless Key Vault PFX certificate-secret URI, not a secret value. |
+| <!-- parameter bootstrap:AIF_APP_GATEWAY_HOSTNAME -->`AIF_APP_GATEWAY_HOSTNAME` | C | `""` | Only when new gateway enabled: custom frontend FQDN covered by certificate DNS SAN. |
+| <!-- parameter bootstrap:AIF_ENABLE_APPLICATION_GATEWAY -->`AIF_ENABLE_APPLICATION_GATEWAY` | O | `"true"` | Optional new Simple-mode gateway; only lowercase true/false. Omitted preserves legacy on; new UI defaults off. |
 | <!-- parameter bootstrap:AIF_AZURE_ML_PRINCIPAL_ID -->`AIF_AZURE_ML_PRINCIPAL_ID` | O | `""` | Existing Azure Machine Learning enterprise-application object ID; otherwise discovered/ensured. |
 | <!-- parameter bootstrap:AIF_BOOTSTRAP_RESOURCE_GROUP -->`AIF_BOOTSTRAP_RESOURCE_GROUP` | O | `"rg-${AIF_PREFIX%-}-bootstrap-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"` | Aif bootstrap resource group override; see create launcher. |
 | <!-- parameter bootstrap:AIF_CONFIGURE_VPN_CLIENT -->`AIF_CONFIGURE_VPN_CLIENT` | O | `"$configure_vpn_client_default"` | Install and configure Azure VPN Client on this computer? (Y/n) |

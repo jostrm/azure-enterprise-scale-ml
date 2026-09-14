@@ -30,8 +30,15 @@
 #>
 
 param(
+    # aifactory.aggregate-report.v1: selected-project actual cost only, no upload or global Az context.
+    [string]$MonitoringRequest,
+    [string]$MonitoringPython,
     # --- Identity / scope ---
     [string]$SubscriptionId,
+    [string]$TenantId,
+    [string]$ProjectNumber,
+    [string]$ProjectResourceGroup,
+    [string]$CommonResourceGroup,
     # Project UAMI client id (mi-prj*). If empty -> Automation Account System MI.
     [string]$UamiClientId,
     [string]$Env,
@@ -44,6 +51,9 @@ param(
 
     # --- Config + source ---
     [string]$ConfigPath = "$PSScriptRoot/report-config.json",
+    [string]$ConfigJson,
+    [ValidateSet('Markdown','Json')] [string]$ReportFormat = 'Markdown',
+    [switch]$NoUpload,
     [ValidateSet('github','ado','config')] [string]$Source = 'config',
     [string]$SettingsPath,
 
@@ -52,6 +62,7 @@ param(
     [string]$Currency,
     # Include a next-period forecast column (Cost Management forecast API).
     [switch]$NoForecast,
+    [ValidateRange(0,90)] [int]$LookbackDays = 0,
 
     # --- Output: common data lake (optional; replaces old 123_upload_to_datalake.sh) ---
     [string]$OutputBlobStorageAccount,   # if empty -> discovered in common RG (dls*/*esml* datalake)
@@ -67,15 +78,61 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+if ($MonitoringRequest) {
+    if (-not $MonitoringPython) { throw 'The reviewed Monitoring Python runtime is required.' }
+    & $MonitoringPython -I -B "$PSScriptRoot/../common/monitoring_report.py" --request $MonitoringRequest
+    exit $LASTEXITCODE
+}
+if ($ReportFormat -eq 'Json') {
+    $WarningPreference = 'SilentlyContinue'
+    $ProgressPreference = 'SilentlyContinue'
+    $InformationPreference = 'SilentlyContinue'
+}
+$reportWarnings = [System.Collections.Generic.List[string]]::new()
+$reportFailure = 'Report configuration or target is invalid.'
+trap {
+    if ($MonitoringRequest) { throw }
+    if ($ReportFormat -eq 'Json') {
+        [ordered]@{
+            schema_version=1; report_type='showback'; source=$(if ($DryRun) {'sample'} else {'live'})
+            generated_at=[datetime]::UtcNow.ToString('o'); period=@{days=$LookbackDays}
+            target=@{subscription_id=$SubscriptionId; project_resource_group=$ProjectResourceGroup; common_resource_group=$CommonResourceGroup; environment=$Env}
+            status='failed'; warnings=@($reportFailure); tables=@(); charts=@(); output="# Showback report`n`n$reportFailure"
+        } | ConvertTo-Json -Depth 12 -Compress | Write-Output
+        exit 1
+    }
+    Write-Error $reportFailure
+    exit 1
+}
+function Write-ReportInfo([string]$Message) {
+    if ($ReportFormat -eq 'Json') { Write-Verbose $Message } else { Write-Output $Message }
+}
+function Format-Cost($Value) {
+    if ($null -eq $Value) { return 'N/A' }
+    return [math]::Round($Value,2)
+}
 
-Import-Module "$PSScriptRoot/../common/AifFactory.psm1" -Force
+$sharedModule = "$PSScriptRoot/../common/AifFactory.psm1"
+if (Test-Path $sharedModule) {
+    Import-Module $sharedModule -Force -WarningAction SilentlyContinue
+} elseif (Get-Module -ListAvailable AifFactory) {
+    Import-Module AifFactory -Force -WarningAction SilentlyContinue
+} else {
+    $reportFailure = 'The shared AifFactory module is unavailable. Import the existing common/AifFactory.psm1 into the Automation runtime.'
+    throw $reportFailure
+}
 
 # ---------------------------------------------------------------------------
 # 1) Resolve naming (param > github/ado source > config.naming)
 # ---------------------------------------------------------------------------
-if (-not (Test-Path $ConfigPath)) { throw "Config file not found: $ConfigPath" }
-$cfg = Get-Content -Raw -Path $ConfigPath | ConvertFrom-Json
+if ($ConfigJson) { $cfg = $ConfigJson | ConvertFrom-Json }
+else {
+    if (-not (Test-Path $ConfigPath)) { throw "Config file not found: $ConfigPath" }
+    $cfg = Get-Content -Raw -Path $ConfigPath | ConvertFrom-Json
+}
 $sb  = $cfg.showback
+if ($sb.PSObject.Properties['includeForecast'] -and -not $sb.includeForecast) { $NoForecast = $true }
+$forecastAvailable = -not $NoForecast
 
 if ($Source -ne 'config') {
     $path = if ($SettingsPath) { $SettingsPath }
@@ -100,6 +157,7 @@ $naming = @{
 
 # Common RG follows the same rule as the token report runbook.
 $commonRg = "$($naming.aifactoryPrefix)$($naming.vnetResourceGroupBase)-$($naming.locationShort)-$($naming.env)$($naming.aifactorySuffix)"
+if ($CommonResourceGroup) { $commonRg = $CommonResourceGroup }
 
 # Project RG regex: {prefix}{projectPrefix}project<NNN>-{loc}-{env}{aifSuffix}{prjSuffix}
 # (same pattern the legacy 121_discover_resource_groups.sh matched, but built from naming rules).
@@ -108,11 +166,14 @@ $rgRegex = '^' + [regex]::Escape("$($naming.aifactoryPrefix)$($naming.projectPre
 
 $currency = if ($Currency) { $Currency } elseif ($sb -and $sb.currency) { $sb.currency } else { 'USD' }
 $reportDate = Get-Date -Format 'yyyy-MM-dd'
+$periodEnd = [datetime]::UtcNow
+$periodStart = if ($LookbackDays) { $periodEnd.AddDays(-$LookbackDays) } else { [datetime]::new($periodEnd.Year,$periodEnd.Month,1,0,0,0,[DateTimeKind]::Utc) }
+$periodLabel = if ($LookbackDays) { "selected $LookbackDays-day window" } else { 'current billing month to date' }
 
-Write-Output "=== AI Factory FinOps Showback Report ==="
-Write-Output "Environment : $($naming.env)"
-Write-Output "Common RG   : $commonRg"
-Write-Output "RG pattern  : $rgRegex"
+Write-ReportInfo "=== AI Factory FinOps Showback Report ==="
+Write-ReportInfo "Environment : $($naming.env)"
+Write-ReportInfo "Common RG   : $commonRg"
+Write-ReportInfo "RG pattern  : $rgRegex"
 
 # ---------------------------------------------------------------------------
 # 2) Connect + discover project resource groups
@@ -120,40 +181,48 @@ Write-Output "RG pattern  : $rgRegex"
 $projects = New-Object System.Collections.Generic.List[object]
 
 if ($DryRun) {
-    Write-Output "DRY-RUN: using sample data from config.showback.sampleProjects (no Azure calls)."
+    Write-ReportInfo "DRY-RUN: using sample data from config.showback.sampleProjects (no Azure calls)."
+    $reportWarnings.Add('Sample costs only; no Azure authentication or queries were performed.')
     foreach ($p in $sb.sampleProjects) {
+        if ($ProjectNumber -and $p.projectNumber -ne $ProjectNumber) { continue }
         $projects.Add([pscustomobject]@{
-            ResourceGroup = $p.resourceGroup; ProjectNumber = $p.projectNumber
+            ResourceGroup = $(if ($ProjectResourceGroup) {$ProjectResourceGroup} else {$p.resourceGroup}); ProjectNumber = $p.projectNumber
             CostCenter = $p.costCenter; Owner = $p.owner
             CurrentCost = [double]$p.currentCost; ForecastCost = [double]$p.forecastCost
         })
     }
 } else {
-    $SubscriptionId = Connect-Aif -SubscriptionId $SubscriptionId -UamiClientId $UamiClientId -UseCurrentLogin:$UseCurrentLogin
-    Write-Output "Subscription: $SubscriptionId"
+    $reportFailure = 'Azure authentication or selected subscription/tenant validation failed.'
+    $SubscriptionId = Connect-Aif -SubscriptionId $SubscriptionId -TenantId $TenantId -UamiClientId $UamiClientId -UseCurrentLogin:$UseCurrentLogin
+    Write-ReportInfo "Subscription: $SubscriptionId"
 
     # Discover matching project RGs + their tags
-    $allRgs = Get-AzResourceGroup
+    $reportFailure = 'Project resource-group discovery failed for the selected target.'
+    $allRgs = if ($ProjectResourceGroup) { Get-AzResourceGroup -Name $ProjectResourceGroup } else { Get-AzResourceGroup }
     $matched = @{}
     foreach ($rg in $allRgs) {
         $m = [regex]::Match($rg.ResourceGroupName, $rgRegex)
-        if (-not $m.Success) { continue }
+        if (-not $m.Success -and -not $ProjectResourceGroup) { continue }
+        if ($ProjectNumber -and -not $ProjectResourceGroup -and $m.Groups['num'].Value -ne $ProjectNumber) { continue }
         $tags = $rg.Tags
         $matched[$rg.ResourceGroupName] = [pscustomobject]@{
             ResourceGroup = $rg.ResourceGroupName
-            ProjectNumber = $m.Groups['num'].Value
+            ProjectNumber = $(if ($ProjectNumber) {$ProjectNumber} else {$m.Groups['num'].Value})
             CostCenter    = if ($tags -and $tags['CostCenter']) { $tags['CostCenter'] } else { 'Unknown' }
             Owner         = if ($tags -and $tags['AIF-Project Owners']) { $tags['AIF-Project Owners'] } else { 'Unknown' }
-            CurrentCost   = 0.0
-            ForecastCost  = 0.0
+            CurrentCost   = $null
+            ForecastCost  = $null
         }
     }
-    Write-Output "Matched project resource groups: $($matched.Count)"
-    if ($matched.Count -eq 0) { Write-Warning "No AI Factory project resource groups matched the naming pattern." }
+    Write-ReportInfo "Matched project resource groups: $($matched.Count)"
+    if ($matched.Count -eq 0) {
+        $reportFailure = 'No AI Factory project resource groups matched the selected target.'
+        throw $reportFailure
+    }
 
     # ---- 3) Cost Management: ActualCost month-to-date, grouped by ResourceGroupName ----
     $costUri = "/subscriptions/$SubscriptionId/providers/Microsoft.CostManagement/query?api-version=2023-11-01"
-    $costBody = @{
+    $costSpec = @{
         type      = 'ActualCost'
         timeframe = 'MonthToDate'
         dataset   = @{
@@ -161,20 +230,40 @@ if ($DryRun) {
             aggregation = @{ totalCost = @{ name = 'Cost'; function = 'Sum' } }
             grouping    = @( @{ type = 'Dimension'; name = 'ResourceGroupName' } )
         }
-    } | ConvertTo-Json -Depth 10
+    }
+    if ($LookbackDays) {
+        $costSpec.timeframe = 'Custom'
+        $costSpec.timePeriod = @{from=$periodStart.ToString('o'); to=$periodEnd.ToString('o')}
+    }
+    $costBody = $costSpec | ConvertTo-Json -Depth 10
 
     try {
+        $reportFailure = 'Actual cost query failed or returned incomplete data; zero cost cannot be inferred.'
+        do {
         $resp = Invoke-AzRestMethod -Method POST -Path $costUri -Payload $costBody
         if ($resp.StatusCode -ge 400) { throw "Cost query HTTP $($resp.StatusCode): $($resp.Content)" }
         $data = $resp.Content | ConvertFrom-Json
         $cols = @($data.properties.columns.name)
         $iCost = [array]::IndexOf($cols, 'Cost')
         $iRg   = [array]::IndexOf($cols, 'ResourceGroupName')
+        $iCurrency = [array]::IndexOf($cols, 'Currency')
+        if ($iCost -lt 0 -or $iRg -lt 0) { throw $reportFailure }
+        if (-not @($data.properties.rows).Count) { $reportWarnings.Add('Cost Management returned no rows for this period; costs may not yet be available.') }
         foreach ($row in $data.properties.rows) {
             $rgName = "$($row[$iRg])"
-            if ($matched.ContainsKey($rgName)) { $matched[$rgName].CurrentCost = [double]$row[$iCost] }
+            if ($matched.ContainsKey($rgName)) {
+                $matched[$rgName].CurrentCost += [double]$row[$iCost]
+                if ($iCurrency -ge 0 -and $row[$iCurrency] -ne $currency) { throw 'Billing currency does not match report configuration.' }
+            }
         }
-    } catch { Write-Warning "Actual cost query failed: $_" }
+        $costUri = if ($data.properties.PSObject.Properties['nextLink']) { $data.properties.nextLink } else { $null }
+        if ($costUri) {
+            $nextUri = [uri]$costUri
+            if ($nextUri.Scheme -ne 'https' -or $nextUri.Host -ne 'management.azure.com' -or $nextUri.AbsolutePath -ne "/subscriptions/$SubscriptionId/providers/Microsoft.CostManagement/query") { throw $reportFailure }
+            $costUri = $nextUri.PathAndQuery
+        }
+        } while ($costUri)
+    } catch { throw $reportFailure }
 
     # ---- Cost Management: forecast for the remainder of the current + next period ----
     if (-not $NoForecast) {
@@ -194,40 +283,64 @@ if ($DryRun) {
             }
         } | ConvertTo-Json -Depth 10
         try {
+            do {
             $fresp = Invoke-AzRestMethod -Method POST -Path $fcUri -Payload $fcBody
             if ($fresp.StatusCode -lt 400) {
                 $fdata = $fresp.Content | ConvertFrom-Json
                 $fcols = @($fdata.properties.columns.name)
                 $fiCost = [array]::IndexOf($fcols, 'Cost')
                 $fiRg   = [array]::IndexOf($fcols, 'ResourceGroupName')
+                if ($fiCost -lt 0 -or $fiRg -lt 0 -or -not @($fdata.properties.rows).Count) { throw 'Forecast data is unavailable.' }
                 foreach ($row in $fdata.properties.rows) {
                     $rgName = "$($row[$fiRg])"
                     if ($matched.ContainsKey($rgName)) { $matched[$rgName].ForecastCost += [double]$row[$fiCost] }
                 }
-            } else { Write-Warning "Forecast query HTTP $($fresp.StatusCode): $($fresp.Content)" }
-        } catch { Write-Warning "Forecast query failed (non-critical): $_" }
+                $fcUri = if ($fdata.properties.PSObject.Properties['nextLink']) { $fdata.properties.nextLink } else { $null }
+                if ($fcUri) {
+                    $nextUri = [uri]$fcUri
+                    if ($nextUri.Scheme -ne 'https' -or $nextUri.Host -ne 'management.azure.com' -or $nextUri.AbsolutePath -ne "/subscriptions/$SubscriptionId/providers/Microsoft.CostManagement/forecast") { throw 'Invalid forecast continuation.' }
+                    $fcUri = $nextUri.PathAndQuery
+                }
+            } else { throw 'Forecast query failed.' }
+            } while ($fcUri)
+        } catch {
+            $forecastAvailable = $false
+            $reportWarnings.Add('Forecast query failed or returned incomplete data. Forecast values are unavailable, not zero.')
+        }
     }
 
     $projects.AddRange([object[]]($matched.Values))
+    if (@($projects | Where-Object {$null -eq $_.CurrentCost}).Count) {
+        $reportWarnings.Add('Some selected projects have no actual-cost rows. Missing costs and incomplete totals are unavailable, not zero.')
+    }
+    if ($forecastAvailable -and @($projects | Where-Object {$null -eq $_.ForecastCost}).Count) {
+        $reportWarnings.Add('Some selected projects have no forecast rows. Missing forecasts and incomplete totals are unavailable, not zero.')
+    }
 }
+if (-not $projects.Count) { $reportWarnings.Add('No projects were present in the selected sample or result.') }
+if (-not $forecastAvailable) { foreach ($p in $projects) { $p.ForecastCost = $null } }
 
 # ---------------------------------------------------------------------------
 # 4) Build Markdown showback report
 # ---------------------------------------------------------------------------
-$ordered = $projects | Sort-Object ProjectNumber
-$totalCurrent  = ($ordered | Measure-Object -Property CurrentCost  -Sum).Sum
-$totalForecast = ($ordered | Measure-Object -Property ForecastCost -Sum).Sum
+$ordered = @($projects | Sort-Object ProjectNumber)
+$totalCurrent  = if ($ordered.Count) { ($ordered | Measure-Object -Property CurrentCost -Sum).Sum } else { $null }
+$totalForecast = if ($ordered.Count) { ($ordered | Measure-Object -Property ForecastCost -Sum).Sum } else { $null }
 if (-not $totalCurrent)  { $totalCurrent  = 0 }
-if (-not $totalForecast) { $totalForecast = 0 }
+if (@($ordered | Where-Object {$null -eq $_.CurrentCost}).Count) { $totalCurrent = $null }
+if (-not $forecastAvailable -or @($ordered | Where-Object {$null -eq $_.ForecastCost}).Count) { $totalForecast = $null }
+elseif (-not $totalForecast) { $totalForecast = 0 }
 
-$rows = foreach ($p in $ordered) {
-    "| project$($p.ProjectNumber) | ``$($p.ResourceGroup)`` | $($p.CostCenter) | $($p.Owner) | $([math]::Round($p.CurrentCost,2)) | $([math]::Round($p.ForecastCost,2)) |"
-}
+$rows = @(foreach ($p in $ordered) {
+    "| project$($p.ProjectNumber) | ``$($p.ResourceGroup)`` | $($p.CostCenter) | $($p.Owner) | $(Format-Cost $p.CurrentCost) | $(Format-Cost $p.ForecastCost) |"
+})
 
 # Cost-center rollup
-$byCc = $ordered | Group-Object CostCenter | ForEach-Object {
-    "| $($_.Name) | $($_.Count) | $([math]::Round((($_.Group | Measure-Object CurrentCost -Sum).Sum),2)) | $([math]::Round((($_.Group | Measure-Object ForecastCost -Sum).Sum),2)) |"
-}
+$byCc = @($ordered | Group-Object CostCenter | ForEach-Object {
+    $ccCurrent = if (@($_.Group | Where-Object {$null -eq $_.CurrentCost}).Count) {$null} else {($_.Group | Measure-Object CurrentCost -Sum).Sum}
+    $ccForecast = if (-not $forecastAvailable -or @($_.Group | Where-Object {$null -eq $_.ForecastCost}).Count) {$null} else {($_.Group | Measure-Object ForecastCost -Sum).Sum}
+    "| $($_.Name) | $($_.Count) | $(Format-Cost $ccCurrent) | $(Format-Cost $ccForecast) |"
+})
 
 $md = @"
 # AI Factory — FinOps Showback Report
@@ -235,7 +348,7 @@ $md = @"
 **Type:** Showback (visibility & accountability — no billing transfer) ·
 **Environment:** $($naming.env) · **Currency:** $currency · **Generated:** $reportDate
 
-> Cost per AI Factory project / cost center for the **current billing month to date**, with an
+> Cost per AI Factory project / cost center for the **$periodLabel**, with an
 > optional forecast for the full month. Costs come from Azure Cost Management; project ownership and
 > cost center come from the ``CostCenter`` and ``AIF-Project Owners`` resource-group tags.
 
@@ -244,7 +357,7 @@ $md = @"
 | Project | Resource Group | Cost Center | Owner | Current ($currency) | Forecast ($currency) |
 |---|---|---|---|---:|---:|
 $([string]::Join("`n", $rows))
-| **TOTAL** | | | | **$([math]::Round($totalCurrent,2))** | **$([math]::Round($totalForecast,2))** |
+| **TOTAL** | | | | **$(Format-Cost $totalCurrent)** | **$(Format-Cost $totalForecast)** |
 
 ## Rollup by cost center
 
@@ -257,7 +370,7 @@ $([string]::Join("`n", $byCc))
 *Generated by the AI Factory FinOps Showback runbook (``Update-ShowbackReport``) — replaces the legacy ``aifactory-governance/gov-cross-charging.yaml`` Azure DevOps pipeline.*
 "@
 
-Write-Output $md
+if ($reportWarnings.Count) { $md += "`n`n> " + ($reportWarnings -join "`n> ") }
 
 # ---------------------------------------------------------------------------
 # 5) Export files (+ optional upload to common data lake)
@@ -266,12 +379,12 @@ $baseName = "aifactory-showback-$($naming.env)-{0:yyyyMMdd}" -f (Get-Date)
 
 if ($OutDir) {
     $files = Export-ReportFiles -Markdown $md -BaseName $baseName -OutDir $OutDir
-    Write-Output "Report files: $($files.Md)"
-    if ($files.Html) { Write-Output "              $($files.Html)" }
-    if ($files.Pdf)  { Write-Output "              $($files.Pdf)" }
+    Write-ReportInfo "Report files: $($files.Md)"
+    if ($files.Html) { Write-ReportInfo "              $($files.Html)" }
+    if ($files.Pdf)  { Write-ReportInfo "              $($files.Pdf)" }
 }
 
-if (-not $DryRun -and ($OutputBlobStorageAccount -or ($sb -and $sb.uploadToLake))) {
+if (-not $NoUpload -and -not $DryRun -and ($OutputBlobStorageAccount -or ($sb -and $sb.uploadToLake))) {
     try {
         $sa = $OutputBlobStorageAccount
         if (-not $sa) {
@@ -283,7 +396,22 @@ if (-not $DryRun -and ($OutputBlobStorageAccount -or ($sb -and $sb.uploadToLake)
             if (-not $OutDir) { $files = Export-ReportFiles -Markdown $md -BaseName $baseName -OutDir (Join-Path $env:TEMP 'aif-showback') }
             $prefix = "aifactory-governance/showback/$($naming.env)/$(Get-Date -Format 'yyyy/MM/dd')/"
             Write-ReportFilesToBlob -Files $files -ProjectRg $commonRg -StorageAccount $sa -Container $container -Prefix $prefix
-            Write-Output "Uploaded to lake: $sa/$container/$prefix"
-        } else { Write-Warning "No common data lake storage account found in $commonRg; skipping upload." }
-    } catch { Write-Warning "Data lake upload failed (non-critical): $_" }
+            Write-ReportInfo "Uploaded to lake: $sa/$container/$prefix"
+        } else { $reportWarnings.Add('No common data lake storage account found; upload was skipped.') }
+    } catch { $reportWarnings.Add('Data lake upload failed; report data is still available.') }
 }
+if ($ReportFormat -eq 'Json') {
+    $tableRows = @($ordered | ForEach-Object { ,@($_.ProjectNumber,$_.ResourceGroup,$_.CostCenter,$_.Owner,$_.CurrentCost,$_.ForecastCost) })
+    [ordered]@{
+        schema_version=1; report_type='showback'; source=$(if ($DryRun) {'sample'} else {'live'})
+        generated_at=[datetime]::UtcNow.ToString('o')
+        period=@{days=$LookbackDays; start=$periodStart.ToString('o'); end=$periodEnd.ToString('o'); actual_cost_window=$periodLabel; forecast_window='current full billing month'}
+        target=@{subscription_id=$SubscriptionId; project_resource_group=$ProjectResourceGroup; common_resource_group=$commonRg; environment=$naming.env}
+        status=$(if ($reportWarnings.Count) {'warning'} else {'completed'}); warnings=@($reportWarnings)
+        tables=@(@{title='Per-project showback'; columns=@('Project','Resource group','Cost center','Owner',"Current ($currency)","Forecast ($currency)"); rows=$tableRows})
+        charts=@(@{title='Project costs'; labels=@($ordered | ForEach-Object {$_.ProjectNumber}); series=@(
+            @{name="Current ($currency)"; values=@($ordered | ForEach-Object {$_.CurrentCost})},
+            @{name="Forecast ($currency)"; values=@($ordered | ForEach-Object {$_.ForecastCost})}
+        )}); output=$md
+    } | ConvertTo-Json -Depth 12 -Compress | Write-Output
+} else { Write-Output $md }

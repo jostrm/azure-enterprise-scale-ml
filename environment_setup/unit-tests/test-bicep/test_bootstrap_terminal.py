@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import shutil
 import subprocess
-import tempfile
 import unittest
 from pathlib import Path
+from uuid import uuid4
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -15,6 +16,15 @@ BOOTSTRAP = ROOT / "bootstrap"
 LIBRARY = BOOTSTRAP / "ui/terminal.sh"
 SCRIPTS = sorted(BOOTSTRAP.glob("*.sh"))
 START = ROOT / "00-start.sh"
+WRAPPER_TARGETS = {
+    "ADO-azurefactory.sh": ("AIFactory-lifecycle.sh",),
+    "GHA-azurefactory.sh": ("AIFactory-lifecycle.sh",),
+    "AIFactory-lifecycle.sh": ("lib/factory_lifecycle.py",),
+    "ADO-create-new-aifactory-scaleset.sh": ("lib/create-new-aifactory-scaleset.sh",),
+    "GHA-create-new-aifactory-scaleset.sh": ("lib/create-new-aifactory-scaleset.sh",),
+    "ALL-create-new-aifactory-scaleset.sh": ("ADO-create-new-aifactory-scaleset.sh", "GHA-create-new-aifactory-scaleset.sh"),
+    "GHA-update-aifactory-and-run-project.sh": ("GH-update-aifactory-and-run-project.sh",),
+}
 
 
 class TestBootstrapTerminal(unittest.TestCase):
@@ -28,6 +38,11 @@ class TestBootstrapTerminal(unittest.TestCase):
         if not cls.bash:
             raise unittest.SkipTest("Bash is required for bootstrap presentation tests.")
 
+    def setUp(self) -> None:
+        self.work = ROOT / f".test-bootstrap-terminal-{uuid4().hex}"
+        self.work.mkdir()
+        self.addCleanup(shutil.rmtree, self.work)
+
     def run_bash(self, script: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
         environment = {
             key: value for key, value in os.environ.items()
@@ -37,7 +52,8 @@ class TestBootstrapTerminal(unittest.TestCase):
         environment.update(env or {})
         return subprocess.run(
             [self.bash, "--noprofile", "--norc", "-s"],
-            input=script, env=environment, capture_output=True, text=True, timeout=30, check=False,
+            input=script, env=environment, capture_output=True, text=True,
+            encoding="utf-8", timeout=30, check=False,
         )
 
     def render(self, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -63,8 +79,15 @@ class TestBootstrapTerminal(unittest.TestCase):
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertTrue(text.startswith("#!/"), path.name)
                 if path != LIBRARY:
-                    self.assertIn("source ", text)
-                    self.assertIn("aif_banner ", text)
+                    if path.name in WRAPPER_TARGETS:
+                        for target in WRAPPER_TARGETS[path.name]:
+                            self.assertIn(target, text)
+                            self.assertTrue((BOOTSTRAP / target).is_file(), target)
+                    else:
+                        source = ('source "$AIF_UI_DIR/bootstrap/ui/terminal.sh"'
+                                  if path == START else 'source "$AIF_UI_LIBRARY"')
+                        self.assertIn(source, text)
+                        self.assertIn("aif_banner ", text)
                     for line in text.splitlines():
                         if not line.lstrip().startswith("#"):
                             self.assertNotRegex(line, r"\$\{(?:GREEN|YELLOW|RED|NC)\}")
@@ -144,13 +167,20 @@ class TestBootstrapTerminal(unittest.TestCase):
 
     def test_theme_resolution_in_original_copied_and_stable_launcher_layouts(self) -> None:
         for script in SCRIPTS:
+            if script.name in WRAPPER_TARGETS:
+                continue
             text = script.read_text(encoding="utf-8")
             is_launcher = "-update-aifactory-" in script.name
-            end = text.index("\nreadonly REPO_ROOT") if is_launcher else text.index("\naif_banner ")
+            if script.name == "00-aif-add-submodule.sh":
+                end = text.index("\naif_banner ")
+            else:
+                source = re.search(r'(?m)^source "\$AIF_UI_LIBRARY"[ \t]*$', text)
+                self.assertIsNotNone(source, script.name)
+                end = source.end()
             loader = text[:end] + '\naif_info "Theme loaded"\n'
             for layout in ("original", "copied", "stable"):
-                with self.subTest(script=script.name, layout=layout), tempfile.TemporaryDirectory() as tmp:
-                    directory = Path(tmp)
+                with self.subTest(script=script.name, layout=layout):
+                    directory = self.work / script.stem / layout
                     lib = directory / (
                         "azure-enterprise-scale-ml/bootstrap/ui/terminal.sh"
                         if layout == "copied" else "ui/terminal.sh"
@@ -168,13 +198,98 @@ class TestBootstrapTerminal(unittest.TestCase):
 
     def test_initial_submodule_loader_works_without_theme_dependency(self) -> None:
         text = (BOOTSTRAP / "00-aif-add-submodule.sh").read_text(encoding="utf-8")
-        with tempfile.TemporaryDirectory() as tmp:
-            entry = Path(tmp) / "00-aif-add-submodule.sh"
-            entry.write_text(text[:text.index("\nfunction try")] + "\n", encoding="utf-8", newline="\n")
-            result = self.run_bash('source "$AIF_TEST_SCRIPT"\n', {"AIF_TEST_SCRIPT": entry.as_posix()})
+        entry = self.work / "00-aif-add-submodule.sh"
+        entry.write_text(text[:text.index("\nfunction try")] + "\n", encoding="utf-8", newline="\n")
+        result = self.run_bash('source "$AIF_TEST_SCRIPT"\n', {"AIF_TEST_SCRIPT": entry.as_posix()})
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("plain-text bootstrap", result.stderr)
         self.assertIn("SUBMODULE SETUP", result.stdout)
+
+    def test_delegated_scaleset_theme_loader_covers_all_three_search_locations(self) -> None:
+        text = (BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh").read_text(encoding="utf-8")
+        start = text.index("  local entry_dir ui_library\n")
+        source = '  source "$ui_library"'
+        end = text.index(source, start) + len(source)
+        loader = "load_theme() {\n" + text[start:end] + '\n}\nload_theme\naif_info "Theme loaded"\n'
+        self.assertIn("aif_banner ", text[end:])
+        for layout in ("original", "copied", "stable"):
+            with self.subTest(layout=layout):
+                directory = self.work / layout
+                entry_dir = directory / "launchers" if layout == "stable" else directory
+                entry_dir.mkdir(parents=True)
+                library = directory / (
+                    "azure-enterprise-scale-ml/bootstrap/ui/terminal.sh"
+                    if layout == "copied" else "ui/terminal.sh"
+                )
+                library.parent.mkdir(parents=True)
+                shutil.copyfile(LIBRARY, library)
+                result = self.run_bash(loader, {"AIF_ENTRYPOINT": (entry_dir / "launcher.sh").as_posix()})
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertIn("[INFO] Theme loaded", result.stdout)
+
+    def test_forwarding_wrappers_preserve_targets_arguments_and_machine_output(self) -> None:
+        cases = [
+            ("GHA-update-aifactory-and-run-project.sh", ["--project-only", "literal argument"],
+             "GH-update-aifactory-and-run-project.sh", ["--project-only", "literal argument"]),
+        ]
+        for route in ("ado", "gha"):
+            for mode in ("inspect", "execute"):
+                arguments = [mode, "--protected-manifest", "reviewed manifest.dpapi"]
+                cases.append((f"{route.upper()}-azurefactory.sh", arguments,
+                              "AIFactory-lifecycle.sh", arguments + ["--expected-orchestrator", route]))
+            cases.append(("ALL-create-new-aifactory-scaleset.sh",
+                          ["--orchestrator", route, "--non-interactive", "literal argument"],
+                          f"{route.upper()}-create-new-aifactory-scaleset.sh",
+                          ["--non-interactive", "literal argument"]))
+        for name, arguments, target, forwarded in cases:
+            with self.subTest(wrapper=name, arguments=arguments):
+                result = self.run_bash(
+                    'az() { exit 97; }; gh() { exit 97; }; git() { exit 97; }; curl() { exit 97; }\n'
+                    'exec() { printf "EXEC_ARG:%s\\n" "$@" >&2; printf \'%s\\n\' \'{"status":"fixture"}\'; }\n'
+                    'printf "ROOT:%s\\n" "$(cd "$(dirname "$AIF_TEST_SCRIPT")" && pwd)" >&2\n'
+                    'builtin source "$AIF_TEST_SCRIPT" ' + shlex.join(arguments) + "\n",
+                    {"AIF_TEST_SCRIPT": (BOOTSTRAP / name).as_posix()},
+                )
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual('{"status":"fixture"}\n', result.stdout)
+                lines = result.stderr.splitlines()
+                root = next(line.removeprefix("ROOT:") for line in lines if line.startswith("ROOT:"))
+                actual = [line.removeprefix("EXEC_ARG:") for line in lines if line.startswith("EXEC_ARG:")]
+                self.assertEqual(["bash", f"{root}/{target}", *forwarded], actual)
+
+    def test_machine_lifecycle_routes_to_python_without_a_banner(self) -> None:
+        result = self.run_bash(
+            'exec() { printf "EXEC_ARG:%s\\n" "$@" >&2; printf \'%s\\n\' \'{"status":"fixture"}\'; }\n'
+            'printf "ROOT:%s\\n" "$(cd "$(dirname "$AIF_TEST_SCRIPT")" && pwd)" >&2\n'
+            'builtin source "$AIF_TEST_SCRIPT" inspect --protected-manifest "reviewed manifest.dpapi"\n',
+            {"AIF_TEST_SCRIPT": (BOOTSTRAP / "AIFactory-lifecycle.sh").as_posix(),
+             "AIFACTORY_PYTHON": "offline python fixture"},
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual('{"status":"fixture"}\n', result.stdout)
+        lines = result.stderr.splitlines()
+        root = next(line.removeprefix("ROOT:") for line in lines if line.startswith("ROOT:"))
+        actual = [line.removeprefix("EXEC_ARG:") for line in lines if line.startswith("EXEC_ARG:")]
+        self.assertEqual(["offline python fixture", "-B", f"{root}/lib/factory_lifecycle.py",
+                          "inspect", "--protected-manifest", "reviewed manifest.dpapi"], actual)
+
+    def test_scaleset_wrappers_call_shared_main_with_their_exact_route(self) -> None:
+        for route in ("ado", "gha"):
+            with self.subTest(route=route):
+                path = BOOTSTRAP / f"{route.upper()}-create-new-aifactory-scaleset.sh"
+                result = self.run_bash(
+                    'source() { printf "SOURCE:%s\\n" "$1"; '
+                    'aif_scaleset_main() { printf "MAIN_ARG:%s\\n" "$@"; }; }\n'
+                    'printf "ROOT:%s\\n" "$(cd "$(dirname "$AIF_TEST_SCRIPT")" && pwd)"\n'
+                    'builtin source "$AIF_TEST_SCRIPT" --prepare-only "literal argument"\n',
+                    {"AIF_TEST_SCRIPT": path.as_posix()},
+                )
+                self.assertEqual(0, result.returncode, result.stderr)
+                lines = result.stdout.splitlines()
+                root = next(line.removeprefix("ROOT:") for line in lines if line.startswith("ROOT:"))
+                self.assertIn(f"SOURCE:{root}/lib/create-new-aifactory-scaleset.sh", lines)
+                actual = [line.removeprefix("MAIN_ARG:") for line in lines if line.startswith("MAIN_ARG:")]
+                self.assertEqual([route, path.as_posix(), "--prepare-only", "literal argument"], actual)
 
     def test_start_choices_and_copy_destinations_with_mocked_side_effects(self) -> None:
         # Only cp/rm would mutate in 00-start; stub both before sourcing the actual entrypoint.

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(VisualLearnerProject)"
+                      Condition="'$(VisualLearnerProject)' != ''"
+                      AdditionalProperties="TargetFrameworks=net10.0" />
+    <EmbeddedResource Include="guide.template.html" />
+  </ItemGroup>
+  <Target Name="RequireVisualLearnerProject" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(VisualLearnerProject)' == '' Or !Exists('$(VisualLearnerProject)')"
+           Text="Pass -p:VisualLearnerProject=&lt;path to the actual AsomRecordsAB.VisualLearner.csproj&gt;. The optional generator requires the portable VisualLearner library; CI and generated documents do not." />
+  </Target>
+</Project>

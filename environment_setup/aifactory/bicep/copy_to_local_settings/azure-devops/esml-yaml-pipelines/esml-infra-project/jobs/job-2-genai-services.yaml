@@ -2801,7 +2801,7 @@ steps:
      --parameters DEBUG_enableAppInsightsDashboard="$(enableAppInsightsDashboard)" \
      --parameters DEBUG_aca_a_registry_image="$(aca_a_registry_image)" \
      --parameters DEBUG_aca_w_registry_image="$(aca_w_registry_image)" \
-     --parameters DEBUG_enableBingSearch="$(enableBingSearch)" \
+     --parameters DEBUG_enableBingSearch="$(enableBing)" \
      --parameters DEBUG_enableCosmosDB="$(enableCosmosDB)" \
      --parameters DEBUG_enableAzureOpenAI="$(enableAzureOpenAI)" \
      --parameters DEBUG_enableAzureAIVision="$(enableAzureAIVision)" \
@@ -2939,6 +2939,7 @@ steps:
      --parameters acr_dedicated="$(acr_dedicated)" \
      --parameters containerRegistrySkuName="$(acr_SKU)" \
      --parameters enableProjectVM="$(enableProjectVM)" \
+     --parameters enableApplicationInsights="$(enableApplicationInsights)" \
      --parameters diagnosticSettingLevel="$(diagnosticSettingLevel)" \
      --parameters updateKeyvaultRbac="$(updateKeyvaultRbac)" \
      --parameters enableLogicApps="$(enableLogicApps)"
@@ -3200,7 +3201,7 @@ steps:
      --parameters enableContainerApps="$(enableContainerApps)" \
      --parameters enableFunction="$(enableFunction)" \
      --parameters enableWebApp="$(enableWebApp)" \
-     --parameters enableBingSearch="$(enableBingSearch)" \
+     --parameters enableBingSearch="$(enableBing)" \
      --parameters enableAzureOpenAI="$(enableAzureOpenAI)" \
      --parameters enableAISearch="$(enableAISearch)" \
      --parameters enableAIServices="$(enableAIServices)" \

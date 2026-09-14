@@ -45,7 +45,7 @@ SPEC.loader.exec_module(CONFIG)
 
 
 class TestPrivateFoundryCapabilityHost(unittest.TestCase):
-    def test_required_bundle_is_visible_and_not_deselectable(self) -> None:
+    def test_default_foundry_bundle_is_visible_and_required_only_when_selected(self) -> None:
         catalog = getattr(CONFIG, "SIMPLE_MODE_RESOURCE_CATALOG", None)
         if catalog is not None:
             project = {item["id"]: item for item in catalog["project"]}
@@ -57,7 +57,13 @@ class TestPrivateFoundryCapabilityHost(unittest.TestCase):
                 "cosmos-db",
             }
             self.assertTrue(required.issubset(project))
-            self.assertTrue(all(project[item]["required"] for item in required))
+            self.assertTrue(all(project[item]["default_selected"] for item in required))
+            self.assertEqual({item["id"] for item in project.values() if item["required"]},
+                             {"storage", "key-vault", "managed-identities"})
+            self.assertEqual(set(CONFIG.simple_mode_project_resources([])),
+                             {"storage", "key-vault", "managed-identities"})
+            with self.assertRaisesRegex(ValueError, "requires selected project resources"):
+                CONFIG.simple_mode_project_resources(["foundry"])
         values = CONFIG.simple_mode_values()
         for key in (
             "enableAIFoundry",

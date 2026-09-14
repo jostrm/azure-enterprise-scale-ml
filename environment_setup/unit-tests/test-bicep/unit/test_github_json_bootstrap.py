@@ -202,10 +202,46 @@ def test_conflicting_aliases_fail_without_printing_values(json_override_module, 
     assert values == {"AIFACTORY_DASHBOARD_URL": ""}
 
 
-@pytest.mark.parametrize("name", ["other-hyphen", "x\nINJECTED", "x;echo", "1invalid"])
+@pytest.mark.parametrize("name", [
+    "other-hyphen", "x\nINJECTED", "x;echo", "1invalid",
+    "org-department-other", "org-department-name\nINJECTED", "org-department-id;echo",
+])
 def test_dashboard_alias_does_not_relax_variable_name_validation(json_override_module, name):
     with pytest.raises(SystemExit):
         json_override_module.selected_values({"dev": {name: "value"}}, "dev")
+
+
+@pytest.mark.parametrize("pipeline_format", ["github", "azure-devops"])
+@pytest.mark.parametrize("environment,section", [
+    ("dev", "dev"), ("stage", "stage_prod"), ("test", "stage_prod"), ("prod", "stage_prod"),
+])
+@pytest.mark.parametrize("metadata", [
+    {"org-department-name": "", "org-department-id": ""},
+    {"org-department-name": '研发 O\'Brien "A" $HOME $(noop) `noop`', "org-department-id": "部门/0007-α"},
+])
+def test_project_organization_metadata_is_not_exported(
+        json_override_module, tmp_path, monkeypatch, capsys, pipeline_format,
+        environment, section, metadata):
+    original = {section: {**metadata, "projectPrefix": "", "enableAIFactoryHub": False},
+                "_wizard": {"orchestrator": "gha"}}
+    config = copy.deepcopy(original)
+    values, selected = json_override_module.selected_values(config, environment)
+    assert selected == section
+    assert values == {"projectPrefix": "", "enableAIFactoryHub": "false"}
+    output = tmp_path / "github-env"
+    monkeypatch.setenv("GITHUB_ENV", str(output))
+    applied, skipped = json_override_module.apply(values, pipeline_format, None)
+    assert applied == 2 and skipped == []
+    captured = capsys.readouterr()
+    text = captured.out + captured.err
+    if pipeline_format == "github":
+        text += output.read_text(encoding="utf-8")
+    for key, value in metadata.items():
+        assert key not in text
+        if value:
+            assert value not in text
+    assert "ORG_DEPARTMENT_" not in text
+    assert config == original
 
 
 @pytest.mark.parametrize("pipeline_format", ["github", "azure-devops"])
@@ -224,6 +260,9 @@ def test_full_canonical_template_applies_with_dashboard_key_offline(tmp_path, pi
     )
     assert result.returncode == 0, result.stderr
     assert "Applied " in result.stdout
+    output = (github_env.read_text(encoding="utf-8") if pipeline_format == "github" else "") + result.stdout
+    assert "org-department-" not in output
+    assert "ORG_DEPARTMENT_" not in output
     if pipeline_format == "github":
         assert "AIFACTORY_DASHBOARD_URL<<" in github_env.read_text(encoding="utf-8")
         assert "SCALING_MODE<<" in github_env.read_text(encoding="utf-8")
@@ -340,6 +379,9 @@ def test_preflight_substitutes_vnet_and_subnet_templates_offline(bash_executable
         "PYBIN": Path(sys.executable).as_posix(),
         "COMMON_VNET_CIDR": cidr,
         "DEV_CIDR_RANGE": octet,
+        # These fixtures validate one configured environment, including fixed VNets.
+        "TEST_CIDR_RANGE": "",
+        "PROD_CIDR_RANGE": "",
         "COMMON_SUBNET_CIDR": "172.16.XX.0/26",
         "COMMON_SUBNET_SCORING_CIDR": "172.16.XX.64/26",
         "COMMON_PBI_SUBNET_CIDR": "172.16.XX.128/26",
@@ -393,7 +435,7 @@ def run_sync_blocks(tmp_path, bash_executable, answer, *, use_json="y", update=N
     )[0]
     config_choice = text.split('\njson_override_choice=', 1)[1].split("\nfor command in git gh;", 1)[0]
     sync = text.split('aif_section "05 / Synchronize GitHub configuration"', 1)[1].split(
-        "\ngrep -q 'AIFACTORY_CONFIG_JSON'", 1
+        '\nif [[ "$project_only" == "false" ]]; then', 1
     )[0]
     dispatch = text.split('\ngh workflow run "$WORKFLOW_FILE"', 1)[1].split('\nrun_id=""', 1)[0]
     config = tmp_path / "aifactory" / "variables.json"
@@ -407,7 +449,9 @@ def run_sync_blocks(tmp_path, bash_executable, answer, *, use_json="y", update=N
         'source "$AIF_TEST_LIBRARY"\n'
         'readonly CONFIG_FILE="aifactory/variables.json"\n'
         'readonly ENVIRONMENT="dev" WORKFLOW_FILE="infra-project.yml" RUNNER_LABEL="unit-runner"\n'
+        'readonly project_only=false\n'
         'PYTHON=("$AIF_TEST_PYTHON")\n'
+        'git() { printf "Unexpected git command in offline fixture\\n" >&2; return 99; }\n'
         'bash() { printf "BULK:%s\\n" "$*"; cat >/dev/null; return "$AIF_TEST_UPLOADER_EXIT"; }\n'
         'gh() { printf "GH:%s\\n" "$*"; if [[ "$1" == "secret" ]]; then cat >/dev/null; fi; }\n'
         'confirm_update_github_variables() {' + function +

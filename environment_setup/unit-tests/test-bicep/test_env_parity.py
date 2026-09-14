@@ -153,6 +153,9 @@ DEFAULT_MISMATCH_ALLOWED = {
 }
 
 KNOWN_MISSING = {
+    "azureDevOpsTenantId",  # ADO organization authentication tenant; GHA has no organization tenant.
+    "adminVMBuildAgentPool",  # ADO agent pool; GHA selects runners by selfHostedRunnerLabel.
+    "adminVMBuildAgentName",  # ADO Agent.Name demand; no equivalent GHA agent-name demand.
     "dev_service_connection",
     "test_service_connection",
     "prod_service_connection",
@@ -384,7 +387,26 @@ def _is_placeholder(value: str) -> bool:
     )
 
 
+def _env_key(key: str, aliases: dict[str, str], env_vars: dict[str, str]) -> str:
+    if key in aliases:
+        return aliases[key]
+    normalized = key.replace("_", "").lower()
+    matches = [candidate for candidate in env_vars
+               if candidate.replace("_", "").lower() == normalized]
+    if len(matches) > 1:
+        raise AssertionError(f"Ambiguous environment alias for {key}: {matches}")
+    return matches[0] if matches else key.upper()
+
+
 class TestADOToGitHubEnvParity(unittest.TestCase):
+    def test_camel_case_aliases_require_unique_matches(self) -> None:
+        self.assertEqual(
+            "APIM_GATEWAY_SKU", _env_key("apimGatewaySku", {}, {"APIM_GATEWAY_SKU": ""}),
+        )
+        self.assertEqual("UNREVIEWED", _env_key("unreviewed", {}, {}))
+        with self.assertRaisesRegex(AssertionError, "Ambiguous"):
+            _env_key("enableFeature", {}, {"ENABLE_FEATURE": "", "ENABLEFEATURE": ""})
+
     def test_variables_yaml_has_env_equivalent(self) -> None:
         yaml_vars = _parse_yaml_vars(YAML_PATH)
         env_vars = _parse_env_template(ENV_TEMPLATE_PATH)
@@ -400,7 +422,7 @@ class TestADOToGitHubEnvParity(unittest.TestCase):
             if key in known_missing:
                 continue
 
-            env_key = aliases.get(key, key.upper())
+            env_key = _env_key(key, aliases, env_vars)
             if env_key not in env_vars:
                 missing.append(f"{key} -> {env_key}")
                 continue

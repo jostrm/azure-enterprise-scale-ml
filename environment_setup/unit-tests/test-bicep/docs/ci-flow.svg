@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 285" role="img" aria-labelledby="flow-title flow-description">
+<title id="flow-title">PURPLE offline CI learning flow</title>
+<desc id="flow-description">Five schematic steps: Push or PR, Configuration, Unit and syntax, Bicep matrix, Review evidence. Non-geographic coordinates; no Azure locations. This is an explanatory sequence, not a scheduler: CI jobs run in parallel.</desc>
+<style>
+:root {
+  color-scheme: light;
+  --cp-bg: #f7f4ef;
+  --cp-bg-elevated: #fcfbf8;
+  --cp-surface: #ffffff;
+  --cp-surface-soft: #f5f5f5;
+  --cp-border: #dedede;
+  --cp-border-strong: #919191;
+  --cp-text: #242424;
+  --cp-text-muted: #5c5c5c;
+  --cp-text-soft: #6f6f6f;
+  --cp-accent: #b11f4b;
+  --cp-accent-hover: #9a1a41;
+  --cp-accent-soft: rgba(177, 31, 75, 0.08);
+  --cp-accent-fg: #ffffff;
+  --cp-success: #16a34a;
+  --cp-danger: #dc2626;
+  --cp-warning: #f59e0b;
+  --cp-link: #0078d4;
+  --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+  --cp-overlay: rgba(255, 255, 255, 0.8);
+  --cp-panel: rgba(255, 255, 255, 0.86);
+  --cp-panel-strong: rgba(255, 255, 255, 0.96);
+  --cp-sheen: rgba(255, 255, 255, 0.55);
+  --cp-highlight: rgba(177, 31, 75, 0.12);
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --cp-bg: #3d3b3a;
+  --cp-bg-elevated: #343231;
+  --cp-surface: #292929;
+  --cp-surface-soft: #2e2e2e;
+  --cp-border: #474747;
+  --cp-border-strong: #5f5f5f;
+  --cp-text: #dedede;
+  --cp-text-muted: #919191;
+  --cp-text-soft: #b0b0b0;
+  --cp-accent: #fd8ea1;
+  --cp-accent-hover: #fb7b91;
+  --cp-accent-soft: rgba(253, 142, 161, 0.14);
+  --cp-accent-fg: #1a1a1a;
+  --cp-success: #4ade80;
+  --cp-danger: #f87171;
+  --cp-warning: #fbbf24;
+  --cp-link: #4da6ff;
+  --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  --cp-overlay: rgba(41, 41, 41, 0.88);
+  --cp-panel: rgba(41, 41, 41, 0.72);
+  --cp-panel-strong: rgba(41, 41, 41, 0.96);
+  --cp-sheen: rgba(255, 255, 255, 0.04);
+  --cp-highlight: rgba(253, 142, 161, 0.12);
+}
+
+@media(prefers-color-scheme:dark){:root{
+  color-scheme: dark;
+  --cp-bg: #3d3b3a;
+  --cp-bg-elevated: #343231;
+  --cp-surface: #292929;
+  --cp-surface-soft: #2e2e2e;
+  --cp-border: #474747;
+  --cp-border-strong: #5f5f5f;
+  --cp-text: #dedede;
+  --cp-text-muted: #919191;
+  --cp-text-soft: #b0b0b0;
+  --cp-accent: #fd8ea1;
+  --cp-accent-hover: #fb7b91;
+  --cp-accent-soft: rgba(253, 142, 161, 0.14);
+  --cp-accent-fg: #1a1a1a;
+  --cp-success: #4ade80;
+  --cp-danger: #f87171;
+  --cp-warning: #fbbf24;
+  --cp-link: #4da6ff;
+  --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  --cp-overlay: rgba(41, 41, 41, 0.88);
+  --cp-panel: rgba(41, 41, 41, 0.72);
+  --cp-panel-strong: rgba(41, 41, 41, 0.96);
+  --cp-sheen: rgba(255, 255, 255, 0.04);
+  --cp-highlight: rgba(253, 142, 161, 0.12);
+}}
+.flow-background { fill:var(--cp-surface); }
+.flow-caption,.node-note { fill:var(--cp-text-muted); font:13px "Segoe UI",Aptos,Calibri,sans-serif; }
+.flow-edge { stroke:var(--cp-border-strong); stroke-width:2; fill:none; }
+.flow-arrow { fill:var(--cp-border-strong); }
+.node-box { fill:var(--cp-surface-soft); stroke:var(--cp-border-strong); stroke-width:1.5; }
+.node-number { fill:var(--cp-accent); font:600 14px "Segoe UI",Aptos,Calibri,sans-serif; }
+.node-title { fill:var(--cp-text); font:600 18px "Segoe UI",Aptos,Calibri,sans-serif; }
+.node-attention { fill:var(--cp-accent); font:700 18px "Segoe UI",Aptos,Calibri,sans-serif; }
+.flow-marker { fill:var(--cp-accent); stroke:var(--cp-surface); stroke-width:2; }</style>
+<rect class="flow-background" x="0" y="0" width="1180" height="285" rx="16"/>
+<text class="flow-caption" x="24" y="30">SCHEMATIC CI FLOW - not geographic / not Azure locations</text>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path class="flow-arrow" d="M0 0 L8 4 L0 8 Z"/></marker></defs>
+<path class="flow-edge" d="M 210 124.33333333333333 L 250 119.66666666666667" marker-end="url(#arrow)"/>
+<path class="flow-edge" d="M 450 119.66666666666667 L 490 124.33333333333333" marker-end="url(#arrow)"/>
+<path class="flow-edge" d="M 690 124.33333333333333 L 730 119.66666666666667" marker-end="url(#arrow)"/>
+<path class="flow-edge" d="M 930 119.66666666666667 L 970 124.33333333333333" marker-end="url(#arrow)"/>
+<g class="flow-node">
+<title>A local commit does not run remote CI. Push the commit to GitHub, open or update a pull request, or dispatch the workflow manually. GitHub checks all branches. ADO must first be registered from its YAML.</title>
+<rect class="node-box" x="10" y="96" width="200" height="80" rx="10"/>
+<text class="node-number" x="28" y="120">01</text>
+<text class="node-title" x="110" y="145" text-anchor="middle">Push / PR</text>
+<text class="node-note" x="110" y="202" text-anchor="middle">Repository event</text>
+</g>
+<g class="flow-node">
+<title>The unit suite inventories 44 public ENABLE_* settings: 41 mapped contracts and three explicit exceptions. AMPLS and RETRIES have no GHA forwarding; AI_FACTORY_HUB records configuration intent only. These are not deployable-feature claims.</title>
+<rect class="node-box" x="250" y="68" width="200" height="80" rx="10"/>
+<text class="node-number" x="268" y="92">02</text>
+<text class="node-title" x="350" y="117" text-anchor="middle">Configuration</text>
+<text class="node-note" x="350" y="174" text-anchor="middle">Inventory + wiring</text>
+<text class="node-attention" x="425" y="94" aria-label="Attention: read the caveats">!</text>
+</g>
+<g class="flow-node">
+<title>Unit tests run on ubuntu-22.04 and windows-2022; syntax checks run on Linux. JUnit records actual tests, failures and platform skips. YAML duplicate keys, Python syntax and Bash -n are checked without executing deployment scripts.</title>
+<rect class="node-box" x="490" y="96" width="200" height="80" rx="10"/>
+<text class="node-number" x="508" y="120">03</text>
+<text class="node-title" x="590" y="145" text-anchor="middle">Unit + syntax</text>
+<text class="node-note" x="590" y="202" text-anchor="middle">Linux + Windows</text>
+</g>
+<g class="flow-node">
+<title>Install checksum-verified Bicep 0.44.1 and explicitly prepare declared public AVM dependencies. The validation step is then offline with --no-restore: compile real entrypoints and bind baseline, individual flips and all four states of every flag pair.</title>
+<rect class="node-box" x="730" y="68" width="200" height="80" rx="10"/>
+<text class="node-number" x="748" y="92">04</text>
+<text class="node-title" x="830" y="117" text-anchor="middle">Bicep matrix</text>
+<text class="node-note" x="830" y="174" text-anchor="middle">Compile + schema bind</text>
+</g>
+<g class="flow-node">
+<title>Inspect JSON and JUnit artifacts, failures and skips. Pairwise input coverage does not evaluate ARM conditions or certify deployment. Configure GitHub required checks or Azure Repos Build validation separately; this change does neither automatically.</title>
+<rect class="node-box" x="970" y="96" width="200" height="80" rx="10"/>
+<text class="node-number" x="988" y="120">05</text>
+<text class="node-title" x="1070" y="145" text-anchor="middle">Review evidence</text>
+<text class="node-note" x="1070" y="202" text-anchor="middle">Artifacts + policies</text>
+<text class="node-attention" x="1145" y="122" aria-label="Attention: read the caveats">!</text>
+</g>
+<circle id="flow-marker" class="flow-marker" cx="440" cy="118.5" r="7" aria-hidden="true"/>
+<text class="flow-caption" x="24" y="245">Legend: numbered box = teaching step; ! = caveat; moving dot = illustrative library motion, not live CI progress.</text>
+<text class="flow-caption" x="24" y="267">Unit Linux + Windows, syntax Linux, Bicep Linux are parallel CI jobs. Preparing tools/modules may use the network.</text>
+</svg>

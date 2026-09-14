@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import ipaddress
 import json
+import os
 import re
 import shlex
 import unicodedata
@@ -17,6 +18,7 @@ from urllib.parse import urlparse
 
 
 AIF_SIMPLE_MODE_CONTRACT_VERSION = 2
+AIF_SIMPLE_OPTIONAL_GATEWAY_CONTRACT = 1
 PROJECT_ORGANIZATION_FIELDS = {"org-department-name": 200, "org-department-id": 128}
 PROJECT_ORGANIZATION_ENV = {"org-department-name": "ORG_DEPARTMENT_NAME", "org-department-id": "ORG_DEPARTMENT_ID"}
 
@@ -46,7 +48,7 @@ SIMPLE_MODE_REQUIRED_SOURCE_PATHS = ("bootstrap", "environment_setup/aifactory")
 SIMPLE_MODE_RESOURCE_CATALOG = {
     "hub": [
         {"id": "virtual-network", "label": "Private virtual network", "description": "Integrated Dev /20 with dedicated access subnets.", "required": True, "default_selected": True, "dependencies": []},
-        {"id": "application-gateway", "label": "Application Gateway WAF_v2", "description": "Billable, autoscale 1-2 instances. Private HTTPS frontend, WAF Prevention, TLS 1.2+, no public IP. Requires hostname, private HTTPS backend and existing Key Vault certificate.", "required": True, "default_selected": True, "dependencies": ["virtual-network", "private-dns"]},
+        {"id": "application-gateway", "label": "Optional Application Gateway WAF_v2", "description": "Deploy a new billable gateway only when needed; not required for private Foundry agents. Includes its dedicated subnet/NSG, managed identity, certificate-vault role grant/private endpoint and frontend DNS. Autoscale 1-2, private HTTPS, WAF Prevention, TLS 1.2+, no public IP. When enabled, requires hostname, private HTTPS backend and existing Key Vault certificate. Does not adopt or modify a customer's existing gateway.", "required": False, "default_selected": False, "dependencies": ["virtual-network", "private-dns"]},
         {"id": "vpn-gateway", "label": "VPN Gateway VpnGw1AZ", "description": "Billable Entra-authenticated P2S; Standard public IP for VPN transport only. Manual client connection.", "required": True, "default_selected": True, "dependencies": ["virtual-network"]},
         {"id": "bastion", "label": "Bastion Developer", "description": "No admin VM; region must support Developer, no paid fallback.", "required": True, "default_selected": True, "dependencies": ["virtual-network"]},
         {"id": "private-dns", "label": "Private DNS and DNS Private Resolver", "description": "Zones, links, billable inbound resolver, scoped DNS policy and access IP-group inventory.", "required": True, "default_selected": True, "dependencies": ["virtual-network"]},
@@ -62,23 +64,29 @@ SIMPLE_MODE_RESOURCE_CATALOG = {
         {"id": "storage", "label": "Project Storage Standard_LRS", "description": "Required project storage accounts and private endpoints.", "required": True, "default_selected": True, "dependencies": ["private-dns"]},
         {"id": "key-vault", "label": "Project Key Vault Standard", "description": "Required project Key Vault and private endpoint.", "required": True, "default_selected": True, "dependencies": ["private-dns"]},
         {"id": "managed-identities", "label": "Project managed identities", "description": "Required project/platform identities and baseline RBAC.", "required": True, "default_selected": True, "dependencies": []},
-        {"id": "foundry", "label": "Microsoft Foundry S0", "description": "Required private Foundry account and default project; model deployments remain optional.", "required": True, "default_selected": True, "dependencies": ["storage", "key-vault", "managed-identities"]},
-        {"id": "foundry-capability-host", "label": "Foundry capability host", "description": "Required standard private-agent data plane; binds thread, vector-store, and file-storage connections.", "required": True, "default_selected": True, "dependencies": ["foundry", "storage", "ai-search", "cosmos-db"]},
-        {"id": "ai-search", "label": "AI Search", "description": "Required Basic-tier capability-host vector-store connection with private networking.", "required": True, "default_selected": True, "dependencies": ["managed-identities", "private-dns"]},
-        {"id": "cosmos-db", "label": "Azure Cosmos DB", "description": "Required capability-host thread and agent-history store with a private endpoint.", "required": True, "default_selected": True, "dependencies": ["managed-identities", "private-dns"]},
+        {"id": "foundry", "label": "Microsoft Foundry S0", "description": "Optional private Foundry account and default project; requires capability host, Search and Cosmos DB. No model deployments.", "required": False, "default_selected": True, "dependencies": ["storage", "key-vault", "managed-identities", "ai-search", "cosmos-db"]},
+        {"id": "foundry-capability-host", "label": "Foundry capability host", "description": "Standard private-agent data plane, available only with Foundry; binds thread, vector-store and file-storage connections.", "required": False, "default_selected": True, "dependencies": ["foundry", "storage", "ai-search", "cosmos-db"]},
+        {"id": "ai-search", "label": "AI Search", "description": "Basic-tier private search, independently selectable or required with Foundry.", "required": False, "default_selected": True, "dependencies": ["managed-identities", "private-dns"]},
+        {"id": "cosmos-db", "label": "Azure Cosmos DB", "description": "Private database, independently selectable or required for Foundry agent history.", "required": False, "default_selected": True, "dependencies": ["managed-identities", "private-dns"]},
         {"id": "application-insights", "label": "Application Insights", "description": "Optional workspace-based project telemetry; not private-only without AMPLS.", "required": False, "default_selected": True, "dependencies": ["log-analytics"]},
+        {"id": "azure-machine-learning", "label": "Azure Machine Learning", "description": "Private Basic workspace using canonical compute defaults; requires its linked Application Insights.", "required": False, "default_selected": False, "dependencies": ["storage", "key-vault", "managed-identities", "common-registry", "application-insights"]},
+        {"id": "aks-for-azure-ml", "label": "AKS for Azure ML", "description": "AKS compute for the selected Azure Machine Learning workspace.", "required": False, "default_selected": False, "dependencies": ["azure-machine-learning"]},
+        {"id": "aks", "label": "Standalone AKS", "description": "Independent private AKS cluster; does not require Azure Machine Learning.", "required": False, "default_selected": False, "dependencies": ["managed-identities", "private-dns"]},
+        {"id": "databricks", "label": "Azure Databricks", "description": "Private Premium workspace using the canonical project data platform.", "required": False, "default_selected": False, "dependencies": ["storage", "managed-identities", "private-dns"]},
+        {"id": "datafactory", "label": "Azure Data Factory", "description": "Project data pipelines with managed private endpoints.", "required": False, "default_selected": False, "dependencies": ["storage", "managed-identities", "private-dns"]},
+        {"id": "event-hubs", "label": "Azure Event Hubs", "description": "Private event ingestion using Standard tier (required for Private Link).", "required": False, "default_selected": False, "dependencies": ["managed-identities", "private-dns"]},
+        {"id": "postgresql", "label": "Azure Database for PostgreSQL", "description": "Private flexible server, Burstable Standard_B1ms.", "required": False, "default_selected": False, "dependencies": ["managed-identities", "private-dns"]},
+        {"id": "container-apps", "label": "Azure Container Apps", "description": "Private Container Apps environment using canonical project defaults and linked Application Insights.", "required": False, "default_selected": False, "dependencies": ["managed-identities", "private-dns", "log-analytics", "application-insights"]},
     ],
 }
 SIMPLE_MODE_DISABLED = (
-    "enableAzureMachineLearning", "addAzureMachineLearning", "enableDatabricks",
-    "enableAIFoundryHub", "addAIFoundryHub", "enableAksForAzureML", "enableAKS",
-    "cleanFoundryCaphost", "enableDatafactory",
+    "enableAIFoundryHub", "addAIFoundryHub", "cleanFoundryCaphost",
     "enableDatafactoryCommon", "enableAIServices", "enableAzureOpenAI",
     "enableAzureAIVision", "enableAzureSpeech", "enableAIDocIntelligence",
     "enableBing", "enableBingCustomSearch", "enableContentSafety",
-    "enablePostgreSQL", "enableRedisCache", "enableSQLDatabase", "enableElasticsearch",
-    "enableFunction", "enableWebApp", "enableContainerApps", "enableLogicApps",
-    "enableEventHubs", "enableBotService", "enableAppInsightsDashboard",
+    "enableRedisCache", "enableSQLDatabase", "enableElasticsearch",
+    "enableFunction", "enableWebApp", "enableLogicApps",
+    "enableBotService", "enableAppInsightsDashboard",
     "enableDefenderforAISubLevel", "enableDefenderforAIResourceLevel",
     "serviceSettingDeployProjectVM", "enableAdminVM", "addBastionHost",
     "useSelfHostedBuildAgent", "enableDeleteForDisabledResources",
@@ -92,6 +100,15 @@ SIMPLE_MODE_DISABLED = (
 
 def simple_mode_enabled(state: dict[str, Any]) -> bool:
     return str(state.get("simple_mode", "false")).lower() == "true"
+
+
+def simple_mode_application_gateway_enabled(value: str | bool = "true") -> bool:
+    """Omission preserves legacy deployments; explicit strings must be canonical."""
+    if isinstance(value, bool):
+        return value
+    if not isinstance(value, str) or value not in ("true", "false"):
+        raise ValueError("AIF_ENABLE_APPLICATION_GATEWAY must be true or false.")
+    return value == "true"
 
 
 def simple_mode_project_resources(selection: str | list[str] | None = None) -> list[str]:
@@ -108,7 +125,40 @@ def simple_mode_project_resources(selection: str | list[str] | None = None) -> l
     allowed = {item["id"] for item in catalog}
     if set(selection) - allowed:
         raise ValueError("Project resources contain unsupported IDs")
-    return [item["id"] for item in catalog if item["required"] or item["id"] in selection]
+    selected = {item["id"] for item in catalog if item["required"]} | set(selection)
+    for item in catalog:
+        dependencies = set(item["dependencies"])
+        if item["id"] == "foundry":
+            dependencies.add("foundry-capability-host")
+        missing = dependencies & allowed - selected
+        if item["id"] in selected and missing:
+            raise ValueError(f"{item['id']} requires selected project resources: {', '.join(sorted(missing))}")
+    return [item["id"] for item in catalog if item["id"] in selected]
+
+
+def simple_mode_project_providers(selection: str | list[str] | None = None) -> list[str]:
+    selected = simple_mode_project_resources(selection)
+    providers = {
+        "Microsoft.Resources", "Microsoft.Network", "Microsoft.Storage", "Microsoft.KeyVault",
+        "Microsoft.ManagedIdentity", "Microsoft.ContainerRegistry", "Microsoft.OperationalInsights",
+        "microsoft.insights", "Microsoft.PolicyInsights",
+    }
+    workloads = {
+        "foundry": {"Microsoft.CognitiveServices", "Microsoft.App"},
+        "ai-search": {"Microsoft.Search"},
+        "cosmos-db": {"Microsoft.DocumentDB"},
+        "azure-machine-learning": {"Microsoft.MachineLearningServices", "Microsoft.Compute", "Microsoft.Batch"},
+        "aks-for-azure-ml": {"Microsoft.ContainerService", "Microsoft.Compute", "Microsoft.KubernetesConfiguration"},
+        "aks": {"Microsoft.ContainerService", "Microsoft.Compute"},
+        "databricks": {"Microsoft.Databricks", "Microsoft.Compute"},
+        "datafactory": {"Microsoft.DataFactory"},
+        "event-hubs": {"Microsoft.EventHub"},
+        "postgresql": {"Microsoft.DBforPostgreSQL"},
+        "container-apps": {"Microsoft.App"},
+    }
+    for resource in selected:
+        providers.update(workloads.get(resource, set()))
+    return sorted(providers)
 
 
 def simple_mode_gateway_inputs(hostname: str, backend_fqdn: str, certificate_secret_id: str) -> dict[str, str]:
@@ -196,15 +246,24 @@ def simple_mode_values(cost_center: str = "123456", project_resources: str | lis
         "allowPublicAccessWhenBehindVnet": "false",
         "enablePublicAccessWithPerimeter": "false",
         "disableLocalAuth": "true",
-        "enableAIFoundry": "true",
-        "enableAFoundryCaphost": "true",
+        "enableAIFoundry": str("foundry" in selected).lower(),
+        "enableAFoundryCaphost": str("foundry-capability-host" in selected).lower(),
         "foundryDeploymentType": "2",
-        "enableAIFactoryCreatedDefaultProjectForAIFv2": "true",
-        "disableAgentNetworkInjection": "false",
-        "enableAISearch": "true",
-        "enableAISearchSharedPrivateLink": "true",
-        "enableCosmosDB": "true",
+        "enableAIFactoryCreatedDefaultProjectForAIFv2": str("foundry" in selected).lower(),
+        "disableAgentNetworkInjection": str("foundry" not in selected).lower(),
+        "enableAISearch": str("ai-search" in selected).lower(),
+        "enableAISearchSharedPrivateLink": str("ai-search" in selected).lower(),
+        "enableCosmosDB": str("cosmos-db" in selected).lower(),
         "enableApplicationInsights": str("application-insights" in selected).lower(),
+        "enableAzureMachineLearning": str("azure-machine-learning" in selected).lower(),
+        "addAzureMachineLearning": str("azure-machine-learning" in selected).lower(),
+        "enableAksForAzureML": str("aks-for-azure-ml" in selected).lower(),
+        "enableAKS": str("aks" in selected).lower(),
+        "enableDatabricks": str("databricks" in selected).lower(),
+        "enableDatafactory": str("datafactory" in selected).lower(),
+        "enableEventHubs": str("event-hubs" in selected).lower(),
+        "enablePostgreSQL": str("postgresql" in selected).lower(),
+        "enableContainerApps": str("container-apps" in selected).lower(),
         "updateAIFoundry": "false",
         "addAIFoundry": "false",
         "addAISearch": "false",
@@ -221,6 +280,17 @@ def simple_mode_values(cost_center: str = "123456", project_resources: str | lis
         "admin_semanticSearchTier": "free",
         "skuAIServicesDev": "S0",
         "skuOpenAIDev": "S0",
+        "skuAzureMLDev": "basic",
+        "skuTierAzureMLDev": "basic",
+        "aksSkuName": "Base",
+        "skuTierAksDev": "Standard",
+        "skuAksDev": "Standard_D4s_v5",
+        "skuDatabricksDev": "premium",
+        "skuEventHubsDev": "Standard",
+        "skuPostgreSQLDev": "Standard_B1ms",
+        "skuTierPostgreSQLDev": "Burstable",
+        "default_model_sku": "DataZoneStandard",
+        "modelGPTXSku": "DataZoneStandard",
         "project_number_000": "001",
         "tag_costceter_common": cost_center,
         "tag_costcenter": cost_center,
@@ -248,6 +318,12 @@ def simple_mode_manifest() -> dict[str, Any]:
         "sourcePinEnvironment": "AIF_SUBMODULE_REF",
         "sourcePinFormat": "40-character lowercase Git commit SHA",
         "resourceCatalog": SIMPLE_MODE_RESOURCE_CATALOG,
+        "appGatewayDeployment": {
+            "environment": "AIF_ENABLE_APPLICATION_GATEWAY",
+            "default": False,
+            "omittedDefault": True,
+            "supported": [False, True],
+        },
         "appGatewayInputs": {
             "app_gateway_backend_fqdn": "AIF_APP_GATEWAY_BACKEND_FQDN",
             "app_gateway_hostname": "AIF_APP_GATEWAY_HOSTNAME",
@@ -255,10 +331,19 @@ def simple_mode_manifest() -> dict[str, Any]:
         },
         "repositoryVisibility": {"environment": "GITHUB_REPOSITORY_VISIBILITY", "default": "private", "allowed": ["private", "public"]},
         "projectResourcesEnvironment": "AIF_SIMPLE_PROJECT_RESOURCES_JSON",
+        "projectResourceSelection": {
+            "contractVersion": 1,
+            "environment": "AIF_SIMPLE_PROJECT_RESOURCES_JSON",
+            "omittedDefault": "catalog-defaults",
+            "dependencies": "strict",
+            "foundryRequires": ["foundry-capability-host", "ai-search", "cosmos-db"],
+            "capabilityHostRequiresFoundry": True,
+            "aksForAzureMLRequires": "azure-machine-learning",
+        },
         "requiredInputs": [
-            {"environment": "AIF_APP_GATEWAY_HOSTNAME", "name": "app_gateway_hostname", "description": "Custom HTTPS frontend FQDN covered by the certificate."},
-            {"environment": "AIF_APP_GATEWAY_BACKEND_FQDN", "name": "app_gateway_backend_fqdn", "description": "Private RFC1918 HTTPS backend reachable from the new VNet, trusted certificate and GET / returning 200-399."},
-            {"environment": "AIF_APP_GATEWAY_CERT_SECRET_ID", "name": "app_gateway_certificate_secret_id", "description": "Existing versionless Key Vault certificate-secret URI; exportable PFX, valid SAN and RBAC vault in Dev subscription."},
+            {"environment": "AIF_APP_GATEWAY_HOSTNAME", "name": "app_gateway_hostname", "description": "When deploying a new gateway: custom HTTPS frontend FQDN covered by the certificate.", "requiredWhen": {"environment": "AIF_ENABLE_APPLICATION_GATEWAY", "equals": True, "omittedDefault": True}},
+            {"environment": "AIF_APP_GATEWAY_BACKEND_FQDN", "name": "app_gateway_backend_fqdn", "description": "When deploying a new gateway: private RFC1918 HTTPS backend reachable from the new VNet, trusted certificate and GET / returning 200-399.", "requiredWhen": {"environment": "AIF_ENABLE_APPLICATION_GATEWAY", "equals": True, "omittedDefault": True}},
+            {"environment": "AIF_APP_GATEWAY_CERT_SECRET_ID", "name": "app_gateway_certificate_secret_id", "description": "When deploying a new gateway: existing versionless Key Vault certificate-secret URI; exportable PFX, valid SAN and RBAC vault in Dev subscription.", "requiredWhen": {"environment": "AIF_ENABLE_APPLICATION_GATEWAY", "equals": True, "omittedDefault": True}},
         ],
         "stagePrefix": "AIF_SIMPLE_STAGE=",
         "stages": ["preflight", "repository", "identity", "common", "hub", "project", "completed"],
@@ -269,15 +354,16 @@ def simple_mode_manifest() -> dict[str, Any]:
             "No model deployments; add models only after quota validation",
             "AMPLS is disabled: canonical Application Insights/Log Analytics networking is not private-only",
             "Azure/GitHub sign-in and region availability must be validated before deployment",
-            "Private Application Gateway requires an existing certificate/private HTTPS backend and registered EnableApplicationGatewayNetworkIsolation feature",
+            "Only when deploying a new Application Gateway: requires an existing certificate/private HTTPS backend and registered EnableApplicationGatewayNetworkIsolation feature",
+            "Gateway deployment is optional, not required for private Foundry agents; disabled skips gateway resources and never adopts or modifies an existing customer gateway",
             "Public GitHub visibility does not enable public Azure services; generated code and non-secret metadata are public",
         ],
         "configuration": simple_mode_values(),
         "services": {
-            "Foundry": "S0 account, default project, and required standard-agent capability host",
-            "AI Search": "Basic capability-host vector store",
-            "Cosmos DB": "capability-host thread and agent-history store",
-            "Storage": "Standard_LRS capability-host file storage",
+            "Foundry": "Optional S0 account, default project, and standard-agent capability host",
+            "AI Search": "Optional Basic search; required with Foundry",
+            "Cosmos DB": "Optional private database; required with Foundry",
+            "Storage": "Required Standard_LRS project storage",
             "Key Vault": "standard",
             "Application Insights": "workspace-based",
             "Log Analytics": "PerGB2018",
@@ -285,7 +371,7 @@ def simple_mode_manifest() -> dict[str, Any]:
         },
         "hub": {
             "mode": "standalone-integrated",
-            "applicationGateway": "Required WAF_v2, private frontend 172.16.2.10, HTTPS/TLS 1.2+, WAF Prevention; no public IP",
+            "applicationGateway": "Optional new WAF_v2 (billable), private frontend 172.16.2.10, HTTPS/TLS 1.2+, WAF Prevention; no public IP. New UI defaults off; omitted bootstrap input preserves legacy on",
             "vpnGateway": "VpnGw1AZ (billable), Entra-authenticated P2S",
             "bastion": "Developer; fail if unavailable, no paid fallback",
             "adminVM": False,
@@ -296,7 +382,7 @@ def simple_mode_manifest() -> dict[str, Any]:
         },
         "deploymentIdentityRoles": ["Contributor", "User Access Administrator",
                                     "Key Vault Secrets User"],
-        "gatewayIdentityRoles": ["Key Vault Secrets User (certificate vault only)"],
+        "gatewayIdentityRoles": ["Key Vault Secrets User (certificate vault only, when deploying a new gateway)"],
         "policyIdentityRoles": ["Network Contributor (Dev subscription)"],
     }
 
@@ -320,14 +406,16 @@ def simple_mode_source_sha256(root: Path | None = None) -> str:
     return digest.hexdigest()
 
 
-def simple_mode_hub_subnets(cidr: str, existing: list[dict[str, Any]]) -> dict[str, str]:
+def simple_mode_hub_subnets(cidr: str, existing: list[dict[str, Any]],
+                           enable_application_gateway: str | bool = "true") -> dict[str, str]:
     """Reserve the access blocks before creation; never move existing subnets."""
     network = ipaddress.ip_network(cidr, strict=True)
     if str(network) != "172.16.0.0/20":
         raise ValueError("Simple Mode contract v2 requires Dev VNet 172.16.0.0/20")
     planned = {"GatewaySubnet": "172.16.1.0/27",
-               "snet-dns-private-resolver": "172.16.1.32/28",
-               "snet-application-gateway": "172.16.2.0/24"}
+               "snet-dns-private-resolver": "172.16.1.32/28"}
+    if simple_mode_application_gateway_enabled(enable_application_gateway):
+        planned["snet-application-gateway"] = "172.16.2.0/24"
     for subnet in existing:
         name = subnet["name"]
         prefixes = subnet.get("addressPrefixes") or [subnet.get("addressPrefix")]
@@ -872,7 +960,11 @@ def main() -> int:
     parser.add_argument("--verify-simple-mode-source", type=Path)
     parser.add_argument("--simple-mode-hub-subnets", type=Path)
     parser.add_argument("--simple-gateway-inputs", action="store_true")
+    parser.add_argument("--enable-application-gateway", choices=("true", "false"))
     parser.add_argument("--project-resources")
+    parser.add_argument("--simple-project-providers", action="store_true")
+    parser.add_argument("--simple-project-selected", choices=[
+        item["id"] for item in SIMPLE_MODE_RESOURCE_CATALOG["project"]])
     parser.add_argument("--repository-visibility", default="private")
     parser.add_argument("--app-gateway-hostname", default="")
     parser.add_argument("--app-gateway-backend-fqdn", default="")
@@ -883,19 +975,45 @@ def main() -> int:
     parser.add_argument("--repo-root", type=Path)
     parser.add_argument("--state-file", type=Path)
     args = parser.parse_args()
+    try:
+        gateway_enabled = simple_mode_application_gateway_enabled(
+            args.enable_application_gateway if args.enable_application_gateway is not None
+            else os.environ.get("AIF_ENABLE_APPLICATION_GATEWAY", "true"))
+    except ValueError as error:
+        parser.error(str(error))
 
     if args.simple_mode_manifest:
-        print(json.dumps(simple_mode_manifest(), indent=2))
+        manifest = simple_mode_manifest()
+        if args.enable_application_gateway is not None or "AIF_ENABLE_APPLICATION_GATEWAY" in os.environ:
+            manifest["enableApplicationGateway"] = gateway_enabled
+            manifest["resourceCatalog"] = {
+                scope: [dict(item, default_selected=gateway_enabled) if item["id"] == "application-gateway" else item
+                        for item in items if item["id"] != "application-gateway" or gateway_enabled]
+                for scope, items in manifest["resourceCatalog"].items()
+            }
+            if not gateway_enabled:
+                manifest["requiredInputs"] = []
+                manifest["gatewayIdentityRoles"] = []
+        print(json.dumps(manifest, indent=2))
+        return 0
+    if args.simple_project_providers:
+        print("\n".join(simple_mode_project_providers(args.project_resources)))
+        return 0
+    if args.simple_project_selected:
+        print(str(args.simple_project_selected in simple_mode_project_resources(args.project_resources)).lower())
         return 0
     if args.verify_simple_mode_source:
         verify_simple_mode_source(Path(__file__).resolve().parents[2], args.verify_simple_mode_source)
         return 0
     if args.simple_mode_hub_subnets:
         existing = json.loads(args.simple_mode_hub_subnets.read_text(encoding="utf-8-sig"))
-        print(json.dumps(simple_mode_hub_subnets("172.16.0.0/20", existing)))
+        print(json.dumps(simple_mode_hub_subnets("172.16.0.0/20", existing, gateway_enabled)))
         return 0
     if args.simple_gateway_inputs:
         simple_mode_values(project_resources=args.project_resources, repository_visibility=args.repository_visibility)
+        if not gateway_enabled:
+            print(json.dumps({"enabled": False}))
+            return 0
         gateway = simple_mode_gateway_inputs(args.app_gateway_hostname, args.app_gateway_backend_fqdn,
                                              args.app_gateway_certificate_secret_id)
         if args.certificate_metadata:
@@ -903,6 +1021,8 @@ def main() -> int:
         print(json.dumps(gateway))
         return 0
     if args.gateway_health:
+        if not gateway_enabled:
+            return 0
         health = json.loads(args.gateway_health.read_text(encoding="utf-8-sig"))
         return 0 if simple_mode_gateway_healthy(health, args.app_gateway_backend_fqdn) else 1
     if not all((args.route, args.repo_root, args.state_file)):

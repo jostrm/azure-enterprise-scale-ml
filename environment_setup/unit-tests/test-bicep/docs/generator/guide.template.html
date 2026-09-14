@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>PURPLE | Offline infrastructure CI visual guide</title>
+<script>
+  (() => {
+    const param = new URLSearchParams(window.location.search).get("scoutTheme");
+    const theme =
+      param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  })();
+</script>
+<style>
+/* THEME START */
+:root {
+  color-scheme: light;
+  --cp-bg: #f7f4ef;
+  --cp-bg-elevated: #fcfbf8;
+  --cp-surface: #ffffff;
+  --cp-surface-soft: #f5f5f5;
+  --cp-border: #dedede;
+  --cp-border-strong: #919191;
+  --cp-text: #242424;
+  --cp-text-muted: #5c5c5c;
+  --cp-text-soft: #6f6f6f;
+  --cp-accent: #b11f4b;
+  --cp-accent-hover: #9a1a41;
+  --cp-accent-soft: rgba(177, 31, 75, 0.08);
+  --cp-accent-fg: #ffffff;
+  --cp-success: #16a34a;
+  --cp-danger: #dc2626;
+  --cp-warning: #f59e0b;
+  --cp-link: #0078d4;
+  --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+  --cp-overlay: rgba(255, 255, 255, 0.8);
+  --cp-panel: rgba(255, 255, 255, 0.86);
+  --cp-panel-strong: rgba(255, 255, 255, 0.96);
+  --cp-sheen: rgba(255, 255, 255, 0.55);
+  --cp-highlight: rgba(177, 31, 75, 0.12);
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --cp-bg: #3d3b3a;
+  --cp-bg-elevated: #343231;
+  --cp-surface: #292929;
+  --cp-surface-soft: #2e2e2e;
+  --cp-border: #474747;
+  --cp-border-strong: #5f5f5f;
+  --cp-text: #dedede;
+  --cp-text-muted: #919191;
+  --cp-text-soft: #b0b0b0;
+  --cp-accent: #fd8ea1;
+  --cp-accent-hover: #fb7b91;
+  --cp-accent-soft: rgba(253, 142, 161, 0.14);
+  --cp-accent-fg: #1a1a1a;
+  --cp-success: #4ade80;
+  --cp-danger: #f87171;
+  --cp-warning: #fbbf24;
+  --cp-link: #4da6ff;
+  --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  --cp-overlay: rgba(41, 41, 41, 0.88);
+  --cp-panel: rgba(41, 41, 41, 0.72);
+  --cp-panel-strong: rgba(41, 41, 41, 0.96);
+  --cp-sheen: rgba(255, 255, 255, 0.04);
+  --cp-highlight: rgba(253, 142, 161, 0.12);
+}
+/* THEME END */
+* { box-sizing:border-box; }
+body { margin:0; background:var(--cp-bg); color:var(--cp-text); font:16px/1.6 "Segoe UI",Aptos,Calibri,-apple-system,BlinkMacSystemFont,sans-serif; }
+main { max-width:1280px; margin:auto; padding:32px 24px 48px; }
+a { color:var(--cp-link); text-underline-offset:3px; }
+button,input { font:inherit; accent-color:var(--cp-accent); }
+button { border:1px solid var(--cp-border-strong); border-radius:.625rem; padding:8px 16px; color:var(--cp-text); background:var(--cp-surface); cursor:pointer; }
+button:hover { background:var(--cp-highlight); }
+:focus-visible { outline:3px solid var(--cp-accent); outline-offset:4px; }
+h1 { font-size:clamp(28px,4vw,44px); line-height:1.2; letter-spacing:-.025em; margin:8px 0 16px; }
+h2 { font-size:24px; line-height:1.3; margin:0 0 16px; }
+h3 { font-size:19px; line-height:1.4; margin:0 0 8px; }
+p { margin:8px 0 16px; }
+.eyebrow { color:var(--cp-accent); font-size:13px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
+.lead { max-width:920px; font-size:19px; color:var(--cp-text-muted); }
+.navigation { display:flex; flex-wrap:wrap; gap:8px 24px; margin:24px 0; }
+.card { background:var(--cp-surface); border:1px solid var(--cp-border); border-radius:16px; padding:24px; margin:24px 0; }
+.callout { border-left:4px solid var(--cp-accent); background:var(--cp-accent-soft); padding:12px 16px; border-radius:0 .625rem .625rem 0; }
+.muted,small { color:var(--cp-text-muted); }
+.metrics { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin:24px 0; }
+.metric { border:1px solid var(--cp-border); border-radius:16px; background:var(--cp-surface); padding:16px; display:flex; flex-direction:column; }
+.metric strong { font-size:32px; font-weight:650; font-variant-numeric:tabular-nums; }
+.metric span { color:var(--cp-text-muted); font-size:14px; }
+.section-header,.controls { display:flex; align-items:center; flex-wrap:wrap; gap:12px; justify-content:space-between; }
+.section-header h2 { margin-bottom:8px; }
+.phase-controls { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
+.phase-button[aria-pressed="true"] { background:var(--cp-accent); color:var(--cp-accent-fg); border-color:var(--cp-accent); }
+.phase-button span { font-variant-numeric:tabular-nums; }
+.diagram-scroll { overflow-x:auto; padding:8px 4px; }
+.diagram-scroll svg { display:block; width:100%; min-width:820px; }
+.flow-background { fill:var(--cp-surface); }
+.flow-caption,.node-note { fill:var(--cp-text-muted); font:13px "Segoe UI",Aptos,Calibri,sans-serif; }
+.flow-edge { stroke:var(--cp-border-strong); stroke-width:2; fill:none; }
+.flow-arrow { fill:var(--cp-border-strong); }
+.node-box { fill:var(--cp-surface-soft); stroke:var(--cp-border-strong); stroke-width:1.5; }
+.node-number { fill:var(--cp-accent); font:600 14px "Segoe UI",Aptos,Calibri,sans-serif; }
+.node-title { fill:var(--cp-text); font:600 18px "Segoe UI",Aptos,Calibri,sans-serif; }
+.node-attention { fill:var(--cp-accent); font:700 18px "Segoe UI",Aptos,Calibri,sans-serif; }
+.flow-marker { fill:var(--cp-accent); stroke:var(--cp-surface); stroke-width:2; pointer-events:none; }
+.flow-node[role="button"] { cursor:pointer; }
+.flow-node[aria-pressed="true"] .node-box,.flow-node:focus-visible .node-box { stroke:var(--cp-accent); stroke-width:3; fill:var(--cp-accent-soft); }
+.phase-panel { border-top:1px solid var(--cp-border); padding:20px 0 0; min-height:152px; }
+.phase-panel p { max-width:1040px; }
+.columns { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.switches { display:flex; flex-wrap:wrap; gap:16px; padding:12px 0; }
+.switches label { display:flex; gap:12px; align-items:center; border:1px solid var(--cp-border-strong); border-radius:.625rem; padding:12px; overflow-wrap:anywhere; }
+input[type="checkbox"] { width:20px; height:20px; flex:none; }
+.table-scroll { overflow:auto; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px; }
+th,td { padding:12px; border-bottom:1px solid var(--cp-border); text-align:left; vertical-align:top; }
+thead th { background:var(--cp-surface-soft); }
+tbody th { font-weight:500; }
+tbody th a { overflow-wrap:anywhere; }
+tr[data-selected="true"] { background:var(--cp-accent-soft); outline:2px solid var(--cp-accent); outline-offset:-2px; }
+code,pre { font-family:Consolas,"Courier New",Courier,monospace; }
+code { overflow-wrap:anywhere; }
+pre { background:var(--cp-surface-soft); border:1px solid var(--cp-border); border-radius:.625rem; padding:16px; overflow:auto; font-size:14px; }
+li { margin:8px 0; }
+summary { cursor:pointer; color:var(--cp-link); font-weight:600; }
+.hash { word-break:break-all; font-size:13px; }
+.skip-link { position:absolute; left:16px; top:-100px; background:var(--cp-surface); padding:8px; }
+.skip-link:focus { top:8px; }
+footer { font-size:14px; color:var(--cp-text-muted); }
+@media(max-width:800px) { main { padding:24px 16px; } .metrics { grid-template-columns:repeat(2,1fr); } .columns { grid-template-columns:1fr; } .card { padding:16px; } }
+@media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto; } }
+@media print { .js-controls,.navigation { display:none; } main { max-width:none; padding:0; } .card { break-inside:avoid; } .diagram-scroll svg { min-width:0; } }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#evidence">Skip to validation evidence</a>
+<main>
+<header>
+  <div class="eyebrow">PURPLE / Engineering field guide</div>
+  <h1>Follow the change. Understand the evidence.</h1>
+  <p class="lead">A credential-free path from repository events to configuration contracts, real Bicep compilation and reviewable CI artifacts. Learn what a green offline check means before using it as a merge signal.</p>
+  <p class="callout"><strong>Offline acceptance is not Azure deployment proof.</strong> No Azure login, what-if, ARM condition evaluation or deployment occurs in these checks. Tool downloads and public AVM cache preparation are explicit network-enabled setup steps.</p>
+  <nav class="navigation" aria-label="Guide sections">
+    <a href="#flow">Explore the flow</a><a href="#pairwise">Try pairwise coverage</a><a href="#operate">Run and activate CI</a><a href="#evidence">Read the evidence</a><a href="#provenance">Reproduce this guide</a>
+  </nav>
+</header>
+<section aria-label="Verified matrix snapshot">
+  <div class="metrics">{{METRICS}}</div>
+  <p class="muted"><strong>Passed matrix snapshot, not live CI status.</strong> Values above are derived and cross-checked against the supplied <code>bicep-matrix.json</code>. Flag counts are template/parameter <strong>occurrences</strong>, not distinct names. Unit-test totals are intentionally not frozen here: inspect the current JUnit artifact.</p>
+</section>
+<section class="card" id="flow" aria-labelledby="flow-heading">
+  <div class="section-header"><h2 id="flow-heading">Five steps, one explicit boundary</h2><div class="controls js-controls"><button id="motion-toggle" type="button" aria-pressed="false">Pause motion</button><span id="motion-status" class="muted">Illustrative motion only</span></div></div>
+  <p>Select a phase or focus a diagram node. Use Tab, then Enter or Space. Selected phases explain evidence; the dot is not a running pipeline.</p>
+  <div class="phase-controls js-controls" aria-label="Select a CI teaching phase">{{PHASE_BUTTONS}}</div>
+  <div class="diagram-scroll" tabindex="0" role="region" aria-label="Scrollable schematic CI diagram">{{SVG}}</div>
+  <div class="phase-panel" aria-live="polite" aria-atomic="true">
+    <div id="phase-kicker" class="eyebrow">01 / Push / PR</div>
+    <h3 id="phase-title">Trigger the checks</h3>
+    <p id="phase-detail">A local commit does not run remote CI. Push the commit to GitHub, open or update a pull request, or dispatch the workflow manually. GitHub checks all branches. ADO must first be registered from its YAML.</p>
+  </div>
+  <p class="muted"><strong>Legend:</strong> numbered boxes = teaching steps; <strong>!</strong> = review a caveat; dot = sampled VisualLearner motion. Coordinates are schematic pixels, <strong>not geography or Azure locations</strong>. Unit, syntax and Bicep are parallel CI jobs, not five sequential jobs.</p>
+  <p><a href="ci-flow.svg">Open the static SVG</a> &middot; <a href="ci-scene.json">Inspect the exported scene JSON</a></p>
+  <noscript><p class="callout">JavaScript is disabled. The diagram, evidence tables and narrative below remain readable; interactive selection and motion are unavailable.</p></noscript>
+</section>
+<section class="card" id="pairwise" aria-labelledby="pair-heading">
+  <div class="eyebrow">Coverage, without exponential promises</div>
+  <h2 id="pair-heading">Two switches have four input states</h2>
+  <p>Toggle these two actual flags from <code>{{PAIR_FILE}}</code>. Each row points to a real generated case in the supplied report. Other flags may differ between those cases; this is <strong>not</strong> an isolated two-variable experiment or a complete Cartesian product.</p>
+  <div class="switches js-controls">
+    <label><input id="first-switch" type="checkbox"><span>{{FIRST_FLAG}}</span></label>
+    <label><input id="second-switch" type="checkbox"><span>{{SECOND_FLAG}}</span></label>
+  </div>
+  <p id="pair-status" class="callout" role="status">Select switch values to highlight a covered state.</p>
+  <div class="table-scroll"><table>
+    <caption>Four covered states for this pair; representative case names come from the matrix</caption>
+    <thead><tr><th scope="col">First / second input</th><th scope="col">Example bound case</th><th scope="col">Cases containing this state</th></tr></thead>
+    <tbody>{{PAIR_ROWS}}</tbody>
+  </table></div>
+  <p>This entrypoint has <strong>{{PAIR_FLAG_COUNT}} flags</strong> and <strong>{{PAIR_CASE_COUNT}} generated cases</strong>. Full enumeration would require <strong>2<sup>{{PAIR_FLAG_COUNT}}</sup> = {{FULL_ASSIGNMENTS}}</strong> assignments. Pairwise coverage checks all four states for every pair <em>within an entrypoint</em>; it does not check every higher-order interaction or cross-entrypoint pair.</p>
+  <p class="muted">Baseline resolves real defaults (with committed pipeline defaults for required flags and a separate GHA-required-defaults case). Individual flips and pairwise variations explicitly bind every flag. All-off/all-on mean false/true <strong>inputs</strong>, including disable flags, not all Azure services off/on. The pair demo illustrates bindings, never runtime dependency compatibility.</p>
+</section>
+<section class="card" id="operate" aria-labelledby="operate-heading">
+  <h2 id="operate-heading">Run it locally. Activate it remotely.</h2>
+  <div class="columns">
+    <article>
+      <h3>GitHub Actions</h3>
+      <p><a href="../../../../.github/workflows/infrastructure-tests.yml">infrastructure-tests.yml</a> listens for every push, pull request and manual dispatch, with no branch filter. Push is required: a local commit alone cannot launch GitHub checks.</p>
+      <ul>
+        <li><code>IaC / unit / ubuntu-22.04</code></li>
+        <li><code>IaC / unit / windows-2022</code></li>
+        <li><code>IaC / syntax / ubuntu-22.04</code></li>
+        <li><code>IaC / bicep / ubuntu-22.04</code></li>
+      </ul>
+      <p>Actions are pinned to immutable commits, token permission is <code>contents: read</code>, and checkout uses <code>persist-credentials: false</code>. No Azure secrets or service connection is needed, including for fork PRs subject to GitHub's approval policy.</p>
+      <p class="callout"><strong>Merge gates are a separate admin action.</strong> Add the four checks to the relevant GitHub branch ruleset. This change does not configure required checks automatically.</p>
+    </article>
+    <article>
+      <h3>Azure DevOps</h3>
+      <p>Create a pipeline using <strong>Existing Azure Pipelines YAML file</strong> and select <a href="../azure-pipelines.yml"><code>environment_setup/unit-tests/test-bicep/azure-pipelines.yml</code></a>.</p>
+      <p>The same unit Linux/Windows, syntax Linux and Bicep Linux jobs run through the shared <a href="../run_ci.py"><code>run_ci.py</code></a>. Python 3.12 and checksum-verified Bicep 0.44.1 are the CI tool versions.</p>
+      <p>YAML triggers cover all branches. For GitHub-backed ADO pipelines, the YAML PR trigger applies. For <strong>Azure Repos</strong>, configure a <strong>Build validation branch policy</strong>; its PR checks do not use YAML <code>pr</code>. Confirm the ADO UI has not overridden CI triggers.</p>
+      <p class="callout">Registering the YAML pipeline and setting branch policies are manual setup steps. No pipeline registration or cloud configuration is performed by this guide.</p>
+    </article>
+  </div>
+  <h3>Local entrypoint</h3>
+  <p>From the repository root, use the existing Python requirements, Bash, Git and PowerShell Core. Install an appropriate standalone Bicep compiler for your operating system; pass its executable path on Windows. The CI installer is Linux x64 only.</p>
+  <pre><code>cd environment_setup/unit-tests/test-bicep
+python -m pip install -r requirements.txt
+python run_ci.py --phase unit --require-ci-tools
+python run_ci.py --phase syntax
+python run_bicep_matrix.py --prepare-cache --bicep bicep --report test-results/bicep-dependencies.json
+python run_ci.py --phase bicep --bicep bicep</code></pre>
+  <p>The separate prepare-cache command restores declared public AVM modules. Subsequent compilation and case binding use <code>--no-restore</code> and fail if cached dependencies are missing. CI forces <code>LIVE_AZURE=0</code> and selects offline tests explicitly. It does not run opt-in integration tests.</p>
+</section>
+<section class="card" id="evidence" aria-labelledby="evidence-heading">
+  <h2 id="evidence-heading">Read artifacts as evidence, not certification</h2>
+  <div class="columns">
+    <article>
+      <h3>Which artifact answers which question?</h3>
+      <ul>
+        <li><code>unit-tests.xml</code>: actual pytest results, failures and platform-specific skips. ADO also publishes these in its Tests view. Do not infer the unit total from this guide.</li>
+        <li><code>feature-contract-coverage.json</code>: public ENABLE inventory, mapped contracts and explicit exceptions/default differences.</li>
+        <li><code>syntax.json</code>: YAML, Python and Bash parse counts and failures.</li>
+        <li><code>bicep-dependencies.json</code>: declared registry dependency preparation.</li>
+        <li><code>bicep-matrix.json</code>: entrypoints, real compiler warnings, flags, case bindings, pair states and scope limits.</li>
+        <li><code>&lt;phase&gt;-summary.json</code>: failed phases and <code>azure_deployment_performed: false</code>.</li>
+      </ul>
+      <p>GitHub uploads per-phase/OS result artifacts even on failure (14-day retention). ADO publishes unit JUnit results and phase/OS artifacts on success or failure. A missing report or failed tool is not substituted with a mocked compiler pass.</p>
+    </article>
+    <article>
+      <h3>Know the configuration exceptions</h3>
+      <p>The contract inventory currently covers <strong>44 public ENABLE flags</strong>: <strong>41 mapped contracts</strong> and three explicit exceptions. Those public flags are a different inventory from the matrix's bool/string parameter occurrences.</p>
+      <ul>
+        <li><code>ENABLE_AMPLS</code>: missing GHA forwarding; not asserted deployable.</li>
+        <li><code>ENABLE_RETRIES</code>: missing GHA forwarding; retries are not provisioning coverage.</li>
+        <li><code>ENABLE_AI_FACTORY_HUB</code>: configuration intent, not a promised resource deployment.</li>
+      </ul>
+      <p>Existing defaults are preserved, including documented ADO/GHA AML-AKS and hybrid-benefit differences. Missing GHA AKS forwarding and ADO Application Insights/Bing parameter wiring are corrected without silently changing customer defaults.</p>
+      <p>No subscription, tenant, credential, quota, resource existence, region capability, RBAC or live network dependency is validated. GREEN consumers pinned to PURPLE submodule commits are not automatically changed or deployed.</p>
+    </article>
+  </div>
+  <details>
+    <summary>Inspect the snapshot's {{BICEP_VERSION}} entrypoint evidence</summary>
+    <div class="table-scroll"><table>
+      <caption>Passed report rows; counts are verified during visual-guide generation</caption>
+      <thead><tr><th scope="col">Entrypoint (repository-relative)</th><th scope="col">Flag occurrences</th><th scope="col">Bound cases</th><th scope="col">Pair states</th></tr></thead>
+      <tbody>{{ROWS}}</tbody>
+    </table></div>
+  </details>
+  <details>
+    <summary>Read the matrix report's scope and limitations verbatim</summary>
+    <ul>{{LIMITS}}</ul>
+  </details>
+  <p class="callout"><strong>Boundary:</strong> Bicep source compilation plus typed parameter-schema binding. Not ARM <code>condition</code>/<code>dependsOn</code> evaluation, complete Azure Pipelines expansion, a real GHA/ADO remote run, what-if, deployment, or production readiness.</p>
+</section>
+<section class="card" id="provenance" aria-labelledby="provenance-heading">
+  <div class="eyebrow">Real library, portable output</div>
+  <h2 id="provenance-heading">How VisualLearner produced this guide</h2>
+  <p>The optional .NET generator references the actual <code>AsomRecordsAB.VisualLearner.csproj</code> portable <code>net10.0</code> target through the externally supplied <code>VisualLearnerProject</code> MSBuild property. It constructs <code>VisualLearnerNode</code> values, runs <code>VisualLearnerPresentation.Normalize</code>, and exports <code>VisualLearnerFlow</code> values from <code>VisualLearnerMotion.FlowAt</code> at 128 deterministic times per cycle. The browser replays those samples; the static SVG uses a flow sampled at 2.75 seconds.</p>
+  <p>Five library phase enum slots are adapted as <code>Ingestion = Push / PR</code>, <code>DataOps = Configuration</code>, <code>Training = Unit + syntax</code>, <code>Inference = Bicep matrix</code>, and <code>Agent = Review evidence</code>. These are CI captions: <strong>no training, inference or agent execution occurs</strong>. Latitude/Longitude are explicitly repurposed as schematic y/x pixels; no geographic claim is made. Web/SVG rendering uses the Scout cp theme, not a copied MAUI surface or the library's own color palette.</p>
+  <p>The generator validates aggregate counts, binding types and all four states for every pair from the passed report. It exports only the needed snapshot fields, not source report paths or synthetic required-parameter values. The report's raw-byte SHA-256 identifies the input snapshot:</p>
+  <p class="hash"><code>{{REPORT_HASH}}</code></p>
+  <h3>Reproduce from an existing report</h3>
+  <p>Requires .NET 10 SDK and a local checkout of the actual portable VisualLearner project. From the PURPLE repository root in PowerShell, set these paths for your own machine:</p>
+  <pre><code>$visualLearnerProject = "&lt;path-to-VisualLearner&gt;\AsomRecordsAB.VisualLearner.csproj"
+$report = "environment_setup\unit-tests\test-bicep\test-results\bicep-matrix.json"
+$docs = "environment_setup\unit-tests\test-bicep\docs"
+$project = "$docs\generator\VisualGuide.csproj"
+dotnet run --project $project --no-restore "-p:VisualLearnerProject=$visualLearnerProject" -p:TargetFrameworks=net10.0 -- --report $report --output $docs
+# If assets are missing, restore once and rerun the preceding command:
+dotnet restore $project "-p:VisualLearnerProject=$visualLearnerProject" -p:TargetFrameworks=net10.0</code></pre>
+  <p>Outputs are <code>ci-visual-guide.html</code>, <code>ci-flow.svg</code> and <code>ci-scene.json</code>. The same generator/template, library and report bytes produce identical outputs, with no timestamps or machine paths. Regeneration replaces these three files. Read the local HTML directly: no server, external JavaScript, fonts, fetch, Azure login, .NET installation or library checkout is required to view it.</p>
+  <p><strong>The generator is optional tooling, not a CI dependency.</strong> Neither workflow builds it or reaches into an external repository. No VisualLearner or MAUI application source changes are needed.</p>
+  <p><a href="../README.md">Full test-suite README</a> &middot; <a href="../run_bicep_matrix.py">Matrix runner</a> &middot; <a href="../domain/pipeline_contracts.py">Feature contracts</a> &middot; <a href="generator/VisualGuide.csproj">Generator project</a> &middot; <a href="generator/Program.cs">Generator source</a></p>
+</section>
+<footer>This static snapshot documents local offline validation. No commit, push, remote CI run, Azure deployment or branch-policy setup is asserted by the visualization.</footer>
+</main>
+<script id="scene-data" type="application/json">{{SCENE_JSON}}</script>
+<script>
+(() => {
+  "use strict";
+  const scene = JSON.parse(document.getElementById("scene-data").textContent);
+  const phases = new Map(scene.phases.map(phase => [phase.id, phase]));
+  const phaseButtons = Array.from(document.querySelectorAll("[data-phase]"));
+  const nodeButtons = Array.from(document.querySelectorAll("[data-node]"));
+  function selectPhase(id) {
+    const phase = phases.get(id);
+    if (!phase) return;
+    document.getElementById("phase-kicker").textContent = phase.number + " / " + phase.label;
+    document.getElementById("phase-title").textContent = phase.title;
+    document.getElementById("phase-detail").textContent = phase.detail;
+    phaseButtons.forEach(button => button.setAttribute("aria-pressed", String(button.dataset.phase === id)));
+    nodeButtons.forEach(button => button.setAttribute("aria-pressed", String(button.dataset.node === id)));
+  }
+  phaseButtons.forEach(button => button.addEventListener("click", () => selectPhase(button.dataset.phase)));
+  nodeButtons.forEach(button => {
+    button.addEventListener("click", () => selectPhase(button.dataset.node));
+    button.addEventListener("focus", () => selectPhase(button.dataset.node));
+    button.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectPhase(button.dataset.node);
+      }
+    });
+  });
+  const first = document.getElementById("first-switch");
+  const second = document.getElementById("second-switch");
+  function showPair() {
+    const state = Number(first.checked) * 2 + Number(second.checked);
+    const example = scene.pairDemo.examples.find(pair => pair.state === state);
+    document.querySelectorAll("[data-pair]").forEach(row => row.dataset.selected = String(Number(row.dataset.pair) === state));
+    document.getElementById("pair-status").textContent =
+      "Covered input state: " + String(first.checked) + " / " + String(second.checked) +
+      ". Example case: " + example.caseName + ". " + example.matchingCases +
+      " generated case(s) contain this pair state. No deployment inference.";
+  }
+  first.addEventListener("change", showPair);
+  second.addEventListener("change", showPair);
+  showPair();
+
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const toggle = document.getElementById("motion-toggle");
+  const status = document.getElementById("motion-status");
+  const marker = document.getElementById("flow-marker");
+  let paused = reducedMotion.matches;
+  let frame = 0;
+  let previousTime = null;
+  let elapsed = 0;
+  function updateMotionState() {
+    toggle.textContent = paused ? "Play motion" : "Pause motion";
+    toggle.setAttribute("aria-pressed", String(paused));
+    status.textContent = paused
+      ? (reducedMotion.matches ? "Paused; reduced-motion preference honored" : "Paused")
+      : "Illustrative library motion; not live CI";
+    cancelAnimationFrame(frame);
+    previousTime = null;
+    if (!paused && !document.hidden) frame = requestAnimationFrame(animate);
+  }
+  function animate(now) {
+    if (paused || document.hidden) return;
+    if (previousTime !== null) elapsed += Math.min(now - previousTime, 250);
+    previousTime = now;
+    const sampleIndex = Math.floor((elapsed % (scene.cycleSeconds * 1000)) /
+      (scene.cycleSeconds * 1000) * scene.motionSamples.length);
+    const sample = scene.motionSamples[sampleIndex];
+    marker.setAttribute("cx", String(sample.x));
+    marker.setAttribute("cy", String(sample.y));
+    frame = requestAnimationFrame(animate);
+  }
+  toggle.addEventListener("click", () => { paused = !paused; updateMotionState(); });
+  reducedMotion.addEventListener("change", event => {
+    if (event.matches) paused = true;
+    updateMotionState();
+  });
+  document.addEventListener("visibilitychange", updateMotionState);
+  updateMotionState();
+})();
+</script>
+</body>
+</html>

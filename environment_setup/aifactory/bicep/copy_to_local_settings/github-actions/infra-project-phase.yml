@@ -2449,6 +2449,7 @@ jobs:
               --parameters enableAIFoundry="${{ env.enableAIFoundry }}" \
               --parameters disableAgentNetworkInjection="${{ env.disableAgentNetworkInjection }}" \
               --parameters diagnosticSettingLevel="${{ env.diagnosticSettingLevel }}" \
+              --parameters enableAKS="${{ env.enableAKS }}" \
               --parameters addAISearch="${{ env.addAISearch }}"
 
       - name: 66-ai-platform
