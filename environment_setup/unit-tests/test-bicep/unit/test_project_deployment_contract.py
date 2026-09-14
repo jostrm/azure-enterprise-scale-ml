@@ -183,6 +183,13 @@ def test_reviewed_preflight_receives_explicit_environment_service_connection():
     assert tasks[0]["inputs"]["azureSubscription"] == "${{ parameters.serviceConnection }}"
 
 
+def test_all_project_deployment_jobs_stop_after_pipeline_cancellation():
+    pipeline = yaml.safe_load((ADO / "infra-project-genai.yaml").read_text(encoding="utf-8"))
+    jobs = [job for stage in pipeline["stages"] for job in stage["jobs"]]
+    assert len(jobs) == 9
+    assert all("not(canceled())" in job["condition"] for job in jobs)
+
+
 def test_ado_scheduling_uses_selected_project_not_other_loaded_export():
     config = document()
     config["stage_prod"].update(runNetworkingVar=False, BYO_subnets=True, useSelfHostedBuildAgent=True,

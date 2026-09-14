@@ -305,6 +305,7 @@ ENABLE_AOAI="$(getval enableAzureOpenAI ENABLE_AZURE_OPENAI false)"
 ENABLE_COSMOS="$(getval enableCosmosDB ENABLE_COSMOS_DB false)"
 ENABLE_ELASTIC="$(getval enableElasticsearch ENABLE_ELASTICSEARCH false)"
 ENABLE_PUBLIC_GENAI="$(getval enablePublicGenAIAccess ENABLE_PUBLIC_GENAI_ACCESS true)"
+CMK_ENABLED="$(getval cmk CMK false)"
 
 # Model deployments
 DEPLOY_GPTX="$(getval deployModel_gpt_X DEPLOY_MODEL_GPT_X false)"
@@ -685,6 +686,10 @@ check_resource_providers() { # $1 subId
   )
   for entry in "${rps[@]}"; do
     ns="${entry%%|*}"; reason="$(printf '%s' "$entry" | cut -d'|' -f2)"; sel="${entry##*|}"
+    if [ "$sel" != "true" ]; then
+      echo "  [SKIP] Provider $ns is not required because $reason is disabled."
+      continue
+    fi
     state="$(az provider show --namespace "$ns" --query 'registrationState' -o tsv 2>/dev/null)"
     if [ -z "$state" ]; then
       add_finding WARN RP_LOOKUP_FAILED "Could not read registration state for provider '$ns' ($reason)." \
@@ -694,11 +699,9 @@ check_resource_providers() { # $1 subId
     [ "$state" = "Registered" ] && continue
     if [ "$state" = "Registering" ]; then
       add_finding WARN RP_REGISTERING "Provider '$ns' is '$state' — wait until 'Registered' before deploying."
-    elif [ "$sel" = "true" ]; then
+    else
       add_finding FAIL RP_NOT_REGISTERED "Provider '$ns' is '$state', not 'Registered'. Used for: $reason." \
         "Run: az provider register --namespace $ns --wait"
-    else
-      add_finding WARN RP_NOT_REGISTERED_OPTIONAL "Provider '$ns' is '$state' (only needed if you enable: $reason)."
     fi
   done
 }
@@ -730,9 +733,10 @@ check_config_placeholders() {
     return 0
   fi
   local out fails warns
-  out="$("$PYBIN" - "$VARS_YAML" <<'PY' 2>/dev/null
+  out="$("$PYBIN" - "$VARS_YAML" "$CMK_ENABLED" <<'PY' 2>/dev/null
 import sys, re
 path = sys.argv[1]
+cmk_enabled = sys.argv[2].strip().lower() in {'true', '1', 'yes', 'y'}
 try:
     lines = open(path, encoding='utf-8', errors='replace').read().splitlines()
 except Exception:
@@ -751,6 +755,8 @@ for line in lines:
     val = val.strip().strip('"').strip("'")
     low = val.lower()
     if '<todo>' not in low and '<optional>' not in low:
+        continue
+    if key in {'cmkKeyName', 'cmkKeyVersion'} and not cmk_enabled:
         continue
     tm = re.search(r'<(mandatory|optional)>', comment, re.I)
     tag = tm.group(1).lower() if tm else 'optional'

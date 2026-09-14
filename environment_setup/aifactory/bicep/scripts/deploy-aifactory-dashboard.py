@@ -351,7 +351,11 @@ def existing_inventory(config: Config, az: Az) -> tuple[dict, str | None]:
             raise RuntimeError("The existing AI Factory dashboard inventory is invalid.")
     etag = payload.get("etag")
     if not isinstance(etag, str) or not etag:
-        raise RuntimeError("The existing AI Factory dashboard did not return an ETag.")
+        # Microsoft.Portal currently omits ETags for some managed dashboards.
+        # If-Match=* still prevents accidentally creating a resource that vanished
+        # between discovery and update, while retaining provider compatibility.
+        etag = "*"
+        print("Dashboard provider omitted an ETag; using an existence-guarded update.")
     return inventory, etag
 
 

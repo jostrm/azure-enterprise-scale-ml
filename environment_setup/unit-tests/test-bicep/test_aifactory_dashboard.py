@@ -248,6 +248,7 @@ class FakeAz:
         self.deployment_parameters = None
         self.rest_body = None
         self.update_error = ""
+        self.include_etag = True
 
     def __call__(self, *args: str) -> subprocess.CompletedProcess[str]:
         self.calls.append(args)
@@ -269,15 +270,15 @@ class FakeAz:
                 return response(
                     error='ERROR: {"error":{"code":"ResourceNotFound"}}'
                 )
-            return response(
-                {
-                    "etag": '"current"',
-                    "tags": {"AI-Factory-Dashboard": "true"},
-                    "properties": {
-                        "metadata": {"aifactoryInventory": self.existing}
-                    }
-                }
-            )
+            payload = {
+                "tags": {"AI-Factory-Dashboard": "true"},
+                "properties": {
+                    "metadata": {"aifactoryInventory": self.existing}
+                },
+            }
+            if self.include_etag:
+                payload["etag"] = '"current"'
+            return response(payload)
         if args[:2] == ("group", "list"):
             subscription = args[args.index("--subscription") + 1]
             if subscription == TEST_SUB:
@@ -520,6 +521,21 @@ class TestAifactoryDashboard(unittest.TestCase):
         self.assertIn('If-Match="current"', update_call)
         self.assertEqual(inventory, fake.rest_body["properties"]["metadata"]["aifactoryInventory"])
         self.assertIn(config.dashboard_id, url)
+
+    def test_existing_dashboard_without_provider_etag_uses_existence_guard(self) -> None:
+        config = self.config()
+        fake = FakeAz(config, {
+            "schemaVersion": 1,
+            "hubResourceGroups": [],
+            "environments": [],
+        })
+        fake.include_etag = False
+        inventory, tenant, etag = module.reconcile(config, fake)
+        self.assertEqual("*", etag)
+        module.deploy(config, inventory, tenant, etag, fake)
+        update_call = fake.calls[-1]
+        self.assertEqual("rest", update_call[0])
+        self.assertIn("If-Match=*", update_call)
 
     def test_missing_dev_common_rg_is_not_created_by_dashboard_step(self) -> None:
         config = self.config()

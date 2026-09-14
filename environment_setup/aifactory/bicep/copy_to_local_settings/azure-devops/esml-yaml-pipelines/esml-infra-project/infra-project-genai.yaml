@@ -88,7 +88,7 @@ stages:
     - deployment: ESGenAI_Networking
       # Skip networking job in ULTRA mode (deleteAllForProject=true) — the project RG is being torn down,
       # so deploying/maintaining the private network is pointless.
-      condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'),ne(variables['deleteAllForProject'], 'true'))
+      condition: and(not(canceled()),eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'),ne(variables['deleteAllForProject'], 'true'))
       displayName: Deploy Private Network
       timeoutInMinutes: 120
       pool:
@@ -126,7 +126,7 @@ stages:
                   target: ${{ parameters.deploymentTarget }}
                   cleanup: true
     - deployment: ESGenAI_Services
-      condition: or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
+      condition: and(not(canceled()),or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true')))
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
@@ -169,7 +169,7 @@ stages:
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
     # dynamic network parameters, resource detection, and salt) are re-created.
     - deployment: ESGenAI_Foundry
-      condition: in(dependencies.ESGenAI_Services.result, 'Succeeded')
+      condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded'))
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
@@ -227,7 +227,7 @@ stages:
     - deployment: ESGenAI_Networking
       # Skip networking job in ULTRA mode (deleteAllForProject=true) — the project RG is being torn down,
       # so deploying/maintaining the private network is pointless.
-      condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'),ne(variables['deleteAllForProject'], 'true'))
+      condition: and(not(canceled()),eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'),ne(variables['deleteAllForProject'], 'true'))
       displayName: Deploy Private Network
       timeoutInMinutes: 240
       pool:
@@ -265,7 +265,7 @@ stages:
                   target: ${{ parameters.deploymentTarget }}
                   cleanup: true
     - deployment: ESGenAI_Services
-      condition: or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
+      condition: and(not(canceled()),or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true')))
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
@@ -308,7 +308,7 @@ stages:
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
     # dynamic network parameters, resource detection, and salt) are re-created.
     - deployment: ESGenAI_Foundry
-      condition: in(dependencies.ESGenAI_Services.result, 'Succeeded')
+      condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded'))
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
@@ -368,7 +368,7 @@ stages:
     - deployment: ESGenAI_Networking
       # Skip networking job in ULTRA mode (deleteAllForProject=true) — the project RG is being torn down,
       # so deploying/maintaining the private network is pointless.
-      condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'),ne(variables['deleteAllForProject'], 'true'))
+      condition: and(not(canceled()),eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'),ne(variables['deleteAllServicesForProject'], 'true'),ne(variables['deleteAllForProject'], 'true'))
       displayName: Deploy Private Network
       timeoutInMinutes: 120
       pool:
@@ -406,7 +406,7 @@ stages:
                   target: ${{ parameters.deploymentTarget }}
                   cleanup: true
     - deployment: ESGenAI_Services
-      condition: or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
+      condition: and(not(canceled()),or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true')))
       dependsOn: ESGenAI_Networking
       displayName: Deploy GenAI services,Personas,RBAC,ACL,CAF & WAF Policys
       timeoutInMinutes: 240  # Increased timeout to accommodate retries
@@ -449,7 +449,7 @@ stages:
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
     # dynamic network parameters, resource detection, and salt) are re-created.
     - deployment: ESGenAI_Foundry
-      condition: in(dependencies.ESGenAI_Services.result, 'Succeeded')
+      condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded'))
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240

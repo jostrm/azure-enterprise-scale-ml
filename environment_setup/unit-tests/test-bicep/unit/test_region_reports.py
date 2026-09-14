@@ -217,7 +217,7 @@ class RegionReportsTests(unittest.TestCase):
 
 
 class PipelineTemplateTests(unittest.TestCase):
-    def test_always_reports_are_last_and_paths_are_job_unique(self):
+    def test_always_reports_precede_only_reviewed_cleanup_and_paths_are_job_unique(self):
         import yaml
 
         for name in ("infra-project.yml", "infra-project-phase.yml", "infra-common.yml"):
@@ -227,7 +227,24 @@ class PipelineTemplateTests(unittest.TestCase):
                     continue
                 with self.subTest(file=name, job=job_name):
                     self.assertNotIn("runner.temp", str(job.get("env", {})))
-                    writer, upload = job["steps"][-2:]
+                    steps = job["steps"]
+                    report_indices = [index for index, step in enumerate(steps)
+                                      if step.get("name") == "Report final pipeline job result (offline)"]
+                    self.assertEqual(len(report_indices), 1)
+                    index = report_indices[0]
+                    writer, upload = steps[index:index + 2]
+                    trailing = steps[index + 2:]
+                    if name in ("infra-project.yml", "infra-project-phase.yml"):
+                        self.assertEqual(len(trailing), 1)
+                        cleanup = trailing[0]
+                        self.assertEqual(cleanup["name"], "Remove run-specific reviewed configuration")
+                        self.assertEqual(cleanup["if"], "${{ always() && inputs.deployment_id != '' }}")
+                        self.assertEqual(
+                            cleanup["run"],
+                            'python3 -c \'from pathlib import Path; Path("aifactory/.reviewed-project-config.json").unlink(missing_ok=True)\'',
+                        )
+                    else:
+                        self.assertFalse(trailing)
                     self.assertEqual(writer["if"], "always()")
                     self.assertTrue(writer["continue-on-error"])
                     self.assertEqual(writer["env"]["AIFACTORY_REPORT_JOB_STATUS"], "${{ job.status }}")
@@ -346,6 +363,32 @@ if command -v cygpath >/dev/null; then export TMPDIR="$(cygpath -u "$PF_TEST_ROO
         self.assertFalse(any(o["kind"] == "capacity" for o in reports[0]["observations"]))
         self.assertTrue(any(o["check_id"] == "search_sku_quota" and o["status"] == "unknown"
                             for o in reports[0]["observations"]))
+
+    def test_disabled_optional_provider_is_not_queried_or_warned(self):
+        result, _ = self.run_preflight(
+            search_json='{"value":[{"name":{"value":"basic"},"limit":16,"currentValue":1}]}'
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = (self.work / "az-calls.txt").read_text(encoding="utf-8")
+        self.assertNotIn("Microsoft.Elastic", calls)
+        self.assertNotIn("RP_NOT_REGISTERED_OPTIONAL", result.stdout + result.stderr)
+
+    def test_disabled_cmk_does_not_warn_about_its_optional_placeholder(self):
+        variables = self.work / "variables.yaml"
+        variables.write_text(
+            'variables:\n'
+            '  cmk: "false"\n'
+            '  cmkKeyName: "<todo>_aifactory-cmk-key" # <optional> only when cmk is enabled\n',
+            encoding="utf-8",
+        )
+        result, _ = self.run_preflight(
+            "--skip-azure-lookups",
+            "--variables-yaml",
+            str(variables),
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("CONFIG_OPTIONAL_UNSET", result.stdout + result.stderr)
+        self.assertNotIn("cmkKeyName", result.stdout + result.stderr)
 
     def test_skip_is_unknown_and_never_calls_azure(self):
         result, reports = self.run_preflight("--skip")
