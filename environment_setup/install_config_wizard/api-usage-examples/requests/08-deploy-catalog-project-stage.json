@@ -1,0 +1,9 @@
+{
+  "folder": "${FACTORY_FOLDER}",
+  "contract_version": 1,
+  "action": "deploy",
+  "factory_id": "${FACTORY_ID}",
+  "scale_set_id": "${STAGE_SCALESET_001_ID}",
+  "project_id": "${PROJECT_ID}",
+  "expected_revision": "${CATALOG_REVISION}"
+}

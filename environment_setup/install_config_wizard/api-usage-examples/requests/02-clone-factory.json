@@ -1,0 +1,10 @@
+{
+  "folder": "${FACTORY_FOLDER}",
+  "contract_version": 1,
+  "action": "clone",
+  "factory_id": "${FACTORY_ID}",
+  "factory_key": "central-ai-europe",
+  "target_prefix": "europe-",
+  "target_region": "westeurope",
+  "include_projects": "none"
+}

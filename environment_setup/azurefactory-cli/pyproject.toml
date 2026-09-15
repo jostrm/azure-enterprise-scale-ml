@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "azurefactory-cli"
+version = "0.1.0"
+description = "Safe CLI and stdlib SDK for the local Azure AI Factory configuration API."
+readme = "readme.md"
+requires-python = ">=3.10"
+authors = [{ name = "AzureFactory CLI maintainers" }]
+license = { text = "MIT" }
+dependencies = []
+
+[project.scripts]
+azurefactory = "azurefactory.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

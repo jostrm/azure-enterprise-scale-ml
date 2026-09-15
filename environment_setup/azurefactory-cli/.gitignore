@@ -1,0 +1,10 @@
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+*.receipt.json
+*.review.json
+*.private.json
+

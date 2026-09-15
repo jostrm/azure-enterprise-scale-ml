@@ -1,0 +1,12 @@
+{
+  "folder": "${FACTORY_FOLDER}",
+  "contract_version": 1,
+  "action": "add-project",
+  "factory_id": "${FACTORY_ID}",
+  "expected_revision": "${CATALOG_REVISION}",
+  "project": {
+    "number": "001",
+    "display_name": "Customer support AI",
+    "placements": [{"environment": "dev", "scale_set_id": "${DEV_SCALESET_001_ID}"}]
+  }
+}

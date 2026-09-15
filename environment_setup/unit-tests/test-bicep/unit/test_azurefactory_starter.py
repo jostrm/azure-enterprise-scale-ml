@@ -284,6 +284,11 @@ class TestStarterBootstrapRouting(StarterWorkspace):
             path.mkdir(parents=True)
             (path / "example.txt").write_text("fixture", encoding="utf-8")
         (self.source / "bootstrap" / ".gitignore.template").write_text("fixture", encoding="utf-8")
+        for relative in ("environment_setup/azurefactory-cli",
+                         "environment_setup/install_config_wizard/api-usage-examples"):
+            shutil.copytree(ROOT / relative, self.source / relative,
+                            ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache", ".venv",
+                                                        "*.egg-info", "build", "dist", ".local"))
 
     def test_explicit_init_and_central_script_paths_only_initialize_register(self):
         before = self.snapshot()
@@ -384,6 +389,87 @@ class TestStarterBootstrapRouting(StarterWorkspace):
                 self.assertFalse(self.target.exists())
                 self.assertTrue((self.workspace / "aifactory-templates" / "config-wizard" / "readme.md").is_file())
                 self.assertEqual((self.workspace / "aifactory-templates" / "azurefactory").exists(), not args)
+
+    def test_cli_and_api_sources_are_copied_for_each_template_mode(self):
+        self.prepare_template_sources()
+        for args in ((), ("--auto",), ("--legacy-templates",)):
+            with self.subTest(args=args):
+                result = self.run_script(*args)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                templates = self.workspace / "aifactory-templates"
+                for relative in (
+                    "azurefactory-cli/.gitignore", "azurefactory-cli/readme.md",
+                    "azurefactory-cli/pyproject.toml", "azurefactory-cli/src/azurefactory/cli.py",
+                    "azurefactory-cli/src/azurefactory/review.py", "azurefactory-cli/tests/test_reviews.py",
+                    "install_config_wizard/api-usage-examples/.gitignore",
+                    "install_config_wizard/api-usage-examples/readme.md",
+                    "install_config_wizard/api-usage-examples/python/inspect_factory.py",
+                    "install_config_wizard/api-usage-examples/powershell/Request-AzureFactory.ps1",
+                    "install_config_wizard/api-usage-examples/node/request.mjs",
+                    "install_config_wizard/api-usage-examples/requests/01-create-factory.json",
+                    "install_config_wizard/api-usage-examples/scenarios.json",
+                ):
+                    copied = templates / relative
+                    source = self.source / "environment_setup" / relative
+                    self.assertEqual(copied.read_bytes(), source.read_bytes(), relative)
+                examples = templates / "install_config_wizard" / "api-usage-examples"
+                self.assertTrue((examples / "../../azurefactory-cli/readme.md").is_file())
+                self.assertTrue((templates / "azurefactory-cli/../install_config_wizard/api-usage-examples/readme.md").is_file())
+                for copied in (templates / "azurefactory-cli", examples):
+                    self.assertFalse((copied / ".venv").exists())
+                self.assertIn("CLI, Python SDK and API usage examples", result.stdout)
+
+    def test_cli_api_copy_excludes_runtime_artifacts_and_refreshes_stale_files(self):
+        self.prepare_template_sources()
+        cli = self.source / "environment_setup" / "azurefactory-cli"
+        examples = self.source / "environment_setup" / "install_config_wizard" / "api-usage-examples"
+        excluded = [
+            cli / ".venv" / "sensitive.py",
+            cli / "src" / "azurefactory" / "__pycache__" / "cached.py",
+            cli / "tests" / ".local" / "private.json",
+            cli / "src" / "azurefactory" / "saved.receipt.json",
+            examples / ".local" / "bootstrap.json",
+            examples / "requests" / "saved.review.json",
+            examples / "requests" / "saved.private.json",
+            examples / "node" / "node_modules" / "dependency.mjs",
+            examples / "python" / ".env",
+        ]
+        for path in excluded:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("do-not-copy", encoding="utf-8")
+        (cli / "operator-config.json").write_text("not a distributable root asset", encoding="utf-8")
+        result = self.run_script("--legacy-templates")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        templates = self.workspace / "aifactory-templates"
+        for path in excluded:
+            relative = path.relative_to(self.source / "environment_setup")
+            self.assertFalse((templates / relative).exists(), relative)
+        self.assertFalse((templates / "azurefactory-cli/operator-config.json").exists())
+        stale = templates / "azurefactory-cli/src/azurefactory/removed.py"
+        stale.write_text("stale template", encoding="utf-8")
+        result = self.run_script("--legacy-templates")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(stale.exists())
+
+    def test_missing_cli_api_source_fails_before_replacing_templates(self):
+        self.prepare_template_sources()
+        (self.source / "environment_setup" / "azurefactory-cli" / "pyproject.toml").unlink()
+        before = self.snapshot()
+        result = self.run_script("--legacy-templates")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CLI/API source is missing", result.stderr)
+        self.assertEqual(before, self.snapshot())
+
+    def test_failed_cli_api_archive_is_reported_without_success_banner(self):
+        self.prepare_template_sources()
+        result = subprocess.run(
+            [str(BASH), "--noprofile", "--norc", "-c",
+             'tar() { return 73; }; export -f tar; bash "$AIF_TEST_COPY_SCRIPT" --legacy-templates'],
+            cwd=self.workspace, env=dict(self.env, AIF_TEST_COPY_SCRIPT=self.script.as_posix()),
+            capture_output=True, text=True, timeout=30)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CLI/API template copy failed", result.stderr)
+        self.assertNotIn("Template copy finished", result.stdout)
 
     def test_populated_or_malformed_staged_register_blocks_copy_unchanged(self):
         self.prepare_template_sources()

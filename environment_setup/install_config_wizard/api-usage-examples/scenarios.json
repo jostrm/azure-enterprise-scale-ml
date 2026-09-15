@@ -1,0 +1,20 @@
+{
+  "01-create-factory.json": {"path": "/api/v1/factory-catalog/prepare", "model": "CatalogPrepare", "phase": "configuration-preview"},
+  "02-clone-factory.json": {"path": "/api/v1/factory-catalog/prepare", "model": "CatalogPrepare", "phase": "configuration-preview"},
+  "03-add-dev-scaleset-002.json": {"path": "/api/v1/factory-catalog/prepare", "model": "CatalogPrepare", "phase": "configuration-preview"},
+  "04-add-project-existing-scaleset.json": {"path": "/api/v1/factory-catalog/prepare", "model": "CatalogPrepare", "phase": "configuration-preview"},
+  "05-add-project-new-scaleset.json": {"path": "/api/v1/factory-catalog/prepare", "model": "CatalogPrepare", "phase": "configuration-preview"},
+  "06-add-stage-scaleset-001.json": {"path": "/api/v1/factory-catalog/prepare", "model": "CatalogPrepare", "phase": "configuration-preview"},
+  "07-add-project-stage-placement.json": {"path": "/api/v1/factory-catalog/prepare", "model": "CatalogPrepare", "phase": "configuration-preview"},
+  "08-deploy-catalog-project-stage.json": {"path": "/api/v1/factory-catalog/prepare", "model": "CatalogPrepare", "phase": "runtime-preview-may-be-blocked"},
+  "09-scoped-auth-status.json": {"path": "/api/v1/azure/auth/status", "model": "AzureAuthBody", "phase": "read-only"},
+  "10-legacy-update-project-dev.json": {"path": "/api/v1/operations/project-deployments/plan", "model": "ProjectDeploymentPlanBody", "phase": "legacy-local-draft"},
+  "11-legacy-promote-project-stage.json": {"path": "/api/v1/operations/project-deployments/plan", "model": "ProjectDeploymentPlanBody", "phase": "legacy-local-draft"},
+  "12-full-bootstrap-gha.json": {"path": "/api/v1/creation/bootstrap/prepare", "model": "BootstrapPrepare", "phase": "full-bootstrap-preview"},
+  "13-full-bootstrap-ado.json": {"path": "/api/v1/creation/bootstrap/prepare", "model": "BootstrapPrepare", "phase": "full-bootstrap-preview"},
+  "14-migrate-legacy-configuration.json": {"path": "/api/v1/factory-catalog/prepare", "model": "CatalogPrepare", "phase": "configuration-preview"},
+  "catalog-confirm.json": {"path": "/api/v1/factory-catalog/confirm", "model": "CatalogConfirm", "phase": "explicit-confirmation"},
+  "legacy-deployment-prepare.json": {"path": "/api/v1/operations/project-deployments/prepare", "model": "ProjectDeploymentPrepareBody", "phase": "legacy-runtime-preview"},
+  "legacy-deployment-start.json": {"path": "/api/v1/operations/project-deployments/start", "model": "ProjectDeploymentStartBody", "phase": "explicit-runtime-start"},
+  "bootstrap-start.json": {"path": "/api/v1/creation/bootstrap/start", "model": "SimpleModeStartBody", "phase": "explicit-runtime-start"}
+}

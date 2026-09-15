@@ -1,0 +1,5 @@
+{
+  "folder": "${FACTORY_FOLDER}",
+  "contract_version": 1,
+  "confirmation_id": "${CONFIRMATION_ID}"
+}

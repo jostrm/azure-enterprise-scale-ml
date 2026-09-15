@@ -1,0 +1,4 @@
+{
+  "folder": "${LEGACY_FACTORY_FOLDER}",
+  "confirmation_id": "${CONFIRMATION_ID}"
+}
