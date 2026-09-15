@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 AIF_UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ ! -f "$AIF_UI_DIR/bootstrap/ui/terminal.sh" ]]; then
@@ -6,8 +7,7 @@ if [[ ! -f "$AIF_UI_DIR/bootstrap/ui/terminal.sh" ]]; then
     exit 1
 fi
 source "$AIF_UI_DIR/bootstrap/ui/terminal.sh"
-aif_require_legacy_workspace "$AIF_UI_DIR/.." || exit 1
-aif_require_legacy_workspace "$PWD" || exit 1
+source "$AIF_UI_DIR/bootstrap/lib/layout_router.sh"
 aif_banner "LAUNCH CONTROL" "Your platform. Your orchestrator. One AI Factory."
 
 # Defaults
@@ -19,13 +19,15 @@ TARGET_REPO="${GH_TARGET_REPO:-githuborg/enterprise-scale-aifactory-001}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Copy the update-and-run helpers to the parent repository root.
-cp "$SCRIPT_DIR/bootstrap/ADO-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/../ADO-update-aifactory-and-run-project.sh"
-cp "$SCRIPT_DIR/bootstrap/GH-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/../GH-update-aifactory-and-run-project.sh"
-cp "$SCRIPT_DIR/bootstrap/GHA-update-aifactory-and-run-project.sh" "$SCRIPT_DIR/../GHA-update-aifactory-and-run-project.sh"
-cp "$SCRIPT_DIR/bootstrap/ADO-create-new-aifactory-scaleset.sh" "$SCRIPT_DIR/../ADO-create-new-aifactory-scaleset.sh"
-cp "$SCRIPT_DIR/bootstrap/GHA-create-new-aifactory-scaleset.sh" "$SCRIPT_DIR/../GHA-create-new-aifactory-scaleset.sh"
-cp "$SCRIPT_DIR/bootstrap/ALL-create-new-aifactory-scaleset.sh" "$SCRIPT_DIR/../ALL-create-new-aifactory-scaleset.sh"
+# Install the complete control bundle from one reviewed source tree.
+aif_restore_launcher_bundle "$SCRIPT_DIR/bootstrap" "$SCRIPT_DIR/.."
+
+if aif_registered_layout_root "$SCRIPT_DIR/.." >/dev/null; then
+    aif_complete "Installed dual-layout launchers. Use ADO/GHA-azurefactory.sh with a reviewed manifest."
+    exit 0
+fi
+aif_require_legacy_workspace "$AIF_UI_DIR/.." || exit 1
+aif_require_legacy_workspace "$PWD" || exit 1
 
 gh_ok() {
     if ! command -v gh >/dev/null 2>&1; then
@@ -112,7 +114,7 @@ if [[ "$orchestrator" == "a" ]]; then
     # Check if the directory exists, if not, create it
     if [ -d "$SCRIPT_DIR/../.github/workflows/" ]; then
         aif_info "Do you also want to remove the GITHUB folder (the workflows for AIFactory is removed) (Enter 'y' or 'n')"
-        read -p "$(aif_prompt "Delete .github/workflows folder: ")" workflowsdelete
+        read -r -p "$(aif_prompt "Delete .github/workflows folder: ")" workflowsdelete || workflowsdelete="n"
         if [[ "$workflowsdelete" == "y" ]]; then
             aif_info "Deleting .github/workflows folder"
             rm -rf "$SCRIPT_DIR/../.github/workflows"

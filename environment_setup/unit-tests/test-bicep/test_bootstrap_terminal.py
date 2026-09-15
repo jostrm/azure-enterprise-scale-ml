@@ -20,8 +20,8 @@ WRAPPER_TARGETS = {
     "ADO-azurefactory.sh": ("AIFactory-lifecycle.sh",),
     "GHA-azurefactory.sh": ("AIFactory-lifecycle.sh",),
     "AIFactory-lifecycle.sh": ("lib/factory_lifecycle.py",),
-    "ADO-create-new-aifactory-scaleset.sh": ("lib/create-new-aifactory-scaleset.sh",),
-    "GHA-create-new-aifactory-scaleset.sh": ("lib/create-new-aifactory-scaleset.sh",),
+    "ADO-create-new-aifactory-scaleset.sh": ("lib/layout_router.sh", "lib/create-new-aifactory-scaleset.sh"),
+    "GHA-create-new-aifactory-scaleset.sh": ("lib/layout_router.sh", "lib/create-new-aifactory-scaleset.sh"),
     "ALL-create-new-aifactory-scaleset.sh": ("ADO-create-new-aifactory-scaleset.sh", "GHA-create-new-aifactory-scaleset.sh"),
     "GHA-update-aifactory-and-run-project.sh": ("GH-update-aifactory-and-run-project.sh",),
 }
@@ -279,6 +279,7 @@ class TestBootstrapTerminal(unittest.TestCase):
                 path = BOOTSTRAP / f"{route.upper()}-create-new-aifactory-scaleset.sh"
                 result = self.run_bash(
                     'source() { printf "SOURCE:%s\\n" "$1"; '
+                    'aif_route_registered_layout() { :; }; '
                     'aif_scaleset_main() { printf "MAIN_ARG:%s\\n" "$@"; }; }\n'
                     'printf "ROOT:%s\\n" "$(cd "$(dirname "$AIF_TEST_SCRIPT")" && pwd)"\n'
                     'builtin source "$AIF_TEST_SCRIPT" --prepare-only "literal argument"\n',
@@ -292,13 +293,20 @@ class TestBootstrapTerminal(unittest.TestCase):
                 self.assertEqual([route, path.as_posix(), "--prepare-only", "literal argument"], actual)
 
     def test_start_choices_and_copy_destinations_with_mocked_side_effects(self) -> None:
-        # Only cp/rm would mutate in 00-start; stub both before sourcing the actual entrypoint.
+        # Keep this presentation test independent of the real parent-directory layout.
         for choice, expected in (("a", "02-ADO-YAML-bootstrap-files.sh"), ("g", "02-GH-bootstrap-files.sh"), ("x", None)):
             with self.subTest(choice=choice):
                 result = self.run_bash(
                     'cp() { printf "COPY:%s\\n" "$*" >&2; }\n'
                     'rm() { printf "REMOVE:%s\\n" "$*" >&2; }\n'
-                    'source "$AIF_TEST_SCRIPT" <<< "$AIF_TEST_CHOICE"\n',
+                    'mkdir() { :; }\n'
+                    'chmod() { :; }\n'
+                    'source() { if [[ "$1" == *layout_router.sh ]]; then return 0; fi; '
+                    'builtin source "$@"; '
+                    'if [[ "$1" == *terminal.sh ]]; then aif_require_legacy_workspace() { return 0; }; fi; }\n'
+                    'aif_registered_layout_root() { return 1; }\n'
+                    'aif_restore_launcher_bundle() { :; }\n'
+                    'builtin source "$AIF_TEST_SCRIPT" <<< "$AIF_TEST_CHOICE"\n',
                     {"AIF_TEST_SCRIPT": START.as_posix(), "AIF_TEST_CHOICE": choice},
                 )
                 self.assertIn("LAUNCH CONTROL", result.stdout)

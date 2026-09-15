@@ -3,6 +3,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for ROUTER in \
+  "$SCRIPT_DIR/lib/layout_router.sh" \
+  "$SCRIPT_DIR/azure-enterprise-scale-ml/bootstrap/lib/layout_router.sh"; do
+  [[ ! -f "$ROUTER" ]] || break
+done
+[[ -f "$ROUTER" ]] || { printf 'ERROR: AI Factory layout router is missing.\n' >&2; exit 1; }
+# shellcheck source=lib/layout_router.sh
+source "$ROUTER"
+aif_route_registered_layout gha "${AIFACTORY_REPO_ROOT:-$SCRIPT_DIR}" "$SCRIPT_DIR" "$@"
 for LIBRARY in \
   "$SCRIPT_DIR/lib/create-new-aifactory-scaleset.sh" \
   "$SCRIPT_DIR/azure-enterprise-scale-ml/bootstrap/lib/create-new-aifactory-scaleset.sh"; do
@@ -16,5 +25,5 @@ fi
 # shellcheck source=lib/create-new-aifactory-scaleset.sh
 source "$LIBRARY"
 readonly AIF_SCALESET_ROUTE="gha"
-readonly AIF_CREATE_DEFAULT_VERSION="main"
+readonly AIF_CREATE_DEFAULT_VERSION="124"
 aif_scaleset_main "$AIF_SCALESET_ROUTE" "${BASH_SOURCE[0]}" "$@"

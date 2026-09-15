@@ -18,8 +18,8 @@ Usage: ADO-create-new-aifactory-scaleset.sh [options]
        ALL-create-new-aifactory-scaleset.sh --orchestrator ado|gha [options]
 
 Options:
-  --repo-root PATH     Legacy AI Factory repository root (not azurefactory/register.json).
-  --aifactory-version VERSION  Template version: main (default), 124, 125, 1.100, or 10.2.
+  --repo-root PATH     Consumer repository root.
+  --aifactory-version VERSION  Legacy template version: 124 (default), 125, main, 1.100, or 10.2.
   --dry-run            Collect and validate answers without changing anything.
   --prepare-only       Prepare Azure, identity, configuration, and automation only.
   --no-wait            Dispatch pipelines/workflows without waiting for completion.
@@ -28,7 +28,7 @@ Options:
   --help               Show this help.
 
 Common non-interactive variables:
-  AIFACTORY_VERSION=main  Optional explicit template version; omitted Create uses main.
+  AIFACTORY_VERSION=124   Optional explicit legacy template version; omitted Create uses 124.
   AIF_TOPOLOGY=s|hs
   AIF_NETWORK_MODE=priv|h|pub
   AIF_IDENTITY_MODE=c|mi|sp
@@ -54,9 +54,9 @@ Common non-interactive variables:
   AIF_COST_CENTER=123456 Simple Mode common and project cost-center tags.
   AIF_SUBMODULE_REF=<sha> Verified published commit (required for Simple Mode).
 
-These launchers create legacy aifactory files; they do not initialize or update
-azurefactory/register.json. For register-managed targets use the catalog UI/API
-or AIFactory-lifecycle.sh with a reviewed, exact-target manifest.
+Without a register these launchers create legacy aifactory files. At a registered
+azurefactory root, pass inspect|execute and the reviewed protected-manifest options;
+the launcher delegates to the route-specific scoped lifecycle and never rewrites the register.
 EOF
   if [[ "${AIF_ROUTE:-}" == "gha" ]]; then
     cat <<'EOF'
@@ -117,7 +117,16 @@ aif_resolve_azure_cli() {
 }
 
 aif_cleanup() {
-  local resource_group
+  local status=$? restore_failed=false resource_group
+  trap - EXIT INT TERM
+  if [[ "${AIF_LAUNCHER_RESTORE_REQUIRED:-false}" == "true" &&
+        -n "${AIF_STATE_DIR:-}" && -d "$AIF_STATE_DIR/launcher-bundle" &&
+        -n "${AIF_REPO_ROOT:-}" && -d "$AIF_REPO_ROOT" ]]; then
+    if ! aif_restore_launcher_bundle "$AIF_STATE_DIR/launcher-bundle" "$AIF_REPO_ROOT"; then
+      restore_failed=true
+      status=1
+    fi
+  fi
   for resource_group in \
     "${AIF_TEMP_BOOTSTRAP_RG:-}" \
     "${AIF_TEMP_MANAGED_RG:-}"; do
@@ -129,7 +138,12 @@ aif_cleanup() {
       --no-wait \
       --output none 2>/dev/null || true
   done
-  [[ -z "${AIF_STATE_DIR:-}" ]] || rm -rf -- "$AIF_STATE_DIR"
+  if [[ "$restore_failed" == "true" ]]; then
+    aif_error "Launcher restoration failed. Recovery snapshot retained at $AIF_STATE_DIR/launcher-bundle." >&2
+  elif [[ -n "${AIF_STATE_DIR:-}" ]]; then
+    rm -rf -- "$AIF_STATE_DIR"
+  fi
+  exit "$status"
 }
 
 aif_python() {
@@ -1396,13 +1410,10 @@ aif_sync_submodule_and_templates() {
   fi
 
   cp azure-enterprise-scale-ml/bootstrap/01-aif-copy-aifactory-templates.sh .
-  cp azure-enterprise-scale-ml/bootstrap/ADO-update-aifactory-and-run-project.sh .
-  cp azure-enterprise-scale-ml/bootstrap/GH-update-aifactory-and-run-project.sh .
-  cp azure-enterprise-scale-ml/bootstrap/GHA-update-aifactory-and-run-project.sh .
-  cp azure-enterprise-scale-ml/bootstrap/ADO-create-new-aifactory-scaleset.sh .
-  cp azure-enterprise-scale-ml/bootstrap/GHA-create-new-aifactory-scaleset.sh .
-  cp azure-enterprise-scale-ml/bootstrap/ALL-create-new-aifactory-scaleset.sh .
-  chmod +x ./*.sh
+  AIF_LAUNCHER_RESTORE_REQUIRED=true
+  aif_restore_launcher_bundle "$AIF_STATE_DIR/launcher-bundle" "$AIF_REPO_ROOT"
+  AIF_LAUNCHER_RESTORE_REQUIRED=false
+  chmod +x ./01-aif-copy-aifactory-templates.sh
 
   if [[ ! -d aifactory ]]; then
     local existing_gitignore="$AIF_STATE_DIR/existing.gitignore"
@@ -1456,6 +1467,7 @@ PY
     fi
   fi
   rm -rf -- aifactory-templates
+  aif_ensure_control_bundle_gitignore "$AIF_REPO_ROOT"
 }
 
 aif_ensure_bootstrap_identity() {
@@ -3180,6 +3192,8 @@ aif_commit_and_push() {
     ADO-create-new-aifactory-scaleset.sh
     GHA-create-new-aifactory-scaleset.sh
     ALL-create-new-aifactory-scaleset.sh
+    ADO-azurefactory.sh GHA-azurefactory.sh AIFactory-lifecycle.sh
+    lib ui
   )
   local existing=() path
   for path in "${paths[@]}"; do
@@ -3889,6 +3903,7 @@ aif_scaleset_main() {
   AIF_NON_INTERACTIVE="${AIF_NON_INTERACTIVE:-false}"
   AIF_YES="${AIF_YES:-false}"
   AIF_STASH_CREATED="false"
+  AIF_LAUNCHER_RESTORE_REQUIRED=false
   while (( $# )); do
     case "$1" in
       --repo-root)
@@ -3942,7 +3957,7 @@ aif_scaleset_main() {
   aif_resolve_azure_cli
   [[ "$AIF_ROUTE" != "gha" ]] || aif_require_command gh
   aif_python
-  aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE" "${AIF_CREATE_DEFAULT_VERSION:-main}"
+  aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE" "${AIF_CREATE_DEFAULT_VERSION:-124}"
   if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
     aif_simple_gateway_config >/dev/null
   fi
@@ -3961,6 +3976,9 @@ aif_scaleset_main() {
   mkdir -p "$state_parent"
   AIF_STATE_DIR="$(mktemp -d "$state_parent/run.XXXXXX")"
   trap aif_cleanup EXIT INT TERM
+  local launcher_source
+  launcher_source="$(aif_launcher_bundle_source "$entry_dir")" || exit $?
+  aif_snapshot_launcher_bundle "$launcher_source" "$AIF_STATE_DIR/launcher-bundle"
   aif_value "Target repo" "$AIF_REPO_ROOT"
 
   aif_collect_answers

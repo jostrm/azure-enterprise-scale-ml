@@ -104,7 +104,7 @@ def state() -> dict[str, object]:
 
 
 class TestScaleSetConfiguration(unittest.TestCase):
-    def test_create_launcher_defaults_omitted_version_to_main(self) -> None:
+    def test_create_launcher_defaults_omitted_version_to_124(self) -> None:
         source = (
             BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"
         ).read_text(encoding="utf-8")
@@ -112,18 +112,18 @@ class TestScaleSetConfiguration(unittest.TestCase):
             BOOTSTRAP / "lib/release_version.sh"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            'aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE" "${AIF_CREATE_DEFAULT_VERSION:-main}"',
+            'aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE" "${AIF_CREATE_DEFAULT_VERSION:-124}"',
             source,
         )
         self.assertIn(
-            'version_arguments+=(--aifactory-version "$default_version")',
+            'version_arguments+=(--default-version "$default_version")',
             version_source,
         )
         for route in ("ADO", "GHA"):
             entrypoint = (
                 BOOTSTRAP / f"{route}-create-new-aifactory-scaleset.sh"
             ).read_text(encoding="utf-8")
-            self.assertIn('readonly AIF_CREATE_DEFAULT_VERSION="main"', entrypoint)
+            self.assertIn('readonly AIF_CREATE_DEFAULT_VERSION="124"', entrypoint)
 
     def test_ado_agent_registration_installs_pwsh_and_prefers_git_bash(self) -> None:
         source = (

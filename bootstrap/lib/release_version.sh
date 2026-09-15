@@ -16,7 +16,7 @@ aif_version_prepare() {
   [[ -z "${AIF_VERSION_ARGUMENT:-}" ]] || version_arguments+=(--aifactory-version "$AIF_VERSION_ARGUMENT")
   if [[ -z "${AIF_VERSION_ARGUMENT:-}" && -z "${AIFACTORY_VERSION:-}" &&
         -z "${AIF_SUBMODULE_BRANCH:-}" && -n "$default_version" ]]; then
-    version_arguments+=(--aifactory-version "$default_version")
+    version_arguments+=(--default-version "$default_version")
   fi
   [[ "$project_only" != "true" ]] || version_arguments+=(--project-only)
   [[ "$non_interactive" != "true" && "${AIFACTORY_VERSION_REVIEWED:-}" != "1" ]] || version_arguments+=(--non-interactive)

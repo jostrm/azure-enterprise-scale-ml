@@ -46,7 +46,7 @@ def version_for_branch(branch):
     return normalize(branch[len("release/v"):])
 
 
-def select(requested=None, *, saved=None, environ=None):
+def select(requested=None, *, saved=None, default=DEFAULT_VERSION, environ=None):
     env = os.environ if environ is None else environ
     explicit = [normalize(requested)] if requested is not None else []
     if env.get("AIFACTORY_VERSION"):
@@ -55,7 +55,7 @@ def select(requested=None, *, saved=None, environ=None):
         explicit.append(version_for_branch(env["AIF_SUBMODULE_BRANCH"]))
     if len(set(explicit)) > 1:
         raise ValueError("Conflicting explicit AI Factory version/branch selectors.")
-    value = explicit[0] if explicit else normalize(saved or DEFAULT_VERSION)
+    value = explicit[0] if explicit else normalize(saved or default)
     ref = env.get("AIF_SUBMODULE_REF", "")
     if ref and not re.fullmatch(r"[0-9a-f]{40}", ref):
         raise ValueError("AIF_SUBMODULE_REF must be an exact lowercase 40-character commit.")
@@ -137,6 +137,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True)
     parser.add_argument("--aifactory-version")
+    parser.add_argument("--default-version", default=DEFAULT_VERSION)
     parser.add_argument("--non-interactive", action="store_true")
     parser.add_argument("--project-only", action="store_true")
     parser.add_argument("--save", action="store_true")
@@ -149,6 +150,7 @@ def main():
     selected = select(
         args.aifactory_version,
         saved=None if has_explicit_version else saved_version(args.root),
+        default=args.default_version,
     )
     if args.save:
         save(args.root, selected)

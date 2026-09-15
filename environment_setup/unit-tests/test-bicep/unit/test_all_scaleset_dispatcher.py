@@ -53,10 +53,9 @@ class TestAllScaleSetDispatcher(unittest.TestCase):
         self.assertIn('exec bash "$LAUNCHER" "${FORWARD_ARGS[@]}"', script)
 
     def test_start_script_copies_unified_dispatcher(self) -> None:
-        self.assertIn(
-            "ALL-create-new-aifactory-scaleset.sh",
-            START.read_text(encoding="utf-8"),
-        )
+        source = START.read_text(encoding="utf-8")
+        self.assertIn("aif_restore_launcher_bundle", source)
+        self.assertIn('source "$AIF_UI_DIR/bootstrap/lib/layout_router.sh"', source)
 
     def test_route_specific_launchers_are_isolated(self) -> None:
         ado = ADO_LAUNCHER.read_text(encoding="utf-8")
@@ -75,11 +74,13 @@ class TestAllScaleSetDispatcher(unittest.TestCase):
             shared,
         )
 
-    def test_shared_bootstrap_copies_unified_dispatcher(self) -> None:
+    def test_shared_bootstrap_restores_preserved_dual_layout_bundle(self) -> None:
         shared = SHARED.read_text(encoding="utf-8")
-        self.assertGreaterEqual(
-            shared.count("ALL-create-new-aifactory-scaleset.sh"),
-            3,
+        self.assertIn("aif_snapshot_launcher_bundle", shared)
+        self.assertIn("aif_restore_launcher_bundle", shared)
+        self.assertNotIn(
+            "cp azure-enterprise-scale-ml/bootstrap/ALL-create-new-aifactory-scaleset.sh",
+            shared,
         )
 
     def test_dns_forwarder_is_reconciled_before_optional_vpn(self) -> None:

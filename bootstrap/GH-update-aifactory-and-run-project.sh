@@ -22,6 +22,16 @@ readonly CONFIG_TEMPLATE_FILE="aifactory/variables-template.json"
 readonly ENVIRONMENT="${AIFACTORY_TARGET_ENVIRONMENT:-dev}"
 readonly RUNNER_LABEL="aifactory-admin-vm"
 
+for AIF_LAYOUT_ROUTER in \
+  "$SCRIPT_DIR/lib/layout_router.sh" \
+  "$SCRIPT_DIR/azure-enterprise-scale-ml/bootstrap/lib/layout_router.sh"; do
+  [[ ! -f "$AIF_LAYOUT_ROUTER" ]] || break
+done
+[[ -f "$AIF_LAYOUT_ROUTER" ]] || { aif_error "Install lib/layout_router.sh with this launcher."; exit 1; }
+# shellcheck source=lib/layout_router.sh
+source "$AIF_LAYOUT_ROUTER"
+aif_route_registered_layout gha "$REPO_ROOT" "$SCRIPT_DIR" "$@"
+
 cd "$REPO_ROOT"
 aif_require_legacy_workspace "$REPO_ROOT" || exit 1
 
@@ -43,15 +53,14 @@ if [[ "${AIFACTORY_LAUNCHER_STABLE:-}" != "1" ]]; then
   if [[ -f "$SCRIPT_DIR/GHA-update-aifactory-and-run-project.sh" ]]; then
     cp "$SCRIPT_DIR/GHA-update-aifactory-and-run-project.sh" "$state_dir/"
   fi
-  version_dir="$SCRIPT_DIR/lib"
-  [[ -f "$version_dir/release_version.py" ]] || version_dir="$REPO_ROOT/azure-enterprise-scale-ml/bootstrap/lib"
+  bundle_source="$(aif_launcher_bundle_source "$SCRIPT_DIR")"
+  version_dir="$bundle_source/lib"
   mkdir -p "$state_dir/lib"
-  cp "$version_dir/release_version.py" "$version_dir/release_version.sh" "$state_dir/lib/"
+  cp "$version_dir/release_version.py" "$version_dir/release_version.sh" \
+    "$version_dir/layout_router.sh" "$state_dir/lib/"
+  aif_snapshot_launcher_bundle "$bundle_source" "$state_dir/launcher-bundle"
   if [[ "$reviewed_project" == "true" ]]; then
-    deployment_helper="$SCRIPT_DIR/lib/project_deployment.py"
-    if [[ ! -f "$deployment_helper" ]]; then
-      deployment_helper="$REPO_ROOT/azure-enterprise-scale-ml/bootstrap/lib/project_deployment.py"
-    fi
+    deployment_helper="$version_dir/project_deployment.py"
     [[ -f "$deployment_helper" ]] || { aif_error "Install lib/project_deployment.py for reviewed project deployment."; exit 1; }
     mkdir -p "$state_dir/lib"
     cp "$deployment_helper" "$state_dir/lib/project_deployment.py"
@@ -64,7 +73,24 @@ if [[ "${AIFACTORY_LAUNCHER_STABLE:-}" != "1" ]]; then
 fi
 
 state_dir="${AIFACTORY_LAUNCHER_STATE_DIR:?Stable launcher state directory is missing.}"
-trap 'rm -rf -- "$state_dir"' EXIT
+AIF_LAUNCHER_RESTORE_REQUIRED=false
+cleanup_update_state() {
+  local status=$? restore_failed=false
+  trap - EXIT
+  if [[ "$AIF_LAUNCHER_RESTORE_REQUIRED" == "true" ]]; then
+    if ! aif_restore_launcher_bundle "$state_dir/launcher-bundle" "$REPO_ROOT"; then
+      status=1
+      restore_failed=true
+    fi
+  fi
+  if [[ "$restore_failed" == "false" ]]; then
+    rm -rf -- "$state_dir"
+  else
+    aif_error "Launcher restoration failed. Recovery snapshot retained at $state_dir/launcher-bundle." >&2
+  fi
+  exit "$status"
+}
+trap cleanup_update_state EXIT
 project_only=false
 resume_after_bootstrap=false
 while (( $# )); do
@@ -83,7 +109,7 @@ while (( $# )); do
       ;;
     --help|-h)
       printf 'Usage: %s [--project-only] [--aifactory-version main|124|125|1.100]\n' "$(basename "$0")"
-      printf '  Omitted version defaults normal Update to main; project-only keeps installed code.\n'
+      printf '  Omitted version inherits the installed factory version; a new legacy root defaults to 124.\n'
       printf '  --project-only  Skip all AI Factory and template updates; dispatch the project workflow only.\n'
       exit 0
       ;;
@@ -106,9 +132,12 @@ case "${AIFACTORY_PROJECT_ONLY:-false}" in
 esac
 
 source "$SCRIPT_DIR/lib/release_version.sh"
-version_default=""
-[[ "$project_only" == "true" ]] || version_default="${AIF_UPDATE_DEFAULT_VERSION:-main}"
-aif_version_prepare "$REPO_ROOT" "$project_only" false "$version_default"
+if [[ "$project_only" != "true" && -z "${AIF_VERSION_ARGUMENT:-}" &&
+      -z "${AIFACTORY_VERSION:-}" && -z "${AIF_SUBMODULE_BRANCH:-}" &&
+      -n "${AIF_UPDATE_DEFAULT_VERSION:-}" ]]; then
+  AIF_VERSION_ARGUMENT="$AIF_UPDATE_DEFAULT_VERSION"
+fi
+aif_version_prepare "$REPO_ROOT" "$project_only" false ""
 
 if [[ "$project_only" == "true" ]]; then
   aif_banner "GITHUB / PROJECT ONLY" "Skip AI Factory updates. Dispatch the existing project workflow."
@@ -279,9 +308,13 @@ else
   git -C "$SUBMODULE_PATH" checkout --detach "$AIF_SUBMODULE_REF"
   aif_version_save "$REPO_ROOT"
 
+  AIF_LAUNCHER_RESTORE_REQUIRED=true
   printf 'g\n' | bash "$SUBMODULE_PATH/00-start.sh"
+  aif_restore_launcher_bundle "$state_dir/launcher-bundle" "$REPO_ROOT"
+  AIF_LAUNCHER_RESTORE_REQUIRED=false
   bash "01-aif-copy-aifactory-templates.sh" --legacy-templates
     bash "03-GH-bootstrap-files-no-env-overwrite.sh"
+  aif_ensure_control_bundle_gitignore "$REPO_ROOT"
   fi
 fi
 
@@ -650,8 +683,7 @@ if [[ "$project_only" == "false" ]]; then
   mkdir -p "$(dirname "$exclude_file")"
   grep -qxF "/$CONFIG_FILE" "$exclude_file" 2>/dev/null || printf '/%s\n' "$CONFIG_FILE" >> "$exclude_file"
 
-  cp "$state_dir/GH-update-aifactory-and-run-project.sh" "$REPO_ROOT/GH-update-aifactory-and-run-project.sh"
-  chmod +x "$REPO_ROOT/GH-update-aifactory-and-run-project.sh"
+
 
   aif_section "06 / Review and publish"
   git add -A

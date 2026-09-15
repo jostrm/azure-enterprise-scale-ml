@@ -1106,7 +1106,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIFACTORY_TARGET_ENVIRONMENT -->`AIFACTORY_TARGET_ENVIRONMENT` | C | `"dev"` | Update target: dev, test/stage, or prod; verify route/environment naming. |
 | <!-- parameter bootstrap:AIFACTORY_UPDATE_GITHUB_VARIABLES -->`AIFACTORY_UPDATE_GITHUB_VARIABLES` | O | `""` | GHA update confirmation y/yes or n/no for synchronization from .env; default No. |
 | <!-- parameter bootstrap:AIFACTORY_USE_JSON_OVERRIDE -->`AIFACTORY_USE_JSON_OVERRIDE` | O | `""` | y/yes enables variables.json overrides; blank/n/no disables. Explicit reviewed project inputs force this to yes. |
-| <!-- parameter bootstrap:AIFACTORY_VERSION -->`AIFACTORY_VERSION` | O | `"main"` | Explicit template release; create/update defaults to main. --aifactory-version takes precedence. |
+| <!-- parameter bootstrap:AIFACTORY_VERSION -->`AIFACTORY_VERSION` | O | `""` | Explicit template release; omitted Create uses 124 and Update inherits the installed version. --aifactory-version takes precedence. |
 | <!-- parameter bootstrap:AIF_ACCESS_HUB_MODE -->`AIF_ACCESS_HUB_MODE` | C | `"i"` | Standalone access hub: integrated in DEV common network (i) or external connectivity subscription (e); allowed: i e |
 | <!-- parameter bootstrap:AIF_ACCESS_HUB_RESOURCE_GROUP -->`AIF_ACCESS_HUB_RESOURCE_GROUP` | C | `"aifactory-connectivity"` | External access-hub and private-DNS resource group |
 | <!-- parameter bootstrap:AIF_ACCESS_HUB_SUBSCRIPTION_ID -->`AIF_ACCESS_HUB_SUBSCRIPTION_ID` | C | `""` | External access-hub subscription ID |
@@ -1121,7 +1121,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIF_BOOTSTRAP_RESOURCE_GROUP -->`AIF_BOOTSTRAP_RESOURCE_GROUP` | O | `"rg-${AIF_PREFIX%-}-bootstrap-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"` | Aif bootstrap resource group override; see create launcher. |
 | <!-- parameter bootstrap:AIF_CONFIGURE_VPN_CLIENT -->`AIF_CONFIGURE_VPN_CLIENT` | O | `"$configure_vpn_client_default"` | Install and configure Azure VPN Client on this computer? (Y/n) |
 | <!-- parameter bootstrap:AIF_COST_CENTER -->`AIF_COST_CENTER` | O | `"123456"` | Simple-mode common and project cost-center tag. |
-| <!-- parameter bootstrap:AIF_CREATE_DEFAULT_VERSION -->`AIF_CREATE_DEFAULT_VERSION` | O | `"main"` | Create launcher default when no explicit version selector is supplied. |
+| <!-- parameter bootstrap:AIF_CREATE_DEFAULT_VERSION -->`AIF_CREATE_DEFAULT_VERSION` | O | `"124"` | Legacy Create launcher default when no explicit version selector is supplied. |
 | <!-- parameter bootstrap:AIF_DATABRICKS_PRINCIPAL_ID -->`AIF_DATABRICKS_PRINCIPAL_ID` | O | `""` | Existing Databricks enterprise-application object ID; otherwise discovered/ensured when needed. |
 | <!-- parameter bootstrap:AIF_DEPLOYMENT_IDENTITY_NAME -->`AIF_DEPLOYMENT_IDENTITY_NAME` | O | `"id-${AIF_PREFIX%-}-deploy-${AIF_LOCATION_SHORT}-${AIF_SCALESET_SUFFIX}"` | Aif deployment identity name override; see create launcher. |
 | <!-- parameter bootstrap:AIF_DEV_SUBSCRIPTION_ID -->`AIF_DEV_SUBSCRIPTION_ID` | M | `"$current_subscription"` | DEV subscription ID |
@@ -1158,7 +1158,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIF_TEAM_MEMBER_EMAIL -->`AIF_TEAM_MEMBER_EMAIL` | M | `"$current_user"` | Initial team member |
 | <!-- parameter bootstrap:AIF_TENANT_ID -->`AIF_TENANT_ID` | M | `"$current_tenant"` | Azure tenant ID |
 | <!-- parameter bootstrap:AIF_TOPOLOGY -->`AIF_TOPOLOGY` | O | `"s"` | Topology: standalone (s) or hub/spoke with central DNS (hs); allowed: s hs |
-| <!-- parameter bootstrap:AIF_UPDATE_DEFAULT_VERSION -->`AIF_UPDATE_DEFAULT_VERSION` | O | `"main"` | Update launcher default when not project-only. |
+| <!-- parameter bootstrap:AIF_UPDATE_DEFAULT_VERSION -->`AIF_UPDATE_DEFAULT_VERSION` | O | `""` | Optional Update override; omission inherits the installed factory version. |
 | <!-- parameter bootstrap:AIF_VPN_CLIENT_CIDR -->`AIF_VPN_CLIENT_CIDR` | O | `"172.31.240.0/24"` | Point-to-site VPN client address pool |
 | <!-- parameter bootstrap:AIF_YES -->`AIF_YES` | O | `"false"` | Aif yes override; see create launcher. |
 | <!-- parameter bootstrap:AZURE_DEVOPS_EXT_PAT -->`AZURE_DEVOPS_EXT_PAT` | C | `""` | Azure DevOps PAT |

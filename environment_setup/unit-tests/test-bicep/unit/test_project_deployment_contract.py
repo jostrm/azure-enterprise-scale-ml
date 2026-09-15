@@ -87,11 +87,17 @@ def test_exact_target_identity_and_no_fallback(target):
 @pytest.mark.parametrize("route", ["ADO", "GH"])
 def test_update_launchers_keep_consumer_main_and_pin_template_version(route):
     script = (ROOT / "bootstrap" / f"{route}-update-aifactory-and-run-project.sh").read_text(encoding="utf-8")
-    assert '[[ "$project_only" == "true" ]] || version_default="${AIF_UPDATE_DEFAULT_VERSION:-main}"' in script
-    assert 'aif_version_prepare "$REPO_ROOT" "$project_only" false "$version_default"' in script
+    assert 'AIF_VERSION_ARGUMENT="$AIF_UPDATE_DEFAULT_VERSION"' in script
+    assert 'aif_version_prepare "$REPO_ROOT" "$project_only" false ""' in script
     assert 'checkout --detach "$AIF_SUBMODULE_REF"' in script
     assert "git submodule foreach" not in script
     assert 'git checkout main' in script or 'readonly BRANCH="${ADO_BRANCH:-main}"' in script
+    assert "cleanup_update_state" in script
+    assert 'aif_restore_launcher_bundle "$state_dir/launcher-bundle" "$REPO_ROOT"' in script
+    bootstrap = script.index('bash "$SUBMODULE_PATH/00-start.sh"')
+    immediate_restore = script.index(
+        'aif_restore_launcher_bundle "$state_dir/launcher-bundle" "$REPO_ROOT"', bootstrap)
+    assert immediate_restore < script.index("aif_complete ", immediate_restore)
 
 
 @pytest.mark.parametrize("kind", ["project", "section", "tenant", "delete"])

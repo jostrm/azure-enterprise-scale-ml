@@ -25,6 +25,22 @@ are separate operations; a saved definition is not a deployed resource.
 
 ## New folder structure
 
+### Version and folder compatibility
+
+| AI Factory source | Folder support | Default use |
+|---|---|---|
+| `release/v1.24` (`124`, LTS) | Legacy `aifactory` only | New legacy bootstrap default |
+| `release/v1.25` (`125`) | Legacy `aifactory` and registered `azurefactory` | Stable registered-layout release |
+| `main` | Legacy `aifactory` and registered `azurefactory` | Unstable development |
+
+Selecting another submodule branch changes the shared code/templates; it does **not**
+rename, migrate or replace configuration storage. A repository originally created
+with `aifactory\variables.json` therefore remains a supported legacy repository
+when its submodule moves to `release/v1.25` or `main`. This is why existing
+repositories such as Spider can track current PURPLE code while retaining the
+single `aifactory` folder. Migration is a separate catalog operation with its own
+preview and confirmation.
+
 The shared starter is `bootstrap/templates/azurefactory/register.json`: a valid
 version-2 register with **zero factories**, empty configurations and empty bindings.
 It deliberately contains no example IDs, tenant/subscription values, projects,
@@ -88,9 +104,12 @@ The register-only helper leaves it untouched and does **not** register that
 factory. Preview and confirm explicit adoption/migration with the catalog API.
 An existing factory recognized from its legacy folder does not need an empty
 register or migration merely to make it visible.
-Existing legacy launchers intentionally refuse a workspace containing
-`azurefactory\register.json`; keep a separate legacy execution repository when
-continuing to use those launchers. An empty register is neither a deployment
+Current v1.25/main launchers detect `azurefactory\register.json`. Registered
+operations require `inspect|execute` plus the reviewed protected manifest and are
+delegated to `ADO-azurefactory.sh` or `GHA-azurefactory.sh`; raw legacy options are
+rejected before writes. A registered runtime still materializes an isolated
+`aifactory` execution projection for the existing pipelines. v1.24 launchers do
+not understand the register layout. An empty register is neither a deployment
 root nor evidence of deployed infrastructure.
 
 With the updated shared checkout/submodule, normal
@@ -138,6 +157,22 @@ reviewed runtime manifest supplied by trusted automation. They do not initialize
 the register or replace authentication/approval. Use the app/API for normal
 setup; see the [execution contract](../../../bootstrap/lib/factory_lifecycle_contract.txt)
 for runner integration.
+
+The legacy-named v1.25/main create/update launchers accept those same
+`inspect|execute` arguments at a registered root and delegate to the scoped
+entrypoint. Conversely, the scoped provider wrappers expose explicit
+`legacy-create` and `legacy-update` compatibility commands for an existing
+single-factory repository:
+
+```bash
+bash ./ADO-azurefactory.sh legacy-update --aifactory-version 125
+bash ./GHA-azurefactory.sh legacy-update --aifactory-version main
+```
+
+The unified `ALL-create-new-aifactory-scaleset.sh` forwards registered
+`inspect|execute` calls after orchestrator selection. The control launcher bundle
+is preserved while switching template versions, so selecting `124` cannot replace
+the modern dual-layout router with an older script.
 
 GitHub Actions and Azure DevOps may use separate repositories. Runtime adapters
 can generate an isolated `aifactory` execution folder for existing pipelines;
@@ -218,7 +253,7 @@ Select templates with `--aifactory-version 125` or `AIFACTORY_VERSION=125`.
 The numeric format is one major digit plus two minor digits: `124` means
 `release/v1.24`, `125` means `release/v1.25`. Use explicit dotted values for
 future versions such as `1.100` or `10.2`; `main` is also an explicit choice.
-New factories default to `124`. Existing factories and new scale sets inherit
+New legacy factories default to `124`. Existing factories and new scale sets inherit
 their saved version; an unknown existing version blocks rather than downgrades.
 Without an explicit choice, an interactive terminal asks you to accept or change
 the effective default. `--non-interactive` and API execution never prompt for it.
@@ -229,6 +264,10 @@ without fallback. `AIF_SUBMODULE_BRANCH` and `AIF_SUBMODULE_REF` remain supporte
 but conflicting explicit selectors are rejected. The chosen version is saved in
 `aifactory/config-wizard/aifactory-version.json`; consumer/development `main`
 remains separate from the selected template release.
+
+Registered `azurefactory` runs do not read that legacy version file. Their
+protected manifest freezes the selected published source branch and exact commit.
+`release/v1.25` and `main` support the register layout; `release/v1.24` does not.
 
 ### Frozen lifecycle creation
 

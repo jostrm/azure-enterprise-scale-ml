@@ -23,6 +23,40 @@ Both launchers inherit the factory's saved template version. To upgrade, supply
 `main` are supported without a mapping table. Consumer `main` is **not** the
 template-version selector.
 
+### Version and folder compatibility
+
+| Selected version | Legacy `aifactory` | Registered `azurefactory` |
+|---|---:|---:|
+| `124` / `release/v1.24` | Supported | Not supported |
+| `125` / `release/v1.25` | Supported | Supported |
+| `main` | Supported | Supported, unstable |
+
+Changing the selected version never migrates folders. An existing legacy
+repository stays legacy on v1.25/main until migration is separately previewed and
+confirmed in the catalog API. New legacy creation defaults to `124`; normal
+updates inherit `aifactory/config-wizard/aifactory-version.json` unless
+`--aifactory-version` is explicit.
+
+At a registered root, the current ADO/GHA create/update launchers accept
+`inspect|execute` and delegate to the scoped lifecycle. They reject ordinary
+legacy update options because the exact factory, scale set, project, environment,
+version and commit must come from the reviewed protected manifest:
+
+```bash
+bash ./ADO-update-aifactory-and-run-project.sh inspect --protected-manifest reviewed.dpapi
+bash ./GH-update-aifactory-and-run-project.sh inspect --protected-manifest reviewed.dpapi
+```
+
+For a legacy root, the provider wrappers offer explicit compatibility commands:
+
+```bash
+bash ./ADO-azurefactory.sh legacy-update --aifactory-version 125
+bash ./GHA-azurefactory.sh legacy-update --aifactory-version main
+```
+
+The modern launcher bundle is preserved across a version switch. Selecting `124`
+can update legacy templates to v1.24 without downgrading the root routing scripts.
+
 Preview binds the published exact commit. The selected release must contain the
 reviewed version/project contracts and be fetched locally for read-only validation.
 Install the PURPLE launchers together with `lib/project_deployment.py`,
@@ -37,12 +71,12 @@ never silently switched. Select the version **before** reviewing confirmation.
 Saved metadata lives in `aifactory/config-wizard/aifactory-version.json`; existing
 raw factory/project configuration values are not overwritten by version selection.
 
-Scoped lifecycle creation uses separate manual-only provider templates and is
-not installed or registered by these project-update launchers. When adopting or
-upgrading that capability, explicitly install the provider file from the same
-selected published commit and review/publish the consumer change before preview,
-as described under [Frozen lifecycle creation](24-end-2-end-setup.md#frozen-lifecycle-creation).
-Neither Patch unchecked nor `--project-only` installs or changes those files.
+Scoped lifecycle creation uses separate reviewed provider templates. v1.25/main
+installation keeps `ADO/GHA-azurefactory.sh`, `AIFactory-lifecycle.sh`,
+`lib/layout_router.sh` and `lib/factory_lifecycle.py` together. The catalog/API
+still owns register initialization, exact-target preparation and confirmation;
+installing launchers does not register or migrate a factory. Neither Patch
+unchecked nor `--project-only` changes configuration storage.
 
 ### Add a project without updating AI Factory
 
@@ -136,6 +170,11 @@ change does not automatically modify a consumer or publish its repository.
 |---|---|
 | `bootstrap/GH-update-aifactory-and-run-project.sh` | Root `GH-update-aifactory-and-run-project.sh` for GitHub |
 | `bootstrap/ADO-update-aifactory-and-run-project.sh` | Root `ADO-update-aifactory-and-run-project.sh` for ADO |
+| `bootstrap/ADO-azurefactory.sh` / `bootstrap/GHA-azurefactory.sh` | Root provider-scoped lifecycle wrappers |
+| `bootstrap/AIFactory-lifecycle.sh` | Root lifecycle compatibility entrypoint |
+| `bootstrap/lib/layout_router.sh`, `release_version.py/.sh` | Root `lib` control/version routing |
+| `bootstrap/lib/factory_lifecycle.py`, `project_deployment.py` | Root `lib` scoped execution helpers |
+| `bootstrap/lib/create-new-aifactory-scaleset.sh`, `aifactory_*` helpers | Root `lib` create/network helpers |
 | `bootstrap/lib/project_deployment.py` | Root `lib/project_deployment.py` |
 | `environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project.yml` | `.github/workflows/infra-project.yml` |
 | Same GitHub template directory: `infra-project-phase.yml` | `.github/workflows/infra-project-phase.yml` |

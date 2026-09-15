@@ -37,6 +37,7 @@ def test_explicit_cli_environment_and_branch_must_agree():
 
 def test_new_default_and_saved_version_inheritance(tmp_path):
     assert rv.select(environ={})["requested_version"] == "124"
+    assert rv.select(saved="125", default="124", environ={})["requested_version"] == "125"
     selected = {**rv.select("1.100", environ={}), "resolved_ref": "a" * 40}
     rv.save(tmp_path, selected)
     assert rv.saved_version(tmp_path) == "1.100"
@@ -50,7 +51,29 @@ def test_existing_unknown_factory_fails_instead_of_downgrading(tmp_path):
         rv.saved_version(tmp_path)
 
 
-def test_update_default_main_and_project_only_inheritance_are_distinct():
+def test_create_default_is_fallback_not_explicit_downgrade(tmp_path, monkeypatch, capsys):
+    rv.save(tmp_path, {**rv.select("125", environ={}), "resolved_ref": "a" * 40})
+    monkeypatch.setattr(
+        rv.sys, "argv",
+        ["release_version.py", "--root", str(tmp_path), "--default-version", "124",
+         "--non-interactive"],
+    )
+    monkeypatch.setattr(
+        rv, "resolve",
+        lambda selected, read, **kwargs: {**selected, "resolved_ref": "b" * 40},
+    )
+    monkeypatch.setattr(
+        rv.subprocess, "run",
+        Mock(return_value=type("Result", (), {"stdout": rv.CONTRACT})()),
+    )
+    for key in ("AIFACTORY_VERSION", "AIF_SUBMODULE_BRANCH", "AIF_SUBMODULE_REF"):
+        monkeypatch.delenv(key, raising=False)
+    rv.main()
+    assert "export AIFACTORY_VERSION=125" in capsys.readouterr().out
+    assert rv.saved_version(tmp_path) == "125"
+
+
+def test_update_inherits_installed_version_and_project_only_keeps_code():
     ado = (ROOT / "bootstrap/ADO-update-aifactory-and-run-project.sh").read_text(
         encoding="utf-8"
     )
@@ -61,17 +84,12 @@ def test_update_default_main_and_project_only_inheritance_are_distinct():
         encoding="utf-8"
     )
     for source in (ado, github):
-        assert 'version_default=""' in source
+        assert 'AIF_VERSION_ARGUMENT="$AIF_UPDATE_DEFAULT_VERSION"' in source
         assert (
-            '[[ "$project_only" == "true" ]] || '
-            'version_default="${AIF_UPDATE_DEFAULT_VERSION:-main}"'
+            'aif_version_prepare "$REPO_ROOT" "$project_only" false ""'
             in source
         )
-        assert (
-            'aif_version_prepare "$REPO_ROOT" "$project_only" false "$version_default"'
-            in source
-        )
-    assert 'AIF_UPDATE_DEFAULT_VERSION="${AIF_UPDATE_DEFAULT_VERSION:-main}"' in alias
+    assert "AIF_UPDATE_DEFAULT_VERSION" not in alias
     assert "exec bash" in alias
     assert "GH-update-aifactory-and-run-project.sh" in alias
 

@@ -298,11 +298,11 @@ def bootstrap_inventory():
             entry["comment"] += "; allowed: " + args[2]
     extras = {
         "AIFACTORY_REPO_ROOT": ("", "Repository root; --repo-root overrides it."),
-        "AIFACTORY_VERSION": ("main", "Explicit template release; create/update defaults to main. --aifactory-version takes precedence."),
+        "AIFACTORY_VERSION": ("", "Explicit template release; omitted Create uses 124 and Update inherits the installed version. --aifactory-version takes precedence."),
         "AIF_SUBMODULE_BRANCH": ("", "Legacy explicit branch selector consumed by release-version resolution."),
         "AIF_SUBMODULE_REF": ("", "Exact published commit SHA; required for the simple-mode source verification contract."),
-        "AIF_CREATE_DEFAULT_VERSION": ("main", "Create launcher default when no explicit version selector is supplied."),
-        "AIF_UPDATE_DEFAULT_VERSION": ("main", "Update launcher default when not project-only."),
+        "AIF_CREATE_DEFAULT_VERSION": ("124", "Legacy Create launcher default when no explicit version selector is supplied."),
+        "AIF_UPDATE_DEFAULT_VERSION": ("", "Optional Update override; omission inherits the installed factory version."),
         "AIFACTORY_TARGET_ENVIRONMENT": ("dev", "Update target: dev, test/stage, or prod; verify route/environment naming."),
         "AIFACTORY_PROJECT_CONFIG": ("", "Reviewed project JSON file; required together with explicit target environment, project number and repository root."),
         "AIFACTORY_PROJECT_NUMBER": ("", "Reviewed update/project target number; required together with target environment, project configuration and repository root."),

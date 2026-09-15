@@ -78,9 +78,67 @@ def test_register_blocks_legacy_entrypoints_without_writes(register_workspace, l
 
 
 @pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")
+@pytest.mark.parametrize("launcher,route", [
+    ("ADO-create-new-aifactory-scaleset.sh", "ado"),
+    ("GHA-create-new-aifactory-scaleset.sh", "gha"),
+    ("ADO-update-aifactory-and-run-project.sh", "ado"),
+    ("GH-update-aifactory-and-run-project.sh", "gha"),
+    ("GHA-update-aifactory-and-run-project.sh", "gha"),
+])
+@pytest.mark.parametrize("nested", [False, True])
+def test_registered_roots_delegate_legacy_named_entrypoints_to_scoped_inspect(
+        register_workspace, launcher, route, nested):
+    fixtures = runpy.run_path(str(Path(__file__).with_name("test_factory_lifecycle.py")))
+    document = fixtures["manifest"]("deploy-project")
+    document["route"]["kind"] = route
+    document["route"]["repository"] = (
+        "https://github.com/org/consumer" if route == "gha"
+        else "https://dev.azure.com/org/project/_git/consumer"
+    )
+    document["target"]["factory_type"] = "ai"
+    root = register_workspace
+    destination = root / "azurefactory/factories/ai-marvel" if nested else root
+    destination.mkdir(parents=True, exist_ok=True)
+    before = {str(path.relative_to(root)): path.read_bytes()
+              for path in root.rglob("*") if path.is_file()}
+    env = dict(os.environ, AIFACTORY_REPO_ROOT=str(destination),
+               AIFACTORY_PYTHON=sys.executable)
+    result = subprocess.run(
+        [str(BASH), str(ROOT / "bootstrap" / launcher), "inspect", "--stdin-manifest"],
+        cwd=root, env=env, input=json.dumps(fixtures["seal"](document)),
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["manifest_valid"] is True
+    assert before == {str(path.relative_to(root)): path.read_bytes()
+                      for path in root.rglob("*") if path.is_file()}
+
+
+@pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")
+@pytest.mark.parametrize("provider,action", [
+    ("ADO-azurefactory.sh", "legacy-create"),
+    ("ADO-azurefactory.sh", "legacy-update"),
+    ("GHA-azurefactory.sh", "legacy-create"),
+    ("GHA-azurefactory.sh", "legacy-update"),
+])
+def test_scoped_provider_launchers_expose_explicit_legacy_compatibility(
+        provider, action, tmp_path):
+    legacy_root = tmp_path / "legacy-layout"
+    legacy_root.mkdir()
+    result = subprocess.run(
+        [str(BASH), str(ROOT / "bootstrap" / provider), action, "--help"],
+        cwd=legacy_root,
+        env=dict(os.environ, AIFACTORY_REPO_ROOT=str(legacy_root)),
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Usage:" in result.stdout + result.stderr
+
+
+@pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")
 @pytest.mark.parametrize("launcher", [
     "01-aif-copy-aifactory-templates.sh", "02a-GH-bootstrap-files.sh", "02b-ADO-YAML-bootstrap-files.sh",
-    "03a-GH-bootstrap-files-no-env-overwrite.sh", "03b-ADO-YAML-bootstrap-files-no-var-overwrite.sh", "00-start.sh",
+    "03a-GH-bootstrap-files-no-env-overwrite.sh", "03b-ADO-YAML-bootstrap-files-no-var-overwrite.sh",
 ])
 def test_manual_template_launchers_block_register_before_copy(register_workspace, launcher):
     root = register_workspace
@@ -95,6 +153,169 @@ def test_manual_template_launchers_block_register_before_copy(register_workspace
     assert result.returncode != 0
     assert "azurefactory/register.json" in result.stderr
     assert before == {str(p.relative_to(root)): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+
+
+@pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")
+def test_start_installs_dual_layout_bundle_at_registered_root(register_workspace):
+    root = register_workspace
+    source = root / "azure-enterprise-scale-ml"
+    (source / "bootstrap/ui").mkdir(parents=True)
+    (source / "bootstrap/lib").mkdir(parents=True)
+    shutil.copy2(ROOT / "00-start.sh", source / "00-start.sh")
+    shutil.copy2(ROOT / "bootstrap/ui/terminal.sh", source / "bootstrap/ui/terminal.sh")
+    for name in (
+        "aifactory_private_dns.py", "aifactory_scaleset_config.py",
+        "aifactory_vpn_profile.py", "create-new-aifactory-scaleset.sh",
+        "factory_lifecycle.py", "layout_router.sh", "project_deployment.py",
+        "release_version.py", "release_version.sh",
+    ):
+        shutil.copy2(ROOT / "bootstrap/lib" / name, source / "bootstrap/lib" / name)
+    scripts = (
+        "ADO-azurefactory.sh", "ADO-create-new-aifactory-scaleset.sh",
+        "ADO-update-aifactory-and-run-project.sh", "AIFactory-lifecycle.sh",
+        "ALL-create-new-aifactory-scaleset.sh", "GH-update-aifactory-and-run-project.sh",
+        "GHA-azurefactory.sh", "GHA-create-new-aifactory-scaleset.sh",
+        "GHA-update-aifactory-and-run-project.sh",
+    )
+    for name in scripts:
+        shutil.copy2(ROOT / "bootstrap" / name, source / "bootstrap" / name)
+    register = root / "azurefactory/register.json"
+    before = register.read_bytes()
+    result = subprocess.run(
+        [str(BASH), str(source / "00-start.sh")], cwd=root,
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert register.read_bytes() == before
+    assert all((root / name).is_file() for name in scripts)
+    assert (root / "lib/layout_router.sh").is_file()
+    assert (root / "lib/factory_lifecycle.py").is_file()
+    assert (root / "lib/release_version.py").is_file()
+    assert (root / "lib/create-new-aifactory-scaleset.sh").is_file()
+    assert (root / "ui/terminal.sh").is_file()
+    assert not (root / "aifactory").exists()
+
+
+@pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")
+@pytest.mark.parametrize("route", ["ado", "gha"])
+def test_all_dispatcher_delegates_registered_inspect(register_workspace, route):
+    fixtures = runpy.run_path(str(Path(__file__).with_name("test_factory_lifecycle.py")))
+    document = fixtures["manifest"]("deploy-project")
+    document["route"]["kind"] = route
+    document["route"]["repository"] = (
+        "https://github.com/org/consumer" if route == "gha"
+        else "https://dev.azure.com/org/project/_git/consumer"
+    )
+    document["target"]["factory_type"] = "ai"
+    result = subprocess.run(
+        [str(BASH), str(ROOT / "bootstrap/ALL-create-new-aifactory-scaleset.sh"),
+         "--orchestrator", route, "--repo-root", str(register_workspace),
+         "inspect", "--stdin-manifest"],
+        cwd=register_workspace,
+        env=dict(os.environ, AIFACTORY_PYTHON=sys.executable),
+        input=json.dumps(fixtures["seal"](document)),
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["manifest_valid"] is True
+
+
+@pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")
+def test_launcher_bundle_round_trip_preserves_all_control_entrypoints(tmp_path):
+    snapshot, destination = tmp_path / "snapshot", tmp_path / "destination"
+    destination.mkdir()
+    (destination / ".gitignore").write_text("/*\ncredentials.json", encoding="utf-8")
+    (destination / "credentials.json").write_text("must-stay-ignored", encoding="utf-8")
+    script = (
+        f'source "{(ROOT / "bootstrap/lib/layout_router.sh").as_posix()}"\n'
+        f'aif_snapshot_launcher_bundle "{(ROOT / "bootstrap").as_posix()}" "{snapshot.as_posix()}"\n'
+        f'aif_restore_launcher_bundle "{snapshot.as_posix()}" "{destination.as_posix()}"\n'
+    )
+    result = subprocess.run(
+        [str(BASH), "--noprofile", "--norc", "-c", script],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    for name in (
+        "ADO-azurefactory.sh", "ADO-create-new-aifactory-scaleset.sh",
+        "ADO-update-aifactory-and-run-project.sh", "AIFactory-lifecycle.sh",
+        "ALL-create-new-aifactory-scaleset.sh", "GH-update-aifactory-and-run-project.sh",
+        "GHA-azurefactory.sh", "GHA-create-new-aifactory-scaleset.sh",
+        "GHA-update-aifactory-and-run-project.sh",
+    ):
+        assert (destination / name).read_bytes() == (ROOT / "bootstrap" / name).read_bytes()
+    for name in (
+        "aifactory_private_dns.py", "aifactory_scaleset_config.py",
+        "aifactory_vpn_profile.py", "create-new-aifactory-scaleset.sh",
+        "factory_lifecycle.py", "layout_router.sh", "project_deployment.py",
+        "release_version.py", "release_version.sh",
+    ):
+        assert (destination / "lib" / name).read_bytes() == (
+            ROOT / "bootstrap/lib" / name).read_bytes()
+    assert (destination / "ui/terminal.sh").read_bytes() == (
+        ROOT / "bootstrap/ui/terminal.sh").read_bytes()
+    ignore = (destination / ".gitignore").read_text(encoding="utf-8")
+    assert "!/lib/layout_router.sh" in ignore
+    assert "!/lib/release_version.py" in ignore
+    assert "!/ui/terminal.sh" in ignore
+    assert ignore.startswith("/*\ncredentials.json\n")
+    (destination / "lib/local-package.bin").write_bytes(b"ignored")
+    subprocess.run(["git", "-C", str(destination), "init", "--quiet"], check=True)
+    assert subprocess.run(
+        ["git", "-C", str(destination), "check-ignore", "--quiet",
+         "lib/layout_router.sh"]).returncode == 1
+    assert subprocess.run(
+        ["git", "-C", str(destination), "check-ignore", "--quiet",
+         "lib/local-package.bin"]).returncode == 0
+    assert subprocess.run(
+        ["git", "-C", str(destination), "check-ignore", "--quiet",
+         "ADO-azurefactory.sh"]).returncode == 1
+    assert subprocess.run(
+        ["git", "-C", str(destination), "check-ignore", "--quiet",
+         "credentials.json"]).returncode == 0
+    template_ignore = (ROOT / "bootstrap/.gitignore.template").read_text(encoding="utf-8")
+    assert "\n!/lib/\n/lib/*\n" in template_ignore
+    assert "\n!lib/\n" not in template_ignore
+
+
+@pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")
+def test_launcher_bundle_restore_reports_copy_failure(tmp_path):
+    snapshot = tmp_path / "snapshot"
+    script = (
+        f'source "{(ROOT / "bootstrap/lib/layout_router.sh").as_posix()}"\n'
+        f'aif_snapshot_launcher_bundle "{(ROOT / "bootstrap").as_posix()}" "{snapshot.as_posix()}"\n'
+        'cp() { return 9; }\n'
+        f'aif_restore_launcher_bundle "{snapshot.as_posix()}" "{(tmp_path / "destination").as_posix()}"\n'
+    )
+    result = subprocess.run(
+        [str(BASH), "--noprofile", "--norc", "-c", script],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode != 0
+    assert snapshot.is_dir()
+
+
+@pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")
+@pytest.mark.parametrize("launcher", [
+    "ADO-update-aifactory-and-run-project.sh",
+    "GH-update-aifactory-and-run-project.sh",
+    "GHA-update-aifactory-and-run-project.sh",
+])
+def test_update_help_does_not_install_or_modify_bundle(tmp_path, launcher):
+    root = tmp_path / "legacy"
+    root.mkdir()
+    marker = root / "existing.txt"
+    marker.write_text("unchanged", encoding="utf-8")
+    before = {str(path.relative_to(root)): path.read_bytes()
+              for path in root.rglob("*") if path.is_file()}
+    result = subprocess.run(
+        [str(BASH), str(ROOT / "bootstrap" / launcher), "--help"],
+        cwd=root, env=dict(os.environ, AIFACTORY_REPO_ROOT=str(root)),
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert before == {str(path.relative_to(root)): path.read_bytes()
+                      for path in root.rglob("*") if path.is_file()}
 
 
 @pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")
