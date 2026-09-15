@@ -3101,7 +3101,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>COMMON_BASTION_SUBNET_CIDR</code></td>
 <td>M</td>
 <td>Y: <code>"172.16.XX.192/26"</code><br>J.dev: <code>"172.16.XX.192/26"</code></td>
-<td>Bastion subnet CIDR mandatory: Bastion subnet CIDR keep-as-is: XX replaced by dev_cidr_range. ensure: within common_vnet_cidr.</td>
+<td>Bastion subnet CIDR mandatory: Bastion subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:common_bastion_subnet_name --><!-- parameter json.dev:common_bastion_subnet_name --><code>common_bastion_subnet_name</code></td>
@@ -3115,7 +3115,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>COMMON_PBI_SUBNET_CIDR</code></td>
 <td>M</td>
 <td>Y: <code>"172.16.XX.128/26"</code><br>J.dev: <code>"172.16.XX.128/26"</code></td>
-<td>Power BI gateway subnet CIDR mandatory: Power BI gateway subnet CIDR keep-as-is: XX replaced by dev_cidr_range. ensure: within common_vnet_cidr.</td>
+<td>Power BI gateway subnet CIDR mandatory: Power BI gateway subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:common_pbi_subnet_name --><!-- parameter json.dev:common_pbi_subnet_name --><code>common_pbi_subnet_name</code></td>
@@ -3129,7 +3129,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>COMMON_SUBNET_CIDR</code></td>
 <td>M</td>
 <td>Y: <code>"172.16.XX.0/26"</code><br>J.dev: <code>"172.16.XX.0/26"</code></td>
-<td>Common subnet CIDR mandatory: Common subnet CIDR keep-as-is: XX replaced by dev_cidr_range. ensure: within common_vnet_cidr.</td>
+<td>Common subnet CIDR mandatory: Common subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:common_subnet_name --><!-- parameter json.dev:common_subnet_name --><code>common_subnet_name</code></td>
@@ -3143,7 +3143,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>COMMON_SUBNET_SCORING_CIDR</code></td>
 <td>M</td>
 <td>Y: <code>"172.16.XX.64/26"</code><br>J.dev: <code>"172.16.XX.64/26"</code></td>
-<td>Scoring subnet CIDR mandatory: Scoring subnet CIDR keep-as-is: XX replaced by dev_cidr_range. ensure: within common_vnet_cidr.</td>
+<td>Scoring subnet CIDR mandatory: Scoring subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:common_vnet_cidr --><!-- parameter json.dev:common_vnet_cidr --><code>common_vnet_cidr</code></td>
@@ -7753,7 +7753,7 @@ reported, not silently represented as multiple settings.</p>
 <td><!-- parameter bootstrap:AIF_DEV_VNET_CIDR --><code>AIF_DEV_VNET_CIDR</code></td>
 <td>O</td>
 <td><code>"172.16.0.0/18"</code></td>
-<td>DEV vNet CIDR (canonical IPv4 /20 or larger; no XX placeholder)</td>
+<td>DEV vNet CIDR used to derive aligned XX templates for all environments (/18, /19 or /20; no XX placeholder)</td>
 </tr>
 <tr>
 <td><!-- parameter bootstrap:AIF_DRY_RUN --><code>AIF_DRY_RUN</code></td>
@@ -8189,7 +8189,7 @@ reported, not silently represented as multiple settings.</p>
 <td><!-- parameter state:dev_vnet_cidr --><code>dev_vnet_cidr</code></td>
 <td>C</td>
 <td>Required lookup</td>
-<td><code>apply_gha</code>, <code>common_values</code>; Dev vnet cidr</td>
+<td><code>common_values</code>; Dev vnet cidr</td>
 </tr>
 <tr>
 <td><!-- parameter state:enable_public_genai_access --><code>enable_public_genai_access</code></td>
