@@ -22,11 +22,15 @@ from uuid import uuid4
 
 
 CONTRACT = "AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1"
+ENVIRONMENT_CONTRACT = "AIFACTORY_ENVIRONMENT_CONTRACT=1"
 VERSION_CONTRACT = "AIFACTORY_VERSION_CONTRACT=1"
 ADO_AUTH_CONTRACT = "AIFACTORY_ADO_AUTH_CONTRACT=2"
 _version_spec = importlib.util.spec_from_file_location("aifactory_release_version", Path(__file__).with_name("release_version.py"))
 release_version = importlib.util.module_from_spec(_version_spec)
 _version_spec.loader.exec_module(release_version)
+_environment_spec = importlib.util.spec_from_file_location("aifactory_project_environment", Path(__file__).with_name("project_environment.py"))
+project_environment = importlib.util.module_from_spec(_environment_spec)
+_environment_spec.loader.exec_module(project_environment)
 GUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 ADO_PIPELINE = "aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-genai.yaml"
 ADO_MCP_PIPELINE = "aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-azure-mcp.yaml"
@@ -104,7 +108,8 @@ def validate_config(document, project, target):
     if not isinstance(values, dict):
         raise ValueError(f"Selected project JSON has no {section} object; Dev fallback is forbidden.")
     for name in ("dev", section):
-        if str((document.get(name) or {}).get("project_number_000", "")).zfill(3) != project:
+        identity = document.get(name)
+        if not isinstance(identity, dict) or project_number(identity.get("project_number_000")) != project:
             raise ValueError("Selected configuration project identity does not match the reviewed project.")
     subscription = str(values.get({"dev": "dev_sub_id", "stage": "test_sub_id", "prod": "prod_sub_id"}[target], ""))
     tenant = str(values.get("tenantId", ""))
@@ -116,6 +121,43 @@ def validate_config(document, project, target):
         raise ValueError("A project promotion cannot use deletion configuration.")
     return {"project": project, "target": target, "subscription": subscription.lower(),
             "tenant": tenant.lower(), "values": values}
+
+
+def project_number(value):
+    if type(value) not in (str, int) or not re.fullmatch(r"[0-9]{1,3}", str(value)) or not 1 <= int(value) <= 999:
+        raise ValueError("Selected configuration requires a project_number_000 from 001 to 999.")
+    return str(value).zfill(3)
+
+
+def deployment_inputs(environment, cli_target=None):
+    """Only the public promotion flag opts into JSON/project discovery."""
+    required = ("AIFACTORY_PROJECT_NUMBER", "AIFACTORY_TARGET_ENVIRONMENT",
+                "AIFACTORY_PROJECT_CONFIG", "AIFACTORY_REPO_ROOT")
+    if cli_target is None:
+        if not all(environment.get(name) for name in required):
+            raise ValueError("All reviewed project, target, config and repository inputs are required.")
+        return tuple(environment[name] for name in required)
+    if cli_target not in ("stage", "prod") or not environment.get("AIFACTORY_REPO_ROOT"):
+        raise ValueError("Public promotion requires Stage or Prod and a consumer repository root.")
+    if "AIFACTORY_TARGET_ENVIRONMENT" in environment and environment["AIFACTORY_TARGET_ENVIRONMENT"] != cli_target:
+        raise ValueError("--aifactory-env conflicts with AIFACTORY_TARGET_ENVIRONMENT.")
+    root = Path(environment["AIFACTORY_REPO_ROOT"]).resolve()
+    for name in ("AIFACTORY_PROJECT_CONFIG", "AIFACTORY_PROJECT_NUMBER"):
+        if name in environment and not environment[name]:
+            raise ValueError(f"{name} must not be empty when explicitly supplied.")
+    path = Path(environment.get("AIFACTORY_PROJECT_CONFIG") or root / "aifactory" / "variables.json")
+    if not path.is_absolute():
+        path = root / path
+    project = environment.get("AIFACTORY_PROJECT_NUMBER", "")
+    if path.suffix == ".dpapi" and not project:
+        raise ValueError("Encrypted configuration requires an explicit reviewed project number.")
+    document = load_config(path, root, project, cli_target)
+    if not project:
+        if not isinstance(document, dict) or not isinstance(document.get("dev"), dict):
+            raise ValueError("Promotion requires a dev object in the selected project JSON.")
+        project = project_number(document["dev"].get("project_number_000"))
+    validate_config(document, project, cli_target)
+    return project, cli_target, str(path), str(root)
 
 
 def canonical_json(document):
@@ -266,6 +308,15 @@ class Deployment:
     def read_json(self, argv):
         return json.loads(self.command(argv, capture=True))
 
+    def verify_predecessor(self):
+        if self.deployment_scope == "azure-mcp":
+            return None
+        document = json.loads(self.config)
+        return project_environment.require_prerequisite(
+            self.selected["target"], self.selected["project"],
+            lambda env: document.get("dev" if env == "dev" else "stage_prod"), self.read_json,
+        )
+
     def ado(self, method, endpoint, data=None):
         token = self.read_json([
             "az", "account", "get-access-token", "--tenant", self.ado_tenant,
@@ -326,7 +377,9 @@ class Deployment:
                 raise ValueError(f"Install the reviewed target-selection template before deployment: {relative}")
             self.templates[relative] = installed.read_bytes()
         account = self.read_json(["az", "account", "show", "--subscription", self.selected["subscription"], "--output", "json"])
-        if account.get("id", "").lower() != self.selected["subscription"] or account.get("tenantId", "").lower() != self.selected["tenant"]:
+        if (not isinstance(account, dict) or str(account.get("id", "")).lower() != self.selected["subscription"]
+                or str(account.get("tenantId", "")).lower() != self.selected["tenant"]
+                or ("state" in account and account["state"] != "Enabled")):
             raise ValueError("The authenticated Azure target differs from the selected configuration.")
         self.account = {key: account.get(key) for key in ("id", "tenantId", "user")}
         self.origin = self.command(["git", "remote", "get-url", "origin"], capture=True)
@@ -352,6 +405,7 @@ class Deployment:
             self.repository, self.ado_project = context["repository"], context["project"]
             self.ado_base = context["organization"] + "/" + quote(self.ado_project, safe="") + "/_apis"
             self.verify_ado_repository()
+        self.verify_predecessor()
         print(f"Reviewed project {project} -> {target}; subscription {self.selected['subscription']}; tenant {self.selected['tenant']}", flush=True)
 
     def update(self, project_only=False):
@@ -426,10 +480,10 @@ class Deployment:
         helper = self.root / "lib" / "project_deployment.py"
         helper.parent.mkdir(exist_ok=True)
         shutil.copyfile(Path(__file__), helper)
-        for name in ("release_version.py", "release_version.sh"):
+        for name in ("release_version.py", "release_version.sh", "project_environment.py"):
             shutil.copyfile(Path(__file__).with_name(name), helper.with_name(name))
         paths = [*self.files, launcher, "lib/project_deployment.py", "lib/release_version.py",
-                 "lib/release_version.sh", "azure-enterprise-scale-ml"]
+                 "lib/release_version.sh", "lib/project_environment.py", "azure-enterprise-scale-ml"]
         alias = "GHA-update-aifactory-and-run-project.sh"
         if self.route == "gha" and (self.state_dir / alias).is_file():
             shutil.copyfile(self.state_dir / alias, self.root / alias)
@@ -454,7 +508,13 @@ class Deployment:
         remote_head = self.command(["git", "ls-remote", "--exit-code", "origin", "refs/heads/main"], capture=True).split()
         if len(remote_head) != 2 or remote_head[0] != commit:
             raise ValueError("Local reviewed HEAD is not the published main branch; no secret or dispatch was created.")
+        self.verify_predecessor()
         self.command(["gh", "secret", "set", secret, "--repo", self.repository, "--env", self.selected["target"]], data=self.config)
+        try:
+            self.verify_predecessor()
+        except (ValueError, OSError, TypeError, KeyError):
+            self.command(["gh", "secret", "delete", secret, "--repo", self.repository, "--env", self.selected["target"]])
+            raise
         self.command([
             "gh", "workflow", "run", "infra-project.yml", "--repo", self.repository, "--ref", "main",
             "--raw-field", "environment=" + self.selected["target"], "--raw-field", "config_file=" + RUNTIME_CONFIG,
@@ -497,6 +557,7 @@ class Deployment:
         if type(pipeline_id) is not int or pipeline_id <= 0:
             raise ValueError("Invalid Azure DevOps pipeline identifier.")
         request = run_request("main", self.config, self.selected)
+        self.verify_predecessor()
         run = self.ado("POST", f"/pipelines/{pipeline_id}/runs?api-version=7.1", request)
         run_id = run.get("id")
         if type(run_id) is not int or run_id <= 0:
@@ -518,22 +579,21 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--route", required=True, choices=("gha", "ado"))
     parser.add_argument("--state-dir", required=True)
+    parser.add_argument("--aifactory-env", choices=("stage", "prod"))
     args = parser.parse_args()
     try:
-        required = ("AIFACTORY_PROJECT_NUMBER", "AIFACTORY_TARGET_ENVIRONMENT", "AIFACTORY_PROJECT_CONFIG", "AIFACTORY_REPO_ROOT")
-        if not all(os.environ.get(name) for name in required):
-            raise ValueError("All reviewed project, target, config and repository inputs are required.")
+        project, target, config_path, root = deployment_inputs(os.environ, args.aifactory_env)
         if args.route == "ado" and (os.environ.get("ADO_BRANCH", "main") != "main" or os.environ.get("ADO_AUTH_METHOD", "aad") != "aad"):
             raise ValueError("The reviewed ADO contract supports main and explicit organization-tenant Entra authentication only.")
-        deployment = Deployment(args.route, os.environ["AIFACTORY_REPO_ROOT"], args.state_dir)
-        deployment.prepare(os.environ["AIFACTORY_PROJECT_NUMBER"], os.environ["AIFACTORY_TARGET_ENVIRONMENT"],
-                           os.environ["AIFACTORY_PROJECT_CONFIG"])
+        deployment = Deployment(args.route, root, args.state_dir)
+        deployment.prepare(project, target, config_path)
         deployment.update(os.environ.get("AIFACTORY_PROJECT_ONLY", "false").lower() in ("true", "yes", "1"))
         origin = deployment.command(["git", "remote", "get-url", "origin"], capture=True)
         if (ado_origin(origin)["origin"] if args.route == "ado" else origin) != deployment.origin:
             raise ValueError("Repository origin changed during refresh.")
         account = deployment.read_json(["az", "account", "show", "--subscription", deployment.selected["subscription"], "--output", "json"])
-        if {key: account.get(key) for key in ("id", "tenantId", "user")} != deployment.account:
+        if (not isinstance(account, dict) or {key: account.get(key) for key in ("id", "tenantId", "user")} != deployment.account
+                or ("state" in account and account["state"] != "Enabled")):
             raise ValueError("Azure identity/target changed during refresh.")
         if args.route == "gha":
             if deployment.read_json(["gh", "api", "user"]).get("id") != deployment.github_identity:

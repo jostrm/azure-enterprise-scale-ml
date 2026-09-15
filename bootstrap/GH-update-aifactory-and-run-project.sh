@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
 # AIFACTORY_VERSION_CONTRACT=1
+# AIFACTORY_ENVIRONMENT_CONTRACT=1
 
 set -euo pipefail
 
@@ -19,7 +20,6 @@ readonly SUBMODULE_PATH="azure-enterprise-scale-ml"
 readonly WORKFLOW_FILE="infra-project.yml"
 readonly CONFIG_FILE="aifactory/variables.json"
 readonly CONFIG_TEMPLATE_FILE="aifactory/variables-template.json"
-readonly ENVIRONMENT="${AIFACTORY_TARGET_ENVIRONMENT:-dev}"
 readonly RUNNER_LABEL="aifactory-admin-vm"
 
 for AIF_LAYOUT_ROUTER in \
@@ -32,11 +32,78 @@ done
 source "$AIF_LAYOUT_ROUTER"
 aif_route_registered_layout gha "$REPO_ROOT" "$SCRIPT_DIR" "$@"
 
+launcher_arguments=("$@")
+project_only=false
+resume_after_bootstrap=false
+environment_argument=""
+while (( $# )); do
+  argument="$1"
+  shift
+  case "$argument" in
+    --aifactory-env)
+      [[ $# -gt 0 && -n "$1" && -z "$environment_argument" ]] || { aif_error "One --aifactory-env value is required."; exit 1; }
+      environment_argument="$1"; shift
+      case "$environment_argument" in dev|stage|prod) ;; *) aif_error "--aifactory-env must be dev, stage or prod."; exit 1 ;; esac
+      ;;
+    --aifactory-env=*)
+      [[ -z "$environment_argument" ]] || { aif_error "Duplicate --aifactory-env."; exit 1; }
+      environment_argument="${argument#*=}"
+      case "$environment_argument" in dev|stage|prod) ;; *) aif_error "--aifactory-env must be dev, stage or prod."; exit 1 ;; esac
+      ;;
+    --aifactory-version)
+      [[ $# -gt 0 && -n "$1" && -z "${AIF_VERSION_ARGUMENT:-}" ]] || { aif_error "One --aifactory-version value is required."; exit 1; }
+      AIF_VERSION_ARGUMENT="$1"; shift
+      ;;
+    --project-only)
+      project_only=true
+      ;;
+    --resume-after-bootstrap)
+      resume_after_bootstrap=true
+      ;;
+    --help|-h)
+      printf 'Usage: %s [--project-only] [--aifactory-env dev|stage|prod] [--aifactory-version main|124|125|1.100]\n' "$(basename "$0")"
+      printf '  Environment defaults to Dev unless AIFACTORY_TARGET_ENVIRONMENT is supplied; conflicting inputs fail.\n'
+      printf '  Stage requires an existing Dev project RG; Prod requires Dev OR Stage. Azure access must be verifiable.\n'
+      printf '  Stage/Prod use aifactory/variables.json (dev + stage_prod); the project number is inferred and validated.\n'
+      printf '  No predecessor is deployed automatically. Only the selected environment is dispatched.\n'
+      printf '  Omitted version inherits the installed factory version; a new legacy root defaults to 124.\n'
+      printf '  --project-only  Skip all AI Factory and template updates; dispatch the project workflow only.\n'
+      exit 0
+      ;;
+    *)
+      aif_error "Unsupported argument: $argument. Use --project-only or --help." >&2
+      exit 1
+      ;;
+  esac
+done
+case "${AIFACTORY_TARGET_ENVIRONMENT-dev}" in dev|stage|prod) ;; *) aif_error "AIFACTORY_TARGET_ENVIRONMENT must be dev, stage or prod."; exit 1 ;; esac
+if [[ -n "$environment_argument" && -n "${AIFACTORY_TARGET_ENVIRONMENT:-}" && "$environment_argument" != "$AIFACTORY_TARGET_ENVIRONMENT" ]]; then
+  aif_error "--aifactory-env conflicts with AIFACTORY_TARGET_ENVIRONMENT."
+  exit 1
+fi
+readonly ENVIRONMENT="${environment_argument:-${AIFACTORY_TARGET_ENVIRONMENT:-dev}}"
+[[ "$ENVIRONMENT" == "dev" ]] || umask 077
+case "${AIFACTORY_PROJECT_ONLY:-false}" in
+  true|TRUE|1|yes|YES)
+    project_only=true
+    ;;
+  false|FALSE|0|no|NO|"")
+    ;;
+  *)
+    aif_error "AIFACTORY_PROJECT_ONLY must be true or false." >&2
+    exit 1
+    ;;
+esac
+
 cd "$REPO_ROOT"
 aif_require_legacy_workspace "$REPO_ROOT" || exit 1
 
 reviewed_project=false
-if [[ -n "${AIFACTORY_TARGET_ENVIRONMENT:-}${AIFACTORY_PROJECT_NUMBER:-}${AIFACTORY_PROJECT_CONFIG:-}" ]]; then
+promotion_arguments=()
+if [[ "$environment_argument" == "stage" || "$environment_argument" == "prod" ]]; then
+  promotion_arguments=(--aifactory-env "$environment_argument")
+fi
+if [[ ${#promotion_arguments[@]} -gt 0 || -n "${AIFACTORY_TARGET_ENVIRONMENT:-}${AIFACTORY_PROJECT_NUMBER:-}${AIFACTORY_PROJECT_CONFIG:-}" ]]; then
   reviewed_project=true
   export AIFACTORY_USE_JSON_OVERRIDE=yes
   export AIFACTORY_REPO_ROOT="$REPO_ROOT"
@@ -46,8 +113,7 @@ fi
 if [[ "${AIFACTORY_LAUNCHER_STABLE:-}" != "1" ]]; then
   state_dir="$HOME/.aifactory-update-state/gh-$$"
   stable_launcher="$state_dir/GH-update-aifactory-and-run-project.sh"
-  mkdir -p "$state_dir"
-  mkdir -p "$state_dir/ui"
+  mkdir -p "$state_dir/ui" "$state_dir/lib"
   cp "$AIF_UI_LIBRARY" "$state_dir/ui/terminal.sh"
   cp "${BASH_SOURCE[0]}" "$stable_launcher"
   if [[ -f "$SCRIPT_DIR/GHA-update-aifactory-and-run-project.sh" ]]; then
@@ -55,21 +121,21 @@ if [[ "${AIFACTORY_LAUNCHER_STABLE:-}" != "1" ]]; then
   fi
   bundle_source="$(aif_launcher_bundle_source "$SCRIPT_DIR")"
   version_dir="$bundle_source/lib"
-  mkdir -p "$state_dir/lib"
   cp "$version_dir/release_version.py" "$version_dir/release_version.sh" \
     "$version_dir/layout_router.sh" "$state_dir/lib/"
   aif_snapshot_launcher_bundle "$bundle_source" "$state_dir/launcher-bundle"
-  if [[ "$reviewed_project" == "true" ]]; then
-    deployment_helper="$version_dir/project_deployment.py"
-    [[ -f "$deployment_helper" ]] || { aif_error "Install lib/project_deployment.py for reviewed project deployment."; exit 1; }
-    mkdir -p "$state_dir/lib"
-    cp "$deployment_helper" "$state_dir/lib/project_deployment.py"
+  deployment_dir="$version_dir"
+  if [[ "$reviewed_project" == "true" || ( -f "$deployment_dir/project_deployment.py" && -f "$deployment_dir/project_environment.py" ) ]]; then
+    for helper in project_deployment.py project_environment.py; do
+      [[ -f "$deployment_dir/$helper" ]] || { aif_error "Install lib/$helper for reviewed project deployment."; exit 1; }
+      cp "$deployment_dir/$helper" "$state_dir/lib/"
+    done
   fi
   chmod +x "$stable_launcher"
   export AIFACTORY_LAUNCHER_STABLE=1
   export AIFACTORY_LAUNCHER_STATE_DIR="$state_dir"
   export AIFACTORY_REPO_ROOT="$REPO_ROOT"
-  exec bash "$stable_launcher" "$@"
+  exec bash "$stable_launcher" "${launcher_arguments[@]}"
 fi
 
 state_dir="${AIFACTORY_LAUNCHER_STATE_DIR:?Stable launcher state directory is missing.}"
@@ -91,46 +157,6 @@ cleanup_update_state() {
   exit "$status"
 }
 trap cleanup_update_state EXIT
-project_only=false
-resume_after_bootstrap=false
-while (( $# )); do
-  argument="$1"
-  shift
-  case "$argument" in
-    --aifactory-version)
-      [[ $# -gt 0 && -n "$1" && -z "${AIF_VERSION_ARGUMENT:-}" ]] || { aif_error "One --aifactory-version value is required."; exit 1; }
-      AIF_VERSION_ARGUMENT="$1"; shift
-      ;;
-    --project-only)
-      project_only=true
-      ;;
-    --resume-after-bootstrap)
-      resume_after_bootstrap=true
-      ;;
-    --help|-h)
-      printf 'Usage: %s [--project-only] [--aifactory-version main|124|125|1.100]\n' "$(basename "$0")"
-      printf '  Omitted version inherits the installed factory version; a new legacy root defaults to 124.\n'
-      printf '  --project-only  Skip all AI Factory and template updates; dispatch the project workflow only.\n'
-      exit 0
-      ;;
-    *)
-      aif_error "Unsupported argument: $argument. Use --project-only or --help." >&2
-      exit 1
-      ;;
-  esac
-done
-case "${AIFACTORY_PROJECT_ONLY:-false}" in
-  true|TRUE|1|yes|YES)
-    project_only=true
-    ;;
-  false|FALSE|0|no|NO|"")
-    ;;
-  *)
-    aif_error "AIFACTORY_PROJECT_ONLY must be true or false." >&2
-    exit 1
-    ;;
-esac
-
 source "$SCRIPT_DIR/lib/release_version.sh"
 if [[ "$project_only" != "true" && -z "${AIF_VERSION_ARGUMENT:-}" &&
       -z "${AIFACTORY_VERSION:-}" && -z "${AIF_SUBMODULE_BRANCH:-}" &&
@@ -250,7 +276,7 @@ if [[ "$reviewed_project" == "true" ]]; then
       export AIFACTORY_PROJECT_CONFIG="$(cygpath -m "$AIFACTORY_PROJECT_CONFIG")"
     fi
   fi
-  "${PYTHON[@]}" "$helper_path" --route gha --state-dir "$helper_state_dir"
+  "${PYTHON[@]}" "$helper_path" --route gha --state-dir "$helper_state_dir" "${promotion_arguments[@]}"
   exit "$?"
 fi
 aif_section "02 / GitHub connection"

@@ -105,6 +105,10 @@ The `aifactory.aggregate-report.v1` JSON contains explicit scope/window/generati
 resource/deployment metric aggregates only. Query failures and partial telemetry fail execution. Missing
 metrics remain absent, PDF tables say `Unknown`, and chart gaps are not filled with zero. Strict request/token
 totals use Azure Metrics; legacy telemetry's defaulted-zero request/token fields are not promoted to observations.
+Strict metrics require `Count` units and `Total` aggregation. One explicit counter is chosen per category;
+aliases such as `InputTokens`/`ProcessedPromptTokens` and `TotalTokens`/`TokenTransaction` are never added
+together. Cache hit percentages, token latencies/rates, service-operation counters and Search compute
+consumption are not usage counts. Session totals remain unknown unless session instrumentation is observed.
 Session activity remains an aggregate sum of hourly distinct counts, never a period-wide unique-user count.
 No raw prompts, response bodies, session/user IDs, dimensions, credentials or SDK errors are exported.
 
@@ -131,6 +135,9 @@ changes or uploads, using the shared `common/monitoring_report.py` adapter:
 These PowerShell entry points require PowerShell 7 but no Az modules in strict Monitoring mode. Showback uses
 only Python's standard library and the existing Azure CLI; usage/token reports require the report packages.
 Daily showback is limited to 31 days to avoid Azure's silent truncation of longer daily queries.
+Cost-query HTTP 429 responses honor the longest Azure retry-after header, with at most three attempts within
+a bounded time budget. If throttling persists, the job displays a safe wait/retry message instead of fabricated
+costs. Billing can lag; absent days are not filled with zero.
 
 ## Azure Automation runbook
 

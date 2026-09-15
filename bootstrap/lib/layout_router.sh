@@ -20,6 +20,7 @@ AIF_DUAL_LAYOUT_LIBRARIES=(
   factory_lifecycle.py
   layout_router.sh
   project_deployment.py
+  project_environment.py
   release_version.py
   release_version.sh
 )
@@ -187,6 +188,7 @@ aif_ensure_control_bundle_gitignore() {
     "!/lib/factory_lifecycle.py"
     "!/lib/layout_router.sh"
     "!/lib/project_deployment.py"
+    "!/lib/project_environment.py"
     "!/lib/release_version.py"
     "!/lib/release_version.sh"
     "!/ui/"

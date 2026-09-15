@@ -9,8 +9,11 @@ import math
 import runpy
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
@@ -21,6 +24,23 @@ MAX_BYTES = 2 * 1024 * 1024
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
         raise RuntimeError("Redirected reporting requests are not permitted.")
+
+
+def retry_delay(headers):
+    delays = []
+    for key, value in headers.items():
+        key = key.lower()
+        if key != "retry-after" and not (key.startswith("x-ms-ratelimit-microsoft.costmanagement-") and key.endswith("retry-after")):
+            continue
+        text = str(value).strip()
+        if text.isascii() and text.isdigit() and len(text) <= 8:
+            delays.append(int(text))
+        elif key == "retry-after" and len(text) <= 100:
+            try:
+                delays.append(max(0, int((parsedate_to_datetime(text) - datetime.now(timezone.utc)).total_seconds())))
+            except (ValueError, TypeError):
+                pass
+    return max(delays, default=60)
 
 
 def read_json(path):
@@ -62,10 +82,21 @@ def arm(request, url, body=None):
     http_request = Request(url, data=encoded_body,
                            headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
                            method="POST" if body is not None else "GET")
-    with build_opener(NoRedirect()).open(http_request, timeout=45) as response:
-        if response.geturl() != url:
-            raise RuntimeError("Redirected reporting responses are not accepted.")
-        raw = response.read(MAX_BYTES + 1)
+    deadline = time.monotonic() + 240
+    opener = build_opener(NoRedirect())
+    for attempt in range(3):
+        try:
+            with opener.open(http_request, timeout=45) as response:
+                if response.geturl() != url:
+                    raise RuntimeError("Redirected reporting responses are not accepted.")
+                raw = response.read(MAX_BYTES + 1)
+            break
+        except HTTPError as error:
+            delay = retry_delay(error.headers) if error.code == 429 else 0
+            error.close()
+            if error.code != 429 or attempt == 2 or delay + 10 > deadline - time.monotonic():
+                raise
+            time.sleep(max(1, delay))
     if len(raw) > MAX_BYTES:
         raise ValueError("Azure aggregate reporting response exceeds its size limit.")
     return json.loads(raw)
@@ -116,7 +147,7 @@ def showback(request):
         **{key: scope[key] for key in ("subscription_id", "resource_group", "workspace_id", "window_start", "window_end")},
         "generated_at": datetime.now(timezone.utc).isoformat(), "daily": rows,
         "currency": next(iter(currencies), None),
-        "warnings": ["selected_project_cost_only", *([] if rows else ["no_data"])],
+        "warnings": ["selected_project_cost_only", "cost_data_lag", *([] if rows else ["no_data"])],
     }
 
 
@@ -151,4 +182,17 @@ def run(request_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--request", required=True)
-    run(parser.parse_args().request)
+    arguments = parser.parse_args()
+    try:
+        run(arguments.request)
+    except HTTPError as error:
+        request = read_json(arguments.request)
+        scope = request["scope"]
+        failure = {"contract": "aifactory.report-error.v1", "report_id": request["report_id"],
+                   "subscription_id": scope["subscription_id"], "resource_group": scope["resource_group"],
+                   "code": "cost_rate_limited" if error.code == 429 else
+                           "cost_access_denied" if error.code in {401, 403} else "cost_query_failed",
+                   "retry_after_seconds": retry_delay(error.headers) if error.code == 429 else None}
+        (Path(arguments.request).resolve().parent / "report-error.json").write_text(
+            json.dumps(failure, allow_nan=False), encoding="utf-8")
+        raise SystemExit(1)

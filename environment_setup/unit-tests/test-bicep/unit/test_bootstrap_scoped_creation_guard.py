@@ -167,7 +167,7 @@ def test_start_installs_dual_layout_bundle_at_registered_root(register_workspace
         "aifactory_private_dns.py", "aifactory_scaleset_config.py",
         "aifactory_vpn_profile.py", "create-new-aifactory-scaleset.sh",
         "factory_lifecycle.py", "layout_router.sh", "project_deployment.py",
-        "release_version.py", "release_version.sh",
+        "project_environment.py", "release_version.py", "release_version.sh",
     ):
         shutil.copy2(ROOT / "bootstrap/lib" / name, source / "bootstrap/lib" / name)
     scripts = (
@@ -190,6 +190,7 @@ def test_start_installs_dual_layout_bundle_at_registered_root(register_workspace
     assert all((root / name).is_file() for name in scripts)
     assert (root / "lib/layout_router.sh").is_file()
     assert (root / "lib/factory_lifecycle.py").is_file()
+    assert (root / "lib/project_environment.py").is_file()
     assert (root / "lib/release_version.py").is_file()
     assert (root / "lib/create-new-aifactory-scaleset.sh").is_file()
     assert (root / "ui/terminal.sh").is_file()
