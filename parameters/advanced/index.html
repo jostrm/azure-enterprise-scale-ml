@@ -7638,8 +7638,8 @@ reported, not silently represented as multiple settings.</p>
 <tr>
 <td><!-- parameter bootstrap:AIFACTORY_VERSION --><code>AIFACTORY_VERSION</code></td>
 <td>O</td>
-<td><code>"main"</code></td>
-<td>Explicit template release; create/update defaults to main. --aifactory-version takes precedence.</td>
+<td><code>""</code></td>
+<td>Explicit template release; omitted Create uses 124 and Update inherits the installed version. --aifactory-version takes precedence.</td>
 </tr>
 <tr>
 <td><!-- parameter bootstrap:AIF_ACCESS_HUB_MODE --><code>AIF_ACCESS_HUB_MODE</code></td>
@@ -7728,8 +7728,8 @@ reported, not silently represented as multiple settings.</p>
 <tr>
 <td><!-- parameter bootstrap:AIF_CREATE_DEFAULT_VERSION --><code>AIF_CREATE_DEFAULT_VERSION</code></td>
 <td>O</td>
-<td><code>"main"</code></td>
-<td>Create launcher default when no explicit version selector is supplied.</td>
+<td><code>"124"</code></td>
+<td>Legacy Create launcher default when no explicit version selector is supplied.</td>
 </tr>
 <tr>
 <td><!-- parameter bootstrap:AIF_DATABRICKS_PRINCIPAL_ID --><code>AIF_DATABRICKS_PRINCIPAL_ID</code></td>
@@ -7950,8 +7950,8 @@ reported, not silently represented as multiple settings.</p>
 <tr>
 <td><!-- parameter bootstrap:AIF_UPDATE_DEFAULT_VERSION --><code>AIF_UPDATE_DEFAULT_VERSION</code></td>
 <td>O</td>
-<td><code>"main"</code></td>
-<td>Update launcher default when not project-only.</td>
+<td><code>""</code></td>
+<td>Optional Update override; omission inherits the installed factory version.</td>
 </tr>
 <tr>
 <td><!-- parameter bootstrap:AIF_VPN_CLIENT_CIDR --><code>AIF_VPN_CLIENT_CIDR</code></td>
