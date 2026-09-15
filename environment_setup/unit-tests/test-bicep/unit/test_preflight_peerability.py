@@ -4,8 +4,10 @@ import contextlib
 import io
 import os
 import re
+import shlex
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -127,7 +129,7 @@ def test_bicep_substitutes_same_environment_octet_in_vnet_and_common_subnets():
 
 
 @pytest.mark.parametrize("index", [0, 1, 2])
-def test_bootstrap_address_diagnostic_branches_warn_without_exiting_or_repairing(index):
+def test_bootstrap_invalid_address_plans_exit_before_mutation(index):
     bash = (Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin" / "bash.exe"
             if os.name == "nt" else Path(shutil.which("bash") or "/unavailable"))
     if not bash.is_file():
@@ -139,17 +141,51 @@ def test_bootstrap_address_diagnostic_branches_warn_without_exiting_or_repairing
     script = """
 set -eu
 AIF_DEV_VNET_CIDR=invalid-dev
+AIF_STAGE_VNET_CIDR=invalid-stage
+AIF_PROD_VNET_CIDR=invalid-prod
 AIF_ACCESS_HUB_VNET_CIDR=invalid-hub
 AIF_VPN_CLIENT_CIDR=invalid-vpn
 aif_validate_cidr() { return 1; }
+aif_derive_environment_vnets() { return 1; }
 aif_validate_access_hub_cidr() { return 1; }
 aif_validate_network_plan() { return 1; }
-aif_warn() { printf 'WARNING:%s\\n' "$1"; }
+aif_error() { printf 'ERROR:%s\\n' "$1"; }
 """ + branches[index].group() + """
 printf 'VALUES:%s:%s:%s\\n' "$AIF_DEV_VNET_CIDR" "$AIF_ACCESS_HUB_VNET_CIDR" "$AIF_VPN_CLIENT_CIDR"
 """
     result = subprocess.run([str(bash), "--noprofile", "--norc", "-c", script],
                             capture_output=True, text=True, timeout=15)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "ERROR:Address planning:" in result.stderr
+    assert "VALUES:" not in result.stdout
+
+
+def test_bootstrap_derives_and_validates_all_environment_vnets():
+    bash = (Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin" / "bash.exe"
+            if os.name == "nt" else Path(shutil.which("bash") or "/unavailable"))
+    if not bash.is_file():
+        pytest.skip("Bash is required for the isolated derivation test")
+    source = (ROOT / "bootstrap" / "lib" / "create-new-aifactory-scaleset.sh").read_text(encoding="utf-8")
+
+    def function(name):
+        return name + "() {" + source.split(name + "() {", 1)[1].split("\n}\n", 1)[0] + "\n}\n"
+
+    script = (
+        "set -eu\n"
+        f"AIF_PYTHON=({shlex.quote(Path(sys.executable).as_posix())})\n"
+        + function("aif_derive_environment_vnets")
+        + function("aif_validate_network_plan")
+        + 'read -r dev stage prod <<<"$(aif_derive_environment_vnets 172.16.0.0/18)"\n'
+        + 'printf "%s|%s|%s\\n" "$dev" "$stage" "$prod"\n'
+        + 'aif_validate_network_plan "$dev" "$stage" "$prod" 10.240.0.0/22 172.31.240.0/24\n'
+    )
+    result = subprocess.run([str(bash), "--noprofile", "--norc", "-c", script],
+                            capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "WARNING:Address planning:" in result.stdout
-    assert "VALUES:invalid-dev:invalid-hub:invalid-vpn" in result.stdout
+    assert result.stdout.strip() == "172.16.0.0/18|172.16.64.0/18|172.16.128.0/18"
+
+    overlap = script.replace("10.240.0.0/22", "172.16.64.0/22")
+    result = subprocess.run([str(bash), "--noprofile", "--norc", "-c", overlap],
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode != 0
+    assert "Overlapping network ranges" in result.stderr

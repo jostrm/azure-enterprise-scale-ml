@@ -388,8 +388,25 @@ import ipaddress
 import sys
 
 network = ipaddress.ip_network(sys.argv[1], strict=True)
-if network.version != 4 or network.prefixlen > 20:
+if network.version != 4 or not 18 <= network.prefixlen <= 20:
     raise SystemExit(1)
+stride = 1 << (24 - network.prefixlen)
+if int(str(network.network_address).split(".")[2]) + 2 * stride > 255:
+    raise SystemExit(1)
+PY
+}
+
+aif_derive_environment_vnets() {
+  "${AIF_PYTHON[@]}" - "$1" <<'PY'
+import ipaddress
+import sys
+
+network = ipaddress.ip_network(sys.argv[1], strict=True)
+stride = 1 << (24 - network.prefixlen)
+octets = str(network.network_address).split(".")
+selectors = [int(octets[2]) + index * stride for index in range(3)]
+print(" ".join(f"{octets[0]}.{octets[1]}.{selector}.{octets[3]}/{network.prefixlen}"
+               for selector in selectors))
 PY
 }
 
@@ -574,10 +591,14 @@ aif_collect_answers() {
       exit 1
       ;;
   esac
-  aif_prompt_value AIF_DEV_VNET_CIDR "DEV vNet CIDR (canonical IPv4 /20 or larger; no XX placeholder)" "172.16.0.0/18"
-  if ! aif_validate_cidr "$AIF_DEV_VNET_CIDR"; then
-    aif_warn "Address planning: DEV vNet CIDR should be canonical IPv4 /20 or larger; resolve XX explicitly. No value was changed; subnet generation still requires a valid allocation."
+  aif_prompt_value AIF_DEV_VNET_CIDR "DEV vNet CIDR used to derive aligned XX templates for all environments (/18, /19 or /20; no XX placeholder)" "172.16.0.0/18"
+  local environment_vnets
+  if ! aif_validate_cidr "$AIF_DEV_VNET_CIDR" ||
+     ! environment_vnets="$(aif_derive_environment_vnets "$AIF_DEV_VNET_CIDR")"; then
+    aif_error "Address planning: DEV vNet CIDR must be canonical IPv4 /18, /19 or /20 with room for two following aligned networks." >&2
+    exit 1
   fi
+  read -r AIF_DEV_VNET_CIDR AIF_STAGE_VNET_CIDR AIF_PROD_VNET_CIDR <<<"$environment_vnets"
 
   if [[ "$AIF_TOPOLOGY" == "s" ]]; then
     aif_prompt_choice AIF_ACCESS_HUB_MODE \
@@ -596,9 +617,12 @@ aif_collect_answers() {
       if ! aif_validate_access_hub_cidr "$AIF_ACCESS_HUB_VNET_CIDR" ||
          ! aif_validate_network_plan \
            "$AIF_DEV_VNET_CIDR" \
+           "$AIF_STAGE_VNET_CIDR" \
+           "$AIF_PROD_VNET_CIDR" \
            "$AIF_ACCESS_HUB_VNET_CIDR" \
            "$AIF_VPN_CLIENT_CIDR"; then
-        aif_warn "Address planning: DEV, access-hub, and VPN client CIDRs should be valid, non-overlapping IPv4 ranges. No values were changed."
+        aif_error "Address planning: Dev, Stage, Prod, access-hub, and VPN client CIDRs must be valid and non-overlapping." >&2
+        exit 1
       fi
     else
       AIF_ACCESS_HUB_MODE="integrated"
@@ -691,8 +715,11 @@ aif_collect_answers() {
     AIF_HUB_VNET_NAME="vnt-esmlcmn-${AIF_LOCATION_SHORT}-dev-001"
     AIF_ACCESS_HUB_VNET_CIDR="$AIF_DEV_VNET_CIDR"
     AIF_VPN_CLIENT_CIDR="${AIF_VPN_CLIENT_CIDR:-172.31.240.0/24}"
-    if ! aif_validate_network_plan "$AIF_DEV_VNET_CIDR" "$AIF_VPN_CLIENT_CIDR"; then
-      aif_warn "Address planning: integrated DEV and VPN client CIDRs should not overlap. No values were changed."
+    if ! aif_validate_network_plan \
+      "$AIF_DEV_VNET_CIDR" "$AIF_STAGE_VNET_CIDR" "$AIF_PROD_VNET_CIDR" \
+      "$AIF_VPN_CLIENT_CIDR"; then
+      aif_error "Address planning: Dev, Stage, Prod, and VPN client CIDRs must not overlap." >&2
+      exit 1
     fi
   fi
 
@@ -807,8 +834,8 @@ aif_collect_answers() {
   esac
   AIF_ADD_BASTION="false"
 
-  # The initial bootstrap intentionally deploys DEV only. Stage/Prod can be added
-  # later with the configuration wizard after separate CIDRs/subscriptions exist.
+  # The initial bootstrap intentionally deploys DEV only. Stage/Prod are
+  # preallocated as peerable address spaces and can be deployed later.
   AIF_STAGE_SUBSCRIPTION_ID="$AIF_DEV_SUBSCRIPTION_ID"
   AIF_PROD_SUBSCRIPTION_ID="$AIF_DEV_SUBSCRIPTION_ID"
 }
@@ -823,6 +850,8 @@ aif_confirm_summary() {
   aif_value "DEV subscription" "$AIF_DEV_SUBSCRIPTION_ID"
   aif_value "Region" "$AIF_LOCATION"
   aif_value "DEV vNet" "$AIF_DEV_VNET_CIDR"
+  aif_value "Stage vNet" "$AIF_STAGE_VNET_CIDR"
+  aif_value "Prod vNet" "$AIF_PROD_VNET_CIDR"
   aif_value "Prefix" "$AIF_PREFIX"
   aif_value "Scale set" "$AIF_SCALESET_SUFFIX_DASH"
   aif_value "Project" "$AIF_PROJECT_NUMBER"

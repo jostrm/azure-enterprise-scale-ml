@@ -724,8 +724,38 @@ def subnet_plan(cidr: str) -> dict[str, str]:
     }
 
 
+def environment_network_plan(dev_cidr: str) -> dict[str, str]:
+    """Derive the third-octet XX template and three aligned environment selectors."""
+    plan = subnet_plan(dev_cidr)
+    network = ipaddress.ip_network(dev_cidr, strict=True)
+    if network.prefixlen < 18:
+        raise ValueError(
+            f"{dev_cidr} is too large for three third-octet XX networks; "
+            "use an aligned /18, /19 or /20")
+    stride = 1 << (24 - network.prefixlen)
+    dev_selector = int(str(network.network_address).split(".")[2])
+    selectors = (dev_selector, dev_selector + stride, dev_selector + 2 * stride)
+    if selectors[-1] > 255:
+        raise ValueError(
+            f"{dev_cidr} has no room for aligned Stage and Prod networks in the "
+            "same third-octet XX template")
+
+    def template(cidr: str) -> str:
+        parsed = ipaddress.ip_network(cidr, strict=True)
+        octets = str(parsed.network_address).split(".")
+        return f"{octets[0]}.{octets[1]}.XX.{octets[3]}/{parsed.prefixlen}"
+
+    return {
+        **{key: template(value) for key, value in plan.items()
+           if key not in {"cidr_selector"}},
+        "dev_cidr_range": str(selectors[0]),
+        "test_cidr_range": str(selectors[1]),
+        "prod_cidr_range": str(selectors[2]),
+    }
+
+
 def common_values(state: dict[str, Any]) -> dict[str, Any]:
-    plan = subnet_plan(state["dev_vnet_cidr"])
+    plan = environment_network_plan(state["dev_vnet_cidr"])
     group_id = state["team_group_id"]
     project_sp = state.get("project_sp_secret_names") or {}
     hub = state["topology"] == "hs" or state.get("access_hub_mode") == "external"
@@ -780,10 +810,7 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
         "dev_sub_id": state["dev_subscription_id"],
         "test_sub_id": state["stage_subscription_id"],
         "prod_sub_id": state["prod_subscription_id"],
-        **{key: value for key, value in plan.items() if key != "cidr_selector"},
-        "dev_cidr_range": plan["cidr_selector"],
-        "test_cidr_range": plan["cidr_selector"],
-        "prod_cidr_range": plan["cidr_selector"],
+        **plan,
         "project_number_000": state["project_number"],
         "project_IP_whitelist": state.get("ip_allowlist", ""),
         "technical_admins_ad_object_id": group_id,
@@ -869,7 +896,6 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
     common = common_values(state)
     common.update(selected_project_organization(json_path, state))
     project_sp = state.get("project_sp_secret_names") or {}
-    plan = subnet_plan(state["dev_vnet_cidr"])
     hub = state["topology"] == "hs" or state.get("access_hub_mode") == "external"
     self_hosted = state.get("runner_mode") == "self-hosted"
     enable_admin_vm = self_hosted or state["add_bastion"] == "true"
@@ -893,9 +919,9 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         "DEV_SUBSCRIPTION_ID": state["dev_subscription_id"],
         "STAGE_SUBSCRIPTION_ID": state["stage_subscription_id"],
         "PROD_SUBSCRIPTION_ID": state["prod_subscription_id"],
-        "DEV_CIDR_RANGE": plan["cidr_selector"],
-        "STAGE_CIDR_RANGE": plan["cidr_selector"],
-        "PROD_CIDR_RANGE": plan["cidr_selector"],
+        "DEV_CIDR_RANGE": common["dev_cidr_range"],
+        "STAGE_CIDR_RANGE": common["test_cidr_range"],
+        "PROD_CIDR_RANGE": common["prod_cidr_range"],
         "CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB": "true" if hub else "false",
         "PRIV_DNS_SUBSCRIPTION_PARAM": state.get("hub_subscription_id", ""),
         "PRIV_DNS_RESOURCE_GROUP_PARAM": state.get("hub_resource_group", ""),
@@ -938,11 +964,11 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
             [state["team_group_id"]] * 5
         ),
         "GROUPS_CORETEAM_MEMBERS": ",".join([state["team_group_id"]] * 3),
-        "COMMON_VNET_CIDR": plan["common_vnet_cidr"],
-        "COMMON_SUBNET_CIDR": plan["common_subnet_cidr"],
-        "COMMON_SUBNET_SCORING_CIDR": plan["common_subnet_scoring_cidr"],
-        "COMMON_PBI_SUBNET_CIDR": plan["common_pbi_subnet_cidr"],
-        "COMMON_BASTION_SUBNET_CIDR": plan["common_bastion_subnet_cidr"],
+        "COMMON_VNET_CIDR": common["common_vnet_cidr"],
+        "COMMON_SUBNET_CIDR": common["common_subnet_cidr"],
+        "COMMON_SUBNET_SCORING_CIDR": common["common_subnet_scoring_cidr"],
+        "COMMON_PBI_SUBNET_CIDR": common["common_pbi_subnet_cidr"],
+        "COMMON_BASTION_SUBNET_CIDR": common["common_bastion_subnet_cidr"],
     }
     if simple_mode_enabled(state):
         env_values.update(simple_mode_env_values(common))

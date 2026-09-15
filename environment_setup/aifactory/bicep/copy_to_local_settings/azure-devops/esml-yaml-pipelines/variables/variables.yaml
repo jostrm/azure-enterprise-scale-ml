@@ -140,21 +140,21 @@ variables:
       # - Read more about Agent Network Injection, and known limitations: https://learn.microsoft.com/en-us/azure/ai-foundry/agents/how-to/virtual-networks?WT.mc_id=Portal-Microsoft_Azure_ProjectOxford
       # 10.x.x.x (/8) is heavily used for IoT and machine learning (e.g., HVAC, AV, VoIP, ML-clusters)
         # Example vnet 10.16.0.0/16 with subets [10.XX.0.0/20,172.XX.16.0/20,10.XX.32.0/25,10.XX.33.0/26]
-      # 172.x.x.x (/12)is often used for hosted systems and backend platforms, especially in Azure and hybrid setups
-        # Example vnet 172.16.0.0/16 with subets [172.16.XX.0/26,172.16.XX.64/26,172.16.XX.128/26,172.16.XX.192/26]
+      # 172.16.0.0/12 is often used for hosted systems and backend platforms, especially in Azure and hybrid setups.
+        # Recommended reusable factory template: 172.16.XX.0/18 with aligned Dev/Stage/Prod selectors 0/64/128.
       # 192.x.x.x  (/16) is less commonly used in large-scale Azure deployments due to its smaller address space.
-      # WAF AI Factory Recommended: 172.16.0.0/16
+      # A static /16 is valid for one VNet, but the current third-octet XX contract cannot create three distinct /16 VNets.
       # Don't use the 172.17.0.0/16 IP address range for your virtual network. This range is the default subnet range used by the Docker bridge network on-premises.
   common_vnet_cidr: "172.16.XX.0/18" # <mandatory>Common vNet CIDR<default>172.16.XX.0/18<keep-as-is> XX is the network-aligned per-environment octet; Dev/Stage/Prod must not overlap. Address intent only, not actual peering.
 
-  common_subnet_cidr: "172.16.XX.0/26" # <mandatory>Common subnet CIDR<default>172.16.XX.0/26<keep-as-is> XX replaced by dev_cidr_range. <ensure> within common_vnet_cidr.
-  common_subnet_scoring_cidr: "172.16.XX.64/26" # <mandatory>Scoring subnet CIDR<default>172.16.XX.64/26<keep-as-is> XX replaced by dev_cidr_range. <ensure> within common_vnet_cidr.
+  common_subnet_cidr: "172.16.XX.0/26" # <mandatory>Common subnet CIDR<default>172.16.XX.0/26<keep-as-is> XX replaced by the selected environment range. <ensure> within common_vnet_cidr.
+  common_subnet_scoring_cidr: "172.16.XX.64/26" # <mandatory>Scoring subnet CIDR<default>172.16.XX.64/26<keep-as-is> XX replaced by the selected environment range. <ensure> within common_vnet_cidr.
   
   common_pbi_subnet_name: "snet-esml-cmn-pbi-001" # <mandatory>Power BI gateway subnet name<default>snet-esml-cmn-pbi-001<keep-as-is> <ensure> within common_vnet_cidr.
-  common_pbi_subnet_cidr: "172.16.XX.128/26" # <mandatory>Power BI gateway subnet CIDR<default>172.16.XX.128/26<keep-as-is> XX replaced by dev_cidr_range. <ensure> within common_vnet_cidr.
+  common_pbi_subnet_cidr: "172.16.XX.128/26" # <mandatory>Power BI gateway subnet CIDR<default>172.16.XX.128/26<keep-as-is> XX replaced by the selected environment range. <ensure> within common_vnet_cidr.
   
   common_bastion_subnet_name: "AzureBastionSubnet" # <mandatory>Bastion subnet name<default>AzureBastionSubnet<keep-as-is> Required name for Azure Bastion. <ensure> within common_vnet_cidr.
-  common_bastion_subnet_cidr: "172.16.XX.192/26" # <mandatory>Bastion subnet CIDR<default>172.16.XX.192/26<keep-as-is> XX replaced by dev_cidr_range. <ensure> within common_vnet_cidr.
+  common_bastion_subnet_cidr: "172.16.XX.192/26" # <mandatory>Bastion subnet CIDR<default>172.16.XX.192/26<keep-as-is> XX replaced by the selected environment range. <ensure> within common_vnet_cidr.
 
 ## HELP for CIDR RANGE============================================================================
   # XX replaces the third octet in BOTH the VNet and common subnet templates.
