@@ -19,6 +19,45 @@ TARGET_REPO="${GH_TARGET_REPO:-githuborg/enterprise-scale-aifactory-001}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Opt-in refresh: never enter the legacy cleanup, prompt or dispatch paths.
+if [[ "${1:-}" == "--no-delete" ]]; then
+    [[ "$#" -eq 1 ]] || { aif_error "Usage: $0 [--no-delete]"; exit 2; }
+    bundle="$(aif_launcher_bundle_source "$SCRIPT_DIR/bootstrap")"
+    registered=false
+    if aif_registered_layout_root "$SCRIPT_DIR/.." >/dev/null; then
+        registered=true
+    else
+        status=$?
+        [[ "$status" -ne 2 ]] || exit 2
+        aif_require_legacy_workspace "$SCRIPT_DIR/.." || exit 1
+        aif_require_legacy_workspace "$PWD" || exit 1
+    fi
+    if [[ -n "${AIFACTORY_PYTHON:-}" ]]; then
+        python_command=("$AIFACTORY_PYTHON")
+    elif command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then
+        python_command=(python3)
+    elif command -v python >/dev/null 2>&1 && python --version >/dev/null 2>&1; then
+        python_command=(python)
+    elif command -v py >/dev/null 2>&1 && py -3 --version >/dev/null 2>&1; then
+        python_command=(py -3)
+    else
+        aif_error "Python 3 is required for --no-delete."
+        exit 1
+    fi
+    PYTHONDONTWRITEBYTECODE=1 "${python_command[@]}" "$bundle/lib/bootstrap_no_delete.py" \
+        bundle --source "$bundle" --root "$SCRIPT_DIR/.."
+    aif_complete "Installed both ADO and GHA bootstrap helpers without deleting files or dispatching workflows."
+    aif_info "Existing .gitignore is preserved; review tracking rules before staging the installed bundle."
+    if [[ "$registered" == "true" ]]; then
+        aif_info "Registered layout: use ADO/GHA-azurefactory.sh with a reviewed manifest. Template copy remains blocked."
+    else
+        aif_info "From your repository root: bash ./01-aif-copy-aifactory-templates.sh --no-delete"
+        aif_info "Then, only to initialize register storage: bash ./01-aif-copy-aifactory-templates.sh --init-azurefactory"
+        aif_info "Do not run legacy 02/03 bootstrap helpers for this register-only setup."
+    fi
+    exit 0
+fi
+
 # Install the complete control bundle from one reviewed source tree.
 aif_restore_launcher_bundle "$SCRIPT_DIR/bootstrap" "$SCRIPT_DIR/.."
 

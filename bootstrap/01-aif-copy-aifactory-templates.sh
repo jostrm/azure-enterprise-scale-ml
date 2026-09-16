@@ -11,12 +11,26 @@ fi
 source "$AIF_UI_LIBRARY"
 
 # New storage initialization never enters the legacy copier (which replaces folders).
-layout_mode="${1:---auto}"
-if [[ "$#" -gt 1 || ( "$layout_mode" != "--auto" && "$layout_mode" != "--legacy-templates" &&
-                     "$layout_mode" != "--init-azurefactory" ) ]]; then
-    aif_error "Usage: $0 [--auto|--init-azurefactory|--legacy-templates]" >&2
-    exit 2
-fi
+layout_mode="--auto"
+no_delete=false
+mode_selected=false
+for argument in "$@"; do
+    case "$argument" in
+        --no-delete)
+            [[ "$no_delete" == "false" ]] || { aif_error "Duplicate --no-delete"; exit 2; }
+            no_delete=true
+            ;;
+        --auto|--legacy-templates|--init-azurefactory)
+            [[ "$mode_selected" == "false" ]] || { aif_error "Select only one layout mode"; exit 2; }
+            layout_mode="$argument"
+            mode_selected=true
+            ;;
+        *)
+            aif_error "Usage: $0 [--auto|--init-azurefactory|--legacy-templates] [--no-delete]" >&2
+            exit 2
+            ;;
+    esac
+done
 if [[ "$layout_mode" != "--init-azurefactory" ]]; then
     aif_require_legacy_workspace "$PWD" || exit 1
     if [[ -e "$PWD/azurefactory" || -L "$PWD/azurefactory" ]]; then
@@ -24,7 +38,7 @@ if [[ "$layout_mode" != "--init-azurefactory" ]]; then
         exit 2
     fi
 fi
-if [[ "$layout_mode" != "--legacy-templates" ]]; then
+if [[ "$layout_mode" != "--legacy-templates" || "$no_delete" == "true" ]]; then
     for initializer in "$AIF_UI_DIR/lib/initialize_azurefactory.py" \
                        "$AIF_UI_DIR/azure-enterprise-scale-ml/bootstrap/lib/initialize_azurefactory.py"; do
         [[ ! -f "$initializer" ]] || break
@@ -82,6 +96,17 @@ for api_asset in "${api_assets[@]}"; do
         exit 1
     fi
 done
+if [[ "$no_delete" == "true" ]]; then
+    safe_copier="$(dirname "$initializer")/bootstrap_no_delete.py"
+    [[ -f "$safe_copier" ]] || { aif_error "Missing bootstrap/lib/bootstrap_no_delete.py"; exit 1; }
+    PYTHONDONTWRITEBYTECODE=1 "${python_command[@]}" "$safe_copier" templates \
+        --source "$PWD/$start_dir" --root "$PWD" --layout-mode="${layout_mode#--}" \
+        --api-assets "${api_assets[@]}" || exit 1
+    aif_complete "Non-deleting template refresh finished. Existing configuration and .gitignore are preserved."
+    aif_info "No factory was registered. To initialize separately: bash ./01-aif-copy-aifactory-templates.sh --init-azurefactory"
+    aif_info "Old files not present in the source remain; review them before using templates."
+    exit 0
+fi
 if ! command -v find >/dev/null 2>&1 || ! command -v tar >/dev/null 2>&1; then
     aif_error "The find and tar utilities are required to copy CLI/API sources without local runtime artifacts." >&2
     exit 1
