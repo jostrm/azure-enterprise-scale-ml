@@ -775,10 +775,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#networking-dns-and-existing-resources" class="md-nav__link">
+  <a href="#factory-project-naming-and-orchestration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Networking, DNS and existing resources
+        Factory, project, naming and orchestration
       
     </span>
   </a>
@@ -786,10 +786,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#factory-project-naming-and-orchestration" class="md-nav__link">
+  <a href="#networking-dns-and-existing-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Factory, project, naming and orchestration
+        Networking, DNS and existing resources
       
     </span>
   </a>
@@ -1820,10 +1820,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#networking-dns-and-existing-resources" class="md-nav__link">
+  <a href="#factory-project-naming-and-orchestration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Networking, DNS and existing resources
+        Factory, project, naming and orchestration
       
     </span>
   </a>
@@ -1831,10 +1831,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#factory-project-naming-and-orchestration" class="md-nav__link">
+  <a href="#networking-dns-and-existing-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Factory, project, naming and orchestration
+        Networking, DNS and existing resources
       
     </span>
   </a>
@@ -2237,6 +2237,11 @@ They use the existing deployment engine and route configuration.</p>
 </tr>
 <tr>
 <td>Update</td>
+<td><code>--aifactory-env dev\|stage\|prod</code></td>
+<td>Dispatch only the selected environment; conflicts with a different <code>AIFACTORY_TARGET_ENVIRONMENT</code>.</td>
+</tr>
+<tr>
+<td>Update</td>
 <td><code>--aifactory-version VERSION</code></td>
 <td>Choose update source version explicitly</td>
 </tr>
@@ -2402,7 +2407,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
-<td style="text-align: right;">79</td>
+<td style="text-align: right;">81</td>
 </tr>
 <tr>
 <td><code>helper</code></td>
@@ -2414,7 +2419,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">347</td>
+<td style="text-align: right;">348</td>
 </tr>
 </tbody>
 </table>
@@ -3028,370 +3033,6 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="networking-dns-and-existing-resources">Networking, DNS and existing resources<a class="headerlink" href="#networking-dns-and-existing-resources" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>YAML / JSON key</th>
-<th>GHA binding(s)</th>
-<th>M/C/O</th>
-<th>Source defaults</th>
-<th>Description / conditions</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><!-- parameter yaml:BYOContributorRoleID --><!-- parameter json.dev:BYOContributorRoleID --><code>BYOContributorRoleID</code></td>
-<td><code>BYO_CONTRIBUTOR_ROLE_ID</code></td>
-<td>O</td>
-<td>Y: <code>"b24988ac-6180-42a0-ab88-20f7382dd24c"</code><br>J.dev: <code>"b24988ac-6180-42a0-ab88-20f7382dd24c"</code></td>
-<td>Contributor role ID keep-as-is: Azure built-in Contributor. otherwise: provide a custom role ID for finer-grained access control.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:BYO_subnets --><!-- parameter json.dev:BYO_subnets --><code>BYO_subnets</code></td>
-<td><code>BYO_SUBNETS</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Bring your own subnets otherwise: true, uses pre-existing subnets defined by the BYO subnet variables below.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:acr_IP_whitelist --><!-- parameter json.dev:acr_IP_whitelist --><code>acr_IP_whitelist</code></td>
-<td><code>ACR_IP_WHITELIST</code></td>
-<td>O</td>
-<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
-<td>ACR IP allowlist otherwise: provide comma-separated IPv4 addresses if ACR network restrictions are needed.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:allowPublicAccessWhenBehindVnet --><!-- parameter json.dev:allowPublicAccessWhenBehindVnet --><code>allowPublicAccessWhenBehindVnet</code></td>
-<td><code>ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET</code> (not in .env template)</td>
-<td>O</td>
-<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
-<td>Public UI access when behind vNet recommended: false to enable fully private networking.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:byoASEv3 --><!-- parameter json.dev:byoASEv3 --><code>byoASEv3</code></td>
-<td><code>BYO_ASEV3</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Use BYO App Service Environment v3 otherwise: true, use an existing ASEv3 specified in byoAseFullResourceId.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:byoAseAppServicePlanResourceId --><!-- parameter json.dev:byoAseAppServicePlanResourceId --><code>byoAseAppServicePlanResourceId</code></td>
-<td><code>BYO_ASE_APP_SERVICE_PLAN_RESOURCE_ID</code></td>
-<td>O</td>
-<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
-<td>BYO App Service Plan resource ID otherwise: provide full ARM resource ID of an existing App Service Plan within the ASEv3.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:byoAseFullResourceId --><!-- parameter json.dev:byoAseFullResourceId --><code>byoAseFullResourceId</code></td>
-<td><code>BYO_ASE_FULL_RESOURCE_ID</code></td>
-<td>C</td>
-<td>Y: <code>"subscriptions/...yourASEnameS2"</code><br>J.dev: <code>"subscriptions/...yourASEnameS2"</code></td>
-<td>BYO ASEv3 ARM resource ID. Note - remove leading slash / in Resource ID mandatory: if byoASEv3:'true' ensure: full ARM resource ID of the existing ASEv3.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:centralDnsZoneByPolicyInHub --><!-- parameter json.dev:centralDnsZoneByPolicyInHub --><code>centralDnsZoneByPolicyInHub</code></td>
-<td><code>CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>false</code></td>
-<td>Centralized DNS via Hub policy otherwise: true, uses central private DNS zones in HUB resource group managed by Azure Policy.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:common_bastion_subnet_cidr --><!-- parameter json.dev:common_bastion_subnet_cidr --><code>common_bastion_subnet_cidr</code></td>
-<td><code>COMMON_BASTION_SUBNET_CIDR</code></td>
-<td>M</td>
-<td>Y: <code>"172.16.XX.192/26"</code><br>J.dev: <code>"172.16.XX.192/26"</code></td>
-<td>Bastion subnet CIDR mandatory: Bastion subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:common_bastion_subnet_name --><!-- parameter json.dev:common_bastion_subnet_name --><code>common_bastion_subnet_name</code></td>
-<td><code>COMMON_BASTION_SUBNET_NAME</code></td>
-<td>M</td>
-<td>Y: <code>"AzureBastionSubnet"</code><br>J.dev: <code>"AzureBastionSubnet"</code></td>
-<td>Bastion subnet name mandatory: Bastion subnet name keep-as-is: Required name for Azure Bastion. ensure: within common_vnet_cidr.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:common_pbi_subnet_cidr --><!-- parameter json.dev:common_pbi_subnet_cidr --><code>common_pbi_subnet_cidr</code></td>
-<td><code>COMMON_PBI_SUBNET_CIDR</code></td>
-<td>M</td>
-<td>Y: <code>"172.16.XX.128/26"</code><br>J.dev: <code>"172.16.XX.128/26"</code></td>
-<td>Power BI gateway subnet CIDR mandatory: Power BI gateway subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:common_pbi_subnet_name --><!-- parameter json.dev:common_pbi_subnet_name --><code>common_pbi_subnet_name</code></td>
-<td><code>COMMON_PBI_SUBNET_NAME</code></td>
-<td>M</td>
-<td>Y: <code>"snet-esml-cmn-pbi-001"</code><br>J.dev: <code>"snet-esml-cmn-pbi-001"</code></td>
-<td>Power BI gateway subnet name mandatory: Power BI gateway subnet name ensure: within common_vnet_cidr.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:common_subnet_cidr --><!-- parameter json.dev:common_subnet_cidr --><code>common_subnet_cidr</code></td>
-<td><code>COMMON_SUBNET_CIDR</code></td>
-<td>M</td>
-<td>Y: <code>"172.16.XX.0/26"</code><br>J.dev: <code>"172.16.XX.0/26"</code></td>
-<td>Common subnet CIDR mandatory: Common subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:common_subnet_name --><!-- parameter json.dev:common_subnet_name --><code>common_subnet_name</code></td>
-<td><code>COMMON_SUBNET_NAME</code> (not in .env template), <code>SUBNET_COMMON_BASE</code></td>
-<td>O</td>
-<td>Y: <code>"snet-esml-cmn-001"</code><br>J.dev: <code>"snet-esml-cmn-001"</code></td>
-<td>Common subnet name</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:common_subnet_scoring_cidr --><!-- parameter json.dev:common_subnet_scoring_cidr --><code>common_subnet_scoring_cidr</code></td>
-<td><code>COMMON_SUBNET_SCORING_CIDR</code></td>
-<td>M</td>
-<td>Y: <code>"172.16.XX.64/26"</code><br>J.dev: <code>"172.16.XX.64/26"</code></td>
-<td>Scoring subnet CIDR mandatory: Scoring subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:common_vnet_cidr --><!-- parameter json.dev:common_vnet_cidr --><code>common_vnet_cidr</code></td>
-<td><code>COMMON_VNET_CIDR</code></td>
-<td>M</td>
-<td>Y: <code>"172.16.XX.0/18"</code><br>J.dev: <code>"172.16.XX.0/18"</code></td>
-<td>Common vNet CIDR mandatory: Common vNet CIDR keep-as-is: XX is the network-aligned per-environment octet; Dev/Stage/Prod must not overlap. Address intent only, not actual peering.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:dev_cidr_range --><!-- parameter json.dev:dev_cidr_range --><code>dev_cidr_range</code></td>
-<td><code>DEV_CIDR_RANGE</code></td>
-<td>M</td>
-<td>Y: <code>"0"</code><br>J.dev: <code>"0"</code></td>
-<td>DEV network-aligned XX value mandatory: DEV network-aligned XX value keep-as-is: VNet 172.16.0.0/18.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:disableAgentNetworkInjection --><!-- parameter json.dev:disableAgentNetworkInjection --><code>disableAgentNetworkInjection</code></td>
-<td><code>DISABLE_AGENT_NETWORK_INJECTION</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Disable agent network injection keep-as-is: false, requires Container Apps subnet in 172.16.0.0/12 or 192.168.0.0/16. otherwise: true, disables network injection.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:disableSubnetJoinAction --><!-- parameter json.dev:disableSubnetJoinAction --><code>disableSubnetJoinAction</code></td>
-<td><code>DISABLE_SUBNET_JOIN_ACTION</code></td>
-<td>O</td>
-<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Disable VNet subnet join RBAC recommended: false, grants Network Contributor role for subnet join actions (required for APIM, Container Apps, AKS). otherwise: true, skip if subnet permissions managed externally.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:enablePublicAccessWithPerimeter --><!-- parameter json.dev:enablePublicAccessWithPerimeter --><code>enablePublicAccessWithPerimeter</code></td>
-<td><code>ENABLE_PUBLIC_ACCESS_WITH_PERIMETER</code></td>
-<td>O</td>
-<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
-<td>Public access with network perimeter recommended: false to enable fully private networking.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:enablePublicGenAIAccess --><!-- parameter json.dev:enablePublicGenAIAccess --><code>enablePublicGenAIAccess</code></td>
-<td><code>ENABLE_PUBLIC_GENAI_ACCESS</code></td>
-<td>O</td>
-<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
-<td>Public GenAI access (control plane) recommended: false to enable fully private networking.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:kongGatewaySubnetCidr --><!-- parameter json.dev:kongGatewaySubnetCidr --><code>kongGatewaySubnetCidr</code></td>
-<td><code>KONG_GATEWAY_SUBNET_CIDR</code></td>
-<td>C</td>
-<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
-<td>Dedicated, unused /28 or larger subnet. Required by the separate AI gateway workflow when Kong is enabled; the consumer API key is an environment secret.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:kongGatewaySubnetName --><!-- parameter json.dev:kongGatewaySubnetName --><code>kongGatewaySubnetName</code></td>
-<td><code>KONG_GATEWAY_SUBNET_NAME</code></td>
-<td>O</td>
-<td>Y: <code>"snet-kong-001"</code><br>J.dev: <code>"snet-kong-001"</code></td>
-<td>Kong gateway subnet name.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:kongGatewayVnetName --><!-- parameter json.dev:kongGatewayVnetName --><code>kongGatewayVnetName</code></td>
-<td><code>KONG_GATEWAY_VNET_NAME</code></td>
-<td>C</td>
-<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
-<td>Kong gateway vnet name. Required by the separate AI gateway workflow when Kong is enabled; the consumer API key is an environment secret.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:kongGatewayVnetResourceGroup --><!-- parameter json.dev:kongGatewayVnetResourceGroup --><code>kongGatewayVnetResourceGroup</code></td>
-<td><code>KONG_GATEWAY_VNET_RESOURCE_GROUP</code></td>
-<td>C</td>
-<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
-<td>Kong gateway vnet resource group. Required by the separate AI gateway workflow when Kong is enabled; the consumer API key is an environment secret.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:network_env_dev --><!-- parameter json.dev:network_env_dev --><code>network_env_dev</code></td>
-<td><code>DEV_NETWORK_ENV</code></td>
-<td>O</td>
-<td>Y: <code>"dev-"</code><br>J.dev: <code>"dev-"</code></td>
-<td>DEV environment prefix for BYO subnets otherwise: set to empty string if not using environment-prefixed naming.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:network_env_prod --><!-- parameter json.dev:network_env_prod --><code>network_env_prod</code></td>
-<td><code>PROD_NETWORK_ENV</code></td>
-<td>O</td>
-<td>Y: <code>"prd-"</code><br>J.dev: <code>"prd-"</code></td>
-<td>PROD environment prefix for BYO subnets otherwise: "prod-", "pr-", or empty string.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:network_env_stage --><!-- parameter json.dev:network_env_stage --><code>network_env_stage</code></td>
-<td><code>STAGE_NETWORK_ENV</code></td>
-<td>O</td>
-<td>Y: <code>"tst2-"</code><br>J.dev: <code>"tst2-"</code></td>
-<td>STAGE environment prefix for BYO subnets otherwise: "test-", "tst-", or empty string.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:privDnsResourceGroup_param --><!-- parameter json.dev:privDnsResourceGroup_param --><code>privDnsResourceGroup_param</code></td>
-<td><code>PRIV_DNS_RESOURCE_GROUP_PARAM</code></td>
-<td>C</td>
-<td>Y: <code>"&lt;todo&gt;_ResourceGroup_name"</code><br>J.dev: <code>"&lt;todo&gt;_ResourceGroup_name"</code></td>
-<td>Hub DNS resource group mandatory: if centralDnsZoneByPolicyInHub:'true' ensure: Hub connectivity resource group where central private DNS zones are deployed.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:privDnsSubscription_param --><!-- parameter json.dev:privDnsSubscription_param --><code>privDnsSubscription_param</code></td>
-<td><code>PRIV_DNS_SUBSCRIPTION_PARAM</code></td>
-<td>C</td>
-<td>Y: <code>"&lt;todo&gt;_SubscriptionID"</code><br>J.dev: <code>"&lt;todo&gt;_SubscriptionID"</code></td>
-<td>Hub DNS subscription ID mandatory: if centralDnsZoneByPolicyInHub:'true' ensure: Hub connectivity subscription ID where central private DNS zones are deployed.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:prod_cidr_range --><!-- parameter json.dev:prod_cidr_range --><code>prod_cidr_range</code></td>
-<td><code>PROD_CIDR_RANGE</code></td>
-<td>M</td>
-<td>Y: <code>"128"</code><br>J.dev: <code>"128"</code></td>
-<td>PROD network-aligned XX value mandatory: PROD network-aligned XX value keep-as-is: VNet 172.16.128.0/18.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:project_IP_whitelist --><!-- parameter json.dev:project_IP_whitelist --><code>project_IP_whitelist</code></td>
-<td><code>PROJECT_IP_WHITELIST</code> (not in .env template), <code>PROJECT_MEMBERS_IP_ADDRESS</code></td>
-<td>C</td>
-<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
-<td>Project UI IP allowlist mandatory: if using IP-whitelisting networking mode ensure: comma-separated IPv4 addresses without spaces, e.g. "10.123.456.10,124.56.78.0/24".</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:runNetworkingVar --><!-- parameter json.dev:runNetworkingVar --><code>runNetworkingVar</code></td>
-<td><code>RUN_JOB1_NETWORKING</code></td>
-<td>M</td>
-<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
-<td>Run networking module mandatory: Run networking module keep-as-is: true when creating or updating a project. otherwise: false, to skip networking on service-only updates.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:scaling-mode --><!-- parameter json.dev:scaling-mode --><code>scaling-mode</code></td>
-<td><code>SCALING_MODE</code></td>
-<td>O</td>
-<td>Y: <code>"shared-subscriptions"</code><br>J.dev: <code>"shared-subscriptions"</code></td>
-<td>Address-planning preset: own-subscriptions or shared-subscriptions. Does not create subscriptions, resize networks, or establish peering.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:subnetCommon --><!-- parameter json.dev:subnetCommon --><code>subnetCommon</code></td>
-<td><code>SUBNET_COMMON</code></td>
-<td>C</td>
-<td>Y: <code>"snet-dev-esml-cmn-001"</code><br>J.dev: <code>"snet-dev-esml-cmn-001"</code></td>
-<td>BYO common subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists in your vNet.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:subnetCommonPowerbiGw --><!-- parameter json.dev:subnetCommonPowerbiGw --><code>subnetCommonPowerbiGw</code></td>
-<td><code>SUBNET_COMMON_POWERBI_GW</code></td>
-<td>C</td>
-<td>Y: <code>"snet-esml-cmn-pbi-001"</code><br>J.dev: <code>"snet-esml-cmn-pbi-001"</code></td>
-<td>BYO Power BI gateway subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:subnetCommonScoring --><!-- parameter json.dev:subnetCommonScoring --><code>subnetCommonScoring</code></td>
-<td><code>SUBNET_COMMON_SCORING</code></td>
-<td>C</td>
-<td>Y: <code>"snet-&lt;network_env&gt;esml-cmn-001-scoring"</code><br>J.dev: <code>"snet-&lt;network_env&gt;esml-cmn-001-scoring"</code></td>
-<td>BYO scoring subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:subnetProjACA --><!-- parameter json.dev:subnetProjACA --><code>subnetProjACA</code></td>
-<td><code>SUBNET_PROJ_ACA</code></td>
-<td>C</td>
-<td>Y: <code>"snt-prj&lt;xxx&gt;-aca"</code><br>J.dev: <code>"snt-prj&lt;xxx&gt;-aca"</code></td>
-<td>ContainerApps subnet. BYO project Container Apps subnet mandatory: if BYO_subnets:'true' ensure: subnet exists and CIDR is in 172.16.0.0/12 or 192.168.0.0/16 if disableAgentNetworkInjection:'false'.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:subnetProjACA2 --><!-- parameter json.dev:subnetProjACA2 --><code>subnetProjACA2</code></td>
-<td><code>SUBNET_PROJ_ACA2</code></td>
-<td>C</td>
-<td>Y: <code>"snt-prj&lt;xxx&gt;-aca-002"</code><br>J.dev: <code>"snt-prj&lt;xxx&gt;-aca-002"</code></td>
-<td>Agent subnet. BYO project secondary Container Apps subnet mandatory: if BYO_subnets:'true' AND enableAIFoundry:'true' AND disableAgentNetworkInjection is 'false'</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:subnetProjAKS --><!-- parameter json.dev:subnetProjAKS --><code>subnetProjAKS</code></td>
-<td><code>SUBNET_PROJ_AKS</code></td>
-<td>C</td>
-<td>Y: <code>"snt-prj&lt;xxx&gt;-aks"</code><br>J.dev: <code>"snt-prj&lt;xxx&gt;-aks"</code></td>
-<td>BYO project AKS subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:subnetProjAKS2 --><!-- parameter json.dev:subnetProjAKS2 --><code>subnetProjAKS2</code></td>
-<td><code>SUBNET_PROJ_AKS2</code></td>
-<td>C</td>
-<td>Y: <code>"snt-&lt;network_env&gt;prj&lt;xxx&gt;-aks2"</code><br>J.dev: <code>"snt-&lt;network_env&gt;prj&lt;xxx&gt;-aks2"</code></td>
-<td>BYO project secondary AKS subnet mandatory: if BYO_subnets:'true' ensure: subnet exists.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:subnetProjDatabricksPrivate --><!-- parameter json.dev:subnetProjDatabricksPrivate --><code>subnetProjDatabricksPrivate</code></td>
-<td><code>SUBNET_PROJ_DATABRICKS_PRIVATE</code>, <code>SUBNET_PROJ_DBX_PRIVATE</code> (not in .env template)</td>
-<td>C</td>
-<td>Y: <code>"snt-prj&lt;xxx&gt;-dbxpriv"</code><br>J.dev: <code>"snt-prj&lt;xxx&gt;-dbxpriv"</code></td>
-<td>BYO Databricks private subnet mandatory: if BYO_subnets:'true' and enableDatabricks:'true'.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:subnetProjDatabricksPublic --><!-- parameter json.dev:subnetProjDatabricksPublic --><code>subnetProjDatabricksPublic</code></td>
-<td><code>SUBNET_PROJ_DATABRICKS_PUBLIC</code>, <code>SUBNET_PROJ_DBX_PUBLIC</code> (not in .env template)</td>
-<td>C</td>
-<td>Y: <code>"snt-prj001-dbxpub"</code><br>J.dev: <code>"snt-prj001-dbxpub"</code></td>
-<td>BYO Databricks public subnet mandatory: if BYO_subnets:'true' and enableDatabricks:'true'.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:subnetProjGenAI --><!-- parameter json.dev:subnetProjGenAI --><code>subnetProjGenAI</code></td>
-<td><code>SUBNET_PROJ_GENAI</code></td>
-<td>C</td>
-<td>Y: <code>"snt-dev-prj&lt;xxx&gt;-genai"</code><br>J.dev: <code>"snt-dev-prj&lt;xxx&gt;-genai"</code></td>
-<td>BYO project GenAI subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:subnetProjWebapp --><!-- parameter json.dev:subnetProjWebapp --><code>subnetProjWebapp</code></td>
-<td><code>SUBNET_PROJ_WEBAPP</code></td>
-<td>C</td>
-<td>Y: <code>"snt-prj&lt;xxx&gt;-webapp"</code><br>J.dev: <code>"snt-prj&lt;xxx&gt;-webapp"</code></td>
-<td>App Service/Function VNet integration subnet (delegated to Microsoft.Web/serverFarms) mandatory: if BYO_subnets:'true' AND (enableWebApp:'true' OR enableFunction:'true') ensure: subnet exists.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:test_cidr_range --><!-- parameter json.dev:test_cidr_range --><code>test_cidr_range</code></td>
-<td><code>STAGE_CIDR_RANGE</code></td>
-<td>M</td>
-<td>Y: <code>"64"</code><br>J.dev: <code>"64"</code></td>
-<td>STAGE network-aligned XX value mandatory: STAGE network-aligned XX value keep-as-is: VNet 172.16.64.0/18.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:vnetNameBase --><!-- parameter json.dev:vnetNameBase --><code>vnetNameBase</code></td>
-<td><code>VNET_NAME_BASE</code></td>
-<td>O</td>
-<td>Y: <code>"vnt-esmlcmn"</code><br>J.dev: <code>"vnt-esmlcmn"</code></td>
-<td>Common vNet base name otherwise: ignored if vnetNameFull_param is set (BYOvNet).</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:vnetNameFull_param --><!-- parameter json.dev:vnetNameFull_param --><code>vnetNameFull_param</code></td>
-<td><code>VNET_NAME_FULL_PARAM</code></td>
-<td>O</td>
-<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
-<td>BYO vNet full name otherwise: provide the full name of your existing vNet.</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:vnetResourceGroupBase --><!-- parameter json.dev:vnetResourceGroupBase --><code>vnetResourceGroupBase</code></td>
-<td><code>VNET_RESOURCE_GROUP_BASE</code></td>
-<td>O</td>
-<td>Y: <code>"esml-common"</code><br>J.dev: <code>"esml-common"</code></td>
-<td>Common vNet resource group base otherwise: ignored if vnetResourceGroup_param is set (BYOvNet).</td>
-</tr>
-<tr>
-<td><!-- parameter yaml:vnetResourceGroup_param --><!-- parameter json.dev:vnetResourceGroup_param --><code>vnetResourceGroup_param</code></td>
-<td><code>VNET_RESOURCE_GROUP_PARAM</code></td>
-<td>O</td>
-<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
-<td>BYO vNet resource group otherwise: provide the full RG name of your existing vNet.</td>
-</tr>
-</tbody>
-</table>
 <h3 id="factory-project-naming-and-orchestration">Factory, project, naming and orchestration<a class="headerlink" href="#factory-project-naming-and-orchestration" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -3404,6 +3045,13 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><!-- parameter json.dev:AZURE_CLIENT_ID --><code>AZURE_CLIENT_ID</code></td>
+<td><code>AZURE_CLIENT_ID</code></td>
+<td>O</td>
+<td>Y: absent<br>J.dev: <code>""</code></td>
+<td>Preferred credentialless deployment identity: client ID of a federated app or user-assigned managed identity. When set, workflows use OIDC instead of AZURE_CREDENTIALS.</td>
+</tr>
 <tr>
 <td><!-- parameter json.dev:GITHUB_NEW_REPO --><code>GITHUB_NEW_REPO</code></td>
 <td><code>GITHUB_NEW_REPO</code></td>
@@ -3879,6 +3527,370 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>"3.11"</code><br>J.dev: <code>"3.11"</code></td>
 <td>Azure Web App runtime version</td>
+</tr>
+</tbody>
+</table>
+<h3 id="networking-dns-and-existing-resources">Networking, DNS and existing resources<a class="headerlink" href="#networking-dns-and-existing-resources" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>YAML / JSON key</th>
+<th>GHA binding(s)</th>
+<th>M/C/O</th>
+<th>Source defaults</th>
+<th>Description / conditions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><!-- parameter yaml:BYOContributorRoleID --><!-- parameter json.dev:BYOContributorRoleID --><code>BYOContributorRoleID</code></td>
+<td><code>BYO_CONTRIBUTOR_ROLE_ID</code></td>
+<td>O</td>
+<td>Y: <code>"b24988ac-6180-42a0-ab88-20f7382dd24c"</code><br>J.dev: <code>"b24988ac-6180-42a0-ab88-20f7382dd24c"</code></td>
+<td>Contributor role ID keep-as-is: Azure built-in Contributor. otherwise: provide a custom role ID for finer-grained access control.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:BYO_subnets --><!-- parameter json.dev:BYO_subnets --><code>BYO_subnets</code></td>
+<td><code>BYO_SUBNETS</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Bring your own subnets otherwise: true, uses pre-existing subnets defined by the BYO subnet variables below.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:acr_IP_whitelist --><!-- parameter json.dev:acr_IP_whitelist --><code>acr_IP_whitelist</code></td>
+<td><code>ACR_IP_WHITELIST</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>ACR IP allowlist otherwise: provide comma-separated IPv4 addresses if ACR network restrictions are needed.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:allowPublicAccessWhenBehindVnet --><!-- parameter json.dev:allowPublicAccessWhenBehindVnet --><code>allowPublicAccessWhenBehindVnet</code></td>
+<td><code>ALLOW_PUBLIC_ACCESS_WHEN_BEHIND_VNET</code> (not in .env template)</td>
+<td>O</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Public UI access when behind vNet recommended: false to enable fully private networking.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:byoASEv3 --><!-- parameter json.dev:byoASEv3 --><code>byoASEv3</code></td>
+<td><code>BYO_ASEV3</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Use BYO App Service Environment v3 otherwise: true, use an existing ASEv3 specified in byoAseFullResourceId.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:byoAseAppServicePlanResourceId --><!-- parameter json.dev:byoAseAppServicePlanResourceId --><code>byoAseAppServicePlanResourceId</code></td>
+<td><code>BYO_ASE_APP_SERVICE_PLAN_RESOURCE_ID</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>BYO App Service Plan resource ID otherwise: provide full ARM resource ID of an existing App Service Plan within the ASEv3.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:byoAseFullResourceId --><!-- parameter json.dev:byoAseFullResourceId --><code>byoAseFullResourceId</code></td>
+<td><code>BYO_ASE_FULL_RESOURCE_ID</code></td>
+<td>C</td>
+<td>Y: <code>"subscriptions/...yourASEnameS2"</code><br>J.dev: <code>"subscriptions/...yourASEnameS2"</code></td>
+<td>BYO ASEv3 ARM resource ID. Note - remove leading slash / in Resource ID mandatory: if byoASEv3:'true' ensure: full ARM resource ID of the existing ASEv3.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:centralDnsZoneByPolicyInHub --><!-- parameter json.dev:centralDnsZoneByPolicyInHub --><code>centralDnsZoneByPolicyInHub</code></td>
+<td><code>CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>false</code></td>
+<td>Centralized DNS via Hub policy otherwise: true, uses central private DNS zones in HUB resource group managed by Azure Policy.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:common_bastion_subnet_cidr --><!-- parameter json.dev:common_bastion_subnet_cidr --><code>common_bastion_subnet_cidr</code></td>
+<td><code>COMMON_BASTION_SUBNET_CIDR</code></td>
+<td>M</td>
+<td>Y: <code>"172.16.XX.192/26"</code><br>J.dev: <code>"172.16.XX.192/26"</code></td>
+<td>Bastion subnet CIDR mandatory: Bastion subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:common_bastion_subnet_name --><!-- parameter json.dev:common_bastion_subnet_name --><code>common_bastion_subnet_name</code></td>
+<td><code>COMMON_BASTION_SUBNET_NAME</code></td>
+<td>M</td>
+<td>Y: <code>"AzureBastionSubnet"</code><br>J.dev: <code>"AzureBastionSubnet"</code></td>
+<td>Bastion subnet name mandatory: Bastion subnet name keep-as-is: Required name for Azure Bastion. ensure: within common_vnet_cidr.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:common_pbi_subnet_cidr --><!-- parameter json.dev:common_pbi_subnet_cidr --><code>common_pbi_subnet_cidr</code></td>
+<td><code>COMMON_PBI_SUBNET_CIDR</code></td>
+<td>M</td>
+<td>Y: <code>"172.16.XX.128/26"</code><br>J.dev: <code>"172.16.XX.128/26"</code></td>
+<td>Power BI gateway subnet CIDR mandatory: Power BI gateway subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:common_pbi_subnet_name --><!-- parameter json.dev:common_pbi_subnet_name --><code>common_pbi_subnet_name</code></td>
+<td><code>COMMON_PBI_SUBNET_NAME</code></td>
+<td>M</td>
+<td>Y: <code>"snet-esml-cmn-pbi-001"</code><br>J.dev: <code>"snet-esml-cmn-pbi-001"</code></td>
+<td>Power BI gateway subnet name mandatory: Power BI gateway subnet name ensure: within common_vnet_cidr.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:common_subnet_cidr --><!-- parameter json.dev:common_subnet_cidr --><code>common_subnet_cidr</code></td>
+<td><code>COMMON_SUBNET_CIDR</code></td>
+<td>M</td>
+<td>Y: <code>"172.16.XX.0/26"</code><br>J.dev: <code>"172.16.XX.0/26"</code></td>
+<td>Common subnet CIDR mandatory: Common subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:common_subnet_name --><!-- parameter json.dev:common_subnet_name --><code>common_subnet_name</code></td>
+<td><code>COMMON_SUBNET_NAME</code> (not in .env template), <code>SUBNET_COMMON_BASE</code></td>
+<td>O</td>
+<td>Y: <code>"snet-esml-cmn-001"</code><br>J.dev: <code>"snet-esml-cmn-001"</code></td>
+<td>Common subnet name</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:common_subnet_scoring_cidr --><!-- parameter json.dev:common_subnet_scoring_cidr --><code>common_subnet_scoring_cidr</code></td>
+<td><code>COMMON_SUBNET_SCORING_CIDR</code></td>
+<td>M</td>
+<td>Y: <code>"172.16.XX.64/26"</code><br>J.dev: <code>"172.16.XX.64/26"</code></td>
+<td>Scoring subnet CIDR mandatory: Scoring subnet CIDR keep-as-is: XX replaced by the selected environment range. ensure: within common_vnet_cidr.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:common_vnet_cidr --><!-- parameter json.dev:common_vnet_cidr --><code>common_vnet_cidr</code></td>
+<td><code>COMMON_VNET_CIDR</code></td>
+<td>M</td>
+<td>Y: <code>"172.16.XX.0/18"</code><br>J.dev: <code>"172.16.XX.0/18"</code></td>
+<td>Common vNet CIDR mandatory: Common vNet CIDR keep-as-is: XX is the network-aligned per-environment octet; Dev/Stage/Prod must not overlap. Address intent only, not actual peering.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:dev_cidr_range --><!-- parameter json.dev:dev_cidr_range --><code>dev_cidr_range</code></td>
+<td><code>DEV_CIDR_RANGE</code></td>
+<td>M</td>
+<td>Y: <code>"0"</code><br>J.dev: <code>"0"</code></td>
+<td>DEV network-aligned XX value mandatory: DEV network-aligned XX value keep-as-is: VNet 172.16.0.0/18.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:disableAgentNetworkInjection --><!-- parameter json.dev:disableAgentNetworkInjection --><code>disableAgentNetworkInjection</code></td>
+<td><code>DISABLE_AGENT_NETWORK_INJECTION</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Disable agent network injection keep-as-is: false, requires Container Apps subnet in 172.16.0.0/12 or 192.168.0.0/16. otherwise: true, disables network injection.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:disableSubnetJoinAction --><!-- parameter json.dev:disableSubnetJoinAction --><code>disableSubnetJoinAction</code></td>
+<td><code>DISABLE_SUBNET_JOIN_ACTION</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Disable VNet subnet join RBAC recommended: false, grants Network Contributor role for subnet join actions (required for APIM, Container Apps, AKS). otherwise: true, skip if subnet permissions managed externally.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:enablePublicAccessWithPerimeter --><!-- parameter json.dev:enablePublicAccessWithPerimeter --><code>enablePublicAccessWithPerimeter</code></td>
+<td><code>ENABLE_PUBLIC_ACCESS_WITH_PERIMETER</code></td>
+<td>O</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Public access with network perimeter recommended: false to enable fully private networking.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:enablePublicGenAIAccess --><!-- parameter json.dev:enablePublicGenAIAccess --><code>enablePublicGenAIAccess</code></td>
+<td><code>ENABLE_PUBLIC_GENAI_ACCESS</code></td>
+<td>O</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Public GenAI access (control plane) recommended: false to enable fully private networking.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:kongGatewaySubnetCidr --><!-- parameter json.dev:kongGatewaySubnetCidr --><code>kongGatewaySubnetCidr</code></td>
+<td><code>KONG_GATEWAY_SUBNET_CIDR</code></td>
+<td>C</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Dedicated, unused /28 or larger subnet. Required by the separate AI gateway workflow when Kong is enabled; the consumer API key is an environment secret.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:kongGatewaySubnetName --><!-- parameter json.dev:kongGatewaySubnetName --><code>kongGatewaySubnetName</code></td>
+<td><code>KONG_GATEWAY_SUBNET_NAME</code></td>
+<td>O</td>
+<td>Y: <code>"snet-kong-001"</code><br>J.dev: <code>"snet-kong-001"</code></td>
+<td>Kong gateway subnet name.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:kongGatewayVnetName --><!-- parameter json.dev:kongGatewayVnetName --><code>kongGatewayVnetName</code></td>
+<td><code>KONG_GATEWAY_VNET_NAME</code></td>
+<td>C</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Kong gateway vnet name. Required by the separate AI gateway workflow when Kong is enabled; the consumer API key is an environment secret.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:kongGatewayVnetResourceGroup --><!-- parameter json.dev:kongGatewayVnetResourceGroup --><code>kongGatewayVnetResourceGroup</code></td>
+<td><code>KONG_GATEWAY_VNET_RESOURCE_GROUP</code></td>
+<td>C</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Kong gateway vnet resource group. Required by the separate AI gateway workflow when Kong is enabled; the consumer API key is an environment secret.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:network_env_dev --><!-- parameter json.dev:network_env_dev --><code>network_env_dev</code></td>
+<td><code>DEV_NETWORK_ENV</code></td>
+<td>O</td>
+<td>Y: <code>"dev-"</code><br>J.dev: <code>"dev-"</code></td>
+<td>DEV environment prefix for BYO subnets otherwise: set to empty string if not using environment-prefixed naming.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:network_env_prod --><!-- parameter json.dev:network_env_prod --><code>network_env_prod</code></td>
+<td><code>PROD_NETWORK_ENV</code></td>
+<td>O</td>
+<td>Y: <code>"prd-"</code><br>J.dev: <code>"prd-"</code></td>
+<td>PROD environment prefix for BYO subnets otherwise: "prod-", "pr-", or empty string.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:network_env_stage --><!-- parameter json.dev:network_env_stage --><code>network_env_stage</code></td>
+<td><code>STAGE_NETWORK_ENV</code></td>
+<td>O</td>
+<td>Y: <code>"tst2-"</code><br>J.dev: <code>"tst2-"</code></td>
+<td>STAGE environment prefix for BYO subnets otherwise: "test-", "tst-", or empty string.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:privDnsResourceGroup_param --><!-- parameter json.dev:privDnsResourceGroup_param --><code>privDnsResourceGroup_param</code></td>
+<td><code>PRIV_DNS_RESOURCE_GROUP_PARAM</code></td>
+<td>C</td>
+<td>Y: <code>"&lt;todo&gt;_ResourceGroup_name"</code><br>J.dev: <code>"&lt;todo&gt;_ResourceGroup_name"</code></td>
+<td>Hub DNS resource group mandatory: if centralDnsZoneByPolicyInHub:'true' ensure: Hub connectivity resource group where central private DNS zones are deployed.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:privDnsSubscription_param --><!-- parameter json.dev:privDnsSubscription_param --><code>privDnsSubscription_param</code></td>
+<td><code>PRIV_DNS_SUBSCRIPTION_PARAM</code></td>
+<td>C</td>
+<td>Y: <code>"&lt;todo&gt;_SubscriptionID"</code><br>J.dev: <code>"&lt;todo&gt;_SubscriptionID"</code></td>
+<td>Hub DNS subscription ID mandatory: if centralDnsZoneByPolicyInHub:'true' ensure: Hub connectivity subscription ID where central private DNS zones are deployed.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:prod_cidr_range --><!-- parameter json.dev:prod_cidr_range --><code>prod_cidr_range</code></td>
+<td><code>PROD_CIDR_RANGE</code></td>
+<td>M</td>
+<td>Y: <code>"128"</code><br>J.dev: <code>"128"</code></td>
+<td>PROD network-aligned XX value mandatory: PROD network-aligned XX value keep-as-is: VNet 172.16.128.0/18.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:project_IP_whitelist --><!-- parameter json.dev:project_IP_whitelist --><code>project_IP_whitelist</code></td>
+<td><code>PROJECT_IP_WHITELIST</code> (not in .env template), <code>PROJECT_MEMBERS_IP_ADDRESS</code></td>
+<td>C</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Project UI IP allowlist mandatory: if using IP-whitelisting networking mode ensure: comma-separated IPv4 addresses without spaces, e.g. "10.123.456.10,124.56.78.0/24".</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:runNetworkingVar --><!-- parameter json.dev:runNetworkingVar --><code>runNetworkingVar</code></td>
+<td><code>RUN_JOB1_NETWORKING</code></td>
+<td>M</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Run networking module mandatory: Run networking module keep-as-is: true when creating or updating a project. otherwise: false, to skip networking on service-only updates.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:scaling-mode --><!-- parameter json.dev:scaling-mode --><code>scaling-mode</code></td>
+<td><code>SCALING_MODE</code></td>
+<td>O</td>
+<td>Y: <code>"shared-subscriptions"</code><br>J.dev: <code>"shared-subscriptions"</code></td>
+<td>Address-planning preset: own-subscriptions or shared-subscriptions. Does not create subscriptions, resize networks, or establish peering.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:subnetCommon --><!-- parameter json.dev:subnetCommon --><code>subnetCommon</code></td>
+<td><code>SUBNET_COMMON</code></td>
+<td>C</td>
+<td>Y: <code>"snet-dev-esml-cmn-001"</code><br>J.dev: <code>"snet-dev-esml-cmn-001"</code></td>
+<td>BYO common subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists in your vNet.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:subnetCommonPowerbiGw --><!-- parameter json.dev:subnetCommonPowerbiGw --><code>subnetCommonPowerbiGw</code></td>
+<td><code>SUBNET_COMMON_POWERBI_GW</code></td>
+<td>C</td>
+<td>Y: <code>"snet-esml-cmn-pbi-001"</code><br>J.dev: <code>"snet-esml-cmn-pbi-001"</code></td>
+<td>BYO Power BI gateway subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:subnetCommonScoring --><!-- parameter json.dev:subnetCommonScoring --><code>subnetCommonScoring</code></td>
+<td><code>SUBNET_COMMON_SCORING</code></td>
+<td>C</td>
+<td>Y: <code>"snet-&lt;network_env&gt;esml-cmn-001-scoring"</code><br>J.dev: <code>"snet-&lt;network_env&gt;esml-cmn-001-scoring"</code></td>
+<td>BYO scoring subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:subnetProjACA --><!-- parameter json.dev:subnetProjACA --><code>subnetProjACA</code></td>
+<td><code>SUBNET_PROJ_ACA</code></td>
+<td>C</td>
+<td>Y: <code>"snt-prj&lt;xxx&gt;-aca"</code><br>J.dev: <code>"snt-prj&lt;xxx&gt;-aca"</code></td>
+<td>ContainerApps subnet. BYO project Container Apps subnet mandatory: if BYO_subnets:'true' ensure: subnet exists and CIDR is in 172.16.0.0/12 or 192.168.0.0/16 if disableAgentNetworkInjection:'false'.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:subnetProjACA2 --><!-- parameter json.dev:subnetProjACA2 --><code>subnetProjACA2</code></td>
+<td><code>SUBNET_PROJ_ACA2</code></td>
+<td>C</td>
+<td>Y: <code>"snt-prj&lt;xxx&gt;-aca-002"</code><br>J.dev: <code>"snt-prj&lt;xxx&gt;-aca-002"</code></td>
+<td>Agent subnet. BYO project secondary Container Apps subnet mandatory: if BYO_subnets:'true' AND enableAIFoundry:'true' AND disableAgentNetworkInjection is 'false'</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:subnetProjAKS --><!-- parameter json.dev:subnetProjAKS --><code>subnetProjAKS</code></td>
+<td><code>SUBNET_PROJ_AKS</code></td>
+<td>C</td>
+<td>Y: <code>"snt-prj&lt;xxx&gt;-aks"</code><br>J.dev: <code>"snt-prj&lt;xxx&gt;-aks"</code></td>
+<td>BYO project AKS subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:subnetProjAKS2 --><!-- parameter json.dev:subnetProjAKS2 --><code>subnetProjAKS2</code></td>
+<td><code>SUBNET_PROJ_AKS2</code></td>
+<td>C</td>
+<td>Y: <code>"snt-&lt;network_env&gt;prj&lt;xxx&gt;-aks2"</code><br>J.dev: <code>"snt-&lt;network_env&gt;prj&lt;xxx&gt;-aks2"</code></td>
+<td>BYO project secondary AKS subnet mandatory: if BYO_subnets:'true' ensure: subnet exists.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:subnetProjDatabricksPrivate --><!-- parameter json.dev:subnetProjDatabricksPrivate --><code>subnetProjDatabricksPrivate</code></td>
+<td><code>SUBNET_PROJ_DATABRICKS_PRIVATE</code>, <code>SUBNET_PROJ_DBX_PRIVATE</code> (not in .env template)</td>
+<td>C</td>
+<td>Y: <code>"snt-prj&lt;xxx&gt;-dbxpriv"</code><br>J.dev: <code>"snt-prj&lt;xxx&gt;-dbxpriv"</code></td>
+<td>BYO Databricks private subnet mandatory: if BYO_subnets:'true' and enableDatabricks:'true'.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:subnetProjDatabricksPublic --><!-- parameter json.dev:subnetProjDatabricksPublic --><code>subnetProjDatabricksPublic</code></td>
+<td><code>SUBNET_PROJ_DATABRICKS_PUBLIC</code>, <code>SUBNET_PROJ_DBX_PUBLIC</code> (not in .env template)</td>
+<td>C</td>
+<td>Y: <code>"snt-prj001-dbxpub"</code><br>J.dev: <code>"snt-prj001-dbxpub"</code></td>
+<td>BYO Databricks public subnet mandatory: if BYO_subnets:'true' and enableDatabricks:'true'.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:subnetProjGenAI --><!-- parameter json.dev:subnetProjGenAI --><code>subnetProjGenAI</code></td>
+<td><code>SUBNET_PROJ_GENAI</code></td>
+<td>C</td>
+<td>Y: <code>"snt-dev-prj&lt;xxx&gt;-genai"</code><br>J.dev: <code>"snt-dev-prj&lt;xxx&gt;-genai"</code></td>
+<td>BYO project GenAI subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:subnetProjWebapp --><!-- parameter json.dev:subnetProjWebapp --><code>subnetProjWebapp</code></td>
+<td><code>SUBNET_PROJ_WEBAPP</code></td>
+<td>C</td>
+<td>Y: <code>"snt-prj&lt;xxx&gt;-webapp"</code><br>J.dev: <code>"snt-prj&lt;xxx&gt;-webapp"</code></td>
+<td>App Service/Function VNet integration subnet (delegated to Microsoft.Web/serverFarms) mandatory: if BYO_subnets:'true' AND (enableWebApp:'true' OR enableFunction:'true') ensure: subnet exists.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:test_cidr_range --><!-- parameter json.dev:test_cidr_range --><code>test_cidr_range</code></td>
+<td><code>STAGE_CIDR_RANGE</code></td>
+<td>M</td>
+<td>Y: <code>"64"</code><br>J.dev: <code>"64"</code></td>
+<td>STAGE network-aligned XX value mandatory: STAGE network-aligned XX value keep-as-is: VNet 172.16.64.0/18.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:vnetNameBase --><!-- parameter json.dev:vnetNameBase --><code>vnetNameBase</code></td>
+<td><code>VNET_NAME_BASE</code></td>
+<td>O</td>
+<td>Y: <code>"vnt-esmlcmn"</code><br>J.dev: <code>"vnt-esmlcmn"</code></td>
+<td>Common vNet base name otherwise: ignored if vnetNameFull_param is set (BYOvNet).</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:vnetNameFull_param --><!-- parameter json.dev:vnetNameFull_param --><code>vnetNameFull_param</code></td>
+<td><code>VNET_NAME_FULL_PARAM</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>BYO vNet full name otherwise: provide the full name of your existing vNet.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:vnetResourceGroupBase --><!-- parameter json.dev:vnetResourceGroupBase --><code>vnetResourceGroupBase</code></td>
+<td><code>VNET_RESOURCE_GROUP_BASE</code></td>
+<td>O</td>
+<td>Y: <code>"esml-common"</code><br>J.dev: <code>"esml-common"</code></td>
+<td>Common vNet resource group base otherwise: ignored if vnetResourceGroup_param is set (BYOvNet).</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:vnetResourceGroup_param --><!-- parameter json.dev:vnetResourceGroup_param --><code>vnetResourceGroup_param</code></td>
+<td><code>VNET_RESOURCE_GROUP_PARAM</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>BYO vNet resource group otherwise: provide the full RG name of your existing vNet.</td>
 </tr>
 </tbody>
 </table>
@@ -5186,7 +5198,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter env:AZURE_CLIENT_ID --><code>AZURE_CLIENT_ID</code></td>
-<td>No verified counterpart</td>
+<td><code>AZURE_CLIENT_ID</code></td>
 <td>O</td>
 <td><code>""</code></td>
 <td>Preferred credentialless deployment identity: client ID of a federated app or user-assigned managed identity. When set, workflows use OIDC instead of AZURE_CREDENTIALS.</td>
@@ -7840,6 +7852,12 @@ reported, not silently represented as multiple settings.</p>
 <td>Aif prepare only override; see create launcher.</td>
 </tr>
 <tr>
+<td><!-- parameter bootstrap:AIF_PROD_SUBSCRIPTION_ID --><code>AIF_PROD_SUBSCRIPTION_ID</code></td>
+<td>O</td>
+<td><code>"$AIF_DEV_SUBSCRIPTION_ID"</code></td>
+<td>Aif prod subscription id override; see create launcher.</td>
+</tr>
+<tr>
 <td><!-- parameter bootstrap:AIF_PROJECT_NUMBER --><code>AIF_PROJECT_NUMBER</code></td>
 <td>O</td>
 <td><code>"001"</code></td>
@@ -7904,6 +7922,12 @@ reported, not silently represented as multiple settings.</p>
 <td>C</td>
 <td><code>""</code></td>
 <td>Existing service-principal client secret</td>
+</tr>
+<tr>
+<td><!-- parameter bootstrap:AIF_STAGE_SUBSCRIPTION_ID --><code>AIF_STAGE_SUBSCRIPTION_ID</code></td>
+<td>O</td>
+<td><code>"$AIF_DEV_SUBSCRIPTION_ID"</code></td>
+<td>Aif stage subscription id override; see create launcher.</td>
 </tr>
 <tr>
 <td><!-- parameter bootstrap:AIF_SUBMODULE_BRANCH --><code>AIF_SUBMODULE_BRANCH</code></td>
