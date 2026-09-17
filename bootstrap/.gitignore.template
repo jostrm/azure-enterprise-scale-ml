@@ -33,6 +33,8 @@ lib/
 !/lib/runner-prerequisites.sh
 !/lib/runner-registration.ps1
 !/lib/runner-registration.sh
+!/lib/runner_bootstrap.py
+!/lib/runner-only-registration.sh
 !ui/
 ui/*
 !ui/terminal.sh

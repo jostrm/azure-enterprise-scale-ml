@@ -104,6 +104,8 @@ def arm(request, url, body=None):
 
 def showback(request):
     scope = request["scope"]
+    if str(scope.get("resource_group", "")).casefold() == "all":
+        raise ValueError("All is a scope filter, never an Azure resource-group identifier.")
     end = datetime.fromisoformat(scope["window_end"]) - timedelta(seconds=1)
     url = (f"https://management.azure.com/subscriptions/{scope['subscription_id']}/resourceGroups/"
            f"{scope['resource_group']}/providers/Microsoft.CostManagement/query?api-version=2023-03-01")
@@ -147,6 +149,10 @@ def showback(request):
         **{key: scope[key] for key in ("subscription_id", "resource_group", "workspace_id", "window_start", "window_end")},
         "generated_at": datetime.now(timezone.utc).isoformat(), "daily": rows,
         "currency": next(iter(currencies), None),
+        "dataSource": "Cost Management",
+        "lineage": {"formula": "Sum daily observed PreTaxCost/Cost at the exact reviewed resource-group scope; no forecast or estimate",
+                    "inputs": {"subscriptionId": scope["subscription_id"], "resourceGroup": scope["resource_group"],
+                               "windowStart": scope["window_start"], "windowEnd": scope["window_end"], "costBasis": "ActualCost"}},
         "warnings": ["selected_project_cost_only", "cost_data_lag", *([] if rows else ["no_data"])],
     }
 

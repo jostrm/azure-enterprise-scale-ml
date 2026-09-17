@@ -5,6 +5,10 @@
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "${1:-}" in
+runner)
+  source "$root/lib/layout_router.sh"
+  aif_route_runner gha "$root" "$@"
+  ;;
 enroll)
   source "$root/lib/layout_router.sh"
   aif_route_enrollment gha "$root" "$@"
@@ -20,6 +24,8 @@ legacy-create|legacy-update)
   ;;
 --help|-h|"")
   printf '%s\n' 'Usage: GHA-azurefactory.sh inspect|execute --protected-manifest <reviewed.dpapi> [execution options]' \
+    '       GHA-azurefactory.sh runner plan|ensure --consumer-root <repo> --config-source <variables.yaml|variables.yml|variables.json|.env> [--factory-id <uuid> --scale-set-id <uuid>] [--environment dev|stage|prod] [--yes]' \
+    '       runner defaults to dev and Linux; see runner --help. ensure requires --yes; --prereqs-only never registers an agent.' \
     '       GHA-azurefactory.sh enroll plan|ensure --consumer-root <repo> --factory-id <uuid> --scale-set-id <uuid> --environment dev|stage|prod --options <nonsecret.json> [--acknowledge-exclusive-writer-governance]' \
     '       enroll ensure additionally requires --expected-plan <plan_hash> --yes. See enroll plan --help.' \
     '       GHA-azurefactory.sh legacy-create|legacy-update [legacy launcher options]' \

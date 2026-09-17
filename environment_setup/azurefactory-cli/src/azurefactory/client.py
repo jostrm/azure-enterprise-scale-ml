@@ -273,8 +273,13 @@ class AzureFactoryClient:
     def creation_capabilities(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/api/v1/creation/capabilities"), "creation capabilities")
 
-    def bootstrap_config(self, state: dict[str, Any]) -> dict[str, Any]:
-        return self._object(self.request("POST", "/api/v1/creation/bootstrap/config", body={"state": state}), "bootstrap config")
+    def bootstrap_config(self, state: dict[str, Any], *, mapping_mode: str = "strict") -> dict[str, Any]:
+        if mapping_mode not in ("strict", "common-details"):
+            raise ConfigError("Choose strict or common-details mapping.")
+        body = {"state": state}
+        if mapping_mode != "strict":
+            body["mapping_mode"] = mapping_mode
+        return self._object(self.request("POST", "/api/v1/creation/bootstrap/config", body=body), "bootstrap config")
 
     def bootstrap_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
         return self._object(self.request("POST", "/api/v1/creation/bootstrap/prepare", body=body), "bootstrap prepare")

@@ -104,6 +104,33 @@ def state() -> dict[str, object]:
 
 
 class TestScaleSetConfiguration(unittest.TestCase):
+    def test_runner_vm_os_controls_only_legacy_admin_vm_creation(self) -> None:
+        values = state()
+        values["add_bastion"] = "false"
+        self.assertEqual(CONFIG.common_values(values)["enableAdminVM"], "true")
+        for os_type, expected in (("windows", "true"), ("linux", "false")):
+            values["runner_vm_os"] = os_type
+            config = CONFIG.common_values(values)
+            self.assertEqual(config["enableAdminVM"], expected)
+            self.assertEqual(config["useSelfHostedBuildAgent"], "true")
+
+    def test_github_runner_defaults_and_registration_metadata_are_saved(self) -> None:
+        with tempfile.TemporaryDirectory(prefix=".runner-config-", dir=ROOT) as directory:
+            root = Path(directory)
+            (root / "aifactory").mkdir()
+            (root / "aifactory/variables.json").write_text('{"dev": {}}', encoding="utf-8")
+            (root / ".env").write_text("", encoding="utf-8")
+            values = dict(state(), add_bastion="false", github_runner_name="selected-agent",
+                          github_runner_label="selected-label")
+            CONFIG.apply_gha(root, values)
+            document = json.loads((root / "aifactory/variables.json").read_text())
+            self.assertEqual(document["dev"]["enableAdminVM"], "false")
+            self.assertEqual(document["dev"]["useSelfHostedBuildAgent"], "true")
+            self.assertEqual(document["dev"]["selfHostedRunnerLabel"], "selected-label")
+            env = (root / ".env").read_text()
+            self.assertIn('GHA_RUNNER_NAME="selected-agent"', env)
+            self.assertIn('GHA_RUNNER_LABEL="selected-label"', env)
+
     def test_create_launcher_defaults_omitted_version_to_124(self) -> None:
         source = (
             BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"

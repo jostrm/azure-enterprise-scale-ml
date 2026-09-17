@@ -1,0 +1,36 @@
+{
+  "contract": "aifactory.monitoring-observations.v1",
+  "source": "sample",
+  "rows": [
+    {
+      "source": "sample",
+      "factory": "factory-a", "scaleset": "001", "project": "001", "environment": "dev", "agent_id": "claims",
+      "timestamp": "2026-09-01T12:00:00Z",
+      "completed_outcomes": 10, "baseline_minutes_per_outcome": 12, "actual_minutes_per_outcome": 3,
+      "outcome_quality_passed": true,
+      "actual_cost": 20, "amortized_cost": 18, "currency": "USD",
+      "security_checks": 5, "security_findings": 2,
+      "provenance": {
+        "completed_outcomes": {"data_source": "Application Insights", "reference": "sample-completed-outcomes"},
+        "baseline_minutes_per_outcome": {"data_source": "Approved baseline input", "reference": "sample-baseline"},
+        "actual_minutes_per_outcome": {"data_source": "Application Insights", "reference": "sample-actual-duration"},
+        "actual_cost": {"data_source": "Cost Management", "reference": "sample-actual-cost"},
+        "amortized_cost": {"data_source": "Cost Management", "reference": "sample-amortized-cost"},
+        "security_checks": {"data_source": "Recorded control evaluation", "reference": "sample-security-checks"},
+        "security_findings": {"data_source": "Recorded control evaluation", "reference": "sample-security-findings"}
+      }
+    },
+    {
+      "source": "sample",
+      "factory": "factory-a", "scaleset": "001", "project": "002", "environment": "dev", "agent_id": "claims",
+      "timestamp": "2026-09-01T12:00:00Z", "actual_cost": 200, "currency": "USD",
+      "provenance": {"actual_cost": {"data_source": "Cost Management", "reference": "sample-other-project"}}
+    },
+    {
+      "source": "sample",
+      "factory": "factory-b", "scaleset": "002", "project": "001", "environment": "dev", "agent_id": "claims",
+      "timestamp": "2026-09-01T12:00:00Z", "actual_cost": 400, "currency": "USD",
+      "provenance": {"actual_cost": {"data_source": "Cost Management", "reference": "sample-other-factory-scaleset"}}
+    }
+  ]
+}

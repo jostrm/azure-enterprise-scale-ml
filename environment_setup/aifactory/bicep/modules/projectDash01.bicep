@@ -266,7 +266,7 @@ var mandatoryServicesMarkdown = '- ${join(mandatoryServices, '\n- ')}'
 
 // Portal deep links
 var aiFoundryProjectUrl    = 'https://ai.azure.com/build/overview?tid=${tenant().tenantId}&wsid=${foundryAccountResId}/projects/${aifV2ProjectName}'
-var costAnalysisUrl        = 'https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${replace(rgResourceId, '/', '%2F')}'
+var costAnalysisUrl        = 'https://portal.azure.com/@${tenant().tenantId}/#blade/Microsoft_Azure_CostManagement/Menu/open/costanalysis/scope/${uriComponent(rgResourceId)}'
 var rgPortalUrl            = 'https://portal.azure.com/#@${tenant().tenantId}/resource${rgResourceId}'
 
 // ============================================================================
@@ -332,7 +332,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
               settings: {
                 content: {
                   settings: {
-                    content: '## 💰 Cost Analysis\n\nDetailed cost breakdown and trends for **${targetResourceGroup}**.\n\n**Quick Links:**\n- [📊 Open Cost Analysis](${costAnalysisUrl})\n- [🔔 Cost Alerts](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${replace(rgResourceId, '/', '%2F')}/alerts)\n- [💵 Budgets](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/budgets/scope/${replace(rgResourceId, '/', '%2F')})\n- [🧠 Azure Advisor — Cost Recommendations](https://portal.azure.com/#blade/Microsoft_Azure_Expert/AdvisorMenuBlade/Cost)\n\n---\n\n### 💡 Optimization Tips\n- Review **Azure Advisor** for right-sizing recommendations\n- Set **budget alerts** to monitor monthly spend\n- Identify and stop **idle compute / storage**\n- Use the **AzqrCostOptimizeAgent** skill for a full audit'
+                    content: '## 💰 Cost Analysis\n\nDetailed cost breakdown and trends for **${targetResourceGroup}**.\n\n**Data source:** Azure Cost Management. **Calculation:** none in this dashboard; the scoped Cost analysis view controls actual/amortized basis, period and currency. Estimates are not billed actuals. Missing cost data is unavailable, not zero.\n\n**Quick Links:**\n- [📊 Open Cost Analysis](${costAnalysisUrl} "Go to Azure Cost analysis for project ${projectNumber}")\n- [🔔 Cost Alerts](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${replace(rgResourceId, '/', '%2F')}/alerts)\n- [💵 Budgets](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/budgets/scope/${replace(rgResourceId, '/', '%2F')})\n- [🧠 Azure Advisor — Cost Recommendations](https://portal.azure.com/#blade/Microsoft_Azure_Expert/AdvisorMenuBlade/Cost)\n\n---\n\n### 💡 Optimization Tips\n- Review **Azure Advisor** for right-sizing recommendations\n- Set **budget alerts** to monitor monthly spend\n- Identify and stop **idle compute / storage**\n- Use the **AzqrCostOptimizeAgent** skill for a full audit'
                     title: ''
                     subtitle: ''
                     markdownSource: 1

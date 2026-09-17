@@ -68,7 +68,7 @@ def plan(folder, report_type, project_number, environment, days, compute="local"
     config_path = (root / SCRIPTS[report_type]).with_name("report-config.json")
     config = json.loads(config_path.read_text(encoding="utf-8-sig")) if config_path.exists() else {}
     naming = config.get("naming", {}).copy()
-    naming.update(projectNumber=str(project_number), env=environment)
+    naming.update(projectNumber="" if str(project_number).casefold() == "all" else str(project_number), env=environment)
     config["naming"] = naming
     return {
         "version": 1, "action": "run", "compute": compute, "report_type": report_type,
@@ -78,6 +78,7 @@ def plan(folder, report_type, project_number, environment, days, compute="local"
             "naming": naming,
         }, "days": days, "dry_run": dry_run, "cloud_resource_id": cloud_resource_id,
         "run_id": None, "report_config": config,
+        "filters": {"aiFactory": "All", "scaleset": "All", "project": "All"},
     }
 
 
@@ -118,11 +119,27 @@ def _validate(request):
     for field in ("project_number", "environment"):
         if not isinstance(target.get(field), str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", target[field]):
             raise ReportError(f"Invalid target {field}.")
+        if target[field].casefold() == "all":
+            raise ReportError("This on-demand collector requires one concrete project/environment. "
+                              "All is supported only over already collected authorized rows; "
+                              "collect each reviewed target separately or use native_monitoring.py. "
+                              "No Azure resource named All will be queried.", "unavailable")
+    filters = request.setdefault("filters", {"aiFactory": "All", "scaleset": "All", "project": "All"})
+    if not isinstance(filters, dict) or set(filters) - {"aiFactory", "scaleset", "project"}:
+        raise ReportError("Invalid report scope filters.")
+    for key, selected in filters.items():
+        if not isinstance(selected, str) or not selected:
+            raise ReportError("Scope filters must be non-empty strings.")
+        known = target.get("factory", target.get("aiFactory")) if key == "aiFactory" else target.get("project_number" if key == "project" else key)
+        if selected.casefold() != "all" and selected != known:
+            raise ReportError("Selected scope does not match this collector's exact reviewed target; "
+                              "unknown scope cannot match a concrete filter.", "unavailable")
     if not request.get("dry_run"):
         for field in ("subscription_id", "tenant_id"):
             target[field] = _guid(target.get(field), field)
         for field in ("project_resource_group", "common_resource_group"):
-            if not isinstance(target.get(field), str) or not re.fullmatch(r"[A-Za-z0-9_.()-]{1,90}", target[field]):
+            if (not isinstance(target.get(field), str) or not re.fullmatch(r"[A-Za-z0-9_.()-]{1,90}", target[field])
+                    or target[field].casefold() == "all"):
                 raise ReportError(f"Exact target {field} is required.")
     config = request["report_config"]
     if not isinstance(config.get("naming", {}), dict) or not isinstance(target.get("naming", {}), dict):
@@ -157,7 +174,7 @@ def _workspace():
 
 def _process(command, timeout=180):
     try:
-        with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
+        with tempfile.TemporaryFile(dir=Path.cwd()) as output, tempfile.TemporaryFile(dir=Path.cwd()) as errors:
             process = subprocess.run(command, stdout=output, stderr=errors, stdin=subprocess.DEVNULL,
                                      timeout=timeout, shell=False, check=False)
             output.seek(0)
@@ -279,6 +296,27 @@ def _accept_report(request, report, run_id=None, **extra):
     for key in ("tables", "charts", "warnings"):
         if not isinstance(report.get(key), list):
             raise ReportError("Report returned invalid structured content.")
+    sources = {
+        "showback": ("Cost Management", "ActualCost: sum returned Cost by validated resource group and currency; forecast is separate, never billed actual."),
+        "foundry-tokens": ("Log Analytics workspace; Calculated", "Account input/output token sums; TPM = tokens / window minutes. PAYGO/PTU estimates use explicit configured rates, discount, cache rate and capacity, not billed cost or business value."),
+        "foundry-usage": ("Azure Monitor metrics; Log Analytics workspace; Application Insights", "Sum observed resource/deployment/day metrics; hourly session sums are not distinct period sessions. Missing observations remain unavailable."),
+    }
+    source, formula = sources[request["report_type"]]
+    if request.get("dry_run"):
+        source = "Sample fixture (not live): " + source
+    lineage = {"dataSource": source, "formula": formula, "inputs": {
+        "target": deepcopy(request["target"]), "period": deepcopy(report.get("period", {})),
+        "configuration": deepcopy(request["report_config"]),
+    }}
+    report.setdefault("dataSource", source)
+    report.setdefault("lineage", lineage)
+    report["filters"] = deepcopy(request["filters"])
+    report["scope_limitation"] = "All means all rows collected for this one reviewed target, not subscription-wide discovery."
+    for item in [*report["tables"], *report["charts"]]:
+        item.setdefault("dataSource", source)
+        item.setdefault("lineage", lineage)
+    if "Data source:" not in report["output"]:
+        report["output"] += f"\n\nData source: {source}\n\nCalculation: {formula}"
     return _result(request, report["status"], report=report, run_id=run_id, **extra)
 
 

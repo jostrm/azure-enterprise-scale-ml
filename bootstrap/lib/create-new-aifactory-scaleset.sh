@@ -26,6 +26,7 @@ Options:
   --non-interactive    Read answers from AIF_* environment variables only.
   --yes                Accept the final execution summary.
   --help               Show this help.
+  runner plan|ensure   Isolated existing-factory runner setup; see runner --help.
 
 Common non-interactive variables:
   AIFACTORY_VERSION=124   Optional explicit legacy template version; omitted Create uses 124.
@@ -46,8 +47,9 @@ Common non-interactive variables:
   AIF_DATABRICKS_PRINCIPAL_ID=<existing-enterprise-app-object-id>
   AIF_ADMIN_VM_SIZE=Standard_D2s_v5
   AIF_RUNNER_MODE=self-hosted|microsoft-hosted|github-hosted
-  AIF_RUNNER_VM_NAME=dsvm-cmn-<region>-dev-001
-  AIF_RUNNER_VM_RESOURCE_GROUP=<existing-or-new-common-resource-group>
+  AIF_RUNNER_VM_OS=windows|linux  ADO legacy default Windows; GHA default Linux.
+  AIF_RUNNER_VM_NAME=<exact-vm-name>  Linux default runner-<provider>-<region>-dev-<suffix>.
+  AIF_RUNNER_VM_RESOURCE_GROUP=<selected-existing-common-resource-group>
   AIF_SETUP_HUB_ACCESS=y|n
   AIF_CONFIGURE_VPN_CLIENT=y|n
   AIF_SIMPLE_MODE=true   Opt in to private-ai-foundation-v2 (GHA, DEV only).
@@ -580,7 +582,11 @@ aif_collect_answers() {
   AIF_MI_RESOURCE_ID="${AIF_MI_RESOURCE_ID:-}"
   AIF_SP_CLIENT_ID="${AIF_SP_CLIENT_ID:-}"
   AIF_SP_CLIENT_SECRET="${AIF_SP_CLIENT_SECRET:-}"
-  AIF_ADMIN_VM_SIZE="${AIF_ADMIN_VM_SIZE:-Standard_D2s_v5}"
+  AIF_RUNNER_VM_OS="${AIF_RUNNER_VM_OS:-$([[ "$AIF_ROUTE" == gha ]] && echo linux || echo windows)}"
+  AIF_RUNNER_VM_OS="${AIF_RUNNER_VM_OS,,}"
+  [[ "$AIF_RUNNER_VM_OS" == linux || "$AIF_RUNNER_VM_OS" == windows ]] ||
+    { aif_error "AIF_RUNNER_VM_OS must be linux or windows."; return 1; }
+  AIF_ADMIN_VM_SIZE="${AIF_ADMIN_VM_SIZE:-$([[ "$AIF_RUNNER_VM_OS" == linux ]] && echo Standard_D4s_v5 || echo Standard_D2s_v5)}"
 
   aif_section "01 / Architecture and networking"
   aif_prompt_choice AIF_TOPOLOGY \
@@ -820,7 +826,11 @@ aif_collect_answers() {
         "Self-hosted admin VM size" \
         "$AIF_ADMIN_VM_SIZE"
       AIF_RUNNER_MODE="self-hosted"
-      ADO_AGENT_NAME="${ADO_AGENT_NAME:-dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001}"
+      if [[ "$AIF_RUNNER_VM_OS" == linux ]]; then
+        ADO_AGENT_NAME="${ADO_AGENT_NAME:-runner-ado-${AIF_LOCATION_SHORT}-dev-${AIF_SCALESET_SUFFIX}}"
+      else
+        ADO_AGENT_NAME="${ADO_AGENT_NAME:-dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001}"
+      fi
     else
       AIF_RUNNER_MODE="microsoft-hosted"
       ADO_AGENT_NAME=""
@@ -838,7 +848,7 @@ aif_collect_answers() {
       "Project runner: self-hosted (recommended for private access) or github-hosted" \
       "$runner_default" "self-hosted github-hosted"
     if [[ "$AIF_RUNNER_MODE" == "self-hosted" ]]; then
-      GHA_RUNNER_NAME="${GHA_RUNNER_NAME:-dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001-gha}"
+      GHA_RUNNER_NAME="${GHA_RUNNER_NAME:-runner-gha-${AIF_LOCATION_SHORT}-dev-${AIF_SCALESET_SUFFIX}}"
       GHA_RUNNER_LABEL="${GHA_RUNNER_LABEL:-${AIF_PREFIX}aifactory-${AIF_SCALESET_SUFFIX}}"
       [[ "$GHA_RUNNER_NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,99}$ ]] ||
         { aif_error "GHA_RUNNER_NAME must be a safe, unique runner name."; exit 1; }
@@ -2577,7 +2587,8 @@ aif_write_state_and_configure() {
     "$AIF_RUNNER_MODE" "${ADO_AGENT_POOL:-}" "${ADO_AGENT_NAME:-}" \
     "$AIF_ADMIN_VM_SIZE" "${AIF_SIMPLE_MODE:-false}" "${AIF_COST_CENTER:-}" \
     "$AIF_TEAM_MEMBER_EMAIL" "${AIF_SIMPLE_PROJECT_RESOURCES_JSON:-}" \
-    "${GITHUB_REPOSITORY_VISIBILITY:-private}" "${AIF_ENABLE_APPLICATION_GATEWAY-true}" <<'PY'
+    "${GITHUB_REPOSITORY_VISIBILITY:-private}" "${AIF_ENABLE_APPLICATION_GATEWAY-true}" \
+    "$AIF_RUNNER_VM_OS" "${GHA_RUNNER_NAME:-}" "${GHA_RUNNER_LABEL:-}" <<'PY'
 import json
 import sys
 
@@ -2599,6 +2610,8 @@ keys = (
     "simple_mode", "cost_center", "team_member_email",
     "simple_project_resources_json", "github_repository_visibility",
     "enable_application_gateway",
+    "runner_vm_os",
+    "github_runner_name", "github_runner_label",
 )
 values = dict(zip(keys, sys.argv[2:]))
 values["dev_service_connection"] = values["ado_service_connection"]
@@ -2634,6 +2647,17 @@ aif_urlencode() {
     tr -d '\r'
 }
 
+aif_runner_ado_token() (
+  set +x
+  "${AIF_PYTHON[@]}" -B - "$AIF_SCALESET_LIB_DIR" "$ADO_TENANT" "$AIF_DEV_SUBSCRIPTION_ID" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from factory_enrollment import Cloud, ADO_AUDIENCE
+cloud = Cloud({"target": {"tenant_id": sys.argv[2].lower(), "subscription_id": sys.argv[3]}})
+print(cloud.token(ADO_AUDIENCE, sys.argv[2].lower()))
+PY
+)
+
 aif_ado_api() {
   local method="$1" url="$2" input_file="${3:-}"
   local auth_header
@@ -2645,11 +2669,7 @@ print("Basic " + base64.b64encode((":" + os.environ["AZURE_DEVOPS_EXT_PAT"]).enc
 ')"
   else
     local token
-    token="$(az account get-access-token \
-      --resource "$AIF_ADO_RESOURCE" \
-      --tenant "$ADO_TENANT" \
-      --query accessToken \
-      --output tsv)"
+    token="$(aif_runner_ado_token)"
     token="${token//$'\r'/}"
     auth_header="Bearer $token"
   fi
@@ -3323,49 +3343,21 @@ aif_run_github_workflow() {
 }
 
 aif_prepare_runner_vm() {
-  local explicit_vm=false
-  if [[ -n "${AIF_RUNNER_VM_NAME:-}" && -n "${AIF_RUNNER_VM_RESOURCE_GROUP:-}" ]]; then explicit_vm=true; fi
-  AIF_RUNNER_VM_NAME="${AIF_RUNNER_VM_NAME:-dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001}"
+  AIF_RUNNER_OS="${AIF_RUNNER_VM_OS:-$([[ "$AIF_ROUTE" == gha ]] && echo Linux || echo Windows)}"
+  AIF_RUNNER_OS="${AIF_RUNNER_OS,,}"
+  AIF_RUNNER_OS="${AIF_RUNNER_OS^}"
+  local default_name="dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001"
+  [[ "$AIF_RUNNER_OS" != Linux ]] || default_name="runner-${AIF_ROUTE}-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"
+  AIF_RUNNER_VM_NAME="${AIF_RUNNER_VM_NAME:-$default_name}"
   AIF_RUNNER_VM_RESOURCE_GROUP="${AIF_RUNNER_VM_RESOURCE_GROUP:-${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}}"
-  aif_use_azure_tenant
-  local vm_details power_state
-  vm_details="$(az vm show \
-    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
-    --resource-group "$AIF_RUNNER_VM_RESOURCE_GROUP" \
-    --name "$AIF_RUNNER_VM_NAME" \
-    --query '[storageProfile.osDisk.osType, location]' --output tsv)" || return
-  local -a vm_values=()
-  mapfile -t vm_values <<< "${vm_details//$'\r'/}"
-  AIF_RUNNER_OS="${vm_values[0]:-}"
-  AIF_RUNNER_VM_LOCATION="${vm_values[1]:-}"
-  case "$AIF_RUNNER_OS" in
-    Windows) ;;
-    Linux)
-      [[ "$explicit_vm" == true ]] ||
-        { aif_error "Select an existing Linux VM explicitly with both AIF_RUNNER_VM_NAME and AIF_RUNNER_VM_RESOURCE_GROUP."; return 1; } ;;
-    *) aif_error "Unsupported or unknown VM OS; no VM was created or changed."; return 1 ;;
-  esac
-  if [[ -z "$AIF_RUNNER_VM_LOCATION" ]]; then
-    aif_error "Could not resolve the existing VM location."
-    return 1
-  fi
-  power_state="$(az vm get-instance-view \
-    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
-    --resource-group "$AIF_RUNNER_VM_RESOURCE_GROUP" \
-    --name "$AIF_RUNNER_VM_NAME" \
-    --query "instanceView.statuses[?starts_with(code, 'PowerState/')].code | [0]" \
-    --output tsv)" || return
-  power_state="${power_state//$'\r'/}"
-  if [[ "$power_state" == "PowerState/stopped" || "$power_state" == "PowerState/deallocated" ]]; then
-    az vm start \
-      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
-      --resource-group "$AIF_RUNNER_VM_RESOURCE_GROUP" \
-      --name "$AIF_RUNNER_VM_NAME" \
-      --output none
-  elif [[ "$power_state" != "PowerState/running" ]]; then
-    aif_error "VM is in state '$power_state'; wait or resolve it explicitly. No restart was requested."
-    return 1
-  fi
+  AIF_RUNNER_VM_LOCATION="$AIF_LOCATION"
+  local config_source="$AIF_REPO_ROOT/aifactory/variables.json"
+  [[ -f "$config_source" ]] || config_source="$AIF_REPO_ROOT/aifactory/esml-infra/azure-devops/bicep/yaml/variables/variables.yaml"
+  # Common deployment has completed. Never enter full bootstrap or switch CLI defaults here.
+  USE_SELF_HOSTED_BUILD_AGENT=true "${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/runner_bootstrap.py" "$AIF_ROUTE" prepare-vm \
+    --consumer-root "$AIF_REPO_ROOT" --config-source "$config_source" --environment dev \
+    --vm-os "${AIF_RUNNER_OS,,}" --vm-name "$AIF_RUNNER_VM_NAME" --common-rg "$AIF_RUNNER_VM_RESOURCE_GROUP" \
+    --prereqs-only --yes
 }
 
 aif_invoke_runner_registration() {
@@ -3437,7 +3429,7 @@ PY
   local run_command_url status=0
   # A unique execution cannot overwrite/interrupt an earlier, still-running managed command.
   run_command_url="https://management.azure.com/subscriptions/$AIF_DEV_SUBSCRIPTION_ID/resourceGroups/$AIF_RUNNER_VM_RESOURCE_GROUP/providers/Microsoft.Compute/virtualMachines/$AIF_RUNNER_VM_NAME/runCommands/register-aifactory-${provider}-$(date -u +%Y%m%d%H%M%S)-$RANDOM"
-  az rest --method put --url "$run_command_url?api-version=2023-03-01" \
+  az rest --subscription "$AIF_DEV_SUBSCRIPTION_ID" --method put --url "$run_command_url?api-version=2023-03-01" \
     --body "@$run_command_body" --output none || status=$?
   rm -f -- "$run_command_body"
   [[ "$tracing" != true ]] || set -x
@@ -3448,6 +3440,7 @@ PY
     local -a execution_values=()
     local execution_details
     execution_details="$(az rest \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
       --method get \
       --url "$run_command_url?api-version=2023-03-01&%24expand=instanceView" \
       --query '[properties.instanceView.executionState, properties.instanceView.exitCode]' \
@@ -3555,8 +3548,7 @@ PY
   elif [[ "$ADO_AUTH_METHOD" == pat ]]; then
     AIF_RUNNER_REGISTRATION_TOKEN="$AZURE_DEVOPS_EXT_PAT"
   else
-    AIF_RUNNER_REGISTRATION_TOKEN="$(az account get-access-token --resource "$AIF_ADO_RESOURCE" \
-      --tenant "$ADO_TENANT" --query accessToken --output tsv)"
+    AIF_RUNNER_REGISTRATION_TOKEN="$(aif_runner_ado_token)"
   fi
   AIF_RUNNER_REGISTRATION_TOKEN="${AIF_RUNNER_REGISTRATION_TOKEN//$'\r'/}"
   aif_invoke_runner_registration ado "$ADO_ORGANIZATION" "$ADO_AGENT_POOL" "$ADO_AGENT_NAME" \
@@ -4074,6 +4066,19 @@ aif_scaleset_main() {
   aif_resolve_azure_cli
   [[ "$AIF_ROUTE" != "gha" ]] || aif_require_command gh
   aif_python
+  local saved_runner_request
+  saved_runner_request="$("${AIF_PYTHON[@]}" -B - "$AIF_SCALESET_LIB_DIR" "$AIF_REPO_ROOT" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from runner_bootstrap import config_sources, read_config, requested, selected_values
+sources = [values for path in config_sources(sys.argv[2]) for values in selected_values(read_config(path), "dev")]
+print("true" if requested(sources) else "false")
+PY
+)" || return
+  if [[ "${saved_runner_request//$'\r'/}" == true ]]; then
+    AIF_RUNNER_MODE=self-hosted
+    [[ "$AIF_ROUTE" != ado ]] || ADO_RUNNER_MODE=s
+  fi
   aif_version_prepare "$AIF_REPO_ROOT" false "$AIF_NON_INTERACTIVE" "${AIF_CREATE_DEFAULT_VERSION:-124}"
   if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
     aif_simple_gateway_config >/dev/null

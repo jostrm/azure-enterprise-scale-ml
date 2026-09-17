@@ -294,10 +294,12 @@ def test_ado_wrapper_cannot_enroll_gha_or_override_provider(selected, suffix, ov
 def test_bundle_and_copy_rules_include_all_helpers():
     router = (ROOT / "bootstrap" / "lib" / "layout_router.sh").read_text()
     ignore = (ROOT / "bootstrap" / ".gitignore.template").read_text()
-    for name in ("factory_enrollment.py", "factory_enrollment_entry.py", "runner-prerequisites.ps1",
-                 "runner-prerequisites.sh", "runner-registration.ps1", "runner-registration.sh"):
+    assert "\n!/lib/\n" in ignore and '"!/lib/"' in router
+    for name in ("factory_enrollment.py", "factory_enrollment_entry.py", "project_environment.py", "runner-prerequisites.ps1",
+                 "runner-prerequisites.sh", "runner-registration.ps1", "runner-registration.sh",
+                 "runner_bootstrap.py", "runner-only-registration.sh"):
         assert "\n  " + name + "\n" in router
         assert '"!/lib/' + name + '"' in router
-        assert "!lib/" + name in ignore
+        assert "\n!/lib/" + name + "\n" in ignore
     copier = (ROOT / "bootstrap" / "01-aif-copy-aifactory-templates.sh").read_text()
     assert '"azurefactory-cli/setup.py"' in copier

@@ -98,6 +98,18 @@ def test_auth_status_payload_and_key(server):
     assert record["key"] == "secret"
     assert record["body"] == {"aifactory_folder": "C:\\factory", "factory_id": "f"}
 
+def test_bootstrap_common_details_is_explicit_and_strict_remains_default(server):
+    client = AzureFactoryClient(server, "test-key")
+    state = {"admin_aifactoryPrefixRG": "demo-", "enableFunction": True}
+    client.bootstrap_config(state)
+    assert Handler.records[-1]["body"] == {"state": state}
+    client.bootstrap_config(state, mapping_mode="common-details")
+    assert Handler.records[-1]["body"] == {"state": state, "mapping_mode": "common-details"}
+    assert state["enableFunction"] is True
+    with pytest.raises(ConfigError):
+        client.bootstrap_config(state, mapping_mode="discard-all")
+    assert len(Handler.records) == 2
+
 
 def test_api_key_repr_and_error_redaction(server):
     assert "secret" not in repr(AzureFactoryClient(server, "secret"))

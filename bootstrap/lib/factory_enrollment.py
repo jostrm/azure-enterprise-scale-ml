@@ -11,6 +11,9 @@ Required non-secret options for a new binding:
   resource_group_ids (exact writable RG ARM IDs), common_dependency_ids ([]),
   deployment_roles ([{scope: RG ID, role_definition_id: role GUID or ARM ID}]).
   ado_tenant_id is additionally required for ADO; it is NOT the target tenant.
+  ADO authentication selects an enabled cached CLI account in that tenant without
+  changing the default subscription. Multiple subscriptions for one identity are
+  supported; missing or ambiguous identities require explicit account setup.
 Existing binding values may supply route/scopes, but are never overwritten.
 runner is the lifecycle hosted/self-hosted Linux object, not the bootstrap VM.
 GitHub environments must be pre-provisioned. GitHub's environment PUT is an
@@ -60,6 +63,7 @@ import fnmatch
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -371,12 +375,18 @@ class NoRedirect(HTTPRedirectHandler):
         raise EnrollmentError("redirect-forbidden")
 
 
+def _run_cli(argv, **kwargs):
+    executable = shutil.which(argv[0])
+    require(executable, "command-unavailable-or-failed")
+    return subprocess.run([executable, *argv[1:]], **kwargs)
+
+
 class Cloud:
     """Azure CLI profile and gh authentication only; never logs in or switches accounts."""
 
     def __init__(self, request, command_runner=None, opener=None):
         self.request_config = request
-        self.command_runner = command_runner or subprocess.run
+        self.command_runner = command_runner or _run_cli
         self.opener = opener or build_opener(NoRedirect())
         self.read_only = True
         self.serialized_provisioning = False
@@ -394,10 +404,26 @@ class Cloud:
         return raw.decode("utf-8") if isinstance(raw, bytes) else raw
 
     def az(self, *args):
-        require(tuple(args[:2]) in (("account", "show"), ("account", "get-access-token"), ("identity", "show"))
+        require(tuple(args[:2]) in (("account", "show"), ("account", "list"),
+                                    ("account", "get-access-token"), ("identity", "show"))
                 or tuple(args[:3]) == ("storage", "account", "check-name"),
                 "unreviewed-cli-command-forbidden")
         return parse_json(self.command(["az", *args, "--only-show-errors", "--output", "json"]))
+
+    def _ado_subscription(self, tenant):
+        accounts = self.az("account", "list", "--all", "--query",
+                           "[].{id:id,tenantId:tenantId,state:state,accountName:user.name}")
+        require(isinstance(accounts, list) and all(isinstance(item, dict) for item in accounts),
+                "ado-account-metadata-invalid")
+        selected = [item for item in accounts
+                    if isinstance(item.get("tenantId"), str) and item["tenantId"].lower() == tenant
+                    and item.get("state") == "Enabled"]
+        require(selected, "ado-tenant-account-unavailable")
+        require(all(isinstance(item.get("accountName"), str) and item["accountName"].strip()
+                    for item in selected), "ado-account-identity-unverified")
+        require(len({item["accountName"].strip().casefold() for item in selected}) == 1,
+                "ado-tenant-account-ambiguous")
+        return min(guid(item.get("id")) for item in selected)
 
     def token(self, audience, tenant=None):
         target = self.request_config["target"]
@@ -405,7 +431,10 @@ class Cloud:
         key = (audience, tenant)
         if key not in self.tokens:
             args = ["account", "get-access-token", "--resource", audience]
-            args += ["--tenant", tenant] if audience == ADO_AUDIENCE else ["--subscription", target["subscription_id"]]
+            # --tenant alone still uses the default CLI user, which may belong to
+            # the separate Azure deployment tenant rather than the ADO tenant.
+            subscription = self._ado_subscription(tenant) if audience == ADO_AUDIENCE else target["subscription_id"]
+            args += ["--subscription", subscription]
             value = self.az(*args)
             try:
                 token = value["accessToken"]
@@ -1202,8 +1231,8 @@ def ensure(request, expected_plan, *, yes=False, acknowledge_exclusive_writer_go
 
     An error after a possible write returns blocked/reconciliation_required.
     A new plan is necessary after any state change, including a successful ensure.
-    Without governance acknowledgment only protocol/provider resources are created;
-    no enrollment JSON or ready binding is emitted.
+    Governance acknowledgment is required before any write, including protocol
+    prerequisites; it never substitutes for the live permission and scope checks.
     """
     require(yes is True, "explicit-yes-required")
     require(acknowledge_exclusive_writer_governance is True,

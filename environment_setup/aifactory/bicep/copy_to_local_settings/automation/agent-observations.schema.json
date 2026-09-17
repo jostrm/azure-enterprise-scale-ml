@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aifactory:agent-observations:v1",
+  "title": "Reviewed evidence-backed agent observations; no raw prompts or responses",
+  "type": "object",
+  "required": ["schema", "source", "authorizedScopes", "rows"],
+  "properties": {
+    "schema": {"const": "aifactory.agent-observations/v1"},
+    "source": {"enum": ["sample", "live"]},
+    "authorizedScopes": {"type": "array", "items": {"$ref": "#/$defs/scope"}, "description": "Exact scopes already collected with authorized reader access; never a substitute for Azure RBAC."},
+    "rows": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/row"}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {"type": ["string", "null"], "pattern": "^(?!\\s*$)[^\\u0000-\\u001F\\u007F]{1,2048}$", "description": "Opaque data identity, including local factory paths or region:suffix scalesets; never interpreted as a resource name, file to open or URL. Preserve leading zeros and exact labels; do not trim or slug. Native unknown scope is null; canonical empty/Unknown/unavailable/N/A markers become null. All is a selector only."},
+    "scope": {
+      "type": "object",
+      "required": ["aiFactory", "scaleset", "project", "environment", "agent"],
+      "properties": {
+        "aiFactory": {"$ref": "#/$defs/identifier"},
+        "scaleset": {"$ref": "#/$defs/identifier"},
+        "project": {"$ref": "#/$defs/identifier"},
+        "environment": {"$ref": "#/$defs/identifier"},
+        "agent": {"$ref": "#/$defs/identifier"}
+      },
+      "additionalProperties": false
+    },
+    "row": {
+      "type": "object",
+      "required": ["id", "timestamp", "scope", "kind", "dataSource"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "scope": {"$ref": "#/$defs/scope"},
+        "kind": {"enum": ["outcome", "cost", "security"]},
+        "dataSource": {"type": "string", "minLength": 1},
+        "metadata_validated": {"type": "boolean", "description": "Explicit assertion from the source collector; canonical export never invents this from syntax validation alone."},
+        "provenance": {
+          "type": "object",
+          "description": "Canonical per-field upstream evidence, retained through the native bridge and exports.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "data_source": {"type": ["string", "null"]},
+              "reference": {"type": ["string", "null"]},
+              "description": {"type": ["string", "null"]},
+              "formula": {"type": ["string", "null"]},
+              "inputs": {"type": ["object", "null"]}
+            },
+            "additionalProperties": false
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "properties": {"reference": {"type": "string", "maxLength": 512, "description": "Approved opaque evidence ID, not raw customer data or a credential."}},
+          "additionalProperties": false
+        },
+        "outcome": {
+          "type": "object",
+          "properties": {
+            "completed": {"type": "number", "minimum": 0},
+            "baselineMinutes": {"type": "number", "minimum": 0, "description": "Explicit baseline minutes per completed outcome, never a total duration across the cohort."},
+            "actualMinutes": {"type": "number", "minimum": 0, "description": "Explicit observed minutes per completed outcome, never a total duration across the cohort."},
+            "qualityPassed": {"type": "boolean"}
+          },
+          "additionalProperties": false
+        },
+        "cost": {
+          "type": "object",
+          "properties": {
+            "basis": {"enum": ["actual", "amortized", "estimate"]},
+            "estimateType": {"enum": ["tokens", "other"], "description": "Explicit estimate classification; canonical token_estimated_cost export requires tokens classification. Field provenance does not override an absent or different classification."},
+            "amount": {"type": "number"},
+            "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+            "inputs": {"type": "object", "description": "Explicit pricing assumptions for estimates; never invented by this report."},
+            "formula": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
+        "security": {
+          "type": "object",
+          "properties": {
+            "control": {"type": "string"},
+            "passed": {"type": "boolean"},
+            "checks": {"type": "number", "minimum": 0},
+            "findings": {"type": "number", "minimum": 0}
+          },
+          "additionalProperties": false
+        },
+        "azure": {
+          "type": "object",
+          "required": ["subscriptionId", "resourceGroup"],
+          "properties": {
+            "subscriptionId": {"type": "string", "format": "uuid"},
+            "resourceGroup": {"type": "string", "pattern": "^[A-Za-z0-9_().-]{1,90}$"},
+            "resourceId": {"type": "string", "description": "Optional discovered resource in the exact subscription/resource group; mismatches disable the link."}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "aifactory.agent-observations/v1",
+  "source": "sample",
+  "authorizedScopes": [
+    {"aiFactory":"factory-a","scaleset":"001","project":"001","environment":"dev","agent":"claims"},
+    {"aiFactory":"factory-a","scaleset":"001","project":"002","environment":"dev","agent":"claims"},
+    {"aiFactory":"factory-a","scaleset":"002","project":"001","environment":"dev","agent":"claims"},
+    {"aiFactory":"factory-b","scaleset":"001","project":"001","environment":"dev","agent":"claims"},
+    {"aiFactory":"factory-a","scaleset":"001","project":"1","environment":"dev","agent":"claims"},
+    {"aiFactory":null,"scaleset":null,"project":null,"environment":null,"agent":null}
+  ],
+  "rows": [
+    {"id":"outcome-a-001","timestamp":"2026-09-01T12:00:00Z","scope":{"aiFactory":"factory-a","scaleset":"001","project":"001","environment":"dev","agent":"claims"},"kind":"outcome","dataSource":"Application Insights","evidence":{"reference":"sample-reviewed-outcome-001"},"outcome":{"completed":10,"baselineMinutes":12,"actualMinutes":3,"qualityPassed":true}},
+    {"id":"cost-a-001","timestamp":"2026-09-01T12:00:00Z","scope":{"aiFactory":"factory-a","scaleset":"001","project":"001","environment":"dev","agent":"claims"},"kind":"cost","dataSource":"Cost Management","evidence":{"reference":"sample-cost-export-001"},"cost":{"basis":"actual","amount":20,"currency":"USD"}},
+    {"id":"amortized-a-001","timestamp":"2026-09-01T12:00:00Z","scope":{"aiFactory":"factory-a","scaleset":"001","project":"001","environment":"dev","agent":"claims"},"kind":"cost","dataSource":"Cost Management","evidence":{"reference":"sample-amortized-export-001"},"cost":{"basis":"amortized","amount":18,"currency":"USD"}},
+    {"id":"security-a-001","timestamp":"2026-09-01T12:00:00Z","scope":{"aiFactory":"factory-a","scaleset":"001","project":"001","environment":"dev","agent":"claims"},"kind":"security","dataSource":"Recorded control evaluation","evidence":{"reference":"sample-control-001"},"security":{"control":"tool-allowlist","passed":false}},
+    {"id":"cost-a-002","timestamp":"2026-09-01T12:00:00Z","scope":{"aiFactory":"factory-a","scaleset":"001","project":"002","environment":"dev","agent":"claims"},"kind":"cost","dataSource":"Cost Management","evidence":{"reference":"sample-cost-export-002"},"cost":{"basis":"actual","amount":200,"currency":"USD"}},
+    {"id":"cost-other-scaleset","timestamp":"2026-09-01T12:00:00Z","scope":{"aiFactory":"factory-a","scaleset":"002","project":"001","environment":"dev","agent":"claims"},"kind":"cost","dataSource":"Cost Management","evidence":{"reference":"sample-other-scaleset"},"cost":{"basis":"actual","amount":300,"currency":"USD"}},
+    {"id":"cost-other-factory","timestamp":"2026-09-01T12:00:00Z","scope":{"aiFactory":"factory-b","scaleset":"001","project":"001","environment":"dev","agent":"claims"},"kind":"cost","dataSource":"Cost Management","evidence":{"reference":"sample-other-factory"},"cost":{"basis":"actual","amount":400,"currency":"USD"}},
+    {"id":"cost-leading-zero","timestamp":"2026-09-01T12:00:00Z","scope":{"aiFactory":"factory-a","scaleset":"001","project":"1","environment":"dev","agent":"claims"},"kind":"cost","dataSource":"Cost Management","evidence":{"reference":"sample-project-1-not-001"},"cost":{"basis":"actual","amount":500,"currency":"USD"}},
+    {"id":"unknown-scope","timestamp":"2026-09-01T12:00:00Z","scope":{"aiFactory":null,"scaleset":null,"project":null,"environment":null,"agent":null},"kind":"security","dataSource":"Recorded control evaluation"}
+  ]
+}

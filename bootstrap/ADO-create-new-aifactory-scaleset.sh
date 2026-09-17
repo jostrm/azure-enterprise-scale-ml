@@ -11,6 +11,7 @@ done
 [[ -f "$ROUTER" ]] || { printf 'ERROR: AI Factory layout router is missing.\n' >&2; exit 1; }
 # shellcheck source=lib/layout_router.sh
 source "$ROUTER"
+aif_route_runner ado "$SCRIPT_DIR" "$@"
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   aif_enrollment_usage "ADO-create-new-aifactory-scaleset.sh"
 fi

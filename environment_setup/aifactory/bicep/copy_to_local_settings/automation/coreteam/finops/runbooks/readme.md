@@ -2,6 +2,100 @@
 
 Folder: `aifactory-templates/automation/runbooks`
 
+## Agent BUSINESS VALUE + COST + SECURITY (opt in, offline by default)
+
+From the copied `automation` folder, run:
+
+```powershell
+python -I -B .\native_monitoring.py --input .\samples\agent-observations.sample.json --aiFactory factory-a --scaleset 001 --project 001
+pwsh -NoProfile -File .\run-native-monitoring-sample.ps1
+```
+
+`coreteam\finops\runbooks\Update-AgentMonitoringReport.ps1` provides the same
+local Python entrypoint for a separately configured automation runtime.
+Its required `-ObservationsPath` must be a reviewed, already-collected
+`agent-observations.schema.json` document. It never authenticates, collects,
+uploads or creates an Azure job/schedule. Python standard library only.
+Optional `--output`, `--csv`, and `--events` write local report, aligned CSV
+and prepared AppEvents files; `--events` does **not** ingest telemetry.
+
+Every selector (`aiFactory`, `scaleset`, `project`, `environment`, `agent`)
+defaults to **All**, meaning all authorized collected scope. Filters intersect
+on rows before totals/charts/exports; `001` is not `1`, and the complete
+factory/scaleset/project identity prevents collisions. The sample proves
+Project001 excludes Project002 and other selected factory/scaleset identities.
+Unknown dimensions do not match concrete selections.
+
+Outcome value is `(baselineMinutes - actualMinutes) * completed`, only with
+evidence and `qualityPassed=true`. Token volumes are not business value.
+Both duration inputs explicitly mean minutes **per completed outcome**, not
+cohort totals; the adapter never infers or divides an ambiguous duration.
+Cost Management actual/amortized observations remain separate from explicit
+estimates and currencies. Security needs recorded control evidence.
+Missing inputs are unavailable; no price, outcome, live value or compliance
+state is invented. JSON and CSV retain source, formula, inputs and evidence.
+Sample artifacts never contain Azure Cost analysis links. Live imported
+observations can link only from validated, collected Azure metadata.
+Both native reports and workbook links require the explicit collector assertion
+`metadata_validated=true`; supplying syntactically valid identifiers alone is
+not enough. Sample events never produce live links.
+
+The shared desktop/API flat input `{contract:"aifactory.monitoring-observations.v1",rows:[...]}`
+is also accepted by `native_monitoring.py`. Specify `--source sample` explicitly
+for a sample import, for example:
+
+```powershell
+python -I -B .\native_monitoring.py --input .\samples\monitoring-observations.sample.json --source sample --aiFactory factory-a --scaleset 001 --project 001
+```
+
+Live imports require `--source live --authorized-scopes
+<reviewed-scope-array.json>`; provenance is never inferred from filenames or
+values. `factory` maps to `scope.aiFactory`, `agent_id` to `scope.agent`, and
+per-field `provenance` survives in native lineage/CSV/AppEvents.
+Native report output identifies itself as `aifactory.native-monitoring-report/v1`
+(with `inputSchema` recorded separately); it is not an observations input document
+or the desktop API's `aifactory.monitoring-report.v1` envelope.
+An explicit optional `outcome_quality_passed=true` is needed for native value;
+completion/evaluation counts do not imply quality approval. Imported token
+estimates require `provenance.token_estimated_cost.inputs` and `.formula`;
+missing assumptions stay unavailable. Aggregate `security_checks` and
+`security_findings` remain aggregate counts, not invented individual controls.
+Canonical Azure metadata requires `metadata_validated=true` and is revalidated
+against `cost_scope`; sample imports still never link to Azure.
+
+Use `--observations-output <observations.json>` (PowerShell wrapper:
+`-CanonicalObservationsPath`) to export the shared
+`{contract:"aifactory.monitoring-observations.v1",rows:[...]}` input directly.
+It maps `aiFactory` to `factory` and `agent` to `agent_id`, preserving exact
+identities, evidence and calculation inputs. Complementary fields pivot only
+at the same complete scope and timestamp. Overlapping fields, mixed currencies
+or conflicting validated Azure scopes are rejected rather than guessed or
+duplicated across agents. Missing fields remain null; no rates, time windows,
+token volumes or findings are invented. Individual control results contribute
+one observed check, not an inferred findings count.
+Mapping an estimate to `token_estimated_cost` requires explicit
+`cost.estimateType="tokens"`; field provenance cannot override its classification.
+Canonical token estimates receive the classification on import. Estimates
+without token classification remain valid native reports but their canonical
+export is rejected rather than silently relabeled. Missing calculation
+inputs or formula still produce an unavailable estimate, not an inferred price.
+The canonical export retains per-row sample/live markers; sample exports are
+validation fixtures, not live-importable evidence. Explicit native
+`metadata_validated=true` must originate with the collector and survive scope
+validation before it is exported; merely supplying Azure identifiers does not
+assert collector validation. Existing native report and AppEvents formats remain
+separate from this canonical observations export.
+This export covers measurements represented by the native outcome/cost/security
+schema; it is not a lossless round-trip for other canonical telemetry fields.
+Keep the original canonical input for token, adoption, latency or labor-rate
+fields that the native event does not represent. Integer-count constraints are
+enforced rather than rounding partial outcomes.
+
+The optional native portal workbook is
+`modules\monitoring\agentMonitoringWorkbook.bicep`; see the
+[dashboard guide](../../../../../../../../documentation/v2/30-39/32-dashboards.md)
+for existing-workspace instrumentation, RBAC and deployment prerequisites.
+
 ## Optional desktop / cloud report protocol
 
 `automation\report_compute.py --request <request.json>` is a stdlib-only adapter.
@@ -19,8 +113,19 @@ Version-1 requests contain `action` (`run`/`status`), `compute`
 `cloud_resource_id`, `run_id`, `report_config`, and `target`.
 The exact target contains `subscription_id`, `tenant_id`, `project_number`,
 `environment`, `project_resource_group`, `common_resource_group`, and `naming`.
+Additive `factory` (including a local factory-path identity) and `scaleset`
+(including `region:suffix`) are preserved as opaque scope metadata, never
+treated as resource names. The legacy `aiFactory` filter accepts the explicit
+`factory` identity, with the older `aiFactory` target field as a fallback.
 Do not put credentials or callback URLs in requests. `plan()` produces an
 offline skeleton; callers must resolve exact targets before live execution.
+This older on-demand collector requires one concrete project/environment:
+`All` as a collection target explicitly returns unavailable **before** any
+resource identifier, authentication or process is generated. Its optional
+`filters` default to All and cover only the already reviewed target. Use the
+native observation merger for multi-factory/scaleset/project results.
+Standalone showback's `-ProjectNumber All` covers authorized collected projects
+within the configured factory/scaleset/environment naming pattern only.
 
 Results contain `status`, `source`, `compute`, `run_id`, `output`, `warnings`
 and `report` (schema-version-1 envelope or null). Cloud results also return
@@ -40,11 +145,12 @@ goes to verbose. Query failures are failed or warning reports, never healthy
 initialized zeros. Foundry model pricing/cache/discount/PTU figures are
 **configuration assumptions and estimates, not verified actual billing**.
 
-The existing **Monitoring API** bridge is separate and unchanged:
+The existing **Monitoring API** bridge remains separate:
 `-MonitoringRequest` plus `-MonitoringPython` routes to
 `common\monitoring_report.py` and its strict
 `aifactory.aggregate-report.v1` contract. That bridge continues to use selected
 identity checks, sparse measurements and selected-project actual cost.
+Aggregate JSON now also includes `dataSource` and `lineage` metadata.
 The Python script retains strict `--automation-json` with
 `--expected-object-id`, while `--tenant-id` plus `--debug-json` also supports
 the compute-selector adapter without ambient-credential fallback.

@@ -24,6 +24,7 @@ CONTROL_LIBRARIES = (
     "release_version.py", "release_version.sh",
     "runner-prerequisites.ps1", "runner-prerequisites.sh",
     "runner-registration.ps1", "runner-registration.sh",
+    "runner_bootstrap.py", "runner-only-registration.sh",
 )
 
 

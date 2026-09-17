@@ -159,6 +159,10 @@ $aifactorySuffix = if ($AifactorySuffix) { $AifactorySuffix } else { $n.aifactor
 $projectPrefix   = if ($ProjectPrefix)   { $ProjectPrefix }   else { $n.projectPrefix }
 $projectSuffix   = if ($ProjectSuffix)   { $ProjectSuffix }   else { $n.projectSuffix }
 $projectNumber   = if ($ProjectNumber)   { $ProjectNumber }   else { $n.projectNumber }
+if ($projectNumber -eq 'All') {
+    $reportFailure = 'This collector requires one concrete project. All applies only to previously collected authorized rows; no resource named All is queried.'
+    throw $reportFailure
+}
 $locShort        = if ($LocationShort)   { $LocationShort }   else { $n.locationShort }
 $env             = if ($Env)             { $Env }             else { $n.env }
 $vnetRgBase      = if ($VnetResourceGroupBase) { $VnetResourceGroupBase } else { $n.vnetResourceGroupBase }
@@ -286,6 +290,7 @@ $ptu = if ($model.inputTpmPerPtu) { [math]::Ceiling(($inputTpm*(1-$d.cacheRate))
 $ptuTpm = $ptu * $model.inputTpmPerPtu
 
 # ---- Build Markdown report ----
+$telemetrySource = if ($DryRun) { 'Sample fixture (not live)' } else { 'Log Analytics workspace' }
 $md = @"
 # Automation for the AI Factory
 
@@ -294,6 +299,8 @@ Model: $($model.name) — RG ``$projectRg`` — window ${LookbackDays}d — gene
 
 > $(if ($DryRun) {'SAMPLE DATA — not live usage.'} else {'Live account-level aggregate telemetry; not per-model measured usage.'})
 > Pricing, cache rate, users with access and PTU sizing use configuration assumptions, not verified actual billing.
+> Data source: $telemetrySource (account token observations); Calculated (configured pricing/PTU estimates).
+> Calculation: TPM = observed tokens / window minutes; monthly estimate = ((input*(1-cacheRate)*inputRate + input*cacheRate*cachedRate + output*outputRate)/1e6) * 30/windowDays. Rates include configured EA discount. Token volume is not business value.
 
 ### 2) Current workload telemetry (from logs)
 
@@ -348,16 +355,18 @@ if ($ReportFormat -eq 'Json') {
         period=@{days=$LookbackDays; start=[datetime]::UtcNow.AddDays(-$LookbackDays).ToString('o'); end=[datetime]::UtcNow.ToString('o')}
         target=@{subscription_id=$SubscriptionId; project_resource_group=$projectRg; common_resource_group=$commonRg; environment=$env}
         status='warning'; warnings=@($reportWarnings)
+        dataSource="$telemetrySource; Calculated"
+        lineage=@{inputs=@{inputTokens=$inputTokens; outputTokens=$outputTokens; requests=$requests; windowMinutes=$activeWindowMinutes; windowDays=$LookbackDays; inputRate=$inputRate; cachedRate=$cachedRate; outputRate=$outputRate; cacheRate=$d.cacheRate; eaDiscount=$d.eaDiscount; inputTpmPerPtu=$model.inputTpmPerPtu}; formula='TPM=tokens/windowMinutes; monthlyEstimate=((input*(1-cacheRate)*inputRate+input*cacheRate*cachedRate+output*outputRate)/1e6)*30/windowDays; PTU=ceil(inputTPM*(1-cacheRate)/inputTpmPerPtu)'; costBasis='estimate-not-billed'}
         tables=@(
-            @{title='Account telemetry'; columns=@('Metric','Value','Unit'); rows=@(
+            @{title='Account telemetry'; dataSource=$telemetrySource; formula='Token/request sums; per-minute rates divide sums by window minutes'; columns=@('Metric','Value','Unit'); rows=@(
                 @('Input tokens',$inputTokens,'tokens'), @('Output tokens',$outputTokens,'tokens'), @('Requests',$requests,'requests'),
                 @('Input TPM',$inputTpm,'TPM'), @('Output TPM',$outputTpm,'TPM'), @('Requests per minute',$rpm,'RPM')
             )},
-            @{title='Configured pricing estimates (not actual billing)'; columns=@('Estimate','Value','Unit'); rows=@(
+            @{title='Configured pricing estimates (not actual billing)'; dataSource='Calculated'; formula='Configured rates, discount, cache ratio and capacity; see report lineage inputs'; columns=@('Estimate','Value','Unit'); rows=@(
                 @('Monthly PAYGO',[math]::Round($monthCost,2),'USD'), @('Average PTUs',$ptu,'PTUs')
             )}
         )
-        charts=@(@{title='Account token totals'; labels=@('Input','Output'); series=@(@{name='Tokens'; values=@($inputTokens,$outputTokens)})})
+        charts=@(@{title='Account token totals'; dataSource=$telemetrySource; formula='Sum observed input/output tokens in selected account and window'; labels=@('Input','Output'); series=@(@{name='Tokens'; values=@($inputTokens,$outputTokens)})})
         output=$md
     } | ConvertTo-Json -Depth 12 -Compress | Write-Output
 } else {
