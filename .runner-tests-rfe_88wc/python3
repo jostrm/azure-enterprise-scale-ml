@@ -1,2 +1,0 @@
-#!/usr/bin/env bash
-printf 'Python 3.12.3\n'
