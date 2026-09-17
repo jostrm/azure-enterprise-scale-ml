@@ -2407,7 +2407,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
-<td style="text-align: right;">81</td>
+<td style="text-align: right;">85</td>
 </tr>
 <tr>
 <td><code>helper</code></td>
@@ -7522,6 +7522,12 @@ reported, not silently represented as multiple settings.</p>
 </thead>
 <tbody>
 <tr>
+<td><!-- parameter bootstrap:ADO_AGENT_NAME --><code>ADO_AGENT_NAME</code></td>
+<td>C</td>
+<td><code>"dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001"</code></td>
+<td>Ado agent name override; see create launcher.</td>
+</tr>
+<tr>
 <td><!-- parameter bootstrap:ADO_AGENT_POOL --><code>ADO_AGENT_POOL</code></td>
 <td>C</td>
 <td><code>"Default"</code></td>
@@ -7566,8 +7572,8 @@ reported, not silently represented as multiple settings.</p>
 <tr>
 <td><!-- parameter bootstrap:ADO_RUNNER_MODE --><code>ADO_RUNNER_MODE</code></td>
 <td>C</td>
-<td><code>"h"</code></td>
-<td>Project build agent: self-hosted admin VM (s) or Microsoft-hosted (h); allowed: s h</td>
+<td><code>"$runner_default"</code></td>
+<td>Project build agent: self-hosted admin VM (s, recommended for private access) or Microsoft-hosted (h); allowed: s h</td>
 </tr>
 <tr>
 <td><!-- parameter bootstrap:ADO_RUNNER_SELECTION --><code>ADO_RUNNER_SELECTION</code></td>
@@ -7862,6 +7868,24 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"001"</code></td>
 <td>First project number (001-999)</td>
+</tr>
+<tr>
+<td><!-- parameter bootstrap:AIF_RUNNER_MODE --><code>AIF_RUNNER_MODE</code></td>
+<td>O</td>
+<td><code>"$runner_default"</code></td>
+<td>Project runner: self-hosted (recommended for private access) or github-hosted; allowed: self-hosted github-hosted</td>
+</tr>
+<tr>
+<td><!-- parameter bootstrap:AIF_RUNNER_VM_NAME --><code>AIF_RUNNER_VM_NAME</code></td>
+<td>O</td>
+<td><code>"dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001"</code></td>
+<td>Aif runner vm name override; see create launcher.</td>
+</tr>
+<tr>
+<td><!-- parameter bootstrap:AIF_RUNNER_VM_RESOURCE_GROUP --><code>AIF_RUNNER_VM_RESOURCE_GROUP</code></td>
+<td>O</td>
+<td><code>"${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"</code></td>
+<td>Aif runner vm resource group override; see create launcher.</td>
 </tr>
 <tr>
 <td><!-- parameter bootstrap:AIF_SCALESET_SUFFIX --><code>AIF_SCALESET_SUFFIX</code></td>
