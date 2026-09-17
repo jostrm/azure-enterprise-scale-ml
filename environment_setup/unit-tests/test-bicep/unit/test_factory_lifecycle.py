@@ -475,6 +475,7 @@ def test_pre_mutation_failure_releases_locks(monkeypatch, workspace):
 
 def test_receipt_write_retries_transient_windows_file_lock(monkeypatch, workspace):
     receipt = workspace / "receipt.json"
+    receipt.write_text('{"status":"previous"}', encoding="utf-8")
     original_replace = fl.os.replace
     calls = 0
 

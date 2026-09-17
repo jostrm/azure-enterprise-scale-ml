@@ -2065,6 +2065,16 @@ def write_receipt(path, receipt):
         json.dump(receipt, stream, sort_keys=True, separators=(",", ":"))
         stream.flush()
         os.fsync(stream.fileno())
+    if not path.exists():
+        try:
+            os.link(staged, path)
+            staged.unlink()
+            return
+        except FileExistsError:
+            pass
+        except OSError:
+            # Filesystems without hard-link support use the replace path below.
+            pass
     for attempt in range(RECEIPT_REPLACE_ATTEMPTS):
         try:
             os.replace(staged, path)
