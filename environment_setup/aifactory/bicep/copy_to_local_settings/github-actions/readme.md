@@ -255,6 +255,22 @@ Do not store credentials, service-connection settings, or GitHub secrets in
 these files. GitHub Environments continue to provide the deployment identity
 and secrets; JSON is for non-secret AI Factory deployment configuration.
 
+When running with JSON-first identity selection, set
+`json_identity_auth: true` and leave `config_secret` empty. The checked-out
+`variables.json` must contain `AZURE_CLIENT_ID`, `tenantId`, and the exact
+Dev/Stage/Prod subscription IDs. The workflow logs in as **Azure login with
+OpenID Connect (OIDC)** using those JSON selectors and GitHub's short-lived
+OIDC token; it does not use GitHub Environment variables or Azure credential
+secrets for target identity selection.
+
+For common infrastructure, run `infra-common.yml` with
+`use_json_config_override: true` and `config_file` set to the checked-in
+`variables.json`. Each scale set needs its own user-assigned managed identity,
+an OIDC federated credential for the `dev`, `stage`, and `prod` GitHub
+Environments, and the required scoped roles across that scale set's three
+subscriptions. Concurrent workflows can then share one GitHub repository
+without sharing a target subscription or deployment identity.
+
 The dashboard link keeps its configuration key `aifactory-dash-01` in JSON.
 The override reader explicitly maps it to the shell-safe runtime variable
 `AIFACTORY_DASHBOARD_URL` for GitHub Actions and Azure DevOps. Empty values and

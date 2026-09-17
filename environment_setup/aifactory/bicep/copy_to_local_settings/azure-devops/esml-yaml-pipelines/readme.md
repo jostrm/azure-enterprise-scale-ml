@@ -144,6 +144,15 @@ JSON configuration is for non-secret deployment settings only. Keep service
 connections, credentials, and other secrets in Azure DevOps service
 connections, secret variables, or Key Vault.
 
+The common pipeline, `infra-aifactory-common.yaml`, supports the same
+`configFile` and `useJsonConfigOverride` queue-time parameters. JSON is loaded
+before common or project deployment steps. Azure DevOps resolves each
+`AzureCLI@2` service connection before runtime JSON values are available, so
+each scale set must use its own pre-authorized workload-identity service
+connection. Its identity needs the required scoped roles in that scale set's
+Dev, Stage, and Prod subscriptions; JSON selects the target subscription but
+does not replace the Azure DevOps service connection.
+
 # QUICK TIPS: Add/Remove services to project, or create NEW project?
 - ❓Q1: If you want to ADD more services to same project? 
 - A: Edit Variables.yaml, Checkin code, Re-run pipeline

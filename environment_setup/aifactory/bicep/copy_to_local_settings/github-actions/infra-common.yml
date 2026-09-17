@@ -15,6 +15,14 @@ on:
         type: boolean
         default: false
         description: Run Prod after Stage/Dev
+      use_json_config_override:
+        type: boolean
+        default: false
+        description: Use repository-backed variables.json instead of GitHub Environment configuration
+      config_file:
+        type: string
+        default: aifactory/variables.json
+        description: Repository-relative canonical AI Factory JSON configuration file
 
 permissions:
   contents: read
@@ -108,8 +116,29 @@ jobs:
         with:
           submodules: true
 
-      - name: Azure Login with OIDC
-        if: ${{ env.AZURE_CLIENT_ID != '' }}
+      - name: Resolve JSON OpenID Connect identity
+        id: json_identity
+        if: ${{ inputs.use_json_config_override }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \
+            --file "${{ inputs.config_file }}" \
+            --environment dev \
+            --format github \
+            --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-common.yml" \
+            --github-identity-output
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ inputs.use_json_config_override }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ steps.json_identity.outputs.azure_client_id }}
+          tenant-id: ${{ steps.json_identity.outputs.azure_tenant_id }}
+          subscription-id: ${{ steps.json_identity.outputs.azure_subscription_id }}
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID != '' }}
         uses: azure/login@v2
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
@@ -117,7 +146,7 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Azure Login with service-principal credentials
-        if: ${{ env.AZURE_CLIENT_ID == '' }}
+        if: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID == '' }}
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -474,8 +503,29 @@ jobs:
         with:
           submodules: true
 
-      - name: Azure Login with OIDC
-        if: ${{ env.AZURE_CLIENT_ID != '' }}
+      - name: Resolve JSON OpenID Connect identity
+        id: json_identity
+        if: ${{ inputs.use_json_config_override }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \
+            --file "${{ inputs.config_file }}" \
+            --environment stage \
+            --format github \
+            --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-common.yml" \
+            --github-identity-output
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ inputs.use_json_config_override }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ steps.json_identity.outputs.azure_client_id }}
+          tenant-id: ${{ steps.json_identity.outputs.azure_tenant_id }}
+          subscription-id: ${{ steps.json_identity.outputs.azure_subscription_id }}
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID != '' }}
         uses: azure/login@v2
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
@@ -483,7 +533,7 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Azure Login with service-principal credentials
-        if: ${{ env.AZURE_CLIENT_ID == '' }}
+        if: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID == '' }}
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -839,8 +889,29 @@ jobs:
         with:
           submodules: true
 
-      - name: Azure Login with OIDC
-        if: ${{ env.AZURE_CLIENT_ID != '' }}
+      - name: Resolve JSON OpenID Connect identity
+        id: json_identity
+        if: ${{ inputs.use_json_config_override }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \
+            --file "${{ inputs.config_file }}" \
+            --environment prod \
+            --format github \
+            --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-common.yml" \
+            --github-identity-output
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ inputs.use_json_config_override }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ steps.json_identity.outputs.azure_client_id }}
+          tenant-id: ${{ steps.json_identity.outputs.azure_tenant_id }}
+          subscription-id: ${{ steps.json_identity.outputs.azure_subscription_id }}
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID != '' }}
         uses: azure/login@v2
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
@@ -848,7 +919,7 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Azure Login with service-principal credentials
-        if: ${{ env.AZURE_CLIENT_ID == '' }}
+        if: ${{ !inputs.use_json_config_override && env.AZURE_CLIENT_ID == '' }}
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}

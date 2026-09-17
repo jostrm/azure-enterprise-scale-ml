@@ -848,10 +848,16 @@ aif_collect_answers() {
   esac
   AIF_ADD_BASTION="false"
 
-  # The initial bootstrap intentionally deploys DEV only. Stage/Prod are
-  # preallocated as peerable address spaces and can be deployed later.
-  AIF_STAGE_SUBSCRIPTION_ID="$AIF_DEV_SUBSCRIPTION_ID"
-  AIF_PROD_SUBSCRIPTION_ID="$AIF_DEV_SUBSCRIPTION_ID"
+  # The initial bootstrap deploys DEV only. Operators can supply separate
+  # Stage/Prod subscriptions up front; otherwise Dev remains the compatibility
+  # default until those environments are explicitly configured.
+  AIF_STAGE_SUBSCRIPTION_ID="${AIF_STAGE_SUBSCRIPTION_ID:-$AIF_DEV_SUBSCRIPTION_ID}"
+  AIF_PROD_SUBSCRIPTION_ID="${AIF_PROD_SUBSCRIPTION_ID:-$AIF_DEV_SUBSCRIPTION_ID}"
+  if ! aif_validate_guid "$AIF_STAGE_SUBSCRIPTION_ID" ||
+     ! aif_validate_guid "$AIF_PROD_SUBSCRIPTION_ID"; then
+    aif_error "Stage and Prod subscription IDs must be GUIDs." >&2
+    exit 1
+  fi
 }
 
 aif_confirm_summary() {
@@ -862,6 +868,8 @@ aif_confirm_summary() {
   aif_value "Identity" "$AIF_IDENTITY_MODE"
   aif_value "Tenant" "$AIF_TENANT_ID"
   aif_value "DEV subscription" "$AIF_DEV_SUBSCRIPTION_ID"
+  aif_value "Stage subscription" "$AIF_STAGE_SUBSCRIPTION_ID"
+  aif_value "Prod subscription" "$AIF_PROD_SUBSCRIPTION_ID"
   aif_value "Region" "$AIF_LOCATION"
   aif_value "DEV vNet" "$AIF_DEV_VNET_CIDR"
   aif_value "Stage vNet" "$AIF_STAGE_VNET_CIDR"
@@ -1541,11 +1549,17 @@ print(value["name"])
     fi
   fi
 
-  local role scope
-  scope="/subscriptions/$AIF_DEV_SUBSCRIPTION_ID"
-  for role in Contributor "User Access Administrator"; do
-    aif_ensure_role_assignment \
-      "$AIF_IDENTITY_PRINCIPAL_ID" ServicePrincipal "$role" "$scope"
+  local role subscription_id scope
+  declare -A unique_deployment_subscriptions=()
+  for subscription_id in "$AIF_DEV_SUBSCRIPTION_ID" "$AIF_STAGE_SUBSCRIPTION_ID" "$AIF_PROD_SUBSCRIPTION_ID"; do
+    unique_deployment_subscriptions["$subscription_id"]=1
+  done
+  for subscription_id in "${!unique_deployment_subscriptions[@]}"; do
+    scope="/subscriptions/$subscription_id"
+    for role in Contributor "User Access Administrator"; do
+      aif_ensure_role_assignment \
+        "$AIF_IDENTITY_PRINCIPAL_ID" ServicePrincipal "$role" "$scope"
+    done
   done
   if [[ "$AIF_TOPOLOGY" == "hs" || "$AIF_ACCESS_HUB_MODE" == "external" ]]; then
     aif_ensure_role_assignment \
@@ -3027,7 +3041,10 @@ aif_configure_ado() {
 aif_configure_github_identity() {
   aif_section "13 / GitHub deployment identity"
   [[ "$AIF_DRY_RUN" != "true" ]] || return 0
-  gh api --method PUT "repos/$GITHUB_REPOSITORY/environments/dev" >/dev/null
+  local github_environment credential_name subject
+  for github_environment in dev stage prod; do
+    gh api --method PUT "repos/$GITHUB_REPOSITORY/environments/$github_environment" >/dev/null
+  done
   if [[ "$AIF_IDENTITY_MODE" == "sp" ]]; then
     if gh secret list --repo "$GITHUB_REPOSITORY" --env dev |
        awk '$1 == "AZURE_CLIENT_ID" { found=1 } END { exit !found }'; then
@@ -3051,24 +3068,26 @@ PY
           --repo "$GITHUB_REPOSITORY" \
           --env dev
   else
-    local credential_name="github-${AIF_SCALESET_SUFFIX}-dev"
-    local subject="repo:$GITHUB_REPOSITORY:environment:dev"
-    if ! az identity federated-credential show \
-      --subscription "$AIF_IDENTITY_SUBSCRIPTION_ID" \
-      --resource-group "$AIF_IDENTITY_RESOURCE_GROUP" \
-      --identity-name "$AIF_IDENTITY_NAME" \
-      --name "$credential_name" \
-      --output none 2>/dev/null; then
-      az identity federated-credential create \
+    for github_environment in dev stage prod; do
+      credential_name="github-${AIF_SCALESET_SUFFIX}-${github_environment}"
+      subject="repo:$GITHUB_REPOSITORY:environment:$github_environment"
+      if ! az identity federated-credential show \
         --subscription "$AIF_IDENTITY_SUBSCRIPTION_ID" \
         --resource-group "$AIF_IDENTITY_RESOURCE_GROUP" \
         --identity-name "$AIF_IDENTITY_NAME" \
         --name "$credential_name" \
-        --issuer "https://token.actions.githubusercontent.com" \
-        --subject "$subject" \
-        --audiences api://AzureADTokenExchange \
-        --output none
-    fi
+        --output none 2>/dev/null; then
+        az identity federated-credential create \
+          --subscription "$AIF_IDENTITY_SUBSCRIPTION_ID" \
+          --resource-group "$AIF_IDENTITY_RESOURCE_GROUP" \
+          --identity-name "$AIF_IDENTITY_NAME" \
+          --name "$credential_name" \
+          --issuer "https://token.actions.githubusercontent.com" \
+          --subject "$subject" \
+          --audiences api://AzureADTokenExchange \
+          --output none
+      fi
+    done
     gh secret set AZURE_CLIENT_ID \
       --repo "$GITHUB_REPOSITORY" \
       --env dev \

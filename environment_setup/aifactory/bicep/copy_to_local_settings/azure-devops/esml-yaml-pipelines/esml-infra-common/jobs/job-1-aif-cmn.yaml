@@ -11,6 +11,14 @@ steps:
   enabled: true # Run this task when the job runs?.  (false,n,no,off,on,true,y,yes)
   name: GIT # ID of the step.  ([-_A-Za-z0-9]*)
 
+- task: PythonScript@0
+  displayName: '00_apply_json_config_override'
+  condition: and(succeeded(), ne(variables['configOverrideFile'], ''))
+  inputs:
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py'
+    arguments: '--file "$(configOverrideFile)" --environment "$(dev_test_prod)" --format azure-devops'
+    workingDirectory: '$(System.DefaultWorkingDirectory)'
+
 # ---------------------------------------------------------------------------
 # PREFLIGHT (early, fail-fast): validate region support, resource-provider
 # registration and policy assignments for the common subscription BEFORE any
