@@ -45,6 +45,9 @@ Common non-interactive variables:
   AIF_AZURE_ML_PRINCIPAL_ID=<existing-enterprise-app-object-id>
   AIF_DATABRICKS_PRINCIPAL_ID=<existing-enterprise-app-object-id>
   AIF_ADMIN_VM_SIZE=Standard_D2s_v5
+  AIF_RUNNER_MODE=self-hosted|microsoft-hosted|github-hosted
+  AIF_RUNNER_VM_NAME=dsvm-cmn-<region>-dev-001
+  AIF_RUNNER_VM_RESOURCE_GROUP=<existing-or-new-common-resource-group>
   AIF_SETUP_HUB_ACCESS=y|n
   AIF_CONFIGURE_VPN_CLIENT=y|n
   AIF_SIMPLE_MODE=true   Opt in to private-ai-foundation-v2 (GHA, DEV only).
@@ -63,6 +66,8 @@ EOF
 
 GitHub Actions route:
   GITHUB_REPOSITORY=owner/repository
+  GHA_RUNNER_NAME=<unique-agent-name>
+  GHA_RUNNER_LABEL=<unique-workflow-label>
 EOF
   else
     cat <<'EOF'
@@ -792,16 +797,30 @@ aif_collect_answers() {
     fi
     aif_prompt_value ADO_SERVICE_CONNECTION_NAME "Azure DevOps service connection name" \
       "$ADO_SERVICE_CONNECTION_NAME"
+    case "${AIF_RUNNER_MODE:-}" in
+      self-hosted)
+        [[ -z "$ADO_RUNNER_MODE" || "$ADO_RUNNER_MODE" == s ]] ||
+          { aif_error "AIF_RUNNER_MODE conflicts with ADO_RUNNER_MODE."; exit 1; }
+        ADO_RUNNER_MODE=s ;;
+      microsoft-hosted)
+        [[ -z "$ADO_RUNNER_MODE" || "$ADO_RUNNER_MODE" == h ]] ||
+          { aif_error "AIF_RUNNER_MODE conflicts with ADO_RUNNER_MODE."; exit 1; }
+        ADO_RUNNER_MODE=h ;;
+      "") ;;
+      *) aif_error "ADO requires AIF_RUNNER_MODE=self-hosted or microsoft-hosted."; exit 1 ;;
+    esac
+    local runner_default=h
+    [[ "$AIF_NETWORK_MODE" != priv ]] || runner_default=s
     aif_prompt_choice ADO_RUNNER_MODE \
-      "Project build agent: self-hosted admin VM (s) or Microsoft-hosted (h)" \
-      "h" "s h"
+      "Project build agent: self-hosted admin VM (s, recommended for private access) or Microsoft-hosted (h)" \
+      "$runner_default" "s h"
     if [[ "$ADO_RUNNER_MODE" == "s" ]]; then
       aif_prompt_value ADO_AGENT_POOL "Azure DevOps agent pool" "Default"
       aif_prompt_value AIF_ADMIN_VM_SIZE \
         "Self-hosted admin VM size" \
         "$AIF_ADMIN_VM_SIZE"
       AIF_RUNNER_MODE="self-hosted"
-      ADO_AGENT_NAME="dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001"
+      ADO_AGENT_NAME="${ADO_AGENT_NAME:-dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001}"
     else
       AIF_RUNNER_MODE="microsoft-hosted"
       ADO_AGENT_NAME=""
@@ -812,7 +831,21 @@ aif_collect_answers() {
     esac
     ADO_ORGANIZATION="${ADO_ORGANIZATION%/}"
   else
-    AIF_RUNNER_MODE="github-hosted"
+    local runner_default=github-hosted
+    [[ "$AIF_NETWORK_MODE" != priv ]] || runner_default=self-hosted
+    AIF_RUNNER_MODE="${AIF_RUNNER_MODE:-}"
+    aif_prompt_choice AIF_RUNNER_MODE \
+      "Project runner: self-hosted (recommended for private access) or github-hosted" \
+      "$runner_default" "self-hosted github-hosted"
+    if [[ "$AIF_RUNNER_MODE" == "self-hosted" ]]; then
+      GHA_RUNNER_NAME="${GHA_RUNNER_NAME:-dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001-gha}"
+      GHA_RUNNER_LABEL="${GHA_RUNNER_LABEL:-${AIF_PREFIX}aifactory-${AIF_SCALESET_SUFFIX}}"
+      [[ "$GHA_RUNNER_NAME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,99}$ ]] ||
+        { aif_error "GHA_RUNNER_NAME must be a safe, unique runner name."; exit 1; }
+      [[ "$GHA_RUNNER_LABEL" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,99}$ ]] ||
+        { aif_error "GHA_RUNNER_LABEL must be a safe, unique runner label."; exit 1; }
+      aif_prompt_value AIF_ADMIN_VM_SIZE "Self-hosted admin VM size" "$AIF_ADMIN_VM_SIZE"
+    fi
     ADO_AGENT_POOL=""
     ADO_AGENT_NAME=""
     local github_owner=""
@@ -829,6 +862,9 @@ aif_collect_answers() {
     fi
   fi
 
+  if [[ "$AIF_RUNNER_MODE" != self-hosted && "$AIF_NETWORK_MODE" == priv ]]; then
+    aif_warn "Hosted runners need separately configured Azure private-network connectivity; ordinary hosted runners cannot access private endpoints."
+  fi
   case "$AIF_NETWORK_MODE" in
     priv)
       AIF_ENABLE_PUBLIC_GENAI_ACCESS="false"
@@ -3286,29 +3322,172 @@ aif_run_github_workflow() {
   fi
 }
 
+aif_prepare_runner_vm() {
+  local explicit_vm=false
+  if [[ -n "${AIF_RUNNER_VM_NAME:-}" && -n "${AIF_RUNNER_VM_RESOURCE_GROUP:-}" ]]; then explicit_vm=true; fi
+  AIF_RUNNER_VM_NAME="${AIF_RUNNER_VM_NAME:-dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001}"
+  AIF_RUNNER_VM_RESOURCE_GROUP="${AIF_RUNNER_VM_RESOURCE_GROUP:-${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}}"
+  aif_use_azure_tenant
+  local vm_details power_state
+  vm_details="$(az vm show \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --resource-group "$AIF_RUNNER_VM_RESOURCE_GROUP" \
+    --name "$AIF_RUNNER_VM_NAME" \
+    --query '[storageProfile.osDisk.osType, location]' --output tsv)" || return
+  local -a vm_values=()
+  mapfile -t vm_values <<< "${vm_details//$'\r'/}"
+  AIF_RUNNER_OS="${vm_values[0]:-}"
+  AIF_RUNNER_VM_LOCATION="${vm_values[1]:-}"
+  case "$AIF_RUNNER_OS" in
+    Windows) ;;
+    Linux)
+      [[ "$explicit_vm" == true ]] ||
+        { aif_error "Select an existing Linux VM explicitly with both AIF_RUNNER_VM_NAME and AIF_RUNNER_VM_RESOURCE_GROUP."; return 1; } ;;
+    *) aif_error "Unsupported or unknown VM OS; no VM was created or changed."; return 1 ;;
+  esac
+  if [[ -z "$AIF_RUNNER_VM_LOCATION" ]]; then
+    aif_error "Could not resolve the existing VM location."
+    return 1
+  fi
+  power_state="$(az vm get-instance-view \
+    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+    --resource-group "$AIF_RUNNER_VM_RESOURCE_GROUP" \
+    --name "$AIF_RUNNER_VM_NAME" \
+    --query "instanceView.statuses[?starts_with(code, 'PowerState/')].code | [0]" \
+    --output tsv)" || return
+  power_state="${power_state//$'\r'/}"
+  if [[ "$power_state" == "PowerState/stopped" || "$power_state" == "PowerState/deallocated" ]]; then
+    az vm start \
+      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+      --resource-group "$AIF_RUNNER_VM_RESOURCE_GROUP" \
+      --name "$AIF_RUNNER_VM_NAME" \
+      --output none
+  elif [[ "$power_state" != "PowerState/running" ]]; then
+    aif_error "VM is in state '$power_state'; wait or resolve it explicitly. No restart was requested."
+    return 1
+  fi
+}
+
+aif_invoke_runner_registration() {
+  local provider="$1" url="$2" pool="$3" name="$4" package_url="$5" checksum="$6" remote_exists="$7" label="${8:-}"
+  local tracing=false
+  [[ $- != *x* ]] || { tracing=true; set +x; }
+  local run_command_body="$AIF_STATE_DIR/${provider}-runner-run-command.json"
+  [[ ! -e "$run_command_body" ]] ||
+    { aif_error "Existing protected Run Command request must be inspected before retrying."; unset AIF_RUNNER_REGISTRATION_TOKEN; return 1; }
+  # AIF_RUNNER_REGISTRATION_TOKEN is deliberately never a positional argument.
+  AIF_RUNNER_REGISTRATION_TOKEN="$AIF_RUNNER_REGISTRATION_TOKEN" "${AIF_PYTHON[@]}" - \
+    "$run_command_body" "$AIF_SCALESET_LIB_DIR" "$AIF_RUNNER_VM_LOCATION" \
+    "$provider" "$url" "$pool" "$name" "$package_url" "$checksum" "$remote_exists" "$label" "$AIF_RUNNER_OS" "${AIF_RUNNER_REMOTE_ID:-}" <<'PY'
+import csv
+import io
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+library = Path(sys.argv[2])
+os_type = sys.argv[-2]
+if os_type not in ("Windows", "Linux"):
+    raise SystemExit("Registration requires a detected Windows or Linux VM")
+prerequisites = "runner-prerequisites.ps1" if os_type == "Windows" else "runner-prerequisites.sh"
+registration = "runner-registration.ps1" if os_type == "Windows" else "runner-registration.sh"
+parameters = dict(zip(
+    ("Provider", "RegistrationUrl", "AgentPool", "AgentName", "PackageUrl",
+     "PackageSha256", "RemoteExists", "RunnerLabel"), sys.argv[4:-2]
+))
+parameters["RemoteAgentId"] = sys.argv[-1]
+parameters["InstallMissing"] = "true"
+parameters["PrerequisitesScript"] = (library / prerequisites).read_text(encoding="utf-8")
+# Inline managed source uses the VM OS shell: RunPowerShellScript / RunShellScript.
+# Do not combine source.script with source.commandId (mutually exclusive inputs).
+# Named Linux protected parameters are environment variables; Windows binds PS parameters.
+# https://learn.microsoft.com/azure/virtual-machines/linux/run-command-managed
+body = {
+    "location": sys.argv[3],
+    "properties": {
+        "source": {"script": (library / registration).read_text(encoding="utf-8")},
+        "parameters": [{"name": key, "value": value} for key, value in parameters.items()],
+        "protectedParameters": [{"name": "RegistrationToken", "value": os.environ["AIF_RUNNER_REGISTRATION_TOKEN"]}],
+        "asyncExecution": False,
+        "timeoutInSeconds": 1800,
+        "treatFailureAsDeploymentFailure": True,
+    },
+}
+# Restrict access before writing a token, including native Windows ACLs under Git Bash.
+fd = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as output:
+        if os.name == "nt":
+            who = subprocess.check_output(["whoami", "/user", "/fo", "csv", "/nh"], text=True)
+            sid = next(csv.reader(io.StringIO(who.strip())))[1]
+            subprocess.run(["icacls", sys.argv[1], "/inheritance:r", "/grant:r", f"*{sid}:F", "*S-1-5-18:F"],
+                           check=True, stdout=subprocess.DEVNULL)
+        json.dump(body, output)
+except (OSError, subprocess.SubprocessError, StopIteration, ValueError):
+    Path(sys.argv[1]).unlink()
+    raise
+PY
+  local body_status=$?
+  unset AIF_RUNNER_REGISTRATION_TOKEN
+  if (( body_status != 0 )); then
+    return "$body_status"
+  fi
+  local run_command_url status=0
+  # A unique execution cannot overwrite/interrupt an earlier, still-running managed command.
+  run_command_url="https://management.azure.com/subscriptions/$AIF_DEV_SUBSCRIPTION_ID/resourceGroups/$AIF_RUNNER_VM_RESOURCE_GROUP/providers/Microsoft.Compute/virtualMachines/$AIF_RUNNER_VM_NAME/runCommands/register-aifactory-${provider}-$(date -u +%Y%m%d%H%M%S)-$RANDOM"
+  az rest --method put --url "$run_command_url?api-version=2023-03-01" \
+    --body "@$run_command_body" --output none || status=$?
+  rm -f -- "$run_command_body"
+  [[ "$tracing" != true ]] || set -x
+  (( status == 0 )) || return "$status"
+
+  local execution_state="" exit_code=""
+  for attempt in {1..180}; do
+    local -a execution_values=()
+    local execution_details
+    execution_details="$(az rest \
+      --method get \
+      --url "$run_command_url?api-version=2023-03-01&%24expand=instanceView" \
+      --query '[properties.instanceView.executionState, properties.instanceView.exitCode]' \
+      --output tsv)" || { aif_error "Could not read managed Run Command status; inspect the existing execution before retrying."; return 1; }
+    mapfile -t execution_values <<< "${execution_details//$'\r'/}"
+    execution_state="${execution_values[0]:-}"
+    exit_code="${execution_values[1]:-}"
+    case "$execution_state" in
+      Succeeded) break ;;
+      Failed|Canceled|TimedOut)
+        aif_error "Runner prerequisites/registration ended as $execution_state (exit ${exit_code:-unknown}). Inspect the Run Command error; no existing agents were replaced." >&2
+        return 1
+        ;;
+    esac
+    sleep 10
+  done
+  if [[ "$execution_state" != "Succeeded" || "$exit_code" != "0" ]]; then
+    aif_error "Runner prerequisites/registration did not complete successfully." >&2
+    return 1
+  fi
+}
+
 aif_ensure_ado_self_hosted_agent() {
   [[ "$AIF_RUNNER_MODE" == "self-hosted" ]] || return 0
+  if [[ "$AIF_DRY_RUN" == true ]]; then
+    aif_info "DRY-RUN: check/install missing shared prerequisites and create or safely reuse the ADO runner."
+    return 0
+  fi
   aif_section "16 / Self-hosted Azure Pipelines agent"
-
-  local pool_encoded pools_file pool_id agent_encoded agents_file
+  local pool_encoded pools_file pool_id agent_encoded agents_file remote_exists packages_file platform
   pool_encoded="$(aif_urlencode "$ADO_AGENT_POOL")"
   pools_file="$AIF_STATE_DIR/agent-pools.json"
   aif_ado_api GET \
-    "$ADO_ORGANIZATION/_apis/distributedtask/pools?poolName=$pool_encoded&actionFilter=manage&api-version=7.1" \
-    > "$pools_file"
+    "$ADO_ORGANIZATION/_apis/distributedtask/pools?poolName=$pool_encoded&actionFilter=manage&api-version=7.1" > "$pools_file"
   pool_id="$("${AIF_PYTHON[@]}" - "$pools_file" "$ADO_AGENT_POOL" <<'PY'
 import json
 import sys
-
-value = json.load(open(sys.argv[1], encoding="utf-8"))
-pools = value.get("value", [])
-if len(pools) != 1:
-    raise SystemExit(
-        f"Expected one manageable Azure DevOps agent pool named {sys.argv[2]!r}; "
-        f"found {len(pools)}"
-    )
-if pools[0].get("isHosted"):
-    raise SystemExit(f"Agent pool {sys.argv[2]!r} is Microsoft-hosted")
+pools = [p for p in json.load(open(sys.argv[1], encoding="utf-8")).get("value", []) if p.get("name") == sys.argv[2]]
+if len(pools) != 1 or pools[0].get("isHosted"):
+    raise SystemExit("Expected one manageable, self-hosted Azure DevOps pool with the exact requested name")
 print(pools[0]["id"])
 PY
 )"
@@ -3316,243 +3495,73 @@ PY
   agent_encoded="$(aif_urlencode "$ADO_AGENT_NAME")"
   agents_file="$AIF_STATE_DIR/agents.json"
   aif_ado_api GET \
-    "$ADO_ORGANIZATION/_apis/distributedtask/pools/$pool_id/agents?agentName=$agent_encoded&includeCapabilities=true&api-version=7.1" \
-    > "$agents_file"
-  if "${AIF_PYTHON[@]}" - "$agents_file" <<'PY'
+    "$ADO_ORGANIZATION/_apis/distributedtask/pools/$pool_id/agents?agentName=$agent_encoded&includeCapabilities=true&api-version=7.1" > "$agents_file"
+  remote_exists="$("${AIF_PYTHON[@]}" - "$agents_file" "$ADO_AGENT_NAME" <<'PY'
 import json
 import sys
-
-agents = json.load(open(sys.argv[1], encoding="utf-8")).get("value", [])
-raise SystemExit(0 if len(agents) == 1 and agents[0].get("enabled") and agents[0].get("status") == "online" else 1)
-PY
-  then
-    aif_success "Azure Pipelines agent '$ADO_AGENT_NAME' is already online in '$ADO_AGENT_POOL'."
-    return
-  fi
-
-  local common_rg="${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"
-  aif_use_azure_tenant
-  az vm show \
-    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
-    --resource-group "$common_rg" \
-    --name "$ADO_AGENT_NAME" \
-    --output none
-  local power_state
-  power_state="$(az vm get-instance-view \
-    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
-    --resource-group "$common_rg" \
-    --name "$ADO_AGENT_NAME" \
-    --query "instanceView.statuses[?starts_with(code, 'PowerState/')].code | [0]" \
-    --output tsv)"
-  power_state="${power_state//$'\r'/}"
-  if [[ "$power_state" != "PowerState/running" ]]; then
-    az vm start \
-      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
-      --resource-group "$common_rg" \
-      --name "$ADO_AGENT_NAME" \
-      --output none
-  fi
-
-  local packages_file package_url ado_token script_file run_command_body
-  packages_file="$AIF_STATE_DIR/agent-packages.json"
-  aif_ado_api GET \
-    "$ADO_ORGANIZATION/_apis/distributedtask/packages/agent?platform=win-x64&top=1&api-version=7.1" \
-    > "$packages_file"
-  package_url="$("${AIF_PYTHON[@]}" - "$packages_file" <<'PY'
-import json
-import sys
-
-packages = json.load(open(sys.argv[1], encoding="utf-8")).get("value", [])
-if not packages:
-    raise SystemExit("Azure DevOps returned no Windows x64 agent package")
-print(packages[0]["downloadUrl"])
+agents = [a for a in json.load(open(sys.argv[1], encoding="utf-8")).get("value", []) if a.get("name") == sys.argv[2]]
+if len(agents) > 1 or (agents and not agents[0].get("enabled")):
+    raise SystemExit("Duplicate or disabled ADO agent; resolve explicitly without replacing registration")
+if agents and (not isinstance(agents[0].get("id"), int) or agents[0]["id"] <= 0):
+    raise SystemExit("Azure DevOps returned an invalid agent ID")
+print(f"true:{agents[0]['id']}" if agents else "false:0")
 PY
 )"
-  package_url="${package_url//$'\r'/}"
-  if [[ "$ADO_AUTH_METHOD" == "pat" ]]; then
-    ado_token="$AZURE_DEVOPS_EXT_PAT"
-  else
-    ado_token="$(az account get-access-token \
-      --resource "$AIF_ADO_RESOURCE" \
-      --tenant "$ADO_TENANT" \
-      --query accessToken \
-      --output tsv)"
-    ado_token="${ado_token//$'\r'/}"
-  fi
-  script_file="$AIF_STATE_DIR/register-ado-agent.ps1"
-  run_command_body="$AIF_STATE_DIR/agent-run-command.json"
-  cat > "$script_file" <<'POWERSHELL'
-param(
-  [Parameter(Mandatory = $true)][string] $AdoToken,
-  [Parameter(Mandatory = $true)][string] $AdoUrl,
-  [Parameter(Mandatory = $true)][string] $AgentPool,
-  [Parameter(Mandatory = $true)][string] $AgentName,
-  [Parameter(Mandatory = $true)][string] $PackageUrl
-)
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
-$agentRoot = 'C:\aifactory-agent'
-$archive = Join-Path $env:TEMP 'azure-pipelines-agent.zip'
-
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-New-Item -ItemType Directory -Path $agentRoot -Force | Out-Null
-$configured = Test-Path (Join-Path $agentRoot '.agent')
-if ($configured) {
-  Get-Service -Name 'vstsagent*' -ErrorAction SilentlyContinue |
-    Stop-Service -Force -ErrorAction SilentlyContinue
-  Push-Location $agentRoot
-  & .\config.cmd remove --unattended --auth pat --token $AdoToken
-  if ($LASTEXITCODE -ne 0) {
-    throw "Existing Azure Pipelines agent removal failed with exit code $LASTEXITCODE."
-  }
-  Pop-Location
-  Get-ChildItem -LiteralPath $agentRoot -Force | Remove-Item -Recurse -Force
-}
-
-Invoke-WebRequest -Uri $PackageUrl -OutFile $archive -UseBasicParsing
-Expand-Archive -LiteralPath $archive -DestinationPath $agentRoot -Force
-Remove-Item -LiteralPath $archive -Force
-
-$env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
-  [Environment]::GetEnvironmentVariable('Path', 'User')
-$gitRoot = Join-Path $env:ProgramFiles 'Git'
-$gitBin = Join-Path $gitRoot 'bin'
-$gitCmd = Join-Path $gitRoot 'cmd'
-$gitBash = Join-Path $gitBin 'bash.exe'
-$missing = @('az', 'git', 'python', 'pwsh') | Where-Object {
-  -not (Get-Command $_ -ErrorAction SilentlyContinue)
-}
-if (($missing -or -not (Test-Path -LiteralPath $gitBash -PathType Leaf)) -and
-    (Get-Command choco -ErrorAction SilentlyContinue)) {
-  if ($missing -contains 'git' -or -not (Test-Path -LiteralPath $gitBash -PathType Leaf)) {
-    choco install git -y --no-progress
-  }
-  if ($missing -contains 'az') {
-    choco install azure-cli -y --no-progress
-  }
-  if ($missing -contains 'python') {
-    choco install python -y --no-progress
-  }
-  if ($missing -contains 'pwsh') {
-    choco install powershell-core -y --no-progress
-  }
-}
-
-$machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-$pathParts = @($machinePath -split ';' | Where-Object {
-  $_ -and $_ -ne $gitBin -and $_ -ne $gitCmd
-})
-$machinePath = (@($gitBin, $gitCmd) + $pathParts) -join ';'
-[Environment]::SetEnvironmentVariable('Path', $machinePath, 'Machine')
-$env:Path = $machinePath + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
-$missing = @('az', 'git', 'python', 'pwsh') | Where-Object {
-  -not (Get-Command $_ -ErrorAction SilentlyContinue)
-}
-if ($missing -or -not (Test-Path -LiteralPath $gitBash -PathType Leaf)) {
-  if (-not (Test-Path -LiteralPath $gitBash -PathType Leaf)) {
-    $missing = @($missing) + 'Git Bash'
-  }
-  throw "Required agent commands are missing: $($missing -join ', ')."
-}
-
-$azModuleScript = @'
-$ErrorActionPreference = 'Stop'
-Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-foreach ($name in @('Az.Accounts', 'Az.Network')) {
-  if (-not (Get-Module -ListAvailable -Name $name)) {
-    Install-Module -Name $name -Repository PSGallery -Scope AllUsers -Force -AllowClobber
-  }
-}
-'@
-& pwsh -NoLogo -NoProfile -NonInteractive -Command $azModuleScript
-if ($LASTEXITCODE -ne 0) {
-  throw "Required Azure PowerShell module installation failed with exit code $LASTEXITCODE."
-}
-
-Push-Location $agentRoot
-& .\config.cmd `
-  --unattended `
-  --url $AdoUrl `
-  --auth pat `
-  --token $AdoToken `
-  --pool $AgentPool `
-  --agent $AgentName `
-  --replace `
-  --runAsService `
-  --windowsLogonAccount 'NT AUTHORITY\SYSTEM' `
-  --work '_work'
-if ($LASTEXITCODE -ne 0) {
-  throw "Azure Pipelines agent configuration failed with exit code $LASTEXITCODE."
-}
-Get-Service -Name 'vstsagent*' | Start-Service
-Pop-Location
-POWERSHELL
-  ADO_TOKEN_FOR_VM="$ado_token" "${AIF_PYTHON[@]}" - \
-    "$run_command_body" "$script_file" "$AIF_LOCATION" \
-    "$ADO_ORGANIZATION" "$ADO_AGENT_POOL" "$ADO_AGENT_NAME" "$package_url" <<'PY'
+  remote_exists="${remote_exists//$'\r'/}"
+  AIF_RUNNER_REMOTE_ID="${remote_exists#*:}"
+  remote_exists="${remote_exists%%:*}"
+  # Online is not prerequisite readiness: always validate software and exact local ownership.
+  aif_prepare_runner_vm || return
+  platform=win-x64
+  [[ "$AIF_RUNNER_OS" != Linux ]] || platform=linux-x64
+  local -a package=("" "")
+  if [[ "$remote_exists" != true ]]; then
+    packages_file="$AIF_STATE_DIR/agent-packages.json"
+    aif_ado_api GET \
+      "$ADO_ORGANIZATION/_apis/distributedtask/packages/agent?platform=$platform&top=1&api-version=7.1" > "$packages_file"
+    mapfile -t package < <("${AIF_PYTHON[@]}" - "$packages_file" "$platform" <<'PY'
 import json
-import os
+import re
 import sys
-
-with open(sys.argv[2], encoding="utf-8") as script_file:
-    script = script_file.read()
-body = {
-    "location": sys.argv[3],
-    "properties": {
-        "source": {"script": script},
-        "parameters": [
-            {"name": "AdoUrl", "value": sys.argv[4]},
-            {"name": "AgentPool", "value": sys.argv[5]},
-            {"name": "AgentName", "value": sys.argv[6]},
-            {"name": "PackageUrl", "value": sys.argv[7]},
-        ],
-        "protectedParameters": [
-            {"name": "AdoToken", "value": os.environ["ADO_TOKEN_FOR_VM"]}
-        ],
-        "asyncExecution": False,
-        "timeoutInSeconds": 1800,
-        "treatFailureAsDeploymentFailure": True,
-    },
-}
-with open(sys.argv[1], "w", encoding="utf-8") as output:
-    json.dump(body, output)
+import urllib.request
+packages = json.load(open(sys.argv[1], encoding="utf-8")).get("value", [])
+if not packages:
+    raise SystemExit("Azure DevOps returned no matching x64 agent package")
+url = packages[0]["downloadUrl"]
+match = re.fullmatch(r"https://(?:download\.agent\.dev\.azure\.com|vstsagentpackage\.azureedge\.net|vstsagentpackage\.blob\.core\.windows\.net)/agent/([0-9]+\.[0-9]+\.[0-9]+)/vsts-agent-" + re.escape(sys.argv[2]) + r"-\1\.(?:zip|tar\.gz)", url)
+if not match:
+    raise SystemExit("Unexpected Azure DevOps package URL")
+request = urllib.request.Request(
+    f"https://api.github.com/repos/microsoft/azure-pipelines-agent/releases/tags/v{match[1]}",
+    headers={"Accept": "application/vnd.github+json", "User-Agent": "AI-Factory-bootstrap"},
+)
+with urllib.request.urlopen(request, timeout=60) as response:
+    release = json.load(response)
+if release.get("draft") or release.get("prerelease"):
+    raise SystemExit("Refusing a non-stable Azure Pipelines release")
+checksum = re.search(r"\]\(" + re.escape(url) + r"\)\s*\|\s*([a-fA-F0-9]{64})\s*\|", release.get("body", ""))
+if not checksum:
+    raise SystemExit("Official Azure Pipelines SHA256 metadata is unavailable for the selected package")
+print(url)
+print(checksum[1])
 PY
-  unset ado_token
-  chmod 600 "$run_command_body"
-
-  local run_command_url
-  run_command_url="https://management.azure.com/subscriptions/$AIF_DEV_SUBSCRIPTION_ID/resourceGroups/$common_rg/providers/Microsoft.Compute/virtualMachines/$ADO_AGENT_NAME/runCommands/register-aifactory-ado-agent"
-  az rest \
-    --method put \
-    --url "$run_command_url?api-version=2023-03-01" \
-    --body "@$run_command_body" \
-    --output none
-  rm -f -- "$run_command_body"
-
-  local execution_state="" exit_code=""
-  for attempt in {1..180}; do
-    local -a execution_values=()
-    mapfile -t execution_values < <(az rest \
-      --method get \
-      --url "$run_command_url?api-version=2023-03-01&%24expand=instanceView" \
-      --query '[properties.instanceView.executionState, properties.instanceView.exitCode]' \
-      --output tsv 2>/dev/null | tr -d '\r' || true)
-    execution_state="${execution_values[0]:-}"
-    exit_code="${execution_values[1]:-}"
-    case "$execution_state" in
-      Succeeded) break ;;
-      Failed|Canceled|TimedOut)
-        aif_error "Agent registration Run Command ended as $execution_state with exit code ${exit_code:-unknown}." >&2
-        exit 1
-        ;;
-    esac
-    sleep 10
-  done
-  if [[ "$execution_state" != "Succeeded" || "$exit_code" != "0" ]]; then
-    aif_error "Agent registration Run Command did not complete successfully." >&2
-    exit 1
+)
+    [[ ${#package[@]} == 2 ]] || { aif_error "Could not verify ADO runner package metadata."; return 1; }
   fi
-
+  local trace=false
+  [[ $- != *x* ]] || { trace=true; set +x; }
+  if [[ "$remote_exists" == true ]]; then
+    AIF_RUNNER_REGISTRATION_TOKEN=''
+  elif [[ "$ADO_AUTH_METHOD" == pat ]]; then
+    AIF_RUNNER_REGISTRATION_TOKEN="$AZURE_DEVOPS_EXT_PAT"
+  else
+    AIF_RUNNER_REGISTRATION_TOKEN="$(az account get-access-token --resource "$AIF_ADO_RESOURCE" \
+      --tenant "$ADO_TENANT" --query accessToken --output tsv)"
+  fi
+  AIF_RUNNER_REGISTRATION_TOKEN="${AIF_RUNNER_REGISTRATION_TOKEN//$'\r'/}"
+  aif_invoke_runner_registration ado "$ADO_ORGANIZATION" "$ADO_AGENT_POOL" "$ADO_AGENT_NAME" \
+    "${package[0]//$'\r'/}" "${package[1]//$'\r'/}" "$remote_exists" || return
+  [[ "$trace" != true ]] || set -x
   for attempt in {1..60}; do
     aif_ado_api GET \
       "$ADO_ORGANIZATION/_apis/distributedtask/pools/$pool_id/agents?agentName=$agent_encoded&includeCapabilities=true&api-version=7.1" \
@@ -3565,10 +3574,6 @@ agents = json.load(open(sys.argv[1], encoding="utf-8")).get("value", [])
 raise SystemExit(0 if len(agents) == 1 and agents[0].get("enabled") and agents[0].get("status") == "online" else 1)
 PY
     then
-      az rest \
-        --method delete \
-        --url "$run_command_url?api-version=2023-03-01" \
-        --output none
       aif_success "Azure Pipelines agent '$ADO_AGENT_NAME' is online in '$ADO_AGENT_POOL'."
       return
     fi
@@ -3576,6 +3581,88 @@ PY
   done
   aif_error "Azure Pipelines agent '$ADO_AGENT_NAME' did not become online." >&2
   exit 1
+}
+
+aif_ensure_github_self_hosted_agent() {
+  [[ "$AIF_RUNNER_MODE" == self-hosted ]] || return 0
+  if [[ "$AIF_DRY_RUN" == true ]]; then
+    aif_info "DRY-RUN: check/install shared prerequisites and create or safely reuse the GitHub runner."
+    return 0
+  fi
+  aif_section "16 / Self-hosted GitHub Actions runner"
+  aif_prepare_runner_vm || return
+  local runners_file="$AIF_STATE_DIR/github-runners.json" remote_exists
+  gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runners?per_page=100" --jq '.runners[]' > "$runners_file"
+  remote_exists="$("${AIF_PYTHON[@]}" - "$runners_file" "$GHA_RUNNER_NAME" "$GHA_RUNNER_LABEL" <<'PY'
+import json
+from pathlib import Path
+import sys
+text = Path(sys.argv[1]).read_text(encoding="utf-8").strip()
+decoder, runners = json.JSONDecoder(), []
+while text:
+    value, end = decoder.raw_decode(text)
+    runners.append(value)
+    text = text[end:].lstrip()
+matches = [runner for runner in runners if runner.get("name") == sys.argv[2]]
+if len(matches) > 1:
+    raise SystemExit("Duplicate GitHub runner names; no registrations will be replaced")
+if matches and sys.argv[3] not in [label["name"] for label in matches[0].get("labels", [])]:
+    raise SystemExit("Existing GitHub runner lacks the requested label; use its existing label or review that change explicitly")
+if matches and (not isinstance(matches[0].get("id"), int) or matches[0]["id"] <= 0):
+    raise SystemExit("GitHub returned an invalid runner ID")
+print(f"true:{matches[0]['id']}" if matches else "false:0")
+PY
+)"
+  remote_exists="${remote_exists//$'\r'/}"
+  AIF_RUNNER_REMOTE_ID="${remote_exists#*:}"
+  remote_exists="${remote_exists%%:*}"
+  local -a package=("" "")
+  if [[ "$remote_exists" != true ]]; then
+    local release="$AIF_STATE_DIR/github-runner-release.json"
+    gh api repos/actions/runner/releases/latest > "$release"
+    mapfile -t package < <("${AIF_PYTHON[@]}" - "$release" "$AIF_RUNNER_OS" <<'PY'
+import json
+import re
+import sys
+release = json.load(open(sys.argv[1], encoding="utf-8"))
+platform, suffix = ("linux-x64", r"\.tar\.gz") if sys.argv[2] == "Linux" else ("win-x64", r"\.zip")
+assets = [a for a in release.get("assets", []) if re.fullmatch("actions-runner-" + platform + r"-[0-9.]+" + suffix, a["name"])]
+if len(assets) != 1 or release.get("draft") or release.get("prerelease"):
+    raise SystemExit("Expected one stable official GitHub package for the VM OS")
+asset = assets[0]
+checksum = (asset.get("digest") or "").removeprefix("sha256:")
+if not re.fullmatch(r"[a-fA-F0-9]{64}", checksum):
+    match = re.search(r"<!-- BEGIN SHA " + platform + r" -->\s*([a-fA-F0-9]{64})\s*<!-- END SHA " + platform + " -->", release.get("body", ""))
+    if not match:
+        raise SystemExit("Official GitHub runner SHA256 metadata is unavailable")
+    checksum = match[1]
+print(asset["browser_download_url"])
+print(checksum)
+PY
+)
+    [[ ${#package[@]} == 2 ]] || { aif_error "Could not verify GitHub runner package metadata."; return 1; }
+  fi
+  local trace=false
+  [[ $- != *x* ]] || { trace=true; set +x; }
+  AIF_RUNNER_REGISTRATION_TOKEN=''
+  if [[ "$remote_exists" != true ]]; then
+    AIF_RUNNER_REGISTRATION_TOKEN="$(gh api --method POST "repos/$GITHUB_REPOSITORY/actions/runners/registration-token" --jq .token)"
+  fi
+  AIF_RUNNER_REGISTRATION_TOKEN="${AIF_RUNNER_REGISTRATION_TOKEN//$'\r'/}"
+  aif_invoke_runner_registration gha "https://github.com/$GITHUB_REPOSITORY" "" "$GHA_RUNNER_NAME" \
+    "${package[0]//$'\r'/}" "${package[1]//$'\r'/}" "${remote_exists//$'\r'/}" "$GHA_RUNNER_LABEL" || return
+  [[ "$trace" != true ]] || set -x
+  for attempt in {1..60}; do
+    if gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runners?per_page=100" \
+      --jq ".runners[] | select(.name == \"$GHA_RUNNER_NAME\" and .status == \"online\") | .labels[].name" |
+      grep -qxF "$GHA_RUNNER_LABEL"; then
+      aif_success "GitHub runner '$GHA_RUNNER_NAME' is online with label '$GHA_RUNNER_LABEL'."
+      return 0
+    fi
+    sleep 10
+  done
+  aif_error "GitHub runner did not become online with the requested label. Existing labels/registrations were not changed."
+  return 1
 }
 
 aif_validate_simple_new_scope() {
@@ -3889,12 +3976,23 @@ aif_deploy_github() {
   aif_verify_common_resource_group
   aif_simple_stage hub
   aif_ensure_private_network_access
+  aif_ensure_github_self_hosted_agent
   aif_simple_stage project
+  local runner_selection="$AIF_RUNNER_MODE"
+  if [[ "$AIF_RUNNER_MODE" == self-hosted ]]; then
+    case "${AIF_RUNNER_OS:-}" in
+      Windows) runner_selection=self-hosted-windows ;;
+      Linux) runner_selection=self-hosted-linux ;;
+      '') [[ "$AIF_DRY_RUN" == true ]] ||
+        { aif_error "Runner OS must be verified before dispatching the project."; return 1; } ;;
+      *) aif_error "Unsupported runner OS; project workflow was not dispatched."; return 1 ;;
+    esac
+  fi
   aif_run_github_workflow infra-project.yml project \
     --raw-field environment=dev \
     --raw-field config_file=aifactory/variables.json \
-    --raw-field runner_selection=github-hosted \
-    --raw-field self_hosted_runner_label=
+    --raw-field "runner_selection=$runner_selection" \
+    --raw-field "self_hosted_runner_label=${GHA_RUNNER_LABEL:-}"
   aif_deploy_simple_application_gateway
 }
 

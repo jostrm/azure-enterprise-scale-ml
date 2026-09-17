@@ -7,4 +7,6 @@ dist/
 *.receipt.json
 *.review.json
 *.private.json
-
+*.enrollment-plan.json
+*.enrollment-result.json
+/src/azurefactory/_vendor/factory_enrollment.py

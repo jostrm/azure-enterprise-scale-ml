@@ -181,6 +181,38 @@ class AzureFactoryClient:
     def schema(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/api/v1/schema"), "schema")
 
+    def configuration_load(self, folder: str, project_number: str) -> dict[str, Any]:
+        return self._object(self.request(
+            "POST", "/api/v1/projects/load",
+            body={"aifactory_folder": folder, "project_number": project_number},
+        ), "configuration load")
+
+    def configuration_import(self, path: str, format: str = "json") -> dict[str, Any]:
+        """Import a persistent file on the API host, not inline uploaded JSON."""
+        return self._object(self.request(
+            "POST", "/api/v1/import", body={"format": format, "path": path},
+        ), "configuration import")
+
+    def configuration_validate(self, state: dict[str, Any]) -> dict[str, Any]:
+        return self._object(self.request(
+            "POST", "/api/v1/validation", body={"state": state},
+        ), "configuration validation")
+
+    def configuration_export(
+        self, state: dict[str, Any], format: str = "json", path: str | None = None,
+    ) -> dict[str, Any]:
+        """Render without writing unless an explicit API-host destination is supplied."""
+        body: dict[str, Any] = {"state": state, "format": format}
+        if path is not None:
+            body["path"] = path
+        return self._object(self.request("POST", "/api/v1/export", body=body), "configuration export")
+
+    def configuration_save(self, state: dict[str, Any], *, write_variables: bool = True) -> dict[str, Any]:
+        """Write local configuration only; the caller must obtain approval first."""
+        return self._object(self.request(
+            "POST", "/api/v1/projects/save", body={"state": state, "write_variables": write_variables},
+        ), "configuration save")
+
     def auth_status(self, **body) -> dict[str, Any]:
         return self._object(self.request("POST", "/api/v1/azure/auth/status", body={k: v for k, v in body.items() if v is not None}), "auth status")
 
@@ -308,9 +340,17 @@ def _decode_error(payload: bytes):
     if not payload:
         return None
     try:
-        return json.loads(payload.decode("utf-8", errors="replace"))
+        decoded = json.loads(payload.decode("utf-8", errors="replace"))
     except json.JSONDecodeError:
         return payload.decode("utf-8", errors="replace")
+    if isinstance(decoded, dict) and isinstance(decoded.get("detail"), list):
+        # Pydantic input/context can echo whole drafts, including serialized secrets.
+        decoded["detail"] = [
+            {key: value for key, value in issue.items() if key not in {"input", "ctx"}}
+            if isinstance(issue, dict) else issue
+            for issue in decoded["detail"]
+        ]
+    return decoded
 
 
 def _error_message(payload: bytes, exc: HTTPError) -> str:
@@ -318,6 +358,9 @@ def _error_message(payload: bytes, exc: HTTPError) -> str:
     if isinstance(decoded, dict):
         detail = decoded.get("detail") or decoded.get("message") or decoded.get("error")
         if detail:
+            if isinstance(detail, list):
+                messages = [item["msg"] for item in detail if isinstance(item, dict) and isinstance(item.get("msg"), str)]
+                return "; ".join(messages) or f"API returned HTTP {exc.code}."
             return str(detail)
     return f"API returned HTTP {exc.code}."
 
@@ -332,7 +375,7 @@ def redact_secrets(value: Any, secret: str | None) -> Any:
     if isinstance(value, dict):
         redacted = {}
         for key, item in value.items():
-            if any(marker in str(key).lower() for marker in ("api_key", "apikey", "secret", "token", "password", "credential")):
+            if key == "_json_source" or any(marker in str(key).lower() for marker in ("api_key", "apikey", "secret", "token", "password", "credential")):
                 redacted[key] = "<redacted>"
             else:
                 redacted[key] = redact_secrets(item, secret)

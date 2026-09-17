@@ -109,6 +109,25 @@ def test_api_key_repr_and_error_redaction(server):
     assert error.value.details["detail"] == "bad <redacted>"
 
 
+@pytest.mark.parametrize("value", [
+    {"_json_source": {"path": "private-source-marker"}, "password": "private-value"},
+    '{"_json_source":{"path":"private-source-marker"},"password":"private-value"}',
+    "private-value",
+])
+def test_validation_errors_do_not_echo_opaque_state_or_credentials(server, value):
+    Handler.responses[("POST", "/api/v1/validation")] = (422, {"detail": [{
+        "loc": ["body", "state"], "msg": "Invalid state", "type": "value_error",
+        "input": value, "ctx": {"value": "private-value"},
+    }]}, {})
+    with pytest.raises(APIError) as exc:
+        AzureFactoryClient(server, "secret").configuration_validate({})
+    assert str(exc.value) == "Invalid state"
+    assert "private-source-marker" not in json.dumps(exc.value.details)
+    assert "private-value" not in json.dumps(exc.value.details)
+    assert "input" not in exc.value.details["detail"][0]
+    assert "ctx" not in exc.value.details["detail"][0]
+
+
 def test_non_json_and_malformed_api_objects(server):
     Handler.responses[("GET", "/plain")] = (200, b"hello", {"Content-Type": "text/plain"})
     with pytest.raises(APIError, match="non-JSON"):

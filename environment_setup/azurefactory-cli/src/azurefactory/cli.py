@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .client import API_KEY_ENV, API_URL_ENV, AzureFactoryClient, canonical_json_hash, redact_secrets
+from .configuration import ConfigurationDraft
+from . import enrollment
 from .errors import APIError, BlockedError, ConfigError, FailureError, RequestTimeout
 from .review import load_receipt as review_load_receipt
 from .review import parse_expires_at, validate_preview, write_receipt
@@ -25,6 +27,15 @@ EXIT_FAILURE = 5
 REQUIRED_OPENAPI_PATHS = {
     "/health": {"get"},
     "/api/v1/schema": {"get"},
+    "/api/v1/projects/load": {"post"},
+    "/api/v1/import": {"post"},
+    "/api/v1/validation": {"post"},
+    "/api/v1/export": {"post"},
+    "/api/v1/projects/save": {"post"},
+    "/api/v1/projects/load": {"post"},
+    "/api/v1/projects/save": {"post"},
+    "/api/v1/validation": {"post"},
+    "/api/v1/export": {"post"},
     "/api/v1/azure/auth/status": {"post"},
     "/api/v1/factory-catalog": {"get"},
     "/api/v1/factory-catalog/settings": {"get"},
@@ -84,10 +95,47 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
 
     add_simple(sub, "health", cmd_health)
+    enroll = sub.add_parser("enrollment", help="Reviewed add-only Azure/provider enrollment; schema-2 consumers only.")
+    enroll_sub = enroll.add_subparsers(dest="enrollment_command", required=True)
+    for name, handler in (("plan", cmd_enrollment_plan), ("ensure", cmd_enrollment_ensure)):
+        command = add_simple(enroll_sub, name, handler)
+        for field in ("consumer-root", "factory-id", "scale-set-id", "options"):
+            command.add_argument("--" + field, required=name == "plan")
+        command.add_argument("--environment", choices=("dev", "stage", "prod"), required=name == "plan")
+        command.add_argument("--expected-orchestrator", choices=("ado", "gha"), help="Block a different registered provider.")
+        command.add_argument("--acknowledge-exclusive-writer-governance", action="store_true",
+                             help="Actual administrator attestation that ALL writers enforce physical leases; not a default.")
+        if name == "plan":
+            command.add_argument("--save-plan", help="New non-secret, integrity-bound local review file; never overwritten.")
+        else:
+            command.add_argument("--plan", help="Previously saved --save-plan artifact; scope/options must still match.")
+            command.add_argument("--expected-plan", help="Approved plan_hash; required without --plan and full scope flags.")
+            command.add_argument("--yes", action="store_true")
+            command.add_argument("--save-result", help="New candidate artifact for prepare-binding; requires --plan.")
+    binding = add_simple(enroll_sub, "prepare-binding", cmd_enrollment_binding,
+                         help="Prepare the exact ensure candidate with the local catalog API; never publish directly.")
+    binding.add_argument("--result", required=True, help="Artifact written by enrollment ensure --save-result.")
+    binding.add_argument("--expected-revision", required=True, help="Current catalog source_revision, not the enrollment hash.")
+    binding.add_argument("--save-receipt", required=True, help="New API receipt for a separate catalog confirm --yes.")
+    publish = add_simple(enroll_sub, "publish", cmd_enrollment_publish,
+                         help="Confirm only a separately reviewed binding API receipt.")
+    add_receipt_and_yes(publish)
     doctor = add_simple(sub, "doctor", cmd_doctor)
     doctor.add_argument("--local-openapi", help="Optional OpenAPI snapshot to compare with the live API.")
     schema = add_simple(sub, "schema", cmd_schema)
     schema.add_argument("--openapi", action="store_true", help="Print live OpenAPI instead of /api/v1/schema.")
+
+    config = sub.add_parser("config", help="Source-preserving JSON legacy-project configuration; never deployment.")
+    config_sub = config.add_subparsers(dest="config_command", required=True)
+    for name, handler in (("review", cmd_config_review), ("save", cmd_config_save)):
+        command = add_simple(config_sub, name, handler)
+        command.add_argument("--folder", required=True, help="Exact legacy factory folder on the API host.")
+        command.add_argument("--project-number", required=True)
+        command.add_argument("--changes-json", help="Local JSON object with only intentional field replacements.")
+        command.add_argument("--snapshot-only", action="store_true", help="Do not write pipeline variable files.")
+        if name == "save":
+            command.add_argument("--expected-review", required=True, help="review_id from the separately approved review.")
+            command.add_argument("--yes", action="store_true")
 
     auth = sub.add_parser("auth", help="Scoped Azure authentication checks.")
     auth_sub = auth.add_subparsers(dest="auth_command", required=True)
@@ -335,9 +383,56 @@ def cmd_health(args):
     return emit(client(args).health())
 
 
+def cmd_enrollment_plan(args):
+    result = enrollment.plan(args)
+    return emit(redact_secrets(result, args.api_key),
+                EXIT_OK if result.get("can_ensure") is True and not result.get("blockers") else EXIT_BLOCKED)
+
+
+def cmd_enrollment_ensure(args):
+    result = enrollment.ensure(args)
+    code = EXIT_OK if result.get("enrollment_complete") is True else EXIT_BLOCKED
+    if result.get("reconciliation_required"):
+        code = EXIT_FAILURE
+    return emit(redact_secrets(result, args.api_key), code)
+
+
+def cmd_enrollment_binding(args):
+    with enrollment.guarded():
+        ensure_receipt_target_available(args)
+        body = enrollment.binding_request(args.result, args.expected_revision)
+        return catalog_prepare_emit(args, body, "enrollment-binding")
+
+
+def cmd_enrollment_publish(args):
+    require_yes(args)
+    with enrollment.guarded():
+        receipt = load_receipt(args.receipt, client(args), "catalog-confirm", operation_mode="configuration")
+        if receipt["operation"] != "enrollment-binding":
+            raise ConfigError("Enrollment publish accepts only a separately prepared enrollment binding receipt.")
+        result = client(args).catalog_confirm(receipt["folder"], receipt["confirmation_id"])
+        return confirmed_emit(result, runtime=False)
+
+
 def cmd_schema(args):
     c = client(args)
     return emit(c.openapi() if args.openapi else c.schema())
+
+
+def configuration_draft(args):
+    changes = read_json_file(args.changes_json) if args.changes_json else {}
+    return ConfigurationDraft.load(client(args), args.folder, args.project_number, changes=changes)
+
+
+def cmd_config_review(args):
+    result = configuration_draft(args).review(write_variables=not args.snapshot_only)
+    return emit(result, EXIT_OK if result["can_save"] else EXIT_BLOCKED)
+
+
+def cmd_config_save(args):
+    require_yes(args)
+    result = configuration_draft(args).save(args.expected_review, write_variables=not args.snapshot_only)
+    return emit(redact_secrets(result, args.api_key))
 
 
 def cmd_doctor(args):
@@ -741,6 +836,8 @@ def read_json_file(path: str) -> Any:
         raise ConfigError(f"JSON file not found: {path}") from exc
     except json.JSONDecodeError as exc:
         raise ConfigError(f"Invalid JSON in {path}: {exc.msg}") from exc
+    except (OSError, UnicodeError) as exc:
+        raise ConfigError(f"Cannot read UTF-8 JSON file: {path}") from exc
 
 
 def maybe_save_receipt(args, preview: dict[str, Any], request_body: dict[str, Any], purpose: str, **extra) -> None:

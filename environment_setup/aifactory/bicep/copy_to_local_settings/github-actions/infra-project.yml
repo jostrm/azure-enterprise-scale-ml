@@ -45,7 +45,7 @@ on:
         required: false
         default: ''
       runner_selection:
-        description: Build runner selection
+        description: Build runner selection (self-hosted uses JSON selfHostedRunnerOS, default Windows)
         required: false
         default: from-config
         type: choice
@@ -53,6 +53,8 @@ on:
           - from-config
           - github-hosted
           - self-hosted
+          - self-hosted-windows
+          - self-hosted-linux
       self_hosted_runner_label:
         description: Custom label assigned to the self-hosted runner
         required: false
@@ -161,6 +163,7 @@ jobs:
           RUNNER_SELECTION: ${{ inputs.runner_selection }}
           SELF_HOSTED_RUNNER_LABEL: ${{ inputs.self_hosted_runner_label }}
           LEGACY_ADMIN_VM_RUNNER_LABEL: ${{ inputs.admin_vm_runner_label }}
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -176,24 +179,39 @@ jobs:
                   raise SystemExit(f"Configuration file not found: {config_path}")
 
               payload = json.loads(config_path.read_text(encoding="utf-8-sig"))
-              environment = "${{ inputs.environment }}"
+              environment = os.environ["TARGET_ENVIRONMENT"]
               section = "stage_prod" if environment != "dev" and isinstance(payload.get("stage_prod"), dict) else "dev"
               config = payload.get(section)
               if not isinstance(config, dict):
                   raise SystemExit(f"Configuration file has no object for section '{section}'")
+              if section == "stage_prod":
+                  baseline = payload.get("dev", {})
+                  if not isinstance(baseline, dict):
+                      raise SystemExit("Configuration file has no object for section 'dev'")
+                  config = {**baseline, **config}
 
           def as_bool(value):
               return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
-          selection = os.environ["RUNNER_SELECTION"]
-          if selection == "self-hosted":
+          selection = os.environ["RUNNER_SELECTION"].strip() or "from-config"
+          explicit_os = {"self-hosted-windows": "Windows", "self-hosted-linux": "Linux"}
+          if selection in {"self-hosted", *explicit_os}:
               use_self_hosted = True
           elif selection == "github-hosted":
               use_self_hosted = False
-          else:
+          elif selection == "from-config":
               use_self_hosted = (
                   as_bool(config.get("useSelfHostedBuildAgent", False))
               )
+          else:
+              raise SystemExit("Unsupported runner_selection; choose from-config, github-hosted, self-hosted, self-hosted-windows or self-hosted-linux")
+
+          runner_os = "Linux"
+          if use_self_hosted:
+              configured_os = config.get("selfHostedRunnerOS", "Windows")
+              if not isinstance(configured_os, str) or configured_os.strip().lower() not in {"windows", "linux"}:
+                  raise SystemExit("selfHostedRunnerOS must be Windows or Linux")
+              runner_os = explicit_os.get(selection, configured_os.strip().capitalize())
 
           runner_label = (
               os.environ["SELF_HOSTED_RUNNER_LABEL"].strip()
@@ -201,8 +219,10 @@ jobs:
               or str(config.get("selfHostedRunnerLabel", "")).strip()
               or "aifactory-admin-vm"
           )
+          if any(ord(char) < 32 or ord(char) == 127 for char in runner_label):
+              raise SystemExit("Self-hosted runner label must not contain control characters")
           runs_on = (
-              ["self-hosted", "Windows", runner_label]
+              ["self-hosted", runner_os, runner_label]
               if use_self_hosted
               else "ubuntu-latest"
           )
@@ -212,7 +232,7 @@ jobs:
               output.write(f"use_self_hosted={str(use_self_hosted).lower()}\n")
               output.write(f"runner_label={runner_label}\n")
 
-          print(f"Runner selection: {'self-hosted/' + runner_label if use_self_hosted else 'ubuntu-latest'}")
+          print(f"Runner selection: {'self-hosted/' + runner_os + '/' + runner_label if use_self_hosted else 'ubuntu-latest'}")
           PY
 
       - name: Report final pipeline job result (offline)

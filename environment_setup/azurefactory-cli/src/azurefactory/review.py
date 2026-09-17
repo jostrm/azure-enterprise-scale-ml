@@ -160,9 +160,17 @@ def validate_bindings(request: dict[str, Any], preview: dict[str, Any], purpose:
                 "factory-create": "create-factory", "factory-clone": "clone",
                 "scaleset-add": "create-scale-set", "project-add": "add-project",
                 "project-add-placements": "add-project-placements", "runtime-deploy": "deploy",
+                "enrollment-binding": "configure-binding",
             }
             if operation not in actions or request.get("action") != actions[operation]:
                 raise ConfigError("Receipt operation does not match the reviewed catalog action.")
+            if operation == "enrollment-binding":
+                if (not isinstance(request.get("binding"), dict) or preview.get("binding") != request["binding"]
+                        or not isinstance(preview.get("target"), dict)
+                        or preview["target"].get("id") != request.get("factory_id")
+                        or not request.get("expected_revision")
+                        or preview.get("source_revision") != request["expected_revision"]):
+                    raise ConfigError("Binding preview must preserve the exact candidate, factory and catalog revision.")
         elif operation != "parameters":
             raise ConfigError("Parameter receipt operation does not match.")
     elif purpose == "bootstrap-start":

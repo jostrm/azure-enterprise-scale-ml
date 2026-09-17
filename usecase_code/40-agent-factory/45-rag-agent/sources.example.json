@@ -1,0 +1,38 @@
+{
+  "sources": {
+    "common-documents": {
+      "agent_name": "aif-rag-common",
+      "binding": {
+        "location": "common",
+        "storage_account_resource_id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/your-common-rg/providers/Microsoft.Storage/storageAccounts/yourcommonlake",
+        "container": "lake3",
+        "blob_path": "mlops/v1/projects/project001/environments/dev/usecases/your-usecase/rag/corpora/your-corpus/versions/v1/documents.jsonl",
+        "format": "shared-lake-jsonl",
+        "sha256": "REPLACE_WITH_DOCUMENTS_JSONL_SHA256",
+        "manifest_path": "mlops/v1/projects/project001/environments/dev/usecases/your-usecase/rag/corpora/your-corpus/versions/v1/_SUCCESS.json",
+        "manifest_sha256": "REPLACE_WITH_SUCCESS_MANIFEST_SHA256",
+        "approved_audience": "project001",
+        "dataset": "your-corpus",
+        "version": "v1",
+        "description": "Approved versioned text corpus from the AI Factory shared lake.",
+        "provenance": ["mlops/v1/master/environments/dev/datasets/your-dataset/versions/v1"]
+      }
+    },
+    "project-helpdesk": {
+      "agent_name": "aif-rag-project",
+      "binding": {
+        "location": "project",
+        "storage_account_resource_id": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/your-project-rg/providers/Microsoft.Storage/storageAccounts/yourproject2001dev",
+        "container": "agent-factory-adf",
+        "blob_path": "kaggle-rag-v1/knowledge/items.json",
+        "format": "knowledge-json-array",
+        "sha256": "REPLACE_WITH_KNOWLEDGE_ITEMS_JSON_SHA256",
+        "approved_audience": "project001",
+        "dataset": "kaggle-helpdesk",
+        "version": "1",
+        "description": "Approved project-storage helpdesk text corpus.",
+        "provenance": ["https://www.kaggle.com/datasets/dkhundley/sample-rag-knowledge-item-dataset"]
+      }
+    }
+  }
+}

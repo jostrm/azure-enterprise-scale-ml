@@ -1,6 +1,7 @@
 """AzureFactory CLI SDK."""
 
 from .client import AzureFactoryClient
+from .configuration import ConfigurationDraft
 from .errors import (
     APIError,
     AuthError,
@@ -18,6 +19,7 @@ __all__ = [
     "AzureFactoryClient",
     "BlockedError",
     "ConfigError",
+    "ConfigurationDraft",
     "FailureError",
     "RedirectError",
     "RequestTimeout",

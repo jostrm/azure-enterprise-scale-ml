@@ -1,5 +1,31 @@
 # Hosted agents
 
+## Use case summary
+
+- Use case type: RAG with LLM
+- Data type: Tabular | Document (Markdown articles packaged in CSV/JSON; text-only runtime)
+- Number of source data sets: 1 shared helpdesk corpus across all framework examples
+- Data sources: No master-lake binding yet; `<project-data-storage>/agent-factory-adf/kaggle-rag-v1/knowledge/items.json` via the persisted knowledge agent and Foundry IQ. See [source paths](../../43-data/readme.md#data-sources-and-lake-layout).
+- Inference type: Online
+- Technology used in full chain: Azure Data Factory | Azure Storage | Azure AI Search | Microsoft Foundry | Microsoft Entra ID | Selected Python agent framework
+
+Each catalog worker retrieves evidence through `aif-knowledge`, then uses its
+framework to answer. The optional expanded profile accepts verified private
+Azure inventory as well as Foundry IQ results. This is not a training pipeline:
+Azure Machine Learning and Azure Databricks are not used in the current chain.
+Serving a response over SSE does not imply a streaming-data ingestion workload.
+
+Framework guides: [Agent Framework](agent-framework/readme.md) |
+[LangGraph](langgraph/readme.md) | [OpenAI Agents SDK](openai-agent-sdk/readme.md) |
+[Anthropic](anthropic-agents/readme.md) | [Copilot SDK](github-copilot-sdk/readme.md) |
+[Custom](custom/readme.md).
+
+## Platform background versus these examples
+
+The following background describes platform possibilities, not enabled tools.
+The actual samples do not enable web search, code interpreter, SharePoint,
+WorkIQ, Fabric IQ, audio or image processing merely by using Foundry.
+
 Hosted agents are code-based agents you build with Agent Framework, LangGraph, the OpenAI Agents SDK, the Anthropic Agent SDK, the GitHub Copilot SDK, or your own code. Ship your agent as either a container image or a .zip file of your source code (Foundry builds the image for you when you bring a .zip file), and Foundry runs it with a managed endpoint, automatic scaling, a dedicated Microsoft Entra identity, session-level state persistence, and end-to-end observability.
 
 Under the hood, your agent code calls your Foundry project endpoint for model inference and tool orchestration, which gives you access to Foundry models from the catalog and a unified set of platform tools: standard tools like file search, code interpreter, and web search, plus additional tools like SharePoint, WorkIQ, and Fabric IQ.
@@ -166,9 +192,10 @@ Deployment and invocation must be exercised in the selected Azure environment;
 offline contract tests alone do not establish runtime or network availability.
 
 The spec fields are `name`, `kind="hosted"`, `framework`, `instructions`,
-`description`, `metadata`, optional `model`, and `members`. Single-agent workers
+`description`, `metadata`, optional `model`, `members`, and `private_tools`. Single-agent workers
 consult configured persisted members before framework inference; the knowledge
-member must actually call Foundry IQ. The team passes prior findings to each
+member must actually call Foundry IQ, or the explicitly enabled private Azure
+inventory tool in the expanded profile. The team passes prior findings to each
 subsequent participant, so its reviewer receives the grounded draft. These are
 real dependencies, not fabricated tools or automatically rendered map edges.
 Source URLs from Foundry response annotations are retained as ordinary Markdown
@@ -204,9 +231,11 @@ external serialization.
   attempted. Child processes receive no inherited GitHub/model keys, and have
   no built-in tools, filesystem permissions, MCP servers, config discovery,
   skills, shell actions or host Git operations enabled.
-* Microsoft Learn MCP is optional and is **not auto-enabled** in these workers.
-  Provision a read-only Learn or RAG prompt agent separately and list it as a
-  coordinator member rather than copying data-access authentication here.
+* Microsoft Learn MCP is **not auto-enabled** in these workers. Public
+  documentation is handled by the separately invoked, approval-gated prompt
+  agent. The current text-only participant helper does not forward its approval
+  requests to callers, so do not add the docs agent as an automatic participant
+  and assume approvals or private-data filtering are implemented.
 * Source deployment uses Python 3.13, remote dependency build, 0.5 CPU, 1 GiB,
   and Responses protocol 2.0.0. Private-network routing, package-build access,
   hosted quotas and identity grants must be established outside this module.

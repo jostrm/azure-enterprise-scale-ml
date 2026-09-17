@@ -125,19 +125,27 @@ class TestScaleSetConfiguration(unittest.TestCase):
             ).read_text(encoding="utf-8")
             self.assertIn('readonly AIF_CREATE_DEFAULT_VERSION="124"', entrypoint)
 
-    def test_ado_agent_registration_installs_pwsh_and_prefers_git_bash(self) -> None:
-        source = (
+    def test_both_runner_providers_share_verified_prerequisites(self) -> None:
+        launcher = (
             BOOTSTRAP / "lib/create-new-aifactory-scaleset.sh"
         ).read_text(encoding="utf-8")
-        self.assertIn("choco install powershell-core -y --no-progress", source)
-        self.assertIn("$gitBash = Join-Path $gitBin 'bash.exe'", source)
-        self.assertIn("@('Az.Accounts', 'Az.Network')", source)
-        self.assertIn("Install-Module -Name $name", source)
+        source = (BOOTSTRAP / "lib/runner-prerequisites.ps1").read_text(encoding="utf-8")
+        registration = (BOOTSTRAP / "lib/runner-registration.ps1").read_text(encoding="utf-8")
+        self.assertIn('aif_invoke_runner_registration ado', launcher)
+        self.assertIn('aif_invoke_runner_registration gha', launcher)
+        self.assertIn('Invoke-AifRunnerPrerequisites', registration)
+        self.assertIn("'Git\\bin'", source)
+        self.assertIn("Name='Az.Accounts'; Minimum=[version]'2.12'", source)
+        self.assertIn("Name='Az.Network'; Minimum=[version]'5.0'", source)
+        self.assertIn("Install-Module -Name $spec.Name", source)
         self.assertIn(
-            "[Environment]::SetEnvironmentVariable('Path', $machinePath, 'Machine')",
+            "[Environment]::SetEnvironmentVariable('Path', $updated, 'Machine')",
             source,
         )
-        self.assertIn("$machinePath = (@($gitBin, $gitCmd) + $pathParts)", source)
+        self.assertIn("Get-FileHash", source)
+        self.assertNotIn("--replace", registration)
+        self.assertNotIn("Stop-Service", registration)
+        self.assertNotIn("config.cmd remove", registration)
 
     def test_vpn_profile_changes_only_the_connection_name(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -734,7 +742,7 @@ class TestScaleSetWorkflowContracts(unittest.TestCase):
         )
         self.assertIn('"protectedParameters"', shared)
         self.assertIn(
-            "Project build agent: self-hosted admin VM (s) or Microsoft-hosted (h)",
+            "Project build agent: self-hosted admin VM (s, recommended for private access) or Microsoft-hosted (h)",
             shared,
         )
         self.assertIn("aif_ensure_dns_private_resolver", shared)

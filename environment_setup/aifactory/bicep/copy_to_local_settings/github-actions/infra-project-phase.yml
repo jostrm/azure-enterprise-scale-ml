@@ -453,8 +453,16 @@ jobs:
       - name: Validate self-hosted runner
         if: ${{ inputs.use_self_hosted == 'true' }}
         shell: pwsh
+        env:
+          EXPECTED_RUNS_ON: ${{ inputs.runs_on }}
+          ACTUAL_RUNNER_OS: ${{ runner.os }}
         run: |
-          $missing = @('az', 'bash', 'git', 'python3', 'jq') | Where-Object {
+          $labels = ConvertFrom-Json -InputObject $env:EXPECTED_RUNS_ON
+          if ($labels -isnot [array] -or $labels.Count -ne 3 -or $labels[0] -cne 'self-hosted' -or
+              $labels[1] -cnotin @('Windows', 'Linux') -or $labels[1] -cne $env:ACTUAL_RUNNER_OS) {
+            throw 'The selected self-hosted runner OS does not match the explicit Windows/Linux runs_on contract.'
+          }
+          $missing = @('az', 'bash', 'git', 'python3', 'python', 'jq') | Where-Object {
             -not (Get-Command $_ -ErrorAction SilentlyContinue)
           }
           if ($missing) {

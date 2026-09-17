@@ -18,7 +18,7 @@ LAUNCHERS = [
 
 
 def copy_launcher_bundle(destination):
-    for folder, patterns in (("", ("*.sh",)), ("lib", ("*.py", "*.sh")), ("ui", ("terminal.sh",))):
+    for folder, patterns in (("", ("*.sh",)), ("lib", ("*.py", "*.sh", "*.ps1")), ("ui", ("terminal.sh",))):
         target = destination / folder
         target.mkdir(parents=True, exist_ok=True)
         for pattern in patterns:

@@ -1,5 +1,9 @@
 # End-to-end setup: Azure Factory and AI projects
 
+> Start with [AI Factory tutorial — Take2: UX first, version 1.25+](28-tutorial-walkthrough.md): a director/teacher manuscript covering Tutorial Mode, every menu view, project001 Function and project003, regional expansion, configuration clone, then the corresponding guarded CLI/API lab. **The new complete film and final deck are not yet produced.** The guide separates implemented UX changes from proposed recording features and keeps producer readiness/approval gates outside the spoken lesson. Its collapsed archive preserves the complete original walkthrough and technical references.
+>
+> For the Monitor-only, FinOps-focused companion, see [AI Factory tutorial: FinOps monitoring](tutorial-fiops.md).
+
 Use the **Enterprise Scale AI Factory** app or its API to configure factories,
 review and trigger IaC pipelines, monitor Azure resources, promote projects from
 Dev to Stage/Prod, and manage tickets. Configuration, deployment and monitoring
@@ -418,5 +422,12 @@ https://`webapp-prj003-your-web-app-name-001`.azurewebsites.net/.auth/login/aad/
     - No new features will be added for this option. Use YAML option instead.
     - Very detailed setup info with screenshots (Azure Devops classic)
         - [Setup AIFactory - Infra Automation (AzureDevops classic + BICEP)](../10-19/13-setup-aifactory.md)
+
+</details>
+
+<details>
+<summary>Archive — original tutorial introduction, preserved before Take2</summary>
+
+> Start with [AI Factory tutorial - MAUI UX](28-tutorial-walkthrough.md), the recorded three-phase walkthrough: Tutorial Mode, the menu tour, existing-project updates, regional expansion, and reviewed API/CLI examples. It includes source-grounded Q1–Q4 answers on folder routing, platform credential storage, tutorial/API state, and source-preserving COPY migration; saved drafts and previews are not deployment success.
 
 </details>

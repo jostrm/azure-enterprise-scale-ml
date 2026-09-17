@@ -7,32 +7,42 @@ use the same HTTP API.
 
 ## Which API?
 
-**Tkinter is the canonical backend.** The MAUI Windows build invokes the Tkinter
-repository's `build-api.ps1` and bundles `aifactory-api.exe`; MAUI does not implement
-a competing REST API. The bundled host starts it on a dynamically selected
-loopback port with a per-process `X-API-Key`. The source server defaults to port
+**Tkinter is the canonical backend**, here at
+`C:\code\code_py_25\008_aifactory_admin_ux_tkinter\src\api.py`. MAUI's
+`build-windows.ps1` invokes the Tkinter repository's `build-api.ps1` and bundles
+`aifactory-api.exe`; MAUI does not implement a competing REST API. The bundled
+host starts it on a dynamically selected loopback port with a per-process
+`X-API-Key`. The source server defaults to port
 8765. Obtain the actual address and authorized key from your API host/operator;
 do not scrape another process's environment or commit connection secrets.
 
-The supplied running instance is:
+For an operator-provided host using port 64979, the addresses would be:
 
 - OpenAPI: <http://127.0.0.1:64979/openapi.json> (one `http://`, not two)
 - Swagger: <http://127.0.0.1:64979/docs>
 - Health: <http://127.0.0.1:64979/health>
 
-That port is an example, not a stable MAUI endpoint. `/api/v1/schema` describes
+That port is an example, not a stable MAUI endpoint; it was **not listening**
+during this update. **GET `/api/v1/schema`** (not POST) describes
 **wizard fields**, not HTTP routes. API version `1.0.0` alone is not a sufficient
 compatibility check: the clients also depend on catalog contract **1**, typed
 parameter endpoints and legacy project-deployment acknowledgement **2**.
 
-The live instance and Tkinter's current `docs/openapi.json` had matching route
-sets and the workflow request schemas used here when these examples were added.
-This does **not** prove every distributed installer is current. Run the CLI's
-`doctor` command against each host before integrating. Rebuild a stale MAUI
-sidecar from the approved Tkinter source; do not work around a missing safety
-contract. `build-windows.ps1` accepts the Tkinter source and calls `build-api.ps1`;
-its `BUILD-INFO.json` records the packaged executable hash. Copying an OpenAPI
-file alone does not update an executable.
+The shared source/build contract explains which implementation is packaged; it
+does **not** certify equality of running binaries or distributed installers.
+No live compatibility claim is made for this update. After starting an approved
+host, check its actual contract with the [CLI](../../azurefactory-cli/readme.md):
+
+```powershell
+azurefactory doctor
+azurefactory doctor --local-openapi C:\contracts\approved-tkinter-openapi.json
+```
+
+`doctor` checks route/model/contract compatibility; optional OpenAPI comparison
+does not prove identical behavior. Rebuild a stale MAUI sidecar from the approved
+Tkinter source, rather than bypassing a missing safety contract.
+`BUILD-INFO.json` records the packaged executable hash. Copying an OpenAPI file
+alone does not update an executable.
 
 ## Configuration is not deployment
 
@@ -44,6 +54,7 @@ file alone does not update an executable.
 | Add a project in existing scale set 001 | Catalog `add-project` prepare, then confirm | Creates the logical project and explicit DEV placement |
 | Add a project in new scale set 002 | Confirm scale set 002, refresh IDs/revision, then add project | Two separately reviewed changes, not an atomic combined operation |
 | Update a catalog project's resource configuration | GET typed parameters, prepare a patch, then parameters confirm | Preserves untouched values; Azure deployment remains a separate operation |
+| Edit an existing **legacy JSON** project's configuration | Exact projects load, validate/render, separately approved projects save | Preserves JSON source metadata; snapshot/optional variable-file writes only, no deployment |
 | Promote a catalog project to STAGE | Add STAGE scale set if absent, add project placement, review STAGE parameters, then catalog `deploy` | Explicit target configuration and deployment; not an automatic copy of all DEV settings/data |
 | Update an existing **legacy** project | Legacy deployments plan `operation:update`, prepare, then start | Same environment, exact legacy factory folder |
 | Promote an existing **legacy** project DEV to STAGE | Legacy deployments plan `operation:deploy`, prepare, then start | Later environment; validates the target's existing configuration |
@@ -291,6 +302,89 @@ older server silently ignore the choice. Update is same-environment; deploy
 allows DEV to STAGE, STAGE to PROD, or DEV to PROD. A promotion does not claim
 that customer data or model artifacts have been replicated.
 
+### Edit a legacy JSON configuration with the Python SDK
+
+Editing configuration is a separate operation from the legacy deployment
+plan/prepare/start flow above. The runnable `python\edit_configuration.py` uses
+the public `AzureFactoryClient` and `ConfigurationDraft` SDK, not a second HTTP
+client implementation. It defaults to **review only** and prints review metadata.
+Install the sibling package once in your Python environment:
+
+```powershell
+python -m pip install -e ..\..\azurefactory-cli
+python .\python\edit_configuration.py --help
+```
+
+Supply the authorized API URL/key through `AIFACTORY_API_URL` and
+`AIFACTORY_API_KEY`; there is no API-key command-line option. Use the **exact
+legacy `aifactory` folder and three-digit project number**, not a catalog root.
+The SDK calls POST `/api/v1/projects/load` with
+`{"aifactory_folder":"C:\\legacy\\aifactory","project_number":"001"}`.
+`/api/v1/startup/load` is only a hint and must not choose the project for editing.
+Catalog roots are rejected by `/projects/load`; use section 3's existing typed
+parameter flow for catalog resource changes. Registering STAGE placement is
+also separate from actually deploying/promoting there.
+
+Prepare a private local `changes.json`: a JSON object containing only intended
+replacements for exact editable fields from GET `/api/v1/schema` and the selected
+configuration. Private keys, `project_number_000` overrides and unknown field
+names are refused. Do not reconstruct the state from a form or saved CLI output.
+The patch file is on your **client machine**; `--folder` names a directory on the
+**API host**. Protect the patch and review its values locally without logging them.
+
+```powershell
+python .\python\edit_configuration.py --folder C:\legacy\aifactory --project-number 001 --changes-json .\changes.json
+```
+
+Omit `--changes-json` to review the current configuration without replacements.
+Review performs API offline validation and in-memory JSON export **without a
+path**, so it writes no configuration and does not validate/deploy in Azure.
+It returns a 64-hex `review_id`, `can_save`, folder/project scope, `changed_fields`,
+`write_variables`, validation issues, warnings and effects. No raw state,
+`_json_source`, rendered JSON or patch values are printed. **The operator must
+review the patch file too:** changed names alone do not establish approval of
+the values.
+
+**Stop here for explicit human approval.** Only in a separate invocation, after
+approving that exact patch and metadata, copy the earlier `review_id`:
+
+```powershell
+python .\python\edit_configuration.py --folder C:\legacy\aifactory --project-number 001 --changes-json .\changes.json --save --expected-review <review_id> --yes
+```
+
+Both `--expected-review` and `--yes` are required with `--save`; neither is
+accepted in review-only mode. `save()` repeats validation/rendering and requires
+`can_save` and the same hash before sending the full edited state to
+`/api/v1/projects/save`. Use `--snapshot-only` in **both** invocations to save
+only a snapshot; by default, pipeline variable files are written too. Save
+output is limited to returned snapshot/variable paths and warnings, never a
+source-state file. Neither invocation deploys, changes accounts, commits or pushes.
+
+Persistent `variables.json` loads return the full state with an opaque
+`_json_source` fingerprint/baseline reference. Preserve **all** state and unknown
+private keys unchanged except the explicit public-field edits; the SDK does
+this for you. Never interpret, edit, display or reconstruct that reference.
+Older lossy snapshots and inline-content imports are not safe editable JSON
+sources. This guarded example blocks a missing persistent `_json_source`;
+generic YAML/env support remains available through the low-level API, not this
+JSON-origin review/save workflow.
+
+The hash binds source state, patch, base URL, scope, validation, warnings,
+rendered content and write choice. It is not authentication, a signature,
+a backend ETag, cross-user approval or an atomic concurrency guarantee. Your
+backend must authorize each operator and bind approval to their exact intent.
+The server also rejects a changed source fingerprint. Reload/review after every
+successful save; obtain fresh approval after any changed input. Do not blindly
+retry an ambiguous save error: inspect host state securely first.
+
+The example uses [CLI/SDK exit codes](../../azurefactory-cli/readme.md#exit-codes),
+including 2 for local patch/usage errors and 3 for a blocked review/save.
+API errors preserve their SDK exit code without printing raw error bodies;
+unexpected programming errors are not swallowed. See the
+[low-level SDK method table](../../azurefactory-cli/readme.md#sdk) for path-only
+import, validation and export. In particular, supplying an export `path` **writes
+on the API host**; it is not equivalent to this review-only render.
+
 ## 5. Full bootstrap, GHA or Azure DevOps
 
 `12-full-bootstrap-gha.json` and `13-full-bootstrap-ado.json` target
@@ -368,8 +462,9 @@ The same design works whether Tkinter, MAUI or your service manages the host.
 ## Layout and maintenance
 
 `requests` holds JSON templates; `scenarios.json` maps every template to its
-actual POST route and canonical request model. `python` contains safe rendering
-and schema-to-patch examples; `node` and `powershell` contain raw REST consumers.
+actual POST route and canonical request model. `python` contains safe rendering,
+schema-to-patch, read-only inspection and guarded JSON-configuration SDK examples;
+`node` and `powershell` contain raw REST consumers.
 `.local` is ignored for generated requests/reviews, but ignore rules are not
 encryption or access control. Protect and delete local artifacts appropriately.
 
@@ -380,7 +475,7 @@ python -m pytest .\tests -q
 ```
 
 Optionally validate every template against the actual Tkinter Pydantic models
-and live route definitions using the backend's existing development environment:
+and in-process route definitions using the backend's existing development environment:
 
 ```powershell
 $env:AIFACTORY_API_SOURCE = 'C:\path\to\008_aifactory_admin_ux_tkinter'

@@ -1,5 +1,15 @@
 # Agent Factory implementation
 
+## AI Factory shared lake RAG example
+
+[45-rag-agent](45-rag-agent/readme.md) is the explicit end-to-end example for
+reading a pinned corpus from either common ADLS Gen2 or project Blob Storage.
+It preserves the existing `mlops/v1/master` and `mlops/v1/projects` physical
+paths, describing them as the **AI Factory shared lake**. ADF copies only the
+selected source into an isolated retrieval folder; Search and Foundry IQ serve
+separate, source-bound RAG agents. Existing `43-data` ingestion and agents remain
+unchanged. No per-user ACL filtering, binary extraction or lake rename is implied.
+
 This directory is a factory-neutral starter for persistent Foundry prompt agents,
 framework-based hosted agents, and a hosted multi-agent team that calls separately
 persisted knowledge and reviewer agents. Target names are discovered from ARM in

@@ -452,7 +452,9 @@ class TestStarterBootstrapRouting(StarterWorkspace):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertFalse((self.workspace / "aifactory-templates/azurefactory").exists())
         cli = self.workspace / "aifactory-templates/azurefactory-cli"
-        self.assertTrue((cli / "src/azurefactory/cli.py").is_file())
+        for relative in ("setup.py", "src/azurefactory/cli.py", "src/azurefactory/enrollment.py",
+                         "src/azurefactory/configuration.py", "src/azurefactory/_vendor/__init__.py"):
+            self.assertEqual((cli / relative).read_bytes(), (source_cli / relative).read_bytes(), relative)
         self.assertFalse((cli / "src/azurefactory/saved.receipt.json").exists())
         self.assertFalse((cli / "tests/.local").exists())
         self.assertFalse((cli / "src/azurefactory/__pycache__").exists())
@@ -609,7 +611,11 @@ class TestStarterBootstrapRouting(StarterWorkspace):
                 templates = self.workspace / "aifactory-templates"
                 for relative in (
                     "azurefactory-cli/.gitignore", "azurefactory-cli/readme.md",
-                    "azurefactory-cli/pyproject.toml", "azurefactory-cli/src/azurefactory/cli.py",
+                    "azurefactory-cli/pyproject.toml", "azurefactory-cli/setup.py",
+                    "azurefactory-cli/src/azurefactory/cli.py",
+                    "azurefactory-cli/src/azurefactory/enrollment.py",
+                    "azurefactory-cli/src/azurefactory/configuration.py",
+                    "azurefactory-cli/src/azurefactory/_vendor/__init__.py",
                     "azurefactory-cli/src/azurefactory/review.py", "azurefactory-cli/tests/test_reviews.py",
                     "install_config_wizard/api-usage-examples/.gitignore",
                     "install_config_wizard/api-usage-examples/readme.md",

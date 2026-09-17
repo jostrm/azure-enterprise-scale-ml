@@ -821,7 +821,9 @@ def main() -> int:
     if strict:
         credential = ScopedCliCredential(args.subscription_id, args.tenant_id, args.expected_object_id)
     elif args.tenant_id:
-        credential = AzureCliCredential(subscription=args.subscription_id, tenant_id=args.tenant_id)
+        # Azure CLI rejects get-access-token with both --tenant and --subscription.
+        # The explicit subscription selects the tenant for this non-strict local report.
+        credential = AzureCliCredential(subscription=args.subscription_id)
     else:
         credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
     warnings: list[str] = []

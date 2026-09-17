@@ -74,6 +74,7 @@ api_assets=(
     "azurefactory-cli/.gitignore"
     "azurefactory-cli/readme.md"
     "azurefactory-cli/pyproject.toml"
+    "azurefactory-cli/setup.py"
     "azurefactory-cli/src/azurefactory"
     "azurefactory-cli/tests"
     "install_config_wizard/api-usage-examples/.gitignore"
@@ -88,7 +89,7 @@ api_assets=(
 for api_asset in "${api_assets[@]}"; do
     api_path="$api_source/$api_asset"
     case "$api_asset" in
-        */.gitignore|*.md|*.toml|*.json) api_type="-f" ;;
+        */.gitignore|*.md|*.toml|*.json|*/setup.py) api_type="-f" ;;
         *) api_type="-d" ;;
     esac
     if [[ -L "$api_path" ]] || ! test "$api_type" "$api_path"; then

@@ -22,6 +22,57 @@ execute and execute_cohort. Validation/inspect is local only and never implies A
 There is no cloud "prepare" command: catalog/backend owns preview, frozen
 configuration, published-version resolution, revisions and reconciliation.
 
+Registered-target enrollment (separate from lifecycle execution)
+---------------------------------------------------------------
+ADO-azurefactory.sh, GHA-azurefactory.sh, ADO-create-new-aifactory-scaleset.sh
+and GHA-create-new-aifactory-scaleset.sh all expose:
+  enroll plan --consumer-root <repository> --factory-id <UUID> \
+    --scale-set-id <UUID> --environment dev|stage|prod --options <nonsecret.json>
+  enroll ensure <same scope/options> --expected-plan <approved-plan_hash> --yes
+The optional --acknowledge-exclusive-writer-governance flag must reflect a real
+administrator attestation and match the reviewed plan; it is never automatic.
+ALL-create-new-aifactory-scaleset.sh --orchestrator ado|gha enroll ... selects
+the same provider-pinned entrypoint. Run enroll plan|ensure --help for flags.
+The thin factory_enrollment_entry.py adapter checks the provider on the same
+core.load_request result passed to plan/ensure; fresh-request checks reject
+consumer changes. Enrollment dispatch precedes legacy guards, but it does not
+permit raw legacy options on a registered root.
+
+Canonical factory_enrollment.py is stdlib-only and schema-2 registered-consumer
+only. It has no env/active-account/legacy target fallback. Plan is cloud/provider
+read-only. Ensure adds missing explicitly scoped identity, federation, role and
+lock/enrollment prerequisites; contradictory existing resources fail closed.
+No VM creation, agent registration, implicit RG adoption, reset, delete, lease
+break, credential persistence or consumer binding write is performed.
+Governance is not inferred from lock blob existence. Incomplete governance or
+rights returns incomplete/blocked rather than falsely marking runtime ready.
+
+Installed CLI equivalents:
+  azurefactory enrollment plan <scope/options> --save-plan <new-plan.json>
+  azurefactory enrollment ensure --plan <plan.json> --yes \
+    --save-result <new-result.json>
+Repeat the governance flag on both commands only when actually attested.
+CLI plan artifacts bind schema/digest, request, absolute consumer path, register
+reference hash and review. Ensure checks those plus fresh live state; there is
+no auto-replan/approve. Artifacts never overwrite existing files. Checksums are
+integrity checks, not signed approvals.
+  azurefactory enrollment prepare-binding --result <result.json> \
+    --expected-revision <catalog-source_revision> --save-receipt <new-receipt.json>
+  azurefactory catalog confirm --receipt <receipt.json> --yes
+azurefactory enrollment publish --receipt <receipt.json> --yes is the binding-only alias.
+Publication always uses catalog prepare/confirm configure-binding and requires
+a separately reviewed API receipt for the exact binding/factory/revision.
+Enrollment readiness is not deployed-resource readiness. Runtime still performs
+live validation. Ordinary source/legacy creation cannot enroll an unregistered
+target: API registration, enrollment and binding publication remain separate.
+
+Control-bundle copy/snapshot/restore includes the canonical core and adapter,
+runner-prerequisites.ps1/.sh and runner-registration.ps1/.sh. Agent registration
+credentials are distinct from the Azure deployment managed identity. CLI wheel
+and sdist builds vendor the canonical core automatically for use outside source.
+
+Lifecycle protected-manifest input
+----------------------------------
 Only a protected child stdin pipe or --protected-manifest <file.dpapi> is
 accepted. The DPAPI file contains the manifest JSON itself, encrypted for the
 current Windows user, without additional entropy or a wrapper envelope.
