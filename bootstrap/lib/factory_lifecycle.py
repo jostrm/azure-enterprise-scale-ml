@@ -30,8 +30,8 @@ from uuid import uuid4
 
 CONTRACT = 1
 MAX_DOCUMENT = 8 * 1024 * 1024
-RECEIPT_REPLACE_ATTEMPTS = 5
-RECEIPT_REPLACE_RETRY_SECONDS = 0.05
+RECEIPT_REPLACE_ATTEMPTS = 20
+RECEIPT_REPLACE_RETRY_SECONDS = 0.25
 ARM = "https://management.azure.com"
 SOURCE_ORIGIN = "https://github.com/jostrm/azure-enterprise-scale-ml"
 GUID = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
