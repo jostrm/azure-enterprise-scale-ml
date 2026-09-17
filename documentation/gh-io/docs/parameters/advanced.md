@@ -135,6 +135,7 @@ They use the existing deployment engine and route configuration.
 | Create/update | `--help`, `-h` | Show entrypoint help |
 | `ALL-create-new-aifactory-scaleset.sh` | `--orchestrator ado\|gha` | Select one route, then forward create options |
 | `GH-update-aifactory-and-run-project.sh`, `GHA-update-aifactory-and-run-project.sh`, `ADO-update-aifactory-and-run-project.sh` | `--project-only` | Dispatch project only; skip factory/template updates |
+| Update | `--aifactory-env dev\|stage\|prod` | Dispatch only the selected environment; conflicts with a different `AIFACTORY_TARGET_ENVIRONMENT`. |
 | Update | `--aifactory-version VERSION` | Choose update source version explicitly |
 
 Create and update default to `main` unless an explicit version selector is
