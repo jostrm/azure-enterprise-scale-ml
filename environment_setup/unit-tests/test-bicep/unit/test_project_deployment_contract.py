@@ -517,7 +517,9 @@ def test_workflows_keep_legacy_defaults_and_forward_run_specific_secret():
     for job in ("deploy_infrastructure", "deploy_foundry"):
         assert main["jobs"][job]["with"]["config_secret"] == "${{ inputs.config_secret }}"
         assert main["jobs"][job]["with"]["config_hash"] == "${{ inputs.config_hash }}"
-    assert phase["jobs"]["deploy-project"]["env"]["AIFACTORY_CONFIG_JSON"] == "${{ secrets[inputs.config_secret] }}"
+    assert phase["jobs"]["deploy-project"]["env"]["AIFACTORY_CONFIG_JSON"] == (
+        "${{ !inputs.json_identity_auth && secrets[inputs.config_secret] || '' }}"
+    )
     assert main["jobs"]["configure"]["steps"][-1]["name"] == "Remove run-specific reviewed configuration"
     assert phase["jobs"]["deploy-project"]["steps"][-1]["name"] == "Remove run-specific reviewed configuration"
 
