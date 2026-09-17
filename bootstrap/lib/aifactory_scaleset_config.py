@@ -895,6 +895,7 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         json_template_path.unlink()
     common = common_values(state)
     common.update(selected_project_organization(json_path, state))
+    update_json(json_path, {**common, "AZURE_CLIENT_ID": state.get("oidc_client_id", "")})
     project_sp = state.get("project_sp_secret_names") or {}
     hub = state["topology"] == "hs" or state.get("access_hub_mode") == "external"
     self_hosted = state.get("runner_mode") == "self-hosted"

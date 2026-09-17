@@ -19,6 +19,10 @@ VARIABLE_ALIASES = {
     "aifactory-dash-01": "AIFACTORY_DASHBOARD_URL",
     "scaling-mode": "SCALING_MODE",
 }
+GITHUB_IDENTITY_OUTPUTS = {
+    "AZURE_CLIENT_ID": "azure_client_id",
+    "tenantId": "azure_tenant_id",
+}
 # Project ownership metadata is not a deployment input or runtime variable.
 METADATA_KEYS = frozenset({"org-department-name", "org-department-id"})
 SCALING_MODES = ("own-subscriptions", "shared-subscriptions")
@@ -57,6 +61,14 @@ def parse_args() -> argparse.Namespace:
             "runtime environment variables."
         ),
     )
+    parser.add_argument(
+        "--github-identity-output",
+        action="store_true",
+        help=(
+            "Require JSON-provided GitHub OIDC identity selectors and write "
+            "validated client, tenant, and target subscription values to GITHUB_OUTPUT."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -91,10 +103,13 @@ def selected_values(config: dict[str, Any], environment: str) -> tuple[dict[str,
         )
 
     # The canonical variables.json has one "dev" section which is a shared
-    # baseline for all environments. A stage_prod section remains optional for
-    # callers that need an explicit Stage/Prod override.
+    # baseline for all environments. Stage/Prod applies its explicit overrides
+    # on top of that baseline, so shared OIDC identity selectors and settings
+    # are never accidentally omitted from the later environment deployments.
+    dev_values = read_object(config.get("dev", {}), "dev")
     section = "stage_prod" if environment != "dev" and "stage_prod" in config else "dev"
-    values = read_object(config.get(section, {}), section)
+    section_values = read_object(config.get(section, {}), section)
+    values = {**dev_values, **section_values} if section == "stage_prod" else dev_values
     serialized: dict[str, str] = {}
     for name, value in values.items():
         if name in METADATA_KEYS:
@@ -127,6 +142,38 @@ def write_github_environment(name: str, value: str) -> None:
     delimiter = f"AI_FACTORY_{uuid.uuid4().hex}"
     with Path(github_env).open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(f"{name}<<{delimiter}\n{value}\n{delimiter}\n")
+
+
+def write_github_output(name: str, value: str) -> None:
+    github_output = os.environ.get("GITHUB_OUTPUT")
+    if not github_output:
+        fail("GITHUB_OUTPUT is not set; this command must run in GitHub Actions.")
+    with Path(github_output).open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(f"{name}={value}\n")
+
+
+def github_identity(values: dict[str, str], environment: str) -> None:
+    subscription_key = {
+        "dev": "dev_sub_id",
+        "stage": "test_sub_id",
+        "test": "test_sub_id",
+        "prod": "prod_sub_id",
+    }[environment]
+    required = {
+        **GITHUB_IDENTITY_OUTPUTS,
+        subscription_key: "azure_subscription_id",
+    }
+    for source, output in required.items():
+        value = values.get(source, "")
+        if not re.fullmatch(
+            r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}",
+            value,
+        ):
+            fail(
+                f"JSON OIDC identity requires '{source}' to be a valid GUID; "
+                "GitHub Environment identity values are not used in this mode."
+            )
+        write_github_output(output, value)
 
 
 def github_runtime_names(workflow_file: str | None) -> dict[str, set[str]]:
@@ -185,16 +232,28 @@ def main() -> None:
 
     environment = args.environment
     values, section = selected_values(read_object(config, "root"), environment)
-    if args.format == "github":
-        network_environment_key = {
-            "dev": "network_env_dev",
-            "stage": "network_env_stage",
-            "test": "network_env_stage",
-            "prod": "network_env_prod",
+    network_environment_key = {
+        "dev": "network_env_dev",
+        "stage": "network_env_stage",
+        "test": "network_env_stage",
+        "prod": "network_env_prod",
+    }[environment]
+    if network_environment_key in values:
+        values["network_env"] = values[network_environment_key]
+    if args.format == "azure-devops":
+        cidr_key = {
+            "dev": "dev_cidr_range",
+            "stage": "test_cidr_range",
+            "test": "test_cidr_range",
+            "prod": "prod_cidr_range",
         }[environment]
-        if network_environment_key in values:
-            values["network_env"] = values[network_environment_key]
+        if cidr_key in values:
+            values["cidr_range"] = values[cidr_key]
     applied, skipped = apply(values, args.format, args.github_workflow)
+    if args.github_identity_output:
+        if args.format != "github":
+            fail("--github-identity-output requires --format github.")
+        github_identity(values, environment)
     print(
         f"Applied {applied} of {len(values)} configuration variable(s) from "
         f"{config_file.name} using the {section} section."

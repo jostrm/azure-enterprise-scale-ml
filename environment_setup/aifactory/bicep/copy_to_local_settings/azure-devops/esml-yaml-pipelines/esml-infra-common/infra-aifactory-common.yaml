@@ -1,3 +1,13 @@
+parameters:
+  - name: configFile
+    displayName: Canonical AI Factory JSON configuration file
+    type: string
+    default: 'aifactory/variables.json'
+  - name: useJsonConfigOverride
+    displayName: Override variables.yaml with variables.json
+    type: boolean
+    default: false
+
 trigger: none
   # branches:
     # include:
@@ -15,6 +25,10 @@ stages:
   displayName: AIFactory_CMN_Dev
   variables:
     dev_test_prod: "dev"
+    ${{ if eq(parameters.useJsonConfigOverride, true) }}:
+      configOverrideFile: ${{ parameters.configFile }}
+    ${{ else }}:
+      configOverrideFile: ''
     dev_test_prod_sub_id: $(dev_sub_id)
     cidr_range: $(dev_cidr_range)
     network_env: "$(network_env_dev)"
@@ -45,6 +59,10 @@ stages:
   displayName: AIFactory_CMN_Stage
   variables:
     dev_test_prod: "test"
+    ${{ if eq(parameters.useJsonConfigOverride, true) }}:
+      configOverrideFile: ${{ parameters.configFile }}
+    ${{ else }}:
+      configOverrideFile: ''
     dev_test_prod_sub_id: $(test_sub_id)
     cidr_range: $(test_cidr_range)
     network_env: "$(network_env_stage)"
@@ -84,6 +102,10 @@ stages:
   displayName: AIFactory_CMN_Prod
   variables:
     dev_test_prod: "prod"
+    ${{ if eq(parameters.useJsonConfigOverride, true) }}:
+      configOverrideFile: ${{ parameters.configFile }}
+    ${{ else }}:
+      configOverrideFile: ''
     dev_test_prod_sub_id: $(prod_sub_id)
     cidr_range: $(prod_cidr_range)
     network_env: "$(network_env_prod)"

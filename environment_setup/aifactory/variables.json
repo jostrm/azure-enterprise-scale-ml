@@ -5,6 +5,7 @@
     "GITHUB_TEMPLATE_REPO": "azure/enterprise-scale-aifactory",
     "GITHUB_NEW_REPO": "",
     "GITHUB_NEW_REPO_VISIBILITY": "public",
+    "AZURE_CLIENT_ID": "",
     "aifactory-dash-01": "",
     "scaling-mode": "shared-subscriptions",
     "aifactory_version_major": "1",

@@ -14,6 +14,22 @@ on:
         required: false
         type: string
         default: AIFACTORY_CONFIG_JSON
+      json_identity_auth:
+        required: false
+        type: boolean
+        default: false
+      azure_client_id:
+        required: false
+        type: string
+        default: ''
+      azure_tenant_id:
+        required: false
+        type: string
+        default: ''
+      azure_subscription_id:
+        required: false
+        type: string
+        default: ''
       deployment_id:
         required: false
         type: string
@@ -49,7 +65,7 @@ jobs:
         shell: pwsh
     env:
       AIFACTORY_REPORT_JOB: deploy-project-${{ inputs.phase }}
-      AIFACTORY_CONFIG_JSON: ${{ secrets[inputs.config_secret] }}
+      AIFACTORY_CONFIG_JSON: ${{ !inputs.json_identity_auth && secrets[inputs.config_secret] || '' }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       dev_test_prod: ${{ inputs.deployment_id != '' && (inputs.environment == 'stage' && 'test' || inputs.environment) || vars.AZURE_ENV_NAME }}
       dev_test_prod_sub_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
@@ -452,8 +468,31 @@ jobs:
           $azureConfig = Join-Path $HOME '.azure'
           New-Item -ItemType Directory -Force -Path $azureConfig | Out-Null
 
+      - name: 00_Materialize_Protected_JSON_Config
+        if: ${{ !inputs.json_identity_auth && inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$CONFIG_FILE")"
+          printf '%s' "$AIFACTORY_CONFIG_JSON" > "$CONFIG_FILE"
+
+      - name: 00_Apply_JSON_Config_Override
+        if: ${{ inputs.config_file != '' }}
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \
+            --file "$CONFIG_FILE" \
+            --environment "${{ inputs.environment }}" \
+            --format github \
+            --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml"
+
       - name: 00_Validate_Reviewed_Target
-        if: ${{ inputs.deployment_id != '' }}
+        if: ${{ inputs.deployment_id != '' && !inputs.json_identity_auth }}
         shell: bash
         env:
           CONFIG_HASH: ${{ inputs.config_hash }}
@@ -475,8 +514,16 @@ jobs:
                   print("::add-mask::" + escaped)
           PY
 
-      - name: 00_Azure_Login_OIDC
-        if: ${{ env.AZURE_CLIENT_ID != '' }}
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ inputs.json_identity_auth }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ inputs.azure_client_id }}
+          tenant-id: ${{ inputs.azure_tenant_id }}
+          subscription-id: ${{ inputs.azure_subscription_id }}
+
+      - name: Azure login with OpenID Connect (OIDC)
+        if: ${{ !inputs.json_identity_auth && env.AZURE_CLIENT_ID != '' }}
         uses: azure/login@v2
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
@@ -484,13 +531,13 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: 00_Azure_Login_Service_Principal
-        if: ${{ env.AZURE_CLIENT_ID == '' }}
+        if: ${{ !inputs.json_identity_auth && env.AZURE_CLIENT_ID == '' }}
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: 00_Verify_Authenticated_Reviewed_Target
-        if: ${{ inputs.deployment_id != '' }}
+        if: ${{ inputs.deployment_id != '' || inputs.json_identity_auth }}
         shell: bash
         run: |
           set -euo pipefail
@@ -502,29 +549,6 @@ jobs:
           if account["id"].lower() != os.environ["dev_test_prod_sub_id"].lower() or account["tenantId"].lower() != os.environ["tenantId"].lower():
               raise SystemExit("Authenticated pipeline identity differs from the reviewed target")
           PY
-
-      - name: 00_Materialize_Protected_JSON_Config
-        if: ${{ inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
-        shell: bash
-        env:
-          CONFIG_FILE: ${{ inputs.config_file }}
-        run: |
-          set -euo pipefail
-          mkdir -p "$(dirname "$CONFIG_FILE")"
-          printf '%s' "$AIFACTORY_CONFIG_JSON" > "$CONFIG_FILE"
-
-      - name: 00_Apply_JSON_Config_Override
-        if: ${{ inputs.config_file != '' }}
-        shell: bash
-        env:
-          CONFIG_FILE: ${{ inputs.config_file }}
-        run: |
-          set -euo pipefail
-          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \
-            --file "$CONFIG_FILE" \
-            --environment "${{ inputs.environment }}" \
-            --format github \
-            --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml"
 
       # ---------------------------------------------------------------------
       # PREFLIGHT (early, fail-fast): validate AI Search/model quota,

@@ -24,6 +24,11 @@ on:
         type: string
         required: false
         default: AIFACTORY_CONFIG_JSON
+      json_identity_auth:
+        description: Authenticate with JSON-provided OpenID Connect identity selectors
+        type: boolean
+        required: false
+        default: false
       deployment_id:
         description: Unique reviewed deployment correlation UUID
         type: string
@@ -69,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     env:
-      AIFACTORY_CONFIG_JSON: ${{ secrets[inputs.config_secret] }}
+      AIFACTORY_CONFIG_JSON: ${{ !inputs.json_identity_auth && secrets[inputs.config_secret] || '' }}
       AIFACTORY_REPORT_JOB: configure
       admin_location: ${{ vars.AIFACTORY_LOCATION }}
       dev_test_prod_sub_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
@@ -79,6 +84,9 @@ jobs:
       runs_on: ${{ steps.runner.outputs.runs_on }}
       use_self_hosted: ${{ steps.runner.outputs.use_self_hosted }}
       runner_label: ${{ steps.runner.outputs.runner_label }}
+      azure_client_id: ${{ steps.json_identity.outputs.azure_client_id }}
+      azure_tenant_id: ${{ steps.json_identity.outputs.azure_tenant_id }}
+      azure_subscription_id: ${{ steps.json_identity.outputs.azure_subscription_id }}
     steps:
       - name: Checkout configuration
         uses: actions/checkout@v4
@@ -86,7 +94,7 @@ jobs:
           submodules: true
 
       - name: Materialize protected JSON configuration
-        if: ${{ inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
+        if: ${{ !inputs.json_identity_auth && inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
         shell: bash
         env:
           CONFIG_FILE: ${{ inputs.config_file }}
@@ -95,8 +103,23 @@ jobs:
           mkdir -p "$(dirname "$CONFIG_FILE")"
           printf '%s' "$AIFACTORY_CONFIG_JSON" > "$CONFIG_FILE"
 
+      - name: Resolve JSON OpenID Connect identity
+        id: json_identity
+        if: ${{ inputs.json_identity_auth }}
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py" \
+            --file "$CONFIG_FILE" \
+            --environment "${{ inputs.environment }}" \
+            --format github \
+            --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml" \
+            --github-identity-output
+
       - name: Validate reviewed project and target
-        if: ${{ inputs.deployment_id != '' }}
+        if: ${{ inputs.deployment_id != '' && !inputs.json_identity_auth }}
         shell: bash
         env:
           PROJECT_NUMBER: ${{ inputs.project_number }}
@@ -228,12 +251,16 @@ jobs:
       environment: ${{ inputs.environment }}
       config_file: ${{ inputs.config_file }}
       config_secret: ${{ inputs.config_secret }}
+      json_identity_auth: ${{ inputs.json_identity_auth }}
       deployment_id: ${{ inputs.deployment_id }}
       config_hash: ${{ inputs.config_hash }}
       phase: infra
       runs_on: ${{ needs.configure.outputs.runs_on }}
       use_self_hosted: ${{ needs.configure.outputs.use_self_hosted }}
       runner_label: ${{ needs.configure.outputs.runner_label }}
+      azure_client_id: ${{ needs.configure.outputs.azure_client_id }}
+      azure_tenant_id: ${{ needs.configure.outputs.azure_tenant_id }}
+      azure_subscription_id: ${{ needs.configure.outputs.azure_subscription_id }}
     secrets: inherit
 
   deploy_foundry:
@@ -247,10 +274,14 @@ jobs:
       environment: ${{ inputs.environment }}
       config_file: ${{ inputs.config_file }}
       config_secret: ${{ inputs.config_secret }}
+      json_identity_auth: ${{ inputs.json_identity_auth }}
       deployment_id: ${{ inputs.deployment_id }}
       config_hash: ${{ inputs.config_hash }}
       phase: foundry
       runs_on: ${{ needs.configure.outputs.runs_on }}
       use_self_hosted: ${{ needs.configure.outputs.use_self_hosted }}
       runner_label: ${{ needs.configure.outputs.runner_label }}
+      azure_client_id: ${{ needs.configure.outputs.azure_client_id }}
+      azure_tenant_id: ${{ needs.configure.outputs.azure_tenant_id }}
+      azure_subscription_id: ${{ needs.configure.outputs.azure_subscription_id }}
     secrets: inherit
