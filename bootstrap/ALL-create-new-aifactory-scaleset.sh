@@ -10,6 +10,7 @@ usage() {
   cat <<'EOF'
 Usage: ALL-create-new-aifactory-scaleset.sh [--orchestrator ado|gha] [launcher options]
        ALL-create-new-aifactory-scaleset.sh --orchestrator ado|gha enroll plan|ensure [enrollment options]
+       ALL-create-new-aifactory-scaleset.sh --orchestrator ado|gha runner plan|ensure [runner options]
 
 Selects one existing AI Factory scale-set launcher:
   ado  Azure DevOps: ADO-create-new-aifactory-scaleset.sh
@@ -32,7 +33,7 @@ while (( $# )); do
       shift
       ;;
     --help|-h)
-      if [[ "${FORWARD_ARGS[0]:-}" == "enroll" ]]; then
+      if [[ "${FORWARD_ARGS[0]:-}" == "enroll" || "${FORWARD_ARGS[0]:-}" == "runner" ]]; then
         FORWARD_ARGS+=("$1")
         shift
       else
@@ -48,8 +49,8 @@ while (( $# )); do
 done
 
 if [[ -z "$ORCHESTRATOR" ]]; then
-  if [[ "${FORWARD_ARGS[0]:-}" == "enroll" ]]; then
-    printf 'ERROR: Enrollment requires --orchestrator ado|gha or AIF_ORCHESTRATOR.\n' >&2
+  if [[ "${FORWARD_ARGS[0]:-}" == "enroll" || "${FORWARD_ARGS[0]:-}" == "runner" ]]; then
+    printf 'ERROR: Enrollment/runner setup requires --orchestrator ado|gha or AIF_ORCHESTRATOR.\n' >&2
     exit 2
   fi
   if printf '%s\n' "${FORWARD_ARGS[@]}" | grep -qx -- '--non-interactive'; then

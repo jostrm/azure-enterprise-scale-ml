@@ -1180,8 +1180,9 @@ class _ExecutionClaim:
                 and proof.get("lease_context_hash") == digest(locks.held),
                 "execution-claim-binding-mismatch")
         accepted = timestamp(proof.get("accepted_at"))
+        # Match the clock used by claim_run; time.time() can lag UTC on Windows.
         require(timestamp(document["prepared_at"]) <= accepted < timestamp(document["expires_at"])
-                and accepted <= time.time(),
+                and accepted <= timestamp(utc_now()),
                 "execution-claim-outside-consent")
         _, _, current = locks.request("GET", "runs/" + document["run_id"] + ".json")
         require(isinstance(current, dict) and current.get("execution_claim") == proof

@@ -154,6 +154,16 @@ including the output of the API examples' `parameter_patch.py`.
 
 Full bootstrap is separate from catalog create and includes common infrastructure plus the initial project:
 
+MAUI's **Copy common details** uses the same API as
+`azurefactory bootstrap config --state-json .\wizard-state.json --mapping-mode common-details`.
+That explicit mode returns a **partial** object containing account, team and
+region defaults; merge only those returned keys into a separate new-factory
+draft. It does not copy the existing destination, project, network or resource
+customizations. Omit the mode for the unchanged strict conversion behavior.
+Capabilities, mapping and preview responses separate neutral `notes` from observed
+`warnings` and blocking failures. VPN client installation is not a connectivity
+test, and existing host networking is left unchanged.
+
 ```powershell
 azurefactory bootstrap capabilities
 azurefactory bootstrap prepare --launcher ADO-create-new-aifactory-scaleset.sh --orchestrator ado --config-json .\bootstrap-config.json --save-receipt .\bootstrap.receipt.json

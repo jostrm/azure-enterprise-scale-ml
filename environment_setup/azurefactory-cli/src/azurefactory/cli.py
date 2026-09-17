@@ -255,6 +255,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_simple(bootstrap_sub, "capabilities", cmd_bootstrap_capabilities)
     boot_config = add_simple(bootstrap_sub, "config", cmd_bootstrap_config)
     boot_config.add_argument("--state-json", required=True)
+    boot_config.add_argument("--mapping-mode", choices=["strict", "common-details"], default="strict",
+                             help="common-details returns only account/team defaults; merge into a separate new-factory draft.")
     boot_prepare = add_simple(bootstrap_sub, "prepare", cmd_bootstrap_prepare)
     boot_prepare.add_argument("--save-receipt", help="Write preview receipt JSON for later start.")
     boot_prepare.add_argument("--request-json", help="Full BootstrapPrepare JSON body.")
@@ -602,7 +604,7 @@ def cmd_bootstrap_capabilities(args):
 
 
 def cmd_bootstrap_config(args):
-    return emit(client(args).bootstrap_config(read_json_file(args.state_json)))
+    return emit(client(args).bootstrap_config(read_json_file(args.state_json), mapping_mode=args.mapping_mode))
 
 
 def cmd_bootstrap_prepare(args):

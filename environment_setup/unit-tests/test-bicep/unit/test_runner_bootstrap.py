@@ -556,23 +556,24 @@ printf '%s\\n' test-only-fixture | aif_linux_runner_configure worker "$root" "$r
             self.assertNotIn("HTTP", result.stderr)
             self.assertRegex(result.stderr, "pinned official Linux|SHA256 metadata is required")
 
-    def test_vm_os_dispatch_never_creates_vm(self) -> None:
+    def test_vm_os_dispatch_uses_isolated_create_or_reuse(self) -> None:
         launcher = shlex.quote(str(LIB / "create-new-aifactory-scaleset.sh").replace("\\", "/"))
-        for os_type, explicit, success in (("Windows", False, True), ("Linux", True, True), ("Linux", False, False), ("Unknown", True, False)):
+        for provider, os_type in (("ado", "Windows"), ("gha", "Linux")):
             result = self.run_bash(f"""
 source {launcher}
-AIF_LOCATION_SHORT=sdc; AIF_PREFIX=fixture; AIF_SCALESET_SUFFIX_DASH=-001; AIF_DEV_SUBSCRIPTION_ID=fixture
-{"AIF_RUNNER_VM_NAME=existing-linux; AIF_RUNNER_VM_RESOURCE_GROUP=existing-rg" if explicit else "unset AIF_RUNNER_VM_NAME AIF_RUNNER_VM_RESOURCE_GROUP"}
-aif_use_azure_tenant() {{ :; }}
+AIF_LOCATION_SHORT=sdc; AIF_LOCATION=swedencentral; AIF_PREFIX=fixture; AIF_SCALESET_SUFFIX_DASH=-001; AIF_DEV_SUBSCRIPTION_ID=fixture
+AIF_ROUTE={provider}; AIF_REPO_ROOT="$PWD"; AIF_PYTHON=(fake_python)
+unset AIF_RUNNER_VM_NAME AIF_RUNNER_VM_RESOURCE_GROUP AIF_RUNNER_VM_OS
+aif_use_azure_tenant() {{ echo UNEXPECTED_ACCOUNT_SET; return 99; }}
 aif_error() {{ echo "$*" >&2; }}
-az() {{
-  if [[ "$1 $2" == 'vm show' ]]; then printf '%s\\n' {os_type} swedencentral
-  elif [[ "$1 $2" == 'vm get-instance-view' ]]; then echo PowerState/running
-  else echo 'UNEXPECTED AZ MUTATION' >&2; return 99; fi
+az() {{ echo 'UNEXPECTED AZ MUTATION' >&2; return 99; }}
+fake_python() {{
+  [[ "$*" == *'prepare-vm'* && "$*" == *'--prereqs-only --yes'* ]]
+  [[ "$*" == *'--vm-os {os_type.lower()}'* && "$*" == *'--common-rg fixtureesml-common-sdc-dev-001'* ]]
 }}
 aif_prepare_runner_vm
 [[ "$AIF_RUNNER_OS" == {os_type} ]]
-""", success=success)
+""")
             self.assertNotIn("UNEXPECTED AZ MUTATION", result.stderr)
 
     def test_managed_payload_dispatches_os_with_protected_named_token(self) -> None:
@@ -722,7 +723,8 @@ class RunnerSourceTests(unittest.TestCase):
 
     @unittest.skipUnless(BASH and Path(BASH).exists(), "Git Bash or Bash is required")
     def test_shell_syntax_and_version_comparison(self) -> None:
-        for filename in ("runner-prerequisites.sh", "runner-registration.sh", "create-new-aifactory-scaleset.sh"):
+        for filename in ("runner-prerequisites.sh", "runner-registration.sh", "runner-only-registration.sh",
+                         "create-new-aifactory-scaleset.sh"):
             if filename != "runner-registration.sh":
                 self.assertEqual((LIB / filename).read_bytes().count(b"\r"), 0, filename)
             result = subprocess.run(
@@ -763,6 +765,391 @@ aif_runner_prerequisites_main "${{args[@]}}"
                     self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
                     self.assertNotIn("INSTALL_WAS_CALLED", result.stderr)
                     self.assertNotIn("DOWNLOAD_WAS_CALLED", result.stderr)
+
+
+class RunnerEnsureTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(LIB))
+        import runner_bootstrap
+        cls.core = runner_bootstrap
+        sys.path.pop(0)
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory(prefix=".runner-ensure with spaces-", dir=ROOT)
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.path = self.root / "variables.json"
+        self.values = {
+                    "useSelfHostedBuildAgent": True, "tenantId": "11111111-1111-1111-1111-111111111111",
+                    "dev_sub_id": "22222222-2222-2222-2222-222222222222", "test_sub_id": "33333333-3333-3333-3333-333333333333",
+                    "admin_location": "swedencentral", "admin_locationSuffix": "sdc",
+                    "admin_aifactoryPrefixRG": "fixture-", "admin_aifactorySuffixRG": "-001",
+        }
+        self.save()
+
+    def save(self):
+        self.path.write_text(json.dumps({"dev": self.values}), encoding="utf-8")
+
+    def request(self, provider="gha", **kwargs):
+        return self.core.load_request(self.root, provider, config_source=self.path, environ={},
+                                              repository="owner/repo" if provider == "gha" else None,
+                                              prereqs_only=kwargs.pop("prereqs_only", True), **kwargs)
+
+    def cloud(self, request):
+        import copy
+        core = self.core
+        class FakeCloud:
+                    def __init__(self):
+                        self.read_only = True
+                        self.writes = []
+                        self.data = {}
+                        for identifier in (request["rg_id"], request["subnet"], request["subnet"].rsplit("/subnets/", 1)[0]):
+                            self.data[identifier] = {"id": identifier, "location": request["location"],
+                                                     "properties": {"provisioningState": "Succeeded"}}
+                    def az(self, *args):
+                        assert args == ("account", "show", "--subscription", request["target"]["subscription_id"])
+                        return {"tenantId": request["target"]["tenant_id"], "id": request["target"]["subscription_id"], "state": "Enabled"}
+                    def arm(self, method, identifier, version, data=None, **kwargs):
+                        if method == "GET":
+                            if identifier.endswith("/instanceView"):
+                                return 200, {}, {"statuses": [{"code": "PowerState/running"}]}
+                            if identifier not in self.data:
+                                return 404, {}, {"error": {"code": "ResourceNotFound"}}
+                            return 200, {}, copy.deepcopy(self.data[identifier])
+                        assert not self.read_only
+                        assert method == "PUT"
+                        self.writes.append(identifier)
+                        if identifier.endswith("/providers/Microsoft.Resources/tags/default"):
+                            disk_id = identifier.rsplit("/providers/", 1)[0]
+                            self.data[disk_id]["tags"] = data["properties"]["tags"]
+                            return 200, {}, {}
+                        assert identifier not in self.data, "overwrite attempted"
+                        value = copy.deepcopy(data)
+                        value["id"] = identifier
+                        value["properties"]["provisioningState"] = "Succeeded"
+                        self.data[identifier] = value
+                        if identifier == request["vm_id"]:
+                            ids = core.resource_ids(request)
+                            value["properties"]["storageProfile"]["osDisk"].update(osType="Linux", managedDisk={"id": ids["disk"]})
+                            self.data[ids["disk"]] = {
+                                "id": ids["disk"], "location": request["location"], "managedBy": identifier,
+                                "sku": {"name": "StandardSSD_LRS"},
+                                "properties": {"provisioningState": "Succeeded", "diskSizeGB": 128},
+                            }
+                        return 201, {}, value
+        return FakeCloud()
+
+    def test_flag_all_formats_any_true_wins_and_environment_isolated(self):
+        for name, content in (
+                    ("variables.yaml", "variables:\n  useSelfHostedBuildAgent: true\n"),
+                    ("variables.yml", "dev:\n  variables:\n    useSelfHostedBuildAgent: 'TRUE'\n"),
+                    ("variables.yaml", "variables:\n- name: useSelfHostedBuildAgent\n  value: true\n"),
+                    ("variables.yml", "dev:\n  variables:\n    - name: 'useSelfHostedBuildAgent'\n      value: true\n"),
+                    ("variables.yaml", 'variables:\n  "useSelfHostedBuildAgent": true\n'),
+                    (".env", "USE_SELF_HOSTED_BUILD_AGENT=true # selected\n"),
+        ):
+                    with self.subTest(name=name):
+                        self.values["useSelfHostedBuildAgent"] = False
+                        self.save()
+                        other = self.root / name
+                        other.write_text(content, encoding="utf-8")
+                        self.assertTrue(self.request()["desired"])
+                        other.unlink()
+        self.path.write_text(json.dumps({"dev": self.values, "stage_prod": {"useSelfHostedBuildAgent": True}}), encoding="utf-8")
+        self.assertFalse(self.request()["desired"])
+        self.assertTrue(self.core.requested(self.core.selected_values(self.core.read_config(self.path), "prod")))
+        self.assertFalse(self.core.requested([{"useSelfHostedBuildAgent": False}, {}]))
+
+    def test_invalid_flag_even_with_true_fails_and_never_evaluates(self):
+        for value in ("yes", "1", "", "$(touch INJECTED)", 1, None, {}, []):
+                    with self.subTest(value=value):
+                        self.path.write_text(json.dumps({"dev": dict(self.values, useSelfHostedBuildAgent=value)}), encoding="utf-8")
+                        with self.assertRaisesRegex(self.core.EnrollmentError, "invalid-self-hosted-flag"):
+                            self.request()
+        self.assertFalse((self.root / "INJECTED").exists())
+
+    def test_malformed_sources_and_unknown_scope_fail(self):
+        for name, text in (("variables.json", '{"dev":{"useSelfHostedBuildAgent":true, "useSelfHostedBuildAgent":false}}'),
+                                   ("variables.yml", "variables:\n  useSelfHostedBuildAgent: 'unterminated\n"),
+                                   (".env", "USE_SELF_HOSTED_BUILD_AGENT=true\nnot an assignment"),
+                                   ("variables.yml", "variables:\n  useSelfHostedBuildAgent: true\n invalid: false")):
+                    with self.subTest(name=name):
+                        path = self.root / name
+                        path.write_text(text, encoding="utf-8")
+                        with self.assertRaises(self.core.EnrollmentError):
+                            self.core.read_config(path)
+                        if path != self.path:
+                            path.unlink()
+        with self.assertRaisesRegex(self.core.EnrollmentError, "ambiguous"):
+                    self.core.selected_values({"factories": {"other": {"useSelfHostedBuildAgent": True}}}, "dev")
+
+    def test_provider_defaults_and_supported_explicit_choices(self):
+        self.assertEqual(self.request()["vm_os"], "linux")
+        self.assertEqual(self.request()["vm_name"], "runner-gha-sdc-dev-001")
+        self.assertEqual(self.request("ado")["vm_os"], "windows")
+        self.assertEqual(self.request("ado")["vm_name"], "dsvm-cmn-sdc-dev-001")
+        self.assertEqual(self.request("ado", vm_os="linux")["vm_os"], "linux")
+        self.assertEqual(self.request(vm_os="windows")["vm_os"], "windows")
+
+    def test_only_selected_environment_and_provider_metadata_is_required(self):
+        self.path.write_text(json.dumps({"dev": {"useSelfHostedBuildAgent": False}, "stage_prod": {
+            **self.values, "azureDevOpsTenantId": "<unused>", "ADO_ORGANIZATION": "<unused>"}}), encoding="utf-8")
+        request = self.core.load_request(self.root, "gha", "stage", config_source=self.path,
+                                        repository="owner/repo", environ={}, prereqs_only=True)
+        self.assertEqual(request["target"]["subscription_id"], self.values["test_sub_id"])
+        self.assertIn("-test-001", request["common_rg"])
+        self.assertNotIn("-dev-", request["vm_name"])
+        self.assertIsNone(request["ado_tenant_id"])
+
+    def test_canonical_env_only_source_and_byo_network_names(self):
+        self.path.unlink()
+        path = self.root / ".env"
+        path.write_text("\n".join(f"{key}={value}" for key, value in {
+            "USE_SELF_HOSTED_BUILD_AGENT": "true", "TENANT_ID": self.values["tenantId"],
+            "DEV_SUBSCRIPTION_ID": self.values["dev_sub_id"], "AIFACTORY_LOCATION": "swedencentral",
+            "AIFACTORY_LOCATION_SHORT": "sdc", "AIFACTORY_PREFIX": "fixture-", "AIFACTORY_SUFFIX": "-001",
+            "BYO_SUBNETS": "true", "SUBNET_COMMON": "snet-<network_env>common",
+            "NETWORK_ENV_DEV": "dev-", "VNET_NAME_FULL_PARAM": "existing-<network_env>vnet",
+            "VNET_RESOURCE_GROUP_PARAM": "existing-network",
+        }.items()), encoding="utf-8")
+        request = self.core.load_request(self.root, "gha", config_source=path, environ={}, prereqs_only=True)
+        self.assertEqual(request["target"]["subscription_id"], self.values["dev_sub_id"])
+        self.assertTrue(request["subnet"].endswith("/virtualNetworks/existing-dev-vnet/subnets/snet-dev-common"))
+        self.assertIn("/resourceGroups/existing-network/", request["subnet"])
+        with self.assertRaisesRegex(self.core.EnrollmentError, "selected-subnet-mismatch"):
+            self.core.load_request(self.root, "gha", config_source=path, environ={}, prereqs_only=True,
+                                   subnet_id=request["subnet"] + "-other")
+
+    def test_provider_inventory_is_read_only_and_rejects_busy_mismatches(self):
+        request = self.request(prereqs_only=False)
+        cloud = mock.Mock()
+        cloud.gh.return_value = (200, {}, {"runners": []})
+        self.assertEqual(self.core.provider_action(request, cloud), "create")
+        runner = {"name": request["agent_name"], "os": "linux", "busy": False,
+                  "labels": [{"name": request["runner_label"]}]}
+        cloud.gh.return_value = (200, {}, {"runners": [runner]})
+        self.assertEqual(self.core.provider_action(request, cloud), "reuse")
+        runner["busy"] = True
+        with self.assertRaisesRegex(self.core.EnrollmentError, "busy"):
+            self.core.provider_action(request, cloud)
+        runner["busy"] = False
+        runner["os"] = "windows"
+        with self.assertRaisesRegex(self.core.EnrollmentError, "mismatch"):
+            self.core.provider_action(request, cloud)
+        self.assertTrue(all(call.args[0] == "GET" for call in cloud.gh.call_args_list))
+
+    def test_registered_ado_layout_can_ensure_all_github_prerequisites_without_a_repository(self):
+        from contextlib import redirect_stdout
+        factory_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        scale_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        self.path.unlink()
+        self.path = self.root / "aifactory" / "variables.json"
+        self.path.parent.mkdir()
+        self.values["admin_aifactoryPrefixRG"] = "spider-"
+        self.save()
+        register = self.root / "azurefactory" / "register.json"
+        register.parent.mkdir()
+        register.write_text(json.dumps({
+            "schema_version": 2, "factories": [{
+                "id": factory_id, "prefix": "spider-", "region": "swedencentral",
+                "scale_sets": [{"id": scale_id, "environment": "dev", "orchestrator": "ado",
+                    "suffix": "001", "tenant_id": self.values["tenantId"],
+                    "subscription_id": self.values["dev_sub_id"],
+                    "provenance": {"source_ref": "frozen-test-source"}}]}],
+            "configurations": {}, "bindings": {},
+        }), encoding="utf-8")
+        original = {path: path.read_bytes() for path in (register, self.path)}
+        request = self.core.load_request(
+            self.root, "gha", config_source=self.path, factory_id=factory_id, scale_set_id=scale_id,
+            separate_github=True, prereqs_only=True, environ={})
+        self.assertIsNone(request["repository"])
+        self.assertEqual(request["common_rg"], "spider-esml-common-sdc-dev-001")
+        self.assertEqual(request["vm_name"], "runner-gha-sdc-dev-001")
+        self.assertTrue(request["subnet"].endswith(
+            "/virtualNetworks/vnt-esmlcmn-sdc-dev-001/subnets/snet-esml-cmn-001"))
+        cloud = self.cloud(request)
+        windows_id = request["rg_id"] + "/providers/Microsoft.Compute/virtualMachines/dsvm-cmn-sdc-dev-001"
+        windows = {"id": windows_id, "location": "swedencentral",
+                   "properties": {"storageProfile": {"osDisk": {"osType": "Windows"}}}}
+        cloud.data[windows_id] = windows
+        normal_arm = cloud.arm
+        guest_scripts = []
+        guest_exit_code = 0
+
+        def arm(method, identifier, version, data=None, **kwargs):
+            if "/runCommands/" not in identifier:
+                return normal_arm(method, identifier, version, data=data, **kwargs)
+            self.assertTrue(identifier.startswith(request["vm_id"] + "/runCommands/prerequisites-"))
+            if method == "PUT":
+                self.assertFalse(cloud.read_only)
+                guest_scripts.append(data["properties"]["source"]["script"])
+                self.assertNotIn("protectedParameters", data["properties"])
+                return 201, {}, {}
+            self.assertEqual(method, "GET")
+            return 200, {}, {"id": identifier.split("?")[0], "properties": {
+                "instanceView": {"executionState": "Succeeded", "exitCode": guest_exit_code}}}
+
+        key = self.root / "public-key"
+        key.write_text("ssh-ed25519 YWJjZA== offline-fixture", encoding="utf-8")
+        arguments = ["gha", "ensure", "--consumer-root", str(self.root), "--config-source", str(self.path),
+                     "--factory-id", factory_id, "--scale-set-id", scale_id, "--environment", "dev",
+                     "--separate-github", "--prereqs-only", "--ssh-public-key", str(key), "--yes"]
+        with mock.patch.object(self.core, "Cloud", return_value=cloud), \
+                mock.patch.object(cloud, "arm", side_effect=arm), \
+                mock.patch.object(self.core.subprocess, "run", side_effect=AssertionError("No host or git-remote commands")), \
+                mock.patch.object(self.core, "register_agent", side_effect=AssertionError("No provider registration")):
+            for expected_vm_action in ("create", "reuse"):
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    self.assertEqual(self.core.main(arguments), 0)
+                report = json.loads(output.getvalue())
+                self.assertEqual(report["status"], "prerequisites-ready")
+                self.assertFalse(report["agent_ready"])
+                self.assertEqual(report["actions"]["agent"], "noop")
+                self.assertEqual(report["actions"]["vm"], expected_vm_action)
+            guest_exit_code = 1
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(self.core.main(arguments), 2)
+            report = json.loads(output.getvalue())
+            self.assertEqual(report["status"], "blocked")
+            self.assertEqual(report["error"], "runner-prerequisites-failed")
+            self.assertFalse(report["agent_ready"])
+        self.assertEqual(len(guest_scripts), 3)
+        for script in guest_scripts:
+            self.assertIn((LIB / "runner-prerequisites.sh").read_text(encoding="utf-8"), script)
+            self.assertIn("aif_runner_prerequisites_main --install-missing --require-runner-runtime --require-az-modules", script)
+        self.assertEqual(cloud.data[windows_id], windows)
+        self.assertNotIn(windows_id, cloud.writes)
+        self.assertEqual(cloud.writes.count(request["vm_id"]), 1)
+        for path, data in original.items():
+            self.assertEqual(path.read_bytes(), data)
+        self.assertFalse((self.root / ".env").exists())
+
+    def test_no_flag_needs_no_unrelated_config_or_cloud(self):
+        self.path.write_text('{"useSelfHostedBuildAgent":false}', encoding="utf-8")
+        request = self.request()
+        cloud = mock.Mock()
+        self.assertEqual(self.core.plan(request, cloud)["status"], "skipped-not-requested")
+        self.assertIsNone(self.core.ensure_vm(request, yes=True, cloud=cloud))
+        self.assertEqual(cloud.mock_calls, [])
+
+    def test_create_linux_then_reuse_without_mutating_existing_resources(self):
+        request = self.request()
+        cloud = self.cloud(request)
+        report = self.core.plan(request, cloud)
+        self.assertEqual(report["actions"]["vm"], "create")
+        self.assertEqual(cloud.writes, [])
+        self.assertNotIn("fingerprints", report)
+        key = self.root / "public-key"
+        key.write_text("ssh-ed25519 YWJjZA== offline-fixture", encoding="utf-8")
+        with mock.patch.object(self.core.subprocess, "run", side_effect=AssertionError("host install/keygen")):
+                    self.core.ensure_vm(request, yes=True, cloud=cloud, ssh_public_key=key)
+                    first = list(cloud.writes)
+                    self.core.ensure_vm(request, yes=True, cloud=cloud, ssh_public_key=key)
+        self.assertEqual(cloud.writes, first)
+        self.assertEqual(self.core.plan(request, cloud)["actions"]["vm"], "reuse")
+        vm = cloud.data[request["vm_id"]]
+        self.assertNotIn("identity", vm)
+        self.assertEqual(vm["properties"]["storageProfile"]["imageReference"], self.core.IMAGE)
+        self.assertEqual(vm["properties"]["hardwareProfile"]["vmSize"], "Standard_D4s_v5")
+        self.assertTrue(all(identifier.startswith(request["rg_id"] + "/providers/") for identifier in first))
+        self.assertFalse(any("publicIPAddresses" in identifier or "deployments" in identifier for identifier in first))
+
+    def test_exact_existing_windows_reused_without_ownership_adoption(self):
+        request = self.request("ado")
+        cloud = self.cloud(request)
+        nic_id = request["rg_id"] + "/providers/Microsoft.Network/networkInterfaces/original"
+        cloud.data[request["vm_id"]] = {"id": request["vm_id"], "location": request["location"],
+                    "properties": {"storageProfile": {"osDisk": {"osType": "Windows"}},
+                                   "hardwareProfile": {"vmSize": "Standard_D2s_v5"},
+                                   "networkProfile": {"networkInterfaces": [{"id": nic_id}]}}}
+        cloud.data[nic_id] = {"id": nic_id, "properties": {"ipConfigurations": [
+                    {"properties": {"subnet": {"id": request["subnet"]}}}]}}
+        self.core.ensure_vm(request, yes=True, cloud=cloud)
+        self.assertEqual(cloud.writes, [])
+        self.assertEqual(self.core.plan(request, cloud)["size"], "Standard_D2s_v5")
+        cloud.data[request["vm_id"]]["properties"]["storageProfile"]["osDisk"]["osType"] = "Linux"
+        with self.assertRaisesRegex(self.core.EnrollmentError, "os-or-location-mismatch"):
+                    self.core.ensure_vm(request, yes=True, cloud=cloud)
+        self.assertEqual(cloud.writes, [])
+
+    def test_absence_is_only_structured_404_and_conflicts_never_write(self):
+        request = self.request()
+        for response in ((403, {}, {"error": {"code": "AuthorizationFailed"}}), (404, {}, b"not found")):
+                    cloud = self.cloud(request)
+                    with mock.patch.object(cloud, "arm", return_value=response):
+                        with self.assertRaises(self.core.EnrollmentError):
+                            self.core.ensure_vm(request, yes=True, cloud=cloud)
+                    self.assertEqual(cloud.writes, [])
+        cloud = self.cloud(request)
+        identifier = self.core.resource_ids(request)["nic"]
+        cloud.data[identifier] = {"id": identifier, "location": request["location"], "tags": {"unrelated": "owner"}}
+        with self.assertRaisesRegex(self.core.EnrollmentError, "ownership-conflict"):
+                    self.core.ensure_vm(request, yes=True, cloud=cloud)
+        self.assertEqual(cloud.writes, [])
+
+    def test_concurrent_resource_creation_is_not_overwritten(self):
+        request = self.request()
+        cloud = self.cloud(request)
+        cloud.read_only = False
+        identifier = self.core.resource_ids(request)["nic"]
+        cloud.data[identifier] = {"id": identifier}
+        with self.assertRaisesRegex(self.core.EnrollmentError, "appeared"):
+                    self.core.create_absent(cloud, identifier, self.core.NETWORK_API, {})
+        self.assertEqual(cloud.writes, [])
+
+    def test_registered_tuple_and_route_are_required_without_changing_register(self):
+        factory_id, scale_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        register = self.root / "azurefactory" / "register.json"
+        register.parent.mkdir()
+        register.write_text(json.dumps({"schema_version": 2, "factories": [{"id": factory_id, "prefix": "fixture",
+                    "region": "swedencentral", "scale_sets": [{"id": scale_id, "environment": "dev", "orchestrator": "ado",
+                    "suffix": "001", "tenant_id": self.values["tenantId"], "subscription_id": self.values["dev_sub_id"]}]}],
+                    "configurations": {}, "bindings": {}}), encoding="utf-8")
+        original = register.read_bytes()
+        with self.assertRaisesRegex(self.core.EnrollmentError, "factory-id"):
+                    self.request()
+        with self.assertRaisesRegex(self.core.EnrollmentError, "orchestrator-mismatch"):
+                    self.request(factory_id=factory_id, scale_set_id=scale_id)
+        request = self.request(factory_id=factory_id, scale_set_id=scale_id, separate_github=True)
+        self.assertEqual(request["vm_os"], "linux")
+        with self.assertRaisesRegex(self.core.EnrollmentError, "linux-scoped"):
+                    self.request("ado", factory_id=factory_id, scale_set_id=scale_id, vm_os="windows")
+        with self.assertRaisesRegex(self.core.EnrollmentError, "separate-github-requires"):
+                    self.request("ado", factory_id=factory_id, scale_set_id=scale_id, separate_github=True, vm_os="windows")
+        child = self.root / "child"
+        child.mkdir()
+        with self.assertRaisesRegex(self.core.EnrollmentError, "factory-id"):
+                    self.core.load_request(child, "gha", config_source=self.path, environ={})
+        self.assertEqual(register.read_bytes(), original)
+
+    def test_config_changes_require_replan_and_ensure_requires_yes(self):
+        request = self.request()
+        cloud = self.cloud(request)
+        with self.assertRaisesRegex(self.core.EnrollmentError, "requires-yes"):
+                    self.core.ensure_vm(request, cloud=cloud)
+        self.path.write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex(self.core.EnrollmentError, "changed-replan"):
+                    self.core.ensure_vm(request, yes=True, cloud=cloud)
+        self.assertEqual(cloud.writes, [])
+
+    def test_runner_routes_before_legacy_and_register_paths(self):
+        env = dict(os.environ, AIFACTORY_PYTHON=sys.executable)
+        self.path.write_text('{"useSelfHostedBuildAgent": false}', encoding="utf-8")
+        for script in ("ADO-azurefactory.sh", "GHA-azurefactory.sh",
+                               "ADO-create-new-aifactory-scaleset.sh", "GHA-create-new-aifactory-scaleset.sh"):
+                    result = subprocess.run([BASH, str(ROOT / "bootstrap" / script), "runner", "plan",
+                                             "--consumer-root", str(self.root), "--config-source", str(self.path)],
+                                            env=env, capture_output=True, text=True, cwd=ROOT, timeout=30)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertEqual(json.loads(result.stdout)["status"], "skipped-not-requested")
+        self.assertFalse((self.root / ".git").exists())
+        source = (LIB / "runner-only-registration.sh").read_text()
+        self.assertNotIn("aif_scaleset_main", source)
+        self.assertNotIn("account set", source)
+        self.assertNotIn("login", source)
 
 
 @unittest.skipUnless(BASH and Path(BASH).exists(), "Git Bash or Bash is required")

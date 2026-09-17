@@ -44,6 +44,72 @@ The wizard's `scaling-mode` accepts `own-subscriptions` (`172.16.XX.0/20`, Dev/S
 > [!TIP]
 > **Tip**: Use the AIFactory Github Template repository to get a bootstrapped repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/azure/enterprise-scale-aifactory). This bootstrap repo becomes your repo - using this as a submodule repo.
 >
+### Ensure only an existing factory's self-hosted runner
+
+The isolated `runner` action is available on `ADO-azurefactory.sh`,
+`GHA-azurefactory.sh` and both `*-create-new-aifactory-scaleset.sh` wrappers:
+
+```bash
+bash GHA-azurefactory.sh runner plan --consumer-root "$PWD" \
+  --config-source "$PWD/aifactory/variables.json" --environment dev --repository owner/repo
+# Review the exact common RG, subnet, VM, OS, size and create/reuse actions.
+bash GHA-azurefactory.sh runner ensure --consumer-root "$PWD" \
+  --config-source "$PWD/aifactory/variables.json" --environment dev --repository owner/repo --yes
+```
+
+Use `runner --help` for all options. `--environment` defaults to **dev**; stage
+uses Azure's `test` naming. Legacy setup requires an exact `--config-source`.
+Schema-2 registered roots additionally require **both** `--factory-id` and
+`--scale-set-id`; their environment, tenant, subscription and orchestrator must
+match. Explicit GHA `--separate-github` setup can use that Azure placement
+without modifying an ADO factory or its frozen provenance. If register
+variables cannot be uniquely selected, supply its exact configuration projection.
+Unknown/ambiguous scopes and malformed files are errors, not an absent request.
+
+Applicable `variables.yaml`, `variables.yml`, `variables.json` and `.env`
+files are read as data, never executed. Canonical legacy locations are the
+consumer root, `aifactory`, and
+`aifactory/esml-infra/azure-devops/bicep/yaml/variables`. A nonstandard explicit
+source selects only its containing directory. YAML supports literal mappings
+and `name`/`value` variable lists (including environment sections), not executable
+templates, aliases or variable-group imports. **Any** selected
+`useSelfHostedBuildAgent: true` / `USE_SELF_HOSTED_BUILD_AGENT=true` wins over
+false; invalid values still fail. False/missing produces `skipped-not-requested`
+without cloud calls. Fresh interactive creation still permits explicit runner
+selection, while saved true is honored automatically.
+
+Legacy ADO retains its existing Windows DSVM/agent default. GHA defaults to a
+separate deterministic Linux VM (`runner-gha-<region-short>-<env>-<suffix>`).
+Explicit supported OS/VM choices remain available; scoped registered lifecycle
+runners still require Linux for **both** providers. Missing Windows VMs are
+never replaced with Linux. Existing VMs must match the selected OS, region and
+private subnet; Linux resources must also carry this helper's exact ownership.
+New Linux VMs use Ubuntu 24.04 x64 Gen2, D4s_v5 (4 vCPU/16 GiB), a 128-GiB
+StandardSSD_LRS OS disk, **the factory's existing COMMON RG and subnet**, no
+public IP, no managed identity, and a dedicated deny-all-inbound NIC NSG.
+Optional `--ssh-public-key` supplies an existing public key. Otherwise a
+protected ephemeral key is generated only when creation is needed and discarded;
+guest installation uses managed Run Command, not inbound SSH.
+
+`plan` makes cloud reads only and does not claim guest readiness. `ensure`
+requires `--yes`, existing authenticated Azure/ADO/GitHub access, and permissions
+for the exact resources and agent pool/repository. Serialize provisioning of
+these names: ARM PUT is not an atomic create-only API. Every create rechecks
+absence; ownership conflicts, failed/uncertain reads, stopped VMs and busy
+agents block rather than overwrite, restart, replace or delete anything.
+Retries reuse matching resources and verify guest prerequisites/registration.
+`--prereqs-only` performs VM/guest prerequisites without provider registration
+when the repository is not yet known; it never reports an agent ready.
+
+This route never enters full-factory creation, changes config or register
+content, commits/pushes, creates repositories, dispatches projects, installs
+tools on the host, logs in, or changes shared Azure/GitHub defaults. ADO
+authentication uses a deterministic cached subscription in the explicit ADO
+tenant without requesting a PAT. Enrollment remains a separate reviewed
+operation; runner setup does not acknowledge governance or publish bindings.
+Full legacy creation ensures the selected runner after common deployment and
+before self-hosted project execution; `--prepare-only` is not runner readiness.
+
 ## AI factory *AI Application Landingzones*: CONCEPTS & DESIGN: Differentiators? 
 - The AI Factory wraps multiple environments together: Dev, Stage, Prod, per team, called `AI Factory project`.
 - The AI Factory sets up 1 to 3 AI Application Landing Zones per `AI Factory project` and `project team` (a team assigned to a project)

@@ -287,7 +287,7 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 |---|---:|
 | `yaml` | 344 |
 | `env` | 342 |
-| `bootstrap` | 85 |
+| `bootstrap` | 81 |
 | `helper` | 17 |
 | `state` | 42 |
 | `json.dev` | 348 |
@@ -1087,7 +1087,6 @@ Inputs are read by the create launchers, with version selectors also used by upd
 
 | Input | M/C/O | Source default / expression | Description |
 |---|---|---|---|
-| <!-- parameter bootstrap:ADO_AGENT_NAME -->`ADO_AGENT_NAME` | C | `"dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001"` | Ado agent name override; see create launcher. |
 | <!-- parameter bootstrap:ADO_AGENT_POOL -->`ADO_AGENT_POOL` | C | `"Default"` | Azure DevOps agent pool |
 | <!-- parameter bootstrap:ADO_AUTH_METHOD -->`ADO_AUTH_METHOD` | C | `"aad"` | Azure DevOps authentication: Microsoft Entra (aad) or PAT (pat); allowed: aad pat |
 | <!-- parameter bootstrap:ADO_BRANCH -->`ADO_BRANCH` | C | `"main"` | ADO update branch; reviewed project dispatch requires main. |
@@ -1095,7 +1094,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:ADO_PIPELINE_NAME -->`ADO_PIPELINE_NAME` | C | `"infra-project-genai"` | ADO legacy update pipeline name. |
 | <!-- parameter bootstrap:ADO_PROJECT -->`ADO_PROJECT` | C | `""` | Azure DevOps project name |
 | <!-- parameter bootstrap:ADO_REPOSITORY_NAME -->`ADO_REPOSITORY_NAME` | C | `"${AIF_PREFIX%-}aifactory-${AIF_SCALESET_SUFFIX}"` | Azure DevOps repository name |
-| <!-- parameter bootstrap:ADO_RUNNER_MODE -->`ADO_RUNNER_MODE` | C | `"$runner_default"` | Project build agent: self-hosted admin VM (s, recommended for private access) or Microsoft-hosted (h); allowed: s h |
+| <!-- parameter bootstrap:ADO_RUNNER_MODE -->`ADO_RUNNER_MODE` | C | `"h"` | Project build agent: self-hosted admin VM (s) or Microsoft-hosted (h); allowed: s h |
 | <!-- parameter bootstrap:ADO_RUNNER_SELECTION -->`ADO_RUNNER_SELECTION` | C | `"from-config"` | ADO legacy update runner selection. |
 | <!-- parameter bootstrap:ADO_SERVICE_CONNECTION_NAME -->`ADO_SERVICE_CONNECTION_NAME` | C | `"sc-${AIF_PREFIX%-}dev-${AIF_SCALESET_SUFFIX}"` | Azure DevOps service connection name |
 | <!-- parameter bootstrap:ADO_SETTINGS_FILE -->`ADO_SETTINGS_FILE` | C | `"$HOME/.aifactory-ado-settings.json"` | ADO saved organization/project context path; generator never reads this file. |
@@ -1145,9 +1144,6 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIF_PREPARE_ONLY -->`AIF_PREPARE_ONLY` | O | `"false"` | Aif prepare only override; see create launcher. |
 | <!-- parameter bootstrap:AIF_PROD_SUBSCRIPTION_ID -->`AIF_PROD_SUBSCRIPTION_ID` | O | `"$AIF_DEV_SUBSCRIPTION_ID"` | Aif prod subscription id override; see create launcher. |
 | <!-- parameter bootstrap:AIF_PROJECT_NUMBER -->`AIF_PROJECT_NUMBER` | O | `"001"` | First project number (001-999) |
-| <!-- parameter bootstrap:AIF_RUNNER_MODE -->`AIF_RUNNER_MODE` | O | `"$runner_default"` | Project runner: self-hosted (recommended for private access) or github-hosted; allowed: self-hosted github-hosted |
-| <!-- parameter bootstrap:AIF_RUNNER_VM_NAME -->`AIF_RUNNER_VM_NAME` | O | `"dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001"` | Aif runner vm name override; see create launcher. |
-| <!-- parameter bootstrap:AIF_RUNNER_VM_RESOURCE_GROUP -->`AIF_RUNNER_VM_RESOURCE_GROUP` | O | `"${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"` | Aif runner vm resource group override; see create launcher. |
 | <!-- parameter bootstrap:AIF_SCALESET_SUFFIX -->`AIF_SCALESET_SUFFIX` | O | `"001"` | Scale-set number (001-999) |
 | <!-- parameter bootstrap:AIF_SEEDING_KEYVAULT_NAME -->`AIF_SEEDING_KEYVAULT_NAME` | C | `"kv${prefix_compact}${AIF_LOCATION_SHORT}${AIF_SCALESET_SUFFIX}"` | Existing seeding Key Vault name |
 | <!-- parameter bootstrap:AIF_SEEDING_MODE -->`AIF_SEEDING_MODE` | O | `"c"` | Seeding Key Vault: create/ensure (c) or use existing (e); allowed: c e |

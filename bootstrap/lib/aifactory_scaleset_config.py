@@ -760,7 +760,8 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
     project_sp = state.get("project_sp_secret_names") or {}
     hub = state["topology"] == "hs" or state.get("access_hub_mode") == "external"
     self_hosted = state.get("runner_mode") == "self-hosted"
-    enable_admin_vm = self_hosted or state["add_bastion"] == "true"
+    runner_os = state.get("runner_vm_os", "windows")
+    enable_admin_vm = (self_hosted and runner_os.lower() == "windows") or state["add_bastion"] == "true"
     lake_prefix = re.sub(r"[^a-z0-9]", "", state["prefix"].lower())[:8]
     values = {
         "admin_location": state["location"],
@@ -893,13 +894,16 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
     if json_template_path.is_file():
         merge_json_template(json_template_path, json_path)
         json_template_path.unlink()
-    common = common_values(state)
+    common = common_values({**state, "runner_vm_os": state.get("runner_vm_os", "linux")})
     common.update(selected_project_organization(json_path, state))
+    if state.get("github_runner_label"):
+        common["selfHostedRunnerLabel"] = state["github_runner_label"]
     update_json(json_path, {**common, "AZURE_CLIENT_ID": state.get("oidc_client_id", "")})
     project_sp = state.get("project_sp_secret_names") or {}
     hub = state["topology"] == "hs" or state.get("access_hub_mode") == "external"
     self_hosted = state.get("runner_mode") == "self-hosted"
-    enable_admin_vm = self_hosted or state["add_bastion"] == "true"
+    runner_os = state.get("runner_vm_os", "linux")
+    enable_admin_vm = (self_hosted and runner_os.lower() == "windows") or state["add_bastion"] == "true"
     env_values = {
         "GITHUB_USERNAME": state["github_repository"].split("/", maxsplit=1)[0],
         "GITHUB_NEW_REPO": state["github_repository"],
@@ -977,6 +981,9 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         env_values["TAGS_PROJECT"] = common["tagsProject"]
         env_values["PROJECT_MEMBERS_EMAILS"] = common["technical_admins_email"]
     env_values.update({env: common[key] for key, env in PROJECT_ORGANIZATION_ENV.items() if key in common})
+    for key, name in (("github_runner_name", "GHA_RUNNER_NAME"), ("github_runner_label", "GHA_RUNNER_LABEL")):
+        if state.get(key):
+            env_values[name] = state[key]
     update_env(env_path, env_values)
     update_json(json_path, common)
 

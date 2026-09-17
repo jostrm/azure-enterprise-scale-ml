@@ -29,7 +29,30 @@ AIF_DUAL_LAYOUT_LIBRARIES=(
   runner-prerequisites.sh
   runner-registration.ps1
   runner-registration.sh
+  runner_bootstrap.py
+  runner-only-registration.sh
 )
+
+aif_route_runner() {
+  local provider="$1" script_dir="$2"
+  shift 2
+  [[ "${1:-}" == runner ]] || return 0
+  shift
+  local candidate adapter
+  for candidate in "$script_dir/lib/runner_bootstrap.py" \
+    "$script_dir/azure-enterprise-scale-ml/bootstrap/lib/runner_bootstrap.py"; do
+    [[ ! -f "$candidate" ]] || { adapter="$candidate"; break; }
+  done
+  [[ -n "${adapter:-}" ]] || { printf 'ERROR: Complete runner helper bundle is missing.\n' >&2; exit 2; }
+  local -a python_command
+  if [[ -n "${AIFACTORY_PYTHON:-}" ]]; then python_command=("$AIFACTORY_PYTHON")
+  elif command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then python_command=(python3)
+  elif command -v python >/dev/null 2>&1 && python --version >/dev/null 2>&1; then python_command=(python)
+  elif command -v py >/dev/null 2>&1 && py -3 --version >/dev/null 2>&1; then python_command=(py -3)
+  else printf 'ERROR: Python 3.10 or newer is required for runner setup.\n' >&2; exit 2
+  fi
+  exec "${python_command[@]}" -B "$adapter" "$provider" "$@"
+}
 
 aif_enrollment_usage() {
   printf '%s\n' \
@@ -240,6 +263,8 @@ aif_ensure_control_bundle_gitignore() {
     "!/lib/release_version.sh"
     "!/lib/runner-prerequisites.ps1"
     "!/lib/runner-prerequisites.sh"
+    "!/lib/runner_bootstrap.py"
+    "!/lib/runner-only-registration.sh"
     "!/lib/runner-registration.ps1"
     "!/lib/runner-registration.sh"
     "!/ui/"

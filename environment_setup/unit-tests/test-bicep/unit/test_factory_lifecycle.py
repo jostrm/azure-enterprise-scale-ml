@@ -1728,17 +1728,48 @@ def test_bounded_names_are_shared_by_nested_dependencies_and_receipt_endpoints()
         assert resource["dependsOn"] == ([fl.deployment_endpoint(document, steps[index - 1]).removeprefix(fl.ARM)] if index else [])
 
 
-def test_full_group_failure_keeps_receipt_and_physical_locks(monkeypatch, workspace):
+@pytest.mark.parametrize("utc_clock_lead", [0, 0.010])
+def test_full_group_failure_keeps_receipt_and_physical_locks(monkeypatch, workspace, utc_clock_lead):
+    now = 1_800_000_000
+
+    class PreciseUtcClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime.fromtimestamp(now + utc_clock_lead, tz)
+
+    # Windows Python 3.12 can report a finer UTC clock than time.time().
+    monkeypatch.setattr(fl, "datetime", PreciseUtcClock)
+    monkeypatch.setattr(fl.time, "time", lambda: now)
     cloud = ClosureCloud()
     document = owned_group_manifest(cloud)
     cloud.fail_delete = True
     source, execution, receipt = setup_execute(monkeypatch, workspace)
     result = fl.execute(document, source, execution, receipt, cloud=cloud)
-    assert result["status"] == "reconciliation-required"
+    assert result["status"] == "reconciliation-required", result
+    assert result["error_code"] == "remote-request-failed-409"
     assert result["pending_resource_group"] == GROUP
     assert result["deleted_resources"] == []
     assert len(cloud.leases) == 2 and not cloud.deleted
     assert json.loads(receipt.read_text())["status"] == "reconciliation-required"
+
+
+@pytest.mark.parametrize("accepted_offset", [-6, 0.001, 1800])
+def test_execution_claim_rejects_acceptance_outside_consent_or_in_future(monkeypatch, accepted_offset):
+    now = 1_800_000_000
+    monkeypatch.setattr(fl.time, "time", lambda: now)
+    monkeypatch.setattr(fl, "utc_now", lambda: datetime.fromtimestamp(now, timezone.utc).isoformat())
+    document, cloud = manifest(), FakeCloud()
+    locks = fl.BlobLocks(cloud, document)
+    locks.acquire()
+    locks.claim_run()
+    proof = copy.deepcopy(locks.read_claim())
+    proof["accepted_at"] = datetime.fromtimestamp(now + accepted_offset, timezone.utc).isoformat()
+    cloud.runs["runs/" + document["run_id"] + ".claim.json"] = copy.deepcopy(proof)
+    cloud.runs["runs/" + document["run_id"] + ".json"]["execution_claim"] = copy.deepcopy(proof)
+    locks.execution_claim = fl._ExecutionClaim(document, proof)
+    with pytest.raises(fl.Blocked, match="execution-claim-outside-consent"):
+        locks.authorize(document)
+    assert not cloud.deleted
 
 
 @pytest.mark.parametrize("tags,code", [
