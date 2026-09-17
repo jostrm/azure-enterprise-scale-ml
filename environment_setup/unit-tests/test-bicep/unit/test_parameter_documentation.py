@@ -101,7 +101,8 @@ class ParameterDocumentationTests(unittest.TestCase):
         self.assertFalse(update_inputs - set(generator.bootstrap_inventory()))
         internal_create = {
             "ADO_AGENT_NAME", "ADO_CONTEXT_SUBSCRIPTION_ID", "AIF_OIDC_CLIENT_ID", "AIF_ROUTE",
-            "AIF_LAUNCHER_RESTORE_REQUIRED", "AIF_REPO_ROOT",
+            "AIF_LAUNCHER_RESTORE_REQUIRED", "AIF_REPO_ROOT", "AIF_RUNNER_OS",
+            "AIF_RUNNER_REMOTE_ID",
             "AIF_SIMPLE_COMMON_READY", "AIF_STATE_DIR",
             "AIF_TEMP_BOOTSTRAP_RG", "AIF_TEMP_MANAGED_RG",
             "AIF_VERSION_ARGUMENT",
