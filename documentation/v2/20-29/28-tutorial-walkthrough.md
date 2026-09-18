@@ -1,12 +1,13 @@
 # AI Factory tutorial — Take2: UX first, version 1.25+
 
-**Deliverable status: workflow recommendations and director/teacher manuscript. The new complete film, chapter timings, clips, and final PowerPoint are not yet produced or verified.** The intended edited running time is **25–35 minutes**, not a measured duration. This guide describes the next production; quoted outcome lines may be recorded only after their evidence checkpoints pass.
+**Delivery status (18 September 2026): Part 1 video, 13 chapter snippets and the 23-slide PowerPoint with four embedded clips are delivered. The full deployment tutorial is not complete.** Part 1 is **10:30.69** (rounded **10:31**), with 13 fresh recorded chapters, local English narration, timed subtitles, native tutor highlighting and real read-only API/CLI commands. The intended **25–35 minutes** still describes the complete three-phase film, not this foundation part. Quoted deployment outcome lines below remain gated by actual evidence.
 
 Start in the maximized Windows MAUI app, with **Tutorial Mode checked**, and open the existing orange **`azurefactory`** folder. Follow one registered-layout workflow throughout. Explicitly choose **1.25** wherever this walkthrough requests a version; use a later supported release only after separately validating its contracts. Do not leave a picker at its default, use `main` as a release, or suggest that selecting a version upgrades a checkout or deployed resources.
 
 **Watch in this order:** orientation and every menu view → project001 Function and project003 in Dev001 → regional expansion → configuration clone → corresponding CLI/API lab → verified outcomes. No terminal detours during the UX scenarios.
 
 - [Workflow and UX changes](#take2-workflow-and-ux-changes)
+- [Part 1 media and chapter index](#take2-part-1-media-and-chapter-index)
 - [Producer-only readiness gate](#take2-producer-only-readiness-gate)
 - [Director and teacher screenplay](#take2-director-and-teacher-screenplay)
 - [CLI/API correspondence and guarded sample](#take2-cliapi-correspondence-and-guarded-sample)
@@ -14,6 +15,48 @@ Start in the maximized Windows MAUI app, with **Tutorial Mode checked**, and ope
 - [Preserved original walkthrough](#preserved-original-walkthrough)
 
 Installation/reference: [Windows MAUI setup](../../../environment_setup/install_config_wizard/maui/readme.md), [end-to-end setup](24-end-2-end-setup.md), [SDK/CLI](../../../environment_setup/azurefactory-cli/readme.md), [API examples](../../../environment_setup/install_config_wizard/api-usage-examples/readme.md). The separate [FinOps monitoring tutorial](tutorial-fiops.md) remains a companion, not a prerequisite scene.
+
+## Take2 Part 1 media and chapter index
+
+Part 1 covers the improved desktop interface first, followed by real REST health, CLI health and ADO/GitHub launcher-capability commands. The command under discussion is highlighted in the terminal and enlarged in a labeled editorial callout. Native tutorial read-aloud has its own uninterrupted demonstration. Guidance is paused after that demonstration rather than showing an unrelated tutorial step throughout the menu tour.
+
+Files are relative to the user's delivered `tutorial` folder, **not** this repository:
+
+```text
+video\take2\AI Factory tutorial - Take2 - Part 1.mp4
+video\take2\AI Factory tutorial - Take2 - Part 1.srt
+video\take2\AI Factory tutorial - Take2 - Part 1.chapters.json
+video\take2\originals\                         full original takes, including preserved superseded attempts
+video\snippets-take2\Take2-Part1-*.mp4         13 edited chapter clips, each with its own SRT
+image-screenshots\maui-take2\take2-new-*.png   26 accepted new screenshots, plus preserved retakes
+ppt\maui-take2\AI Factory tutorial - Take2 - Part 1.pptx
+```
+
+The 23-slide deck includes four embedded H.264/AAC clips, actual narration in speaker notes, chapter references, a relative full-video link, and one explicit next-lab roadmap. Keep the `tutorial` directory structure together for the full-video link. Embedded clips are self-contained and are intended for desktop PowerPoint Slide Show.
+
+| Start | Chapter |
+|---|---|
+| 00:00 | Open the orange factory and use the tutor |
+| 01:26 | Find settings without losing your place |
+| 02:33 | Select scope before choosing an operation |
+| 03:12 | Existing-factory work or a new quickstart |
+| 03:45 | Full bootstrap: configure, review, run |
+| 04:33 | Monitoring by question and source |
+| 05:18 | Agent and model map |
+| 05:53 | Portfolio and individual factory views |
+| 06:34 | Projects and scale sets |
+| 07:12 | Concept animations |
+| 07:46 | Tickets, API connection, appearance and About |
+| 08:42 | Actual read-only API and CLI commands |
+| 09:46 | Next-lab roadmap |
+
+The edited video is 2560 x 1440, H.264/AAC, with captions outside the full native window. Clip timing is retained; no whole-chapter speed changes are used. Simple Mode explicitly shows 1.25 in the accepted retake. Its account labels are editorially masked in the edited video and deck derivatives; original user-owned captures remain unchanged.
+
+Production evidence covers complete media decoding, audio presence, measured cue bounds, native PowerPoint rendering, package/embedded-media consistency, and independent rendered-slide inspection. It does not claim a continuous human watch-and-listen review of the entire film.
+
+**Still to record:** the real project001 Function update, project003 deployment, Germany West Central dedicated-subscription scenario, intentionally undeployed configuration clone, and corresponding execution CLI/API workflows. Part 1 does not claim those operations occurred. Project001's Function remains absent and project003's canonical resource group was absent in the latest exact-scope readiness evidence; the recorded draft is not a substitute for deployment.
+
+**Continuation (18 September):** the owner supplied the Germany subscription and tenant, and the subscription is enabled in that tenant. They are also the existing Sweden subscription and tenant, so reusing them must not be presented as dedicated-subscription isolation. A native **configuration-only** review succeeded for a separate Germany West Central factory, explicit release **1.25**, Dev suffix **002**, and a proposed **`172.17.0.0/20`** network with capacity **one**. The range does not overlap the registered Sweden ranges or the VNets observed in the supplied subscription; this is not an organizational IPAM or peering approval. The review remains **unconfirmed**, with no Germany factory/project saved or Azure deployment started. Keep actual subscription/tenant IDs in private operator material, not this public guide.
 
 ## Take2 workflow and UX changes
 
@@ -23,6 +66,7 @@ The learning model is **select scope → inspect configuration → review an exa
 |---|---|---|
 | Implemented in the revised source/build work; verify the installed recording build | Bundled API payload/startup and stale ephemeral-port recovery repaired; explicit connection failure/recovery | Healthy local API independently of the selected folder, backend choice, and Azure sign-in. A healthy API does not establish Azure/ADO readiness. |
 | Implemented | Centered 42px action buttons and progressive disclosure in catalog, projects, scale sets, Simple Mode, and bootstrap | A clear primary action with advanced details opened deliberately. Consent, warnings, exact scopes, and review controls remain present. |
+| Implemented in the continuation build | Catalog saved-release guidance follows the actual version field immediately | Selecting 1.25 no longer leaves a stale "release 124" explanation. Blank new-factory input requests an explicit release; blank clone input retains source inheritance. Saving a release is not described as deploying or upgrading Azure. |
 | Implemented | Full bootstrap now starts with a provider choice and grouped destination/team fields; network and source options expand on demand | A page-level **Setup details** button uses the existing selectable details viewer. Static notes are neutral; actual blockers remain visible and still prevent starting. |
 | Implemented | **Copy common details** explicitly copies account/team defaults into the separate new-factory draft | The new destination, project, networking and resource settings are not copied. API/CLI `mapping_mode=common-details` returns a partial configuration to merge; strict conversion remains available. Existing UAMI, self-hosted runner and ADO-tenant inputs now reach the reviewed launcher. |
 | Implemented | Tutorial current step/progress pinned; history and read-only console compactly disclosed | The supported configuration tutorial remains legible instead of leaving an obsolete step in view. Verification still requires explicit action. |
@@ -41,15 +85,15 @@ The learning model is **select scope → inspect configuration → review an exa
 |---|---|
 | Recording build and release | Rebuild/install the revised MAUI app and its correct bundled API; confirm healthy startup and the intended live URL. Use an isolated supported **1.25** source checkout without changing the dirty working tree. Existing source being on `main` is not a release qualification. Recheck every relevant picker and the prepared operation's resolved source ref. |
 | Scope and existing work | The orange register already exists. Discover UUIDs from it; never publish machine-specific IDs. Project001's saved `enableFunction` is already true, but no live Function site/plan was established by the readiness check. Project003 already exists as a **Dev001-only draft**, with no cloud resource group established. Reuse both; do not toggle off/on or add another project003 for a “new edit” shot. |
-| Execution enrollment | Azure identity currently matches the intended tenant/subscriptions, but **ADO login is missing**. Catalog runtime bindings, approved Linux runner, deployment principal, auth namespace, repository/ref, write-resource-group scope, and Blob-lease enrollment are missing. Existing common/project001 resource groups lack required ownership tags; source adoption is not automatic. Bindings, enrollment, and adoption need separate scope approval. Do not bypass a blocked prepare or use raw updater flags. |
+| Execution enrollment | **ADO authentication is working** through explicit cached organization-tenant account selection; no new login or default Azure account switch is needed. The existing federated service connection matches the deployment managed identity. The 18 September recheck confirms that both explicit v1.25 prepares still stop at missing ADO runtime binding and Blob-lease enrollment. The existing Windows VM is now **deallocated** and its agent **offline**; neither was changed. The registered scoped contract requires Linux. An additional Linux ADO worker can preserve Windows, but still needs approval. Project001 lacks verified ownership; project003's exact Dev RG remains absent. Identify the authorized common/network writer and establish actual lease governance across existing writers before enrollment. A lock container or a runner alone does not establish that governance; do not silently adopt common resources, redirect legacy pipelines, or attest ownership. |
 | Consent and cost | Present approval covers project001 DEV update and project003 costs—not regional expansion, clone, ownership changes, or arbitrary wider writes. Review the exact service profile: saved defaults include Foundry/capability host, Search, AML, Cosmos DB, ADF, Databricks, Event Hubs, Bot, and admin VM. “Defaults” is not a low-cost guarantee. Do not change unrelated services to make a demo succeed. |
 | Non-deletion | Every delete/cleanup flag must be false, including `deleteAllForProject`, `deleteAllServicesForProject`, `enableDeleteForDisabledResources`, and `debugEnableCleaning` where present. The supported runtime uses incremental ARM and accepts only **Create, Modify, NoChange** what-if changes. Reject destructive or unresolved changes. There is no `--no-delete` switch. Retain all existing files/resources. |
-| Phase 2 decision | Region belongs to the **factory**, not the scale set. Germany West Central needs a **new regional factory identity in the same register**, owner-supplied dedicated subscriptions, agreed prefix/suffix/project, and nonoverlapping CIDRs. This differs from “same factory” and needs explicit confirmation. Alternatively approve another **Sweden** scale set in the existing factory. Own-subscription mode does not create subscriptions. Full-profile `/20` capacity is one; the existing shared configuration estimates seven, despite the “up to 8” mode label. |
+| Phase 2 decision | Region belongs to the **factory**, not the scale set. The supplied Germany target is valid but is also the Sweden shared subscription. Confirm intentional reuse for a one-project regional demonstration, or supply a separate dedicated subscription for the original isolation scenario. The unconfirmed regional proposal is `ai-spider-germany`, prefix `spider-gw-`, Dev002, release 1.25, ADO, `172.17.0.0/20`, capacity one, followed by project004 in Dev002 only. It leaves Sweden unchanged. Own-subscription mode does not create subscriptions or make a reused subscription exclusive. The existing shared configuration estimates seven, despite the “up to 8” mode label. |
 | Phase 3 decision | Clone copies configuration with new UUIDs and reset ownership; it retains subscription/address choices. Copied identity/network fields are currently locked against ordinary settings edits, so do not promise an available deployable retarget flow. Obtain approval for an explicitly **undeployed configuration clone**, or substitute an approved local network-planning exercise. Do not deploy a copied overlapping network. |
 | Capture and privacy | Maximize each actual window after every switch. Keep scope, footer, review, and tutorial readable. Use local Microsoft Zira for the teacher track; native read-aloud is a separate deliberate demonstration. Hide keys, receipts, sensitive paths, full-state exports, account IDs, and unredacted logs. Obtain the app URL/key off camera; never inspect protected credential files. |
 | Release evidence | No deployment was executed as part of preparing this manuscript. Before using any success line, retain the real job result and scoped Azure evidence privately. A successful local save, queue entry, or script exit alone is insufficient. |
 
-The original film review used its **full transcript and selected decoded frames**, not complete audio listening. The earlier OneDrive PowerPoint was not located, so no analysis of its slide contents is claimed. Production lessons: the old 13:37.54/14-chapter edit showed a real pulsing ring but stale tutorial step 1 at several later points; screen/caption drift occurred at 02:05, 02:25, and 11:50; whole-chapter retiming ranged from 0.39× to 2.14×; the 126px caption strip obscured lower UI. The Function segment did not deploy, project003 was a local save, Germany lacked IDs, and clone never reached confirmation. These are off-camera findings—not scenes to replay.
+The original film review used its **full transcript and selected decoded frames**, not complete audio listening. The supplied OneDrive PowerPoint has now been located; its slide contents were not re-analyzed during this media continuation. Production lessons: the old 13:37.54/14-chapter edit showed a real pulsing ring but stale tutorial step 1 at several later points; screen/caption drift occurred at 02:05, 02:25, and 11:50; whole-chapter retiming ranged from 0.39× to 2.14×; the 126px caption strip obscured lower UI. The Function segment did not deploy, project003 was a local save, Germany lacked IDs, and clone never reached confirmation. These are off-camera findings—not scenes to replay.
 
 ## Take2 director and teacher screenplay
 
@@ -432,7 +476,7 @@ Source-checked against [CLI parser/handlers](../../../environment_setup/azurefac
 
 ## Take2 production and delivery plan
 
-**Planned paths, not existing download links.** Keep all original captures, the prior film, and any supplied decks. Create Take2 alongside them; never overwrite the old media. Paths below are relative to the delivered `tutorial` bundle, not this Markdown file:
+**The complete three-phase film remains planned.** The separately named, delivered Part 1 files and measured chapter index are listed above. Keep all original captures, the prior film, and any supplied decks. Create Take2 alongside them; never overwrite the old media. Paths below reserve the future complete-film names relative to the delivered `tutorial` bundle, not this Markdown file:
 
 ```text
 tutorial\
@@ -442,7 +486,7 @@ tutorial\
       AI Factory tutorial - MAUI UX - Take2.srt
       AI Factory tutorial - MAUI UX - Take2-chapters.json
     snippets-take2\
-  images\
+  image-screenshots\
     maui-take2\
   ppt\
     maui-take2\
@@ -452,7 +496,7 @@ tutorial\
 1. **Capture:** preserve full-resolution original actions, unretimed audio, and per-scene evidence. Maximize before every capture, including a deliberate browser/terminal switch. Hold each title, selection, review, and outcome long enough to read.
 2. **Narration:** use local Microsoft Zira at a natural, consistent rate. Split audio at sentence/action boundaries; align each sentence to the actual screen state. Native tutorial speech gets its own uninterrupted demonstration and is otherwise stopped to avoid doubled narration.
 3. **Edit:** use straight cuts and measured elapsed-time cards for waiting. No whole-chapter retiming. Use player captions or a reserved safe area that does not cover footer, chat, buttons, or warnings; do not repeat the old bottom-strip obstruction. Inspect every transition for screen/caption/command drift.
-4. **Deck:** build a new companion after screenshots and clips are verified: learning path, menu map, one scenario/evidence pair per phase, CLI/API matrix, receipt boundary, and truthful outcomes. Do not assert the contents of the unlocated earlier OneDrive deck. From `ppt\maui-take2`, the planned video target is `..\..\video\take2\AI Factory tutorial - MAUI UX - Take2.mp4`.
+4. **Deck:** build a new companion after screenshots and clips are verified: learning path, menu map, one scenario/evidence pair per completed phase, CLI/API matrix, receipt boundary, and truthful outcomes. Do not assert the contents of the earlier OneDrive deck without reading it through its authorized document route. From `ppt\maui-take2`, the planned complete-film video target is `..\..\video\take2\AI Factory tutorial - MAUI UX - Take2.mp4`; Part 1 has its own explicitly scoped filenames.
 5. **Portable packaging:** set relative media targets from each deliverable's own directory. Validate them after moving the entire bundle to a different folder. Add clickable chapter timestamps and links to this guide only after actual files exist and final durations are measured.
 6. **Acceptance:** watch/listen to the entire finished cut, not just transcript/frames. Verify every spoken sentence against its screen, every pulse against its intended control, every command selection against its narration, every claimed outcome against retained evidence, and every caption/clip/PPT link from the relocated bundle. Update the status at the top only after this passes.
 

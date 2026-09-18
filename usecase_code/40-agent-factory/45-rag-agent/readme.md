@@ -169,6 +169,20 @@ are reused. After correcting a terminal failure, explicitly use
 `materialize --apply --retry-failed` or `start --apply --retry-failed`; active runs
 are never restarted. Invalid staged bytes require explicit retry, not acceptance.
 
+If ADF reports `Succeeded` but the copied bytes fail integrity verification, use:
+
+```powershell
+python .\45-rag-agent\main.py materialize @selection --apply --retry-failed
+python .\45-rag-agent\main.py poll-materialization @selection
+```
+
+The source must still match its approved hash. The retry rechecks prerequisites,
+starts one replacement copy and saves the new run ID with
+`retry_reason=destination-verification-failed`. A valid completed copy is reused
+even with this flag. Authentication/connectivity errors do not trigger a
+replacement, and a failed attempt to start one does not replace the previous
+journal.
+
 State is stored under:
 
 ```text

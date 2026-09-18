@@ -1,4 +1,5 @@
 import importlib.util
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import tempfile
@@ -115,6 +116,93 @@ class RagCliTests(unittest.TestCase):
                 result = rag.run(args)
                 self.assertEqual("destination-verification-failed", result["retry_reason"])
                 start.assert_called_once()
+
+    @contextmanager
+    def materialization_scenario(self):
+        source, _ = knowledge()
+        args = self.args("materialize", "--apply", "--retry-failed")
+        state = (args.config.parent / ".agent-factory" / TARGET.account_name
+                 / TARGET.project_name / "rag" / source.source_key / source.binding_fingerprint)
+        state.mkdir(parents=True)
+        journal = state / "materialization.json"
+        saved = {
+            "binding_fingerprint": source.binding_fingerprint, "factory_name": "adf",
+            "factory_id": "/factory", "run_id": "existing-run",
+        }
+        journal.write_text(json.dumps(saved), encoding="utf-8")
+        session = Mock()
+        session.pages.return_value = [{"name": "adf", "type": "Microsoft.DataFactory/factories"}]
+        session.arm.return_value = {"status": "Succeeded"}
+        with patch.object(rag, "load_selection", return_value=({}, CONFIG, {})), \
+                patch.object(rag, "discover", return_value=TARGET), \
+                patch.object(rag, "AzureSession", return_value=session), \
+                patch.object(rag.RagSource, "from_binding", return_value=source), \
+                patch.object(rag, "validated_documents", return_value=[]), \
+                patch.object(rag, "verify_destination") as verify, \
+                patch.object(rag, "start_materialization", return_value={
+                    **saved, "status": "running", "run_id": "retry-run",
+                }) as start:
+            yield args, source, journal, saved, session, verify, start
+
+    def test_retry_persists_replacement_run_and_next_call_does_not_duplicate_it(self):
+        with self.materialization_scenario() as (args, source, journal, _, session, verify, start):
+            verify.side_effect = ValueError("SHA mismatch")
+            result = rag.run(args)
+            start.assert_called_once_with(session, TARGET, source, "adf")
+            self.assertEqual("retry-run", result["run_id"])
+            self.assertEqual("destination-verification-failed", result["retry_reason"])
+            self.assertEqual(result, json.loads(journal.read_text(encoding="utf-8")))
+            session.arm.return_value = {"status": "InProgress"}
+            with self.assertRaisesRegex(RuntimeError, "already active"):
+                rag.run(args)
+            self.assertEqual(1, start.call_count)
+            self.assertIn("/pipelineruns/retry-run", session.arm.call_args.args[1])
+
+    def test_valid_completed_copy_is_reused_even_with_retry_flag(self):
+        with self.materialization_scenario() as (args, _, journal, saved, _, verify, start):
+            verify.return_value = {"content_verified": True}
+            self.assertEqual(
+                {"content_verified": True, "status": "reused", "run_id": "existing-run"},
+                rag.run(args),
+            )
+            start.assert_not_called()
+            self.assertEqual(saved, json.loads(journal.read_text(encoding="utf-8")))
+
+    def test_retry_flag_never_restarts_active_copy(self):
+        with self.materialization_scenario() as (args, _, journal, saved, session, verify, start):
+            for status in ("Queued", "InProgress", "Canceling"):
+                session.arm.return_value = {"status": status}
+                with self.subTest(status=status), self.assertRaisesRegex(RuntimeError, "already active"):
+                    rag.run(args)
+            start.assert_not_called()
+            verify.assert_not_called()
+            self.assertEqual(saved, json.loads(journal.read_text(encoding="utf-8")))
+
+    def test_access_failure_is_not_treated_as_corrupt_destination(self):
+        with self.materialization_scenario() as (args, _, journal, saved, _, verify, start):
+            verify.side_effect = RuntimeError("Storage read failed: HTTP 403")
+            with self.assertRaisesRegex(RuntimeError, "HTTP 403"):
+                rag.run(args)
+            start.assert_not_called()
+            self.assertEqual(saved, json.loads(journal.read_text(encoding="utf-8")))
+
+    def test_failed_restart_preserves_previous_journal(self):
+        with self.materialization_scenario() as (args, _, journal, saved, _, verify, start):
+            verify.side_effect = ValueError("SHA mismatch")
+            start.side_effect = RuntimeError("Materialization prerequisites are not ready")
+            with self.assertRaisesRegex(RuntimeError, "prerequisites"):
+                rag.run(args)
+            self.assertEqual(saved, json.loads(journal.read_text(encoding="utf-8")))
+
+    def test_retry_cannot_cross_binding_or_factory(self):
+        with self.materialization_scenario() as (args, _, journal, saved, session, verify, start):
+            for field in ("binding_fingerprint", "factory_name"):
+                journal.write_text(json.dumps({**saved, field: "different"}), encoding="utf-8")
+                with self.subTest(field=field), self.assertRaisesRegex(RuntimeError, "another binding or factory"):
+                    rag.run(args)
+            session.arm.assert_not_called()
+            verify.assert_not_called()
+            start.assert_not_called()
 
 
 if __name__ == "__main__":

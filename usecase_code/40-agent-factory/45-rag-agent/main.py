@@ -248,7 +248,10 @@ def parser():
     result.add_argument("--target")
     result.add_argument("--apply", action="store_true")
     result.add_argument("--grant-read", action="store_true", help="Explicit conditional common-lake read permission for ADF's project UAMI.")
-    result.add_argument("--retry-failed", action="store_true", help="Explicitly retry one terminal failed indexer after prerequisites are repaired.")
+    result.add_argument(
+        "--retry-failed", action="store_true",
+        help="Explicitly retry a terminal failed copy/indexer or a completed copy with invalid staged bytes; never restart active or verified work.",
+    )
     result.add_argument("--connection-id")
     result.add_argument("--private-endpoint-id")
     result.add_argument("--data-factory")
