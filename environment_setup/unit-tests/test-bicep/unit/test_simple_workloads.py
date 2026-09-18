@@ -313,8 +313,10 @@ printf '%s\\n' "AML=$AIF_AZURE_ML_PRINCIPAL_ID" "DBX=$AIF_DATABRICKS_PRINCIPAL_I
 @pytest.mark.parametrize("selection", SCENARIOS + [[]])
 def test_gateway_off_still_dispatches_common_access_and_each_selected_workload(selection):
     result = bash(f"""AIF_SIMPLE_MODE=true; AIF_ENABLE_APPLICATION_GATEWAY=false; AIF_NO_WAIT=false
+AIF_RUNNER_MODE=github-hosted
 AIF_SIMPLE_PROJECT_RESOURCES_JSON='{json.dumps(selection)}'
 aif_run_github_workflow() {{ echo "$1"; }}
+aif_ensure_github_self_hosted_agent() {{ :; }}
 aif_verify_common_resource_group() {{ echo COMMON; }}
 aif_ensure_private_network_access() {{ echo VPN_DNS; }}
 aif_deploy_github

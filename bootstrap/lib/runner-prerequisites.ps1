@@ -8,18 +8,30 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+function Join-AifWindowsPath {
+    param([string] $BasePath, [string] $ChildPath)
+    (($BasePath -replace '[\\/]+$', '') + '\' + ($ChildPath -replace '^[\\/]+', ''))
+}
+
+function Get-AifProgramFilesPath {
+    param([string] $ChildPath)
+    $root = $env:ProgramFiles
+    if ([string]::IsNullOrWhiteSpace($root)) { $root = 'C:\Program Files' }
+    Join-AifWindowsPath $root $ChildPath
+}
+
 function Get-AifRunnerToolSpecs {
-    $gitRoot = Join-Path $env:ProgramFiles 'Git'
+    $gitRoot = Get-AifProgramFilesPath 'Git'
     @(
-        @{ Name = 'git'; Minimum = '2.30'; Arguments = @('--version'); Paths = @((Join-Path $gitRoot 'cmd\git.exe')) }
-        @{ Name = 'bash'; Minimum = '4.0'; Arguments = @('--version'); Paths = @((Join-Path $gitRoot 'bin\bash.exe')); Exact = $true }
-        @{ Name = 'python'; Minimum = '3.10'; Arguments = @('--version'); Paths = @((Join-Path $env:ProgramFiles 'AIFactory\Python312\python.exe'), 'C:\Python312\python.exe', 'C:\Miniconda\python.exe') }
-        @{ Name = 'az'; Minimum = '2.50'; Arguments = @('version', '--output', 'json'); VersionProperty = 'azure-cli'; Paths = @((Join-Path $env:ProgramFiles 'Microsoft SDKs\Azure\CLI2\wbin\az.cmd')) }
-        @{ Name = 'pwsh'; Minimum = '7.0'; Arguments = @('--version'); Paths = @((Join-Path $env:ProgramFiles 'PowerShell\7\pwsh.exe')) }
-        @{ Name = 'gh'; Minimum = '2.0'; Arguments = @('--version'); Paths = @((Join-Path $env:ProgramFiles 'GitHub CLI\gh.exe')) }
+        @{ Name = 'git'; Minimum = '2.30'; Arguments = @('--version'); Paths = @((Join-AifWindowsPath $gitRoot 'cmd\git.exe')) }
+        @{ Name = 'bash'; Minimum = '4.0'; Arguments = @('--version'); Paths = @((Join-AifWindowsPath $gitRoot 'bin\bash.exe')); Exact = $true }
+        @{ Name = 'python'; Minimum = '3.10'; Arguments = @('--version'); Paths = @((Get-AifProgramFilesPath 'AIFactory\Python312\python.exe'), 'C:\Python312\python.exe', 'C:\Miniconda\python.exe') }
+        @{ Name = 'az'; Minimum = '2.50'; Arguments = @('version', '--output', 'json'); VersionProperty = 'azure-cli'; Paths = @((Get-AifProgramFilesPath 'Microsoft SDKs\Azure\CLI2\wbin\az.cmd')) }
+        @{ Name = 'pwsh'; Minimum = '7.0'; Arguments = @('--version'); Paths = @((Get-AifProgramFilesPath 'PowerShell\7\pwsh.exe')) }
+        @{ Name = 'gh'; Minimum = '2.0'; Arguments = @('--version'); Paths = @((Get-AifProgramFilesPath 'GitHub CLI\gh.exe')) }
         # Compile-time imports/functions need the 0.31 generation; 0.44.1 is the CI install pin, not a minimum.
-        @{ Name = 'bicep'; Minimum = '0.31.92'; Arguments = @('--version'); Paths = @((Join-Path $env:ProgramFiles 'AIFactory\bin\bicep.exe')) }
-        @{ Name = 'jq'; Minimum = '1.6'; Arguments = @('--version'); Paths = @((Join-Path $env:ProgramFiles 'AIFactory\bin\jq.exe')) }
+        @{ Name = 'bicep'; Minimum = '0.31.92'; Arguments = @('--version'); Paths = @((Get-AifProgramFilesPath 'AIFactory\bin\bicep.exe')) }
+        @{ Name = 'jq'; Minimum = '1.6'; Arguments = @('--version'); Paths = @((Get-AifProgramFilesPath 'AIFactory\bin\jq.exe')) }
     )
 }
 
@@ -119,8 +131,8 @@ function Save-AifVerifiedDownload {
 function Install-AifMissingTool {
     param([string] $Name)
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $bin = Join-Path $env:ProgramFiles 'AIFactory\bin'
-    $downloadRoot = Join-Path $env:ProgramFiles 'AIFactory\downloads'
+    $bin = Get-AifProgramFilesPath 'AIFactory\bin'
+    $downloadRoot = Get-AifProgramFilesPath 'AIFactory\downloads'
     New-Item -ItemType Directory -Path $bin, $downloadRoot -Force | Out-Null
     $asset = $null
     $publisher = ''
@@ -175,7 +187,7 @@ function Install-AifMissingTool {
                 $executable = 'msiexec.exe'
                 $arguments = @('/i', "`"$file`"", '/qn', '/norestart')
             } elseif ($Name -eq 'python') {
-                $target = Join-Path $env:ProgramFiles 'AIFactory\Python312'
+                $target = Get-AifProgramFilesPath 'AIFactory\Python312'
                 $arguments = @('/quiet', '/norestart', 'InstallAllUsers=1', 'PrependPath=0', 'Include_test=0', "TargetDir=`"$target`"")
             } else {
                 $arguments = @('/VERYSILENT', '/NORESTART', '/SP-')
@@ -190,7 +202,7 @@ function Install-AifMissingTool {
 }
 
 function Set-AifRunnerPrerequisiteMarker {
-    $directory = Join-Path $env:ProgramFiles 'AIFactory'
+    $directory = Get-AifProgramFilesPath 'AIFactory'
     New-Item -ItemType Directory -Path $directory -Force | Out-Null
     @{ ChangedUtc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json |
         Set-Content -LiteralPath (Join-Path $directory 'prerequisites-changed.json') -Encoding UTF8
@@ -199,9 +211,9 @@ function Set-AifRunnerPrerequisiteMarker {
 function Set-AifRunnerMachinePath {
     param([string[]] $ToolPaths)
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-    $gitBin = Join-Path $env:ProgramFiles 'Git\bin'
-    $gitCmd = Join-Path $env:ProgramFiles 'Git\cmd'
-    $bin = Join-Path $env:ProgramFiles 'AIFactory\bin'
+    $gitBin = Get-AifProgramFilesPath 'Git\bin'
+    $gitCmd = Get-AifProgramFilesPath 'Git\cmd'
+    $bin = Get-AifProgramFilesPath 'AIFactory\bin'
     $preferred = @($gitBin, $gitCmd, $bin) + @($ToolPaths | ForEach-Object { Split-Path -Parent $_ })
     $pathParts = @($machinePath -split ';' | Where-Object { $_ -and $_ -notin $preferred })
     $updated = (@($preferred | Select-Object -Unique) + $pathParts) -join ';'
@@ -231,13 +243,13 @@ function Invoke-AifRunnerPrerequisites {
     if (-not [Environment]::Is64BitOperatingSystem) { throw 'Windows x64 is required.' }
     $specs = @(Get-AifRunnerToolSpecs)
     if ($RequirePython3) {
-        $specs += @{ Name = 'python3'; Minimum = '3.10'; Arguments = @('--version'); Paths = @((Join-Path $env:ProgramFiles 'AIFactory\bin\python3.cmd')) }
+        $specs += @{ Name = 'python3'; Minimum = '3.10'; Arguments = @('--version'); Paths = @((Get-AifProgramFilesPath 'AIFactory\bin\python3.cmd')) }
     }
     $tools = @($specs | ForEach-Object { Test-AifRunnerTool $_ })
     $invalid = @($tools | Where-Object Status -eq 'invalid')
     if ($InstallMissing -and $invalid.Count -eq 1 -and $invalid[0].Name -eq 'python' -and
         $invalid[0].Version -and [version]$invalid[0].Version -lt [version]'3.10') {
-        $privatePython = Join-Path $env:ProgramFiles 'AIFactory\Python312\python.exe'
+        $privatePython = Get-AifProgramFilesPath 'AIFactory\Python312\python.exe'
         if (Test-Path -LiteralPath $privatePython) { throw 'The dedicated runner Python exists but is invalid; repair it explicitly.' }
         if (-not (Test-AifRunnerElevation)) { throw '-InstallMissing requires elevation.' }
         Set-AifRunnerPrerequisiteMarker
@@ -271,7 +283,7 @@ function Invoke-AifRunnerPrerequisites {
         if ($RequirePython3 -and ($tools | Where-Object Name -eq 'python3').Status -eq 'missing') {
             $python = $tools | Where-Object Name -eq 'python'
             if ($python.Status -ne 'ready') { throw 'Cannot create python3 forwarding scripts without a valid Python >=3.10.' }
-            $bin = Join-Path $env:ProgramFiles 'AIFactory\bin'
+            $bin = Get-AifProgramFilesPath 'AIFactory\bin'
             New-Item -ItemType Directory -Path $bin -Force | Out-Null
             $cmd = Join-Path $bin 'python3.cmd'
             $bash = Join-Path $bin 'python3'
@@ -296,7 +308,8 @@ foreach ($spec in @(@{Name='Az.Accounts'; Minimum=[version]'2.12'}, @{Name='Az.N
     }
     if (-not $module) {
         if (-not $InstallMissing) { throw "Missing PowerShell module $($spec.Name) (check mode)." }
-        $directory = Join-Path $env:ProgramFiles 'AIFactory'
+        $programFiles = if ([string]::IsNullOrWhiteSpace($env:ProgramFiles)) { 'C:\Program Files' } else { $env:ProgramFiles }
+        $directory = ($programFiles -replace '[\\/]+$', '') + '\AIFactory'
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
         @{ ChangedUtc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json |
             Set-Content -LiteralPath (Join-Path $directory 'prerequisites-changed.json') -Encoding UTF8

@@ -28,6 +28,7 @@ OPERATOR = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
 FACTORY = "11111111-1111-1111-1111-111111111111"
 SCALE = "22222222-2222-2222-2222-222222222222"
 ADO_TENANT = "33333333-3333-3333-3333-333333333333"
+ADO_SUB = "55555555-5555-5555-5555-555555555555"
 PROJECT = "44444444-4444-4444-4444-444444444444"
 CONTRIBUTOR = "b24988ac-6180-42a0-ab88-20f7382dd24c"
 GROUP = f"/subscriptions/{SUB}/resourcegroups/owned"
@@ -114,6 +115,10 @@ class Fake:
         self.token_tenant = TENANT
         self.identity_subscription_tenant = TENANT
         self.token_audience = None
+        self.ado_accounts = [
+            {"id": SUB, "tenantId": TENANT, "state": "Enabled", "accountName": "operator@example.test"},
+            {"id": ADO_SUB, "tenantId": ADO_TENANT, "state": "Enabled", "accountName": "ado@example.test"},
+        ]
         self.name_available = True
         for scope in {GROUP, req["account_id"].split("/providers/")[0], req["identity_id"].split("/providers/")[0]}:
             self.resources[scope] = {"id": scope, "location": "swedencentral",
@@ -147,9 +152,16 @@ class Fake:
                                                                           "name": "Stage subscription"}), stderr=b"")
             if args[:2] == ["account", "get-access-token"]:
                 audience = args[args.index("--resource") + 1]
-                tenant = args[args.index("--tenant") + 1] if "--tenant" in args else self.token_tenant
+                selected = args[args.index("--subscription") + 1] if "--subscription" in args else None
+                tenant = self.token_tenant
+                if audience == en.ADO_AUDIENCE:
+                    account = next((item for item in self.ado_accounts if item["id"] == selected), None)
+                    tenant = account["tenantId"] if account else self.token_tenant
                 return SimpleNamespace(returncode=0, stdout=en.canonical({
                     "accessToken": self._token(self.token_audience or audience, tenant)}), stderr=b"")
+            if args[:2] == ["account", "list"]:
+                assert "--all" in args
+                return SimpleNamespace(returncode=0, stdout=en.canonical(self.ado_accounts), stderr=b"")
             if args[:2] == ["identity", "show"]:
                 identifier = args[args.index("--ids") + 1]
                 resource = self.resources[identifier]
@@ -221,7 +233,7 @@ class Fake:
                 return Response(200, self.resources[identifier], {"ETag": '"arm-' + identifier + '"'}) if identifier in self.resources else Response(404)
             assert method == "PUT", "No DELETE, PATCH, login, account switch or replacement!"
             # Model documented ARM upserts, not an invented conditional-create
-            # guarantee. Strict production guards must prevent reaching here.
+            # guarantee; the core requires serialized-provisioning acknowledgment.
             self.writes.append(("arm", method, identifier, copy.deepcopy(body)))
             value = dict(body, id=identifier)
             if "/userassignedidentities/" in identifier and "/federatedidentitycredentials/" not in identifier:
@@ -342,13 +354,17 @@ def test_plan_is_cloud_read_only_and_does_not_print_secrets(workspace):
     fake = Fake(req)
     before = (workspace / "azurefactory" / "register.json").read_bytes()
     result = en.plan(req, cloud=fake.cloud)
-    assert result["can_ensure"]
+    assert not result["can_ensure"]
     assert not result["enrollment_complete"]
     assert "exclusive-writer-governance-attestation-required" in result["blockers"]
+    acknowledged = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
+    assert acknowledged["can_ensure"] and not acknowledged["enrollment_complete"]
+    assert not acknowledged["blockers"]
     assert not fake.writes
     assert all(method in ("GET", "HEAD") for method, *_ in fake.calls)
-    assert "SECRET" not in en.canonical(result).decode()
-    assert "accessToken" not in en.canonical(result).decode()
+    for review in (result, acknowledged):
+        assert "SECRET" not in en.canonical(review).decode()
+        assert "accessToken" not in en.canonical(review).decode()
     assert before == (workspace / "azurefactory" / "register.json").read_bytes()
 
 
@@ -427,11 +443,16 @@ def test_403_github_environment_never_replaced(workspace):
 def test_attestation_is_not_implicitly_written(workspace):
     req = request(workspace)
     fake = Fake(req)
-    result = enroll(req, fake, ack=False)
-    assert result["status"] == "incomplete", result
-    assert not result["enrollment_complete"] and result["binding_candidate"] is None
-    assert "coordination.json" not in fake.blobs
-    assert any(x.startswith("locks/") for x in fake.blobs)
+    review = en.plan(req, cloud=fake.cloud)
+    assert not review["can_ensure"] and not review["enrollment_complete"]
+    assert "exclusive-writer-governance-attestation-required" in review["blockers"]
+    commands, calls = len(fake.commands), len(fake.calls)
+    for consent in ({}, {"acknowledge_exclusive_writer_governance": False}):
+        with pytest.raises(en.EnrollmentError, match="exclusive-writer-governance-attestation-required"):
+            en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud, **consent)
+    assert not fake.writes and not fake.blobs and not fake.variables
+    assert len(fake.commands) == commands and len(fake.calls) == calls
+    assert fake.cloud.read_only and not fake.cloud.serialized_provisioning
     result = enroll(req, fake, ack=True)
     assert result["enrollment_complete"], result
 
@@ -440,10 +461,11 @@ def test_existing_untagged_groups_are_blockers_not_retagged(workspace):
     req = request(workspace)
     fake = Fake(req)
     fake.resources[GROUP]["tags"] = {}
-    review = en.plan(req, cloud=fake.cloud)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     assert "existing-resource-group-ownership-not-proven:" + GROUP in review["blockers"]
     with pytest.raises(en.EnrollmentError, match="prerequisites-blocked"):
-        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud)
+        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud,
+                  acknowledge_exclusive_writer_governance=True)
     assert not fake.writes
     assert fake.resources[GROUP]["tags"] == {}
 
@@ -469,16 +491,19 @@ def test_exact_environment_tenant_subscription_and_ambiguity(workspace):
 def test_plan_and_local_changes_invalidate_approval_before_writes(workspace):
     req = request(workspace)
     fake = Fake(req)
-    review = en.plan(req, cloud=fake.cloud)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     fake.resources[req["identity_id"]]["tags"] = {"changed": "externally"}
     with pytest.raises(en.EnrollmentError, match="plan-or-live-state-changed"):
-        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud)
+        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud,
+                  acknowledge_exclusive_writer_governance=True)
     assert not fake.writes
     doc = document(workspace)
     doc["generation"] = "changed"
     save(workspace, doc)
     with pytest.raises(en.EnrollmentError, match="consumer-or-request-changed"):
-        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud)
+        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud,
+                  acknowledge_exclusive_writer_governance=True)
+    assert not fake.writes
 
 
 def test_no_yes_or_changed_governance_consent(workspace):
@@ -486,7 +511,7 @@ def test_no_yes_or_changed_governance_consent(workspace):
     fake = Fake(req)
     review = en.plan(req, cloud=fake.cloud)
     with pytest.raises(en.EnrollmentError, match="explicit-yes"):
-        en.ensure(req, review["plan_hash"], cloud=fake.cloud)
+        en.ensure(req, review["plan_hash"], cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     with pytest.raises(en.EnrollmentError, match="plan-or-live-state-changed"):
         en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     assert not fake.writes
@@ -600,7 +625,7 @@ def test_shared_dependencies_must_already_have_reviewed_writer(workspace):
     req = request(workspace, common_dependency_ids=[common])
     fake = Fake(req)
     fake.existing_identity()
-    review = en.plan(req, cloud=fake.cloud)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     assert not review["can_ensure"]
     assert "common-dependency-writer-must-be-independently-enrolled" in review["blockers"]
 
@@ -650,15 +675,15 @@ def test_subscription_role_grants_and_unapproved_rg_creation_forbidden(workspace
     req = request(workspace, create_resource_group_ids=[GROUP], approved_group_creation_scope="/subscriptions/" + SUB)
     fake = Fake(req)
     del fake.resources[GROUP]
-    review = en.plan(req, cloud=fake.cloud)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     # An approved missing group is an executable create-or-update action, not a blocker.
     assert review["can_ensure"], review
     assert "create-resource-group:" + GROUP in review["actions"]
     assert not any(code.startswith("arm-create-only-contract-unverified") for code in review["blockers"])
     # Without the serialized-provisioning acknowledgment the upsert is refused with zero writes.
-    blocked = en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud)
-    assert blocked["status"] == "blocked" and blocked["error"] == "arm-serialized-provisioning-required"
-    assert not any(write[0] == "arm" for write in fake.writes) and GROUP not in fake.resources
+    with pytest.raises(en.EnrollmentError, match="exclusive-writer-governance-attestation-required"):
+        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud)
+    assert not fake.writes and GROUP not in fake.resources
     # With the acknowledgment the approved group is created and tagged for ownership.
     result = enroll(req, fake)
     assert result["enrollment_complete"], result
@@ -701,6 +726,84 @@ def test_invalid_token_audience_blocks_before_storage(workspace):
     assert not fake.calls and not fake.writes
 
 
+def test_ado_uses_cached_tenant_account_without_changing_azure_default(workspace):
+    req = request(workspace, "ado")
+    fake = Fake(req)
+    fake.ado_accounts.append({**fake.ado_accounts[1], "id": "66666666-6666-6666-6666-666666666666",
+                              "accountName": "ADO@example.test"})
+    fake.cloud.token(en.ADO_AUDIENCE, ADO_TENANT)
+    fake.cloud.token(en.ADO_AUDIENCE, ADO_TENANT)
+    fake.cloud.token(en.ARM + "/")
+    tokens = [argv for argv, _ in fake.commands if argv[1:3] == ["account", "get-access-token"]]
+    ado_tokens = [argv for argv in tokens if en.ADO_AUDIENCE in argv]
+    assert len(ado_tokens) == 1
+    assert ado_tokens[0][ado_tokens[0].index("--subscription") + 1] == ADO_SUB
+    assert "--tenant" not in ado_tokens[0]
+    assert tokens[-1][tokens[-1].index("--subscription") + 1] == SUB
+    assert not fake.calls and not fake.writes
+
+
+@pytest.mark.parametrize("change,code", [
+    ("missing", "ado-tenant-account-unavailable"),
+    ("disabled", "ado-tenant-account-unavailable"),
+    ("blank-identity", "ado-account-identity-unverified"),
+    ("ambiguous", "ado-tenant-account-ambiguous"),
+    ("invalid-id", "invalid-guid"),
+    ("invalid-metadata", "ado-account-metadata-invalid"),
+])
+def test_ado_account_selection_fails_closed_before_token_request(workspace, change, code):
+    req = request(workspace, "ado")
+    fake = Fake(req)
+    if change == "missing":
+        fake.ado_accounts.pop()
+    elif change == "disabled":
+        fake.ado_accounts[1]["state"] = "Disabled"
+    elif change == "blank-identity":
+        fake.ado_accounts[1]["accountName"] = ""
+    elif change == "ambiguous":
+        fake.ado_accounts.append({**fake.ado_accounts[1], "accountName": "other@example.test"})
+    elif change == "invalid-id":
+        fake.ado_accounts[1]["id"] = "not-an-id"
+    else:
+        fake.ado_accounts = {}
+    with pytest.raises(en.EnrollmentError, match=code):
+        fake.cloud.token(en.ADO_AUDIENCE, ADO_TENANT)
+    assert all(argv[1:3] != ["account", "get-access-token"] for argv, _ in fake.commands)
+    assert not fake.calls and not fake.writes
+
+
+def test_ado_selected_account_token_still_requires_expected_tenant(workspace):
+    req = request(workspace, "ado")
+    fake = Fake(req)
+    fake._token = lambda audience, tenant: Fake._token(fake, audience, TENANT)
+    with pytest.raises(en.EnrollmentError, match="token-tenant-or-lifetime-mismatch"):
+        fake.cloud.token(en.ADO_AUDIENCE, ADO_TENANT)
+    assert not fake.calls and not fake.writes
+
+
+def test_default_cli_runner_resolves_windows_command_extension(monkeypatch):
+    command = r"C:\Program Files\Azure CLI\az.cmd"
+    monkeypatch.setattr(en.shutil, "which", lambda name: command if name == "az" else None)
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return SimpleNamespace(returncode=0, stdout=b"{}", stderr=b"")
+
+    monkeypatch.setattr(en.subprocess, "run", run)
+    cloud = en.Cloud({}, opener=SimpleNamespace())
+    assert cloud.az("account", "list", "--all") == {}
+    assert calls[0][0] == [command, "account", "list", "--all", "--only-show-errors", "--output", "json"]
+    assert calls[0][1]["shell"] is False
+    assert calls[0][1]["timeout"] == 120
+
+
+def test_default_cli_runner_reports_missing_executable(monkeypatch):
+    monkeypatch.setattr(en.shutil, "which", lambda name: None)
+    with pytest.raises(en.EnrollmentError, match="command-unavailable-or-failed"):
+        en.Cloud({}, opener=SimpleNamespace()).az("account", "list", "--all")
+
+
 def test_missing_org_auth_and_arm_prerequisites_never_return_ready(workspace):
     req = request(workspace, "ado")
     fake = Fake(req)
@@ -712,7 +815,7 @@ def test_missing_org_auth_and_arm_prerequisites_never_return_ready(workspace):
     # A missing coordination account is a documented create action, not a blocker.
     del fake.resources[req["account_id"]]
     del fake.resources[req["account_id"] + "/blobservices/default/containers/" + req["coordinates"]["container"]]
-    review = en.plan(req, cloud=fake.cloud)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     assert review["can_ensure"], review
     assert "create-secure-coordination-account" in review["actions"]
     assert not any(code.startswith("arm-create-only-contract-unverified") for code in review["blockers"])
@@ -875,12 +978,13 @@ def test_missing_github_environment_blocks_every_mutation(workspace):
     req = request(workspace)
     fake = Fake(req)
     fake.github_environment = None
-    review = en.plan(req, cloud=fake.cloud)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     assert not review["can_ensure"]
     assert "github-environment-must-be-preprovisioned-no-atomic-create" in review["blockers"]
     assert "create-github-environment" not in review["actions"]
     with pytest.raises(en.EnrollmentError, match="prerequisites-blocked"):
-        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud)
+        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud,
+                  acknowledge_exclusive_writer_governance=True)
     assert not fake.writes
     # An environment appearing in the GET/PUT gap cannot be overwritten even by
     # a direct provider call with the originally absent snapshot.
@@ -974,7 +1078,7 @@ def test_new_disjoint_target_accepts_independent_identity_under_shared_binding(w
     fake.identity_properties = {
         "tenantId": TENANT, "clientId": "55555555-5555-5555-5555-555555555555",
         "principalId": "66666666-6666-6666-6666-666666666666"}
-    review = en.plan(second, cloud=fake.cloud)
+    review = en.plan(second, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     # The disjoint target's own identity/FIC/roles/lease are creatable, not blockers.
     assert review["can_ensure"], review
     assert "create-user-assigned-managed-identity" in review["actions"]
@@ -1003,11 +1107,12 @@ def test_selected_existing_binding_still_requires_verified_identity(workspace):
     save(workspace, doc)
     req = request(workspace)
     empty = Fake(req, provisioned=False)
-    review = en.plan(req, cloud=empty.cloud)
+    review = en.plan(req, cloud=empty.cloud, acknowledge_exclusive_writer_governance=True)
     assert not review["can_ensure"]
     assert "existing-binding-without-verified-identity" in review["blockers"]
     with pytest.raises(en.EnrollmentError, match="prerequisites-blocked"):
-        en.ensure(req, review["plan_hash"], yes=True, cloud=empty.cloud)
+        en.ensure(req, review["plan_hash"], yes=True, cloud=empty.cloud,
+                  acknowledge_exclusive_writer_governance=True)
     assert not empty.writes
 
 
@@ -1044,7 +1149,7 @@ def test_nonapplicable_denies_preserve_add_only_enrollment(workspace, identity_e
         value = deny(scope, data_actions=["*"])
         value["properties"]["permissions"][0]["notDataActions"] = ["*/read", "*/write"]
     fake.denies = [value]
-    review = en.plan(req, cloud=fake.cloud)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     assert "deny-assignment-requires-independent-rights-review" not in review["blockers"], review
     # A non-applicable deny never turns a creatable target into a blocker, whether the
     # identity already exists or the whole target is provisioned green-field this run.
@@ -1102,11 +1207,12 @@ def test_applicable_or_unresolved_denies_block_every_mutation(workspace, case):
     else:
         value = deny("/providers/Microsoft.Management/managementGroups/parent", ["*/write"])
     fake.denies = [value]
-    review = en.plan(req, cloud=fake.cloud)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     assert not review["can_ensure"], review
     assert "deny-assignment-requires-independent-rights-review" in review["blockers"]
     with pytest.raises(en.EnrollmentError, match="prerequisites-blocked"):
-        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud)
+        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud,
+                  acknowledge_exclusive_writer_governance=True)
     assert not fake.writes
 
 
@@ -1124,7 +1230,7 @@ def test_missing_arm_prerequisites_are_created_under_serialized_provisioning(wor
     del fake.resources[identifier]
     if resource == "storage":
         del fake.resources[req["account_id"] + "/blobservices/default/containers/" + req["coordinates"]["container"]]
-    review = en.plan(req, cloud=fake.cloud)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     # A missing ARM object is an executable create-or-update action, never a blocker.
     assert review["can_ensure"], review
     assert review["actions"]
@@ -1297,8 +1403,9 @@ def test_container_create_requires_operator_control_plane_action(workspace):
     del fake.resources[container]
     data_role = f"/subscriptions/{SUB}/providers/microsoft.authorization/roledefinitions/{en.DATA_ROLE}"
     fake.resources[data_role]["properties"]["permissions"][0]["actions"] = []
-    review = en.plan(req, cloud=fake.cloud)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
     assert not review["can_ensure"] and "operator-container-create-permission-not-verified" in review["blockers"]
     with pytest.raises(en.EnrollmentError, match="prerequisites-blocked"):
-        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud)
+        en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud,
+                  acknowledge_exclusive_writer_governance=True)
     assert not fake.writes

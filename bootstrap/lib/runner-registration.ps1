@@ -17,6 +17,21 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
+function Join-AifRunnerPath {
+    param([string] $BasePath, [string] $ChildPath)
+    if ($BasePath -match '^[A-Za-z]:[\\/]') {
+        return (($BasePath -replace '[\\/]+$', '') + '\' + ($ChildPath -replace '^[\\/]+', ''))
+    }
+    Join-Path $BasePath $ChildPath
+}
+
+function Get-AifRunnerProgramFilesPath {
+    param([string] $ChildPath)
+    $root = $env:ProgramFiles
+    if ([string]::IsNullOrWhiteSpace($root)) { $root = 'C:\Program Files' }
+    Join-AifRunnerPath $root $ChildPath
+}
+
 function ConvertTo-AifRunnerScope {
     param([string] $Url, [string] $Provider)
     $uri = [uri]$Url
@@ -32,7 +47,7 @@ function ConvertTo-AifRunnerScope {
 
 function Test-AifRunnerConfiguration {
     param([string] $Provider, [string] $AgentRoot, [string] $Url, [string] $Pool, [string] $Name, [string] $RemoteAgentId)
-    $configPath = Join-Path $AgentRoot $(if ($Provider -eq 'ado') { '.agent' } else { '.runner' })
+    $configPath = Join-AifRunnerPath $AgentRoot $(if ($Provider -eq 'ado') { '.agent' } else { '.runner' })
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) { return $false }
     $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
     $actualUrl = if ($Provider -eq 'ado') { $config.serverUrl } else { $config.gitHubUrl }
@@ -52,7 +67,7 @@ function Get-AifOwnedRunnerService {
     param([string] $Provider, [string] $AgentRoot)
     $prefix = if ($Provider -eq 'ado') { 'vstsagent.' } else { 'actions.runner.' }
     $executable = if ($Provider -eq 'ado') { 'AgentService.exe' } else { 'RunnerService.exe' }
-    $expected = [IO.Path]::GetFullPath((Join-Path $AgentRoot "bin\$executable"))
+    $expected = [IO.Path]::GetFullPath((Join-AifRunnerPath $AgentRoot "bin\$executable"))
     $services = @(Get-CimInstance Win32_Service | Where-Object {
         $image = $_.PathName
         $path = ''
@@ -64,7 +79,7 @@ function Get-AifOwnedRunnerService {
     if ($services.Count -ne 1) {
         throw "Expected exactly one $Provider service whose executable belongs to $AgentRoot; found $($services.Count). No other services were touched."
     }
-    $serviceFile = Join-Path $AgentRoot '.service'
+    $serviceFile = Join-AifRunnerPath $AgentRoot '.service'
     if (Test-Path -LiteralPath $serviceFile) {
         if ((Get-Content -LiteralPath $serviceFile -Raw).Trim() -cne $services[0].Name) {
             throw "Service ownership does not match $serviceFile."
@@ -110,12 +125,12 @@ function Invoke-AifWindowsRunnerRegistration {
     }
 
     if (-not $PrerequisitesScript) {
-        $PrerequisitesScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'runner-prerequisites.ps1') -Raw
+        $PrerequisitesScript = Get-Content -LiteralPath (Join-AifRunnerPath $PSScriptRoot 'runner-prerequisites.ps1') -Raw
     }
     . ([scriptblock]::Create($PrerequisitesScript)) -InstallMissing:$InstallMissing -RequirePython3 -RequireAzModules
     $report = Invoke-AifRunnerPrerequisites -InstallMissing:$InstallMissing -RequirePython3 -RequireAzModules
     if ($configured) {
-        $restartMarker = Join-Path $env:ProgramFiles 'AIFactory\prerequisites-changed.json'
+        $restartMarker = Get-AifRunnerProgramFilesPath 'AIFactory\prerequisites-changed.json'
         if ($service.State -eq 'Running' -and (Test-Path -LiteralPath $restartMarker)) {
             $marker = Get-Content -LiteralPath $restartMarker -Raw | ConvertFrom-Json
             $started = (Get-Process -Id $service.ProcessId).StartTime.ToUniversalTime()
@@ -160,7 +175,7 @@ function Invoke-AifWindowsRunnerRegistration {
         [Security.Principal.SecurityIdentifier]'S-1-5-20', 'Modify', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
     $acl.AddAccessRule($workerRule)
     Set-Acl -LiteralPath $agentRoot -AclObject $acl
-    $archive = Join-Path $agentRoot 'runner-package.zip'
+    $archive = Join-AifRunnerPath $agentRoot 'runner-package.zip'
     try {
         Invoke-WebRequest -Uri $PackageUrl -OutFile $archive -UseBasicParsing
         if ($PackageSha256 -and (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ine $PackageSha256) {
