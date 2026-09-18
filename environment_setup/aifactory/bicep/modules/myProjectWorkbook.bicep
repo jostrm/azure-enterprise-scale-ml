@@ -122,7 +122,8 @@ var coverageParameters = [for field in coverageFields: {
   type: 2
   isRequired: true
   value: string(coverageDefaults[field.key])
-  jsonData: string([{ value: 'false', label: 'False — unreviewed / unavailable' }, { value: 'true', label: 'True — reviewed complete' }])
+  // ARM copy expansion re-evaluates a leading "["; whitespace is valid JSON and prevents that.
+  jsonData: concat(' ', string([{ value: 'false', label: 'False — unreviewed / unavailable' }, { value: 'true', label: 'True — reviewed complete' }]))
 }]
 var usageVisibility = { parameterName: 'Navigation', comparison: 'isEqualTo', value: 'usage' }
 var costVisibility = { parameterName: 'Navigation', comparison: 'isEqualTo', value: 'cost' }

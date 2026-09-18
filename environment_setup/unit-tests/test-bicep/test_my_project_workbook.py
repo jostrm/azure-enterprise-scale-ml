@@ -358,6 +358,10 @@ def test_templates_scope_selection_and_coverage_defaults(workbook):
     assert "{Factory:base64}" in params["ScaleSet"]["query"]
     for name in ("Questions", "Devices", "Feedback", "Cart", "Bookings", "Cases", "StateBaseline", "Metering", "Billing"):
         assert params[name + "Complete"]["value"] == "false"
+        json_data = params[name + "Complete"]["jsonData"]
+        assert not json_data.startswith("["), "ARM copy expansion must not re-evaluate JSON text as an expression"
+        assert json_data.lstrip().startswith("[")
+        assert {v["value"] for v in json.loads(json_data)} == {"false", "true"}
     assert "Project" not in params and "Environment" not in params
 
 
