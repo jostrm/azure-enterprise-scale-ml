@@ -27,11 +27,13 @@ READER_ROLE = "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
 
 def destination(source: RagSource) -> dict:
     validate_target(source.target)
+    container = source.target.resolve_container(legacy=CONTAINER)
     folder = f"sources/{source.binding_fingerprint}/knowledge"
-    path = f"{folder}/items.{'jsonl' if source.location == 'common' else 'json'}"
+    path = f"{folder}/items.{'jsonl' if source.format == 'shared-lake-jsonl' else 'json'}"
     return {"storage_id": source.target.storage_id, "storage_name": source.target.storage_name,
-            "container": CONTAINER, "blob_path": path, "query": folder + "/",
-            "blob_url": f"https://{source.target.storage_name}.blob.core.windows.net/{CONTAINER}/{path}"}
+            "storage_resource_group": source.target.storage_resource_group or source.target.resource_group,
+            "container": container, "blob_path": path, "query": folder + "/",
+            "blob_url": f"https://{source.target.storage_name}.blob.core.windows.net/{container}/{path}"}
 
 
 def definitions(source: RagSource, factory_name: str) -> dict:
@@ -170,9 +172,12 @@ def _reader(session, target, source, principal, grant):
 
 def _artifacts(session, source, bodies, apply):
     factory = bodies["factory_id"]
-    resources = [(f"{source.target.storage_id}/blobServices/default/containers/{CONTAINER}", {
+    resources = [(f"{source.target.storage_id}/blobServices/default/containers/{source.target.resolve_container(legacy=CONTAINER)}", {
         "properties": {"publicAccess": "None", "metadata": {"owner": OWNER}},
     }, adf.STORAGE_API)]
+    if source.target.use_common_datalake_storage is not None:
+        adf._selected_container(session, source.target, legacy=CONTAINER, owner=OWNER)
+        resources = []
     for kind, key in (("linkedservices", "linked_services"), ("datasets", "datasets")):
         resources.extend((f"{factory}/{kind}/{name}", body, adf.ADF_API) for name, body in bodies[key].items())
     resources.append((f"{factory}/pipelines/{bodies['pipeline_name']}", bodies["pipeline"], adf.ADF_API))
@@ -227,7 +232,9 @@ def configure_materialization(session, target, source, factory_name, *, apply=Fa
     reader = (_reader(session, target, source, principal, apply and grant_read) if source.location == "common"
               else {"verified": None, "status": "existing-project-role-required"})
     link = _link(session, bodies["factory_id"], source.storage_id, source.location, apply)
-    sink_link = link if source.location == "project" else _link(session, bodies["factory_id"], target.storage_id, "project")
+    sink_link = link if source.storage_id.lower() == target.storage_id.lower() else _link(
+        session, bodies["factory_id"], target.storage_id, "common" if target.use_common_datalake_storage else "project",
+    )
     prerequisites = []
     for label, endpoint in (("source", link), ("destination", sink_link)):
         props = endpoint.get("properties", {}) if endpoint else {}
@@ -235,6 +242,7 @@ def configure_materialization(session, target, source, factory_name, *, apply=Fa
             prerequisites.append(f"Exact ADF {label} Blob endpoint must be Approved/Succeeded.")
     if source.location == "common" and not reader["verified"]:
         prerequisites.append("Explicitly grant the project UAMI the conditional common pinned-blob reader role.")
+    storage = target.storage_summary(legacy=CONTAINER)
     missing = _artifacts(session, source, bodies, apply)
     if missing:
         prerequisites.append("Apply the missing owned materialization definitions.")
@@ -247,6 +255,11 @@ def configure_materialization(session, target, source, factory_name, *, apply=Fa
     return {key: value for key, value in {
         **bodies, "status": "needs-setup" if prerequisites else "configured" if apply else "ready",
         "prerequisites": prerequisites, "project_identity_id": target.identity_id,
+        "storage": storage,
+        "required_storage_permissions": [
+            f"Project UAMI needs Storage Blob Data Contributor on {target.storage_id}/blobServices/default/containers/{storage['container']}; no write roles are granted automatically.",
+            f"Search system-assigned MI needs Storage Blob Data Reader on {target.storage_id}/blobServices/default/containers/{storage['container']}.",
+        ],
         "project_identity_principal_id": principal, "reader_permission": reader,
         "private_endpoints": [link, sink_link], "pending_storage_connections": pending, "content_verified": False,
     }.items() if key not in {"linked_services", "datasets", "pipeline"}}
@@ -271,7 +284,8 @@ def approve_materialization_link(session, target, source, factory_name, connecti
     if (current["properties"]["privateLinkServiceConnectionState"]["status"] != "Approved"
             or current["properties"].get("privateEndpoint", {}).get("id", "").lower() != endpoint.lower()):
         raise RuntimeError("The exact selected connection is not Approved with its expected requester.")
-    return {"connection_id": connection_id, "private_endpoint_id": endpoint, "status": "Approved"}
+    return {"connection_id": connection_id, "private_endpoint_id": endpoint, "status": "Approved",
+            "storage": target.storage_summary(legacy=CONTAINER)}
 
 
 def start_materialization(session, target, source, factory_name):
@@ -294,6 +308,7 @@ def verify_destination(session, target, source):
     if not raw or len(raw) > MAX_BYTES or sha256(raw) != source.sha256:
         raise ValueError("Materialized bytes are empty, oversized or differ from the approved source SHA-256.")
     return {"destination": dest, "binding_fingerprint": source.binding_fingerprint,
+            "storage": target.storage_summary(legacy=CONTAINER),
             "source": source.as_dict(), "target": target.to_dict(),
             "bytes": len(raw), "sha256": source.sha256, "content_verified": True}
 

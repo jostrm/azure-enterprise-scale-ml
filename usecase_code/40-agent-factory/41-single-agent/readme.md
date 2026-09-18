@@ -5,12 +5,17 @@ their instructions and tools in Foundry; hosted agents run a selected Python
 framework and consult the persisted knowledge agent before generating an answer.
 They demonstrate retrieval-augmented generation, not model training.
 
+All prompt and hosted frameworks inherit the
+[root common/project storage selection](../readme.md#one-storage-selection-for-every-example)
+through ingestion and Foundry IQ; there are no per-framework account/container
+paths to edit. Foundry, Search and runtime identities remain project-scoped.
+
 ## Use case summary
 
 - Use case type: RAG with LLM
 - Data type: Tabular | Document (the source CSV contains Markdown knowledge articles)
 - Number of source data sets: 1 shared helpdesk corpus; 0 for a standalone reviewer or documentation-only agent
-- Data sources: No master-lake binding yet; `<project-data-storage>/agent-factory-adf/kaggle-rag-v1/knowledge/items.json`, through Azure AI Search and Foundry IQ. See [source paths](../43-data/readme.md#data-sources-and-lake-layout).
+- Data sources: `<selected-storage>/<selected-container>/kaggle-rag-v1/knowledge/items.json`, through Azure AI Search and Foundry IQ. See [source paths](../43-data/readme.md#data-sources-and-lake-layout).
 - Inference type: Online
 - Technology used in full chain: Azure Data Factory | Azure Storage | Azure AI Search | Microsoft Foundry | Microsoft Entra ID | Python framework for hosted variants
 

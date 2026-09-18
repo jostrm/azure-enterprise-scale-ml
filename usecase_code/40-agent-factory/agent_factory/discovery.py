@@ -48,10 +48,28 @@ def discover(config: FactoryConfig, session: AzureSession) -> Target:
         embeddings or config.embedding_deployment
     ) else None
     search = select_one(of_type("Microsoft.Search/searchServices"), "AI Search service", config.search_name)
-    storage = select_one(
-        [item for item in of_type("Microsoft.Storage/storageAccounts") if "2001" in item["name"]],
-        "2001 project data storage (1001 is reserved for Foundry)", config.storage_name,
+    storage_group = config.storage_resource_group or config.resource_group
+    storage_resources = resources if storage_group.lower() == config.resource_group.lower() else session.pages(
+        f"{ARM}/subscriptions/{config.subscription_id}/resourceGroups/{storage_group}/resources?api-version=2021-04-01"
     )
+    candidates = [item for item in storage_resources if item["type"].lower() == "microsoft.storage/storageaccounts"]
+    if config.use_common_datalake_storage is None:
+        candidates = [item for item in candidates if "2001" in item["name"] and "1001" not in item["name"]]
+    elif not config.storage_name:
+        raise ValueError("Selected storage requires an explicit data account name; automatic first-account selection is forbidden.")
+    storage = select_one(candidates, "configured data storage account", config.storage_name)
+    expected_storage_id = (
+        f"/subscriptions/{config.subscription_id}/resourceGroups/{storage_group}"
+        f"/providers/Microsoft.Storage/storageAccounts/{storage['name']}"
+    )
+    if storage.get("id", "").lower() != expected_storage_id.lower():
+        raise ValueError("Discovered storage account is outside the selected storage resource group/subscription.")
+    if config.use_common_datalake_storage is not None:
+        for workspace in of_type("Microsoft.MachineLearningServices/workspaces"):
+            details = session.arm("GET", workspace["id"], api_version="2024-04-01")
+            artifact_account = details.get("properties", {}).get("storageAccount", "")
+            if artifact_account.lower() == expected_storage_id.lower():
+                raise ValueError("Selected storage is an AML workspace artifact account, not project/common data storage.")
     identity = select_one(
         [item for item in of_type("Microsoft.ManagedIdentity/userAssignedIdentities")
          if item["name"].startswith(f"mi-prj{config.project_number}-")],
@@ -63,4 +81,6 @@ def discover(config: FactoryConfig, session: AzureSession) -> Target:
         account["name"], project_name, endpoint, account["location"], chat["name"].split("/")[-1],
         embedding["name"].split("/")[-1] if embedding else "", search["name"], storage["name"],
         identity["id"], identity["properties"]["clientId"],
+        storage_resource_group=config.storage_resource_group, storage_container=config.storage_container,
+        use_common_datalake_storage=config.use_common_datalake_storage,
     )

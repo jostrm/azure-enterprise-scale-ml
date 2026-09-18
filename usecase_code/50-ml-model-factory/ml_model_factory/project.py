@@ -75,10 +75,27 @@ def discover(project_file: Path) -> dict:
         "workspace_name": workspace["name"], "compute": compute["name"],
         "aifactory": model_scope["aifactory"], "project": model_scope["project"],
         "environment_name": model_scope["environment"],
-        **{key: project[key] for key in ("input_data", "gpu_compute", "datastore", "serving", "credential", "managed_identity_client_id") if key in project},
+        **{key: project[key] for key in (
+            "input_data", "input_path", "gpu_compute", "datastore", "serving", "credential",
+            "managed_identity_client_id", "use_common_datalake_storage", "storage_targets", "common_resource_group",
+        ) if key in project},
     }
     if project.get("lake"):
         runtime["lake"] = project["lake"]
     if project.get("environment_asset"):
         runtime["environment"] = project["environment_asset"]
-    return validate_runtime(runtime)
+    runtime = validate_runtime(runtime)
+    from .storage_selection import selected_profile, verify_datastore
+    storage = selected_profile(runtime)
+    if storage is not None:
+        storage_group = storage["resource_group"]
+        inventory = resources if storage_group.casefold() == group.casefold() else azure_cli(
+            "resource", "list", "--subscription", subscription, "--resource-group", storage_group,
+        )
+        accounts = [row for row in inventory if row["type"].lower() == "microsoft.storage/storageaccounts"]
+        select_one(accounts, "selected data storage account", storage["account_name"])
+        stores = azure_cli("ml", "datastore", "list", "--subscription", subscription,
+                           "--resource-group", group, "--workspace-name", workspace["name"])
+        store = select_one(stores, "existing selected AML datastore", storage["datastore"])
+        verify_datastore(storage, store)
+    return runtime

@@ -410,6 +410,9 @@ class AzureMLSDKBackend(MLBackend):
         name, output_name = _name(name), _name(output_name, "output_name")
         self.client.jobs.download(name=name, download_path=str(_download_destination(destination)), output_name=output_name)
 
+    def get_datastore(self, name: str) -> dict:
+        return _datastore(self.client.datastores.get(name=_name(name)))
+
     def ensure_datastore(self, definition: dict) -> dict:
         from azure.ai.ml import load_datastore
         from azure.core.exceptions import ResourceNotFoundError
@@ -593,6 +596,9 @@ class AzureMLCLIBackend(MLBackend):
         self._check()
         self._call("job", "download", "--name", name, "--download-path", str(_download_destination(destination)),
                    "--output-name", output_name)
+
+    def get_datastore(self, name: str) -> dict:
+        return _datastore(self._call("datastore", "show", "--name", _name(name)))
 
     def ensure_datastore(self, definition: dict) -> dict:
         doc = _datastore_definition(definition)

@@ -5,6 +5,12 @@ expanded read-only agent profile. It lets agents inspect actual project resource
 names, IDs, types and locations instead of inventing live infrastructure facts.
 It is a supporting tool service, not a RAG dataset or a model-training workload.
 
+Discovery inherits the
+[root common/project storage selection](../readme.md#one-storage-selection-for-every-example)
+and previews report the selected account/group/container. This does **not**
+move the MCP inventory scope or Reader role to the common resource group;
+both remain restricted to the project's resources.
+
 ## Use case summary
 
 - Use case type: Not applicable as a standalone model use case; supporting tooling for RAG with LLM

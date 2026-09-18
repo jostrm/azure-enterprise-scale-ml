@@ -49,11 +49,11 @@ def run(args):
     checked = preflight_mcp(session, target, plan)
     identity_path = args.identity_file or args.config.resolve().parent / "azure-mcp-identity.json"
     if args.command == "plan":
-        return {"plan": plan, "preflight": checked, "mutations": False}
+        return {"plan": plan, "preflight": checked, "storage": target.storage_summary(), "mutations": False}
     if args.command == "prepare-identity":
         identity = prepare_mcp_identity(session, target, plan, apply=True)
         write_json(identity_path, identity)
-        return {"identity_file": str(identity_path), **identity}
+        return {"identity_file": str(identity_path), **identity, "storage": target.storage_summary()}
     identity = json.loads(identity_path.read_text(encoding="utf-8"))
     if identity.get("project_principal_id", "").lower() != checked["project_principal_id"].lower():
         raise ValueError("The prepared identity belongs to a different Foundry project identity.")

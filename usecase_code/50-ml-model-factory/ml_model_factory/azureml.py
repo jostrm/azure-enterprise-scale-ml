@@ -12,6 +12,7 @@ from typing import Any
 
 import yaml
 from .tags import build_tags, merge_registration_tags, scope_tags
+from .storage_selection import resolve_storage_selection, resolve_location, selected_profile, validate_job_storage, verify_datastore
 
 
 SCHEMAS = "https://azuremlschemas.azureedge.net/latest/"
@@ -44,6 +45,7 @@ LAKE_LINEAGE_FIELDS = ("project", "environment", "use_case", "dataset", "data_ve
 
 def _lake_context(scenario: dict, runtime: dict) -> dict | None:
     """Resolve optional lake bindings without importing an Azure SDK or opening storage."""
+    runtime = resolve_storage_selection(runtime)
     if "lake" not in runtime:
         return None
     from .lake import LakeLayout, lake_manifest
@@ -207,6 +209,7 @@ def render(
     """
     if mode not in {"automl", "custom"}:
         raise ValueError("mode must be 'automl' or 'custom'")
+    runtime = resolve_storage_selection(runtime)
     task = scenario.get("task")
     if task not in TASK_SCHEMAS:
         raise ValueError(f"Unsupported task: {task}")
@@ -220,6 +223,8 @@ def render(
     if not image and not scenario.get("target"):
         raise ValueError("scenario.target is required")
     scenario = copy.deepcopy(scenario)
+    if scenario.get("vision", {}).get("image_base_uri"):
+        scenario["vision"]["image_base_uri"] = resolve_location(scenario["vision"]["image_base_uri"], runtime)
     if image:
         scenario.setdefault("target", "label")
     source, output = Path(source).resolve(), Path(output).resolve()
@@ -267,6 +272,7 @@ def render(
         "credential", "managed_identity_client_id", "project", "project_number",
         "environment_name", "target_environment",
         "aifactory",
+        "use_common_datalake_storage", "storage_targets", "storage", "common_resource_group",
     ) if k in runtime}
     if lake is not None:
         safe_runtime["lake"] = lake["config"]
@@ -541,7 +547,7 @@ def _client(runtime: dict):
 
     from .config import validate_runtime
 
-    validate_runtime(runtime)
+    runtime = validate_runtime(runtime)
     required = ("subscription_id", "resource_group", "workspace_name")
     missing = [key for key in required if not runtime.get(key)]
     if missing:
@@ -566,7 +572,13 @@ def submit(job_path: Path, runtime: dict) -> str:
     job = load_job(source=str(job_path))
     from .tags import assert_scope
     assert_scope(job.tags or {}, runtime)
-    submitted = _client(runtime).jobs.create_or_update(job)
+    runtime = resolve_storage_selection(runtime)
+    validate_job_storage(yaml.safe_load(job_path.read_text(encoding="utf-8")), runtime)
+    client = _client(runtime)
+    storage = selected_profile(runtime)
+    if storage is not None:
+        verify_datastore(storage, client.datastores.get(storage["datastore"]))
+    submitted = client.jobs.create_or_update(job)
     return submitted.name
 
 

@@ -10,7 +10,7 @@ the consumer's configuration, not in this package.
 - Use case type: RAG with LLM (shared implementation support, not a separate agent)
 - Data type: Tabular | Document (helpdesk ingestion); structured JSON configuration and operational metadata
 - Number of source data sets: 1 for the helpdesk ingestion path; 0 for deployment, Azure inventory and offline monitoring
-- Data sources: No master-lake binding yet; `<project-data-storage>/agent-factory-adf/kaggle-rag-v1/knowledge/items.json`. See [current and proposed lake paths](../43-data/readme.md#data-sources-and-lake-layout).
+- Data sources: `<selected-storage>/<selected-container>/kaggle-rag-v1/knowledge/items.json`, or a pinned `45-rag-agent` corpus. See [storage selection](../readme.md#one-storage-selection-for-every-example).
 - Inference type: Online (invocation) | Batch (ingestion preparation only); configuration/monitoring commands do not infer
 - Technology used in full chain: Azure Data Factory | Azure Storage | Azure AI Search | Microsoft Foundry | Microsoft Entra ID | Azure Container Apps / Azure MCP in the expanded profile
 
@@ -28,6 +28,14 @@ the consumer's configuration, not in this package.
 Run `python -m agent_factory --help` from the parent directory.
 See the [operator guide](../readme.md). None of these utilities turns arbitrary
 PDFs, images or audio into supported training/retrieval inputs without an
-explicit adapter. Default target discovery deliberately retains project `2001`;
-[45-rag-agent](../45-rag-agent/readme.md) selects the common source separately,
-without changing that project deployment target or renaming physical lake paths.
+explicit adapter. `load_selection` merges root storage defaults with per-target
+selection profiles. `FactoryConfig` and exported `Target` carry
+`use_common_datalake_storage`, `storage_resource_group` and `storage_container`;
+`Target.storage_id` uses the selected storage RG, never the Foundry project RG
+by assumption. `Target.resolve_container` rejects contradictory overrides.
+
+The flag is strictly boolean: true selects configured common storage, false
+configured project data storage. Only omission retains legacy `2001` discovery
+and route-specific containers. All examples, including
+[45-rag-agent](../45-rag-agent/readme.md), inherit explicit selection without
+moving Foundry/Search/project identities or renaming physical lake paths.

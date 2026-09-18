@@ -198,6 +198,7 @@ def run(args):
             "source": source.as_dict(), "agent": result, "knowledge": knowledge, "verification": verified,
         })
         return {"agent": result, "source": source.blob_url, "document_count": verified["document_count"],
+                "storage": target.storage_summary(legacy="agent-factory-rag"),
                 "retrieval_verified": knowledge["retrieval_verified"]}
     if args.command == "ask":
         if not args.input or not args.input.strip() or len(args.input) > 6000:
@@ -228,6 +229,7 @@ def run(args):
             raise RuntimeError("The RAG response lacks a completed answer and successful source-specific retrieval.")
         return {
             "agent": selected["agent_name"], "source": source.source_key,
+            "storage": target.storage_summary(legacy="agent-factory-rag"),
             "version": deployment["agent"]["version"], "response_id": response.id,
             "text": response.output_text, "tool_calls": [{"name": item.name, "server_label": item.server_label} for item in calls],
         }

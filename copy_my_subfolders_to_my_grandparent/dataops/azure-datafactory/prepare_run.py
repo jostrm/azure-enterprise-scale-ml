@@ -92,6 +92,12 @@ def bind_lake(copy, payload, lake, scenario, input_name):
 
 
 def build_parameters(runtime, copy, payload, lake=None, scenario=None, input_name="raw"):
+    from ml_model_factory.storage_selection import resolve_storage_selection
+    context = deepcopy(runtime)
+    if lake is not None:
+        context["lake"] = lake
+    runtime = resolve_storage_selection(context)
+    lake = runtime.get("lake", lake)
     lake = lake if lake is not None else runtime.get("lake")
     UUID(runtime["subscription_id"])
     for key in ("resource_group", "workspace_name"):
@@ -123,6 +129,8 @@ def build_parameters(runtime, copy, payload, lake=None, scenario=None, input_nam
     metadata = None
     if lake is not None:
         copy, payload, metadata = bind_lake(copy, payload, lake, scenario, input_name)
+    from ml_model_factory.storage_selection import validate_job_storage
+    validate_job_storage(payload, runtime)
     result = {
         **copy,
         "subscriptionId": runtime["subscription_id"],

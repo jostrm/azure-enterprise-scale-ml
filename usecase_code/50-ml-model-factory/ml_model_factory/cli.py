@@ -101,11 +101,21 @@ def parser() -> argparse.ArgumentParser:
     champion = selection.add_mutually_exclusive_group(required=True)
     champion.add_argument("--champion", type=Path, help="Champion comparison.json from the same held-out benchmark")
     champion.add_argument("--no-champion", action="store_true", help="Explicit first-model comparison")
+    storage = commands.add_parser("storage-target", help="Preview common/project storage selection without Azure calls")
+    storage.add_argument("--config", type=Path, required=True)
     return root
 
 
 def execute(args):
     scenario = validate_scenario(load_json(args.scenario)) if hasattr(args, "scenario") else None
+    if args.command == "storage-target":
+        from .storage_selection import resolve_storage_selection, selected_profile
+        value = resolve_storage_selection(load_json(args.config))
+        target = selected_profile(value)
+        return {"selection": "legacy-explicit" if target is None else (
+            "common" if value["use_common_datalake_storage"] else "project"),
+            "storage": target or value.get("storage", value.get("lake", {}).get("storage", {})),
+            "input_data": value.get("input_data"), "preview_only": True, "data_moved": False}
     if args.command == "validate":
         if args.runtime:
             validate_runtime(load_json(args.runtime))

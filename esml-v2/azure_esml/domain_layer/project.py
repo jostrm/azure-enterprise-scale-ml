@@ -55,6 +55,12 @@ class ESMLProject:
             raise ValueError("Inject an AzureMLSDKBackend or AzureMLCLIBackend before requesting cloud operations")
         return self.backend
 
+    def _verify_selected_datastore(self):
+        from ml_model_factory.storage_selection import selected_profile, verify_datastore
+        storage = selected_profile(self.settings.runtime)
+        if storage is not None:
+            verify_datastore(storage, self._backend().get_datastore(storage["datastore"]))
+
     def pipeline_factory(self):
         from .pipeline import ESMLPipelineFactory
         return ESMLPipelineFactory(self.settings, step_map=self.step_map, folder_catalog=self.folder_catalog)
@@ -121,7 +127,10 @@ class ESMLProject:
 
     def submit_document(self, document: dict, base_path: Path) -> dict:
         from azure.core.exceptions import ResourceNotFoundError
+        from ml_model_factory.storage_selection import validate_job_storage
+        validate_job_storage(document, self.settings.runtime)
         name, digest = self._verify_document(document, base_path)
+        self._verify_selected_datastore()
         try:
             existing = self._backend().get_job(name)
         except ResourceNotFoundError:
@@ -229,6 +238,7 @@ class ESMLProject:
     def publish_pipeline(self, plan, *, version: str, endpoint_name: str | None = None,
                          deployment_name: str | None = None) -> dict:
         self._verify_document(plan.document, plan.base_path)
+        self._verify_selected_datastore()
         pipeline_type = PipelineType(plan.manifest["pipeline_type"])
         if not pipeline_type.is_inference:
             raise ValueError("Batch endpoint publication is for inference plans; submit training pipelines directly")
@@ -250,6 +260,7 @@ class ESMLProject:
         if published.get("plan_sha256") != canonical_hash(plan.document):
             raise ValueError("Published deployment is bound to a different plan; rebuild/submit daily requests or republish explicitly")
         self._verify_document(plan.document, plan.base_path)
+        self._verify_selected_datastore()
         invocation = plan.invocation()
         return self._backend().invoke(published["endpoint_name"], published["deployment_name"],
                                       invocation["inputs"], invocation["outputs"])

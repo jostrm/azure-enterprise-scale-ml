@@ -26,6 +26,8 @@ def main():
     parser.add_argument("--selection-output", type=Path, default=Path("selection-decision.json"))
     args = parser.parse_args()
     runtime = json.loads(args.runtime.read_text(encoding="utf-8-sig"))
+    from ml_model_factory.storage_selection import resolve_storage_selection, selected_profile, validate_job_storage, verify_datastore
+    runtime = resolve_storage_selection(runtime)
     if args.register_job:
         if not args.model_name:
             raise ValueError("--model-name is required with --register-job")
@@ -62,6 +64,14 @@ def main():
     from ml_model_factory.tags import assert_scope
     definition = yaml.safe_load(args.job.read_text(encoding="utf-8"))
     assert_scope(definition.get("tags", {}), runtime)
+    validate_job_storage(definition, runtime)
+    storage = selected_profile(runtime)
+    if storage is not None:
+        from ml_model_factory.project import azure_cli
+        verify_datastore(storage, azure_cli(
+            "ml", "datastore", "show", "--name", storage["datastore"], "--subscription", runtime["subscription_id"],
+            "--resource-group", runtime["resource_group"], "--workspace-name", runtime["workspace_name"],
+        ))
     executable = shutil.which("az")
     if not executable:
         raise RuntimeError("Install Azure CLI and its ml v2 extension, then sign in to runtime.tenant_id")

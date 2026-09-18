@@ -118,6 +118,8 @@ def publish_model_report(report_path: Path, runtime: dict) -> dict:
     The SDK model update is read-modify-write; schedule one publisher per model
     version. It is not a distributed transaction with the Blob upload.
     """
+    from .storage_selection import resolve_storage_selection
+    runtime = resolve_storage_selection(runtime)
     from azure.storage.blob import BlobServiceClient, ContentSettings
     from .azureml import _client
     from .lake import LakeLayout

@@ -201,6 +201,19 @@ def test_job_operations_and_relative_origin(backend, workspace, documents):
         )
 
 
+def test_datastore_lookup_is_read_only(backend):
+    adapter, transport = backend
+    definition = {"name": "lake", "type": "azure_blob", "account_name": "sampleaccount",
+                  "container_name": "lake3"}
+    existing(transport, "datastore", definition)
+    result = adapter.get_datastore("lake")
+    assert result["account_name"] == "sampleaccount" and result["container_name"] == "lake3"
+    if isinstance(transport, CLIRunner):
+        assert not transport.documents
+    else:
+        transport.datastores.create_or_update.assert_not_called()
+
+
 def existing(transport, group, value):
     if isinstance(transport, CLIRunner):
         transport.resources[group, value["name"], value.get("version")] = deepcopy(value)

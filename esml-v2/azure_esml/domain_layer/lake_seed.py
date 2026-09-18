@@ -17,6 +17,8 @@ def stage_kaggle_examples(config: dict, *, source_root: Path, scenario_root: Pat
                          root: Path, version: str) -> dict:
     from .lake_ingestion import SharedLakeIngestion
     from .runtime import TabularDataSteps
+    from ml_model_factory.storage_selection import resolve_storage_selection
+    config = resolve_storage_selection(config)
 
     if config.get("schema") != "esml.shared-lake-bootstrap/v2":
         raise ValueError("Use a shared-lake-bootstrap/v2 configuration")
@@ -243,6 +245,8 @@ def stage_kaggle_examples(config: dict, *, source_root: Path, scenario_root: Pat
 def write_common_runtimes(config: dict, seed: dict, runtime: dict, output: Path) -> list[str]:
     """Generate consumer runtime files; does not create the proposed datastore."""
     from ml_model_factory.tags import assert_scope
+    from ml_model_factory.storage_selection import resolve_storage_selection
+    config = resolve_storage_selection(config)
     assert_scope({"aifactory": config["aifactory"], "project": config["project"],
                   "environment": config["environment"]}, runtime)
     files = []
@@ -252,7 +256,11 @@ def write_common_runtimes(config: dict, seed: dict, runtime: dict, output: Path)
             continue
         name = sample["scenario"]
         current = deepcopy(runtime)
+        current.pop("input_path", None)
         current["datastore"] = config["storage"]["datastore"]
+        for key in ("use_common_datalake_storage", "storage_targets", "common_resource_group"):
+            if key in config:
+                current[key] = deepcopy(config[key])
         current["input_data"] = f"azureml://datastores/{current['datastore']}/paths/{sample['project_in']}/"
         if name in declarations:
             current["input_data"] += declarations[name]["file"]
@@ -263,6 +271,7 @@ def write_common_runtimes(config: dict, seed: dict, runtime: dict, output: Path)
             "storage": {key: config["storage"][key] for key in ("account_url", "container", "datastore")},
         }
         path = Path(output) / f"{name}.runtime.local.json"
+        current = resolve_storage_selection(current)
         if path.exists() and load_json(path) != current:
             raise ValueError(f"Consumer runtime already differs: {path}")
         write_json(path, current)

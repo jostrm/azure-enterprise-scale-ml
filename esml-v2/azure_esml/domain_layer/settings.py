@@ -98,6 +98,8 @@ class LakeSettings:
 
     @classmethod
     def from_dict(cls, document: dict, *, base_path: Path | None = None):
+        from ml_model_factory.storage_selection import resolve_storage_selection
+        document = resolve_storage_selection(document)
         if not isinstance(document, dict):
             raise ValueError("lake_settings must be an object")
         if document.get("schema", "esml.lake-settings/v2") != "esml.lake-settings/v2":

@@ -45,6 +45,8 @@ class LakeLayout:
 
     @classmethod
     def from_config(cls, config: dict, scenario: dict | None = None):
+        from .storage_selection import resolve_storage_selection
+        config = resolve_storage_selection(config)
         if not isinstance(config, dict):
             raise ValueError("lake configuration must be an object")
         project = config.get("project")

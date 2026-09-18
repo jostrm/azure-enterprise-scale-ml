@@ -5,6 +5,16 @@ Its CSV contains Markdown knowledge articles together with evaluation questions
 and expected answers. Preparation separates those concerns so evaluation answers
 cannot leak into the searchable knowledge corpus.
 
+Both routes inherit the root
+[`use_common_datalake_storage` selection](../readme.md#one-storage-selection-for-every-example):
+`true` uses the configured common RG account/container (default `lake3`);
+`false` uses configured project data storage (default `agent-factory`).
+Account and RG must be explicit, not AML/Foundry artifact storage. ADF, Search
+and the worker's UAMI stay project-scoped. Export a fresh `target.json` for the
+worker; its optional `--container` must match the configured container. Selected
+containers must already exist and be private; no account, container, role or
+public-access change is implicit in selection.
+
 ## Use case summary
 
 - Use case type: RAG with LLM (data preparation and retrieval setup, not model training)
@@ -18,8 +28,8 @@ cannot leak into the searchable knowledge corpus.
 
 | Route | Processing and identity | Output |
 | --- | --- | --- |
-| Azure Data Factory | Managed-VNet copy/projection with the project UAMI; Search indexer uses Search's identity. | `agent-factory-adf/kaggle-rag-v1/knowledge/items.json` and separate evaluation JSON. |
-| `worker.py` | Python on already-approved Azure compute with the project UAMI; no local-user fallback. | Default `agent-factory/kaggle-rag-v1/documents/<hash>.md`, manifest and separate evaluation JSONL. |
+| Azure Data Factory | Managed-VNet copy/projection with the project UAMI; Search indexer uses Search's identity. | `<selected-container>/kaggle-rag-v1/knowledge/items.json` and separate evaluation JSON. |
+| `worker.py` | Python on already-approved Azure compute with the project UAMI; no local-user fallback. | `<selected-container>/kaggle-rag-v1/documents/<hash>.md`, manifest and separate evaluation JSONL. |
 
 ADF is the configured reference route. Both use a private semantic text index
 and existing-index Foundry IQ source. The initial implementation does not compute
@@ -31,9 +41,10 @@ does not describe the implemented connection policy.
 
 ## Data sources and lake layout
 
-`<project-data-storage>` means the explicitly selected project account with
-`2001` in its name, not Foundry's reserved `1001` metadata storage.
-For the Spider project-001 reference deployment the current ADF source paths are:
+When the flag is omitted, `<project-data-storage>` retains legacy project `2001`
+discovery, not Foundry's reserved `1001` metadata storage. Legacy containers remain
+`agent-factory-adf` for ADF and `agent-factory` for the worker. The following are
+historical Spider project-001 reference paths, not defaults for other factories:
 
 ```text
 Storage account: saprj001sdcbltsc2001dev
@@ -76,7 +87,8 @@ The existing `SharedLake` contract already provides project document and
 [45-rag-agent bridge](../45-rag-agent/readme.md) now explicitly chooses the
 existing common-lake JSONL publication or this project JSON corpus, copies only
 the pinned file with ADF managed identity, and builds a separately verified
-Search/Foundry IQ retrieval path. This `43-data` ingestion remains unchanged.
+Search/Foundry IQ retrieval path. Both `43-data` and `45-rag-agent` now inherit
+the root storage profile when the flag is set.
 The proposed helpdesk master path above is still not created or bound by either
 example. No `mlops/v1` rename is required.
 

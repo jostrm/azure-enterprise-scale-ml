@@ -5,12 +5,17 @@ It asks `aif-knowledge` for evidence, passes those findings to `aif-reviewer`,
 and synthesizes the reviewed answer. Both participants retain their own Foundry
 identity and definition; the coordinator does not create duplicate agents.
 
+Both participants inherit the
+[root common/project storage selection](../readme.md#one-storage-selection-for-every-example)
+through the shared knowledge agent. No participant-specific paths change;
+Foundry/Search and their identities remain in the project resource group.
+
 ## Use case summary
 
 - Use case type: RAG with LLM
 - Data type: Tabular | Document (CSV-packaged knowledge articles; text at inference)
 - Number of source data sets: 1 shared helpdesk corpus, not one dataset per participant
-- Data sources: No master-lake binding yet; `<project-data-storage>/agent-factory-adf/kaggle-rag-v1/knowledge/items.json` through `aif-knowledge`. See [source paths](../43-data/readme.md#data-sources-and-lake-layout).
+- Data sources: `<selected-storage>/<selected-container>/kaggle-rag-v1/knowledge/items.json` through `aif-knowledge`. See [source paths](../43-data/readme.md#data-sources-and-lake-layout).
 - Inference type: Online
 - Technology used in full chain: Azure Data Factory | Azure Storage | Azure AI Search | Microsoft Foundry | Azure AI Projects SDK | Python | Microsoft Entra ID
 

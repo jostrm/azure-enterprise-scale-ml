@@ -4,6 +4,21 @@
   "project_number": 1,
   "project_folder_name": "project001",
   "active_model": 11,
+  "use_common_datalake_storage": false,
+  "storage_targets": {
+    "common": {
+      "account_name": "examplecommonlake",
+      "resource_group": "example-common-dev",
+      "container": "lake3",
+      "datastore": "esml_shared_lake"
+    },
+    "project": {
+      "account_name": "exampleesmlstorage",
+      "resource_group": "example-project001-dev",
+      "container": "lake3",
+      "datastore": "esml_lake"
+    }
+  },
   "storage": {
     "datastore": "esml_lake",
     "type": "azure_blob",
@@ -15,6 +30,7 @@
     "tenant_id": "00000000-0000-0000-0000-000000000001",
     "subscription_id": "00000000-0000-0000-0000-000000000002",
     "resource_group": "example-project001-dev",
+    "common_resource_group": "example-common-dev",
     "workspace_name": "example-ml-dev",
     "environment_name": "dev",
     "compute": "cpu-cluster",

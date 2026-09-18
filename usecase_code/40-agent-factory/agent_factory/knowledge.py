@@ -124,13 +124,37 @@ def configure_knowledge(session: AzureSession, target: Target, *,
     validate_index(index, index_name)
     document_probe = session.request(
         "POST", search_url(target, f"indexes/{index_name}/docs/search"),
-        {"search": "*", "select": "id,topic,content", "top": 1, "count": True}, audience=SEARCH_AUDIENCE,
+        {"search": "*", "select": "id,topic,content,document_url",
+         "top": 1000 if target.use_common_datalake_storage is not None else 1, "count": True}, audience=SEARCH_AUDIENCE,
     )
     rows = document_probe.get("value", [])
     count = document_probe.get("@odata.count")
     if (type(count) is not int or count < 1 or not rows
             or not rows[0].get("content", "").strip() or not rows[0].get("topic", "").strip()):
         raise RuntimeError("Index has no searchable knowledge documents; complete managed-identity ingestion first.")
+    if target.use_common_datalake_storage is not None:
+        prefix = f"https://{target.storage_name}.blob.core.windows.net/{target.resolve_container()}/"
+        from .data import MAX_ROWS
+        if count > MAX_ROWS:
+            raise ValueError("Index exceeds the bounded factory corpus size; review its source explicitly.")
+        seen = set()
+        page = document_probe
+        while True:
+            current = page.get("value", [])
+            if not current or page.get("@odata.count") != count:
+                raise ValueError("Index changed or pagination is incomplete; finish ingestion before configuring knowledge.")
+            for row in current:
+                if (not row.get("id") or row["id"] in seen
+                        or not row.get("document_url", "").startswith(prefix)):
+                    raise ValueError("Indexed knowledge belongs to another storage selection or is inconsistent; ingest and verify explicitly.")
+                seen.add(row["id"])
+            if len(seen) == count:
+                break
+            if len(seen) > count:
+                raise ValueError("Index count changed during storage verification.")
+            page = session.request("POST", search_url(target, f"indexes/{index_name}/docs/search"),
+                                   {"search": "*", "select": "id,document_url", "top": 1000,
+                                    "skip": len(seen), "count": True}, audience=SEARCH_AUDIENCE)
     semantic_probe = session.request(
         "POST", search_url(target, f"indexes/{index_name}/docs/search"),
         {"search": rows[0]["topic"], "queryType": "semantic",
@@ -169,6 +193,7 @@ def configure_knowledge(session: AzureSession, target: Target, *,
         "connection_name": connection_name, "connection_id": connection_id,
         "document_count": document_probe["@odata.count"], "embeddings_required": False,
         "retrieval_verified": False,
+        "storage": target.storage_summary(),
     }
 
 
@@ -226,6 +251,7 @@ def verify_retrieval(session: AzureSession, target: Target, query: str, *,
     # Return only a verification summary, never query text, raw CSV, or evaluation answers.
     return {
         "retrieval_verified": True, "knowledge_base_name": knowledge_base_name,
+        "storage": target.storage_summary(),
         "reference_count": len(grounded), "response_sha256": hashlib.sha256(
             json.dumps(texts, ensure_ascii=False).encode("utf-8")
         ).hexdigest(),

@@ -127,6 +127,17 @@ class RagSource:
         """Bind an explicit config object; never discover or fall back to storage."""
         if not isinstance(binding, dict):
             raise ValueError("A RAG source binding must be an object.")
+        binding = dict(binding)
+        if target.use_common_datalake_storage is not None:
+            inherited = {
+                "location": "common" if target.use_common_datalake_storage else "project",
+                "storage_account_resource_id": target.storage_id,
+                "container": target.resolve_container(),
+            }
+            for name, value in inherited.items():
+                if name in binding and binding[name] != value:
+                    raise ValueError(f"RAG binding {name} contradicts the selected storage profile.")
+                binding[name] = value
         allowed = set(cls.__dataclass_fields__) - {"config", "target", "source_key"}
         required = allowed - {"provenance", "manifest_path", "manifest_sha256", "aifactory"}
         if set(binding) - allowed or required - set(binding):
@@ -138,6 +149,8 @@ class RagSource:
         for name in ("tenant_id", "subscription_id", "resource_group", "common_resource_group"):
             if getattr(config, name).lower() != getattr(target, name).lower():
                 raise ValueError("Source configuration and target must select the same tenant, subscription and groups.")
+        if config.use_common_datalake_storage != target.use_common_datalake_storage:
+            raise ValueError("Source configuration and target must use the same storage selection.")
         if not re.fullmatch(r"[0-9]{3}", config.project_number) or config.environment not in {"dev", "test", "prod"}:
             raise ValueError("The source requires an explicit project number and environment.")
         match = _STORAGE_ID.fullmatch(self.storage_account_resource_id) if isinstance(self.storage_account_resource_id, str) else None
@@ -146,7 +159,7 @@ class RagSource:
         if self.location not in {"common", "project"}:
             raise ValueError("Source location must be common or project.")
         expected_format = "shared-lake-jsonl" if self.location == "common" else "knowledge-json-array"
-        if self.format != expected_format:
+        if target.use_common_datalake_storage is None and self.format != expected_format:
             raise ValueError("Common sources require shared-lake-jsonl with project scope and ACL validation; project sources require knowledge-json-array.")
         expected_group = config.common_resource_group if self.location == "common" else config.resource_group
         if match[2].lower() != expected_group.lower():
@@ -154,7 +167,16 @@ class RagSource:
         storage = match[3]
         if storage != storage.lower() or "1001" in storage:
             raise ValueError("Source storage must be lowercase and must never use the 1001 account.")
-        if self.location == "project" and (storage != target.storage_name or "2001" not in storage):
+        if target.use_common_datalake_storage is not None:
+            if (self.location != ("common" if target.use_common_datalake_storage else "project")
+                    or self.storage_id.lower() != target.storage_id.lower()
+                    or self.container != target.resolve_container()):
+                raise ValueError("RAG source contradicts the selected storage profile.")
+            if (config.storage_name != target.storage_name
+                    or config.storage_resource_group.lower() != target.storage_resource_group.lower()
+                    or config.storage_container != target.storage_container):
+                raise ValueError("Source configuration and target storage profiles differ.")
+        elif self.location == "project" and (storage != target.storage_name or "2001" not in storage):
             raise ValueError("Project source storage must be the target's selected 2001 account.")
         if (not isinstance(self.container, str)
                 or not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", self.container)
@@ -194,6 +216,11 @@ class RagSource:
                          "ground-truth", "landing", "training", "fine-tuning", "images", "audio", "tombstones"}
             if parts[-2:] != ["knowledge", "items.json"] or any(p.lower() in forbidden for p in parts[:-2]):
                 raise ValueError("Knowledge source must be knowledge/items.json, never raw/evaluation or binary data.")
+            if target.use_common_datalake_storage is not None and any(
+                re.fullmatch(r"project\d{3}", part, re.I) and part.lower() != f"project{config.project_number}"
+                for part in parts
+            ):
+                raise ValueError("Knowledge source path belongs to a different project.")
             if self.manifest_path or self.manifest_sha256:
                 raise ValueError("Knowledge arrays use the mandatory blob hash pin, not a snapshot manifest.")
         else:

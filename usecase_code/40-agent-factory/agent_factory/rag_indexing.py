@@ -173,7 +173,7 @@ def configure_indexing(session, target, source, *, apply=False):
     props, identity = service.get("properties", {}), service.get("identity", {})
     if (storage.get("publicNetworkAccess", "").lower() != "disabled"
             or storage.get("allowBlobPublicAccess") is not False):
-        raise ValueError("Project staging storage must already be private and forbid anonymous access.")
+        raise ValueError("Selected staging storage must already be private and forbid anonymous access.")
     if (props.get("publicNetworkAccess", "").lower() != "disabled"
             or props.get("semanticSearch", "").lower() not in {"free", "standard"}):
         raise ValueError("Search must already be private with semantic free/standard; no upgrade is performed.")
@@ -184,7 +184,7 @@ def configure_indexing(session, target, source, *, apply=False):
     link = _private_link(session, target)
     prerequisites = []
     if not link or link["properties"].get("status") != "Approved" or link["properties"].get("provisioningState") != "Succeeded":
-        prerequisites.append("Existing project Search Blob shared private link to project storage must be Approved/Succeeded.")
+        prerequisites.append("Existing project Search Blob shared private link to selected storage must be Approved/Succeeded.")
     verified = None
     if apply and not prerequisites:
         verified = _verified_destination(session, target, source)
@@ -193,6 +193,7 @@ def configure_indexing(session, target, source, *, apply=False):
             "prerequisites": prerequisites, "binding_fingerprint": source.binding_fingerprint,
             "search_identity_principal_id": principal, "private_link": link,
             "destination": dest, "destination_verification": verified,
+            "storage": target.storage_summary(legacy="agent-factory-rag"),
             "original_source_blob": source.blob_url, "materialized_blob": dest["blob_url"],
             "content_verified": False}
 
@@ -252,6 +253,7 @@ def start_indexing(session, target, source, *, retry_failed=False):
         else:
             status = "reused" if _execution(response) == "success" else "running"
     return {**artifact_names(source), "status": status, "binding_fingerprint": source.binding_fingerprint,
+            "storage": target.storage_summary(legacy="agent-factory-rag"),
             "indexer_etag": (current or {}).get("@odata.etag"), "content_verified": False,
             "destination_verification": verified}
 
@@ -271,6 +273,7 @@ def poll_indexing(session, target, source, *, timeout=900, interval=5):
             if latest is None or latest.get("@odata.etag") != current.get("@odata.etag"):
                 raise RuntimeError("Pinned indexer version changed during polling; inspect before accepting execution.")
             return {**artifact_names(source), "status": "success", "binding_fingerprint": source.binding_fingerprint,
+                    "storage": target.storage_summary(legacy="agent-factory-rag"),
                     "indexer_etag": latest.get("@odata.etag"), "content_verified": False,
                     "execution": {key: response["lastResult"][key] for key in ("startTime", "endTime", "itemsProcessed", "itemsFailed")}}
         remaining = deadline - time.monotonic()
@@ -335,6 +338,7 @@ def verify_indexed(session, target, source, expected_rows):
         hashes.append({"topic_sha256": sha256(topic.encode("utf-8")), "content_sha256": digest})
     hashes.sort(key=lambda item: item["topic_sha256"])
     return {**artifact_names(source), "binding_fingerprint": source.binding_fingerprint,
+            "storage": target.storage_summary(legacy="agent-factory-rag"),
             "document_count": len(rows), "content_verified": True, "documents": hashes,
             "original_source_blob": source.blob_url, "materialized_blob": verified["destination"]["blob_url"],
             "source_sha256": source.sha256, "materialized_sha256": verified["sha256"],
