@@ -1,0 +1,116 @@
+let RawEvents = materialize(AppEvents
+    | where tolower(_ResourceId) == tolower(Component)
+    | where Name == 'aifactory.chat'
+    | where ScopeReady and WindowValid and TimeGenerated >= HistoryStartUtc and TimeGenerated < EndUtc
+    | where tostring(Properties.factory) == Factory and tostring(Properties.scaleset) == ScaleSet
+        and tostring(Properties['project']) == Project and tostring(Properties.environment) == Environment
+    | extend store = tostring(Properties.store), EventKind = tostring(Properties['kind'])
+    | where Concrete(store) and (Store == 'All' or store == Store)
+    | where TimeGenerated >= StartUtc or EventKind in ('booking_status', 'case_status')
+    | project event_id = tostring(Properties.event_id), TimeGenerated, store, EventKind,
+        conversation_id = tostring(Properties.conversation_id), question_id = tostring(Properties.question_id),
+        device_id = tostring(Properties.device_id), rating = tostring(Properties.rating),
+        quantity_text = tostring(Properties.quantity), entity_id = tostring(Properties.entity_id),
+        status = tostring(Properties.status), item_count = coalesce(ItemCount, 1)
+    | distinct *);
+let EventConflicts = toscalar(RawEvents | summarize Variants = count() by store, event_id | where Variants > 1 | count);
+let InvalidEvents = toscalar(RawEvents
+    | where isempty(event_id) or item_count != 1
+        or EventKind !in ('question', 'feedback', 'cart_open', 'cart_add', 'cart_send', 'booking_status', 'case_status')
+        or (EventKind in ('question', 'feedback', 'cart_open', 'cart_add', 'cart_send') and isempty(conversation_id))
+        or (EventKind in ('question', 'feedback') and isempty(question_id))
+        or (EventKind == 'feedback' and rating !in ('up', 'down'))
+        or (EventKind == 'cart_add' and (not(quantity_text matches regex @'^[0-9]+$') or tolong(quantity_text) !between (1 .. 1000000)))
+        or (EventKind in ('booking_status', 'case_status') and isempty(entity_id))
+        or (EventKind == 'booking_status' and status !in ('planned', 'confirmed', 'completed', 'canceled'))
+        or (EventKind == 'case_status' and status !in ('open', 'in_progress', 'solved', 'closed', 'canceled'))
+        or (EventKind != 'question' and isnotempty(device_id))
+        or (EventKind != 'feedback' and isnotempty(rating))
+        or (EventKind != 'cart_add' and isnotempty(quantity_text))
+        or (EventKind !in ('question', 'feedback') and isnotempty(question_id))
+        or (EventKind !in ('booking_status', 'case_status') and (isnotempty(entity_id) or isnotempty(status)))
+        or (EventKind in ('booking_status', 'case_status') and isnotempty(conversation_id))
+    | count);
+let Questions = materialize(RawEvents
+    | where EventKind == 'question' and TimeGenerated >= StartUtc
+    | project-away event_id
+    | distinct *);
+let QuestionConflicts = toscalar(Questions
+    | summarize Variants = count() by store, conversation_id, question_id | where Variants > 1 | count);
+let Votes = materialize(RawEvents | where EventKind == 'feedback' and TimeGenerated >= StartUtc
+    | distinct store, conversation_id, question_id, TimeGenerated, rating);
+let VoteConflicts = toscalar(Votes
+    | summarize Variants = count() by store, conversation_id, question_id, TimeGenerated | where Variants > 1 | count);
+let States = materialize(RawEvents | where EventKind in ('booking_status', 'case_status')
+    | distinct store, EventKind, entity_id, TimeGenerated, status);
+let StateConflicts = toscalar(States
+    | summarize Variants = count() by store, EventKind, entity_id, TimeGenerated | where Variants > 1 | count);
+// arg_max is used only AFTER rejecting conflicting identities and same-time votes/states.
+let UsageValid = ScopeReady and WindowValid and EventConflicts == 0 and InvalidEvents == 0
+    and QuestionConflicts == 0 and VoteConflicts == 0 and StateConflicts == 0;
+let Feedback = materialize(Votes | where UsageValid | summarize arg_max(TimeGenerated, *) by store, conversation_id, question_id);
+let LatestStates = materialize(States | where UsageValid | summarize arg_max(TimeGenerated, *) by store, EventKind, entity_id);
+let Cohort = materialize(Questions | summarize Questions = count() by store, conversation_id);
+let ConversationCount = toscalar(Cohort | count);
+let QuestionCount = toscalar(Questions | count);
+let DeviceCount = toscalar(Questions | where isnotempty(device_id) | distinct device_id | count);
+let QuestionsWithDevice = toscalar(Questions | where isnotempty(device_id) | count);
+let ThreePlus = toscalar(Cohort | where Questions >= 3 | count);
+let SingleQuestion = toscalar(Cohort | where Questions == 1 | count);
+let Up = toscalar(Feedback | where rating == 'up' | count);
+let Down = toscalar(Feedback | where rating == 'down' | count);
+let Rated = toscalar(Feedback | distinct store, conversation_id | join kind=inner (Cohort) on store, conversation_id | count);
+let Unhappy = toscalar(Feedback | where rating == 'down' | distinct store, conversation_id | join kind=inner (Cohort) on store, conversation_id | count);
+let CurrentCart = materialize(RawEvents | where TimeGenerated >= StartUtc and EventKind in ('cart_open', 'cart_add', 'cart_send'));
+let OpenCohort = materialize(CurrentCart | where EventKind == 'cart_open' | distinct store, conversation_id | join kind=inner (Cohort) on store, conversation_id | project store, conversation_id);
+let AddedCohortCount = toscalar(CurrentCart | where EventKind == 'cart_add' | distinct store, conversation_id | join kind=inner (Cohort) on store, conversation_id | count);
+let SentCohortCount = toscalar(CurrentCart | where EventKind == 'cart_send' | distinct store, conversation_id | join kind=inner (OpenCohort) on store, conversation_id | count);
+let OpenCohortCount = toscalar(OpenCohort | count);
+let Q = UsageValid and QuestionsComplete;
+let F = UsageValid and FeedbackComplete;
+let C = UsageValid and CartComplete;
+let B = UsageValid and BookingsComplete and StateBaselineComplete;
+let S = UsageValid and CasesComplete and StateBaselineComplete;
+let Metric = (section:string, label:string, value:real, unit:string, complete:bool, formula:string) {
+    print Section = section, Metric = label, Value = iff(complete, value, real(null)), Unit = unit,
+        Availability = iff(not(complete), 'Unavailable: coverage/scope/validation', iff(isnull(value), 'Undefined: empty denominator', 'Declared complete')),
+        Formula = formula, Source = 'AppEvents / aifactory.chat'
+};
+let Metrics = union
+    (Metric('common', 'Active conversations', toreal(ConversationCount), 'conversations', Q, 'Exact distinct (store, conversation_id) with an in-window question; not a sum of days')),
+    (Metric('common', 'Questions', toreal(QuestionCount), 'questions', Q, 'Exact distinct (store, conversation_id, question_id); conflicting duplicates reject the report')),
+    (Metric('common', 'Unique devices', toreal(DeviceCount), 'devices', Q and DevicesComplete and QuestionsWithDevice == QuestionCount, 'Exact distinct pseudonymous device_id; unavailable when any question lacks an ID')),
+    (Metric('common', 'Device ID coverage', 100.0 * Ratio(toreal(QuestionsWithDevice), toreal(QuestionCount)), '% of questions', Q, '100 * questions with pseudonymous device_id / questions')),
+    (Metric('common', 'Questions per conversation', Ratio(toreal(QuestionCount), toreal(ConversationCount)), 'questions/conversation', Q, 'Questions / active conversations; zero denominator is undefined')),
+    (Metric('common', '3+ question rate', 100.0 * Ratio(toreal(ThreePlus), toreal(ConversationCount)), '%', Q, '100 * active conversations with >=3 questions / active conversations')),
+    (Metric('common', 'Thumbs up', toreal(Up), 'votes', F, 'Latest genuine in-window vote per (store, conversation_id, question_id) = up')),
+    (Metric('common', 'Thumbs down', toreal(Down), 'votes', F, 'Latest genuine in-window vote per (store, conversation_id, question_id) = down')),
+    (Metric('common', 'Satisfaction', 100.0 * Ratio(toreal(Up), toreal(Up + Down)), '%', F, '100 * up / (up + down); no ratings is undefined')),
+    (Metric('common', 'Rated conversations', 100.0 * Ratio(toreal(Rated), toreal(ConversationCount)), '%', Q and F, '100 * (rated conversations intersect active-question cohort) / active conversations')),
+    (Metric('common', 'Unhappy conversations', toreal(Unhappy), 'conversations', Q and F, 'Exact distinct latest-down-vote conversations intersect active-question cohort')),
+    (Metric('common', 'Single-question rate (not abandonment)', 100.0 * Ratio(toreal(SingleQuestion), toreal(ConversationCount)), '%', Q, '100 * active conversations with exactly one in-window question / active conversations')),
+    (Metric('retail-chat', 'Cart opens', toreal(toscalar(CurrentCart | where EventKind == 'cart_open' | count)), 'opens', C, 'Count deduplicated cart_open events')),
+    (Metric('retail-chat', 'Products added', toreal(toscalar(CurrentCart | where EventKind == 'cart_add' | summarize sum(tolong(quantity_text)))), 'products', C, 'Sum positive integer quantity over deduplicated cart_add events')),
+    (Metric('retail-chat', 'Carts sent to phone', toreal(toscalar(CurrentCart | where EventKind == 'cart_send' | count)), 'sends', C, 'Count deduplicated cart_send events; no phone values are queried')),
+    (Metric('retail-chat', 'Add-to-cart rate', 100.0 * Ratio(toreal(AddedCohortCount), toreal(ConversationCount)), '%', C and Q, '100 * (cart_add conversations intersect active-question cohort) / active conversations')),
+    (Metric('retail-chat', 'Sent-to-phone rate', 100.0 * Ratio(toreal(SentCohortCount), toreal(OpenCohortCount)), '%', C and Q, '100 * sends intersect active cart-open cohort / active cart-open cohort')),
+    (Metric('booking-chat', 'Planned / confirmed bookings', toreal(toscalar(LatestStates | where EventKind == 'booking_status' and status in ('planned', 'confirmed') | count)), 'bookings', B, 'Latest recorded status per (store, entity_id) at selected end, including reviewed complete baseline')),
+    (Metric('booking-chat', 'Historic completed bookings', toreal(toscalar(LatestStates | where EventKind == 'booking_status' and status == 'completed' | count)), 'bookings', B, 'Latest recorded status = completed at selected end; canceled excluded')),
+    (Metric('support-chat', 'Active cases (includes in progress)', toreal(toscalar(LatestStates | where EventKind == 'case_status' and status in ('open', 'in_progress') | count)), 'cases', S, 'Latest recorded status open or in_progress at selected end, including reviewed complete baseline')),
+    (Metric('support-chat', 'Solved cases', toreal(toscalar(LatestStates | where EventKind == 'case_status' and status == 'solved' | count)), 'cases', S, 'Latest recorded status solved at selected end; closed/canceled excluded')),
+    (Metric('support-chat', 'In-progress cases (subset of active)', toreal(toscalar(LatestStates | where EventKind == 'case_status' and status == 'in_progress' | count)), 'cases', S, 'Latest recorded status in_progress; subset of active, not an additional total'));
+let DailyQuestions = Questions | extend Day = startofday(datetime_utc_to_local(TimeGenerated, Zone))
+    | summarize Questions = count() by Day;
+let DailyConversations = Questions | extend Day = startofday(datetime_utc_to_local(TimeGenerated, Zone))
+    | distinct Day, store, conversation_id | summarize Conversations = count() by Day;
+let DailyFeedback = Feedback | extend Day = startofday(datetime_utc_to_local(TimeGenerated, Zone))
+    | summarize Up = countif(rating == 'up'), Down = countif(rating == 'down') by Day;
+let Daily = Days
+    | join kind=leftouter (DailyQuestions) on Day
+    | join kind=leftouter (DailyConversations) on Day
+    | join kind=leftouter (DailyFeedback) on Day
+    | project Day, Questions = iff(Q, toreal(coalesce(Questions, 0)), real(null)),
+        Conversations = iff(Q, toreal(coalesce(Conversations, 0)), real(null)),
+        Up = iff(F, toreal(coalesce(Up, 0)), real(null)), Down = iff(F, toreal(coalesce(Down, 0)), real(null))
+    | extend QuestionsPerConversation = Ratio(Questions, Conversations)
+    | order by Day asc;

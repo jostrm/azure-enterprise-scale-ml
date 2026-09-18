@@ -1,0 +1,38 @@
+// Fixed deployment scope is encoded by Bicep, never inferred from resource-group names.
+let Component = base64_decode_tostring('__COMPONENT__');
+let Project = base64_decode_tostring('__PROJECT__');
+let Environment = base64_decode_tostring('__ENVIRONMENT__');
+let Factory = base64_decode_tostring('{Factory:base64}');
+let ScaleSet = base64_decode_tostring('{ScaleSet:base64}');
+let Store = base64_decode_tostring('{Store:base64}');
+let Zone = base64_decode_tostring('{TimeZone:base64}');
+let Preset = base64_decode_tostring('{DatePreset:base64}');
+let Concrete = (s:string) { isnotempty(s) and s == trim(@'\s+', s) and tolower(s) !in ('all', 'unknown', 'unavailable', 'n/a', 'none', 'null', '*') };
+let ScopeReady = Concrete(Factory) and Concrete(ScaleSet) and Concrete(Environment)
+    and Project matches regex @'^[0-9]{1,3}$' and isnotempty(Store);
+let TodayLocal = startofday(datetime_utc_to_local(now(), Zone));
+let FirstText = base64_decode_tostring('{FromDate:base64}');
+let LastText = base64_decode_tostring('{ToDate:base64}');
+let FirstLocalDate = iff(Preset == 'custom', todatetime(FirstText), TodayLocal - (toint(Preset) - 1) * 1d);
+let LastLocalDate = iff(Preset == 'custom', todatetime(LastText), TodayLocal);
+let WindowValid = coalesce(array_index_of(datetime_list_timezones(), Zone) >= 0
+    and (Preset in ('1', '7', '30') or (Preset == 'custom' and FirstText matches regex @'^\d{4}-\d{2}-\d{2}$' and LastText matches regex @'^\d{4}-\d{2}-\d{2}$'))
+    and datetime_diff('day', LastLocalDate, FirstLocalDate) between (0 .. 29), false);
+// Convert each local midnight separately: DST days are not necessarily 24 hours.
+let StartUtc = datetime_local_to_utc(FirstLocalDate, Zone);
+let EndUtc = datetime_local_to_utc(LastLocalDate + 1d, Zone);
+let HistoryStartUtc = datetime_local_to_utc(LastLocalDate + 1d - __HISTORY_DAYS__ * 1d, Zone);
+let Days = range Offset from 0 to 29 step 1
+    | extend Day = FirstLocalDate + Offset * 1d
+    | where WindowValid and Day <= LastLocalDate
+    | project Day;
+let QuestionsComplete = coalesce(tobool(base64_decode_tostring('{QuestionsComplete:base64}')), false);
+let DevicesComplete = coalesce(tobool(base64_decode_tostring('{DevicesComplete:base64}')), false);
+let FeedbackComplete = coalesce(tobool(base64_decode_tostring('{FeedbackComplete:base64}')), false);
+let CartComplete = coalesce(tobool(base64_decode_tostring('{CartComplete:base64}')), false);
+let BookingsComplete = coalesce(tobool(base64_decode_tostring('{BookingsComplete:base64}')), false);
+let CasesComplete = coalesce(tobool(base64_decode_tostring('{CasesComplete:base64}')), false);
+let StateBaselineComplete = coalesce(tobool(base64_decode_tostring('{StateBaselineComplete:base64}')), false);
+let MeteringComplete = coalesce(tobool(base64_decode_tostring('{MeteringComplete:base64}')), false);
+let BillingComplete = coalesce(tobool(base64_decode_tostring('{BillingComplete:base64}')), false);
+let Ratio = (n:real, d:real) { iff(d > 0.0, n / d, real(null)) };

@@ -45,7 +45,21 @@ def test_samples_never_run_processes(kind, compute):
     assert result["status"] == "warning"
     assert result["report"]["tables"]
     assert result["report"]["charts"]
+    assert result["report"]["dataSource"].startswith("Sample fixture (not live): ")
+    assert result["report"]["dataSource"] == result["report"]["lineage"]["dataSource"]
     assert result["run_id"] is None
+
+
+@pytest.mark.parametrize("source", ["Explicit fixture collector", {"name": "Explicit fixture collector", "reference": "fixture-only"}])
+def test_accept_report_preserves_explicit_source_and_lineage_shapes(source):
+    value = request()
+    value["dry_run"] = True
+    report = reports._sample(value)["report"]
+    lineage = {"formula": "Fixture counters supplied without transformation", "inputs": {"reference": "fixture-only"}}
+    report.update(dataSource=source, lineage=lineage)
+    accepted = reports._accept_report(value, report)["report"]
+    assert accepted["dataSource"] == source
+    assert accepted["lineage"] == lineage
 
 
 def test_target_required_and_no_credentials_in_config():
@@ -57,6 +71,47 @@ def test_target_required_and_no_credentials_in_config():
     result = reports.execute(value)
     assert result["status"] == "failed"
     assert "never-return-this" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("kind", list(reports.SCRIPTS))
+@pytest.mark.parametrize("compute", ["local", "runbook", "logicapp"])
+def test_all_never_becomes_an_azure_identifier(kind, compute):
+    value = reports.plan(ROOT, kind, "All", "dev", 30, compute=compute)
+    assert value["report_config"]["naming"]["projectNumber"] == ""
+    with patch.object(reports, "_process", side_effect=AssertionError("No processes for All")):
+        result = reports.execute(value)
+    assert result["status"] == "unavailable"
+    assert "concrete project" in result["output"]
+
+
+def test_legacy_scope_intersection_and_lineage():
+    value = request()
+    value["dry_run"] = True
+    value["filters"] = {"aiFactory": "unknown-factory", "scaleset": "All", "project": "004"}
+    assert reports.execute(value)["status"] == "unavailable"
+    value["target"]["aiFactory"] = "unknown-factory"
+    report = reports.execute(value)["report"]
+    assert report["filters"]["project"] == "004"
+    assert all(item["dataSource"] and item["lineage"]["formula"] for item in report["tables"] + report["charts"])
+    assert report["lineage"]["inputs"]["target"]["project_number"] == "004"
+
+
+def test_additive_target_identities_are_metadata_not_resource_names():
+    value = request()
+    value["dry_run"] = True
+    factory, scaleset = r"C:\reviewed factories\factory001", "sdc:001"
+    value["target"].update(factory=factory, scaleset=scaleset, aiFactory="older-label")
+    value["filters"] = {"aiFactory": factory, "scaleset": scaleset, "project": "004"}
+    validated = reports._validate(value)
+    assert validated["target"]["factory"] == factory and validated["target"]["scaleset"] == scaleset
+    parameters = reports._parameters(validated)
+    assert parameters["ProjectResourceGroup"] == value["target"]["project_resource_group"]
+    assert "factory" not in parameters and "scaleset" not in parameters
+    assert factory not in parameters["ConfigJson"] and scaleset not in parameters["ConfigJson"]
+    report = reports.execute(value)["report"]
+    assert report["lineage"]["inputs"]["target"]["factory"] == factory
+    value["filters"]["aiFactory"] = "different-factory"
+    assert reports.execute(value)["status"] == "unavailable"
 
 
 def test_cloud_usage_explicitly_unavailable():
@@ -187,6 +242,40 @@ def test_showback_missing_sample_is_warning_not_crash():
     assert envelope["status"] == "warning"
 
 
+def test_showback_all_sample_links_remain_disabled_and_aligned():
+    pwsh = shutil.which("pwsh")
+    if not pwsh:
+        pytest.skip("Optional PowerShell runtime not installed")
+    process = subprocess.run([pwsh, "-NoProfile", "-NonInteractive", "-File", str(ROOT / reports.SCRIPTS["showback"]),
+                              "-DryRun", "-NoUpload", "-ReportFormat", "Json", "-ProjectNumber", "All"],
+                             capture_output=True, encoding="utf-8", check=False)
+    assert process.returncode == 0, process.stderr
+    report = json.loads(process.stdout)
+    chart = report["charts"][0]
+    assert len(chart["labelLinks"]) == len(chart["labels"])
+    assert all(link is None for link in chart["labelLinks"])
+    assert report["filters"]["project"] == "All"
+    assert report["lineage"]["inputs"]["costBasis"] == "ActualCost"
+
+
+def test_exported_html_preserves_validated_cost_link_tooltip_and_theme():
+    pwsh = shutil.which("pwsh")
+    if not pwsh:
+        pytest.skip("Optional PowerShell runtime not installed")
+    module = ROOT / "coreteam" / "finops" / "runbooks" / "common" / "AifFactory.psm1"
+    command = f"""Import-Module '{module}' -Force -WarningAction SilentlyContinue
+$md = '[project001](https://portal.azure.com/#blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/%2Freviewed "Go to Azure Cost analysis for project 001")'
+ConvertTo-ReportHtml -Markdown $md -Title '<safe>'
+"""
+    process = subprocess.run([pwsh, "-NoProfile", "-NonInteractive", "-Command", command],
+                             capture_output=True, encoding="utf-8", check=False)
+    assert process.returncode == 0
+    assert '<a href="https://portal.azure.com/' in process.stdout
+    assert 'title="Go to Azure Cost analysis for project 001"' in process.stdout
+    assert "scoutTheme" in process.stdout and "--cp-bg" in process.stdout
+    assert "<title>&lt;safe&gt;</title>" in process.stdout
+
+
 @pytest.mark.parametrize("kind", ["foundry-tokens", "showback"])
 def test_local_helper_configjson_and_exact_target(kind):
     if not shutil.which("pwsh"):
@@ -263,6 +352,9 @@ function Invoke-AzRestMethod {{
     assert envelope["status"] == "warning"
     assert envelope["tables"][0]["rows"][0][-1] is None
     assert envelope["tables"][0]["rows"][0][-2] == (None if missing_actual else 10.5)
+    link = envelope["charts"][0]["labelLinks"][0]
+    assert link["url"].startswith("https://portal.azure.com/#blade/Microsoft_Azure_CostManagement/Menu/open/costanalysis/scope/%2Fsubscriptions%2F")
+    assert link["tooltip"] == "Go to Azure Cost analysis for project 004"
     assert "secret-forecast-response" not in process.stdout
     assert "UPLOAD MUST NOT RUN" not in process.stdout
 

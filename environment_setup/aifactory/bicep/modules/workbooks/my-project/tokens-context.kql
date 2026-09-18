@@ -1,0 +1,20 @@
+// Independent of business-event factory/store selectors; native account scope is fixed.
+let ProjectResourceGroup = base64_decode_tostring('__PROJECT_RG__');
+let AccountPrefix = strcat(tolower(ProjectResourceGroup), '/providers/microsoft.cognitiveservices/accounts/');
+let Inventory = print Accounts=parse_json(base64_decode_tostring('{TokenAccountInventory:base64}'))
+    | mv-expand Accounts
+    | project AccountId=tolower(tostring(Accounts['id'])), Account=tostring(Accounts['name']), AccountKind=tostring(Accounts['kind'])
+    | where AccountId startswith AccountPrefix and AccountKind in~ ('AIServices', 'OpenAI')
+    | where substring(AccountId, strlen(AccountPrefix)) !contains '/'
+    | distinct AccountId, Account, AccountKind;
+let SelectedAccount = tolower(base64_decode_tostring('{TokenAccount:base64}'));
+let AccountSelected = isnotempty(SelectedAccount) and SelectedAccount in (Inventory | project AccountId);
+let Zone = base64_decode_tostring('{TimeZone:base64}');
+let ZoneValid = array_index_of(datetime_list_timezones(), Zone) >= 0;
+let SafeZone = iff(ZoneValid, Zone, 'UTC');
+// One dedicated native time picker binds Metrics and request logs; business dates are independent.
+let StartUtc = {TokenTimeRange:start};
+let EndUtc = {TokenTimeRange:end};
+let WindowValid = coalesce(ZoneValid and isnotnull(StartUtc) and isnotnull(EndUtc)
+    and EndUtc > StartUtc and EndUtc - StartUtc <= 31d, false);
+let TokenSource = 'AzureDiagnostics / AzureOpenAIRequestUsage (observed request usage, not billing)';

@@ -3,7 +3,7 @@
 // ============================================================================
 // This deploys Azure dashboards for the AI Factory project
 // Dependencies: 01-foundation.bicep (for resource groups and naming)
-// Components: Project dashboard with quick access to resources and services
+// Components: Project dashboard and optional native My Project Usage & Cost workbook
 
 targetScope = 'subscription'
 
@@ -77,6 +77,27 @@ param technicalAdminsEmail string = ''
 param genaiSubnetId string
 param aksSubnetId string
 param acaSubnetId string = ''
+
+@description('Create the Azure-native My Project Usage & Cost workbook from existing telemetry; no new workspace/roles/ingestion. Set false to omit it.')
+param enableMyProjectDashboard bool = true
+@description('Optional override for the existing project Application Insights ARM ID.')
+param myProjectApplicationInsightsResourceId string = ''
+@description('Optional override for the existing common Log Analytics workspace ARM ID.')
+param myProjectLogAnalyticsResourceId string = ''
+@description('Optional opaque canonical telemetry factory ID. Empty requires explicit workbook selection, never RG inference.')
+param myProjectFactoryId string = ''
+@description('Optional opaque canonical telemetry scale set ID. Empty requires explicit workbook selection.')
+param myProjectScaleSetId string = ''
+@description('Fixed telemetry environment; deployment test defaults to stage.')
+param myProjectTelemetryEnvironment string = env == 'test' ? 'stage' : env
+@description('Default IANA time zone for inclusive local dates; DST-aware.')
+param myProjectTimeZone string = 'Europe/Berlin'
+@description('Reviewed completeness keys: questions, devices, feedback, cart, bookings, cases, stateBaseline, metering, billing. Unspecified channels are false.')
+param myProjectCoverage object = {}
+@minValue(30)
+@maxValue(90)
+@description('Bounded state history; requires an explicitly reviewed full baseline for state totals.')
+param myProjectStateHistoryDays int = 90
 
 @description('Whether AI Foundry was added (addAIFoundry=true) — affects AI Foundry V2 account naming')
 param addAIFoundry bool = false
@@ -223,6 +244,16 @@ module projectDashboard '../modules/projectDash01.bicep' = {
     aksSubnetId: aksSubnetId
     acaSubnetId: acaSubnetId
 
+    enableMyProjectDashboard: enableMyProjectDashboard
+    myProjectApplicationInsightsResourceId: myProjectApplicationInsightsResourceId
+    myProjectLogAnalyticsResourceId: myProjectLogAnalyticsResourceId
+    myProjectFactoryId: myProjectFactoryId
+    myProjectScaleSetId: myProjectScaleSetId
+    myProjectTelemetryEnvironment: myProjectTelemetryEnvironment
+    myProjectTimeZone: myProjectTimeZone
+    myProjectCoverage: myProjectCoverage
+    myProjectStateHistoryDays: myProjectStateHistoryDays
+
     // AI Foundry naming mode
     addAIFoundry: addAIFoundry
 
@@ -317,6 +348,10 @@ output dashboardOutputs object = {
   dashboardId: projectDashboard.outputs.dashboardId
   dashboardName: projectDashboard.outputs.dashboardName
   dashboardUrl: projectDashboard.outputs.dashboardUrl
+  myProjectWorkbookId: projectDashboard.outputs.myProjectWorkbookId
+  myProjectWorkbookName: projectDashboard.outputs.myProjectWorkbookName
+  myProjectWorkbookUrl: projectDashboard.outputs.myProjectWorkbookUrl
+  myProjectSourceIds: projectDashboard.outputs.myProjectSourceIds
   
   // AI Foundry Information
   aiFoundryUrl: projectDashboard.outputs.aiFoundryUrl
@@ -330,9 +365,16 @@ output dashboardOutputs object = {
 @description('Ready for next deployment layer')
 output dashboardsComplete bool = true
 
+@description('Azure-native My Project workbook outputs; empty when explicitly disabled.')
+output myProjectWorkbookId string = projectDashboard.outputs.myProjectWorkbookId
+output myProjectWorkbookName string = projectDashboard.outputs.myProjectWorkbookName
+output myProjectWorkbookUrl string = projectDashboard.outputs.myProjectWorkbookUrl
+output myProjectSourceIds object = projectDashboard.outputs.myProjectSourceIds
+
 @description('Dashboard access information')
 output dashboardAccess object = {
   portalUrl: projectDashboard.outputs.dashboardUrl
+  myProjectWorkbookUrl: projectDashboard.outputs.myProjectWorkbookUrl
   directAccess: 'Navigate to Azure Portal > Dashboards > ${projectDashboard.outputs.dashboardName}'
   description: 'Project dashboard with quick access to AI Factory resources and services'
 }
