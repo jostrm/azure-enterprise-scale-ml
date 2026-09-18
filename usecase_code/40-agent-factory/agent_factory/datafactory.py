@@ -32,6 +32,14 @@ DATA_SOURCE_NAME = "aif-kaggle-adf-blob"
 INDEXER_NAME = "aif-kaggle-adf-indexer"
 
 
+def storage_prefix(target: Target) -> str:
+    if target.use_common_datalake_storage is None:
+        return PREFIX
+    import hashlib
+    scope = hashlib.sha256(target.project_id.casefold().encode("utf-8")).hexdigest()[:16]
+    return f"{PREFIX}/adf/{scope}"
+
+
 def integrity_reference() -> dict:
     path = Path(__file__).resolve().parents[1] / "43-data" / "kaggle-v1.integrity.json"
     return json.loads(path.read_text(encoding="utf-8"))
@@ -89,10 +97,12 @@ def _policy(*, secure: bool = True) -> dict:
 def build_datafactory_definitions(target: Target, *, factory_name: str) -> dict:
     """Pure ARM/REST definitions. Does not authenticate, read private data, or deploy."""
     validate_target(target)
+    container = target.resolve_container(legacy=CONTAINER)
+    prefix = storage_prefix(target)
     factory_id = _factory_id(target, factory_name)
     pin = integrity_reference()
     blob_endpoint = f"https://{target.storage_name}.blob.core.windows.net"
-    document_url = f"{blob_endpoint}/{CONTAINER}/{PREFIX}/knowledge/items.json"
+    document_url = f"{blob_endpoint}/{container}/{prefix}/knowledge/items.json"
     ir = _reference(INTEGRATION_RUNTIME, "IntegrationRuntimeReference")
     metadata = [
         {"name": "owner", "value": ADF_OWNER},
@@ -122,8 +132,8 @@ def build_datafactory_definitions(target: Target, *, factory_name: str) -> dict:
 
     def dataset(name, kind, folder=None, filename=None, http=False):
         location = {"type": "HttpServerLocation"} if http else {
-            "type": "AzureBlobStorageLocation", "container": CONTAINER,
-            "folderPath": f"{PREFIX}/{folder}", "fileName": filename,
+            "type": "AzureBlobStorageLocation", "container": container,
+            "folderPath": f"{prefix}/{folder}", "fileName": filename,
         }
         properties = {
             "description": ADF_OWNER, "annotations": [ADF_OWNER], "type": kind,
@@ -259,13 +269,14 @@ def build_datafactory_definitions(target: Target, *, factory_name: str) -> dict:
         "description": ADF_OWNER, "annotations": [ADF_OWNER], "concurrency": 1, "activities": activities,
     }}
     return {
-        "factory_id": factory_id, "pipeline_name": PIPELINE_NAME, "container": CONTAINER,
-        "prefix": PREFIX, "index_name": INDEX_NAME, "document_url": document_url,
+        "factory_id": factory_id, "pipeline_name": PIPELINE_NAME, "container": container,
+        "storage": target.storage_summary(legacy=CONTAINER),
+        "prefix": prefix, "index_name": INDEX_NAME, "document_url": document_url,
         "linked_services": linked_services, "datasets": datasets, "pipeline": pipeline,
         "data_source": {
             "name": DATA_SOURCE_NAME, "description": ADF_OWNER, "type": "azureblob",
             "credentials": {"connectionString": f"ResourceId={target.storage_id};"},
-            "container": {"name": CONTAINER, "query": f"{PREFIX}/knowledge/"},
+            "container": {"name": container, "query": f"{prefix}/knowledge/"},
         },
         "indexer": {
             "name": INDEXER_NAME, "description": ADF_OWNER, "dataSourceName": DATA_SOURCE_NAME,
@@ -338,6 +349,27 @@ def _ensure_owned_arm(session, resource_id, body, api_version) -> dict:
     return current
 
 
+def _selected_container(session, target, *, legacy, owner, apply=False):
+    container = target.resolve_container(legacy=legacy)
+    resource_id = f"{target.storage_id}/blobServices/default/containers/{container}"
+    body = {"properties": {"publicAccess": "None", "metadata": {"owner": owner}}}
+    if target.use_common_datalake_storage is None:
+        if apply:
+            _ensure_owned_arm(session, resource_id, body, STORAGE_API)
+        return resource_id, body
+    # An existing shared container need not be owned by this example. Never take
+    # ownership, create it implicitly, or change its metadata/public access.
+    try:
+        current = session.arm("GET", resource_id, api_version=STORAGE_API)
+    except AzureError as exc:
+        if exc.status == 404:
+            raise RuntimeError(f"Selected private container must already exist: {resource_id}; not creating it implicitly.") from None
+        raise
+    if current.get("properties", {}).get("publicAccess") not in (None, "None"):
+        raise ValueError("Selected storage container must already forbid anonymous access.")
+    return resource_id, body
+
+
 def _arm_collection(session, resource_id, api_version):
     page = session.arm("GET", resource_id, api_version=api_version)
     rows = list(page.get("value", []))
@@ -400,14 +432,15 @@ def _preflight(session, target, definitions):
         "type": "Managed", "managedVirtualNetwork": {"referenceName": "default"},
     }):
         raise ValueError("AutoResolveIntegrationRuntime must run in ADF managed VNet default.")
-    lake = _required_arm(session, f"{factory_id}/linkedservices/ls_storage_lake", ADF_API)
-    if not _contains_expected(lake.get("properties"), {
-        "type": "AzureBlobFS", "typeProperties": {
-            "url": f"https://{target.storage_name}.dfs.core.windows.net",
-            "credential": _reference(CREDENTIAL, "CredentialReference"),
-        },
-    }):
-        raise ValueError("Project storage linked service does not use the selected 2001 account and UAMI.")
+    if target.use_common_datalake_storage is None:
+        lake = _required_arm(session, f"{factory_id}/linkedservices/ls_storage_lake", ADF_API)
+        if not _contains_expected(lake.get("properties"), {
+            "type": "AzureBlobFS", "typeProperties": {
+                "url": f"https://{target.storage_name}.dfs.core.windows.net",
+                "credential": _reference(CREDENTIAL, "CredentialReference"),
+            },
+        }):
+            raise ValueError("Project storage linked service does not use the selected 2001 account and UAMI.")
     storage = _required_arm(session, target.storage_id, STORAGE_API)
     if (storage.get("properties", {}).get("publicNetworkAccess", "").lower() != "disabled"
             or storage.get("properties", {}).get("allowBlobPublicAccess") is not False):
@@ -430,7 +463,7 @@ def approve_storage_connection(session: AzureSession, target: Target, *,
     validate_target(target)
     prefix = target.storage_id + "/privateEndpointConnections/"
     if not connection_id.lower().startswith(prefix.lower()) or "/" in connection_id[len(prefix):]:
-        raise ValueError("The connection must be an immediate child of the selected 2001 storage account.")
+        raise ValueError("The connection must be an immediate child of the selected data storage account.")
     connection = session.arm("GET", connection_id, api_version=STORAGE_API)
     properties = connection["properties"]
     endpoint_id = properties.get("privateEndpoint", {}).get("id", "")
@@ -445,7 +478,8 @@ def approve_storage_connection(session: AzureSession, target: Target, *,
         status = connection["properties"]["privateLinkServiceConnectionState"]["status"]
     if status != "Approved":
         raise RuntimeError(f"Storage connection is {status}, not Approved; no rejected request is overridden.")
-    return {"connection_id": connection_id, "private_endpoint_id": endpoint_id, "status": status}
+    return {"connection_id": connection_id, "private_endpoint_id": endpoint_id, "status": status,
+            "storage": target.storage_summary(legacy=CONTAINER)}
 
 
 def configure_datafactory_ingestion(session: AzureSession, target: Target, *, factory_name: str) -> dict:
@@ -454,10 +488,7 @@ def configure_datafactory_ingestion(session: AzureSession, target: Target, *, fa
     require_private_endpoint(target.search_endpoint)
     search_principal = _preflight(session, target, definitions)
     factory_id = definitions["factory_id"]
-    container_id = f"{target.storage_id}/blobServices/default/containers/{CONTAINER}"
-    _ensure_owned_arm(session, container_id, {
-        "properties": {"publicAccess": "None", "metadata": {"owner": ADF_OWNER}},
-    }, STORAGE_API)
+    _selected_container(session, target, legacy=CONTAINER, owner=ADF_OWNER, apply=True)
     adf_link = _private_link(
         session, f"{factory_id}/managedVirtualNetworks/default/managedPrivateEndpoints",
         "aif-kaggle-storage-blob", target, search=False,
@@ -495,16 +526,17 @@ def configure_datafactory_ingestion(session: AzureSession, target: Target, *, fa
     return {
         "status": "configured" if ready else "awaiting-private-endpoint-approval",
         "factory_name": factory_name, "factory_id": factory_id, "pipeline_name": PIPELINE_NAME,
-        "index_name": INDEX_NAME, "container": CONTAINER, "prefix": PREFIX,
+        "index_name": INDEX_NAME, "container": definitions["container"], "prefix": definitions["prefix"],
+        "storage": target.storage_summary(legacy=CONTAINER),
         "project_identity_id": target.identity_id, "search_identity_principal_id": search_principal,
         "private_endpoints": [adf_link, search_link], "embeddings_required": False,
         "indexer_deferred_until_pipeline_success": True,
         "prerequisites": [
             "Project deployment must enable Data Factory with project UAMI, ls_cred_project_uami and managed VNet IR.",
-            "Approve ADF Blob managed private endpoint on project storage; approve the existing DFS endpoint if other lake workloads need it.",
-            "Approve Search Blob shared private link on project storage (Basic supports indexers WITHOUT skillsets).",
+            f"Approve ADF Blob managed private endpoint on {target.storage_id}; existing project DFS links are unchanged.",
+            f"Approve Search Blob shared private link on {target.storage_id} (Basic supports indexers WITHOUT skillsets).",
             f"Search system-assigned MI {search_principal} needs Storage Blob Data Reader on {target.storage_id}.",
-            "Project UAMI needs Storage Blob Data Contributor; operator needs ADF/artifact and Search configuration permissions.",
+            f"Project UAMI needs Storage Blob Data Contributor on {target.storage_id}/blobServices/default/containers/{definitions['container']}; operator needs ADF/artifact and Search configuration permissions.",
             "Managed IR needs outbound public HTTPS to Kaggle and its signed download redirect; Azure services stay private.",
             "Foundry project MI needs Search Index Data Reader and an independent private runtime path for MCP.",
         ],
@@ -581,7 +613,7 @@ def verify_datafactory_index(session: AzureSession, target: Target) -> dict:
     rows = response.get("value", [])
     if response.get("@odata.count") != len(expected) or len(rows) != len(expected):
         raise RuntimeError("Search does not contain the complete pinned knowledge corpus; not ready for IQ.")
-    document_url = f"https://{target.storage_name}.blob.core.windows.net/{CONTAINER}/{PREFIX}/knowledge/items.json"
+    document_url = f"https://{target.storage_name}.blob.core.windows.net/{target.resolve_container(legacy=CONTAINER)}/{storage_prefix(target)}/knowledge/items.json"
     seen = set()
     document_hashes = []
     keys = set()
@@ -612,6 +644,7 @@ def verify_datafactory_index(session: AzureSession, target: Target) -> dict:
     if not probe.get("value") or probe["value"][0].get("@search.rerankerScore") is None:
         raise RuntimeError("Semantic ranking failed or its quota is exhausted; no paid upgrade is performed.")
     return {"index_name": INDEX_NAME, "document_count": len(rows), "corpus_sha256_verified": True,
+            "storage": target.storage_summary(legacy=CONTAINER),
             "documents": document_hashes, "embeddings_required": False}
 
 
@@ -694,7 +727,8 @@ def poll_datafactory_ingestion(session: AzureSession, target: Target, *, factory
             time.sleep(3)
     return {
         "status": "ingested", "factory_name": factory_name, "pipeline_name": PIPELINE_NAME, "run_id": run_id,
-        "container": CONTAINER, "prefix": PREFIX, "blob_integrity": metadata,
+        "container": definitions["container"], "prefix": definitions["prefix"], "blob_integrity": metadata,
+        "storage": target.storage_summary(legacy=CONTAINER),
         "expected_raw_sha256": integrity_reference()["raw_sha256"],
         "raw_integrity_method": "pinned-byte-count-and-content-md5",
         "raw_sha256_computed_by_adf": False, "knowledge_kwargs": {"index_name": INDEX_NAME},

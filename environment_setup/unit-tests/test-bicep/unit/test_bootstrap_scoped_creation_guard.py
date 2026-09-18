@@ -16,6 +16,60 @@ BASH = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin"
 if not BASH.is_file():
     BASH = shutil.which("bash")
 
+CONTROL_LIBRARIES = (
+    "aifactory_private_dns.py", "aifactory_scaleset_config.py",
+    "aifactory_vpn_profile.py", "create-new-aifactory-scaleset.sh",
+    "factory_enrollment.py", "factory_enrollment_entry.py", "factory_lifecycle.py",
+    "layout_router.sh", "project_deployment.py", "project_environment.py",
+    "release_version.py", "release_version.sh",
+    "runner-prerequisites.ps1", "runner-prerequisites.sh",
+    "runner-registration.ps1", "runner-registration.sh",
+)
+
+
+@pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")
+@pytest.mark.parametrize("provider", ["ADO", "GHA"])
+@pytest.mark.parametrize("launcher", ["azurefactory.sh", "create-new-aifactory-scaleset.sh", "dispatcher"])
+@pytest.mark.parametrize("action", ["plan", "ensure"])
+@pytest.mark.parametrize("adapter_in_submodule", [False, True])
+def test_enrollment_wrappers_preserve_provider_arguments_and_exit_status(
+        tmp_path, provider, launcher, action, adapter_in_submodule):
+    root = tmp_path / "registered consumer"
+    library = root / "lib"
+    library.mkdir(parents=True)
+    shutil.copyfile(ROOT / "bootstrap/lib/layout_router.sh", library / "layout_router.sh")
+    selected_name = f"{provider}-{launcher if launcher != 'dispatcher' else 'create-new-aifactory-scaleset.sh'}"
+    shutil.copyfile(ROOT / "bootstrap" / selected_name, root / selected_name)
+    if launcher == "dispatcher":
+        selected_name = "ALL-create-new-aifactory-scaleset.sh"
+        shutil.copyfile(ROOT / "bootstrap" / selected_name, root / selected_name)
+    adapter_root = root / "azure-enterprise-scale-ml/bootstrap/lib" if adapter_in_submodule else library
+    adapter_root.mkdir(parents=True, exist_ok=True)
+    (adapter_root / "factory_enrollment_entry.py").write_text(
+        "import json, sys\nprint(json.dumps(sys.argv[1:]))\nsys.exit(3)\n", encoding="utf-8",
+    )
+    (root / "azurefactory").mkdir()
+    (root / "azurefactory/register.json").write_text('{"schema_version":2}', encoding="utf-8")
+    before = {str(path.relative_to(root)): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    arguments = [
+        action, "--consumer-root", str(root), "--factory-id", "fixture-factory",
+        "--scale-set-id", "fixture-scaleset", "--environment", "stage",
+        "--options", str(root / "approved options.json"),
+    ]
+    if action == "ensure":
+        arguments += ["--expected-plan", "a" * 64, "--yes", "--acknowledge-exclusive-writer-governance"]
+    env = {key: value for key, value in os.environ.items()
+           if not key.startswith(("AIF_", "AIFACTORY_")) and key not in ("BASH_ENV", "ENV", "SHELLOPTS")}
+    env["AIFACTORY_PYTHON"] = sys.executable
+    prefix = ["--orchestrator", provider.lower()] if launcher == "dispatcher" else []
+    result = subprocess.run(
+        [str(BASH), "--noprofile", "--norc", str(root / selected_name), *prefix, "enroll", *arguments],
+        cwd=root, env=env, input="", capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 3, result.stderr
+    assert json.loads(result.stdout) == [provider.lower(), *arguments]
+    assert before == {str(path.relative_to(root)): path.read_bytes() for path in root.rglob("*") if path.is_file()}
+
 
 @pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")
 @pytest.mark.parametrize("name,value", [
@@ -163,12 +217,7 @@ def test_start_installs_dual_layout_bundle_at_registered_root(register_workspace
     (source / "bootstrap/lib").mkdir(parents=True)
     shutil.copy2(ROOT / "00-start.sh", source / "00-start.sh")
     shutil.copy2(ROOT / "bootstrap/ui/terminal.sh", source / "bootstrap/ui/terminal.sh")
-    for name in (
-        "aifactory_private_dns.py", "aifactory_scaleset_config.py",
-        "aifactory_vpn_profile.py", "create-new-aifactory-scaleset.sh",
-        "factory_lifecycle.py", "layout_router.sh", "project_deployment.py",
-        "release_version.py", "release_version.sh",
-    ):
+    for name in CONTROL_LIBRARIES:
         shutil.copy2(ROOT / "bootstrap/lib" / name, source / "bootstrap/lib" / name)
     scripts = (
         "ADO-azurefactory.sh", "ADO-create-new-aifactory-scaleset.sh",
@@ -188,10 +237,9 @@ def test_start_installs_dual_layout_bundle_at_registered_root(register_workspace
     assert result.returncode == 0, result.stderr
     assert register.read_bytes() == before
     assert all((root / name).is_file() for name in scripts)
-    assert (root / "lib/layout_router.sh").is_file()
-    assert (root / "lib/factory_lifecycle.py").is_file()
-    assert (root / "lib/release_version.py").is_file()
-    assert (root / "lib/create-new-aifactory-scaleset.sh").is_file()
+    assert {path.name for path in (root / "lib").iterdir()} == set(CONTROL_LIBRARIES)
+    for name in CONTROL_LIBRARIES:
+        assert (root / "lib" / name).read_bytes() == (ROOT / "bootstrap/lib" / name).read_bytes()
     assert (root / "ui/terminal.sh").is_file()
     assert not (root / "aifactory").exists()
 
@@ -244,19 +292,16 @@ def test_launcher_bundle_round_trip_preserves_all_control_entrypoints(tmp_path):
         "GHA-update-aifactory-and-run-project.sh",
     ):
         assert (destination / name).read_bytes() == (ROOT / "bootstrap" / name).read_bytes()
-    for name in (
-        "aifactory_private_dns.py", "aifactory_scaleset_config.py",
-        "aifactory_vpn_profile.py", "create-new-aifactory-scaleset.sh",
-        "factory_lifecycle.py", "layout_router.sh", "project_deployment.py",
-        "release_version.py", "release_version.sh",
-    ):
+    assert {path.name for path in (snapshot / "lib").iterdir()} == set(CONTROL_LIBRARIES)
+    assert {path.name for path in (destination / "lib").iterdir()} == set(CONTROL_LIBRARIES)
+    for name in CONTROL_LIBRARIES:
         assert (destination / "lib" / name).read_bytes() == (
             ROOT / "bootstrap/lib" / name).read_bytes()
     assert (destination / "ui/terminal.sh").read_bytes() == (
         ROOT / "bootstrap/ui/terminal.sh").read_bytes()
     ignore = (destination / ".gitignore").read_text(encoding="utf-8")
-    assert "!/lib/layout_router.sh" in ignore
-    assert "!/lib/release_version.py" in ignore
+    for name in CONTROL_LIBRARIES:
+        assert "!/lib/" + name in ignore.splitlines()
     assert "!/ui/terminal.sh" in ignore
     assert ignore.startswith("/*\ncredentials.json\n")
     (destination / "lib/local-package.bin").write_bytes(b"ignored")
@@ -274,8 +319,29 @@ def test_launcher_bundle_round_trip_preserves_all_control_entrypoints(tmp_path):
         ["git", "-C", str(destination), "check-ignore", "--quiet",
          "credentials.json"]).returncode == 0
     template_ignore = (ROOT / "bootstrap/.gitignore.template").read_text(encoding="utf-8")
+    for name in CONTROL_LIBRARIES:
+        assert "!/lib/" + name in template_ignore.splitlines()
     assert "\n!/lib/\n/lib/*\n" in template_ignore
     assert "\n!lib/\n" not in template_ignore
+
+
+@pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")
+@pytest.mark.parametrize("missing", CONTROL_LIBRARIES)
+def test_incomplete_launcher_bundle_fails_before_snapshot(tmp_path, missing):
+    source = tmp_path / "source"
+    shutil.copytree(ROOT / "bootstrap", source, ignore=shutil.ignore_patterns("__pycache__"))
+    helper = source / "lib" / missing
+    helper.rename(helper.with_name(helper.name + ".unavailable"))
+    snapshot = tmp_path / "snapshot"
+    result = subprocess.run(
+        [str(BASH), "--noprofile", "--norc", "-c",
+         'source "$1/lib/layout_router.sh"; aif_snapshot_launcher_bundle "$2" "$3"',
+         "bundle-test", str(ROOT / "bootstrap"), str(source), str(snapshot)],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode != 0
+    assert "Complete dual-layout launcher bundle" in result.stderr
+    assert not snapshot.exists()
 
 
 @pytest.mark.skipif(not BASH, reason="Git Bash is unavailable")

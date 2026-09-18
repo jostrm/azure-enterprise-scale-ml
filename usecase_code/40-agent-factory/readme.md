@@ -1,5 +1,24 @@
 # Agent Factory implementation
 
+After changing storage selection, reconfigure and verify ingestion/knowledge and
+redeploy the affected agents. Invocation checks the stored deployment and knowledge
+selection rather than reporting a new account while retrieving from an old one.
+Index provenance checks cover the complete bounded corpus, not just one document.
+With explicit storage profiles, the ADF ingestion prefix includes a target-specific
+route suffix so its metadata writes cannot collide with the standalone worker or
+another project's ADF route in the shared container. implementation
+
+## AI Factory shared lake RAG example
+
+[45-rag-agent](45-rag-agent/readme.md) is the explicit end-to-end example for
+reading a pinned corpus from either common ADLS Gen2 or project Blob Storage.
+It preserves the existing `mlops/v1/master` and `mlops/v1/projects` physical
+paths, describing them as the **AI Factory shared lake**. ADF copies only the
+selected source into an isolated retrieval folder; Search and Foundry IQ serve
+separate, source-bound RAG agents. All examples inherit the storage selection
+below. Omitting it preserves existing `43-data` behavior. No per-user ACL
+filtering, binary extraction or lake rename is implied.
+
 This directory is a factory-neutral starter for persistent Foundry prompt agents,
 framework-based hosted agents, and a hosted multi-agent team that calls separately
 persisted knowledge and reviewer agents. Target names are discovered from ARM in
@@ -23,6 +42,79 @@ steps as a workaround; reviewers and hosted workers retain that limitation.
 - Multiple named targets are supported in configuration. Every mutation selects
   exactly one target; there is deliberately no implicit subscription/fleet-wide write.
   Ambiguous accounts/projects require an explicit `selection`.
+
+## One storage selection for every example
+
+`config.example.json` defaults **new** configurations to
+`"use_common_datalake_storage": false`. Replace its unresolved account/group
+placeholders with existing resources before running `plan`:
+
+```json
+{
+  "use_common_datalake_storage": false,
+  "storage_targets": {
+    "common": {
+      "account_name": "yourcommonlake",
+      "resource_group": "your-common-rg",
+      "container": "lake3"
+    },
+    "project": {
+      "account_name": "yourprojectdata",
+      "resource_group": "your-project-rg",
+      "container": "agent-factory"
+    }
+  }
+}
+```
+
+- `true` selects the explicit existing common-RG data account, with default
+  container `lake3`; `false` selects the explicit project-RG **data** account,
+  with default container `agent-factory`. Neither means local disk, Foundry
+  `1001` metadata storage, or AML workspace artifact storage.
+- Use actual JSON booleans. Strings such as `"false"`, numbers and `null` fail.
+  Account name and resource group are mandatory in the selected profile. The
+  group must match the corresponding group derived from `variables.json` or
+  overridden in the target's `selection`. No first-account/prefix guessing:
+  e.g. common accounts for multiple factories must be selected explicitly.
+- All targets inherit these root fields. Override under
+  `targets[i].selection.use_common_datalake_storage` and/or
+  `targets[i].selection.storage_targets`. Profiles merge **by field**, root
+  first, target second; other targets remain unchanged. For example,
+  `"selection": {"use_common_datalake_storage": true, "storage_targets":
+  {"common": {"container": "reviewed-data"}}}` inherits the common account/group.
+  Conflicting flat `storage_name`, `storage_resource_group` or
+  `storage_container` values are rejected.
+- Omitting the flag preserves legacy `2001` project discovery and legacy route
+  containers (`agent-factory`, `agent-factory-adf`, `agent-factory-rag`). Old
+  credential-free `target.json` files still load; regenerate them with
+  `discover --output target.json` to propagate a new selection to `43-data`.
+  A worker `--container` override must match the selected profile, never silently
+  redirect its writes. Custom profile containers apply to every route.
+- `41-single-agent` prompt/hosted frameworks and `42-multi-agent` consume the
+  selected ingestion/Foundry IQ path; no runtime-specific storage paths change.
+  `43-data` uploads, ADF linked services/datasets/private links and Search data
+  sources use the same account/group/container. `44-azure-mcp` inherits discovery
+  but its inventory/identity scope remains the **project** RG. Foundry, Search,
+  ADF and the project UAMI are never moved to the common RG.
+- `45-rag-agent/sources.example.json` omits storage location/account/container
+  so sources and isolated materializations inherit this selection. An explicit
+  source storage field must match the selected profile. Source formats, pinned
+  hashes, manifests and project audience checks still apply: selecting common
+  storage does not convert a knowledge array into a shared-lake snapshot.
+  Without the flag, retain all three explicit source storage fields as described
+  in the legacy RAG guide. Existing source paths are not renamed or migrated.
+
+This setting does not provision accounts, grant write permissions, change runtime
+cloud settings, or enable public access. In selected mode the private container
+must already exist; its metadata/ownership is not changed. Operators must arrange
+private connectivity, project-UAMI data permissions and Search MI read access on
+the **selected** account/container. Existing explicit `--apply` operations still
+configure owned ingestion/retrieval artifacts; incompatible old artifacts fail
+rather than being silently repointed. Re-run discovery, ingestion and knowledge
+verification after changing profiles; do not reuse old grounding journals.
+`plan` is offline; discovery and data/network verification are read-only cloud
+operations. Plans, target exports and storage results expose resource names,
+groups and containers, never credentials.
 
 ## Operator commands (PowerShell)
 
@@ -53,7 +145,7 @@ hub policy owner must retain all three Foundry zones in future remediations.
 The example configuration selects Data Factory ingestion. Enable Data Factory
 through the existing project pipeline first; its project UAMI and managed-VNet
 integration runtime must be present. Configure task-owned copy artifacts and
-approve only their two Blob private links (ADF and Search) on `2001` storage:
+approve only their two Blob private links (ADF and Search) on the selected storage:
 
 ```powershell
 .\.venv\Scripts\python.exe -m agent_factory configure-datafactory --config $config --apply
@@ -74,12 +166,13 @@ or silently deduplicate. See `43-data/datafactory-guide.txt`.
 Alternatively, run `43-data/worker.py` on already-approved Azure compute with the
 selected project UAMI attached. Local operator OAuth cannot impersonate a managed
 identity. This optional worker refuses unavailable UAMI authentication instead
-of falling back to your user account. It uses a separate container/index from
-ADF. Select a non-ADF ingestion mode only when intentionally using that path.
+of falling back to your user account. It uses a separate index and artifact
+subfolders from ADF (also a separate container in legacy mode). Select a non-ADF
+ingestion mode only when intentionally using that path.
 
 The pinned, public MIT Kaggle dataset is downloaded directly on that Azure host.
-It writes only to the project's `2001` data storage, never the `1001` Foundry
-metadata account. It preserves attribution and hashes, parses multiline CSV,
+It writes only to the selected data storage (legacy: project `2001`), never the
+`1001` Foundry metadata account. It preserves attribution and hashes, parses multiline CSV,
 deduplicates knowledge documents, and keeps evaluation questions/ground truth
 separate from the searchable knowledge.
 

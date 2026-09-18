@@ -1,0 +1,124 @@
+# Copy to .github/workflows/infra-project-dashboards.yml in the consumer.
+# Existing dev/stage/prod environments use the same OIDC secrets as infra-project:
+# AZURE_CLIENT_ID, TENANT_ID and vars.AZURE_SUBSCRIPTION_ID. No new identity or roles.
+# Requires PowerShell Core, Python 3.10+, Azure CLI and preinstalled Bicep.
+# Reads persistent nested variables.json unchanged; never exports its contents.
+name: infra-project-dashboards
+run-name: Dashboards ${{ inputs.environment }} project${{ inputs.project_number }} (${{ inputs.mode }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Selected GitHub environment (stage deploys Azure test)
+        type: choice
+        required: true
+        default: dev
+        options: [dev, stage, prod]
+      project_number:
+        description: Exact project number assertion
+        type: string
+        required: true
+        default: '001'
+      config_file:
+        description: Persistent consumer-relative variables.json (nested registered projects supported)
+        type: string
+        required: true
+        default: aifactory/variables.json
+      mode:
+        description: Plan is read-only; deploy explicitly refreshes dashboards and workbook
+        type: choice
+        required: true
+        default: plan
+        options: [plan, deploy]
+      runner_selection:
+        description: Runner selection (from-config reads the selected variables.json)
+        type: choice
+        required: true
+        default: from-config
+        options: [from-config, github-hosted, self-hosted, self-hosted-windows, self-hosted-linux]
+      factory_id:
+        description: Exact telemetry factory ID from the register (optional; no register publication needed)
+        type: string
+        required: false
+        default: ''
+      scale_set_id:
+        description: Exact telemetry scale set ID for the selected placement (optional)
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  configure:
+    name: Validate configuration and select runner (no Azure access)
+    runs-on: ubuntu-latest
+    outputs:
+      runs_on: ${{ steps.resolve.outputs.runs_on }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Resolve only allowlisted routing values
+        id: resolve
+        shell: pwsh
+        env:
+          CONSUMER_ROOT: ${{ github.workspace }}
+          CONFIG_FILE: ${{ inputs.config_file }}
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          PROJECT_NUMBER: ${{ inputs.project_number }}
+          RUNNER_SELECTION: ${{ inputs.runner_selection }}
+          FACTORY_ID: ${{ inputs.factory_id }}
+          SCALE_SET_ID: ${{ inputs.scale_set_id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+          if (-not $python) { $python = Get-Command python3 -CommandType Application -ErrorAction Stop }
+          $script = Join-Path $env:CONSUMER_ROOT 'azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-dashboards-only.py'
+          $scopeArgs = @()
+          if ($env:FACTORY_ID) { $scopeArgs += @('--factory-id', $env:FACTORY_ID) }
+          if ($env:SCALE_SET_ID) { $scopeArgs += @('--scale-set-id', $env:SCALE_SET_ID) }
+          & $python.Source $script --consumer-root $env:CONSUMER_ROOT --variables-json $env:CONFIG_FILE --environment $env:TARGET_ENVIRONMENT --project $env:PROJECT_NUMBER --ci-output github --runner-selection $env:RUNNER_SELECTION @scopeArgs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  dashboards:
+    name: Dashboard-only ${{ inputs.mode }}
+    needs: configure
+    environment: ${{ inputs.environment }}
+    runs-on: ${{ fromJSON(needs.configure.outputs.runs_on) }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Sign in with the existing environment OIDC identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify exact account and refresh dashboards only
+        shell: pwsh
+        env:
+          CONSUMER_ROOT: ${{ github.workspace }}
+          CONFIG_FILE: ${{ inputs.config_file }}
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          PROJECT_NUMBER: ${{ inputs.project_number }}
+          DASHBOARD_MODE: ${{ inputs.mode }}
+          FACTORY_ID: ${{ inputs.factory_id }}
+          SCALE_SET_ID: ${{ inputs.scale_set_id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+          if (-not $python) { $python = Get-Command python3 -CommandType Application -ErrorAction Stop }
+          $script = Join-Path $env:CONSUMER_ROOT 'azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-dashboards-only.py'
+          $scopeArgs = @()
+          if ($env:FACTORY_ID) { $scopeArgs += @('--factory-id', $env:FACTORY_ID) }
+          if ($env:SCALE_SET_ID) { $scopeArgs += @('--scale-set-id', $env:SCALE_SET_ID) }
+          & $python.Source $script --consumer-root $env:CONSUMER_ROOT --variables-json $env:CONFIG_FILE --environment $env:TARGET_ENVIRONMENT --project $env:PROJECT_NUMBER --mode $env:DASHBOARD_MODE @scopeArgs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

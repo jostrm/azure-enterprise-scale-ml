@@ -7,7 +7,7 @@ import sys
 
 from .azure import ARM, AzureSession
 from .catalog import agent_catalog
-from .config import FactoryConfig
+from .config import FactoryConfig, Target, storage_selection
 from .discovery import discover, select_one
 from .network import private_endpoint_checks, repair_foundry_dns
 
@@ -26,7 +26,7 @@ def load_selection(path: Path, key: str | None, *, variables_file: Path | None =
     selected = candidates[0]
     variables = variables_file.resolve() if variables_file is not None else (path.parent / selected["variables_file"]).resolve()
     environment = selected.get("environment", "dev")
-    config = FactoryConfig.load(variables, environment, selected.get("selection"))
+    config = FactoryConfig.load(variables, environment, storage_selection(settings, selected.get("selection", {})))
     document = json.loads(variables.read_text(encoding="utf-8-sig"))
     values = document[environment] if environment in document else document["stage_prod"]
     return settings, config, values
@@ -58,6 +58,26 @@ def summarize_response(response, spec: dict) -> dict:
             "tool_calls": calls}
 
 
+def validate_invocation_storage(state: Path, target: Target, spec: dict) -> None:
+    if target.use_common_datalake_storage is None:
+        return
+    deployment_path = state / "deployment.json"
+    if not deployment_path.is_file():
+        raise RuntimeError("Deploy and verify the agent for this storage selection before invocation.")
+    deployment = json.loads(deployment_path.read_text(encoding="utf-8"))
+    if (Target(**deployment["target"]) != target
+            or spec["name"] not in {item["name"] for item in deployment.get("completed", [])}):
+        raise RuntimeError("Deployment journal uses another storage selection; explicitly reconfigure and deploy.")
+    if spec.get("grounding") or spec.get("knowledge_tool"):
+        path = state / "knowledge.json"
+        if not path.is_file():
+            raise RuntimeError("Configure and verify knowledge for this storage selection before invocation.")
+        knowledge = json.loads(path.read_text(encoding="utf-8"))
+        if (knowledge.get("retrieval_verified") is not True or knowledge.get("storage") != target.storage_summary()
+                or not str(knowledge.get("connection_id", "")).startswith(target.project_id + "/connections/")):
+            raise RuntimeError("Knowledge journal uses another storage selection; explicitly reconfigure and verify.")
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
         description="OAuth-only, single-target AI Factory agent provisioning.",
@@ -82,7 +102,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--timeout-seconds", type=int, default=900)
     result.add_argument("--data-factory", help="Explicit Data Factory name when more than one exists in the selected group.")
     result.add_argument("--run-id", help="Resume a specific existing Data Factory ingestion run.")
-    result.add_argument("--connection-id", help="Exact pending private connection ID under the selected 2001 storage.")
+    result.add_argument("--connection-id", help="Exact pending private connection ID under the selected data storage.")
     result.add_argument("--private-endpoint-id", help="Exact requester private endpoint ID read from that connection.")
     return result
 
@@ -113,20 +133,25 @@ def run(args: argparse.Namespace) -> dict | list:
         raise ValueError(f"{args.command} requires --apply. Use plan/discover/preflight first.")
     session = AzureSession(config.subscription_id, config.tenant_id)
     target = discover(config, session)
+
+    def report(result):
+        legacy = "agent-factory-adf" if settings.get("ingestion", {}).get("mode") == "datafactory" else "agent-factory"
+        return {"storage": target.storage_summary(legacy=legacy), **result}
+
     if args.command == "discover":
         return target.to_dict()
     if args.command == "repair-dns":
-        return repair_foundry_dns(
+        return report(repair_foundry_dns(
             session, target, dns_subscription_id=values["privDnsSubscription_param"],
             dns_resource_group=values["privDnsResourceGroup_param"], apply=args.apply,
-        )
+        ))
     state = args.config.parent / ".agent-factory" / target.account_name / target.project_name
     if args.command == "repair-azure-mcp-dns":
         from .mcp_control import build_mcp_plan
         from .mcp_connection import repair_mcp_dns
-        return repair_mcp_dns(
+        return report(repair_mcp_dns(
             session, target, build_mcp_plan(target, settings.get("azure_mcp", {})), apply=args.apply,
-        )
+        ))
     azure_tool = None
     if args.command in {"configure-azure-mcp", "verify-azure-mcp"} or (args.command == "deploy" and tool_profile == "expanded-readonly"):
         from .mcp_control import build_mcp_plan
@@ -138,7 +163,7 @@ def run(args: argparse.Namespace) -> dict | list:
         )
         if args.command == "configure-azure-mcp":
             write_json(state / "azure-mcp-connection.json", mcp)
-            return mcp
+            return report(mcp)
         if not mcp["connection_ready"]:
             raise RuntimeError("Run configure-azure-mcp --apply before deploying expanded agents.")
         if args.command == "verify-azure-mcp":
@@ -156,7 +181,7 @@ def run(args: argparse.Namespace) -> dict | list:
                 )
             mcp.update(verify_mcp_tool_response(response, target))
             write_json(state / "azure-mcp-connection.json", mcp)
-            return mcp
+            return report(mcp)
         verification = json.loads((state / "azure-mcp-connection.json").read_text(encoding="utf-8"))
         if (verification.get("tool_call_verified") is not True
                 or verification.get("connection_id") != mcp["connection_id"]
@@ -167,9 +192,9 @@ def run(args: argparse.Namespace) -> dict | list:
         from .datafactory import approve_storage_connection
         if not args.connection_id or not args.private_endpoint_id:
             raise ValueError("Approval requires explicit --connection-id and --private-endpoint-id.")
-        return approve_storage_connection(
+        return report(approve_storage_connection(
             session, target, connection_id=args.connection_id, expected_private_endpoint_id=args.private_endpoint_id,
-        )
+        ))
     if args.command.endswith("-datafactory"):
         from .datafactory import (
             ADF_API, configure_datafactory_ingestion, poll_datafactory_ingestion,
@@ -189,7 +214,7 @@ def run(args: argparse.Namespace) -> dict | list:
             return result
         ingestion_path = state / "ingestion.json"
         saved = json.loads(ingestion_path.read_text(encoding="utf-8")) if ingestion_path.exists() else {}
-        if saved and (saved.get("target") != target.to_dict() or saved.get("factory_name") != factory_name):
+        if saved and (Target(**saved["target"]) != target or saved.get("factory_name") != factory_name):
             raise RuntimeError("Saved ingestion run belongs to a different target or Data Factory.")
         if args.command == "start-datafactory":
             if saved.get("status") == "running":
@@ -216,9 +241,9 @@ def run(args: argparse.Namespace) -> dict | list:
                                  audience="https://ai.azure.com")
         indexes = session.request("GET", f"{target.search_endpoint}/indexes?api-version=2025-09-01",
                                   audience="https://search.azure.com")
-        return {"target": target.to_dict(), "network": checks, "foundry_access": True,
+        return report({"target": target.to_dict(), "network": checks, "foundry_access": True,
                 "search_indexes": [item["name"] for item in indexes["value"]],
-                "agent_count_on_page": len(agents.get("data", agents.get("value", [])))}
+                "agent_count_on_page": len(agents.get("data", agents.get("value", [])))})
     if args.command == "ingest":
         from .data import ingest
         return ingest(target)
@@ -230,7 +255,7 @@ def run(args: argparse.Namespace) -> dict | list:
             if not ingestion_path.exists():
                 raise RuntimeError("Run and verify Data Factory ingestion before configuring Foundry IQ.")
             ingestion = json.loads(ingestion_path.read_text(encoding="utf-8"))
-            if (ingestion.get("target") != target.to_dict() or ingestion.get("status") != "ingested"
+            if (Target(**ingestion["target"]) != target or ingestion.get("status") != "ingested"
                     or ingestion.get("corpus_sha256_verified") is not True):
                 raise RuntimeError("Data Factory ingestion is not verified for the selected target.")
             knowledge_kwargs = ingestion["knowledge_kwargs"]
@@ -238,6 +263,10 @@ def run(args: argparse.Namespace) -> dict | list:
         result.update(verify_retrieval(session, target, args.input or "How do I reset my password?"))
         write_json(state / "knowledge.json", result)
         return result
+    if args.command == "invoke":
+        if len(catalog) != 1 or not args.input:
+            raise ValueError("invoke requires exactly one --agent and --input.")
+        validate_invocation_storage(state, target, catalog[0])
     from .prompt import deploy_prompt, project_client
     with project_client(session, target) as project:
         if args.command == "invoke":
@@ -245,7 +274,7 @@ def run(args: argparse.Namespace) -> dict | list:
                 raise ValueError("invoke requires exactly one --agent and --input.")
             with project.get_openai_client(agent_name=catalog[0]["name"]) as client:
                 response = client.responses.create(input=args.input, store=False)
-                return summarize_response(response, catalog[0])
+                return report(summarize_response(response, catalog[0]))
         if args.command == "deploy":
             selected = [item for item in catalog
                         if item["kind"] == "prompt" or args.include_hosted or args.agent]
@@ -256,9 +285,12 @@ def run(args: argparse.Namespace) -> dict | list:
                     target.project_id + "/connections/"
                 ):
                     raise RuntimeError("Configure and verify Foundry IQ for this exact target before deploying its grounded agent.")
+                if (target.use_common_datalake_storage is not None
+                        and knowledge.get("storage") != target.storage_summary()):
+                    raise RuntimeError("Foundry IQ journal uses another storage selection; reconfigure and verify explicitly.")
             deployment_path = state / "deployment.json"
             previous = json.loads(deployment_path.read_text(encoding="utf-8")) if deployment_path.exists() else {}
-            if previous and previous.get("target") != target.to_dict():
+            if previous and Target(**previous["target"]) != target:
                 raise RuntimeError("Deployment state belongs to a different target or resource configuration.")
             inventory = {item["name"]: item for item in previous.get("completed", [])}
             results = []
@@ -276,7 +308,7 @@ def run(args: argparse.Namespace) -> dict | list:
                     "completed_this_run": results,
                     "requested": [item["name"] for item in selected],
                 })
-            return {"target": target.to_dict(), "agents": results}
+            return report({"target": target.to_dict(), "agents": results})
     raise ValueError(f"Unsupported command: {args.command}")
 
 

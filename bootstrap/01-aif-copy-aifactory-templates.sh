@@ -11,12 +11,26 @@ fi
 source "$AIF_UI_LIBRARY"
 
 # New storage initialization never enters the legacy copier (which replaces folders).
-layout_mode="${1:---auto}"
-if [[ "$#" -gt 1 || ( "$layout_mode" != "--auto" && "$layout_mode" != "--legacy-templates" &&
-                     "$layout_mode" != "--init-azurefactory" ) ]]; then
-    aif_error "Usage: $0 [--auto|--init-azurefactory|--legacy-templates]" >&2
-    exit 2
-fi
+layout_mode="--auto"
+no_delete=false
+mode_selected=false
+for argument in "$@"; do
+    case "$argument" in
+        --no-delete)
+            [[ "$no_delete" == "false" ]] || { aif_error "Duplicate --no-delete"; exit 2; }
+            no_delete=true
+            ;;
+        --auto|--legacy-templates|--init-azurefactory)
+            [[ "$mode_selected" == "false" ]] || { aif_error "Select only one layout mode"; exit 2; }
+            layout_mode="$argument"
+            mode_selected=true
+            ;;
+        *)
+            aif_error "Usage: $0 [--auto|--init-azurefactory|--legacy-templates] [--no-delete]" >&2
+            exit 2
+            ;;
+    esac
+done
 if [[ "$layout_mode" != "--init-azurefactory" ]]; then
     aif_require_legacy_workspace "$PWD" || exit 1
     if [[ -e "$PWD/azurefactory" || -L "$PWD/azurefactory" ]]; then
@@ -24,7 +38,7 @@ if [[ "$layout_mode" != "--init-azurefactory" ]]; then
         exit 2
     fi
 fi
-if [[ "$layout_mode" != "--legacy-templates" ]]; then
+if [[ "$layout_mode" != "--legacy-templates" || "$no_delete" == "true" ]]; then
     for initializer in "$AIF_UI_DIR/lib/initialize_azurefactory.py" \
                        "$AIF_UI_DIR/azure-enterprise-scale-ml/bootstrap/lib/initialize_azurefactory.py"; do
         [[ ! -f "$initializer" ]] || break
@@ -53,7 +67,52 @@ if [[ -L "$PWD/aifactory" || ( -e "$PWD/aifactory" && ! -d "$PWD/aifactory" ) ]]
     aif_error "A symbolic-link or non-directory aifactory is not a legacy bootstrap destination." >&2
     exit 1
 fi
-aif_banner "TEMPLATE SYNC" "Infrastructure / Automation / Use-case code"
+# Check the distributable inputs before replacing any existing template copies.
+start_dir="azure-enterprise-scale-ml"
+api_source="$start_dir/environment_setup"
+api_assets=(
+    "azurefactory-cli/.gitignore"
+    "azurefactory-cli/readme.md"
+    "azurefactory-cli/pyproject.toml"
+    "azurefactory-cli/setup.py"
+    "azurefactory-cli/src/azurefactory"
+    "azurefactory-cli/tests"
+    "install_config_wizard/api-usage-examples/.gitignore"
+    "install_config_wizard/api-usage-examples/readme.md"
+    "install_config_wizard/api-usage-examples/scenarios.json"
+    "install_config_wizard/api-usage-examples/python"
+    "install_config_wizard/api-usage-examples/powershell"
+    "install_config_wizard/api-usage-examples/node"
+    "install_config_wizard/api-usage-examples/requests"
+    "install_config_wizard/api-usage-examples/tests"
+)
+for api_asset in "${api_assets[@]}"; do
+    api_path="$api_source/$api_asset"
+    case "$api_asset" in
+        */.gitignore|*.md|*.toml|*.json|*/setup.py) api_type="-f" ;;
+        *) api_type="-d" ;;
+    esac
+    if [[ -L "$api_path" ]] || ! test "$api_type" "$api_path"; then
+        aif_error "CLI/API source is missing or linked: $api_path. Update the shared submodule before copying templates." >&2
+        exit 1
+    fi
+done
+if [[ "$no_delete" == "true" ]]; then
+    safe_copier="$(dirname "$initializer")/bootstrap_no_delete.py"
+    [[ -f "$safe_copier" ]] || { aif_error "Missing bootstrap/lib/bootstrap_no_delete.py"; exit 1; }
+    PYTHONDONTWRITEBYTECODE=1 "${python_command[@]}" "$safe_copier" templates \
+        --source "$PWD/$start_dir" --root "$PWD" --layout-mode="${layout_mode#--}" \
+        --api-assets "${api_assets[@]}" || exit 1
+    aif_complete "Non-deleting template refresh finished. Existing configuration and .gitignore are preserved."
+    aif_info "No factory was registered. To initialize separately: bash ./01-aif-copy-aifactory-templates.sh --init-azurefactory"
+    aif_info "Old files not present in the source remain; review them before using templates."
+    exit 0
+fi
+if ! command -v find >/dev/null 2>&1 || ! command -v tar >/dev/null 2>&1; then
+    aif_error "The find and tar utilities are required to copy CLI/API sources without local runtime artifacts." >&2
+    exit 1
+fi
+aif_banner "TEMPLATE SYNC" "Infrastructure / Automation / Use-case code / CLI and API"
 
 ################### VARIABLES ###################
 copy_notebooks=false
@@ -80,9 +139,6 @@ else
     rm -rf "$aif_dir"
     mkdir -p "$aif_dir"
 fi
-
-# Copy template files
-start_dir="azure-enterprise-scale-ml"
 
 ## TEMPLATES: DataOps, MLOps, GenAIOps
 if [ "$copy_notebooks" = true ]; then
@@ -111,7 +167,7 @@ if [ "$init_esml_util" = true ]; then
 fi
 
 ## TEMPLATES: infra orchestration (pipelines) - ADO (Bicep)
-aif_step "02/05" "Azure DevOps pipelines and GitHub workflows"
+aif_step "02/06" "Azure DevOps pipelines and GitHub workflows"
 
 mkdir -p "$aif_dir/esml-infra/azure-devops/bicep/yaml/"
 cp -r "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/"* "$aif_dir/esml-infra/azure-devops/bicep/yaml/"
@@ -124,7 +180,7 @@ mkdir -p "$aif_dir/esml-infra/github-actions/terraform/"
 cp -r "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"* "$aif_dir/esml-infra/github-actions/terraform/"
 
 ## TEMPLATES: automation (core-team runbooks, FinOps showback/token reports, etc.)
-aif_step "03/05" "Automation and Azure dashboards"
+aif_step "03/06" "Automation and Azure dashboards"
 mkdir -p "$aif_dir/automation/"
 cp -r "$start_dir/environment_setup/aifactory/bicep/copy_to_local_settings/automation/." "$aif_dir/automation/"
 
@@ -133,7 +189,7 @@ mkdir -p "$aif_dir/esml-infra/azure_dashboards/"
 cp -r "$start_dir/environment_setup/aifactory/azure_dashboards/." "$aif_dir/esml-infra/azure_dashboards/"
 
 ## UseCase Code - Copy to root level (including dotfiles like .env.template)
-aif_step "04/05" "Use-case code and environment templates"
+aif_step "04/06" "Use-case code and environment templates"
 usecase_code_dir="$current_dir/aifactory-usecase-code"
 rm -rf "$usecase_code_dir"
 mkdir -p "$usecase_code_dir"
@@ -142,8 +198,27 @@ cp -r "$start_dir/usecase_code/." "$usecase_code_dir/"
 # Git Ignore
 cp "$start_dir/bootstrap/.gitignore.template" "$start_dir/../.gitignore"
 
+## CLI and API examples keep the same relative layout as environment_setup.
+aif_step "05/06" "Azure Factory CLI, Python SDK and API usage examples"
+if ! (
+    set -o pipefail
+    cd "$api_source" || exit 1
+    find "${api_assets[@]}" \
+        \( -type d \( -name '.*' -o -name '__pycache__' -o -name 'node_modules' \
+            -o -name 'build' -o -name 'dist' -o -name 'venv' -o -name '*.egg-info' \) -prune \) -o \
+        \( -type f \( -name '*.py' -o -name '*.mjs' -o -name '*.ps1' -o -name '*.json' \
+            -o -name '*.toml' -o -name '*.md' -o -name '.gitignore' \) \
+            \( ! -name '.*' -o -name '.gitignore' \) \
+            ! -name '*.receipt.json' ! -name '*.review.json' ! -name '*.private.json' -print0 \) |
+        tar -cf - --null -T - |
+        tar -xf - -C "$aif_dir"
+); then
+    aif_error "CLI/API template copy failed. Resolve the file error and rerun; no API operation was started." >&2
+    exit 1
+fi
+
 ## Config wizard placeholder
-aif_step "05/05" "Configuration wizard directory"
+aif_step "06/06" "Configuration wizard directory"
 mkdir -p "$aif_dir/config-wizard"
 echo "# Placeholder folder for the AI Factory configuration wizard" > "$aif_dir/config-wizard/readme.md"
 

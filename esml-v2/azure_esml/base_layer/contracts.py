@@ -54,6 +54,10 @@ class MLBackend(ABC):
         """Create a missing credentialless store or verify an identical existing one."""
 
     @abstractmethod
+    def get_datastore(self, name: str) -> dict:
+        """Read datastore binding metadata without provisioning or changing it."""
+
+    @abstractmethod
     def register_data(self, definition: dict) -> dict:
         """Register an explicit immutable data version, or reuse matching metadata."""
 

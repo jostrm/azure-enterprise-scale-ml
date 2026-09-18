@@ -1,5 +1,63 @@
 # ML MODEL FACTORY
 
+## Choose common or project data storage
+
+Set `use_common_datalake_storage` to the JSON boolean `true` for the common
+datalake, or `false` for the data account in the project resource group (not
+local disk and not the AML workspace's artifact account). Merge
+[`storage-selection.example.json`](storage-selection.example.json) into the
+project discovery JSON, runtime JSON, or standalone lake configuration:
+
+```json
+{
+  "use_common_datalake_storage": false,
+  "storage_targets": {
+    "common": {
+      "account_name": "examplecommonlake",
+      "resource_group": "example-common-dev",
+      "container": "lake3",
+      "datastore": "esml_shared_lake"
+    },
+    "project": {
+      "account_name": "exampleprojectdata",
+      "resource_group": "example-project001-dev",
+      "container": "ml-model-factory",
+      "datastore": "ml_model_factory"
+    }
+  }
+}
+```
+
+Use actual, existing accounts and identity-based AML datastores. No selection
+is made by taking the first account in a resource group; the older `mrvel`
+account must not be substituted for the configured common account.
+Resource-group checks reject a project/common scope mismatch. Keep `resource_group`
+as the project's AML group and optionally set `common_resource_group` explicitly.
+
+All scenarios and batch/online/streaming templates share this resolver: Azure ML
+SDK/CLI rendering, lake publication, Databricks lake bindings, monitoring and ADF
+lake-bound run parameters use the selected account/container/datastore. Local
+Kaggle source paths remain local. A configured data URI is retargeted only when
+it belongs to one of the supplied profiles; unknown cloud paths and opaque data
+asset references fail instead of silently reading another account. Prefer an
+account-independent `input_path` object key when switching frequently.
+
+```powershell
+python -m ml_model_factory storage-target --config runtime.local.json
+python -m ml_model_factory discover --project project.json --output runtime.local.json
+```
+
+Changing the flag requires re-rendering saved jobs/schedules. Submission refuses
+a job still bound to the other datastore and checks the selected datastore's
+actual account/container. Existing configurations without the flag retain their
+previous explicit storage behavior. `"false"` is not accepted as a boolean.
+This is configuration, **not data migration or resource provisioning**: copy or
+publish the intended input release to the chosen location, and arrange its
+private connectivity/RBAC/ACL access separately. Streaming checkpoints still need
+a supported HNS/ABFS or UC-Volume backend; selecting a non-HNS project account
+does not turn it into Gen2. Registered models, Foundry resources and compute stay
+in the project resource group.
+
 # How is the folder structure of these AI Factory ML templates ordered
 Evertyihng are generic templates. Not hardcoded examples. You can simply change to your data, and it will work - or prefferlby use the usecase_code\40-agent-factory to build ML-models from these templates.
 

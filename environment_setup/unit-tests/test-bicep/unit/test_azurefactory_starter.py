@@ -256,7 +256,8 @@ class TestStarterBootstrapRouting(StarterWorkspace):
         super().setUp()
         self.source = self.workspace / "azure-enterprise-scale-ml"
         for relative in ("01-aif-copy-aifactory-templates.sh", "ui/terminal.sh",
-                         "lib/initialize_azurefactory.py", "templates/azurefactory/register.json"):
+                         "lib/initialize_azurefactory.py", "lib/bootstrap_no_delete.py",
+                         "templates/azurefactory/register.json"):
             destination = self.source / "bootstrap" / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(BOOTSTRAP / relative, destination)
@@ -284,6 +285,222 @@ class TestStarterBootstrapRouting(StarterWorkspace):
             path.mkdir(parents=True)
             (path / "example.txt").write_text("fixture", encoding="utf-8")
         (self.source / "bootstrap" / ".gitignore.template").write_text("fixture", encoding="utf-8")
+        for relative in ("environment_setup/azurefactory-cli",
+                         "environment_setup/install_config_wizard/api-usage-examples"):
+            shutil.copytree(ROOT / relative, self.source / relative,
+                            ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache", ".venv",
+                                                        "*.egg-info", "build", "dist", ".local"))
+
+    def run_no_delete(self, *args, script=None):
+        audit = self.workspace / "audit"
+        audit.mkdir(exist_ok=True)
+        if not (audit / "sitecustomize.py").exists():
+            (audit / "sitecustomize.py").write_text(
+                "import sys\n"
+                "def no_removal(event, args):\n"
+                "    if event in {'os.remove', 'os.rmdir', 'shutil.rmtree'}:\n"
+                "        raise RuntimeError('FORBIDDEN_REMOVAL: ' + event)\n"
+                "sys.addaudithook(no_removal)\n", encoding="utf-8")
+        command = (
+            'rm() { echo FORBIDDEN_RM >&2; return 99; }; '
+            'rmdir() { echo FORBIDDEN_RMDIR >&2; return 99; }; '
+            'gh() { echo FORBIDDEN_CLOUD >&2; return 99; }; '
+            'az() { echo FORBIDDEN_CLOUD >&2; return 99; }; '
+            'export -f rm rmdir gh az; bash "$@"'
+        )
+        return subprocess.run(
+            [str(BASH), "--noprofile", "--norc", "-c", command, "no-delete-test",
+             str(script or self.script), "--no-delete", *args],
+            cwd=self.workspace, env=dict(self.env, PYTHONPATH=str(audit)), input="",
+            capture_output=True, text=True, timeout=60)
+
+    def prepare_start_bundle(self):
+        shutil.copytree(BOOTSTRAP, self.source / "bootstrap", dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache"))
+        script = self.source / "00-start.sh"
+        shutil.copyfile(ROOT / script.name, script)
+        return script
+
+    def test_no_delete_start_backs_up_dirty_bundle_and_installs_both_helpers(self):
+        script = self.prepare_start_bundle()
+        dirty = {
+            "ADO-azurefactory.sh": b"my changed launcher\n",
+            "lib/layout_router.sh": b"my changed router\n",
+            "ui/terminal.sh": b"my changed terminal\n",
+            "01-aif-copy-aifactory-templates.sh": b"my changed copier\n",
+        }
+        preserved = {
+            ".github/workflows/infra-common.yml": b"my workflow",
+            ".gitignore": b"private-config.json\n",
+            "aifactory/variables.json": b'{"dev":{"existing":"configuration"}}',
+        }
+        for relative, content in {**dirty, **preserved}.items():
+            path = self.workspace / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        result = self.run_no_delete(script=script)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("FORBIDDEN_", result.stdout + result.stderr)
+        self.assertNotIn("Choose your orchestrator", result.stdout)
+        self.assertIn("--init-azurefactory", result.stdout)
+        backups = list((self.workspace / ".aifactory-backups").iterdir())
+        self.assertEqual(len(backups), 1)
+        for relative, content in dirty.items():
+            self.assertEqual((backups[0] / relative).read_bytes(), content)
+            self.assertEqual((self.workspace / relative).read_bytes(), (BOOTSTRAP / relative).read_bytes())
+        for relative, content in preserved.items():
+            self.assertEqual((self.workspace / relative).read_bytes(), content)
+        for relative in ("02-ADO-YAML-bootstrap-files.sh", "03-ADO-YAML-bootstrap-files-no-var-overwrite.sh",
+                         "02-GH-bootstrap-files.sh", "03-GH-bootstrap-files-no-env-overwrite.sh",
+                         "lib/bootstrap_no_delete.py", "lib/initialize_azurefactory.py",
+                         "lib/factory_lifecycle_contract.txt", "templates/azurefactory/register.json"):
+            self.assertTrue((self.workspace / relative).is_file(), relative)
+        self.assertFalse(self.target.exists())
+        result = self.run_no_delete(script=script)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(list((self.workspace / ".aifactory-backups").iterdir()), backups)
+
+    def test_no_delete_start_checks_complete_bundle_before_overwriting(self):
+        script = self.prepare_start_bundle()
+        missing = self.source / "bootstrap/GHA-azurefactory.sh"
+        missing.rename(missing.with_suffix(".missing"))
+        before = self.snapshot()
+        result = self.run_no_delete(script=script)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Complete dual-layout launcher bundle", result.stderr)
+        for relative, value in before.items():
+            self.assertEqual(self.snapshot()[relative], value)
+        self.assertFalse((self.workspace / "ADO-azurefactory.sh").exists())
+        self.assertFalse((self.workspace / ".aifactory-backups").exists())
+
+    def test_no_delete_start_at_registered_root_refreshes_only_control_bundle(self):
+        script = self.prepare_start_bundle()
+        self.write_register(json.dumps(populated_document(), indent=4))
+        before = self.snapshot()
+        result = self.run_no_delete(script=script)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Template copy remains blocked", result.stdout)
+        for relative in ("azurefactory/register.json", "aifactory-templates/keep.txt",
+                         "aifactory-usecase-code/keep.txt"):
+            self.assertEqual(self.snapshot()[str(Path(relative))], before[str(Path(relative))])
+
+    def test_no_delete_refresh_preserves_sentinels_and_versions_for_all_modes(self):
+        self.prepare_template_sources()
+        templates = self.workspace / "aifactory-templates"
+        preserved = {
+            ".gitignore": b"my private ignore rules",
+            "aifactory/variables.json": b'{"dev":{"existing":"value"}}',
+            "aifactory-templates/keep.txt": b"template sentinel",
+            "aifactory-usecase-code/keep.txt": b"usecase sentinel",
+            "aifactory-templates/config-wizard/readme.md": b"my wizard notes",
+            "aifactory-templates/azurefactory-cli/.gitignore": b"my CLI ignore rules",
+        }
+        changed = (
+            "aifactory-templates/esml-infra/azure-devops/bicep/yaml/example.txt",
+            "aifactory-usecase-code/example.txt",
+            "aifactory-templates/azurefactory-cli/src/azurefactory/cli.py",
+            "aifactory-templates/install_config_wizard/api-usage-examples/python/inspect_factory.py",
+        )
+        for relative, content in preserved.items():
+            path = self.workspace / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        previous_backups = set()
+        staged = templates / "azurefactory/register.json"
+        for mode in ((), ("--auto",), ("--legacy-templates",)):
+            with self.subTest(mode=mode):
+                for relative in changed:
+                    path = self.workspace / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(b"my modified version")
+                register_before = (staged.read_bytes(), staged.stat().st_mtime_ns) if staged.exists() else None
+                result = self.run_no_delete(*mode)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn("FORBIDDEN_", result.stdout + result.stderr)
+                backups = set((self.workspace / ".aifactory-backups").iterdir())
+                self.assertEqual(len(backups - previous_backups), 1)
+                backup = (backups - previous_backups).pop()
+                previous_backups = backups
+                for relative in changed:
+                    self.assertEqual((backup / relative).read_bytes(), b"my modified version")
+                    self.assertNotEqual((self.workspace / relative).read_bytes(), b"my modified version")
+                for relative, content in preserved.items():
+                    self.assertEqual((self.workspace / relative).read_bytes(), content)
+                self.assertFalse(self.target.exists())
+                self.assertEqual(STARTER.read_document(staged), STARTER.EMPTY_DOCUMENT)
+                if register_before:
+                    self.assertEqual((staged.read_bytes(), staged.stat().st_mtime_ns), register_before)
+        result = self.run_script("--init-azurefactory")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(STARTER.read_document(self.target / "register.json"), STARTER.EMPTY_DOCUMENT)
+        for relative, content in preserved.items():
+            self.assertEqual((self.workspace / relative).read_bytes(), content)
+
+    def test_no_delete_direct_and_installed_copiers_ship_api_without_runtime_artifacts(self):
+        script = self.prepare_start_bundle()
+        self.prepare_template_sources()
+        result = self.run_no_delete(script=script)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        source_cli = self.source / "environment_setup/azurefactory-cli"
+        for relative in ("src/azurefactory/saved.receipt.json", "tests/.local/private.json",
+                         "src/azurefactory/__pycache__/cached.py"):
+            path = source_cli / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("not distributable", encoding="utf-8")
+        for copier in (self.source / "bootstrap" / self.script.name, self.script):
+            result = self.run_no_delete("--legacy-templates", script=copier)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((self.workspace / "aifactory-templates/azurefactory").exists())
+        cli = self.workspace / "aifactory-templates/azurefactory-cli"
+        for relative in ("setup.py", "src/azurefactory/cli.py", "src/azurefactory/enrollment.py",
+                         "src/azurefactory/configuration.py", "src/azurefactory/_vendor/__init__.py"):
+            self.assertEqual((cli / relative).read_bytes(), (source_cli / relative).read_bytes(), relative)
+        self.assertFalse((cli / "src/azurefactory/saved.receipt.json").exists())
+        self.assertFalse((cli / "tests/.local").exists())
+        self.assertFalse((cli / "src/azurefactory/__pycache__").exists())
+
+    def test_no_delete_refuses_unsafe_layout_and_type_conflicts_without_overwrite(self):
+        self.prepare_template_sources()
+        conflict = self.workspace / "aifactory-templates/esml-infra"
+        conflict.write_text("existing file, not a directory", encoding="utf-8")
+        before = self.snapshot()
+        result = self.run_no_delete()
+        self.assertNotEqual(result.returncode, 0)
+        for relative, value in before.items():
+            self.assertEqual(self.snapshot()[relative], value)
+        self.assertFalse((self.workspace / ".aifactory-backups").exists())
+        self.target.mkdir()
+        for mode in ((), ("--auto",), ("--legacy-templates",)):
+            result = self.run_no_delete(*mode)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("refuses mixed/new roots", result.stderr)
+
+    def test_no_delete_preserves_nonempty_staged_register_on_failure(self):
+        self.prepare_template_sources()
+        register = self.workspace / "aifactory-templates/azurefactory/register.json"
+        register.parent.mkdir()
+        for document in ("{", json.dumps(populated_document())):
+            register.write_text(document, encoding="utf-8")
+            before = self.snapshot()
+            result = self.run_no_delete()
+            self.assertNotEqual(result.returncode, 0)
+            for relative, value in before.items():
+                self.assertEqual(self.snapshot()[relative], value)
+            self.assertFalse((self.workspace / ".aifactory-backups").exists())
+
+    def test_no_delete_refuses_linked_destination_without_changing_its_target(self):
+        self.prepare_template_sources()
+        original = self.workspace / "original.txt"
+        original.write_bytes(b"preserve linked user file")
+        destination = self.workspace / "aifactory-usecase-code/example.txt"
+        os.link(original, destination)
+        before = self.snapshot()
+        result = self.run_no_delete()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Hard-linked", result.stderr)
+        for relative, value in before.items():
+            self.assertEqual(self.snapshot()[relative], value)
+        self.assertFalse((self.workspace / ".aifactory-backups").exists())
 
     def test_explicit_init_and_central_script_paths_only_initialize_register(self):
         before = self.snapshot()
@@ -384,6 +601,91 @@ class TestStarterBootstrapRouting(StarterWorkspace):
                 self.assertFalse(self.target.exists())
                 self.assertTrue((self.workspace / "aifactory-templates" / "config-wizard" / "readme.md").is_file())
                 self.assertEqual((self.workspace / "aifactory-templates" / "azurefactory").exists(), not args)
+
+    def test_cli_and_api_sources_are_copied_for_each_template_mode(self):
+        self.prepare_template_sources()
+        for args in ((), ("--auto",), ("--legacy-templates",)):
+            with self.subTest(args=args):
+                result = self.run_script(*args)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                templates = self.workspace / "aifactory-templates"
+                for relative in (
+                    "azurefactory-cli/.gitignore", "azurefactory-cli/readme.md",
+                    "azurefactory-cli/pyproject.toml", "azurefactory-cli/setup.py",
+                    "azurefactory-cli/src/azurefactory/cli.py",
+                    "azurefactory-cli/src/azurefactory/enrollment.py",
+                    "azurefactory-cli/src/azurefactory/configuration.py",
+                    "azurefactory-cli/src/azurefactory/_vendor/__init__.py",
+                    "azurefactory-cli/src/azurefactory/review.py", "azurefactory-cli/tests/test_reviews.py",
+                    "install_config_wizard/api-usage-examples/.gitignore",
+                    "install_config_wizard/api-usage-examples/readme.md",
+                    "install_config_wizard/api-usage-examples/python/inspect_factory.py",
+                    "install_config_wizard/api-usage-examples/powershell/Request-AzureFactory.ps1",
+                    "install_config_wizard/api-usage-examples/node/request.mjs",
+                    "install_config_wizard/api-usage-examples/requests/01-create-factory.json",
+                    "install_config_wizard/api-usage-examples/scenarios.json",
+                ):
+                    copied = templates / relative
+                    source = self.source / "environment_setup" / relative
+                    self.assertEqual(copied.read_bytes(), source.read_bytes(), relative)
+                examples = templates / "install_config_wizard" / "api-usage-examples"
+                self.assertTrue((examples / "../../azurefactory-cli/readme.md").is_file())
+                self.assertTrue((templates / "azurefactory-cli/../install_config_wizard/api-usage-examples/readme.md").is_file())
+                for copied in (templates / "azurefactory-cli", examples):
+                    self.assertFalse((copied / ".venv").exists())
+                self.assertIn("CLI, Python SDK and API usage examples", result.stdout)
+
+    def test_cli_api_copy_excludes_runtime_artifacts_and_refreshes_stale_files(self):
+        self.prepare_template_sources()
+        cli = self.source / "environment_setup" / "azurefactory-cli"
+        examples = self.source / "environment_setup" / "install_config_wizard" / "api-usage-examples"
+        excluded = [
+            cli / ".venv" / "sensitive.py",
+            cli / "src" / "azurefactory" / "__pycache__" / "cached.py",
+            cli / "tests" / ".local" / "private.json",
+            cli / "src" / "azurefactory" / "saved.receipt.json",
+            examples / ".local" / "bootstrap.json",
+            examples / "requests" / "saved.review.json",
+            examples / "requests" / "saved.private.json",
+            examples / "node" / "node_modules" / "dependency.mjs",
+            examples / "python" / ".env",
+        ]
+        for path in excluded:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("do-not-copy", encoding="utf-8")
+        (cli / "operator-config.json").write_text("not a distributable root asset", encoding="utf-8")
+        result = self.run_script("--legacy-templates")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        templates = self.workspace / "aifactory-templates"
+        for path in excluded:
+            relative = path.relative_to(self.source / "environment_setup")
+            self.assertFalse((templates / relative).exists(), relative)
+        self.assertFalse((templates / "azurefactory-cli/operator-config.json").exists())
+        stale = templates / "azurefactory-cli/src/azurefactory/removed.py"
+        stale.write_text("stale template", encoding="utf-8")
+        result = self.run_script("--legacy-templates")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(stale.exists())
+
+    def test_missing_cli_api_source_fails_before_replacing_templates(self):
+        self.prepare_template_sources()
+        (self.source / "environment_setup" / "azurefactory-cli" / "pyproject.toml").unlink()
+        before = self.snapshot()
+        result = self.run_script("--legacy-templates")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CLI/API source is missing", result.stderr)
+        self.assertEqual(before, self.snapshot())
+
+    def test_failed_cli_api_archive_is_reported_without_success_banner(self):
+        self.prepare_template_sources()
+        result = subprocess.run(
+            [str(BASH), "--noprofile", "--norc", "-c",
+             'tar() { return 73; }; export -f tar; bash "$AIF_TEST_COPY_SCRIPT" --legacy-templates'],
+            cwd=self.workspace, env=dict(self.env, AIF_TEST_COPY_SCRIPT=self.script.as_posix()),
+            capture_output=True, text=True, timeout=30)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CLI/API template copy failed", result.stderr)
+        self.assertNotIn("Template copy finished", result.stdout)
 
     def test_populated_or_malformed_staged_register_blocks_copy_unchanged(self):
         self.prepare_template_sources()

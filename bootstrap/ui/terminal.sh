@@ -68,15 +68,21 @@ aif_warn() { aif_emit WARN "$@"; }
 aif_error() { aif_emit ERROR "$@"; }
 
 aif_require_legacy_workspace() {
-    local cursor
+    local cursor register_path
     cursor="$(realpath -m -- "$1")" || return 1
-    while [[ -n "$cursor" ]]; do
-        if [[ -e "$cursor/azurefactory/register.json" || -L "$cursor/azurefactory/register.json" ||
+    while [[ -n "$cursor" && "$cursor" != "/" ]]; do
+        if [[ ( "${cursor##*/}" != "aifactory-templates" &&
+                ( -e "$cursor/azurefactory/register.json" || -L "$cursor/azurefactory/register.json" ) ) ||
               ( "${cursor##*/}" == "azurefactory" && ( -e "$cursor/register.json" || -L "$cursor/register.json" ) ) ]]; then
-            aif_error "azurefactory/register.json is canonical register storage, not a legacy bootstrap destination. Use the authenticated catalog UI/API with exact factory, scale set and project IDs, or bootstrap/AIFactory-lifecycle.sh with its reviewed scoped manifest. Legacy ADO/GHA create scripts require a separate destination; they do not register factories." >&2
+            if [[ "${cursor##*/}" == "azurefactory" ]]; then
+                register_path="$cursor/register.json"
+            else
+                register_path="$cursor/azurefactory/register.json"
+            fi
+            aif_error "Registered layout detected at $register_path; azurefactory/register.json is canonical register storage, not a legacy bootstrap destination. Use the authenticated catalog UI/API with exact factory, scale set and project IDs, or bootstrap/AIFactory-lifecycle.sh with its reviewed scoped manifest. Legacy ADO/GHA create scripts require a separate destination; they do not register factories." >&2
             return 1
         fi
-        [[ "$cursor" != "/" && "$cursor" != "$(dirname -- "$cursor")" ]] || break
+        [[ "$cursor" != "$(dirname -- "$cursor")" ]] || break
         cursor="$(dirname -- "$cursor")"
     done
 }

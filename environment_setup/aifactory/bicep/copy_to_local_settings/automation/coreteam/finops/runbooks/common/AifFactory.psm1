@@ -111,6 +111,11 @@ function ConvertTo-ReportHtml {
         $t = [regex]::Replace($t, '`([^`]+)`', '<code>$1</code>')
         $t = [regex]::Replace($t, '\*\*([^*]+)\*\*', '<strong>$1</strong>')
         $t = [regex]::Replace($t, '(?<!\*)\*(?!\*)([^*\n]+?)\*(?!\*)', '<em>$1</em>')
+        $t = [regex]::Replace($t, '\[([^\]\r\n]+)\]\((https://portal\.azure\.com/[A-Za-z0-9%/#@_.:-]+)(?: "([^"]*)")?\)', {
+            param($match)
+            $tooltip = [System.Net.WebUtility]::HtmlEncode($match.Groups[3].Value)
+            return '<a href="' + $match.Groups[2].Value + '" title="' + $tooltip + '" rel="noopener noreferrer">' + $match.Groups[1].Value + '</a>'
+        })
         return $t
     }
 
@@ -158,16 +163,79 @@ function ConvertTo-ReportHtml {
     Flush-Quote
     if ($inTable) { [void]$sb.Append('</table>') }
 
+    $safeTitle = [System.Net.WebUtility]::HtmlEncode($Title)
     @"
-<!doctype html><html><head><meta charset='utf-8'><title>$Title</title>
-<style>body{font-family:Segoe UI,Arial;margin:32px;color:#222;line-height:1.45}
-h1{border-bottom:2px solid #444;padding-bottom:4px}h2{margin-top:24px}
+<!doctype html><html><head><meta charset='utf-8'><title>$safeTitle</title>
+<script>
+  (() => {
+    const param = new URLSearchParams(window.location.search).get("scoutTheme");
+    const theme =
+      param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  })();
+</script>
+<style>
+:root {
+  color-scheme: light;
+  --cp-bg: #f7f4ef;
+  --cp-bg-elevated: #fcfbf8;
+  --cp-surface: #ffffff;
+  --cp-surface-soft: #f5f5f5;
+  --cp-border: #dedede;
+  --cp-border-strong: #919191;
+  --cp-text: #242424;
+  --cp-text-muted: #5c5c5c;
+  --cp-text-soft: #6f6f6f;
+  --cp-accent: #b11f4b;
+  --cp-accent-hover: #9a1a41;
+  --cp-accent-soft: rgba(177, 31, 75, 0.08);
+  --cp-accent-fg: #ffffff;
+  --cp-success: #16a34a;
+  --cp-danger: #dc2626;
+  --cp-warning: #f59e0b;
+  --cp-link: #0078d4;
+  --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+  --cp-overlay: rgba(255, 255, 255, 0.8);
+  --cp-panel: rgba(255, 255, 255, 0.86);
+  --cp-panel-strong: rgba(255, 255, 255, 0.96);
+  --cp-sheen: rgba(255, 255, 255, 0.55);
+  --cp-highlight: rgba(177, 31, 75, 0.12);
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --cp-bg: #3d3b3a;
+  --cp-bg-elevated: #343231;
+  --cp-surface: #292929;
+  --cp-surface-soft: #2e2e2e;
+  --cp-border: #474747;
+  --cp-border-strong: #5f5f5f;
+  --cp-text: #dedede;
+  --cp-text-muted: #919191;
+  --cp-text-soft: #b0b0b0;
+  --cp-accent: #fd8ea1;
+  --cp-accent-hover: #fb7b91;
+  --cp-accent-soft: rgba(253, 142, 161, 0.14);
+  --cp-accent-fg: #1a1a1a;
+  --cp-success: #4ade80;
+  --cp-danger: #f87171;
+  --cp-warning: #fbbf24;
+  --cp-link: #4da6ff;
+  --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  --cp-overlay: rgba(41, 41, 41, 0.88);
+  --cp-panel: rgba(41, 41, 41, 0.72);
+  --cp-panel-strong: rgba(41, 41, 41, 0.96);
+  --cp-sheen: rgba(255, 255, 255, 0.04);
+  --cp-highlight: rgba(253, 142, 161, 0.12);
+}
+body{font-family:"Segoe UI",Aptos,Calibri,-apple-system,BlinkMacSystemFont,sans-serif;margin:32px;background:var(--cp-bg);color:var(--cp-text);line-height:1.45}
+h1{border-bottom:2px solid var(--cp-accent);padding-bottom:4px}h2{margin-top:24px}
 table{border-collapse:collapse;margin:12px 0;width:100%;font-size:14px}
-th,td{border:1px solid #bbb;padding:6px 10px;text-align:left;vertical-align:top}
-th{background:#f2f4f7}tr td:nth-child(n+5){text-align:right}
-code{background:#f4f4f4;padding:1px 4px;border-radius:3px;font-family:Consolas,monospace;font-size:90%}
-blockquote{border-left:4px solid #ccc;margin:10px 0;padding:4px 14px;color:#555;background:#fafafa}
-hr{border:0;border-top:1px solid #ddd;margin:20px 0}</style></head><body>$($sb.ToString())</body></html>
+th,td{border:1px solid var(--cp-border);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:var(--cp-surface-soft)}tr td:nth-child(n+5){text-align:right}
+code{background:var(--cp-surface-soft);padding:4px;border-radius:0.625rem;font-family:Consolas,"Courier New",Courier,monospace;font-size:90%}
+blockquote{border-left:4px solid var(--cp-border-strong);margin:12px 0;padding:4px 16px;color:var(--cp-text-muted);background:var(--cp-surface)}
+a{color:var(--cp-link)}a:focus-visible{outline:2px solid var(--cp-accent)}
+hr{border:0;border-top:1px solid var(--cp-border);margin:20px 0}</style></head><body>$($sb.ToString())</body></html>
 "@
 }
 

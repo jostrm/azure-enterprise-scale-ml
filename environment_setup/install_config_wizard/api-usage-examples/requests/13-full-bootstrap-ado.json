@@ -1,0 +1,24 @@
+{
+  "launcher": "ADO-create-new-aifactory-scaleset.sh",
+  "orchestrator": "ado",
+  "config": {
+    "aifactory_version": "main",
+    "subscription_id": "${DEV_SUBSCRIPTION_ID}",
+    "tenant_id": "${TENANT_ID}",
+    "location": "swedencentral",
+    "factory_prefix": "central-",
+    "scale_set_number": "001",
+    "project_number": "001",
+    "repo_root": "${NEW_REPO_ROOT}",
+    "ado_organization": "${ADO_ORGANIZATION}",
+    "ado_project": "${ADO_PROJECT}",
+    "ado_repository": "${ADO_REPOSITORY}",
+    "ado_service_connection": "${ADO_SERVICE_CONNECTION}",
+    "team_member_email": "${TEAM_MEMBER_EMAIL}",
+    "team_group_name": "${TEAM_GROUP_NAME}",
+    "cost_center": "${COST_CENTER}",
+    "dev_vnet_cidr": "172.16.0.0/18",
+    "vpn_client_cidr": "172.31.240.0/24",
+    "setup_hub_access": false
+  }
+}

@@ -36,7 +36,7 @@ param(
     # --- Identity / scope ---
     [string]$SubscriptionId,
     [string]$TenantId,
-    [string]$ProjectNumber,
+    [string]$ProjectNumber = 'All',
     [string]$ProjectResourceGroup,
     [string]$CommonResourceGroup,
     # Project UAMI client id (mi-prj*). If empty -> Automation Account System MI.
@@ -111,6 +111,19 @@ function Format-Cost($Value) {
     if ($null -eq $Value) { return 'N/A' }
     return [math]::Round($Value,2)
 }
+function Get-ProjectCostLink([string]$Project, [string]$ResourceGroup) {
+    $subscription = [guid]::Empty
+    if ($DryRun -or -not $Project -or -not [guid]::TryParse($SubscriptionId, [ref]$subscription) -or $subscription -eq [guid]::Empty) { return $null }
+    if ($ResourceGroup -notmatch '^[A-Za-z0-9_().-]{1,90}$' -or $ResourceGroup.EndsWith('.') -or $ResourceGroup -eq 'All') { return $null }
+    $scope = "/subscriptions/$subscription/resourceGroups/$ResourceGroup"
+    $encodedScope = [uri]::EscapeDataString($scope)
+    return @{url="https://portal.azure.com/#blade/Microsoft_Azure_CostManagement/Menu/open/costanalysis/scope/$encodedScope"; tooltip="Go to Azure Cost analysis for project $Project"; scope=$scope}
+}
+if ($ProjectNumber -eq 'All') { $ProjectNumber = $null }
+if ($ProjectResourceGroup -eq 'All' -or $CommonResourceGroup -eq 'All') {
+    $reportFailure = 'All is a project filter, never an Azure resource-group identifier.'
+    throw $reportFailure
+}
 
 $sharedModule = "$PSScriptRoot/../common/AifFactory.psm1"
 if (Test-Path $sharedModule) {
@@ -184,7 +197,7 @@ if ($DryRun) {
     Write-ReportInfo "DRY-RUN: using sample data from config.showback.sampleProjects (no Azure calls)."
     $reportWarnings.Add('Sample costs only; no Azure authentication or queries were performed.')
     foreach ($p in $sb.sampleProjects) {
-        if ($ProjectNumber -and $p.projectNumber -ne $ProjectNumber) { continue }
+        if ($ProjectNumber -and [string]$p.projectNumber -cne $ProjectNumber) { continue }
         $projects.Add([pscustomobject]@{
             ResourceGroup = $(if ($ProjectResourceGroup) {$ProjectResourceGroup} else {$p.resourceGroup}); ProjectNumber = $p.projectNumber
             CostCenter = $p.costCenter; Owner = $p.owner
@@ -203,11 +216,11 @@ if ($DryRun) {
     foreach ($rg in $allRgs) {
         $m = [regex]::Match($rg.ResourceGroupName, $rgRegex)
         if (-not $m.Success -and -not $ProjectResourceGroup) { continue }
-        if ($ProjectNumber -and -not $ProjectResourceGroup -and $m.Groups['num'].Value -ne $ProjectNumber) { continue }
+        if ($ProjectNumber -and (-not $m.Success -or $m.Groups['num'].Value -cne $ProjectNumber)) { continue }
         $tags = $rg.Tags
         $matched[$rg.ResourceGroupName] = [pscustomobject]@{
             ResourceGroup = $rg.ResourceGroupName
-            ProjectNumber = $(if ($ProjectNumber) {$ProjectNumber} else {$m.Groups['num'].Value})
+            ProjectNumber = $m.Groups['num'].Value
             CostCenter    = if ($tags -and $tags['CostCenter']) { $tags['CostCenter'] } else { 'Unknown' }
             Owner         = if ($tags -and $tags['AIF-Project Owners']) { $tags['AIF-Project Owners'] } else { 'Unknown' }
             CurrentCost   = $null
@@ -247,12 +260,14 @@ if ($DryRun) {
         $iCost = [array]::IndexOf($cols, 'Cost')
         $iRg   = [array]::IndexOf($cols, 'ResourceGroupName')
         $iCurrency = [array]::IndexOf($cols, 'Currency')
-        if ($iCost -lt 0 -or $iRg -lt 0) { throw $reportFailure }
+        if ($iCost -lt 0 -or $iRg -lt 0 -or $iCurrency -lt 0) { throw $reportFailure }
         if (-not @($data.properties.rows).Count) { $reportWarnings.Add('Cost Management returned no rows for this period; costs may not yet be available.') }
         foreach ($row in $data.properties.rows) {
             $rgName = "$($row[$iRg])"
             if ($matched.ContainsKey($rgName)) {
-                $matched[$rgName].CurrentCost += [double]$row[$iCost]
+                $amount = [double]$row[$iCost]
+                if ([double]::IsNaN($amount) -or [double]::IsInfinity($amount)) { throw $reportFailure }
+                $matched[$rgName].CurrentCost += $amount
                 if ($iCurrency -ge 0 -and $row[$iCurrency] -ne $currency) { throw 'Billing currency does not match report configuration.' }
             }
         }
@@ -290,10 +305,15 @@ if ($DryRun) {
                 $fcols = @($fdata.properties.columns.name)
                 $fiCost = [array]::IndexOf($fcols, 'Cost')
                 $fiRg   = [array]::IndexOf($fcols, 'ResourceGroupName')
-                if ($fiCost -lt 0 -or $fiRg -lt 0 -or -not @($fdata.properties.rows).Count) { throw 'Forecast data is unavailable.' }
+                $fiCurrency = [array]::IndexOf($fcols, 'Currency')
+                if ($fiCost -lt 0 -or $fiRg -lt 0 -or $fiCurrency -lt 0 -or -not @($fdata.properties.rows).Count) { throw 'Forecast data is unavailable.' }
                 foreach ($row in $fdata.properties.rows) {
                     $rgName = "$($row[$fiRg])"
-                    if ($matched.ContainsKey($rgName)) { $matched[$rgName].ForecastCost += [double]$row[$fiCost] }
+                    if ($matched.ContainsKey($rgName)) {
+                        $amount = [double]$row[$fiCost]
+                        if ([double]::IsNaN($amount) -or [double]::IsInfinity($amount) -or $row[$fiCurrency] -ne $currency) { throw 'Forecast currency or amount is invalid.' }
+                        $matched[$rgName].ForecastCost += $amount
+                    }
                 }
                 $fcUri = if ($fdata.properties.PSObject.Properties['nextLink']) { $fdata.properties.nextLink } else { $null }
                 if ($fcUri) {
@@ -326,13 +346,15 @@ if (-not $forecastAvailable) { foreach ($p in $projects) { $p.ForecastCost = $nu
 $ordered = @($projects | Sort-Object ProjectNumber)
 $totalCurrent  = if ($ordered.Count) { ($ordered | Measure-Object -Property CurrentCost -Sum).Sum } else { $null }
 $totalForecast = if ($ordered.Count) { ($ordered | Measure-Object -Property ForecastCost -Sum).Sum } else { $null }
-if (-not $totalCurrent)  { $totalCurrent  = 0 }
+if ($ordered.Count -and -not $totalCurrent)  { $totalCurrent  = 0 }
 if (@($ordered | Where-Object {$null -eq $_.CurrentCost}).Count) { $totalCurrent = $null }
 if (-not $forecastAvailable -or @($ordered | Where-Object {$null -eq $_.ForecastCost}).Count) { $totalForecast = $null }
-elseif (-not $totalForecast) { $totalForecast = 0 }
+elseif ($ordered.Count -and -not $totalForecast) { $totalForecast = 0 }
 
 $rows = @(foreach ($p in $ordered) {
-    "| project$($p.ProjectNumber) | ``$($p.ResourceGroup)`` | $($p.CostCenter) | $($p.Owner) | $(Format-Cost $p.CurrentCost) | $(Format-Cost $p.ForecastCost) |"
+    $link = Get-ProjectCostLink $p.ProjectNumber $p.ResourceGroup
+    $label = if ($link) { "[project$($p.ProjectNumber)]($($link.url) `"$($link.tooltip)`")" } else { "project$($p.ProjectNumber)" }
+    "| $label | ``$($p.ResourceGroup)`` | $($p.CostCenter) | $($p.Owner) | $(Format-Cost $p.CurrentCost) | $(Format-Cost $p.ForecastCost) |"
 })
 
 # Cost-center rollup
@@ -351,6 +373,8 @@ $md = @"
 > Cost per AI Factory project / cost center for the **$periodLabel**, with an
 > optional forecast for the full month. Costs come from Azure Cost Management; project ownership and
 > cost center come from the ``CostCenter`` and ``AIF-Project Owners`` resource-group tags.
+> Data source: $(if ($DryRun) {'Sample fixture (not live billing or resource discovery).'} else {'Azure Cost Management (ActualCost and separate forecast); Azure Resource Manager (resource-group tags).'})
+> Calculation: sum returned Cost for matched resource groups in one billing currency after the project filter, then roll up by cost center. Forecast is never added to actual cost. All means all authorized collected projects within the configured factory/scaleset/environment naming pattern, not all tenant resources.
 
 ## Per-project showback
 
@@ -402,14 +426,20 @@ if (-not $NoUpload -and -not $DryRun -and ($OutputBlobStorageAccount -or ($sb -a
 }
 if ($ReportFormat -eq 'Json') {
     $tableRows = @($ordered | ForEach-Object { ,@($_.ProjectNumber,$_.ResourceGroup,$_.CostCenter,$_.Owner,$_.CurrentCost,$_.ForecastCost) })
+    $projectLinks = [object[]]::new($ordered.Count)
+    for ($i=0; $i -lt $ordered.Count; $i++) { $projectLinks[$i] = Get-ProjectCostLink $ordered[$i].ProjectNumber $ordered[$i].ResourceGroup }
+    $lineage = @{dataSource=$(if ($DryRun) {'Sample fixture (not live)'} else {'Cost Management; Azure Resource Manager'}); formula='Sum Cost after exact project/resource-group filtering in one currency; actual cost and forecast remain distinct'; inputs=@{currency=$currency; periodStart=$periodStart.ToString('o'); periodEnd=$periodEnd.ToString('o'); resourceGroups=@($ordered | ForEach-Object {$_.ResourceGroup}); costBasis='ActualCost'; forecastIncludesActualCost=$true}}
     [ordered]@{
         schema_version=1; report_type='showback'; source=$(if ($DryRun) {'sample'} else {'live'})
         generated_at=[datetime]::UtcNow.ToString('o')
         period=@{days=$LookbackDays; start=$periodStart.ToString('o'); end=$periodEnd.ToString('o'); actual_cost_window=$periodLabel; forecast_window='current full billing month'}
         target=@{subscription_id=$SubscriptionId; project_resource_group=$ProjectResourceGroup; common_resource_group=$commonRg; environment=$naming.env}
         status=$(if ($reportWarnings.Count) {'warning'} else {'completed'}); warnings=@($reportWarnings)
-        tables=@(@{title='Per-project showback'; columns=@('Project','Resource group','Cost center','Owner',"Current ($currency)","Forecast ($currency)"); rows=$tableRows})
-        charts=@(@{title='Project costs'; labels=@($ordered | ForEach-Object {$_.ProjectNumber}); series=@(
+        dataSource=$lineage.dataSource; lineage=$lineage
+        filters=@{aiFactory='All'; scaleset='All'; project=$(if ($ProjectNumber) {$ProjectNumber} else {'All'})}
+        scopeLimitation='All includes only authorized collected projects in the configured factory/scaleset/environment naming pattern.'
+        tables=@(@{title='Per-project showback'; dataSource=$lineage.dataSource; lineage=$lineage; rowLinks=$projectLinks; columns=@('Project','Resource group','Cost center','Owner',"Current ($currency)","Forecast ($currency)"); rows=$tableRows})
+        charts=@(@{title='Project costs'; dataSource=$lineage.dataSource; lineage=$lineage; labelLinks=$projectLinks; labels=@($ordered | ForEach-Object {$_.ProjectNumber}); series=@(
             @{name="Current ($currency)"; values=@($ordered | ForEach-Object {$_.CurrentCost})},
             @{name="Forecast ($currency)"; values=@($ordered | ForEach-Object {$_.ForecastCost})}
         )}); output=$md

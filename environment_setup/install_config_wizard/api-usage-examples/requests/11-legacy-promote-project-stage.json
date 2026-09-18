@@ -1,0 +1,8 @@
+{
+  "folder": "${LEGACY_FACTORY_FOLDER}",
+  "project_number": "001",
+  "source_environment": "dev",
+  "target_environment": "stage",
+  "operation": "deploy",
+  "patch": false
+}

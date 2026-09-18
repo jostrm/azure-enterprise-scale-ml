@@ -11,6 +11,8 @@
 //   Row 0-1:  [ Banner H1 — Project {N} · {ENV} · {REGION} ]                    (colSpan 12, rowSpan 2)
 //   Row 2-9:  [ Resources (RG) ][ Cost Analysis ]                                (6 + 6)
 //   Row 10:   [Foundry][Storage][KeyVault][AISearch]                             (1 + 1 + 1 + 1)
+//   Row 19-21: Optional My Project Usage & Cost workbook entry (existing rows preserved)
+//   Row 22-24: Optional native model-token report entry
 
 // ============================================================================
 // PARAMETERS
@@ -159,6 +161,27 @@ param projectBudget string = 'TBA'
 @description('Use case description — banner placeholder')
 param projectUseCase string = 'TBA'
 
+@description('Add the Azure-native My Project Usage & Cost workbook using existing telemetry only. No workspace, ingestion or roles are created.')
+param enableMyProjectDashboard bool = true
+@description('Override the existing project Application Insights ARM ID if it differs from naming outputs.')
+param myProjectApplicationInsightsResourceId string = ''
+@description('Override the existing common Log Analytics workspace ARM ID if it differs from naming outputs.')
+param myProjectLogAnalyticsResourceId string = ''
+@description('Optional exact canonical telemetry factory ID (opaque, may include paths/colons). Empty requires user selection; never inferred from RG naming.')
+param myProjectFactoryId string = ''
+@description('Optional exact canonical telemetry scale set ID. Empty requires user selection; no All scope.')
+param myProjectScaleSetId string = ''
+@description('Fixed telemetry environment. Deployment test maps to stage by default; override only to match actual instrumentation.')
+param myProjectTelemetryEnvironment string = env == 'test' ? 'stage' : env
+@description('Default workbook IANA time zone; local calendar boundaries are DST-aware.')
+param myProjectTimeZone string = 'Europe/Berlin'
+@description('Reviewed completeness keys: questions, devices, feedback, cart, bookings, cases, stateBaseline, metering, billing. All default false.')
+param myProjectCoverage object = {}
+@minValue(30)
+@maxValue(90)
+@description('Bounded baseline history in local dates ending at selected end. State coverage remains false unless a full baseline is reviewed.')
+param myProjectStateHistoryDays int = 90
+
 // ============================================================================
 // MODULE: NAMING CONVENTION
 // ============================================================================
@@ -266,8 +289,72 @@ var mandatoryServicesMarkdown = '- ${join(mandatoryServices, '\n- ')}'
 
 // Portal deep links
 var aiFoundryProjectUrl    = 'https://ai.azure.com/build/overview?tid=${tenant().tenantId}&wsid=${foundryAccountResId}/projects/${aifV2ProjectName}'
-var costAnalysisUrl        = 'https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${replace(rgResourceId, '/', '%2F')}'
+var costAnalysisUrl        = 'https://portal.azure.com/@${tenant().tenantId}/#blade/Microsoft_Azure_CostManagement/Menu/open/costanalysis/scope/${uriComponent(rgResourceId)}'
 var rgPortalUrl            = 'https://portal.azure.com/#@${tenant().tenantId}/resource${rgResourceId}'
+
+var projectInsightsId = empty(myProjectApplicationInsightsResourceId)
+  ? '${rgResourceId}/providers/Microsoft.Insights/components/${namingOutputs.applicationInsightName}'
+  : myProjectApplicationInsightsResourceId
+var projectWorkspaceId = empty(myProjectLogAnalyticsResourceId)
+  ? resourceId(subscriptionIdDevTestProd, commonResourceGroupName, 'Microsoft.OperationalInsights/workspaces', namingOutputs.laWorkspaceName)
+  : myProjectLogAnalyticsResourceId
+
+module myProjectWorkbook './myProjectWorkbook.bicep' = if (enableMyProjectDashboard) {
+  name: 'my-project-workbook-${uniqueString(resourceGroup().id, projectNumber, env)}'
+  params: {
+    location: location
+    projectNumber: projectNumber
+    env: env
+    telemetryEnvironment: myProjectTelemetryEnvironment
+    applicationInsightsResourceId: projectInsightsId
+    logAnalyticsResourceId: projectWorkspaceId
+    projectResourceGroupId: rgResourceId
+    factoryId: myProjectFactoryId
+    scaleSetId: myProjectScaleSetId
+    timeZone: myProjectTimeZone
+    coverage: myProjectCoverage
+    stateHistoryDays: myProjectStateHistoryDays
+    tags: tags
+  }
+}
+var myProjectEntryParts = enableMyProjectDashboard ? [
+  {
+    position: { x: 0, y: 19, colSpan: 12, rowSpan: 3 }
+    metadata: {
+      inputs: []
+      type: 'Extension/HubsExtension/PartType/MarkdownPart'
+      settings: {
+        content: {
+          settings: {
+            content: '## My Project ${projectNumber} — Usage & Cost\n\n[Open the Azure-native My Project workbook](${myProjectWorkbook!.outputs.url} "Usage, customer outcomes and separately attributed meter costs")\n\nRetail (default), Booking and Support share exact project-scoped usage and feedback metrics. Select canonical factory/scale set, inclusive local dates (1–30), IANA time zone and store. Coverage defaults to unavailable until reviewed; no sample data is shown.\n\n**Cost:** separate actual / allocated / estimated evidence and currencies, with session/day, pseudonymous IP-group/day and meter views. Not a real-time invoice or an automatic billing collector. [Native billed project Cost Analysis](${costAnalysisUrl}) remains independent.'
+            title: ''
+            subtitle: ''
+            markdownSource: 1
+            markdownUri: null
+          }
+        }
+      }
+    }
+  }
+  {
+    position: { x: 0, y: 22, colSpan: 12, rowSpan: 3 }
+    metadata: {
+      inputs: []
+      type: 'Extension/HubsExtension/PartType/MarkdownPart'
+      settings: {
+        content: {
+          settings: {
+            content: '## Model tokens — Foundry & Azure OpenAI\n\n[Open native model-token report](${myProjectWorkbook!.outputs.tokensUrl} "Per deployment and model: input, output and cached tokens")\n\n**Scope:** discovered AIServices/OpenAI accounts in this exact project RG. Native Azure Monitor Metrics totals and separate request-log detail by model deployment, model name/version, plus trends. No factory/scale-set selection, business-event coverage declaration or new instrumentation is required for native Metrics.\n\n**Source coverage:** missing cached series/fields = **Unavailable, not zero**. Input includes cached tokens; never add input + cached. Metric aliases and request-log totals are not added together. Counts are observed usage, not billable costs or an invoice.'
+            title: ''
+            subtitle: ''
+            markdownSource: 1
+            markdownUri: null
+          }
+        }
+      }
+    }
+  }
+] : []
 
 // ============================================================================
 // DASHBOARD RESOURCE
@@ -281,7 +368,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
     lenses: [
       {
         order: 0
-        parts: [
+        parts: concat([
           // ── ROW 0-1: Full-width H1 banner (project · env · region) ────────────
           {
             position: { x: 0, y: 0, colSpan: 12, rowSpan: 2 }
@@ -332,7 +419,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
               settings: {
                 content: {
                   settings: {
-                    content: '## 💰 Cost Analysis\n\nDetailed cost breakdown and trends for **${targetResourceGroup}**.\n\n**Quick Links:**\n- [📊 Open Cost Analysis](${costAnalysisUrl})\n- [🔔 Cost Alerts](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${replace(rgResourceId, '/', '%2F')}/alerts)\n- [💵 Budgets](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/budgets/scope/${replace(rgResourceId, '/', '%2F')})\n- [🧠 Azure Advisor — Cost Recommendations](https://portal.azure.com/#blade/Microsoft_Azure_Expert/AdvisorMenuBlade/Cost)\n\n---\n\n### 💡 Optimization Tips\n- Review **Azure Advisor** for right-sizing recommendations\n- Set **budget alerts** to monitor monthly spend\n- Identify and stop **idle compute / storage**\n- Use the **AzqrCostOptimizeAgent** skill for a full audit'
+                    content: '## 💰 Cost Analysis\n\nDetailed cost breakdown and trends for **${targetResourceGroup}**.\n\n**Data source:** Azure Cost Management. **Calculation:** none in this dashboard; the scoped Cost analysis view controls actual/amortized basis, period and currency. Estimates are not billed actuals. Missing cost data is unavailable, not zero.\n\n**Quick Links:**\n- [📊 Open Cost Analysis](${costAnalysisUrl} "Go to Azure Cost analysis for project ${projectNumber}")\n- [🔔 Cost Alerts](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${replace(rgResourceId, '/', '%2F')}/alerts)\n- [💵 Budgets](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/budgets/scope/${replace(rgResourceId, '/', '%2F')})\n- [🧠 Azure Advisor — Cost Recommendations](https://portal.azure.com/#blade/Microsoft_Azure_Expert/AdvisorMenuBlade/Cost)\n\n---\n\n### 💡 Optimization Tips\n- Review **Azure Advisor** for right-sizing recommendations\n- Set **budget alerts** to monitor monthly spend\n- Identify and stop **idle compute / storage**\n- Use the **AzqrCostOptimizeAgent** skill for a full audit'
                     title: ''
                     subtitle: ''
                     markdownSource: 1
@@ -430,7 +517,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
 
-        ]
+        ], myProjectEntryParts)
       }
     ]
     metadata: {
@@ -486,3 +573,9 @@ output aiFoundryUrl string = aiFoundryProjectUrl
 
 @description('Project name from naming convention')
 output projectName string = namingOutputs.projectName
+
+@description('Empty when My Project is disabled.')
+output myProjectWorkbookId string = enableMyProjectDashboard ? myProjectWorkbook!.outputs.id : ''
+output myProjectWorkbookName string = enableMyProjectDashboard ? myProjectWorkbook!.outputs.name : ''
+output myProjectWorkbookUrl string = enableMyProjectDashboard ? myProjectWorkbook!.outputs.url : ''
+output myProjectSourceIds object = enableMyProjectDashboard ? myProjectWorkbook!.outputs.sourceIds : {}

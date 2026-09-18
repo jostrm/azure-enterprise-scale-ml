@@ -107,6 +107,8 @@ def validate_scenario(value: dict, *, require_dataset: bool = False) -> dict:
 
 
 def validate_runtime(value: dict) -> dict:
+    from .storage_selection import resolve_storage_selection
+    value = resolve_storage_selection(value)
     for field in ("subscription_id", "tenant_id"):
         try:
             UUID(value.get(field, ""))

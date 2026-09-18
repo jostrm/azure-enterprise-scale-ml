@@ -5,12 +5,14 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -537,3 +539,169 @@ def test_modified_launcher_has_valid_bash_syntax(bash_executable):
         timeout=30, check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+WORKFLOWS = ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions"
+
+
+def project_workflow(name="infra-project.yml"):
+    return yaml.load((WORKFLOWS / name).read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+
+
+def resolve_project_runner(tmp_path, bash_executable, payload, *, selection="from-config",
+                           label="", legacy_label="", environment="dev"):
+    step = next(step for step in project_workflow()["jobs"]["configure"]["steps"] if step.get("id") == "runner")
+    config = tmp_path / "runner-config.json"
+    if payload is not None:
+        config.write_text(json.dumps(payload), encoding="utf-8")
+    output = tmp_path / "runner-output"
+    output.unlink(missing_ok=True)
+    env = os.environ | {
+        "CONFIG_FILE": str(config) if payload is not None else "",
+        "RUNNER_SELECTION": selection,
+        "SELF_HOSTED_RUNNER_LABEL": label,
+        "LEGACY_ADMIN_VM_RUNNER_LABEL": legacy_label,
+        "TARGET_ENVIRONMENT": environment,
+        "GITHUB_OUTPUT": str(output),
+    }
+    python = shlex.quote(sys.executable.replace("\\", "/"))
+    result = subprocess.run(
+        [bash_executable, "-c", f'python3() {{ {python} "$@"; }}\n' + step["run"]],
+        cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30,
+    )
+    values = dict(line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines()) if output.exists() else {}
+    return result, values
+
+
+@pytest.mark.parametrize("selection,config,expected", [
+    ("from-config", {}, "ubuntu-latest"),
+    ("", {"useSelfHostedBuildAgent": "true"}, ["self-hosted", "Windows", "aifactory-admin-vm"]),
+    ("from-config", {"useSelfHostedBuildAgent": True, "selfHostedRunnerOS": "linux"}, ["self-hosted", "Linux", "aifactory-admin-vm"]),
+    ("self-hosted", {}, ["self-hosted", "Windows", "aifactory-admin-vm"]),
+    ("self-hosted", {"selfHostedRunnerOS": "Linux"}, ["self-hosted", "Linux", "aifactory-admin-vm"]),
+    ("self-hosted-windows", {"selfHostedRunnerOS": "Linux"}, ["self-hosted", "Windows", "aifactory-admin-vm"]),
+    ("self-hosted-linux", {"selfHostedRunnerOS": "Windows"}, ["self-hosted", "Linux", "aifactory-admin-vm"]),
+    ("github-hosted", {"useSelfHostedBuildAgent": True, "selfHostedRunnerOS": "Linux"}, "ubuntu-latest"),
+])
+def test_actual_project_runner_resolver_selection(tmp_path, bash_executable, selection, config, expected):
+    result, output = resolve_project_runner(tmp_path, bash_executable, {"dev": config}, selection=selection)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(output["runs_on"]) == expected
+    assert output["use_self_hosted"] == str(isinstance(expected, list)).lower()
+
+
+@pytest.mark.parametrize("selection,expected_os", [("self-hosted", "Windows"), ("self-hosted-linux", "Linux")])
+def test_actual_runner_resolver_without_config_retains_legacy_label(
+        tmp_path, bash_executable, selection, expected_os):
+    result, output = resolve_project_runner(
+        tmp_path, bash_executable, None, selection=selection, legacy_label="legacy-vm")
+    assert result.returncode == 0, result.stderr
+    assert json.loads(output["runs_on"]) == ["self-hosted", expected_os, "legacy-vm"]
+
+
+@pytest.mark.parametrize("environment", ["stage", "prod"])
+@pytest.mark.parametrize("override", [{}, {"selfHostedRunnerOS": "Windows", "selfHostedRunnerLabel": "stage-vm"}])
+def test_actual_runner_resolver_uses_environment_config_and_dispatch_label(
+        tmp_path, bash_executable, environment, override):
+    payload = {"dev": {"useSelfHostedBuildAgent": True, "selfHostedRunnerOS": "Linux", "selfHostedRunnerLabel": "dev-vm"},
+               "stage_prod": override}
+    for label in ("", "explicit-vm"):
+        result, output = resolve_project_runner(
+            tmp_path, bash_executable, payload, environment=environment, label=label)
+        assert result.returncode == 0, result.stderr
+        assert json.loads(output["runs_on"]) == [
+            "self-hosted", override.get("selfHostedRunnerOS", "Linux"),
+            label or override.get("selfHostedRunnerLabel", "dev-vm"),
+        ]
+
+
+@pytest.mark.parametrize("runner_os", ["", "macOS", None, 42, ["Linux"]])
+def test_actual_runner_resolver_rejects_invalid_config_os(tmp_path, bash_executable, runner_os):
+    result, output = resolve_project_runner(
+        tmp_path, bash_executable, {"dev": {"selfHostedRunnerOS": runner_os}}, selection="self-hosted")
+    assert result.returncode != 0
+    assert "selfHostedRunnerOS must be Windows or Linux" in result.stderr
+    assert not output
+
+
+@pytest.mark.parametrize("selection,label", [("unknown", ""), ("self-hosted-linux", "label\nruns_on=spoof")])
+def test_actual_runner_resolver_rejects_invalid_selection_or_label(tmp_path, bash_executable, selection, label):
+    result, output = resolve_project_runner(tmp_path, bash_executable, None, selection=selection, label=label)
+    assert result.returncode != 0
+    assert not output
+
+
+@pytest.mark.parametrize("mode,os_type", [
+    ("self-hosted", "Windows"), ("self-hosted", "Linux"), ("github-hosted", ""),
+    ("self-hosted", ""), ("self-hosted", "unknown"),
+])
+def test_actual_bootstrap_dispatch_resolves_same_runner_os(tmp_path, bash_executable, mode, os_type):
+    launcher = shlex.quote(str(ROOT / "bootstrap/lib/create-new-aifactory-scaleset.sh").replace("\\", "/"))
+    script = f"""
+source {launcher}
+AIF_NO_WAIT=false; AIF_DRY_RUN=false; AIF_RUNNER_MODE={shlex.quote(mode)}; GHA_RUNNER_LABEL=fixture-vm
+aif_simple_stage() {{ :; }}
+aif_verify_common_resource_group() {{ :; }}
+aif_ensure_private_network_access() {{ :; }}
+aif_ensure_github_self_hosted_agent() {{ AIF_RUNNER_OS={shlex.quote(os_type)}; }}
+aif_deploy_simple_application_gateway() {{ :; }}
+aif_error() {{ echo "$*" >&2; }}
+gh() {{ echo UNEXPECTED_CLOUD_CALL >&2; return 99; }}
+az() {{ echo UNEXPECTED_CLOUD_CALL >&2; return 99; }}
+aif_run_github_workflow() {{
+  if [[ "$1" == infra-project.yml ]]; then shift 2; printf '%s\\n' "$@"; fi
+}}
+aif_deploy_github
+"""
+    result = subprocess.run(
+        [bash_executable, "-c", script], cwd=tmp_path, capture_output=True, text=True, timeout=30)
+    assert "UNEXPECTED_CLOUD_CALL" not in result.stderr
+    if mode == "self-hosted" and os_type not in {"Windows", "Linux"}:
+        assert result.returncode != 0
+        assert not result.stdout
+        return
+    assert result.returncode == 0, result.stderr
+    args = result.stdout.splitlines()
+    fields = dict(args[index + 1].split("=", 1) for index in range(0, len(args), 2))
+    assert fields["runner_selection"] in project_workflow()["on"]["workflow_dispatch"]["inputs"]["runner_selection"]["options"]
+    result, output = resolve_project_runner(
+        tmp_path, bash_executable, {"dev": {}}, selection=fields["runner_selection"],
+        label=fields["self_hosted_runner_label"])
+    assert result.returncode == 0, result.stderr
+    assert json.loads(output["runs_on"]) == (
+        ["self-hosted", os_type, "fixture-vm"] if mode == "self-hosted" else "ubuntu-latest")
+
+
+def test_project_runner_os_transport_preserves_workflow_input_budget():
+    workflow = project_workflow()
+    assert len(workflow["on"]["workflow_dispatch"]["inputs"]) <= 10
+    for job in ("deploy_infrastructure", "deploy_foundry"):
+        assert workflow["jobs"][job]["with"]["runs_on"] == "${{ needs.configure.outputs.runs_on }}"
+    phase = project_workflow("infra-project-phase.yml")
+    assert phase["jobs"]["deploy-project"]["runs-on"] == "${{ fromJSON(inputs.runs_on) }}"
+
+
+@pytest.mark.parametrize("expected_os,actual_os,missing_tool,success", [
+    ("Windows", "Windows", "", True), ("Linux", "Linux", "", True),
+    ("Windows", "Linux", "", False), ("Linux", "Windows", "", False),
+    ("macOS", "macOS", "", False), ("Linux", "Linux", "python", False),
+])
+def test_actual_project_phase_validates_runner_os(tmp_path, expected_os, actual_os, missing_tool, success):
+    pwsh = shutil.which("pwsh")
+    if not pwsh:
+        pytest.skip("PowerShell is required for offline project phase tests")
+    phase = project_workflow("infra-project-phase.yml")
+    step = next(s for s in phase["jobs"]["deploy-project"]["steps"] if s.get("name") == "Validate self-hosted runner")
+    script = (
+        "$ErrorActionPreference = 'Stop'\n"
+        "function Get-Command { param($Name) if ($Name -ne $env:MISSING_TOOL) { [pscustomobject]@{Name=$Name} } }\n"
+        + step["run"]
+    )
+    env = os.environ | {"EXPECTED_RUNS_ON": json.dumps(["self-hosted", expected_os, "fixture-vm"]),
+                        "ACTUAL_RUNNER_OS": actual_os, "MISSING_TOOL": missing_tool}
+    result = subprocess.run(
+        [pwsh, "-NoProfile", "-NonInteractive", "-Command", script], cwd=tmp_path,
+        env=env, capture_output=True, text=True, timeout=30)
+    assert (result.returncode == 0) == success, result.stdout + result.stderr
+    if not success:
+        assert ("missing required commands: python" if missing_tool else "runner OS does not match") in result.stderr

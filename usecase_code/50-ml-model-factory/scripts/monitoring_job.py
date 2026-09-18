@@ -58,13 +58,16 @@ AZURE_DEPENDENCIES = [
 
 
 def _safe_runtime(runtime: dict, scenario: dict, publish: bool) -> dict:
-    validate_runtime(runtime)
+    runtime = validate_runtime(runtime)
     scope = scope_tags(runtime, require=True)
     result = {key: runtime[key] for key in (
         "subscription_id", "tenant_id", "resource_group", "workspace_name", "compute",
     )}
     result.update(aifactory=scope["aifactory"], project=scope["project"],
                   environment_name=scope["environment"], credential="managed_identity")
+    for key in ("use_common_datalake_storage", "storage_targets", "storage", "datastore", "common_resource_group"):
+        if key in runtime:
+            result[key] = runtime[key]
     if runtime.get("managed_identity_client_id"):
         result["managed_identity_client_id"] = str(UUID(runtime["managed_identity_client_id"]))
     if "lake" in runtime:
@@ -185,7 +188,8 @@ def render(
         raise ValueError("Observed labels require explicit predictions and reference outcomes")
     inputs = {key: {"type": "uri_file", "path": f"./{key}.json", "mode": "download"}
               for key in ("scenario", "context")}
-    inputs.update({key: _input_uri(value) for key, value in (
+    from ml_model_factory.storage_selection import resolve_location
+    inputs.update({key: _input_uri(resolve_location(value, runtime)) for key, value in (
         ("config", config_uri), ("reference", reference_uri), ("current", current_uri),
         ("reference_outcomes", reference_outcomes_uri), ("predictions", predictions_uri),
         ("labels", labels_uri),
@@ -287,14 +291,27 @@ def create_schedule(path: Path, runtime: dict, *, execute: bool = False) -> dict
     """Preview by default; --execute authorizes the recurring cloud job/compute costs."""
     if not isinstance(execute, bool):
         raise ValueError("execute must be an explicit boolean")
-    validate_runtime(runtime)
+    runtime = validate_runtime(runtime)
     schedule = load_monitoring_schedule(path)
     assert_scope(schedule.tags, runtime)
+    from ml_model_factory.storage_selection import selected_profile, validate_job_storage, verify_datastore
+    storage = selected_profile(runtime)
+    if storage is not None:
+        declaration = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        job = yaml.safe_load((Path(path).parent / declaration["create_job"]).read_text(encoding="utf-8"))
+        validate_job_storage(job, runtime)
+        context = load_json(Path(path).parent / "context.json")
+        recorded = selected_profile(context)
+        if recorded != storage:
+            raise ValueError("Monitoring context was rendered for different storage; render the schedule again")
     if not execute:
         return {"preview_only": True, "name": schedule.name, "cloud_created": False}
     from ml_model_factory.azureml import _client
 
-    created = _client(runtime).schedules.begin_create_or_update(schedule).result()
+    client = _client(runtime)
+    if storage is not None:
+        verify_datastore(storage, client.datastores.get(storage["datastore"]))
+    created = client.schedules.begin_create_or_update(schedule).result()
     return {"name": created.name, "id": created.id, "cloud_created": True}
 
 

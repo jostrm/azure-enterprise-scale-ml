@@ -17,12 +17,58 @@ AIF_DUAL_LAYOUT_LIBRARIES=(
   aifactory_scaleset_config.py
   aifactory_vpn_profile.py
   create-new-aifactory-scaleset.sh
+  factory_enrollment.py
+  factory_enrollment_entry.py
   factory_lifecycle.py
   layout_router.sh
   project_deployment.py
+  project_environment.py
   release_version.py
   release_version.sh
+  runner-prerequisites.ps1
+  runner-prerequisites.sh
+  runner-registration.ps1
+  runner-registration.sh
 )
+
+aif_enrollment_usage() {
+  printf '%s\n' \
+    "Enrollment: $1 enroll plan|ensure --consumer-root <repo> --factory-id <uuid> --scale-set-id <uuid> --environment dev|stage|prod --options <nonsecret.json>" \
+    '  ensure requires --expected-plan <approved-plan_hash> --yes.' \
+    '  --acknowledge-exclusive-writer-governance is a real administrator attestation, never a default.' \
+    '  Requires a registered schema-2 target; no legacy fallback, binding publication, VM creation or agent registration.'
+}
+
+aif_route_enrollment() {
+  local provider="$1" script_dir="$2"
+  shift 2
+  [[ "${1:-}" == "enroll" ]] || return 0
+  shift
+  local adapter candidate
+  for candidate in "$script_dir/lib/factory_enrollment_entry.py" \
+    "$script_dir/azure-enterprise-scale-ml/bootstrap/lib/factory_enrollment_entry.py"; do
+    [[ ! -f "$candidate" ]] || { adapter="$candidate"; break; }
+  done
+  [[ -n "${adapter:-}" ]] || {
+    printf 'ERROR: Complete enrollment helper bundle is missing.\n' >&2
+    exit 2
+  }
+  local -a python_command
+  if [[ -n "${AIFACTORY_PYTHON:-}" ]]; then
+    python_command=("$AIFACTORY_PYTHON")
+  elif command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then
+    python_command=(python3)
+  elif command -v python >/dev/null 2>&1 && python --version >/dev/null 2>&1; then
+    python_command=(python)
+  elif command -v py >/dev/null 2>&1 && py -3 --version >/dev/null 2>&1; then
+    python_command=(py -3)
+  else
+    printf 'ERROR: Python 3.10 or newer is required for enrollment.\n' >&2
+    exit 2
+  fi
+  # Adapter consumes the first fixed argument before parsing any caller options.
+  exec "${python_command[@]}" -B "$adapter" "$provider" "$@"
+}
 
 aif_registered_layout_root() {
   local cursor="$1"
@@ -184,11 +230,18 @@ aif_ensure_control_bundle_gitignore() {
     "!/lib/aifactory_scaleset_config.py"
     "!/lib/aifactory_vpn_profile.py"
     "!/lib/create-new-aifactory-scaleset.sh"
+    "!/lib/factory_enrollment.py"
+    "!/lib/factory_enrollment_entry.py"
     "!/lib/factory_lifecycle.py"
     "!/lib/layout_router.sh"
     "!/lib/project_deployment.py"
+    "!/lib/project_environment.py"
     "!/lib/release_version.py"
     "!/lib/release_version.sh"
+    "!/lib/runner-prerequisites.ps1"
+    "!/lib/runner-prerequisites.sh"
+    "!/lib/runner-registration.ps1"
+    "!/lib/runner-registration.sh"
     "!/ui/"
     "/ui/*"
     "!/ui/terminal.sh"

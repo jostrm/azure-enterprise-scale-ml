@@ -27,6 +27,40 @@ def naming_value(values: dict, key: str) -> str:
     return value
 
 
+def container_name(value: str) -> str:
+    if (not isinstance(value, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", value)
+            or "--" in value):
+        raise ValueError("Invalid private Blob container name.")
+    return value
+
+
+def storage_selection(defaults: dict, selection: dict) -> dict:
+    """Root storage defaults, then per-target selection; merge each profile by field."""
+    if not isinstance(defaults, dict) or not isinstance(selection, dict):
+        raise ValueError("Storage defaults and target selection must be objects.")
+    profiles = {}
+    merged = {}
+    for options in (defaults, selection):
+        if "use_common_datalake_storage" in options:
+            value = options["use_common_datalake_storage"]
+            if type(value) is not bool:
+                raise ValueError("use_common_datalake_storage must be a JSON boolean.")
+            merged["use_common_datalake_storage"] = value
+        if "storage_targets" in options:
+            incoming = options["storage_targets"]
+            if not isinstance(incoming, dict) or incoming.keys() - {"common", "project"}:
+                raise ValueError("storage_targets must contain only common/project profiles.")
+            for name, profile in incoming.items():
+                if not isinstance(profile, dict) or profile.keys() - {"account_name", "resource_group", "container"}:
+                    raise ValueError(f"Invalid storage_targets.{name} profile fields.")
+                profiles[name] = {**profiles.get(name, {}), **profile}
+    merged.update({key: value for key, value in selection.items()
+                   if key not in {"storage_targets", "use_common_datalake_storage"}})
+    if profiles:
+        merged["storage_targets"] = profiles
+    return merged
+
+
 @dataclass(frozen=True)
 class FactoryConfig:
     tenant_id: str
@@ -42,6 +76,26 @@ class FactoryConfig:
     search_name: str = ""
     storage_name: str = ""
     identity_name: str = ""
+    storage_resource_group: str = ""
+    storage_container: str = ""
+    use_common_datalake_storage: bool | None = None
+
+    def __post_init__(self):
+        flag = self.use_common_datalake_storage
+        if flag is not None:
+            if type(flag) is not bool:
+                raise ValueError("use_common_datalake_storage must be a JSON boolean.")
+            expected = self.common_resource_group if flag else self.resource_group
+            if (not isinstance(self.storage_resource_group, str) or not self.storage_resource_group
+                    or self.storage_resource_group.lower() != expected.lower()):
+                raise ValueError("Selected storage resource group does not match common/project selection.")
+            if (not isinstance(self.storage_name, str) or not re.fullmatch(r"[a-z0-9]{3,24}", self.storage_name)
+                    or "1001" in self.storage_name):
+                raise ValueError("Select an explicit data account, never the 1001 artifact account.")
+            if not self.storage_container:
+                object.__setattr__(self, "storage_container", "lake3" if flag else "agent-factory")
+        if self.storage_container:
+            container_name(self.storage_container)
 
     @classmethod
     def load(cls, variables_path: Path, environment: str = "dev",
@@ -55,7 +109,7 @@ class FactoryConfig:
         values = document[section]
         if not isinstance(values, dict):
             raise ValueError("The selected variables.json section must be an object.")
-        selected = overrides or {}
+        selected = storage_selection({}, overrides if overrides is not None else {})
         tenant_id = str(UUID(required(values, "tenantId")))
         subscription_id = str(UUID(required(values, f"{environment}_sub_id")))
         project_number = required(values, "project_number_000")
@@ -77,6 +131,30 @@ class FactoryConfig:
             "tenant_id", "subscription_id", "environment", "project_number",
             "resource_group", "common_resource_group",
         }
+        profiles = selected.pop("storage_targets", {})
+        flag = selected.pop("use_common_datalake_storage", None)
+        allowed -= {"use_common_datalake_storage"}
+        if flag is not None:
+            scope = "common" if flag else "project"
+            profile = profiles.get(scope, {})
+            account = required(profile, "account_name")
+            if not re.fullmatch(r"[a-z0-9]{3,24}", account) or "1001" in account:
+                raise ValueError("Select a lowercase data storage account, never the 1001 artifact account.")
+            group = required(profile, "resource_group")
+            expected = common_group if flag else resource_group
+            if group.lower() != expected.lower():
+                raise ValueError(f"storage_targets.{scope}.resource_group must match the selected {scope} resource group.")
+            normalized = {
+                "storage_name": account, "storage_resource_group": group,
+                "storage_container": container_name(profile.get("container", "lake3" if flag else "agent-factory")),
+            }
+            for key, value in normalized.items():
+                if key in selected and selected[key] != value:
+                    raise ValueError(f"{key} contradicts the selected storage_targets.{scope} profile.")
+            selected.update(normalized)
+        elif ("storage_resource_group" in selected
+              and required(selected, "storage_resource_group").lower() != resource_group.lower()):
+            raise ValueError("Cross-group storage requires use_common_datalake_storage and an explicit profile.")
         unknown = selected.keys() - allowed - {"resource_group", "common_resource_group"}
         if unknown:
             raise ValueError(f"Unknown target options: {', '.join(sorted(unknown))}")
@@ -84,6 +162,7 @@ class FactoryConfig:
         return cls(
             tenant_id, subscription_id, environment, project_number,
             identifier(resource_group, "resource group"), identifier(common_group, "common resource group"),
+            use_common_datalake_storage=flag,
             **optional,
         )
 
@@ -104,6 +183,47 @@ class Target:
     storage_name: str
     identity_id: str
     identity_client_id: str
+    storage_resource_group: str = ""
+    storage_container: str = ""
+    use_common_datalake_storage: bool | None = None
+
+    def __post_init__(self):
+        flag = self.use_common_datalake_storage
+        if flag is not None and type(flag) is not bool:
+            raise ValueError("use_common_datalake_storage must be a JSON boolean.")
+        expected = self.common_resource_group if flag is True else self.resource_group
+        if not isinstance(self.storage_resource_group, str) or not isinstance(self.storage_container, str):
+            raise ValueError("Storage resource group and container metadata must be strings.")
+        if flag is not None and not self.storage_resource_group:
+            raise ValueError("Selected storage metadata requires storage_resource_group.")
+        if self.storage_resource_group and self.storage_resource_group.lower() != expected.lower():
+            raise ValueError("Storage resource group contradicts use_common_datalake_storage.")
+        if flag is not None:
+            if (not isinstance(self.storage_name, str) or not re.fullmatch(r"[a-z0-9]{3,24}", self.storage_name)
+                    or "1001" in self.storage_name):
+                raise ValueError("Select a data storage account, never the 1001 artifact account.")
+            if not self.storage_container:
+                object.__setattr__(self, "storage_container", "lake3" if flag else "agent-factory")
+        if self.storage_container:
+            container_name(self.storage_container)
+
+    def resolve_container(self, requested: str | None = None, *, legacy: str = "agent-factory") -> str:
+        """Explicit configured containers are binding, not silently overridden by callers."""
+        chosen = self.storage_container or legacy
+        if requested is not None:
+            container_name(requested)
+            if self.storage_container and requested != chosen:
+                raise ValueError("Requested container contradicts selected storage_container; change the profile explicitly.")
+            chosen = requested
+        return container_name(chosen)
+
+    def storage_summary(self, *, legacy: str = "agent-factory") -> dict:
+        return {
+            "account_name": self.storage_name,
+            "resource_group": self.storage_resource_group or self.resource_group,
+            "container": self.resolve_container(legacy=legacy),
+            "use_common_datalake_storage": self.use_common_datalake_storage,
+        }
 
     @property
     def group_id(self) -> str:
@@ -123,7 +243,9 @@ class Target:
 
     @property
     def storage_id(self) -> str:
-        return f"{self.group_id}/providers/Microsoft.Storage/storageAccounts/{self.storage_name}"
+        group = self.storage_resource_group or self.resource_group
+        return (f"/subscriptions/{self.subscription_id}/resourceGroups/{group}"
+                f"/providers/Microsoft.Storage/storageAccounts/{self.storage_name}")
 
     def to_dict(self) -> dict:
         return asdict(self)

@@ -183,6 +183,8 @@ def report_period(args: argparse.Namespace) -> tuple[datetime, datetime, date, Z
 def discover_resources(
     resource_client: ResourceManagementClient, resource_group: str
 ) -> tuple[list[Resource], list[Resource], list[Resource]]:
+    if not isinstance(resource_group, str) or resource_group.casefold() == "all":
+        raise ValueError("This collector requires one concrete resource group; All only filters already collected authorized rows.")
     cognitive_resources: list[Resource] = []
     search_resources: list[Resource] = []
     application_insights_resources: list[Resource] = []
@@ -658,7 +660,7 @@ def write_chart_pdf(
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name="Small", parent=styles["BodyText"], fontSize=8, leading=10))
     styles.add(ParagraphStyle(name="ReportTitle", parent=styles["Title"], textColor=colors.HexColor("#003C71")))
-    has_data = any(value > 0 for values in series.values() for value in values)
+    has_data = any(value is not None for values in series.values() for value in values)
     story: list[Any] = [
         Paragraph(title, styles["ReportTitle"]),
         Paragraph(
@@ -667,6 +669,9 @@ def write_chart_pdf(
             f"<b>{as_of:%Y-%m-%d}</b> | Timezone: <b>{display_time_zone(args.time_zone)}</b>",
             styles["Small"],
         ),
+        Paragraph("Data source: Azure Monitor metrics; Log Analytics workspace / Application Insights where configured. "
+                  "Calculation: sum selected resource/deployment/day request or token counters; token volume is not business value. "
+                  "Missing observations remain unavailable, not zero.", styles["Small"]),
         Spacer(1, 0.45 * cm),
         line_chart(day_labels, series, y_axis_label),
     ]
@@ -724,6 +729,9 @@ def write_pdf(
             + " Metric dimensions identify deployments when exposed by the resource.",
             styles["Small"],
         ),
+        Paragraph("Calculation: sum observed metrics by resource, deployment and time bucket. "
+                  "Session activity sums hourly approximate distinct counts, not period-wide unique sessions. "
+                  "Token volume is not business value; no billed cost or price is inferred.", styles["Small"]),
         Spacer(1, 0.4 * cm),
     ]
 
@@ -821,6 +829,8 @@ def main() -> int:
     if strict:
         credential = ScopedCliCredential(args.subscription_id, args.tenant_id, args.expected_object_id)
     elif args.tenant_id:
+        # Azure CLI rejects get-access-token with both --tenant and --subscription.
+        # The explicit subscription selects the tenant for this non-strict local report.
         credential = AzureCliCredential(subscription=args.subscription_id, tenant_id=args.tenant_id)
     else:
         credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
@@ -876,6 +886,11 @@ def main() -> int:
         "warnings": warnings,
         "period": {"start": start.isoformat(), "end": end.isoformat(), "days": args.days},
         "sessions_available": bool(telemetry_points),
+        "dataSource": "Azure Monitor metrics; Log Analytics workspace; Application Insights",
+        "lineage": {"formula": "Sum observed counters by resource/deployment/time bucket; hourly session activity is not a period-wide distinct count",
+                    "inputs": {"subscriptionId": args.subscription_id, "resourceGroup": args.resource_group,
+                               "workspaceId": args.workspace_id, "periodStart": start.isoformat(), "periodEnd": end.isoformat()},
+                    "costBasis": "not_evaluated"},
     }
 
     write_pdf(
@@ -938,6 +953,8 @@ def main() -> int:
             "window_start": start.isoformat(),
             "window_end": end.isoformat(),
             "generated_at": datetime.now(timezone.utc).isoformat(),
+            "dataSource": aggregates["dataSource"],
+            "lineage": aggregates["lineage"],
             "daily": [{"timestamp": bucket + "T00:00:00+00:00", "resource": resource,
                        "deployment": deployment,
                        "metrics": {key: value for key, value in values.items() if key in allowed}}

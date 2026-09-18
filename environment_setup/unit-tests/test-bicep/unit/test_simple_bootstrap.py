@@ -109,13 +109,15 @@ def test_advanced_progress_is_unchanged_and_invalid_stage_data_is_not_emitted():
 
 @pytest.mark.parametrize("failure,stages", [
     ("common", ["common"]), ("hub", ["common", "hub"]),
+    ("runner", ["common", "hub"]),
     ("project", ["common", "hub", "project"]), ("none", ["common", "hub", "project"]),
 ])
 def test_deployment_stage_records_stop_at_the_failing_phase(failure, stages):
-    code = f"""AIF_SIMPLE_MODE=true; AIF_NO_WAIT=false
+    code = f"""AIF_SIMPLE_MODE=true; AIF_NO_WAIT=false; AIF_RUNNER_MODE=github-hosted
 aif_run_github_workflow() {{ if [[ "$2" == "{failure}" ]]; then return 77; fi; }}
 aif_verify_common_resource_group() {{ :; }}
 aif_ensure_private_network_access() {{ if [[ "{failure}" == hub ]]; then return 78; fi; }}
+aif_ensure_github_self_hosted_agent() {{ if [[ "{failure}" == runner ]]; then return 79; fi; }}
 aif_deploy_simple_application_gateway() {{ :; }}
 aif_deploy_github
 """
@@ -874,15 +876,16 @@ aif_ensure_vpn_access_hub() { echo VPN; }
 
 
 def test_gateway_off_deployment_still_runs_common_and_private_foundry_project():
-    result = bash("""AIF_SIMPLE_MODE=true; AIF_ENABLE_APPLICATION_GATEWAY=false; AIF_NO_WAIT=false
+    result = bash("""AIF_SIMPLE_MODE=true; AIF_ENABLE_APPLICATION_GATEWAY=false; AIF_NO_WAIT=false; AIF_RUNNER_MODE=github-hosted
 aif_run_github_workflow() { echo "$1"; }
 aif_verify_common_resource_group() { echo COMMON_READY; }
 aif_ensure_private_network_access() { echo PRIVATE_ACCESS; }
+aif_ensure_github_self_hosted_agent() { echo RUNNER_READY; }
 aif_deploy_github
 """, "aif_simple_stage", "aif_deploy_github", "aif_deploy_simple_application_gateway")
     assert result.returncode == 0, result.stderr
     assert result.stdout.splitlines() == ["AIF_SIMPLE_STAGE=common", "infra-common.yml", "COMMON_READY",
-                                         "AIF_SIMPLE_STAGE=hub", "PRIVATE_ACCESS", "AIF_SIMPLE_STAGE=project",
+                                         "AIF_SIMPLE_STAGE=hub", "PRIVATE_ACCESS", "RUNNER_READY", "AIF_SIMPLE_STAGE=project",
                                          "infra-project.yml"]
 
 

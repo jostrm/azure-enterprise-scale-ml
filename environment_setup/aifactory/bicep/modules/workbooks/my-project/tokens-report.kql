@@ -1,0 +1,14 @@
+let SelectedTokenRecords = TokenRecords
+    | where base64_decode_tostring('{TokenDeployment:base64}') == '*' or Deployment == base64_decode_tostring('{TokenDeployment:base64}')
+    | where base64_decode_tostring('{TokenModel:base64}') == '*' or ModelKey == base64_decode_tostring('{TokenModel:base64}');
+let TokenDaily = SelectedTokenRecords | invoke AggregateTokens();
+let TokenTotals = SelectedTokenRecords | extend Day=datetime(null) | invoke AggregateTokens()
+    | join kind=leftouter Inventory on AccountId
+    | extend Source=TokenSource, FromUtc=StartUtc, ExclusiveEndUtc=EndUtc,
+        LastObservationAge=now() - LastObservedUtc, GapToWindowEnd=EndUtc - LastObservedUtc,
+        AccountUrl=strcat('https://portal.azure.com/#resource', AccountId),
+        DeploymentUrl=iff(Deployment == '[not emitted]', '', strcat('https://portal.azure.com/#resource', AccountId, '/deployments/', url_encode_component(Deployment)))
+    | project Account, AccountId, AccountKind, Deployment, ModelName, ModelVersion, InputTokens, OutputTokens, CachedTokens,
+        ObservedRecords, IngestedRecords, MissingInput, MissingOutput, MissingCached, MissingRequestId, ConflictingRecords, InvalidRecords,
+        CachedCoverage, Deduplication, FirstObservedUtc, LastObservedUtc, LastObservationAge, GapToWindowEnd,
+        Source, FromUtc, ExclusiveEndUtc, AccountUrl, DeploymentUrl;

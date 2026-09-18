@@ -98,6 +98,14 @@ explicit post-success operation rather than hidden inside data splitting.
 
 ### Lake mapping, dynamic inputs, and names
 
+`use_common_datalake_storage` selects common (`true`) or project (`false`)
+data storage for every generated pipeline. Supply explicit `storage_targets`
+profiles; the project workspace/compute do not move. The same setting is supported
+by the ML use-case runtime and the agent factory. See
+[storage selection](36-dataops.md#selecting-the-common-lake-or-project-data-account).
+Changing it requires re-rendering and existing data/permissions at the selected
+location; it is not a migration operation.
+
 The [AppLayer lake_settings.json](../../../esml-v2/examples/app_layer/lake_settings.json)
 retains the recognizable `project_number`, `project_folder_name`, `active_model`,
 `models`, `model_number`, `model_folder_name`, `model_short_alias`,

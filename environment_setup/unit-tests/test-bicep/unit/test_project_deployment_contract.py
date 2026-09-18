@@ -33,6 +33,8 @@ def document():
         "project_number_000": "017", "tenantId": TENANT, "azureDevOpsTenantId": TENANT,
         "dev_sub_id": SUBS["dev"], "test_sub_id": SUBS["stage"], "prod_sub_id": SUBS["prod"],
         "GITHUB_NEW_REPO": "org/consumer", "servicePrincipalSecret": "synthetic-secret-not-a-real-credential",
+        "admin_aifactoryPrefixRG": "mrvel-1-", "admin_locationSuffix": "eus2", "admin_aifactorySuffixRG": "-008",
+        "admin_location": "eastus2", "projectPrefix": "esml-", "projectSuffix": "-rg",
     }
     return {"dev": values, "stage_prod": copy.deepcopy(values)}
 
@@ -51,6 +53,7 @@ def instance(route):
     result.repository = "org/consumer" if route == "gha" else "consumer"
     result.environment = {}
     result.sleep = Mock()
+    result.verify_predecessor = Mock()
     return result
 
 
@@ -63,6 +66,10 @@ def test_mcp_scope_selects_only_the_exact_mcp_pipeline_and_templates():
     assert pd.ADO_PIPELINE not in deployment.files
     assert pd.ADO_CONFIG_STEP in deployment.files
     assert len(deployment.files) == 4
+    del deployment.verify_predecessor
+    deployment.read_json = Mock(side_effect=AssertionError("MCP service-only deployment is not project promotion"))
+    deployment.verify_predecessor()
+    deployment.read_json.assert_not_called()
 
 
 @pytest.mark.parametrize("route,scope", [("gha", "azure-mcp"), ("ado", "arbitrary-pipeline")])
@@ -98,6 +105,8 @@ def test_update_launchers_keep_consumer_main_and_pin_template_version(route):
     immediate_restore = script.index(
         'aif_restore_launcher_bundle "$state_dir/launcher-bundle" "$REPO_ROOT"', bootstrap)
     assert immediate_restore < script.index("aif_complete ", immediate_restore)
+    assert pd.ENVIRONMENT_CONTRACT in script
+    assert pd.project_environment.CONTRACT == pd.ENVIRONMENT_CONTRACT
 
 
 @pytest.mark.parametrize("kind", ["project", "section", "tenant", "delete"])
@@ -291,6 +300,7 @@ def test_ado_uses_returned_run_id_and_watches_completion(result):
             deployment.azure_devops()
     request_body = next(body for method, _, body in calls if method == "POST")
     assert request_body["templateParameters"]["deploymentTarget"] == "stage"
+    deployment.verify_predecessor.assert_called_once_with()
 
 
 @pytest.mark.parametrize("route", ["gha", "ado"])
@@ -347,6 +357,9 @@ def test_refresh_preserves_selected_config_and_reviewed_templates(tmp_path, rout
     staged = next(argv for argv in calls if argv[:2] == ["git", "add"])
     assert "-A" not in staged and "aifactory/variables.json" not in staged and ".env" not in staged
     assert json.loads(deployment.config)["stage_prod"]["project_number_000"] == "017"
+    for name in ("project_deployment.py", "project_environment.py", "release_version.py", "release_version.sh"):
+        assert (deployment.root / "lib" / name).read_bytes() == (ROOT / "bootstrap/lib" / name).read_bytes()
+        assert "lib/" + name in staged
 
 
 def test_github_unpublished_head_blocks_before_secret_or_dispatch():
@@ -376,6 +389,7 @@ def test_prepare_validates_selected_export_templates_and_target_before_mutation(
     })
     deployment.ado = Mock(return_value={"id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "name": "consumer", "project": {"name": "project"}})
     deployment.prepare("017", "stage", str(config))
+    deployment.verify_predecessor.assert_called_once_with()
     assert deployment.selected["subscription"] == SUBS["stage"]
     assert deployment.config == pd.canonical_json(document())
     deployment.command.reset_mock()
@@ -515,7 +529,8 @@ def test_root_contract_is_opt_in_and_stable_helper_is_copied():
         source = (ROOT / "bootstrap" / f"{name}-update-aifactory-and-run-project.sh").read_text(encoding="utf-8")
         assert pd.CONTRACT in source
         assert 'reviewed_project=false' in source
-        assert 'cp "$deployment_helper" "$state_dir/lib/project_deployment.py"' in source
+        assert 'for helper in project_deployment.py project_environment.py; do' in source
+        assert 'cp "$deployment_dir/$helper" "$state_dir/lib/"' in source
         assert '"$helper_path" --route' in source
         assert 'helper_state_dir="$(cygpath -m "$helper_state_dir")"' in source
         assert "--project-only" in source
@@ -650,3 +665,193 @@ def test_ado_missing_or_invalid_org_tenant_does_not_fall_back(tmp_path, tenant):
         deployment.prepare("017", "stage", str(config))
     deployment.command.assert_not_called()
     deployment.read_json.assert_not_called()
+
+
+def azure_evidence(data, existing, calls):
+    def read(argv):
+        calls.append(argv)
+        if argv[0] == "gh":
+            if "--env" not in argv:
+                return []
+            environment = argv[argv.index("--env") + 1]
+            return [{"name": "AZURE_ENV_NAME", "value": "test" if environment == "stage" else environment},
+                    {"name": "AZURE_SUBSCRIPTION_ID", "value": SUBS[environment]}]
+        subscription = argv[argv.index("--subscription") + 1]
+        environment = next(env for env, value in SUBS.items() if value == subscription)
+        values = data["dev" if environment == "dev" else "stage_prod"]
+        if argv[1:3] == ["account", "show"]:
+            return {"id": subscription, "tenantId": values["tenantId"], "state": "Enabled"}
+        selected = pd.project_environment.scope(values, environment, "017")
+        assert argv[1:3] == ["group", "list"]
+        assert calls[-2][1:3] == ["account", "show"]
+        assert calls[-2][calls[-2].index("--subscription") + 1] == subscription
+        if isinstance(existing.get(environment), Exception):
+            raise existing[environment]
+        return [{
+            "id": f"/subscriptions/{subscription}/resourceGroups/{selected['name']}",
+            "name": selected["name"], "location": selected["location"],
+            "properties": {"provisioningState": "Succeeded"},
+        }] if existing.get(environment) else []
+    return read
+
+
+@pytest.mark.parametrize("target,existing,expected", [
+    ("dev", {}, None),
+    ("stage", {"dev": True}, "dev"),
+    ("stage", {"dev": False, "stage": True}, "blocked"),
+    ("prod", {"dev": True, "stage": False}, "dev"),
+    ("prod", {"dev": False, "stage": True}, "stage"),
+    ("prod", {"dev": True, "stage": True}, "dev"),
+    ("prod", {"dev": False, "stage": False}, "blocked"),
+    ("prod", {"dev": ValueError("403 unknown"), "stage": True}, "blocked"),
+    ("prod", {"dev": ValueError("403 unknown"), "stage": False}, "blocked"),
+    ("prod", {"dev": False, "stage": ValueError("403 unknown")}, "blocked"),
+    ("stage", {"dev": ValueError("403 unknown"), "stage": True}, "blocked"),
+])
+def test_promotion_requires_real_earlier_exact_project_rg(target, existing, expected):
+    data = document()
+    data["stage_prod"].update(admin_aifactoryPrefixRG="prod-company-", admin_location="swedencentral",
+                              admin_locationSuffix="sdc", admin_aifactorySuffixRG="-009", tenantId=ORG_TENANT)
+    calls = []
+    reader = azure_evidence(data, existing, calls)
+    check = lambda: pd.project_environment.require_prerequisite(
+        target, "017", lambda env: data["dev" if env == "dev" else "stage_prod"], reader,
+    )
+    if expected == "blocked":
+        with pytest.raises(ValueError):
+            check()
+    else:
+        assert check() == expected
+    assert all(argv[0] == "az" and argv[1:3] in (["account", "show"], ["group", "list"]) for argv in calls)
+    groups = [argv for argv in calls if argv[1] == "group"]
+    if expected is None:
+        assert calls == []
+    if expected == "dev":
+        assert len(groups) == 1 and groups[0][groups[0].index("--subscription") + 1] == SUBS["dev"]
+    if expected == "stage":
+        assert groups[-1][groups[-1].index("--subscription") + 1] == SUBS["stage"]
+        assert pd.project_environment.scope(data["stage_prod"], "stage", "017")["name"] == "prod-company-esml-project017-sdc-test-009-rg"
+
+
+@pytest.mark.parametrize("change", [
+    {"name": "mrvel-1-esml-common-eus2-dev-008"},
+    {"name": "mrvel-1-esml-project018-eus2-dev-008-rg"},
+    {"id": f"/subscriptions/{SUBS['prod']}/resourceGroups/mrvel-1-esml-project017-eus2-dev-008-rg"},
+    {"location": "swedencentral"},
+    {"properties": None},
+])
+def test_common_other_project_and_incomplete_representations_never_prove_deployment(change):
+    data = document()
+    selected = pd.project_environment.scope(data["dev"], "dev", "017")
+    calls = []
+    complete = azure_evidence(data, {"dev": True}, calls)
+
+    def read(argv):
+        result = complete(argv)
+        if argv[1] == "group":
+            result[0].update(change)
+        return result
+
+    if "location" in change or "properties" in change:
+        with pytest.raises(ValueError):
+            pd.project_environment.project_exists(selected, read)
+    else:
+        assert not pd.project_environment.project_exists(selected, read)
+
+
+@pytest.mark.parametrize("account", [
+    None, {}, {"id": SUBS["dev"], "tenantId": ORG_TENANT, "state": "Enabled"},
+    {"id": SUBS["dev"], "tenantId": TENANT, "state": "Disabled"},
+])
+def test_source_tenant_metadata_must_be_verified_before_rg_query(account):
+    reader = Mock(return_value=account)
+    selected = pd.project_environment.scope(document()["dev"], "dev", "017")
+    with pytest.raises(ValueError, match="metadata"):
+        pd.project_environment.project_exists(selected, reader)
+    assert len(reader.call_args_list) == 1
+    assert reader.call_args.args[0][1:3] == ["account", "show"]
+
+
+@pytest.mark.parametrize("field", [
+    "dev_sub_id", "tenantId", "admin_locationSuffix", "admin_aifactoryPrefixRG",
+    "admin_aifactorySuffixRG", "project_number_000",
+])
+def test_missing_effective_source_scope_fails_closed(field):
+    values = document()["dev"]
+    del values[field]
+    with pytest.raises(ValueError):
+        pd.project_environment.scope(values, "dev", "017")
+
+
+def test_prod_can_skip_stage_even_when_stage_subscription_not_configured():
+    data = document()
+    del data["stage_prod"]["test_sub_id"]
+    assert pd.project_environment.require_prerequisite(
+        "prod", "017", lambda env: data["dev" if env == "dev" else "stage_prod"],
+        azure_evidence(data, {"dev": True}, []),
+    ) == "dev"
+
+
+@pytest.mark.parametrize("cause", ["missing_configuration", "wrong_tenant", "disabled_account"])
+def test_prod_fails_closed_when_dev_evidence_is_unknown(cause):
+    data = document()
+    calls = []
+    complete = azure_evidence(data, {"stage": True}, calls)
+    if cause == "missing_configuration":
+        del data["dev"]["tenantId"]
+
+    def reader(argv):
+        subscription = argv[argv.index("--subscription") + 1]
+        if subscription == SUBS["dev"]:
+            assert argv[1:3] == ["account", "show"]
+            return {"id": subscription, "tenantId": ORG_TENANT if cause == "wrong_tenant" else TENANT,
+                    "state": "Disabled" if cause == "disabled_account" else "Enabled"}
+        return complete(argv)
+
+    with pytest.raises(ValueError):
+        pd.project_environment.require_prerequisite(
+            "prod", "017", lambda env: data["dev" if env == "dev" else "stage_prod"], reader,
+        )
+    assert not any(argv[1] == "group" and SUBS["dev"] in argv for argv in calls)
+
+
+@pytest.mark.parametrize("route", ["gha", "ado"])
+def test_reviewed_queue_rechecks_predecessor_and_stops_on_stale_evidence(route):
+    deployment = instance(route)
+    if route == "gha":
+        deployment.command = Mock(side_effect=["a" * 40, "a" * 40 + "\trefs/heads/main", 0, 0])
+        deployment.verify_predecessor.side_effect = [None, ValueError("Predecessor removed since review")]
+        with pytest.raises(ValueError, match="removed since review"):
+            deployment.github()
+        assert deployment.verify_predecessor.call_count == 2
+        assert not any(call.args[0][:3] == ["gh", "workflow", "run"] for call in deployment.command.call_args_list)
+        assert deployment.command.call_args.args[0][:3] == ["gh", "secret", "delete"]
+    else:
+        deployment.ado = Mock(return_value={"value": [{"id": 7, "repository": {"name": "consumer"},
+                                                     "process": {"yamlFilename": pd.ADO_PIPELINE}}]})
+        deployment.verify_predecessor.side_effect = ValueError("Predecessor removed since review")
+        with pytest.raises(ValueError, match="removed since review"):
+            deployment.azure_devops()
+        assert all(call.args[0] == "GET" for call in deployment.ado.call_args_list)
+
+
+def test_reviewed_prepare_executes_real_prerequisite_guard(tmp_path):
+    deployment = instance("gha")
+    del deployment.verify_predecessor
+    deployment.root = tmp_path
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "aifactory").mkdir()
+    for relative in pd.FILES["gha"]:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# " + pd.CONTRACT, encoding="utf-8")
+    config = tmp_path / "aifactory/selected.json"
+    config.write_text(json.dumps(document()), encoding="utf-8")
+    calls = []
+    evidence = azure_evidence(document(), {"dev": True}, calls)
+    deployment.read_json = lambda argv: {"id": 17} if argv[0] == "gh" else evidence(argv)
+    deployment.command = Mock(side_effect=lambda argv, **kwargs: "https://github.com/org/consumer" if argv[0] == "git" else 0)
+    deployment.prepare("017", "stage", config)
+    assert any(argv[1:3] == ["group", "list"] for argv in calls)
+    assert all(call.args[0][:3] in (["git", "remote", "get-url"], ["gh", "auth", "status"])
+               for call in deployment.command.call_args_list)

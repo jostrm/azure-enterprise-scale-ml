@@ -10,6 +10,42 @@ Use the implemented
 They are opt-in code-first artifacts, not evidence that pipelines, permissions or
 triggers have already been deployed.
 
+## Selecting the common lake or project data account
+
+Both factory families use the configuration setting
+`use_common_datalake_storage`: `true` selects the explicit common storage target;
+`false` selects the explicit project resource group's data account. It does not
+mean the developer's local disk. New example configurations show `false`;
+omitting the setting preserves the previous explicit storage configuration.
+
+For ML, add `storage_targets.common` and `storage_targets.project`, each with
+`account_name`, `resource_group`, `container`, and the matching existing AML
+`datastore`. An optional credential-free `account_url` supports the correct Azure
+cloud endpoint. See the [ML configuration example](../../../usecase_code/50-ml-model-factory/storage-selection.example.json).
+The ESML v2 AppLayer lake settings accept the same option. Agent target selection
+uses the same boolean and account/resource-group/container profiles; Foundry and
+Search remain project-scoped.
+
+For Spider project001/dev, the verified locations are:
+
+| Selection | Account | Container | AML datastore |
+|---|---|---|---|
+| Common (`true`) | `spiderbltscesml001dev` | `lake3` | `esml_shared_lake` |
+| Project (`false`) | `saprj001sdcbltsc2001dev` | `ml-model-factory` for ML; configured agent container for agents | `ml_model_factory` for ML |
+
+The common RG also contains the earlier `mrvelbltscesml001dev`; neither factory
+selects it simply because it appears first. Explicit profile names remove that
+ambiguity. For a different project/environment, configure its actual resources,
+not these example names. Empty containers are not evidence that an account has
+no dependencies.
+
+Switching selects destinations and known source URI bindings; it does not copy
+data, create datastores, grant cross-project access, change ACLs/firewalls, or
+delete resources. Re-render jobs and schedules after switching. Published runs,
+model lineage and immutable data releases are not rewritten. Dataset bytes must
+exist in the selected location; opaque registered data assets need an explicit,
+reviewed binding instead of assumed relocation.
+
 ## Delta interoperability and shareback
 
 **New ESML v2 silver/gold default to Delta; bronze defaults to unchanged source

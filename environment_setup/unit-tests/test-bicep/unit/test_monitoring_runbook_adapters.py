@@ -1,11 +1,15 @@
 """Offline safe token/showback adapters; no Azure login, sends or network calls."""
 
 import importlib.util
+import base64
 import json
 import shutil
 import subprocess
 import sys
+import time
+from types import SimpleNamespace
 from pathlib import Path
+from urllib.error import HTTPError
 
 import pytest
 
@@ -85,6 +89,27 @@ def test_redirects_and_foreign_scope_are_blocked_before_outbound_auth(adapter, r
         adapter.NoRedirect().redirect_request(None, None, None, None, None, "https://other.example/")
     with pytest.raises(ValueError, match="exact reviewed"):
         adapter.arm(request_document, "https://management.azure.com/subscriptions/other/resourceGroups/other/query?api-version=2023-03-01")
+
+
+def test_cost_429_retries_respect_longest_header_and_are_bounded(adapter, request_document, monkeypatch):
+    claims = {"tid": request_document["scope"]["tenant_id"], "oid": request_document["object_id"],
+              "exp": time.time() + 3600, "aud": "https://management.azure.com/"}
+    encoded = base64.urlsafe_b64encode(json.dumps(claims).encode()).decode().rstrip("=")
+    monkeypatch.setattr(adapter.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(
+        returncode=0, stdout=f"header.{encoded}.signature"))
+    attempts, sleeps = [], []
+    def request(*args, **kwargs):
+        attempts.append(1)
+        raise HTTPError("https://management.azure.com", 429, "rate limited",
+                        {"Retry-After": "2", "x-ms-ratelimit-microsoft.costmanagement-qpu-retry-after": "5"}, None)
+    monkeypatch.setattr(adapter, "build_opener", lambda *args: SimpleNamespace(open=request))
+    monkeypatch.setattr(adapter.time, "sleep", sleeps.append)
+    scope = request_document["scope"]
+    url = f"https://management.azure.com/subscriptions/{scope['subscription_id']}/resourceGroups/{scope['resource_group']}/providers/Microsoft.CostManagement/query?api-version=2023-03-01"
+    with pytest.raises(HTTPError):
+        adapter.arm(request_document, url, {"type": "ActualCost"})
+    assert len(attempts) == 3 and sleeps == [5, 5]
+    assert adapter.retry_delay({"Retry-After": "500"}) == 500
 
 
 @pytest.mark.parametrize("relative", [Path("Update-FoundryTokenReport.ps1"), Path("showback") / "Update-ShowbackReport.ps1"])

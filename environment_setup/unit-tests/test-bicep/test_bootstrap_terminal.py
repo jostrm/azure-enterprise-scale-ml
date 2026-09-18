@@ -280,6 +280,7 @@ class TestBootstrapTerminal(unittest.TestCase):
                 result = self.run_bash(
                     'source() { printf "SOURCE:%s\\n" "$1"; '
                     'aif_route_registered_layout() { :; }; '
+                    'aif_route_enrollment() { :; }; '
                     'aif_scaleset_main() { printf "MAIN_ARG:%s\\n" "$@"; }; }\n'
                     'printf "ROOT:%s\\n" "$(cd "$(dirname "$AIF_TEST_SCRIPT")" && pwd)"\n'
                     'builtin source "$AIF_TEST_SCRIPT" --prepare-only "literal argument"\n',

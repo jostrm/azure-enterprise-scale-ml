@@ -17,7 +17,73 @@ bash ./GH-update-aifactory-and-run-project.sh
 
 These scripts replace the manual feature-update steps below. They protect existing work, update the AI Factory submodule and templates, merge the existing configuration into the latest templates, commit and push the changes, start the project pipeline or workflow, and monitor the run until it finishes.
 
-Both launchers inherit the factory's saved template version. To upgrade, supply
+### Select the project environment
+
+```bash
+# Normal Dev create/update (also the default when the flag is omitted)
+bash ./GH-update-aifactory-and-run-project.sh --aifactory-env dev
+
+# Update templates and deploy only Stage, provided this project already exists in Dev
+bash ./GH-update-aifactory-and-run-project.sh --aifactory-env stage
+
+# Skip template updates; GHA is an alias of GH
+bash ./GHA-update-aifactory-and-run-project.sh --project-only --aifactory-env stage
+bash ./ADO-update-aifactory-and-run-project.sh --project-only --aifactory-env=prod
+```
+
+`--aifactory-env dev|stage|prod` selects only that project's environment. Omission
+preserves the legacy **Dev** default; explicit `dev` is equivalent. Reviewed
+callers can still supply `AIFACTORY_TARGET_ENVIRONMENT`; supplying both requires
+identical values. Missing, invalid, duplicate, or conflicting environment flags
+fail before Git/Azure operations. `GHA-...` forwards all arguments to `GH-...`.
+This flag does not enable Patch, change versions, or deploy the common factory.
+
+Stage requires a real **Dev project resource group**. Prod requires a real
+**Dev OR Stage project resource group**; Stage may be skipped, and **Prod is allowed
+when Stage exists but Dev has been removed**. A configuration
+file, saved review, pipeline receipt, common/shared RG, or another project is
+never deployment evidence. The launchers verify Azure CLI subscription/tenant
+metadata, then query deployed RGs in the explicit subscription and match the full
+name and resource ID (plus Azure location when configured). A returned provisioning
+state must be `Succeeded`; deleting or failed RGs do not qualify. No resource inside
+the matching RG is required. Dev and Stage use their own JSON section's naming,
+subscription and tenant; Stage's physical Azure naming alias is `test`.
+Failed CLI/authentication/network reads or malformed responses **block**, rather
+than being treated as an absent Dev RG. Read access to the configured predecessor
+subscriptions and target account is required. Checks run
+before updates and again immediately before dispatch; they do not log in, switch
+accounts, or create a prerequisite deployment.
+
+Public Stage/Prod flags select the reviewed single-project route automatically,
+using **`aifactory/variables.json`** inside the consumer repository. Both `dev` and
+`stage_prod` objects are required; their `project_number_000` must identify the same
+nonzero project. The project number is inferred; no hidden environment variables
+are needed. Existing explicit `AIFACTORY_PROJECT_CONFIG` and
+`AIFACTORY_PROJECT_NUMBER` are respected and checked, not overwritten.
+Missing, invalid, out-of-factory, oversized or linked JSON is rejected. An
+encrypted DPAPI export still needs its explicit reviewed project number.
+
+Use literal naming values: `admin_aifactoryPrefixRG`, `admin_aifactorySuffixRG`
+and `admin_locationSuffix`; `projectPrefix`/`projectSuffix` default to the Bicep
+defaults `esml-`/`-rg` when omitted. The full project RG name is
+`{admin_aifactoryPrefixRG}{projectPrefix}project{NNN}-{admin_locationSuffix}-{dev|test}{admin_aifactorySuffixRG}{projectSuffix}`.
+Prefer a three-digit string such as `"017"` for `project_number_000`; RG lookup
+preserves the raw number formatting actually passed to Bicep, without adding zeros.
+Source subscriptions are `dev.dev_sub_id` and `stage_prod.test_sub_id`; target
+Stage/Prod uses `stage_prod.test_sub_id`/`stage_prod.prod_sub_id`. Each section
+supplies its own `tenantId`. There is no subscription or Dev-configuration fallback.
+
+Promotion requires already-installed reviewed pipeline templates and existing
+authentication: GitHub environment credentials for the target, or ADO Entra
+authentication in `azureDevOpsTenantId` with matching target service connections.
+The helper binds the consumer origin and target, transports JSON securely per
+run, and dispatches/watches **only** the chosen target; other environments are
+skipped, not deployed automatically. It does not offer the legacy JSON opt-out.
+Omitted/explicit Dev retains the existing optional JSON prompt and GitHub
+variables/secrets or ADO YAML behavior, without new Azure predecessor checks.
+
+Normal Update defaults to `main`; project-only inherits the installed template
+version. To select a release, supply
 `--aifactory-version 125` (or `AIFACTORY_VERSION=125`); this maps to `release/v1.25`.
 `124` maps to `release/v1.24`; dotted values such as `1.100` and `10.2` and explicit
 `main` are supported without a mapping table. Consumer `main` is **not** the
@@ -60,7 +126,7 @@ can update legacy templates to v1.24 without downgrading the root routing script
 Preview binds the published exact commit. The selected release must contain the
 reviewed version/project contracts and be fetched locally for read-only validation.
 Install the PURPLE launchers together with `lib/project_deployment.py`,
-`lib/release_version.py`, and `lib/release_version.sh`; old installed scripts are
+`lib/project_environment.py`, `lib/release_version.py`, and `lib/release_version.sh`; old installed scripts are
 blocked, never silently replaced during preview. API creation materializes the
 reviewed Git archive per job, without checking out or changing shared development
 source. Missing/incompatible publication blocks until explicitly corrected.
@@ -98,7 +164,7 @@ It preserves the normal authentication and optional `variables.json` override
 flow, then dispatches the project deployment. For unattended execution, set
 `AIFACTORY_PROJECT_ONLY=true`.
 
-Both scripts ask `Do you want to override with variables.json? [y/N]` before starting the update. Enter `y` to pass `aifactory/variables.json` as the deployment override. Enter `n`, or press Enter, to pass an empty configuration path: Azure DevOps then uses `variables.yaml`, while GitHub Actions uses its configured variables and secrets without applying `variables.json`.
+In the legacy Dev flow, both scripts ask `Do you want to override with variables.json? [y/N]` before starting the update. Enter `y` to pass `aifactory/variables.json` as the deployment override. Enter `n`, or press Enter, to pass an empty configuration path: Azure DevOps then uses `variables.yaml`, while GitHub Actions uses its configured variables and secrets without applying `variables.json`.
 
 `useAdminVMBuildAgent` has been removed. Existing configurations must use `useSelfHostedBuildAgent` instead. The update scripts remove the deprecated key while merging configuration templates.
 
@@ -116,9 +182,12 @@ On the first Azure DevOps run, the ADO script prompts for your organization name
 
 ### Reviewed single-project Stage/Prod deployment
 
-The updated root launchers declare `# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1`.
-Without the following opt-in inputs, their existing Dev/default and full-promotion
-behavior is unchanged. A reviewed deployment supplies **all three**:
+The updated root launchers declare `# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1`
+and `# AIFACTORY_ENVIRONMENT_CONTRACT=1`. Callers must check the environment
+contract before relying on the flag and Azure prerequisite checks.
+The public Stage/Prod flag supplies the target and enables JSON/project discovery
+as described above. Existing API/environment-only deployments still require
+**all three** explicit inputs; missing reviewed inputs are not inferred:
 
 - `AIFACTORY_PROJECT_NUMBER`: selected three-digit project, for example `017`;
 - `AIFACTORY_TARGET_ENVIRONMENT`: exactly `dev`, `stage`, or `prod`;
@@ -169,6 +238,7 @@ change does not automatically modify a consumer or publish its repository.
 | Canonical shared source | Consumer destination |
 |---|---|
 | `bootstrap/GH-update-aifactory-and-run-project.sh` | Root `GH-update-aifactory-and-run-project.sh` for GitHub |
+| `bootstrap/GHA-update-aifactory-and-run-project.sh` | Root `GHA-update-aifactory-and-run-project.sh` forwarding alias |
 | `bootstrap/ADO-update-aifactory-and-run-project.sh` | Root `ADO-update-aifactory-and-run-project.sh` for ADO |
 | `bootstrap/ADO-azurefactory.sh` / `bootstrap/GHA-azurefactory.sh` | Root provider-scoped lifecycle wrappers |
 | `bootstrap/AIFactory-lifecycle.sh` | Root lifecycle compatibility entrypoint |
@@ -176,12 +246,17 @@ change does not automatically modify a consumer or publish its repository.
 | `bootstrap/lib/factory_lifecycle.py`, `project_deployment.py` | Root `lib` scoped execution helpers |
 | `bootstrap/lib/create-new-aifactory-scaleset.sh`, `aifactory_*` helpers | Root `lib` create/network helpers |
 | `bootstrap/lib/project_deployment.py` | Root `lib/project_deployment.py` |
+| `bootstrap/lib/project_environment.py` | Root `lib/project_environment.py` (required by both launchers and the reviewed helper) |
+| `bootstrap/lib/release_version.py`, `bootstrap/lib/release_version.sh` | Root `lib/` version helpers |
 | `environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project.yml` | `.github/workflows/infra-project.yml` |
 | Same GitHub template directory: `infra-project-phase.yml` | `.github/workflows/infra-project-phase.yml` |
 | `environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/infra-project-genai.yaml` | `aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-genai.yaml` |
 | Same ADO template directory: `jobs/job-0-reviewed-project-config.yaml` | Same consumer pipeline directory: `jobs/job-0-reviewed-project-config.yaml` |
 
 Keep the existing root `ui/terminal.sh` and normal bootstrap dependencies installed.
+`00-start.sh` copies the launcher/helper family together. Stable relaunch and
+post-update restoration preserve this family rather than mixing fetched helpers
+with the running launcher. No existing consumer is synchronized by this source change.
 Install the helper plus both pipeline files for the selected provider; adding only
 the marker is not sufficient. The confirmation blocks missing/stale capabilities.
 The helper can publish the reviewed allowlisted code only after its explicit

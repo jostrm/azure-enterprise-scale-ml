@@ -1,0 +1,95 @@
+let ScopedCosts = materialize(AppEvents
+    | where tolower(_ResourceId) == tolower(Component)
+    | where Name == 'aifactory.chat.meter'
+    | where ScopeReady and WindowValid and TimeGenerated >= StartUtc and TimeGenerated < EndUtc
+    | where tostring(Properties.factory) == Factory and tostring(Properties.scaleset) == ScaleSet
+        and tostring(Properties['project']) == Project and tostring(Properties.environment) == Environment
+    | project event_id = tostring(Properties.event_id), TimeGenerated, store = tostring(Properties.store),
+        session_key = tostring(Properties.session_key), network_key = tostring(Properties.network_key),
+        service = tostring(Properties.service), meter = tostring(Properties.meter),
+        quantity_text = tostring(Properties.quantity), unit = tostring(Properties.unit),
+        basis = tostring(Properties.basis), currency = tostring(Properties.currency),
+        unit_price_text = tostring(Properties.unit_price), price_unit_quantity_text = tostring(Properties.price_unit_quantity),
+        rate_reference = tostring(Properties.rate_reference), amount_text = tostring(Properties.amount),
+        evidence_reference = tostring(Properties.evidence_reference), allocation_method = tostring(Properties.allocation_method),
+        billing_reference = tostring(Properties.billing_reference), attribution_reference = tostring(Properties.attribution_reference),
+        charge_type = tostring(Properties.charge_type), item_count = coalesce(ItemCount, 1));
+let RawCosts = materialize(ScopedCosts | where Store == 'All' or store == Store | distinct *);
+let CostConflicts = toscalar(RawCosts | summarize Variants = count() by event_id | where Variants > 1 | count);
+// Check only allowlisted fields; never query client_IP, prompts, transcripts or contact values.
+let HasRawIP = (s:string) { s matches regex @'(?:[0-9]{1,3}\.){3}[0-9]{1,3}|(?i)(?:[0-9a-f]{0,4}:){2,}[0-9a-f]{0,4}' };
+let DecimalText = (s:string) { s matches regex @'^-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$' };
+let ParsedCosts = materialize(RawCosts
+    | extend quantity = todecimal(quantity_text), unit_price = todecimal(unit_price_text),
+        price_unit_quantity = todecimal(price_unit_quantity_text), amount = todecimal(amount_text)
+    | extend charge_type = iff(isempty(charge_type), iff(basis == 'actual' and service == 'other' and unit == 'billing charge', 'unclassified', 'paygo'), charge_type)
+    | extend valid = isnotempty(event_id) and item_count == 1 and DecimalText(quantity_text) and isnotnull(quantity) and quantity >= 0
+        and (isempty(unit_price_text) or (DecimalText(unit_price_text) and isnotnull(unit_price) and unit_price >= 0))
+        and (isempty(price_unit_quantity_text) or (DecimalText(price_unit_quantity_text) and isnotnull(price_unit_quantity) and price_unit_quantity > 0))
+        and (isempty(amount_text) or (DecimalText(amount_text) and isnotnull(amount)))
+        and (isempty(rate_reference) or Concrete(rate_reference))
+        and (isempty(evidence_reference) or Concrete(evidence_reference))
+        and (isempty(allocation_method) or Concrete(allocation_method))
+        and (isempty(billing_reference) or Concrete(billing_reference))
+        and (isempty(attribution_reference) or Concrete(attribution_reference))
+        and (isempty(session_key) or session_key matches regex @'^session_[A-Za-z0-9_-]{8,64}$')
+        and (isempty(network_key) or network_key matches regex @'^ipkey_[0-9a-f]{32,64}$')
+        and currency matches regex @'^[A-Z]{3}$' and basis in ('estimated', 'actual', 'allocated')
+        and charge_type in ('paygo', 'fixed', 'unclassified') and Concrete(meter) and Concrete(unit)
+        and ((service == 'token' and meter in ('input_tokens', 'output_tokens', 'cached_input_tokens') and unit == 'tokens' and charge_type == 'paygo')
+            or (service == 'speech' and ((meter == 'audio_input_seconds' and unit == 'seconds') or (meter == 'audio_output_characters' and unit == 'characters')) and charge_type == 'paygo')
+            or (service == 'other' and meter !in ('input_tokens', 'output_tokens', 'cached_input_tokens', 'audio_input_seconds', 'audio_output_characters')))
+        and not(meter matches regex @'(?i)(?:^|[\s_:-])(?:ptu|reservation|reserved)(?:[\s_:-]|$)' and charge_type == 'paygo')
+        and ((basis == 'estimated' and isnotnull(unit_price) and unit_price >= 0 and price_unit_quantity > 0 and Concrete(rate_reference) and isempty(amount_text))
+            or (basis in ('actual', 'allocated') and isnotnull(amount) and Concrete(evidence_reference)
+                and (basis != 'allocated' or (Concrete(allocation_method) and Concrete(billing_reference)))
+                and ((isempty(session_key) and isempty(network_key)) or Concrete(attribution_reference))))
+        and not(HasRawIP(tostring(pack_array(store, meter, unit, rate_reference, evidence_reference, allocation_method, billing_reference, attribution_reference))))
+    | extend cost = iff(basis == 'estimated', quantity * unit_price / price_unit_quantity, amount)
+    | extend valid = coalesce(valid, false) and isnotnull(cost));
+let InvalidCosts = toscalar(ParsedCosts | where not(valid) | count);
+let CostValid = ScopeReady and WindowValid and CostConflicts == 0 and InvalidCosts == 0;
+let MissingStoreBases = ScopedCosts | where not(Concrete(store)) | distinct basis;
+let Bases = datatable(basis:string) ['actual', 'allocated', 'estimated']
+    | extend Declared = iff(basis == 'estimated', MeteringComplete, BillingComplete)
+    | join kind=leftouter (MissingStoreBases | extend MissingStore = true) on basis
+    | project basis, Complete = CostValid and Declared and (Store == 'All' or not(coalesce(MissingStore, false)));
+let CostRows = materialize(ParsedCosts | where CostValid
+    | extend Day = startofday(datetime_utc_to_local(TimeGenerated, Zone)),
+        Session = iff(isempty(session_key), 'Unattributed', session_key),
+        IPGroup = iff(isempty(network_key), 'Unattributed', network_key),
+        StoreLabel = iff(Concrete(store), store, 'Unattributed'));
+let Totals = CostRows | summarize Cost = sum(cost), Observations = count(),
+    AttributedCost = sumif(cost, isnotempty(session_key)), UnattributedCost = sumif(cost, isempty(session_key)) by basis, currency;
+let Sessions = CostRows | where isnotempty(session_key) | distinct store, session_key, basis, currency
+    | summarize KnownMeteredSessions = count() by basis, currency;
+let CostSummary = Bases | join kind=leftouter (Totals) on basis
+    | join kind=leftouter (Sessions) on basis, currency
+    | extend Availability = case(not(CostValid), 'Unavailable: select scope/dates or correct rejected evidence', Complete, 'Declared complete', isnotnull(Observations), 'Partial observed costs; not a full total', 'Unavailable: no coverage'),
+        Cost = iff(isnotnull(Observations), Cost, iff(Complete, decimal(0), decimal(null))),
+        Currency = iff(isempty(currency), 'No currency observed (not a billed total)', currency),
+        KnownMeteredSessions = iff(isnotnull(Observations), coalesce(KnownMeteredSessions, 0), long(null))
+    | project Basis = basis, Currency, Cost, Availability, KnownMeteredSessions,
+        CostPerObservedSession = iff(KnownMeteredSessions > 0, AttributedCost / todecimal(KnownMeteredSessions), decimal(null)),
+        SessionUnattributedCost = UnattributedCost,
+        Formula = 'estimated = quantity * unit_price / price_unit_quantity; actual/allocated = supplied evidenced amount; per session = attributed cost / exact known (store,session_key) count';
+let Pairs = CostRows | distinct basis, currency;
+let DailyAmounts = CostRows | summarize Cost = sum(cost) by Day, basis, currency;
+let DailyCosts = Days | extend JoinKey = 1
+    | join kind=inner (Pairs | extend JoinKey = 1) on JoinKey
+    | join kind=leftouter (DailyAmounts) on Day, basis, currency
+    | join kind=inner (Bases) on basis
+    | project Day, Basis = basis, Currency = currency, Cost = iff(isnotnull(Cost), Cost, iff(Complete, decimal(0), decimal(null))),
+        Coverage = iff(Complete, 'Declared complete', 'Partial observed costs')
+    | order by Day asc;
+let DailyServiceAmounts = CostRows | summarize Cost = sum(cost) by Day, basis, currency, service;
+let Services = datatable(service:string) ['token', 'speech', 'other'];
+let DailyServiceCosts = Days | extend JoinKey = 1
+    | join kind=inner (Pairs | extend JoinKey = 1) on JoinKey
+    | join kind=inner (Services | extend JoinKey = 1) on JoinKey
+    | join kind=leftouter (DailyServiceAmounts) on Day, basis, currency, service
+    | join kind=inner (Bases) on basis
+    | project Day, Basis = basis, Currency = currency, Service = service,
+        Cost = iff(isnotnull(Cost), Cost, iff(Complete, decimal(0), decimal(null))),
+        Coverage = iff(Complete, 'Declared complete', 'Partial observed costs')
+    | order by Day asc;

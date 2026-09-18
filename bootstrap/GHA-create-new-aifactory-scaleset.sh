@@ -11,6 +11,10 @@ done
 [[ -f "$ROUTER" ]] || { printf 'ERROR: AI Factory layout router is missing.\n' >&2; exit 1; }
 # shellcheck source=lib/layout_router.sh
 source "$ROUTER"
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  aif_enrollment_usage "GHA-create-new-aifactory-scaleset.sh"
+fi
+aif_route_enrollment gha "$SCRIPT_DIR" "$@"
 aif_route_registered_layout gha "${AIFACTORY_REPO_ROOT:-$SCRIPT_DIR}" "$SCRIPT_DIR" "$@"
 for LIBRARY in \
   "$SCRIPT_DIR/lib/create-new-aifactory-scaleset.sh" \

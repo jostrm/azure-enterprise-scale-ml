@@ -14,7 +14,7 @@ from agent_factory.data import ingest
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", type=Path, required=True)
-    parser.add_argument("--container", default="agent-factory")
+    parser.add_argument("--container", help="Legacy override; must match the configured container on a selected target.")
     parser.add_argument("--prefix", default="kaggle-rag-v1")
     parser.add_argument("--index", default="aif-kaggle-rag-v1")
     args = parser.parse_args()

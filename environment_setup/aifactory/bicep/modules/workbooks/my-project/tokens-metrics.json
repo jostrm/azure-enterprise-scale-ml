@@ -1,0 +1,46 @@
+[
+  {
+    "key": "foundry",
+    "label": "Foundry / Models metrics",
+    "metrics": [
+      {
+        "namespace": "microsoft.cognitiveservices/accounts",
+        "metric": "microsoft.cognitiveservices/accounts-Models  Usage-InputTokens",
+        "aggregation": 1,
+        "splitBy": ["ModelDeploymentName", "ModelName", "ModelVersion"],
+        "splitByLimit": 100,
+        "columnName": "Input tokens (inclusive; do not add cache)"
+      },
+      {
+        "namespace": "microsoft.cognitiveservices/accounts",
+        "metric": "microsoft.cognitiveservices/accounts-Models  Usage-OutputTokens",
+        "aggregation": 1,
+        "splitBy": ["ModelDeploymentName", "ModelName", "ModelVersion"],
+        "splitByLimit": 100,
+        "columnName": "Output tokens"
+      }
+    ]
+  },
+  {
+    "key": "openai",
+    "label": "Standard Azure OpenAI metrics (model name not emitted)",
+    "metrics": [
+      {
+        "namespace": "microsoft.cognitiveservices/accounts",
+        "metric": "microsoft.cognitiveservices/accounts-Azure OpenAI  Usage-ProcessedPromptTokens",
+        "aggregation": 1,
+        "splitBy": ["ModelDeploymentName", "ModelVersion"],
+        "splitByLimit": 100,
+        "columnName": "Input tokens (inclusive; do not add cache)"
+      },
+      {
+        "namespace": "microsoft.cognitiveservices/accounts",
+        "metric": "microsoft.cognitiveservices/accounts-Azure OpenAI  Usage-GeneratedTokens",
+        "aggregation": 1,
+        "splitBy": ["ModelDeploymentName", "ModelVersion"],
+        "splitByLimit": 100,
+        "columnName": "Output tokens"
+      }
+    ]
+  }
+]

@@ -1,0 +1,145 @@
+# Copy beside infra-project-genai.yaml in the consumer's pipeline directory.
+# Requires Python 3.10+, PowerShell Core, Azure CLI + preinstalled Bicep.
+# Use a persistent repository-relative variables.json (nested registered projects supported).
+# The existing selected service connection must match that environment's JSON connection.
+# The configuration job uses variables.yaml to bootstrap from-config runner selection;
+# its output selects the actual dashboard job's pool from variables.json.
+# Explicit microsoft-hosted overrides JSON self-hosting for both jobs (windows-2022);
+# no private-network agent or VM start/provisioning is needed for these ARM operations.
+# Permissions: existing RG/resource read, DEV common dashboard read/write, selected
+# project RG deployment/dashboard/workbook write. No role grants or RG creation.
+trigger: none
+pr: none
+
+parameters:
+  - name: environment
+    displayName: Selected environment (stage deploys Azure test)
+    type: string
+    default: dev
+    values: [dev, stage, test, prod]
+  - name: projectNumber
+    displayName: Exact project number assertion
+    type: string
+    default: '001'
+  - name: configFile
+    displayName: Persistent consumer-relative variables.json
+    type: string
+    default: aifactory/variables.json
+  - name: mode
+    displayName: Plan is read-only; deploy explicitly refreshes dashboards and workbook
+    type: string
+    default: plan
+    values: [plan, deploy]
+  - name: runnerSelection
+    type: string
+    default: from-config
+    values: [from-config, microsoft-hosted, self-hosted]
+  - name: selfHostedPool
+    displayName: Bootstrap pool for explicit self-hosted selection (actual job uses JSON pool)
+    type: string
+    default: Default
+  - name: serviceConnection
+    displayName: Existing connection override (empty uses existing per-environment variables.yaml)
+    type: string
+    default: ''
+  - name: factory_id
+    displayName: Exact telemetry factory ID from the register (optional; no register publication needed)
+    type: string
+    default: ''
+  - name: scale_set_id
+    displayName: Exact telemetry scale set ID for the selected placement (optional)
+    type: string
+    default: ''
+
+variables:
+  - template: ../variables/variables.yaml
+  - name: dashboardServiceConnection
+    ${{ if ne(parameters.serviceConnection, '') }}:
+      value: ${{ parameters.serviceConnection }}
+    ${{ elseif eq(parameters.environment, 'dev') }}:
+      value: ${{ variables.dev_service_connection }}
+    ${{ elseif eq(parameters.environment, 'prod') }}:
+      value: ${{ variables.prod_service_connection }}
+    ${{ else }}:
+      value: ${{ variables.test_service_connection }}
+
+jobs:
+  - job: Configure
+    displayName: Validate configuration and select runner (no Azure access)
+    pool:
+      ${{ if eq(parameters.runnerSelection, 'self-hosted') }}:
+        name: ${{ parameters.selfHostedPool }}
+      ${{ elseif and(eq(parameters.runnerSelection, 'from-config'), eq(variables.useSelfHostedBuildAgent, 'true')) }}:
+        name: ${{ coalesce(variables.adminVMBuildAgentPool, 'Default') }}
+      ${{ else }}:
+        vmImage: windows-2022
+    steps:
+      - checkout: self
+        submodules: recursive
+        persistCredentials: false
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+          if (-not $python) { $python = Get-Command python3 -CommandType Application -ErrorAction Stop }
+          $script = Join-Path $env:CONSUMER_ROOT 'azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-dashboards-only.py'
+          $scopeArgs = @()
+          if ($env:FACTORY_ID) { $scopeArgs += @('--factory-id', $env:FACTORY_ID) }
+          if ($env:SCALE_SET_ID) { $scopeArgs += @('--scale-set-id', $env:SCALE_SET_ID) }
+          & $python.Source $script --consumer-root $env:CONSUMER_ROOT --variables-json $env:CONFIG_FILE --environment $env:TARGET_ENVIRONMENT --project $env:PROJECT_NUMBER --ci-output ado --runner-selection $env:RUNNER_SELECTION --service-connection $env:SERVICE_CONNECTION @scopeArgs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        name: resolve
+        displayName: Resolve only allowlisted routing values
+        env:
+          CONSUMER_ROOT: $(Build.SourcesDirectory)
+          CONFIG_FILE: ${{ parameters.configFile }}
+          TARGET_ENVIRONMENT: ${{ parameters.environment }}
+          PROJECT_NUMBER: ${{ parameters.projectNumber }}
+          RUNNER_SELECTION: ${{ parameters.runnerSelection }}
+          SERVICE_CONNECTION: ${{ variables.dashboardServiceConnection }}
+          FACTORY_ID: ${{ parameters.factory_id }}
+          SCALE_SET_ID: ${{ parameters.scale_set_id }}
+
+  - ${{ each runner in split('hosted,self_hosted', ',') }}:
+    - job: Dashboards_${{ runner }}
+      displayName: Dashboard-only ${{ parameters.mode }} (${{ runner }})
+      dependsOn: Configure
+      timeoutInMinutes: 60
+      ${{ if eq(runner, 'self_hosted') }}:
+        condition: and(succeeded(), eq(dependencies.Configure.outputs['resolve.use_self_hosted'], 'true'))
+        pool:
+          name: $[ dependencies.Configure.outputs['resolve.pool'] ]
+      ${{ else }}:
+        condition: and(succeeded(), eq(dependencies.Configure.outputs['resolve.use_self_hosted'], 'false'))
+        pool:
+          vmImage: windows-2022
+      steps:
+        - checkout: self
+          submodules: recursive
+          persistCredentials: false
+        - task: AzureCLI@2
+          displayName: Verify exact account and refresh dashboards only
+          inputs:
+            azureSubscription: ${{ variables.dashboardServiceConnection }}
+            scriptType: pscore
+            scriptLocation: inlineScript
+            addSpnToEnvironment: false
+            visibleAzLogin: false
+            inlineScript: |
+              $ErrorActionPreference = 'Stop'
+              $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+              if (-not $python) { $python = Get-Command python3 -CommandType Application -ErrorAction Stop }
+              $script = Join-Path $env:CONSUMER_ROOT 'azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-dashboards-only.py'
+              $scopeArgs = @()
+              if ($env:FACTORY_ID) { $scopeArgs += @('--factory-id', $env:FACTORY_ID) }
+              if ($env:SCALE_SET_ID) { $scopeArgs += @('--scale-set-id', $env:SCALE_SET_ID) }
+              & $python.Source $script --consumer-root $env:CONSUMER_ROOT --variables-json $env:CONFIG_FILE --environment $env:TARGET_ENVIRONMENT --project $env:PROJECT_NUMBER --mode $env:DASHBOARD_MODE --service-connection $env:SERVICE_CONNECTION @scopeArgs
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          env:
+            CONSUMER_ROOT: $(Build.SourcesDirectory)
+            CONFIG_FILE: ${{ parameters.configFile }}
+            TARGET_ENVIRONMENT: ${{ parameters.environment }}
+            PROJECT_NUMBER: ${{ parameters.projectNumber }}
+            DASHBOARD_MODE: ${{ parameters.mode }}
+            SERVICE_CONNECTION: ${{ variables.dashboardServiceConnection }}
+            FACTORY_ID: ${{ parameters.factory_id }}
+            SCALE_SET_ID: ${{ parameters.scale_set_id }}

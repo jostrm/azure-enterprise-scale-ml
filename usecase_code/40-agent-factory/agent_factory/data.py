@@ -46,10 +46,9 @@ def search_name(value: str) -> str:
 
 
 def validate_target(target: Target) -> None:
-    # This ingestion is deliberately bound to the requested project storage family.
     if not re.fullmatch(r"[a-z0-9]{3,24}", target.storage_name):
         raise ValueError("Invalid project storage account name.")
-    if "2001" not in target.storage_name or "1001" in target.storage_name:
+    if target.use_common_datalake_storage is None and ("2001" not in target.storage_name or "1001" in target.storage_name):
         raise ValueError("Refusing storage: the project account must contain 2001, never 1001.")
     search_name(target.search_name)
     UUID(target.identity_client_id)
@@ -316,10 +315,11 @@ def _index_inventory(session, target: Target, index_name: str, expected: dict[st
     raise RuntimeError("Search inventory exceeded the bounded dataset limit.")
 
 
-def ingest(target: Target, *, container: str = "agent-factory", prefix: str = "kaggle-rag-v1",
+def ingest(target: Target, *, container: str | None = None, prefix: str = "kaggle-rag-v1",
            index_name: str = "aif-kaggle-rag-v1") -> dict:
     """Download and persist using only the explicitly selected Azure-host UAMI."""
     validate_target(target)
+    container = target.resolve_container(container)
     search_name(index_name)
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", container) or "--" in container:
         raise ValueError("Invalid private Blob container name.")
@@ -354,7 +354,12 @@ def ingest(target: Target, *, container: str = "agent-factory", prefix: str = "k
         _index_inventory(session, target, index_name, expected)
         service = _blob_service(account_url, credential)
         try:
-            blobs = _private_container(service, container)
+            if target.use_common_datalake_storage is None:
+                blobs = _private_container(service, container)
+            else:
+                blobs = service.get_container_client(container)
+                if blobs.get_container_properties().get("public_access"):
+                    raise ValueError("Selected Blob container permits public access; refusing to modify it.")
             metadata = {"dataset_version": DATASET_VERSION, "dataset_sha256": dataset.raw_sha256, "license": "MIT"}
             _put_blob(blobs, f"{prefix}/raw/{DATASET_FILE}", raw, "text/csv; charset=utf-8", metadata)
             evaluations = b"\n".join(json_bytes(row) for row in dataset.evaluations) + b"\n"
@@ -402,6 +407,8 @@ def ingest(target: Target, *, container: str = "agent-factory", prefix: str = "k
             raise RuntimeError("Semantic ranking did not return grounded documents; check service region, enablement and quota.")
         return {
             "status": "ingested", "storage_account": target.storage_name, "container": container,
+            "storage_resource_group": target.storage_resource_group or target.resource_group,
+            "storage": {**target.storage_summary(), "container": container},
             "prefix": prefix, "index_name": index_name, "row_count": dataset.row_count,
             "document_count": len(documents), "evaluation_count": len(dataset.evaluations),
             "raw_sha256": dataset.raw_sha256, "manifest_url": f"{account_url}/{container}/{prefix}/manifest.json",

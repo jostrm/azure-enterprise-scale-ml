@@ -53,6 +53,9 @@ def test_load_and_named_model_selection_preserve_mapping_and_no_side_effects():
 def test_invalid_configuration(changes):
     value = document()
     value.update(changes)
+    if changes == {"storage": {}}:
+        value.pop("use_common_datalake_storage", None)
+        value.pop("storage_targets", None)
     with pytest.raises(ValueError):
         LakeSettings.from_dict(value)
 

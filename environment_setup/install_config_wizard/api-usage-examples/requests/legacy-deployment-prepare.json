@@ -1,0 +1,5 @@
+{
+  "folder": "${LEGACY_FACTORY_FOLDER}",
+  "draft_id": "${DRAFT_ID}",
+  "patch": false
+}

@@ -1,5 +1,18 @@
 {
   "agent_prefix": "aif",
+  "use_common_datalake_storage": false,
+  "storage_targets": {
+    "common": {
+      "account_name": "<existing-common-data-account>",
+      "resource_group": "<existing-common-resource-group>",
+      "container": "lake3"
+    },
+    "project": {
+      "account_name": "<existing-project-data-account>",
+      "resource_group": "<existing-project-resource-group>",
+      "container": "agent-factory"
+    }
+  },
   "targets": [
     {
       "key": "project001-dev",

@@ -1,0 +1,7 @@
+{
+  "aifactory_folder": "${FACTORY_FOLDER}",
+  "factory_id": "${FACTORY_ID}",
+  "scale_set_id": "${DEV_SCALESET_001_ID}",
+  "expected_tenant_id": "${TENANT_ID}",
+  "expected_subscription_id": "${DEV_SUBSCRIPTION_ID}"
+}
