@@ -172,12 +172,12 @@ function Install-AifMissingTool {
         default { throw "No installer for $Name." }
     }
     # Use the same official verified installer even when a Chocolatey mirror lags the release.
-    $file = Join-Path $downloadRoot $asset.Name
+    $file = Join-AifWindowsPath $downloadRoot $asset.Name
     if (Test-Path -LiteralPath $file) { throw "Download staging file already exists: $file. Inspect it before retrying." }
     try {
         Save-AifVerifiedDownload $asset.Url $file $asset.Digest $publisher
         if ($Name -in @('bicep', 'jq')) {
-            $destination = Join-Path $bin "$Name.exe"
+            $destination = Join-AifWindowsPath $bin "$Name.exe"
             if (Test-Path -LiteralPath $destination) { throw "Refusing to replace existing $destination." }
             Move-Item -LiteralPath $file -Destination $destination
         } else {
@@ -205,7 +205,7 @@ function Set-AifRunnerPrerequisiteMarker {
     $directory = Get-AifProgramFilesPath 'AIFactory'
     New-Item -ItemType Directory -Path $directory -Force | Out-Null
     @{ ChangedUtc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json |
-        Set-Content -LiteralPath (Join-Path $directory 'prerequisites-changed.json') -Encoding UTF8
+        Set-Content -LiteralPath (Join-AifWindowsPath $directory 'prerequisites-changed.json') -Encoding UTF8
 }
 
 function Set-AifRunnerMachinePath {
@@ -285,8 +285,8 @@ function Invoke-AifRunnerPrerequisites {
             if ($python.Status -ne 'ready') { throw 'Cannot create python3 forwarding scripts without a valid Python >=3.10.' }
             $bin = Get-AifProgramFilesPath 'AIFactory\bin'
             New-Item -ItemType Directory -Path $bin -Force | Out-Null
-            $cmd = Join-Path $bin 'python3.cmd'
-            $bash = Join-Path $bin 'python3'
+            $cmd = Join-AifWindowsPath $bin 'python3.cmd'
+            $bash = Join-AifWindowsPath $bin 'python3'
             if ((Test-Path -LiteralPath $cmd) -or (Test-Path -LiteralPath $bash)) { throw 'Refusing to overwrite existing python3 forwarding scripts.' }
             # Only the requested python3 entry point is forwarded; python and pip are never shadowed.
             [IO.File]::WriteAllText($cmd, "@echo off`r`n`"$($python.Path)`" %*`r`nexit /b %errorlevel%`r`n", [Text.Encoding]::ASCII)
@@ -312,7 +312,7 @@ foreach ($spec in @(@{Name='Az.Accounts'; Minimum=[version]'2.12'}, @{Name='Az.N
         $directory = ($programFiles -replace '[\\/]+$', '') + '\AIFactory'
         New-Item -ItemType Directory -Path $directory -Force | Out-Null
         @{ ChangedUtc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json |
-            Set-Content -LiteralPath (Join-Path $directory 'prerequisites-changed.json') -Encoding UTF8
+            Set-Content -LiteralPath ($directory + '\prerequisites-changed.json') -Encoding UTF8
         $version = (Find-Module -Name $spec.Name -Repository PSGallery).Version
         Install-Module -Name $spec.Name -RequiredVersion $version -Repository PSGallery -Scope AllUsers -Force -AcceptLicense
         if (-not (Get-Module -ListAvailable -Name $spec.Name | Where-Object Version -GE $spec.Minimum)) {

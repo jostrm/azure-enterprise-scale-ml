@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import html
 import io
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -31,6 +33,21 @@ def quote(value: str | Path) -> str:
     return "'" + str(value).replace("'", "''") + "'"
 
 
+def powershell_stream_text(value: str) -> str:
+    if not value.startswith("#< CLIXML"):
+        return value
+    value = re.sub(r"<[^>]+>", " ", value.partition("\n")[2])
+    value = html.unescape(value)
+    value = re.sub(r"_x([0-9a-fA-F]{4})_", lambda match: chr(int(match.group(1), 16)), value)
+    value = re.sub(r"\x1b\[[0-9;]*m", "", value)
+    return " ".join(value.split())
+
+
+def test_powershell_stream_text_normalizes_wrapped_clixml() -> None:
+    stream = '#< CLIXML\n<Objs><S S="Error">left_x000A_</S><S S="Error">untouched &amp; safe</S></Objs>'
+    assert powershell_stream_text(stream) == "left untouched & safe"
+
+
 @unittest.skipUnless(POWERSHELL, "PowerShell is required for offline function tests")
 class RunnerPowerShellTests(unittest.TestCase):
     def run_ps(self, body: str, *, success: bool = True) -> subprocess.CompletedProcess[str]:
@@ -49,6 +66,8 @@ class RunnerPowerShellTests(unittest.TestCase):
             [POWERSHELL, "-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
             cwd=ROOT, text=True, capture_output=True, timeout=30,
         )
+        result.stdout = powershell_stream_text(result.stdout)
+        result.stderr = powershell_stream_text(result.stderr)
         if success:
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         else:
