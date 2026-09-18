@@ -40,11 +40,12 @@ def powershell_stream_text(value: str) -> str:
     value = html.unescape(value)
     value = re.sub(r"_x([0-9a-fA-F]{4})_", lambda match: chr(int(match.group(1), 16)), value)
     value = re.sub(r"\x1b\[[0-9;]*m", "", value)
+    value = re.sub(r"\s+\|\s+", " ", value)
     return " ".join(value.split())
 
 
 def test_powershell_stream_text_normalizes_wrapped_clixml() -> None:
-    stream = '#< CLIXML\n<Objs><S S="Error">left_x000A_</S><S S="Error">untouched &amp; safe</S></Objs>'
+    stream = '#< CLIXML\n<Objs><S S="Error">left_x000A_</S><S S="Error"> | untouched &amp; safe</S></Objs>'
     assert powershell_stream_text(stream) == "left untouched & safe"
 
 
