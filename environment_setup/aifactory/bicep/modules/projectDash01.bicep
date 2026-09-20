@@ -292,6 +292,58 @@ var aiFoundryProjectUrl    = 'https://ai.azure.com/build/overview?tid=${tenant()
 var costAnalysisUrl        = 'https://portal.azure.com/@${tenant().tenantId}/#blade/Microsoft_Azure_CostManagement/Menu/open/costanalysis/scope/${uriComponent(rgResourceId)}'
 var rgPortalUrl            = 'https://portal.azure.com/#@${tenant().tenantId}/resource${rgResourceId}'
 
+// Same native pin schema as deploy-aifactory-dashboard.py::cost_part.
+var nativeCostAnalysisPart = {
+  position: { x: 6, y: 2, colSpan: 6, rowSpan: 8 }
+  metadata: {
+    deepLink: '#@${tenant().tenantId}/resource${rgResourceId}/costanalysis'
+    inputs: [
+      { name: 'scope', value: rgResourceId }
+      { name: 'scopeName', value: targetResourceGroup }
+      {
+        name: 'view'
+        isOptional: true
+        value: {
+          accumulated: 'true'
+          chart: 'Area'
+          currency: null
+          dateRange: 'ThisMonth'
+          displayName: 'AccumulatedCosts'
+          kpis: [
+            {
+              enabled: true
+              extendedProperties: { name: 'COST_NAVIGATOR.BUDGET_OPTIONS.NONE' }
+              id: 'COST_NAVIGATOR.BUDGET_OPTIONS.NONE'
+              type: 'Budget'
+            }
+            { enabled: true, type: 'Forecast' }
+          ]
+          pivots: [
+            { name: 'ServiceName', type: 'Dimension' }
+            { name: 'ResourceLocation', type: 'Dimension' }
+            { name: 'ResourceId', type: 'Dimension' }
+          ]
+          query: {
+            dataSet: {
+              aggregation: {
+                totalCost: { function: 'Sum', name: 'Cost' }
+                totalCostUSD: { function: 'Sum', name: 'CostUSD' }
+              }
+              granularity: 'Daily'
+              sorting: [{ direction: 'ascending', name: 'UsageDate' }]
+            }
+            timeframe: 'None'
+            type: 'ActualCost'
+          }
+          scope: substring(rgResourceId, 1)
+        }
+      }
+      { name: 'externalState', isOptional: true }
+    ]
+    type: 'Extension/Microsoft_Azure_CostManagement/PartType/CostAnalysisPinPart'
+  }
+}
+
 var projectInsightsId = empty(myProjectApplicationInsightsResourceId)
   ? '${rgResourceId}/providers/Microsoft.Insights/components/${namingOutputs.applicationInsightName}'
   : myProjectApplicationInsightsResourceId
@@ -406,29 +458,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
 
-          // ── ROW 2-9: Cost Analysis tile (right half — to the right of the RG) ─
-          // Note: CostAnalysisPinnedChartPart is deprecated; we use a rich Markdown
-          // tile with direct cost-management links instead so the dashboard always
-          // deploys cleanly across tenants.
-          {
-            position: { x: 6, y: 2, colSpan: 6, rowSpan: 8 }
-            metadata: {
-              inputs: []
-              #disable-next-line BCP088
-              type: 'Extension/HubsExtension/PartType/MarkdownPart'
-              settings: {
-                content: {
-                  settings: {
-                    content: '## 💰 Cost Analysis\n\nDetailed cost breakdown and trends for **${targetResourceGroup}**.\n\n**Data source:** Azure Cost Management. **Calculation:** none in this dashboard; the scoped Cost analysis view controls actual/amortized basis, period and currency. Estimates are not billed actuals. Missing cost data is unavailable, not zero.\n\n**Quick Links:**\n- [📊 Open Cost Analysis](${costAnalysisUrl} "Go to Azure Cost analysis for project ${projectNumber}")\n- [🔔 Cost Alerts](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${replace(rgResourceId, '/', '%2F')}/alerts)\n- [💵 Budgets](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/budgets/scope/${replace(rgResourceId, '/', '%2F')})\n- [🧠 Azure Advisor — Cost Recommendations](https://portal.azure.com/#blade/Microsoft_Azure_Expert/AdvisorMenuBlade/Cost)\n\n---\n\n### 💡 Optimization Tips\n- Review **Azure Advisor** for right-sizing recommendations\n- Set **budget alerts** to monitor monthly spend\n- Identify and stop **idle compute / storage**\n- Use the **AzqrCostOptimizeAgent** skill for a full audit'
-                    title: ''
-                    subtitle: ''
-                    markdownSource: 1
-                    markdownUri: null
-                  }
-                }
-              }
-            }
-          }
+          nativeCostAnalysisPart
 
           // ── ROW 10: 1x1 shortcut — AI Foundry V2 project ─────────────────────
           {
@@ -494,6 +524,24 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
               asset: {
                 idInputName: 'id'
                 type: 'Microsoft.Search/searchServices'
+              }
+            }
+          }
+          {
+            position: { x: 4, y: 10, colSpan: 8, rowSpan: 1 }
+            metadata: {
+              inputs: []
+              type: 'Extension/HubsExtension/PartType/MarkdownPart'
+              settings: {
+                content: {
+                  settings: {
+                    content: '**Data source:** Azure Cost Management · **Basis:** ActualCost · **Period:** This month. Azure forecast is a prediction, not a billed charge; unavailable when Azure cannot forecast.\n\n[📊 Open Cost Analysis](${costAnalysisUrl} "Go to Azure Cost analysis for project ${projectNumber}") | [Cost Alerts](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${replace(rgResourceId, '/', '%2F')}/alerts) | [Budgets](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/budgets/scope/${replace(rgResourceId, '/', '%2F')}) | [Advisor](https://portal.azure.com/#blade/Microsoft_Azure_Expert/AdvisorMenuBlade/Cost)'
+                    title: ''
+                    subtitle: ''
+                    markdownSource: 1
+                    markdownUri: null
+                  }
+                }
               }
             }
           }

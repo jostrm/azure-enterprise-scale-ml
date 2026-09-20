@@ -383,9 +383,27 @@ below made explicit rather than claiming automatic billing or telemetry setup.
 
 Coverage keys are `questions`, `devices`, `feedback`, `cart`, `bookings`,
 `cases`, `stateBaseline`, `metering` and `billing`. Their defaults are false.
+The saved dropdown values are explicitly lowercase `false` / `true`, matching
+their options; ARM's `string(bool)` produces `False` / `True` and must not be
+used for those defaults. Unreviewed coverage is a selected false value, not
+an unset required parameter.
 Review the assertions again after changing scope, store or dates. Coverage is
 not inferred from the existence or absence of rows, and query/permission
 failures do not become healthy zeros.
+
+In **View > Model tokens**, a sole Foundry/OpenAI account in the exact project
+resource group is selected automatically. Multiple accounts require an explicit
+choice; no account produces an unavailable state, never a subscription-wide
+fallback. These native token reports do not depend on business-event coverage.
+
+The project portal dashboard has a native **Cost Analysis** chart beside its
+resource-group tile, using the same `CostAnalysisPinPart` schema as the shared
+factory dashboard. It shows accumulated **ActualCost** for **this month** with
+Azure's **Forecast** KPI enabled, scoped to that exact project RG. Currency
+comes from Azure; an unavailable forecast is not replaced by a linear estimate.
+Resource-group actuals and forecast are not added to app-meter cost estimates.
+Every My Project workbook view also exposes an always-visible native Cost
+Analysis link, independent of the coverage, factory, store and session filters.
 
 The deployed project number and telemetry environment are fixed in the
 workbook. Every query filters the **exact Application Insights component**
@@ -414,12 +432,20 @@ a separate project-RG billing destination with its own filters; the workbook's
 session/IP costs come from recorded meter evidence. There are no embedded
 fictional samples presented as live native data.
 
-**Validation boundary:** the source and isolated Spider copy were compiled and
-their serialized workbook/query structure checked locally. Usage, Cost and
-request-log token KQL were also executed read-only against an existing workspace,
-including array-valued input/output/cache counters. Missing business events
-remain unavailable. The new workbook still requires an approved deployment and
-Portal rendering check; successful KQL alone is not proof of the complete UI.
+**Deployment status (18 September 2026):** the approved consumer-driven
+dashboard-only rollout deployed the project dashboards and 36-item My Project
+workbooks for Dev projects 001 and 002, and refreshed the shared factory dashboard
+without losing either project's inventory. Orange retained ownership of
+`variables.json` and pinned purple commit `26496876`.
+
+Eight aggregate queries from each actual saved workbook were executed against
+the existing workspace. Project 001 returned real per-model input, output and
+cached-token observations; Project 002 returned no matching request-usage rows
+for the selected window, not measured zero. Missing business events and
+session/IP cost evidence remain unavailable. No telemetry was synthesized or
+ingested, and no Azure roles or underlying infrastructure were changed.
+Portal rendering remains pending interactive Azure sign-in; successful ARM
+deployment and KQL execution alone are not proof of the complete UI.
 
 ### Keeping MAUI and Tkinter API hosts in sync
 
@@ -640,9 +666,10 @@ pwsh -NoProfile -File .\run-native-monitoring-sample.ps1
 ```
 
 Optional `--output`, `--csv` and `--events` produce local artifacts.
-**`--events` only prepares event payloads; it does not ingest them.** The native
-workbook was not deployed or rendered against newly published telemetry in
-this implementation pass.
+**`--events` only prepares event payloads; it does not ingest them.** The optional
+agent-monitoring workbook was not deployed or rendered against newly published
+business-value telemetry. This is separate from the deployed My Project
+Usage/Cost/Model Tokens workbooks described above.
 
 For supported native observations, `--observations-output` produces the flat
 canonical input used by the desktop/API:
@@ -1073,8 +1100,10 @@ examples, and selected actual Azure/Foundry portal views. Full-resolution PNGs
 are supplied with the explanatory PowerPoint; wide charts/tables can require
 horizontal scrolling beyond the captured viewport.
 
-**Not performed:** Azure deployment, telemetry ingestion, schedule creation,
-permission changes or live rendering of the new workbook. Its grid uses the
+**Not performed in the initial desktop/screenshot pass:** Azure deployment,
+telemetry ingestion, schedule creation, permission changes or live rendering of
+the optional agent-monitoring workbook. The later approved My Project
+dashboard-only deployment is documented above. The agent workbook's grid uses the
 verified text-link renderer and a visible tooltip-description column; a
 custom workbook hover renderer is not claimed. Existing native portal
 dashboards remain deployment-specific and do not inherit the desktop filters.

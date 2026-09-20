@@ -121,7 +121,7 @@ var coverageParameters = [for field in coverageFields: {
   description: 'Explicit reviewed completeness for the selected scope/store/period. Never infer true from an empty result or from the presence of events.'
   type: 2
   isRequired: true
-  value: string(coverageDefaults[field.key])
+  value: coverageDefaults[field.key] ? 'true' : 'false'
   // ARM copy expansion re-evaluates a leading "["; whitespace is valid JSON and prevents that.
   jsonData: concat(' ', string([{ value: 'false', label: 'False — unreviewed / unavailable' }, { value: 'true', label: 'True — reviewed complete' }]))
 }]
@@ -321,6 +321,13 @@ var workbook = {
       }
     }
     {
+      type: 1
+      name: 'native-rg-cost-navigation'
+      content: {
+        json: '### Azure resource-group Cost Analysis — actual & forecast\n\n[Open Azure Cost Analysis for Project ${projectNumber}](${costUrl} "Actual Azure cost and Azure forecast for this exact resource group")\n\n**Scope:** `${projectResourceGroupId}`. **Data source:** Azure Cost Management, not Log Analytics or app-meter estimates. The project portal dashboard includes the native accumulated ActualCost chart with Azure forecast enabled for this month. Cost Analysis has its own period, basis and currency controls; workbook store/session filters and coverage declarations do not affect RG billing. Forecast is a prediction, never a billed actual, and may be unavailable when Azure has insufficient history.'
+      }
+    }
+    {
       type: 9
       name: 'reviewed-coverage'
       content: {
@@ -503,12 +510,12 @@ var workbook = {
             id: 'token-account'
             name: 'TokenAccount'
             label: 'Native Foundry / OpenAI account in this project RG'
-            description: 'Select one discovered AIServices/OpenAI account. No All/subscription-wide fallback.'
+            description: 'A single discovered AIServices/OpenAI account is selected automatically. Choose explicitly when this project has multiple accounts. No All/subscription-wide fallback.'
             type: 5
             isRequired: true
             multiSelect: false
             value: ''
-            query: '${tokenAccounts}\n| order by name asc\n| project value=id, label=id, selected=false'
+            query: '${tokenAccounts}\n| summarize Accounts=make_list(pack(\'id\', id, \'name\', name))\n| mv-expand Account=Accounts\n| project value=tostring(Account.id), label=tostring(Account.id), selected=array_length(Accounts) == 1\n| order by label asc'
           })
           {
             id: 'token-time-range'

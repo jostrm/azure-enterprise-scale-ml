@@ -7,6 +7,7 @@ so assertions inspect the deployed serializedData, not an unconnected fixture.
 from __future__ import annotations
 
 import base64
+import importlib.util
 import json
 import math
 import os
@@ -14,6 +15,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -172,6 +174,8 @@ class Arm:
                 result.update(arg)
             return result
         if name == "string":
+            if isinstance(args[0], bool):
+                return "True" if args[0] else "False"
             return args[0] if isinstance(args[0], str) else json.dumps(args[0], separators=(",", ":"), ensure_ascii=False)
         if name == "json":
             return json.loads(args[0])
@@ -179,6 +183,8 @@ class Arm:
             return args[0].format(*args[1:])
         if name == "replace":
             return args[0].replace(args[1], args[2])
+        if name == "substring":
+            return args[0][args[1]:] if len(args) == 2 else args[0][args[1]:args[1] + args[2]]
         if name == "base64":
             return base64.b64encode(args[0].encode()).decode()
         if name == "length":
@@ -312,6 +318,41 @@ def test_dashboard_existing_layout_and_native_cost_preserved():
     assert "[📊 Open Cost Analysis](${costAnalysisUrl}" in text
 
 
+@pytest.mark.parametrize("project", ["001", "002"])
+@pytest.mark.parametrize("environment", ["dev", "test", "prod"])
+def test_native_cost_chart_matches_existing_factory_schema(project_template, project, environment):
+    path = BICEP / "scripts" / "deploy-aifactory-dashboard.py"
+    spec = importlib.util.spec_from_file_location("project_cost_tile_reference", path)
+    reference = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = reference
+    spec.loader.exec_module(reference)
+    resource_name = f"project-{project}-{environment}"
+    resource_id = RG.rsplit("/", 1)[0] + "/" + resource_name
+    arm = Arm(project_template)
+    arm.cache.update(rgResourceId=resource_id, targetResourceGroup=resource_name)
+    actual = arm.variable("nativeCostAnalysisPart")
+    expected = reference.cost_part(6, 2, {"id": resource_id, "name": resource_name},
+                                   "22222222-2222-4222-8222-222222222222")
+    expected["position"]["rowSpan"] = 8
+    assert actual == expected
+    inputs = {item["name"]: item.get("value") for item in actual["metadata"]["inputs"]}
+    assert inputs["scope"] == resource_id
+    assert inputs["view"]["query"]["type"] == "ActualCost"
+    assert inputs["view"]["dateRange"] == "ThisMonth"
+    assert {"enabled": True, "type": "Forecast"} in inputs["view"]["kpis"]
+
+
+def test_workbook_rg_cost_navigation_is_visible_without_business_parameters(workbook):
+    tile = items(workbook)["native-rg-cost-navigation"]
+    assert tile["type"] == 1 and "conditionalVisibility" not in tile
+    text = tile["content"]["json"]
+    assert RG in text and quote(RG, safe="") in text
+    assert "Azure Cost Management" in text and "forecast" in text
+    assert "not Log Analytics or app-meter estimates" in text
+    assert "coverage declarations do not affect RG billing" in text
+    assert "{Factory" not in text and "Complete:" not in text
+
+
 def test_workbook_schema_shapes_and_real_query_items(workbook):
     assert workbook["version"] == "Notebook/1.0"
     assert workbook["fallbackResourceIds"] == [WORKSPACE]
@@ -363,6 +404,19 @@ def test_templates_scope_selection_and_coverage_defaults(workbook):
         assert json_data.lstrip().startswith("[")
         assert {v["value"] for v in json.loads(json_data)} == {"false", "true"}
     assert "Project" not in params and "Environment" not in params
+
+
+@pytest.mark.parametrize("complete", [False, True])
+def test_coverage_defaults_match_declared_dropdown_options(workbook_template, complete):
+    arm, _ = materialize(workbook_template)
+    fields = arm.variable("coverageFields")
+    _, document = materialize(workbook_template, coverage={field["key"]: complete for field in fields})
+    params = parameters(document)
+    for field in fields:
+        parameter = params[field["name"]]
+        values = {option["value"] for option in json.loads(parameter["jsonData"])}
+        assert parameter["value"] in values
+        assert parameter["value"] == ("true" if complete else "false")
 
 
 def test_opaque_identifiers_and_query_substitution(workbook_template):
@@ -542,6 +596,10 @@ def test_token_inventory_exact_rg_kinds_and_parameter_fail_closed(workbook):
     assert params["TokenAccount"]["type"] == 5
     assert params["TokenAccount"]["isRequired"] and not params["TokenAccount"]["multiSelect"]
     assert params["TokenAccount"]["value"] == ""
+    account_query = params["TokenAccount"]["query"]
+    assert "mv-expand Account=Accounts" in account_query
+    assert "selected=array_length(Accounts) == 1" in account_query
+    assert "selected=true" not in account_query and "| take 1" not in account_query
     query = items(workbook)["tokens-log-model-totals"]["content"]["query"]
     assert "AccountId startswith AccountPrefix" in query
     assert "substring(AccountId, strlen(AccountPrefix)) !contains '/'" in query
