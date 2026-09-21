@@ -39,6 +39,9 @@ param env string
 @description('Project number (e.g., "005")')
 param projectNumber string
 
+@description('Internal only: validated exact names of existing project and Container Apps managed identities in the project resource group. Empty values retain computed naming.')
+param resolvedManagedIdentityNames object = {}
+
 @description('Location for all resources')
 param location string
 
@@ -205,6 +208,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
   name: take('02-naming-${targetResourceGroup}', 64) // max 64 chars
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
+    resolvedManagedIdentityNames: resolvedManagedIdentityNames
     env: env
     projectNumber: projectNumber
     locationSuffix: locationSuffix

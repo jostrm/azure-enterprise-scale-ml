@@ -14,6 +14,9 @@ import { aifactoryNamingType } from '../types/aifactoryNaming.bicep'
 param env string
 
 param keepMIandKVsuffixAs001 bool = false
+@description('Internal only: validated exact names of existing project and Container Apps managed identities in the project resource group. Empty values retain computed naming.')
+param resolvedManagedIdentityNames object = {}
+
 @description('Project number (e.g., "005")')
 param projectNumber string
 
@@ -176,8 +179,8 @@ var acrCommonName = replace('acrcommon${uniqueInAIFenv}${locationSuffix}${common
 
 // Managed Identities (with random salt for uniqueness)
 var miSuffix = keepMIandKVsuffixAs001 ? '-001' : resourceSuffix
-var miACAName = 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${miSuffix}'
-var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${miSuffix}'
+var miACAName = empty(resolvedManagedIdentityNames.?containerApps) ? 'mi-aca-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${miSuffix}' : resolvedManagedIdentityNames.containerApps
+var miPrjName = empty(resolvedManagedIdentityNames.?project) ? 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${miSuffix}' : resolvedManagedIdentityNames.project
 
 // Common Resource Group Services
 var laWorkspaceName = 'la-${cmnName}-${locationSuffix}-${env}-${uniqueInAIFenv}${commonResourceSuffix}'

@@ -31,6 +31,9 @@ param env string
 @description('Project number (three digits) used in naming, for example "001".')
 param projectNumber string
 
+@description('Internal only: validated exact names of existing project and Container Apps managed identities in the project resource group. Empty values retain computed naming.')
+param resolvedManagedIdentityNames object = {}
+
 @description('Suffix used for shared/common resources (for example "-001").')
 param commonResourceSuffix string
 
@@ -213,6 +216,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 	name: take('foundryv2-naming-${resolvedTargetResourceGroup}', 64)
 	scope: resourceGroup(resolvedSubscriptionId, resolvedTargetResourceGroup)
 	params: {
+		resolvedManagedIdentityNames: resolvedManagedIdentityNames
 		env: env
 		projectNumber: projectNumber
 		locationSuffix: locationSuffix

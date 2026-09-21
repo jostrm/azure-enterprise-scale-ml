@@ -340,6 +340,34 @@ identity assignments retain their existing behavior. The legacy `updateRbac`
 flag does not suppress RG reconciliation. Changing a role or enabling an opt-out
 does not remove an existing assignment; review and revoke old access separately.
 
+### Existing managed identities and legacy names
+
+ADO task `05b_Extract_and_set_aifactory_salt_values` and GitHub step
+`17_Extract_aifactory_salt_random` use the same read-only identity resolver.
+It discovers both the project and Container Apps identities in the exact project
+resource group, extracts the naming salt and passes their exact existing names
+internally to Bicep. No user-maintained identity-name overrides are required.
+The legacy `aifactory_salt_random` setting is not an override for this discovery.
+
+Supported identities have the project/region/environment prefix and a five-character
+environment hash plus a ten-character random salt. Discovery accepts both
+`<hash><salt>-001` and the older `<hash>-<salt>-001` layout, as well as the historical
+`<hash><salt>001` layout without the suffix separator. Existing names are reused
+literally, including their suffix; they are not renamed or recreated.
+
+For a new, empty project, Bicep retains its normal generated names. If only one of
+the two identities exists, its recognized salt is reused for the missing identity.
+Multiple matching identities, conflicting salts, unsupported/short salt formats,
+failed Azure reads or an existing workload with neither identity cause an explicit
+failure instead of choosing the first match or silently generating replacement names.
+Do not delete an in-use MI to get past this error: inspect the reported names and
+resolve the ambiguity or extend support for the actual historical format.
+
+The discovered names are forwarded to foundation, core infrastructure, compute,
+data/AI platform and RBAC/Foundry templates. Foundation does not redeploy an identity
+whose exact name was discovered. This preserves its principal ID and existing access;
+normal service deployment and RBAC enable/disable settings remain unchanged.
+
 ---
 
 ## Group 11 — AI Foundry

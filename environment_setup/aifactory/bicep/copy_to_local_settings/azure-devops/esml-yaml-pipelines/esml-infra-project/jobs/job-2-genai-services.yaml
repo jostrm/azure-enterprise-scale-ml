@@ -1499,20 +1499,7 @@ steps:
       echo "##vso[task.setvariable variable=funcAppServicePlanExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/serverfarms" "$funcAppServicePlanName" "$suffixAppServicePlan")"
       echo "##vso[task.setvariable variable=webAppServicePlanExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/serverfarms" "$webbAppServicePlanName" "$suffixAppServicePlan")"
       echo "##vso[task.setvariable variable=keyvaultExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.KeyVault/vaults" "$keyvaultName" "$suffixKeyvault")"
-      echo "##vso[task.setvariable variable=miACAExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miACAPrefix" "$suffixStandard")"
-      
-      # Debug output for managed identity check
-      echo "=== DEBUGGING MANAGED IDENTITY CHECK ==="
-      echo "Target Resource Group: $targetResourceGroup"
-      echo "MI Project Prefix: $miPrjPrefix"
-      echo "Suffix Standard: $suffixStandard"
-      echo "Looking for managed identity with prefix: $miPrjPrefix"
-      
-      # List all managed identities in the resource group for debugging
-      echo "=== ALL MANAGED IDENTITIES IN RESOURCE GROUP ==="
-      az resource list --resource-group "$targetResourceGroup" --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" --query "[].name" -o table || echo "Failed to list managed identities or none found"
-      
-      echo "##vso[task.setvariable variable=miPrjExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.ManagedIdentity/userAssignedIdentities" "$miPrjPrefix" "$suffixStandard")"
+      # The following shared resolver owns MI existence, exact names and salt together.
       echo "##vso[task.setvariable variable=storageAccount1001Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "$suffixStorage1")"
       echo "##vso[task.setvariable variable=storageAccount2001Exists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name" "$suffixStorage2")"
       echo "##vso[task.setvariable variable=aifExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.MachineLearningServices/workspaces" "$aifName" "$suffixStandard")"
@@ -1540,146 +1527,28 @@ steps:
   displayName: '05b_Extract_and_set_aifactory_salt_values'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
+    scriptType: pscore
     scriptLocation: inlineScript
     inlineScript: |
-      set -e
-      
-      az account set --subscription "$(dev_test_prod_sub_id)"
-      
-      DETERMINISTIC_SALT=""
-      RANDOM_SALT=""
-      
-      echo "=== Starting aifactory salt extraction ==="
-      
-      # Build resource group names
-      COMMON_RG_INPUT="$(commonResourceGroup_param)"
-      if [ -n "$COMMON_RG_INPUT" ] && [ "$COMMON_RG_INPUT" != '$''(commonResourceGroup_param)' ]; then
-        COMMON_RG="$COMMON_RG_INPUT"
-      else
-        COMMON_RG="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
-      fi
-      
-      echo "Common resource group: $COMMON_RG"
-      
-      # Try to extract deterministic salt from common resources
-      echo "Scanning common RG for salt pattern..."
-      RESOURCE_NAMES=$(az resource list --resource-group "$COMMON_RG" --query "[].name" -o tsv 2>/dev/null || echo "")
-      
-      if [ -n "$RESOURCE_NAMES" ]; then
-        # Look for pattern like: anything-xxxxx-anything where xxxxx is 5 alphanumeric chars
-        while IFS= read -r resource_name; do
-          if [ -z "$resource_name" ]; then
-            continue
-          fi
-          
-          # Extract 5-char segments between hyphens
-          IFS='-' read -ra PARTS <<< "$resource_name"
-          for part in "${PARTS[@]}"; do
-            if [ ${#part} -eq 5 ]; then
-              # Check if it's alphanumeric lowercase
-              if echo "$part" | grep -qE '^[a-z0-9]{5}$'; then
-                DETERMINISTIC_SALT="$part"
-                echo "Found deterministic salt from common RG: $DETERMINISTIC_SALT"
-                break 2
-              fi
-            fi
-          done
-        done <<< "$RESOURCE_NAMES"
-      else
-        echo "Warning: Could not list resources in common RG"
-      fi
-      
-      # Extract salts from managed identity if it exists
-      MI_EXISTS="$(miPrjExists)"
-      echo "miPrjExists: $MI_EXISTS"
-      
-      if [ "$MI_EXISTS" = "true" ]; then
-        echo "Extracting salts from managed identity..."
-        
-        # Build project resource group name
-        PROJECT_NUM="$(project_number_000)"
-        PROJECT_NAME="prj${PROJECT_NUM}"
-        LOCATION_SUFFIX="$(admin_locationSuffix)"
-        ENV_NAME="$(dev_test_prod)"
-        AIF_SUFFIX="$(admin_aifactorySuffixRG)"
-        PROJECT_PREFIX="$(projectPrefix)"
-        PROJECT_SUFFIX="$(projectSuffix)"
-        COMMON_PREFIX="$(admin_aifactoryPrefixRG)"
-        
-        PROJECT_NAME_REPLACED="${PROJECT_NAME/prj/project}"
-        PROJECT_RG="${COMMON_PREFIX}${PROJECT_PREFIX}${PROJECT_NAME_REPLACED}-${LOCATION_SUFFIX}-${ENV_NAME}${AIF_SUFFIX}${PROJECT_SUFFIX}"
-        
-        MI_PREFIX="mi-${PROJECT_NAME}-${LOCATION_SUFFIX}-${ENV_NAME}"
-        
-        echo "Looking for MI with prefix: $MI_PREFIX"
-        echo "In resource group: $PROJECT_RG"
-        
-        MI_NAME=$(az resource list \
-          --resource-group "$PROJECT_RG" \
-          --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" \
-          --query "[?starts_with(name, '$MI_PREFIX')].name" \
-          -o tsv 2>/dev/null | head -n 1)
-        
-        if [ -n "$MI_NAME" ]; then
-          echo "Found managed identity: $MI_NAME"
-          
-          # Extract the last segment before the final suffix
-          # Expected format: mi-prj001-weu-dev-xxxxxxxxxxxxx-001
-          # Remove the last segment (suffix like -001)
-          MI_NO_SUFFIX="${MI_NAME%-*}"
-          # Get the last remaining segment (the salt)
-          SALT_SEGMENT="${MI_NO_SUFFIX##*-}"
-          
-          echo "Extracted salt segment: $SALT_SEGMENT (length: ${#SALT_SEGMENT})"
-          
-          # Expected format: 5 chars deterministic + 10 chars random = 15 total
-          SALT_LEN=${#SALT_SEGMENT}
-          if [ "$SALT_LEN" -ge 15 ]; then
-            # Extract first 5 chars for deterministic salt (if not already found)
-            if [ -z "$DETERMINISTIC_SALT" ]; then
-              DETERMINISTIC_SALT="${SALT_SEGMENT:0:5}"
-              echo "Extracted deterministic salt from MI: $DETERMINISTIC_SALT"
-            fi
-            # Extract next 10 chars for random salt
-            RANDOM_SALT="${SALT_SEGMENT:5:10}"
-            echo "Extracted random salt from MI: $RANDOM_SALT"
-          elif [ "$SALT_LEN" -ge 5 ]; then
-            echo "Warning: Salt segment shorter than expected (${SALT_LEN} chars)"
-            if [ -z "$DETERMINISTIC_SALT" ]; then
-              DETERMINISTIC_SALT="${SALT_SEGMENT:0:5}"
-              echo "Extracted deterministic salt from MI: $DETERMINISTIC_SALT"
-            fi
-            # Try to extract whatever random portion is available
-            if [ "$SALT_LEN" -gt 5 ]; then
-              REMAINING=$((SALT_LEN - 5))
-              RANDOM_SALT="${SALT_SEGMENT:5:$REMAINING}"
-              echo "Extracted partial random salt from MI: $RANDOM_SALT"
-            fi
-          else
-            echo "Warning: Salt segment too short (${SALT_LEN} chars, expected at least 5)"
-          fi
-        else
-          echo "Warning: Could not find managed identity with prefix: $MI_PREFIX"
-        fi
-      else
-        echo "Managed identity does not exist yet, skipping MI-based extraction"
-      fi
-      
-      # Set the pipeline variables
-      echo "##vso[task.setvariable variable=aifactory_salt]$DETERMINISTIC_SALT"
-      echo "##vso[task.setvariable variable=aifactory_salt_random]$RANDOM_SALT"
-      
-      echo "=== Salt extraction complete ==="
-      echo "aifactory_salt: ${DETERMINISTIC_SALT:-<not set>}"
-      echo "aifactory_salt_random: ${RANDOM_SALT:-<not set>}"
-      
-      if [ -z "$DETERMINISTIC_SALT" ]; then
-        echo "WARNING: aifactory_salt could not be determined"
-      fi
-      if [ -z "$RANDOM_SALT" ]; then
-        echo "WARNING: aifactory_salt_random could not be determined"
-      fi
+      $ErrorActionPreference = 'Stop'
+      $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+      if (-not $python) { $python = Get-Command python3 -CommandType Application -ErrorAction SilentlyContinue }
+      if (-not $python) { throw 'Python is required for managed identity discovery.' }
+      $script = Join-Path $env:SYSTEM_DEFAULTWORKINGDIRECTORY 'azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/resolve_managed_identities.py'
+      & $python.Source -X utf8 $script --format ado
+      if ($LASTEXITCODE -ne 0) { throw 'Managed identity discovery failed; no deployment is safe until the identity names and salt are resolved.' }
+  env:
+    MI_DISCOVERY_SUBSCRIPTION: $(dev_test_prod_sub_id)
+    MI_DISCOVERY_PROJECT_NUMBER: $(project_number_000)
+    MI_DISCOVERY_LOCATION_SUFFIX: $(admin_locationSuffix)
+    MI_DISCOVERY_ENVIRONMENT: $(dev_test_prod)
+    MI_DISCOVERY_RG_PREFIX: $(admin_aifactoryPrefixRG)
+    MI_DISCOVERY_RG_SUFFIX: $(admin_aifactorySuffixRG)
+    MI_DISCOVERY_PROJECT_PREFIX: $(projectPrefix)
+    MI_DISCOVERY_PROJECT_SUFFIX: $(projectSuffix)
+    MI_DISCOVERY_COMMON_RG: $(commonResourceGroup_param)
+    MI_DISCOVERY_COMMON_NAME: $(vnetResourceGroupBase)
+    MI_DISCOVERY_COMMON_SUFFIX: $(admin_commonResourceSuffix)
 - task: AzureCLI@2
   displayName: '05c_Validate Required Parameters'
   condition: and(succeeded(), ne(variables['debug_disable_validation_tasks'], 'true'))
@@ -2780,6 +2649,7 @@ steps:
      --parameters inputKeyvaultResourcegroup="$(admin_bicep_kv_fw_rg)" \
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters resolvedManagedIdentityNames='$(resolvedManagedIdentityNames)' \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters projectPrefix="$(projectPrefix)" \
      --parameters projectSuffix="$(projectSuffix)" \
@@ -2928,6 +2798,7 @@ steps:
      --parameters randomValue="$(deployment_random_value)" \
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters resolvedManagedIdentityNames='$(resolvedManagedIdentityNames)' \
      --parameters tags='$(tags)' \
      --parameters tagsProject='$(tagsProject)' \
      --parameters enablePublicGenAIAccess="$(enablePublicGenAIAccess)" \
@@ -2988,6 +2859,7 @@ steps:
      --parameters randomValue="$(deployment_random_value)" \
      --parameters keyvaultSoftDeleteDays="$(admin_keyvaultSoftDeleteDays)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters resolvedManagedIdentityNames='$(resolvedManagedIdentityNames)' \
      --parameters enableAIServices="$(enableAIServices)" \
      --parameters enableAISearch="$(enableAISearch)" \
      --parameters skuAISearchDev="$(skuAISearchDev)" \
@@ -3101,6 +2973,7 @@ steps:
      --parameters sqlServerExists="$(sqlServerExists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters resolvedManagedIdentityNames='$(resolvedManagedIdentityNames)' \
      --parameters enableCosmosDB="$(enableCosmosDB)" \
      --parameters cosmosKind="$(cosmosKind)" \
      --parameters enablePostgreSQL="$(enablePostgreSQL)" \
@@ -3196,6 +3069,7 @@ steps:
      --parameters applicationInsightExists="$(applicationInsightExists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters resolvedManagedIdentityNames='$(resolvedManagedIdentityNames)' \
      --parameters enableContainerApps="$(enableContainerApps)" \
      --parameters enableFunction="$(enableFunction)" \
      --parameters enableWebApp="$(enableWebApp)" \
@@ -3280,6 +3154,7 @@ steps:
      --parameters miPrjExists="$(miPrjExists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters resolvedManagedIdentityNames='$(resolvedManagedIdentityNames)' \
      --parameters enableAIFoundryHub="$(enableAIFoundryHub)" \
      --parameters addAIFoundryHub="$(addAIFoundryHub)" \
      --parameters enableAISearch="$(enableAISearch)" \
@@ -3346,6 +3221,7 @@ steps:
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters resolvedManagedIdentityNames='$(resolvedManagedIdentityNames)' \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters subscriptionIdDevTestProd="$(dev_test_prod_sub_id)" \
@@ -3474,6 +3350,7 @@ steps:
      --parameters commonResourceSuffix="$(admin_commonResourceSuffix)" \
      --parameters resourceSuffix="$(admin_prjResourceSuffix)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters resolvedManagedIdentityNames='$(resolvedManagedIdentityNames)' \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters subscriptionIdDevTestProd="$(dev_test_prod_sub_id)" \
@@ -3658,6 +3535,7 @@ steps:
      --parameters useAdGroups="$(use_ad_groups)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters resolvedManagedIdentityNames='$(resolvedManagedIdentityNames)' \
      --parameters enableAzureMachineLearning="$AML_RBAC" \
      --parameters enableAIFoundryHub="$(enableAIFoundryHub)" \
      --parameters addAIFoundryHub="$(addAIFoundryHub)" \
@@ -3728,6 +3606,7 @@ steps:
     RBAC_USE_AD_GROUPS: $(use_ad_groups)
     RBAC_RANDOM_VALUE: $(deployment_random_value)
     RBAC_SALT: $(aifactory_salt_random)
+    RBAC_RESOLVED_IDENTITIES: $(resolvedManagedIdentityNames)
     RBAC_ENABLE_AML: $(enableAzureMachineLearning)
     RBAC_ENABLE_HUB: $(enableAIFoundryHub)
     RBAC_ADD_HUB: $(addAIFoundryHub)
@@ -3805,6 +3684,7 @@ steps:
      --parameters useAdGroups="${RBAC_USE_AD_GROUPS:-true}" \
      --parameters randomValue="$RBAC_RANDOM_VALUE" \
      --parameters aifactorySalt10char="${RBAC_SALT:-}" \
+     --parameters resolvedManagedIdentityNames="$RBAC_RESOLVED_IDENTITIES" \
      --parameters enableAzureMachineLearning="$AML_RBAC" \
      --parameters enableAIFoundryHub="${RBAC_ENABLE_HUB:-false}" \
      --parameters addAIFoundryHub="${RBAC_ADD_HUB:-false}" \
@@ -4350,6 +4230,7 @@ steps:
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters resolvedManagedIdentityNames='$(resolvedManagedIdentityNames)' \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
      --parameters technicalAdminsEmail="$(technical_admins_email)" \
@@ -4883,6 +4764,7 @@ steps:
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters commonResourceName="$(vnetResourceGroupBase)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
+     --parameters resolvedManagedIdentityNames='$(resolvedManagedIdentityNames)' \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters technicalAdminsObjectID="$(technical_admins_ad_object_id)" \
      --parameters technicalAdminsEmail="$(technical_admins_email)" \

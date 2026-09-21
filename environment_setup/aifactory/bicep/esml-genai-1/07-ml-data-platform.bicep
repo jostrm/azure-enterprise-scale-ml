@@ -49,6 +49,9 @@ param env string
 @description('Project number (e.g., "005")')
 param projectNumber string
 
+@description('Internal only: validated exact names of existing project and Container Apps managed identities in the project resource group. Empty values retain computed naming.')
+param resolvedManagedIdentityNames object = {}
+
 @description('Location for all resources')
 param location string
 
@@ -247,6 +250,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
   name: take('01-naming-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
+    resolvedManagedIdentityNames: resolvedManagedIdentityNames
     env: env
     projectNumber: projectNumber
     locationSuffix: locationSuffix
@@ -379,7 +383,7 @@ resource logAnalyticsWorkspaceOpInsight 'Microsoft.OperationalInsights/workspace
 
 // ===== SPECIAL: Managed Identity principal & SP+MI array (copied from 06) =====
 var randomSaltLogic = empty(aifactorySalt10char) || length(aifactorySalt10char) <= 5 ? (empty(randomValue) ? substring(uniqueString(subscription().subscriptionId), 0, 10) : substring(randomValue, 0, 10)) : aifactorySalt10char
-var miPrjName_Static = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${randomSaltLogic}${resourceSuffix}'
+var miPrjName_Static = empty(resolvedManagedIdentityNames.?project) ? 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${randomSaltLogic}${resourceSuffix}' : resolvedManagedIdentityNames.project
 resource miPrjREF 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
   name: miPrjName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)

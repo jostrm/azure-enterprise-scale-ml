@@ -43,6 +43,9 @@ param locationSuffix string
 @description('Project number (e.g., "005")')
 param projectNumber string
 
+@description('Internal only: validated exact names of existing project and Container Apps managed identities in the project resource group. Empty values retain computed naming.')
+param resolvedManagedIdentityNames object = {}
+
 // ============================================================================
 // PARAMETERS - Resource Existence Flags
 // ============================================================================
@@ -431,6 +434,7 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
   name: take('01-naming-${targetResourceGroup}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
+    resolvedManagedIdentityNames: resolvedManagedIdentityNames
     env: env
     projectNumber: projectNumber
     locationSuffix: locationSuffix
@@ -664,7 +668,7 @@ module createNewPrivateDnsZonesIfNotExists '../modules/createNewPrivateDnsZonesI
 }
 
 // Project Managed Identity
-module miForPrj '../modules/mi.bicep' = if (!resourceExists.miPrj) {
+module miForPrj '../modules/mi.bicep' = if (empty(resolvedManagedIdentityNames.?project) && !resourceExists.miPrj) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('01-miForPrj${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -678,7 +682,7 @@ module miForPrj '../modules/mi.bicep' = if (!resourceExists.miPrj) {
 }
 
 // Container Apps Managed Identity
-module miForAca '../modules/mi.bicep' = if (!resourceExists.miACA) {
+module miForAca '../modules/mi.bicep' = if (empty(resolvedManagedIdentityNames.?containerApps) && !resourceExists.miACA) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('01-miForAca${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

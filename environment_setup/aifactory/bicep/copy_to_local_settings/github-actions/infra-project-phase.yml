@@ -382,6 +382,7 @@ jobs:
       keyvaultExists: 'false'
       miACAExists: 'false'
       miPrjExists: 'false'
+      resolvedManagedIdentityNames: '{}'
       storageAccount1001Exists: 'false'
       storageAccount2001Exists: 'false'
       cosmosDBExists: 'false'
@@ -1215,12 +1216,6 @@ jobs:
               output=$(az resource list --resource-group "$rg" --resource-type "$type" --query "[?starts_with(name, '$prefix') && ends_with(name, '$suffix') ].name" -o tsv 2>/dev/null)
               if [ -n "$output" ]; then echo true; else echo false; fi
             }
-            resource_exists_identity(){
-              local rg=$1; local prefix=$2
-              local output
-              output=$(az resource list --resource-group "$rg" --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" --query "[?starts_with(name, '$prefix')].name" -o tsv 2>/dev/null)
-              if [ -n "$output" ]; then echo true; else echo false; fi
-            }
             suffixStandard="${{ env.admin_prjResourceSuffix }}"
             suffixStandardNoDash="${suffixStandard#-}"
             # Both storage slots share a prefix; distinguish slot, resource suffix and env like ADO.
@@ -1355,8 +1350,7 @@ jobs:
             set_env "containerAppAExists"    "$(resource_exists_fuzzy "$targetRG" "Microsoft.App/containerApps" "$containerAppAName" "$suffixStandard")"
             set_env "containerAppWExists"    "$(resource_exists_fuzzy "$targetRG" "Microsoft.App/containerApps" "$containerAppWName" "$suffixStandard")"
             set_env "keyvaultExists"         "$(resource_exists_fuzzy "$targetRG" "Microsoft.KeyVault/vaults" "$keyvaultName" "$twoNumbers")"
-            set_env "miACAExists"            "$(resource_exists_identity "$targetRG" "$miACAPrefix")"
-            set_env "miPrjExists"            "$(resource_exists_identity "$targetRG" "$miPrjPrefix")"
+            # Step 17 resolves MI existence, exact names and salt together.
             set_env "storageAccount1001Exists" "$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount1001Name" "$suffixStorage1")"
             set_env "storageAccount2001Exists" "$(resource_exists_fuzzy "$targetRG" "Microsoft.Storage/storageAccounts" "$storageAccount2001Name" "$suffixStorage2")"
             set_env "databricksExists"       "$(resource_exists_fuzzy "$targetRG" "Microsoft.Databricks/workspaces" "$databricksName" "$suffixStandard")"
@@ -1371,28 +1365,27 @@ jobs:
             set_env "bingCustomSearchExists" "$(resource_exists_fuzzy "$targetRG" "Microsoft.CognitiveServices/accounts" "$bingCustomName" "$suffixStandard")"
 
       - name: 17_Extract_aifactory_salt_random
-        shell: bash
+        shell: pwsh
+        env:
+          MI_DISCOVERY_SUBSCRIPTION: ${{ env.dev_test_prod_sub_id }}
+          MI_DISCOVERY_PROJECT_NUMBER: ${{ env.project_number_000 }}
+          MI_DISCOVERY_LOCATION_SUFFIX: ${{ env.admin_locationSuffix }}
+          MI_DISCOVERY_ENVIRONMENT: ${{ env.dev_test_prod }}
+          MI_DISCOVERY_RG_PREFIX: ${{ env.admin_aifactoryPrefixRG }}
+          MI_DISCOVERY_RG_SUFFIX: ${{ env.admin_aifactorySuffixRG }}
+          MI_DISCOVERY_PROJECT_PREFIX: ${{ env.projectPrefix }}
+          MI_DISCOVERY_PROJECT_SUFFIX: ${{ env.projectSuffix }}
+          MI_DISCOVERY_COMMON_RG: ${{ env.commonResourceGroup_param }}
+          MI_DISCOVERY_COMMON_NAME: ${{ env.vnetResourceGroupBase }}
+          MI_DISCOVERY_COMMON_SUFFIX: ${{ env.admin_commonResourceSuffix }}
         run: |
-            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-            if [ "${{ env.miPrjExists }}" != "true" ]; then exit 0; fi
-            commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}"
-            projectNumber="${{ env.project_number_000 }}"
-            projectName="prj${projectNumber}"
-            locationSuffix="${{ env.admin_locationSuffix }}"
-            envName="${{ env.dev_test_prod }}"
-            aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}"
-            projectPrefix="${{ env.projectPrefix }}"
-            projectSuffix="${{ env.projectSuffix }}"
-            projectNameReplaced="${projectName/prj/project}"
-            targetResourceGroup="${commonRGNamePrefix}${projectPrefix}${projectNameReplaced}-${locationSuffix}-${envName}${aifactorySuffixRG}${projectSuffix}"
-            miPrjPrefix="mi-${projectName}-${locationSuffix}-${envName}"
-            miName=$(az identity list --resource-group "$targetResourceGroup" --query "[?starts_with(name, '$miPrjPrefix')].name" -o tsv | head -n1)
-            if [ -n "$miName" ]; then
-              salt="${miName: -14:10}"
-              echo "aifactory_salt_random=$salt" >> $GITHUB_ENV
-              salt5="${miName: -19:5}"
-              echo "aifactory_salt=$salt5" >> $GITHUB_ENV
-            fi
+          $ErrorActionPreference = 'Stop'
+          $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+          if (-not $python) { $python = Get-Command python3 -CommandType Application -ErrorAction SilentlyContinue }
+          if (-not $python) { throw 'Python is required for managed identity discovery.' }
+          $script = Join-Path $env:GITHUB_WORKSPACE 'azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/resolve_managed_identities.py'
+          & $python.Source -X utf8 $script --format github
+          if ($LASTEXITCODE -ne 0) { throw 'Managed identity discovery failed; no deployment is safe until the identity names and salt are resolved.' }
 
       - name: 06a_Delete_CapabilityHosts
         if: |
@@ -1986,6 +1979,7 @@ jobs:
               --parameters inputKeyvaultResourcegroup="${{ env.admin_bicep_kv_fw_rg }}" \
               --parameters inputKeyvaultSubscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters projectPrefix="${{ env.projectPrefix }}" \
               --parameters projectSuffix="${{ env.projectSuffix }}" \
@@ -2172,6 +2166,7 @@ jobs:
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters keyvaultSoftDeleteDays="${{ env.admin_keyvaultSoftDeleteDays }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters tags='${{ env.tags }}' \
               --parameters tagsProject='${{ env.tagsProject }}' \
               --parameters enablePublicGenAIAccess="${{ env.enablePublicGenAIAccess }}" \
@@ -2230,6 +2225,7 @@ jobs:
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters keyvaultSoftDeleteDays="${{ env.admin_keyvaultSoftDeleteDays }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters enableAIServices="${{ env.enableAIServices }}" \
               --parameters enableAISearch="${{ env.enableAISearch }}" \
               --parameters skuAISearchDev="${{ env.skuAISearchDev }}" \
@@ -2325,6 +2321,7 @@ jobs:
               --parameters sqlServerExists="${{ env.sqlServerExists }}" \
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters enableCosmosDB="${{ env.enableCosmosDB }}" \
               --parameters cosmosKind="${{ env.cosmosKind }}" \
               --parameters enablePostgreSQL="${{ env.enablePostgreSQL }}" \
@@ -2405,6 +2402,7 @@ jobs:
               --parameters applicationInsightExists="${{ env.applicationInsightExists }}" \
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters enableContainerApps="${{ env.enableContainerApps }}" \
               --parameters enableFunction="${{ env.enableFunction }}" \
               --parameters enableWebApp="${{ env.enableWebApp }}" \
@@ -2485,6 +2483,7 @@ jobs:
               --parameters miPrjExists="${{ env.miPrjExists }}" \
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters enableAIFoundryHub="${{ env.enableAIFoundryHub }}" \
               --parameters addAIFoundryHub="${{ env.addAIFoundryHub }}" \
               --parameters enableAISearch="${{ env.enableAISearch }}" \
@@ -2541,6 +2540,7 @@ jobs:
               --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
               --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
               --parameters subscriptionIdDevTestProd="${{ env.dev_test_prod_sub_id }}" \
@@ -2668,6 +2668,7 @@ jobs:
               --parameters commonResourceSuffix="${{ env.admin_commonResourceSuffix }}" \
               --parameters resourceSuffix="${{ env.admin_prjResourceSuffix }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
               --parameters subscriptionIdDevTestProd="${{ env.dev_test_prod_sub_id }}" \
@@ -2793,6 +2794,7 @@ jobs:
               --parameters useAdGroups="${{ env.use_groups }}" \
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters enableAzureMachineLearning="$AML_RBAC" \
               --parameters enableAIFoundryHub="${{ env.enableAIFoundryHub }}" \
               --parameters addAIFoundryHub="${{ env.addAIFoundryHub }}" \
@@ -2875,6 +2877,7 @@ jobs:
               --parameters useAdGroups="${{ env.use_groups }}" \
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters enableAzureMachineLearning="$AML_RBAC" \
               --parameters enableAIFoundryHub="${{ env.enableAIFoundryHub }}" \
               --parameters addAIFoundryHub="${{ env.addAIFoundryHub }}" \
@@ -3371,6 +3374,7 @@ jobs:
               --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
               --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
               --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
@@ -3674,6 +3678,7 @@ jobs:
               --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
               --parameters commonResourceName="${{ env.vnetResourceGroupBase }}" \
               --parameters aifactorySalt10char="${{ env.aifactory_salt_random }}" \
+              --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters randomValue="${{ env.deployment_random_value }}" \
               --parameters technicalAdminsObjectID="${{ env.technical_admins_ad_object_id }}" \
               --parameters technicalAdminsEmail="${{ env.technical_admins_email }}" \
