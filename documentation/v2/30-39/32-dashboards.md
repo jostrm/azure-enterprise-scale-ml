@@ -7,9 +7,62 @@ replacement for the native billing or telemetry source.
 
 This guide covers the reusable **purple** module, the **orange** consumer
 repository, and the two desktop clients. Native capability/source review:
-**17 September 2026**; My Project and Cost extension: **18 September 2026**.
+**22 September 2026**; My Project and Cost extension: **18 September 2026**;
+read-only native Portal/Foundry capture: **21 September 2026**.
 Local artifacts and sample captures are not evidence
 that a resource has been deployed in Azure.
+
+## Start here: one monitoring story, four delivery groups
+
+Organize the experience along two axes. **Value, cost, quality and security**
+describe the question; **delivery group** describes where the answer runs.
+Do not make users choose a technology before they can ask a business question.
+
+| Delivery group | What exists | Best use |
+|---|---|---|
+| **Azure built-in & Foundry** | Cost analysis, budgets/exports, Monitor Metrics/Logs, Application Insights, Foundry monitoring/tracing/evaluations, Defender and optimization experiences | Inspect Microsoft's native financial, operational and security evidence |
+| **AI Factory native** | Shared factory and project Portal dashboards, Application Insights dashboard, My Project workbook and opt-in agent evidence workbook | Repeatable saved Azure views deployed from the purple Bicep modules |
+| **On-demand reports** | Foundry tokens, project/cost-center showback, deployment usage and the offline agent observation report | Generate reviewed report artifacts from existing telemetry or supplied evidence |
+| **Custom dashboards** | The same six canonical reports in MAUI/Tkinter/CLI/API; project-scoped Retail, Booking, Support and Cost views; existing operational panels | Compare useful outcomes, cost and security together without creating a second billing source |
+
+The common entry is a **Monitoring hub**, with the four delivery
+groups, source readiness, scope limitations and direct actions into the
+existing views. The question-oriented report navigation is **Value and
+adoption / Usage and cost / Quality and reliability / Security and governance**.
+Keep operational inventory, capacity, lifecycle and quota accessible rather
+than removing them to make the layouts look identical.
+
+Use **AI Factory -> Scaleset -> Project -> Environment**, initially All, for
+portfolio reports. My Project deliberately requires one concrete placement and
+adds local dates, store and time zone. Native Azure pages retain their own
+controls; an application filter is not automatically an Azure Portal filter.
+
+| Read next | Contents |
+|---|---|
+| [1. Azure-native capabilities](#1-azure-native-dashboards-and-finops-capabilities) | What Azure and Foundry already provide, pricing boundaries and availability |
+| [2a. Bicep assets](#2a-bicep-dashboards-and-telemetry) | Saved dashboards/workbooks and diagnostic prerequisites |
+| [2b. On-demand reports](#2b-on-demand-dashboards-and-reports) | Collectors, offline reducers and reviewed execution |
+| [3. MAUI Monitoring](#3-maui-monitoring) | Custom views and client/backend responsibilities |
+| [4. Tkinter Dashboards](#4-tkinter-dashboards-and-canonical-reports) | Custom views, canonical reports, CLI and API |
+| [My Project](#my-project-chat-dashboard-templates) | Retail, Booking, Support, feedback, usage and attributed cost |
+| [Business-value realization](#business-value-realization-a-practical-model) | Evidence model, financial qualifications and instrumentation |
+| [Implementation sequence](#implementation-sequence) | Cross-repository delivery and rollout boundaries |
+
+### Quick answer: can an agent's business value be shown beside cost and security?
+
+**Yes, with explicit business evidence.** Native Foundry already supplies
+technical activity, tracing and evaluation signals. Application Insights
+funnels and HEART workbooks can display instrumented conversion and task
+success. Neither knows automatically that an accepted business outcome saved
+money or generated revenue.
+
+Show four neighboring evidence panels: **accepted outcomes**, **modeled or
+verified benefit**, **attributable cost**, and **quality/security coverage**.
+Keep modeled time savings separate from finance-approved realized benefit.
+Keep input/output/cached-token usage separate from token-price estimates and
+billing-derived charges. Missing findings mean unknown security coverage, not
+"secure". An approved valuation and matched cost period/currency are
+prerequisites for a defensible financial return.
 
 ## My Project: chat dashboard templates
 
@@ -277,7 +330,7 @@ before invoicing.
 
 | Native surface | Usage, tokens, cost and security coverage | Important boundary |
 |---|---|---|
-| [Azure Monitor Metrics / Azure OpenAI](https://learn.microsoft.com/en-us/azure/foundry-classic/openai/how-to/monitor-openai) | Requests, input/output tokens, latency, errors and PTU utilization | Platform measurements are not an invoice. Dimensions are predefined; arbitrary factory/project tags are not automatically metric dimensions. |
+| [Azure Monitor Metrics / Foundry models](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/how-to/monitor-models) | Requests, input/output tokens, latency, errors, supported cache counters and PTU utilization | Platform measurements are not an invoice. Metrics depend on deployment type; organizational tags are not automatically metric dimensions. |
 | [Azure Monitor Workbooks](https://learn.microsoft.com/en-us/azure/azure-monitor/visualize/workbooks-data-sources) | Parameterized views over Metrics, Logs/Application Insights, Resource Graph and ARM APIs | A workbook can be deployed with Bicep, but it does not create missing telemetry or attribution. |
 | [Application Insights usage](https://learn.microsoft.com/en-us/azure/azure-monitor/app/usage) | Users, sessions, events, funnels, retention and custom business events | Requires instrumentation. Business actions and organizational dimensions must be supplied by the application. |
 | [Cost Management Cost analysis](https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/customize-cost-analysis-views) | Billing-derived actual/amortized cost, forecast, resource/service/tag breakdown and saved views | A saved cost view is not a workbook. Customizable views do not group by multiple attributes simultaneously. |
@@ -285,8 +338,28 @@ before invoicing.
 | [Foundry agent Monitor](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/how-to-monitor-agents-dashboard) | Application Insights-backed agent tokens, latency, run success, evaluations and configured red-team results | Documentation marks agent metrics, recurring evaluations, red-team scans and dashboard alerts as preview. These are portal experiences, not the same asset as a custom workbook. |
 | [Foundry tracing](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/trace-agent-setup) | Run/tool/model trace details for supported agents | Current documentation distinguishes GA tracing for prompt/hosted agents from preview workflow/external-agent tracing. Custom application code still needs instrumentation. |
 | [Foundry Control Plane](https://learn.microsoft.com/en-us/azure/foundry/control-plane/overview) | Permission-aware agent inventory and operational views; token-based estimated agent cost | Operate experiences are documented as portal-only. A token-cost estimate is not reconciled Azure billing or complete workload cost. |
+| [Foundry cost management](https://learn.microsoft.com/en-us/azure/foundry/concepts/manage-costs) | Model/agent operational estimates and links to Cost Management; preview project billing attribution for Models sold by Azure | Estimates exclude negotiated discounts and provisioned throughput; coverage varies by agent/provider. Marketplace and shared-service attribution must not be assumed. |
 | [Defender for Cloud AI threat protection](https://learn.microsoft.com/en-us/azure/defender-for-cloud/ai-threat-protection) and [AI posture](https://learn.microsoft.com/en-us/azure/defender-for-cloud/ai-security-posture) | Threat alerts, posture recommendations, inventory and attack-path evidence | Threat protection is GA and currently scans text. Agent discovery/posture is preview and documentation requires Agent 365 from July 2026; account/project posture is a separate scope. |
 | [FinOps toolkit Optimization workbook](https://learn.microsoft.com/en-us/cloud-computing/finops/toolkit/workbooks/optimization) | Advisor, idle resources, usage/rate optimization and potential savings | Deployable workbook; recommended savings are opportunities, not proof of realized business value. |
+| [FinOps hubs](https://learn.microsoft.com/en-us/cloud-computing/finops/toolkit/hubs/finops-hubs-overview) | FOCUS export ingestion, normalization and cross-account analytics with optional ADX/Fabric and Power BI | Deployable toolkit infrastructure, not a free managed dashboard; infrastructure and applicable BI licensing have costs. |
+| [AKS cost analysis](https://learn.microsoft.com/en-us/azure/aks/cost-analysis) | Cluster/namespace compute, storage, network and idle/system/unallocated cost | Standard/Premium AKS and supported billing agreements; not a task-level business-value collector. |
+| [Azure ML endpoint monitoring](https://learn.microsoft.com/en-us/azure/machine-learning/how-to-monitor-online-endpoints?view=azureml-api-2) | Endpoint requests/latency/status and deployment CPU/GPU/memory/disk | Model quality needs additional monitoring/ground truth; infrastructure health does not establish accepted business outcomes. |
+
+**Availability as reviewed on 20 September 2026:** the new Foundry portal is
+GA, but Build Monitoring and Operate Overview/Assets/Compliance remain
+Preview. Application Insights' Agents view is also Preview. Tracing is GA
+for prompt/hosted agents and Preview for workflow/external agents. Use the
+[feature-readiness table](https://learn.microsoft.com/en-us/azure/foundry/concepts/general-availability)
+instead of describing every experience as GA because its parent portal is GA.
+Agent-specific security requires the appropriate
+[Agent 365 licensing from 1 July 2026](https://learn.microsoft.com/en-us/defender-xdr/security-for-ai/transition-agent-security-to-agent-365);
+Defender for AI Services model protection is a different coverage boundary.
+
+These are public product capabilities, not assertions that a selected tenant
+has the required plan, region, permissions, diagnostic settings or telemetry.
+Budget alerts are not spending caps. Advisor recommendations are potential
+savings, not realized savings. Application Insights ingestion/retention,
+evaluation runs and optional reporting infrastructure can themselves add cost.
 
 ### Usage, price and billed cost are different things
 
@@ -348,6 +421,25 @@ and realized benefit remain customer instrumentation and governance work.
 The value model below makes that additional evidence explicit.
 
 ## 2. AI Factory Azure-native assets
+
+### Project resource groups, shortcuts and Cost analysis
+
+The project Portal dashboard retains the **resource-group resource list on the
+left** and **native Cost analysis on the right**, both scoped to the selected
+project resource group. Direct shortcuts below open **AI Foundry, Storage,
+Key Vault, AI Search and Application Insights**. Application Insights uses the
+same explicit resource-ID override as the companion workbook, when supplied.
+The Cost analysis tile shows this month's **ActualCost** and Azure's forecast;
+the direct Cost analysis link, Budgets and Cost Alerts remain available.
+
+The factory landing dashboard keeps its common/project resource groups and
+their separate Cost analysis tiles. Each project now supports the same five
+shortcut types, showing only resources returned by existing inventory discovery
+(fewer shortcuts when a type is absent). The Bicep project shortcuts retain
+their configured naming bindings; they do not themselves provision the target
+services. Workbook and business-value reports supplement this resource/cost
+layout rather than replacing it. These are local source changes; existing Azure
+dashboards require a separately authorized dashboard deployment to update.
 
 ### Native My Project generated with the project dashboard
 
@@ -432,11 +524,14 @@ a separate project-RG billing destination with its own filters; the workbook's
 session/IP costs come from recorded meter evidence. There are no embedded
 fictional samples presented as live native data.
 
-**Deployment status (18 September 2026):** the approved consumer-driven
-dashboard-only rollout deployed the project dashboards and 36-item My Project
+**Deployment status (20 September 2026):** the approved consumer-driven
+dashboard-only rollout deployed the project dashboards and 37-item My Project
 workbooks for Dev projects 001 and 002, and refreshed the shared factory dashboard
 without losing either project's inventory. Orange retained ownership of
-`variables.json` and pinned purple commit `26496876`.
+`variables.json` and pinned purple commit `76727432`. The updated workbooks have
+37 items, valid lowercase coverage defaults and single-account auto-selection.
+Both project dashboards again contain native RG ActualCost charts with Azure
+forecast enabled. The ADO dashboard-only deployment runs were 2345 and 2346.
 
 Eight aggregate queries from each actual saved workbook were executed against
 the existing workspace. Project 001 returned real per-model input, output and
@@ -444,8 +539,27 @@ cached-token observations; Project 002 returned no matching request-usage rows
 for the selected window, not measured zero. Missing business events and
 session/IP cost evidence remain unavailable. No telemetry was synthesized or
 ingested, and no Azure roles or underlying infrastructure were changed.
-Portal rendering remains pending interactive Azure sign-in; successful ARM
-deployment and KQL execution alone are not proof of the complete UI.
+**Rendered Portal inspection (21 September 2026):** both project dashboards
+visibly render their native accumulated actual-cost and forecast charts. Both
+workbooks select all nine coverage defaults and execute usage validation without
+the former missing-parameter blocker.
+
+**Remaining defect:** both Model tokens views auto-select the correct project
+account, but their runtime scope check still reports `AccountSelected=false`
+and `Unavailable - no valid scoped account`, hiding the native metric charts.
+This is a workbook parameter/scoping issue, not proof of missing token telemetry.
+The earlier direct KQL checks supplied explicit parameter values and did not
+exercise the Portal's parameter substitution. The deployment was left unchanged
+as requested; a token-view rendering correction has not been deployed.
+
+**September 22 local continuation:** the source now uses a scalar account ARM ID,
+explicitly serialized inventory, and a separately validated Metrics resource
+binding. It accepts documented/legacy scalar, JSON-string and singleton-array
+selection forms, while rejecting multiple accounts, wrong resource kinds and
+out-of-RG identities. The validation table exposes the selection/inventory shapes
+and whether the Metrics binding matches. This is local hardening, not proof of
+the exact earlier runtime serialization or a deployed fix. Real Portal acceptance
+is still required after a reviewed dashboard-only rollout.
 
 ### Keeping MAUI and Tkinter API hosts in sync
 
@@ -570,7 +684,7 @@ not three Foundry agent-ROI dashboards.
 | [`aifactory-dash-01.bicep`](../../../environment_setup/aifactory/bicep/modules/aifactory-dash-01.bicep) | Factory/shared landing-zone navigation and resource-group cost/inventory tiles | Configured factory/scaleset/environment resources; tiles can reference resources not yet deployed |
 | [`projectDash01.bicep`](../../../environment_setup/aifactory/bicep/modules/projectDash01.bicep) | Project resource dashboard and native resource/cost navigation | Actual project resource IDs determine scope; a generated dashboard name does not prove deployment |
 | [`appinsightsDashboard.bicep`](../../../environment_setup/aifactory/bicep/modules/appinsightsDashboard.bicep) | Application Insights operational dashboard | Application instrumentation is required; not a cost or realized-value collector |
-| [`monitoring/agentMonitoringWorkbook.bicep`](../../../environment_setup/aifactory/bicep/modules/monitoring/agentMonitoringWorkbook.bicep) | New opt-in value, cost and security workbook over evidence-backed observations | Existing workspace; five All-default scope selectors plus time; no collection, ingestion or RBAC deployment |
+| [`monitoring/agentMonitoringWorkbook.bicep`](../../../environment_setup/aifactory/bicep/modules/monitoring/agentMonitoringWorkbook.bicep) | Opt-in usage/token, quality, value, cost and security workbook over evidence-backed observations | One common-RG workbook, existing explicit workspace; five All-default scope selectors plus time; no collection, ingestion or RBAC deployment |
 | [`myProjectWorkbook.bicep`](../../../environment_setup/aifactory/bicep/modules/myProjectWorkbook.bicep) | Project-scoped chat templates and daily/session/IP-group Cost views, linked from `projectDash01` | Fixed project/component; explicit factory/scaleset and coverage; existing `aifactory.chat` / `aifactory.chat.meter` telemetry |
 
 The diagnostics inventory contains **33 diagnostic-setting declarations across
@@ -603,7 +717,7 @@ configuration.
 | `coreteam\finops\runbooks\showback\Update-ShowbackReport.ps1` | Project and cost-center showback, with native project cost links | Cost Management; All is limited to the configured naming/scope and authorized collected projects |
 | `projectteam\foundry-usage\foundry_usage_report.py` | Foundry deployment usage and report artifacts | Operational usage evidence; optional runtime dependencies are separate from desktop sample viewing |
 | `report_compute.py` / `report-local.ps1` | Reviewed local/runbook/Logic App report execution contract | Existing three collector types; concrete project/environment execution required |
-| `native_monitoring.py` | New offline value/cost/security report, aligned JSON/CSV and prepared AppEvents | Already-collected, explicitly sample or live observations; not a new Azure collector |
+| `native_monitoring.py` + `native_monitoring_v2.py` | Offline six-family evidence report, JSON/CSV, lossless v2 interchange and prepared AppEvents | Already-collected, explicitly sample or live observations; not a new Azure collector; native verified-finance calculations remain unavailable |
 | `coreteam\finops\runbooks\Update-AgentMonitoringReport.ps1` | New PowerShell wrapper for the observation report | Same importer; does not authenticate, upload, ingest or create a job/schedule |
 | `run-native-monitoring-sample.ps1` | Safe consumer demonstration of Project 001 filtering | Local sample only; no Azure calls or live resource URLs |
 
@@ -627,14 +741,31 @@ The new native workflow is deliberately opt-in:
 4. Publish observations through an approved telemetry pipeline and deploy the
    workbook separately when ready.
 
-`enableAgentMonitoring` defaults to `false`. Enabling the standalone workbook
-requires `workspaceResourceId` for an existing Log Analytics workspace. The
-module adds no telemetry sink, role assignment, collection schedule or
-instrumentation automatically.
+`enableAgentMonitoring` defaults to `false` in phase
+`esml-genai-1\10-aifactory-dashboards.bicep`. Enabling requires the explicit
+`agentMonitoringWorkspaceResourceId` of an existing Log Analytics workspace.
+The standalone module uses `workspaceResourceId`. An existing-resource read
+resolves the workspace's `customerId`; the deployment identity therefore needs
+workspace read access. Empty, wrong-type, missing or inaccessible references
+fail rather than creating or guessing a workspace.
+
+Phase 10 deploys one stable workbook in the **common resource group**, with
+optional project-dashboard navigation rather than one duplicate workspace-wide
+workbook per project. Outputs are `agentMonitoringWorkbookId` and
+`agentMonitoringWorkbookUrl`. Disabling omits future deployment; it does not
+delete an already deployed workbook. There is no automatic telemetry sink,
+role assignment, collection schedule or application instrumentation.
+
+The separate **dashboard-only runner does not deploy this workbook**. Supply
+the reviewed phase-10 output as `agentMonitoringWorkbookResourceId` in the
+selected configuration to retain its navigation tile during dashboard-only
+refresh. The reference must be in the selected subscription/common RG.
+Without that configuration the tile is omitted, not the existing workbook.
 
 The workbook queries `AppEvents`, event `aifactory.agent.observation`. Its
-sections show collection coverage, evidence-backed minutes saved, separately
-grouped actual/amortized/estimated cost, and recorded security evidence.
+sections show collection coverage, usage/tokens, quality/reliability, modeled
+and quality-qualified benefit, separately grouped actual/amortized/estimated
+cost, and recorded security evidence.
 The native source is Logs/Application Insights; imported cost observations
 retain their Cost Management source. Currency and cost basis are never
 combined silently.
@@ -643,11 +774,13 @@ combined silently.
 |---|---|
 | `aifactory.monitoring-observations.v1` | Shared flat observation input accepted by the canonical backend and native importer |
 | `aifactory.agent-observations/v1` | Native observation/event input; scope includes AI Factory, scaleset, project, environment and agent |
+| `aifactory.agent-observations/v2` | Lossless canonical-wrapper evidence for all six report families, including original per-field provenance and finance evidence objects |
 | `aifactory.native-monitoring-report/v1` | Native report output, including `inputSchema` and imported-observation provenance |
+| `aifactory.native-monitoring-report/v2` | Explicit native projection of v2 evidence with shared classification/qualification metadata and unavailable unsupported financial calculations |
 | `aifactory.monitoring-report.v1` | Desktop/API canonical report envelope; not the native report output |
 | `aifactory.aggregate-report.v1` | Existing monitoring execution bridge; additive `dataSource` and `lineage` preserve compatibility |
 
-The native bridge maps flat `factory` to `scope.aiFactory` and `agent_id` to
+The legacy native bridge maps flat `factory` to `scope.aiFactory` and `agent_id` to
 `scope.agent`. Live imports require an explicit reviewed authorization manifest;
 ARM syntax checking is not proof of resource existence. Native value requires
 explicit `outcome_quality_passed=true`, not an inference from completion or
@@ -700,6 +833,46 @@ canonical API requests: export the supported flat observation envelope first.
 Validated-resource metadata is preserved only when explicitly supplied and
 consistent; syntactically valid IDs alone do not authorize live links.
 
+### Native v2 and the shared six-report evidence
+
+Use v2 for the complete canonical evidence interchange; v1 remains accepted
+with its existing formulas and behavior. Ship `native_monitoring_v2.py`
+alongside `native_monitoring.py`, and `agentMonitoringCanonical.kql` alongside
+the workbook's existing query assets.
+
+```powershell
+python -I -B .\native_monitoring.py `
+  --input .\samples\monitoring-observations.canonical-reviewed.sample.json `
+  --source sample --native-version 2 `
+  --aiFactory "Demo AI Factory" --scaleset demo-east --project 001 --environment dev
+```
+
+The reviewed sample is separately pinned with original and LF-normalized
+SHA-256 metadata. Its fixed historical timestamps do not become fresh live
+observations when the command runs. For numeric comparisons with generated
+canonical samples, select the same concrete placement and **one sample day**.
+
+V2 preserves input/output tokens, requests, request success, evaluation counts,
+latency sum/sample count, outcomes, cost, security, per-field source evidence
+and optional financial evidence without flattening unknown into zero.
+`value_class` uses the shared `observed | modeled | unavailable` vocabulary;
+native `value_tier` is a separate detail. All visible rows must qualify before
+strict qualified totals are shown. Legacy v1 retains its documented behavior.
+
+**Intentional native boundary:** `realized_benefit_amount`, `value_evidence`
+and `cost_evidence` round-trip, but native verified monetary benefit, net value,
+ROI and cost per accepted outcome remain unavailable. The native workbook
+does not independently reproduce the canonical financial-evidence validator.
+Use the canonical CLI/API for those calculations; do not turn a supplied
+amount into "verified realization" merely because it exists in an event.
+
+V2 preserves canonical input numbers up to the canonical bound, while native
+projections withhold values outside the exact interoperable absolute range
+`2^53 - 1`. Range and unsupported-evidence reasons are visible. Local event-file
+fidelity does not establish Azure ingestion-size compatibility, retention,
+KQL execution or Portal rendering. No new observations were ingested as part
+of this local implementation.
+
 ## 3. MAUI Monitoring
 
 MAUI is a visual consumer of the canonical Tkinter backend, not a second
@@ -707,14 +880,16 @@ calculation engine. Its existing Monitoring surfaces are retained:
 
 | View | What it shows | Evidence boundary |
 |---|---|---|
+| Monitoring hub | Four delivery groups, canonical report/template shortcuts, source prerequisites and native-navigation readiness | Catalog metadata only; does not deploy, collect or start jobs |
 | Overview | Monitoring summary and navigation | Source-specific operational context |
 | Current AI Factory | Factory analytics; sample sections include capacity, model lifecycle, project inventory, agent/ML health | Configuration, cached/discovered evidence or explicitly labeled samples |
 | Models & quota | Model quota/allocation, token popularity and quota risk | Model/region/pool scope; quota is not actual billed consumption |
 | ML | Model and agent monitoring across Dev/Stage/Prod | Subject/environment-specific monitoring, not automatic business-value realization |
 | Automation reports | Existing Foundry tokens, showback and deployment-usage workflow | Reviewed legacy execution; a leaking aggregate is blocked rather than relabeled |
 | Value & insights | New canonical value, cost, usage, quality and security reports, plus native-source catalog | Same filtered canonical observations and metrics used by API/CLI |
+| My Project | Retail, Booking and Support usage/outcomes plus separate Cost | One concrete placement with its own date, store, time-zone and evidence rules |
 
-**Value & insights** provides the common AI Factory / Scaleset / Project
+**Monitoring hub / Value & insights** provide the shared AI Factory / Scaleset / Project / Environment
 selectors, default All, and all six canonical report types listed below. The
 client rejects an unexpected returned scope or out-of-scope rows before showing
 metrics, charts, tables or exporting the report. Changing scope, source or
@@ -726,8 +901,23 @@ matches the validated observation metadata. Sample links are disabled.
 Report/chart source text and calculated-metric formula/input/upstream lineage
 remain visible.
 
+The hub consumes the backend's navigation index rather than maintaining a
+competing resource registry. It opens existing local views or reviewed
+automation setup; it never starts a report run merely because a card is opened.
+Native actions resolve the exact supplied navigation identity, including
+separate project contexts for a shared physical workbook. Documentation links
+remain separate from live-resource actions.
+
+My Project accepts shared-scope transfer only when all four dimensions identify
+a placement in its own catalog. Legacy operations and automation retain their
+own clearly labeled scope. The shared Tk-specific **capacity issues**,
+**lifecycle/services** and **agent inventory** workspaces are explicitly
+unsupported in MAUI's shared catalog; MAUI does not silently substitute its
+different allocation, model-lifecycle or ML-metric panels. Those MAUI panels
+remain available through their separately labeled routes.
+
 Live unified reporting uses an explicitly selected
-`aifactory.monitoring-observations.v1` JSON input, with a 5 MB / 10,000-row
+`aifactory.monitoring-observations.v1` JSON input, with an 8 MiB / 10,000-row
 limit. The client does not authenticate a new collector or query Azure
 implicitly. Source claims in imported evidence are not independently attested
 by the UI. A native nested event/report document is not directly interchangeable
@@ -738,14 +928,19 @@ with the flat observation input.
 | Capability | MAUI | Tkinter |
 |---|---|---|
 | Unified six-report calculation | Canonical API consumer | Canonical Python implementation used directly by the UI |
-| Consistent All-default organizational filtering | Value & insights | Automation reports |
+| Common entry | Monitoring hub | Monitoring hub, first Dashboards entry |
+| Combined overview | Six backend-owned sections in the hub, with detailed-report drill-down | Combined summary tab followed by the four existing delivery groups |
+| Consistent All-default canonical filtering | Factory / Scaleset / Project / Environment and optional UTC dates shared by summary and insights | Factory / Scaleset / Project / Environment and optional UTC dates shared by summary and reports |
 | Existing operational layout | Current AI Factory, Models & quota, ML and other Monitor tabs | Separate Capacity, Lifecycle, Models & Quota and Agents tabs |
 | Existing automation workflow | Dedicated legacy Automation reports surface | Canonical and existing report choices in the same Automation reports area |
 | Sample data | Explicit dummy/sample mode; unified samples come from canonical API | Explicit isolated in-memory demo/sample mode |
 | Live evidence | Explicit flat-observation JSON import, submitted to canonical API | Explicit observation/report import and existing reviewed collectors |
 | Source details | Source/provenance panels and native catalog | Sources & provenance subtab and report details |
 | Filtered export | Canonical JSON copied through the UI | JSON/CSV actions; CLI/API also export |
-| Native nested observation input | Not accepted directly | Native purple importer provides a separate canonical-to-native bridge |
+| Preflight capacity, lifecycle/services, agent inventory | Shared actions explicitly unsupported; distinct MAUI operational panels remain | Dedicated existing operational workspaces |
+| My Project | Typed API consumer; concrete compatible scope transfer | Direct canonical Python rendering; concrete placement |
+| Native nested observation input | Export canonical flat observations before import | Use purple's v2 canonical/native bridge; never relabel nested events as flat API requests |
+| Native resource actions | Exact context/identity and permitted URL checks; no sample links | Same backend metadata-binding model; no sample links |
 | Legacy lineage | Preserved through a single-response metadata bridge and raw JSON export; missing legacy metadata is labeled unavailable | Preserved through normalization, scoped projections and JSON/CSV exports |
 
 These are **not identical screen layouts**. Legacy operational panels retain
@@ -762,6 +957,7 @@ packages. The current dashboard window preserves these operational views:
 
 | View | Contents | Source |
 |---|---|---|
+| Monitoring hub | Four delivery groups, six report shortcuts, My Project templates, existing operations and scoped native navigation | Shared capability catalog; explicitly supplied resource bindings are not cloud discovery |
 | Overview | Project/environment/scaleset inventory | Local configuration and deployment evidence |
 | Capacity issues | Capacity checks and issue drill-down | `preflight-status.json` |
 | Lifecycle & services | Cumulative stalled Dev/Stage, lifecycle observations, configured services | Local configuration and persisted observations |
@@ -797,7 +993,7 @@ For a source-launched sample window, run from the Tkinter repository:
 ```powershell
 python -m src.monitor_launcher `
   --factory "C:\path\to\existing\consumer\aifactory" `
-  --demo --view automation-reports --report showback `
+  --demo --maximized --view automation-reports --report showback `
   --factory-scope "Demo AI Factory" --scaleset demo-east `
   --project 001 --environment dev
 ```
@@ -805,6 +1001,14 @@ python -m src.monitor_launcher `
 `--demo` is explicit and non-persistent. The native **Sources & provenance**
 subtab explains the collection boundaries; report details and filtered JSON/CSV
 retain metric inputs and upstream references.
+
+The default launcher view is **Monitoring hub**. Use `--view hub --section`
+with `azure-native`, `factory-native`, `on-demand` or `custom` to open one
+delivery group. `--days 1`, `7` or `30` controls the sample observation window;
+it is not an implicit date filter on imported live evidence. The same compound
+sample placement identities are reused by the hub, canonical reports and
+My Project. Legacy operational samples intentionally describe a narrower
+scenario and disclose that scope; they are not tenant-wide totals.
 
 ### Canonical CLI
 
@@ -867,9 +1071,36 @@ Responses identify `aifactory.monitoring-report.v1` and include `filters`,
 `filter_options`, `metrics`, `charts`, `tables`, `rows`, `data_source`,
 `provenance`, `coverage`, `warnings` and `collection_notice`.
 
+The catalog now adds `navigation_contract: "aifactory.monitoring-navigation.v1"`,
+`navigation_groups` and `navigation_entries`, retaining existing `reports`,
+`native_dashboards` and `native_sources`. Its four group IDs are `azure-native`,
+`factory-native`, `on-demand` and `custom`. Each entry describes availability,
+supported data modes, scope dimensions/limitations, prerequisites, source and
+an allowlisted navigation action. A navigation action never executes an
+arbitrary command or starts a cloud report job.
+
+An optional `native_bindings` array supplies actual ARM resource IDs, concrete
+factory/scaleset/project/environment, configured/observed metadata and optional
+tenant/subscription IDs. The backend checks type/scope consistency and
+constructs the permitted Azure Portal URL; caller-supplied URLs are not accepted.
+`metadata_validated` means **metadata validation only**, not proof of resource
+existence, deployment, permissions or telemetry. Resolve the exact returned
+`navigation_id`, not the first item with the same resource type. Multiple
+logical scopes can deliberately share one physical workbook. Sample and
+unbound entries never become actionable live resources.
+
+Imports accept **8 MiB (8,388,608 bytes)** and at most **10,000 observations**;
+the canonical API permits at most **100 native bindings**. Live imports reject
+explicit sample markers. `source: "sample"` generates isolated fixtures rather
+than accepting caller rows. `POST /monitoring/export` returns filtered **CSV
+text** using the same request as `/report`; there is no invented JSON export
+wrapper or `format` request property.
+
 Metric values are numeric or null, not preformatted success-shaped strings.
 Metric metadata includes `data_source`, `formula`, `inputs`, `upstream` and
-status. Chart `links` align with chart labels; row `native_link` records contain
+status, plus additive `value_class`, `qualification`, `cost_basis`, `currency`
+and `estimate_type`. `value_class` is `observed`, `modeled` or `unavailable`;
+it does not override the report's sample/live mode. Chart `links` align with chart labels; row `native_link` records contain
 the URL, tooltip, scope, source and access notice. Samples have no fake live
 resource links.
 
@@ -878,6 +1109,35 @@ separate. Its singular `foundry-token` ID is preserved for compatibility;
 the canonical report ID is `foundry-tokens`. Where a legacy result is projected,
 `job.report.monitoring` carries the canonical representation. Do not substitute
 the native importer output schema for either API response schema.
+
+### Purple consumer CLI and SDK
+
+The reusable CLI now calls the same authenticated report API instead of
+implementing its own metric arithmetic:
+
+```powershell
+azurefactory monitoring catalog
+azurefactory monitoring report --report agent-value --source sample --days 1 `
+  --factory "Demo AI Factory" --scaleset demo-east --project 001 --environment dev
+azurefactory monitoring export --report showback --source sample --days 7 `
+  --factory "Demo AI Factory" --scaleset demo-east --project 001 --environment dev --format csv
+```
+
+Use an already running approved local API, with `AIFACTORY_API_URL` and
+`AIFACTORY_API_KEY` supplied through the supported host configuration. The key
+is sent as `X-API-Key`, not placed in a URL or committed configuration.
+Generated CLI requests default to seven sample days; an API request omitting
+`days` retains its existing 30-day default. Live CLI calls require an explicit
+reviewed `--request` file with `source: live` and `rows`; they do not trigger
+Azure collection.
+
+SDK methods are `monitoring_catalog()`, `monitoring_report(request)` and
+`monitoring_export(request)`. Runnable Python/PowerShell requests are under
+`environment_setup\install_config_wizard\api-usage-examples`, including
+`python\monitoring_report.py` and `monitoring\sample-report.json` /
+`sample-export.json`. CLI JSON export returns the canonical report; CSV uses
+the API's filtered export. Opening a report is distinct from a reviewed legacy
+automation job.
 
 ## Recommended information architecture
 
@@ -1001,6 +1261,41 @@ valuation evidence. Tag estimates explicitly and explain exclusions such as
 shared infrastructure, platform staffing, review labor, data services and
 observability ingestion.
 
+### Implemented canonical evidence gates
+
+The six-report backend now exposes additive strict metrics without changing
+the meaning of older clients' fields:
+
+| Metric | Required evidence and meaning |
+|---|---|
+| `hours_saved`, legacy `realized_value` | Existing supplied-input time/capacity calculation, now explicitly **modeled**; the historical field name does not make it realized money |
+| Historical `net_value`, `roi_percent` | Compatibility modeled arithmetic; `cost_coverage` says matched or unverified. These are not the strict financial metrics below |
+| `qualified_outcomes`, `qualified_hours_saved` | Explicit `outcome_quality_passed: true` and provenance references for completed outcomes, baseline minutes and assisted minutes across all visible rows |
+| `verified_realized_value` | Explicit realized benefit amount plus complete approved value evidence, matching scope/agent/currency and a valid, nonoverlapping measurement period |
+| `cost_per_accepted_outcome` | Positive qualified outcomes and complete, exactly matched actual-cost evidence |
+| `verified_net_value`, `verified_roi_percent` | Verified benefit and complete matched cost; ROI additionally requires positive actual cost |
+
+Qualification of a subset does not produce an apparently complete accepted
+total. Missing/failed evidence remains unavailable with a reason; explicit
+failed quality also suppresses modeled benefits. Qualified labor capacity is
+still **modeled**, not cash realization.
+
+Optional `realized_benefit_amount` is a finite nonnegative amount supplied by
+the business, never inferred from a labor rate. `value_evidence` must include
+`owner`, `baseline_reference`, timezone-aware `period_start`/`period_end`,
+`valuation_method`, `evidence_reference`, `approval_reference`, `currency` and
+`scope`. `cost_evidence` includes the same period/currency/scope, a `reference`,
+and `coverage: complete | partial | unknown`. Only complete exact attribution
+supports strict cost/return measures. Financial overlap checks are independent
+of model; a project-total observation cannot be counted again through its
+child-agent observations. Touching period endpoints are allowed.
+
+These gates validate the consistency of **caller-supplied approved evidence**.
+They do not independently audit finance records, sign an approval or attest
+that a business claim is true. The report shows the references and qualification
+state so owners can review them. Demonstration values remain fictional even
+when they satisfy all sample evidence gates.
+
 The same agent view should show quality and security beside value and cost,
 not compress them into a misleading single green score. No Defender findings
 collected is not evidence of no security risk. A content-safety signal is not
@@ -1015,11 +1310,161 @@ and assisted effort, valuation basis, currency and source. Correlate to traces
 without storing prompts, completions, customer data or personal identifiers
 by default.
 
+For Foundry client instrumentation, disabling message-content recording is not
+by itself a complete privacy policy: Python `@trace_function` can record
+arguments and return values independently. Allowlist aggregate metadata, avoid
+decorating functions that carry business content, and review error text and
+tool arguments/results before collection. See
+[client tracing settings](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/trace-agent-client-side#enable-content-recording).
+The documented [sensitive-content routing change](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/traces-sensitive-content)
+is scheduled for **30 September 2026**, after this review; do not assume that
+future routing already protects current telemetry. Access controls are not a
+substitute for avoiding unnecessary content collection.
+
 Use explicit cost allocation evidence when consumption is shared. Keep
 unattributed cost visible instead of distributing it silently. Version the
 contract so existing clients and automation can evolve compatibly.
 
 ## Implementation sequence
+
+### September 22 continuation: from navigation to a combined dashboard
+
+`MAUI-preview` is a runnable, dated application build, not the source repository
+or a deployment of the native Azure workbooks. Continue development in the MAUI,
+Tkinter/backend and purple repositories; copying a preview does not update an
+installed application, the orange consumer pin or an Azure resource.
+
+The existing four-group hub and six reports are the foundation, not work to
+recreate. This local continuation adds one combined, source-aware overview and
+an explicit reporting window, with source-level fixes for the native rendering
+defects found in the September 21 captures.
+
+| Surface | Current native possibility / implementation direction | Boundary |
+|---|---|---|
+| Azure Cost Management | Resource/service/meter cost views, actual versus amortized cost, exports and budgets; retain links to the financial source | Foundry token-cost estimates are not billing amounts or full application cost |
+| Azure Monitor and Application Insights | Platform metrics, logs, workbooks, operational traces, custom-event funnels and HEART task-success analysis | Outcomes require instrumentation; empty telemetry is not measured zero |
+| Foundry | Model/agent token usage, requests, latency, run success, evaluations and estimated costs | Core portal GA does not make Monitoring or Operate Overview/Assets/Compliance GA; those experiences remain Preview |
+| Purple Bicep | Repair My Project token-account binding and unavailable-series rendering; preserve the existing default-off shared agent workbook | A local fix still needs reviewed deployment and real Portal acceptance |
+| Purple on-demand and CLI/API | Reuse existing evidence reducers and guarded API clients for the same combined overview and date-bounded reports | No implicit collector, authentication, job, ingestion, scheduler or upload |
+| MAUI and Tkinter | Combined value, cost, usage, quality and security sections under one source/scope/window, with same-context report drill-down | Legacy operational panels and native Portal pages retain their declared filter capabilities |
+
+This native baseline was rechecked on **22 September 2026** against
+[Cost Analysis](https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/quick-acm-cost-analysis),
+[Foundry readiness](https://learn.microsoft.com/en-us/azure/foundry/concepts/general-availability),
+[Foundry cost guidance](https://learn.microsoft.com/en-us/azure/foundry/concepts/manage-costs),
+[agent monitoring](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/how-to-monitor-agents-dashboard)
+and [Application Insights usage](https://learn.microsoft.com/en-us/azure/azure-monitor/app/usage).
+Foundry monitoring still needs the relevant connected telemetry and permissions.
+Its estimates exclude negotiated discounts and provisioned throughput; the
+aggregate agent estimate also excludes prompt and non-Foundry agents. Neither
+run completion nor a model evaluation establishes finance-approved realization.
+
+| Step | Implementation plan | Acceptance criterion |
+|---|---|---|
+| 1. Shared projection | Add a compact summary using the existing six canonical report calculations, not a new metric engine | Each section matches its detailed report for identical evidence, scope and dates; raw observations are not duplicated six times |
+| 2. Explicit period | Optional paired inclusive UTC calendar dates, applied before aggregation | Invalid/undatable selections fail explicitly; omitted bounds retain legacy behavior; `days` stays a sample-generation setting |
+| 3. Desktop experience | Surface the summary in both hubs, preserve source/qualification disclosures and same-context drill-down | Source/scope/date changes invalidate stale display/export; live evidence never falls back to samples |
+| 4. Native correctness | Isolate account-parameter serialization and all-unavailable chart behavior | Exact resource-group/account guards remain; no synthetic zero history; cloud acceptance stays a separate rollout step |
+| 5. Consumer integration | Exercise the purple SDK/CLI against the source API from Spider's directory | Consumer settings, copied templates and submodule pin remain unchanged |
+| 6. Release | Package coordinated client/API sources and deploy reviewed native assets through their normal release flows | A dated preview and local compilation are not treated as proof of installation, deployment or production evidence |
+
+The plan does not grant permissions to the denied Foundry inventory, enable
+business-event coverage, or invent accepted outcomes. Those require source-owner
+review and evidence. My Project retains its independent concrete placement,
+local-time-zone, store and state-history rules.
+
+#### Implemented summary and explicit-period contract
+
+`POST /api/v1/monitoring/summary` returns
+`aifactory.monitoring-summary.v1`. It prepares the source, compound scope and
+window once, then reuses the six existing report calculations. `sections` carries
+each report's `report_id`, `title`, `data_source`, exact `metrics`, `provenance`
+and `warnings`. The envelope carries the shared source/scope/coverage,
+native/navigation metadata and filtered `rows` **once**. Sections overlap:
+do not add their costs, tokens or outcomes together. The summary introduces no
+client-side monetary arithmetic or finance attestation.
+
+```json
+{
+  "source": "sample",
+  "days": 7,
+  "filters": {
+    "factory": "Demo AI Factory",
+    "scaleset": "demo-east",
+    "project": "001",
+    "environment": "dev"
+  },
+  "start_date": "2026-09-09",
+  "end_date": "2026-09-16"
+}
+```
+
+The same optional `start_date` / `end_date` fields apply to detailed report and
+CSV export requests. They mean **inclusive UTC calendar dates**, supplied
+together, at most 90 days. Timestamped point observations are filtered in UTC.
+For aggregate observations, the half-open `[period_start, period_end)` interval
+takes precedence and must fit wholly within the requested window. A partial
+overlap or unusable date in a selected scope is an explicit error, not a
+prorated bill/benefit or a silently excluded unknown. Scope filtering happens
+first. Omitting both bounds preserves legacy unbounded behavior and reports
+the count of undated rows. `days` continues to control only sample generation.
+
+The frozen sample clock is **2026-09-16T10:00:00Z**; seven sample days run from
+September 9 at 10:00 UTC to September 16 at 10:00 UTC. The example's eight
+inclusive calendar dates enclose those seven complete daily grains. Choosing
+September 15 as the end would cut the final grain and is rejected. The response
+separates requested dates, observed bounds, sample clock, and report-generation
+time. Generation time is not evidence freshness.
+
+```powershell
+# Existing authenticated local API; no Azure collector or job.
+azurefactory monitoring summary --source sample --days 7 `
+  --factory "Demo AI Factory" --scaleset demo-east --project 001 --environment dev `
+  --start-date 2026-09-09 --end-date 2026-09-16
+
+# Direct canonical backend CLI, from its repository.
+python -m src.monitoring_reports --summary --source sample --days 7 `
+  --factory "Demo AI Factory" --scaleset demo-east --project 001 --environment dev `
+  --start-date 2026-09-09 --end-date 2026-09-16
+```
+
+The SDK equivalent is `client.monitoring_summary(request)`; a summary request
+has no `report_id`. The purple Python example supports
+`monitoring_report.py --summary --request ..\monitoring\sample-summary.json`.
+Summary exports are JSON; CSV remains a selected detailed-report export.
+Both hosts clear stale output/export when evidence, source, scope or dates
+change and preserve the selected dates when opening a detailed canonical report.
+
+The native My Project source now gates its three daily business charts on
+defined numeric values. All-unavailable series show an explanation instead of
+feeding all-null columns to a time chart. Partial series retain null days and
+reviewed/measured zeros remain zeros. These changes flow through the existing
+Bicep and dashboard-only module; no new deployment parameters, automatic
+diagnostics or ingestion are introduced.
+
+The source API, purple SDK/CLI, date-filtered CSV and example were exercised
+from Spider's directory. Its status, working diff and submodule entry remained
+unchanged. This does not update Spider's copied templates or publish the purple
+changes. Native deployment/Portal acceptance and normal installer release remain
+separate. The September 20/21 presentation and copied OneDrive preview are
+historical artifacts, not a build of this continuation.
+
+The current MAUI source has also been exercised in a maximized Windows client
+against the authenticated loopback source API: all six overview sections load,
+editing dates clears stale export, and showback drill-down retains the same dates.
+Returning to the hub reloads the overview. The standalone client output is
+`ESAIF.ConfigWizard\artifacts\monitoring-summary-20260922\standalone-client`;
+it contains its .NET/Windows App SDK runtimes but **not** an updated bundled API.
+Use the updated Python source API and configure its matching endpoint/key; an
+older installed API correctly reports the summary route as unsupported.
+
+The normal coordinated installer remains a separate release step. At this
+checkpoint the Python API packager's required
+`build\creation-source\aifactory-source.json` is absent. Do not bypass that
+provenance prerequisite or attach a stale `ApiHost` to claim a complete package.
+The earlier `preview` directory from a no-build publish is not the accepted
+runtime output; use the self-contained client above. No installed application,
+consumer pin, diagnostic setting or deployed Azure workbook was replaced.
 
 | Phase | Deliverable | Completion criterion |
 |---|---|---|
@@ -1034,9 +1479,40 @@ Production rollout is separate from local implementation: review telemetry
 privacy, RBAC, tag propagation, cost-allocation rules, ingestion/retention costs
 and the business baseline with the relevant owners before enabling collection.
 
-## Native capture observations
+### September 20 implementation and rollout plan
 
-The read-only Spider capture pass opened the existing shared factory dashboard,
+| Workstream | Local implementation | Production or follow-on work |
+|---|---|---|
+| Shared experience | Four-group, 26-entry capability/navigation catalog; six unchanged report IDs; explicit scope/source/availability | Configure actual native resource bindings and review which source supports which filters |
+| Business value | Modeled compatibility measures plus strict quality-qualified and evidence-backed realized-value measures in the canonical backend | Instrument accepted outcomes and obtain business/finance-approved baseline, valuation and cost-coverage evidence |
+| Native evidence | V2 lossless interchange, usage/reliability KQL, default-off common-RG workbook and project navigation | Publish the reviewed module, deploy against an existing workspace, ingest approved metadata-only events, and verify real KQL/Portal behavior |
+| Native monetary realization | Original finance evidence preserved; unsupported native financial calculations remain unavailable | Reuse the canonical financial validator before publishing a versioned, attributable derived-result event; add native display only with equivalent overlap/period/currency/coverage gates |
+| Automation and CLI/API | Native offline reducer/wrapper, canonical API/CSV and purple SDK/CLI examples | Configure approved existing collectors/runbooks separately; catalog browsing must not dispatch jobs |
+| Samples and operation | Shared placement identities, scoped popularity samples, aligned lifecycle thresholds and no live synthetic history fallback | Validate current source freshness and completeness before operational decisions |
+| Consumer adoption | Updated source exercised from Spider's directory without overwriting its modified files or submodule pin | Publish/version the approved purple change, review the consumer template merge, then update its pin through the normal owner-controlled process |
+
+For further automated realization, reuse My Project's outcome events but
+validate successful transactions/resolutions against the business system of
+record. Add explicit accepted-outcome and human-handoff observations, reviewed
+baseline versions, and aggregate review/rework effort. Join an approved
+financial export using the same compound scope and period; do not reinterpret
+cart activity, token volume or an evaluator score as revenue.
+
+For native finance parity, the next step is **validator reuse**, not another
+approximate KQL ROI formula. A proposed derived-result contract should preserve
+validator version, qualified scope/period/currency, input/evidence references,
+cost coverage, publication identity and freshness. It must make stale,
+partially attributed or unvalidated results unavailable. This is follow-on
+design, not an implemented ingestion service or an attestation mechanism.
+
+No local source update changes an already distributed desktop installer or an
+already deployed workbook. Build/package from the reviewed source and use the
+normal release flow. Keep the source API and MAUI's packaged API host aligned;
+a matching API version string alone does not prove matching report behavior.
+
+## Earlier native capture observations
+
+The earlier recorded read-only Spider capture pass opened the existing shared factory dashboard,
 Project 001 resource-group Cost analysis, the Foundry account's processed
 inference-token metric, Application Insights, and the new Foundry Operate /
 Compliance experiences.
@@ -1062,7 +1538,7 @@ Screenshots are point-in-time evidence, not live dashboards. Review account and
 resource identifiers before distributing the presentation outside its intended
 audience.
 
-## Delivered implementation and capture boundaries
+## Earlier delivery and capture boundaries
 
 The six canonical report families now have shared scope-first filtering,
 All-default organizational selectors, explicit missing-data handling, retained
@@ -1110,10 +1586,132 @@ dashboards remain deployment-specific and do not inherit the desktop filters.
 Production value realization still needs approved instrumentation, allocation,
 baseline and outcome evidence.
 
-The delivery contains **89 full-resolution screenshots** (8 Azure-native,
+The earlier delivery contains **89 full-resolution screenshots** (8 Azure-native,
 56 MAUI and 25 Tkinter) and the **98-slide**
 `AI-Factory-Monitoring-FinOps-Value.pptx`, with a `capture-index.json` describing
 each view, mode, scope and source. The requested output folder uses the name
 `screebshots`. Office applied a sensitivity label to the final PowerPoint;
 that protection was preserved. Open it with an authorized Office account and
 review the audience before sharing.
+
+## September 20 local delivery
+
+This refresh preserves the earlier presentation and captures. Its new artifacts
+in the requested `monitoring-finops` folder are:
+
+| Artifact | Contents |
+|---|---|
+| `AI-Factory-Monitoring-FinOps-20260920.pptx` | 206-slide reference atlas: capability/architecture summary, every new full-window capture, enlarged details, filters, sources and citations |
+| `screebshots\20260920-refresh` | 147 actual maximized 3840 x 2076 captures: 48 MAUI and 99 Tkinter |
+| `screebshots\20260920-refresh\details` | 48 exact crops from those retained full images, not redrawn dashboards |
+| `capture-index-20260920.json` | Per-view mode, scope, sources, full-image/detail paths and capture notes |
+
+The standard MAUI canonical captures use **30 sample days**; Tkinter's main
+canonical sweep uses **7 sample days**, with explicit scoped/one-day examples.
+My Project captures use their displayed local-date/store/time-zone selections
+(MAUI Europe/Berlin; Tkinter UTC). Compare totals only after aligning scope,
+period and time zone. Shared formulas do not make different selected windows
+numerically identical.
+
+The local MAUI preview is under
+`<MAUI-repository>\artifacts\monitoring-hub-20260920\preview`. It includes the
+updated `ApiHost\aifactory-api.exe`. Run `Start-MonitoringSample.ps1` there for
+an isolated sample session: the launcher starts its own authenticated loopback
+API, opens Monitoring hub and stops its API when that app exits. Keep its
+PowerShell session open while using the preview. It does not overwrite stored
+API connection settings or require the temporary capture server. Normal
+executable launch continues to honor the application's connection settings.
+
+The updated source/API and packaged host were exercised locally, including
+all six report families, full All-scope responses, scoped exports and the
+purple consumer examples run from Spider. Spider's existing modified files
+and submodule pin were retained; no normal consumer release was silently
+replaced.
+
+**September 20 live boundary (superseded by the September 21 capture below):**
+no new Azure Portal screenshots were captured in that refresh.
+The initial attempt required interactive sign-in; a later browser check showed
+a different tenant, which was not captured or changed. At that point a confirmed
+Spider portal session was still required. Native catalog cards in the apps are not
+substituted for live Azure views. This refresh did not deploy the
+optional agent workbook, ingest telemetry, start cloud report jobs, change
+permissions or create schedules. Native verified-finance calculations remain
+unavailable as documented; the canonical custom reports support the explicit
+financial-evidence gates.
+
+## September 21 native evidence supplement
+
+The user completed interactive sign-in, and the Spider account and tenant were
+confirmed before accessing resources. This pass captured **actual native Azure
+and Foundry pages**, not the desktop capability catalog. The browser was full
+screen; the retained PNG viewport is **2195 x 1235 CSS pixels**. The earlier
+MAUI/Tkinter screenshots, presentations, consumer settings and submodule pin
+were preserved.
+
+| Artifact in the requested `monitoring-finops` folder | Contents |
+|---|---|
+| `AI-Factory-Monitoring-FinOps-Native-20260921.pptx` | 40-slide native supplement: interpretation, all 27 captures, seven enlarged details, filters, sources and limitations |
+| `screebshots\20260921-native` | 27 native browser captures, including explicit unavailable/access-error states |
+| `screebshots\20260921-native\details` | Seven exact image crops; full originals retained |
+| `capture-index-native-20260921.json` | Per-image scope, source, capture time, dimensions, hashes and interpretation boundaries |
+
+Use this supplement together with the **206-slide September 20 local atlas**.
+It does not replace or relabel the sample MAUI/Tkinter views as live telemetry.
+Live screenshots include tenant/resource identifiers and billing information;
+review the audience and apply an appropriate sensitivity label before sharing.
+The public guide intentionally does not reproduce those identifiers or amounts.
+
+### What actually opened, and what it establishes
+
+| Native surface | September 21 observation | Interpretation |
+|---|---|---|
+| Shared factory dashboard | Connectivity/common cost tiles loaded; stage/prod resource tiles reported invalid resource IDs | Working cost tiles do not prove every environment is deployed |
+| Project 001 DEV dashboard | Opened successfully, including My Project and model-token links | Supersedes the earlier observation that this project-dashboard destination was absent |
+| My Project Usage | Retail, Booking and Support rendered; coverage declarations remained false/unreviewed and business cards unavailable | No completeness, accepted outcomes or business realization was asserted |
+| My Project empty charts | Some all-unavailable daily charts displayed `Could not find appropriate columns for Time chart` | A visible native-rendering limitation, not a valid zero-valued history |
+| My Project Cost | Separate actual/allocated/estimated rows had no coverage; no observed currency was available for the charts | App-meter evidence is independent of the working resource-group billing view |
+| My Project Model tokens | A discovered account name was displayed, but account validation returned no valid scoped account and empty account ID | Unresolved deployed-workbook binding/validation issue; it is not evidence of no token consumption |
+| Azure Cost Analysis | Actual and amortized views both loaded with the project RG, month and currency visible; forecast remained separate | Billing-derived, open-period cost; neither basis should be added to the other or to forecast |
+| Azure Monitor account metrics | The 24-hour window had no displayed token value; seven days showed measured inference-token activity | Window selection matters; native platform metrics do not depend on business-event coverage |
+| Application Insights | Operational overview loaded; Agents Preview displayed its setup/no-recent-activity state | Neither zero request counts nor missing agent data establishes complete health coverage |
+| Foundry model Monitor | Deployment requests, input/output tokens, latency and estimated cost loaded for the seven-day window | Technical model activity and a native estimate, not full workload cost or business ROI |
+| Azure Monitor Dashboards with Grafana | The built-in AI Foundry view opened from Foundry's own link with the actual subscription/RG/account and period | Native usage/cost-estimate/reliability panels without creating a Grafana resource or saving a dashboard |
+| Foundry Operate | Overview displayed no agent totals; Assets returned HTTP 403 | A missing or denied source is not an empty healthy inventory; no alternate access path was used for that inventory |
+| Foundry Compliance | Policy list and recommendation panel were empty; the model guardrail configuration matrix loaded | Configured controls, absent recommendations and effective protection are different evidence types |
+
+Native controls were used only for unsaved view selection, time/basis changes
+and scrolling. The workbook's coverage declarations and scope guards were not
+relaxed. Model Monitor's visible cost-processing warning was preserved.
+Grafana/Foundry estimates were not substituted for Cost Management amounts,
+and model-token totals were not substituted for business outcomes.
+
+The exact Foundry model-monitor route was reached through the live portal's
+navigation. This confirms that destination for this observed deployment; it
+does **not** establish a durable, generic Foundry deep-link contract for the
+desktop catalog or every tenant.
+
+### Follow-on work exposed by live rendering
+
+1. Reproduce the deployed token-workbook account selection against its saved
+   parameter values, discovered ARM IDs and inventory. Correct the binding or
+   serialization mismatch only after isolating it; retain exact-RG validation
+   and fail-closed behavior. Acceptance requires real input/output metric
+   series and independently scoped request logs, not simply successful Bicep
+   compilation or a populated account label.
+2. Make all-unavailable business-series rendering explicit without turning
+   missing values into zeros. Verify the native empty and partial states in
+   Portal as well as the KQL output schema.
+3. Have the source owner review denied agent-inventory access and telemetry
+   prerequisites. Do not reinterpret HTTP 403, no policies, no recommendations
+   or no recent agent data as a healthy score.
+4. Instrument accepted outcomes, review/rework effort and comparable baselines;
+   supply approved valuation and matched cost evidence before claiming realized
+   benefit. Native model requests and guardrail settings cannot provide that
+   business evidence automatically.
+
+**Not performed:** cloud deployment, saved Azure edits, diagnostic settings,
+RBAC changes, telemetry ingestion, inference, evaluations, report jobs or
+schedules. The optional agent-evidence workbook and standalone generated
+Application Insights dashboard were not verified in this pass. On-demand cloud
+execution was deliberately not started. Those surfaces retain their existing
+deployment/execution prerequisites; these screenshots do not imply otherwise.

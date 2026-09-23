@@ -48,7 +48,9 @@ class Handler(BaseHTTPRequestHandler):
 @pytest.fixture()
 def server():
     Handler.records = []
-    Handler.responses = {}
+    Handler.responses = {("GET", "/openapi.json"): (200, {
+        "components": {"schemas": {"CatalogPrepare": {"properties": {"initial_project": {}}}}},
+    }, {})}
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
@@ -111,6 +113,77 @@ def test_bootstrap_common_details_is_explicit_and_strict_remains_default(server)
     assert len(Handler.records) == 2
 
 
+def test_factory_create_sdk_defers_defaults_and_prepares_only(server):
+    client = AzureFactoryClient(server, "test-key")
+    scales = [{"environment": "dev", "suffix": "001"}]
+    client.factory_create_prepare("C:\\consumer\\azurefactory", prefix="example-", region="swedencentral",
+                                  scale_sets=scales)
+    assert [record["path"] for record in Handler.records] == ["/openapi.json", "/api/v1/factory-catalog/prepare"]
+    record = Handler.records[-1]
+    assert record["path"] == "/api/v1/factory-catalog/prepare"
+    assert record["body"]["action"] == "create-factory"
+    assert "initial_project" not in record["body"]
+    assert "aifactory_version" not in record["body"]
+    assert "target_region_short_name" not in record["body"]
+    assert record["body"]["scale_sets"] == scales
+
+
+def test_factory_create_sdk_forwards_one_explicit_project_and_version(server):
+    client = AzureFactoryClient(server, "test-key")
+    project = {"number": "003", "display_name": "Example project"}
+    client.factory_create_prepare(
+        "C:\\consumer\\azurefactory", prefix="example-", region="swedencentral",
+        scale_sets=[{"environment": "dev", "suffix": "001"}],
+        initial_project=project, aifactory_version="main", expected_revision="a" * 64,
+    )
+    assert len(Handler.records) == 2
+    body = Handler.records[-1]["body"]
+    assert body["initial_project"] == project
+    assert body["aifactory_version"] == "main"
+    assert body["expected_revision"] == "a" * 64
+    assert project["number"] == "003"
+
+
+def test_factory_create_sdk_preserves_explicit_common_only_and_settings(server):
+    client = AzureFactoryClient(server, "test-key")
+    client.factory_create_prepare(
+        "C:\\consumer\\azurefactory", prefix="example-", region="swedencentral",
+        scale_sets=[{"environment": "dev", "suffix": "001"}],
+        initial_project=None, settings={"enableAIFactoryHub": "false"},
+    )
+    body = Handler.records[-1]["body"]
+    assert "initial_project" in body and body["initial_project"] is None
+    assert body["settings"] == {"enableAIFactoryHub": "false"}
+
+
+def test_factory_create_sdk_blocks_stale_api_without_preparing(server):
+    Handler.responses[("GET", "/openapi.json")] = (200, {"components": {"schemas": {}}}, {})
+    with pytest.raises(ConfigError, match="initial_project"):
+        AzureFactoryClient(server, "test-key").factory_create_prepare(
+            "C:\\consumer\\azurefactory", prefix="example-", region="swedencentral", scale_sets=[],
+        )
+    assert [record["path"] for record in Handler.records] == ["/openapi.json"]
+
+
+@pytest.mark.parametrize("supported", [True, False])
+def test_factory_create_sdk_region_short_name_is_explicit_and_capability_checked(server, supported):
+    properties = {"initial_project": {}}
+    if supported:
+        properties["target_region_short_name"] = {}
+    Handler.responses[("GET", "/openapi.json")] = (
+        200, {"components": {"schemas": {"CatalogPrepare": {"properties": properties}}}}, {},
+    )
+    client = AzureFactoryClient(server, "test-key")
+    request = dict(prefix="example-", region="swedencentral", region_short_name="sec", scale_sets=[])
+    if supported:
+        client.factory_create_prepare("C:\\consumer\\azurefactory", **request)
+        assert Handler.records[-1]["body"]["target_region_short_name"] == "sec"
+    else:
+        with pytest.raises(ConfigError, match="target_region_short_name"):
+            client.factory_create_prepare("C:\\consumer\\azurefactory", **request)
+        assert [record["path"] for record in Handler.records] == ["/openapi.json"]
+
+
 def test_api_key_repr_and_error_redaction(server):
     assert "secret" not in repr(AzureFactoryClient(server, "secret"))
     Handler.responses[("GET", "/api/v1/schema")] = (500, {"detail": "bad secret", "api_key": "secret"}, {})
@@ -147,3 +220,18 @@ def test_non_json_and_malformed_api_objects(server):
     Handler.responses[("GET", "/api/v1/schema")] = (200, [], {})
     with pytest.raises(APIError):
         AzureFactoryClient(server, "k").schema()
+
+
+def test_monitoring_csv_is_accepted_only_at_exact_export_route(server):
+    body = {"source": "sample", "report_id": "showback", "rows": []}
+    csv = b"project,actual_cost\r\n001,20\r\n"
+    Handler.responses[("POST", "/api/v1/monitoring/export")] = (200, csv, {"Content-Type": "text/csv"})
+    assert AzureFactoryClient(server, "k").monitoring_export(body) == csv.decode()
+    assert Handler.records[-1]["key"] == "k"
+    assert Handler.records[-1]["body"] == body
+    Handler.responses[("POST", "/api/v1/monitoring/report")] = (200, csv, {"Content-Type": "text/csv"})
+    with pytest.raises(APIError, match="non-JSON"):
+        AzureFactoryClient(server, "k").monitoring_report(body)
+    Handler.responses[("POST", "/api/v1/monitoring/export")] = (200, {"wrong": "json"}, {})
+    with pytest.raises(APIError, match="text/csv"):
+        AzureFactoryClient(server, "k").monitoring_export(body)

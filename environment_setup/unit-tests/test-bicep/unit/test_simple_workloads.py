@@ -311,20 +311,30 @@ printf '%s\\n' "AML=$AIF_AZURE_ML_PRINCIPAL_ID" "DBX=$AIF_DATABRICKS_PRINCIPAL_I
 
 
 @pytest.mark.parametrize("selection", SCENARIOS + [[]])
-def test_gateway_off_still_dispatches_common_access_and_each_selected_workload(selection):
+@pytest.mark.parametrize("runner_mode,runner_os,expected_runner", [
+    ("github-hosted", "", "github-hosted"),
+    ("self-hosted", "Linux", "self-hosted-linux"),
+    ("self-hosted", "Windows", "self-hosted-windows"),
+])
+def test_gateway_off_still_dispatches_common_access_and_each_selected_workload(selection, runner_mode, runner_os, expected_runner):
     result = bash(f"""AIF_SIMPLE_MODE=true; AIF_ENABLE_APPLICATION_GATEWAY=false; AIF_NO_WAIT=false
-AIF_RUNNER_MODE=github-hosted
+AIF_RUNNER_MODE='{runner_mode}'; AIF_RUNNER_OS='{runner_os}'; AIF_DRY_RUN=false
 AIF_SIMPLE_PROJECT_RESOURCES_JSON='{json.dumps(selection)}'
-aif_run_github_workflow() {{ echo "$1"; }}
-aif_ensure_github_self_hosted_agent() {{ :; }}
+aif_run_github_workflow() {{
+  if [[ "$1" == infra-project.yml ]]; then
+    [[ " $* " == *" runner_selection={expected_runner} "* ]] || return 91
+  fi
+  echo "$1"
+}}
 aif_verify_common_resource_group() {{ echo COMMON; }}
 aif_ensure_private_network_access() {{ echo VPN_DNS; }}
+aif_ensure_github_self_hosted_agent() {{ echo RUNNER_READY; }}
 aif_deploy_github
 """, "aif_simple_stage", "aif_deploy_github", "aif_deploy_simple_application_gateway")
     assert result.returncode == 0, result.stderr
     assert result.stdout.splitlines() == [
         "AIF_SIMPLE_STAGE=common", "infra-common.yml", "COMMON", "AIF_SIMPLE_STAGE=hub",
-        "VPN_DNS", "AIF_SIMPLE_STAGE=project", "infra-project.yml"]
+        "VPN_DNS", "RUNNER_READY", "AIF_SIMPLE_STAGE=project", "infra-project.yml"]
     assert result.stderr == ""
 
 

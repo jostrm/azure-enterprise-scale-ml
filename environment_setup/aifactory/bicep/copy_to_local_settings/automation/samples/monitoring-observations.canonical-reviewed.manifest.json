@@ -1,0 +1,14 @@
+{
+  "scenario": "aifactory.monitoring-sample.v1",
+  "observation_contract": "aifactory.monitoring-observations.v1",
+  "artifact": "monitoring-observations.canonical-reviewed.sample.json",
+  "source_artifact": "monitoring-hub-review-fixture.json",
+  "source": "sample",
+  "rows": 18,
+  "period_start": "2026-09-15T10:00:00+00:00",
+  "period_end": "2026-09-16T10:00:00+00:00",
+  "source_bytes_crlf": 134376,
+  "source_sha256_crlf": "403291be58199d40ecb55ecc8ce800fc81707320fb471e22b59e12422954a5a1",
+  "sha256_lf": "ea28bbf88947f07e54ecd6bc2e97be4342ae71195ea389dfb1acb88b20860c2c",
+  "notice": "Reviewed canonical synthetic one-day fixture. Never live evidence. LF-normalized digest supports Git line-ending conversion; the original CRLF source digest is retained separately."
+}

@@ -341,6 +341,34 @@ resolution, settings-to-parameter compilation and review remain backend
 preparation responsibilities. Missing resolved parameters/what-if evidence is
 an explicit preparation blocker. This helper is never run by inspect/help.
 
+Prefix-first preservation and first-workload ownership
+-----------------------------------------------------
+For commonNetworkProfile=preserve-v1, the network12 step MUST carry
+network_preservation with contract=preserve-v1-runtime-proof, the exact
+source_payload_sha256, desired network parameters/IDs from successful native
+foundation, and expected_resource_ids from its verified postflight.
+The only permitted replay has createVnet=false and empty createSubnets and
+createNetworkSecurityGroups. The published helper validates actual compiled
+ARM semantics and exact parameters, not a BYO flag or profile-name assertion.
+Preparation freezes a NEW snapshot_sha256 after runner/private-endpoint setup.
+The worker recollects the exact network footprint under its held lease and
+rejects changed configuration, etags, compiler output or source before PUT.
+This proves only network12's zero-write footprint; it does not certify
+13-rgLevel, arbitrary DNS operations or later project effects.
+
+For groups actually created by the reviewed native minimum stage, the backend
+may attach deployment.bootstrap_foundation with
+contract=created-group-ownership-v1 and groups={lowercase_RG_ID:
+{plan_id: native_creation_UUID, plan_hash: approved_native_plan_SHA256}}.
+Reused/shared groups are not creation claims. Preparation freezes
+bootstrap_ownership entries for untagged descendants of those exact locked,
+ownership-tagged groups; each entry binds owner and current body_hash.
+The worker verifies those snapshots again under the lease before mutation.
+Foreign ownership and changed instances block. The backend stops attaching
+each group's bootstrap claim once ordinary lifecycle ownership is recorded.
+This handoff avoids requiring a prior lifecycle receipt before the first
+workload without treating unrelated groups as adoptable.
+
 Pure parameter preparation utility:
   resolve_template_parameters(compiled_template, selected_values, parameter_sources)
 Explicit parameter_sources maps Bicep parameter names to selected config keys.

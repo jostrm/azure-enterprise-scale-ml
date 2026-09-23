@@ -83,6 +83,8 @@ ALIASES = {
     # AI Search reuses the shared ADMIN_AISEARCH_TIER GitHub variable.
     "skuAISearchDev": "ADMIN_AISEARCH_TIER",
     "skuAISearchStageProd": "ADMIN_AISEARCH_TIER",
+    "skuAISearchDevArray": "SKU_AI_SEARCH_DEV_ARRAY",
+    "skuAISearchStageProdArray": "SKU_AI_SEARCH_STAGE_PROD_ARRAY",
     "skuAIServicesDev": "SKU_AISERVICES_DEV",
     "skuAIServicesStageProd": "SKU_AISERVICES_STAGEPROD",
     "skuOpenAIDev": "SKU_OPENAI_DEV",

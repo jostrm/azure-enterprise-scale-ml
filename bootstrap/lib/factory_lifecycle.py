@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import sys
 import time
+import types
 import zlib
 from datetime import datetime, timezone
 from pathlib import Path
@@ -326,6 +327,12 @@ def validate_deployment_plan(document):
         require(hash_value(step.get("template_hash")) and isinstance(step.get("parameters"), dict),
                 "frozen-template-parameters-required")
         parameters = step["parameters"]
+        if parameters.get("commonNetworkProfile") == "preserve-v1" or "network_preservation" in step:
+            proof = step.get("network_preservation")
+            require(template == COMMON_TEMPLATES["12-networkCommon"] and isinstance(proof, dict)
+                    and proof.get("contract") == "preserve-v1-runtime-proof"
+                    and hash_value(proof.get("source_payload_sha256")),
+                    "runtime-network-preservation-proof-required")
         require(all(isinstance(key, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key) for key in parameters),
                 "invalid-arm-parameter-name")
         expected = {"env": "test" if target["environment"] == "stage" else target["environment"],
@@ -386,6 +393,25 @@ def validate_deployment_plan(document):
         combined_ids.add(change["resource_id"].lower())
 
 
+def protect_coordination_storage(document):
+    """Never destroy the account/RG that holds this operation's live leases."""
+    account = urlsplit(document["locks"]["account_url"]).hostname.split(".")[0].lower()
+    suffix = "/providers/microsoft.storage/storageaccounts/" + account
+    data = document["deletion"]
+    protected_groups = set()
+    for item in data["resources"]:
+        identifier = str(item.get("id", "")).lower()
+        if suffix not in identifier:
+            continue
+        tail = identifier.split(suffix, 1)[1]
+        if tail and not tail.startswith("/"):
+            continue
+        protected_groups.add(arm_scope(identifier))
+        require(item.get("delete") is not True, "coordination-storage-delete-forbidden")
+    require(not any(item.get("delete") is True and str(item.get("id", "")).lower() in protected_groups
+                    for item in data["resource_groups"]), "coordination-resource-group-delete-forbidden")
+
+
 def validate_deletion(document):
     data = document.get("deletion")
     require(isinstance(data, dict) and data.get("inventory_complete") is True, "complete-inventory-required")
@@ -393,6 +419,7 @@ def validate_deletion(document):
     resources, groups = data.get("resources"), data.get("resource_groups")
     require(isinstance(resources, list) and isinstance(groups, list) and groups, "inventory-resources-required")
     require(all(isinstance(item, dict) for item in groups + resources), "invalid-inventory-entry")
+    protect_coordination_storage(document)
     full = data.get("inventory_mode") == "arm-provider-closure-v1"
     require(any(item.get("delete") is True for item in groups + resources), "nonempty-delete-allowlist-required")
     require(data.get("inventory_hash") == digest(resources), "inventory-hash-mismatch")
@@ -479,6 +506,8 @@ def capabilities():
         "project_environments": ["dev", "stage", "prod"],
         "scoped_worker_os": ["linux"], "scoped_runners": ["hosted", "self-hosted"],
         "scoped_group_ownership_receipt": "resource-group-ownership-v1",
+        "network_preservation": "preserve-v1-runtime-proof",
+        "bootstrap_ownership": "created-group-ownership-v1",
         "delete_leaf_types": sorted(LEAF_TYPES), "delete_empty_owned_resource_groups": True,
         "delete_owned_resource_groups": "arm-provider-closure-v1",
         "factory_cohort": "physical-lease-cohort-v1",
@@ -776,8 +805,14 @@ class Cloud:
             seen.add(url)
             status, _, body = self.request("GET", url, ARM, allowed=(200, 400, 404, 405))
             if status != 200:
-                code = (body or {}).get("error", {}).get("code")
-                require(extension and code in UNSUPPORTED_COLLECTION_CODES, "unsupported-child-inventory-endpoint")
+                error = body.get("error") if isinstance(body, dict) else None
+                # Diagnostic Settings documents a top-level ErrorResponse, unlike ARM's error envelope.
+                if (isinstance(body, dict) and "error" not in body
+                        and path.lower().endswith("/providers/microsoft.insights/diagnosticsettings")):
+                    error = body
+                code = error.get("code") if isinstance(error, dict) else None
+                require(extension and isinstance(code, str) and code in UNSUPPORTED_COLLECTION_CODES
+                        and not ("error" in body and "code" in body), "unsupported-child-inventory-endpoint")
                 return [], code
             require(isinstance(body, dict) and isinstance(body.get("value"), list),
                     "incomplete-child-inventory")
@@ -1098,6 +1133,7 @@ def verify_full_inventory(cloud, document, removed_groups=()):
 
 
 def delete_owned_groups(cloud, locks, document, receipt, persist, sleep=time.sleep):
+    protect_coordination_storage(document)
     locks.authorize(document)
     require(all(group["delete"] for group in document["deletion"]["resource_groups"])
             and all(row["delete"] for row in document["deletion"]["resources"]), "whole-owned-groups-only")
@@ -1417,6 +1453,7 @@ def verify_inventory(cloud, document, remaining=None):
 
 
 def delete_resources(cloud, locks, document, receipt, persist, sleep=time.sleep):
+    protect_coordination_storage(document)
     locks.authorize(document)
     verify_inventory(cloud, document)
     remaining = list(document["deletion"]["resources"])
@@ -1578,6 +1615,74 @@ def deployment_endpoint(document, step):
     return ARM + scope + "/providers/Microsoft.Resources/deployments/" + name
 
 
+def _network_preservation_helper(source_root):
+    path = clean_path(source_root / "bootstrap" / "lib" / "common_network_preservation.py")
+    require(path.is_relative_to(source_root) and path.is_file(), "published-network-preservation-helper-required")
+    module = types.ModuleType("published_common_network_preservation")
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), "exec"), module.__dict__)
+    return module
+
+
+def verify_preserved_network(cloud, document, step, source_root, *, template=None, freeze=False):
+    """Revalidate only the zero-write template footprint; never authorize allocation."""
+    if step["parameters"].get("commonNetworkProfile") != "preserve-v1" and "network_preservation" not in step:
+        return
+    proof = step.get("network_preservation")
+    require(step["template"] == COMMON_TEMPLATES["12-networkCommon"] and isinstance(proof, dict)
+            and proof.get("contract") == "preserve-v1-runtime-proof",
+            "runtime-network-preservation-proof-required")
+    helper = _network_preservation_helper(source_root)
+    try:
+        require(helper.digest(helper._source_files(source_root)) == proof["source_payload_sha256"],
+                "runtime-network-preservation-source-changed")
+        template = template if template is not None else cloud.compile_template(source_root, step["template"])
+        require(digest(template) == step["template_hash"], "compiled-template-hash-mismatch")
+        helper.validate_compiled_capability(template)
+        desired = json.loads(canonical(proof["desired"]))
+        require(desired["factory_id"] == document["target"]["factory_id"]
+                and arm_scope(desired["vnet_id"]) == str(step.get("resource_group", "")).lower(),
+                "runtime-network-preservation-target-mismatch")
+        parameters = step["parameters"]
+        replay = parameters.get("preservationPlan", {})
+        require(parameters.get("commonNetworkProfile") == "preserve-v1"
+                and replay.get("createVnet") is False and replay.get("createSubnets") == []
+                and replay.get("createNetworkSecurityGroups") == [],
+                "runtime-network-replay-must-be-exactly-zero-write")
+        expected_parameters = {**desired["parameters"], "commonNetworkProfile": "preserve-v1",
+                               "preservationPlan": replay}
+        require(expected_parameters == parameters, "runtime-network-preservation-parameters-changed")
+        desired["parameters"] = parameters
+        _, vnet_id, subnets, _ = helper._canonical(desired)
+        identifiers = set(helper.required_resource_ids(desired))
+        required = set(proof["expected_resource_ids"])
+        require({vnet_id, *[vnet_id + "/subnets/" + item["name"].lower() for item in subnets]} <= required
+                and required <= identifiers, "runtime-network-preservation-footprint-incomplete")
+        inventory = {}
+        for identifier in sorted(identifiers):
+            status, _, body = cloud.arm("GET", identifier, helper.API_VERSION, allowed=(200, 404))
+            require(status in (200, 404), "runtime-network-preservation-read-unverified")
+            inventory[identifier] = body if status == 200 else None
+            if identifier in required:
+                helper._validate_existing(inventory[identifier], identifier)
+        parent = inventory[vnet_id]["properties"]
+        require(isinstance(parent.get("subnets"), list) and isinstance(parent.get("virtualNetworkPeerings"), list)
+                and sorted(parent["addressSpace"]["addressPrefixes"]) == sorted(desired["approved_address_prefixes"]),
+                "runtime-network-preservation-address-space-changed")
+        for subnet in subnets:
+            require(helper._prefixes(inventory[vnet_id + "/subnets/" + subnet["name"].lower()])
+                    == [subnet["properties"]["addressPrefix"]], "runtime-network-preservation-subnet-changed")
+        fingerprint = helper.digest(inventory)
+        if freeze:
+            proof["snapshot_sha256"] = fingerprint
+        else:
+            require(proof.get("snapshot_sha256") == fingerprint, "network-inventory-changed-since-prepare")
+    except (KeyError, TypeError, ValueError) as error:
+        if isinstance(error, Blocked):
+            raise
+        raise Blocked("runtime-network-preservation-unverified") from None
+
+
 def compiled_plan_step(cloud, document, step, source_root):
     template = cloud.compile_template(source_root, step["template"])
     require(digest(template) == step["template_hash"], "compiled-template-hash-mismatch")
@@ -1585,6 +1690,7 @@ def compiled_plan_step(cloud, document, step, source_root):
     schema = template.get("$schema", "").lower()
     require(("subscriptiondeploymenttemplate" in schema) == (step["scope"] == "subscription"),
             "compiled-template-scope-mismatch")
+    verify_preserved_network(cloud, document, step, source_root, template=template)
     return {"location": document["target"]["region"],
             "properties": {"mode": "Incremental", "template": template,
                            "parameters": {key: {"value": value} for key, value in step["parameters"].items()}}}
@@ -1712,16 +1818,51 @@ def combined_plan_payload(cloud, document, source_root):
     return {"location": target["region"], "properties": {"mode": "Incremental", "template": outer, "parameters": parameters}}
 
 
+def bootstrap_ownership_snapshot(cloud, document):
+    proof = document["deployment"].get("bootstrap_foundation")
+    if proof is None:
+        return {}
+    require(isinstance(proof, dict) and proof.get("contract") == "created-group-ownership-v1"
+            and isinstance(proof.get("groups"), dict), "created-bootstrap-groups-proof-required")
+    for group, receipt in proof["groups"].items():
+        require(isinstance(group, str) and RG_ID.fullmatch(group) and isinstance(receipt, dict)
+                and guid(receipt.get("plan_id")) and hash_value(receipt.get("plan_hash")),
+                "created-bootstrap-group-receipt-required")
+    groups = sorted({scope.lower() for scope in document["locks"]["scopes"]} & set(proof["groups"]))
+    if not groups:
+        return {}
+    closure, bodies = collect_resource_closure(cloud, groups)
+    expected = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
+    for group in groups:
+        verify_group_ownership(bodies[group], expected, bodies)
+    result = {}
+    for identifier, metadata in closure["resources"].items():
+        tags = bodies[identifier].get("tags") or {}
+        tagged = {key: tags[TAG_KEYS[key]] for key in TAG_KEYS if TAG_KEYS[key] in tags}
+        if tagged:
+            require(all(tagged.get(key) == value for key, value in expected.items()),
+                    "bootstrap-resource-ownership-conflict")
+            continue
+        owner = inherited_new_resource_owner(identifier, bodies)
+        require(all(owner.get(key) == value for key, value in expected.items()),
+                "bootstrap-descendant-ownership-unverified")
+        result[identifier] = {"owner": owner, "body_hash": metadata["body_hash"]}
+    return result
+
+
 def freeze_deployment_plan(cloud, document, source_root):
     """Read-only whole-plan what-if for a caller-resolved, ordered ARM plan."""
     source_root = verify_source(cloud, source_root, document["source"])
     cloud.verify_identity()
     result = json.loads(canonical(document["deployment"]))
     draft = {**document, "deployment": result}
+    if "bootstrap_foundation" in result:
+        result["bootstrap_ownership"] = bootstrap_ownership_snapshot(cloud, draft)
     for step in result["steps"]:
         template = cloud.compile_template(source_root, step["template"])
         require(set(template["parameters"]) == set(step["parameters"]), "parameters-not-fully-resolved")
         step["template_hash"] = digest(template)
+        verify_preserved_network(cloud, draft, step, source_root, template=template, freeze=True)
     payload = combined_plan_payload(cloud, draft, source_root)
     result["changes"] = evaluate_what_if(cloud, draft, {"id": "factory", "scope": "subscription"}, payload)
     result["configuration_hash"] = digest(document["config"])
@@ -1763,6 +1904,9 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         locks.request("PUT", blob, data=receipt, headers={"x-ms-blob-type": "BlockBlob", "If-Match": "*"}, allowed=(201,))
 
     try:
+        bootstrap_owners = bootstrap_ownership_snapshot(cloud, document)
+        require(bootstrap_owners == document["deployment"].get("bootstrap_ownership", {}),
+                "bootstrap-resource-inventory-changed-since-prepare")
         before_ids = set()
         previous_owners, previous_receipts = {}, {}
         modified_ids = {row["resource_id"].lower() for row in document["deployment"]["changes"]
@@ -1785,7 +1929,12 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
                     previous_owners[key] = owner
                 else:
                     evidence = document["deployment"].get("known_ownership", {}).get(key, {})
-                    previous_owners[key] = verified_receipt_owner(locks, evidence, key, metadata["body_hash"], previous_receipts)
+                    if not evidence and key in bootstrap_owners:
+                        require(bootstrap_owners[key]["body_hash"] == metadata["body_hash"],
+                                "bootstrap-resource-instance-changed")
+                        previous_owners[key] = bootstrap_owners[key]["owner"]
+                    else:
+                        previous_owners[key] = verified_receipt_owner(locks, evidence, key, metadata["body_hash"], previous_receipts)
                 require(all(previous_owners[key].get(field) == document["target"][field]
                             for field in ("factory_id", "scaleset_id")), "existing-resource-owner-mismatch")
                 require(key not in modified_ids or not previous_owners[key].get("project_id")
@@ -1801,6 +1950,10 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
                 "arm-what-if-changed-since-prepare")
         locks.assert_held()
         locks.authorize(document)
+        require(bootstrap_ownership_snapshot(cloud, document) == bootstrap_owners,
+                "bootstrap-resource-inventory-changed-before-write")
+        for step in document["deployment"]["steps"]:
+            verify_preserved_network(cloud, document, step, source_root)
         endpoint = deployment_endpoint(document, root_step)
         receipt["pending_deployment"] = endpoint.removeprefix(ARM)
         receipt["mutation_started"] = True

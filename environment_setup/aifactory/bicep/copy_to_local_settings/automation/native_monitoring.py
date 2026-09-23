@@ -7,11 +7,13 @@ from copy import deepcopy
 import csv
 from datetime import datetime
 import hashlib
+import importlib.util
 import json
 import math
 from pathlib import Path
 import re
 import sys
+from types import SimpleNamespace
 from urllib.parse import quote
 import uuid
 
@@ -23,8 +25,24 @@ ALL = {key: "All" for key in DIMENSIONS}
 SCOPE_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
 SCOPE_LABEL_PATTERN = re.compile(r"[^\x00-\x1f\x7f]{1,2048}")
 RG_PATTERN = re.compile(r"[A-Za-z0-9_().-]{1,90}")
-LIMIT = 2 * 1024 * 1024
+LIMIT = 8 * 1024 * 1024
 CANONICAL_SCHEMA = "aifactory.monitoring-observations.v1"
+SCHEMA_V2 = "aifactory.agent-observations/v2"
+_V2 = None
+
+
+def _v2():
+    global _V2
+    if _V2 is None:
+        spec = importlib.util.spec_from_file_location(
+            "aifactory_native_monitoring_v2", Path(__file__).with_name("native_monitoring_v2.py"))
+        _V2 = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_V2)
+    return _V2
+
+
+def _v2_helpers():
+    return SimpleNamespace(SCOPE_PATTERN=SCOPE_PATTERN, matches=matches, cost_link=cost_link)
 
 
 def scope_key(scope):
@@ -102,8 +120,30 @@ def _summary(rows, field):
     return sum(values) if values else None
 
 
-def import_monitoring_observations(document, *, source, authorized_scopes=None):
+def import_monitoring_observations(document, *, source, authorized_scopes=None, native_version=None):
     """Bridge the desktop/API flat contract without inferring provenance or quality approval."""
+    if native_version not in (None, 1, 2):
+        raise ValueError("Native observation version must be 1 or 2.")
+    if isinstance(document, dict) and set(document) - {"contract", "source", "rows"}:
+        raise ValueError("Unsupported canonical envelope field; nothing is silently dropped.")
+    legacy_fields = {
+        "factory", "scaleset", "project", "environment", "agent_id", "timestamp",
+        "completed_outcomes", "baseline_minutes_per_outcome", "actual_minutes_per_outcome",
+        "outcome_quality_passed", "actual_cost", "amortized_cost", "token_estimated_cost",
+        "currency", "security_checks", "security_findings", "provenance", "data_source",
+        "source", "metadata_validated", "subscription_id", "resource_group", "resource_id", "cost_scope",
+    }
+    needs_v2 = isinstance(document, dict) and isinstance(document.get("rows"), list) and any(
+        isinstance(record, dict) and (
+            set(record) - legacy_fields or
+            isinstance(record.get("provenance"), dict) and set(record["provenance"]) - legacy_fields
+        ) for record in document["rows"])
+    if native_version == 1 and needs_v2:
+        raise ValueError("Native v1 cannot represent these fields losslessly; select native version 2.")
+    if native_version == 2 or needs_v2:
+        result = _v2().import_document(document, source=source, authorized_scopes=authorized_scopes)
+        build_report(result)
+        return result
     if not isinstance(document, dict) or document.get("contract") != CANONICAL_SCHEMA or source not in {"sample", "live"}:
         raise ValueError("Canonical imports require monitoring-observations.v1 and explicit sample/live source.")
     if document.get("source") not in (None, source):
@@ -184,6 +224,8 @@ def import_monitoring_observations(document, *, source, authorized_scopes=None):
 
 
 def build_report(document, filters=None):
+    if isinstance(document, dict) and document.get("schema") == SCHEMA_V2:
+        return _v2().build_report(document, selection(filters), _v2_helpers())
     if not isinstance(document, dict) or document.get("schema") != SCHEMA or document.get("source") not in {"sample", "live"}:
         raise ValueError("Expected the native agent-observations schema and explicit sample/live provenance.")
     if set(document) - {"schema", "source", "authorizedScopes", "rows"}:
@@ -322,6 +364,11 @@ def build_report(document, filters=None):
 
 def app_events(document, filters=None):
     """Prepare events for an approved existing telemetry publisher; never ingest them here."""
+    if document.get("schema") == SCHEMA_V2:
+        return [{"name": "aifactory.agent.observation", "timestamp": row["timestamp"],
+                 "properties": {"observation": json.dumps(
+                     {**row, "schema": SCHEMA_V2, "source": document["source"]}, allow_nan=False)}}
+                for row in _v2().selected(document, selection(filters), _v2_helpers())]
     report = build_report(document, filters)
     included = {(scope_key(row["scope"]), row["id"]) for row in report["rows"]}
     return [{"name": "aifactory.agent.observation", "timestamp": row["timestamp"],
@@ -331,6 +378,8 @@ def app_events(document, filters=None):
 
 def export_monitoring_observations(document, filters=None):
     """Pivot complementary measurements at an exact grain into the canonical input."""
+    if document.get("schema") == SCHEMA_V2:
+        return _v2().export_document(document, selection(filters), _v2_helpers())
     report = build_report(document, filters)
     originals = {(scope_key(row["scope"]), row["id"]): row for row in document["rows"]}
     groups = {}
@@ -410,7 +459,7 @@ def export_monitoring_observations(document, filters=None):
             record.update(metadata)
     for state in groups.values():
         state["record"]["data_source"] = "; ".join(dict.fromkeys(state["sources"]))
-    return {"contract": CANONICAL_SCHEMA, "rows": [state["record"] for state in groups.values()]}
+    return {"contract": CANONICAL_SCHEMA, "source": document["source"], "rows": [state["record"] for state in groups.values()]}
 
 
 def export_csv(report, path):
@@ -422,9 +471,9 @@ def export_csv(report, path):
 
     with Path(path).open("w", encoding="utf-8", newline="") as stream:
         writer = csv.writer(stream)
-        writer.writerow([*DIMENSIONS, "id", "kind", "value", "unit", "costBasis", "source", "status", "dataSource", "formula", "inputs", "upstream", "evidence", "costAnalysisUrl"])
+        writer.writerow([*DIMENSIONS, "id", "kind", "metric", "value", "unit", "costBasis", "source", "status", "dataSource", "formula", "inputs", "upstream", "evidence", "costAnalysisUrl"])
         for row in report["rows"]:
-            cells = [*(row["scope"][key] for key in DIMENSIONS), row["id"], row["kind"], row["value"], row["unit"],
+            cells = [*(row["scope"][key] for key in DIMENSIONS), row["id"], row["kind"], row.get("metric", ""), row["value"], row["unit"],
                      row["costBasis"], report["source"], row["status"], row["dataSource"], row["lineage"]["formula"],
                      json.dumps(row["lineage"]["inputs"]), json.dumps(row["lineage"]["upstream"]), json.dumps(row["evidence"]),
                      row["drillthrough"]["url"] if row["drillthrough"] else ""]
@@ -438,7 +487,10 @@ def main(argv=None):
     parser.add_argument("--csv", help="Optional CSV with identical filtered rows and lineage.")
     parser.add_argument("--events", help="Prepare local AppEvents JSON for a separately approved publisher; never uploads.")
     parser.add_argument("--observations-output", help="Export filtered canonical monitoring-observations.v1 rows for the desktop/API.")
+    parser.add_argument("--native-output", help="Save the filtered native evidence envelope locally; never publishes or ingests.")
     parser.add_argument("--source", choices=("sample", "live"), help="Required for canonical monitoring-observations.v1 imports; never inferred.")
+    parser.add_argument("--native-version", type=int, choices=(1, 2),
+                        help="Canonical import target. Default retains v1 for legacy-compatible inputs, otherwise selects v2. Select 2 for lossless original row grain.")
     parser.add_argument("--authorized-scopes", help="Reviewed JSON array of native five-part scopes; required for live canonical imports.")
     for name in DIMENSIONS:
         parser.add_argument("--" + name, default="All")
@@ -446,7 +498,7 @@ def main(argv=None):
     with Path(args.input).open("rb") as stream:
         raw = stream.read(LIMIT + 1)
     if len(raw) > LIMIT:
-        parser.error("Input exceeds 2 MiB.")
+        parser.error("Input exceeds 8 MiB.")
     try:
         document = json.loads(raw)
         if not isinstance(document, dict):
@@ -457,9 +509,10 @@ def main(argv=None):
                 with Path(args.authorized_scopes).open("rb") as stream:
                     scope_bytes = stream.read(LIMIT + 1)
                 if len(scope_bytes) > LIMIT:
-                    raise ValueError("Authorized scope manifest exceeds 2 MiB.")
+                    raise ValueError("Authorized scope manifest exceeds 8 MiB.")
                 scopes = json.loads(scope_bytes)
-            document = import_monitoring_observations(document, source=args.source, authorized_scopes=scopes)
+            document = import_monitoring_observations(document, source=args.source, authorized_scopes=scopes,
+                                                     native_version=args.native_version)
         elif args.source and args.source != document.get("source"):
             raise ValueError("Explicit source must match the input document; sample provenance cannot be relabeled.")
         filters = {key: getattr(args, key) for key in DIMENSIONS}
@@ -478,6 +531,13 @@ def main(argv=None):
         Path(args.events).write_text(json.dumps(app_events(document, filters), indent=2, allow_nan=False), encoding="utf-8")
     if args.observations_output:
         Path(args.observations_output).write_text(json.dumps(observations, indent=2, allow_nan=False), encoding="utf-8")
+    if args.native_output:
+        if document["schema"] == SCHEMA_V2:
+            filtered = _v2().selected(document, filters, _v2_helpers())
+        else:
+            included = {(scope_key(row["scope"]), row["id"]) for row in report["rows"]}
+            filtered = [row for row in document["rows"] if (scope_key(row["scope"]), row["id"]) in included]
+        Path(args.native_output).write_text(json.dumps({**document, "rows": filtered}, indent=2, allow_nan=False), encoding="utf-8")
     return 0
 
 

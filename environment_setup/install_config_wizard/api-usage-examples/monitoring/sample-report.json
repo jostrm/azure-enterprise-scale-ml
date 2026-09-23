@@ -1,0 +1,11 @@
+{
+  "report_id": "agent-value",
+  "source": "sample",
+  "days": 7,
+  "filters": {
+    "factory": "All",
+    "scaleset": "All",
+    "project": "001",
+    "environment": "All"
+  }
+}

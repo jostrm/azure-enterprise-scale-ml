@@ -6,9 +6,10 @@ Offline; reads files only.
 """
 from __future__ import annotations
 
+import json
 import unittest
 
-from base.config import env_defaults, yaml_defaults
+from base.config import REPO_ROOT, env_defaults, yaml_defaults
 from domain.scenarios import NETWORK_FLAGS, SERVICE_FLAGS
 
 
@@ -36,6 +37,17 @@ class TestConfigWizardParity(unittest.TestCase):
             if f.lower().replace("_", "") not in self.yaml_norm
         ]
         self.assertFalse(missing, f"variables.yaml missing service flags: {missing}")
+
+    def test_future_search_capacity_arrays_match_all_templates(self) -> None:
+        values = json.loads((REPO_ROOT / "environment_setup" / "aifactory" / "variables.json").read_text(encoding="utf-8"))["dev"]
+        expected = ["basic", "standard", "standard2"]
+        for key, environment in (
+            ("skuAISearchDevArray", "SKU_AI_SEARCH_DEV_ARRAY"),
+            ("skuAISearchStageProdArray", "SKU_AI_SEARCH_STAGE_PROD_ARRAY"),
+        ):
+            self.assertEqual(expected, values[key])
+            self.assertEqual(expected, json.loads(yaml_defaults()[key].strip("'")))
+            self.assertEqual(expected, json.loads(self.env[environment]))
 
 
 if __name__ == "__main__":

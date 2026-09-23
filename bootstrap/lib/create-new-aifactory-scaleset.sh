@@ -19,17 +19,18 @@ Usage: ADO-create-new-aifactory-scaleset.sh [options]
 
 Options:
   --repo-root PATH     Consumer repository root.
-  --aifactory-version VERSION  Legacy template version: 124 (default), 125, main, 1.100, or 10.2.
+  --aifactory-version VERSION  New consumers default to main; main/125+ use registered configuration review.
   --dry-run            Collect and validate answers without changing anything.
   --prepare-only       Prepare Azure, identity, configuration, and automation only.
   --no-wait            Dispatch pipelines/workflows without waiting for completion.
   --non-interactive    Read answers from AIF_* environment variables only.
   --yes                Accept the final execution summary.
   --help               Show this help.
+  --save-receipt PATH   main/125+: save a new API configuration review receipt; never deploy.
   runner plan|ensure   Isolated existing-factory runner setup; see runner --help.
 
 Common non-interactive variables:
-  AIFACTORY_VERSION=124   Optional explicit legacy template version; omitted Create uses 124.
+  AIFACTORY_VERSION=124   Explicit legacy template version; saved legacy versions are preserved.
   AIF_TOPOLOGY=s|hs
   AIF_NETWORK_MODE=priv|h|pub
   AIF_IDENTITY_MODE=c|mi|sp
@@ -59,9 +60,11 @@ Common non-interactive variables:
   AIF_COST_CENTER=123456 Simple Mode common and project cost-center tags.
   AIF_SUBMODULE_REF=<sha> Verified published commit (required for Simple Mode).
 
-Without a register these launchers create legacy aifactory files. At a registered
-azurefactory root, pass inspect|execute and the reviewed protected-manifest options;
-the launcher delegates to the route-specific scoped lifecycle and never rewrites the register.
+Without a register, main/125+ prepare registered configuration through the authenticated
+local API, then stop for separate review/confirmation. --yes does not approve that review.
+Only legacy124 uses the historical Azure/repository bootstrap and aifactory templates.
+At a registered azurefactory root, pass inspect|execute and reviewed protected-manifest
+options, or use azurefactory.sh factory create for another factory; no implicit migration.
 EOF
   if [[ "${AIF_ROUTE:-}" == "gha" ]]; then
     cat <<'EOF'
@@ -4005,6 +4008,8 @@ aif_scaleset_main() {
   AIF_ROUTE="$1"
   AIF_ENTRYPOINT="$2"
   shift 2
+  source "$AIF_SCALESET_LIB_DIR/layout_router.sh"
+  aif_route_modern_creation "$AIF_ROUTE" "$AIF_SCALESET_LIB_DIR/.." "$@"
   AIF_REPO_ROOT="${AIFACTORY_REPO_ROOT:-}"
   AIF_DRY_RUN="${AIF_DRY_RUN:-false}"
   AIF_PREPARE_ONLY="${AIF_PREPARE_ONLY:-false}"

@@ -1,7 +1,7 @@
 union isfuzzy=true (datatable(Name:string, TimeGenerated:datetime, Properties:dynamic)[]), AppEvents
 | where Name == "aifactory.agent.observation"
 | extend observation = parse_json(tostring(Properties.observation))
-| where tostring(observation.source) == "live" and tostring(observation.schema) == "aifactory.agent-observations/v1"
+| where tostring(observation.source) == "live" and tostring(observation.schema) in ("aifactory.agent-observations/v1", "aifactory.agent-observations/v2")
 | extend AiFactory=tostring(observation.scope.aiFactory), Scaleset=tostring(observation.scope.scaleset), Project=tostring(observation.scope.project), Environment=tostring(observation.scope.environment), Agent=tostring(observation.scope.agent)
 | extend Kind=tostring(observation.kind), DataSource=tostring(observation.dataSource), Evidence=tostring(observation.evidence.reference), ObservationId=tostring(observation.id)
 | extend EvidencePresent=isnotempty(trim(@"\s+", Evidence))

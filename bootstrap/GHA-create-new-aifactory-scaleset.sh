@@ -17,6 +17,7 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 fi
 aif_route_enrollment gha "$SCRIPT_DIR" "$@"
 aif_route_registered_layout gha "${AIFACTORY_REPO_ROOT:-$SCRIPT_DIR}" "$SCRIPT_DIR" "$@"
+aif_route_modern_creation gha "$SCRIPT_DIR" "$@"
 for LIBRARY in \
   "$SCRIPT_DIR/lib/create-new-aifactory-scaleset.sh" \
   "$SCRIPT_DIR/azure-enterprise-scale-ml/bootstrap/lib/create-new-aifactory-scaleset.sh"; do

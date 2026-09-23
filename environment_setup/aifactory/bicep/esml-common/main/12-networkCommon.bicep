@@ -71,6 +71,16 @@ param byoAseFullResourceId string = ''
 param byoAseAppServicePlanResourceId string = ''
 @description('Common resource name identifier. Default is "esml-common"')
 param commonResourceName string = 'esml-common'
+@allowed(['legacy', 'preserve-v1'])
+@description('preserve-v1 requires the reviewed common_network_preservation helper, a fresh complete inventory and the shared hub lease. Legacy deployments are unchanged.')
+param commonNetworkProfile string = 'legacy'
+@description('Add-only plan produced by common_network_preservation.plan_common_network; never reuse a stale plan.')
+param preservationPlan object = {
+  createVnet: false
+  addressPrefixes: []
+  createSubnets: []
+  createNetworkSecurityGroups: []
+}
 
 var subscriptionIdDevTestProd = subscription().subscriptionId
 var common_vnet_cidr_v = replace(common_vnet_cidr,'XX',cidr_range)
@@ -95,22 +105,24 @@ resource vnetResourceGroup 'Microsoft.Resources/resourceGroups@2020-10-01' exist
   scope:subscription(subscriptionIdDevTestProd)
 }
 
-module nsgCommon '../modules-common/nsgCommon.bicep' = {
+module nsgCommon '../modules-common/nsgCommon.bicep' = if (commonNetworkProfile == 'legacy' || contains(preservationPlan.createNetworkSecurityGroups, 'nsg-${common_subnet_name}')) {
   name: 'nsg-${common_subnet_name}-depl${uniqueDetermenistic}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_subnet_name}'
+    enableFlowLogs: commonNetworkProfile == 'legacy'
     tags: tags
     location:location
     bastionIpRange: common_bastion_subnet_cidr_v
   }
 }
 
-module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
+module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = if (commonNetworkProfile == 'legacy' || contains(preservationPlan.createNetworkSecurityGroups, 'nsg-${common_subnet_name}-scoring')) {
   name: 'nsg-${common_subnet_name}-scoring-depl${uniqueDetermenistic}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_subnet_name}-scoring'
+    enableFlowLogs: commonNetworkProfile == 'legacy'
     tags: tags
     location:location
     bastionIpRange: common_bastion_subnet_cidr_v
@@ -123,11 +135,12 @@ module nsgCommonScoring '../modules-common/nsgCommonScoring.bicep' = {
 var ipWhitelist_array_1 = array(split(replace(IPwhiteList, '\\s+', ''), ','))
 var ipWhitelist_array = (empty(IPwhiteList) || IPwhiteList == 'null' || length(IPwhiteList) < 5) ? [] : union(ipWhitelist_array_1,[]) // remove dups
 
-module nsgBastion '../modules-common/nsgBastion.bicep' = if(empty(ipWhitelist_array)==false){
+module nsgBastion '../modules-common/nsgBastion.bicep' = if(!empty(ipWhitelist_array) && (commonNetworkProfile == 'legacy' || contains(preservationPlan.createNetworkSecurityGroups, 'nsg-${common_bastion_subnet_name}'))){
   name: 'nsg-${common_bastion_subnet_name}-depl${uniqueDetermenistic}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_bastion_subnet_name}'
+    enableFlowLogs: commonNetworkProfile == 'legacy'
     tags: tags
     location:location
     IPwhiteList_Array: ipWhitelist_array
@@ -136,11 +149,12 @@ module nsgBastion '../modules-common/nsgBastion.bicep' = if(empty(ipWhitelist_ar
     nsgCommonScoring
   ]
 }
-module nsgBastionNoWhitelist '../modules-common/nsgBastionNoWhitelist.bicep' = if(empty(ipWhitelist_array)){
+module nsgBastionNoWhitelist '../modules-common/nsgBastionNoWhitelist.bicep' = if(empty(ipWhitelist_array) && (commonNetworkProfile == 'legacy' || contains(preservationPlan.createNetworkSecurityGroups, 'nsg-${common_bastion_subnet_name}'))){
   name: 'nsg-${common_bastion_subnet_name}-NoWLdepl${uniqueDetermenistic}'
   scope: vnetResourceGroup
   params: {
     name: 'nsg-${common_bastion_subnet_name}'
+    enableFlowLogs: commonNetworkProfile == 'legacy'
     tags: tags
     location:location
     IPwhiteList_Array: ipWhitelist_array
@@ -150,11 +164,12 @@ module nsgBastionNoWhitelist '../modules-common/nsgBastionNoWhitelist.bicep' = i
   ]
 }
 
-module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
+module nsgPBI  '../modules-common/nsgPowerBI.bicep'= if (commonNetworkProfile == 'legacy' || contains(preservationPlan.createNetworkSecurityGroups, 'nsg-${common_pbi_subnet_name}')) {
   scope: vnetResourceGroup
   name: 'nsg-${common_pbi_subnet_name}-depl${uniqueDetermenistic}'
   params: {
     name: 'nsg-${common_pbi_subnet_name}'
+    enableFlowLogs: commonNetworkProfile == 'legacy'
     tags: tags
     location:location
   }
@@ -164,7 +179,7 @@ module nsgPBI  '../modules-common/nsgPowerBI.bicep'= {
     : [ nsgBastionNoWhitelist ]
 }
 var byoVnet = !empty(vnetNameFull_param)
-module vNetCommon '../modules-common/vNetCommon.bicep' = if(!BYO_subnets) {
+module vNetCommon '../modules-common/vNetCommon.bicep' = if(commonNetworkProfile == 'legacy' && !BYO_subnets) {
   scope: vnetResourceGroup
   name: '${vnetNameFull}depl${uniqueDetermenistic}'
   params: {
@@ -192,9 +207,27 @@ module vNetCommon '../modules-common/vNetCommon.bicep' = if(!BYO_subnets) {
   ]
 }
 
+module vNetCommonPreserve '../modules-common/vNetCommonPreserve.bicep' = if (commonNetworkProfile == 'preserve-v1') {
+  scope: vnetResourceGroup
+  name: '${vnetNameFull}-preserve-${uniqueDetermenistic}'
+  params: {
+    location: location
+    tags: tags
+    vnetNameFull: vnetNameFull
+    plan: preservationPlan
+  }
+  dependsOn: [
+    nsgCommon
+    nsgCommonScoring
+    nsgBastion
+    nsgBastionNoWhitelist
+    nsgPBI
+  ]
+}
+
 //var aiGwNetworkingName = 'ai-gateway-${locationSuffix}-${env}-${commonResourceSuffix}'
 var aiGwNetworkingName = 'ai-gateway'
-module aiGatewayNetworking '../ai-gateway/14-add-networking-aigw.bicep' = if(deployAIGatewayNetworking){
+module aiGatewayNetworking '../ai-gateway/14-add-networking-aigw.bicep' = if(commonNetworkProfile == 'legacy' && deployAIGatewayNetworking){
   name: 'ai-gateway-networking-${uniqueDetermenistic}'
   scope: vnetResourceGroup
   params: {
@@ -220,4 +253,3 @@ module aiGatewayNetworking '../ai-gateway/14-add-networking-aigw.bicep' = if(dep
     vNetCommon
   ] : []
 }
-

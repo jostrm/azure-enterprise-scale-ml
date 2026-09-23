@@ -387,6 +387,7 @@ def resource_shortcuts(
         ("Storage", "microsoft.storage/storageaccounts"),
         ("Key Vault", "microsoft.keyvault/vaults"),
         ("AI Search", "microsoft.search/searchservices"),
+        ("Application Insights", "microsoft.insights/components"),
     )
     shortcuts: list[dict] = []
     for label, resource_type in wanted:
@@ -767,7 +768,7 @@ def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
                     cost_part(x + 4, y + 1, project, tenant_id),
                 )
             )
-            for shortcut_index, shortcut in enumerate(project["shortcuts"][:4]):
+            for shortcut_index, shortcut in enumerate(project["shortcuts"][:5]):
                 parts.append(
                     resource_part(x + shortcut_index, y + 5, 1, 1, shortcut)
                 )

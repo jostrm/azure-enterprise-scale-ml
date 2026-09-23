@@ -25,7 +25,37 @@ def load_module(name):
 renderer = load_module("render_request")
 patcher = load_module("parameter_patch")
 inspector = load_module("inspect_factory")
+monitoring = load_module("monitoring_report")
 SCENARIOS = json.loads((ROOT / "scenarios.json").read_text())
+
+
+def test_monitoring_examples_use_canonical_sample_routes_without_jobs():
+    class Client:
+        def monitoring_report(self, body):
+            return {"route": "report", "body": body}
+
+        def monitoring_export(self, body):
+            return {"route": "export", "body": body}
+
+    for name, export in (("sample-report.json", False), ("sample-export.json", True)):
+        body = json.loads((ROOT / "monitoring" / name).read_text())
+        result = monitoring.request_report(Client(), body, export=export)
+        assert result["route"] == ("export" if export else "report")
+        assert result["body"] == body and body["source"] == "sample"
+        assert body["filters"]["project"] == "001"
+
+
+def test_monitoring_summary_example_uses_combined_route():
+    class Client:
+        def monitoring_summary(self, body):
+            return {"route": "summary", "body": body}
+
+    body = json.loads((ROOT / "monitoring" / "sample-summary.json").read_text())
+    result = monitoring.request_report(Client(), body, summary=True)
+    assert result == {"route": "summary", "body": body}
+    assert body["source"] == "sample" and "report_id" not in body
+    with pytest.raises(ValueError, match="CSV"):
+        monitoring.request_report(Client(), body, summary=True, export=True)
 
 
 def example_environment():

@@ -114,7 +114,40 @@ aif_runner_require_root() {
   (( EUID == 0 )) || { printf '%s\n' 'Installation requires sudo/root.' >&2; return 1; }
 }
 
-aif_runner_az_modules() {
+aif_runner_repair_partial_az_module_permissions() {
+  python3 - "$1" <<'PY'
+import os
+import pathlib
+import stat
+import sys
+
+root = pathlib.Path(sys.argv[1])
+if root.name != "Modules" or root.parent.name != "powershell":
+    raise SystemExit("Unexpected AllUsers module root")
+if not root.exists():
+    raise SystemExit(0)
+names = {"Az.Accounts", "Az.Network"}
+if any(path.name not in names or not path.is_dir() for path in root.iterdir()):
+    raise SystemExit("Unrelated modules prevent partial-install permission repair")
+paths = [root.parent, root, *root.rglob("*")]
+for path in paths:
+    info = path.lstat()
+    if (info.st_uid != 0 or not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode))
+            or info.st_mode & (stat.S_IWGRP | stat.S_IWOTH | stat.S_ISUID | stat.S_ISGID)):
+        raise SystemExit("Partial module permissions require root-owned, nonlinked, nonwritable package files")
+changed = False
+for path in paths:
+    mode = stat.S_IMODE(path.stat().st_mode)
+    readable = mode | (0o055 if path.is_dir() or mode & stat.S_IXUSR else 0o044)
+    if readable != mode:
+        os.chmod(path, readable)
+        changed = True
+print("Repaired reviewed AllUsers module visibility." if changed else "AllUsers module visibility already correct.")
+PY
+}
+
+aif_runner_az_modules() (
+  umask 022
   local install_missing="$1" script
   script="$(cat <<'PS'
 $ErrorActionPreference = 'Stop'
@@ -137,7 +170,7 @@ foreach ($spec in @(@{Name='Az.Accounts'; Minimum=[version]'2.12'}, @{Name='Az.N
 PS
 )"
   AIF_INSTALL_MODULES="$install_missing" pwsh -NoProfile -NonInteractive -Command "$script"
-}
+)
 
 aif_runner_prerequisites_main() (
   local install_missing=false require_runtime=false require_modules=false
@@ -176,11 +209,11 @@ aif_runner_prerequisites_main() (
     fi
   done
   [[ "$invalid" == false ]] || return 2
-  local -a runtime_missing=() runtime_packages=(libkrb5-3 zlib1g liblttng-ust1)
+  local -a runtime_missing=() runtime_packages=(libkrb5-3 zlib1g)
   if [[ "$VERSION_ID" == 22.04 ]]; then
-    runtime_packages+=(libicu70 libssl3 libcurl4)
+    runtime_packages+=(liblttng-ust1 libicu70 libssl3 libcurl4)
   else
-    runtime_packages+=(libicu74 libssl3t64 libcurl4t64)
+    runtime_packages+=(liblttng-ust1t64 libicu74 libssl3t64 libcurl4t64)
   fi
   if [[ "$require_runtime" == true ]]; then
     for name in "${runtime_packages[@]}"; do
@@ -250,6 +283,10 @@ aif_runner_prerequisites_main() (
   for name in "${names[@]}"; do
     actual="$(aif_runner_version "$name")" && aif_runner_version_at_least "$actual" "${minimum[$name]}" ||
       { printf 'Post-install verification failed: %s\n' "$name" >&2; return 1; }
+  done
+  for name in "${runtime_missing[@]}"; do
+    dpkg-query -W -f='${Status}' "$name" 2>/dev/null | grep -qx 'install ok installed' ||
+      { printf 'Runner runtime package failed post-install verification: %s\n' "$name" >&2; return 1; }
   done
   if [[ "$require_modules" == true ]]; then aif_runner_az_modules true || return; fi
   printf '%s\n' 'Prerequisites verified. Runner registration and scoped Linux identity/lease checks are separate.'

@@ -385,6 +385,20 @@ def test_compiled_current_module_passes_and_parameters_are_allowlisted(compiled)
     assert params["myProjectFactoryId"] == params["myProjectScaleSetId"] == ""
 
 
+def test_explicit_agent_navigation_passes_only_selected_common_workbook(compiled):
+    azure = fake_azure(payload(), "dev", compiled)
+    values, cfg, _ = runner.configuration(payload(), "dev", "001")
+    workbook = f"/subscriptions/{DEV}/resourceGroups/{cfg.common_resource_group('dev')}/providers/Microsoft.Insights/workbooks/55555555-5555-4555-8555-555555555555"
+    values["agentMonitoringWorkbookResourceId"] = workbook
+    params = runner.project_parameters(values, cfg, azure.resources, azure.resources[1]["id"], azure.workspace)
+    assert params["agentMonitoringWorkbookResourceId"] == workbook
+    assert "enableAgentMonitoring" not in params
+    runner.validate_template(compiled, params)
+    values["agentMonitoringWorkbookResourceId"] = workbook.replace(DEV, STAGE)
+    with pytest.raises(ValueError, match="outside"):
+        runner.project_parameters(values, cfg, azure.resources, azure.resources[1]["id"], azure.workspace)
+
+
 @pytest.mark.parametrize("mutation", ["role", "rg", "storage", "nested-role", "complete", "linked", "cross-scope", "expression"])
 def test_compiled_guard_rejects_nondashboard_writes(compiled, mutation):
     template = copy.deepcopy(compiled)
@@ -593,7 +607,10 @@ def test_deploy_only_incremental_dashboard_writes_with_etag_retry(compiled, work
     environments = azure.factory["properties"]["metadata"]["aifactoryInventory"]["environments"]
     assert all(any(p["projectNumber"] == "005" for p in e["projects"]) for e in environments)
     assert any(p["projectNumber"] == "008" for p in environments[0]["projects"])
-    assert next(p for p in environments[1]["projects"] if p["projectNumber"] == "001")["shortcuts"][0]["label"] == "AI Search"
+    shortcuts = next(p for p in environments[1]["projects"] if p["projectNumber"] == "001")["shortcuts"]
+    assert {s["label"] for s in shortcuts} == {"AI Search", "Application Insights"}
+    assert next(s for s in shortcuts if s["label"] == "Application Insights")["id"] == azure.resources[1]["id"]
+    assert next(s for s in shortcuts if s["label"] == "AI Search")["id"].endswith("/searchServices/retained")
     assert path.read_bytes() == before
     assert not list(workspace.glob(".dashboard-only-*"))
     assert "SECRET" not in capsys.readouterr().out

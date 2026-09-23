@@ -1,0 +1,36 @@
+{
+  "purpose": "Illustrations for RELEASE_125.md; not cloud deployment or release-build proof.",
+  "banner": "Original editorial artwork generated for these release notes.",
+  "screenshots": [
+    {
+      "file": "foundry-token-report-sample.png",
+      "source_filename": "40-maui-foundry-tokens-p1.png",
+      "source_sha256": "b8cf8a033629abf8241a823d4bac715680c5a1e527b45935c591656cad1e686d",
+      "capture_manifest": "capture-index.json, dated 17 September 2026",
+      "data_class": "Fictional sample data; no live billing, Azure collection or measured business value.",
+      "purpose": "Recorded desktop demonstration; exact binary provenance against release/v1.25 not established.",
+      "transformation": "Cropped blank side margins and window title; proportionally resized. Sample-data warnings and all retained figures unchanged.",
+      "source_crop_pixels": [
+        653,
+        52,
+        3187,
+        2076
+      ]
+    },
+    {
+      "file": "agent-value-report-sample.png",
+      "source_filename": "40-maui-agent-value-p1.png",
+      "source_sha256": "a46265b63f0072a81d503b1d1519673898952612a4808473cfec9ce67894540a",
+      "capture_manifest": "capture-index.json, dated 17 September 2026",
+      "data_class": "Fictional sample data; no live billing, Azure collection or measured business value.",
+      "purpose": "Recorded desktop demonstration; exact binary provenance against release/v1.25 not established.",
+      "transformation": "Cropped blank side margins and window title; proportionally resized. Sample-data warnings and all retained figures unchanged.",
+      "source_crop_pixels": [
+        653,
+        52,
+        3187,
+        2076
+      ]
+    }
+  ]
+}

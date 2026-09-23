@@ -694,6 +694,28 @@ def test_scoped_creation_supports_selected_environment_and_exact_project_set(env
     assert [step["project_id"] for step in document["deployment"]["steps"] if step["kind"] == "project"] == list(projects)
 
 
+@pytest.mark.parametrize("short_name", ["sdc", "weu", "dke", "swe9", "eus2"])
+@pytest.mark.parametrize("environment", ["dev", "stage", "prod"])
+def test_frozen_region_short_name_survives_shared_arm_payload(short_name, environment):
+    document, templates = scoped_manifest(("017",), environment=environment)
+    document["config"] = {section: {"admin_locationSuffix": short_name} for section in ("dev", "stage_prod")}
+    document["deployment"]["configuration_hash"] = fl.digest(document["config"])
+    for step in document["deployment"]["steps"]:
+        step["parameters"]["locationSuffix"] = short_name
+        template = templates[step["template"]]
+        template["parameters"]["locationSuffix"] = {"type": "string"}
+        step["template_hash"] = fl.digest(template)
+    fl.validate_manifest(seal(document))
+    cloud = PlanCloud(document, templates)
+    for step in document["deployment"]["steps"]:
+        payload = fl.compiled_plan_step(cloud, document, step, ROOT)
+        assert payload["properties"]["parameters"]["locationSuffix"]["value"] == short_name
+    request = fl.project_run_request(document)
+    assert request["templateParameters"]["deploymentSettings"]["admin_locationSuffix"] == short_name
+    config = json.loads(request["variables"]["AIFACTORY_CONFIG_JSON"]["value"])
+    assert all(section["admin_locationSuffix"] == short_name for section in config.values())
+
+
 @pytest.mark.parametrize("change,code", [
     (lambda d: d["deployment"]["steps"][0]["parameters"].update(env="dev"), "arm-plan-target-mismatch"),
     (lambda d: d["deployment"]["steps"][0]["parameters"].update(projectNumber="001"), "common-only-project-leak"),
@@ -1617,6 +1639,79 @@ class ArmResponse(io.BytesIO):
         super().__init__(b"" if body is None else fl.canonical(body))
         self.code = code
         self.headers = headers or {}
+
+
+@pytest.mark.parametrize("status", [400, 404, 405])
+@pytest.mark.parametrize("code", sorted(fl.UNSUPPORTED_COLLECTION_CODES))
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_collection_accepts_documented_unsupported_diagnostic_error_envelopes(status, code, wrapped):
+    error = {"code": code, "message": "This resource type does not support diagnostic settings."}
+    opener = Mock()
+    opener.open.return_value = ArmResponse(status, {"error": error} if wrapped else error)
+    cloud = fl.Cloud(manifest(), command_runner=Mock(), opener=opener)
+    cloud.token = Mock(return_value="synthetic-token")
+    path = RESOURCE + "/providers/Microsoft.Insights/diagnosticSettings"
+    assert cloud.collection(path, "2021-05-01-preview", extension=True) == ([], code)
+    assert opener.open.call_count == 1
+    assert opener.open.call_args.args[0].method == "GET"
+
+
+@pytest.mark.parametrize("body", [
+    None, [], "ResourceTypeNotSupported", {},
+    {"code": None}, {"code": ["ResourceTypeNotSupported"]},
+    {"code": {"code": "ResourceTypeNotSupported"}},
+    {"error": None, "code": "ResourceTypeNotSupported"},
+    {"error": "ResourceTypeNotSupported"},
+    {"error": {"code": ["ResourceTypeNotSupported"]}},
+    {"error": {}, "code": "ResourceTypeNotSupported"},
+    {"error": {"code": "AuthorizationFailed"}, "code": "ResourceTypeNotSupported"},
+    {"error": {"code": "ResourceTypeNotSupported"}, "code": "AuthorizationFailed"},
+    {"error": {"code": "ResourceTypeNotSupported"}, "code": "ResourceTypeNotSupported"},
+    {"code": "AuthorizationFailed", "details": [{"code": "ResourceTypeNotSupported"}]},
+    {"error": {"code": "AuthorizationFailed", "details": [{"code": "ResourceTypeNotSupported"}]}},
+    {"properties": {"code": "ResourceTypeNotSupported"}},
+    {"code": "InvalidAuthenticationToken"},
+    {"code": "BadRequest"},
+])
+def test_collection_rejects_malformed_ambiguous_or_unrelated_error_envelopes(body):
+    opener = Mock()
+    opener.open.return_value = ArmResponse(400, body)
+    cloud = fl.Cloud(manifest(), command_runner=Mock(), opener=opener)
+    cloud.token = Mock(return_value="synthetic-token")
+    with pytest.raises(fl.Blocked, match="unsupported-child-inventory-endpoint"):
+        cloud.collection(RESOURCE + "/providers/Microsoft.Insights/diagnosticSettings",
+                         "2021-05-01-preview", extension=True)
+
+
+@pytest.mark.parametrize("status", [401, 403, 409, 429, 500])
+def test_collection_never_treats_unexpected_http_status_as_unsupported(status):
+    opener = Mock()
+    opener.open.return_value = ArmResponse(status, {"code": "ResourceTypeNotSupported"})
+    cloud = fl.Cloud(manifest(), command_runner=Mock(), opener=opener)
+    cloud.token = Mock(return_value="synthetic-token")
+    with pytest.raises(fl.Blocked, match="unexpected-remote-status"):
+        cloud.collection(RESOURCE + "/providers/Microsoft.Insights/diagnosticSettings",
+                         "2021-05-01-preview", extension=True)
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_collection_unsupported_errors_require_extension_inventory(wrapped):
+    error = {"code": "ResourceTypeNotSupported"}
+    cloud = fl.Cloud(manifest(), command_runner=Mock(), opener=Mock())
+    cloud.request = Mock(return_value=(400, {}, {"error": error} if wrapped else error))
+    with pytest.raises(fl.Blocked, match="unsupported-child-inventory-endpoint"):
+        cloud.collection(RESOURCE + "/providers/Microsoft.Insights/diagnosticSettings",
+                         "2021-05-01-preview")
+
+
+def test_collection_top_level_error_code_is_diagnostic_settings_specific():
+    cloud = fl.Cloud(manifest(), command_runner=Mock(), opener=Mock())
+    cloud.request = Mock(return_value=(400, {}, {"code": "ScopeNotSupported"}))
+    path = RESOURCE + "/providers/Microsoft.Authorization/policyAssignments"
+    with pytest.raises(fl.Blocked, match="unsupported-child-inventory-endpoint"):
+        cloud.collection(path, "2022-06-01", extension=True)
+    cloud.request.return_value = (400, {}, {"error": {"code": "ScopeNotSupported"}})
+    assert cloud.collection(path, "2022-06-01", extension=True) == ([], "ScopeNotSupported")
 
 
 def test_what_if_accepts_empty_202_polls_before_final_changes():

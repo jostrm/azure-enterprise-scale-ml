@@ -8,6 +8,7 @@ import os
 import socket
 import ipaddress
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
@@ -18,6 +19,7 @@ from .errors import APIError, AuthError, ConfigError, RedirectError, RequestTime
 DEFAULT_API_URL = "http://127.0.0.1:8765"
 API_URL_ENV = "AIFACTORY_API_URL"
 API_KEY_ENV = "AIFACTORY_API_KEY"
+_OMITTED = object()
 
 SAFE_UNAUTHENTICATED_PATHS = {"/health", "/openapi.json"}
 
@@ -102,7 +104,7 @@ class _NoRedirect(HTTPRedirectHandler):
 
 @dataclass(frozen=True)
 class AzureFactoryClient:
-    """Small SDK returning JSON-compatible dictionaries/lists."""
+    """Small SDK returning JSON objects, with CSV for canonical monitoring export."""
 
     base_url: str | None = None
     api_key: str | None = field(default=None, repr=False)
@@ -145,7 +147,7 @@ class AzureFactoryClient:
         if needs_key and not self.api_key:
             raise AuthError(f"{API_KEY_ENV} is required for {path}.")
         data = None
-        request_headers = {"Accept": "application/json"}
+        request_headers = {"Accept": "text/csv" if path == "/api/v1/monitoring/export" and method == "POST" else "application/json"}
         if self.api_key and needs_key:
             request_headers["X-API-Key"] = self.api_key
         if body is not None:
@@ -158,6 +160,13 @@ class AzureFactoryClient:
         try:
             with opener.open(req, timeout=float(self.timeout)) as response:
                 payload = response.read()
+                if path == "/api/v1/monitoring/export" and method == "POST":
+                    if response.headers.get_content_type() != "text/csv":
+                        raise APIError("Monitoring export did not return text/csv.")
+                    try:
+                        return payload.decode("utf-8-sig")
+                    except UnicodeDecodeError:
+                        raise APIError("Monitoring export did not return UTF-8 CSV.") from None
                 return _decode_response(payload, response.headers.get_content_type(), method)
         except HTTPError as exc:
             payload = exc.read()
@@ -180,6 +189,58 @@ class AzureFactoryClient:
 
     def schema(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/api/v1/schema"), "schema")
+
+    def monitoring_catalog(self) -> dict[str, Any]:
+        """Read canonical report/source capabilities; never start a collector."""
+        return self._object(self.request("GET", "/api/v1/monitoring/catalog"), "monitoring catalog")
+
+    def monitoring_report(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Calculate a report from explicit sample or supplied observation evidence."""
+        return self._object(self.request(
+            "POST", "/api/v1/monitoring/report", body=self._monitoring_request(request),
+        ), "monitoring report")
+
+    def monitoring_summary(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Read the combined overview using the same canonical report calculations."""
+        return self._object(self.request(
+            "POST", "/api/v1/monitoring/summary",
+            body=self._monitoring_request(request, require_report=False),
+        ), "monitoring summary")
+
+    def monitoring_export(self, request: dict[str, Any]) -> str:
+        """Return canonical filtered CSV; no file, job or cloud upload."""
+        result = self.request(
+            "POST", "/api/v1/monitoring/export", body=self._monitoring_request(request),
+        )
+        if not isinstance(result, str):
+            raise ConfigError("Monitoring export did not return the canonical CSV response.")
+        return result
+
+    @staticmethod
+    def _monitoring_request(
+        request: dict[str, Any], *, require_report: bool = True,
+    ) -> dict[str, Any]:
+        if (not isinstance(request, dict) or not isinstance(request.get("source"), str)
+                or request["source"] not in {"sample", "live"}):
+            raise ConfigError("Monitoring requires an explicit sample/live source.")
+        if require_report and (not isinstance(request.get("report_id"), str) or request["report_id"] not in {
+            "agent-value", "showback", "foundry-tokens", "foundry-usage",
+            "quality-reliability", "security-governance",
+        }):
+            raise ConfigError("Select a canonical monitoring report ID from monitoring catalog.")
+        if not require_report and "report_id" in request:
+            raise ConfigError("Monitoring summary includes all six reports; omit report_id.")
+        start, end = request.get("start_date"), request.get("end_date")
+        if start is not None or end is not None:
+            try:
+                first, last = date.fromisoformat(start), date.fromisoformat(end)
+            except (TypeError, ValueError):
+                raise ConfigError("Specify both start_date and end_date as YYYY-MM-DD UTC dates.") from None
+            if first.isoformat() != start or last.isoformat() != end:
+                raise ConfigError("Specify both start_date and end_date as YYYY-MM-DD UTC dates.")
+            if not 0 <= (last - first).days < 90:
+                raise ConfigError("Monitoring date window must contain 1 to 90 inclusive UTC days.")
+        return request
 
     def configuration_load(self, folder: str, project_number: str) -> dict[str, Any]:
         return self._object(self.request(
@@ -242,7 +303,34 @@ class AzureFactoryClient:
         ), "catalog parameters")
 
     def catalog_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
+        if body.get("action") == "create-factory":
+            schema = self.openapi()
+            issues = registered_creation_issues(schema)
+            if ("target_region_short_name" in body and "target_region_short_name" not in
+                    schema.get("components", {}).get("schemas", {}).get("CatalogPrepare", {}).get("properties", {})):
+                issues.append("CatalogPrepare.target_region_short_name is missing; the requested region short name is unsupported.")
+            if issues:
+                raise ConfigError("Update/start the supported registered-creation API before creating a factory: " + "; ".join(issues))
         return self._object(self.request("POST", "/api/v1/factory-catalog/prepare", body=body), "catalog prepare")
+
+    def factory_create_prepare(
+        self, folder: str, *, prefix: str, region: str, scale_sets: list[dict[str, Any]],
+        factory_key: str | None = None, kind: str = "ai", aifactory_version: str | None = None,
+        initial_project: Any = _OMITTED, settings: dict[str, Any] | None = None,
+        expected_revision: str | None = None, region_short_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Prepare configuration only; backend owns initial-project/version defaults.
+
+        Omit initial_project for the canonical AI initial project; None explicitly
+        requests common-only. An explicit project is sent once, not followed by a
+        second add-project request. Review before separately calling catalog_confirm.
+        """
+        body = factory_create_request(
+            folder, prefix=prefix, region=region, scale_sets=scale_sets, factory_key=factory_key,
+            kind=kind, aifactory_version=aifactory_version, initial_project=initial_project,
+            settings=settings, expected_revision=expected_revision, region_short_name=region_short_name,
+        )
+        return self.catalog_prepare(body)
 
     def catalog_confirm(self, folder: str, confirmation_id: str) -> dict[str, Any]:
         return self._object(self.request(
@@ -325,6 +413,35 @@ class AzureFactoryClient:
         if not isinstance(value, dict):
             raise APIError(f"Malformed {context} response: expected JSON object.")
         return value
+
+
+def registered_creation_issues(openapi: dict[str, Any]) -> list[str]:
+    properties = openapi.get("components", {}).get("schemas", {}).get("CatalogPrepare", {}).get("properties", {})
+    if "initial_project" not in properties:
+        return ["CatalogPrepare.initial_project is missing; this server cannot guarantee the initial-project contract."]
+    return []
+
+
+def factory_create_request(
+    folder: str, *, prefix: str, region: str, scale_sets: list[dict[str, Any]],
+    factory_key: str | None = None, kind: str = "ai", aifactory_version: str | None = None,
+    initial_project: Any = _OMITTED, settings: dict[str, Any] | None = None,
+    expected_revision: str | None = None, region_short_name: str | None = None,
+) -> dict[str, Any]:
+    """Build the shared CatalogPrepare request without inventing catalog data."""
+    body = {key: value for key, value in {
+        "folder": folder, "contract_version": 1, "action": "create-factory",
+        "factory_key": factory_key, "factory_kind": kind,
+        "target_prefix": prefix, "target_region": region,
+        "target_region_short_name": region_short_name,
+        "scale_sets": scale_sets, "aifactory_version": aifactory_version,
+        "settings": settings, "expected_revision": expected_revision,
+    }.items() if value is not None}
+    if initial_project is not _OMITTED:
+        if initial_project is not None and not isinstance(initial_project, dict):
+            raise ConfigError("initial_project must be an object or null (common-only).")
+        body["initial_project"] = initial_project
+    return body
 
 
 def _decode_response(payload: bytes, content_type: str, method: str) -> Any:

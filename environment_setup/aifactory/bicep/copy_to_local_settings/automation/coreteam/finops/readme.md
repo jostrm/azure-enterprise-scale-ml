@@ -2,6 +2,110 @@
 
 **Governance, visibility and control for AI / token-based cloud consumption.**
 
+## Offline evidence bridge and optional native workbook
+
+From the copied `automation` directory, the following only prints a local sample:
+
+```powershell
+python -I -B .\native_monitoring.py --input .\samples\monitoring-observations.six-reports.sample.json `
+  --source sample --native-version 2 --aiFactory factory-a --scaleset 001 --project 001
+```
+
+This additive six-family fixture deliberately repeats project `001` in two
+factories, with one quality-qualified and one unqualified modeled observation.
+It is not a synchronized desktop fixture or live evidence. The earlier
+`monitoring-observations.sample.json` fixture and its regression totals are unchanged.
+
+For the **shared canonical scenario**, use the separately reviewed, fixed-day
+18-scope fixture below. Its adjacent `.manifest.json` records scenario
+`aifactory.monitoring-sample.v1`, original CRLF SHA-256/size and a portable
+LF-normalized digest. It includes duplicate displayed project IDs across
+`Demo AI Factory` and `Demo Factory B`, so exact compound filtering matters:
+
+```powershell
+python -I -B .\native_monitoring.py --input .\samples\monitoring-observations.canonical-reviewed.sample.json `
+  --source sample --native-version 2 --aiFactory "Demo AI Factory" --scaleset demo-east --project 001 --environment dev
+```
+
+This checked-in copy has no runtime dependency on another repository and is
+never passed to a live loader. Its source markers and original finance evidence
+survive round trips; native finance projections remain unavailable. The fixture
+omits derived report-row `native_link`, which is not an observation input.
+
+Native v2 (`agent-observations.v2.schema.json`) wraps each recognized
+`aifactory.monitoring-observations.v1` row without splitting its original grain.
+It retains requests/input/output tokens, ratio numerators/denominators, latency
+sum/sample count, outcome inputs, cost bases, security counts, identity, model,
+period and per-field provenance. Reverse `--observations-output` is the filtered
+canonical envelope, including its source marker. Unknown fields fail instead
+of being silently discarded. Files are bounded to 8 MiB and 10,000 rows.
+The canonical CLI/API does **not** accept native v2 directly: use the canonical
+reverse export for compatible observation-file consumers, or its recognized
+`rows` in a reviewed API request. Sample exports remain sample and must never
+enter the canonical live loader. Canonical API sample mode generates its own
+scenario and does not accept externally supplied rows.
+Native publication requires an explicit timezone-aware timestamp or period end;
+none is guessed. Existing native v1 input is still supported. Omitting the
+version retains v1 for legacy-compatible imports; select **2** for lossless
+canonical round trips.
+
+`--native-output`, `--output`, `--csv`, `--observations-output` and `--events`
+write only explicitly requested local files. **Events are prepared, never
+ingested.** Exact local serialization is not a claim of Azure ingestion size
+acceptance, storage fidelity, query execution or Portal rendering.
+The PowerShell wrapper `runbooks\Update-AgentMonitoringReport.ps1`
+offers matching `NativeVersion`, `NativeObservationsPath`, `OutputPath`, `CsvPath`,
+`CanonicalObservationsPath` and `EventsPath` options. Live imports require
+explicit source and an authorized five-part scope manifest, not a login or
+implicit Azure discovery.
+
+V2 exposes the six existing report-family IDs. Missing operands stay null;
+latency and success/quality rates use ratios of sums. User adoption is only
+calculated from a single supplied population observation. Actual and amortized
+cost need billing evidence; estimates need formula/inputs; currencies and cost
+bases are never added together.
+
+**Modeled** time-saving capacity preserves the canonical false-versus-null
+qualification policy. **Qualified** capacity additionally requires explicit
+quality approval and completion/baseline/effort evidence; monetary qualification
+also needs an evidenced labor rate. Neither is cash realization. The additive
+canonical `realized_benefit_amount`, `value_evidence` and `cost_evidence` fields
+are preserved losslessly, including incomplete evidence. **Native verified
+realized value, net/ROI and cost-per-accepted-outcome stay explicitly unsupported**:
+use the canonical API's finance validation for approvals, exact currency/period/
+scope and cost coverage/overlap checks. A supplied amount is never promoted to
+verified benefit by this bridge. Original evidence is retained even when native
+reporting withholds a calculated value.
+Qualified v2 aggregates require **every visible row** to qualify. An incomplete
+scope produces null qualified totals, not a sum of just its successful subset;
+qualification counts still expose partial evidence. Historical v1 projections
+and modeled formulas retain their existing semantics.
+
+Native v2 metadata uses `value_class=observed|modeled|unavailable` plus descriptive
+`value_tier`. Qualified labor capacity remains **modeled**; qualified outcome
+counts are observed. `qualification.state`, `evidence_refs` and `reason` describe
+outcome qualification, not financial approval. `cost_basis=actual|amortized|estimated`
+keeps token estimates separate (`estimate_type=tokens`); legacy `costBasis=estimate`
+is retained only as the compatibility spelling on projected rows.
+Per-metric `status` is `available` or `unavailable`. Unsupported finance carries
+an explicit reason, never a permissive modeled substitute. Non-outcome metrics
+have qualification state `not-applicable`; supplied finance references are not
+independently audited.
+
+V2 evidence envelopes preserve canonical numbers up to absolute `1e100`, including
+large integer precision. Native Python/KQL **projections** have the narrower
+absolute `2^53-1` interoperability limit for inputs, intermediates and totals:
+unsupported values are unavailable, never rounded or clamped. Lossless reverse
+exports retain the original larger values; legacy native v1 retains its old limit.
+
+The existing `modules\monitoring\agentMonitoringWorkbook.bicep` now accepts live
+v1/v2 events. Phase 10 has a default-false `enableAgentMonitoring` parameter and
+explicit `agentMonitoringWorkspaceResourceId`: enabling creates one stable
+workbook in the existing common RG and links project dashboards to it. It adds
+no diagnostics, ingestion, RBAC, schedules or workspace. Local tests/compiler
+success do not prove deployment, KQL execution, source availability or Portal
+rendering. Existing My Project dashboards retain their separate semantics.
+
 ## What is FinOps
 
 FinOps = **Finance + DevOps**. It is the operating model and practice used to gain
@@ -293,5 +397,3 @@ See in the YAML how this is concatenated from variables.yaml at task `05b_Check 
       echo "aifactorySuffixRG: '$aifactorySuffixRG'"
       echo "projectSuffix: '$projectSuffix'"
       echo "Final targetResourceGroup: '$targetResourceGroup'"
-
-

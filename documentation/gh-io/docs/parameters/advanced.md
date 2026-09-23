@@ -285,18 +285,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 344 |
-| `env` | 342 |
-| `bootstrap` | 81 |
+| `yaml` | 346 |
+| `env` | 344 |
+| `bootstrap` | 86 |
 | `helper` | 17 |
-| `state` | 42 |
-| `json.dev` | 348 |
+| `state` | 44 |
+| `json.dev` | 350 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 130, 364; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 131, 365; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 366, 390; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 130, 367; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 131, 368; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 369, 393; one reference row.
 
 ## YAML and variables.json reference
 
@@ -573,7 +573,9 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:aksPrivateDNSZone --><!-- parameter json.dev:aksPrivateDNSZone -->`aksPrivateDNSZone` | `AKS_PRIVATE_DNS_ZONE` | O | Y: `"system"`<br>J.dev: `"system"` | AKS private DNS zone otherwise: "none" or full resource ID of a private DNS zone. |
 | <!-- parameter yaml:aksSkuName --><!-- parameter json.dev:aksSkuName -->`aksSkuName` | `AKS_SKU_NAME` | O | Y: `"Base"`<br>J.dev: `"Base"` | AKS SKU name otherwise: "Standard" for production workloads. |
 | <!-- parameter yaml:skuAISearchDev --><!-- parameter json.dev:skuAISearchDev -->`skuAISearchDev` | `ADMIN_AISEARCH_TIER`, `SKU_AISEARCH_DEV` (not in .env template) | O | Y: `"basic"`<br>J.dev: `"basic"` | AI Search SKU Dev ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] ('free' not allowed with private endpoints) |
+| <!-- parameter yaml:skuAISearchDevArray --><!-- parameter json.dev:skuAISearchDevArray -->`skuAISearchDevArray` | No verified binding | O | Y: `"[\"basic\",\"standard\",\"standard2\"]"`<br>J.dev: `["basic","standard","standard2"]` | Sku aisearch dev array. |
 | <!-- parameter yaml:skuAISearchStageProd --><!-- parameter json.dev:skuAISearchStageProd -->`skuAISearchStageProd` | `ADMIN_AISEARCH_TIER`, `SKU_AISEARCH_STAGEPROD` (not in .env template) | O | Y: `"standard"`<br>J.dev: `"standard"` | AI Search SKU Stage/Prod |
+| <!-- parameter yaml:skuAISearchStageProdArray --><!-- parameter json.dev:skuAISearchStageProdArray -->`skuAISearchStageProdArray` | No verified binding | O | Y: `"[\"basic\",\"standard\",\"standard2\"]"`<br>J.dev: `["basic","standard","standard2"]` | Sku aisearch stage prod array. |
 | <!-- parameter yaml:skuAIServicesDev --><!-- parameter json.dev:skuAIServicesDev -->`skuAIServicesDev` | `SKU_AISERVICES_DEV` | O | Y: `"S0"`<br>J.dev: `"S0"` | Azure AI Services (multi-service account) SKU Dev |
 | <!-- parameter yaml:skuAIServicesStageProd --><!-- parameter json.dev:skuAIServicesStageProd -->`skuAIServicesStageProd` | `SKU_AISERVICES_STAGEPROD` | O | Y: `"S0"`<br>J.dev: `"S0"` | Azure AI Services (multi-service account) SKU Stage/Prod |
 | <!-- parameter yaml:skuAksDev --><!-- parameter json.dev:skuAksDev -->`skuAksDev` | `SKU_AKS_DEV` | O | Y: `"Standard_D4s_v5"`<br>J.dev: `"Standard_D4s_v5"` | AKS dev node VM size keep-as-is: empty=template default Standard_B4ms. |
@@ -934,6 +936,8 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ENABLE_AKS_FOR_AZURE_ML -->`ENABLE_AKS_FOR_AZURE_ML` | `enableAksForAzureML` | C | `"true"` | Enable AKS for Azure ML inference mandatory: if ENABLE_AZURE_MACHINE_LEARNING:'true' |
 | <!-- parameter env:SKU_AISERVICES_DEV -->`SKU_AISERVICES_DEV` | `skuAIServicesDev` | O | `"S0"` | Azure AI Services (multi-service account) SKU Dev |
 | <!-- parameter env:SKU_AISERVICES_STAGEPROD -->`SKU_AISERVICES_STAGEPROD` | `skuAIServicesStageProd` | O | `"S0"` | Azure AI Services SKU Stage/Prod |
+| <!-- parameter env:SKU_AI_SEARCH_DEV_ARRAY -->`SKU_AI_SEARCH_DEV_ARRAY` | No verified counterpart | O | `"[\"basic\",\"standard\",\"standard2\"]"` | Sku ai search dev array. |
+| <!-- parameter env:SKU_AI_SEARCH_STAGE_PROD_ARRAY -->`SKU_AI_SEARCH_STAGE_PROD_ARRAY` | No verified counterpart | O | `"[\"basic\",\"standard\",\"standard2\"]"` | Sku ai search stage prod array. |
 | <!-- parameter env:SKU_AKS_DEV -->`SKU_AKS_DEV` | `skuAksDev` | O | `""` | AKS SKU Dev keep-as-is: Leave empty for managed/auto SKU. |
 | <!-- parameter env:SKU_AKS_STAGEPROD -->`SKU_AKS_STAGEPROD` | `skuAksStageProd` | O | `""` | AKS SKU Stage/Prod |
 | <!-- parameter env:SKU_AZUREML_DEV -->`SKU_AZUREML_DEV` | `skuAzureMLDev` | O | `"basic"` | Azure ML workspace SKU Dev |
@@ -1087,6 +1091,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 
 | Input | M/C/O | Source default / expression | Description |
 |---|---|---|---|
+| <!-- parameter bootstrap:ADO_AGENT_NAME -->`ADO_AGENT_NAME` | C | `"dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001"` | Ado agent name override; see create launcher. |
 | <!-- parameter bootstrap:ADO_AGENT_POOL -->`ADO_AGENT_POOL` | C | `"Default"` | Azure DevOps agent pool |
 | <!-- parameter bootstrap:ADO_AUTH_METHOD -->`ADO_AUTH_METHOD` | C | `"aad"` | Azure DevOps authentication: Microsoft Entra (aad) or PAT (pat); allowed: aad pat |
 | <!-- parameter bootstrap:ADO_BRANCH -->`ADO_BRANCH` | C | `"main"` | ADO update branch; reviewed project dispatch requires main. |
@@ -1094,7 +1099,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:ADO_PIPELINE_NAME -->`ADO_PIPELINE_NAME` | C | `"infra-project-genai"` | ADO legacy update pipeline name. |
 | <!-- parameter bootstrap:ADO_PROJECT -->`ADO_PROJECT` | C | `""` | Azure DevOps project name |
 | <!-- parameter bootstrap:ADO_REPOSITORY_NAME -->`ADO_REPOSITORY_NAME` | C | `"${AIF_PREFIX%-}aifactory-${AIF_SCALESET_SUFFIX}"` | Azure DevOps repository name |
-| <!-- parameter bootstrap:ADO_RUNNER_MODE -->`ADO_RUNNER_MODE` | C | `"h"` | Project build agent: self-hosted admin VM (s) or Microsoft-hosted (h); allowed: s h |
+| <!-- parameter bootstrap:ADO_RUNNER_MODE -->`ADO_RUNNER_MODE` | C | `"$runner_default"` | Project build agent: self-hosted admin VM (s, recommended for private access) or Microsoft-hosted (h); allowed: s h |
 | <!-- parameter bootstrap:ADO_RUNNER_SELECTION -->`ADO_RUNNER_SELECTION` | C | `"from-config"` | ADO legacy update runner selection. |
 | <!-- parameter bootstrap:ADO_SERVICE_CONNECTION_NAME -->`ADO_SERVICE_CONNECTION_NAME` | C | `"sc-${AIF_PREFIX%-}dev-${AIF_SCALESET_SUFFIX}"` | Azure DevOps service connection name |
 | <!-- parameter bootstrap:ADO_SETTINGS_FILE -->`ADO_SETTINGS_FILE` | C | `"$HOME/.aifactory-ado-settings.json"` | ADO saved organization/project context path; generator never reads this file. |
@@ -1115,7 +1120,7 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIF_ACCESS_HUB_VNET_CIDR -->`AIF_ACCESS_HUB_VNET_CIDR` | C | `"10.240.0.0/22"` | External access-hub vNet CIDR |
 | <!-- parameter bootstrap:AIF_ACCESS_HUB_VNET_NAME -->`AIF_ACCESS_HUB_VNET_NAME` | C | `""` | Aif access hub vnet name override; see create launcher. |
 | <!-- parameter bootstrap:AIF_ADD_BASTION -->`AIF_ADD_BASTION` | O | `""` | Compatibility input; collection resets this to false. Access-hub Bastion is controlled separately. |
-| <!-- parameter bootstrap:AIF_ADMIN_VM_SIZE -->`AIF_ADMIN_VM_SIZE` | O | `"Standard_D2s_v5"` | Self-hosted admin VM size |
+| <!-- parameter bootstrap:AIF_ADMIN_VM_SIZE -->`AIF_ADMIN_VM_SIZE` | O | `"$([[ \"$AIF_RUNNER_VM_OS\" == linux ]] && echo Standard_D4s_v5 &#124;&#124; echo Standard_D2s_v5)"` | Self-hosted admin VM size |
 | <!-- parameter bootstrap:AIF_APP_GATEWAY_BACKEND_FQDN -->`AIF_APP_GATEWAY_BACKEND_FQDN` | C | `""` | Simple-mode distinct private HTTPS backend; trusted TLS and unauthenticated GET / returning 200-399. |
 | <!-- parameter bootstrap:AIF_APP_GATEWAY_CERT_SECRET_ID -->`AIF_APP_GATEWAY_CERT_SECRET_ID` | C | `""` | Simple-mode versionless Key Vault PFX certificate-secret URI, not a secret value. |
 | <!-- parameter bootstrap:AIF_APP_GATEWAY_HOSTNAME -->`AIF_APP_GATEWAY_HOSTNAME` | C | `""` | Simple-mode custom frontend FQDN covered by certificate DNS SAN. |
@@ -1144,6 +1149,10 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIF_PREPARE_ONLY -->`AIF_PREPARE_ONLY` | O | `"false"` | Aif prepare only override; see create launcher. |
 | <!-- parameter bootstrap:AIF_PROD_SUBSCRIPTION_ID -->`AIF_PROD_SUBSCRIPTION_ID` | O | `"$AIF_DEV_SUBSCRIPTION_ID"` | Aif prod subscription id override; see create launcher. |
 | <!-- parameter bootstrap:AIF_PROJECT_NUMBER -->`AIF_PROJECT_NUMBER` | O | `"001"` | First project number (001-999) |
+| <!-- parameter bootstrap:AIF_RUNNER_MODE -->`AIF_RUNNER_MODE` | O | `"$runner_default"` | Project runner: self-hosted (recommended for private access) or github-hosted; allowed: self-hosted github-hosted |
+| <!-- parameter bootstrap:AIF_RUNNER_VM_NAME -->`AIF_RUNNER_VM_NAME` | O | `"$default_name"` | Aif runner vm name override; see create launcher. |
+| <!-- parameter bootstrap:AIF_RUNNER_VM_OS -->`AIF_RUNNER_VM_OS` | O | `"$([[ \"$AIF_ROUTE\" == gha ]] && echo linux &#124;&#124; echo windows)"` | Aif runner vm os override; see create launcher. |
+| <!-- parameter bootstrap:AIF_RUNNER_VM_RESOURCE_GROUP -->`AIF_RUNNER_VM_RESOURCE_GROUP` | O | `"${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"` | Aif runner vm resource group override; see create launcher. |
 | <!-- parameter bootstrap:AIF_SCALESET_SUFFIX -->`AIF_SCALESET_SUFFIX` | O | `"001"` | Scale-set number (001-999) |
 | <!-- parameter bootstrap:AIF_SEEDING_KEYVAULT_NAME -->`AIF_SEEDING_KEYVAULT_NAME` | C | `"kv${prefix_compact}${AIF_LOCATION_SHORT}${AIF_SCALESET_SUFFIX}"` | Existing seeding Key Vault name |
 | <!-- parameter bootstrap:AIF_SEEDING_MODE -->`AIF_SEEDING_MODE` | O | `"c"` | Seeding Key Vault: create/ensure (c) or use existing (e); allowed: c e |
@@ -1216,6 +1225,7 @@ These exact fields are consumed by the Python helper's local `--state-file` API.
 | <!-- parameter state:enable_public_perimeter -->`enable_public_perimeter` | C | Required lookup | `apply_gha`, `common_values`; Enable public perimeter |
 | <!-- parameter state:github_repository -->`github_repository` | C | Required lookup | `apply_gha`; Github repository |
 | <!-- parameter state:github_repository_visibility -->`github_repository_visibility` | O | `null` | `common_values`; Github repository visibility |
+| <!-- parameter state:github_runner_label -->`github_runner_label` | C | Required lookup | `apply_gha`; Github runner label |
 | <!-- parameter state:hub_resource_group -->`hub_resource_group` | O | `""` | `apply_gha`, `common_values`; Hub resource group |
 | <!-- parameter state:hub_subscription_id -->`hub_subscription_id` | O | `""` | `apply_gha`, `common_values`; Hub subscription id |
 | <!-- parameter state:ip_allowlist -->`ip_allowlist` | O | `""`, `null` | `apply_gha`, `common_values`; Ip allowlist |
@@ -1228,6 +1238,7 @@ These exact fields are consumed by the Python helper's local `--state-file` API.
 | <!-- parameter state:project_number -->`project_number` | C | Required lookup | `apply_gha`, `common_values`, `selected_project_organization`; Project number |
 | <!-- parameter state:project_sp_secret_names -->`project_sp_secret_names` | O | `null` | `apply_gha`, `common_values`; Project sp secret names |
 | <!-- parameter state:runner_mode -->`runner_mode` | O | `null` | `apply_gha`, `common_values`; Runner mode |
+| <!-- parameter state:runner_vm_os -->`runner_vm_os` | O | `"windows"`, `"linux"` | `apply_gha`, `common_values`; Runner vm os |
 | <!-- parameter state:scaleset_suffix -->`scaleset_suffix` | C | Required lookup | `apply_gha`, `common_values`; Scaleset suffix |
 | <!-- parameter state:seeding_keyvault_name -->`seeding_keyvault_name` | C | Required lookup | `apply_gha`, `common_values`; Seeding keyvault name |
 | <!-- parameter state:seeding_resource_group -->`seeding_resource_group` | C | Required lookup | `apply_gha`, `common_values`; Seeding resource group |

@@ -21,6 +21,7 @@ CONTROL_LIBRARIES = (
     "aifactory_vpn_profile.py", "create-new-aifactory-scaleset.sh",
     "factory_enrollment.py", "factory_enrollment_entry.py", "factory_lifecycle.py",
     "layout_router.sh", "project_deployment.py", "project_environment.py",
+    "registered_creation.py",
     "release_version.py", "release_version.sh",
     "runner-prerequisites.ps1", "runner-prerequisites.sh",
     "runner-registration.ps1", "runner-registration.sh",
@@ -85,7 +86,7 @@ def test_scoped_creation_settings_fail_before_legacy_defaults_or_auth(name, valu
 source bootstrap/lib/create-new-aifactory-scaleset.sh
 aif_simple_stage() { printf 'FORBIDDEN_LEGACY_STAGE\n'; return 91; }
 aif_collect_answers() { printf 'FORBIDDEN_PROJECT_DEFAULT\n'; return 92; }
-aif_scaleset_main gha "$PWD/bootstrap/GHA-create-new-aifactory-scaleset.sh" --non-interactive --yes
+aif_scaleset_main gha "$PWD/bootstrap/GHA-create-new-aifactory-scaleset.sh" --aifactory-version 124 --non-interactive --yes
 '''
     result = subprocess.run([str(BASH), "--noprofile", "--norc", "-c", script],
                             cwd=ROOT, env=env, input="", capture_output=True, text=True,

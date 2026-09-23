@@ -492,6 +492,38 @@ class TestAifactoryDashboard(unittest.TestCase):
             for part in shortcut_parts
         ))
 
+    def test_five_discovered_resource_shortcuts_are_kept_in_project_layout(self) -> None:
+        config = self.config()
+        fake = FakeAz(config)
+        inventory, tenant, _ = module.reconcile(config, fake)
+        project = inventory["environments"][0]["projects"][0]
+        expected = [
+            ("AI Foundry", "Microsoft.CognitiveServices/accounts", "foundry"),
+            ("Storage", "Microsoft.Storage/storageAccounts", "storage2001"),
+            ("Key Vault", "Microsoft.KeyVault/vaults", "vault"),
+            ("AI Search", "Microsoft.Search/searchServices", "search"),
+            ("Application Insights", "Microsoft.Insights/components", "insights"),
+        ]
+        discovered = [
+            {"id": f"{project['id']}/providers/{kind}/{name}", "type": kind, "name": name}
+            for _, kind, name in expected
+        ]
+        with patch.object(module, "az_cli", return_value=response(discovered)) as az:
+            project["shortcuts"] = module.resource_shortcuts(DEV_SUB, project["name"], [], az)
+        self.assertEqual([label for label, _, _ in expected],
+                         [item["label"] for item in project["shortcuts"]])
+        self.assertEqual(DEV_SUB, az.call_args.args[az.call_args.args.index("--subscription") + 1])
+        self.assertEqual(project["name"], az.call_args.args[az.call_args.args.index("--resource-group") + 1])
+        parts = module.dashboard_parts(inventory, tenant)
+        shortcuts = [
+            part for part in parts
+            if part["metadata"].get("asset", {}).get("type") in {kind for _, kind, _ in expected}
+        ]
+        self.assertEqual(5, len(shortcuts))
+        for index, (part, resource) in enumerate(zip(shortcuts, discovered)):
+            self.assertEqual(resource["id"], part["metadata"]["inputs"][0]["value"])
+            self.assertEqual({"x": index, "y": 16, "colSpan": 1, "rowSpan": 1}, part["position"])
+
     def test_deploy_passes_reconciled_inventory_and_parts_to_bicep(self) -> None:
         config = self.config()
         fake = FakeAz(config)

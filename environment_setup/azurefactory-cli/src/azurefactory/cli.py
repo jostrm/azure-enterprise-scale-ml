@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from .client import API_KEY_ENV, API_URL_ENV, AzureFactoryClient, canonical_json_hash, redact_secrets
+from .client import API_KEY_ENV, API_URL_ENV, AzureFactoryClient, canonical_json_hash, factory_create_request, redact_secrets, registered_creation_issues
 from .configuration import ConfigurationDraft
 from . import enrollment
 from .errors import APIError, BlockedError, ConfigError, FailureError, RequestTimeout
@@ -95,6 +95,29 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
 
     add_simple(sub, "health", cmd_health)
+    api = sub.add_parser("api", help="Discover/start the supported standalone API; no desktop app is required.")
+    api_sub = api.add_subparsers(dest="api_command", required=True)
+    add_simple(api_sub, "instructions", cmd_api_instructions,
+               help="Print offline startup instructions and the selected URL; never print or persist credentials.")
+    monitoring = sub.add_parser("monitoring", help="Canonical evidence reports; no collectors, deployments or cloud jobs.")
+    monitoring_sub = monitoring.add_subparsers(dest="monitoring_command", required=True)
+    add_simple(monitoring_sub, "catalog", cmd_monitoring_catalog)
+    for action in ("summary", "report", "export"):
+        command = add_simple(monitoring_sub, action, cmd_monitoring)
+        command.add_argument("--request", help="Exact canonical request JSON, including explicit source and supplied live observations.")
+        if action != "summary":
+            command.add_argument("--report", choices=(
+                "agent-value", "showback", "foundry-tokens", "foundry-usage",
+                "quality-reliability", "security-governance",
+            ))
+        command.add_argument("--source", choices=("sample", "live"))
+        command.add_argument("--days", type=int)
+        command.add_argument("--start-date", help="Inclusive UTC date (YYYY-MM-DD); requires --end-date.")
+        command.add_argument("--end-date", help="Inclusive UTC date (YYYY-MM-DD); requires --start-date, at most 90 days.")
+        for dimension in ("factory", "scaleset", "project", "environment"):
+            command.add_argument("--" + dimension, help="Exact identity; omitted selects All.")
+        if action == "export":
+            command.add_argument("--format", choices=("json", "csv"))
     enroll = sub.add_parser("enrollment", help="Reviewed add-only Azure/provider enrollment; schema-2 consumers only.")
     enroll_sub = enroll.add_subparsers(dest="enrollment_command", required=True)
     for name, handler in (("plan", cmd_enrollment_plan), ("ensure", cmd_enrollment_ensure)):
@@ -174,7 +197,14 @@ def build_parser() -> argparse.ArgumentParser:
     factory_create.add_argument("--kind", default="ai", choices=["ai", "robot", "web", "app"])
     factory_create.add_argument("--prefix", required=True)
     factory_create.add_argument("--region", required=True)
-    factory_create.add_argument("--aifactory-version")
+    factory_create.add_argument("--region-short-name", help="Explicit naming abbreviation; omit for the API's region default.")
+    factory_create.add_argument("--aifactory-version", help="Registered source version: 125 or newer, or main; omit for the API default.")
+    initial_project = factory_create.add_mutually_exclusive_group()
+    initial_project.add_argument("--project-number", help="Choose one initial project instead of the AI default project001.")
+    initial_project.add_argument("--initial-project-json", help="Initial-project object with number, optional display_name and environment/suffix placements.")
+    initial_project.add_argument("--common-only", action="store_true", help="Explicitly configure without an initial project.")
+    factory_create.add_argument("--project-display-name", help="Optional initial-project friendly name; requires --project-number.")
+    factory_create.add_argument("--settings-json", help="Nonsecret editable factory settings object; identity stays in factory/scale-set flags.")
     add_scaleset_flags(factory_create)
     factory_clone = add_prepare_common(factory_sub, "clone", cmd_factory_clone)
     factory_clone.add_argument("--factory-id", required=True)
@@ -385,6 +415,46 @@ def cmd_health(args):
     return emit(client(args).health())
 
 
+def cmd_monitoring_catalog(args):
+    return emit(client(args).monitoring_catalog())
+
+
+def cmd_monitoring(args):
+    fields = ("report", "source", "days", "start_date", "end_date",
+              "factory", "scaleset", "project", "environment", "format")
+    if args.request:
+        if any(getattr(args, field, None) is not None for field in fields):
+            raise ConfigError("--request cannot be combined with generated request options.")
+        body = read_json_file(args.request)
+    else:
+        report_id = getattr(args, "report", None)
+        if args.monitoring_command != "summary" and not report_id:
+            raise ConfigError("Specify --report or --request.")
+        if args.source == "live":
+            raise ConfigError("Live reporting requires --request with explicitly supplied observations; this client never collects.")
+        days = args.days if args.days is not None else 7
+        if not 1 <= days <= 90:
+            raise ConfigError("--days must be between 1 and 90.")
+        body = {
+            "source": "sample", "days": days,
+            "filters": {field: getattr(args, field) or "All"
+                        for field in ("factory", "scaleset", "project", "environment")},
+        }
+        if report_id is not None:
+            body["report_id"] = report_id
+        for field in ("start_date", "end_date"):
+            if getattr(args, field) is not None:
+                body[field] = getattr(args, field)
+    api = client(args)
+    if args.monitoring_command == "summary":
+        return emit(api.monitoring_summary(body))
+    if args.monitoring_command == "export" and (args.format or "csv") == "csv":
+        print(api.monitoring_export(body), end="")
+        return EXIT_OK
+    result = api.monitoring_report(body)
+    return emit(result)
+
+
 def cmd_enrollment_plan(args):
     result = enrollment.plan(args)
     return emit(redact_secrets(result, args.api_key),
@@ -455,6 +525,24 @@ def cmd_doctor(args):
     return emit({"ok": ok, "checks": checks}, EXIT_OK if ok else EXIT_FAILURE)
 
 
+def cmd_api_instructions(args):
+    return emit({
+        "api_url": client(args).canonical_base_url,
+        "desktop_required": False,
+        "server": "Canonical Azure Factory Tkinter API (same backend bundled by MAUI).",
+        "start": [
+            "Use an approved, current backend checkout; install its documented requirements in a Python virtual environment.",
+            "Set AIFACTORY_API_KEY privately in both server and client shells; never store it in the consumer repository.",
+            "In the backend checkout, run: python -m src.api",
+            "Keep the server running in its own terminal. Default URL: http://127.0.0.1:8765.",
+            "For another authorized host, set AIFACTORY_API_URL to its actual URL; do not guess a MAUI random port.",
+        ],
+        "verify": ["azurefactory health", "azurefactory doctor"],
+        "configuration": "factory create prepares only; review its initial project and version, then catalog confirm --yes.",
+        "deployment": "Separate reviewed runtime operation with existing protected-manifest, binding and approval checks.",
+    })
+
+
 def cmd_auth_status(args):
     if not any((args.aifactory_folder, args.factory_id, args.scale_set_id, args.expected_tenant_id, args.expected_subscription_id)):
         raise ConfigError("auth status requires an explicit folder, factory/scale-set or expected tenant/subscription scope.")
@@ -510,9 +598,26 @@ def cmd_catalog_poll(args):
 
 
 def cmd_factory_create(args):
-    body = prepare_base(args, "create-factory")
-    body.update(factory_kind=args.kind, factory_key=args.factory_key, target_prefix=args.prefix, target_region=args.region,
-                aifactory_version=args.aifactory_version, scale_sets=build_scale_sets(args))
+    if args.project_display_name is not None and args.project_number is None:
+        raise ConfigError("--project-display-name requires --project-number.")
+    project_options = {}
+    if args.project_number is not None:
+        project_options["initial_project"] = {"number": args.project_number, "display_name": args.project_display_name or ""}
+    elif args.initial_project_json:
+        project_options["initial_project"] = read_json_file(args.initial_project_json)
+        if not isinstance(project_options["initial_project"], dict):
+            raise ConfigError("--initial-project-json requires an object; use --common-only for no project.")
+    elif args.common_only:
+        project_options["initial_project"] = None
+    settings = read_json_file(args.settings_json) if args.settings_json else None
+    if args.settings_json and not isinstance(settings, dict):
+        raise ConfigError("--settings-json requires an object.")
+    body = factory_create_request(
+        args.folder, prefix=args.prefix, region=args.region, kind=args.kind, factory_key=args.factory_key,
+        aifactory_version=args.aifactory_version, scale_sets=build_scale_sets(args),
+        settings=settings, expected_revision=args.expected_revision, region_short_name=args.region_short_name,
+        **project_options,
+    )
     return catalog_prepare_emit(args, body, "factory-create")
 
 
@@ -787,7 +892,8 @@ def parse_key_value(value: str) -> tuple[str, str]:
 
 def catalog_prepare_emit(args, body: dict[str, Any], operation: str) -> int:
     ensure_receipt_target_available(args)
-    body = {k: v for k, v in body.items() if v is not None}
+    body = {k: v for k, v in body.items() if v is not None or
+            (body.get("action") == "create-factory" and k == "initial_project")}
     result = client(args).catalog_prepare(body)
     maybe_save_receipt(args, result, body, "catalog-confirm", operation=operation)
     return preview_emit(result)
@@ -1135,7 +1241,7 @@ def added_schema_properties(expected: dict[str, Any], actual: dict[str, Any]) ->
 
 def contract_issues(openapi: dict[str, Any]) -> list[str]:
     schemas = openapi.get("components", {}).get("schemas", {})
-    issues = []
+    issues = registered_creation_issues(openapi)
     issues.extend(require_schema_const(schemas, "CatalogPrepare", "contract_version", 1))
     issues.extend(require_schema_const(schemas, "CatalogConfirm", "contract_version", 1))
     issues.extend(require_schema_const(schemas, "CatalogParameterPrepare", "contract_version", 1))

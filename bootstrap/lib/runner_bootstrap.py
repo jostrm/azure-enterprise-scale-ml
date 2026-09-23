@@ -32,6 +32,7 @@ FLAGS = ("useSelfHostedBuildAgent", "USE_SELF_HOSTED_BUILD_AGENT")
 FORMATS = ("variables.yaml", "variables.yml", "variables.json", ".env")
 ENVIRONMENTS = {"dev": "dev", "stage": "test", "prod": "prod"}
 COMPUTE_API = "2024-03-01"
+DISK_API = "2024-03-02"
 NETWORK_API = "2023-11-01"
 TAGS_API = "2021-04-01"
 SIZE = "Standard_D4s_v5"
@@ -226,6 +227,10 @@ def load_request(root, provider, environment="dev", config_source=None, factory_
                 "registered-orchestrator-mismatch")
         fingerprints[str(register)] = hashlib.sha256(register.read_bytes()).hexdigest()
         configuration = document.get("configurations", {}).get(factory["id"], {})
+        if "factory" in configuration or "scale_sets" in configuration:
+            effective = {**configuration.get("factory", {}),
+                         **configuration.get("scale_sets", {}).get(scale_set_id, {})}
+            sources.extend(selected_values(effective, environment))
         variables = configuration.get("variables", {})
         require(isinstance(variables, dict), "invalid-registered-variables")
         # Register schema-2 variables may be keyed by exact scale-set UUID.
@@ -439,7 +444,7 @@ def snapshot(request, cloud):
     require(vnet and vnet.get("location", "").replace(" ", "").lower() == request["location"], "subnet-location-mismatch")
     vm = get(cloud, request["vm_id"], COMPUTE_API)
     ids = resource_ids(request)
-    resources = {key: get(cloud, value, COMPUTE_API if key == "disk" else NETWORK_API) for key, value in ids.items()}
+    resources = {key: get(cloud, value, DISK_API if key == "disk" else NETWORK_API) for key, value in ids.items()}
     if vm:
         props = vm.get("properties", {})
         require(vm.get("location", "").replace(" ", "").lower() == request["location"]
@@ -492,7 +497,7 @@ def deny_inbound():
             "priority": 100, "direction": "Inbound"}
 
 
-def provider_action(request, cloud):
+def provider_action(request, cloud, *, require_online=False, allow_pool_create=False):
     if request["prereqs_only"]:
         return "noop"
     if request["provider"] == "gha":
@@ -512,6 +517,8 @@ def provider_action(request, cloud):
             require(request["runner_label"] in [x.get("name") for x in runner.get("labels", [])]
                     and runner.get("os", "").lower() == request["vm_os"], "existing-provider-runner-mismatch")
             require(not runner.get("busy"), "runner-busy-retry-without-interruption")
+            if require_online and runner.get("status") != "online":
+                return "offline"
     else:
         prefix = request["ado_organization"] + "/_apis/distributedtask/"
         def ado(endpoint):
@@ -522,6 +529,10 @@ def provider_action(request, cloud):
             return value["value"]
         pools = [x for x in ado("pools?poolName=" + quote(request["pool"], safe="") + "&actionFilter=manage&api-version=7.1")
                  if x.get("name") == request["pool"]]
+        if not pools and allow_pool_create:
+            visible = ado("pools?poolName=" + quote(request["pool"], safe="") + "&api-version=7.1")
+            require(not visible, "existing-pool-not-manageable")
+            return "create-pool-and-register"
         require(len(pools) == 1 and not pools[0].get("isHosted"), "exact-manageable-self-hosted-pool-required")
         matches = [x for x in ado(f"pools/{pools[0]['id']}/agents?agentName=" +
                                   quote(request["agent_name"], safe="") +
@@ -533,16 +544,18 @@ def provider_action(request, cloud):
             actual_os = matches[0].get("systemCapabilities", {}).get("Agent.OS")
             require(actual_os == ("Linux" if request["vm_os"] == "linux" else "Windows_NT"),
                     "existing-provider-runner-os-mismatch")
+            if require_online and matches[0].get("status") != "online":
+                return "offline"
     return "reuse" if matches else "create"
 
 
-def plan(request, cloud=None):
+def plan(request, cloud=None, *, allow_pool_create=False):
     if not request["desired"]:
         return {"desired": False, "status": "skipped-not-requested", "actions": {"vm": "noop", "agent": "noop"}}
     cloud = cloud or Cloud(request)
     cloud.read_only = True
     state = snapshot(request, cloud)
-    agent_action = provider_action(request, cloud)
+    agent_action = provider_action(request, cloud, allow_pool_create=allow_pool_create)
     require(state["vm"] or agent_action != "reuse", "existing-agent-without-matching-vm-no-takeover")
     result = {key: request[key] for key in ("desired", "provider", "environment", "common_rg", "subnet",
                                           "vm_os", "vm_name", "size", "location")}
@@ -559,6 +572,37 @@ def plan(request, cloud=None):
                       os_disk_sku=disk.get("managedDisk", {}).get("storageAccountType"),
                       managed_identity="unchanged-existing-vm")
     return result
+
+
+def ensure_provider_pool(request, cloud, *, project=None):
+    if request["provider"] != "ado":
+        return
+    action = provider_action(request, cloud, allow_pool_create=True)
+    prefix = request["ado_organization"] + "/_apis/distributedtask/"
+    cloud.read_only = False
+    if action == "create-pool-and-register":
+        cloud.http("POST", prefix + "pools?api-version=7.1", ADO_AUDIENCE,
+                   {"name": request["pool"], "autoProvision": False, "autoUpdate": True, "poolType": "automation"},
+                   tenant=request["ado_tenant_id"], allowed=(200, 201))
+    _, headers, value = cloud.http("GET", prefix + "pools?poolName=" + quote(request["pool"], safe="") +
+                                  "&actionFilter=manage&api-version=7.1", ADO_AUDIENCE, tenant=request["ado_tenant_id"])
+    require(not headers.get("x-ms-continuationtoken"), "complete-pool-inventory-required")
+    pools = [item for item in value["value"] if item.get("name") == request["pool"] and not item.get("isHosted")]
+    require(len(pools) == 1, "created-pool-not-verified")
+    require(isinstance(project, str) and bool(project.strip()), "exact-agent-project-required")
+    endpoint = request["ado_organization"] + "/" + quote(project, safe="") + "/_apis/distributedtask/queues"
+    _, headers, value = cloud.http("GET", endpoint + "?queueName=" + quote(request["pool"], safe="") + "&api-version=7.1",
+                                  ADO_AUDIENCE, tenant=request["ado_tenant_id"])
+    require(not headers.get("x-ms-continuationtoken"), "complete-queue-inventory-required")
+    require(all(item.get("pool", {}).get("id") == pools[0]["id"] for item in value["value"]), "existing-agent-queue-conflict")
+    if not value["value"]:
+        cloud.http("POST", endpoint + "?api-version=7.1", ADO_AUDIENCE,
+                   {"name": request["pool"], "pool": {"id": pools[0]["id"]}},
+                   tenant=request["ado_tenant_id"], allowed=(200, 201))
+    _, _, value = cloud.http("GET", endpoint + "?queueName=" + quote(request["pool"], safe="") + "&api-version=7.1",
+                            ADO_AUDIENCE, tenant=request["ado_tenant_id"])
+    require(len(value["value"]) == 1 and value["value"][0].get("pool", {}).get("id") == pools[0]["id"],
+            "created-agent-queue-not-verified")
 
 
 def wait_resource(cloud, identifier, version):
@@ -637,13 +681,13 @@ def ensure_vm(request, *, yes=False, cloud=None, ssh_public_key=None):
     # A disk created by this exact owned VM is tagged only after verifying managedBy.
     state = snapshot(request, cloud)
     if not request["legacy_windows"] and any(tag_values(state["disk"]).get(k) != v for k, v in request["tags"].items()):
-        disk = get(cloud, ids["disk"], COMPUTE_API)
+        disk = get(cloud, ids["disk"], DISK_API)
         require(disk and disk.get("managedBy", "").lower() == request["vm_id"].lower()
                 and not any(key in tag_values(disk) and tag_values(disk)[key] != value
                             for key, value in request["tags"].items()), "runner-disk-ownership-conflict")
         cloud.arm("PUT", ids["disk"] + "/providers/Microsoft.Resources/tags/default", TAGS_API,
                   data={"properties": {"tags": (disk.get("tags") or {}) | request["tags"]}}, allowed=(200, 201))
-        disk = get(cloud, ids["disk"], COMPUTE_API)
+        disk = get(cloud, ids["disk"], DISK_API)
         owned(request, disk, ids["disk"])
     return request
 
@@ -674,7 +718,7 @@ def prerequisites(request, cloud):
     raise EnrollmentError("runner-prerequisites-timeout")
 
 
-def register_agent(request, cloud):
+def register_agent(request, cloud, *, python_executable=None):
     state = Path(request["root"]) / (".aifactory-runner-state-" + uuid4().hex)
     protect_directory(state)
     env = dict(os.environ)
@@ -684,7 +728,7 @@ def register_agent(request, cloud):
                AIF_RUNNER_VM_NAME=request["vm_name"], AIF_RUNNER_VM_RESOURCE_GROUP=request["common_rg"],
                AIF_RUNNER_VM_LOCATION=request["location"], AIF_RUNNER_OS=request["vm_os"].title(),
                AIF_DEV_SUBSCRIPTION_ID=request["target"]["subscription_id"], AIF_STATE_DIR=str(state),
-               AIF_RUNNER_PYTHON=sys.executable, GH_HOST="github.com", GITHUB_REPOSITORY=request["repository"] or "",
+               AIF_RUNNER_PYTHON=python_executable or sys.executable, GH_HOST="github.com", GITHUB_REPOSITORY=request["repository"] or "",
                GHA_RUNNER_NAME=request["agent_name"], GHA_RUNNER_LABEL=request["runner_label"],
                ADO_AGENT_NAME=request["agent_name"], ADO_AGENT_POOL=request["pool"],
                ADO_ORGANIZATION=request["ado_organization"] or "", ADO_TENANT=request["ado_tenant_id"] or "",

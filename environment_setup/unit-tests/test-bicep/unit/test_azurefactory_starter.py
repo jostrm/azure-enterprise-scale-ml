@@ -7,7 +7,9 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -19,7 +21,16 @@ STARTER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(STARTER)
 BASH = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin" / "bash.exe"
 if not BASH.is_file():
-    BASH = shutil.which("bash")
+    BASH = None if os.name == "nt" else shutil.which("bash")
+
+
+def bash_environment():
+    env = dict(os.environ, AIFACTORY_PYTHON=sys.executable, PYTHONDONTWRITEBYTECODE="1")
+    if os.name == "nt" and BASH:
+        # Nested `bash` and path utilities must not resolve to Cygwin or WSL.
+        git_root = Path(BASH).parent.parent
+        env["PATH"] = os.pathsep.join((str(git_root / "bin"), str(git_root / "usr" / "bin"), env.get("PATH", "")))
+    return env
 
 
 def populated_document():
@@ -263,7 +274,7 @@ class TestStarterBootstrapRouting(StarterWorkspace):
             shutil.copyfile(BOOTSTRAP / relative, destination)
         self.script = self.workspace / "01-aif-copy-aifactory-templates.sh"
         shutil.copyfile(BOOTSTRAP / self.script.name, self.script)
-        self.env = dict(os.environ, AIFACTORY_PYTHON=sys.executable, PYTHONDONTWRITEBYTECODE="1")
+        self.env = bash_environment()
         for directory in ("aifactory-templates", "aifactory-usecase-code"):
             path = self.workspace / directory
             path.mkdir()
@@ -707,6 +718,163 @@ class TestStarterBootstrapRouting(StarterWorkspace):
                      if "bash " in line and "01-aif-copy-aifactory-templates.sh" in line]
             self.assertTrue(calls)
             self.assertTrue(all("--legacy-templates" in line for line in calls))
+
+
+@unittest.skipUnless(BASH and (os.name != "nt" or Path(BASH).name == "bash.exe"
+                              and "Git" in Path(BASH).parts), "Git Bash is required on Windows")
+class TestRegisteredShellSetup(StarterWorkspace):
+    def setUp(self):
+        super().setUp()
+        subprocess.run(["git", "init", "--quiet", str(self.workspace)], check=True, capture_output=True)
+        self.env = bash_environment()
+
+    def start(self, *args):
+        return subprocess.run(
+            [str(BASH), str(ROOT / "01-start-v125-and-above.sh"), *args],
+            cwd=self.workspace, env=self.env, capture_output=True, text=True, timeout=60,
+        )
+
+    def test_clean_consumer_installs_both_providers_and_real_cli_offline(self):
+        result = self.start()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Source commit:", result.stdout)
+        self.assertIn("payload SHA256:", result.stdout)
+        self.assertEqual(STARTER.read_document(self.target / "register.json"), STARTER.EMPTY_DOCUMENT)
+        for name in ("ADO-azurefactory.sh", "GHA-azurefactory.sh", "azurefactory.sh", "AIFactory-lifecycle.sh"):
+            self.assertTrue((self.workspace / name).is_file(), name)
+        for name in ("aifactory", "aifactory-templates", "01-aif-copy-aifactory-templates.sh"):
+            self.assertFalse((self.workspace / name).exists(), name)
+        result = subprocess.run(
+            [str(BASH), str(self.workspace / "azurefactory.sh"), "api", "instructions"],
+            cwd=self.workspace, env=self.env, capture_output=True, text=True, timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(json.loads(result.stdout)["desktop_required"])
+        before = self.snapshot()
+        result = self.start()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Refreshed 0 files", result.stdout)
+        self.assertEqual(before, self.snapshot())
+
+    def test_selected_provider_preserves_other_helpers_workflows_and_config(self):
+        document = populated_document()
+        factory_id = document["factories"][0]["id"]
+        document["configurations"][factory_id]["factory"]["aifactory_version"] = "main"
+        self.write_register(json.dumps(document, indent=4))
+        preserved = {
+            ".gitignore": b"my-private-configuration.json\n",
+            ".env": b"USER_SETTING=keep\n",
+            ".github/workflows/custom.yml": b"name: user workflow\n",
+            "GHA-azurefactory.sh": b"user opposing-provider launcher\n",
+            "azurefactory/factories/ai-example/factory.json": b"existing projection\n",
+        }
+        for relative, data in preserved.items():
+            path = self.workspace / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        register_before = (self.target / "register.json").read_bytes()
+        changed = self.workspace / "ADO-azurefactory.sh"
+        changed.write_bytes(b"user ADO launcher\n")
+        result = self.start("--provider", "ado")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for relative, data in preserved.items():
+            self.assertEqual((self.workspace / relative).read_bytes(), data)
+        self.assertEqual((self.target / "register.json").read_bytes(), register_before)
+        backups = list((self.workspace / ".aifactory-backups").iterdir())
+        self.assertEqual(len(backups), 1)
+        self.assertEqual((backups[0] / "ADO-azurefactory.sh").read_bytes(), b"user ADO launcher\n")
+
+    def test_installed_cli_prepares_initial_project_via_api_without_confirm(self):
+        installed = self.start()
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+        records = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *_):
+                pass
+
+            def do_GET(self):
+                records.append((self.path, None))
+                self.respond({"components": {"schemas": {"CatalogPrepare": {
+                    "properties": {"initial_project": {}}}}}})
+
+            def do_POST(self):
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                records.append((self.path, body))
+                self.respond({
+                    "contract_version": 1, "can_execute": True, "operation_mode": "configuration",
+                    "confirmation_id": "11111111-1111-4111-8111-111111111111",
+                    "expires_at": "2099-01-01T00:00:00+00:00", "source_revision": "a" * 64,
+                    "summary": "review configuration", "effects": [], "warnings": [], "blockers": [],
+                })
+
+            def respond(self, body):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps(body).encode())
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            result = subprocess.run([
+                str(BASH), str(self.workspace / "azurefactory.sh"),
+                "--api-url", f"http://127.0.0.1:{server.server_port}", "--api-key", "fixture-key",
+                "factory", "create", "--folder", str(self.target), "--prefix", "example-",
+                "--region", "swedencentral", "--environment", "dev", "--suffix", "001",
+                "--tenant-id", "11111111-1111-4111-8111-111111111111",
+                "--subscription-id", "22222222-2222-4222-8222-222222222222",
+                "--orchestrator", "ado", "--vnet-cidr", "172.16.0.0/18",
+                "--project-number", "003", "--aifactory-version", "main",
+            ], cwd=self.workspace, env=self.env, capture_output=True, text=True, timeout=30)
+        finally:
+            server.shutdown()
+            thread.join(timeout=2)
+            server.server_close()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([path for path, _ in records], ["/openapi.json", "/api/v1/factory-catalog/prepare"])
+        self.assertEqual(records[-1][1]["initial_project"], {"number": "003", "display_name": ""})
+        self.assertEqual(records[-1][1]["aifactory_version"], "main")
+        self.assertEqual(STARTER.read_document(self.target / "register.json"), STARTER.EMPTY_DOCUMENT)
+
+    def test_bad_register_or_legacy_root_fail_before_installing_helpers(self):
+        self.write_register("{malformed")
+        before = self.snapshot()
+        result = self.start()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(before, self.snapshot())
+        (self.target / "register.json").write_text(json.dumps(STARTER.EMPTY_DOCUMENT), encoding="utf-8")
+        (self.workspace / "aifactory").mkdir()
+        before = self.snapshot()
+        result = self.start()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("reviewed migration", result.stderr)
+        self.assertEqual(before, self.snapshot())
+
+    def test_refresh_only_leaves_register_absent_and_provider_selection_is_additive(self):
+        result = self.start("--provider", "gha", "--refresh-only")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self.target.exists())
+        self.assertFalse((self.workspace / "ADO-azurefactory.sh").exists())
+        result = self.start("--provider", "ado")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.workspace / "ADO-azurefactory.sh").exists())
+        self.assertTrue((self.workspace / "GHA-azurefactory.sh").exists())
+
+    def test_explicit_consumer_with_spaces_is_used_without_updating_its_submodule(self):
+        consumer = self.workspace / "consumer with spaces"
+        subprocess.run(["git", "init", "--quiet", str(consumer)], check=True, capture_output=True)
+        source = consumer / "azure-enterprise-scale-ml"
+        source.mkdir()
+        sentinel = source / "existing-dirty-source.txt"
+        sentinel.write_bytes(b"consumer's separately managed source\n")
+        result = self.start("--consumer-root", str(consumer))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((consumer / "azurefactory" / "register.json").is_file())
+        self.assertFalse(self.target.exists())
+        self.assertEqual(sentinel.read_bytes(), b"consumer's separately managed source\n")
+        self.assertFalse((source / "01-start-v125-and-above.sh").exists())
 
 
 if __name__ == "__main__":

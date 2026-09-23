@@ -487,6 +487,11 @@ def project_parameters(values: dict, cfg, project_resources: list, insight: str,
         params[key] = boolean(values[key], key)
     for key in TEXT_PARAMETERS & values.keys():
         params[key] = text(values[key], key)
+    if values.get("agentMonitoringWorkbookResourceId"):
+        params["agentMonitoringWorkbookResourceId"] = resource_id(
+            values["agentMonitoringWorkbookResourceId"], "Microsoft.Insights/workbooks",
+            {cfg.current_subscription}, cfg.common_resource_group(cfg.current_environment),
+        )
     for source, target in (("acr_SKU", "acrSku"), (
         "skuTierAksDev" if cfg.current_environment == "dev" else "skuTierAksStageProd", "aksSkuTier"
     )):

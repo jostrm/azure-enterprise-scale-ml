@@ -5,12 +5,12 @@
 //   - Full-width H1 banner (project number, environment, region)
 //   - Resource Group resources list tile      (left half)
 //   - Cost Analysis tile                       (right half — to the right of the RG)
-//   - 4 small 1x1 quick-access shortcut tiles  (AI Foundry project, Storage, Key Vault, AI Search)
+//   - 5 small 1x1 quick-access shortcut tiles  (Foundry account, Storage, Key Vault, AI Search, Application Insights)
 //
 // Layout (12-column grid):
 //   Row 0-1:  [ Banner H1 — Project {N} · {ENV} · {REGION} ]                    (colSpan 12, rowSpan 2)
 //   Row 2-9:  [ Resources (RG) ][ Cost Analysis ]                                (6 + 6)
-//   Row 10:   [Foundry][Storage][KeyVault][AISearch]                             (1 + 1 + 1 + 1)
+//   Row 10:   [Foundry][Storage][KeyVault][AISearch][AppInsights][Cost links]    (5 + 7)
 //   Row 19-21: Optional My Project Usage & Cost workbook entry (existing rows preserved)
 //   Row 22-24: Optional native model-token report entry
 
@@ -181,6 +181,9 @@ param myProjectCoverage object = {}
 @maxValue(90)
 @description('Bounded baseline history in local dates ending at selected end. State coverage remains false unless a full baseline is reviewed.')
 param myProjectStateHistoryDays int = 90
+
+@description('Optional deployed shared agent workbook ARM ID supplied by phase 10. Empty adds no navigation tile and creates no agent workbook.')
+param agentMonitoringWorkbookResourceId string = ''
 
 // ============================================================================
 // MODULE: NAMING CONVENTION
@@ -408,6 +411,27 @@ var myProjectEntryParts = enableMyProjectDashboard ? [
   }
 ] : []
 
+var agentMonitoringEntryParts = empty(agentMonitoringWorkbookResourceId) ? [] : [
+  {
+    position: { x: 0, y: 25, colSpan: 12, rowSpan: 3 }
+    metadata: {
+      inputs: []
+      type: 'Extension/HubsExtension/PartType/MarkdownPart'
+      settings: {
+        content: {
+          settings: {
+            content: '## Agent value, usage, cost and trust\n\n[Open the shared agent evidence workbook](https://portal.azure.com/#@${tenant().tenantId}/resource${agentMonitoringWorkbookResourceId})\n\nSelect the exact factory, scale set, project and environment. All means authorized collected observations in the workspace, not automatic tenant discovery. Modeled benefit, quality-qualified outcomes and verified realized value are distinct. Billing and token estimates are never added together. A saved workbook does not create telemetry or prove collection coverage.'
+            title: ''
+            subtitle: ''
+            markdownSource: 1
+            markdownUri: null
+          }
+        }
+      }
+    }
+  }
+]
+
 // ============================================================================
 // DASHBOARD RESOURCE
 // ============================================================================
@@ -420,7 +444,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
     lenses: [
       {
         order: 0
-        parts: concat([
+        parts: concat(concat([
           // ── ROW 0-1: Full-width H1 banner (project · env · region) ────────────
           {
             position: { x: 0, y: 0, colSpan: 12, rowSpan: 2 }
@@ -460,7 +484,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
 
           nativeCostAnalysisPart
 
-          // ── ROW 10: 1x1 shortcut — AI Foundry V2 project ─────────────────────
+          // ── ROW 10: 1x1 shortcut — AI Foundry V2 account ─────────────────────
           {
             position: { x: 0, y: 10, colSpan: 1, rowSpan: 1 }
             metadata: {
@@ -528,7 +552,22 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
           {
-            position: { x: 4, y: 10, colSpan: 8, rowSpan: 1 }
+            position: { x: 4, y: 10, colSpan: 1, rowSpan: 1 }
+            metadata: {
+              inputs: [
+                { name: 'id', isOptional: false, value: projectInsightsId }
+              ]
+              #disable-next-line BCP088
+              type: 'Extension/HubsExtension/PartType/ResourcePart'
+              #disable-next-line BCP037
+              asset: {
+                idInputName: 'id'
+                type: 'Microsoft.Insights/components'
+              }
+            }
+          }
+          {
+            position: { x: 5, y: 10, colSpan: 7, rowSpan: 1 }
             metadata: {
               inputs: []
               type: 'Extension/HubsExtension/PartType/MarkdownPart'
@@ -565,7 +604,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
 
-        ], myProjectEntryParts)
+        ], myProjectEntryParts), agentMonitoringEntryParts)
       }
     ]
     metadata: {

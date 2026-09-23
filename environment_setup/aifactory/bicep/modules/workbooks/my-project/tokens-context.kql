@@ -1,13 +1,20 @@
 // Independent of business-event factory/store selectors; native account scope is fixed.
 let ProjectResourceGroup = base64_decode_tostring('__PROJECT_RG__');
 let AccountPrefix = strcat(tolower(ProjectResourceGroup), '/providers/microsoft.cognitiveservices/accounts/');
-let Inventory = print Accounts=parse_json(base64_decode_tostring('{TokenAccountInventory:base64}'))
+let InventorySelection = parse_json(base64_decode_tostring('{TokenAccountInventory:base64}'));
+let Inventory = print Accounts=iff(gettype(InventorySelection) == 'array', InventorySelection, dynamic([]))
     | mv-expand Accounts
     | project AccountId=tolower(tostring(Accounts['id'])), Account=tostring(Accounts['name']), AccountKind=tostring(Accounts['kind'])
     | where AccountId startswith AccountPrefix and AccountKind in~ ('AIServices', 'OpenAI')
+    | where isnotempty(substring(AccountId, strlen(AccountPrefix)))
     | where substring(AccountId, strlen(AccountPrefix)) !contains '/'
     | distinct AccountId, Account, AccountKind;
-let SelectedAccount = tolower(base64_decode_tostring('{TokenAccount:base64}'));
+// Accept a scalar ARM ID and legacy JSON string/single-selection array, never multiple accounts.
+let AccountSelection = parse_json(base64_decode_tostring('{TokenAccount:base64}'));
+let SelectedAccount = tolower(case(
+    gettype(AccountSelection) == 'string', tostring(AccountSelection),
+    gettype(AccountSelection) == 'array' and array_length(AccountSelection) == 1 and gettype(AccountSelection[0]) == 'string', tostring(AccountSelection[0]),
+    ''));
 let AccountSelected = isnotempty(SelectedAccount) and SelectedAccount in (Inventory | project AccountId);
 let Zone = base64_decode_tostring('{TimeZone:base64}');
 let ZoneValid = array_index_of(datetime_list_timezones(), Zone) >= 0;

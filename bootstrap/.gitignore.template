@@ -27,6 +27,7 @@ lib/
 !/lib/layout_router.sh
 !/lib/project_deployment.py
 !/lib/project_environment.py
+!/lib/registered_creation.py
 !/lib/release_version.py
 !/lib/release_version.sh
 !/lib/runner-prerequisites.ps1

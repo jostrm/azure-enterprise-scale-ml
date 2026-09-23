@@ -546,6 +546,83 @@ printf '%s\\n' test-only-fixture | aif_linux_runner_configure worker "$root" "$r
                 self.assertEqual((root / "configured-ok").read_text(), "ok")
                 self.assertNotIn("test-only-fixture", result.stdout + result.stderr)
 
+    def test_worker_check_sources_a_worker_owned_pipe(self) -> None:
+        with tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+            result = self.run_bash(f"""
+runuser() {{ shift 3; "$@"; }}
+root={shlex.quote(directory.replace(chr(92), '/'))}
+script='set -eu
+aif_runner_prerequisites_main() {{
+  [[ "$*" == "--check --require-runner-runtime --require-az-modules" ]]
+  [[ "$USER" == worker && "$LOGNAME" == worker && "$AZURE_BICEP_USE_BINARY_FROM_PATH" == true ]]
+  printf worker-check-ok
+}}'
+aif_linux_runner_worker_check worker "$root" "$root" "$script" /usr/bin:/bin
+""")
+            self.assertIn("worker-check-ok", result.stdout)
+        source = (LIB / "runner-registration.sh").read_text()
+        worker_check = source.split("aif_linux_runner_worker_check()", 1)[1].split("\n}", 1)[0]
+        self.assertNotIn("source /dev/stdin", worker_check)
+
+    def test_package_resume_rejects_changed_extra_registered_or_unowned_content(self) -> None:
+        for change in ("", "content", "extra", ".agent", ".runner", ".service", ".credentials", "owner", "checksum"):
+            with self.subTest(change=change), tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+                root = Path(directory) / "agent"
+                root.mkdir()
+                (root / "bin").mkdir()
+                (root / "bin" / "Listener").write_bytes(b"official fixture")
+                package = Path(directory) / "package.tar.gz"
+                with tarfile.open(package, "w:gz") as archive:
+                    archive.add(root / "bin", arcname="bin")
+                checksum = hashlib.sha256(package.read_bytes()).hexdigest()
+                uid = root.stat().st_uid
+                if change == "content":
+                    (root / "bin" / "Listener").write_bytes(b"changed")
+                elif change == "owner":
+                    uid += 1
+                elif change == "checksum":
+                    checksum = "0" * 64
+                elif change:
+                    (root / change).write_text("must not be adopted")
+                result = self.run_bash("aif_linux_runner_verify_package " + shlex.join([
+                    str(root).replace("\\", "/"), str(package).replace("\\", "/"), checksum, str(uid)
+                ]), success=not change)
+                if not change:
+                    self.assertIn("Verified exact unregistered official package", result.stdout)
+
+    def test_package_resume_rejects_unsafe_archive(self) -> None:
+        with tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+            root = Path(directory) / "agent"
+            root.mkdir()
+            package = Path(directory) / "package.tar.gz"
+            with tarfile.open(package, "w:gz") as archive:
+                member = tarfile.TarInfo("../escape")
+                archive.addfile(member, io.BytesIO(b""))
+            result = self.run_bash("aif_linux_runner_verify_package " + shlex.join([
+                str(root).replace("\\", "/"), str(package).replace("\\", "/"),
+                hashlib.sha256(package.read_bytes()).hexdigest(), str(root.stat().st_uid)
+            ]), success=False)
+            self.assertIn("Unsafe resume archive path", result.stderr)
+
+    def test_nonempty_directory_still_requires_explicit_matching_resume_hash(self) -> None:
+        with tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+            (Path(directory) / "arbitrary-content").write_text("unowned")
+            path = directory.replace("\\", "/")
+            for resume in ("", "a" * 64, "invalid"):
+                result = self.run_bash(f"""
+eval "$(declare -f aif_linux_runner_main | sed 's@local root=/opt/aifactory-agent @local root={path} @')"
+Provider=ado; AgentName=vm; AgentPool=Default; RegistrationUrl=https://dev.azure.com/org
+InstallMissing=true; PackageSha256={'b' * 64}; ResumePackageSha256={shlex.quote(resume)}
+uname() {{ [[ "$1" != -m ]] && echo Linux || echo x86_64; }}
+source() {{ if [[ "$1" == /etc/os-release ]]; then ID=ubuntu; VERSION_ID=24.04; else builtin source "$@"; fi; }}
+aif_linux_runner_scope() {{ echo false; }}
+aif_linux_runner_worker() {{ echo MUTATION >&2; return 99; }}
+aif_linux_runner_download() {{ echo MUTATION >&2; return 99; }}
+aif_linux_runner_main
+""", success=False)
+                self.assertIn("Unregistered nonempty runner directory", result.stderr)
+                self.assertNotIn("MUTATION", result.stderr)
+
     def test_linux_download_rejects_wrong_os_or_missing_digest_before_network(self) -> None:
         for url, checksum in (
             ("https://github.com/actions/runner/releases/download/v2.0.0/actions-runner-win-x64-2.0.0.zip", "a" * 64),
@@ -555,6 +632,28 @@ printf '%s\\n' test-only-fixture | aif_linux_runner_configure worker "$root" "$r
             self.assertFalse((ROOT / "must-not-exist.tar.gz").exists())
             self.assertNotIn("HTTP", result.stderr)
             self.assertRegex(result.stderr, "pinned official Linux|SHA256 metadata is required")
+
+    def test_allusers_module_install_uses_readable_umask(self) -> None:
+        path = str(LIB / "runner-prerequisites.sh").replace("\\", "/")
+        result = self.run_bash(f"""
+source {shlex.quote(path)}
+umask 077
+pwsh() {{ [[ "$(umask)" == 0022 ]]; printf module-umask-ok; }}
+aif_runner_az_modules true
+[[ "$(umask)" == 0077 ]]
+""")
+        self.assertIn("module-umask-ok", result.stdout)
+
+    def test_module_permission_recovery_rejects_unrelated_packages(self) -> None:
+        with tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+            root = Path(directory) / "powershell" / "Modules"
+            (root / "Unrelated").mkdir(parents=True)
+            path = str(LIB / "runner-prerequisites.sh").replace("\\", "/")
+            result = self.run_bash(f"""
+source {shlex.quote(path)}
+aif_runner_repair_partial_az_module_permissions {shlex.quote(str(root).replace(chr(92), '/'))}
+""", success=False)
+            self.assertIn("Unrelated modules prevent", result.stderr)
 
     def test_vm_os_dispatch_uses_isolated_create_or_reuse(self) -> None:
         launcher = shlex.quote(str(LIB / "create-new-aifactory-scaleset.sh").replace("\\", "/"))
@@ -766,6 +865,51 @@ aif_runner_prerequisites_main "${{args[@]}}"
                     self.assertNotIn("INSTALL_WAS_CALLED", result.stderr)
                     self.assertNotIn("DOWNLOAD_WAS_CALLED", result.stderr)
 
+    @unittest.skipUnless(BASH and Path(BASH).exists(), "Bash is required")
+    def test_ubuntu_runtime_package_names_check_install_and_postverify(self) -> None:
+        path = str(LIB / "runner-prerequisites.sh").replace("\\", "/")
+        for distro, package in (("22.04", "liblttng-ust1"), ("24.04", "liblttng-ust1t64")):
+            for state, expected in (("ready", 0), ("check-missing", 2), ("install", 0), ("install-broken", 1)):
+                with self.subTest(distro=distro, state=state), tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+                    script = f"""
+builtin source '{path}'
+uname() {{ if [[ "$1" == -m ]]; then echo x86_64; else echo Linux; fi; }}
+source() {{ ID=ubuntu; VERSION_ID={distro}; VERSION_CODENAME=noble; }}
+for tool in git bash python3 python az pwsh gh bicep jq curl gpg; do
+  eval "$tool() {{ echo 99.0.0; }}"
+done
+installed=false
+dpkg-query() {{
+  name="${{@: -1}}"
+  if [[ "$name" == liblttng-* ]]; then
+    [[ "$name" == {package} ]] || {{ echo WRONG_RUNTIME_PACKAGE >&2; return 99; }}
+    [[ {state} == ready || "$installed" == true ]] || return 1
+  fi
+  printf 'install ok installed'
+}}
+aif_runner_require_root() {{ return 0; }}
+aif_runner_mark_prerequisites_changed() {{ return 0; }}
+apt-get() {{
+  if [[ "$1" == install ]]; then
+    [[ "$*" == 'install -y --no-upgrade {package}' ]] || return 99
+    echo EXPECTED_RUNTIME_INSTALL
+    [[ {state} == install-broken ]] || installed=true
+  fi
+  return 0
+}}
+args=(--check)
+[[ {state} != install* ]] || args=(--install-missing)
+aif_runner_prerequisites_main "${{args[@]}}" --require-runner-runtime
+"""
+                    result = subprocess.run([BASH, "-c", script], cwd=directory, capture_output=True, text=True, timeout=15)
+                    self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+                    if state.startswith("install"):
+                        self.assertIn("EXPECTED_RUNTIME_INSTALL", result.stdout)
+                    else:
+                        self.assertNotIn("EXPECTED_RUNTIME_INSTALL", result.stdout)
+                    if state == "install-broken":
+                        self.assertIn("runtime package failed post-install verification", result.stderr)
+
 
 class RunnerEnsureTests(unittest.TestCase):
     @classmethod
@@ -811,6 +955,10 @@ class RunnerEnsureTests(unittest.TestCase):
                         assert args == ("account", "show", "--subscription", request["target"]["subscription_id"])
                         return {"tenantId": request["target"]["tenant_id"], "id": request["target"]["subscription_id"], "state": "Enabled"}
                     def arm(self, method, identifier, version, data=None, **kwargs):
+                        if "/providers/Microsoft.Compute/disks/" in identifier and not identifier.endswith("/tags/default"):
+                            assert version == "2024-03-02", "disk GET must not use the VM API version"
+                        elif "/providers/Microsoft.Compute/virtualMachines/" in identifier:
+                            assert version == "2024-03-01"
                         if method == "GET":
                             if identifier.endswith("/instanceView"):
                                 return 200, {}, {"statuses": [{"code": "PowerState/running"}]}

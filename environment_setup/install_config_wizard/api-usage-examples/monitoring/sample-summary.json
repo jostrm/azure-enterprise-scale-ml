@@ -1,0 +1,10 @@
+{
+  "source": "sample",
+  "days": 7,
+  "filters": {
+    "factory": "Demo AI Factory",
+    "scaleset": "demo-east",
+    "project": "001",
+    "environment": "dev"
+  }
+}

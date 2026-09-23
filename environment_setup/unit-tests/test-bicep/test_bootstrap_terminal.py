@@ -25,6 +25,7 @@ WRAPPER_TARGETS = {
     "ALL-create-new-aifactory-scaleset.sh": ("ADO-create-new-aifactory-scaleset.sh", "GHA-create-new-aifactory-scaleset.sh"),
     "GHA-update-aifactory-and-run-project.sh": ("GH-update-aifactory-and-run-project.sh",),
 }
+PYTHON_WRAPPER_MODULES = {"azurefactory.sh": "azurefactory"}
 
 
 class TestBootstrapTerminal(unittest.TestCase):
@@ -79,7 +80,11 @@ class TestBootstrapTerminal(unittest.TestCase):
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertTrue(text.startswith("#!/"), path.name)
                 if path != LIBRARY:
-                    if path.name in WRAPPER_TARGETS:
+                    if path.name in PYTHON_WRAPPER_MODULES:
+                        module = PYTHON_WRAPPER_MODULES[path.name]
+                        self.assertIn(f'exec "${{python_command[@]}}" -B -m {module} "$@"', text)
+                        self.assertTrue((ROOT / "environment_setup/azurefactory-cli/src" / module / "__main__.py").is_file())
+                    elif path.name in WRAPPER_TARGETS:
                         for target in WRAPPER_TARGETS[path.name]:
                             self.assertIn(target, text)
                             self.assertTrue((BOOTSTRAP / target).is_file(), target)
@@ -167,7 +172,7 @@ class TestBootstrapTerminal(unittest.TestCase):
 
     def test_theme_resolution_in_original_copied_and_stable_launcher_layouts(self) -> None:
         for script in SCRIPTS:
-            if script.name in WRAPPER_TARGETS:
+            if script.name in WRAPPER_TARGETS or script.name in PYTHON_WRAPPER_MODULES:
                 continue
             text = script.read_text(encoding="utf-8")
             is_launcher = "-update-aifactory-" in script.name
@@ -279,8 +284,11 @@ class TestBootstrapTerminal(unittest.TestCase):
                 path = BOOTSTRAP / f"{route.upper()}-create-new-aifactory-scaleset.sh"
                 result = self.run_bash(
                     'source() { printf "SOURCE:%s\\n" "$1"; '
+                    'aif_route_runner() { printf "RUNNER_ARG:%s\\n" "$@"; }; '
+                    'aif_route_enrollment() { :; }; '
                     'aif_route_registered_layout() { :; }; '
                     'aif_route_enrollment() { :; }; '
+                    'aif_route_modern_creation() { :; }; '
                     'aif_scaleset_main() { printf "MAIN_ARG:%s\\n" "$@"; }; }\n'
                     'printf "ROOT:%s\\n" "$(cd "$(dirname "$AIF_TEST_SCRIPT")" && pwd)"\n'
                     'builtin source "$AIF_TEST_SCRIPT" --prepare-only "literal argument"\n',
@@ -290,8 +298,25 @@ class TestBootstrapTerminal(unittest.TestCase):
                 lines = result.stdout.splitlines()
                 root = next(line.removeprefix("ROOT:") for line in lines if line.startswith("ROOT:"))
                 self.assertIn(f"SOURCE:{root}/lib/create-new-aifactory-scaleset.sh", lines)
+                runner = [line.removeprefix("RUNNER_ARG:") for line in lines if line.startswith("RUNNER_ARG:")]
+                self.assertEqual([route, root, "--prepare-only", "literal argument"], runner)
                 actual = [line.removeprefix("MAIN_ARG:") for line in lines if line.startswith("MAIN_ARG:")]
                 self.assertEqual([route, path.as_posix(), "--prepare-only", "literal argument"], actual)
+
+    def test_sdk_wrapper_preserves_arguments_and_machine_output(self) -> None:
+        result = self.run_bash(
+            'exec() { printf "EXEC_ARG:%s\\n" "$@" >&2; printf \'%s\\n\' \'{"status":"fixture"}\'; }\n'
+            'builtin source "$AIF_TEST_SCRIPT" factory list --folder "literal folder"\n',
+            {"AIF_TEST_SCRIPT": (BOOTSTRAP / "azurefactory.sh").as_posix(),
+             "AIFACTORY_PYTHON": "offline python fixture"},
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual('{"status":"fixture"}\n', result.stdout)
+        self.assertEqual(
+            ["offline python fixture", "-B", "-m", "azurefactory", "factory", "list",
+             "--folder", "literal folder"],
+            [line.removeprefix("EXEC_ARG:") for line in result.stderr.splitlines()],
+        )
 
     def test_start_choices_and_copy_destinations_with_mocked_side_effects(self) -> None:
         # Keep this presentation test independent of the real parent-directory layout.

@@ -1,0 +1,3264 @@
+{
+  "contract": "aifactory.monitoring-observations.v1",
+  "source": "sample",
+  "rows": [
+    {
+      "agent_id": "demo-agent-001",
+      "agent_name": "Demo support assistant 001",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Support",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo AI Factory",
+      "scaleset": "demo-east",
+      "project": "001",
+      "environment": "dev",
+      "requests": 80,
+      "input_tokens": 14400,
+      "output_tokens": 3600,
+      "completed_outcomes": 26,
+      "attempted_outcomes": 28,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 8.25,
+      "amortized_cost": 7.84,
+      "token_estimated_cost": null,
+      "successful_requests": 78,
+      "latency_ms_sum": 65600,
+      "latency_samples": 80,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 19.5,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-east",
+          "project": "001",
+          "environment": "dev",
+          "agent_id": "demo-agent-001"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-east",
+          "project": "001",
+          "environment": "dev",
+          "agent_id": "demo-agent-001"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-001",
+      "agent_name": "Demo support assistant 001",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Support",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo AI Factory",
+      "scaleset": "demo-east",
+      "project": "001",
+      "environment": "stage",
+      "requests": 160,
+      "input_tokens": 28800,
+      "output_tokens": 7200,
+      "completed_outcomes": 53,
+      "attempted_outcomes": 55,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 16.5,
+      "amortized_cost": 15.67,
+      "token_estimated_cost": null,
+      "successful_requests": 158,
+      "latency_ms_sum": 131200,
+      "latency_samples": 160,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 39.75,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-east",
+          "project": "001",
+          "environment": "stage",
+          "agent_id": "demo-agent-001"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-east",
+          "project": "001",
+          "environment": "stage",
+          "agent_id": "demo-agent-001"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-001",
+      "agent_name": "Demo support assistant 001",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Support",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo AI Factory",
+      "scaleset": "demo-east",
+      "project": "001",
+      "environment": "prod",
+      "requests": 320,
+      "input_tokens": 57600,
+      "output_tokens": 14400,
+      "completed_outcomes": 106,
+      "attempted_outcomes": 108,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 33.0,
+      "amortized_cost": 31.35,
+      "token_estimated_cost": null,
+      "successful_requests": 318,
+      "latency_ms_sum": 262400,
+      "latency_samples": 320,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 79.5,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-east",
+          "project": "001",
+          "environment": "prod",
+          "agent_id": "demo-agent-001"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-east",
+          "project": "001",
+          "environment": "prod",
+          "agent_id": "demo-agent-001"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-002",
+      "agent_name": "Demo support assistant 002",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Research",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo AI Factory",
+      "scaleset": "demo-east",
+      "project": "002",
+      "environment": "dev",
+      "requests": 160,
+      "input_tokens": 28800,
+      "output_tokens": 7200,
+      "completed_outcomes": 53,
+      "attempted_outcomes": 55,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 16.5,
+      "amortized_cost": 15.67,
+      "token_estimated_cost": null,
+      "successful_requests": 158,
+      "latency_ms_sum": 131200,
+      "latency_samples": 160,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 39.75,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-east",
+          "project": "002",
+          "environment": "dev",
+          "agent_id": "demo-agent-002"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-east",
+          "project": "002",
+          "environment": "dev",
+          "agent_id": "demo-agent-002"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-002",
+      "agent_name": "Demo support assistant 002",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Research",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo AI Factory",
+      "scaleset": "demo-east",
+      "project": "002",
+      "environment": "stage",
+      "requests": 320,
+      "input_tokens": 57600,
+      "output_tokens": 14400,
+      "completed_outcomes": 106,
+      "attempted_outcomes": 108,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 33.0,
+      "amortized_cost": 31.35,
+      "token_estimated_cost": null,
+      "successful_requests": 318,
+      "latency_ms_sum": 262400,
+      "latency_samples": 320,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 79.5,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-east",
+          "project": "002",
+          "environment": "stage",
+          "agent_id": "demo-agent-002"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-east",
+          "project": "002",
+          "environment": "stage",
+          "agent_id": "demo-agent-002"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-002",
+      "agent_name": "Demo support assistant 002",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Research",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo AI Factory",
+      "scaleset": "demo-east",
+      "project": "002",
+      "environment": "prod",
+      "requests": 640,
+      "input_tokens": 115200,
+      "output_tokens": 28800,
+      "completed_outcomes": 213,
+      "attempted_outcomes": 215,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 66.0,
+      "amortized_cost": 62.7,
+      "token_estimated_cost": null,
+      "successful_requests": 638,
+      "latency_ms_sum": 524800,
+      "latency_samples": 640,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 159.75,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-east",
+          "project": "002",
+          "environment": "prod",
+          "agent_id": "demo-agent-002"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-east",
+          "project": "002",
+          "environment": "prod",
+          "agent_id": "demo-agent-002"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-003",
+      "agent_name": "Demo support assistant 003",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Research",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo AI Factory",
+      "scaleset": "demo-west",
+      "project": "003",
+      "environment": "dev",
+      "requests": 240,
+      "input_tokens": 43200,
+      "output_tokens": 10800,
+      "completed_outcomes": 80,
+      "attempted_outcomes": 82,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 24.75,
+      "amortized_cost": 23.51,
+      "token_estimated_cost": null,
+      "successful_requests": 238,
+      "latency_ms_sum": 196800,
+      "latency_samples": 240,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 60.0,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-west",
+          "project": "003",
+          "environment": "dev",
+          "agent_id": "demo-agent-003"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-west",
+          "project": "003",
+          "environment": "dev",
+          "agent_id": "demo-agent-003"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-003",
+      "agent_name": "Demo support assistant 003",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Research",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo AI Factory",
+      "scaleset": "demo-west",
+      "project": "003",
+      "environment": "stage",
+      "requests": 480,
+      "input_tokens": 86400,
+      "output_tokens": 21600,
+      "completed_outcomes": 160,
+      "attempted_outcomes": 162,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 49.5,
+      "amortized_cost": 47.02,
+      "token_estimated_cost": null,
+      "successful_requests": 478,
+      "latency_ms_sum": 393600,
+      "latency_samples": 480,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 120.0,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-west",
+          "project": "003",
+          "environment": "stage",
+          "agent_id": "demo-agent-003"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-west",
+          "project": "003",
+          "environment": "stage",
+          "agent_id": "demo-agent-003"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-003",
+      "agent_name": "Demo support assistant 003",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Research",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo AI Factory",
+      "scaleset": "demo-west",
+      "project": "003",
+      "environment": "prod",
+      "requests": 960,
+      "input_tokens": 172800,
+      "output_tokens": 43200,
+      "completed_outcomes": 320,
+      "attempted_outcomes": 322,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 99.0,
+      "amortized_cost": 94.05,
+      "token_estimated_cost": null,
+      "successful_requests": 958,
+      "latency_ms_sum": 787200,
+      "latency_samples": 960,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 240.0,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-west",
+          "project": "003",
+          "environment": "prod",
+          "agent_id": "demo-agent-003"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-west",
+          "project": "003",
+          "environment": "prod",
+          "agent_id": "demo-agent-003"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-004",
+      "agent_name": "Demo support assistant 004",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Research",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo AI Factory",
+      "scaleset": "demo-west",
+      "project": "004",
+      "environment": "dev",
+      "requests": 320,
+      "input_tokens": 57600,
+      "output_tokens": 14400,
+      "completed_outcomes": 106,
+      "attempted_outcomes": 108,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 33.0,
+      "amortized_cost": 31.35,
+      "token_estimated_cost": null,
+      "successful_requests": 318,
+      "latency_ms_sum": 262400,
+      "latency_samples": 320,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 79.5,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-west",
+          "project": "004",
+          "environment": "dev",
+          "agent_id": "demo-agent-004"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-west",
+          "project": "004",
+          "environment": "dev",
+          "agent_id": "demo-agent-004"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-004",
+      "agent_name": "Demo support assistant 004",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Research",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo AI Factory",
+      "scaleset": "demo-west",
+      "project": "004",
+      "environment": "stage",
+      "requests": 640,
+      "input_tokens": 115200,
+      "output_tokens": 28800,
+      "completed_outcomes": 213,
+      "attempted_outcomes": 215,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 66.0,
+      "amortized_cost": 62.7,
+      "token_estimated_cost": null,
+      "successful_requests": 638,
+      "latency_ms_sum": 524800,
+      "latency_samples": 640,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 159.75,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-west",
+          "project": "004",
+          "environment": "stage",
+          "agent_id": "demo-agent-004"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-west",
+          "project": "004",
+          "environment": "stage",
+          "agent_id": "demo-agent-004"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-004",
+      "agent_name": "Demo support assistant 004",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Research",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo AI Factory",
+      "scaleset": "demo-west",
+      "project": "004",
+      "environment": "prod",
+      "requests": 1280,
+      "input_tokens": 230400,
+      "output_tokens": 57600,
+      "completed_outcomes": 426,
+      "attempted_outcomes": 428,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 132.0,
+      "amortized_cost": 125.4,
+      "token_estimated_cost": null,
+      "successful_requests": 1278,
+      "latency_ms_sum": 1049600,
+      "latency_samples": 1280,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 319.5,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-west",
+          "project": "004",
+          "environment": "prod",
+          "agent_id": "demo-agent-004"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo AI Factory",
+          "scaleset": "demo-west",
+          "project": "004",
+          "environment": "prod",
+          "agent_id": "demo-agent-004"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-001",
+      "agent_name": "Demo support assistant 001",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Support",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo Factory B",
+      "scaleset": "demo-east",
+      "project": "001",
+      "environment": "dev",
+      "requests": 160,
+      "input_tokens": 28800,
+      "output_tokens": 7200,
+      "completed_outcomes": 53,
+      "attempted_outcomes": 55,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 16.5,
+      "amortized_cost": 15.67,
+      "token_estimated_cost": null,
+      "successful_requests": 158,
+      "latency_ms_sum": 131200,
+      "latency_samples": 160,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 39.75,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo Factory B",
+          "scaleset": "demo-east",
+          "project": "001",
+          "environment": "dev",
+          "agent_id": "demo-agent-001"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo Factory B",
+          "scaleset": "demo-east",
+          "project": "001",
+          "environment": "dev",
+          "agent_id": "demo-agent-001"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-001",
+      "agent_name": "Demo support assistant 001",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Support",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo Factory B",
+      "scaleset": "demo-east",
+      "project": "001",
+      "environment": "stage",
+      "requests": 320,
+      "input_tokens": 57600,
+      "output_tokens": 14400,
+      "completed_outcomes": 106,
+      "attempted_outcomes": 108,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 33.0,
+      "amortized_cost": 31.35,
+      "token_estimated_cost": null,
+      "successful_requests": 318,
+      "latency_ms_sum": 262400,
+      "latency_samples": 320,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 79.5,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo Factory B",
+          "scaleset": "demo-east",
+          "project": "001",
+          "environment": "stage",
+          "agent_id": "demo-agent-001"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo Factory B",
+          "scaleset": "demo-east",
+          "project": "001",
+          "environment": "stage",
+          "agent_id": "demo-agent-001"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-001",
+      "agent_name": "Demo support assistant 001",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Support",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo Factory B",
+      "scaleset": "demo-east",
+      "project": "001",
+      "environment": "prod",
+      "requests": 640,
+      "input_tokens": 115200,
+      "output_tokens": 28800,
+      "completed_outcomes": 213,
+      "attempted_outcomes": 215,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 66.0,
+      "amortized_cost": 62.7,
+      "token_estimated_cost": null,
+      "successful_requests": 638,
+      "latency_ms_sum": 524800,
+      "latency_samples": 640,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 159.75,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo Factory B",
+          "scaleset": "demo-east",
+          "project": "001",
+          "environment": "prod",
+          "agent_id": "demo-agent-001"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo Factory B",
+          "scaleset": "demo-east",
+          "project": "001",
+          "environment": "prod",
+          "agent_id": "demo-agent-001"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-002",
+      "agent_name": "Demo support assistant 002",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Research",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo Factory B",
+      "scaleset": "demo-north",
+      "project": "002",
+      "environment": "dev",
+      "requests": 320,
+      "input_tokens": 57600,
+      "output_tokens": 14400,
+      "completed_outcomes": 106,
+      "attempted_outcomes": 108,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 33.0,
+      "amortized_cost": 31.35,
+      "token_estimated_cost": null,
+      "successful_requests": 318,
+      "latency_ms_sum": 262400,
+      "latency_samples": 320,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 79.5,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo Factory B",
+          "scaleset": "demo-north",
+          "project": "002",
+          "environment": "dev",
+          "agent_id": "demo-agent-002"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo Factory B",
+          "scaleset": "demo-north",
+          "project": "002",
+          "environment": "dev",
+          "agent_id": "demo-agent-002"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-002",
+      "agent_name": "Demo support assistant 002",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Research",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo Factory B",
+      "scaleset": "demo-north",
+      "project": "002",
+      "environment": "stage",
+      "requests": 640,
+      "input_tokens": 115200,
+      "output_tokens": 28800,
+      "completed_outcomes": 213,
+      "attempted_outcomes": 215,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 66.0,
+      "amortized_cost": 62.7,
+      "token_estimated_cost": null,
+      "successful_requests": 638,
+      "latency_ms_sum": 524800,
+      "latency_samples": 640,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 159.75,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo Factory B",
+          "scaleset": "demo-north",
+          "project": "002",
+          "environment": "stage",
+          "agent_id": "demo-agent-002"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo Factory B",
+          "scaleset": "demo-north",
+          "project": "002",
+          "environment": "stage",
+          "agent_id": "demo-agent-002"
+        }
+      }
+    },
+    {
+      "agent_id": "demo-agent-002",
+      "agent_name": "Demo support assistant 002",
+      "timestamp": "2026-09-15T10:00:00+00:00",
+      "period_start": "2026-09-15T10:00:00+00:00",
+      "period_end": "2026-09-16T10:00:00+00:00",
+      "model": "demo-model-1",
+      "cost_center": "Research",
+      "currency": "USD",
+      "data_source": "Sample fixture",
+      "subscription_id": null,
+      "resource_group": null,
+      "resource_id": null,
+      "cost_scope": null,
+      "factory": "Demo Factory B",
+      "scaleset": "demo-north",
+      "project": "002",
+      "environment": "prod",
+      "requests": 1280,
+      "input_tokens": 230400,
+      "output_tokens": 57600,
+      "completed_outcomes": 426,
+      "attempted_outcomes": 428,
+      "baseline_minutes_per_outcome": 12,
+      "actual_minutes_per_outcome": 7,
+      "labor_rate_per_hour": 36,
+      "actual_cost": 132.0,
+      "amortized_cost": 125.4,
+      "token_estimated_cost": null,
+      "successful_requests": 1278,
+      "latency_ms_sum": 1049600,
+      "latency_samples": 1280,
+      "evaluated_responses": 20,
+      "quality_passed_responses": 18,
+      "security_findings": 1,
+      "security_checks": 10,
+      "active_users": null,
+      "eligible_users": null,
+      "realized_benefit_amount": 319.5,
+      "outcome_quality_passed": true,
+      "source": "sample",
+      "provenance": {
+        "requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "input_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "output_tokens": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "completed_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "attempted_outcomes": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "baseline_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_minutes_per_outcome": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "labor_rate_per_hour": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "actual_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "amortized_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "token_estimated_cost": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "successful_requests": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_ms_sum": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "latency_samples": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "evaluated_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "quality_passed_responses": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_findings": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "security_checks": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "active_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "eligible_users": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        },
+        "realized_benefit_amount": {
+          "data_source": "Sample fixture",
+          "reference": "in-memory fictional scenario",
+          "description": "Explicit illustrative input, never a measured live result."
+        }
+      },
+      "metadata_validated": false,
+      "value_evidence": {
+        "owner": "Fictional Support owner",
+        "baseline_reference": "sample:illustrative-baseline",
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "valuation_method": "Fictional observed avoided external spend",
+        "evidence_reference": "sample:fictional-ledger",
+        "approval_reference": "sample:fictional-approval",
+        "currency": "USD",
+        "scope": {
+          "factory": "Demo Factory B",
+          "scaleset": "demo-north",
+          "project": "002",
+          "environment": "prod",
+          "agent_id": "demo-agent-002"
+        }
+      },
+      "cost_evidence": {
+        "period_start": "2026-09-15T10:00:00+00:00",
+        "period_end": "2026-09-16T10:00:00+00:00",
+        "currency": "USD",
+        "coverage": "complete",
+        "reference": "sample:fictional-billing",
+        "scope": {
+          "factory": "Demo Factory B",
+          "scaleset": "demo-north",
+          "project": "002",
+          "environment": "prod",
+          "agent_id": "demo-agent-002"
+        }
+      }
+    }
+  ]
+}

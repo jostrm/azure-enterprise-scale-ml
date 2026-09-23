@@ -104,6 +104,7 @@ class Fake:
         self.blobs = {}
         self.etag = 0
         self.denies = []
+        self.management_permissions = [{"actions": ["*"], "notActions": [], "dataActions": []}]
         self.fail = {}
         self.concurrent_enrollment = False
         self.concurrent_container = False
@@ -220,6 +221,8 @@ class Fake:
             return Response(self.fail[(method, identifier)], {"error": "SECRET HTTP BODY"})
         if parsed.hostname == "management.azure.com":
             if method == "GET":
+                if identifier.endswith("/permissions"):
+                    return Response(200, {"value": self.management_permissions})
                 if identifier.endswith("/roleassignments"):
                     return Response(200, {"value": [v for k, v in self.resources.items() if "/roleassignments/" in k]})
                 if identifier.endswith("/denyassignments"):
@@ -306,6 +309,9 @@ class Fake:
             "id": self.request["account_id"], "properties": {
                 "allowSharedKeyAccess": False, "allowBlobPublicAccess": False, "supportsHttpsTrafficOnly": True,
                 "minimumTlsVersion": "TLS1_2", "publicNetworkAccess": "Disabled", "networkAcls": {"defaultAction": "Deny"}}}
+        if en._common_mode(self.request):
+            self.resources[self.request["account_id"]]["properties"].update(
+                isHnsEnabled=True, allowSharedKeyAccess=True)
         identifier = self.request["account_id"] + "/blobservices/default/containers/" + self.request["coordinates"]["container"]
         self.resources[identifier] = {"id": identifier, "properties": {"publicAccess": "None"}}
 
@@ -347,6 +353,383 @@ def enroll(req, fake, ack=True):
     assert not fake.cloud.read_only is False
     return en.ensure(req, review["plan_hash"], yes=True, cloud=fake.cloud,
                      acknowledge_exclusive_writer_governance=ack)
+
+
+def common_options(**overrides):
+    return {
+        "coordination_storage_mode": "factory-common",
+        "coordination_account_id": f"/subscriptions/{SUB}/resourcegroups/common/providers/microsoft.storage/storageaccounts/esmlsaltedcommon001",
+        **overrides,
+    }
+
+
+def common_creation():
+    return {
+        "location": "swedencentral", "kind": "StorageV2", "sku": {"name": "Standard_GRS"},
+        "tags": {"canonical": "frozen-common-plan"}, "identity": {"type": "None"},
+        "properties": {
+            "isHnsEnabled": True, "allowSharedKeyAccess": True, "allowBlobPublicAccess": False,
+            "supportsHttpsTrafficOnly": True, "minimumTlsVersion": "TLS1_2", "accessTier": "Hot",
+            "publicNetworkAccess": "Disabled",
+            "networkAcls": {"defaultAction": "Deny", "bypass": "AzureServices", "ipRules": [], "virtualNetworkRules": []},
+        },
+    }
+
+
+def canonical_common_parameters():
+    return {"location": "swedencentral", "locationSuffix": "sdc", "env": "test",
+            "commonLakeNamePrefixMax8chars": "mrvel", "commonResourceSuffix": "-001",
+            "tags": {"owner": "canonical-common-plan"}}
+
+
+def naming_identity(name, group):
+    return {"id": group + "/providers/Microsoft.ManagedIdentity/userAssignedIdentities/" + name,
+            "properties": {"tenantId": TENANT, "clientId": CLIENT, "principalId": PRINCIPAL}}
+
+
+@pytest.mark.parametrize("kind", ["cmk", "project", "aca", "evaluated-no-mi"])
+def test_pure_common_resolver_uses_authoritative_salt_not_random_mi_suffix(workspace, kind):
+    group = f"/subscriptions/{SUB}/resourcegroups/common"
+    params = canonical_common_parameters()
+    account = group + "/providers/microsoft.storage/storageaccounts/mrvelx46jfesml001test"
+    kwargs = {"tenant_id": TENANT}
+    if kind == "evaluated-no-mi":
+        kwargs["evaluated_account_id"] = account
+    else:
+        name = ("id-cmn-cmk-test-x46jf-001" if kind == "cmk" else
+                "mi-" + ("aca-" if kind == "aca" else "") + "prj017-sdc-test-x46jfc2ebe6a898-001")
+        evidence = naming_identity(name, group if kind == "cmk" else GROUP)
+        kwargs.update(naming_identity=evidence, naming_identity_id=evidence["id"])
+        if kind != "cmk":
+            kwargs["project_naming"] = {"resource_group_id": GROUP, "projectNumber": "017",
+                                       "resourceSuffix": "-002", "keepMIandKVsuffixAs001": True}
+    before = copy.deepcopy((params, kwargs))
+    resolved = en.resolve_factory_common_storage(group, params, **kwargs)
+    assert resolved["coordination_account_id"] == account
+    assert (params, kwargs) == before
+    body = resolved["coordination_account_creation"]
+    assert body["sku"] == {"name": "Standard_ZRS"}
+    assert body["properties"]["encryption"]["keySource"] == "Microsoft.Storage"
+    assert body["properties"]["keyPolicy"] == {"keyExpirationPeriodInDays": 14}
+    assert body["properties"]["networkAcls"] == {
+        "defaultAction": "Deny", "bypass": "AzureServices", "ipRules": [], "virtualNetworkRules": []}
+    req = request(workspace, **resolved)
+    fake = Fake(req, provisioned=False)
+    result = enroll(req, fake)
+    assert result["enrollment_complete"], result
+    assert fake.resources[account]["properties"] == body["properties"]
+    assert not any("c2ebe6a898" in write[2] or "lake3" in write[2] for write in fake.writes)
+
+
+@pytest.mark.parametrize("case,code", [
+    ("missing-evidence", "canonical-common-naming-evidence-required"),
+    ("no-identity-read", "canonical-naming-identity-read-required"),
+    ("wrong-tenant", "canonical-naming-identity-tenant"),
+    ("wrong-id", "canonical-naming-identity-id"),
+    ("wrong-rg", "canonical-naming-identity-scope"),
+    ("afwriter", "canonical-naming-identity-pattern"),
+    ("wrong-env", "canonical-naming-identity-pattern"),
+    ("contradictory-evidence", "canonical-common-naming-evidence-conflict"),
+    ("wrong-evaluated-rg", "canonical-common-account-scope-conflict"),
+    ("manual-salt", "canonical-common-parameters-required"),
+    ("cmk", "common-cmk-identity-key-access"),
+    ("unknown-override", "canonical-common-parameters-required"),
+    ("unresolved-prefix", "invalid-canonical-common-naming-parameters"),
+    ("invalid-whitelist", "invalid-canonical-common-ip-whitelist"),
+])
+def test_pure_common_resolver_blocks_unproven_or_conflicting_creation(case, code):
+    group = f"/subscriptions/{SUB}/resourcegroups/common"
+    params = canonical_common_parameters()
+    identity = naming_identity("id-cmn-cmk-test-x46jf-001", group)
+    kwargs = {"tenant_id": TENANT, "naming_identity": identity, "naming_identity_id": identity["id"]}
+    if case == "missing-evidence":
+        kwargs = {"tenant_id": TENANT}
+    elif case == "no-identity-read":
+        kwargs.pop("naming_identity")
+    elif case == "wrong-tenant":
+        identity["properties"]["tenantId"] = ADO_TENANT
+    elif case == "wrong-id":
+        kwargs["naming_identity_id"] += "other"
+    elif case == "wrong-rg":
+        group = GROUP
+    elif case in ("afwriter", "wrong-env"):
+        identity["id"] = identity["id"].rsplit("/", 1)[0] + "/" + (
+            "afwriter-0123456789abcdef" if case == "afwriter" else "id-cmn-cmk-dev-x46jf-001")
+        kwargs["naming_identity_id"] = identity["id"]
+    elif case == "contradictory-evidence":
+        kwargs["evaluated_account_id"] = group + "/providers/Microsoft.Storage/storageAccounts/mrvelabcdeesml001test"
+    elif case == "wrong-evaluated-rg":
+        kwargs["evaluated_account_id"] = GROUP + "/providers/Microsoft.Storage/storageAccounts/mrvelx46jfesml001test"
+    elif case == "manual-salt":
+        params["salt"] = "abcde"
+    elif case == "cmk":
+        params["cmk"] = True
+    elif case == "unknown-override":
+        params["datalakeName_param"] = "ignored-by-canonical-bicep"
+    elif case == "unresolved-prefix":
+        params["commonLakeNamePrefixMax8chars"] = "<todo>"
+    elif case == "invalid-whitelist":
+        params["IPwhiteList"] = "not-an-ip"
+    with pytest.raises(en.EnrollmentError, match=code):
+        en.resolve_factory_common_storage(group, params, **kwargs)
+
+
+def test_common_resolver_custom_frozen_parameters_and_name_length():
+    group = f"/subscriptions/{SUB}/resourcegroups/common"
+    params = canonical_common_parameters() | {
+        "commonLakeNamePrefixMax8chars": "custom", "commonResourceAbbreviation": "data",
+        "commonResourceSuffix": "-003", "env": "prod", "skuNameStorage": "Standard_GRS",
+        "IPwhiteList": "203.0.113.9,198.51.100.0/24"}
+    identity = naming_identity("id-cmn-cmk-prod-abcde-003", group)
+    resolved = en.resolve_factory_common_storage(
+        group, params, tenant_id=TENANT, naming_identity=identity, naming_identity_id=identity["id"])
+    assert resolved["coordination_account_id"].endswith("/customabcdedata003prod")
+    assert resolved["coordination_account_creation"]["sku"]["name"] == "Standard_GRS"
+    assert resolved["coordination_account_creation"]["properties"]["networkAcls"]["ipRules"] == [
+        {"action": "Allow", "value": "203.0.113.9"}, {"action": "Allow", "value": "198.51.100.0/24"}]
+    params["commonResourceAbbreviation"] = "toolongabbr"
+    with pytest.raises(en.EnrollmentError, match="invalid-canonical-common-account-name"):
+        en.resolve_factory_common_storage(
+            group, params, tenant_id=TENANT, naming_identity=identity, naming_identity_id=identity["id"])
+
+
+def test_common_resolver_matches_canonical_bicep_not_unused_override():
+    bicep = ROOT / "environment_setup" / "aifactory" / "bicep"
+    common = (bicep / "esml-common" / "main" / "13-rgLevel.bicep").read_text()
+    naming = (bicep / "modules" / "common" / "CmnAIfactoryNaming.bicep").read_text()
+    lake = (bicep / "modules" / "dataLake.bicep").read_text()
+    assert "var uniqueInAIFenv = substring(uniqueString(esmlCommonResourceGroup.id), 0, 5)" in common
+    assert "var datalakeName = '${commonLakeNamePrefixMax8chars}${uniqueInAIFenv}${commonResourceAbbreviation}${replace(commonResourceSuffix,'-','')}${env}'" in common
+    assert "param skuNameStorage string = 'Standard_ZRS'" in common
+    assert "param commonResourceAbbreviation string = 'esml'" in common
+    assert "var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${miSuffix}'" in naming
+    for clause in ("param keyExpirationPeriodInDays int = 14", "publicNetworkAccess:'Disabled'",
+                   "isHnsEnabled: true", "allowSharedKeyAccess: true"):
+        assert clause in lake
+
+
+@pytest.mark.parametrize("container_exists", [False, True])
+def test_common_reuses_shared_key_adls_and_never_touches_lake3(workspace, container_exists):
+    req = request(workspace, **common_options())
+    fake = Fake(req)
+    container = en._container_id(req)
+    if not container_exists:
+        del fake.resources[container]
+    lake = req["account_id"] + "/blobservices/default/containers/lake3"
+    lake_body = {"id": lake, "properties": {"publicAccess": "None", "metadata": {"business": "preserve"}}}
+    fake.resources[lake] = copy.deepcopy(lake_body)
+    account_body = copy.deepcopy(fake.resources[req["account_id"]])
+    register = (workspace / "azurefactory" / "register.json").read_bytes()
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
+    assert review["can_ensure"] and review["coordination"]["container"] == "factorymeta"
+    assert review["coordination"]["storage_mode"] == "factory-common"
+    assert review["coordination"]["coordination_blob"] == "coordination.json"
+    assert "account-and-key-administrators-can-bypass-or-destroy-coordination" in review["warnings"]
+    assert review["lifecycle_protection"]["resource_group_id"].endswith("/common")
+    result = enroll(req, fake)
+    assert result["enrollment_complete"], result
+    assert fake.resources[lake] == lake_body and fake.resources[req["account_id"]] == account_body
+    assert not any(write[2] in (lake, req["account_id"]) for write in fake.writes)
+    assert sum(write[0] == "arm" and write[2] == container for write in fake.writes) == (not container_exists)
+    count = len(fake.writes)
+    assert enroll(req, fake)["status"] == "unchanged"
+    assert len(fake.writes) == count
+    assert (workspace / "azurefactory" / "register.json").read_bytes() == register
+    assert all("listkeys" not in url.lower() and "sig=" not in url.lower() for _, url, *_ in fake.calls)
+    assert not any("lake3" in url for _, url, *_ in fake.calls)
+
+
+def test_common_missing_creates_only_exact_canonical_hns_account_before_metadata_rbac(workspace):
+    body = common_creation()
+    req = request(workspace, **common_options(coordination_account_creation=body))
+    fake = Fake(req, provisioned=False)
+    result = enroll(req, fake)
+    assert result["enrollment_complete"], result
+    account_writes = [write for write in fake.writes if write[0] == "arm" and "/storageaccounts/" in write[2]
+                     and "/blobservices/" not in write[2]]
+    assert len(account_writes) == 1 and account_writes[0][2:] == (req["account_id"], body)
+    assert not any("aflock" in str(write) or "lake3" in str(write) for write in fake.writes)
+    container = en._container_id(req)
+    container_index = next(index for index, write in enumerate(fake.writes) if write[2] == container)
+    data_grants = [(index, write) for index, write in enumerate(fake.writes)
+                   if write[0] == "arm" and "/roleassignments/" in write[2]
+                   and write[3]["properties"]["roleDefinitionId"].endswith(en.DATA_ROLE)]
+    assert len(data_grants) == 2
+    assert all(index > container_index and write[2].startswith(container + "/providers/") for index, write in data_grants)
+    first_blob = next(index for index, write in enumerate(fake.writes) if write[0] == "storage")
+    assert all(index < first_blob for index, _ in data_grants)
+    assert result["lifecycle_protection"]["account_id"] == req["account_id"]
+    count = len(fake.writes)
+    assert enroll(req, fake)["status"] == "unchanged"
+    assert len(fake.writes) == count
+
+
+def test_common_missing_requires_exact_id_and_reviewed_creation_policy(workspace):
+    with pytest.raises(en.EnrollmentError, match="canonical-common-account-id-required"):
+        request(workspace, coordination_storage_mode="factory-common")
+    req = request(workspace, **common_options())
+    fake = Fake(req, provisioned=False)
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
+    assert "canonical-common-account-creation-required" in review["blockers"]
+    assert not review["can_ensure"] and not fake.writes
+    with pytest.raises(en.EnrollmentError, match="business-container"):
+        request(workspace, **common_options(container="lake3"))
+    with pytest.raises(en.EnrollmentError, match="coordination-resource-group-conflict"):
+        request(workspace, **common_options(coordination_resource_group_id=GROUP))
+
+
+@pytest.mark.parametrize("field,value,expected", [
+    ("isHnsEnabled", False, "canonical-security"),
+    ("allowBlobPublicAccess", True, "canonical-security"),
+    ("allowSharedKeyAccess", None, "canonical-security"),
+    ("minimumTlsVersion", "TLS1_0", "canonical-security"),
+    ("publicNetworkAccess", "Enabled", "private-network"),
+    ("networkAcls", {"defaultAction": "Allow", "bypass": "AzureServices"}, "private-network"),
+])
+def test_common_creation_rejects_noncanonical_security(workspace, field, value, expected):
+    body = common_creation()
+    body["properties"][field] = value
+    with pytest.raises(en.EnrollmentError, match=expected):
+        request(workspace, **common_options(coordination_account_creation=body))
+
+
+@pytest.mark.parametrize("field,value,expected", [
+    ("isHnsEnabled", False, "hns-required"),
+    ("allowBlobPublicAccess", True, "security-policy"),
+    ("supportsHttpsTrafficOnly", False, "security-policy"),
+    ("minimumTlsVersion", "TLS1_0", "security-policy"),
+    ("publicNetworkAccess", "Enabled", "network-policy-conflict"),
+    ("networkAcls", {"defaultAction": "Allow"}, "private-network-policy"),
+])
+def test_common_reuse_security_conflict_never_updates_storage(workspace, field, value, expected):
+    req = request(workspace, **common_options())
+    fake = Fake(req)
+    fake.resources[req["account_id"]]["properties"][field] = value
+    with pytest.raises(en.EnrollmentError, match=expected):
+        en.plan(req, cloud=fake.cloud)
+    assert not fake.writes
+
+
+@pytest.mark.parametrize("target,method,status", [
+    ("account", "GET", 403), ("container", "GET", 403), ("data", "HEAD", 403), ("data", "HEAD", 401),
+])
+def test_common_denied_or_inaccessible_is_never_missing(workspace, target, method, status):
+    req = request(workspace, **common_options())
+    fake = Fake(req)
+    identifier = {"account": req["account_id"], "container": en._container_id(req), "data": "/factorymeta"}[target]
+    fake.fail[(method, identifier)] = status
+    with pytest.raises(en.EnrollmentError, match=(
+            "private-routing-dns-or-entra-access-required" if target == "data" else f"remote-request-failed-{status}")):
+        en.plan(req, cloud=fake.cloud)
+    assert not fake.writes
+
+
+def test_common_private_creation_blocked_until_routing_without_public_fallback(workspace, monkeypatch):
+    req = request(workspace, **common_options(coordination_account_creation=common_creation()))
+    fake = Fake(req, provisioned=False)
+    fake.fail[("HEAD", "/factorymeta")] = 403
+    monkeypatch.setattr(en.time, "sleep", lambda _: None)
+    result = enroll(req, fake)
+    assert result["status"] == "blocked" and result["reconciliation_required"]
+    assert result["error"].startswith("common-storage-private-routing-dns-or-entra-access-required:")
+    assert not result["binding_candidate"] and not fake.blobs and not fake.variables
+    assert fake.resources[req["account_id"]]["properties"]["publicNetworkAccess"] == "Disabled"
+    assert len([write for write in fake.writes if write[2] == req["account_id"]]) == 1
+    del fake.fail[("HEAD", "/factorymeta")]
+    assert enroll(req, fake)["enrollment_complete"]
+
+
+def test_common_unreachable_private_endpoint_is_actionable_without_writes(workspace, monkeypatch):
+    req = request(workspace, **common_options())
+    fake = Fake(req)
+    original = fake.open
+
+    def disconnected(http_request, timeout):
+        if ".blob.core.windows.net" in http_request.full_url:
+            raise en.URLError("private endpoint DNS unavailable")
+        return original(http_request, timeout)
+
+    monkeypatch.setattr(fake, "open", disconnected)
+    with pytest.raises(en.EnrollmentError, match="common-storage-private-routing-dns-or-entra-access-required:remote-request-uncertain"):
+        en.plan(req, cloud=fake.cloud)
+    assert not fake.writes
+
+
+def test_common_container_management_permission_is_separate_from_data_grant(workspace):
+    req = request(workspace, **common_options())
+    fake = Fake(req)
+    del fake.resources[en._container_id(req)]
+    fake.management_permissions = [{"actions": [], "dataActions": ["*"]}]
+    review = en.plan(req, cloud=fake.cloud, acknowledge_exclusive_writer_governance=True)
+    assert not review["can_ensure"]
+    assert "operator-common-container-arm-create-permission-required" in review["blockers"]
+    assert not fake.writes
+
+
+@pytest.mark.parametrize("resource,compatible", [("account", True), ("account", False), ("container", True), ("container", False)])
+def test_common_concurrent_create_rechecks_and_never_overwrites(workspace, resource, compatible, monkeypatch):
+    req = request(workspace, **common_options(coordination_account_creation=common_creation()))
+    fake = Fake(req, provisioned=False)
+    fake.existing_identity()
+    if resource == "container":
+        fake.existing_storage()
+        del fake.resources[en._container_id(req)]
+    original = en._create_arm
+    identifier = req["account_id"] if resource == "account" else en._container_id(req)
+    concurrent = (dict(common_creation(), id=identifier) if resource == "account"
+                  else {"id": identifier, "properties": {"publicAccess": "None"}})
+    if not compatible:
+        concurrent["properties"]["isHnsEnabled" if resource == "account" else "publicAccess"] = False if resource == "account" else "Blob"
+
+    def appear(cloud, target, api, body):
+        if target == identifier:
+            fake.resources[target] = copy.deepcopy(concurrent)
+        return original(cloud, target, api, body)
+
+    monkeypatch.setattr(en, "_create_arm", appear)
+    result = enroll(req, fake)
+    assert result["enrollment_complete"] is compatible, result
+    assert not any(write[2] == identifier for write in fake.writes)
+    assert fake.resources[identifier] == concurrent
+    if not compatible:
+        assert not fake.blobs and not fake.variables
+
+
+def test_common_preserves_existing_namespace_and_rejects_split_locks(workspace):
+    req = request(workspace, **common_options(container="reviewed-meta", coordination_blob="stable/enrollment.json"))
+    fake = Fake(req)
+    result = enroll(req, fake)
+    doc = document(workspace)
+    doc["bindings"] = {FACTORY: {"gha": result["binding_candidate"]}}
+    save(workspace, doc)
+    same = request(workspace, **common_options())
+    assert same["coordinates"] == req["coordinates"]
+    with pytest.raises(en.EnrollmentError, match="overlapping-coordination-namespaces-conflict"):
+        request(workspace, **common_options(container="factorymeta"))
+    with pytest.raises(en.EnrollmentError, match="overlapping-coordination-namespaces-conflict"):
+        request(workspace, **common_options(coordination_account_id=req["account_id"] + "other"))
+
+
+@pytest.mark.parametrize("deleting_group", [False, True])
+def test_lifecycle_refuses_destroying_lease_storage_or_its_resource_group(workspace, deleting_group):
+    spec = importlib.util.spec_from_file_location("enrollment_lifecycle_guard", ROOT / "bootstrap" / "lib" / "factory_lifecycle.py")
+    lifecycle = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lifecycle)
+    req = request(workspace, **common_options())
+    group = req["account_id"].split("/providers/")[0]
+    value = {"locks": req["coordinates"], "deletion": {
+        "resource_groups": [{"id": group, "delete": deleting_group}],
+        "resources": [{"id": req["account_id"], "delete": not deleting_group}],
+    }}
+    with pytest.raises(lifecycle.Blocked, match="coordination-.*-delete-forbidden"):
+        lifecycle.protect_coordination_storage(value)
+        value["deletion"]["resources"][0]["id"] = req["account_id"] + "unrelated"
+        value["deletion"]["resources"][0]["delete"] = True
+        value["deletion"]["resource_groups"][0]["delete"] = True
+        lifecycle.protect_coordination_storage(value)
+    value["deletion"]["resources"][0]["delete"] = False
+    value["deletion"]["resource_groups"][0]["delete"] = False
+    lifecycle.protect_coordination_storage(value)
 
 
 def test_plan_is_cloud_read_only_and_does_not_print_secrets(workspace):

@@ -2,6 +2,44 @@
 
 This folder contains Bicep modules for deploying Azure Monitor Private Link Scope (AMPLS) in a hub/spoke network architecture, designed to integrate with the AI Factory infrastructure.
 
+## Opt-in agent evidence workbook (independent of AMPLS)
+
+`agentMonitoringWorkbook.bicep` creates only a saved workbook. It reads existing
+`AppEvents` named `aifactory.agent.observation`, supports legacy native v1 and
+lossless canonical-wrapper v2 evidence, and never creates collection resources.
+`agentMonitoringRows.kql` provides common source/scope projection;
+`agentMonitoringCanonical.kql` provides six-family v2 usage, token, cost,
+quality, business-value and security calculations.
+
+Phase `esml-genai-1\10-aifactory-dashboards.bicep` defaults
+`enableAgentMonitoring=false`. Enabling additionally requires
+`agentMonitoringWorkspaceResourceId` for an existing authorized workspace.
+The module checks the explicit workspace ARM path and resolves its `customerId`
+through a read-only existing-resource reference before writing the workbook.
+The deployment identity therefore needs workspace resource read access; an
+empty, wrong-type, missing or inaccessible workspace fails rather than creating
+one or guessing its identity.
+The workbook has a stable identity in the common RG; projects receive an
+optional navigation link, not duplicate workspace-wide workbooks. Outputs are
+`agentMonitoringWorkbookId` and `agentMonitoringWorkbookUrl`. Disabling omits
+future deployment; it does not delete an existing workbook.
+
+The separate dashboard-only runner does **not** deploy this workbook. Supply
+the reviewed phase-10 output as `agentMonitoringWorkbookResourceId` in the
+selected configuration to retain its optional tile during a dashboard-only
+refresh. The runner permits only an existing-workbook reference in the selected
+subscription/common RG; absent configuration omits the tile, not the workbook.
+
+The five All-default filters cover collected scope, not tenant discovery.
+Modeled capacity, quality-qualified capacity and verified realization are
+separate; native finance verification remains unsupported even when canonical
+finance evidence objects are preserved. Use the canonical API to validate those
+approvals, periods, coverage and nonoverlap; native results never promote a
+supplied amount into verified benefit. Cost bases
+and currencies remain distinct. KQL explicitly withholds values outside the
+exact interoperable numeric range; the offline v2 bridge preserves original
+canonical numbers. Compilation is not proof of KQL execution or Portal rendering.
+
 ## Overview
 
 Azure Monitor Private Link Scope (AMPLS) enables secure monitoring by routing Azure Monitor traffic through private endpoints, eliminating the need for public internet access.

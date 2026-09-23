@@ -137,7 +137,7 @@ var tokenMetricSettings = {
   size: 0
   resourceType: 'microsoft.cognitiveservices/accounts'
   metricScope: 0
-  resourceParameter: 'TokenMetricAccount'
+  // A query-backed text scalar avoids resource-picker JSON/quoting in resourceIds.
   resourceIds: ['{TokenMetricAccount}']
   resourceLimit: 1
   timeContextFromParameter: 'TokenTimeRange'
@@ -190,30 +190,52 @@ var commonCharts = [
     title: 'Conversations and questions per local day'
     projection: 'Daily | project Day, Conversations, Questions'
     columns: ['Conversations', 'Questions']
+    available: 'isnotnull(Conversations) or isnotnull(Questions)'
+    coverage: 'Questions complete: **{QuestionsComplete}**.'
   }
   {
     name: 'feedback-daily'
     title: 'Customer feedback per local day (latest in-window vote)'
     projection: 'Daily | project Day, Up, Down'
     columns: ['Up', 'Down']
+    available: 'isnotnull(Up) or isnotnull(Down)'
+    coverage: 'Feedback complete: **{FeedbackComplete}**.'
   }
   {
     name: 'questions-per-conversation-daily'
     title: 'Questions per conversation per local day'
     projection: 'Daily | project Day, QuestionsPerConversation'
     columns: ['QuestionsPerConversation']
+    available: 'isnotnull(QuestionsPerConversation)'
+    coverage: 'Questions complete: **{QuestionsComplete}**. A day with no active conversations has an undefined ratio, even with reviewed complete coverage.'
   }
 ]
+var chartAvailabilityParameters = [for chart in commonCharts: union(dropdownQuerySettings, {
+  id: '${chart.name}-availability'
+  name: '${chart.name}-availability'
+  type: 1
+  isHiddenWhenLocked: true
+  query: '${usageQuery}${chart.projection} | summarize AvailableDays=countif(${chart.available}) | project value=iff(base64_decode_tostring(\'{Navigation:base64}\') != \'usage\', \'hidden\', iff(AvailableDays > 0, \'available\', \'unavailable\'))'
+})]
 var chartItems = [for chart in commonCharts: {
   type: 3
   name: chart.name
-  conditionalVisibility: usageVisibility
+  conditionalVisibility: { parameterName: '${chart.name}-availability', comparison: 'isEqualTo', value: 'available' }
   content: union(querySettings, {
     title: chart.title
-    query: '${usageQuery}${chart.projection}'
+    query: '${usageQuery}${chart.projection} | where toscalar(Daily | summarize countif(${chart.available})) > 0'
     visualization: 'timechart'
+    noDataMessage: 'Unavailable / undefined — no numeric daily values for this scope, coverage and date range; not zero.'
     chartSettings: { xAxis: 'Day', yAxis: chart.columns, showLegend: true }
   })
+}]
+var chartUnavailableItems = [for chart in commonCharts: {
+  type: 1
+  name: '${chart.name}-unavailable'
+  conditionalVisibility: { parameterName: '${chart.name}-availability', comparison: 'isEqualTo', value: 'unavailable' }
+  content: {
+    json: '### ${chart.title}\n\n**Unavailable / undefined — no numeric daily values for this selection; not zero.** ${chart.coverage}\n\nReview **Usage source / validation** and the coverage declarations for this exact scope and local date range. Missing coverage, invalid scope/dates/evidence or an empty denominator do not create historical values. The time chart appears only when at least one daily value is defined.'
+  }
 }]
 var sourceQuery = '''
 union
@@ -231,6 +253,13 @@ var workbook = {
       name: 'my-project-heading'
       content: {
         json: '# My Project ${projectNumber} · ${toUpper(env)}\n\n**Fixed telemetry project:** `${projectNumber}` · **environment:** `${telemetryEnvironment}`. This saved Azure-native workbook uses existing telemetry; it creates no workspace, collector, ingestion pipeline, diagnostic setting or role assignment. Native model calls are not user questions; no model metrics are substituted for business events.\n\n**Usage & Cost:** select the canonical factory and scale set, not an RG-derived label. Selectors discover this component/project/environment in the last 90 days; no missing selection broadens to All. **Store All** is allowed only within this exact project scope.\n\n**Model tokens:** independent native Foundry / Azure OpenAI account metrics and request-usage logs, scoped to this exact project RG. Factory, scale set, store, business dates and coverage declarations do not gate tokens. Select View = Model tokens below.'
+      }
+    }
+    {
+      type: 1
+      name: 'native-rg-cost-navigation'
+      content: {
+        json: '### Azure resource-group Cost Analysis — actual & forecast\n\n[Open Azure Cost Analysis for Project ${projectNumber}](${costUrl} "Actual Azure cost and Azure forecast for this exact resource group")\n\n**Scope:** `${projectResourceGroupId}`. **Data source:** Azure Cost Management, not Log Analytics or app-meter estimates. The project portal dashboard includes the native accumulated ActualCost chart with Azure forecast enabled for this month. Cost Analysis has its own period, basis and currency controls; workbook store/session filters and coverage declarations do not affect RG billing. Forecast is a prediction, never a billed actual, and may be unavailable when Azure has insufficient history.'
       }
     }
     {
@@ -321,13 +350,6 @@ var workbook = {
       }
     }
     {
-      type: 1
-      name: 'native-rg-cost-navigation'
-      content: {
-        json: '### Azure resource-group Cost Analysis — actual & forecast\n\n[Open Azure Cost Analysis for Project ${projectNumber}](${costUrl} "Actual Azure cost and Azure forecast for this exact resource group")\n\n**Scope:** `${projectResourceGroupId}`. **Data source:** Azure Cost Management, not Log Analytics or app-meter estimates. The project portal dashboard includes the native accumulated ActualCost chart with Azure forecast enabled for this month. Cost Analysis has its own period, basis and currency controls; workbook store/session filters and coverage declarations do not affect RG billing. Forecast is a prediction, never a billed actual, and may be unavailable when Azure has insufficient history.'
-      }
-    }
-    {
       type: 9
       name: 'reviewed-coverage'
       content: {
@@ -382,7 +404,16 @@ var workbook = {
         tileSettings: tileSettings
       })
     }
-  ], chartItems, [
+    {
+      type: 9
+      name: 'usage-daily-availability'
+      content: {
+        version: 'KqlParameterItem/1.0'
+        style: 'above'
+        parameters: chartAvailabilityParameters
+      }
+    }
+  ], chartItems, chartUnavailableItems, [
     {
       type: 3
       name: 'metric-formulas'
@@ -504,18 +535,20 @@ var workbook = {
             name: 'TokenAccountInventory'
             type: 1
             isHiddenWhenLocked: true
-            query: '${tokenAccounts}\n| project id, name, [\'kind\']\n| summarize value=make_list(pack(\'id\', id, \'name\', name, \'kind\', [\'kind\']))'
+            // Text parameters require a string cell, not a dynamic array of bags.
+            query: '${tokenAccounts}\n| project id, name, [\'kind\']\n| summarize Accounts=make_list(pack(\'id\', id, \'name\', name, \'kind\', [\'kind\']))\n| project value=tostring(Accounts)'
           })
           union(tokenArgSettings, {
             id: 'token-account'
             name: 'TokenAccount'
             label: 'Native Foundry / OpenAI account in this project RG'
             description: 'A single discovered AIServices/OpenAI account is selected automatically. Choose explicitly when this project has multiple accounts. No All/subscription-wide fallback.'
-            type: 5
+            // A single-value dropdown preserves the ARM ID as text without resource-picker formatting.
+            type: 2
             isRequired: true
             multiSelect: false
             value: ''
-            query: '${tokenAccounts}\n| summarize Accounts=make_list(pack(\'id\', id, \'name\', name))\n| mv-expand Account=Accounts\n| project value=tostring(Account.id), label=tostring(Account.id), selected=array_length(Accounts) == 1\n| order by label asc'
+            query: '${tokenAccounts}\n| summarize Accounts=make_list(pack(\'id\', id, \'name\', name, \'kind\', [\'kind\']))\n| extend Accounts=iff(array_length(Accounts) == 1, Accounts, array_concat(pack_array(pack(\'id\', \'\', \'name\', \'Select one discovered account\', \'kind\', \'\')), Accounts))\n| mv-expand Account=Accounts\n| project value=tostring(Account.id), label=iff(isempty(tostring(Account.id)), \'Select one discovered account\', strcat(tostring(Account.name), \' (\', tostring(Account[\'kind\']), \')\')), selected=array_length(Accounts) == 1 or isempty(tostring(Account.id))\n| order by label asc'
           })
           {
             id: 'token-time-range'
@@ -538,21 +571,21 @@ var workbook = {
             value: 'foundry'
             jsonData: string([{ value: 'foundry', label: 'Foundry / Models — InputTokens, OutputTokens' }, { value: 'openai', label: 'Standard Azure OpenAI — ProcessedPromptTokens, GeneratedTokens' }])
           }
-          union(tokenArgSettings, {
+          union(dropdownQuerySettings, {
             id: 'token-metric-account'
             name: 'TokenMetricAccount'
-            type: 5
-            isRequired: true
-            multiSelect: false
+            type: 1
+            isRequired: false
+            value: ''
             isHiddenWhenLocked: true
-            query: '${tokenAccounts}\n| where id =~ "{TokenAccount:escapejson}"\n| project value=id, label=id, selected=true'
+            query: '${tokenContext}\nprint value=iff(AccountSelected and WindowValid, SelectedAccount, \'\')'
           })
           union(dropdownQuerySettings, {
             id: 'token-metric-view'
             name: 'TokenMetricView'
             type: 1
             isHiddenWhenLocked: true
-            query: '${tokenContext}\nlet Profile=base64_decode_tostring(\'{TokenMetricProfile:base64}\');\nprint value=iff(base64_decode_tostring(\'{Navigation:base64}\') == \'tokens\' and AccountSelected and WindowValid and Profile in (\'foundry\', \'openai\'), Profile, \'unavailable\')'
+            query: '${tokenContext}\nlet Profile=base64_decode_tostring(\'{TokenMetricProfile:base64}\');\nprint value=iff(base64_decode_tostring(\'{Navigation:base64}\') == \'tokens\' and AccountSelected and WindowValid and base64_decode_tostring(\'{TokenMetricAccount:base64}\') == SelectedAccount and Profile in (\'foundry\', \'openai\'), Profile, \'unavailable\')'
           })
         ]
       }
@@ -563,7 +596,7 @@ var workbook = {
       conditionalVisibility: tokenVisibility
       content: union(querySettings, {
         title: 'Token source inputs, scope and availability'
-        query: '${tokenContext}\nprint AccountSelected, ValidTimeRange=WindowValid, FromUtc=StartUtc, ExclusiveEndUtc=EndUtc, DailyTimeZone=Zone, ProjectResourceGroup, AccountId=iff(AccountSelected, SelectedAccount, \'\'), MetricSchema=base64_decode_tostring(\'{TokenMetricProfile:base64}\'), NativeSource=\'Azure Monitor Metrics / Microsoft.CognitiveServices/accounts / Total\', NativeCoverage=\'Observed series only; max 100 series per metric; absent series is unavailable\', RequestLogSource=TokenSource, Workspace=base64_decode_tostring(\'${base64(logAnalyticsResourceId)}\'), Status=case(not(AccountSelected), \'Unavailable — select a discovered account in this exact RG\', not(WindowValid), \'Unavailable — invalid time zone or time range (maximum 31 days)\', \'Read sources separately below; no cache series/field is NOT zero\'), AccountUrl=iff(AccountSelected, strcat(\'https://portal.azure.com/#resource\', SelectedAccount), \'\'), MetricsUrl=iff(AccountSelected, strcat(\'https://portal.azure.com/#resource\', SelectedAccount, \'/metrics\'), \'\')'
+        query: '${tokenContext}\nprint AccountSelected, InventoryShape=gettype(InventorySelection), ScopedAccounts=toscalar(Inventory | count), AccountSelectionShape=gettype(AccountSelection), MetricAccountMatchesSelection=(AccountSelected and base64_decode_tostring(\'{TokenMetricAccount:base64}\') == SelectedAccount), ValidTimeRange=WindowValid, FromUtc=StartUtc, ExclusiveEndUtc=EndUtc, DailyTimeZone=Zone, ProjectResourceGroup, AccountId=iff(AccountSelected, SelectedAccount, \'\'), MetricSchema=base64_decode_tostring(\'{TokenMetricProfile:base64}\'), NativeSource=\'Azure Monitor Metrics / Microsoft.CognitiveServices/accounts / Total\', NativeCoverage=\'Observed series only; max 100 series per metric; absent series is unavailable\', RequestLogSource=TokenSource, Workspace=base64_decode_tostring(\'${base64(logAnalyticsResourceId)}\'), Status=case(not(AccountSelected), \'Unavailable — select a discovered account in this exact RG\', not(WindowValid), \'Unavailable — invalid time zone or time range (maximum 31 days)\', \'Read sources separately below; no cache series/field is NOT zero\'), AccountUrl=iff(AccountSelected, strcat(\'https://portal.azure.com/#resource\', SelectedAccount), \'\'), MetricsUrl=iff(AccountSelected, strcat(\'https://portal.azure.com/#resource\', SelectedAccount, \'/metrics\'), \'\')'
         gridSettings: {
           formatters: [
             { columnMatch: 'AccountId', formatter: 1, formatOptions: { linkColumn: 'AccountUrl', linkTarget: 'Url' } }

@@ -35,6 +35,8 @@ Private containers use the storage data-plane create API, which fails (409) if t
 container already exists. The operator's blob-data role is granted before any
 container or lease write; those data-plane writes retry only known RBAC
 propagation (403) and never treat an authorization failure as absence.
+Factory-common containers instead use reviewed ARM provisioning before container-
+scoped RBAC; no account-wide data role or access to business containers is granted.
 Lock/enrollment blobs use supported conditional PUTs.
 New disjoint targets are allowed under shared bindings, with independent writer,
 auth namespace and identity; a missing identity still needs that provisioning.
@@ -46,6 +48,20 @@ factory-locks container and coordination.json across ALL factories/providers.
 Planned new accounts require public_network_access = Enabled or Disabled. Reuse never
 changes networking or security policies. Disabled needs existing private routing;
 this helper does not deploy private endpoints or firewall exceptions.
+Explicit coordination_storage_mode = factory-common requires coordination_account_id
+from the caller's authoritative frozen common deployment plan (the salted common
+name is never reconstructed here). It defaults to private factorymeta, preserves
+known enrollment coordinates, and requires ADLS Gen2/HNS. It never touches lake3.
+Missing accounts additionally require coordination_account_creation: the reviewed
+canonical ARM account PUT body (location, kind, sku, properties, optional tags and
+identity), with HNS and publicNetworkAccess Disabled. No fallback account is made.
+Private routing/DNS and Entra data access must work before enrollment can complete;
+provision those separately and replan after a blocked first private creation.
+Existing shared-key-enabled common accounts are reused unchanged, using only Entra
+Bearer tokens. Governance explicitly trusts account/key administrators: they can
+bypass or destroy coordination. Leases are not a security boundary against them.
+The common account, metadata container and their RG must be retained during normal
+factory deletion; plan/result lifecycle_protection identifies that deletion boundary.
 Missing RGs require create_resource_group_ids plus approved_group_creation_scope
 = /subscriptions/<selected-subscription>. Existing unowned RGs remain blockers.
 
@@ -61,6 +77,7 @@ import base64
 import copy
 import fnmatch
 import hashlib
+import ipaddress
 import json
 import re
 import shutil
@@ -94,6 +111,7 @@ OPTIONS = {
     "coordination_resource_group_id", "container", "coordination_blob", "public_network_access",
     "resource_group_ids", "common_dependency_ids", "deployment_roles",
     "create_resource_group_ids", "approved_group_creation_scope", "ado_tenant_id",
+    "coordination_storage_mode", "coordination_account_creation",
 }
 
 
@@ -167,6 +185,165 @@ def default_coordination(subscription, tenant):
     return {"account_name": "aflock" + hashlib.sha256(seed.encode()).hexdigest()[:18],
             "resource_group_id": f"/subscriptions/{guid(subscription)}/resourcegroups/aifactory-enrollment",
             "container": "factory-locks", "coordination_blob": "coordination.json"}
+
+
+def _common_mode(request):
+    return request.get("coordination_storage_mode") == "factory-common"
+
+
+def _container_id(request):
+    return request["account_id"] + "/blobservices/default/containers/" + request["coordinates"]["container"]
+
+
+def _common_account_creation(body, region, public):
+    require(isinstance(body, dict) and set(body) <= {"location", "kind", "sku", "properties", "tags", "identity"},
+            "invalid-common-account-creation")
+    require(body.get("location") == region and body.get("kind") == "StorageV2"
+            and isinstance(body.get("sku"), dict) and set(body["sku"]) == {"name"}
+            and body["sku"]["name"] in ("Standard_LRS", "Standard_GRS", "Standard_ZRS",
+                                      "Standard_GZRS", "Standard_RAGRS", "Standard_RAGZRS"),
+            "common-account-canonical-location-kind-sku-required")
+    props = body.get("properties")
+    require(isinstance(props, dict) and set(props) <= {
+        "isHnsEnabled", "allowSharedKeyAccess", "allowBlobPublicAccess", "supportsHttpsTrafficOnly",
+        "minimumTlsVersion", "defaultToOAuthAuthentication", "publicNetworkAccess", "networkAcls",
+        "accessTier", "encryption", "keyPolicy", "largeFileSharesState"},
+        "invalid-common-account-creation-properties")
+    require(props.get("isHnsEnabled") is True and type(props.get("allowSharedKeyAccess")) is bool
+            and props.get("allowBlobPublicAccess") is False and props.get("supportsHttpsTrafficOnly") is True
+            and props.get("minimumTlsVersion") == "TLS1_2" and props.get("accessTier") == "Hot",
+            "common-account-canonical-security-policy-required")
+    require(public == "Disabled" and props.get("publicNetworkAccess") == "Disabled",
+            "common-account-private-network-policy-required")
+    network = props.get("networkAcls")
+    require(isinstance(network, dict) and network.get("defaultAction") == "Deny"
+            and network.get("bypass") in ("None", "AzureServices"),
+            "common-account-private-network-policy-required")
+    return copy.deepcopy(body)
+
+
+def resolve_factory_common_storage(common_resource_group_id, parameters, *, tenant_id,
+                                   naming_identity=None, naming_identity_id=None,
+                                   project_naming=None, evaluated_account_id=None):
+    """Pure projection of common13/dataLake naming and the non-CMK account body.
+
+    parameters is a frozen subset of 13-rgLevel inputs, NOT arbitrary UI defaults:
+    location, locationSuffix, env (dev/test/prod), commonLakeNamePrefixMax8chars,
+    commonResourceSuffix, tags; optional commonResourceAbbreviation, skuNameStorage,
+    IPwhiteList, cmk. Defaults below are the canonical Bicep defaults.
+
+    Evidence is either the exact ARM-read canonical CMK/project UAMI, or an account
+    ID evaluated by ARM in the caller's trusted frozen common plan. No random salt
+    is accepted/generated and uniqueString is never reimplemented. A project UAMI
+    also requires project_naming: resource_group_id, projectNumber, resourceSuffix,
+    keepMIandKVsuffixAs001 (optional, default false), from that project's plan.
+    The caller must bind this identity/plan evidence to the selected factory and
+    reject incomplete/ambiguous inventory; this pure function does no cloud reads.
+
+    When no such evidence exists, first review narrowly scoped common-RG/naming
+    prerequisites or a native ARM what-if evaluation; never run all common13
+    unlocked merely to discover the name. CMK requires its separate reviewed
+    identity/key-access prerequisites and an explicit canonical creation body.
+    Network provisioning is separate: exact VNet/subnet, blob private endpoint,
+    private DNS/zone link (or approved hub DNS), and operator/runner routing must
+    exist before data-plane enrollment completes. No lake3 or network writes here.
+    """
+    group = rg_id(common_resource_group_id)
+    tenant = guid(tenant_id)
+    required = {"location", "locationSuffix", "env", "commonLakeNamePrefixMax8chars",
+                "commonResourceSuffix", "tags"}
+    require(isinstance(parameters, dict) and required <= set(parameters)
+            and set(parameters) <= required | {
+                "commonResourceAbbreviation", "skuNameStorage", "IPwhiteList", "cmk"},
+            "canonical-common-parameters-required")
+    env, suffix = parameters["env"], parameters["commonResourceSuffix"]
+    prefix = parameters["commonLakeNamePrefixMax8chars"]
+    abbreviation = parameters.get("commonResourceAbbreviation", "esml")
+    require(env in ("dev", "test", "prod") and isinstance(suffix, str)
+            and re.fullmatch(r"(?:-[0-9]{3})?", suffix)
+            and isinstance(prefix, str) and re.fullmatch(r"[a-z0-9]{1,8}", prefix)
+            and isinstance(abbreviation, str) and re.fullmatch(r"[a-z0-9]{1,12}", abbreviation)
+            and re.fullmatch(r"[a-z0-9]{1,12}", str(parameters["locationSuffix"]))
+            and re.fullmatch(r"[a-z0-9]+", str(parameters["location"])),
+            "invalid-canonical-common-naming-parameters")
+    require(isinstance(parameters["tags"], dict)
+            and all(isinstance(k, str) and isinstance(v, str) for k, v in parameters["tags"].items()),
+            "canonical-common-tags-required")
+    require(parameters.get("cmk", False) is False,
+            "common-cmk-identity-key-access-and-reviewed-creation-body-required")
+    salt = None
+    if naming_identity is not None:
+        expected = resource_id(naming_identity_id, "Microsoft.ManagedIdentity/userAssignedIdentities")
+        require(isinstance(naming_identity, dict)
+                and str(naming_identity.get("id", "")).lower() == expected
+                and expected.split("/")[2] == group.split("/")[2], "canonical-naming-identity-id-conflict")
+        props = naming_identity.get("properties", {})
+        require(guid(props.get("tenantId")) == tenant
+                and guid(props.get("principalId")) != guid(props.get("clientId")),
+                "canonical-naming-identity-tenant-or-identifiers-conflict")
+        name = expected.rsplit("/", 1)[1]
+        if project_naming is None:
+            require(expected.split("/providers/")[0] == group, "canonical-naming-identity-scope-conflict")
+            pattern = "id-cmn-cmk-" + env + r"-([a-z0-9]{5})" + re.escape(suffix)
+        else:
+            require(isinstance(project_naming, dict)
+                    and {"resource_group_id", "projectNumber", "resourceSuffix"} <= set(project_naming)
+                    and set(project_naming) <= {
+                        "resource_group_id", "projectNumber", "resourceSuffix", "keepMIandKVsuffixAs001"},
+                    "canonical-project-naming-required")
+            require(expected.split("/providers/")[0] == rg_id(project_naming["resource_group_id"]),
+                    "canonical-naming-identity-scope-conflict")
+            number, resource_suffix = project_naming["projectNumber"], project_naming["resourceSuffix"]
+            keep = project_naming.get("keepMIandKVsuffixAs001", False)
+            require(re.fullmatch(r"[0-9]{3}", str(number))
+                    and re.fullmatch(r"-[0-9]{3}", str(resource_suffix)) and type(keep) is bool,
+                    "canonical-project-naming-required")
+            mi_suffix = "-001" if keep else resource_suffix
+            pattern = (r"mi-(?:aca-)?prj" + number + "-" + parameters["locationSuffix"] + "-" + env
+                       + r"-([a-z0-9]{5})[a-z0-9_-]{10}" + re.escape(mi_suffix))
+        match = re.fullmatch(pattern, name)
+        require(match, "canonical-naming-identity-pattern-conflict")
+        salt = match[1]
+    require(naming_identity is not None or naming_identity_id is None, "canonical-naming-identity-read-required")
+    if evaluated_account_id is not None:
+        evaluated = resource_id(evaluated_account_id, "Microsoft.Storage/storageAccounts")
+        require(evaluated.split("/providers/")[0] == group, "canonical-common-account-scope-conflict")
+        match = re.fullmatch(re.escape(prefix) + r"([a-z0-9]{5})"
+                             + re.escape(abbreviation + suffix.replace("-", "") + env), evaluated.rsplit("/", 1)[1])
+        require(match and (salt is None or salt == match[1]), "canonical-common-naming-evidence-conflict")
+        salt = match[1]
+    require(salt is not None, "canonical-common-naming-evidence-required")
+    name = prefix + salt + abbreviation + suffix.replace("-", "") + env
+    require(re.fullmatch(r"[a-z0-9]{3,24}", name), "invalid-canonical-common-account-name")
+    whitelist = parameters.get("IPwhiteList", "")
+    require(isinstance(whitelist, str), "invalid-canonical-common-ip-whitelist")
+    ips = [] if whitelist in ("", "null") else whitelist.replace("\\s+", "").split(",")
+    try:
+        for ip in ips:
+            ipaddress.IPv4Network(ip, strict=False)
+    except (ValueError, TypeError):
+        raise EnrollmentError("invalid-canonical-common-ip-whitelist") from None
+    body = {
+        "location": parameters["location"], "kind": "StorageV2",
+        "sku": {"name": parameters.get("skuNameStorage", "Standard_ZRS")},
+        "tags": copy.deepcopy(parameters["tags"]), "identity": {"type": "None"},
+        "properties": {
+            "isHnsEnabled": True, "allowBlobPublicAccess": False, "allowSharedKeyAccess": True,
+            "publicNetworkAccess": "Disabled", "accessTier": "Hot", "minimumTlsVersion": "TLS1_2",
+            "supportsHttpsTrafficOnly": True, "largeFileSharesState": "Disabled",
+            "keyPolicy": {"keyExpirationPeriodInDays": 14},
+            "encryption": {"keySource": "Microsoft.Storage", "identity": None, "keyvaultproperties": None,
+                           "services": {service: {"enabled": True, "keyType": key_type}
+                                        for service, key_type in (("blob", "Account"), ("file", "Account"),
+                                                                  ("queue", "Service"), ("table", "Service"))}},
+            "networkAcls": {"defaultAction": "Deny", "bypass": "AzureServices",
+                            "ipRules": [{"action": "Allow", "value": ip} for ip in ips], "virtualNetworkRules": []},
+        },
+    }
+    _common_account_creation(body, parameters["location"], "Disabled")
+    return {"coordination_storage_mode": "factory-common",
+            "coordination_account_id": group + "/providers/microsoft.storage/storageaccounts/" + name,
+            "coordination_account_creation": body, "public_network_access": "Disabled"}
 
 
 def validate_runner(runner, provider):
@@ -296,6 +473,12 @@ def load_request(consumer_root, factory_id, scale_set_id, environment, options):
     require(1 <= len(scopes) <= 24 and len(dependencies) <= 24
             and len(set(scopes + dependencies)) == len(scopes + dependencies), "exact-disjoint-physical-scopes-required")
     require(all(x.split("/")[2] == subscription for x in scopes), "writable-scope-subscription-mismatch")
+    storage_mode = options.get("coordination_storage_mode", "dedicated")
+    require(storage_mode in ("dedicated", "factory-common", "connectivity-hub"), "invalid-coordination-storage-mode")
+    require(storage_mode == "factory-common" or "coordination_account_creation" not in options,
+            "common-account-creation-requires-factory-common-mode")
+    require(storage_mode != "factory-common" or options.get("coordination_account_id"),
+            "canonical-common-account-id-required")
     defaults = default_coordination(subscription, tenant)
     overlapping = []
     for item in inventory:
@@ -304,22 +487,33 @@ def load_request(consumer_root, factory_id, scale_set_id, environment, options):
                  for x in t.get("resource_group_ids", []) + t.get("common_dependency_ids", [])}
         if bound.intersection(scopes + dependencies):
             overlapping.append({key: binding["locks"].get(key) for key in ("account_url", "container", "coordination_blob")})
+    if old:
+        overlapping.append({key: old["locks"][key] for key in ("account_url", "container", "coordination_blob")})
     require(not overlapping or all(x == overlapping[0] for x in overlapping), "overlapping-coordination-namespaces-conflict")
     coordination_rg = rg_id(options.get("coordination_resource_group_id", defaults["resource_group_id"]))
     account_id = options.get("coordination_account_id")
     if account_id:
         account_id = resource_id(account_id, "Microsoft.Storage/storageAccounts")
         coordination_rg = account_id.split("/providers/")[0]
+        require("coordination_resource_group_id" not in options
+                or rg_id(options["coordination_resource_group_id"]) == coordination_rg,
+                "coordination-resource-group-conflict")
     elif overlapping:
         # Exact ARM identity is required for custom coordinates; never guess an RG.
         require(overlapping[0]["account_url"] == "https://" + defaults["account_name"] + ".blob.core.windows.net",
                 "existing-coordination-account-id-required")
     account_id = account_id or coordination_rg + "/providers/microsoft.storage/storageaccounts/" + defaults["account_name"]
-    require(account_id.split("/")[2] == subscription, "coordination-subscription-mismatch")
+    require(storage_mode == "connectivity-hub" or account_id.split("/")[2] == subscription, "coordination-subscription-mismatch")
+    if storage_mode == "connectivity-hub":
+        require(coordination_rg not in scopes and coordination_rg not in dependencies,
+                "shared-hub-must-not-be-factory-owned-or-deleted")
+        require(account_id.rsplit("/", 1)[1] == "afhub" + hashlib.sha256(coordination_rg.encode()).hexdigest()[:19]
+                and options.get("container") == "hub-locks", "canonical-shared-hub-coordinates-required")
     account_name = account_id.rsplit("/", 1)[1]
     require(re.fullmatch(r"[a-z0-9]{3,24}", account_name), "invalid-coordination-account-name")
     coordinates = {"account_url": "https://" + account_name + ".blob.core.windows.net",
-                   "container": options.get("container", overlapping[0]["container"] if overlapping else defaults["container"]),
+                   "container": options.get("container", overlapping[0]["container"] if overlapping else (
+                       "factorymeta" if storage_mode == "factory-common" else defaults["container"])),
                    "coordination_blob": options.get("coordination_blob", overlapping[0]["coordination_blob"] if overlapping else defaults["coordination_blob"])}
     require(re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", str(coordinates["container"]))
             and "--" not in coordinates["container"], "invalid-container")
@@ -327,6 +521,8 @@ def load_request(consumer_root, factory_id, scale_set_id, environment, options):
             and ".." not in coordinates["coordination_blob"] and not coordinates["coordination_blob"].startswith(("locks/", "runs/")),
             "invalid-coordination-blob")
     require(not overlapping or coordinates == overlapping[0], "overlapping-coordination-namespaces-conflict")
+    require(storage_mode != "factory-common" or coordinates["container"] != "lake3",
+            "business-container-cannot-host-coordination")
     identity_rg = rg_id(options.get("identity_resource_group_id", coordination_rg))
     identity_id = options.get("identity_id")
     reuse_identity = bool(identity_id)
@@ -339,6 +535,9 @@ def load_request(consumer_root, factory_id, scale_set_id, environment, options):
     require(reuse_identity or identity_id.split("/")[2] == subscription, "identity-subscription-mismatch")
     public = options.get("public_network_access")
     require(public in (None, "Enabled", "Disabled"), "invalid-public-network-policy")
+    account_creation = options.get("coordination_account_creation")
+    if account_creation is not None:
+        account_creation = _common_account_creation(account_creation, target["region"], public)
     creation = sorted(rg_id(x) for x in options.get("create_resource_group_ids", []))
     require(set(creation) <= set(scopes + [identity_rg, coordination_rg]), "resource-group-creation-escapes-scope")
     require(all(x.split("/")[2] == subscription for x in creation), "resource-group-creation-escapes-subscription")
@@ -365,6 +564,7 @@ def load_request(consumer_root, factory_id, scale_set_id, environment, options):
             "target": target, "route": route, "scopes": scopes, "common_dependencies": dependencies,
             "identity_id": identity_id, "reuse_identity": reuse_identity,
             "account_id": account_id, "coordinates": coordinates, "public_network_access": public,
+            "coordination_storage_mode": storage_mode, "coordination_account_creation": account_creation,
             "create_resource_group_ids": creation, "approved_group_creation_scope": approved,
             "deployment_roles": sorted(roles, key=canonical), "ado_tenant_id": ado_tenant,
             "existing_bindings": inventory, "options": copy.deepcopy(options)}
@@ -524,7 +724,13 @@ class Cloud:
                 require(not headers and data in (None, b""), "private-container-create-required")
             else:
                 require(headers and ("If-None-Match" in headers or "If-Match" in headers), "conditional-storage-write-required")
-        return self.http(method, url, STORAGE, data, headers, allowed=allowed)
+        try:
+            return self.http(method, url, STORAGE, data, headers, allowed=allowed)
+        except EnrollmentError as exc:
+            if _common_mode(self.request_config) and exc.code in (
+                    "remote-request-uncertain", "remote-request-failed-401", "remote-request-failed-403"):
+                raise EnrollmentError("common-storage-private-routing-dns-or-entra-access-required:" + exc.code) from None
+            raise
 
     def gh(self, method, endpoint, body=None, allowed=(200,)):
         require(method in ("GET", "POST"), "delete-or-replacement-forbidden")
@@ -796,13 +1002,15 @@ def _roles(cloud, request, identity, operator_id, operator_operations):
     storage_scope = request["account_id"] + "/blobservices/default/containers/" + request["coordinates"]["container"]
     subscription = "/subscriptions/" + request["target"]["subscription_id"]
     requested = copy.deepcopy(request["deployment_roles"])
+    storage_subscription = "/subscriptions/" + request["account_id"].split("/")[2]
     requested.append({"scope": storage_scope,
-                      "role_definition_id": subscription + "/providers/microsoft.authorization/roledefinitions/" + DATA_ROLE})
+                      "role_definition_id": storage_subscription + "/providers/microsoft.authorization/roledefinitions/" + DATA_ROLE})
     role_definitions = {}
     for item in requested:
         definition = item["role_definition_id"]
         role_definitions[definition] = cloud.arm("GET", definition, ROLE_API)[2]
-    assignments = cloud.collection(subscription + "/providers/Microsoft.Authorization/roleAssignments", ROLE_API)
+    assignments = [row for scope in sorted({subscription, storage_subscription})
+                   for row in cloud.collection(scope + "/providers/Microsoft.Authorization/roleAssignments", ROLE_API)]
     blockers = []
     affected = request["scopes"] + [storage_scope]
     # Inspect every applicable assignment without Graph name resolution.
@@ -983,12 +1191,54 @@ def binding_candidate(request, identity, enrollment):
             **execution, "locks": locks, "targets": [selected]}
 
 
+def _validate_storage(request, storage):
+    props = storage.get("properties", {})
+    require(str(storage.get("id", "")).lower() == request["account_id"], "storage-account-id-conflict")
+    require((type(props.get("allowSharedKeyAccess")) is bool if _common_mode(request)
+             else props.get("allowSharedKeyAccess") is False)
+            and props.get("allowBlobPublicAccess") is False
+            and props.get("supportsHttpsTrafficOnly") is True and props.get("minimumTlsVersion") in ("TLS1_2", "TLS1_3"),
+            "existing-storage-security-policy-not-compatible")
+    if _common_mode(request):
+        require(props.get("isHnsEnabled") is True, "factory-common-storage-hns-required")
+        require(props.get("publicNetworkAccess") in ("Enabled", "Disabled")
+                and props.get("networkAcls", {}).get("defaultAction") == "Deny",
+                "existing-common-storage-private-network-policy-not-compatible")
+    if request.get("coordination_storage_mode") == "connectivity-hub":
+        hub = request["account_id"].split("/providers/")[0]
+        require(storage.get("kind") == "StorageV2" and props.get("isHnsEnabled") is False
+                and props.get("defaultToOAuthAuthentication") is True
+                and props.get("networkAcls", {}).get("defaultAction") == "Deny"
+                and storage.get("tags", {}).get("aifactory.coordination") == "connectivity-hub-v1"
+                and storage.get("tags", {}).get("aifactory.hub_scope_sha256") == hashlib.sha256(hub.encode()).hexdigest(),
+                "shared-hub-storage-policy-conflict")
+    if request["public_network_access"] is not None:
+        require(props.get("publicNetworkAccess") == request["public_network_access"], "existing-storage-network-policy-conflict")
+
+
+def _validate_container(container):
+    require(container.get("properties", {}).get("publicAccess") in (None, "None"),
+            "existing-container-public-access-forbidden")
+
+
+def _lifecycle_protection(request):
+    return {"account_id": request["account_id"], "container_id": _container_id(request),
+            "resource_group_id": request["account_id"].split("/providers/")[0],
+            "ordinary_factory_delete": "forbidden",
+            "retention": "retain-coordination-account-container-and-parent-resource-group"}
+
+
 def _collect_snapshot(request, cloud):
     cloud.read_only = True
     target = request["target"]
     account = cloud.az("account", "show", "--subscription", target["subscription_id"])
     require(str(account.get("id", "")).lower() == target["subscription_id"]
             and str(account.get("tenantId", "")).lower() == target["tenant_id"], "selected-account-tenant-mismatch")
+    if request["account_id"].split("/")[2] != target["subscription_id"]:
+        storage_account = cloud.az("account", "show", "--subscription", request["account_id"].split("/")[2])
+        require(str(storage_account.get("tenantId", "")).lower() == target["tenant_id"]
+                and str(storage_account.get("id", "")).lower() == request["account_id"].split("/")[2],
+                "shared-hub-subscription-tenant-mismatch")
     identity_subscription = request["identity_id"].split("/")[2]
     identity_account = None
     if identity_subscription != target["subscription_id"]:
@@ -1023,22 +1273,24 @@ def _collect_snapshot(request, cloud):
     else:
         actions.append("create-user-assigned-managed-identity")
     storage = _absent(cloud.arm("GET", request["account_id"], STORAGE_API, allowed=(200, 404)))
+    require(request.get("coordination_storage_mode") != "connectivity-hub" or storage is not None,
+            "shared-hub-foundation-must-exist")
     container, enrollment = None, None
     blobs = {}
     if storage:
-        props = storage["body"].get("properties", {})
-        require(str(storage["body"].get("id", "")).lower() == request["account_id"], "storage-account-id-conflict")
-        require(props.get("allowSharedKeyAccess") is False and props.get("allowBlobPublicAccess") is False
-                and props.get("supportsHttpsTrafficOnly") is True and props.get("minimumTlsVersion") in ("TLS1_2", "TLS1_3"),
-                "existing-storage-security-policy-not-compatible")
-        if request["public_network_access"] is not None:
-            require(props.get("publicNetworkAccess") == request["public_network_access"], "existing-storage-network-policy-conflict")
-        container = _absent(cloud.storage("HEAD", allowed=(200, 404)))
+        _validate_storage(request, storage["body"])
+        if _common_mode(request):
+            # ARM distinguishes a missing container before scoped data RBAC exists.
+            # A forbidden/unreachable data plane never becomes evidence of absence.
+            container = _absent(cloud.arm("GET", _container_id(request), STORAGE_API, allowed=(200, 404)))
+        else:
+            container = _absent(cloud.storage("HEAD", allowed=(200, 404)))
         if container:
-            container_id = request["account_id"] + "/blobServices/default/containers/" + request["coordinates"]["container"]
-            container_arm = cloud.arm("GET", container_id, STORAGE_API)[2]
-            require(container_arm.get("properties", {}).get("publicAccess") in (None, "None"),
-                    "existing-container-public-access-forbidden")
+            container_arm = (container["body"] if _common_mode(request)
+                             else cloud.arm("GET", _container_id(request), STORAGE_API)[2])
+            _validate_container(container_arm)
+            if _common_mode(request):
+                cloud.storage("HEAD")
             enrollment = _absent(cloud.storage("GET", request["coordinates"]["coordination_blob"], allowed=(200, 404)))
             for scope in request["scopes"] + request["common_dependencies"]:
                 response = cloud.storage("HEAD", lock_blob(scope), allowed=(200, 404))
@@ -1055,9 +1307,22 @@ def _collect_snapshot(request, cloud):
         require(available.get("nameAvailable") is True, "coordination-account-global-name-unavailable")
         if request["public_network_access"] is None:
             blockers.append("explicit-new-storage-public-network-policy-required")
-        actions.append("create-secure-coordination-account")
+        if _common_mode(request):
+            if request["coordination_account_creation"] is None:
+                blockers.append("canonical-common-account-creation-required")
+            actions.append("create-canonical-common-adls-account")
+        else:
+            actions.append("create-secure-coordination-account")
     if container is None:
         actions.append("create-private-coordination-container")
+    container_permissions = None
+    if _common_mode(request) and container is None:
+        parent = request["account_id"] if storage else request["account_id"].split("/providers/")[0]
+        if not storage and groups.get(parent) is None:
+            parent = "/subscriptions/" + target["subscription_id"]
+        container_permissions = cloud.collection(parent + "/providers/Microsoft.Authorization/permissions", ROLE_API)
+        if not _permission(container_permissions, "Microsoft.Storage/storageAccounts/blobServices/containers/write"):
+            blockers.append("operator-common-container-arm-create-permission-required")
     for scope in request["scopes"] + request["common_dependencies"]:
         if not blobs.get(scope):
             actions.append("create-empty-physical-lock:" + lock_blob(scope))
@@ -1107,6 +1372,7 @@ def _collect_snapshot(request, cloud):
             "identity_account": identity_account,
             "operator_id": cloud.operator_id, "groups": groups, "identity_arm": identity_arm, "identity": identity,
             "storage": storage, "container": container, "enrollment": enrollment, "blobs": blobs,
+            "container_permissions": container_permissions,
             "provider": provider, "fic": fic, "roles": roles, "merged": merged, "candidate": candidate,
             "actions": sorted(actions), "blockers": sorted(set(blockers))}
 
@@ -1140,6 +1406,15 @@ def _review(request, state, acknowledge):
               "acknowledge_exclusive_writer_governance": acknowledge,
               "can_ensure": not blockers, "enrollment_complete": False,
               "binding_publication": "catalog-prepare-confirm-configure-binding-only"}
+    if _common_mode(request):
+        result["coordination"]["storage_mode"] = request["coordination_storage_mode"]
+        result["lifecycle_protection"] = _lifecycle_protection(request)
+        result["warnings"] = [
+            "account-and-key-administrators-can-bypass-or-destroy-coordination",
+            "private-routing-dns-and-entra-data-access-required-before-normal-leases",
+        ]
+        if state["storage"] is None:
+            result["coordination"]["account_creation"] = request["coordination_account_creation"]
     result["plan_hash"] = digest(result)
     return result
 
@@ -1180,7 +1455,9 @@ def _propagating_storage_put(cloud, blob, data, headers, allowed, retry):
         try:
             return cloud.storage("PUT", blob, data=data, headers=headers, allowed=allowed)
         except EnrollmentError as exc:
-            if exc.code != "remote-request-failed-403" or attempt + 1 >= attempts:
+            if exc.code not in ("remote-request-failed-403",
+                                "common-storage-private-routing-dns-or-entra-access-required:remote-request-failed-403"
+                                ) or attempt + 1 >= attempts:
                 raise
             time.sleep(5)
 
@@ -1271,15 +1548,27 @@ def ensure(request, expected_plan, *, yes=False, acknowledge_exclusive_writer_go
                     "managed-identity-changed-during-read")
         if state["storage"] is None:
             changed = True
-            _create_arm(cloud, request["account_id"], STORAGE_API,
-                        {"location": target["region"], "kind": "StorageV2", "sku": {"name": "Standard_LRS"},
+            body = (request["coordination_account_creation"] if _common_mode(request) else
+                    {"location": target["region"], "kind": "StorageV2", "sku": {"name": "Standard_LRS"},
                          "properties": {"allowSharedKeyAccess": False, "allowBlobPublicAccess": False,
                                         "supportsHttpsTrafficOnly": True, "minimumTlsVersion": "TLS1_2",
                                         "defaultToOAuthAuthentication": True,
                                         "publicNetworkAccess": request["public_network_access"],
                                         "networkAcls": {"defaultAction": "Deny" if request["public_network_access"] == "Disabled" else "Allow",
                                                         "bypass": "None"}}})
-            _wait_arm(cloud, request["account_id"], STORAGE_API)
+            _validate_storage(request, _create_arm(cloud, request["account_id"], STORAGE_API, body))
+        elif _common_mode(request):
+            _validate_storage(request, cloud.arm("GET", request["account_id"], STORAGE_API)[2])
+        if _common_mode(request):
+            # Create only metadata, using existing ARM management rights. Assigning
+            # its data role afterwards never grants access to lake3 or its ACLs.
+            if state["container"] is None:
+                changed = True
+                container = _create_arm(cloud, _container_id(request), STORAGE_API,
+                                       {"properties": {"publicAccess": "None"}})
+            else:
+                container = cloud.arm("GET", _container_id(request), STORAGE_API)[2]
+            _validate_container(container)
         # Grant RBAC (notably the operator's blob-data role) BEFORE any data-plane
         # container or lease write: a just-created account's operator otherwise
         # lacks blob-data rights to create the container.
@@ -1297,11 +1586,21 @@ def ensure(request, expected_plan, *, yes=False, acknowledge_exclusive_writer_go
                                         "roleDefinitionId": grant["role_definition_id"]}})
             if grant["principal"] == "operator":
                 operator_grant_created = True
-        if state["container"] is None:
+        if state["container"] is None and not _common_mode(request):
             changed = True
             container_id = request["account_id"] + "/blobServices/default/containers/" + request["coordinates"]["container"]
             _propagating_storage_put(cloud, None, b"", None, (201,), operator_grant_created)
             _wait_arm(cloud, container_id, STORAGE_API)
+        if _common_mode(request):
+            for attempt in range(8 if operator_grant_created else 1):
+                try:
+                    cloud.storage("HEAD")
+                    break
+                except EnrollmentError as exc:
+                    if not (operator_grant_created and exc.code.endswith(":remote-request-failed-403")
+                            and attempt < 7):
+                        raise
+                    time.sleep(5)
         provider_writes = any(x.startswith(("create-github", "create-ado")) for x in state["actions"])
         changed = changed or provider_writes
         provider = _create_provider(cloud, request, state, identity)
@@ -1345,9 +1644,11 @@ def ensure(request, expected_plan, *, yes=False, acknowledge_exclusive_writer_go
         _fresh_request(request)
         return {"status": "changed" if changed else "unchanged", "changed": changed, "enrollment_complete": True,
                 "binding_candidate": final["candidate"], "identity": final["identity"],
+                **({"lifecycle_protection": _lifecycle_protection(request)} if _common_mode(request) else {}),
                 "publication_required": True, "runtime_ready": False}
     except (EnrollmentError, OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
         return {"status": "blocked", "changed": changed, "enrollment_complete": False,
+                **({"lifecycle_protection": _lifecycle_protection(request)} if _common_mode(request) else {}),
                 "reconciliation_required": changed,
                 "error": exc.code if isinstance(exc, EnrollmentError) else "unexpected-response-reconciliation-required",
                 "binding_candidate": None}

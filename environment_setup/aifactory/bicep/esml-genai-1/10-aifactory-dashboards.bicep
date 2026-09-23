@@ -99,6 +99,11 @@ param myProjectCoverage object = {}
 @description('Bounded state history; requires an explicitly reviewed full baseline for state totals.')
 param myProjectStateHistoryDays int = 90
 
+@description('Opt in to the existing agent evidence workbook in the common RG. Creates only a saved workbook; no collection, diagnostics, roles or ingestion.')
+param enableAgentMonitoring bool = false
+@description('Explicit existing, authorized Log Analytics workspace ARM ID. Required when enableAgentMonitoring is true.')
+param agentMonitoringWorkspaceResourceId string = ''
+
 @description('Whether AI Foundry was added (addAIFoundry=true) — affects AI Foundry V2 account naming')
 param addAIFoundry bool = false
 
@@ -253,6 +258,7 @@ module projectDashboard '../modules/projectDash01.bicep' = {
     myProjectTimeZone: myProjectTimeZone
     myProjectCoverage: myProjectCoverage
     myProjectStateHistoryDays: myProjectStateHistoryDays
+    agentMonitoringWorkbookResourceId: enableAgentMonitoring ? agentMonitoringWorkbook!.outputs.workbookResourceId : ''
 
     // AI Foundry naming mode
     addAIFoundry: addAIFoundry
@@ -338,6 +344,17 @@ module projectDashboard '../modules/projectDash01.bicep' = {
   ]
 }
 
+module agentMonitoringWorkbook '../modules/monitoring/agentMonitoringWorkbook.bicep' = if (enableAgentMonitoring) {
+  name: '10-agent-monitoring-${uniqueString(commonResourceGroupRef.id)}'
+  scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
+  params: {
+    enableAgentMonitoring: true
+    location: location
+    workspaceResourceId: agentMonitoringWorkspaceResourceId
+    tags: tags
+  }
+}
+
 // ============================================================================
 // OUTPUTS
 // ============================================================================
@@ -352,6 +369,8 @@ output dashboardOutputs object = {
   myProjectWorkbookName: projectDashboard.outputs.myProjectWorkbookName
   myProjectWorkbookUrl: projectDashboard.outputs.myProjectWorkbookUrl
   myProjectSourceIds: projectDashboard.outputs.myProjectSourceIds
+  agentMonitoringWorkbookId: enableAgentMonitoring ? agentMonitoringWorkbook!.outputs.workbookResourceId : ''
+  agentMonitoringWorkbookUrl: enableAgentMonitoring ? agentMonitoringWorkbook!.outputs.workbookUrl : ''
   
   // AI Foundry Information
   aiFoundryUrl: projectDashboard.outputs.aiFoundryUrl
@@ -371,10 +390,14 @@ output myProjectWorkbookName string = projectDashboard.outputs.myProjectWorkbook
 output myProjectWorkbookUrl string = projectDashboard.outputs.myProjectWorkbookUrl
 output myProjectSourceIds object = projectDashboard.outputs.myProjectSourceIds
 
+output agentMonitoringWorkbookId string = enableAgentMonitoring ? agentMonitoringWorkbook!.outputs.workbookResourceId : ''
+output agentMonitoringWorkbookUrl string = enableAgentMonitoring ? agentMonitoringWorkbook!.outputs.workbookUrl : ''
+
 @description('Dashboard access information')
 output dashboardAccess object = {
   portalUrl: projectDashboard.outputs.dashboardUrl
   myProjectWorkbookUrl: projectDashboard.outputs.myProjectWorkbookUrl
+  agentMonitoringWorkbookUrl: enableAgentMonitoring ? agentMonitoringWorkbook!.outputs.workbookUrl : ''
   directAccess: 'Navigate to Azure Portal > Dashboards > ${projectDashboard.outputs.dashboardName}'
   description: 'Project dashboard with quick access to AI Factory resources and services'
 }

@@ -226,6 +226,113 @@ def test_cli_subprocess_help_and_json_health(server):
     assert json.loads(result.stdout)["status"] == "ok"
 
 
+def factory_create_args(server):
+    return [
+        "--api-url", server, "--api-key", "k", "factory", "create",
+        "--folder", "C:\\consumer\\azurefactory", "--prefix", "example-", "--region", "swedencentral",
+        "--environment", "dev", "--suffix", "001",
+        "--tenant-id", "11111111-1111-4111-8111-111111111111",
+        "--subscription-id", "22222222-2222-4222-8222-222222222222",
+        "--orchestrator", "ado", "--vnet-cidr", "172.16.0.0/18",
+    ]
+
+
+def test_factory_create_delegates_default_project_and_version_to_api(server, capsys):
+    assert main(factory_create_args(server)) == 0
+    assert [record["route"] for record in Handler.records] == ["/openapi.json", "/api/v1/factory-catalog/prepare"]
+    body = Handler.records[-1]["body"]
+    assert body["action"] == "create-factory"
+    assert "initial_project" not in body and "aifactory_version" not in body
+    assert body["scale_sets"][0]["tenant_id"] == "11111111-1111-4111-8111-111111111111"
+    assert json.loads(capsys.readouterr().out)["operation_mode"] == "configuration"
+
+
+def test_factory_create_sends_alternate_initial_project_once_without_confirm(server):
+    assert main(factory_create_args(server) + [
+        "--project-number", "003", "--project-display-name", "Example", "--aifactory-version", "main",
+    ]) == 0
+    assert len(Handler.records) == 2
+    body = Handler.records[-1]["body"]
+    assert body["initial_project"] == {"number": "003", "display_name": "Example"}
+    assert body["aifactory_version"] == "main"
+    assert body["action"] == "create-factory"
+
+
+def test_factory_create_requires_number_when_project_name_is_explicit(server):
+    assert main(factory_create_args(server) + ["--project-display-name", "Example"]) == 2
+    assert Handler.records == []
+
+
+def test_factory_create_common_only_keeps_explicit_null(server):
+    assert main(factory_create_args(server) + ["--common-only"]) == 0
+    body = Handler.records[-1]["body"]
+    assert "initial_project" in body and body["initial_project"] is None
+
+
+def test_factory_create_blocks_stale_api_without_preparing(server, monkeypatch, capsys):
+    schema = valid_openapi()
+    del schema["components"]["schemas"]["CatalogPrepare"]["properties"]["initial_project"]
+    monkeypatch.setattr(sys.modules[__name__], "valid_openapi", lambda: schema)
+    assert main(factory_create_args(server)) == 2
+    assert [record["route"] for record in Handler.records] == ["/openapi.json"]
+    assert "initial_project" in capsys.readouterr().err
+    assert any("initial_project" in issue for issue in contract_issues(schema))
+
+
+def test_factory_create_forwards_explicit_placements_and_settings(server, tmp_path):
+    project = {"number": "007", "placements": [{"environment": "dev", "suffix": "002"}]}
+    project_file = tmp_path / "project.json"
+    project_file.write_text(json.dumps(project), encoding="utf-8")
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text('{"enableAIFactoryHub":"false","BYO_subnets":"false"}', encoding="utf-8")
+    assert main(factory_create_args(server) + [
+        "--initial-project-json", str(project_file), "--settings-json", str(settings_file),
+    ]) == 0
+    body = Handler.records[-1]["body"]
+    assert body["initial_project"] == project
+    assert body["settings"] == {"enableAIFactoryHub": "false", "BYO_subnets": "false"}
+
+
+def test_factory_create_forwards_ordered_search_sku_arrays(server, tmp_path):
+    settings = {
+        "skuAISearchDevArray": ["standard2", "basic", "standard"],
+        "skuAISearchStageProdArray": '["standard3","standard2","standard"]',
+    }
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps(settings), encoding="utf-8")
+    assert main(factory_create_args(server) + ["--settings-json", str(path)]) == 0
+    assert Handler.records[-1]["body"]["settings"] == settings
+
+
+def test_factory_create_forwards_region_short_name_without_changing_region(server, monkeypatch):
+    schema = valid_openapi()
+    schema["components"]["schemas"]["CatalogPrepare"]["properties"]["target_region_short_name"] = {}
+    monkeypatch.setattr(sys.modules[__name__], "valid_openapi", lambda: schema)
+    assert main(factory_create_args(server) + ["--region-short-name", "sec"]) == 0
+    body = Handler.records[-1]["body"]
+    assert body["target_region"] == "swedencentral"
+    assert body["target_region_short_name"] == "sec"
+
+
+@pytest.mark.parametrize("flag", ["--initial-project-json", "--settings-json"])
+@pytest.mark.parametrize("content", ["null", "[]"])
+def test_factory_create_rejects_nonobject_inputs_before_network(server, tmp_path, flag, content):
+    path = tmp_path / "input.json"
+    path.write_text(content, encoding="utf-8")
+    assert main(factory_create_args(server) + [flag, str(path)]) == 2
+    assert Handler.records == []
+
+
+def test_api_instructions_are_offline_and_never_reveal_key(monkeypatch, capsys):
+    monkeypatch.setenv("AIFACTORY_API_KEY", "private-key-not-for-output")
+    assert main(["api", "instructions"]) == 0
+    output = capsys.readouterr().out
+    assert "private-key-not-for-output" not in output
+    result = json.loads(output)
+    assert result["desktop_required"] is False
+    assert any("python -m src.api" in step for step in result["start"])
+
+
 def test_legacy_plan_preserves_patch_false_and_version(server, capsys):
     code = main(["--api-url", server, "--api-key", "k", "legacy", "plan", "--folder", "C:\\factory",
                  "--project-number", "001", "--source-env", "dev", "--target-env", "dev", "--operation", "update",
@@ -511,7 +618,7 @@ def test_comparison_ignores_documentation_but_detects_root_constraints():
 
 def valid_openapi():
     schemas = {
-        "CatalogPrepare": {"required": ["folder", "contract_version", "action"], "properties": {"contract_version": {"const": 1}, "folder": {"type": "string"}, "action": {"type": "string"}}},
+        "CatalogPrepare": {"required": ["folder", "contract_version", "action"], "properties": {"contract_version": {"const": 1}, "folder": {"type": "string"}, "action": {"type": "string"}, "initial_project": {"anyOf": [{"type": "object"}, {"type": "null"}]}}},
         "CatalogConfirm": {"required": ["folder", "contract_version", "confirmation_id"], "properties": {"contract_version": {"const": 1}, "folder": {"type": "string"}, "confirmation_id": {"type": "string"}}},
         "CatalogPreview": {"properties": {}},
         "CatalogConfirmed": {"properties": {}},

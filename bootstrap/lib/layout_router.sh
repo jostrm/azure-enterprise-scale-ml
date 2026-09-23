@@ -23,6 +23,7 @@ AIF_DUAL_LAYOUT_LIBRARIES=(
   layout_router.sh
   project_deployment.py
   project_environment.py
+  registered_creation.py
   release_version.py
   release_version.sh
   runner-prerequisites.ps1
@@ -91,6 +92,38 @@ aif_route_enrollment() {
   fi
   # Adapter consumes the first fixed argument before parsing any caller options.
   exec "${python_command[@]}" -B "$adapter" "$provider" "$@"
+}
+
+aif_route_modern_creation() {
+  local provider="$1" script_dir="$2"
+  shift 2
+  local argument
+  for argument in "$@"; do
+    [[ "$argument" != --help && "$argument" != -h ]] || return 0
+  done
+  local adapter candidate
+  for candidate in "$script_dir/lib/registered_creation.py" \
+    "$script_dir/azure-enterprise-scale-ml/bootstrap/lib/registered_creation.py"; do
+    [[ ! -f "$candidate" ]] || { adapter="$candidate"; break; }
+  done
+  [[ -n "${adapter:-}" ]] || {
+    printf 'ERROR: Complete registered creation helper bundle is missing; refresh the approved source helpers.\n' >&2
+    exit 2
+  }
+  local -a python_command
+  if [[ -n "${AIFACTORY_PYTHON:-}" ]]; then python_command=("$AIFACTORY_PYTHON")
+  elif command -v python3 >/dev/null 2>&1 && python3 --version >/dev/null 2>&1; then python_command=(python3)
+  elif command -v python >/dev/null 2>&1 && python --version >/dev/null 2>&1; then python_command=(python)
+  elif command -v py >/dev/null 2>&1 && py -3 --version >/dev/null 2>&1; then python_command=(py -3)
+  else printf 'ERROR: Python 3 is required for version-safe creation.\n' >&2; exit 2
+  fi
+  local selection
+  selection="$("${python_command[@]}" -B "$adapter" "$provider" --select-layout "$@")" || exit $?
+  case "${selection//$'\r'/}" in
+    registered) exec "${python_command[@]}" -B "$adapter" "$provider" "$@" ;;
+    legacy) return 0 ;;
+    *) printf 'ERROR: Invalid creation layout selection; no legacy fallback.\n' >&2; exit 2 ;;
+  esac
 }
 
 aif_registered_layout_root() {
@@ -259,6 +292,7 @@ aif_ensure_control_bundle_gitignore() {
     "!/lib/layout_router.sh"
     "!/lib/project_deployment.py"
     "!/lib/project_environment.py"
+    "!/lib/registered_creation.py"
     "!/lib/release_version.py"
     "!/lib/release_version.sh"
     "!/lib/runner-prerequisites.ps1"

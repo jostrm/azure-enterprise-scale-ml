@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:aifactory:agent-observations:v2",
+  "title": "Lossless canonical observation wrappers; publication remains separately approved",
+  "type": "object",
+  "required": ["schema", "source", "authorizedScopes", "rows"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "aifactory.agent-observations/v2"},
+    "source": {"enum": ["sample", "live"]},
+    "authorizedScopes": {"type": "array", "items": {"$ref": "agent-observations.schema.json#/$defs/scope"}},
+    "rows": {"type": "array", "maxItems": 10000, "items": {"$ref": "#/$defs/row"}}
+  },
+  "$defs": {
+    "text": {"type": ["string", "null"], "maxLength": 2048, "pattern": "^[^\\u0000-\\u001F\\u007F]*$"},
+    "count": {"type": ["integer", "null"], "minimum": 0, "maximum": 1e100},
+    "quantity": {"type": ["number", "null"], "minimum": 0, "maximum": 1e100},
+    "amount": {"type": ["number", "null"], "minimum": -1e100, "maximum": 1e100},
+    "provenance": {
+      "type": "object",
+      "propertyNames": {"enum": ["requests", "input_tokens", "output_tokens", "completed_outcomes", "attempted_outcomes", "successful_requests", "latency_samples", "evaluated_responses", "quality_passed_responses", "security_findings", "security_checks", "active_users", "eligible_users", "baseline_minutes_per_outcome", "actual_minutes_per_outcome", "labor_rate_per_hour", "latency_ms_sum", "token_estimated_cost", "actual_cost", "amortized_cost", "realized_benefit_amount", "outcome_quality_passed"]},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data_source": {"$ref": "#/$defs/text"},
+          "reference": {"$ref": "#/$defs/text"},
+          "description": {"$ref": "#/$defs/text"},
+          "formula": {"$ref": "#/$defs/text"},
+          "inputs": {"type": ["object", "null"], "description": "Runtime validation bounds depth/size and rejects credential-like keys."}
+        }
+      }
+    },
+    "financeScope": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "factory": {"$ref": "#/$defs/text"}, "scaleset": {"$ref": "#/$defs/text"},
+        "project": {"$ref": "#/$defs/text"}, "environment": {"$ref": "#/$defs/text"},
+        "agent_id": {"$ref": "#/$defs/text"}
+      }
+    },
+    "valueEvidence": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "description": "Preserved without native finance attestation. Canonical finance validation must qualify exact period, scope, approval, currency and supporting outcome evidence.",
+      "properties": {
+        "owner": {"$ref": "#/$defs/text"}, "baseline_reference": {"$ref": "#/$defs/text"},
+        "period_start": {"$ref": "#/$defs/text"}, "period_end": {"$ref": "#/$defs/text"},
+        "valuation_method": {"$ref": "#/$defs/text"}, "evidence_reference": {"$ref": "#/$defs/text"},
+        "approval_reference": {"$ref": "#/$defs/text"}, "currency": {"$ref": "#/$defs/text"},
+        "scope": {"$ref": "#/$defs/financeScope"}
+      }
+    },
+    "costEvidence": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "description": "Preserved without native finance attestation. Native reporting does not infer complete cost coverage or deduplicate overlapping financial periods.",
+      "properties": {
+        "period_start": {"$ref": "#/$defs/text"}, "period_end": {"$ref": "#/$defs/text"},
+        "currency": {"$ref": "#/$defs/text"}, "scope": {"$ref": "#/$defs/financeScope"},
+        "coverage": {"enum": ["complete", "partial", "unknown", null]},
+        "reference": {"$ref": "#/$defs/text"}
+      }
+    },
+    "canonical": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Original recognized flat row; null versus absent, row grain, values and provenance are retained. Runtime also validates cross-field ratios, scope and timestamp before publication.",
+      "properties": {
+        "factory": {"$ref": "#/$defs/text"}, "scaleset": {"$ref": "#/$defs/text"},
+        "project": {"$ref": "#/$defs/text"}, "environment": {"$ref": "#/$defs/text"},
+        "agent_id": {"$ref": "#/$defs/text"}, "agent_name": {"$ref": "#/$defs/text"},
+        "timestamp": {"$ref": "#/$defs/text"}, "period_start": {"$ref": "#/$defs/text"},
+        "period_end": {"$ref": "#/$defs/text"}, "model": {"$ref": "#/$defs/text"},
+        "cost_center": {"$ref": "#/$defs/text"}, "currency": {"$ref": "#/$defs/text"},
+        "data_source": {"$ref": "#/$defs/text"}, "subscription_id": {"$ref": "#/$defs/text"},
+        "resource_group": {"$ref": "#/$defs/text"}, "resource_id": {"$ref": "#/$defs/text"},
+        "cost_scope": {"$ref": "#/$defs/text"},
+        "requests": {"$ref": "#/$defs/count"}, "input_tokens": {"$ref": "#/$defs/count"},
+        "output_tokens": {"$ref": "#/$defs/count"}, "completed_outcomes": {"$ref": "#/$defs/count"},
+        "attempted_outcomes": {"$ref": "#/$defs/count"}, "successful_requests": {"$ref": "#/$defs/count"},
+        "latency_samples": {"$ref": "#/$defs/count"}, "evaluated_responses": {"$ref": "#/$defs/count"},
+        "quality_passed_responses": {"$ref": "#/$defs/count"}, "security_findings": {"$ref": "#/$defs/count"},
+        "security_checks": {"$ref": "#/$defs/count"}, "active_users": {"$ref": "#/$defs/count"},
+        "eligible_users": {"$ref": "#/$defs/count"},
+        "baseline_minutes_per_outcome": {"$ref": "#/$defs/quantity"},
+        "actual_minutes_per_outcome": {"$ref": "#/$defs/quantity"},
+        "labor_rate_per_hour": {"$ref": "#/$defs/quantity"},
+        "latency_ms_sum": {"$ref": "#/$defs/quantity"},
+        "token_estimated_cost": {"$ref": "#/$defs/quantity"},
+        "actual_cost": {"$ref": "#/$defs/amount"}, "amortized_cost": {"$ref": "#/$defs/amount"},
+        "realized_benefit_amount": {"$ref": "#/$defs/quantity"},
+        "value_evidence": {"$ref": "#/$defs/valueEvidence"},
+        "cost_evidence": {"$ref": "#/$defs/costEvidence"},
+        "outcome_quality_passed": {"type": ["boolean", "null"]},
+        "metadata_validated": {"type": ["boolean", "null"]},
+        "source": {"enum": ["sample", "live", null]},
+        "provenance": {"$ref": "#/$defs/provenance"}
+      }
+    },
+    "row": {
+      "type": "object",
+      "required": ["id", "timestamp", "scope", "kind", "dataSource", "canonical"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "scope": {"$ref": "agent-observations.schema.json#/$defs/scope"},
+        "kind": {"const": "canonical"},
+        "dataSource": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "canonical": {"$ref": "#/$defs/canonical"}
+      }
+    }
+  }
+}

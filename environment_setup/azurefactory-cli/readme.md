@@ -26,6 +26,56 @@ identity on the host and a user's approval to save or deploy.
 
 ## Core commands
 
+### Shell-first registered onboarding
+
+From the root of an existing consumer Git repository, with a **current approved**
+shared submodule:
+
+```bash
+git -C ./azure-enterprise-scale-ml status --short --branch
+git -C ./azure-enterprise-scale-ml rev-parse HEAD
+test -f ./azure-enterprise-scale-ml/01-start-v125-and-above.sh
+bash ./azure-enterprise-scale-ml/01-start-v125-and-above.sh
+bash ./azurefactory.sh api instructions
+```
+
+The source entrypoint installs the same CLI plus registered ADO/GHA root helpers
+without running legacy template copy/cleanup. `--provider ado|gha` selects just
+one wrapper without deleting the other. Reruns back up changed helpers and
+preserve register configuration, explicit saved versions and `.gitignore`;
+`--refresh-only` installs helpers without initializing storage. The printed
+source commit/dirty state and payload digest describe the files actually used.
+They do not certify a published release or the running API binary.
+Nothing updates a nested submodule automatically; missing entrypoint means stop
+and obtain reviewed current source, not fall back to legacy `00-start.sh`.
+
+**An API is required for catalog creation, but a GUI is not.** `api instructions`
+works offline and prints the selected URL and canonical backend startup pattern:
+in an approved Tkinter checkout with its documented prerequisites installed,
+set the server's `AIFACTORY_API_KEY` privately and run `python -m src.api`.
+Keep that terminal running; configure the same key in the client shell and use
+`AIFACTORY_API_URL` for a non-default authorized host. Run `health` then `doctor`.
+The installed wrapper supports all commands below as `bash ./azurefactory.sh ...`.
+No API executable, secret or downloaded shell script is copied into the consumer.
+
+Empty register initialization creates **no factory or project**. The separate
+`factory create` preview and approved `catalog confirm` configure the factory
+plus one initial project (default project001, `--project-number` for another).
+Registered sources are 125+ or `main`; 124 is not a registered fallback.
+Omitting the version delegates to the current API's registered default; pass
+`--aifactory-version 125` or `--aifactory-version main` to select explicitly.
+Deployment remains a separate reviewed runtime operation. See the
+[end-to-end shell workflow](../../documentation/v2/20-29/24-end-2-end-setup.md#shell-first-new-registered-consumer-v125--main).
+
+The modern raw Simple/Full creation launchers map `AIF_SETUP_HUB_ACCESS` into
+`config.setup_hub_access` for `/api/v1/creation/prepare`. With
+`AIF_SIMPLE_MODE=true`, omit it (or use `true`/`y`) to retain the owned-hub preset;
+set `AIF_SETUP_HUB_ACCESS=false` (or `n`) for standalone, with no owned or external
+hub. Other values are rejected. The API accepts only a JSON boolean for this
+optional field and saves both hub and central-hub DNS flags as false for standalone.
+This modern override does not change the legacy 124 Simple contract or deploy
+anything; review and confirm the local configuration before separate deployment.
+
 ```powershell
 azurefactory health
 azurefactory doctor
@@ -109,10 +159,10 @@ and its [two-phase usage](../install_config_wizard/api-usage-examples/readme.md#
 Confirm/start and generic writes require separate review and `--yes`. Preparation can persist a local draft/preview but never starts a deployment. Read the complete preview before approving. Save the preview receipt and consume it before expiry; expired or blocked previews are never re-prepared silently. All folder paths below are on the API host. New registers normally use a root named `azurefactory`.
 
 ```powershell
-azurefactory factory create --folder C:\factory --prefix aif-prod --region swedencentral --environment dev --suffix 001 --subscription-id <uuid> --tenant-id <uuid> --orchestrator ado --vnet-cidr 172.16.0.0/18 --save-receipt .\factory.receipt.json
+azurefactory factory create --folder C:\factory --prefix aif-prod --region swedencentral --environment dev --suffix 001 --subscription-id <uuid> --tenant-id <uuid> --orchestrator ado --vnet-cidr 172.16.0.0/18 --max-projects 2 --save-receipt .\factory.receipt.json
 azurefactory catalog confirm --receipt .\factory.receipt.json --yes
 
-azurefactory project add --folder C:\factory --factory-id <uuid> --number 001 --display-name "Portal backend" --placement dev=<scale-set-uuid> --save-receipt .\project.receipt.json
+azurefactory project add --folder C:\factory --factory-id <uuid> --number 002 --display-name "Portal backend" --placement dev=<scale-set-uuid> --save-receipt .\project.receipt.json
 azurefactory catalog confirm --receipt .\project.receipt.json --yes
 
 azurefactory factory clone --folder C:\factory --factory-id <uuid> --prefix aif-copy --region swedencentral --include-projects all --save-receipt .\clone.receipt.json
@@ -130,6 +180,30 @@ unattended immediately after prepare. Receipt checksums detect accidental edits;
 they are not cryptographic signatures or a substitute for your backend's user
 authorization. Store receipts privately. Resource parameter values are omitted
 from parameter receipts; the API retains the reviewed protected payload.
+
+AI `factory create` already includes project001; do not add it a second time.
+Use `--project-number 003` (and optionally `--project-display-name`) to choose
+one different initial project in that same reviewed configuration transaction.
+The backend owns defaulting and placements; the CLI never writes the register.
+An omitted factory version uses the backend's registered default, while an
+explicit supported version is forwarded unchanged. `doctor` and creation check
+the live `CatalogPrepare.initial_project` OpenAPI field; older APIs are blocked
+before prepare, not silently used with their old creation/default behavior.
+An optional `--region-short-name sec` preserves an explicit naming abbreviation
+(`region_short_name="sec"` in the SDK); omission delegates naming to the API.
+An older API lacking that field is rejected rather than silently ignoring it.
+
+`--initial-project-json` accepts a project object, for example
+`{"number":"007","placements":[{"environment":"dev","suffix":"002"}]}`.
+Explicit placements are required when the submitted `--scale-set-json` contains
+multiple scales for the same environment. Omitted placements select the only
+submitted scale in each environment. `--common-only` explicitly opts out of the
+initial project; non-AI factory types do not implicitly create an AI project.
+`--settings-json` supplies nonsecret editable factory settings in the same review
+(for example `{"enableAIFactoryHub":"false","BYO_subnets":"false"}`).
+Immutable identity remains in the top-level factory/scale-set flags. The SDK
+equivalent is `client.factory_create_prepare(..., initial_project={...}, settings={...})`;
+omit `initial_project` for the default or pass `None` for common-only.
 
 For a project in a **new DEV scale set 002**, first run `scaleset add` with
 `--environment dev --suffix 002` and an approved non-overlapping CIDR, confirm
@@ -441,6 +515,58 @@ Tkinter/MAUI releases. Use `python -m azurefactory` if the console script is not
 on PATH.
 
 Use `client.request("GET", "/api/v1/...")` for future read resources. Generic CLI writes require `request POST ... --write --yes`.
+
+### Monitoring: canonical reports, not collector jobs
+
+An already-running authorized local API is required. These commands reuse its
+canonical calculations and `X-API-Key`; they do not deploy resources, authenticate
+to Azure, start a collector, ingest telemetry or upload artifacts.
+
+```powershell
+azurefactory monitoring catalog
+azurefactory monitoring summary --source sample --factory "Demo AI Factory" --scaleset demo-east --project 001 --environment dev --days 7
+azurefactory monitoring report --report showback --source sample --project 001 --days 7
+azurefactory monitoring export --report agent-value --source sample --format csv
+azurefactory monitoring report --request .\reviewed-monitoring-request.json
+```
+
+All organizational filters default to `All`; combine `--factory`, `--scaleset`,
+`--project` and `--environment` for an exact compound identity. `001` remains a
+string. Sample mode is the default only for generated requests. Live requests
+must explicitly supply `"source": "live"` and their observation evidence in the
+canonical request file; `--source live` alone cannot collect anything. Output is
+the API JSON response with provenance for reports; the CLI writes no files.
+Export defaults to the API's CSV response; use
+`monitoring export --report showback --format json` for the full canonical JSON
+report. Missing evidence is not replaced by a sample.
+The live request uses `"rows": [...]` (not `observations`) and only the four
+organizational filter keys; `days` controls sample generation, not live time
+filtering. Optional `--start-date YYYY-MM-DD --end-date YYYY-MM-DD` (or
+`start_date` / `end_date` in a request file) explicitly bound summary, report and
+CSV output to 1-90 inclusive UTC calendar days. Both dates are required together.
+Dated aggregate intervals must fit entirely inside the window; partial overlaps
+and unusable dates are rejected, never prorated or silently included. Omit both
+dates to retain the existing unbounded evidence behavior. The API's export body
+has no `format` field.
+Generated CLI requests explicitly default to **7 sample days**; the API's own
+omitted-days default remains 30. Use `--days 1` when comparing one-day sample
+values with the reviewed native fixture (whose historical timestamps are fixed).
+
+SDK equivalents are `client.monitoring_catalog()`,
+`client.monitoring_summary(request)`, `client.monitoring_report(request)` and
+`client.monitoring_export(request)`.
+Summary returns `aifactory.monitoring-summary.v1`: six sections with the same
+metric/provenance/qualification objects as detailed reports, shared scope/source/
+window/coverage, and observation rows once. It omits `report_id` from its request
+and does not sum overlapping report sections. The CLI prints summary JSON;
+select a detailed report for CSV.
+Samples expose their frozen clock rather than implying today's activity. For
+the current seven-day scenario, an explicit enclosing window is
+`--start-date 2026-09-09 --end-date 2026-09-16`.
+The six IDs remain `agent-value`, `showback`, `foundry-tokens`, `foundry-usage`,
+`quality-reliability`, `security-governance`. Modeled benefit, quality-qualified
+outcomes and verified realized value are distinct; token volume is not value.
+Actual/amortized bills and estimates remain separate.
 
 ```powershell
 azurefactory request GET /api/v1/schema

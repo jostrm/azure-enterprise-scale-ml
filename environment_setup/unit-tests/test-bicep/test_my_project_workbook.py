@@ -189,6 +189,8 @@ class Arm:
             return base64.b64encode(args[0].encode()).decode()
         if name == "length":
             return len(args[0])
+        if name == "empty":
+            return not args[0]
         if name in ("toupper", "tolower"):
             return args[0].upper() if name == "toupper" else args[0].lower()
         if name == "uricomponent":
@@ -204,6 +206,8 @@ class Arm:
             return str(uuid.uuid5(uuid.UUID("11fb06fb-712d-4ddd-98c7-e71bbd588830"), "-".join(args)))
         if name in ("true", "false"):
             return name == "true"
+        if name == "null":
+            return None
         if name == "equals":
             return args[0] == args[1]
         if name == "if":
@@ -307,7 +311,8 @@ def test_dashboard_existing_layout_and_native_cost_preserved():
         "x: 0, y: 0, colSpan: 12, rowSpan: 2",
         "x: 0, y: 2, colSpan: 6, rowSpan: 8",
         "x: 6, y: 2, colSpan: 6, rowSpan: 8",
-        *(f"x: {x}, y: 10, colSpan: 1, rowSpan: 1" for x in range(4)),
+        *(f"x: {x}, y: 10, colSpan: 1, rowSpan: 1" for x in range(5)),
+        "x: 5, y: 10, colSpan: 7, rowSpan: 1",
         "x: 0, y: 11, colSpan: 12, rowSpan: 8",
         "x: 0, y: 19, colSpan: 12, rowSpan: 3",
     ):
@@ -316,6 +321,85 @@ def test_dashboard_existing_layout_and_native_cost_preserved():
     assert "var myProjectEntryParts = enableMyProjectDashboard ?" in text
     assert "Microsoft_Azure_CostManagement/Menu/open/costanalysis/scope/" in text
     assert "[📊 Open Cost Analysis](${costAnalysisUrl}" in text
+
+
+@pytest.mark.parametrize("project", ["001", "002"])
+@pytest.mark.parametrize("environment", ["dev", "test", "prod"])
+@pytest.mark.parametrize("override_insights", [False, True])
+def test_project_resource_group_five_shortcuts_and_cost_share_scope(
+    project_template, project, environment, override_insights,
+):
+    resource_name = f"project-{project}-{environment}"
+    resource_id = RG.rsplit("/", 1)[0] + "/" + resource_name
+    insights_id = resource_id + "/providers/Microsoft.Insights/components/existing-insights"
+    arm = Arm(project_template, {
+        "projectNumber": project, "env": environment,
+        "myProjectApplicationInsightsResourceId": insights_id if override_insights else "",
+        "enableMyProjectDashboard": False,
+    })
+    arm.cache.update(
+        rgResourceId=resource_id, targetResourceGroup=resource_name,
+        fixtureNamingOutputs={"namingConvention": {"value": {
+            "aifV2Name": "foundry", "aifV2NameAdd": "foundry-add",
+            "aifV2PrjName": "foundry-project", "aifV2PrjNameAdd": "foundry-project-add",
+            "storageAccount2001Name": "storage2001", "keyvaultName": "keyvault",
+            "safeNameAISearch": "search", "applicationInsightName": "insights",
+        }}},
+        fixtureWorkbookOutputs={
+            "url": {"value": "https://example.invalid/workbook"},
+            "tokensUrl": {"value": "https://example.invalid/tokens"},
+        },
+        agentMonitoringEntryParts=[],
+        enabledByUserMarkdown="", mandatoryServicesMarkdown="",
+    )
+    dashboard = next(r for r in project_template["resources"] if r["type"] == "Microsoft.Portal/dashboards")
+    expression = dashboard["properties"]["lenses"][0]["parts"]
+    # Supply nested module outputs; evaluate the actual compiled tile expressions.
+    for prefix, fixture in (("projectDash-naming-", "fixtureNamingOutputs"),
+                            ("my-project-workbook-", "fixtureWorkbookOutputs")):
+        deployment = next(r for r in project_template["resources"] if prefix in r["name"])
+        reference = (
+            f"reference(resourceId('Microsoft.Resources/deployments', {deployment['name'][1:-1]}), "
+            f"'{deployment['apiVersion']}').outputs"
+        )
+        assert reference in expression
+        expression = expression.replace(reference, f"variables('{fixture}')")
+    parts = arm.value(expression)
+    resources = [
+        part for part in parts
+        if part["metadata"]["type"] == "Extension/HubsExtension/PartType/ResourcePart"
+    ]
+    group, *shortcuts = resources
+    assert group["metadata"]["asset"]["type"] == "ResourceGroup"
+    assert group["metadata"]["inputs"][0]["value"] == resource_id
+    expected = [
+        ("Microsoft.CognitiveServices/accounts", "foundry"),
+        ("Microsoft.Storage/storageAccounts", "storage2001"),
+        ("Microsoft.KeyVault/vaults", "keyvault"),
+        ("Microsoft.Search/searchServices", "search"),
+        ("Microsoft.Insights/components", "existing-insights" if override_insights else "insights"),
+    ]
+    assert len(shortcuts) == 5
+    for index, (part, (resource_type, name)) in enumerate(zip(shortcuts, expected)):
+        assert part["metadata"]["asset"]["type"] == resource_type
+        assert part["metadata"]["inputs"][0]["value"] == f"{resource_id}/providers/{resource_type}/{name}"
+        assert part["position"] == {"x": index, "y": 10, "colSpan": 1, "rowSpan": 1}
+    cost = next(p for p in parts if p["metadata"]["type"].endswith("CostAnalysisPinPart"))
+    assert cost["position"]["x"] == group["position"]["x"] + group["position"]["colSpan"]
+    inputs = {item["name"]: item.get("value") for item in cost["metadata"]["inputs"]}
+    assert inputs["scope"] == resource_id
+    assert inputs["view"]["query"]["type"] == "ActualCost"
+    assert inputs["view"]["dateRange"] == "ThisMonth"
+    footer = next(p for p in parts if p["position"]["x"] == 5 and p["position"]["y"] == 10)
+    assert quote(resource_id, safe="") in footer["metadata"]["settings"]["content"]["settings"]["content"]
+    for index, left in enumerate(parts):
+        a = left["position"]
+        for right in parts[index + 1:]:
+            b = right["position"]
+            assert (
+                a["x"] + a["colSpan"] <= b["x"] or b["x"] + b["colSpan"] <= a["x"]
+                or a["y"] + a["rowSpan"] <= b["y"] or b["y"] + b["rowSpan"] <= a["y"]
+            )
 
 
 @pytest.mark.parametrize("project", ["001", "002"])
@@ -552,7 +636,7 @@ def test_native_token_metrics_are_real_scoped_controls_and_not_alias_sums(workbo
         assert content["version"] == "MetricsItem/2.0"
         assert content["resourceType"] == "microsoft.cognitiveservices/accounts"
         assert content["resourceIds"] == ["{TokenMetricAccount}"]
-        assert content["resourceParameter"] == "TokenMetricAccount"
+        assert "resourceParameter" not in content  # Bind the validated scalar, not another resource picker.
         assert content["resourceLimit"] == 1
         assert content["timeContextFromParameter"] == "TokenTimeRange"
         assert content["chartType"] in (0, 2)
@@ -571,10 +655,14 @@ def test_native_token_metrics_are_real_scoped_controls_and_not_alias_sums(workbo
     assert params["TokenMetricProfile"]["value"] == "foundry"
     assert {x["value"] for x in json.loads(params["TokenMetricProfile"]["jsonData"])} == {"foundry", "openai"}
     assert params["TokenTimeRange"]["value"] == {"durationMs": 604800000}
-    assert params["TokenMetricAccount"]["type"] == 5
-    assert params["TokenMetricAccount"]["queryType"] == 1
-    assert 'id =~ "{TokenAccount:escapejson}"' in params["TokenMetricAccount"]["query"]
+    assert params["TokenMetricAccount"]["type"] == 1
+    assert params["TokenMetricAccount"]["queryType"] == 0
+    assert params["TokenMetricAccount"]["value"] == "" and not params["TokenMetricAccount"]["isRequired"]
+    assert params["TokenMetricAccount"]["query"].endswith(
+        "print value=iff(AccountSelected and WindowValid, SelectedAccount, '')"
+    )
     assert "AccountSelected and WindowValid" in params["TokenMetricView"]["query"]
+    assert "base64_decode_tostring('{TokenMetricAccount:base64}') == SelectedAccount" in params["TokenMetricView"]["query"]
     assert "Navigation:base64" in params["TokenMetricView"]["query"]
     assert "Profile in ('foundry', 'openai')" in params["TokenMetricView"]["query"]
     assert "CacheRate" not in json.dumps(native)
@@ -583,7 +671,7 @@ def test_native_token_metrics_are_real_scoped_controls_and_not_alias_sums(workbo
 def test_token_inventory_exact_rg_kinds_and_parameter_fail_closed(workbook):
     params = parameters(workbook)
     prefix = RG.lower() + "/providers/microsoft.cognitiveservices/accounts/"
-    for name in ("TokenAccount", "TokenAccountInventory", "TokenMetricAccount"):
+    for name in ("TokenAccount", "TokenAccountInventory"):
         param = params[name]
         assert param["queryType"] == 1
         assert param["resourceType"] == "microsoft.resourcegraph/resources"
@@ -593,13 +681,16 @@ def test_token_inventory_exact_rg_kinds_and_parameter_fail_closed(workbook):
         assert "['kind'] in~ ('AIServices', 'OpenAI')" in param["query"]
         assert "type =~ 'microsoft.cognitiveservices/accounts'" in param["query"]
         assert not param["typeSettings"]["additionalResourceOptions"]
-    assert params["TokenAccount"]["type"] == 5
+    assert params["TokenAccount"]["type"] == 2
     assert params["TokenAccount"]["isRequired"] and not params["TokenAccount"]["multiSelect"]
     assert params["TokenAccount"]["value"] == ""
     account_query = params["TokenAccount"]["query"]
     assert "mv-expand Account=Accounts" in account_query
     assert "selected=array_length(Accounts) == 1" in account_query
     assert "selected=true" not in account_query and "| take 1" not in account_query
+    assert "or isempty(tostring(Account.id))" in account_query
+    assert "array_concat(pack_array(pack('id', '', 'name', 'Select one discovered account', 'kind', '')), Accounts)" in account_query
+    assert params["TokenAccountInventory"]["query"].endswith("| project value=tostring(Accounts)")
     query = items(workbook)["tokens-log-model-totals"]["content"]["query"]
     assert "AccountId startswith AccountPrefix" in query
     assert "substring(AccountId, strlen(AccountPrefix)) !contains '/'" in query
@@ -622,6 +713,171 @@ def test_token_inventory_exact_rg_kinds_and_parameter_fail_closed(workbook):
     assert scoped(valid.upper())
     assert not any(scoped(value) for value in ("", "*", RG + "-other/providers/microsoft.cognitiveservices/accounts/a",
                                               valid + "/deployments/model", valid + "-other"))
+
+
+def substitute_parameter_text(query, values):
+    """Workbook text formatting contract only; this does not execute Portal or Kusto."""
+    def replace(match):
+        name, format_ = match.groups()
+        if name not in values:
+            return match[0]
+        value = values[name]
+        assert isinstance(value, str), "Query-backed text parameters must supply scalar strings"
+        if format_ == "base64":
+            return base64.b64encode(value.encode()).decode()
+        assert format_ is None
+        return value
+    return re.sub(r"\{(\w+)(?::(\w+))?\}", replace, query)
+
+
+@pytest.mark.parametrize("count", [0, 1, 2])
+def test_compiled_account_choices_select_only_a_single_discovered_account(workbook, count):
+    query = parameters(workbook)["TokenAccount"]["query"]
+    assert "iff(array_length(Accounts) == 1, Accounts, array_concat(" in query
+    accounts = [{"id": RG + f"/providers/Microsoft.CognitiveServices/accounts/account-{index}"}
+                for index in range(count)]
+    # Reference for the emitted ARG array/selected expressions, not a live ARG execution.
+    choices = accounts if len(accounts) == 1 else [{"id": ""}, *accounts]
+    selected = [row["id"] for row in choices if len(choices) == 1 or not row["id"]]
+    assert selected == ([accounts[0]["id"]] if count == 1 else [""])
+
+
+@pytest.mark.parametrize("form", ["raw", "json-string", "singleton-array"])
+def test_compiled_token_binding_substituted_scalar_and_legacy_forms(workbook, form):
+    params = parameters(workbook)
+    account = RG + "/providers/Microsoft.CognitiveServices/accounts/actual-account"
+    selected = {"raw": account, "json-string": json.dumps(account),
+                "singleton-array": json.dumps([account])}[form]
+    inventory = json.dumps([{"id": account, "name": "actual-account", "kind": "AIServices"}])
+    values = {"TokenAccount": selected, "TokenAccountInventory": inventory}
+    query = substitute_parameter_text(params["TokenMetricAccount"]["query"], values)
+    encoded = re.search(r"let AccountSelection = parse_json\(base64_decode_tostring\('([^']*)'\)\);", query)[1]
+    decoded = base64.b64decode(encoded).decode()
+    try:
+        selection = json.loads(decoded)
+    except ValueError:
+        selection = decoded  # Kusto parse_json preserves non-JSON input as a dynamic string.
+    normalized = selection[0] if isinstance(selection, list) and len(selection) == 1 else selection
+    assert normalized.lower() == account.lower()
+    # The previous raw tolower(base64_decode_tostring(...)) failed for both JSON forms.
+    assert (decoded.lower() == account.lower()) == (form == "raw")
+    assert "gettype(AccountSelection) == 'string', tostring(AccountSelection)" in query
+    assert "array_length(AccountSelection) == 1 and gettype(AccountSelection[0]) == 'string'" in query
+    assert "'{TokenAccount:base64}'" not in query and "'{TokenAccountInventory:base64}'" not in query
+    inventory_encoded = re.search(r"let InventorySelection = parse_json\(base64_decode_tostring\('([^']+)'\)\);", query)[1]
+    inventory_rows = json.loads(base64.b64decode(inventory_encoded))
+    assert inventory_rows == json.loads(inventory)
+    assert any(row["id"].lower() == normalized.lower() and row["kind"] in ("AIServices", "OpenAI")
+               for row in inventory_rows)
+    assert params["TokenAccountInventory"]["query"].endswith("| project value=tostring(Accounts)")
+    # Both the visibility gate and every actual MetricsItem consume the same scalar output.
+    values["TokenMetricAccount"] = normalized.lower()
+    gate = substitute_parameter_text(params["TokenMetricView"]["query"], values)
+    assert f"base64_decode_tostring('{base64.b64encode(normalized.lower().encode()).decode()}') == SelectedAccount" in gate
+    for item in workbook["items"]:
+        if item["type"] == 10:
+            assert substitute_parameter_text(item["content"]["resourceIds"][0], values) == account.lower()
+            assert item["conditionalVisibility"]["parameterName"] == "TokenMetricView"
+    assert not any("{TokenAccount:escapejson}" in p.get("query", "") for p in params.values())
+    source = items(workbook)["tokens-source-coverage"]["content"]["query"]
+    assert "InventoryShape=gettype(InventorySelection)" in source
+    assert "ScopedAccounts=toscalar(Inventory | count)" in source
+    assert "AccountSelectionShape=gettype(AccountSelection)" in source
+    assert "MetricAccountMatchesSelection=(AccountSelected and " in source
+
+
+@pytest.mark.parametrize("inventory", [
+    None, {}, [], "[object Object]", [{"id": "account-name", "kind": "AIServices"}],
+    [{"id": RG + "/providers/Microsoft.CognitiveServices/accounts/actual-account", "kind": "SpeechServices"}],
+    [{"id": RG + "-other/providers/Microsoft.CognitiveServices/accounts/actual-account", "kind": "AIServices"}],
+    [{"id": RG + "/providers/Microsoft.CognitiveServices/accounts/actual-account/deployments/model", "kind": "OpenAI"}],
+])
+def test_compiled_token_inventory_substitution_never_accepts_shape_or_kind_mismatches(workbook, inventory):
+    params = parameters(workbook)
+    prefix = RG.lower() + "/providers/microsoft.cognitiveservices/accounts/"
+    selected = prefix + "actual-account"
+    query = substitute_parameter_text(params["TokenMetricAccount"]["query"], {
+        "TokenAccount": selected, "TokenAccountInventory": json.dumps(inventory),
+    })
+    encoded = re.search(r"let InventorySelection = parse_json\(base64_decode_tostring\('([^']*)'\)\);", query)[1]
+    decoded = json.loads(base64.b64decode(encoded))
+    rows = decoded if isinstance(decoded, list) else []
+    eligible = [
+        row["id"].lower() for row in rows
+        if isinstance(row, dict) and isinstance(row.get("id"), str)
+        and row["id"].lower().startswith(prefix)
+        and row["id"][len(prefix):] and "/" not in row["id"][len(prefix):]
+        and row.get("kind", "").lower() in ("aiservices", "openai")
+    ]
+    assert selected not in eligible
+    assert "gettype(InventorySelection) == 'array', InventorySelection, dynamic([])" in query
+    assert "AccountSelected and WindowValid, SelectedAccount, ''" in query
+
+
+@pytest.mark.parametrize("selection", [
+    "", "actual-account", "*", "[]", "null", "true", "123", '{"id":"not-a-selection"}',
+    '["one","two"]', '[["nested"]]', "[null]", "[123]",
+    RG + "-other/providers/Microsoft.CognitiveServices/accounts/actual-account",
+    RG + "/providers/Microsoft.CognitiveServices/accounts/actual-account/deployments/model",
+    RG + "/providers/Microsoft.CognitiveServices/accounts/",
+    RG + "/providers/Microsoft.Storage/storageAccounts/actual-account",
+])
+def test_compiled_token_binding_rejects_ambiguous_or_out_of_scope_forms(workbook, selection):
+    query = substitute_parameter_text(parameters(workbook)["TokenMetricAccount"]["query"], {"TokenAccount": selection})
+    encoded = re.search(r"let AccountSelection = parse_json\(base64_decode_tostring\('([^']*)'\)\);", query)[1]
+    decoded = base64.b64decode(encoded).decode()
+    try:
+        value = json.loads(decoded)
+    except ValueError:
+        value = decoded
+    if isinstance(value, list):
+        value = value[0] if len(value) == 1 and isinstance(value[0], str) else ""
+    if not isinstance(value, str):
+        value = ""
+    valid = (RG + "/providers/Microsoft.CognitiveServices/accounts/actual-account").lower()
+    assert not (value and value.lower() == valid)
+    assert "gettype(InventorySelection) == 'array'" in query
+    assert "isnotempty(substring(AccountId, strlen(AccountPrefix)))" in query
+    assert "AccountKind in~ ('AIServices', 'OpenAI')" in query
+    assert "SelectedAccount in (Inventory | project AccountId)" in query
+
+
+@pytest.mark.parametrize("chart,columns", [
+    ("conversations-questions-daily", ["Conversations", "Questions"]),
+    ("feedback-daily", ["Up", "Down"]),
+    ("questions-per-conversation-daily", ["QuestionsPerConversation"]),
+])
+def test_compiled_daily_charts_gate_null_only_series_and_keep_coverage_state(workbook, chart, columns):
+    all_items, params = items(workbook), parameters(workbook)
+    condition = " or ".join(f"isnotnull({column})" for column in columns)
+    available = params[chart + "-availability"]
+    assert available["type"] == 1 and available["isHiddenWhenLocked"]
+    assert f"summarize AvailableDays=countif({condition})" in available["query"]
+    assert "iff(AvailableDays > 0, 'available', 'unavailable')" in available["query"]
+    assert "base64_decode_tostring('{Navigation:base64}') != 'usage', 'hidden'" in available["query"]
+    assert all_items[chart]["conditionalVisibility"] == {
+        "parameterName": chart + "-availability", "comparison": "isEqualTo", "value": "available",
+    }
+    fallback = all_items[chart + "-unavailable"]
+    assert fallback["type"] == 1
+    assert fallback["conditionalVisibility"] == {
+        "parameterName": chart + "-availability", "comparison": "isEqualTo", "value": "unavailable",
+    }
+    assert "Unavailable / undefined" in fallback["content"]["json"]
+    assert "not zero" in fallback["content"]["json"]
+    content = all_items[chart]["content"]
+    assert content["visualization"] == "timechart"
+    assert content["query"].endswith(f"| where toscalar(Daily | summarize countif({condition})) > 0")
+    assert "coverage" in content["noDataMessage"]
+    # Reference row behavior includes measured zero, partially unavailable and all-null series.
+    for row, expected in [([None] * len(columns), False), ([0] + [None] * (len(columns) - 1), True),
+                          ([3] * len(columns), True)]:
+        assert any(value is not None for value in row) is expected
+    # Filtering is report-wide: a partially defined chart keeps its null days, not a fabricated line/zero.
+    rows = [[None] * len(columns), [0] + [None] * (len(columns) - 1)]
+    filtered = rows if any(value is not None for row in rows for value in row) else []
+    assert filtered == rows and filtered[0] == [None] * len(columns)
+    assert "real(null)" in content["query"]  # Existing completeness semantics remain unchanged.
 
 
 def test_token_request_usage_nulls_privacy_and_explicit_source_separation(workbook):

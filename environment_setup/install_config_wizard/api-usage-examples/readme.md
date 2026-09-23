@@ -5,6 +5,47 @@ against Tkinter widgets, MAUI views, generated configuration files or shell
 launchers. These examples and the [Azure Factory CLI / Python SDK](../../azurefactory-cli/readme.md)
 use the same HTTP API.
 
+## Monitoring reports without collection or deployment
+
+With the sibling CLI/SDK installed and an approved local API already running:
+
+```powershell
+azurefactory monitoring catalog
+python .\python\monitoring_report.py --request .\monitoring\sample-summary.json --summary
+python .\python\monitoring_report.py --request .\monitoring\sample-report.json
+python .\python\monitoring_report.py --request .\monitoring\sample-export.json --export
+pwsh -NoProfile -File .\powershell\Request-AzureFactory.ps1 -Method POST `
+  -Path /api/v1/monitoring/report -BodyFile .\monitoring\sample-report.json -AllowWrite
+```
+
+The raw client's `-AllowWrite` permits HTTP POST; this specific canonical report
+endpoint only calculates from supplied/sample evidence. It is not the legacy
+automation start endpoint. These examples print responses, never launch Azure
+collectors or write report files. API credentials use the existing environment
+configuration described below.
+
+The six report IDs are `agent-value`, `showback`, `foundry-tokens`,
+`foundry-usage`, `quality-reliability`, `security-governance`. Change the sample
+request's report ID to inspect each family. Project `001` under All factories
+can match multiple compound identities; specify factory/scaleset/environment
+for a single placement. The canonical response preserves filters, metric
+provenance, missing evidence and sample labeling. Export returns the same scoped
+projection as the API's CSV attachment, printed to stdout.
+
+`--summary` calls `POST /api/v1/monitoring/summary` and returns all six report
+sections under one source/scope/window. Its request has no `report_id`, and rows
+are included only once. Summary and detailed requests accept paired
+`start_date` / `end_date` values as inclusive UTC dates, at most 90 days.
+Intervals must be fully contained; no partial-period cost or benefit is prorated.
+Omitted bounds preserve legacy behavior, and `days` remains sample-generation
+length rather than a live lookback. Use the returned frozen `sample_clock` and
+observed period when selecting sample dates.
+
+For live imports, supply an explicitly reviewed canonical request with
+`source: live` and observation evidence. No API-host path or Azure authentication
+is inferred. Estimates are not bills; modeled benefit is not verified realized
+value, and model tokens are not business outcomes.
+
 ## Which API?
 
 **Tkinter is the canonical backend**, here at

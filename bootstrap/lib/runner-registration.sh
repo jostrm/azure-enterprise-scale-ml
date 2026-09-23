@@ -114,7 +114,80 @@ aif_linux_runner_worker_check() {
     { printf '%s\n' 'Invalid captured runner PATH; inspect .path explicitly.' >&2; return 1; }
   printf '%s\n%s\n' "$script" 'aif_runner_prerequisites_main --check --require-runner-runtime --require-az-modules' |
     (cd "$home" && runuser -u "$worker" -- env -i HOME="$home" USER="$worker" LOGNAME="$worker" PATH="$path" \
-      AZURE_BICEP_USE_BINARY_FROM_PATH=true /bin/bash -c 'source /dev/stdin')
+      AZURE_BICEP_USE_BINARY_FROM_PATH=true /bin/bash -c 'source <(cat)')
+}
+
+aif_linux_runner_verify_package() {
+  python3 - "$@" <<'PY'
+import hashlib
+import os
+import pathlib
+import posixpath
+import re
+import stat
+import sys
+import tarfile
+
+root, package = map(pathlib.Path, sys.argv[1:3])
+checksum, uid = sys.argv[3], int(sys.argv[4])
+def require(value, message):
+    if not value:
+        raise SystemExit(message)
+def digest(stream):
+    result = hashlib.sha256()
+    while chunk := stream.read(1024 * 1024):
+        result.update(chunk)
+    return result.hexdigest()
+require(re.fullmatch(r"[a-f0-9]{64}", checksum), "Explicit reviewed package SHA256 is required")
+require(root.is_dir() and not root.is_symlink() and root.stat().st_uid == uid,
+        "Resume requires the exact dedicated-worker package directory")
+require(package.is_file() and not package.is_symlink(), "Verified package must be a regular file")
+with package.open("rb") as stream:
+    require(digest(stream) == checksum, "Resume package SHA256 mismatch")
+for name in (".agent", ".runner", ".service", ".credentials", ".credentials_rsaparams"):
+    require(not os.path.lexists(root / name), "Existing registration prevents package-only resume")
+with tarfile.open(package) as archive:
+    expected = {}
+    for entry in archive:
+        path = pathlib.PurePosixPath(entry.name)
+        require(not path.is_absolute() and ".." not in path.parts, "Unsafe resume archive path")
+        if str(path) == ".":
+            continue
+        name = str(path)
+        require(name not in expected, "Duplicate resume archive entry")
+        require(entry.isdir() or entry.isfile() or entry.issym() or entry.islnk(), "Unsafe resume archive type")
+        if entry.issym() or entry.islnk():
+            target = pathlib.PurePosixPath(entry.linkname)
+            resolved = posixpath.normpath(posixpath.join(str(path.parent), str(target)) if entry.issym() else str(target))
+            require(not target.is_absolute() and resolved != ".." and not resolved.startswith("../"),
+                    "Unsafe resume archive link")
+        expected[name] = entry
+    directories = {str(parent) for name in expected for parent in pathlib.PurePosixPath(name).parents
+                   if str(parent) != "."}
+    actual = {}
+    for directory, folders, files in os.walk(root, followlinks=False):
+        for name in folders + files:
+            path = pathlib.Path(directory) / name
+            actual[path.relative_to(root).as_posix()] = path
+    require(set(actual) == set(expected) | directories, "Unregistered directory differs from verified package inventory")
+    # Follow archive order so gzip never repeatedly decompresses earlier package contents.
+    for name in (*expected, *sorted(directories - set(expected))):
+        path = actual[name]
+        info = path.lstat()
+        require(info.st_uid == uid and not info.st_mode & (stat.S_ISUID | stat.S_ISGID),
+                "Resume package ownership or permissions differ")
+        entry = expected.get(name)
+        if entry is None or entry.isdir():
+            require(stat.S_ISDIR(info.st_mode), "Resume package directory differs")
+        elif entry.issym():
+            require(stat.S_ISLNK(info.st_mode) and os.readlink(path) == entry.linkname, "Resume package symlink differs")
+        else:
+            require(stat.S_ISREG(info.st_mode), "Resume package file type differs")
+            require(path.resolve().is_relative_to(root.resolve()), "Resume package file escapes directory")
+            with path.open("rb") as local, archive.extractfile(entry) as official:
+                require(digest(local) == digest(official), "Resume package file content differs")
+print("Verified exact unregistered official package; no existing registration was adopted.")
+PY
 }
 
 aif_linux_runner_download() {
@@ -231,7 +304,7 @@ aif_linux_runner_main() (
   [[ "$ID" == ubuntu && ( "$VERSION_ID" == 22.04 || "$VERSION_ID" == 24.04 ) ]] || exit 1
   local root=/opt/aifactory-agent worker=aifactory-ado home=/var/lib/aifactory-ado
   if [[ "$provider" == gha ]]; then root=/opt/aifactory-gha-runner; worker=aifactory-gha; home=/var/lib/aifactory-gha; fi
-  local path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin configured
+  local path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin configured resume_verified=false
   [[ ! -L "$root" && ! -L /opt && ! -L "$home" ]] || { printf '%s\n' 'Refusing symlinked runner roots.' >&2; exit 1; }
   [[ ! -e "$root" || -d "$root" ]] || { printf '%s\n' 'Runner root is not a directory; inspect explicitly.' >&2; exit 1; }
   # Ubuntu supplies Python; fail safely instead of installing before local ownership checks.
@@ -242,7 +315,22 @@ aif_linux_runner_main() (
   elif [[ "$remote_exists" == true ]]; then
     printf '%s\n' 'Provider already has this name but local registration is absent; refusing takeover.' >&2; exit 1
   elif [[ -d "$root" && -n "$(find "$root" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
-    printf '%s\n' 'Unregistered nonempty runner directory; inspect explicitly. Nothing was deleted.' >&2; exit 1
+    # Only an explicitly reviewed package-only failure may resume; default takeover rejection remains.
+    if [[ "$provider" != ado || "$install_missing" != true ||
+          ! "${ResumePackageSha256:-}" =~ ^[a-f0-9]{64}$ ||
+          "${ResumePackageSha256:-}" != "${PackageSha256:-}" ]]; then
+      printf '%s\n' 'Unregistered nonempty runner directory; inspect explicitly. Nothing was deleted.' >&2; exit 1
+    fi
+    aif_linux_runner_worker "$worker" "$home" false || exit
+    [[ ! -e /etc/systemd/system/vsts.agent.aifactory.service &&
+       ! -L /etc/systemd/system/vsts.agent.aifactory.service ]] ||
+      { printf '%s\n' 'Existing service prevents package-only resume.' >&2; exit 1; }
+    local resume_archive="$PWD/.aifactory-runner-resume-${ResumePackageSha256}.tar.gz"
+    if [[ ! -e "$resume_archive" && ! -L "$resume_archive" ]]; then
+      aif_linux_runner_download "$provider" "${PackageUrl:-}" "$ResumePackageSha256" "$resume_archive" || exit
+    fi
+    aif_linux_runner_verify_package "$root" "$resume_archive" "$ResumePackageSha256" "$(id -u "$worker")" || exit
+    resume_verified=true
   fi
   local script="${PrerequisitesScript:-}"
   [[ -n "$script" ]] || script="$(cat "$(dirname "${BASH_SOURCE[0]}")/runner-prerequisites.sh")"
@@ -252,6 +340,9 @@ aif_linux_runner_main() (
     options=(--install-missing --require-runner-runtime --require-az-modules)
   fi
   source /dev/stdin <<< "$script"
+  if [[ "$resume_verified" == true ]]; then
+    aif_runner_repair_partial_az_module_permissions /usr/local/share/powershell/Modules || exit
+  fi
   aif_runner_prerequisites_main "${options[@]}" || exit
   if [[ "$configured" == true ]]; then
     aif_linux_runner_worker_check "$worker" "$home" "$root" "$script" "$path" || exit
@@ -272,12 +363,14 @@ aif_linux_runner_main() (
     { printf '%s\n' 'A protected registration token is required for first registration.' >&2; exit 1; }
   aif_linux_runner_worker "$worker" "$home" true || exit
   install -d -m 750 -o "$worker" -g "$worker" "$root" || exit
-  local archive="$root/runner-package.tar.gz"
-  [[ ! -e "$archive" && ! -L "$archive" ]] || exit 1
-  trap 'rm -f -- "$archive"' EXIT
-  aif_linux_runner_download "$provider" "${PackageUrl:-}" "${PackageSha256:-}" "$archive" || exit
-  chown "root:$worker" "$archive" && chmod 640 "$archive" || exit
-  runuser -u "$worker" -- tar --extract --gzip --no-same-owner --file "$archive" --directory "$root" || exit
+  if [[ "$resume_verified" != true ]]; then
+    local archive="$root/runner-package.tar.gz"
+    [[ ! -e "$archive" && ! -L "$archive" ]] || exit 1
+    trap 'rm -f -- "$archive"' EXIT
+    aif_linux_runner_download "$provider" "${PackageUrl:-}" "${PackageSha256:-}" "$archive" || exit
+    chown "root:$worker" "$archive" && chmod 640 "$archive" || exit
+    runuser -u "$worker" -- tar --extract --gzip --no-same-owner --file "$archive" --directory "$root" || exit
+  fi
   aif_linux_runner_worker_check "$worker" "$home" "$root" "$script" "$path" || exit
   if ! printf '%s\n' "$token" | aif_linux_runner_configure "$worker" "$home" "$root" "$provider" "$url" "$pool" "$name" "$label" "$path"; then
     printf '%s\n' 'Runner configuration failed. Inspect the protected runner diagnostics; no registration was replaced.' >&2; exit 1

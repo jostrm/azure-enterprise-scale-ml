@@ -4,10 +4,22 @@ param enableAgentMonitoring bool = false
 param location string = resourceGroup().location
 
 @description('Existing authorized Log Analytics workspace ARM ID; workbook readers also need query access and private network reachability.')
+@minLength(1)
 param workspaceResourceId string
 
 param workbookDisplayName string = 'AI Factory — Agent business value, cost and security'
 param tags object = {}
+
+var workspaceParts = split(workspaceResourceId, '/')
+var validWorkspacePath = length(workspaceParts) == 9 ? (empty(workspaceParts[0]) && toLower(workspaceParts[1]) == 'subscriptions' && toLower(workspaceParts[3]) == 'resourcegroups' && toLower(workspaceParts[5]) == 'providers' && toLower(workspaceParts[6]) == 'microsoft.operationalinsights' && toLower(workspaceParts[7]) == 'workspaces') : false
+
+// A control-plane read must resolve this exact existing workspace before the workbook write.
+// Malformed paths deliberately produce an invalid empty resource name, never a guessed workspace.
+resource sourceWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
+  scope: resourceGroup(validWorkspacePath ? workspaceParts[2] : subscription().subscriptionId, validWorkspacePath ? workspaceParts[4] : resourceGroup().name)
+  name: validWorkspacePath ? workspaceParts[8] : ''
+}
+var resolvedWorkspaceId = enableAgentMonitoring ? sourceWorkspace.properties.customerId : ''
 
 var rows = loadTextContent('agentMonitoringRows.kql')
 var filteredRows = '''
@@ -62,10 +74,17 @@ ${filteredRows}
 | extend Passed=iff(AvailableObservations > 0 and Mode == "control", Passed, long(null)), Failed=iff(AvailableObservations > 0 and Mode == "control", Failed, long(null)), Checks=iff(AvailableObservations > 0 and Mode == "aggregate", Checks, real(null)), Findings=iff(AvailableObservations > 0 and Mode == "aggregate", Findings, real(null)), Status=case(AvailableObservations == 0, "NO DATA: control evidence required", AvailableObservations < CollectedObservations, "PARTIAL: only observed controls included", "Available"), Calculation="Count supplied evidence-backed controls or sum explicit aggregate findings/checks; aggregate findings are not fabricated individual failed controls"
 '''
 var reportQueries = [
-  { name: 'Business value — evidence-backed minutes saved', query: valueQuery }
-  { name: 'Cost — actual, amortized and estimates remain separate', query: costQuery }
-  { name: 'Security — recorded controls, not inferred compliance', query: securityQuery }
+  { name: 'Legacy v1 — quality-qualified minutes saved (not realized cash)', query: valueQuery }
+  { name: 'Legacy v1 — actual, amortized and estimates remain separate', query: costQuery }
+  { name: 'Legacy v1 — recorded security controls, not inferred compliance', query: securityQuery }
+  { name: 'Canonical v2 — Usage and adoption', query: '${canonicalQueries}\nCanonicalMetrics | where Section == "usage"' }
+  { name: 'Canonical v2 — Foundry token observations (not billing)', query: '${canonicalQueries}\nCanonicalMetrics | where Section == "tokens"' }
+  { name: 'Canonical v2 — Quality and reliability', query: '${canonicalQueries}\nCanonicalMetrics | where Section == "reliability"' }
+  { name: 'Canonical v2 — Showback: distinct actual / amortized / estimated costs', query: '${canonicalQueries}\nCanonicalMetrics | where Section == "cost"' }
+  { name: 'Canonical v2 — Modeled, qualified and verified realized value', query: '${canonicalQueries}\nCanonicalMetrics | where Section == "value"' }
+  { name: 'Canonical v2 — Security and governance evidence', query: '${canonicalQueries}\nCanonicalMetrics | where Section == "security"' }
 ]
+var canonicalQueries = replace(loadTextContent('agentMonitoringCanonical.kql'), '__FILTERED_ROWS__', filteredRows)
 var workbook = {
   version: 'Notebook/1.0'
   items: [
@@ -73,7 +92,14 @@ var workbook = {
       type: 1
       name: 'provenance-and-prerequisites'
       content: {
-        json: '# Agent BUSINESS VALUE + COST + SECURITY\n\n**Data source:** existing Log Analytics workspace / Application Insights `AppEvents`, event `aifactory.agent.observation`. Cost rows must be collected from **Cost Management**; estimates require explicit inputs and formula. This workbook does not collect or fabricate billing data. **Calculation inputs and evidence** are exposed in query result columns and workbook exports.\n\n**All** means all known authorized collected scope in this workspace, not all tenant resources. Five selectors intersect **before** aggregation; identifiers retain leading zeros. Reader RBAC and private-network access still apply. Missing data is **unavailable**, not zero, healthy or compliant. Token volume is not business value. Outcome value requires a baseline, observed duration, completion count, quality gate and evidence. Deployment alone adds no instrumentation, ingestion, cost export or automation schedule.'
+        json: '# Agent value, usage, cost and trust\n\n**Data source:** existing Log Analytics workspace / Application Insights `AppEvents`, event `aifactory.agent.observation`. Native v1 and v2 are supported. V2 preserves canonical observation row grain across all six report families; legacy v1 sections retain their qualified-evidence semantics. Cost rows require **Cost Management** evidence; estimates require supplied formula/inputs. This workbook does not collect or fabricate billing.\n\n**All** means authorized collected scope in this workspace, not all tenant resources. Five selectors intersect **before** aggregation. Missing data is unavailable, not zero, healthy or compliant. V2 complete-row sums and ratios of sums do not sum latency averages or distinct user populations. KQL values outside the exact interoperable numeric range (2^53-1) are explicitly unavailable; original v2 exports retain them.\n\n**Value tiers:** modeled time-saving capacity is not qualified outcomes or cash. Qualified capacity requires explicit true plus completion/baseline/effort evidence; monetary qualification also requires rate evidence and one currency. Qualified labor capacity remains modeled. **Native verified finance metrics are unsupported**: supplied realized benefit and value/cost evidence are preserved, but require the canonical API finance validator for exact approval, currency, period, scope, complete cost coverage and nonoverlap. This workbook never promotes a supplied amount to verified benefit. Input/output tokens are usage, not value. Actual, amortized and estimated costs remain alternative bases.\n\nReader RBAC/private-network access still apply. Deployment adds no instrumentation, ingestion, diagnostic settings, roles, cost exports or schedules. Per-field sources, formulas and evidence are visible in result columns. Native v2 sections use only published live evidence, never embedded samples.'
+      }
+    }
+    {
+      type: 1
+      name: 'existing-workspace-reference'
+      content: {
+        json: '**Resolved existing workspace:** ${resolvedWorkspaceId}\n\nThis deployment-time resource read confirms the configured workspace exists and is readable by the deployment identity. It does not confirm event collection, cost coverage, reader query access or data freshness.'
       }
     }
     {
@@ -155,3 +181,4 @@ resource agentWorkbook 'Microsoft.Insights/workbooks@2023-06-01' = if (enableAge
 }
 
 output workbookResourceId string = enableAgentMonitoring ? agentWorkbook!.id : ''
+output workbookUrl string = enableAgentMonitoring ? 'https://portal.azure.com/#@${tenant().tenantId}/resource${agentWorkbook!.id}' : ''

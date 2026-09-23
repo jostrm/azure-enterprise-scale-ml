@@ -1,0 +1,145 @@
+// Canonical v1 input rows retain their original grain inside native v2 wrappers.
+let CanonicalRows = materialize(__FILTERED_ROWS__
+    | where Kind == 'canonical' and tostring(observation.schema) == 'aifactory.agent-observations/v2'
+    | extend C = observation.canonical
+    | where isempty(tostring(C.source)) or tostring(C.source) == 'live'
+    | extend Subscription=trim(@'\s+', tostring(C.subscription_id)), ResourceGroup=trim(@'\s+', tostring(C.resource_group)), ResourceId=trim(@'\s+', tostring(C.resource_id)), SuppliedCostScope=trim(@'\s+', tostring(C.cost_scope))
+    | extend GroupScope=strcat('/subscriptions/', Subscription, '/resourceGroups/', ResourceGroup)
+    | extend ValidMetadata=gettype(C.metadata_validated) == 'bool' and tobool(C.metadata_validated) == true
+        and Subscription matches regex '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+        and Subscription != '00000000-0000-0000-0000-000000000000'
+        and ResourceGroup matches regex '^[A-Za-z0-9_().-]{1,90}$' and ResourceGroup !endswith '.' and ResourceGroup !~ 'All'
+        and (isempty(ResourceId) or (ResourceId startswith strcat(GroupScope, '/providers/')
+            and ResourceId matches regex '^/subscriptions/[0-9a-fA-F-]{36}/resourceGroups/[^/]+/providers/[A-Za-z0-9.]+(/[A-Za-z0-9_.()-]+/[A-Za-z0-9_.()-]+)+$'
+            and ResourceId !contains '/../' and ResourceId !contains '/./' and ResourceId !endswith '/..' and ResourceId !endswith '/.'))
+    | extend EffectiveCostScope=coalesce(SuppliedCostScope, ResourceId, GroupScope)
+    | extend CostAnalysisUrl=iff(ValidMetadata and (EffectiveCostScope =~ GroupScope or EffectiveCostScope =~ ResourceId)
+        and isnotempty(trim(@'\s+', Project)) and tolower(trim(@'\s+', Project)) !in ('all', 'unknown', 'undefined', 'null', 'unavailable', 'n/a'),
+        strcat('https://portal.azure.com/#blade/Microsoft_Azure_CostManagement/Menu/open/costanalysis/scope/', url_encode_component(EffectiveCostScope)), ''));
+let Numeric = (value:dynamic) {
+    gettype(value) in ('long', 'real') and isfinite(todouble(value)) and abs(todouble(value)) <= 9007199254740991.0
+};
+let Referenced = (metadata:dynamic) {
+    gettype(metadata.reference) == 'string' and isnotempty(trim(@'\s+', tostring(metadata.reference)))
+};
+let Fields = datatable(Metric:string, Section:string, Unit:string, Additive:bool) [
+    'requests', 'usage', 'requests', true,
+    'input_tokens', 'tokens', 'tokens', true,
+    'output_tokens', 'tokens', 'tokens', true,
+    'successful_requests', 'reliability', 'requests', true,
+    'latency_samples', 'reliability', 'samples', true,
+    'latency_ms_sum', 'reliability', 'milliseconds', true,
+    'evaluated_responses', 'reliability', 'responses', true,
+    'quality_passed_responses', 'reliability', 'responses', true,
+    'completed_outcomes', 'value', 'outcomes', true,
+    'attempted_outcomes', 'value', 'outcomes', true,
+    'active_users', 'usage', 'users', false,
+    'eligible_users', 'usage', 'users', false,
+    'security_checks', 'security', 'checks', true,
+    'security_findings', 'security', 'findings', true,
+    'actual_cost', 'cost', 'currency', true,
+    'amortized_cost', 'cost', 'currency', true,
+    'token_estimated_cost', 'cost', 'currency', true
+];
+let Measured = CanonicalRows | extend JoinKey=1
+    | join kind=inner (Fields | extend JoinKey=1) on JoinKey
+    | extend Raw=C[Metric], Metadata=C.provenance[Metric], Currency=trim(@'\s+', tostring(C.currency))
+    | extend Available=Numeric(Raw) and (Metric in ('actual_cost', 'amortized_cost') or todouble(Raw) >= 0)
+        and (Metric in ('latency_ms_sum', 'actual_cost', 'amortized_cost', 'token_estimated_cost') or floor(todouble(Raw), 1.0) == todouble(Raw))
+        and (Section != 'cost' or
+            (Metric == 'token_estimated_cost' and gettype(Metadata.formula) == 'string'
+                and isnotempty(trim(@'\s+', tostring(Metadata.formula))) and array_length(bag_keys(Metadata.inputs)) > 0)
+            or (Metric in ('actual_cost', 'amortized_cost') and Referenced(Metadata)
+                and coalesce(trim(@'\s+', tostring(Metadata.data_source)), trim(@'\s+', tostring(C.data_source))) == 'Cost Management'))
+    | summarize Total=sum(iff(Available, todouble(Raw), real(null))), AvailableObservations=countif(Available),
+        Observations=count(), Currencies=make_set(Currency), MissingCurrency=countif(isempty(Currency)),
+        Evidence=make_set(Metadata.reference, 20), Inputs=make_set(Metadata, 20),
+        Links=make_set(CostAnalysisUrl, 2), MissingLinks=countif(isempty(CostAnalysisUrl)),
+        Sources=make_set(coalesce(tostring(Metadata.data_source), DataSource), 20)
+        by AiFactory, Scaleset, Project, Environment, Agent, Metric, Section, Unit, Additive
+    | extend Currency=iff(array_length(Currencies) == 1 and MissingCurrency == 0, tostring(Currencies[0]), '')
+    | extend CostAnalysisUrl=iff(array_length(Links) == 1 and MissingLinks == 0, tostring(Links[0]), ''), Tooltip=strcat('Go to Azure Cost analysis for project ', Project)
+    | extend Complete=AvailableObservations == Observations and (Additive or Observations == 1)
+        and (Section != 'cost' or isnotempty(Currency)) and abs(Total) <= 9007199254740991.0
+    | extend Value=iff(Complete, Total, real(null)), ValueClass=iff(Complete, 'observed', 'unavailable'),
+        Unit=iff(Section == 'cost', Currency, Unit),
+        Status=iff(Complete, 'Available', 'Unavailable: missing evidence, mixed currency, non-additive users or unsupported magnitude'),
+        Formula='Sum complete disjoint observations; no mixed currencies, alias token sums, inferred zeros or multirow user sums'
+    | project-away Total, Complete, Currencies, MissingCurrency, Additive, Links, MissingLinks;
+let AggregateInputs = Measured
+    | summarize Values=make_bag(pack(Metric, Value)), Observations=max(Observations),
+        Evidence=make_set(Evidence, 20), Inputs=make_set(Inputs, 20), Sources=make_set(Sources, 20), CostAnalysisUrl=take_any(CostAnalysisUrl), Tooltip=take_any(Tooltip)
+        by AiFactory, Scaleset, Project, Environment, Agent;
+let Ratios = AggregateInputs
+    | extend Items=pack_array(
+        pack('Metric', 'success_rate', 'Section', 'reliability', 'Unit', '%',
+             'Value', iff(todouble(Values.requests) > 0, 100.0 * todouble(Values.successful_requests) / todouble(Values.requests), real(null))),
+        pack('Metric', 'quality_pass_rate', 'Section', 'reliability', 'Unit', '%',
+             'Value', iff(todouble(Values.evaluated_responses) > 0, 100.0 * todouble(Values.quality_passed_responses) / todouble(Values.evaluated_responses), real(null))),
+        pack('Metric', 'mean_latency_ms', 'Section', 'reliability', 'Unit', 'milliseconds',
+             'Value', iff(todouble(Values.latency_samples) > 0, todouble(Values.latency_ms_sum) / todouble(Values.latency_samples), real(null))),
+        pack('Metric', 'adoption_rate', 'Section', 'usage', 'Unit', '%',
+             'Value', iff(Observations == 1 and todouble(Values.eligible_users) > 0, 100.0 * todouble(Values.active_users) / todouble(Values.eligible_users), real(null))))
+    | mv-expand Items
+    | extend Metric=tostring(Items.Metric), Section=tostring(Items.Section), Unit=tostring(Items.Unit), Value=todouble(Items.Value),
+        ValueClass=iff(isnull(todouble(Items.Value)), 'unavailable', 'observed'), Formula='Ratio of complete numerator/denominator sums; positive denominator; user adoption requires one observation'
+    | extend Status=iff(isnull(Value), 'Unavailable: missing inputs or empty denominator', 'Available')
+    | project AiFactory, Scaleset, Project, Environment, Agent, Metric, Section, Unit, Value, ValueClass, Status, Formula, Observations, Evidence, Inputs, Sources, CostAnalysisUrl, Tooltip;
+let ValueInputs = CanonicalRows
+    | extend Valid=Numeric(C.completed_outcomes) and Numeric(C.baseline_minutes_per_outcome) and Numeric(C.actual_minutes_per_outcome)
+        and todouble(C.completed_outcomes) >= 0 and todouble(C.baseline_minutes_per_outcome) >= 0 and todouble(C.actual_minutes_per_outcome) >= 0
+        and not(gettype(C.outcome_quality_passed) == 'bool' and tobool(C.outcome_quality_passed) == false)
+    | extend Minutes=(todouble(C.baseline_minutes_per_outcome) - todouble(C.actual_minutes_per_outcome)) * todouble(C.completed_outcomes),
+        Qualified=Valid and gettype(C.outcome_quality_passed) == 'bool' and tobool(C.outcome_quality_passed) == true
+            and Referenced(C.provenance.completed_outcomes) and Referenced(C.provenance.baseline_minutes_per_outcome) and Referenced(C.provenance.actual_minutes_per_outcome),
+        RateValid=Numeric(C.labor_rate_per_hour) and todouble(C.labor_rate_per_hour) >= 0,
+        Currency=trim(@'\s+', tostring(C.currency))
+    | extend Valid=Valid and isfinite(Minutes) and abs(Minutes) <= 9007199254740991.0,
+        Qualified=Qualified and isfinite(Minutes) and abs(Minutes) <= 9007199254740991.0,
+        CapacityValue=Minutes * todouble(C.labor_rate_per_hour) / 60.0
+    | extend CapacityValid=RateValid and isfinite(CapacityValue) and abs(CapacityValue) <= 9007199254740991.0
+    | summarize Modeled=sum(iff(Valid, Minutes, real(null))), ModeledCount=countif(Valid),
+        ModeledValue=sum(iff(Valid and CapacityValid, CapacityValue, real(null))),
+        ModeledValueCount=countif(Valid and CapacityValid),
+        QualifiedMinutes=sum(iff(Qualified, Minutes, real(null))), QualifiedCount=countif(Qualified),
+        QualifiedOutcomes=sum(iff(Qualified, todouble(C.completed_outcomes), real(null))),
+        QualifiedValue=sum(iff(Qualified and CapacityValid and Referenced(C.provenance.labor_rate_per_hour), CapacityValue, real(null))),
+        QualifiedValueCount=countif(Qualified and CapacityValid and Referenced(C.provenance.labor_rate_per_hour)),
+        Observations=count(), Currencies=make_set(Currency), MissingCurrency=countif(isempty(Currency)),
+        Evidence=make_set(C.provenance, 20), Inputs=make_set(pack('completed', C.completed_outcomes, 'baseline', C.baseline_minutes_per_outcome, 'actual', C.actual_minutes_per_outcome, 'rate', C.labor_rate_per_hour, 'qualityPassed', C.outcome_quality_passed), 20), Sources=make_set(DataSource, 20),
+        FinanceEvidence=make_set(pack('realized_benefit_amount', C.realized_benefit_amount, 'value_evidence', C.value_evidence, 'cost_evidence', C.cost_evidence), 20),
+        Links=make_set(CostAnalysisUrl, 2), MissingLinks=countif(isempty(CostAnalysisUrl))
+        by AiFactory, Scaleset, Project, Environment, Agent
+    | extend Currency=iff(array_length(Currencies) == 1 and MissingCurrency == 0, tostring(Currencies[0]), ''),
+        CostAnalysisUrl=iff(array_length(Links) == 1 and MissingLinks == 0, tostring(Links[0]), ''), Tooltip=strcat('Go to Azure Cost analysis for project ', Project);
+let ValueMetrics = ValueInputs
+    | extend Items=pack_array(
+        pack('Metric', 'modeled_minutes_saved', 'Class', 'modeled-time-saving', 'Unit', 'minutes saved', 'Count', ModeledCount,
+             'Value', iff(ModeledCount == Observations, Modeled, real(null))),
+        pack('Metric', 'modeled_capacity_value', 'Class', 'modeled-time-saving', 'Unit', Currency, 'Count', ModeledValueCount,
+             'Value', iff(ModeledValueCount == Observations and isnotempty(Currency), ModeledValue, real(null))),
+        pack('Metric', 'qualified_minutes_saved', 'Class', 'qualified-capacity', 'Unit', 'minutes saved', 'Count', QualifiedCount,
+             'Value', iff(QualifiedCount == Observations and Observations > 0, QualifiedMinutes, real(null))),
+        pack('Metric', 'qualified_hours_saved', 'Class', 'qualified-capacity', 'Unit', 'hours saved', 'Count', QualifiedCount,
+             'Value', iff(QualifiedCount == Observations and Observations > 0 and abs(QualifiedMinutes) <= 9007199254740991.0, QualifiedMinutes / 60.0, real(null))),
+        pack('Metric', 'qualified_outcomes', 'Class', 'qualified-outcomes', 'Unit', 'outcomes', 'Count', QualifiedCount,
+             'Value', iff(QualifiedCount == Observations and Observations > 0, QualifiedOutcomes, real(null))),
+        pack('Metric', 'qualified_capacity_value', 'Class', 'qualified-capacity', 'Unit', Currency, 'Count', QualifiedValueCount,
+             'Value', iff(QualifiedValueCount == Observations and Observations > 0 and isnotempty(Currency), QualifiedValue, real(null))),
+        pack('Metric', 'verified_realized_value', 'Class', 'verified-realized', 'Unit', Currency, 'Count', 0, 'Value', real(null)),
+        pack('Metric', 'verified_net_value', 'Class', 'verified-realized', 'Unit', Currency, 'Count', 0, 'Value', real(null)),
+        pack('Metric', 'verified_roi_percent', 'Class', 'verified-realized', 'Unit', '%', 'Count', 0, 'Value', real(null)),
+        pack('Metric', 'cost_per_accepted_outcome', 'Class', 'finance-unsupported', 'Unit', Currency, 'Count', 0, 'Value', real(null)))
+    | mv-expand Items
+    | extend Metric=tostring(Items.Metric), Section='value', Value=todouble(Items.Value), Unit=tostring(Items.Unit),
+        ValueTier=tostring(Items.Class), AvailableObservations=tolong(Items.Count)
+    | extend Value=iff(isfinite(Value) and abs(Value) <= 9007199254740991.0, Value, real(null))
+    | extend ValueClass=case(isnull(Value), 'unavailable', Metric == 'qualified_outcomes', 'observed', 'modeled')
+    | extend Status=case(ValueTier in ('verified-realized', 'finance-unsupported'), 'Unsupported: use canonical API finance validation for exact approval, currency, period, scope, coverage and nonoverlap',
+        Metric == 'qualified_capacity_value' and AvailableObservations < Observations, 'Unavailable: ALL rows require qualified outcome inputs, labor rate and rate reference within native range',
+        isnull(Value), 'Unavailable: partial qualification, missing evidence or unsupported magnitude', 'Available'),
+        Formula=case(ValueTier in ('verified-realized', 'finance-unsupported'), 'Not calculated natively: original finance evidence is preserved for canonical API validation.',
+            Metric == 'qualified_capacity_value', 'Qualified minutes / 60 * labor rate; ALL rows require outcome qualification plus labor_rate_per_hour and its provenance reference, one currency and native numeric-range support. Modeled capacity, not realized cash.',
+            'Minutes=(baseline - assisted) * completed; capacity=minutes/60 * supplied rate. Qualified requires ALL visible rows explicit true plus input references. Neither modeled nor qualified capacity is realized cash.')
+    | project AiFactory, Scaleset, Project, Environment, Agent, Metric, Section, Unit, Value, ValueClass, ValueTier, Status, Formula, Observations, AvailableObservations, Evidence, Inputs, FinanceEvidence, Sources, CostAnalysisUrl, Tooltip;
+let CanonicalMetrics = union Measured, Ratios, ValueMetrics;
