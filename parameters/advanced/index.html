@@ -2399,15 +2399,15 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">344</td>
+<td style="text-align: right;">346</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">342</td>
+<td style="text-align: right;">344</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
-<td style="text-align: right;">85</td>
+<td style="text-align: right;">86</td>
 </tr>
 <tr>
 <td><code>helper</code></td>
@@ -2415,19 +2415,19 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>state</code></td>
-<td style="text-align: right;">42</td>
+<td style="text-align: right;">44</td>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">348</td>
+<td style="text-align: right;">350</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 130, 364; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 131, 365; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 366, 390; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 130, 367; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 131, 368; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 369, 393; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -4229,11 +4229,25 @@ reported, not silently represented as multiple settings.</p>
 <td>AI Search SKU Dev ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] ('free' not allowed with private endpoints)</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:skuAISearchDevArray --><!-- parameter json.dev:skuAISearchDevArray --><code>skuAISearchDevArray</code></td>
+<td>No verified binding</td>
+<td>O</td>
+<td>Y: <code>"[\"basic\",\"standard\",\"standard2\"]"</code><br>J.dev: <code>["basic","standard","standard2"]</code></td>
+<td>Sku aisearch dev array.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:skuAISearchStageProd --><!-- parameter json.dev:skuAISearchStageProd --><code>skuAISearchStageProd</code></td>
 <td><code>ADMIN_AISEARCH_TIER</code>, <code>SKU_AISEARCH_STAGEPROD</code> (not in .env template)</td>
 <td>O</td>
 <td>Y: <code>"standard"</code><br>J.dev: <code>"standard"</code></td>
 <td>AI Search SKU Stage/Prod</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skuAISearchStageProdArray --><!-- parameter json.dev:skuAISearchStageProdArray --><code>skuAISearchStageProdArray</code></td>
+<td>No verified binding</td>
+<td>O</td>
+<td>Y: <code>"[\"basic\",\"standard\",\"standard2\"]"</code><br>J.dev: <code>["basic","standard","standard2"]</code></td>
+<td>Sku aisearch stage prod array.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:skuAIServicesDev --><!-- parameter json.dev:skuAIServicesDev --><code>skuAIServicesDev</code></td>
@@ -6604,6 +6618,20 @@ reported, not silently represented as multiple settings.</p>
 <td>Azure AI Services SKU Stage/Prod</td>
 </tr>
 <tr>
+<td><!-- parameter env:SKU_AI_SEARCH_DEV_ARRAY --><code>SKU_AI_SEARCH_DEV_ARRAY</code></td>
+<td>No verified counterpart</td>
+<td>O</td>
+<td><code>"[\"basic\",\"standard\",\"standard2\"]"</code></td>
+<td>Sku ai search dev array.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKU_AI_SEARCH_STAGE_PROD_ARRAY --><code>SKU_AI_SEARCH_STAGE_PROD_ARRAY</code></td>
+<td>No verified counterpart</td>
+<td>O</td>
+<td><code>"[\"basic\",\"standard\",\"standard2\"]"</code></td>
+<td>Sku ai search stage prod array.</td>
+</tr>
+<tr>
 <td><!-- parameter env:SKU_AKS_DEV --><code>SKU_AKS_DEV</code></td>
 <td><code>skuAksDev</code></td>
 <td>O</td>
@@ -7698,7 +7726,7 @@ reported, not silently represented as multiple settings.</p>
 <tr>
 <td><!-- parameter bootstrap:AIF_ADMIN_VM_SIZE --><code>AIF_ADMIN_VM_SIZE</code></td>
 <td>O</td>
-<td><code>"Standard_D2s_v5"</code></td>
+<td><code>"$([[ \"$AIF_RUNNER_VM_OS\" == linux ]] &amp;&amp; echo Standard_D4s_v5 &amp;#124;&amp;#124; echo Standard_D2s_v5)"</code></td>
 <td>Self-hosted admin VM size</td>
 </tr>
 <tr>
@@ -7878,8 +7906,14 @@ reported, not silently represented as multiple settings.</p>
 <tr>
 <td><!-- parameter bootstrap:AIF_RUNNER_VM_NAME --><code>AIF_RUNNER_VM_NAME</code></td>
 <td>O</td>
-<td><code>"dsvm-cmn-${AIF_LOCATION_SHORT}-dev-001"</code></td>
+<td><code>"$default_name"</code></td>
 <td>Aif runner vm name override; see create launcher.</td>
+</tr>
+<tr>
+<td><!-- parameter bootstrap:AIF_RUNNER_VM_OS --><code>AIF_RUNNER_VM_OS</code></td>
+<td>O</td>
+<td><code>"$([[ \"$AIF_ROUTE\" == gha ]] &amp;&amp; echo linux &amp;#124;&amp;#124; echo windows)"</code></td>
+<td>Aif runner vm os override; see create launcher.</td>
 </tr>
 <tr>
 <td><!-- parameter bootstrap:AIF_RUNNER_VM_RESOURCE_GROUP --><code>AIF_RUNNER_VM_RESOURCE_GROUP</code></td>
@@ -8264,6 +8298,12 @@ reported, not silently represented as multiple settings.</p>
 <td><code>common_values</code>; Github repository visibility</td>
 </tr>
 <tr>
+<td><!-- parameter state:github_runner_label --><code>github_runner_label</code></td>
+<td>C</td>
+<td>Required lookup</td>
+<td><code>apply_gha</code>; Github runner label</td>
+</tr>
+<tr>
 <td><!-- parameter state:hub_resource_group --><code>hub_resource_group</code></td>
 <td>O</td>
 <td><code>""</code></td>
@@ -8334,6 +8374,12 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>null</code></td>
 <td><code>apply_gha</code>, <code>common_values</code>; Runner mode</td>
+</tr>
+<tr>
+<td><!-- parameter state:runner_vm_os --><code>runner_vm_os</code></td>
+<td>O</td>
+<td><code>"windows"</code>, <code>"linux"</code></td>
+<td><code>apply_gha</code>, <code>common_values</code>; Runner vm os</td>
 </tr>
 <tr>
 <td><!-- parameter state:scaleset_suffix --><code>scaleset_suffix</code></td>
