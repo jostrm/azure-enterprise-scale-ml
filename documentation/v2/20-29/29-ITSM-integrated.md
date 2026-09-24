@@ -10,6 +10,135 @@ retry, cancel, approve, or redeploy a workflow. Workflow monitoring also does no
 replace the separate factory setup, deployment approval, or distributed-lock
 requirements.
 
+## Prerequisites and scope
+
+The Python examples need **both** the `azurefactory-cli` package (which provides
+the `azurefactory` Python SDK) and a separately running AI Factory API. Installing
+the package does not install/start the backend, generate an API key, or sign in
+to GitHub. `AzureFactoryClient()` only reads the client's connection settings.
+
+### 1. Install the Python SDK and CLI
+
+Use **Python 3.10 or newer** and an updated checkout of this repository containing
+`environment_setup\azurefactory-cli`, from `main` or `release/v.1.25`.
+The commands below use **PowerShell 7 or newer**; replace the checkout path with
+your own:
+
+```powershell
+Set-Location "C:\path\to\azure-enterprise-scale-ml"
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e .\environment_setup\azurefactory-cli
+python -c "from azurefactory.client import AzureFactoryClient; print('SDK import OK')"
+```
+
+Install from this repository's package directory, not an assumed PyPI package
+named `azurefactory`. The editable install above provides both the
+`from azurefactory.client import AzureFactoryClient` import and the
+`azurefactory` command. See the [CLI/SDK installation guide](../../../environment_setup/azurefactory-cli/readme.md#install).
+
+Run your Python script with this same activated environment. In an IDE or
+notebook, select this virtual environment as the interpreter/kernel; installing
+into a different Python environment will still leave the import unavailable.
+The import check does not need an API server or credentials.
+
+### 2. Start or obtain access to the API backend
+
+Use an updated API containing `/api/v1/workflow-runs/status` and
+`/api/v1/workflow-runs/events`. The canonical backend is in the separate
+`008_aifactory_admin_ux_tkinter` repository, not this SDK package.
+
+**If you run the standalone source backend:** install that repository's
+documented prerequisites in its own Python environment. Create a strong random
+API secret using your approved secret manager, then supply it to the server
+before startup. In a separate server terminal, with the backend environment
+activated:
+
+```powershell
+Set-Location "C:\path\to\008_aifactory_admin_ux_tkinter"
+$env:AIFACTORY_API_KEY = Read-Host "API secret from your secret manager" -MaskInput
+gh auth status --hostname github.com
+python -m src.api
+```
+
+Keep the server terminal running. The standalone source server defaults to
+`http://127.0.0.1:8765`; use its actual address if the operator changed the port.
+`gh auth status` checks existing authentication, not sign-in. Before monitoring,
+the API host's GitHub CLI (`gh`) must be installed and authenticated as an account
+or approved automation identity that can read the selected repository's Actions
+runs. If needed, complete `gh auth login --hostname github.com` interactively on
+the API host before starting it. Monitoring never launches sign-in for you.
+
+**If you use the packaged MAUI app or an operator-managed API:** obtain the
+authorized URL and key from the host/operator instead of generating a new client
+key. MAUI starts its bundled API on a dynamically selected loopback port with a
+per-process key. Neither `8765` nor the example port `64979` is a guaranteed MAUI
+port, and connection settings may change after restart. This guide does not
+provide a MAUI key-export UI or command; do not scrape another process's
+environment. For a standalone integration without an operator-provided
+connection, use the source-backend setup above.
+
+See [API host and connection guidance](../../../environment_setup/install_config_wizard/api-usage-examples/readme.md#which-api)
+for the relationship between the source backend and packaged desktop API.
+
+### 3. Configure the client's API URL and key
+
+| Variable | What to set |
+|---|---|
+| `AIFACTORY_API_URL` | The running backend's **base URL**, for example `http://127.0.0.1:8765` for the default standalone server. Do not append `/api/v1`, `/docs`, or a workflow endpoint. |
+| `AIFACTORY_API_KEY` | The **same secret accepted by that server**: the secret you configured before standalone startup, or the authorized key supplied by its operator. |
+
+These values are not an Azure resource endpoint/key, an Azure access token, or a
+GitHub token. Setting an arbitrary secret only in the client will not authorize
+it. If the URL is omitted, the SDK defaults to `http://127.0.0.1:8765`; the key
+has no usable default for authenticated calls.
+
+In the **client terminal** from step 1:
+
+```powershell
+$env:AIFACTORY_API_URL = "http://127.0.0.1:8765" # Replace if your API uses another address.
+$env:AIFACTORY_API_KEY = Read-Host "Enter the same API secret accepted by the server" -MaskInput
+azurefactory health
+azurefactory doctor
+```
+
+The masked prompts keep the secret out of the visible command and shell history.
+For unattended clients, inject it through your approved secret-management
+mechanism instead. Never commit it to a script, notebook, `.env` file, or
+repository. The SDK sends it as the `X-API-Key` header, not in the URL.
+Environment variables set here apply to this terminal and processes launched
+from it; configure them separately for an already-running IDE or another shell.
+
+`health` checks reachability without a key; success does **not** prove
+authentication or GitHub access. `doctor` checks API compatibility; the exact-run
+status call below checks workflow monitoring. An old API missing the workflow
+routes must be upgraded, not worked around by changing credentials.
+
+`127.0.0.1` refers to the machine running the client. For a remote ITSM service,
+obtain an authorized, secured integration endpoint from its operator; do not
+expose a desktop loopback listener publicly. The SDK permits plain HTTP only for
+loopback hosts and requires HTTPS for non-loopback hosts.
+
+### 4. Identify the exact GitHub run
+
+Supply the exact repository and numeric GitHub run ID. For
+`https://github.com/contoso/ai-factory/actions/runs/123456789`, use repository
+`contoso/ai-factory` and run ID `123456789`. Replace these illustrative values with
+a real run that the API host's identity is authorized to read:
+
+```powershell
+azurefactory workflow status --repository contoso/ai-factory --run-id 123456789
+```
+
+Never identify a deployment by asking for the repository's "latest run." Another
+person or workflow can start a run concurrently. Retain the verified remote run
+ID returned or recorded by the deployment process. The GitHub run ID is not the
+AI Factory's local job UUID.
+
+The current provider is GitHub.com. Azure DevOps, arbitrary GitHub Enterprise
+hosts, and custom callback URLs are not implicitly supported by these routes.
+Using the same event contract for another provider requires a separate adapter.
+
 ## Integration architecture
 
 ```text
@@ -79,27 +208,6 @@ Keep `status`, `conclusion`, and monitoring health separate.
 A successful workflow conclusion is not, by itself, independent evidence that
 every Azure resource is healthy. Retain deployment verification and any
 application-specific acceptance checks.
-
-## Prerequisites and scope
-
-1. Run an updated AI Factory API containing the workflow-monitor routes.
-2. On the API host, authenticate GitHub CLI (`gh`) using an account or approved
-   automation identity that can read the selected repository's Actions runs.
-   Monitoring does not launch an interactive sign-in for you.
-3. Give the consumer the authorized API URL and API key through its normal
-   protected configuration. The API key and GitHub credentials are different.
-4. Supply the exact repository and numeric GitHub run ID. For
-   `https://github.com/contoso/ai-factory/actions/runs/123456789`, use repository
-   `contoso/ai-factory` and run ID `123456789`.
-
-Never identify a deployment by asking for the repository's "latest run." Another
-person or workflow can start a run concurrently. Retain the verified remote run
-ID returned or recorded by the deployment process. The GitHub run ID is not the
-AI Factory's local job UUID.
-
-The current provider is GitHub.com. Azure DevOps, arbitrary GitHub Enterprise
-hosts, and custom callback URLs are not implicitly supported by these routes.
-Using the same event contract for another provider requires a separate adapter.
 
 ## API: current status and SSE
 
@@ -192,8 +300,8 @@ publicly just to make a browser example work.
 
 ## CLI examples
 
-Configure the API URL and key privately using the existing CLI configuration.
-These commands read one exact run:
+Complete the [prerequisites](#prerequisites-and-scope) first, including SDK/CLI
+installation and private API URL/key configuration. These commands read one exact run:
 
 ```bash
 azurefactory workflow status --repository contoso/ai-factory --run-id 123456789
@@ -221,6 +329,10 @@ Timeouts stop observation, not the workflow.
 | `6` | AI Factory API authentication failure. |
 
 ### Python callback subscription
+
+First complete the [prerequisites](#prerequisites-and-scope). Save the example as
+`watch_workflow.py`, replace the sample repository/run ID with your actual run,
+and execute `python .\watch_workflow.py` from the configured client terminal.
 
 The SDK exposes `get_workflow_run_status`, `watch_workflow_run` (an event
 generator), and `subscribe_workflow_run` (a synchronous callback adapter).
