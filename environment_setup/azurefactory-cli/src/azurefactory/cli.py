@@ -95,6 +95,21 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
 
     add_simple(sub, "health", cmd_health)
+    workflow = sub.add_parser("workflow", help="Read-only GitHub Actions status and events; never dispatch or rerun.")
+    workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
+    for name, handler in (("status", cmd_workflow_status), ("watch", cmd_workflow_watch)):
+        command = add_simple(workflow_sub, name, handler)
+        command.add_argument("--repository", required=True, help="Exact GitHub OWNER/REPO.")
+        command.add_argument("--run-id", type=int, required=True)
+        command.add_argument("--json", action="store_true", help="JSON status, or one JSON event per line when watching.")
+        if name == "watch":
+            command.add_argument("--after", help="Opaque event cursor from an earlier observation.")
+            command.add_argument("--follow", action=argparse.BooleanOptionalAction, default=True)
+            command.add_argument("--timeout", dest="watch_timeout", type=positive_float, default=300.0,
+                                 help="Overall observation deadline seconds (default 300); does not cancel the workflow.")
+            command.add_argument("--max-retries", type=int, default=3, help="Maximum read-only reconnects (default 3).")
+            command.add_argument("--backoff-initial", type=positive_float, default=0.5)
+            command.add_argument("--backoff-max", type=positive_float, default=8.0)
     api = sub.add_parser("api", help="Discover/start the supported standalone API; no desktop app is required.")
     api_sub = api.add_subparsers(dest="api_command", required=True)
     add_simple(api_sub, "instructions", cmd_api_instructions,
@@ -413,6 +428,60 @@ def client(args) -> AzureFactoryClient:
 
 def cmd_health(args):
     return emit(client(args).health())
+
+
+def _workflow_output(args, event):
+    from .workflow_events import monitoring_unavailable
+
+    event = redact_secrets(event, args.api_key)
+    if args.json:
+        print(json.dumps(event, ensure_ascii=False, separators=(",", ":")), flush=True)
+    else:
+        # JSON-escape server strings even in human-readable terminal output.
+        label = json.dumps(f"{event['repository']} run {event['run_id']} attempt {event['run_attempt']}", ensure_ascii=True)
+        state = (event["status"] or "unknown") + ("/" + event["conclusion"] if event["conclusion"] else "")
+        print(f"{label}: {event['event_type']} {state}", flush=True)
+    if monitoring_unavailable(event):
+        print("Workflow monitoring error; workflow outcome is not inferred.", file=sys.stderr, flush=True)
+
+
+def _workflow_exit(event):
+    from .workflow_events import WorkflowMonitorError, monitoring_unavailable
+
+    if event is None or monitoring_unavailable(event):
+        raise WorkflowMonitorError("Workflow monitoring has no current healthy observation; workflow outcome is unknown.")
+    if event["status"] == "completed":
+        if event["conclusion"] is None:
+            raise WorkflowMonitorError("Workflow completed without an observed conclusion; outcome is unknown.")
+        # neutral/skipped, like every conclusion other than success, are non-success.
+        return EXIT_OK if event["conclusion"] == "success" else EXIT_FAILURE
+    return EXIT_OK
+
+
+def cmd_workflow_status(args):
+    event = client(args).get_workflow_run_status(args.repository, args.run_id)
+    _workflow_output(args, event)
+    return _workflow_exit(event)
+
+
+def cmd_workflow_watch(args):
+    events = client(args).watch_workflow_run(
+        args.repository, args.run_id, after=args.after, follow=args.follow,
+        timeout=args.watch_timeout, max_retries=args.max_retries,
+        backoff_initial=args.backoff_initial, backoff_max=args.backoff_max,
+    )
+    last = None
+    try:
+        while True:
+            try:
+                last = next(events)
+            except StopIteration as finished:
+                last = finished.value or last
+                break
+            _workflow_output(args, last)
+    finally:
+        events.close()
+    return _workflow_exit(last)
 
 
 def cmd_monitoring_catalog(args):
