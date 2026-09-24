@@ -30,6 +30,7 @@ param useAdGroups bool = false
 param enableAdminVM bool = false
 @description('Common resource name identifier. Default is "esml-common"')
 param esmlCommonOverride string = 'esml-common'
+@description('Opt in to subscription-wide paid Defender plans for AI, Key Vault and Storage, plus Servers P2 when enableAdminVM is true. Review existing plans, extensions and costs before enabling.')
 param enableDefenderforAISubLevel bool = false
 param enableDefenderforAIResourceLevel bool = false
 param commonResourceSuffix string = ''
@@ -114,8 +115,8 @@ module defenderForCloud '../security/defender.bicep' = if (enableDefenderforAISu
   scope: subscription(subscriptionIdDevTestProd)
   name: 'DefenderForCloud-depl${commonRGNamePrefix}${env}${aifactorySuffixRG}${locationSuffix}'
   params: {
-    enableAll: true
-    pricingTier: 'Free'
+    enableAll: false
+    pricingTier: 'Standard'
     advancedPricingTier: 'Standard'
     enableDefenderForAI: enableDefenderforAISubLevel
     enableDefenderForKeyVault: true
@@ -123,6 +124,7 @@ module defenderForCloud '../security/defender.bicep' = if (enableDefenderforAISu
     enableDefenderForContainers: false
     enableDefenderForCloudPosture: false
     enableDefenderForVirtualMachines: enableAdminVM
+    vmSubPlan: 'P2'
     enforce: 'False'
     enableAIPromptEvidence: false
     enableStorageMalwareScanning: true

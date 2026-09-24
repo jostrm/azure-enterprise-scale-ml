@@ -11,11 +11,11 @@ targetScope = 'subscription'
 // - Standard: Advanced security features including threat detection, vulnerability assessments, and compliance
 //
 // TIER BEHAVIOR:
-// - pricingTier (default: Free): Controls AI and Key Vault plans
+// - pricingTier (default: Standard): Controls AI and Key Vault plans
 // - advancedPricingTier (default: Standard): Controls Storage, Containers, Cloud Posture, and Virtual Machines plans
 //
 // ENABLE FLAGS:
-// - enableAll (default: true): Master switch using OR logic - either enableAll=true OR individual plan flag=true will deploy that plan
+// - enableAll (default: false): Explicit override using OR logic - either enableAll=true OR individual plan flag=true will deploy that plan
 // - Individual enable flags: Control specific Defender plans independently (e.g., enableDefenderForAI, enableDefenderForStorage)
 //
 // EXTENSIONS:
@@ -28,17 +28,17 @@ targetScope = 'subscription'
 //
 // EXAMPLE CONFIGURATIONS:
 // 1. All Free tier: enableAll=true, pricingTier='Free', advancedPricingTier='Free'
-// 2. Mixed tiers: enableAll=true, pricingTier='Free', advancedPricingTier='Standard' (recommended for AI workloads)
+// 2. Mixed tiers: enableAll=true, pricingTier='Free', advancedPricingTier='Standard' (explicitly disables paid AI/Key Vault protection)
 // 3. All Standard: enableAll=true, pricingTier='Standard', advancedPricingTier='Standard'
 // 4. Selective: enableAll=false, then enable specific plans (e.g., enableDefenderForAI=true, enableDefenderForStorage=true)
 // ================================================================
 
-@description('Master switch to enable all Defender plans. Set to false to disable all plans regardless of individual settings.')
-param enableAll bool = true
+@description('Explicitly manage all six plans implemented by this module, overriding individual flags. False respects individual flags; disable every flag to leave every plan unmanaged. This is not a complete subscription compliance baseline.')
+param enableAll bool = false
 
-@description('Pricing tier for the AI services plan.')
+@description('Pricing tier for AI and Key Vault. Free explicitly disables paid protection; Standard can incur subscription-wide charges.')
 @allowed(['Standard','Free'])
-param pricingTier string = 'Free'
+param pricingTier string = 'Standard'
 
 @description('Pricing tier for Storage, Containers, Cloud Posture, and Virtual Machines plans.')
 @allowed(['Standard','Free'])
@@ -95,7 +95,7 @@ param enableDefenderForVirtualMachines bool = false
 
 @description('Sub-plan for Virtual Machines (P1 or P2).')
 @allowed(['P1','P2',''])
-param vmSubPlan string = 'P1'
+param vmSubPlan string = 'P2'
 
 @description('Enable MdeDesignatedSubscription extension for VirtualMachines plan.')
 param enableMdeDesignatedSubscription bool = false
@@ -107,7 +107,7 @@ resource defenderForAI 'Microsoft.Security/pricings@2024-01-01' = if (enableAll 
     pricingTier: pricingTier
     enforce: enforce
     subPlan: !empty(aiSubPlan) ? aiSubPlan : null
-    extensions: enableAIPromptEvidence ? [
+    extensions: (pricingTier == 'Standard' && enableAIPromptEvidence) ? [
       {
         name: 'AIPromptEvidence'
         isEnabled: 'True'
@@ -222,7 +222,7 @@ output defenderForStorageEnabled bool = enableAll || enableDefenderForStorage
 output defenderForKeyVaultEnabled bool = enableAll || enableDefenderForKeyVault
 
 @description('AI Prompt Evidence extension enabled.')
-output aiPromptEvidenceEnabled bool = enableAIPromptEvidence
+output aiPromptEvidenceEnabled bool = (enableAll || enableDefenderForAI) && pricingTier == 'Standard' && enableAIPromptEvidence
 
 @description('Storage Malware Scanning extension enabled.')
 output storageMalwareScanningEnabled bool = enableStorageMalwareScanning

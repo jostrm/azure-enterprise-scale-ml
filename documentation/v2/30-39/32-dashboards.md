@@ -729,6 +729,31 @@ not enable paid Defender plans, rotate credentials, modify network access,
 grant additional deployment permissions or guarantee a compliance score.
 Confirm the applicable policy result after deployment and scanner refresh.
 
+#### Subscription Defender and private build agents
+
+`enableDefenderforAISubLevel` remains **false by default**: a reusable factory
+must not silently change a customer's subscription-wide security configuration
+or billing. When explicitly enabled, the common deployment manages paid AI,
+Key Vault and Storage V2 plans, plus Servers **P2** when `enableAdminVM` is true.
+It no longer forces the all-plans override, writes AI/Key Vault to `Free`, or
+selects Servers P1 implicitly. Existing explicit tier overrides on the standalone
+Defender module remain available.
+
+The common opt-in leaves Containers and CSPM unmanaged. The standalone module's
+`enableAll` switch refers only to its six implemented plans, not every Defender
+plan or every customer's compliance baseline. Review centrally managed plans,
+extensions, storage malware-scanning volume and recurring charges before
+opting in; this is not an automatic migration of existing subscriptions.
+The module still configures the selected plans' extensions, so compare them
+with the existing configuration before a rerun.
+
+Admin VMs use private networking; newly provisioned ADO/GitHub runner VMs use
+private NICs with deny-all inbound rules. Agents initiate outbound connections,
+so remediation must not remove their HTTPS, identity, registry, storage or
+private DNS access. Preserve the configured private admin-access path rather
+than adding public SSH/RDP or applying extra inbound restrictions merely to
+clear a delayed assessment.
+
 Four older exported dashboard JSON files remain under
 [`environment_setup/aifactory/azure_dashboards`](../../../environment_setup/aifactory/azure_dashboards).
 Treat these as legacy portal artifacts, distinct from the current Bicep
