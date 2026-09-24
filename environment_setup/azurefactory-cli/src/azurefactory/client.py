@@ -9,12 +9,13 @@ import socket
 import ipaddress
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any
+from typing import Any, Callable, Generator
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from .errors import APIError, AuthError, ConfigError, RedirectError, RequestTimeout
+from .workflow_events import WorkflowRunEvent
 
 DEFAULT_API_URL = "http://127.0.0.1:8765"
 API_URL_ENV = "AIFACTORY_API_URL"
@@ -189,6 +190,39 @@ class AzureFactoryClient:
 
     def schema(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/api/v1/schema"), "schema")
+
+    def get_workflow_run_status(self, repository: str, run_id: int) -> WorkflowRunEvent:
+        """Read one scoped workflow event; never dispatch or rerun a workflow."""
+        from .workflow_events import get_status
+
+        return get_status(self, repository, run_id)
+
+    def watch_workflow_run(
+        self, repository: str, run_id: int, after: str | None = None, follow: bool = True,
+        *, timeout: float = 300.0, max_retries: int = 3,
+        backoff_initial: float = 0.5, backoff_max: float = 8.0,
+    ) -> Generator[WorkflowRunEvent, None, WorkflowRunEvent | None]:
+        """Yield SSE events until completion or the bounded observation deadline.
+
+        Close the generator when cancelling. Retries reconnect the read-only feed,
+        not the workflow. Completion requires stream EOF and current-status confirmation.
+        """
+        from .workflow_events import watch
+
+        return watch(self, repository, run_id, after, follow, timeout=timeout,
+                     max_retries=max_retries, backoff_initial=backoff_initial, backoff_max=backoff_max)
+
+    def subscribe_workflow_run(
+        self, repository: str, run_id: int, callback: Callable[[WorkflowRunEvent], bool | None], **options,
+    ) -> None:
+        """Call a synchronous observer; returning False cancels and closes the feed."""
+        events = self.watch_workflow_run(repository, run_id, **options)
+        try:
+            for event in events:
+                if callback(event) is False:
+                    break
+        finally:
+            events.close()
 
     def monitoring_catalog(self) -> dict[str, Any]:
         """Read canonical report/source capabilities; never start a collector."""
