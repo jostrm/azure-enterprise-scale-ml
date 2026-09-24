@@ -48,9 +48,9 @@ value, and model tokens are not business outcomes.
 
 ## Which API?
 
-**Tkinter is the canonical backend**, here at
-`C:\code\code_py_25\008_aifactory_admin_ux_tkinter\src\api.py`. MAUI's
-`build-windows.ps1` invokes the Tkinter repository's `build-api.ps1` and bundles
+These examples use **the backend Python API used by the AI Factory Configuration
+Wizard**. Its source entry point is `src/api.py` in the backend source directory. MAUI's
+`build-windows.ps1` invokes the backend's `build-api.ps1` and bundles
 `aifactory-api.exe`; MAUI does not implement a competing REST API. The bundled
 host starts it on a dynamically selected loopback port with a per-process
 `X-API-Key`. The source server defaults to port
@@ -515,11 +515,11 @@ Run the existing pytest runner from this folder:
 python -m pytest .\tests -q
 ```
 
-Optionally validate every template against the actual Tkinter Pydantic models
+Optionally validate every template against the backend Python API's Pydantic models
 and in-process route definitions using the backend's existing development environment:
 
 ```powershell
-$env:AIFACTORY_API_SOURCE = 'C:\path\to\008_aifactory_admin_ux_tkinter'
+$env:AIFACTORY_API_SOURCE = 'C:\path\to\ai-factory-backend'
 & "$env:AIFACTORY_API_SOURCE\.venv\Scripts\python.exe" -m pytest .\tests -q
 ```
 

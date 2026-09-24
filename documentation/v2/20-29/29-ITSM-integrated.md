@@ -45,17 +45,17 @@ The import check does not need an API server or credentials.
 ### 2. Start or obtain access to the API backend
 
 Use an updated API containing `/api/v1/workflow-runs/status` and
-`/api/v1/workflow-runs/events`. The canonical backend is in the separate
-`008_aifactory_admin_ux_tkinter` repository, not this SDK package.
+`/api/v1/workflow-runs/events`. This is the backend Python API used by the
+AI Factory Configuration Wizard; it is not included in this SDK package.
 
-**If you run the standalone source backend:** install that repository's
+**If you run the standalone source backend:** install the backend's
 documented prerequisites in its own Python environment. Create a strong random
 API secret using your approved secret manager, then supply it to the server
 before startup. In a separate server terminal, with the backend environment
 activated:
 
 ```powershell
-Set-Location "C:\path\to\008_aifactory_admin_ux_tkinter"
+Set-Location "C:\path\to\ai-factory-backend"
 $env:AIFACTORY_API_KEY = Read-Host "API secret from your secret manager" -MaskInput
 gh auth status --hostname github.com
 python -m src.api
@@ -421,8 +421,8 @@ The purple repository carries the shared monitor in
 `environment_setup/azurefactory-cli`, tests, and this document on both `main`
 and `release/v.1.25`.
 
-The canonical HTTP API and Tkinter integration are in the separate
-`008_aifactory_admin_ux_tkinter` repository. MAUI and its typed client live in
+The backend Python API used by the AI Factory Configuration Wizard is maintained
+separately from this SDK. MAUI and its typed client live in
 `ESAIF.ConfigWizard` and `ESAIF.DomainLayer`. Updating only a purple submodule does
 not update an already running or previously packaged desktop/API binary:
 consumers need the matching API build. An old API returning 404 is an upgrade
