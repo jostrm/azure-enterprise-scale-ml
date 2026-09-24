@@ -5,7 +5,9 @@ import hashlib
 import json
 import os
 import shutil
+import sys
 from pathlib import Path
+from time import sleep as REAL_SLEEP
 from types import SimpleNamespace
 
 import pytest
@@ -267,10 +269,30 @@ def test_repository_execution_retains_published_pin_and_never_stages_saved_draft
     assert all(kwargs.get("environment", {}).get("GIT_INDEX_FILE") for args, kwargs in calls if args[0] == "read-tree")
 
 
+@pytest.fixture
+def offline_git_wait(monkeypatch, no_live):
+    # POSIX subprocess timeout polling must not use the shared no-live sleep guard.
+    monkeypatch.setattr(repository.subprocess, "time", SimpleNamespace(sleep=REAL_SLEEP))
+
+
+def test_offline_git_wait_preserves_no_live_guard(offline_git_wait):
+    for blocked in (lambda: core.time.sleep(0),
+                    lambda: repository.subprocess.run(["git", "--version"]),
+                    core.enrollment.build_opener):
+        with pytest.raises(AssertionError, match="LIVE COMMANDS/HTTP/SLEEP FORBIDDEN"):
+            blocked()
+    repository.subprocess.time.sleep(0)
+    result = REAL_SUBPROCESS_RUN(
+        [sys.executable, "-c",
+         "import os,time; os.close(1); os.close(2); time.sleep(0.1); os._exit(0)"],
+        capture_output=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+
+
 @pytest.mark.parametrize("environment_failure", [False, True])
 @pytest.mark.parametrize("dirty_source", [False, True])
 def test_ignored_probe_is_committed_by_exact_path_without_private_metadata(
-        workspace, tmp_path, environment_failure, dirty_source):
+        workspace, tmp_path, environment_failure, dirty_source, offline_git_wait):
     consumer = tmp_path / "consumer"
     shutil.copytree(workspace[0], consumer)
     source = consumer / repository.SHARED_PATH
@@ -287,7 +309,8 @@ def test_ignored_probe_is_committed_by_exact_path_without_private_metadata(
             ["git", "-c", "core.hooksPath=" + str(hooks), "-c", "core.autocrlf=false",
              "-c", "commit.gpgsign=false", "-C", str(directory), *args],
             input=data, capture_output=True, env={**environment, **(extra_env or {})}, timeout=30)
-        assert result.returncode == 0, result.stderr.decode(errors="replace")
+        if result.returncode:
+            pytest.fail(f"Offline git {args!r} in {directory}: {result.stderr.decode(errors='replace')}")
         return result.stdout
 
     local_git("init", "--initial-branch=main")
@@ -358,6 +381,8 @@ def test_ignored_probe_is_committed_by_exact_path_without_private_metadata(
                               bootstrap_config={"github_repository": "example/factory"}, runtime=runtime)
     result = repository.execute(plan, state_dir=state, runtime=runtime)
     assert result["status"] == ("uncertain" if environment_failure else "succeeded"), result
+    if environment_failure:
+        assert result["error"] == "fixture-environment-response-lost", result
     committed = refs["refs/heads/main"]
     assert local_git("show", committed + ":" + probe) == probe_bytes.replace(b"\r\n", b"\n")
     assert (consumer / probe).read_bytes() == probe_bytes.replace(b"\r\n", b"\n")
