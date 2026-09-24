@@ -196,6 +196,7 @@ def _matching_container_role(value, body, scope):
 def capabilities():
     return {"contract_version": CONTRACT_VERSION, "implemented_stages": ["hub-lock-foundation"],
             "cold_start_supported": True, "requires_common_deployment": False,
+            "storage_provider_registration": "reviewed-register-or-wait",
             "private_transition_implemented": False, "runner_reachability_verified": False,
             "distributed_lock_before_initialization": False, "initialization_governance_required": True}
 
@@ -240,8 +241,14 @@ def prepare(*, source_root, tenant_id, hub_resource_group_id, location, bootstra
             blockers.append("existing-foundation-resource-conflict:" + identifier)
 
     provider = f"/subscriptions/{target['subscription_id']}/providers/Microsoft.Storage"
-    if (read(provider, "2021-04-01") or {}).get("registrationState") != "Registered":
-        blockers.append("storage-provider-registration-required:" + provider)
+    registration_state = (read(provider, "2021-04-01") or {}).get("registrationState")
+    storage_registered = registration_state == "Registered"
+    if registration_state in ("NotRegistered", "Registering"):
+        effects.append({"kind": "provider-register" if registration_state == "NotRegistered" else "provider-wait",
+                        "id": provider, "api": "2021-04-01",
+                        "ownership": "subscription-provider-registration-not-factory-ownership"})
+    elif not storage_registered:
+        blockers.append("storage-provider-state-unavailable:" + provider)
     group = read(rg, enrollment.RG_API)
     if group is None:
         ensure(rg, enrollment.RG_API, {"location": location, "tags": ownership_tags(rg)}, None)
@@ -253,11 +260,12 @@ def prepare(*, source_root, tenant_id, hub_resource_group_id, location, bootstra
     private_required = True
     if account is None:
         require(ip is not None, "approved-bootstrap-public-ipv4-required")
-        available = runtime.az("storage", "account", "check-name", "--name", coords["account_id"].rsplit("/", 1)[1],
-                               "--subscription", target["subscription_id"])
-        observations.append({"kind": "name-availability", "value": copy.deepcopy(available)})
-        if available.get("nameAvailable") is not True:
-            blockers.append("deterministic-hub-account-name-unavailable:" + coords["account_id"])
+        if storage_registered:
+            available = runtime.az("storage", "account", "check-name", "--name", coords["account_id"].rsplit("/", 1)[1],
+                                   "--subscription", target["subscription_id"])
+            observations.append({"kind": "name-availability", "value": copy.deepcopy(available)})
+            if available.get("nameAvailable") is not True:
+                blockers.append("deterministic-hub-account-name-unavailable:" + coords["account_id"])
         ensure(coords["account_id"], enrollment.STORAGE_API, account_body(rg, location, ip), None)
     else:
         try:
@@ -312,6 +320,10 @@ def prepare(*, source_root, tenant_id, hub_resource_group_id, location, bootstra
         "Account/key administrators remain trusted; leases are not a security boundary.",
         "Storage IPv4 firewall rules have NO automatic expiry; a blocked or interrupted workflow does not close the public path.",
     ]
+    if registration_state in ("NotRegistered", "Registering"):
+        warnings.append("Storage provider registration is reviewed for the connectivity subscription, not the workload "
+                        "subscription. Wait for Registered before checking the exact account name or creating storage. "
+                        "A name conflict after registration stops creation; no substitute name or rollback is attempted.")
     if account and account.get("location", "").lower() != location:
         warnings.append("Existing shared account location is retained unchanged: " + str(account.get("location"))
                         + "; requested location applies only to new resources.")
@@ -354,9 +366,15 @@ def prepare(*, source_root, tenant_id, hub_resource_group_id, location, bootstra
             "private_reuse_access": private_reuse_access,
             "bootstrap_network_access": bootstrap_network_access,
             "capabilities": capabilities(), "runtime_ready": False,
-            "commands": [{"transport": "arm", "method": "PUT", "resource_id": e["id"],
-                          "api_version": e["api"], "body": copy.deepcopy(e["body"]),
-                          "precondition": "externally-serialized-initialization-and-resource-still-absent"}
+            "commands": [{"transport": "arm",
+                          "method": "POST" if e["kind"] == "provider-register" else "GET" if e["kind"] == "provider-wait" else "PUT",
+                          "resource_id": e["id"] + ("/register" if e["kind"] == "provider-register" else ""),
+                          "api_version": e["api"],
+                          **({"body": copy.deepcopy(e["body"])} if "body" in e else {}),
+                          "precondition": ("externally-serialized-initialization-and-resource-still-absent"
+                                           if e["kind"] == "arm-create" else
+                                           "registrationState=" + registration_state),
+                          **({"wait_for": "Registered"} if e["kind"].startswith("provider-") else {})}
                          for e in effects] + [
                 {"transport": "storage", "method": "PUT", "blob": lock_blob(rg), "container": CONTAINER,
                  "precondition": "If-None-Match:*", "purpose": "retain-existing-lock-blob"},
@@ -373,6 +391,18 @@ def prepare(*, source_root, tenant_id, hub_resource_group_id, location, bootstra
                                              "Microsoft.Authorization/roleAssignments/write"]},
                             {"service": "storage", "scope": container_id, "principal_id": principal,
                              "role_definition_id": enrollment.DATA_ROLE, "authentication": "Entra-OAuth-only"}]}
+    if registration_state in ("NotRegistered", "Registering"):
+        permissions = ["Microsoft.Resources/subscriptions/providers/read"]
+        if registration_state == "NotRegistered":
+            permissions.append("Microsoft.Storage/register/action")
+        plan["auth_scopes"].append({"service": "arm", "scope": "/subscriptions/" + target["subscription_id"],
+                                    "permissions": permissions})
+        if account is None:
+            plan["commands"].insert(1, {
+                "transport": "azure-cli",
+                "argv": ["az", "storage", "account", "check-name", "--name", coords["account_id"].rsplit("/", 1)[1],
+                         "--subscription", target["subscription_id"]],
+                "precondition": "Microsoft.Storage Registered; nameAvailable=true before any resource creation"})
     if group is None:
         plan["auth_scopes"].append({"service": "arm", "scope": "/subscriptions/" + target["subscription_id"],
                                     "permissions": ["Microsoft.Resources/subscriptions/resourceGroups/write"]})
@@ -478,7 +508,42 @@ def execute(plan, *, state_dir, expected_plan_hash, acknowledge_initialization_g
 
     try:
         for index, effect in enumerate(plan["effects"]):
+            require(time.time() < plan["expires_at"], "foundation-review-expired")
             require(source_fingerprint(plan["source"]["root"]) == plan["source"], "foundation-source-changed")
+            if effect["kind"] in ("provider-register", "provider-wait"):
+                _, _, provider = runtime.arm("GET", effect["id"], effect["api"])
+                expected = "NotRegistered" if effect["kind"] == "provider-register" else "Registering"
+                require(provider.get("registrationState") == expected, "storage-provider-state-changed")
+                receipt["pending_effect"] = index
+                persist()
+                if effect["kind"] == "provider-register":
+                    receipt["changed"] = True
+                    persist()
+                    require(time.time() < plan["expires_at"], "foundation-review-expired")
+                    runtime.arm("POST", effect["id"] + "/register", effect["api"], allowed=(200, 202))
+                for attempt in range(120):
+                    require(time.time() < plan["expires_at"], "foundation-review-expired")
+                    _, _, provider = runtime.arm("GET", effect["id"], effect["api"])
+                    if provider.get("registrationState") == "Registered":
+                        break
+                    require(provider.get("registrationState") == "Registering", "storage-provider-registration-failed")
+                    sleep(5)
+                require(provider.get("registrationState") == "Registered", "storage-provider-registration-uncertain")
+                require(time.time() < plan["expires_at"], "foundation-review-expired")
+                receipt["storage_provider_registered"] = effect["id"]
+                receipt["effects_completed"].append(index)
+                receipt.pop("pending_effect", None)
+                persist()
+                if plan["bootstrap_network_access"]["rule_origin"] == "planned-with-new-account":
+                    require(time.time() < plan["expires_at"], "foundation-review-expired")
+                    available = runtime.az("storage", "account", "check-name",
+                                           "--name", plan["coordination"]["account_id"].rsplit("/", 1)[1],
+                                           "--subscription", plan["target"]["subscription_id"])
+                    require(available.get("nameAvailable") is True, "deterministic-hub-account-name-unavailable")
+                    receipt["storage_name_availability_verified"] = True
+                    persist()
+                continue
+            require(effect["kind"] == "arm-create", "unsupported-foundation-effect")
             status, _, _ = runtime.arm("GET", effect["id"], effect["api"], allowed=(200, 404))
             require(status == 404, "foundation-resource-appeared-after-review:" + effect["id"])
             receipt.update(pending_effect=index, changed=True)

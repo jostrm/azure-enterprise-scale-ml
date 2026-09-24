@@ -230,6 +230,14 @@ def load_request(root, provider, environment="dev", config_source=None, factory_
         if "factory" in configuration or "scale_sets" in configuration:
             effective = {**configuration.get("factory", {}),
                          **configuration.get("scale_sets", {}).get(scale_set_id, {})}
+            # Typed registers own placement; factory defaults can retain template placeholders.
+            effective.update(
+                tenantId=selected["tenant_id"],
+                admin_location=factory["region"],
+                admin_aifactoryPrefixRG=factory["prefix"].rstrip("-") + "-",
+                admin_aifactorySuffixRG="-" + selected["suffix"],
+            )
+            effective[{"dev": "dev_sub_id", "stage": "test_sub_id", "prod": "prod_sub_id"}[environment]] = selected["subscription_id"]
             sources.extend(selected_values(effective, environment))
         variables = configuration.get("variables", {})
         require(isinstance(variables, dict), "invalid-registered-variables")

@@ -754,6 +754,126 @@ def test_foundation_requires_exact_explicit_global_ipv4(workspace, ip):
     assert not runtime.writes
 
 
+@pytest.mark.parametrize("registration", ["Unregistering", "Unavailable", None])
+def test_foundation_missing_provider_preserves_blocker_without_dependent_cli(workspace, registration):
+    class Unregistered(FoundationRuntime):
+        def arm(self, method, identifier, api, **kwargs):
+            if method == "GET" and identifier.lower().endswith("/providers/microsoft.storage"):
+                return 200, {}, {"registrationState": registration}
+            return super().arm(method, identifier, api, **kwargs)
+
+        def az(self, *args):
+            pytest.fail("Name availability must not mask missing Storage registration.")
+
+    runtime = Unregistered()
+    plan = foundation.prepare(**foundation_args(workspace), runtime=runtime)
+    assert not plan["can_execute"]
+    assert any(item.startswith("storage-provider-state-unavailable:") for item in plan["blockers"])
+    assert runtime.writes == []
+    with pytest.raises(foundation.FoundationError, match="plan-blocked"):
+        foundation_execute(plan, workspace, runtime)
+    assert runtime.writes == []
+
+
+@pytest.mark.parametrize("registration", ["Registered", "NotRegistered", "Registering"])
+def test_foundation_registers_only_missing_hub_provider_before_storage(workspace, registration):
+    provider = f"/subscriptions/{EXTERNAL}/providers/Microsoft.Storage"
+    runtime = FoundationRuntime()
+    runtime.resources[provider.lower()] = {"id": provider, "registrationState": registration}
+    calls = []
+    native_az = runtime.az
+
+    def az(*args):
+        assert runtime.resources[provider.lower()]["registrationState"] == "Registered"
+        assert args[-2:] == ("--subscription", EXTERNAL)
+        calls.append(args)
+        return native_az(*args)
+
+    runtime.az = az
+    plan = foundation.prepare(**foundation_args(workspace), runtime=runtime)
+    assert plan["can_execute"], plan["blockers"]
+    assert not runtime.writes
+    provider_effects = [effect for effect in plan["effects"] if effect["kind"].startswith("provider-")]
+    if registration == "Registered":
+        assert not provider_effects and calls
+    else:
+        assert not calls
+        assert provider_effects == [plan["effects"][0]]
+        assert plan["effects"][0]["kind"] == ("provider-register" if registration == "NotRegistered" else "provider-wait")
+        assert plan["commands"][0]["resource_id"] == provider + ("/register" if registration == "NotRegistered" else "")
+        assert plan["commands"][0]["wait_for"] == "Registered"
+        authority = next(item for item in plan["auth_scopes"] if item["scope"] == "/subscriptions/" + EXTERNAL)
+        assert ("Microsoft.Storage/register/action" in authority["permissions"]) is (registration == "NotRegistered")
+    with pytest.raises(foundation.FoundationError, match="initialization-governance-required"):
+        foundation.execute(plan, state_dir=workspace[2], expected_plan_hash=plan["plan_hash"], runtime=runtime)
+    assert not runtime.writes
+
+    def sleep(_):
+        assert registration == "Registering"
+        assert not runtime.writes and not calls
+        runtime.resources[provider.lower()]["registrationState"] = "Registered"
+
+    result = foundation.execute(plan, state_dir=workspace[2], expected_plan_hash=plan["plan_hash"],
+                                acknowledge_initialization_governance=True, runtime=runtime, sleep=sleep)
+    assert result["status"] == "succeeded", result
+    registrations = [item for item in runtime.writes if item[1] == "POST"]
+    assert len(registrations) == (1 if registration == "NotRegistered" else 0)
+    if registrations:
+        assert registrations[0][2] == (provider + "/register").lower()
+        assert runtime.writes[0] == registrations[0]
+    assert calls and runtime.resources[provider.lower()]["registrationState"] == "Registered"
+    assert not any("/subscriptions/" + SUB + "/" in item[2] for item in runtime.writes)
+    rerun = foundation.prepare(**foundation_args(workspace), runtime=runtime)
+    assert rerun["can_execute"] and not rerun["effects"]
+    writes = len(runtime.writes)
+    assert foundation_execute(rerun, workspace, runtime)["status"] == "succeeded"
+    assert len(runtime.writes) == writes
+
+
+@pytest.mark.parametrize("failure", ["denied", "lost-response", "timeout", "failed", "expired", "name-conflict"])
+def test_foundation_registration_failure_never_proceeds_to_storage(workspace, monkeypatch, failure):
+    provider = f"/subscriptions/{EXTERNAL}/providers/Microsoft.Storage"
+    runtime = FoundationRuntime()
+    runtime.resources[provider.lower()] = {"id": provider, "registrationState": "NotRegistered"}
+    original_arm = runtime.arm
+
+    def arm(method, identifier, api, **kwargs):
+        if identifier.lower() == (provider + "/register").lower():
+            if failure == "denied":
+                raise core.enrollment.EnrollmentError("remote-request-failed-403")
+            result = original_arm(method, identifier, api, **kwargs)
+            if failure == "lost-response":
+                raise core.enrollment.EnrollmentError("remote-request-uncertain")
+            if failure in ("timeout", "expired", "failed"):
+                runtime.resources[provider.lower()]["registrationState"] = "Failed" if failure == "failed" else "Registering"
+            return result
+        return original_arm(method, identifier, api, **kwargs)
+
+    runtime.arm = arm
+    runtime.available = failure != "name-conflict"
+    plan = foundation.prepare(**foundation_args(workspace), runtime=runtime)
+    assert plan["can_execute"] and not runtime.writes
+    now = [foundation.time.time()]
+    monkeypatch.setattr(foundation.time, "time", lambda: now[0])
+
+    def sleep(_):
+        if failure == "expired":
+            now[0] = plan["expires_at"]
+
+    result = foundation.execute(plan, state_dir=workspace[2], expected_plan_hash=plan["plan_hash"],
+                                acknowledge_initialization_governance=True, runtime=runtime, sleep=sleep)
+    assert result["status"] == "uncertain" and result["reconciliation_required"]
+    assert result["error"] == {
+        "denied": "remote-request-failed-403", "lost-response": "remote-request-uncertain",
+        "timeout": "storage-provider-registration-uncertain", "failed": "storage-provider-registration-failed",
+        "expired": "foundation-review-expired", "name-conflict": "deterministic-hub-account-name-unavailable",
+    }[failure]
+    assert all(item[1] == "POST" and item[2] == (provider + "/register").lower() for item in runtime.writes)
+    assert not runtime.blobs
+    assert Path(result["initialization_guard_path"]).exists()
+    assert result["bootstrap_network_access"]["rule_write_state"] == "not-attempted"
+
+
 def test_foundation_global_name_collision_does_not_pick_a_random_fallback(workspace):
     runtime = FoundationRuntime()
     runtime.available = False
@@ -930,14 +1050,18 @@ def test_foundation_real_cloud_transport_uses_exact_cached_oid_and_oauth_only():
     assert "opaque" not in serialized and "accessToken" not in serialized
 
 
-def test_foundation_full_real_cloud_prepare_execute_transport_chain(workspace):
+@pytest.mark.parametrize("registered", [False, True])
+def test_foundation_full_real_cloud_prepare_execute_transport_chain(workspace, registered):
     transport = FoundationRuntime()
+    provider = f"/subscriptions/{EXTERNAL}/providers/Microsoft.Storage"
+    transport.resources[provider.lower()] = {"id": provider, "registrationState": "Registered" if registered else "NotRegistered"}
     requests = []
     coordinates = foundation.coordination(HUB_RG)
 
     def run(argv, **kwargs):
         assert argv[0] == "az" and kwargs["shell"] is False
         if argv[1:4] == ["storage", "account", "check-name"]:
+            assert transport.resources[provider.lower()]["registrationState"] == "Registered"
             return SimpleNamespace(returncode=0, stdout=b'{"nameAvailable":true}')
         assert argv[1:3] == ["account", "get-access-token"]
         claims = {"tid": TENANT, "oid": MEMBER, "aud": argv[argv.index("--resource") + 1],
@@ -999,6 +1123,7 @@ def test_foundation_full_real_cloud_prepare_execute_transport_chain(workspace):
     assert result["coordination"] == coordinates and result["bootstrap_data_plane_verified"]
     assert any(method == "HEAD" and url.endswith("hub-locks?restype=container") for method, url in requests)
     assert any(method == "PUT" and "?comp=lease" in url for method, url in requests)
+    assert sum(method == "POST" and "/register?" in url for method, url in requests) == (0 if registered else 1)
     assert json.loads(Path(result["receipt_path"]).read_bytes()) == result
 
 

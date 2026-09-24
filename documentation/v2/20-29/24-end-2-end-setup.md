@@ -13,13 +13,14 @@ are separate operations; a saved definition is not a deployed resource.
 
 ## Two common workflows
 
-- **ITSM-integrated (fully automated):** Teams order projects through ServiceNow,
+- **ITSM/Own Cloud portal integrated (fully automated):** Teams order projects through ServiceNow,
   Jira Service Management or their own cloud portal. A trusted automation runner
   calls the AI Factory API to prepare the exact configuration, apply the team's
   approval policy, confirm execution and track the job. With identities,
   permissions, pipeline bindings and approvals established, this can run without
   manual intervention. The desktop's local API is not a public ITSM endpoint;
   use an authenticated integration, not an exposed loopback port.
+  - See How to integrate the AI Factory to your "cloud portal", by using the AI Factory CLI/API here [Integate with callback](./29-ITSM-integrated.md)
 - **Core-team managed:** The core team uses the
   [Enterprise Scale AI Factory app](../../../environment_setup/install_config_wizard/maui/readme.md)
   to configure from the ticket, review and trigger the pipeline, and follow its
@@ -329,8 +330,18 @@ same-subscription hubs. Existing factory ownership/deletion guards are unchanged
 No-hub setups do not need this foundation. The prerequisite core uses the exact
 reviewed provider initializer reference for serialization instead; a missing or
 changed reference blocks rather than silently running without coordination.
-Storage provider registration is a separate explicit prerequisite if absent;
-the foundation does not silently register providers or verify deployment permissions.
+Provider registration is per subscription: workload-subscription registration
+does not cover a separate connectivity subscription. The hub foundation reviews
+`Microsoft.Storage` registration in its exact connectivity subscription before
+any storage creation. `Registered` is reused without another registration;
+`NotRegistered` adds an explicit register-and-wait effect to the same stage;
+`Registering` waits without submitting a duplicate registration. Preparation
+never registers a provider. Execution requires the reviewed subscription-level
+`Microsoft.Storage/register/action` permission and waits for `Registered`.
+The exact account-name availability check is deferred until registration is
+ready and must succeed before resource creation. A failure, timeout or expired
+review stops storage creation and retains reconciliation evidence; it never
+unregisters the provider or silently changes subscriptions.
 
 The shared starter is `bootstrap/templates/azurefactory/register.json`: a valid
 version-2 register with **zero factories**, empty configurations and empty bindings.

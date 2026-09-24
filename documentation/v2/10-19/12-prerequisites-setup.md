@@ -330,6 +330,20 @@ Note that if a pipeline (to support a new feature) needs a NEW variable, you nee
 
 ## ✅ E) VERIFY, BEFORE running any pipelines: Ensure Azure resource providers are enabled (create if not exists)
 
+Resource-provider registration is **per subscription**. Check the subscriptions
+hosting shared dependencies as well as the common/project subscriptions. A
+working hub VNet/VPN requires `Microsoft.Network`, but does not prove that
+`Microsoft.Storage` is registered for a new hub coordination account.
+
+The registered Full bootstrap hub-foundation stage includes a reviewed
+register-if-needed action for `Microsoft.Storage` in the exact connectivity
+subscription. It reuses `Registered`, registers `NotRegistered`, or waits for an
+existing `Registering` operation. No registration happens during local save or
+read-only preparation. Approved execution waits for `Registered` before account
+name checks and storage provisioning; denied, failed, unknown or timed-out
+registration never proceeds to storage. This does not replace the workload
+provider, private DNS-zone or policy prerequisite checks below.
+
 [Docs-link: 26-enable-resource-providers.ps1](../../../environment_setup/aifactory/bicep/esml-util/26-enable-resource-providers.ps1) | [Local-repo-link](../../../../aifactory/esml-util/26-enable-resource-providers.ps1)
 
 How to run from root:
@@ -469,4 +483,3 @@ The AI Factory automation supports intelligent CRUD: Create Update Delete of res
 |2022-10  |ESML MLOps |ESML MLOps v3 advanced mode, support for Spark steps ( Databricks notebooks / DatabrickStep )|-|
 
 </details>
-
