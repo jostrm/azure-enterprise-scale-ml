@@ -58,11 +58,18 @@ class Repository:
         tree = enrollment.parse_json(raw)
         require(tree.get("sha") == sha and tree.get("truncated") is False, "complete-published-source-tree-required")
         files = {item["path"]: item for item in tree["tree"] if item.get("type") == "blob"}
+        single_writer = self.config.get("coordination_mode") == "single-writer"
         required = {"bootstrap/templates/factory-lifecycle-" + self.provider + ".yml",
                     "bootstrap/templates/hub_private_probe.py", "bootstrap/lib/common_network_preservation.py",
                     "bootstrap/lib/hub_private_transition.py"}
+        helpers = ("lib/common_network_preservation.py", "lib/hub_private_transition.py", "templates/hub_private_probe.py")
+        if single_writer:
+            helpers = ("lib/common_network_preservation.py", "lib/provider_repository_state.py",
+                       "lib/factory_enrollment.py", "lib/factory_lifecycle.py")
+            required = {"bootstrap/" + relative for relative in helpers} | {
+                "bootstrap/templates/factory-lifecycle-single-writer-" + self.provider + ".yml"}
         require(required <= files.keys(), "selected-published-source-lacks-prefix-bootstrap")
-        for relative in ("lib/common_network_preservation.py", "lib/hub_private_transition.py", "templates/hub_private_probe.py"):
+        for relative in helpers:
             content = (Path(__file__).parent.parent / relative).read_bytes()
             expected = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
             require(files["bootstrap/" + relative]["sha"] == expected, "published-prefix-bootstrap-helper-mismatch:" + relative)
@@ -79,6 +86,16 @@ class Repository:
                                           tenant=self.config.get("ado_tenant_id") or self.target["tenant_id"],
                                           allowed=(200, 404))
         return value if status == 200 else None
+
+    def private_project(self):
+        require(self.provider == "ado", "ado-project-verification-required")
+        url = self.config["ado_organization"].rstrip("/") + "/_apis/projects/" + quote(self.config["ado_project"], safe="")
+        _, _, project = self.cloud.http("GET", url + "?api-version=7.1", enrollment.ADO_AUDIENCE,
+                                       tenant=self.config.get("ado_tenant_id") or self.target["tenant_id"])
+        require(project.get("visibility") == "private"
+                and str(project.get("name", "")).casefold() == self.config["ado_project"].casefold(),
+                "single-writer-private-repository-required")
+        return {"id": project.get("id"), "name": project["name"], "visibility": "private"}
 
     def create(self):
         self.cloud.read_only = False
@@ -187,21 +204,34 @@ def prepare(*, consumer_root, scope, bootstrap_config, expected_revision, runtim
     provider = providers.pop()
     config = {key: bootstrap_config[key] for key in (
         "github_repository", "github_visibility", "ado_organization", "ado_project",
-        "ado_repository", "ado_tenant_id") if key in bootstrap_config}
+        "ado_repository", "ado_tenant_id", "coordination_mode") if key in bootstrap_config}
+    require(config.get("coordination_mode", "blob") in ("blob", "single-writer"), "unknown-coordination-mode")
     url = repository_url(provider, config)
     runtime = runtime or Repository(target, provider, config)
     remote = runtime.discover()
+    private_project = None
+    if config.get("coordination_mode") == "single-writer":
+        require(provider != "gha" or config.get("github_visibility", "private") == "private",
+                "single-writer-private-repository-required")
+        require(not remote or (remote.get("private") is True if provider == "gha"
+                               else remote.get("project", {}).get("visibility") == "private"),
+                "single-writer-private-repository-required")
+        if provider == "ado":
+            private_project = runtime.private_project()
     pipeline = runtime.pipeline(remote) if provider == "ado" else None
     namespace, environment = None, None
     if provider == "gha":
         binding = document.get("bindings", {}).get(scope["factory_id"], {}).get(provider, {})
         old_target = next((item for item in binding.get("targets", [])
                            if item["scale_set_id"] == scope["scale_set_id"]), None)
-        execution = (old_target or {}).get("execution") or (binding if old_target else None) or {}
-        namespace = execution.get("auth_namespace") or "aifactory-" + enrollment.digest({
-            "factory": target["tenant_id"] + ":" + scope["factory_id"],
-            "subscription": target["subscription_id"], "scale": scope["scale_set_id"],
-            "repository": url.lower(), "provider": provider})[:20]
+        single_writer = config.get("coordination_mode") == "single-writer"
+        execution = (old_target or {}).get("execution") or (binding if old_target or single_writer else None) or {}
+        namespace_seed = ({"repository": url.lower(), "provider": provider, "coordination_mode": "single-writer"}
+                          if single_writer else {
+                              "factory": target["tenant_id"] + ":" + scope["factory_id"],
+                              "subscription": target["subscription_id"], "scale": scope["scale_set_id"],
+                              "repository": url.lower(), "provider": provider})
+        namespace = execution.get("auth_namespace") or "aifactory-" + enrollment.digest(namespace_seed)[:20]
         require(re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", namespace), "invalid-auth-namespace")
         environment = runtime.environment(namespace) if remote else None
     existing = (root / ".git").exists()
@@ -247,6 +277,11 @@ def prepare(*, consumer_root, scope, bootstrap_config, expected_revision, runtim
                         " through create-or-return; preserve existing protection and branch policies unchanged.",
                         "For Azure DevOps, create or reuse the exact repository-bound lifecycle YAML pipeline."],
             "can_execute": True, "blockers": []}
+    if config.get("coordination_mode") == "single-writer":
+        plan["private_project"] = private_project
+        plan["warnings"] = [enrollment._single_writer_module().WARNING, enrollment._single_writer_module().HUB_WARNING,
+                            "Single-writer coordination requires a private repository; repository visibility is never changed automatically."]
+        plan["effects"][2] = "Pin the published accelerator, repository-state helpers and single-writer scoped workflow; no Blob coordination/private probe."
     plan["plan_hash"] = enrollment.digest(plan)
     return plan
 
@@ -261,6 +296,8 @@ def execute(plan, *, state_dir, runtime=None):
     for key in ("register_hash", "existing_git", "head", "origin", "remote_id", "remote_sha", "source",
                 "application_helper_sha256", "gitmodules_sha256", "pipeline", "auth_namespace", "environment"):
         require(fresh[key] == plan[key], "repository-discovery-changed:" + key)
+    if plan["config"].get("coordination_mode") == "single-writer":
+        require(fresh.get("private_project") == plan.get("private_project"), "repository-private-project-changed")
     root, folder = Path(plan["consumer_root"]), prerequisites.ordinary(state_dir)
     folder.mkdir(parents=True, exist_ok=True)
     receipt_path = folder / (plan["plan_id"] + ".json")
@@ -271,7 +308,12 @@ def execute(plan, *, state_dir, runtime=None):
     try:
         if plan["remote_id"] is None:
             runtime.create()
-        require(runtime.discover() is not None, "repository-creation-not-verified")
+        remote = runtime.discover()
+        require(remote is not None, "repository-creation-not-verified")
+        if plan["config"].get("coordination_mode") == "single-writer":
+            require(remote.get("private") is True if plan["provider"] == "gha"
+                    else remote.get("project", {}).get("visibility") == "private",
+                    "single-writer-private-repository-required")
         if not plan["existing_git"]:
             runtime.git(root, "init", "--initial-branch=main")
         if not plan["origin"]:
@@ -286,6 +328,10 @@ def execute(plan, *, state_dir, runtime=None):
                 "bootstrap/templates/factory-lifecycle-" + plan["provider"] + ".yml",
             ".azurefactory/hub_private_probe.py": "bootstrap/templates/hub_private_probe.py",
         }
+        if plan["config"].get("coordination_mode") == "single-writer":
+            projected.pop(".azurefactory/hub_private_probe.py")
+            for destination in projected:
+                projected[destination] = "bootstrap/templates/factory-lifecycle-single-writer-" + plan["provider"] + ".yml"
         projections = {}
         for destination, relative in projected.items():
             content = runtime.git(source, "cat-file", "blob", plan["source"]["sha"] + ":" + relative, raw=True)

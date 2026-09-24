@@ -45,6 +45,12 @@ identity_resource_group_id optionally override deterministic prerequisite names.
 Coordination options: coordination_account_id OR coordination_resource_group_id,
 container, coordination_blob. Defaults share a tenant/subscription-derived account,
 factory-locks container and coordination.json across ALL factories/providers.
+Explicit coordination_mode="single-writer" instead uses private provider Git
+state with one repository-wide designated writer and persistent claims/receipts.
+It rejects Blob options and never reads/provisions coordination storage or data
+RBAC. The separate reviewed workflow grants repository state-write permission.
+Exclusive governance must also cover shared-hub changes from other repositories;
+this mode provides no global exclusion. See factory_lifecycle_contract.txt.
 Planned new accounts require public_network_access = Enabled or Disabled. Reuse never
 changes networking or security policies. Disabled needs existing private routing;
 this helper does not deploy private endpoints or firewall exceptions.
@@ -500,7 +506,7 @@ def load_request(consumer_root, factory_id, scale_set_id, environment, options):
             binding = item["binding"]
             bound = {rg_id(x) for t in binding["targets"]
                      for x in t.get("resource_group_ids", []) + t.get("common_dependency_ids", [])}
-            if bound.intersection(scopes + dependencies) or binding is old:
+            if bound.intersection(scopes + dependencies):
                 require(all(binding["locks"].get(k) == v for k, v in coordinates.items()),
                         "overlapping-coordination-namespaces-conflict")
         if old:
@@ -705,6 +711,8 @@ class Cloud:
         return min(guid(item.get("id")) for item in selected)
 
     def token(self, audience, tenant=None):
+        require(not _single_writer(self.request_config) or audience != STORAGE,
+                "single-writer-storage-access-forbidden")
         target = self.request_config["target"]
         tenant = tenant or target["tenant_id"]
         key = (audience, tenant)
@@ -795,6 +803,7 @@ class Cloud:
         return rows
 
     def storage(self, method, blob=None, data=None, headers=None, allowed=(200,)):
+        require(not _single_writer(self.request_config), "single-writer-storage-access-forbidden")
         coordinates = self.request_config["coordinates"]
         url = coordinates["account_url"] + "/" + coordinates["container"]
         url += "?restype=container" if blob is None else "/" + quote(blob, safe="/")
@@ -1118,7 +1127,7 @@ def _roles(cloud, request, identity, operator_id, operator_operations):
             blockers.append("conditional-role-assignment-requires-independent-rights-review")
             continue
         definition = str(props.get("roleDefinitionId", "")).lower()
-        if definition not in role_definitions:
+        if definition not in role_definitions and not single:
             role_definitions[definition] = cloud.arm("GET", definition, ROLE_API)[2]
         relevant.append(props)
     grants = []
@@ -1137,7 +1146,7 @@ def _roles(cloud, request, identity, operator_id, operator_operations):
     operator_permissions = [permission for x in relevant if x.get("principalId", "").lower() == operator_id
                             and (storage_scope == str(x.get("scope", "")).lower()
                                  or storage_scope.startswith(str(x.get("scope", "")).lower() + "/"))
-                            for permission in role_definitions[str(x["roleDefinitionId"]).lower()].get("properties", {}).get("permissions", [])]
+                            for permission in role_definitions.get(str(x["roleDefinitionId"]).lower(), {}).get("properties", {}).get("permissions", [])]
     operator_access = single or all(_permission(operator_permissions, action, data=True) for action in (
             "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
             "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write"))
@@ -1606,6 +1615,7 @@ def _review(request, state, acknowledge):
         helper = _single_writer_module()
         result["coordination_mode"] = "single-writer"
         result["warnings"] = [helper.WARNING, helper.HUB_WARNING,
+                              "Single-writer coordination requires a private repository; repository visibility is never changed automatically.",
                               "Private repository administrators can bypass or destroy repository coordination."]
     result["plan_hash"] = digest(result)
     return result
@@ -1881,7 +1891,7 @@ def main(argv=None):
     parser.add_argument("--expected-plan", help="Exact plan_hash SHA256 from a separate read-only plan.")
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--acknowledge-exclusive-writer-governance", action="store_true",
-                        help="Administrator attestation that ALL writers enforce physical leases; not merely blobs enabled.")
+                        help="Attest ALL writers enforce Blob leases, or exclusive repository/shared-hub governance in explicit single-writer mode.")
     args = parser.parse_args(argv)
     try:
         options = parse_json(Path(args.options).read_bytes())

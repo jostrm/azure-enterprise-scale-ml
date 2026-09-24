@@ -133,6 +133,29 @@ def test_external_hub_coordinates_are_independent_from_optional_access(tmp_path,
     assert config["vpn_client_cidr"] == "172.30.0.0/24"
 
 
+@pytest.mark.parametrize("simple", [False, True])
+@pytest.mark.parametrize("mode", [None, "blob", "single-writer"])
+def test_coordination_mode_is_explicit_and_never_changes_hub_topology(tmp_path, simple, mode):
+    args = CREATION.parser().parse_args(["gha", "--non-interactive"])
+    env = input_env(simple=simple, AIF_ACCESS_HUB_MODE="external", AIF_SETUP_HUB_ACCESS="true",
+                    AIF_ACCESS_HUB_SUBSCRIPTION_ID="33333333-3333-3333-3333-333333333333",
+                    AIF_ACCESS_HUB_RESOURCE_GROUP="shared-hub", AIF_ACCESS_HUB_VNET_NAME="existing-hub",
+                    AIF_ACCESS_HUB_VNET_CIDR="10.40.0.0/24")
+    if mode is not None:
+        env["AIF_COORDINATION_MODE"] = mode
+    config = CREATION.creation_input(args, tmp_path, "main", env)["config"]
+    assert config.get("coordination_mode") == mode
+    assert config["access_hub_mode"] == "external" and config["setup_hub_access"] is True
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("mode", ["fallback", "none", "Single-Writer"])
+def test_coordination_mode_does_not_accept_implicit_fallback(tmp_path, mode):
+    args = CREATION.parser().parse_args(["gha", "--non-interactive"])
+    with pytest.raises(ValueError, match="automatic fallback"):
+        CREATION.creation_input(args, tmp_path, "main", input_env(AIF_COORDINATION_MODE=mode))
+
+
 def test_external_hub_coordinates_are_not_ignored_or_guessed(tmp_path):
     args = CREATION.parser().parse_args(["gha", "--non-interactive"])
     with pytest.raises(ValueError, match="explicit reviewed coordinates"):

@@ -41,6 +41,7 @@ def install(source, root, provider="both", refresh_only=False):
     for relative in (
         "lib/factory_lifecycle.py", "lib/factory_lifecycle_contract.txt", "lib/layout_router.sh",
         "lib/factory_enrollment.py", "lib/factory_enrollment_entry.py", "lib/runner_bootstrap.py",
+        "lib/provider_repository_state.py",
         "ui/terminal.sh",
     ):
         if not starter.ordinary(bootstrap / relative).is_file():
@@ -68,6 +69,7 @@ def install(source, root, provider="both", refresh_only=False):
             raise ValueError(f"Incomplete CLI source: {name}")
     merge.tree(cli, package)
     merge.file(bootstrap / "lib" / "factory_enrollment.py", package / "_vendor" / "factory_enrollment.py")
+    merge.file(bootstrap / "lib" / "provider_repository_state.py", package / "_vendor" / "provider_repository_state.py")
     merge.file(bootstrap / ".gitignore.template", ".gitignore", preserve=True)
     # Print a digest of the actual reviewed payload, including uncommitted changes.
     digest = hashlib.sha256()

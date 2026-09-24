@@ -25,6 +25,7 @@ COMMON_FIELDS = {
     "AIF_ACCESS_HUB_VNET_NAME": "access_hub_vnet_name",
     "AIF_ACCESS_HUB_VNET_CIDR": "access_hub_vnet_cidr",
     "AIF_VPN_CLIENT_CIDR": "vpn_client_cidr",
+    "AIF_COORDINATION_MODE": "coordination_mode",
 }
 FULL_FIELDS = {
     "GITHUB_REPOSITORY": "github_repository", "GITHUB_REPOSITORY_VISIBILITY": "github_visibility",
@@ -178,6 +179,8 @@ def creation_input(args, root, version, environ):
         raise ValueError("Unmapped modern bootstrap settings (never silently discarded): " + ", ".join(unsupported)
                          + ". Use explicit catalog configuration/enrollment for these choices.")
     config = {target: environ[name] for name, target in fields.items() if environ.get(name)}
+    if config.get("coordination_mode", "blob") not in ("blob", "single-writer"):
+        raise ValueError("AIF_COORDINATION_MODE must be blob or single-writer; automatic fallback is not supported.")
     config.update(repo_root=str(root), aifactory_version=version)
     if simple:
         config["enable_application_gateway"] = boolean(

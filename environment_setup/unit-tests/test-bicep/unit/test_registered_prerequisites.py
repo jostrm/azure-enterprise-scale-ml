@@ -218,6 +218,50 @@ def test_prepare_readonly_and_no_hub_is_independent(workspace):
     assert not list(workspace[2].iterdir())
 
 
+@pytest.mark.parametrize("external", [False, True])
+def test_explicit_single_writer_retains_topology_without_blob(workspace, external):
+    runtime = Runtime()
+    args = external_arguments(workspace, setup=False) if external else arguments(workspace)
+    args["bootstrap_config"]["coordination_mode"] = "single-writer"
+    proof = {"repository": "https://github.com/reviewed/private", "ref": "refs/heads/aifactory-bootstrap-lock",
+             "sha": "a" * 40}
+    args["context"].update(coordination={}, coordination_mode="provider", provider_serialization=proof)
+    checked = []
+    runtime.verify_provider_serialization = lambda actual: checked.append(actual) if actual == proof else pytest.fail("reservation changed")
+    runtime.blob = lambda *a, **k: pytest.fail("single-writer must never contact Blob")
+    plan = core.prepare(**args, runtime=runtime)
+    assert plan["can_execute"], plan["blockers"]
+    assert plan["bootstrap_config"] == args["bootstrap_config"]
+    assert not any("microsoft.storage" in effect.get("id", "") for effect in plan["effects"])
+    assert "hub_private_endpoint_subnet_id" not in plan["bindings"]
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded", result.get("error", result)
+    assert result["bindings"]["network"]["mode"] == ("external" if external else "none")
+    assert checked and not runtime.leases
+    assert not result["coordination"]
+
+
+def test_provider_hub_bypass_requires_explicit_mode_and_reservation(workspace):
+    args = external_arguments(workspace, setup=False)
+    args["context"].update(coordination={}, coordination_mode="provider", provider_serialization={})
+    runtime = Runtime()
+    runtime.verify_provider_serialization = lambda proof: pytest.fail("implicit bypass reached reservation")
+    with pytest.raises(core.PrerequisiteError, match="hub-requires-shared"):
+        core.prepare(**args, runtime=runtime)
+    args["bootstrap_config"]["coordination_mode"] = "single-writer"
+    def denied(proof):
+        raise core.PrerequisiteError("reservation-unverified")
+    runtime.verify_provider_serialization = denied
+    with pytest.raises(core.PrerequisiteError, match="reservation-unverified"):
+        core.prepare(**args, runtime=runtime)
+
+
+def test_single_writer_rejects_blob_coordinates(workspace):
+    args = arguments(workspace, coordination_mode="single-writer")
+    with pytest.raises(core.PrerequisiteError, match="single-writer-requires-provider"):
+        core.prepare(**args, runtime=Runtime())
+
+
 def test_backend_plan_schema_and_explicit_capabilities(workspace):
     runtime = Runtime()
     args = arguments(workspace)

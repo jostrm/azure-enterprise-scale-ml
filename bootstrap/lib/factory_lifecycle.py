@@ -2,7 +2,8 @@
 """AIFACTORY_LIFECYCLE_CONTRACT=1: frozen, scoped, fail-closed execution.
 
 See factory_lifecycle_contract.txt beside this module for the wire format and
-operator-provisioned distributed locking prerequisite. Import, --help,
+operator-provisioned coordination prerequisite (Blob by default; explicit
+single-writer private repository state is also supported). Import, --help,
 capabilities and inspect never authenticate, deploy, or modify a repository.
 """
 
@@ -617,6 +618,8 @@ class Cloud:
         return result.stdout.strip()
 
     def token(self, audience):
+        require(not single_writer(self.document) or audience.rstrip("/") != "https://storage.azure.com",
+                "single-writer-storage-access-forbidden")
         if self.token_expiries.get(audience, 0) <= time.time() + 60:
             self.tokens.pop(audience, None)
         if audience not in self.tokens:
@@ -1503,6 +1506,7 @@ class RepositoryCoordination:
         self.held = context
 
     def assert_held(self):
+        require(not self.store.write_failed, "single-writer-write-reconciliation-required")
         _, value = self.state()
         self._active(value)
 
@@ -2049,6 +2053,11 @@ def bootstrap_ownership_snapshot(cloud, document):
 
 def freeze_deployment_plan(cloud, document, source_root):
     """Read-only whole-plan what-if for a caller-resolved, ordered ARM plan."""
+    if single_writer(document):
+        _, state = RepositoryCoordination(cloud, document).state()
+        require(state["active"] is None, "single-writer-repository-active-claim")
+        require(not any(key.startswith("runs/" + document["run_id"] + ".") for key in state["records"]),
+                "single-writer-run-already-submitted")
     source_root = verify_source(cloud, source_root, document["source"])
     cloud.verify_identity()
     result = json.loads(canonical(document["deployment"]))
@@ -2520,9 +2529,10 @@ def _cohort_order(documents):
 
 
 def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_factory=Cloud, lock_factory=BlobLocks):
-    require(not any(single_writer(document) for document in documents), "single-writer-cohort-not-supported")
     """Accept all factory children under the full physical union before deleting."""
     require(isinstance(documents, list) and documents, "nonempty-delete-cohort-required")
+    require(not any(isinstance(document, dict) and single_writer(document) for document in documents),
+            "single-writer-cohort-not-supported")
     documents = json.loads(canonical(documents))
     for document in documents:
         validate_manifest(document)

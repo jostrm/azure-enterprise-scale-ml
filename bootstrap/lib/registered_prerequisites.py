@@ -58,7 +58,7 @@ CONFIG_KEYS = {
     "team_group_id", "team_member_email", "access_hub_mode", "setup_hub_access",
     "access_hub_subscription_id", "access_hub_resource_group", "access_hub_vnet_name",
     "access_hub_vnet_cidr", "vpn_client_cidr", "dev_vnet_cidr",
-    "first_party_apps", "resource_providers",
+    "first_party_apps", "resource_providers", "coordination_mode",
 }
 FIRST_PARTY_APPS = {"azure-machine-learning": "0736f41a-0425-4b46-bdb5-1563eff02385",
                     "databricks": "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"}
@@ -527,7 +527,8 @@ def _hub(builder, config, context, target, bindings, owned):
     dev = _network(config.get("dev_vnet_cidr", "172.16.0.0/18"), "dev_vnet_cidr")
     require(not external or not cidr.overlaps(dev), "external-and-factory-vnet-overlap")
     old_rg = builder.read(rg, enrollment.RG_API)
-    if external and context.get("coordination_mode") == "connectivity-hub" and old_rg:
+    if external and (context.get("coordination_mode") == "connectivity-hub"
+                     or config.get("coordination_mode") == "single-writer") and old_rg:
         require(not any(k.lower() in ("aifactory.factory_id", "aifactory.scaleset_id")
                         for k in old_rg.get("tags", {})), "shared-hub-resource-group-has-factory-ownership")
     if old_rg is None:
@@ -537,7 +538,8 @@ def _hub(builder, config, context, target, bindings, owned):
     network_location = existing_vnet.get("location") if external and existing_vnet else target["location"]
     require(isinstance(network_location, str) and re.fullmatch(r"[a-z0-9]{2,40}", network_location),
             "access-vnet-location-required")
-    if external and context.get("coordination_mode") == "connectivity-hub" and existing_vnet:
+    if external and (context.get("coordination_mode") == "connectivity-hub"
+                     or config.get("coordination_mode") == "single-writer") and existing_vnet:
         require(not any(key.lower() in ("aifactory.factory_id", "aifactory.scaleset_id")
                         for key in (existing_vnet.get("tags") or {})), "shared-hub-vnet-has-factory-ownership")
     vnet_body = {"location": network_location, "properties": {"addressSpace": {"addressPrefixes": [str(cidr)]}}}
@@ -726,6 +728,10 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
             and re.fullmatch(r"[^@\s/]+@[^@\s/]+", config["team_member_email"]), "team-member-email-required")
     require(re.fullmatch(r"[a-z0-9]{2,16}", str(context.get("location_short", ""))), "location-short-required")
     mode = context.get("coordination_mode", "factory-common")
+    require(config.get("coordination_mode", "blob") in ("blob", "single-writer"),
+            "unknown-explicit-coordination-mode")
+    if config.get("coordination_mode") == "single-writer":
+        require(mode == "provider" and not context.get("coordination"), "single-writer-requires-provider-reservation")
     coordinates = copy.deepcopy(context.get("coordination", {}))
     require(mode == "provider" and not coordinates
             or set(coordinates) == {"account_id", "account_url", "container"}, "exact-coordination-required")
@@ -754,7 +760,8 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
     runtime.read_only = True
     builder = Builder(runtime)
     if mode == "provider":
-        require(config["access_hub_mode"] != "external" and not config["setup_hub_access"],
+        require(config.get("coordination_mode") == "single-writer"
+                or config["access_hub_mode"] != "external" and not config["setup_hub_access"],
                 "hub-requires-shared-physical-coordination")
         runtime.verify_provider_serialization(context.get("provider_serialization"))
     storage = builder.read(account, enrollment.STORAGE_API) if account else None

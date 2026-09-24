@@ -1,6 +1,79 @@
 AIFACTORY_LIFECYCLE_CONTRACT=1
 ============================
 
+Opt-in single-writer coordination (provider-repository-cas-v1)
+-----------------------------------------------------------
+Blob coordination remains the default. Enrollment options may explicitly select
+coordination_mode="single-writer". This is NOT an automatic fallback from Blob
+errors and cannot be selected with environment variables. Blob account/container,
+storage-mode and public-network options are rejected in this mode.
+
+The reviewed plan and successful enrollment result expose these warnings:
+  Bypassing lock, due to issues, dont do parallell updates on same AI Factory
+  Do not make concurrent changes to a shared hub, including from other
+  repositories; repository claims do not provide global exclusion.
+The existing exclusive-writer governance acknowledgment must be explicitly
+reviewed and supplied. No storage account, container, Storage data role, or
+storage-audience token is read, created or required by this backend.
+
+RuntimeBinding.locks for this mode is the closed object:
+  {"provider":"provider-repository-cas","coordination_mode":"single-writer",
+   "repository":"<exact route repository URL>",
+   "state_ref":"refs/heads/aifactory-state/single-writer-v1",
+   "coordination_hash":"<SHA256 of enrollment>","revision":<positive integer>}
+The manifest adds scopes and common_dependencies only; inherited_leases and
+Blob coordinates are forbidden. The protected envelope still uses lease_context
+as the wire name, but its values bind a persistent repository claim, NOT leases.
+Its mode comes only from the reviewed manifest and binding.
+
+State lives in state.json on the dedicated deterministic state ref, never in a
+consumer worktree. GitHub creates immutable blobs, trees and commits parented
+by the previously read ref, then creates the absent ref or advances it with
+force:false. Concurrent siblings cannot fast-forward over each other. ADO
+pushes commit changes with refUpdates.oldObjectId compare-and-swap. Both
+providers verify the ref and contents after each write. There is no reset,
+overwrite, fallback, force-push or write retry on contention/uncertain response.
+Private GitHub repositories / private ADO projects are mandatory and checked;
+the helper never changes visibility. State contains enrollment, one repo-wide
+active claim, run consent proofs, worker receipts and resource ownership
+evidence, NOT configuration, ARM payloads, access tokens or secret values.
+State is bounded to 8 MiB; reaching that bound blocks rather than discarding
+receipts. Enrollment provisioning itself first reserves a persistent claim;
+partial/uncertain enrollment or run results retain that claim for independent
+reconciliation. Replanning or resubmitting does not clear it.
+
+One writer_id, auth namespace, deployment identity and runner is designated for
+the entire repository. Additional exact owned scopes may be enrolled add-only;
+common dependencies must already have same-repository enrollment. Source,
+frozen changes, current ownership, deployment identity, enrollment hash/revision,
+run uniqueness and acceptance-before-expiry checks still apply. A worker reads
+the same durable claim/receipts independently; envelope assertions alone are
+not proof. Repository admins/code writers are trusted and can bypass/delete
+this state. This does not fence other repositories or arbitrary Azure writers.
+
+Supported: frozen common/create-factory/create-scaleset and exact project
+deployments via GHA and ADO Linux workers. Single-writer delete, physical-lease
+cohorts and legacy project pipelines are explicitly blocked before provisioning;
+they must not be presented as available. Capabilities advertises coordination_modes
+["blob","single-writer"], single_writer="provider-repository-cas-v1" and the
+single_writer_operations list.
+
+Publish the separately reviewed factory-lifecycle-single-writer-gha.yml or
+factory-lifecycle-single-writer-ado.yml to the usual lifecycle workflow path.
+Blob templates keep their existing permissions. The GHA single-writer template
+alone grants contents:write and exposes github.token as GH_TOKEN only to the
+worker step; its Azure login uses the enrolled environment AZURE_CLIENT_ID,
+AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID variables. Local enrollment uses the
+existing authenticated gh API wrapper; local lifecycle uses gh auth token.
+The ADO worker exposes System.AccessToken only as AIFACTORY_STATE_TOKEN on the
+worker task, with persistCredentials:false. Grant that build identity read,
+create-branch and contribute access on this exact repository/state ref through
+normal operator governance. Local ADO enrollment uses its explicitly selected
+ADO-tenant cached CLI account; lifecycle uses the existing ADO audience wrapper.
+Denied authentication/ref policy or missing build permissions fail closed.
+No broader Azure IAM is added. Pin provider_repository_state.py alongside the
+lifecycle/enrollment source and selected template in the reviewed source bundle.
+
 Entrypoint
 ----------
 python -B bootstrap/lib/factory_lifecycle.py capabilities

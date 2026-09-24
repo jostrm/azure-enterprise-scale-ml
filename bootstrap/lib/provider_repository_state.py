@@ -8,7 +8,6 @@ exclusion and is not a replacement for exclusive shared-hub governance.
 
 import base64
 import copy
-import hashlib
 import json
 import re
 from urllib.parse import quote, unquote, urlsplit
@@ -35,6 +34,7 @@ def coordinates(repository):
 class ProviderState:
     def __init__(self, cloud, route, error):
         self.cloud, self.route, self.error = cloud, route, error
+        self.write_failed = False
         if route["kind"] == "gha":
             self.base = "repos/" + urlsplit(route["repository"]).path.strip("/").removesuffix(".git")
         else:
@@ -129,6 +129,13 @@ class ProviderState:
 
     def replace(self, expected, value):
         """One attempt only. Lost response/CAS conflict requires reconciliation."""
+        self.require(not self.write_failed, "single-writer-write-reconciliation-required")
+        self.write_failed = True
+        result = self._replace(expected, value)
+        self.write_failed = False
+        return result
+
+    def _replace(self, expected, value):
         raw = canonical(value)
         self.require(len(raw) <= MAX_BYTES, "single-writer-state-too-large")
         self.private()
