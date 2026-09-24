@@ -1286,9 +1286,13 @@ class RunnerEnsureTests(unittest.TestCase):
     def test_runner_routes_before_legacy_and_register_paths(self):
         env = dict(os.environ, AIFACTORY_PYTHON=sys.executable)
         self.path.write_text('{"useSelfHostedBuildAgent": false}', encoding="utf-8")
-        for script in ("ADO-azurefactory.sh", "GHA-azurefactory.sh",
-                               "ADO-create-new-aifactory-scaleset.sh", "GHA-create-new-aifactory-scaleset.sh"):
-                    result = subprocess.run([BASH, str(ROOT / "bootstrap" / script), "runner", "plan",
+        for script, route in (
+            ("ADO-azurefactory.sh", []), ("GHA-azurefactory.sh", []),
+            ("ADO-create-new-aifactory-scaleset.sh", []), ("GHA-create-new-aifactory-scaleset.sh", []),
+            ("ALL-create-new-aifactory-scaleset.sh", ["--orchestrator", "ado"]),
+            ("ALL-create-new-aifactory-scaleset.sh", ["--orchestrator", "gha"]),
+        ):
+                    result = subprocess.run([BASH, str(ROOT / "bootstrap" / script), *route, "runner", "plan",
                                              "--consumer-root", str(self.root), "--config-source", str(self.path)],
                                             env=env, capture_output=True, text=True, cwd=ROOT, timeout=30)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -1298,6 +1302,21 @@ class RunnerEnsureTests(unittest.TestCase):
         self.assertNotIn("aif_scaleset_main", source)
         self.assertNotIn("account set", source)
         self.assertNotIn("login", source)
+
+    def test_all_runner_help_requires_and_forwards_explicit_provider(self):
+        env = dict(os.environ, AIFACTORY_PYTHON=sys.executable)
+        env.pop("AIF_ORCHESTRATOR", None)
+        launcher = [BASH, str(ROOT / "bootstrap" / "ALL-create-new-aifactory-scaleset.sh")]
+        result = subprocess.run([*launcher, "runner", "plan"], env=env, input="",
+                                capture_output=True, text=True, cwd=ROOT, timeout=30)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("requires --orchestrator ado|gha", result.stderr)
+        for provider in ("ado", "gha"):
+            result = subprocess.run([*launcher, "--orchestrator", provider, "runner", "--help"],
+                                    env=env, capture_output=True, text=True, cwd=ROOT, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("--prereqs-only", result.stdout)
+            self.assertIn("--vm-os", result.stdout)
 
 
 @unittest.skipUnless(BASH and Path(BASH).exists(), "Git Bash or Bash is required")

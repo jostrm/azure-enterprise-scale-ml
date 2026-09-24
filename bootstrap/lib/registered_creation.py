@@ -90,16 +90,17 @@ def consumer_root(value):
     root = ordinary(value)
     if root.exists() and not root.is_dir():
         raise ValueError("Consumer repository path is not a directory.")
-    if root.name == "azurefactory":
+    if root.name.casefold() == "azurefactory":
         raise ValueError("--repo-root must be the consumer directory above azurefactory.")
-    ancestry = (root, *root.parents)
-    for ancestor in ancestry:
+    for ancestor in (root, *root.parents):
         if (ancestor / "environment_setup" / "aifactory").is_dir() and (ancestor / "bootstrap").is_dir():
             raise ValueError("Do not create a consumer inside the shared source checkout.")
-        legacy = ancestor / "aifactory"
-        if legacy.exists() and (ancestor == root or legacy in ancestry or (ancestor / ".git").exists()):
+        if (ancestor.name.casefold() == "aifactory" or
+                (ancestor / "aifactory").exists() and (ancestor == root or (ancestor / ".git").exists())):
             raise ValueError("Existing legacy aifactory requires separately reviewed migration; no automatic conversion.")
-        if (ancestor / "azurefactory" / "register.json").exists():
+        if (ancestor.name.casefold() == "azurefactory" and (ancestor / "register.json").exists() or
+                (ancestor / "azurefactory" / "register.json").exists()
+                and (ancestor == root or (ancestor / ".git").exists())):
             raise ValueError("Existing register requires azurefactory.sh factory create or reviewed lifecycle operations.")
     target = ordinary(root / "azurefactory")
     if target.exists():

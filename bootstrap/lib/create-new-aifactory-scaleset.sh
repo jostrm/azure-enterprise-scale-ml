@@ -4008,6 +4008,10 @@ aif_scaleset_main() {
   AIF_ROUTE="$1"
   AIF_ENTRYPOINT="$2"
   shift 2
+  if [[ -n "${AIF_CREATE_PROJECTS:-}${AIF_PROJECT_MODE:-}" ]]; then
+    printf 'ERROR: Scoped/common-only creation requires AIFactory-lifecycle.sh and a complete frozen manifest; no implicit project001 fallback is allowed.\n' >&2
+    return 1
+  fi
   source "$AIF_SCALESET_LIB_DIR/layout_router.sh"
   aif_route_modern_creation "$AIF_ROUTE" "$AIF_SCALESET_LIB_DIR/.." "$@"
   AIF_REPO_ROOT="${AIFACTORY_REPO_ROOT:-}"
