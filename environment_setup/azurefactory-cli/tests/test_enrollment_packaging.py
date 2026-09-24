@@ -32,6 +32,8 @@ def test_wheel_and_sdist_install_with_bundled_canonical_core_outside_source(tmp_
     helper = source / "bootstrap" / "lib" / "factory_enrollment.py"
     helper.parent.mkdir(parents=True)
     helper.write_bytes((ROOT / "bootstrap" / "lib" / "factory_enrollment.py").read_bytes())
+    coordination = helper.with_name("provider_repository_state.py")
+    coordination.write_bytes((ROOT / "bootstrap" / "lib" / coordination.name).read_bytes())
     dist = tmp_path / "distributions"
     scratch = tmp_path / "build-scratch"
     scratch.mkdir()
@@ -44,9 +46,12 @@ def test_wheel_and_sdist_install_with_bundled_canonical_core_outside_source(tmp_
     sdist = next(dist.glob("*.tar.gz"))
     with zipfile.ZipFile(wheel) as archive:
         assert archive.read("azurefactory/_vendor/factory_enrollment.py") == helper.read_bytes()
+        assert archive.read("azurefactory/_vendor/provider_repository_state.py") == coordination.read_bytes()
     with tarfile.open(sdist) as archive:
         name = next(name for name in archive.getnames() if name.endswith("/src/azurefactory/_vendor/factory_enrollment.py"))
         assert archive.extractfile(name).read() == helper.read_bytes()
+        name = next(name for name in archive.getnames() if name.endswith("/src/azurefactory/_vendor/provider_repository_state.py"))
+        assert archive.extractfile(name).read() == coordination.read_bytes()
     outside = tmp_path / "outside-source"
     outside.mkdir()
     for kind, artifact in (("wheel", wheel), ("sdist", sdist)):
@@ -65,3 +70,8 @@ def test_wheel_and_sdist_install_with_bundled_canonical_core_outside_source(tmp_
                         "from azurefactory.enrollment import core; print(core().__file__)"], outside, env).strip()
         assert Path(location).is_relative_to(installed)
         assert Path(location).read_bytes() == helper.read_bytes()
+        location = run([str(python), "-c",
+                        "from azurefactory._vendor import provider_repository_state; print(provider_repository_state.__file__)"],
+                       outside, env).strip()
+        assert Path(location).is_relative_to(installed)
+        assert Path(location).read_bytes() == coordination.read_bytes()
