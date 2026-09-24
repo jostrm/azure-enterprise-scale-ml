@@ -8,9 +8,13 @@ reviewed stages. New shared hubs use the retained standard Blob foundation in
 remain compatible without migration. This after-common stage never invents storage.
 
 prepare(...) performs discovery only. execute(...) consumes its exact plan once,
-under physical-resource leases, and persists results before returning. An
-interruption retains infinite leases and an uncertain receipt: automatic retry
-is deliberately unsupported. Newly generated Entra IDs require downstream review.
+under physical-resource leases or explicit manual single-writer governance, and
+persists results before returning. An interruption retains any infinite leases
+and an uncertain receipt: automatic retry is deliberately unsupported.
+Newly generated Entra IDs require downstream review.
+Existing gateway route additions require explicit manual single-writer governance:
+GET/ETag comparison is not atomic, and no provider-enforced If-Match is claimed.
+Blob-coordinated route updates remain blocked without that provider guarantee.
 """
 
 from __future__ import annotations
@@ -38,6 +42,31 @@ import release_version
 CONTRACT_VERSION = 1
 NETWORK_API = "2024-05-01"
 DNS_API = "2022-07-01"
+GATEWAY_ROUTE_APPEND_LIMITATION = "gateway-route-append-strong-if-match-unverified"
+# VirtualNetworkGateways_CreateOrUpdate has no documented If-Match precondition;
+# UpdateTags (PATCH) cannot update routes. An ETag alone is not a CAS guarantee.
+GATEWAY_API_CONTRACT = (
+    "https://github.com/Azure/azure-rest-api-specs/blob/main/specification/network/"
+    "resource-manager/Microsoft.Network/Network/stable/2024-05-01/virtualNetworkGateway.json"
+)
+GATEWAY_MANUAL_WRITER_WARNING = (
+    "MANUAL SINGLE-WRITER ONLY: You must serialize ALL shared-hub writers, including other "
+    "factories, repositories, pipelines, portal and CLI users, from review through completion "
+    "and reconciliation of any uncertain result. The initializer repository reservation does "
+    "not lock the shared hub. The gateway PUT has no verified provider-enforced If-Match; "
+    "the final GET/ETag comparison is not atomic. No Blob lock or distributed guarantee is "
+    "provided. Do not retry an uncertain write; reconcile the durable receipt first."
+)
+GATEWAY_RESPONSE_EXTENSIONS = (
+    "packetCaptureDiagnosticState", "isMigrateToCSES", "isMigratedLegacySKU",
+    "blockUpgradeOfMigratedLegacyGateways", "remoteVirtualNetworkPeerings", "vpnStack",
+)
+GATEWAY_RESPONSE_EXTENSION_WARNING = (
+    "This gateway exposes service extensions absent from the published request model. "
+    "The explicitly recognised, type-checked extension values are retained unchanged in "
+    "the PUT, not assumed read-only or silently discarded. Provider acceptance is not "
+    "live-verified; active capture or migration is blocked."
+)
 GRAPH = "https://graph.microsoft.com/"
 SOURCE_FILES = (
     "bootstrap/lib/registered_prerequisites.py",
@@ -262,11 +291,15 @@ class Builder:
     def read(self, identifier, api):
         status, _, value = self.runtime.arm("GET", identifier, api, allowed=(200, 404))
         value = value if status == 200 else None
+        if value is not None and "/virtualnetworkgateways/" in identifier.lower():
+            value = _gateway_configuration(value)
         self.observations.append({"kind": "arm", "id": identifier, "api": api, "value": value})
         return value
 
     def collection(self, identifier, api):
         value = sorted(self.runtime.collection(identifier, api), key=lambda x: x["id"].lower())
+        if identifier.lower().endswith("/virtualnetworkgateways"):
+            value = [_gateway_configuration(gateway) for gateway in value]
         self.observations.append({"kind": "collection", "id": identifier, "api": api, "value": value})
         return value
 
@@ -503,6 +536,303 @@ def _hub_private_endpoint_subnet(builder, vnet, cidr, existing_vnet, bindings, *
     bindings["hub_private_endpoint_subnet_id"] = identifier
 
 
+def _gateway_routes(gateway):
+    props = gateway.get("properties")
+    require(isinstance(props, dict), "existing-gateway-properties-required")
+    routes = props.get("customRoutes")
+    if routes is None:
+        return []
+    require(isinstance(routes, dict) and isinstance(routes.get("addressPrefixes"), list),
+            "existing-gateway-custom-routes-malformed")
+    prefixes = routes["addressPrefixes"]
+    require(all(isinstance(value, str) and str(_network(value, "gateway-custom-route")) == value
+                for value in prefixes), "existing-gateway-custom-routes-malformed")
+    require(len(set(prefixes)) == len(prefixes), "existing-gateway-custom-routes-duplicated")
+    return copy.deepcopy(prefixes)
+
+
+def _gateway_route_scope(gateway, identifier, vnet):
+    require(isinstance(gateway, dict)
+            and _resource(gateway.get("id"), "Microsoft.Network/virtualNetworkGateways") == identifier
+            and identifier.split("/providers/")[0] == vnet.split("/providers/")[0],
+            "existing-gateway-exact-scope-mismatch")
+    props = gateway.get("properties")
+    require(isinstance(props, dict), "existing-gateway-properties-required")
+    configurations = props.get("ipConfigurations")
+    require(isinstance(configurations, list) and configurations, "existing-gateway-ip-configurations-required")
+    for item in configurations:
+        require(isinstance(item, dict) and isinstance(item.get("properties"), dict),
+                "existing-gateway-ip-configuration-malformed")
+        subnet = item["properties"].get("subnet")
+        require(isinstance(subnet, dict) and isinstance(subnet.get("id"), str)
+                and subnet["id"].lower() == vnet + "/subnets/gatewaysubnet",
+                "existing-gateway-exact-subnet-mismatch")
+
+
+def _gateway_configuration(gateway):
+    """Exclude only typed client-traffic counters, not ETags or configuration."""
+    result = copy.deepcopy(gateway)
+    props = result.get("properties") if isinstance(result, dict) else None
+    vpn = props.get("vpnClientConfiguration") if isinstance(props, dict) else None
+    if isinstance(vpn, dict) and "vpnClientConnectionHealth" in vpn:
+        health = vpn["vpnClientConnectionHealth"]
+        counters = {"vpnClientConnectionsCount", "totalIngressBytesTransferred", "totalEgressBytesTransferred"}
+        require(isinstance(health, dict) and set(health) == counters
+                and all(type(value) is int and value >= 0 for value in health.values()),
+                "existing-gateway-unsupported-client-health")
+        del vpn["vpnClientConnectionHealth"]
+    return result
+
+
+def _gateway_etag_valid(value):
+    # Weak ETags are opaque freshness tokens here, never HTTP If-Match validators.
+    return isinstance(value, str) and re.fullmatch(r'(?:W/)?"[\x21\x23-\x7e\x80-\xff]+"', value) is not None
+
+
+def _gateway_writable_body(gateway):
+    """Fail-closed GET-to-PUT projection for NETWORK_API, never a generic field stripper.
+
+    Writable shapes: https://learn.microsoft.com/azure/templates/microsoft.network/
+    2024-05-01/virtualnetworkgateways and the generated VirtualNetworkGatewayData
+    reference (enableHighBandwidthVpnGateway and migration status are writable).
+    Undocumented service extensions are retained, never inferred to be read-only.
+    RADIUS secrets cannot be reliably recovered from GET.
+    """
+    gateway = _gateway_configuration(gateway)
+
+    def fields(value, writable, readonly=()):
+        require(isinstance(value, dict), "existing-gateway-unsupported-shape")
+        require(set(value) <= set(writable) | set(readonly),
+                "existing-gateway-unsupported-property")
+        return {key: copy.deepcopy(item) for key, item in value.items() if key in writable}
+
+    def project(value, schema):
+        if isinstance(schema, type):
+            require(type(value) is schema, "existing-gateway-unsupported-shape")
+            return copy.deepcopy(value)
+        if isinstance(schema, list):
+            require(isinstance(value, list), "existing-gateway-unsupported-shape")
+            return [project(item, schema[0]) for item in value]
+        writable, readonly, required = schema
+        output = fields(value, writable, readonly)
+        require(set(required) <= set(output), "existing-gateway-incomplete-writable-shape")
+        for key in output:
+            output[key] = project(output[key], writable[key])
+        # Read-only does not mean safe to ignore an unrecognised response shape.
+        for key in set(value) & set(readonly):
+            project(value[key], readonly[key])
+        return output
+
+    def obj(writable, readonly=None, required=()):
+        return writable, readonly or {}, required
+
+    resource_metadata = {"etag": str, "type": str}
+    state = {"provisioningState": str}
+    reference = obj({"id": str}, required=("id",))
+    address_space = obj({"addressPrefixes": [str]}, required=("addressPrefixes",))
+    child = lambda properties: obj(
+        {"id": str, "name": str, "properties": properties}, resource_metadata, ("name", "properties"))
+    certificate = lambda prop: child(obj({prop: str}, state, (prop,)))
+    bgp_address = obj({"ipconfigurationId": str, "customBgpIpAddresses": [str]},
+                      {"defaultBgpIpAddresses": [str], "tunnelIpAddresses": [str]}, ("ipconfigurationId",))
+    ipconfig = child(obj({"privateIPAllocationMethod": str, "subnet": reference,
+                         "publicIPAddress": reference}, {**state, "privateIPAddress": str}))
+    mapping = obj({"addressSpace": str, "portRange": str}, required=("addressSpace",))
+    nat = child(obj({"type": str, "mode": str, "ipConfigurationId": str,
+                     "internalMappings": [mapping], "externalMappings": [mapping]}, state,
+                    ("type", "mode", "internalMappings", "externalMappings")))
+    policy = child(obj({"isDefault": bool, "priority": int, "policyMembers": [
+        obj({"name": str, "attributeType": str, "attributeValue": str},
+            required=("name", "attributeType", "attributeValue"))]}, state,
+        ("isDefault", "priority", "policyMembers")))
+    connection = child(obj({"virtualNetworkGatewayPolicyGroups": [reference],
+                            "vpnClientAddressPool": address_space}, state,
+                           ("virtualNetworkGatewayPolicyGroups", "vpnClientAddressPool")))
+    vpn_schema = obj({
+        "vpnClientAddressPool": address_space, "vpnClientProtocols": [str],
+        "vpnAuthenticationTypes": [str], "aadTenant": str, "aadAudience": str, "aadIssuer": str,
+        "vpnClientRootCertificates": [certificate("publicCertData")],
+        "vpnClientRevokedCertificates": [certificate("thumbprint")],
+        "vpnClientIpsecPolicies": [obj({
+            **{key: str for key in ("dhGroup", "ikeEncryption", "ikeIntegrity",
+                                   "ipsecEncryption", "ipsecIntegrity", "pfsGroup")},
+            "saDataSizeKilobytes": int, "saLifeTimeSeconds": int})],
+        "vngClientConnectionConfigurations": [connection],
+        "radiusServerAddress": str, "radiusServerSecret": str,
+        "radiusServers": [obj({"radiusServerAddress": str, "radiusServerScore": int,
+                               "radiusServerSecret": str})],
+    })
+    props = fields(gateway.get("properties"), {
+        "ipConfigurations", "gatewayType", "vpnType", "enableBgp", "activeActive", "sku",
+        "vpnClientConfiguration", "bgpSettings", "customRoutes", "gatewayDefaultSite",
+        "vpnGatewayGeneration", "enablePrivateIpAddress", "enableDnsForwarding",
+        "disableIPSecReplayProtection", "natRules", "enableBgpRouteTranslationForNat",
+        "allowRemoteVnetTraffic", "allowVirtualWanTraffic", "virtualNetworkGatewayPolicyGroups",
+        "adminState", "autoScaleConfiguration", "resiliencyModel", "vNetExtendedLocationResourceId",
+        "enableHighBandwidthVpnGateway", "virtualNetworkGatewayMigrationStatus",
+        *GATEWAY_RESPONSE_EXTENSIONS,
+    }, {"provisioningState", "resourceGuid", "inboundDnsForwardingEndpoint"})
+    require(props.get("enableBgp") is False, "existing-gateway-route-append-bgp-review-required")
+    require(props.get("gatewayType") == "Vpn" and props.get("vpnType") == "RouteBased",
+            "existing-gateway-not-routebased-vpn")
+    for key in ("resourceGuid", "provisioningState", "inboundDnsForwardingEndpoint"):
+        if key in gateway["properties"]:
+            project(gateway["properties"][key], str)
+    require(_gateway_ready(gateway) and gateway["properties"].get("provisioningState") == "Succeeded",
+            "existing-gateway-route-append-pending-configuration")
+    vpn = props.get("vpnClientConfiguration")
+    require(isinstance(vpn, dict), "existing-gateway-vpn-configuration-required")
+    require(not any(vpn.get(key) for key in ("radiusServerAddress", "radiusServerSecret", "radiusServers"))
+            and "Radius" not in (vpn.get("vpnAuthenticationTypes") or []),
+            "existing-gateway-radius-secret-preservation-unverified")
+    schemas = {
+        "ipConfigurations": [ipconfig], "sku": obj({"name": str, "tier": str}, {"capacity": int}),
+        "vpnClientConfiguration": vpn_schema,
+        "bgpSettings": obj({"asn": int, "peerWeight": int, "bgpPeeringAddress": str,
+                             "bgpPeeringAddresses": [bgp_address]}),
+        "customRoutes": address_space, "gatewayDefaultSite": reference,
+        "natRules": [nat], "virtualNetworkGatewayPolicyGroups": [policy],
+        "autoScaleConfiguration": obj({"bounds": obj({"min": int, "max": int})}),
+        "virtualNetworkGatewayMigrationStatus": obj(
+            {"state": str, "phase": str, "errorMessage": str}, required=("state", "phase", "errorMessage")),
+        "remoteVirtualNetworkPeerings": [reference],
+        **{key: bool for key in ("enableBgp", "activeActive", "enablePrivateIpAddress",
+                                "enableDnsForwarding", "disableIPSecReplayProtection",
+                                "enableBgpRouteTranslationForNat", "allowRemoteVnetTraffic",
+                                "allowVirtualWanTraffic", "enableHighBandwidthVpnGateway",
+                                "isMigrateToCSES", "isMigratedLegacySKU", "blockUpgradeOfMigratedLegacyGateways")},
+    }
+    for key, value in props.items():
+        if value is None and key in ("customRoutes", "gatewayDefaultSite"):
+            continue
+        props[key] = project(value, schemas.get(key, str))
+    if "virtualNetworkGatewayMigrationStatus" in props:
+        migration = props["virtualNetworkGatewayMigrationStatus"]
+        require(migration["state"] == "None" and migration["phase"] == "None" and not migration["errorMessage"],
+                "existing-gateway-migration-not-idle")
+    require(props.get("isMigrateToCSES", False) is False, "existing-gateway-migration-not-idle")
+    require(props.get("packetCaptureDiagnosticState", "None") in ("None", "Stopped"),
+            "existing-gateway-packet-capture-not-idle")
+    require(isinstance(props.get("sku"), dict) and {"name", "tier"} <= set(props["sku"]),
+            "existing-gateway-sku-required")
+    require(isinstance(props.get("ipConfigurations"), list) and props["ipConfigurations"],
+            "existing-gateway-ip-configurations-required")
+    for config in props["ipConfigurations"]:
+        ip = config.get("properties", {})
+        require(config.get("name") and ip.get("privateIPAllocationMethod") == "Dynamic"
+                and ip.get("subnet", {}).get("id") and ip.get("publicIPAddress", {}).get("id"),
+                "existing-gateway-ip-configuration-preservation-unverified")
+    body = fields(gateway, {"location", "tags", "extendedLocation", "identity", "properties"},
+                  {"id", "name", "type", "etag"})
+    for key in ("id", "name", "type", "etag"):
+        if key in gateway:
+            project(gateway[key], str)
+    require(isinstance(body.get("location"), str) and body["location"], "existing-gateway-location-required")
+    if "tags" in body:
+        require(isinstance(body["tags"], dict) and all(isinstance(key, str) and isinstance(value, str)
+                for key, value in body["tags"].items()), "existing-gateway-unsupported-shape")
+    if "extendedLocation" in body:
+        body["extendedLocation"] = project(body["extendedLocation"], obj({"name": str, "type": str}))
+    if "identity" in body:
+        identity = fields(body["identity"], {"type", "userAssignedIdentities"}, {"principalId", "tenantId"})
+        require(identity.get("type") in ("None", "SystemAssigned", "UserAssigned", "SystemAssigned, UserAssigned"),
+                "existing-gateway-unsupported-identity")
+        for key in ("principalId", "tenantId"):
+            if key in body["identity"] and body["identity"][key] is not None:
+                project(body["identity"][key], str)
+        if "userAssignedIdentities" in identity:
+            require(isinstance(identity["userAssignedIdentities"], dict), "existing-gateway-unsupported-identity")
+            for identifier, value in identity["userAssignedIdentities"].items():
+                _resource(identifier, "Microsoft.ManagedIdentity/userAssignedIdentities")
+                identity["userAssignedIdentities"][identifier] = project(
+                    value, obj({}, {"principalId": str, "clientId": str}))
+        body["identity"] = identity
+    body["properties"] = props
+    return body
+
+
+def _gateway_ready(value):
+    if isinstance(value, dict):
+        return value.get("provisioningState", "Succeeded") == "Succeeded" and all(
+            _gateway_ready(item) for item in value.values())
+    return not isinstance(value, list) or all(_gateway_ready(item) for item in value)
+
+
+def _gateway_route_review(builder, gateway, vnet, dev, ownership, coordination_mode):
+    gateway = _gateway_configuration(gateway)
+    before = _gateway_routes(gateway)
+    if dev in before:
+        return False
+    identifier = _resource(gateway["id"], "Microsoft.Network/virtualNetworkGateways")
+    _gateway_route_scope(gateway, identifier, vnet)
+    expected = copy.deepcopy(gateway)
+    expected["properties"]["customRoutes"] = {
+        **(expected["properties"].get("customRoutes") or {}), "addressPrefixes": before + [dev]}
+    effect = {
+        "kind": "gateway-route-append", "id": identifier, "api": NETWORK_API,
+        "vnet_id": vnet, "factory_cidr": dev, "ownership": ownership,
+        "before": copy.deepcopy(gateway), "before_etag": gateway.get("etag"),
+        "expected": expected, "executable": False,
+        "limitation": GATEWAY_ROUTE_APPEND_LIMITATION,
+    }
+    builder.effects.append(effect)
+    manual = coordination_mode == "single-writer"
+    if not manual:
+        builder.blockers.append(GATEWAY_ROUTE_APPEND_LIMITATION + ":" + identifier)
+    blockers_before = len(builder.blockers)
+    etag = gateway.get("etag")
+    if not _gateway_etag_valid(etag):
+        builder.blockers.append("existing-gateway-valid-etag-required:" + identifier)
+    props = gateway["properties"]
+    if props.get("enableBgp") is not False:
+        builder.blockers.append("existing-gateway-route-append-bgp-review-required:" + identifier)
+
+    if props.get("provisioningState") != "Succeeded" or not _gateway_ready(gateway):
+        builder.blockers.append("existing-gateway-route-append-pending-configuration:" + identifier)
+    if manual:
+        effect["manual_writer_warning"] = GATEWAY_MANUAL_WRITER_WARNING
+        extensions = [key for key in GATEWAY_RESPONSE_EXTENSIONS if key in props]
+        if extensions:
+            effect["retained_response_extensions"] = extensions
+            effect["response_extension_warning"] = GATEWAY_RESPONSE_EXTENSION_WARNING
+        try:
+            _gateway_writable_body(gateway)
+            effect["body"] = _gateway_writable_body(expected)
+        except PrerequisiteError as exc:
+            builder.blockers.append(exc.code + ":" + identifier)
+        effect["executable"] = len(builder.blockers) == blockers_before
+        effect.pop("limitation")
+    return True
+
+
+def _revalidate_gateway_route_review(runtime, effect, *, coordination_mode=None, manual_writer_warning=None):
+    require(coordination_mode == "single-writer", GATEWAY_ROUTE_APPEND_LIMITATION)
+    require(manual_writer_warning == GATEWAY_MANUAL_WRITER_WARNING
+            and effect.get("manual_writer_warning") == GATEWAY_MANUAL_WRITER_WARNING,
+            "gateway-route-append-manual-writer-warning-required")
+    identifier = _resource(effect["id"], "Microsoft.Network/virtualNetworkGateways")
+    vnet = _resource(effect["vnet_id"], "Microsoft.Network/virtualNetworks")
+    require(effect["api"] == NETWORK_API, "gateway-route-append-api-mismatch")
+    _, _, current = runtime.arm("GET", identifier, NETWORK_API)
+    current = _gateway_configuration(current)
+    _gateway_route_scope(current, identifier, vnet)
+    require(current.get("etag") == effect["before_etag"], "gateway-route-append-etag-changed")
+    require(current == effect["before"], "gateway-route-append-configuration-changed")
+    require(_gateway_etag_valid(current.get("etag")), "existing-gateway-valid-etag-required")
+    _gateway_writable_body(current)
+    before = _gateway_routes(current)
+    dev = str(_network(effect["factory_cidr"], "dev_vnet_cidr"))
+    require(dev not in before, "gateway-route-append-no-longer-required")
+    expected = copy.deepcopy(current)
+    expected["properties"]["customRoutes"] = {
+        **(expected["properties"].get("customRoutes") or {}), "addressPrefixes": before + [dev]}
+    require(expected == effect["expected"], "gateway-route-append-not-exact-addition")
+    body = _gateway_writable_body(expected)
+    require(effect.get("executable") is True and body == effect.get("body"),
+            "gateway-route-append-writable-body-changed")
+    return body
+
+
 def _hub(builder, config, context, target, bindings, owned):
     external = config["access_hub_mode"] == "external"
     if not external and not config["setup_hub_access"]:
@@ -573,7 +903,10 @@ def _hub(builder, config, context, target, bindings, owned):
            "aadAudience": "c632b3df-fb67-4d84-bdcf-b95ad541b5c8",
            "aadIssuer": "https://sts.windows.net/" + target["tenant_id"] + "/"}
     if matching:
-        gateway = matching[0]
+        identifier = _resource(matching[0]["id"], "Microsoft.Network/virtualNetworkGateways")
+        gateway = builder.read(identifier, NETWORK_API)
+        require(gateway == matching[0], "existing-gateway-inventory-changed:" + identifier)
+        _gateway_route_scope(gateway, identifier, vnet)
         props = gateway.get("properties", {})
         if props.get("provisioningState") != "Succeeded":
             builder.blockers.append("existing-gateway-not-ready:" + gateway["id"])
@@ -581,8 +914,8 @@ def _hub(builder, config, context, target, bindings, owned):
                 "existing-gateway-not-routebased-vpn:" + gateway["id"])
         if not _contains(props.get("vpnClientConfiguration"), vpn):
             builder.blockers.append("existing-gateway-p2s-configuration-incompatible-review-exact-resource:" + gateway["id"])
-        if str(dev) not in props.get("customRoutes", {}).get("addressPrefixes", []):
-            builder.blockers.append("existing-gateway-missing-factory-route-review-exact-resource:" + gateway["id"])
+        route_append = _gateway_route_review(builder, gateway, vnet, str(dev), ownership,
+                                            config.get("coordination_mode", "blob"))
         dns = (existing_vnet or {}).get("properties", {}).get("dhcpOptions", {}).get("dnsServers", [])
         resolvers = builder.collection(f"/subscriptions/{vnet.split('/')[2]}/providers/Microsoft.Network/dnsResolvers", DNS_API)
         endpoints = []
@@ -598,11 +931,13 @@ def _hub(builder, config, context, target, bindings, owned):
         if not dns or any(ip not in verified_ips for ip in dns):
             builder.blockers.append("existing-gateway-private-dns-resolver-unverified:" + gateway["id"])
         bindings["network"]["gateway_id"] = gateway["id"]
-        bindings["network"]["gateway_reused_unchanged"] = True
+        bindings["network"]["gateway_reused_unchanged"] = not route_append
+        if route_append:
+            bindings["network"]["gateway_route_append_required"] = True
         bindings["network"]["dns_servers"] = dns
         bindings["network"]["dns_inbound_endpoint_ids"] = [e["id"] for e in endpoints]
-        # Never guess the generated name, replace pools/routes, or touch an
-        # arbitrary shared gateway. DNS resources are separately reviewed below.
+        # Never guess the generated name or replace an arbitrary shared gateway.
+        # DNS resources are separately reviewed below.
     else:
         seed = digest({"vnet": vnet})[:12]
         gateway_subnet = str(ipaddress.ip_network((int(cidr.broadcast_address) - 31, 27)))
@@ -668,6 +1003,13 @@ def capabilities():
         "requires_existing_common_network_for_access": True,
         "supports_restricted_wizard": False,
         "cold_start_supported": False,
+        "existing_gateway_route_append": {
+            "preview_supported": True, "execution_supported": True,
+            "execution_coordination_modes": ["single-writer"],
+            "manual_writer_warning": GATEWAY_MANUAL_WRITER_WARNING,
+            "provider_enforced_if_match": False,
+            "blob_mode_limitation": GATEWAY_ROUTE_APPEND_LIMITATION, "api_contract": GATEWAY_API_CONTRACT,
+        },
         "unsupported_stages": [
             "cold-start-foundation", "identity-federation-enrollment", "repository-publication",
             "runner-provisioning", "common-deployment", "project-deployment",
@@ -692,6 +1034,30 @@ def _commands(effects):
                                            "preserve_all_other_vnet_properties": True}
             else:
                 command["precondition"] = {"registrationState": "NotRegistered"}
+        elif kind == "gateway-route-append":
+            command = {
+                "transport": "arm", "method": "PUT", "resource_id": effect["id"],
+                "api_version": effect["api"], "executable": effect["executable"],
+                "api_contract": GATEWAY_API_CONTRACT,
+                "property_changes": {
+                    "properties.customRoutes.addressPrefixes":
+                        effect["expected"]["properties"]["customRoutes"]["addressPrefixes"]},
+                "precondition": {
+                    "exact_gateway_state_sha256": digest(effect["before"]),
+                    "etag": effect["before_etag"], "vnet_id": effect["vnet_id"],
+                    "provider_enforced_strong_if_match_required": "manual_writer_warning" not in effect,
+                    "provider_enforced_if_match": False,
+                    "preserve_all_other_gateway_configuration": True},
+            }
+            if "manual_writer_warning" in effect:
+                command["precondition"]["manual_writer_warning"] = effect["manual_writer_warning"]
+                if "body" in effect:
+                    command["body"] = copy.deepcopy(effect["body"])
+                if "retained_response_extensions" in effect:
+                    command["retained_response_extensions"] = effect["retained_response_extensions"]
+                    command["response_extension_warning"] = effect["response_extension_warning"]
+            else:
+                command["limitation"] = GATEWAY_ROUTE_APPEND_LIMITATION
         elif kind in ("group-create", "first-party-app-create"):
             command = {"transport": "graph", "method": "POST",
                        "path": "groups" if kind == "group-create" else "servicePrincipals",
@@ -866,6 +1232,20 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
         bindings["deployment_identity_id"] = identity_id
         bindings["deployment_metadata_role_id"] = metadata_role
     hub_scopes = [] if minimum else _hub(builder, config, context, target, bindings, owned)
+    gateway_auth_scopes = []
+    network = bindings.get("network", {})
+    if "gateway_reused_unchanged" in network:
+        append_required = network.get("gateway_route_append_required", False)
+        gateway_auth_scopes.append({
+            "service": "arm", "scope": _resource(network["gateway_id"], "Microsoft.Network/virtualNetworkGateways"),
+            "ownership": "factory-owned" if network["owned"] else "external-retain-never-enroll-or-delete",
+            "read_actions": ["Microsoft.Network/virtualNetworkGateways/read"],
+            "write_actions": ["Microsoft.Network/virtualNetworkGateways/write"] if append_required else [],
+            "purpose": "gateway-route-append" if append_required else "gateway-reuse-readonly",
+            "execution_supported": not append_required or any(
+                effect["kind"] == "gateway-route-append" and effect["executable"]
+                for effect in builder.effects),
+        })
     locks = sorted(set(owned + hub_scopes + provider_scopes + ["/tenants/" + target["tenant_id"] + "/groups/" +
                                            digest(config["team_group_name"].casefold())]))
     plan = {"contract_version": CONTRACT_VERSION, "stage": "privileged-prerequisites",
@@ -878,10 +1258,15 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
             "bindings": bindings, "lock_scopes": locks, "blockers": builder.blockers,
             "can_execute": not builder.blockers,
             "requires_downstream_review": True, "runtime_binding_published": False,
-            "governance": "all-writers-use-these-" + mode + "-physical-leases; no automatic recovery or lease break",
-            "warnings": (["Legacy factory-common coordination is retained unchanged; it does not establish "
+            "governance": (GATEWAY_MANUAL_WRITER_WARNING if config.get("coordination_mode") == "single-writer"
+                           else "all-writers-use-these-" + mode +
+                           "-physical-leases; no automatic recovery or lease break"),
+            "warnings": ([GATEWAY_MANUAL_WRITER_WARNING] if config.get("coordination_mode") == "single-writer"
+                         else ["Legacy factory-common coordination is retained unchanged; it does not establish "
                           "cross-factory shared-hub coordination. Review a separate explicit migration."]
                          if mode == "factory-common" else [])}
+    if any("retained_response_extensions" in effect for effect in builder.effects):
+        plan["warnings"].append(GATEWAY_RESPONSE_EXTENSION_WARNING)
     plan.update(
         commands=_commands(builder.effects),
         auth_scopes=[
@@ -889,7 +1274,7 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
              "ownership": ("factory-owned" if value in owned else "subscription-provider-registration"
                            if value in provider_scopes else "external-retained")}
             for value in sorted(set(owned + hub_scopes + provider_scopes))
-        ] + [{"service": "graph", "tenant_id": target["tenant_id"],
+        ] + gateway_auth_scopes + [{"service": "graph", "tenant_id": target["tenant_id"],
               "permissions": ["Group.ReadWrite.All", "User.Read.All"] +
                   (["Application.ReadWrite.All"] if config.get("first_party_apps") else [])},
              *([{"service": "storage", "scope": container_id,
@@ -967,13 +1352,14 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
     _verify_loaded_source(plan["source"])
     target, consumer_hash = _read_target(ordinary(plan["consumer_root"]), plan["scope"])
     require(target == plan["target"] and consumer_hash == plan["consumer_hash"], "consumer-register-changed")
-    runtime = runtime or Cloud(target, plan["context"]["coordination"])
+    runtime = runtime or Cloud(target, plan["context"].get("coordination", {}))
     # Rebuild commands from validated configuration, not from caller-supplied argv.
     fresh = prepare(source_root=plan["source"]["root"], consumer_root=plan["consumer_root"],
                     scope=plan["scope"], bootstrap_config=plan["bootstrap_config"],
                     expected_revision=plan["expected_revision"], context=plan["context"], runtime=runtime)
     for key in ("effects", "observations", "bindings", "lock_scopes", "blockers", "commands",
-                "auth_scopes", "source_hashes", "input_hash", "stages", "preconditions", "capabilities"):
+                "auth_scopes", "source_hashes", "input_hash", "stages", "preconditions", "capabilities",
+                "warnings", "governance"):
         require(fresh[key] == plan[key], "prerequisite-live-state-or-plan-changed:" + key)
     folder = ordinary(state_dir)
     require(folder.is_dir(), "durable-existing-state-directory-required")
@@ -982,7 +1368,7 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
                "status": "claimed", "effects_completed": [], "bindings": copy.deepcopy(plan["bindings"]),
                "source": copy.deepcopy(plan["source"]), "scope": copy.deepcopy(plan["scope"]),
                "expected_revision": plan["expected_revision"], "consumer_hash": plan["consumer_hash"],
-               "coordination": copy.deepcopy(plan["context"]["coordination"]), "lock_scopes": plan["lock_scopes"],
+               "coordination": copy.deepcopy(plan["context"].get("coordination", {})), "lock_scopes": plan["lock_scopes"],
                "leases": {}, "reconciliation_required": True, "runtime_ready": False,
                "changed": False, "outputs": copy.deepcopy(plan["bindings"]),
                "receipt_path": str(receipt_path), "stage_results": []}
@@ -1095,6 +1481,19 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
                 value = runtime.graph("POST", "servicePrincipals", effect["body"], allowed=(201,))
                 require(value.get("appId") == app, "created-first-party-app-not-verified")
                 receipt["bindings"].setdefault("first_party_apps", {})[effect["name"]] = _guid(value.get("id"))
+            elif kind == "gateway-route-append":
+                require(GATEWAY_MANUAL_WRITER_WARNING in plan["warnings"],
+                        "gateway-route-append-manual-writer-warning-required")
+                body = _revalidate_gateway_route_review(
+                    runtime, effect, coordination_mode=plan["bootstrap_config"].get("coordination_mode"),
+                    manual_writer_warning=GATEWAY_MANUAL_WRITER_WARNING)
+                # No If-Match: serialization is explicitly the operator's responsibility.
+                runtime.arm("PUT", effect["id"], effect["api"], data=body, allowed=(200, 201, 202))
+                result = _wait(runtime, effect["id"], effect["api"], assert_held, sleep)
+                _gateway_route_scope(result, effect["id"], effect["vnet_id"])
+                require(_gateway_writable_body(result) == body,
+                        "gateway-route-append-post-verification-failed")
+                receipt["bindings"]["network"]["gateway_route_append_verified"] = True
             elif kind == "vnet-dns":
                 _, _, current = runtime.arm("GET", effect["id"], effect["api"])
                 require(current.get("properties", {}).get("dhcpOptions", {}).get("dnsServers", []) == effect["before_dns"],

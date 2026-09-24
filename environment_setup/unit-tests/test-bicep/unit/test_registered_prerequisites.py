@@ -474,6 +474,654 @@ def test_incompatible_gateway_blocks_before_any_write_with_exact_id(workspace):
     assert not runtime.writes and not runtime.blobs
 
 
+def gateway_route_review_fixture(workspace, single_writer=False):
+    runtime = Runtime()
+    identifier = existing_gateway(runtime)
+    gateway = runtime.resources[identifier]
+    gateway.update(location="westeurope", etag='"reviewed-etag"', tags={"shared": "retain"},
+                   identity={"type": "SystemAssigned", "principalId": MEMBER, "tenantId": TENANT})
+    gateway["properties"].update(
+        enableBgp=False, activeActive=False, vpnGatewayGeneration="Generation2",
+        sku={"name": "VpnGw2AZ", "tier": "VpnGw2AZ", "capacity": 2},
+        bgpSettings={"asn": 65515, "peerWeight": 0, "bgpPeeringAddresses": []},
+        enableDnsForwarding=True, resourceGuid=GROUP,
+        customRoutes={"addressPrefixes": ["172.16.0.0/18", "10.42.0.0/24"]},
+        gatewayDefaultSite=None, natRules=[], allowRemoteVnetTraffic=True)
+    gateway["properties"]["ipConfigurations"][0].update(name="retained-ip", etag='"ip-etag"')
+    gateway["properties"]["ipConfigurations"][0]["properties"].update(
+        provisioningState="Succeeded", privateIPAllocationMethod="Dynamic",
+        publicIPAddress={"id": HUB_RG + "/providers/microsoft.network/publicipaddresses/shared-pip"})
+    runtime.resources[HUB]["location"] = gateway["location"]
+    args = external_arguments(workspace)
+    args["bootstrap_config"]["dev_vnet_cidr"] = "172.18.64.0/18"
+    runtime.resources[COMMON_VNET]["properties"]["addressSpace"]["addressPrefixes"] = ["172.18.64.0/18"]
+    if single_writer:
+        args["bootstrap_config"]["coordination_mode"] = "single-writer"
+        proof = {"repository": "https://github.com/reviewed/private",
+                 "ref": "refs/heads/aifactory-initializer-lock", "sha": "a" * 40, "owner": FACTORY}
+        args["context"].update(coordination={}, coordination_mode="provider", provider_serialization=proof)
+        runtime.verify_provider_serialization = lambda actual: (
+            None if actual == proof else pytest.fail("reservation changed"))
+        runtime.blob = lambda *a, **k: pytest.fail("single-writer must never contact Blob")
+    return runtime, identifier, args
+
+
+def route_effect(plan):
+    return next(effect for effect in plan["effects"] if effect["kind"] == "gateway-route-append")
+
+
+def test_gateway_route_append_preview_frozen_exact_addition_and_retained_scope(workspace):
+    runtime, identifier, args = gateway_route_review_fixture(workspace)
+    original = copy.deepcopy(runtime.resources)
+    plan = core.prepare(**args, runtime=runtime)
+    effect = route_effect(plan)
+    assert effect["before"] == original[identifier]
+    assert effect["before_etag"] == original[identifier]["etag"]
+    expected = copy.deepcopy(original[identifier])
+    expected["properties"]["customRoutes"]["addressPrefixes"].append(args["bootstrap_config"]["dev_vnet_cidr"])
+    assert effect["expected"] == expected
+    assert effect["expected"]["location"] == "westeurope" != plan["target"]["location"]
+    assert effect["ownership"] == "external-retain-never-enroll-or-delete"
+    assert plan["bindings"]["network"]["gateway_reused_unchanged"] is False
+    assert plan["bindings"]["network"]["gateway_route_append_required"] is True
+    assert not effect["executable"] and not plan["can_execute"]
+    assert core.GATEWAY_ROUTE_APPEND_LIMITATION + ":" + identifier in plan["blockers"]
+    capability = plan["capabilities"]["existing_gateway_route_append"]
+    assert capability["execution_supported"] is True
+    assert capability["execution_coordination_modes"] == ["single-writer"]
+    assert capability["provider_enforced_if_match"] is False
+    command = next(command for command in plan["commands"] if command.get("resource_id") == identifier)
+    assert command["method"] == "PUT" and command["executable"] is False
+    assert "body" not in command  # Never advertise a lossy PUT or route-writing PATCH.
+    assert command["precondition"]["exact_gateway_state_sha256"] == core.digest(original[identifier])
+    assert command["precondition"]["provider_enforced_strong_if_match_required"] is True
+    permission = next(scope for scope in plan["auth_scopes"] if scope.get("scope") == identifier)
+    assert permission["write_actions"] == ["Microsoft.Network/virtualNetworkGateways/write"]
+    assert permission["read_actions"] == ["Microsoft.Network/virtualNetworkGateways/read"]
+    assert permission["ownership"] == effect["ownership"]
+    with pytest.raises(core.PrerequisiteError, match="prerequisite-plan-blocked"):
+        execute(plan, workspace, runtime)
+    assert runtime.resources == original and not runtime.writes and not runtime.blobs
+    assert not list(workspace[2].iterdir())
+
+
+@pytest.mark.parametrize("single_writer", [False, True])
+@pytest.mark.parametrize("prefixes", [
+    ["172.16.0.0/18", "172.18.64.0/18", "10.42.0.0/24"],
+    ["10.42.0.0/24", "172.16.0.0/18", "172.18.64.0/18"],
+])
+def test_gateway_route_already_present_noop_preserves_order_and_all_configuration(workspace, prefixes, single_writer):
+    runtime, identifier, args = gateway_route_review_fixture(workspace, single_writer)
+    gateway = runtime.resources[identifier]
+    gateway["properties"]["customRoutes"]["addressPrefixes"] = prefixes
+    gateway["properties"]["enableBgp"] = True  # Reuse does not rewrite BGP configuration.
+    before = copy.deepcopy(gateway)
+    plan = core.prepare(**args, runtime=runtime)
+    assert plan["can_execute"], plan["blockers"]
+    assert plan["bindings"]["network"]["gateway_reused_unchanged"] is True
+    permission = next(scope for scope in plan["auth_scopes"] if scope.get("scope") == identifier)
+    assert permission["write_actions"] == []
+    assert permission["read_actions"] == ["Microsoft.Network/virtualNetworkGateways/read"]
+    assert not any(effect["kind"] == "gateway-route-append" for effect in plan["effects"])
+    assert execute(plan, workspace, runtime)["status"] == "succeeded"
+    assert runtime.resources[identifier] == before
+    assert not any(write[0] == "arm" and write[2] == identifier for write in runtime.writes)
+
+
+@pytest.mark.parametrize("routes", [
+    {"addressPrefixes": "172.16.0.0/18"},
+    {"addressPrefixes": ["172.16.1.1/18"]},
+    {"addressPrefixes": ["172.16.0.0/18", "172.16.0.0/18"]},
+    {"addressPrefixes": [None]}, {"addressPrefixes": ["::/0"]}, {}, [],
+])
+def test_gateway_route_malformed_or_duplicate_inventory_fails_closed(workspace, routes):
+    runtime, identifier, args = gateway_route_review_fixture(workspace)
+    runtime.resources[identifier]["properties"]["customRoutes"] = routes
+    with pytest.raises(core.PrerequisiteError):
+        core.prepare(**args, runtime=runtime)
+    assert not runtime.writes and not runtime.blobs
+
+
+@pytest.mark.parametrize("routes", [None, {"addressPrefixes": []}, "absent"])
+@pytest.mark.parametrize("single_writer", [False, True])
+def test_gateway_route_empty_inventory_only_adds_exact_factory_route(workspace, routes, single_writer):
+    runtime, identifier, args = gateway_route_review_fixture(workspace, single_writer)
+    props = runtime.resources[identifier]["properties"]
+    if routes == "absent":
+        props.pop("customRoutes")
+    else:
+        props["customRoutes"] = routes
+    plan = core.prepare(**args, runtime=runtime)
+    assert plan["can_execute"] is single_writer
+    assert route_effect(plan)["expected"]["properties"]["customRoutes"]["addressPrefixes"] == [
+        args["bootstrap_config"]["dev_vnet_cidr"]]
+    assert not runtime.writes and not runtime.blobs
+    if single_writer:
+        result = execute(plan, workspace, runtime)
+        assert result["status"] == "succeeded", result.get("error")
+
+
+def test_gateway_route_detail_get_must_match_subscription_inventory(workspace):
+    runtime, identifier, args = gateway_route_review_fixture(workspace)
+    original = runtime.arm
+
+    def changed_get(method, resource, api, *args, **kwargs):
+        status, headers, body = original(method, resource, api, *args, **kwargs)
+        if method == "GET" and resource == identifier:
+            body["tags"] = {"changed-during-discovery": "yes"}
+        return status, headers, body
+
+    runtime.arm = changed_get
+    with pytest.raises(core.PrerequisiteError, match="existing-gateway-inventory-changed"):
+        core.prepare(**args, runtime=runtime)
+    assert not runtime.writes and not runtime.blobs
+
+
+@pytest.mark.parametrize("mutation,blocker", [
+    ("bgp", "bgp-review-required"), ("pending", "pending-configuration"),
+    ("pending-ip", "pending-configuration"), ("malformed-etag", "valid-etag-required"),
+    ("missing-etag", "valid-etag-required"),
+])
+def test_gateway_route_unready_configuration_blocks_with_exact_resource(workspace, mutation, blocker):
+    runtime, identifier, args = gateway_route_review_fixture(workspace, single_writer=True)
+    gateway = runtime.resources[identifier]
+    if mutation == "bgp":
+        gateway["properties"]["enableBgp"] = True
+    elif mutation == "pending":
+        gateway["properties"]["provisioningState"] = "Updating"
+    elif mutation == "pending-ip":
+        gateway["properties"]["ipConfigurations"][0]["properties"]["provisioningState"] = "Updating"
+    elif mutation == "malformed-etag":
+        gateway["etag"] = 'w/"invalid-case"'
+    else:
+        gateway.pop("etag")
+    plan = core.prepare(**args, runtime=runtime)
+    assert not plan["can_execute"]
+    assert any(blocker + ":" + identifier in value for value in plan["blockers"])
+    assert not runtime.writes and not runtime.blobs
+
+
+@pytest.mark.parametrize("mutation,code", [
+    ("etag", "etag-changed"), ("tags", "configuration-changed"),
+    ("pool", "configuration-changed"), ("order", "configuration-changed"),
+    ("subnet", "exact-subnet-mismatch"), ("id", "exact-scope-mismatch"),
+    ("expected", "not-exact-addition"), ("body", "writable-body-changed"),
+])
+def test_gateway_route_independent_execution_guard_never_blindly_writes(workspace, mutation, code):
+    runtime, identifier, args = gateway_route_review_fixture(workspace, single_writer=True)
+    effect = route_effect(core.prepare(**args, runtime=runtime))
+    current = runtime.resources[identifier]
+    if mutation == "etag":
+        current["etag"] = '"new-etag"'
+    elif mutation == "tags":
+        current["tags"]["another-factory"] = "retain"
+    elif mutation == "pool":
+        current["properties"]["vpnClientConfiguration"]["vpnClientAddressPool"]["addressPrefixes"] = ["192.168.0.0/24"]
+    elif mutation == "order":
+        current["properties"]["customRoutes"]["addressPrefixes"].reverse()
+    elif mutation == "subnet":
+        current["properties"]["ipConfigurations"][0]["properties"]["subnet"]["id"] = COMMON_VNET + "/subnets/GatewaySubnet"
+    elif mutation == "id":
+        current["id"] = identifier + "-other"
+    elif mutation == "expected":
+        effect["expected"]["tags"] = {}
+    elif mutation == "body":
+        effect["body"]["properties"]["customRoutes"]["addressPrefixes"].reverse()
+    runtime.read_only = False
+    runtime.serialized_provisioning = True
+    with pytest.raises(core.PrerequisiteError, match=code):
+        core._revalidate_gateway_route_review(runtime, effect, coordination_mode="single-writer",
+                                              manual_writer_warning=core.GATEWAY_MANUAL_WRITER_WARNING)
+    assert not runtime.writes and not runtime.blobs
+
+
+def test_gateway_route_manual_plan_is_readonly_then_appends_once(workspace):
+    runtime, identifier, args = gateway_route_review_fixture(workspace, single_writer=True)
+    before = copy.deepcopy(runtime.resources)
+    plan = core.prepare(**args, runtime=runtime)
+    effect = route_effect(plan)
+    assert plan["can_execute"], plan["blockers"]
+    assert effect["executable"]
+    assert core.GATEWAY_MANUAL_WRITER_WARNING in plan["warnings"]
+    assert plan["governance"] == core.GATEWAY_MANUAL_WRITER_WARNING
+    assert runtime.resources == before and not runtime.writes and not runtime.blobs
+    assert not list(workspace[2].iterdir())
+    command = next(command for command in plan["commands"] if command.get("resource_id") == identifier)
+    assert command["body"] == effect["body"] and command["executable"]
+    assert command["precondition"]["provider_enforced_strong_if_match_required"] is False
+    assert command["precondition"]["manual_writer_warning"] == core.GATEWAY_MANUAL_WRITER_WARNING
+    assert next(scope for scope in plan["auth_scopes"] if scope.get("scope") == identifier)["execution_supported"]
+    original = runtime.arm
+    last_gateway_get = []
+
+    def checked_arm(method, resource, api, *positional, **kwargs):
+        if resource == identifier:
+            if method == "GET":
+                last_gateway_get[:] = [copy.deepcopy(runtime.resources[identifier])]
+            else:
+                assert method == "PUT" and not kwargs.get("headers")
+                assert last_gateway_get == [effect["before"]]
+        return original(method, resource, api, *positional, **kwargs)
+
+    runtime.arm = checked_arm
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded", result.get("error")
+    assert result["bindings"]["network"]["gateway_route_append_verified"]
+    assert core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"]) == result
+    assert not result["leases"] and not result["coordination"]
+    writes = [write for write in runtime.writes if write[0] == "arm" and write[2] == identifier]
+    assert len(writes) == 1 and writes[0][1] == "PUT" and writes[0][3] == effect["body"]
+    assert runtime.resources[identifier]["properties"]["customRoutes"]["addressPrefixes"] == [
+        "172.16.0.0/18", "10.42.0.0/24", "172.18.64.0/18"]
+    refreshed = core.prepare(**args, runtime=runtime)
+    assert not any(effect["kind"] == "gateway-route-append" for effect in refreshed["effects"])
+
+
+@pytest.mark.parametrize("mode,warning,code", [
+    (None, core.GATEWAY_MANUAL_WRITER_WARNING, "strong-if-match-unverified"),
+    ("blob", core.GATEWAY_MANUAL_WRITER_WARNING, "strong-if-match-unverified"),
+    ("provider", core.GATEWAY_MANUAL_WRITER_WARNING, "strong-if-match-unverified"),
+    ("single-writer", None, "manual-writer-warning-required"),
+    ("single-writer", "I hold a repository lock", "manual-writer-warning-required"),
+])
+def test_gateway_route_guard_requires_explicit_mode_and_exact_warning(workspace, mode, warning, code):
+    runtime, _, args = gateway_route_review_fixture(workspace, single_writer=True)
+    effect = route_effect(core.prepare(**args, runtime=runtime))
+    with pytest.raises(core.PrerequisiteError, match=code):
+        core._revalidate_gateway_route_review(runtime, effect, coordination_mode=mode,
+                                              manual_writer_warning=warning)
+    assert not runtime.writes and not runtime.blobs
+
+
+@pytest.mark.parametrize("field", ["warnings", "governance"])
+def test_gateway_route_manual_warning_is_rebuilt_not_caller_controlled(workspace, field):
+    runtime, _, args = gateway_route_review_fixture(workspace, single_writer=True)
+    plan = core.prepare(**args, runtime=runtime)
+    plan[field] = [] if field == "warnings" else "distributed lock guaranteed"
+    plan["plan_hash"] = core.digest({key: value for key, value in plan.items() if key != "plan_hash"})
+    with pytest.raises(core.PrerequisiteError, match="live-state-or-plan-changed:" + field):
+        execute(plan, workspace, runtime)
+    assert not runtime.writes and not list(workspace[2].iterdir())
+
+
+@pytest.mark.parametrize("path,value", [
+    (("futureProperty",), False),
+    (("properties", "futureProperty"), {}),
+    (("properties", "bgpSettings", "futureProperty"), []),
+    (("properties", "vpnClientConfiguration", "futureProperty"), ""),
+    (("properties", "customRoutes", "futureProperty"), None),
+    (("properties", "sku", "capacity"), {}),
+    (("properties", "inboundDnsForwardingEndpoint"), {}),
+    (("properties", "ipConfigurations", 0, "properties", "privateIPAddress"), {}),
+    (("properties", "ipConfigurations", 0, "properties", "privateIPAllocationMethod"), "Static"),
+    (("properties", "vpnClientConfiguration", "radiusServers"), [{"radiusServerAddress": "10.0.0.1"}]),
+    (("properties", "vpnClientConfiguration", "radiusServerAddress"), "10.0.0.1"),
+    (("identity", "userAssignedIdentities"), []),
+    (("properties", "natRules"), [{}]),
+])
+def test_gateway_route_unsupported_shapes_block_before_put(workspace, path, value):
+    runtime, identifier, args = gateway_route_review_fixture(workspace, single_writer=True)
+    node = runtime.resources[identifier]
+    for key in path[:-1]:
+        node = node[key]
+    node[path[-1]] = value
+    plan = core.prepare(**args, runtime=runtime)
+    assert not plan["can_execute"] and not route_effect(plan)["executable"]
+    assert any(identifier in blocker for blocker in plan["blockers"])
+    with pytest.raises(core.PrerequisiteError, match="plan-blocked"):
+        execute(plan, workspace, runtime)
+    assert not runtime.writes and not list(workspace[2].iterdir())
+
+
+def test_gateway_route_writable_projection_retains_complete_known_configuration(workspace):
+    runtime, identifier, args = gateway_route_review_fixture(workspace, single_writer=True)
+    gateway = runtime.resources[identifier]
+    gateway.update(name="corporate-gateway-not-generated", type="Microsoft.Network/virtualNetworkGateways",
+                   extendedLocation={"name": "edge", "type": "EdgeZone"})
+    gateway["identity"].update(type="SystemAssigned, UserAssigned", userAssignedIdentities={
+        OWNED + "/providers/Microsoft.ManagedIdentity/userAssignedIdentities/retained":
+            {"principalId": MEMBER, "clientId": GROUP}})
+    props = gateway["properties"]
+    props.update(enablePrivateIpAddress=False, disableIPSecReplayProtection=False,
+                 inboundDnsForwardingEndpoint="10.40.0.253",
+                 enableBgpRouteTranslationForNat=False, allowVirtualWanTraffic=False,
+                 adminState="Enabled", resiliencyModel="SingleHomed",
+                 autoScaleConfiguration={"bounds": {"min": 2, "max": 4}},
+                 vNetExtendedLocationResourceId=HUB,
+                 gatewayDefaultSite={"id": HUB_RG + "/providers/Microsoft.Network/localNetworkGateways/site"})
+    props["bgpSettings"].update(bgpPeeringAddress="10.40.0.254", bgpPeeringAddresses=[{
+        "ipconfigurationId": identifier + "/ipConfigurations/retained-ip",
+        "customBgpIpAddresses": ["169.254.21.1"], "defaultBgpIpAddresses": ["10.40.0.254"],
+        "tunnelIpAddresses": ["203.0.113.1"]}])
+    props["ipConfigurations"][0]["properties"]["privateIPAddress"] = "10.40.0.254"
+    props["natRules"] = [{
+        "id": identifier + "/natRules/retained", "name": "retained", "etag": '"nat-etag"',
+        "properties": {"provisioningState": "Succeeded", "type": "Static", "mode": "EgressSnat",
+                       "ipConfigurationId": identifier + "/ipConfigurations/retained-ip",
+                       "internalMappings": [{"addressSpace": "10.50.0.0/24", "portRange": "100"}],
+                       "externalMappings": [{"addressSpace": "10.60.0.0/24", "portRange": "100"}]}}]
+    policy_id = identifier + "/virtualNetworkGatewayPolicyGroups/retained"
+    props["virtualNetworkGatewayPolicyGroups"] = [{
+        "id": policy_id, "name": "retained", "properties": {"provisioningState": "Succeeded",
+            "priority": 1, "isDefault": True, "policyMembers": [
+                {"name": "member", "attributeType": "AADGroupId", "attributeValue": GROUP}]}}]
+    vpn = props["vpnClientConfiguration"]
+    vpn.update(vpnClientRootCertificates=[{"name": "root", "properties": {
+        "publicCertData": "retained-public-certificate", "provisioningState": "Succeeded"}}],
+        vpnClientRevokedCertificates=[{"name": "revoked", "properties": {"thumbprint": "retained-thumbprint"}}],
+        vpnClientIpsecPolicies=[{"dhGroup": "DHGroup14", "ikeEncryption": "AES256", "ikeIntegrity": "SHA256",
+            "ipsecEncryption": "AES256", "ipsecIntegrity": "SHA256", "pfsGroup": "PFS14",
+            "saDataSizeKilobytes": 102400000, "saLifeTimeSeconds": 27000}],
+        vngClientConnectionConfigurations=[{"name": "retained", "properties": {
+            "provisioningState": "Succeeded", "virtualNetworkGatewayPolicyGroups": [{"id": policy_id}],
+            "vpnClientAddressPool": {"addressPrefixes": ["172.30.1.0/24"]}}}])
+    independently_projected = copy.deepcopy(gateway)
+    for key in ("id", "name", "type", "etag"):
+        independently_projected.pop(key)
+    for key in ("principalId", "tenantId"):
+        independently_projected["identity"].pop(key)
+    for key in independently_projected["identity"]["userAssignedIdentities"]:
+        independently_projected["identity"]["userAssignedIdentities"][key] = {}
+    preserved = independently_projected["properties"]
+    for key in ("provisioningState", "resourceGuid", "inboundDnsForwardingEndpoint"):
+        preserved.pop(key)
+    preserved["sku"].pop("capacity")
+    preserved["ipConfigurations"][0].pop("etag")
+    for key in ("provisioningState", "privateIPAddress"):
+        preserved["ipConfigurations"][0]["properties"].pop(key)
+    for key in ("defaultBgpIpAddresses", "tunnelIpAddresses"):
+        preserved["bgpSettings"]["bgpPeeringAddresses"][0].pop(key)
+    preserved["natRules"][0].pop("etag")
+    preserved["natRules"][0]["properties"].pop("provisioningState")
+    preserved["virtualNetworkGatewayPolicyGroups"][0]["properties"].pop("provisioningState")
+    preserved["vpnClientConfiguration"]["vpnClientRootCertificates"][0]["properties"].pop("provisioningState")
+    preserved["vpnClientConfiguration"]["vngClientConnectionConfigurations"][0]["properties"].pop("provisioningState")
+    before_body = core._gateway_writable_body(gateway)
+    assert before_body == independently_projected
+    assert "capacity" not in before_body["properties"]["sku"]
+    assert "privateIPAddress" not in before_body["properties"]["ipConfigurations"][0]["properties"]
+    assert "principalId" not in before_body["identity"]
+    assert before_body["identity"]["userAssignedIdentities"] == {
+        OWNED + "/providers/Microsoft.ManagedIdentity/userAssignedIdentities/retained": {}}
+    assert "defaultBgpIpAddresses" not in before_body["properties"]["bgpSettings"]["bgpPeeringAddresses"][0]
+    expected = copy.deepcopy(before_body)
+    expected["properties"]["customRoutes"]["addressPrefixes"].append("172.18.64.0/18")
+    plan = core.prepare(**args, runtime=runtime)
+    assert plan["can_execute"], plan["blockers"]
+    assert route_effect(plan)["body"] == expected
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded", result.get("error")
+    assert core._gateway_writable_body(runtime.resources[identifier]) == expected
+
+
+@pytest.mark.parametrize("change", ["etag", "configuration"])
+def test_gateway_route_last_get_detects_drift_after_locked_review(workspace, change):
+    runtime, identifier, args = gateway_route_review_fixture(workspace, single_writer=True)
+    plan = core.prepare(**args, runtime=runtime)
+    original = runtime.arm
+
+    def arm(method, resource, api, *positional, **kwargs):
+        if method == "GET" and resource == identifier and not runtime.read_only:
+            if change == "etag":
+                runtime.resources[identifier]["etag"] = '"changed-after-review"'
+            else:
+                runtime.resources[identifier]["tags"]["another-writer"] = "must-retain"
+        return original(method, resource, api, *positional, **kwargs)
+
+    runtime.arm = arm
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "uncertain"
+    assert result["error"] == "gateway-route-append-" + change + "-changed"
+    assert core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"]) == result
+    assert not any(write[0] == "arm" and write[2] == identifier for write in runtime.writes)
+
+
+@pytest.mark.parametrize("failure", ["lost-response", "http-412", "post-route", "post-config", "failed", "timeout"])
+def test_gateway_route_failed_write_or_verification_is_durable_uncertain_no_retry(workspace, failure):
+    runtime, identifier, args = gateway_route_review_fixture(workspace, single_writer=True)
+    plan = core.prepare(**args, runtime=runtime)
+    original = runtime.arm
+    polls = []
+
+    def arm(method, resource, api, *positional, **kwargs):
+        status, headers, body = original(method, resource, api, *positional, **kwargs)
+        if resource == identifier and method == "PUT":
+            if failure in ("lost-response", "http-412"):
+                raise core.PrerequisiteError("remote-request-uncertain" if failure == "lost-response"
+                                             else "remote-request-failed-412")
+            if failure == "post-route":
+                runtime.resources[identifier]["properties"]["customRoutes"]["addressPrefixes"].reverse()
+            elif failure == "post-config":
+                runtime.resources[identifier]["tags"]["shared"] = "changed"
+            else:
+                runtime.resources[identifier]["properties"]["provisioningState"] = (
+                    "Failed" if failure == "failed" else "Updating")
+        if resource == identifier and method == "GET" and "pending" in polls:
+            polls.append("get")
+        if resource == identifier and method == "PUT":
+            polls.append("pending")
+        return status, headers, body
+
+    runtime.arm = arm
+    sleeps = []
+    result = core.execute(plan, expected_plan_hash=plan["plan_hash"], state_dir=workspace[2], runtime=runtime,
+                          acknowledge_exclusive_writer_governance=True, sleep=lambda seconds: sleeps.append(seconds))
+    assert result["status"] == "uncertain" and result["reconciliation_required"]
+    assert result["pending_effect"] == plan["effects"].index(route_effect(plan))
+    assert result["pending_effect"] not in result["effects_completed"]
+    assert not result["bindings"]["network"].get("gateway_route_append_verified")
+    assert not result["leases"] and not result["coordination"]
+    assert core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"]) == result
+    assert len([write for write in runtime.writes if write[0] == "arm" and write[2] == identifier]) == 1
+    if failure == "timeout":
+        assert len(sleeps) == len([item for item in polls if item == "get"]) == 240
+        assert "provisioning-uncertain" in result["error"]
+    before_retry = copy.deepcopy(runtime.writes)
+    with pytest.raises((core.PrerequisiteError, FileExistsError)):
+        execute(plan, workspace, runtime)
+    assert runtime.writes == before_retry
+
+
+def service_gateway_route_fixture(workspace):
+    runtime, identifier, args = gateway_route_review_fixture(workspace, single_writer=True)
+    gateway = runtime.resources[identifier]
+    gateway["etag"] = 'W/"cf1ae4a8-170e-48e8-9428-13bcbeed068b"'
+    gateway["properties"].update(
+        packetCaptureDiagnosticState="None", isMigrateToCSES=False, isMigratedLegacySKU=False,
+        blockUpgradeOfMigratedLegacyGateways=False,
+        virtualNetworkGatewayMigrationStatus={"state": "None", "phase": "None", "errorMessage": ""},
+        enableHighBandwidthVpnGateway=True,
+        remoteVirtualNetworkPeerings=[{"id": HUB + "/virtualNetworkPeerings/spider"}], vpnStack="Classic")
+    gateway["properties"]["vpnClientConfiguration"].update(radiusServers=[], vpnClientConnectionHealth={
+        "vpnClientConnectionsCount": 1, "totalIngressBytesTransferred": 100, "totalEgressBytesTransferred": 200})
+    return runtime, identifier, args
+
+
+def test_gateway_service_shape_preserves_configuration_without_traffic_counters(workspace):
+    runtime, identifier, args = service_gateway_route_fixture(workspace)
+    before = copy.deepcopy(runtime.resources[identifier])
+    plan = core.prepare(**args, runtime=runtime)
+    assert plan["can_execute"], plan["blockers"]
+    effect = route_effect(plan)
+    assert effect["before_etag"] == before["etag"]
+    assert core.GATEWAY_RESPONSE_EXTENSION_WARNING in plan["warnings"]
+    assert effect["retained_response_extensions"] == list(core.GATEWAY_RESPONSE_EXTENSIONS)
+    for key in (*core.GATEWAY_RESPONSE_EXTENSIONS, "enableHighBandwidthVpnGateway",
+                "virtualNetworkGatewayMigrationStatus"):
+        assert effect["body"]["properties"][key] == before["properties"][key]
+    for snapshot in (effect["before"], effect["expected"], effect["body"]):
+        assert "vpnClientConnectionHealth" not in snapshot["properties"]["vpnClientConfiguration"]
+    assert runtime.resources[identifier] == before and not runtime.writes
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded", result.get("error")
+    body = next(write[3] for write in runtime.writes if write[0] == "arm" and write[2] == identifier)
+    assert body == effect["body"]
+    assert body["properties"]["customRoutes"]["addressPrefixes"] == [
+        "172.16.0.0/18", "10.42.0.0/24", "172.18.64.0/18"]
+
+
+@pytest.mark.parametrize("etag", [
+    '"opaque"', 'W/"opaque"', 'W/"cf1ae4a8-170e-48e8-9428-13bcbeed068b"',
+])
+def test_gateway_freshness_accepts_opaque_strong_and_weak_etags(workspace, etag):
+    runtime, identifier, args = service_gateway_route_fixture(workspace)
+    runtime.resources[identifier]["etag"] = etag
+    plan = core.prepare(**args, runtime=runtime)
+    assert plan["can_execute"], plan["blockers"]
+    body = core._revalidate_gateway_route_review(
+        runtime, route_effect(plan), coordination_mode="single-writer",
+        manual_writer_warning=core.GATEWAY_MANUAL_WRITER_WARNING)
+    assert body == route_effect(plan)["body"] and not runtime.writes
+    runtime.resources[identifier]["etag"] = 'W/"new-token"'
+    with pytest.raises(core.PrerequisiteError, match="etag-changed"):
+        core._revalidate_gateway_route_review(
+            runtime, route_effect(plan), coordination_mode="single-writer",
+            manual_writer_warning=core.GATEWAY_MANUAL_WRITER_WARNING)
+
+
+@pytest.mark.parametrize("etag", [
+    None, "", "*", "unquoted", 'w/"wrong-case"', 'W/""', '"unterminated',
+    'W/"has space"', '"embedded"quote"', 'W/"line\r\nbreak"', '"tab\t"',
+])
+def test_gateway_freshness_rejects_malformed_etags(workspace, etag):
+    runtime, identifier, args = service_gateway_route_fixture(workspace)
+    runtime.resources[identifier]["etag"] = etag
+    plan = core.prepare(**args, runtime=runtime)
+    assert not plan["can_execute"]
+    assert "existing-gateway-valid-etag-required:" + identifier in plan["blockers"]
+    assert not runtime.writes
+
+
+def test_gateway_traffic_can_change_on_every_read_without_changing_the_plan(workspace):
+    runtime, identifier, args = service_gateway_route_fixture(workspace)
+    original_arm = runtime.arm
+    original_collection = runtime.collection
+    reads = []
+
+    def traffic():
+        reads.append(1)
+        runtime.resources[identifier]["properties"]["vpnClientConfiguration"]["vpnClientConnectionHealth"] = {
+            "vpnClientConnectionsCount": len(reads) % 3, "totalIngressBytesTransferred": len(reads) * 17,
+            "totalEgressBytesTransferred": len(reads) * 29}
+
+    def arm(method, resource, api, *positional, **kwargs):
+        if resource == identifier and method == "GET":
+            traffic()
+        return original_arm(method, resource, api, *positional, **kwargs)
+
+    def collection(resource, api):
+        if resource.endswith("/virtualNetworkGateways"):
+            traffic()
+        return original_collection(resource, api)
+
+    runtime.arm = arm
+    runtime.collection = collection
+    plan = core.prepare(**args, runtime=runtime)
+    assert plan["can_execute"], plan["blockers"]
+    fresh = core.prepare(**args, runtime=runtime)
+    for key in ("effects", "observations", "commands", "preconditions"):
+        assert plan[key] == fresh[key]
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded", result.get("error")
+    assert len(reads) > 5
+    assert len([write for write in runtime.writes if write[0] == "arm" and write[2] == identifier]) == 1
+
+
+@pytest.mark.parametrize("path,value", [
+    (("properties", "enableHighBandwidthVpnGateway"), False),
+    (("properties", "blockUpgradeOfMigratedLegacyGateways"), True),
+    (("properties", "vpnStack"), "changed"),
+    (("properties", "remoteVirtualNetworkPeerings"), []),
+    (("properties", "vpnClientConfiguration", "aadAudience"), "different-client"),
+    (("properties", "futureWritableProperty"), True),
+])
+def test_gateway_traffic_normalization_never_hides_configuration_drift(workspace, path, value):
+    runtime, identifier, args = service_gateway_route_fixture(workspace)
+    plan = core.prepare(**args, runtime=runtime)
+    gateway = runtime.resources[identifier]
+    node = gateway
+    for key in path[:-1]:
+        node = node[key]
+    node[path[-1]] = value
+    gateway["properties"]["vpnClientConfiguration"]["vpnClientConnectionHealth"]["totalIngressBytesTransferred"] += 1
+    with pytest.raises(core.PrerequisiteError, match="configuration-changed"):
+        core._revalidate_gateway_route_review(
+            runtime, route_effect(plan), coordination_mode="single-writer",
+            manual_writer_warning=core.GATEWAY_MANUAL_WRITER_WARNING)
+    with pytest.raises(core.PrerequisiteError, match="live-state-or-plan-changed"):
+        execute(plan, workspace, runtime)
+    assert not runtime.writes
+
+
+@pytest.mark.parametrize("path,value", [
+    (("properties", "packetCaptureDiagnosticState"), "Capturing"),
+    (("properties", "packetCaptureDiagnosticState"), {"status": "None"}),
+    (("properties", "isMigrateToCSES"), True),
+    (("properties", "isMigratedLegacySKU"), "false"),
+    (("properties", "blockUpgradeOfMigratedLegacyGateways"), 0),
+    (("properties", "virtualNetworkGatewayMigrationStatus", "state"), "InProgress"),
+    (("properties", "virtualNetworkGatewayMigrationStatus", "phase"), "Prepare"),
+    (("properties", "virtualNetworkGatewayMigrationStatus", "errorMessage"), "failed"),
+    (("properties", "virtualNetworkGatewayMigrationStatus", "futureFlag"), True),
+    (("properties", "remoteVirtualNetworkPeerings"), [{"id": "retained", "unknown": True}]),
+    (("properties", "futureWritableProperty"), True),
+])
+def test_gateway_service_shapes_and_active_operations_fail_closed(workspace, path, value):
+    runtime, identifier, args = service_gateway_route_fixture(workspace)
+    node = runtime.resources[identifier]
+    for key in path[:-1]:
+        node = node[key]
+    node[path[-1]] = value
+    plan = core.prepare(**args, runtime=runtime)
+    assert not plan["can_execute"] and not route_effect(plan)["executable"]
+    with pytest.raises(core.PrerequisiteError, match="plan-blocked"):
+        execute(plan, workspace, runtime)
+    assert not runtime.writes
+
+
+@pytest.mark.parametrize("health", [
+    None, [], {}, {"vpnClientConnectionsCount": True, "totalIngressBytesTransferred": 1,
+                   "totalEgressBytesTransferred": 1},
+    {"vpnClientConnectionsCount": 1, "totalIngressBytesTransferred": -1, "totalEgressBytesTransferred": 1},
+    {"vpnClientConnectionsCount": 1, "totalIngressBytesTransferred": 1, "totalEgressBytesTransferred": 1,
+     "unknownWritableFlag": True},
+])
+def test_gateway_health_unknown_fields_or_shapes_are_not_silently_discarded(workspace, health):
+    runtime, identifier, args = service_gateway_route_fixture(workspace)
+    runtime.resources[identifier]["properties"]["vpnClientConfiguration"]["vpnClientConnectionHealth"] = health
+    with pytest.raises(core.PrerequisiteError, match="unsupported-client-health"):
+        core.prepare(**args, runtime=runtime)
+    assert not runtime.writes
+
+
+def test_gateway_route_blocker_cannot_be_overridden_in_reviewed_plan(workspace):
+    runtime, _, args = gateway_route_review_fixture(workspace)
+    plan = core.prepare(**args, runtime=runtime)
+    plan["blockers"] = []
+    plan["can_execute"] = True
+    plan["plan_hash"] = core.digest({key: value for key, value in plan.items() if key != "plan_hash"})
+    with pytest.raises(core.PrerequisiteError, match="live-state-or-plan-changed:blockers"):
+        execute(plan, workspace, runtime)
+    assert not runtime.writes and not runtime.blobs
+    assert not list(workspace[2].iterdir())
+
+
+def test_existing_gateway_retained_on_other_effect_write_failure_and_uncertain_receipt(workspace):
+    runtime, identifier, args = gateway_route_review_fixture(workspace)
+    runtime.resources[identifier]["properties"]["customRoutes"]["addressPrefixes"].append(
+        args["bootstrap_config"]["dev_vnet_cidr"])
+    before = copy.deepcopy(runtime.resources[identifier])
+    plan = core.prepare(**args, runtime=runtime)
+    runtime.fail_write = lambda resource: resource == VAULT
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "uncertain" and result["error"] == "remote-request-uncertain"
+    assert result["leases"] and result["reconciliation_required"]
+    assert core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"]) == result
+    assert runtime.resources[identifier] == before
+    assert len([write for write in runtime.writes if write[0] == "arm" and write[2] == VAULT]) == 1
+    assert not any(write[0] == "arm" and write[2] == identifier for write in runtime.writes)
+
+
 @pytest.mark.parametrize("mutation,code", [
     ("source", "source-changed"), ("register", "consumer-register-changed"),
     ("plan", "plan-hash-mismatch"), ("remote", "live-state-or-plan-changed"), ("expired", "review-expired"),

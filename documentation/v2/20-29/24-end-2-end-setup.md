@@ -223,6 +223,21 @@ The registered adapter accepts `AIF_ACCESS_HUB_MODE=integrated|external`
 `AIF_SETUP_HUB_ACCESS=true|false` is independent of topology; setting it to
 false does not convert an external hub into an owned hub.
 
+When reusing a VPN gateway, privileged bootstrap can review an **additive factory
+route** in explicit `single-writer` mode. Existing routes and gateway settings
+are retained. The preview is read-only; execution rechecks the configuration and
+opaque ETag, appends only the approved factory CIDR, waits for completion and
+verifies the resulting settings. Ordinary client-traffic counters do not count
+as configuration changes.
+
+This gateway update has **no verified provider-enforced conditional-write
+guarantee**. Manually serialize every writer to the shared hub, including other
+factories, repositories, portal users and CLI users, from review through
+completion. A repository reservation is not a shared-hub lock. Blob mode does
+not silently fall back to this operation. Unsupported gateway settings, active
+migration/capture, BGP or unrecoverable RADIUS secrets block the update. Any
+uncertain result retains its receipt and requires reconciliation, not a retry.
+
 #### Privileged prerequisite engine contract
 
 `bootstrap/lib/registered_prerequisites.py` provides read-only `prepare(...)`
