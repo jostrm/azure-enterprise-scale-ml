@@ -714,9 +714,11 @@ class Cloud:
         require(not _single_writer(self.request_config) or audience != STORAGE,
                 "single-writer-storage-access-forbidden")
         target = self.request_config["target"]
-        tenant = tenant or target["tenant_id"]
+        tenant = guid(tenant or target["tenant_id"])
         key = (audience, tenant)
-        if key not in self.tokens:
+        cached = self.tokens.get(key)
+        # Budget for the 90-second request timeout plus clock skew, on every use.
+        if cached is None or cached["expires_at"] <= time.time() + 120:
             args = ["account", "get-access-token", "--resource", audience]
             # --tenant alone still uses the default CLI user, which may belong to
             # the separate Azure deployment tenant rather than the ADO tenant.
@@ -724,24 +726,43 @@ class Cloud:
             args += ["--subscription", subscription]
             value = self.az(*args)
             try:
+                require(isinstance(value, dict), "invalid-authenticated-token")
                 token = value["accessToken"]
+                require(isinstance(token, str) and len(token.split(".")) == 3, "invalid-authenticated-token")
                 encoded = token.split(".")[1]
                 claims = parse_json(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
-                require(guid(claims["tid"]) == tenant and float(claims["exp"]) > time.time()
-                        and float(claims.get("nbf", 0)) <= time.time() + 60, "token-tenant-or-lifetime-mismatch")
+                require(isinstance(claims, dict), "invalid-authenticated-token")
+                expires_at, not_before = claims["exp"], claims.get("nbf", 0)
+                now = time.time()
+                require(guid(claims["tid"]) == tenant
+                        and type(expires_at) in (int, float) and type(not_before) in (int, float)
+                        and now + 120 < expires_at < float("inf")
+                        and 0 <= not_before <= now + 60 and not_before < expires_at,
+                        "token-tenant-or-lifetime-mismatch")
                 audiences = {audience.rstrip("/")}
                 if audience == ARM + "/":
                     audiences |= {"https://management.core.windows.net", "797f4846-ba00-4fd7-ba43-dac1f8f63013"}
                 if audience == ADO_AUDIENCE:
                     audiences.add("https://app.vssps.visualstudio.com")
-                require(str(claims["aud"]).rstrip("/") in audiences, "token-audience-mismatch")
+                if audience == "https://graph.microsoft.com/":
+                    audiences.add("00000003-0000-0000-c000-000000000000")
+                require(isinstance(claims["aud"], str) and claims["aud"].rstrip("/") in audiences,
+                        "token-audience-mismatch")
                 oid = guid(claims["oid"])
             except (KeyError, IndexError, ValueError, TypeError):
                 raise EnrollmentError("invalid-authenticated-token") from None
-            if audience == ARM + "/":
-                self.operator_id = oid
-            self.tokens[key] = token
-        return self.tokens[key]
+            cached = {"token": token, "expires_at": expires_at, "not_before": not_before, "oid": oid}
+        require(cached["not_before"] <= time.time() + 60, "token-tenant-or-lifetime-mismatch")
+        # Retain the original identity even when an expired token's refresh fails.
+        # Different ADO tenants may legitimately have different operator object IDs.
+        require(all(item["oid"] == cached["oid"] for (_, cached_tenant), item in self.tokens.items()
+                    if cached_tenant == tenant), "token-operator-mismatch")
+        require(self.operator_id is None or (tenant != target["tenant_id"] and audience != ARM + "/")
+                or self.operator_id == cached["oid"], "token-operator-mismatch")
+        if audience == ARM + "/" and self.operator_id is None:
+            self.operator_id = cached["oid"]
+        self.tokens[key] = cached
+        return cached["token"]
 
     def http(self, method, url, audience, data=None, headers=None, tenant=None, allowed=(200,)):
         require(method in ("GET", "HEAD", "PUT", "POST"), "delete-or-replacement-forbidden")

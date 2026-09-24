@@ -238,6 +238,12 @@ not silently fall back to this operation. Unsupported gateway settings, active
 migration/capture, BGP or unrecoverable RADIUS secrets block the update. Any
 uncertain result retains its receipt and requires reconciliation, not a retry.
 
+Long-running privileged stages refresh cached Azure CLI tokens before they enter
+the final two minutes of their lifetime. Refreshed tokens must retain the reviewed
+tenant and operator identity. This does not sign in, switch accounts or retry an
+HTTP write after a 401; an unexpected authentication failure still stops the
+stage and retains its recovery evidence.
+
 #### Privileged prerequisite engine contract
 
 `bootstrap/lib/registered_prerequisites.py` provides read-only `prepare(...)`

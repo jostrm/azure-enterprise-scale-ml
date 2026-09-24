@@ -10,6 +10,7 @@ import subprocess
 import time
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.error import HTTPError
 from urllib.parse import parse_qs, unquote, urlsplit
 from uuid import uuid4
 
@@ -1107,6 +1108,197 @@ def test_invalid_token_audience_blocks_before_storage(workspace):
     with pytest.raises(en.EnrollmentError, match="token-audience"):
         en.plan(req, cloud=fake.cloud)
     assert not fake.calls and not fake.writes
+
+
+@pytest.fixture
+def token_transport(monkeypatch):
+    state = SimpleNamespace(now=2000000000, expiry=2000003600, claims={}, omit=set(),
+                            commands=[], calls=[], issued=[], status=200, fail_cli=False,
+                            cli_delay=0, invalid_response=None)
+    monkeypatch.setattr(en.time, "time", lambda: state.now)
+    req = {"target": {"tenant_id": TENANT, "subscription_id": SUB},
+           "coordinates": {"account_url": "https://offline.blob.core.windows.net"}}
+
+    def run(argv, **kwargs):
+        state.commands.append(argv)
+        assert kwargs["shell"] is False
+        assert not any(arg in argv for arg in ("login", "set", "--tenant"))
+        if argv[1:3] == ["account", "list"]:
+            value = [{"id": ADO_SUB, "tenantId": ADO_TENANT, "state": "Enabled",
+                      "accountName": "ado@example.test"}]
+        else:
+            assert argv[1:3] == ["account", "get-access-token"]
+            audience = argv[argv.index("--resource") + 1]
+            ado = audience == en.ADO_AUDIENCE
+            assert argv[argv.index("--subscription") + 1] == (ADO_SUB if ado else SUB)
+            claims = {"tid": ADO_TENANT if ado else TENANT, "aud": audience,
+                      "oid": PRINCIPAL if ado else OPERATOR, "exp": state.expiry} | state.claims
+            for key in state.omit:
+                claims.pop(key, None)
+            encoded = base64.urlsafe_b64encode(json.dumps(claims).encode()).decode().rstrip("=")
+            token = "header." + encoded + ".secret-must-not-leak"
+            state.issued.append(token)
+            value = state.invalid_response if state.invalid_response is not None else {"accessToken": token}
+            state.now += state.cli_delay
+        return SimpleNamespace(returncode=1 if state.fail_cli else 0, stdout=en.canonical(value),
+                               stderr=b"secret-must-not-leak")
+
+    def open_request(request, **kwargs):
+        state.calls.append(request)
+        assert kwargs["timeout"] == 90
+        if state.status == 401:
+            raise HTTPError(request.full_url, 401, "Unauthorized", {}, io.BytesIO(b"{}"))
+        return Response(state.status, {})
+
+    state.cloud = en.Cloud(req, command_runner=run, opener=SimpleNamespace(open=open_request))
+    return state
+
+
+TOKEN_ROUTES = [
+    (en.ARM + "/", None, en.ARM + GROUP, "PUT"),
+    (en.STORAGE, None, "https://offline.blob.core.windows.net/container/blob", "PUT"),
+    (en.ADO_AUDIENCE, ADO_TENANT, "https://dev.azure.com/org/project", "POST"),
+]
+
+
+@pytest.mark.parametrize("audience,tenant,url,method", TOKEN_ROUTES)
+@pytest.mark.parametrize("elapsed", [3479, 3480, 3599, 3601])
+def test_token_cache_refreshes_before_each_request_with_lifetime_budget(token_transport, audience, tenant, url,
+                                                                      method, elapsed):
+    state = token_transport
+    cloud = state.cloud
+    cloud.token(en.ARM + "/")
+    cloud.http("GET", url, audience, tenant=tenant)
+    original = state.calls[-1].get_header("Authorization")
+    issued = len(state.issued)
+    state.now += elapsed
+    state.expiry = state.now + 3600
+    cloud.read_only = False
+    cloud.serialized_provisioning = True
+    cloud.http(method, url, audience, tenant=tenant, data={"reviewed": True})
+    assert len(state.issued) == issued + (elapsed >= 3480)
+    assert (state.calls[-1].get_header("Authorization") != original) == (elapsed >= 3480)
+    assert len(state.calls) == 2 and state.calls[-1].method == method
+    assert cloud.operator_id == OPERATOR
+    cloud.http("GET", url, audience, tenant=tenant)
+    assert len(state.issued) == issued + (elapsed >= 3480)
+    assert all(not any("header." in arg or "secret-must-not-leak" in arg for arg in argv)
+               for argv in state.commands)
+
+
+@pytest.mark.parametrize("audience,tenant,url,method", TOKEN_ROUTES)
+@pytest.mark.parametrize("claims,omit", [
+    ({"exp": 1}, set()), ({"exp": 2000003600}, set()),
+    ({"exp": None}, set()), ({"exp": True}, set()), ({"exp": "4102444800"}, set()),
+    ({"exp": float("inf")}, set()), ({"exp": float("nan")}, set()), ({}, {"exp"}),
+    ({"nbf": 2000008000}, set()), ({"nbf": None}, set()), ({"nbf": True}, set()),
+    ({"nbf": "0"}, set()), ({"nbf": -1}, set()), ({"nbf": float("-inf")}, set()),
+    ({"tid": CLIENT}, set()), ({}, {"tid"}), ({"oid": CLIENT}, set()),
+    ({"oid": "bad-id"}, set()), ({}, {"oid"}),
+    ({"aud": "https://wrong.example.test"}, set()), ({"aud": []}, set()), ({}, {"aud"}),
+])
+def test_token_refresh_rejects_bad_claims_before_mutating_http(token_transport, audience, tenant, url, method,
+                                                            claims, omit, capsys):
+    state = token_transport
+    cloud = state.cloud
+    cloud.token(en.ARM + "/")
+    cloud.http("GET", url, audience, tenant=tenant)
+    before = copy.deepcopy(cloud.tokens)
+    issued = len(state.issued)
+    state.now += 3480
+    state.expiry = state.now + 3600
+    state.claims, state.omit = claims, omit
+    cloud.read_only = False
+    cloud.serialized_provisioning = True
+    with pytest.raises(en.EnrollmentError) as captured:
+        cloud.http(method, url, audience, tenant=tenant, data={"reviewed": True})
+    assert len(state.issued) == issued + 1 and len(state.calls) == 1
+    assert cloud.tokens == before and cloud.operator_id == OPERATOR
+    output = capsys.readouterr()
+    assert "secret-must-not-leak" not in str(captured.value) + output.out + output.err
+
+
+@pytest.mark.parametrize("response", [
+    [], {}, {"accessToken": None}, {"accessToken": 1}, {"accessToken": []},
+    {"accessToken": "secret-must-not-leak"}, {"accessToken": "header.*.secret-must-not-leak"},
+    {"accessToken": "header.W10.secret-must-not-leak"},
+])
+def test_token_refresh_rejects_malformed_cli_metadata(token_transport, response):
+    state = token_transport
+    cloud = state.cloud
+    cloud.token(en.ARM + "/")
+    before = copy.deepcopy(cloud.tokens)
+    state.now += 3601
+    state.invalid_response = response
+    with pytest.raises(en.EnrollmentError) as captured:
+        cloud.http("GET", en.ARM + GROUP, en.ARM + "/")
+    assert not state.calls and cloud.tokens == before and cloud.operator_id == OPERATOR
+    assert "secret-must-not-leak" not in str(captured.value)
+
+
+def test_token_refresh_cli_failure_never_falls_back_to_expired_cache(token_transport):
+    state = token_transport
+    cloud = state.cloud
+    cloud.token(en.ARM + "/")
+    state.now += 3601
+    state.fail_cli = True
+    with pytest.raises(en.EnrollmentError, match="authenticated-cli-command-failed"):
+        cloud.http("GET", en.ARM + GROUP, en.ARM + "/")
+    assert not state.calls and cloud.operator_id == OPERATOR and len(state.issued) == 2
+
+
+def test_token_lifetime_budget_is_checked_after_cli_returns(token_transport):
+    state = token_transport
+    state.expiry = state.now + 200
+    state.cli_delay = 90
+    with pytest.raises(en.EnrollmentError, match="token-tenant-or-lifetime-mismatch"):
+        state.cloud.http("GET", en.ARM + GROUP, en.ARM + "/")
+    assert not state.calls and not state.cloud.tokens and state.cloud.operator_id is None
+
+
+def test_cached_token_not_before_is_rechecked_after_clock_moves_back(token_transport):
+    state = token_transport
+    state.claims = {"nbf": state.now}
+    state.cloud.token(en.ARM + "/")
+    state.now -= 61
+    with pytest.raises(en.EnrollmentError, match="token-tenant-or-lifetime-mismatch"):
+        state.cloud.http("GET", en.ARM + GROUP, en.ARM + "/")
+    assert not state.calls and len(state.issued) == 1
+
+
+@pytest.mark.parametrize("audience,tenant,url,method", TOKEN_ROUTES)
+def test_expired_token_does_not_bypass_read_only_guard(token_transport, audience, tenant, url, method):
+    state = token_transport
+    state.cloud.token(audience, tenant)
+    state.now += 3601
+    with pytest.raises(en.EnrollmentError, match="plan-mutation-forbidden"):
+        state.cloud.http(method, url, audience, tenant=tenant)
+    assert not state.calls and len(state.issued) == 1
+
+
+@pytest.mark.parametrize("audience,tenant,url,method", TOKEN_ROUTES)
+def test_refreshed_mutating_request_is_never_retried_on_401(token_transport, audience, tenant, url, method):
+    state = token_transport
+    state.cloud.token(audience, tenant)
+    state.now += 3601
+    state.expiry = state.now + 3600
+    state.status = 401
+    state.cloud.read_only = False
+    state.cloud.serialized_provisioning = True
+    with pytest.raises(en.EnrollmentError, match="remote-request-failed-401"):
+        state.cloud.http(method, url, audience, tenant=tenant, data={"reviewed": True})
+    assert len(state.calls) == 1 and len(state.issued) == 2
+    assert state.calls[0].get_header("Authorization") == "Bearer " + state.issued[-1]
+
+
+def test_token_refresh_preserves_single_writer_storage_guard(token_transport):
+    state = token_transport
+    state.cloud.token(en.STORAGE)
+    state.now += 3601
+    state.cloud.request_config["coordination_mode"] = "single-writer"
+    with pytest.raises(en.EnrollmentError, match="single-writer-storage-access-forbidden"):
+        state.cloud.token(en.STORAGE)
+    assert not state.calls and len(state.issued) == 1
 
 
 def test_ado_uses_cached_tenant_account_without_changing_azure_default(workspace):

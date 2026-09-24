@@ -3,11 +3,13 @@
 import copy
 import base64
 import importlib.util
+import io
 import json
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+from urllib.error import HTTPError
 from urllib.parse import unquote, urlsplit, parse_qs
 from types import SimpleNamespace
 from uuid import uuid4
@@ -44,6 +46,171 @@ def no_live(monkeypatch):
     monkeypatch.setattr(core.enrollment.subprocess, "run", fail)
     monkeypatch.setattr(core.enrollment, "build_opener", fail)
     monkeypatch.setattr(core.time, "sleep", fail)
+
+
+@pytest.fixture
+def graph_transport(monkeypatch):
+    state = SimpleNamespace(now=2000000000, expiry=2000003600, claims={}, omit=set(),
+                            commands=[], calls=[], issued=[], status=200, fail_cli=False, cli_delay=0)
+    monkeypatch.setattr(core.time, "time", lambda: state.now)
+
+    def run(argv, **kwargs):
+        state.commands.append(argv)
+        assert argv[1:3] == ["account", "get-access-token"] and kwargs["shell"] is False
+        assert argv[argv.index("--subscription") + 1] == SUB
+        assert not any(arg in argv for arg in ("login", "set", "--tenant"))
+        claims = {"tid": TENANT, "oid": MEMBER, "aud": argv[argv.index("--resource") + 1],
+                  "exp": state.expiry} | state.claims
+        for key in state.omit:
+            claims.pop(key, None)
+        token = "header." + base64.urlsafe_b64encode(json.dumps(claims).encode()).decode().rstrip("=")
+        token += ".secret-must-not-leak"
+        state.issued.append(token)
+        state.now += state.cli_delay
+        return SimpleNamespace(returncode=1 if state.fail_cli else 0,
+                               stdout=core.canonical({"accessToken": token}), stderr=b"secret-must-not-leak")
+
+    def open_request(request, **kwargs):
+        state.calls.append(request)
+        assert kwargs["timeout"] == 90
+        if state.status == 401:
+            raise HTTPError(request.full_url, 401, "Unauthorized", {}, io.BytesIO(b"{}"))
+        response = io.BytesIO(b"{}")
+        response.status = state.status
+        response.headers = {}
+        return response
+
+    state.cloud = core.Cloud({"tenant_id": TENANT, "subscription_id": SUB}, {},
+                             command_runner=run, opener=SimpleNamespace(open=open_request))
+    return state
+
+
+@pytest.mark.parametrize("elapsed", [3479, 3480, 3599, 3601])
+@pytest.mark.parametrize("audience", [core.GRAPH, "00000003-0000-0000-c000-000000000000"])
+def test_graph_token_cache_refreshes_before_each_request(graph_transport, elapsed, audience):
+    state = graph_transport
+    cloud = state.cloud
+    cloud.token(core.enrollment.ARM + "/")
+    state.claims = {"aud": audience}
+    cloud.graph("GET", "groups")
+    original = state.calls[-1].get_header("Authorization")
+    state.now += elapsed
+    state.expiry = state.now + 3600
+    cloud.read_only = False
+    cloud.graph("POST", "groups", {"displayName": "reviewed"})
+    assert len(state.issued) == 2 + (elapsed >= 3480)
+    assert (state.calls[-1].get_header("Authorization") != original) == (elapsed >= 3480)
+    assert len(state.calls) == 2 and state.calls[-1].method == "POST"
+    assert cloud.operator_id == MEMBER
+    cloud.graph("GET", "groups")
+    assert len(state.issued) == 2 + (elapsed >= 3480)
+    assert all(not any("header." in arg or "secret-must-not-leak" in arg for arg in argv)
+               for argv in state.commands)
+
+
+@pytest.mark.parametrize("claims,omit", [
+    ({"exp": 1}, set()), ({"exp": 2000003600}, set()),
+    ({"exp": None}, set()), ({"exp": True}, set()), ({"exp": "4102444800"}, set()),
+    ({"exp": float("inf")}, set()), ({"exp": float("nan")}, set()), ({}, {"exp"}),
+    ({"nbf": 2000008000}, set()), ({"nbf": None}, set()), ({"nbf": True}, set()),
+    ({"nbf": "0"}, set()), ({"nbf": -1}, set()), ({"nbf": float("-inf")}, set()),
+    ({"tid": EXTERNAL}, set()), ({}, {"tid"}), ({"oid": GROUP}, set()),
+    ({"oid": "bad-id"}, set()), ({}, {"oid"}),
+    ({"aud": core.enrollment.ARM}, set()), ({"aud": []}, set()), ({}, {"aud"}),
+])
+def test_graph_refresh_rejects_bad_claims_before_mutating_http(graph_transport, claims, omit, capsys):
+    state = graph_transport
+    cloud = state.cloud
+    cloud.token(core.enrollment.ARM + "/")
+    cloud.graph("GET", "groups")
+    before = copy.deepcopy(cloud.tokens)
+    state.now += 3480
+    state.expiry = state.now + 3600
+    state.claims, state.omit = claims, omit
+    cloud.read_only = False
+    with pytest.raises(core.PrerequisiteError) as captured:
+        cloud.graph("POST", "groups", {"displayName": "reviewed"})
+    assert len(state.issued) == 3 and len(state.calls) == 1
+    assert cloud.tokens == before and cloud.operator_id == MEMBER
+    output = capsys.readouterr()
+    assert "secret-must-not-leak" not in str(captured.value) + output.out + output.err
+
+
+@pytest.mark.parametrize("arm_first", [False, True])
+def test_graph_operator_identity_cannot_change_even_without_prior_arm_token(graph_transport, arm_first):
+    state = graph_transport
+    cloud = state.cloud
+    if arm_first:
+        cloud.token(core.enrollment.ARM + "/")
+    else:
+        cloud.graph("GET", "groups")
+        state.now += 3601
+        state.expiry = state.now + 3600
+    before = copy.deepcopy(cloud.tokens)
+    state.claims = {"oid": GROUP}
+    with pytest.raises(core.PrerequisiteError, match="graph-token-operator-mismatch"):
+        cloud.graph("GET", "groups")
+    assert len(state.calls) == (0 if arm_first else 1)
+    assert cloud.tokens == before and cloud.operator_id == (MEMBER if arm_first else None)
+
+
+def test_arm_operator_must_match_existing_graph_identity(graph_transport):
+    state = graph_transport
+    state.cloud.graph("GET", "groups")
+    state.claims = {"oid": GROUP}
+    with pytest.raises(core.enrollment.EnrollmentError, match="token-operator-mismatch"):
+        state.cloud.http("GET", core.enrollment.ARM + OWNED, core.enrollment.ARM + "/")
+    assert len(state.calls) == 1 and state.cloud.operator_id is None
+
+
+def test_graph_cached_identity_is_checked_against_operator_on_every_use(graph_transport):
+    state = graph_transport
+    state.cloud.graph("GET", "groups")
+    state.cloud.operator_id = GROUP
+    with pytest.raises(core.PrerequisiteError, match="graph-token-operator-mismatch"):
+        state.cloud.graph("GET", "groups")
+    assert len(state.calls) == 1 and len(state.issued) == 1 and state.cloud.operator_id == GROUP
+
+
+def test_graph_refresh_cli_failure_never_falls_back_to_expired_cache(graph_transport):
+    state = graph_transport
+    state.cloud.graph("GET", "groups")
+    state.now += 3601
+    state.fail_cli = True
+    with pytest.raises(core.PrerequisiteError, match="graph-authenticated-cli-command-failed"):
+        state.cloud.graph("GET", "groups")
+    assert len(state.calls) == 1 and len(state.issued) == 2
+
+
+def test_graph_lifetime_budget_is_checked_after_cli_returns(graph_transport):
+    state = graph_transport
+    state.expiry = state.now + 200
+    state.cli_delay = 90
+    with pytest.raises(core.PrerequisiteError, match="graph-token-tenant-or-lifetime-mismatch"):
+        state.cloud.graph("GET", "groups")
+    assert not state.calls and not state.cloud.tokens
+
+
+def test_expired_graph_token_does_not_bypass_read_only_guard(graph_transport):
+    state = graph_transport
+    state.cloud.graph("GET", "groups")
+    state.now += 3601
+    with pytest.raises(core.PrerequisiteError, match="unreviewed-graph-write"):
+        state.cloud.graph("POST", "groups", {"displayName": "reviewed"})
+    assert len(state.calls) == 1 and len(state.issued) == 1
+
+
+def test_refreshed_graph_post_is_never_retried_on_401(graph_transport):
+    state = graph_transport
+    state.cloud.graph("GET", "groups")
+    state.now += 3601
+    state.expiry = state.now + 3600
+    state.status = 401
+    state.cloud.read_only = False
+    with pytest.raises(core.PrerequisiteError, match="graph-request-failed-401"):
+        state.cloud.graph("POST", "groups", {"displayName": "reviewed"})
+    assert len(state.calls) == 2 and len(state.issued) == 2
+    assert state.calls[-1].get_header("Authorization") == "Bearer " + state.issued[-1]
 
 
 class Runtime:

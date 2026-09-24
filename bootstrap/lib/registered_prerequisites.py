@@ -232,22 +232,11 @@ class Cloud(enrollment.Cloud):
                 "unreviewed-graph-write")
         require(path.startswith(("groups", "users/", "servicePrincipals")) and "://" not in path and ".." not in path,
                 "untrusted-graph-endpoint")
-        key = ("graph", self.request_config["target"]["tenant_id"])
-        if key not in self.tokens:
-            value = self.az("account", "get-access-token", "--resource", GRAPH,
-                            "--subscription", self.request_config["target"]["subscription_id"])
-            try:
-                token = value["accessToken"]
-                encoded = token.split(".")[1]
-                claims = enrollment.parse_json(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
-                require(_guid(claims["tid"]) == key[1] and float(claims["exp"]) > time.time()
-                        and float(claims.get("nbf", 0)) <= time.time() + 60
-                        and claims["aud"].rstrip("/") in (GRAPH.rstrip("/"), "00000003-0000-0000-c000-000000000000"),
-                        "graph-token-tenant-or-audience-mismatch")
-            except (KeyError, IndexError, ValueError, TypeError):
-                raise PrerequisiteError("invalid-graph-token") from None
-            self.tokens[key] = token
-        headers = {"Authorization": "Bearer " + self.tokens[key], "Content-Type": "application/json"}
+        try:
+            token = self.token(GRAPH)
+        except enrollment.EnrollmentError as exc:
+            raise PrerequisiteError("graph-" + exc.code) from None
+        headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
         try:
             response = self.opener.open(Request(GRAPH + "v1.0/" + path, method=method,
                                                data=canonical(body) if body is not None else None,
