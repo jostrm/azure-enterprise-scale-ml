@@ -39,7 +39,7 @@ param eventHubSkuCapacity int = 1
 
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
-param diagnosticSettingLevel string = 'silver'
+param diagnosticSettingLevel string = 'gold'
 
 // ============== PARAMETERS ==============
 @allowed(['Consumption','Standard'])
@@ -619,6 +619,21 @@ module logicAppStandard 'br/public:avm/res/web/site:0.21.0' = if(logiAppType == 
     serverFarm
     namingConvention
     subnetDelegationServerFarm
+  ]
+}
+
+// Keep diagnostics in the creation path; do not take over policy-managed settings on reused apps.
+module logicAppStandardDiagnostics '../modules/diagnostics/functionAppsDiagnostics.bicep' = if (logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  name: take('11-diagLogicApp-${deploymentProjSpecificUniqueSuffix}', 64)
+  params: {
+    functionAppName: logicAppsName
+    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
+    diagnosticSettingLevel: diagnosticSettingLevel
+    isLogicAppStandard: true
+  }
+  dependsOn: [
+    logicAppStandard
   ]
 }
 

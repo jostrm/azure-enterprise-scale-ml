@@ -39,7 +39,7 @@ param aksEnablePrivateCluster bool = true
 param aksManagedOutboundIPs int = 1
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
-param diagnosticSettingLevel string = 'silver'
+param diagnosticSettingLevel string = 'gold'
 // ============== SKUs ==============
 // ============== PARAMETERS ==============
 @description('Environment: dev, test, prod')

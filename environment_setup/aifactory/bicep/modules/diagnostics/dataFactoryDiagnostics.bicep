@@ -4,7 +4,7 @@
 // This module creates diagnostic settings for Azure Data Factory with three tiers:
 // - Gold: All metrics and logs (comprehensive monitoring)
 // - Silver: Key metrics and logs (balanced monitoring)  
-// - Bronze: Essential metrics only (basic monitoring)
+// - Bronze: Essential metrics and logs (basic monitoring)
 
 @description('The name of the Data Factory resource')
 param dataFactoryName string
@@ -14,7 +14,7 @@ param logAnalyticsWorkspaceId string
 
 @description('Diagnostic setting level - determines metrics and logs collected')
 @allowed(['gold', 'silver', 'bronze'])
-param diagnosticSettingLevel string = 'silver'
+param diagnosticSettingLevel string = 'gold'
 
 @description('Optional. Data Factory name prefix for diagnostic setting')
 param diagnosticSettingName string = 'diag-${dataFactoryName}'
@@ -48,47 +48,7 @@ var bronzeMetrics = [
 
 var goldLogs = [
   {
-    category: 'ActivityRuns'
-    enabled: true
-  }
-  {
-    category: 'PipelineRuns'
-    enabled: true
-  }
-  {
-    category: 'TriggerRuns'
-    enabled: true
-  }
-  {
-    category: 'SandboxPipelineRuns'
-    enabled: true
-  }
-  {
-    category: 'SandboxActivityRuns'
-    enabled: true
-  }
-  {
-    category: 'SSISPackageEventMessages'
-    enabled: true
-  }
-  {
-    category: 'SSISPackageExecutableStatistics'
-    enabled: true
-  }
-  {
-    category: 'SSISPackageEventMessageContext'
-    enabled: true
-  }
-  {
-    category: 'SSISPackageExecutionComponentPhases'
-    enabled: true
-  }
-  {
-    category: 'SSISPackageExecutionDataStatistics'
-    enabled: true
-  }
-  {
-    category: 'SSISIntegrationRuntimeLogs'
+    categoryGroup: 'allLogs'
     enabled: true
   }
 ]

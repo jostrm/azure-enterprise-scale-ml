@@ -44,7 +44,7 @@ param addAIFoundry bool = false
 
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
-param diagnosticSettingLevel string = 'silver'
+param diagnosticSettingLevel string = 'gold'
 
 @description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
 param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'

@@ -65,7 +65,7 @@ var activeVersion = 122
 
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
-param diagnosticSettingLevel string = 'silver'
+param diagnosticSettingLevel string = 'gold'
 
 // Skip diagnostic-setting modules per-resource. Set true (typically by the
 // pipeline pre-detect step) when a diagnostic setting already exists on that
@@ -832,6 +832,7 @@ module csAzureOpenAI '../modules/csOpenAI.bicep' = if(!openaiExists && enableAzu
     cognitiveName: aoaiName
     tags: tagsProject
     laWorkspaceName: laWorkspaceName
+    diagnosticSettingLevel: diagnosticSettingLevel
     restore: restore
     location: location
     vnetResourceGroupName: vnetResourceGroupName

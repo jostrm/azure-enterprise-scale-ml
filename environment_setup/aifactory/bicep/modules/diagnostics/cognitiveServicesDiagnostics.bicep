@@ -4,7 +4,7 @@
 // This module creates diagnostic settings for Cognitive Services with three tiers:
 // - Gold: All metrics and logs (comprehensive monitoring)
 // - Silver: Key metrics and logs (balanced monitoring)  
-// - Bronze: Essential metrics only (basic monitoring)
+// - Bronze: Essential metrics and logs (basic monitoring)
 
 @description('The name of the Cognitive Services resource')
 param cognitiveServiceName string
@@ -14,7 +14,7 @@ param logAnalyticsWorkspaceId string
 
 @description('Diagnostic setting level - determines metrics and logs collected')
 @allowed(['gold', 'silver', 'bronze'])
-param diagnosticSettingLevel string = 'silver'
+param diagnosticSettingLevel string = 'gold'
 
 @description('Enable the RequestResponse, Trace, and AzureOpenAIRequestUsage categories required for Azure OpenAI and AI Foundry telemetry, regardless of diagnostic setting level.')
 param includeAzureOpenAIUsageTelemetry bool = false
@@ -51,15 +51,7 @@ var bronzeMetrics = [
 
 var goldLogs = [
   {
-    category: 'Audit'
-    enabled: true
-  }
-  {
-    category: 'RequestResponse'
-    enabled: true
-  }
-  {
-    category: 'Trace'
+    categoryGroup: 'allLogs'
     enabled: true
   }
 ]
@@ -102,7 +94,8 @@ var foundryRequiredLogs = [
 // Select metrics and logs based on diagnostic level.
 var selectedMetrics = diagnosticSettingLevel == 'gold' ? goldMetrics : diagnosticSettingLevel == 'silver' ? silverMetrics : bronzeMetrics
 var tierLogs = diagnosticSettingLevel == 'gold' ? goldLogs : diagnosticSettingLevel == 'silver' ? silverLogs : bronzeLogs
-var selectedLogs = includeAzureOpenAIUsageTelemetry ? union(tierLogs, foundryRequiredLogs) : tierLogs
+// allLogs already includes usage telemetry; mixing the group with its categories is invalid.
+var selectedLogs = diagnosticSettingLevel == 'gold' ? goldLogs : (includeAzureOpenAIUsageTelemetry ? union(tierLogs, foundryRequiredLogs) : tierLogs)
 
 // Cognitive Services Diagnostic Settings
 resource cognitiveServiceDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {

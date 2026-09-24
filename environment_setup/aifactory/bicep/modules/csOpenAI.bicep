@@ -17,6 +17,9 @@ param vnetRules array = []
 param ipRules array = []
 param restore bool=false
 param disableLocalAuth bool = true
+@description('Gold collects all supported logs; silver and bronze retain the required OpenAI usage telemetry.')
+@allowed(['gold', 'silver', 'bronze'])
+param diagnosticSettingLevel string = 'gold'
 /*
 @allowed([
   '1106-Preview'
@@ -137,7 +140,12 @@ resource openAIDiagSettingsOpenAI 'Microsoft.Insights/diagnosticSettings@2021-05
         enabled: true
       }
     ]
-    logs: [
+    logs: diagnosticSettingLevel == 'gold' ? [
+      {
+        categoryGroup: 'allLogs'
+        enabled: true
+      }
+    ] : [
       {
         category: 'RequestResponse'
         enabled: true

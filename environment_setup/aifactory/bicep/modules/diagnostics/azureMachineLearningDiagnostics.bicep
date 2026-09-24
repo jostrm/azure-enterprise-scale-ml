@@ -4,7 +4,7 @@
 // This module creates diagnostic settings for Azure Machine Learning workspace with three tiers:
 // - Gold: All metrics and logs (comprehensive monitoring)
 // - Silver: Key metrics and logs (balanced monitoring)  
-// - Bronze: Essential metrics only (basic monitoring)
+// - Bronze: Essential metrics and logs (basic monitoring)
 
 @description('The name of the Azure Machine Learning workspace resource')
 param machineLearningWorkspaceName string
@@ -14,7 +14,7 @@ param logAnalyticsWorkspaceId string
 
 @description('Diagnostic setting level - determines metrics and logs collected')
 @allowed(['gold', 'silver', 'bronze'])
-param diagnosticSettingLevel string = 'silver'
+param diagnosticSettingLevel string = 'gold'
 
 @description('Optional. Azure ML workspace name prefix for diagnostic setting')
 param diagnosticSettingName string = 'diag-${machineLearningWorkspaceName}'
@@ -48,99 +48,7 @@ var bronzeMetrics = [
 
 var goldLogs = [
   {
-    category: 'AmlComputeClusterEvent'
-    enabled: true
-  }
-  {
-    category: 'AmlComputeClusterNodeEvent'
-    enabled: true
-  }
-  {
-    category: 'AmlComputeJobEvent'
-    enabled: true
-  }
-  {
-    category: 'AmlComputeCpuGpuUtilization'
-    enabled: true
-  }
-  {
-    category: 'AmlRunStatusChangedEvent'
-    enabled: true
-  }
-  {
-    category: 'ModelsChangeEvent'
-    enabled: true
-  }
-  {
-    category: 'ModelsReadEvent'
-    enabled: true
-  }
-  {
-    category: 'ModelsActionEvent'
-    enabled: true
-  }
-  {
-    category: 'DeploymentReadEvent'
-    enabled: true
-  }
-  {
-    category: 'DeploymentEventACI'
-    enabled: true
-  }
-  {
-    category: 'DeploymentEventAKS'
-    enabled: true
-  }
-  {
-    category: 'InferencingOperationAKS'
-    enabled: true
-  }
-  {
-    category: 'InferencingOperationACI'
-    enabled: true
-  }
-  {
-    category: 'DataLabelChangeEvent'
-    enabled: true
-  }
-  {
-    category: 'DataLabelReadEvent'
-    enabled: true
-  }
-  {
-    category: 'ComputeInstanceEvent'
-    enabled: true
-  }
-  {
-    category: 'DataStoreChangeEvent'
-    enabled: true
-  }
-  {
-    category: 'DataStoreReadEvent'
-    enabled: true
-  }
-  {
-    category: 'DataSetChangeEvent'
-    enabled: true
-  }
-  {
-    category: 'DataSetReadEvent'
-    enabled: true
-  }
-  {
-    category: 'PipelineChangeEvent'
-    enabled: true
-  }
-  {
-    category: 'PipelineReadEvent'
-    enabled: true
-  }
-  {
-    category: 'RunEvent'
-    enabled: true
-  }
-  {
-    category: 'RunReadEvent'
+    categoryGroup: 'allLogs'
     enabled: true
   }
 ]

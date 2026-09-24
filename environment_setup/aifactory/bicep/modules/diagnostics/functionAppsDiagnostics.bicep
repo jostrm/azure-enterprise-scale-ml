@@ -1,10 +1,10 @@
 // ============================================================================
 // FUNCTION APPS DIAGNOSTIC SETTINGS MODULE
 // ============================================================================
-// This module creates diagnostic settings for Azure Function Apps with three tiers:
+// This module creates diagnostic settings for Function Apps and Logic Apps Standard with three tiers:
 // - Gold: All metrics and logs (comprehensive monitoring)
 // - Silver: Key metrics and logs (balanced monitoring)  
-// - Bronze: Essential metrics only (basic monitoring)
+// - Bronze: Essential metrics and logs (basic monitoring)
 
 @description('The name of the Function App resource')
 param functionAppName string
@@ -14,7 +14,10 @@ param logAnalyticsWorkspaceId string
 
 @description('Diagnostic setting level - determines metrics and logs collected')
 @allowed(['gold', 'silver', 'bronze'])
-param diagnosticSettingLevel string = 'silver'
+param diagnosticSettingLevel string = 'gold'
+
+@description('Collect WorkflowRuntime for Logic Apps Standard when a lower-cost diagnostic tier is selected. Not for Consumption Logic Apps.')
+param isLogicAppStandard bool = false
 
 @description('Optional. Function App name prefix for diagnostic setting')
 param diagnosticSettingName string = 'diag-${functionAppName}'
@@ -48,7 +51,7 @@ var bronzeMetrics = [
 
 var goldLogs = [
   {
-    category: 'FunctionAppLogs'
+    categoryGroup: 'allLogs'
     enabled: true
   }
 ]
@@ -59,18 +62,20 @@ var silverLogs = [
     enabled: true
   }
   {
-    category: 'AppServiceAppLogs'
-    enabled: true
-  }
-  {
     category: 'AppServiceAuditLogs'
     enabled: true
   }
+  ...(isLogicAppStandard ? [
+    {
+      category: 'WorkflowRuntime'
+      enabled: true
+    }
+  ] : [])
 ]
 
 var bronzeLogs = [
   {
-    category: 'FunctionAppLogs'
+    category: isLogicAppStandard ? 'WorkflowRuntime' : 'FunctionAppLogs'
     enabled: true
   }
 ]

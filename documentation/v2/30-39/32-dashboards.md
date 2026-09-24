@@ -699,6 +699,36 @@ trace and Azure OpenAI request-usage categories. Diagnostic settings are
 establish agent business-outcome instrumentation, complete cost attribution or
 query permissions.
 
+#### Diagnostic defaults and safe rollout
+
+The default `gold` tier uses the Azure Monitor `allLogs` category group for
+Azure ML, Data Factory, Cognitive Services/Foundry, and Function Apps/Logic Apps
+Standard. New standalone OpenAI accounts also use `allLogs`. This includes
+resource-supported audit, environment, managed-network and Airflow categories
+without maintaining incomplete hard-coded lists. `AllMetrics`, existing
+diagnostic-setting names, workspace routing and the legacy `AzureDiagnostics`
+destination behavior are retained; no extra Log Analytics workspace is created.
+
+Logic Apps **Standard** now receives a diagnostic setting when AI Factory creates
+the app. Consumption Logic Apps are not passed to the Function App diagnostics
+module. Explicit `silver` and `bronze` selections remain available for lower
+ingestion volume, but need not satisfy policies requiring every log category.
+Lower tiers retain required Foundry usage telemetry when requested. Function/
+Logic App settings do not request the unsupported `AppServiceAppLogs` category.
+
+Existing resource-reuse and `skipDiag*` guards remain in place. Updating the
+purple repo or rerunning a pipeline does **not** forcibly replace settings on
+reused or policy-managed resources. To repair those resources, first inspect
+their existing setting name, destination and owner; update that setting through
+its owning deployment/policy or a separately reviewed diagnostic-module
+deployment, rather than creating a competing setting with the same sink.
+
+`allLogs` also includes newly supported categories over time, so ingestion,
+retention costs and data-handling requirements can increase. These defaults do
+not enable paid Defender plans, rotate credentials, modify network access,
+grant additional deployment permissions or guarantee a compliance score.
+Confirm the applicable policy result after deployment and scanner refresh.
+
 Four older exported dashboard JSON files remain under
 [`environment_setup/aifactory/azure_dashboards`](../../../environment_setup/aifactory/azure_dashboards).
 Treat these as legacy portal artifacts, distinct from the current Bicep

@@ -116,7 +116,7 @@ param skuTierAksStageProd string = ''
 
 @description('Diagnostic setting level for monitoring and logging')
 @allowed(['gold', 'silver', 'bronze'])
-param diagnosticSettingLevel string = 'silver'
+param diagnosticSettingLevel string = 'gold'
 
 @description('Enable Customer Managed Keys (CMK) encryption')
 param cmk bool = false
