@@ -12,6 +12,7 @@ import argparse
 import base64
 import ctypes
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -152,6 +153,25 @@ def valid_ref(value):
             and ".." not in value and "//" not in value and not value.endswith("/"))
 
 
+def single_writer(document):
+    return document.get("locks", {}).get("coordination_mode") == "single-writer"
+
+
+def repository_state_module():
+    spec = importlib.util.spec_from_file_location("provider_repository_state", Path(__file__).with_name("provider_repository_state.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def scoped_template(document):
+    return SCOPED_SOURCE + ("single-writer-" if single_writer(document) else "") + document["route"]["kind"] + ".yml"
+
+
+def coordination(cloud, document):
+    return RepositoryCoordination(cloud, document) if single_writer(document) else BlobLocks(cloud, document)
+
+
 def validate_manifest(document, now=None):
     _validate_manifest(document)
     now = time.time() if now is None else now
@@ -208,14 +228,16 @@ def _validate_manifest(document):
     require(isinstance(route.get("commit"), str) and re.fullmatch(r"[0-9a-f]{40}", route["commit"])
             and valid_ref(route.get("ref")), "exact-consumer-version-required")
     locks = document["locks"]
-    require(locks.get("provider") == "azure-blob-lease", "distributed-lock-provider-required")
-    require(isinstance(locks.get("account_url"), str) and re.fullmatch(
-        r"https://[a-z0-9]{3,24}\.blob\.core\.windows\.net", locks["account_url"]), "unsupported-lock-endpoint")
-    require(isinstance(locks.get("container"), str) and re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]",
-                                                                 locks["container"]), "invalid-lock-container")
-    require(isinstance(locks.get("coordination_blob"), str)
-            and re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9_./-]{0,255}", locks["coordination_blob"])
-            and ".." not in locks["coordination_blob"], "invalid-enrollment-blob")
+    if single_writer(document):
+        require(all(locks.get(k) == v for k, v in repository_state_module().coordinates(repository).items())
+                and set(locks) <= {"provider", "coordination_mode", "repository", "state_ref", "coordination_hash",
+                                   "revision", "scopes", "common_dependencies"}, "invalid-single-writer-coordinates")
+        require(document["operation"] != "delete" and "deployment" in document,
+                "single-writer-scoped-deployment-required")
+    else:
+        require(locks.get("provider") == "azure-blob-lease"
+                and locks.get("coordination_mode", "blob") == "blob", "distributed-lock-provider-required")
+        validate_blob_coordinates(locks)
     require(hash_value(locks.get("coordination_hash")) and type(locks.get("revision")) is int
             and locks["revision"] > 0, "missing-enrollment-revision")
     scopes = locks.get("scopes")
@@ -238,6 +260,16 @@ def _validate_manifest(document):
     if document["operation"] == "delete":
         validate_deletion(document)
     return document
+
+
+def validate_blob_coordinates(locks):
+    require(isinstance(locks.get("account_url"), str) and re.fullmatch(
+        r"https://[a-z0-9]{3,24}\.blob\.core\.windows\.net", locks["account_url"]), "unsupported-lock-endpoint")
+    require(isinstance(locks.get("container"), str) and re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]",
+                                                                 locks["container"]), "invalid-lock-container")
+    require(isinstance(locks.get("coordination_blob"), str)
+            and re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9_./-]{0,255}", locks["coordination_blob"])
+            and ".." not in locks["coordination_blob"], "invalid-enrollment-blob")
 
 
 def validate_project(document):
@@ -502,6 +534,9 @@ def capabilities():
         "contract": CONTRACT, "manifest_schema": CONTRACT,
         "protected_inputs": ["stdin", "windows-current-user-dpapi"],
         "local_preview": True, "distributed_lock": "azure-blob-infinite-lease-v1",
+        "coordination_modes": ["blob", "single-writer"],
+        "single_writer": "provider-repository-cas-v1",
+        "single_writer_operations": ["create-factory", "create-scaleset", "deploy-project"],
         "project_routes": ["ado", "gha"],
         "project_environments": ["dev", "stage", "prod"],
         "scoped_worker_os": ["linux"], "scoped_runners": ["hosted", "self-hosted"],
@@ -683,7 +718,9 @@ class Cloud:
 
     def request(self, method, url, audience, data=None, headers=None, allowed=(200,)):
         parsed = urlsplit(url)
-        allowed_hosts = {urlsplit(ARM).netloc, urlsplit(self.document["locks"]["account_url"]).netloc, "dev.azure.com"}
+        allowed_hosts = {urlsplit(ARM).netloc, "dev.azure.com"}
+        if not single_writer(self.document):
+            allowed_hosts.add(urlsplit(self.document["locks"]["account_url"]).netloc)
         require(parsed.scheme == "https" and parsed.netloc in allowed_hosts and not parsed.username
                 and not parsed.password and not parsed.fragment, "untrusted-service-endpoint")
         request_headers = {"Authorization": "Bearer " + self.token(audience), "Content-Type": "application/json"}
@@ -709,6 +746,37 @@ class Cloud:
             return status, response_headers, json.loads(raw)
         except ValueError:
             raise Blocked("invalid-remote-json") from None
+
+    def state_request(self, kind, method, endpoint, body, allowed):
+        require(single_writer(self.document), "single-writer-not-selected")
+        if kind == "gha":
+            url = "https://api.github.com/" + endpoint
+            token = (os.environ.get("GH_TOKEN", "") if self.pipeline_identity else
+                     self.command(["gh", "auth", "token", "--hostname", "github.com"]))
+        else:
+            url = endpoint
+            token = (os.environ.get("AIFACTORY_STATE_TOKEN", "") if self.pipeline_identity else
+                     self.token("499b84ac-1321-427f-aa17-267ca6975798"))
+        require(token and urlsplit(url).hostname == ("api.github.com" if kind == "gha" else "dev.azure.com"),
+                "single-writer-provider-auth-required")
+        headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                   "Accept": "application/vnd.github+json" if kind == "gha" else "application/json"}
+        try:
+            response = self.opener.open(Request(url, method=method, data=canonical(body) if body is not None else None,
+                                                headers=headers), timeout=60)
+        except HTTPError as error:
+            response = error
+        except (URLError, OSError, TimeoutError):
+            raise Blocked("single-writer-provider-write-or-read-uncertain") from None
+        with response:
+            status = response.code
+            raw, incoming = response.read(MAX_DOCUMENT + 1), dict(response.headers)
+        require(status in allowed, "single-writer-provider-request-failed-" + str(status))
+        require(len(raw) <= MAX_DOCUMENT, "single-writer-provider-response-too-large")
+        try:
+            return status, incoming, json.loads(raw) if raw else None
+        except (ValueError, UnicodeError):
+            raise Blocked("single-writer-provider-response-invalid") from None
 
     def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
         arm_scope(resource_id)

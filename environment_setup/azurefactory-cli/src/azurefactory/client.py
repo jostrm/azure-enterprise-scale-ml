@@ -12,6 +12,7 @@ from datetime import date
 from typing import Any, Callable, Generator
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
+from uuid import UUID
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from .errors import APIError, AuthError, ConfigError, RedirectError, RequestTimeout
@@ -411,6 +412,35 @@ class AzureFactoryClient:
 
     def bootstrap_job(self, job_id: str) -> dict[str, Any]:
         return self._object(self.request("GET", f"/api/v1/creation/bootstrap/jobs/{job_id}"), "bootstrap job")
+
+    def creation_workflow_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
+        return self._object(self.request("POST", "/api/v1/creation/workflows/prepare", body=body), "workflow prepare")
+
+    @staticmethod
+    def _workflow_id(value: str) -> str:
+        try:
+            identifier = UUID(value)
+            if not identifier.int or str(identifier) != value:
+                raise ValueError()
+        except (ValueError, TypeError, AttributeError):
+            raise ConfigError("Use the exact canonical workflow UUID returned by the server.") from None
+        return value
+
+    def creation_workflow_next(self, folder: str, workflow_id: str) -> dict[str, Any]:
+        identifier = self._workflow_id(workflow_id)
+        return self._object(self.request(
+            "POST", f"/api/v1/creation/workflows/{identifier}/prepare-next",
+            body={"folder": folder}), "workflow next")
+
+    def creation_workflow_start(self, folder: str, workflow_id: str, confirmation_id: str) -> dict[str, Any]:
+        return self._object(self.request("POST", "/api/v1/creation/workflows/start", body={
+            "folder": folder, "workflow_id": self._workflow_id(workflow_id),
+            "confirmation_id": confirmation_id}), "workflow start")
+
+    def creation_workflow_status(self, folder: str, workflow_id: str) -> dict[str, Any]:
+        identifier = self._workflow_id(workflow_id)
+        return self._object(self.request("GET", f"/api/v1/creation/workflows/{identifier}",
+                                        query={"folder": folder}), "workflow status")
 
     def project_deployments(self, folder: str) -> dict[str, Any]:
         return self._object(self.request("GET", "/api/v1/operations/project-deployments", query={"folder": folder}), "project deployments")

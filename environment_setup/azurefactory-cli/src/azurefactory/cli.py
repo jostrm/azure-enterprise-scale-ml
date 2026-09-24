@@ -317,6 +317,21 @@ def build_parser() -> argparse.ArgumentParser:
     boot_status.add_argument("--wait", action="store_true")
     add_poll_args(boot_status)
 
+    workflow = bootstrap_sub.add_parser("workflow", help="Registered staged bootstrap; each start needs its own reviewed receipt.")
+    workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
+    workflow_prepare = add_simple(workflow_sub, "prepare", cmd_creation_workflow_prepare)
+    workflow_prepare.add_argument("--request-json", required=True, help="Exact CreationWorkflowPrepare JSON; coordination mode belongs in bootstrap_config.")
+    workflow_prepare.add_argument("--save-receipt")
+    workflow_next = add_simple(workflow_sub, "next", cmd_creation_workflow_next)
+    workflow_next.add_argument("--folder", required=True)
+    workflow_next.add_argument("--workflow-id", required=True)
+    workflow_next.add_argument("--save-receipt")
+    workflow_start = add_simple(workflow_sub, "start", cmd_creation_workflow_start)
+    add_receipt_and_yes(workflow_start)
+    workflow_status = add_simple(workflow_sub, "status", cmd_creation_workflow_status)
+    workflow_status.add_argument("--folder", required=True)
+    workflow_status.add_argument("--workflow-id", required=True)
+
     legacy = sub.add_parser("legacy", help="Legacy project update/promote deployments for legacy roots only; never catalog roots.")
     legacy_sub = legacy.add_subparsers(dest="legacy_command", required=True)
     legacy_list = add_simple(legacy_sub, "list", cmd_legacy_list)
@@ -808,6 +823,46 @@ def cmd_bootstrap_status(args):
     c = client(args)
     result = poll(lambda: c.bootstrap_job(args.job_id), args.poll_timeout, args.poll_interval, {"succeeded"}) if args.wait else c.bootstrap_job(args.job_id)
     return emit(result, status_exit(result.get("status")))
+
+
+def cmd_creation_workflow_prepare(args):
+    ensure_receipt_target_available(args)
+    body = read_json_file(args.request_json)
+    result = client(args).creation_workflow_prepare(body)
+    maybe_save_receipt(args, result, body, "creation-workflow-start", operation="creation-workflow")
+    return preview_emit(result)
+
+
+def cmd_creation_workflow_next(args):
+    ensure_receipt_target_available(args)
+    body = {"folder": args.folder, "workflow_id": args.workflow_id}
+    result = client(args).creation_workflow_next(args.folder, args.workflow_id)
+    maybe_save_receipt(args, result, body, "creation-workflow-start", operation="creation-workflow")
+    return preview_emit(result)
+
+
+def cmd_creation_workflow_start(args):
+    require_yes(args)
+    api = client(args)
+    receipt = load_receipt(args.receipt, api, "creation-workflow-start")
+    result = api.creation_workflow_start(receipt["folder"], receipt["preview"]["workflow_id"], receipt["confirmation_id"])
+    if result.get("scope") != receipt["preview"]["scope"]:
+        raise FailureError("Workflow start returned a different scope. Inspect state; do not submit again.")
+    return workflow_status_emit(result, receipt["folder"], receipt["preview"]["workflow_id"])
+
+
+def cmd_creation_workflow_status(args):
+    result = client(args).creation_workflow_status(args.folder, args.workflow_id)
+    return workflow_status_emit(result, args.folder, args.workflow_id)
+
+
+def workflow_status_emit(result, folder, identifier):
+    if (result.get("contract_version") != 1 or result.get("workflow_id") != identifier
+            or not isinstance(result.get("scope"), dict) or result["scope"].get("folder") != folder):
+        raise FailureError("Workflow status returned a different or incomplete scope. Inspect state before retrying.")
+    status = result.get("status")
+    code = EXIT_BLOCKED if status == "blocked" else EXIT_OK if status == "awaiting-review" else status_exit(status)
+    return emit(result, code)
 
 
 def cmd_legacy_list(args):

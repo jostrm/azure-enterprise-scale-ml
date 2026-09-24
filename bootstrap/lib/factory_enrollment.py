@@ -77,6 +77,7 @@ import base64
 import copy
 import fnmatch
 import hashlib
+import importlib.util
 import ipaddress
 import json
 import re
@@ -91,7 +92,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
-from uuid import UUID, NAMESPACE_URL, uuid5
+from uuid import UUID, NAMESPACE_URL, uuid4, uuid5
 
 
 ARM = "https://management.azure.com"
@@ -112,7 +113,19 @@ OPTIONS = {
     "resource_group_ids", "common_dependency_ids", "deployment_roles",
     "create_resource_group_ids", "approved_group_creation_scope", "ado_tenant_id",
     "coordination_storage_mode", "coordination_account_creation",
+    "coordination_mode",
 }
+
+
+def _single_writer_module():
+    spec = importlib.util.spec_from_file_location("provider_repository_state", Path(__file__).with_name("provider_repository_state.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _single_writer(request):
+    return request.get("coordination_mode") == "single-writer"
 
 
 class EnrollmentError(Exception):
@@ -371,9 +384,12 @@ def _validate_binding(binding):
             and binding.get("orchestrator") in ("gha", "ado")
             and isinstance(binding.get("targets"), list) and binding["targets"]
             and isinstance(binding.get("locks"), dict), "invalid-existing-binding")
-    require(set(binding["locks"]) == {"account_url", "container", "coordination_blob", "coordination_hash", "revision"},
+    single = binding["locks"].get("coordination_mode") == "single-writer"
+    require(set(binding["locks"]) == ({"provider", "coordination_mode", "repository", "state_ref", "coordination_hash", "revision"}
+            if single else {"account_url", "container", "coordination_blob", "coordination_hash", "revision"}),
             "invalid-existing-binding")
-    require(re.fullmatch(r"https://[a-z0-9]{3,24}\.blob\.core\.windows\.net", str(binding["locks"]["account_url"]))
+    require((all(binding["locks"].get(k) == v for k, v in _single_writer_module().coordinates(binding["repository"]).items())
+             if single else re.fullmatch(r"https://[a-z0-9]{3,24}\.blob\.core\.windows\.net", str(binding["locks"]["account_url"])))
             and re.fullmatch(r"[a-f0-9]{64}", str(binding["locks"]["coordination_hash"]))
             and type(binding["locks"]["revision"]) is int and binding["locks"]["revision"] >= 1,
             "invalid-existing-binding")
@@ -473,6 +489,24 @@ def load_request(consumer_root, factory_id, scale_set_id, environment, options):
     require(1 <= len(scopes) <= 24 and len(dependencies) <= 24
             and len(set(scopes + dependencies)) == len(scopes + dependencies), "exact-disjoint-physical-scopes-required")
     require(all(x.split("/")[2] == subscription for x in scopes), "writable-scope-subscription-mismatch")
+    mode = options.get("coordination_mode", "blob")
+    require(mode in ("blob", "single-writer"), "invalid-coordination-mode")
+    if mode == "single-writer":
+        forbidden = {"coordination_storage_mode", "coordination_account_creation", "coordination_account_id",
+                     "coordination_resource_group_id", "container", "coordination_blob", "public_network_access"}
+        require(not forbidden.intersection(options), "single-writer-blob-options-forbidden")
+        coordinates = _single_writer_module().coordinates(route["repository"])
+        for item in inventory:
+            binding = item["binding"]
+            bound = {rg_id(x) for t in binding["targets"]
+                     for x in t.get("resource_group_ids", []) + t.get("common_dependency_ids", [])}
+            if bound.intersection(scopes + dependencies) or binding is old:
+                require(all(binding["locks"].get(k) == v for k, v in coordinates.items()),
+                        "overlapping-coordination-namespaces-conflict")
+        if old:
+            require(all(old["locks"].get(k) == v for k, v in coordinates.items()),
+                    "existing-binding-coordinates-conflict")
+        return _single_writer_request(root, raw, target, route, scopes, dependencies, inventory, options)
     storage_mode = options.get("coordination_storage_mode", "dedicated")
     require(storage_mode in ("dedicated", "factory-common", "connectivity-hub"), "invalid-coordination-storage-mode")
     require(storage_mode == "factory-common" or "coordination_account_creation" not in options,
@@ -486,8 +520,11 @@ def load_request(consumer_root, factory_id, scale_set_id, environment, options):
         bound = {rg_id(x) for t in binding["targets"]
                  for x in t.get("resource_group_ids", []) + t.get("common_dependency_ids", [])}
         if bound.intersection(scopes + dependencies):
+            require(binding["locks"].get("coordination_mode") != "single-writer",
+                    "overlapping-coordination-namespaces-conflict")
             overlapping.append({key: binding["locks"].get(key) for key in ("account_url", "container", "coordination_blob")})
     if old:
+        require(old["locks"].get("coordination_mode") != "single-writer", "existing-binding-coordinates-conflict")
         overlapping.append({key: old["locks"][key] for key in ("account_url", "container", "coordination_blob")})
     require(not overlapping or all(x == overlapping[0] for x in overlapping), "overlapping-coordination-namespaces-conflict")
     coordination_rg = rg_id(options.get("coordination_resource_group_id", defaults["resource_group_id"]))
@@ -567,6 +604,48 @@ def load_request(consumer_root, factory_id, scale_set_id, environment, options):
             "coordination_storage_mode": storage_mode, "coordination_account_creation": account_creation,
             "create_resource_group_ids": creation, "approved_group_creation_scope": approved,
             "deployment_roles": sorted(roles, key=canonical), "ado_tenant_id": ado_tenant,
+            "existing_bindings": inventory, "options": copy.deepcopy(options)}
+
+
+def _single_writer_request(root, raw, target, route, scopes, dependencies, inventory, options):
+    subscription = target["subscription_id"]
+    identity_rg = rg_id(options.get("identity_resource_group_id", scopes[0]))
+    identity_id = options.get("identity_id")
+    reuse = bool(identity_id)
+    if not identity_id:
+        name = options.get("identity_name", "afwriter-" + digest({"repository": route["repository"], "writer": route["writer_id"]})[:16])
+        require(isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9_-]{3,128}", name), "invalid-identity-name")
+        identity_id = identity_rg + "/providers/Microsoft.ManagedIdentity/userAssignedIdentities/" + name
+    identity_id = resource_id(identity_id, "Microsoft.ManagedIdentity/userAssignedIdentities")
+    identity_rg = identity_id.split("/providers/")[0]
+    require(reuse or identity_id.split("/")[2] == subscription, "identity-subscription-mismatch")
+    creation = sorted(rg_id(x) for x in options.get("create_resource_group_ids", []))
+    require(set(creation) <= set(scopes + [identity_rg]), "resource-group-creation-escapes-scope")
+    require(all(x.split("/")[2] == subscription for x in creation), "resource-group-creation-escapes-subscription")
+    approved = options.get("approved_group_creation_scope")
+    require(approved is None or approved.lower() == "/subscriptions/" + subscription, "invalid-approved-group-creation-scope")
+    require(not creation or approved, "explicit-wider-group-creation-approval-required")
+    roles = []
+    for role in options.get("deployment_roles", []):
+        require(isinstance(role, dict) and set(role) == {"scope", "role_definition_id"}, "invalid-role-grant")
+        scope = rg_id(role["scope"])
+        require(scope in scopes, "role-grant-escapes-explicit-writable-scope")
+        definition = role["role_definition_id"]
+        if re.fullmatch(r"[a-fA-F0-9-]{36}", str(definition)):
+            definition = f"/subscriptions/{subscription}/providers/microsoft.authorization/roledefinitions/{guid(definition)}"
+        require(isinstance(definition, str) and re.fullmatch(re.escape(f"/subscriptions/{subscription}") +
+                r"/providers/microsoft.authorization/roledefinitions/[a-f0-9-]{36}", definition, re.I), "invalid-role-definition-id")
+        guid(definition.rsplit("/", 1)[1])
+        roles.append({"scope": scope, "role_definition_id": definition.lower()})
+    require(len({(x["scope"], x["role_definition_id"]) for x in roles}) == len(roles), "duplicate-role-grant")
+    require(route["kind"] != "ado" or options.get("ado_tenant_id"), "explicit-ado-tenant-id-required")
+    return {"schema": 1, "consumer_root": str(root), "consumer_hash": hashlib.sha256(raw).hexdigest(),
+            "target": target, "route": route, "scopes": scopes, "common_dependencies": dependencies,
+            "identity_id": identity_id, "reuse_identity": reuse, "coordination_mode": "single-writer",
+            "coordinates": _single_writer_module().coordinates(route["repository"]),
+            "create_resource_group_ids": creation, "approved_group_creation_scope": approved,
+            "deployment_roles": sorted(roles, key=canonical),
+            "ado_tenant_id": guid(options["ado_tenant_id"]) if route["kind"] == "ado" else None,
             "existing_bindings": inventory, "options": copy.deepcopy(options)}
 
 
@@ -733,7 +812,11 @@ class Cloud:
             raise
 
     def gh(self, method, endpoint, body=None, allowed=(200,)):
-        require(method in ("GET", "POST"), "delete-or-replacement-forbidden")
+        require(method in ("GET", "POST") or (
+            method == "PATCH" and _single_writer(self.request_config)
+            and endpoint == "repos/" + urlsplit(self.request_config["route"]["repository"]).path.strip("/").removesuffix(".git")
+            + "/git/refs/heads/aifactory-state/single-writer-v1"
+            and isinstance(body, dict) and body.get("force") is False), "delete-or-replacement-forbidden")
         require(not self.read_only or method == "GET", "plan-mutation-forbidden")
         require(endpoint.startswith("repos/") and "://" not in endpoint, "untrusted-github-endpoint")
         argv = ["gh", "api", "--hostname", "github.com", "--include", "--method", method, endpoint]
@@ -756,6 +839,13 @@ class Cloud:
         headers = {k.lower(): v.strip() for line in header.splitlines()[1:] if ":" in line
                    for k, v in [line.split(":", 1)]}
         return status, headers, parse_json(text) if text.strip() else None
+
+    def state_request(self, kind, method, endpoint, body, allowed):
+        require(_single_writer(self.request_config), "single-writer-not-selected")
+        if kind == "gha":
+            return self.gh(method, endpoint, body, allowed)
+        return self.http(method, endpoint, ADO_AUDIENCE, data=body,
+                         tenant=self.request_config["ado_tenant_id"], allowed=allowed)
 
 
 def _absent(response):
@@ -999,12 +1089,14 @@ def _writer_deny_applies(deny, request, definitions, principal_id):
 
 
 def _roles(cloud, request, identity, operator_id, operator_operations):
-    storage_scope = request["account_id"] + "/blobservices/default/containers/" + request["coordinates"]["container"]
+    single = _single_writer(request)
+    storage_scope = "" if single else request["account_id"] + "/blobservices/default/containers/" + request["coordinates"]["container"]
     subscription = "/subscriptions/" + request["target"]["subscription_id"]
     requested = copy.deepcopy(request["deployment_roles"])
-    storage_subscription = "/subscriptions/" + request["account_id"].split("/")[2]
-    requested.append({"scope": storage_scope,
-                      "role_definition_id": storage_subscription + "/providers/microsoft.authorization/roledefinitions/" + DATA_ROLE})
+    storage_subscription = subscription if single else "/subscriptions/" + request["account_id"].split("/")[2]
+    if not single:
+        requested.append({"scope": storage_scope,
+                          "role_definition_id": storage_subscription + "/providers/microsoft.authorization/roledefinitions/" + DATA_ROLE})
     role_definitions = {}
     for item in requested:
         definition = item["role_definition_id"]
@@ -1012,7 +1104,7 @@ def _roles(cloud, request, identity, operator_id, operator_operations):
     assignments = [row for scope in sorted({subscription, storage_subscription})
                    for row in cloud.collection(scope + "/providers/Microsoft.Authorization/roleAssignments", ROLE_API)]
     blockers = []
-    affected = request["scopes"] + [storage_scope]
+    affected = request["scopes"] + ([] if single else [storage_scope])
     # Inspect every applicable assignment without Graph name resolution.
     relevant = []
     for assignment in assignments:
@@ -1046,7 +1138,7 @@ def _roles(cloud, request, identity, operator_id, operator_operations):
                             and (storage_scope == str(x.get("scope", "")).lower()
                                  or storage_scope.startswith(str(x.get("scope", "")).lower() + "/"))
                             for permission in role_definitions[str(x["roleDefinitionId"]).lower()].get("properties", {}).get("permissions", [])]
-    operator_access = all(_permission(operator_permissions, action, data=True) for action in (
+    operator_access = single or all(_permission(operator_permissions, action, data=True) for action in (
             "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
             "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write"))
     container_create = "Microsoft.Storage/storageAccounts/blobServices/containers/write"
@@ -1060,7 +1152,8 @@ def _roles(cloud, request, identity, operator_id, operator_operations):
     if any(action == container_create for _, action, _ in operator_operations) and not _permission(
             planned_operator_permissions, container_create):
         blockers.append("operator-container-create-permission-not-verified")
-    grants.append(dict(requested[-1], exists=operator_access, principal="operator"))
+    if not single:
+        grants.append(dict(requested[-1], exists=operator_access, principal="operator"))
     operator_operations = list(operator_operations)
     for grant in grants:
         if not grant["exists"]:
@@ -1074,8 +1167,9 @@ def _roles(cloud, request, identity, operator_id, operator_operations):
             "Microsoft.Resources/deployments/read", "Microsoft.Resources/deployments/write")]
     blob_operations = [
         (storage_scope + "/blobs/" + blob, action, True)
-        for blob in [request["coordinates"]["coordination_blob"]] + [
+        for blob in ([] if single else [request["coordinates"]["coordination_blob"]] + [
             lock_blob(scope) for scope in request["scopes"] + request["common_dependencies"]]
+        )
         for action in ("Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
                        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write")]
     operator_operations.extend(blob_operations)
@@ -1104,13 +1198,16 @@ def merge_enrollment(existing, request, identity):
     target, route = request["target"], request["route"]
     writer = {key: copy.deepcopy(route[key]) for key in ("kind", "repository", "shared_remote", "auth_namespace", "runner")}
     writer["deployment_object_id"] = identity["principal_id"] if identity else None
+    single = _single_writer(request)
+    protocol = "aifactory-single-writer-v1" if single else "aifactory-physical-lock-v1"
+    enforcement = "repository-exclusive-writer" if single else "all-writers-exclusive"
     if existing is None:
-        result = {"schema": 1, "protocol": "aifactory-physical-lock-v1", "enforcement": "all-writers-exclusive",
+        result = {"schema": 1, "protocol": protocol, "enforcement": enforcement,
                   "revision": 0, "writers": {}, "scopes": {}}
     else:
         require(isinstance(existing, dict) and existing.get("schema") == 1
-                and existing.get("protocol") == "aifactory-physical-lock-v1"
-                and existing.get("enforcement") == "all-writers-exclusive"
+                and existing.get("protocol") == protocol
+                and existing.get("enforcement") == enforcement
                 and type(existing.get("revision")) is int and existing["revision"] >= 1
                 and isinstance(existing.get("writers"), dict) and isinstance(existing.get("scopes"), dict),
                 "invalid-existing-enrollment")
@@ -1128,6 +1225,7 @@ def merge_enrollment(existing, request, identity):
                     "invalid-existing-scope-dependencies")
     for writer_id, previous in result["writers"].items():
         require(isinstance(previous, dict), "invalid-existing-writer")
+        require(not single or writer_id == route["writer_id"], "single-writer-repository-writer-conflict")
         if writer_id != route["writer_id"]:
             require(not (previous.get("kind") == route["kind"]
                          and str(previous.get("repository", "")).lower().removesuffix(".git") == route["repository"].lower().removesuffix(".git")
@@ -1228,7 +1326,95 @@ def _lifecycle_protection(request):
             "retention": "retain-coordination-account-container-and-parent-resource-group"}
 
 
+def _collect_single_writer_snapshot(request, cloud):
+    cloud.read_only = True
+    target = request["target"]
+    store = _single_writer_module().ProviderState(cloud, request["route"], EnrollmentError)
+    head, repository_state = store.read()
+    claim = getattr(cloud, "single_writer_enrollment_claim", None)
+    require(not repository_state or repository_state["active"] in (None, claim),
+            "single-writer-repository-active-claim")
+    bound = any(item["binding"]["locks"].get("coordination_mode") == "single-writer"
+                and item["binding"]["repository"] == request["route"]["repository"]
+                for item in request["existing_bindings"])
+    require(not bound or repository_state is not None and repository_state["enrollment"] is not None,
+            "single-writer-enrollment-state-missing")
+    account = cloud.az("account", "show", "--subscription", target["subscription_id"])
+    require(str(account.get("id", "")).lower() == target["subscription_id"]
+            and str(account.get("tenantId", "")).lower() == target["tenant_id"], "selected-account-tenant-mismatch")
+    identity_subscription = request["identity_id"].split("/")[2]
+    identity_account = None
+    if identity_subscription != target["subscription_id"]:
+        identity_account = cloud.az("account", "show", "--subscription", identity_subscription)
+        require(str(identity_account.get("id", "")).lower() == identity_subscription
+                and str(identity_account.get("tenantId", "")).lower() == target["tenant_id"], "identity-subscription-tenant-mismatch")
+    cloud.token(ARM + "/")
+    require(cloud.operator_id, "operator-principal-required")
+    blockers, actions, groups = [], [], {}
+    for scope in sorted(set(request["scopes"] + request["common_dependencies"]
+                            + [request["identity_id"].split("/providers/")[0]])):
+        groups[scope] = _absent(cloud.arm("GET", scope, RG_API, allowed=(200, 404)))
+        if groups[scope] is None:
+            (actions if scope in request["create_resource_group_ids"] else blockers).append(
+                ("create-resource-group:" if scope in request["create_resource_group_ids"] else "resource-group-missing:") + scope)
+        elif scope in request["scopes"]:
+            tags = groups[scope]["body"].get("tags", {})
+            if tags.get("aifactory.factory_id") != target["factory_id"] or tags.get("aifactory.scaleset_id") != target["scaleset_id"]:
+                blockers.append("existing-resource-group-ownership-not-proven:" + scope)
+    identity_arm = _absent(cloud.arm("GET", request["identity_id"], IDENTITY_API, allowed=(200, 404)))
+    identity = _identity(identity_arm["body"], request) if identity_arm else None
+    if identity:
+        require(_identity(cloud.az("identity", "show", "--ids", request["identity_id"],
+                                   "--subscription", identity_subscription), request) == identity,
+                "managed-identity-changed-during-read")
+    elif request["reuse_identity"]:
+        blockers.append("requested-existing-identity-not-found")
+    else:
+        actions.append("create-user-assigned-managed-identity")
+    provider = _provider(cloud, request, identity)
+    if provider["kind"] == "gha":
+        if not provider["environment"]:
+            blockers.append("github-environment-must-be-preprovisioned-no-atomic-create")
+        actions.extend("create-github-variable:" + name for name in (
+            "AZURE_CLIENT_ID", "AZURE_TENANT_ID", "AZURE_SUBSCRIPTION_ID") if not provider["variables"].get(name))
+    elif not provider["endpoint"]:
+        actions.append("create-ado-workload-identity-service-connection")
+    fic = _fic(cloud, request, provider, identity)
+    if not fic["exists"]:
+        actions.append("create-federated-identity-credential")
+    operations = [(scope, "Microsoft.Resources/subscriptions/resourceGroups/write", False)
+                  for scope, value in groups.items() if value is None]
+    if identity is None:
+        operations.append((request["identity_id"], "Microsoft.ManagedIdentity/userAssignedIdentities/write", False))
+    if not fic["exists"]:
+        operations.append((fic["id"], "Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials/write", False))
+    roles = _roles(cloud, request, identity, cloud.operator_id, operations)
+    blockers.extend(roles["blockers"])
+    actions.extend("grant-role:" + x["principal"] + ":" + x["scope"] + ":" + x["role_definition_id"].rsplit("/", 1)[1]
+                   for x in roles["grants"] if not x["exists"])
+    previous = repository_state["enrollment"] if repository_state else None
+    merged, candidate = None, None
+    try:
+        require(identity is not None or not bound, "existing-binding-without-verified-identity")
+        proposed = merge_enrollment(previous, request, identity)
+        proposed_binding = binding_candidate(request, identity or {"principal_id": None}, proposed)
+        if identity:
+            merged, candidate = proposed, proposed_binding
+        if previous != proposed:
+            actions.append("merge-coordination-enrollment-conditionally")
+    except EnrollmentError as exc:
+        blockers.append(exc.code)
+    return {"account": {"id": account["id"], "tenant_id": account["tenantId"], "name": account.get("name")},
+            "identity_account": identity_account, "operator_id": cloud.operator_id, "groups": groups,
+            "identity_arm": identity_arm, "identity": identity, "provider": provider, "fic": fic, "roles": roles,
+            "enrollment": {"body": previous, "etag": head} if previous else None,
+            "repository_head": head, "repository_state": repository_state, "merged": merged, "candidate": candidate,
+            "actions": sorted(actions), "blockers": sorted(set(blockers))}
+
+
 def _collect_snapshot(request, cloud):
+    if _single_writer(request):
+        return _collect_single_writer_snapshot(request, cloud)
     cloud.read_only = True
     target = request["target"]
     account = cloud.az("account", "show", "--subscription", target["subscription_id"])
@@ -1400,7 +1586,8 @@ def _review(request, state, acknowledge):
     result = {"schema": 1, "scope_hash": scope_hash, "state_hash": digest(state),
               "target": request["target"], "route": request["route"],
               "identity_id": request["identity_id"], "identity": state["identity"],
-              "coordination": {"account_id": request["account_id"], **request["coordinates"]},
+              "coordination": ({**request["coordinates"]} if _single_writer(request) else
+                               {"account_id": request["account_id"], **request["coordinates"]}),
               "resource_group_ids": request["scopes"], "common_dependency_ids": request["common_dependencies"],
               "actions": state["actions"], "blockers": sorted(set(blockers)),
               "acknowledge_exclusive_writer_governance": acknowledge,
@@ -1415,6 +1602,11 @@ def _review(request, state, acknowledge):
         ]
         if state["storage"] is None:
             result["coordination"]["account_creation"] = request["coordination_account_creation"]
+    if _single_writer(request):
+        helper = _single_writer_module()
+        result["coordination_mode"] = "single-writer"
+        result["warnings"] = [helper.WARNING, helper.HUB_WARNING,
+                              "Private repository administrators can bypass or destroy repository coordination."]
     result["plan_hash"] = digest(result)
     return result
 
@@ -1527,6 +1719,17 @@ def ensure(request, expected_plan, *, yes=False, acknowledge_exclusive_writer_go
     cloud.serialized_provisioning = acknowledge_exclusive_writer_governance
     try:
         target = request["target"]
+        single = _single_writer(request)
+        if single and state["actions"]:
+            store = _single_writer_module().ProviderState(cloud, request["route"], EnrollmentError)
+            pending = state["repository_state"] or store.empty()
+            require(pending["active"] is None, "single-writer-repository-active-claim")
+            claim = {"kind": "enrollment", "id": str(uuid4()), "plan_hash": expected_plan}
+            pending = copy.deepcopy(pending)
+            pending["active"] = claim
+            changed = True
+            store.replace(state["repository_head"], pending)
+            cloud.single_writer_enrollment_claim = claim
         for scope, existing in state["groups"].items():
             if existing is None:
                 require(scope in request["create_resource_group_ids"] and request["approved_group_creation_scope"],
@@ -1546,7 +1749,7 @@ def ensure(request, expected_plan, *, yes=False, acknowledge_exclusive_writer_go
             require(_identity(cloud.az("identity", "show", "--ids", request["identity_id"],
                                        "--subscription", target["subscription_id"]), request) == identity,
                     "managed-identity-changed-during-read")
-        if state["storage"] is None:
+        if not single and state["storage"] is None:
             changed = True
             body = (request["coordination_account_creation"] if _common_mode(request) else
                     {"location": target["region"], "kind": "StorageV2", "sku": {"name": "Standard_LRS"},
@@ -1586,7 +1789,7 @@ def ensure(request, expected_plan, *, yes=False, acknowledge_exclusive_writer_go
                                         "roleDefinitionId": grant["role_definition_id"]}})
             if grant["principal"] == "operator":
                 operator_grant_created = True
-        if state["container"] is None and not _common_mode(request):
+        if not single and state["container"] is None and not _common_mode(request):
             changed = True
             container_id = request["account_id"] + "/blobServices/default/containers/" + request["coordinates"]["container"]
             _propagating_storage_put(cloud, None, b"", None, (201,), operator_grant_created)
@@ -1609,7 +1812,7 @@ def ensure(request, expected_plan, *, yes=False, acknowledge_exclusive_writer_go
             require(provider["issuer"] and provider["subject"], "provider-federation-not-confirmed")
             changed = True
             _create_arm(cloud, fic["id"], IDENTITY_API, {"properties": _fic_properties(provider)})
-        for scope in request["scopes"] + request["common_dependencies"]:
+        for scope in ([] if single else request["scopes"] + request["common_dependencies"]):
             if not state["blobs"].get(scope):
                 changed = True
                 _propagating_storage_put(cloud, lock_blob(scope), b"",
@@ -1625,7 +1828,14 @@ def ensure(request, expected_plan, *, yes=False, acknowledge_exclusive_writer_go
             return {"status": "incomplete", "changed": changed, "enrollment_complete": False,
                     "blockers": ["exclusive-writer-governance-attestation-required"], "binding_candidate": None}
         enrollment = verified["merged"]
-        if not verified["enrollment"] or enrollment != verified["enrollment"]["body"]:
+        if single and state["actions"]:
+            require(verified["repository_state"]["active"] == cloud.single_writer_enrollment_claim
+                    and verified["repository_state"]["enrollment"] == (
+                        state["repository_state"]["enrollment"] if state["repository_state"] else None),
+                    "single-writer-enrollment-changed")
+            cloud.read_only = False
+            store.update(verified["repository_head"], verified["repository_state"], enrollment=enrollment, active=None)
+        elif not single and (not verified["enrollment"] or enrollment != verified["enrollment"]["body"]):
             require((state["enrollment"] or {}).get("etag") == (verified["enrollment"] or {}).get("etag")
                     and (state["enrollment"] or {}).get("body") == (verified["enrollment"] or {}).get("body"),
                     "coordination-changed-replan-required")
@@ -1644,6 +1854,7 @@ def ensure(request, expected_plan, *, yes=False, acknowledge_exclusive_writer_go
         _fresh_request(request)
         return {"status": "changed" if changed else "unchanged", "changed": changed, "enrollment_complete": True,
                 "binding_candidate": final["candidate"], "identity": final["identity"],
+                **({"coordination_mode": "single-writer", "warnings": review["warnings"]} if single else {}),
                 **({"lifecycle_protection": _lifecycle_protection(request)} if _common_mode(request) else {}),
                 "publication_required": True, "runtime_ready": False}
     except (EnrollmentError, OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
@@ -1655,6 +1866,8 @@ def ensure(request, expected_plan, *, yes=False, acknowledge_exclusive_writer_go
     finally:
         cloud.read_only = True
         cloud.serialized_provisioning = False
+        if hasattr(cloud, "single_writer_enrollment_claim"):
+            del cloud.single_writer_enrollment_claim
 
 
 def main(argv=None):

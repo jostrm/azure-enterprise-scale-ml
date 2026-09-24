@@ -119,3 +119,29 @@ def test_confirmed_runtime_failure_is_not_success(capsys):
     assert json.loads(capsys.readouterr().out)["job"]["status"] == "failed"
     with pytest.raises(APIError):
         confirmed_emit({"contract_version": 1, "job": None, "catalog": {}}, runtime=True)
+
+
+@pytest.mark.parametrize("changed", ["scope", "revision", "workflow", "effects", "review", "confirmation"])
+def test_workflow_receipt_rejects_changed_or_incomplete_binding(tmp_path, changed):
+    identifier = "33333333-3333-4333-8333-333333333333"
+    scope = {"folder": r"C:\consumer\azurefactory", "factory_id": "factory", "scale_set_id": "scale"}
+    request = {"scope": scope, "expected_revision": "a" * 64}
+    preview = {"contract_version": 1, "workflow_id": identifier,
+               "confirmation_id": "11111111-1111-4111-8111-111111111111", "scope": copy.deepcopy(scope),
+               "stage": "repository-initialization", "source_revision": "a" * 64, "input_hash": "b" * 64,
+               "effects": ["reviewed effect"], "review": {"mode": "single-writer"},
+               "can_execute": True, "blockers": [], "expires_at": future()}
+    if changed == "scope":
+        preview["scope"]["factory_id"] = "another"
+    elif changed == "revision":
+        preview["source_revision"] = "c" * 64
+    elif changed == "workflow":
+        request = {"folder": scope["folder"], "workflow_id": "44444444-4444-4444-8444-444444444444"}
+    elif changed in ("effects", "review"):
+        preview[changed] = [] if changed == "effects" else {}
+    else:
+        preview["confirmation_id"] = "invalid"
+    with pytest.raises(ConfigError):
+        write_receipt(str(tmp_path / "workflow.json"), client=AzureFactoryClient(),
+                      purpose="creation-workflow-start", operation="creation-workflow",
+                      request_body=request, preview=preview)

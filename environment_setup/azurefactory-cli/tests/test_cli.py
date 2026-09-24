@@ -16,6 +16,8 @@ from azurefactory.cli import compare_openapi, contract_issues, main
 
 DRAFT_ID = "22222222-2222-2222-2222-222222222222"
 CONFIRMATION_ID = "11111111-1111-1111-1111-111111111111"
+WORKFLOW_ID = "33333333-3333-4333-8333-333333333333"
+WORKFLOW_SCOPE = {"folder": "C:\\consumer\\azurefactory", "factory_id": "factory", "scale_set_id": "scale", "project_id": None}
 
 
 def future():
@@ -176,6 +178,15 @@ class Handler(BaseHTTPRequestHandler):
             response = {**type(self).saved_draft, "job_id": "job", "status": "submitted", "message": "Pipeline submitted."}
         elif parsed_path == "/api/v1/creation/bootstrap/start":
             response = {"id": "bootstrap-job", "status": "queued"}
+        elif parsed_path in ("/api/v1/creation/workflows/prepare", f"/api/v1/creation/workflows/{WORKFLOW_ID}/prepare-next"):
+            response = {"contract_version": 1, "workflow_id": WORKFLOW_ID, "confirmation_id": CONFIRMATION_ID,
+                        "stage": "repository-initialization", "scope": WORKFLOW_SCOPE,
+                        "can_execute": True, "expires_at": future(), "effects": ["Reviewed single-writer setup"],
+                        "blockers": [], "source_revision": "a" * 64, "input_hash": "b" * 64,
+                        "review": {"coordination_mode": "single-writer"}}
+        elif parsed_path in ("/api/v1/creation/workflows/start", f"/api/v1/creation/workflows/{WORKFLOW_ID}"):
+            response = {"contract_version": 1, "workflow_id": WORKFLOW_ID, "scope": WORKFLOW_SCOPE,
+                        "status": "queued" if self.command == "POST" else "awaiting-review"}
         elif parsed_path == "/api/v1/creation/bootstrap/jobs/bootstrap-job":
             response = {"id": "bootstrap-job", "status": "succeeded"}
         elif parsed_path in {"/api/v1/factory-catalog/confirm", "/api/v1/factory-catalog/parameters/confirm"}:
@@ -224,6 +235,40 @@ def test_cli_subprocess_help_and_json_health(server):
     )
     assert result.returncode == 0
     assert json.loads(result.stdout)["status"] == "ok"
+
+
+def test_registered_workflow_single_writer_requires_review_per_stage(server, tmp_path, capsys):
+    args = ["--api-url", server, "--api-key", "fixture-key", "bootstrap", "workflow"]
+    body = {"contract_version": 1, "creation_mode": "full-bootstrap",
+            "scope": WORKFLOW_SCOPE, "expected_revision": "a" * 64,
+            "bootstrap_config": {"coordination_mode": "single-writer", "access_hub_mode": "external"}}
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps(body), encoding="utf-8")
+    receipt = tmp_path / "review.json"
+    assert main([*args, "prepare", "--request-json", str(request), "--save-receipt", str(receipt)]) == 0
+    assert len(Handler.records) == 1 and Handler.records[0]["body"] == body
+    assert "fixture-key" not in receipt.read_text()
+    assert main([*args, "start", "--receipt", str(receipt)]) == 2
+    assert len(Handler.records) == 1
+    assert main([*args, "start", "--receipt", str(receipt), "--yes"]) == 0
+    assert Handler.records[-1]["body"] == {
+        "folder": WORKFLOW_SCOPE["folder"], "workflow_id": WORKFLOW_ID, "confirmation_id": CONFIRMATION_ID}
+    assert main([*args, "status", "--folder", WORKFLOW_SCOPE["folder"], "--workflow-id", WORKFLOW_ID]) == 0
+    next_receipt = tmp_path / "next.json"
+    assert main([*args, "next", "--folder", WORKFLOW_SCOPE["folder"], "--workflow-id", WORKFLOW_ID,
+                 "--save-receipt", str(next_receipt)]) == 0
+    assert Handler.records[-1]["body"] == {"folder": WORKFLOW_SCOPE["folder"]}
+    assert len([item for item in Handler.records if item["route"].endswith("/start")]) == 1
+    assert main([*args, "next", "--folder", WORKFLOW_SCOPE["folder"], "--workflow-id", WORKFLOW_ID,
+                 "--save-receipt", str(next_receipt)]) == 2
+    assert len(Handler.records) == 4
+
+
+@pytest.mark.parametrize("identifier", ["../start", "00000000-0000-0000-0000-000000000000", "wrong"])
+def test_workflow_status_rejects_malformed_identifier_before_network(server, identifier):
+    assert main(["--api-url", server, "--api-key", "k", "bootstrap", "workflow", "status",
+                 "--folder", WORKFLOW_SCOPE["folder"], "--workflow-id", identifier]) == 2
+    assert Handler.records == []
 
 
 def factory_create_args(server):

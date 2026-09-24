@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from .client import AzureFactoryClient, canonical_json_hash, redact_secrets
 from .errors import BlockedError, ConfigError, FailureError
@@ -140,6 +141,9 @@ def parse_expires_at(value: str | None) -> datetime:
 
 
 def request_folder(request: dict[str, Any], purpose: str) -> str | None:
+    if purpose == "creation-workflow-start":
+        scope = request.get("scope")
+        return scope.get("folder") if isinstance(scope, dict) else request.get("folder")
     if purpose == "bootstrap-start":
         config = request.get("config")
         return config.get("repo_root") if isinstance(config, dict) else None
@@ -173,6 +177,28 @@ def validate_bindings(request: dict[str, Any], preview: dict[str, Any], purpose:
                     raise ConfigError("Binding preview must preserve the exact candidate, factory and catalog revision.")
         elif operation != "parameters":
             raise ConfigError("Parameter receipt operation does not match.")
+    elif purpose == "creation-workflow-start":
+        if operation != "creation-workflow" or type(preview.get("contract_version")) is not int or preview["contract_version"] != 1:
+            raise ConfigError("Expected a registered creation workflow contract.")
+        try:
+            for field in ("workflow_id", "confirmation_id"):
+                identifier = UUID(preview[field])
+                if not identifier.int or str(identifier) != preview[field]:
+                    raise ValueError()
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise ConfigError("Workflow preview must contain exact canonical workflow and confirmation IDs.") from None
+        if (not isinstance(preview.get("scope"), dict) or not request_folder(request, purpose)
+                or preview["scope"].get("folder") != request_folder(request, purpose)
+                or not isinstance(preview.get("stage"), str) or not preview["stage"]
+                or not preview.get("source_revision") or not preview.get("input_hash")
+                or not isinstance(preview.get("effects"), list) or not preview["effects"]
+                or not isinstance(preview.get("review"), dict) or not preview["review"]):
+            raise ConfigError("Workflow preview is missing its exact stage, scope, source or effects.")
+        if "scope" in request:
+            if preview["scope"] != request["scope"] or preview["source_revision"] != request.get("expected_revision"):
+                raise ConfigError("Workflow preview changed the requested saved scope or revision.")
+        elif preview["workflow_id"] != request.get("workflow_id"):
+            raise ConfigError("Workflow preview changed the workflow ID.")
     elif purpose == "bootstrap-start":
         if operation != "bootstrap" or preview.get("flow") != "full-bootstrap":
             raise ConfigError("Expected an explicitly reviewed full-bootstrap flow.")
