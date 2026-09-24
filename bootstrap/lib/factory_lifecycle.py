@@ -1316,10 +1316,14 @@ class BlobLocks:
 
     def verify_enrollment(self):
         _, _, enrollment = self.request("GET", self.settings["coordination_blob"])
+        self.verify_enrollment_document(enrollment)
+
+    def verify_enrollment_document(self, enrollment, protocol="aifactory-physical-lock-v1",
+                                   enforcement="all-writers-exclusive"):
         require(digest(enrollment) == self.settings["coordination_hash"], "lock-enrollment-changed")
         require(isinstance(enrollment, dict) and enrollment.get("schema") == 1
-                and enrollment.get("protocol") == "aifactory-physical-lock-v1"
-                and enrollment.get("enforcement") == "all-writers-exclusive"
+                and enrollment.get("protocol") == protocol
+                and enrollment.get("enforcement") == enforcement
                 and enrollment.get("revision") == self.settings["revision"], "invalid-lock-enrollment")
         route = self.document["route"]
         writers = enrollment.get("writers", {})
@@ -1456,6 +1460,127 @@ class BlobLocks:
         require(not failures, "lock-release-reconciliation-required")
 
 
+class RepositoryCoordination:
+    """Repository-wide durable claim and receipts, not an Azure Blob lease."""
+
+    def __init__(self, cloud, document):
+        self.cloud, self.document, self.settings = cloud, document, document["locks"]
+        self.store = repository_state_module().ProviderState(cloud, document["route"], Blocked)
+        self.held, self.inherited = {}, set()
+        self.enrollment, self.execution_claim = None, None
+        self.closed = False
+
+    def state(self):
+        head, value = self.store.read()
+        require(head and value and value["enrollment"], "single-writer-enrollment-state-missing")
+        BlobLocks.verify_enrollment_document(self, value["enrollment"], "aifactory-single-writer-v1",
+                                            "repository-exclusive-writer")
+        require(set(self.enrollment["writers"]) == {self.document["route"]["writer_id"]},
+                "single-writer-repository-writer-conflict")
+        return head, value
+
+    def verify_enrollment(self):
+        self.state()
+
+    def _active(self, value):
+        active = value["active"]
+        require(self.held and isinstance(active, dict) and active.get("kind") == "run"
+                and active.get("run_id") == self.document["run_id"]
+                and active.get("manifest_hash") == self.document["manifest_hash"]
+                and active.get("context") == self.held, "single-writer-active-claim-changed")
+
+    def acquire(self):
+        validate_manifest(self.document)
+        head, value = self.state()
+        require(value["active"] is None, "single-writer-repository-active-claim")
+        require(not any(key.startswith("runs/" + self.document["run_id"] + ".") for key in value["records"]),
+                "single-writer-run-already-submitted")
+        identifier = str(uuid4())
+        context = {scope.lower(): identifier for scope in self.settings["scopes"] + self.settings["common_dependencies"]}
+        active = {"kind": "run", "run_id": self.document["run_id"],
+                  "manifest_hash": self.document["manifest_hash"], "context": context}
+        self.store.update(head, value, active=active)
+        self.held = context
+
+    def assert_held(self):
+        _, value = self.state()
+        self._active(value)
+
+    def claim_run(self):
+        validate_manifest(self.document)
+        head, value = self.state()
+        self._active(value)
+        proof = {"schema": 1, "claim_id": str(uuid4()), "run_id": self.document["run_id"],
+                 "manifest_hash": self.document["manifest_hash"], "source": self.document["source"],
+                 "accepted_at": utc_now(), "lease_context_hash": digest(self.held)}
+        name = "runs/" + self.document["run_id"]
+        require(name + ".json" not in value["records"] and name + ".claim.json" not in value["records"],
+                "single-writer-run-already-submitted")
+        value["records"][name + ".json"] = {"schema": 1, "run_id": self.document["run_id"], "state": "claimed",
+                                            "manifest_hash": self.document["manifest_hash"], "execution_claim": proof}
+        value["records"][name + ".claim.json"] = proof
+        self.store.replace(head, value)
+        self.execution_claim = _ExecutionClaim(self.document, proof)
+        self.authorize(self.document)
+
+    def request(self, method, name, data=None, headers=None, allowed=(200,), query=""):
+        require(not query and re.fullmatch(r"runs/[a-fA-F0-9-]{36}\.(?:claim\.|worker\.)?json", name),
+                "single-writer-record-path-invalid")
+        head, value = self.state()
+        records = value["records"]
+        if method == "GET":
+            if name not in records:
+                require(404 in allowed, "single-writer-run-state-missing")
+                return 404, {}, None
+            return 200, {}, records[name]
+        require(method == "PUT" and name.startswith("runs/" + self.document["run_id"] + ".")
+                and not name.endswith(".claim.json"), "single-writer-record-write-forbidden")
+        self._active(value)
+        conditions = headers or {}
+        require((conditions.get("If-None-Match") == "*" and name not in records)
+                or (conditions.get("If-Match") == "*" and name in records),
+                "single-writer-record-precondition-failed")
+        if name in records:
+            require(records[name].get("status") not in ("succeeded", "reconciliation-required", "blocked"),
+                    "single-writer-terminal-record-immutable")
+        require(isinstance(data, dict) and data.get("run_id") == self.document["run_id"]
+                and data.get("manifest_hash") == self.document["manifest_hash"],
+                "single-writer-record-binding-mismatch")
+        value["records"][name] = json.loads(canonical(data))
+        self.store.replace(head, value)
+        return 201, {}, None
+
+    def read_claim(self):
+        return self.request("GET", "runs/" + self.document["run_id"] + ".claim.json")[2]
+
+    def authorize(self, document):
+        return BlobLocks.authorize(self, document)
+
+    def store_receipt(self, receipt):
+        if self.execution_claim is not None:
+            receipt["execution_claim"] = json.loads(self.execution_claim.proof)
+        if self.closed:
+            # The successful receipt is already durable; do not rewrite it after
+            # releasing the claim or overwrite another run's active state.
+            require(receipt["status"] == "succeeded", "single-writer-terminal-record-immutable")
+            return
+        self.request("PUT", "runs/" + self.document["run_id"] + ".json", data=receipt,
+                     headers={"If-Match": "*"}, allowed=(201,))
+
+    def release(self):
+        if not self.held:
+            return
+        head, value = self.state()
+        self._active(value)
+        receipt = value["records"].get("runs/" + self.document["run_id"] + ".json", {})
+        worker = value["records"].get("runs/" + self.document["run_id"] + ".worker.json", {})
+        require(receipt.get("status") == "succeeded" and worker.get("status") == "succeeded",
+                "single-writer-claim-retained-reconciliation-required")
+        self.store.update(head, value, active=None)
+        self.held.clear()
+        self.closed = True
+
+
 def verify_source(cloud, root, source):
     return _verify_source(cloud, root, source, published=True)
 
@@ -1484,6 +1609,10 @@ def _verify_source(cloud, root, source, *, published):
     published_helper = cloud.command(["git", "show", source["commit"] + ":bootstrap/lib/factory_lifecycle.py"], cwd=str(root))
     require(published_helper == Path(__file__).read_text(encoding="utf-8").strip(),
             "published-lifecycle-adapter-mismatch")
+    if single_writer(getattr(cloud, "document", {})):
+        published_state = cloud.command(["git", "show", source["commit"] + ":bootstrap/lib/provider_repository_state.py"], cwd=str(root))
+        require(published_state == Path(__file__).with_name("provider_repository_state.py").read_text(encoding="utf-8").strip(),
+                "published-single-writer-adapter-mismatch")
     return root
 
 
@@ -1951,7 +2080,7 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         require(sys.platform.startswith("linux"), "linux-scoped-worker-required")
     cloud = cloud or Cloud(document, expected_object_id=document["identity"]["deployment_object_id"])
     cloud.verify_identity(require_default=True)
-    locks = BlobLocks(cloud, document)
+    locks = coordination(cloud, document)
     locks.held = dict(context)
     locks.verify_enrollment()
     locks.assert_held()
@@ -2139,7 +2268,7 @@ def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=t
     item = github("GET", "/contents/" + SCOPED_GHA + "?ref=" + route["commit"])
     require(item.get("encoding") == "base64" and isinstance(item.get("content"), str), "scoped-github-template-missing")
     content = base64.b64decode(item["content"]).decode("utf-8")
-    expected = cloud.command(["git", "show", document["source"]["commit"] + ":" + SCOPED_SOURCE + "gha.yml"],
+    expected = cloud.command(["git", "show", document["source"]["commit"] + ":" + scoped_template(document)],
                              cwd=str(source_root))
     require(content.strip() == expected and SCOPED_CONTRACT in content, "scoped-github-template-mismatch")
     tree = github("GET", "/git/trees/" + route["commit"])
@@ -2230,7 +2359,7 @@ def ado_scoped(cloud, locks, document, source_root, receipt, persist, sleep=time
                    + quote("/" + SCOPED_ADO, safe="") + "&versionDescriptor.version=" + route["commit"]
                    + "&versionDescriptor.versionType=commit&includeContent=true&api-version=7.1")
     content = item.get("content", "")
-    expected = cloud.command(["git", "show", document["source"]["commit"] + ":" + SCOPED_SOURCE + "ado.yml"],
+    expected = cloud.command(["git", "show", document["source"]["commit"] + ":" + scoped_template(document)],
                              cwd=str(source_root))
     require(content.strip() == expected and SCOPED_CONTRACT in content, "scoped-ado-template-mismatch")
     _, headers, definitions = cloud.request("GET", api + "/build/definitions?includeAllProperties=true&%24top=1000&api-version=7.1",
@@ -2391,6 +2520,7 @@ def _cohort_order(documents):
 
 
 def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_factory=Cloud, lock_factory=BlobLocks):
+    require(not any(single_writer(document) for document in documents), "single-writer-cohort-not-supported")
     """Accept all factory children under the full physical union before deleting."""
     require(isinstance(documents, list) and documents, "nonempty-delete-cohort-required")
     documents = json.loads(canonical(documents))
@@ -2522,7 +2652,7 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
     return aggregate
 
 
-def execute(document, source_root, execution_root, receipt_path, cloud=None, lock_factory=BlobLocks):
+def execute(document, source_root, execution_root, receipt_path, cloud=None, lock_factory=None):
     document = json.loads(canonical(document))
     validate_manifest(document)
     reasons = operation_blockers(document)
@@ -2542,7 +2672,7 @@ def execute(document, source_root, execution_root, receipt_path, cloud=None, loc
                "target": document["target"], "source_commit": document["source"]["commit"],
                "status": "validating", "started_at": utc_now(), "mutation_started": False,
                "deleted_resources": [], "locks_retained": []}
-    locks = lock_factory(cloud, document)
+    locks = (lock_factory or coordination)(cloud, document)
     claimed = False
 
     def persist():
