@@ -90,6 +90,128 @@ def test_lost_provider_reservation_blocks_before_writes(workspace):
     assert not runtime.writes
 
 
+@pytest.mark.parametrize("failure", ["provider-initializer-lock-not-held", "remote-request-failed-401"])
+def test_minimum_preflight_rejection_retains_evidence_without_cloud_writes(workspace, failure):
+    runtime = ProviderRuntime()
+    runtime.resources.clear()
+    plan = core.prepare(**provider_arguments(workspace, True), runtime=runtime)
+    runtime.fail_read = failure
+    with pytest.raises(core.PrerequisiteError, match=failure):
+        execute(plan, workspace, runtime)
+    receipt = core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"])
+    assert receipt["status"] == "rejected"
+    assert receipt["phase"] == "preflight" and receipt["cloud_writes_started"] is False
+    assert receipt["error"] == failure and receipt["plan_hash"] == plan["plan_hash"]
+    assert receipt["changed"] is False and receipt["effects_completed"] == [] and receipt["leases"] == {}
+    assert receipt["reconciliation_required"] and receipt["requires_fresh_review"]
+    assert runtime.read_only and not runtime.serialized_provisioning and not runtime.writes
+    original = (workspace[2] / (plan["plan_id"] + ".json")).read_bytes()
+    runtime.fail_read = None
+    with pytest.raises(FileExistsError):
+        execute(plan, workspace, runtime)
+    assert (workspace[2] / (plan["plan_id"] + ".json")).read_bytes() == original
+    assert not runtime.writes
+
+
+def test_minimum_preflight_preserves_safe_error_not_transport_secret(workspace, monkeypatch):
+    runtime = ProviderRuntime()
+    plan = core.prepare(**provider_arguments(workspace, True), runtime=runtime)
+    def failed_read(*args, **kwargs):
+        raise OSError("Authorization: Bearer secret-must-not-leak")
+    monkeypatch.setattr(runtime, "arm", failed_read)
+    with pytest.raises(OSError):
+        execute(plan, workspace, runtime)
+    receipt = core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"])
+    assert receipt["error"] == "prerequisite-preflight-io-failed"
+    assert "secret-must-not-leak" not in json.dumps(receipt)
+    assert not runtime.writes and runtime.read_only
+
+
+def test_minimum_execution_failure_never_claims_preflight_rejection(workspace):
+    runtime = ProviderRuntime()
+    runtime.resources.clear()
+    plan = core.prepare(**provider_arguments(workspace, True), runtime=runtime)
+    runtime.fail_write = lambda _: True
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "uncertain"
+    assert result["phase"] == "execution" and result["cloud_writes_started"] is True
+    assert result["pending_effect"] == 0 and result["reconciliation_required"]
+    assert core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"]) == result
+
+
+def test_minimum_execution_intent_is_durable_before_transport_can_write(workspace, monkeypatch):
+    runtime = ProviderRuntime()
+    runtime.resources.clear()
+    plan = core.prepare(**provider_arguments(workspace, True), runtime=runtime)
+    original = runtime.arm
+    def observed(method, *args, **kwargs):
+        if method != "GET":
+            receipt = core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"])
+            assert receipt["phase"] == "execution" and receipt["cloud_writes_started"] is True
+        return original(method, *args, **kwargs)
+    monkeypatch.setattr(runtime, "arm", observed)
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded"
+    assert runtime.read_only and not runtime.serialized_provisioning
+
+
+def test_minimum_preflight_expiring_during_discovery_never_enables_writes(workspace, monkeypatch):
+    clock = [core.time.time()]
+    monkeypatch.setattr(core.time, "time", lambda: clock[0])
+    runtime = ProviderRuntime()
+    plan = core.prepare(**provider_arguments(workspace, True), runtime=runtime)
+    prepare = core.prepare
+    def slow_prepare(**kwargs):
+        result = prepare(**kwargs)
+        clock[0] += 901
+        return result
+    monkeypatch.setattr(core, "prepare", slow_prepare)
+    with pytest.raises(core.PrerequisiteError, match="prerequisite-review-expired"):
+        execute(plan, workspace, runtime)
+    receipt = core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"])
+    assert receipt["status"] == "rejected" and not receipt["cloud_writes_started"]
+    assert not runtime.writes and runtime.read_only
+
+
+def test_minimum_write_intent_persistence_failure_never_enables_writes(workspace, monkeypatch):
+    runtime = ProviderRuntime()
+    plan = core.prepare(**provider_arguments(workspace, True), runtime=runtime)
+    def fail_persist(*args):
+        raise OSError("disk unavailable")
+    monkeypatch.setattr(core, "_persist", fail_persist)
+    with pytest.raises(OSError, match="disk unavailable"):
+        execute(plan, workspace, runtime)
+    receipt = core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"])
+    assert receipt["status"] == "preflight" and not receipt["cloud_writes_started"]
+    assert not runtime.writes and runtime.read_only and not runtime.serialized_provisioning
+
+
+def test_minimum_rejection_persistence_failure_preserves_original_error(workspace, monkeypatch):
+    runtime = ProviderRuntime()
+    plan = core.prepare(**provider_arguments(workspace, True), runtime=runtime)
+    runtime.fail_read = "remote-request-failed-401"
+    def fail_persist(*args):
+        raise PermissionError("receipt replacement denied")
+    monkeypatch.setattr(core, "_persist", fail_persist)
+    with pytest.raises(core.PrerequisiteError, match="remote-request-failed-401") as captured:
+        execute(plan, workspace, runtime)
+    assert isinstance(captured.value.__cause__, PermissionError)
+    receipt = core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"])
+    assert receipt["status"] == "preflight" and not receipt["cloud_writes_started"]
+    assert not runtime.writes and runtime.read_only
+    with pytest.raises(FileExistsError):
+        execute(plan, workspace, runtime)
+
+
+def test_minimum_invalid_consent_cannot_create_receipt(workspace):
+    runtime = ProviderRuntime()
+    plan = core.prepare(**provider_arguments(workspace, True), runtime=runtime)
+    plan["effects"].clear()
+    with pytest.raises(core.PrerequisiteError, match="prerequisite-plan-hash-mismatch"):
+        execute(plan, workspace, runtime)
+    assert not list(workspace[2].iterdir()) and not runtime.writes
+
+
 def test_repo_prepare_pins_published_source_and_preserves_saved_draft(workspace):
     consumer = workspace[0]
     document = json.loads((consumer / "azurefactory" / "register.json").read_bytes())

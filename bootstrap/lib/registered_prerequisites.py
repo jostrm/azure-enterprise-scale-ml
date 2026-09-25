@@ -1322,39 +1322,26 @@ def read_result(*, state_dir, plan_id):
     require(path.is_file() and path.stat().st_size <= enrollment.MAX_BYTES, "durable-prerequisite-result-required")
     result = enrollment.parse_json(path.read_bytes())
     require(result.get("contract_version") == 1 and result.get("plan_id") == plan_id
-            and result.get("status") in ("claimed", "running", "uncertain", "succeeded"),
+            and result.get("status") in ("preflight", "rejected", "claimed", "running", "uncertain", "succeeded"),
             "invalid-prerequisite-result")
     return result
 
 
 def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
             acknowledge_exclusive_writer_governance=False, sleep=time.sleep):
-    """Consume one reviewed plan. Returns succeeded or uncertain; never retries writes."""
+    """Consume one reviewed plan; persist preflight rejection or execution evidence."""
     require(acknowledge_exclusive_writer_governance is True, "exclusive-writer-governance-required")
     require(isinstance(plan, dict) and plan.get("contract_version") == 1
             and plan.get("plan_hash") == expected_plan_hash
             and digest({k: v for k, v in plan.items() if k != "plan_hash"}) == expected_plan_hash,
             "prerequisite-plan-hash-mismatch")
     require(plan.get("can_execute") is True and not plan.get("blockers"), "prerequisite-plan-blocked")
-    require(plan["prepared_at"] <= time.time() < plan["expires_at"], "prerequisite-review-expired")
-    require(source_fingerprint(plan["source"]["root"]) == plan["source"], "privileged-source-changed")
-    _verify_loaded_source(plan["source"])
-    target, consumer_hash = _read_target(ordinary(plan["consumer_root"]), plan["scope"])
-    require(target == plan["target"] and consumer_hash == plan["consumer_hash"], "consumer-register-changed")
-    runtime = runtime or Cloud(target, plan["context"].get("coordination", {}))
-    # Rebuild commands from validated configuration, not from caller-supplied argv.
-    fresh = prepare(source_root=plan["source"]["root"], consumer_root=plan["consumer_root"],
-                    scope=plan["scope"], bootstrap_config=plan["bootstrap_config"],
-                    expected_revision=plan["expected_revision"], context=plan["context"], runtime=runtime)
-    for key in ("effects", "observations", "bindings", "lock_scopes", "blockers", "commands",
-                "auth_scopes", "source_hashes", "input_hash", "stages", "preconditions", "capabilities",
-                "warnings", "governance"):
-        require(fresh[key] == plan[key], "prerequisite-live-state-or-plan-changed:" + key)
     folder = ordinary(state_dir)
     require(folder.is_dir(), "durable-existing-state-directory-required")
-    receipt_path = ordinary(folder / (plan["plan_id"] + ".json"))
+    receipt_path = ordinary(folder / (_guid(plan["plan_id"]) + ".json"))
     receipt = {"contract_version": 1, "plan_id": plan["plan_id"], "plan_hash": expected_plan_hash,
-               "status": "claimed", "effects_completed": [], "bindings": copy.deepcopy(plan["bindings"]),
+               "status": "preflight", "phase": "preflight", "cloud_writes_started": False,
+               "effects_completed": [], "bindings": copy.deepcopy(plan["bindings"]),
                "source": copy.deepcopy(plan["source"]), "scope": copy.deepcopy(plan["scope"]),
                "expected_revision": plan["expected_revision"], "consumer_hash": plan["consumer_hash"],
                "coordination": copy.deepcopy(plan["context"].get("coordination", {})), "lock_scopes": plan["lock_scopes"],
@@ -1365,6 +1352,37 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
         stream.write(canonical(receipt))
         stream.flush()
         os.fsync(stream.fileno())
+    try:
+        require(plan["prepared_at"] <= time.time() < plan["expires_at"], "prerequisite-review-expired")
+        require(source_fingerprint(plan["source"]["root"]) == plan["source"], "privileged-source-changed")
+        _verify_loaded_source(plan["source"])
+        target, consumer_hash = _read_target(ordinary(plan["consumer_root"]), plan["scope"])
+        require(target == plan["target"] and consumer_hash == plan["consumer_hash"], "consumer-register-changed")
+        runtime = runtime or Cloud(target, plan["context"].get("coordination", {}))
+        require(runtime.read_only is True and runtime.serialized_provisioning is False,
+                "read-only-preflight-runtime-required")
+        # Rebuild commands from validated configuration, not caller-supplied argv.
+        fresh = prepare(source_root=plan["source"]["root"], consumer_root=plan["consumer_root"],
+                        scope=plan["scope"], bootstrap_config=plan["bootstrap_config"],
+                        expected_revision=plan["expected_revision"], context=plan["context"], runtime=runtime)
+        for key in ("effects", "observations", "bindings", "lock_scopes", "blockers", "commands",
+                    "auth_scopes", "source_hashes", "input_hash", "stages", "preconditions", "capabilities",
+                    "warnings", "governance"):
+            require(fresh[key] == plan[key], "prerequisite-live-state-or-plan-changed:" + key)
+        require(time.time() < plan["expires_at"], "prerequisite-review-expired")
+    except (PrerequisiteError, enrollment.EnrollmentError, OSError) as exc:
+        code = getattr(exc, "code", "prerequisite-preflight-io-failed")
+        if not isinstance(code, str) or not re.fullmatch(r"[A-Za-z0-9:/._-]{1,256}", code):
+            code = "prerequisite-preflight-rejected"
+        receipt.update(status="rejected", error=code, requires_fresh_review=True)
+        try:
+            _persist(receipt_path, receipt)
+        except (OSError, PrerequisiteError) as persistence_error:
+            raise exc from persistence_error
+        raise
+    # Persist write intent before enabling any mutating transport, including Blob.
+    receipt.update(status="claimed", phase="execution", cloud_writes_started=True)
+    _persist(receipt_path, receipt)
     runtime.read_only = False
     runtime.serialized_provisioning = True
     remote = "bootstrap/runs/" + plan["plan_id"] + ".json"

@@ -908,7 +908,10 @@ def test_gateway_route_manual_warning_is_rebuilt_not_caller_controlled(workspace
     plan["plan_hash"] = core.digest({key: value for key, value in plan.items() if key != "plan_hash"})
     with pytest.raises(core.PrerequisiteError, match="live-state-or-plan-changed:" + field):
         execute(plan, workspace, runtime)
-    assert not runtime.writes and not list(workspace[2].iterdir())
+    assert not runtime.writes
+    rejected = core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"])
+    assert rejected["status"] == "rejected" and not rejected["cloud_writes_started"]
+    assert rejected["error"] == "prerequisite-live-state-or-plan-changed:" + field
 
 
 @pytest.mark.parametrize("path,value", [
@@ -1270,7 +1273,8 @@ def test_gateway_route_blocker_cannot_be_overridden_in_reviewed_plan(workspace):
     with pytest.raises(core.PrerequisiteError, match="live-state-or-plan-changed:blockers"):
         execute(plan, workspace, runtime)
     assert not runtime.writes and not runtime.blobs
-    assert not list(workspace[2].iterdir())
+    rejected = core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"])
+    assert rejected["status"] == "rejected" and not rejected["cloud_writes_started"]
 
 
 def test_existing_gateway_retained_on_other_effect_write_failure_and_uncertain_receipt(workspace):
