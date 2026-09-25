@@ -7,8 +7,207 @@ implementing their own GitHub polling.
 
 Monitoring is read-only. Starting or stopping a subscription does **not** dispatch,
 retry, cancel, approve, or redeploy a workflow. Workflow monitoring also does not
-replace the separate factory setup, deployment approval, or distributed-lock
+replace the separate factory setup, deployment approval, or deployment-coordination
 requirements.
+
+## Creating a factory is a separate workflow
+
+This chapter starts with an existing GitHub workflow run. It is **not by itself
+an end-to-end Full bootstrap tutorial**: installing the CLI and subscribing to
+events does not create a repository, identity, hub, VPN Gateway, common
+infrastructure, initial project, or laptop VPN connection.
+
+For a new factory, inspect the running API's `/openapi.json` and
+`azurefactory bootstrap capabilities` before selecting a creation route.
+In the current source API, `main` and v1.25+ use this sequence:
+
+| Phase | Factory API | Result |
+|---|---|---|
+| Prepare local configuration | `POST /api/v1/creation/prepare` with `contract_version:1`, `mode:"full-bootstrap"`, consumer `folder`, `orchestrator:"gha"`, `factory_key`, and `config` | Reviewable local configuration; no Azure deployment |
+| Confirm local configuration | `POST /api/v1/creation/confirm` with `contract_version:1`, the returned canonical `folder`, and `confirmation_id` | Saved register, scale set and initial project |
+| Prepare privileged bootstrap | `POST /api/v1/creation/workflows/prepare` with `contract_version:1`, `creation_mode:"full-bootstrap"`, exact saved `scope`, `expected_revision`, and original `bootstrap_config` | First stage's effects, commands, blockers and expiring confirmation |
+| Execute a reviewed stage | `POST /api/v1/creation/workflows/start` with `folder`, `workflow_id` and `confirmation_id` | Stage job; not proof of completed infrastructure |
+| Observe and review the next stage | `GET /api/v1/creation/workflows/{workflow_id}?folder=...`, then `POST /api/v1/creation/workflows/{workflow_id}/prepare-next` with `folder` and any required `connection_request` | Further separately reviewed stages; stop on blockers or uncertainty |
+| Monitor a dispatched GitHub run | The exact-run status/SSE endpoints below | Observed pipeline status and conclusion |
+
+Use the IDs and revision returned by the saved catalog, not display names or
+fabricated UUIDs. Preserve the original creation form for later stage review.
+The consumer `folder` may be an existing Git repository; confirmation uses the
+canonical `azurefactory` child returned by prepare. The `config.repo_root`
+identifies the consumer repository, not that child.
+
+**Version boundary:** the current source backend rejects
+`POST /api/v1/creation/bootstrap/prepare` for `main`/v1.25+ with HTTP 409.
+That launcher route is restricted to explicit v1.24. Consequently, an example
+using `azurefactory bootstrap prepare` or `12-full-bootstrap-gha.json` with
+`main` is not a runnable modern deployment recipe. Do not downgrade to v1.24,
+invoke a launcher directly, or switch to legacy deployment routes to bypass
+this response. Use the modern creation/workflow endpoints through the Factory
+API or `azurefactory request`; this is still a CLI/API-only workflow.
+
+For **an independent factory with its own hub**, use
+`access_hub_mode:"integrated"` and `setup_hub_access:true`, and leave external-hub
+references empty. `setup_hub_access:false` means **no owned hub**, not "create a
+standalone owned hub." Review non-overlapping factory, hub and VPN-client address
+ranges. Bootstrap can require additional explicit coordination/network settings;
+honor the actual stage preview rather than assuming that a saved configuration
+proves the entire topology is executable.
+
+VPN Gateway provisioning and Azure VPN Client profile import/connection are
+different operations. `setup_hub_access` does not install/import a laptop VPN
+profile or prove connectivity. Do not promise CLI/API-only laptop VPN setup
+without a supported client-configuration operation in the running API.
+
+Retain each verified GitHub run ID from deployment evidence. A local
+configuration confirmation ID, bootstrap workflow UUID or job UUID is **not**
+the numeric GitHub run ID. Full bootstrap can involve multiple remote runs:
+subscribe to each relevant exact run, and verify Azure resources and VPN
+connectivity separately. The callback below is a local SDK callback over SSE,
+not an inbound GitHub webhook.
+
+### Modern CLI transport and approval boundaries
+
+The generic Factory CLI can call the modern endpoints without opening a GUI:
+
+```bash
+azurefactory request POST /api/v1/creation/prepare \
+  --body-json creation.json --write --yes > creation-preview.json
+```
+
+Here `--write --yes` authorizes this HTTP POST, **not** a later deployment.
+`creation.json` contains the request from the first row above. Its `config`
+uses the fields of the running API's `BootstrapConfig`, including the explicit
+subscription, tenant, region, prefix, scale/project numbers, repository,
+team identity, real cost center and network ranges. Keep the API key out of this
+file. Review `operation_mode:"configuration"`, `can_execute`, `blockers`, the
+complete `target`, `mapped_settings`, `deferred_fields` and warnings before saving.
+
+After approving that exact local preview, create `creation-confirm.json` with
+`contract_version:1`, its returned `folder` and `confirmation_id`, then run:
+
+```bash
+azurefactory request POST /api/v1/creation/confirm \
+  --body-json creation-confirm.json --write --yes > creation-saved.json
+```
+
+Build `workflow-prepare.json` from the returned catalog: select the exact factory,
+scale set and initial project UUIDs, use `catalog.revision` for
+`expected_revision`, and preserve the original `config` as `bootstrap_config`.
+These IDs are generated by the API; do not copy example IDs from another run.
+
+```bash
+azurefactory --timeout 180 request POST /api/v1/creation/workflows/prepare \
+  --body-json workflow-prepare.json --write --yes > workflow-preview.json
+```
+
+Review this **separate** privileged preview. It may create billable resources,
+identities, repository content, environments and pipeline configuration.
+Only an approved executable preview with no blockers can be started:
+
+```bash
+azurefactory request POST /api/v1/creation/workflows/start \
+  --body-json workflow-start.json --write --yes
+azurefactory request GET "/api/v1/creation/workflows/<workflow-id>" \
+  --query "folder=<returned-canonical-folder>"
+```
+
+`workflow-start.json` contains that preview's `workflow_id`, `confirmation_id`
+and canonical `folder`. The request acknowledges **one stage**, not all remaining
+stages. At an `awaiting-review` boundary, prepare the next stage with a separate
+`prepare-next` request and review its actual effects. A successful start response
+or CLI exit code can describe a queued job; inspect the workflow status.
+Never automate `start` immediately after every `prepare-next` without reviewing
+scope, effects, warnings, blockers and expiry.
+
+### Source compatibility and stopped bootstrap runs
+
+Use mutually compatible, published backend and accelerator revisions. A developer
+checkout can contain an unpublished bundled helper even when its branch is
+named `main`. The runtime checks actual helper bytes, not just branch names.
+For example,
+`published-prefix-bootstrap-helper-mismatch:lib/common_network_preservation.py`
+means the API's reviewed helper differs from the requested published accelerator.
+Use a compatible clean backend checkout/build, or publish the reviewed matching
+source through the normal release process. Do not change expected hashes, copy
+unpublished helper files into the consumer, reset somebody else's working tree,
+or disable verification to make preparation pass.
+
+If a stage reports `status:"uncertain"`, `is_terminal:true`, and
+`requires_review:false`, stop. Preserve the workflow ID, scope/revision, start
+response, native stage receipts, provider initializer reservation and observed
+cloud state. Do not clear the register/database, delete the reservation, retry
+the start, create a competing workflow, or provision missing resources directly.
+Use only a supported reconciliation operation applicable to that exact failure.
+Read-only monitoring and inventory do not authorize recovery.
+
+**Live trial, 2026-09-25:** a Full bootstrap using published backend
+`0eaf80984cc882ed8c19e5991f341109dad82bec` and accelerator `main` at
+`5175a628eb62316c2db1d0801f3d0a727fd200b0` saved a modern configuration and
+completed repository initialization. The following `minimum-foundation` stage
+became terminal `uncertain`. The status response exposed no underlying exception,
+and no native receipt for that foundation plan was present. No GitHub workflow
+run had been dispatched. This trial therefore **did not establish successful
+end-to-end provisioning, VPN connectivity, or delivery of a completion callback**.
+The API needs actionable failure evidence and a supported reconciliation path
+for this case before this chapter can claim unattended recovery. Absence of a
+receipt is not, by itself, proof that every remote side effect is absent.
+The legacy `/api/v1/operations/overview` route rejects a modern catalog root
+with HTTP 409; it is not a substitute for exact catalog-scoped diagnostics.
+Do not interpret that rejected inventory request as an empty Azure inventory.
+
+**Native preflight evidence:** updated prerequisite helpers retain an exclusive,
+single-use local receipt before volatile source, input and cloud revalidation.
+Known preflight failures retain `status:"rejected"`, `phase:"preflight"`,
+`cloud_writes_started:false` and a bounded diagnostic code, while still raising
+the original failure. Reusing the same plan is refused even if that transient
+failure later disappears. A new review is required; do not delete the receipt.
+Before enabling a mutating transport, the helper durably records
+`phase:"execution"` and `cloud_writes_started:true`. That flag is conservative
+write intent, not proof that a resource was created. An incomplete `preflight`
+receipt or a missing historical receipt is not a successful stage, and does not
+by itself authorize retry. Use an applicable API reconciliation operation that
+checks the original source, plan, ownership and live state. Native helper changes
+must also be included in the backend's verified bundle before the API uses them.
+
+Provider registration GETs include Azure's mutable discovery catalogue. Native
+execution freshness excludes only `resourceTypes` and `authorizations` from
+those subscription-provider observations: neither field is used by the
+prerequisite planner to select writes, and the latter is not the caller's
+effective permissions. Raw observations and their hashes remain retained.
+Registration state, provider identity/policy, unknown fields, all actual resource
+observations and the exact effects/APIs remain checked. This avoids treating an
+unrelated advertised API version as a change to the reviewed resource deployment.
+
+The repaired API has a deliberately narrow legacy recovery contract:
+`POST /api/v1/creation/workflows/{workflow_id}/prepare-foundation-recovery`,
+then `.../confirm-foundation-recovery`. It applies only to an audited
+`minimum-foundation` attempt with consumed consent and no native receipt, after
+verifying the original code's write boundary, unchanged scope/revision, retained
+initializer reservation, effective read permissions and exact live evidence.
+It is not a general "reset failed workflow" operation, and does not accept new
+`rejected` receipts. Inspect the running OpenAPI schema for the required original
+plan hash and retained source folder. A blocked reconstruction is a stop condition,
+not permission to relax its checks.
+
+Confirmation preserves the original failed attempt and only restores a review
+boundary. Call `prepare-next` for a **new** foundation preview, inspect it, and
+use its new confirmation ID for `start`. Recovery confirmation itself neither
+provisions resources nor proves the old attempt succeeded. It also does not
+repin the consumer submodule or rewrite the initializer's published-source proof.
+
+**Repair trial, 2026-09-25:** the audited reconciliation completed without cloud
+writes, then a separately reviewed fresh `minimum-foundation` execution succeeded:
+both resource groups, the VNet and deployment managed identity were verified in
+the native receipt. The next `prerequisites` preview stopped with
+`graph-request-failed-403`; no start was submitted for that blocked stage.
+Successful Azure Resource Manager access does not establish Microsoft Graph
+directory permissions. An authorized tenant administrator must resolve the
+denial for the bootstrap operator/application in the configured tenant before
+a fresh prerequisite review. The planner requires user/group access and, where
+selected workloads need first-party service principals, application access.
+Do not switch identities, substitute a group or bypass Graph discovery to turn
+this blocked preview into success. Hub/VPN provisioning, laptop VPN import and
+GitHub completion callbacks were still **not reached** in this repaired trial.
 
 ## Prerequisites and scope
 
