@@ -1327,6 +1327,23 @@ def read_result(*, state_dir, plan_id):
     return result
 
 
+def _execution_observations(plan):
+    require(plan["preconditions"]["observations_hash"] == digest(plan["observations"]),
+            "prerequisite-observation-hash-mismatch")
+    observations = copy.deepcopy(plan["observations"])
+    for item in observations:
+        if (item.get("kind") == "arm" and item.get("api") == "2021-04-01"
+                and re.fullmatch(r"/subscriptions/[0-9a-f-]{36}/providers/Microsoft\.[A-Za-z][A-Za-z0-9]*",
+                                 item.get("id", ""), flags=re.I)
+                and isinstance(item.get("value"), dict)):
+            # _providers consumes registration state, not Azure's discovery catalogue.
+            # Retain the raw signed evidence; exclude only these two metadata fields
+            # from execution freshness, never resource state or caller permissions.
+            item["value"].pop("resourceTypes", None)
+            item["value"].pop("authorizations", None)
+    return observations
+
+
 def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
             acknowledge_exclusive_writer_governance=False, sleep=time.sleep):
     """Consume one reviewed plan; persist preflight rejection or execution evidence."""
@@ -1368,7 +1385,14 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
         for key in ("effects", "observations", "bindings", "lock_scopes", "blockers", "commands",
                     "auth_scopes", "source_hashes", "input_hash", "stages", "preconditions", "capabilities",
                     "warnings", "governance"):
-            require(fresh[key] == plan[key], "prerequisite-live-state-or-plan-changed:" + key)
+            if key == "observations":
+                unchanged = _execution_observations(fresh) == _execution_observations(plan)
+            elif key == "preconditions":
+                unchanged = ({k: v for k, v in fresh[key].items() if k != "observations_hash"}
+                             == {k: v for k, v in plan[key].items() if k != "observations_hash"})
+            else:
+                unchanged = fresh[key] == plan[key]
+            require(unchanged, "prerequisite-live-state-or-plan-changed:" + key)
         require(time.time() < plan["expires_at"], "prerequisite-review-expired")
     except (PrerequisiteError, enrollment.EnrollmentError, OSError) as exc:
         code = getattr(exc, "code", "prerequisite-preflight-io-failed")
@@ -1429,7 +1453,8 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
         locked = prepare(source_root=plan["source"]["root"], consumer_root=plan["consumer_root"],
                          scope=plan["scope"], bootstrap_config=plan["bootstrap_config"],
                          expected_revision=plan["expected_revision"], context=plan["context"], runtime=runtime)
-        require(locked["observations"] == plan["observations"] and locked["effects"] == plan["effects"],
+        require(_execution_observations(locked) == _execution_observations(plan)
+                and locked["effects"] == plan["effects"],
                 "prerequisites-changed-before-lock")
         runtime.read_only = False
         receipt["status"] = "running"

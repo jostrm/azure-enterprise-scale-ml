@@ -212,6 +212,92 @@ def test_minimum_invalid_consent_cannot_create_receipt(workspace):
     assert not list(workspace[2].iterdir()) and not runtime.writes
 
 
+def provider_catalogue(runtime):
+    identifier = f"/subscriptions/{SUB}/providers/microsoft.network"
+    runtime.resources[identifier] = {
+        "id": identifier, "namespace": "Microsoft.Network", "registrationState": "Registered",
+        "registrationPolicy": "RegistrationRequired",
+        "authorizations": [{"applicationId": "one"}, {"applicationId": "two"}],
+        "resourceTypes": [{"resourceType": "virtualNetworks", "apiVersions": ["2024-05-01"]},
+                          {"resourceType": "unrelatedAdvertisement", "apiVersions": ["2025-01-01"]}],
+    }
+    return identifier
+
+
+def test_provider_catalogue_metadata_changes_do_not_change_reviewed_resource_effects(workspace):
+    runtime = ProviderRuntime()
+    identifier = provider_catalogue(runtime)
+    args = provider_arguments(workspace, True)
+    plan = core.prepare(**args, runtime=runtime)
+    original = copy.deepcopy(plan)
+    catalogue = runtime.resources[identifier]
+    catalogue["authorizations"].reverse()
+    catalogue["resourceTypes"].pop()
+    catalogue["resourceTypes"][0]["apiVersions"].insert(0, "2026-05-01")
+    fresh = core.prepare(**args, runtime=runtime)
+    assert plan["observations"] != fresh["observations"]
+    assert plan["preconditions"]["observations_hash"] != fresh["preconditions"]["observations_hash"]
+    assert plan["effects"] == fresh["effects"]
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded", result.get("error")
+    assert plan == original
+
+
+@pytest.mark.parametrize("field,value", [
+    ("namespace", "Microsoft.Compute"), ("id", "/subscriptions/other/providers/microsoft.network"),
+    ("registrationState", "NotRegistered"), ("registrationPolicy", "RegistrationFree"),
+    ("unknownFutureField", "changed"),
+])
+def test_provider_registration_identity_and_unknown_fields_still_block_drift(workspace, field, value):
+    runtime = ProviderRuntime()
+    identifier = provider_catalogue(runtime)
+    plan = core.prepare(**provider_arguments(workspace, True), runtime=runtime)
+    runtime.resources[identifier][field] = value
+    with pytest.raises(core.PrerequisiteError, match="prerequisite-live-state-or-plan-changed"):
+        execute(plan, workspace, runtime)
+    assert not runtime.writes
+    assert core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"])["status"] == "rejected"
+
+
+def test_provider_catalogue_can_change_again_during_locked_preflight(workspace, monkeypatch):
+    runtime = ProviderRuntime()
+    provider_catalogue(runtime)
+    original_arm = runtime.arm
+    reads = []
+    def changing_catalogue(method, identifier, api, **kwargs):
+        status, headers, value = original_arm(method, identifier, api, **kwargs)
+        if method == "GET" and identifier.lower().endswith("/providers/microsoft.network"):
+            reads.append(1)
+            value["resourceTypes"][0]["apiVersions"].insert(0, f"advertisement-{len(reads)}")
+        return status, headers, value
+    monkeypatch.setattr(runtime, "arm", changing_catalogue)
+    plan = core.prepare(**provider_arguments(workspace, True), runtime=runtime)
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded", result.get("error")
+    assert len(reads) >= 4
+
+
+def test_catalogue_comparison_still_checks_original_raw_observation_hash(workspace):
+    runtime = ProviderRuntime()
+    provider_catalogue(runtime)
+    plan = core.prepare(**provider_arguments(workspace, True), runtime=runtime)
+    plan["preconditions"]["observations_hash"] = "0" * 64
+    plan["plan_hash"] = core.digest({k: v for k, v in plan.items() if k != "plan_hash"})
+    with pytest.raises(core.PrerequisiteError, match="prerequisite-observation-hash-mismatch"):
+        execute(plan, workspace, runtime)
+    assert not runtime.writes
+
+
+def test_provider_catalogue_exception_never_applies_to_resource_observations(workspace):
+    runtime = ProviderRuntime()
+    provider_catalogue(runtime)
+    plan = core.prepare(**provider_arguments(workspace, True), runtime=runtime)
+    runtime.resources[COMMON_VNET]["authorizations"] = ["unreviewed-resource-field"]
+    with pytest.raises(core.PrerequisiteError, match="prerequisite-live-state-or-plan-changed:observations"):
+        execute(plan, workspace, runtime)
+    assert not runtime.writes
+
+
 def test_repo_prepare_pins_published_source_and_preserves_saved_draft(workspace):
     consumer = workspace[0]
     document = json.loads((consumer / "azurefactory" / "register.json").read_bytes())
