@@ -68,6 +68,72 @@ It creates no RG/managed identity and authenticates nobody: the coordinator firs
 creates its canonical RG/identity substrate. Network creation requires no ADLS.
 Failure/pending outcomes never trigger automatic deletion.
 
+### Regional service-endpoint preflight
+
+Before approving a network plan, use the same authenticated Cloud adapter for:
+
+```python
+capabilities = collect_service_endpoint_capabilities(
+    cloud, subscription_id=workload_subscription_id, location=network_location)
+readiness = validate_common_network_region(desired, capabilities)
+prepared = prepare_common_network(
+    source_root=source_root, desired=desired, inventory=inventory,
+    regional_capabilities=capabilities)
+```
+
+The collector reads only
+`GET /subscriptions/{subscription}/providers/Microsoft.Network/locations/{location}/virtualNetworkAvailableEndpointServices?api-version=2023-11-01`.
+It returns `subscription_id`, `location`, `api_version`, `source` and `services`.
+The validator binds that evidence to the exact target VNet subscription and
+location, and checks **all** configured common/scoring endpoints. It returns
+`can_execute`, `blockers`, `required_services` and `capabilities`. Each unavailable
+service produces a `regional-service-endpoint-not-supported` blocker including
+the service, subscription, location and actionable message. Storage.Global is
+not an implicit replacement for Storage. No region names are hardcoded.
+
+Preparation accepts the optional `regional_capabilities` argument to expose
+blockers **before approval**; it checks only newly planned subnets, not retained
+ones. Omitting it preserves the existing call signature, but the returned
+`regional_service_endpoints: null` means **regional readiness has not yet been
+checked**, not that the region is supported. Execution always repeats the live
+capability GET before its first subscription deployment PUT, including before
+any NSG creation. Unsupported services raise `RegionalServiceEndpointError`
+with structured `.preflight` evidence. Denied/failed/malformed/incomplete reads
+fail closed; a paginated response is rejected rather than treated as complete.
+A no-mutation replay needs no endpoint capability query and never reconciles
+existing subnets. Source fingerprints must be refreshed for this helper change;
+compiled ARM shapes and planned writable resource bodies are unchanged.
+
+Manual/public setup flows which invoke Bicep directly must perform the same
+read-only regional check before submission; Bicep alone cannot query this
+provider capability. For inspection:
+
+```powershell
+az network vnet list-endpoint-services --location <network-location> --subscription <workload-subscription> --output json
+```
+
+**Denmark East finding (2026-09-24):** the live Network RP capability response
+does not include `Microsoft.CognitiveServices`. Therefore the unchanged native
+common template cannot be submitted there. The project `31-network.bicep` also
+requests this endpoint on AKS, GenAI, ACA and App Service subnets; removing only
+the common endpoint would merely postpone failure. No endpoint is silently
+dropped, and no firewall, public-access setting, requested workload or region
+is changed by this safeguard.
+
+The endpoint itself is **not universally required for private Foundry agents**:
+Microsoft's [private-agent sample VNet](https://github.com/microsoft-foundry/foundry-samples/blob/main/infrastructure/infrastructure-setup-bicep/15-private-network-standard-agent-setup/modules-network-secured/vnet.bicep)
+uses a delegated agent subnet and a private-endpoint subnet without service
+endpoints. However, [Foundry Agent Service's supported-region table](https://learn.microsoft.com/en-us/azure/foundry/agents/concepts/limits-quotas-regions#supported-regions)
+does not list Denmark East as of that date, and
+[private networking requires the Foundry account and injected VNet to share a region](https://learn.microsoft.com/en-us/azure/foundry/agents/how-to/virtual-networks).
+Endpoint capability support must not be mistaken for Agent/model availability.
+For requested private managed agents in Denmark East, the remaining dependency
+is **product regional support**, not permission to weaken networking. Proceed
+only after Azure confirms that precise regional workload is supported, or the
+user explicitly approves a supported-region/topology or workload change. A
+private endpoint does not by itself overcome the agent injection region
+requirement. No opt-out parameter is introduced as a purported Full-factory fix.
+
 * An absent parent is created once with its approved address space. There is
   **no parent VNet PUT on reuse**, including with `vnetNameFull_param`.
 * Missing canonical common/scoring/Power BI/Bastion subnets are created as

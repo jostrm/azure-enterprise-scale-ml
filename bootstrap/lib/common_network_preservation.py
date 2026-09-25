@@ -30,6 +30,13 @@ class PreservationError(ValueError):
     pass
 
 
+class RegionalServiceEndpointError(PreservationError):
+    def __init__(self, preflight):
+        self.preflight = copy.deepcopy(preflight)
+        super().__init__("regional-service-endpoints-unsupported:" + preflight["capabilities"]["location"]
+                         + ":" + ",".join(item["service"] for item in preflight["blockers"]))
+
+
 def require(value, code):
     if not value:
         raise PreservationError(code)
@@ -304,6 +311,70 @@ def _canonical(desired):
 def required_resource_ids(desired):
     _, identifier, subnets, nsg_ids = _canonical(desired)
     return [identifier, *[identifier + "/subnets/" + s["name"].lower() for s in subnets], *nsg_ids]
+
+
+def _endpoint_capability_scope(subscription_id, location):
+    require(isinstance(subscription_id, str) and re.fullmatch(
+        r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", subscription_id),
+        "endpoint-capability-subscription-required")
+    require(isinstance(location, str) and re.fullmatch(r"[a-zA-Z0-9]+", location),
+            "endpoint-capability-canonical-location-required")
+    return (f"/subscriptions/{subscription_id.lower()}/providers/Microsoft.Network/"
+            f"locations/{location.lower()}/virtualNetworkAvailableEndpointServices")
+
+
+def collect_service_endpoint_capabilities(cloud, *, subscription_id, location):
+    """Read the Network RP's exact subscription/region support, never infer it."""
+    path = _endpoint_capability_scope(subscription_id, location)
+    status, _, body = cloud.arm("GET", path, API_VERSION, allowed=(200,))
+    require(status == 200, "regional-service-endpoint-capability-read-failed")
+    require(isinstance(body, dict) and isinstance(body.get("value"), list)
+            and not body.get("nextLink"), "complete-regional-service-endpoint-capabilities-required")
+    names = [item.get("name") if isinstance(item, dict) else None for item in body["value"]]
+    require(all(isinstance(name, str) and re.fullmatch(r"Microsoft\.[a-zA-Z0-9.]+", name, re.I)
+                for name in names), "invalid-regional-service-endpoint-capability")
+    require(len(names) == len({name.lower() for name in names}),
+            "duplicate-regional-service-endpoint-capability")
+    return {"subscription_id": subscription_id.lower(), "location": location.lower(),
+            "api_version": API_VERSION, "source": path, "services": sorted(names, key=str.lower)}
+
+
+def validate_common_network_region(desired, capabilities, *, subnets=None):
+    """Read-only readiness for canonical or actually planned NEW subnets.
+
+    Missing services are blockers, not permission to remove an endpoint, alter
+    a firewall, move a workload or rewrite an existing subnet. Provider endpoint
+    support is not proof of Foundry/Agent/model availability.
+    """
+    params, identifier, canonical_subnets, _ = _canonical(desired)
+    subscription_id, location = identifier.split("/")[2], params["location"].lower()
+    path = _endpoint_capability_scope(subscription_id, location)
+    require(isinstance(capabilities, dict) and set(capabilities) == {
+        "subscription_id", "location", "api_version", "source", "services"}
+        and capabilities["subscription_id"] == subscription_id
+        and capabilities["location"] == location and capabilities["api_version"] == API_VERSION
+        and capabilities["source"] == path, "regional-service-endpoint-capability-scope-mismatch")
+    services = capabilities["services"]
+    require(isinstance(services, list)
+            and all(isinstance(name, str) and re.fullmatch(r"Microsoft\.[a-zA-Z0-9.]+", name, re.I)
+                    for name in services)
+            and len(services) == len({name.lower() for name in services}),
+            "invalid-regional-service-endpoint-capability")
+    selected = canonical_subnets if subnets is None else subnets
+    require(isinstance(selected, list) and all(subnet in canonical_subnets for subnet in selected),
+            "unreviewed-regional-service-endpoint-subnet")
+    required = sorted({endpoint["service"] for subnet in selected
+                       for endpoint in subnet["properties"]["serviceEndpoints"]})
+    supported = {name.lower() for name in services}
+    blockers = [{
+        "code": "regional-service-endpoint-not-supported", "service": service,
+        "subscription_id": subscription_id, "location": location,
+        "message": (f"{service} service endpoints are unavailable in {location} for the selected subscription. "
+                    "No network writes are permitted. Review workload/private-network regional support; "
+                    "do not silently remove endpoints, enable public access, or relocate workloads."),
+    } for service in required if service.lower() not in supported]
+    return {"can_execute": not blockers, "blockers": blockers, "required_services": required,
+            "capabilities": copy.deepcopy(capabilities)}
 
 
 def collect_inventory(cloud, *, vnet_id, other_vnet_ids, reserved_ranges=(), resource_ids=()):
@@ -665,16 +736,22 @@ def _deployment_parameters(template, parameters):
     return {key: {"value": copy.deepcopy(value)} for key, value in parameters.items()}
 
 
-def prepare_common_network(*, source_root, desired, inventory, expected_payload_sha256=None, bicep=None):
+def prepare_common_network(*, source_root, desired, inventory, expected_payload_sha256=None, bicep=None,
+                           regional_capabilities=None):
     """Coordinator hook after it resolves its saved scope into template parameters."""
     template, proof = _compile_capability(source_root, expected_payload_sha256=expected_payload_sha256, bicep=bicep)
     identifier = resource_id(desired["vnet_id"])
     require(identifier in inventory["resources"], "incomplete-network-inventory")
     plan = plan_common_network(vnet=inventory["resources"][identifier], desired=desired, inventory=inventory)
     _deployment_parameters(template, plan["deployment_parameters"])
-    return {"can_execute": True, "blockers": [], "commands": [],
+    regional = (validate_common_network_region(desired, regional_capabilities,
+                subnets=plan["deployment_parameters"]["preservationPlan"]["createSubnets"])
+                if regional_capabilities is not None else None)
+    return {"can_execute": regional["can_execute"] if regional is not None else True,
+            "blockers": regional["blockers"] if regional is not None else [], "commands": [],
             "effects": [{"kind": "create-network-resource", "resource_id": key}
                         for key in plan["mutation_resource_ids"]],
+            "regional_service_endpoints": regional,
             "frozen_plan": plan, "expected_resources": expected_resource_bodies(template, plan), "source": proof}
 
 
@@ -686,6 +763,8 @@ def execute_common_network(prepared, *, cloud, source_root, inventory_collector,
     recollects the same complete domain, and assert_lease must affirm the held
     lease. Unknown deployment outcomes raise and retain resources; never roll
     back or silently release the lease. RG/identity substrate is a separate stage.
+    Every mutation is preceded by a fresh, read-only regional endpoint preflight;
+    failure prevents the entire deployment, including its NSG writes.
     """
     require(prepared.get("can_execute") is True and not prepared.get("blockers"), "network-plan-not-executable")
     require(type(max_polls) is int and max_polls > 0 and poll_interval >= 0, "bounded-network-polling-required")
@@ -704,7 +783,14 @@ def execute_common_network(prepared, *, cloud, source_root, inventory_collector,
     subscription_id = identifier.split("/")[2]
     name = "afnet-" + digest({"factory": plan["desired"]["factory_id"], "vnet": identifier})[:24]
     deployment_id = f"/subscriptions/{subscription_id}/providers/Microsoft.Resources/deployments/{name}"
+    regional = None
     if plan["mutation_resource_ids"]:
+        capabilities = collect_service_endpoint_capabilities(cloud, subscription_id=subscription_id,
+                                                             location=plan["deployment_parameters"]["location"])
+        regional = validate_common_network_region(plan["desired"], capabilities,
+            subnets=plan["deployment_parameters"]["preservationPlan"]["createSubnets"])
+        if not regional["can_execute"]:
+            raise RegionalServiceEndpointError(regional)
         require(assert_lease() is True, "shared-hub-lease-required")
         status, _, _ = cloud.arm("PUT", deployment_id, "2022-09-01", data={
             "location": plan["deployment_parameters"]["location"],
@@ -727,6 +813,7 @@ def execute_common_network(prepared, *, cloud, source_root, inventory_collector,
     common_subnet_id = identifier + "/subnets/" + plan["deployment_parameters"]["common_subnet_name"].lower()
     return {"succeeded": True, "outputs": {"vnet_id": identifier, "admin_subnet_id": common_subnet_id,
             "owned_resource_ids": plan["owned_resource_ids"], "preservation_evidence": evidence,
+            "regional_service_endpoints": regional,
             "deployment_id": deployment_id if plan["mutation_resource_ids"] else None}}
 
 

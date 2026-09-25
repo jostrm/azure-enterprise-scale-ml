@@ -20,6 +20,14 @@ RG = f"/subscriptions/{SUB}/resourcegroups/shared"
 VNET = RG + "/providers/microsoft.network/virtualnetworks/shared"
 HUB = RG + "/providers/microsoft.network/virtualnetworks/hub"
 NSG = RG + "/providers/microsoft.network/networksecuritygroups/"
+ENDPOINT_SERVICES = ["Microsoft.Storage", "Microsoft.KeyVault", "Microsoft.ContainerRegistry",
+                     "Microsoft.CognitiveServices"]
+
+
+def endpoint_capabilities(location="westeurope", services=None):
+    return {"subscription_id": SUB, "location": location, "api_version": net.API_VERSION,
+            "source": net._endpoint_capability_scope(SUB, location),
+            "services": list(ENDPOINT_SERVICES if services is None else services)}
 
 
 def resource(identifier, props, **extra):
@@ -437,9 +445,14 @@ def executor_fixture(monkeypatch, compiled):
         def __init__(self):
             self.state = state
             self.calls = []
+            self.endpoint_services = list(ENDPOINT_SERVICES)
 
         def arm(self, method, identifier, version, data=None, allowed=()):
             self.calls.append((method, identifier))
+            if identifier.endswith("/virtualNetworkAvailableEndpointServices"):
+                assert method == "GET" and version == net.API_VERSION and allowed == (200,)
+                assert identifier == endpoint_capabilities()["source"]
+                return 200, {}, {"value": [{"name": name} for name in self.endpoint_services]}
             assert "/providers/Microsoft.Resources/deployments/afnet-" in identifier
             if method == "PUT":
                 assert data["properties"]["mode"] == "Incremental"
@@ -458,7 +471,8 @@ def test_native_executor_revalidates_then_deploys_and_proves_retention(monkeypat
     assert result["succeeded"]
     assert result["outputs"]["admin_subnet_id"] == VNET + "/subnets/snet-one"
     assert result["outputs"]["preservation_evidence"]["preserved"] is True
-    assert [method for method, _ in cloud.calls] == ["PUT", "GET"]
+    assert [method for method, _ in cloud.calls] == ["GET", "PUT", "GET"]
+    assert result["outputs"]["regional_service_endpoints"]["can_execute"] is True
     intent["owned_resource_ids"] = result["outputs"]["owned_resource_ids"]
     replay = net.prepare_common_network(source_root=ROOT, desired=intent, inventory=inventory(cloud.state, intent))
     cloud.calls.clear()
@@ -491,7 +505,7 @@ def test_executor_unknown_outcome_never_deletes_or_claims_success(monkeypatch, c
     original = cloud.arm
 
     def pending(method, *args, **kwargs):
-        if method == "GET":
+        if method == "GET" and "/deployments/" in args[0]:
             return 200, {}, {"properties": {"provisioningState": "Running"}}
         return original(method, *args, **kwargs)
     monkeypatch.setattr(cloud, "arm", pending)
@@ -506,6 +520,128 @@ def test_prepare_checks_compiled_parameter_schema_before_mutation(monkeypatch, c
     intent["parameters"]["enablePublicAccessWithPerimeter"] = True
     with pytest.raises(net.PreservationError, match="unknown-common-network-parameter"):
         net.prepare_common_network(source_root=ROOT, desired=intent, inventory=inventory(initial(), intent))
+
+
+def test_regional_endpoint_read_uses_exact_subscription_location_and_preserves_provider_names():
+    calls = []
+
+    class Cloud:
+        def arm(self, method, identifier, version, allowed):
+            calls.append((method, identifier, version, allowed))
+            return 200, {}, {"value": [{"name": name} for name in reversed(ENDPOINT_SERVICES)]}
+    result = net.collect_service_endpoint_capabilities(Cloud(), subscription_id=SUB, location="DenmarkEast")
+    assert calls == [("GET", endpoint_capabilities("denmarkeast")["source"], net.API_VERSION, (200,))]
+    assert result["services"] == sorted(ENDPOINT_SERVICES, key=str.lower)
+    assert result["location"] == "denmarkeast" and result["subscription_id"] == SUB
+
+
+@pytest.mark.parametrize("status,body,error", [
+    (403, {}, "capability-read-failed"),
+    (404, {}, "capability-read-failed"),
+    (429, {}, "capability-read-failed"),
+    (200, {}, "complete-regional"),
+    (200, {"value": [], "nextLink": "https://example.invalid/next"}, "complete-regional"),
+    (200, {"value": [{"name": None}]}, "invalid-regional"),
+    (200, {"value": [{"service": "Microsoft.Storage"}]}, "invalid-regional"),
+    (200, {"value": [None]}, "invalid-regional"),
+    (200, {"value": [{"name": "Microsoft.Storage"}, {"name": "microsoft.storage"}]}, "duplicate-regional"),
+])
+def test_regional_endpoint_read_never_treats_denial_or_incomplete_evidence_as_support(status, body, error):
+    class Cloud:
+        def arm(self, method, *args, **kwargs):
+            assert method == "GET"
+            return status, {}, body
+    with pytest.raises(net.PreservationError, match=error):
+        net.collect_service_endpoint_capabilities(Cloud(), subscription_id=SUB, location="westeurope")
+
+
+@pytest.mark.parametrize("location", ["denmarkeast", "anotherregion", "westeurope"])
+def test_regional_readiness_blocks_missing_services_without_region_hardcoding_or_dropping_endpoints(location):
+    intent = desired()
+    intent["parameters"]["location"] = location
+    original = copy.deepcopy(intent)
+    capabilities = endpoint_capabilities(location, ["Microsoft.Storage", "Microsoft.KeyVault",
+                                                   "Microsoft.ContainerRegistry", "Microsoft.Storage.Global"])
+    result = net.validate_common_network_region(intent, capabilities)
+    assert result["can_execute"] is False
+    assert [item["service"] for item in result["blockers"]] == ["Microsoft.CognitiveServices"]
+    assert result["blockers"][0]["code"] == "regional-service-endpoint-not-supported"
+    assert result["blockers"][0]["location"] == location
+    assert "Microsoft.CognitiveServices" in result["required_services"]
+    assert intent == original
+    assert net.validate_common_network_region(intent, endpoint_capabilities(location))["can_execute"]
+    capabilities["services"].remove("Microsoft.Storage")
+    result = net.validate_common_network_region(intent, capabilities)
+    assert {item["service"] for item in result["blockers"]} == {"Microsoft.Storage", "Microsoft.CognitiveServices"}
+
+
+@pytest.mark.parametrize("key,value", [
+    ("subscription_id", "22222222-2222-2222-2222-222222222222"),
+    ("location", "anotherregion"), ("api_version", "2020-01-01"),
+    ("source", "https://unrelated.example/endpoint-services"),
+])
+def test_regional_readiness_rejects_evidence_from_other_scope(key, value):
+    capabilities = endpoint_capabilities()
+    capabilities[key] = value
+    with pytest.raises(net.PreservationError, match="capability-scope-mismatch"):
+        net.validate_common_network_region(desired(), capabilities)
+
+
+def test_regional_readiness_cannot_claim_review_of_a_modified_canonical_subnet():
+    intent = desired()
+    _, _, subnets, _ = net._canonical(intent)
+    subnets[0]["properties"]["serviceEndpoints"].pop()
+    with pytest.raises(net.PreservationError, match="unreviewed-regional-service-endpoint-subnet"):
+        net.validate_common_network_region(intent, endpoint_capabilities(), subnets=subnets)
+
+
+def test_prepare_exposes_regional_blocker_and_retains_exact_frozen_resource_bodies(monkeypatch, compiled):
+    _, intent, supported = executor_fixture(monkeypatch, compiled)
+    blocked = net.prepare_common_network(source_root=ROOT, desired=intent, inventory=inventory(initial(), intent),
+        regional_capabilities=endpoint_capabilities(services=ENDPOINT_SERVICES[:-1]))
+    assert blocked["can_execute"] is False
+    assert blocked["blockers"][0]["service"] == "Microsoft.CognitiveServices"
+    assert blocked["expected_resources"] == supported["expected_resources"]
+    assert blocked["frozen_plan"] == supported["frozen_plan"]
+    assert blocked["source"] == supported["source"]
+
+
+def test_executor_rechecks_region_before_any_nsg_or_subnet_write_even_after_supported_prepare(monkeypatch, compiled):
+    cloud, intent, _ = executor_fixture(monkeypatch, compiled)
+    prepared = net.prepare_common_network(source_root=ROOT, desired=intent, inventory=inventory(initial(), intent),
+                                         regional_capabilities=endpoint_capabilities())
+    original = copy.deepcopy(cloud.state)
+    cloud.endpoint_services.remove("Microsoft.CognitiveServices")
+    with pytest.raises(net.RegionalServiceEndpointError, match="unsupported:westeurope:Microsoft.CognitiveServices") as exc:
+        net.execute_common_network(prepared, cloud=cloud, source_root=ROOT,
+            inventory_collector=lambda: inventory(cloud.state, intent), assert_lease=lambda: True)
+    assert [method for method, _ in cloud.calls] == ["GET"]
+    assert exc.value.preflight["blockers"][0]["service"] == "Microsoft.CognitiveServices"
+    assert cloud.state == original
+
+
+def test_executor_capability_read_failure_prevents_all_network_writes(monkeypatch, compiled):
+    cloud, intent, prepared = executor_fixture(monkeypatch, compiled)
+
+    def denied(method, identifier, *args, **kwargs):
+        cloud.calls.append((method, identifier))
+        return 403, {}, {}
+    monkeypatch.setattr(cloud, "arm", denied)
+    with pytest.raises(net.PreservationError, match="capability-read-failed"):
+        net.execute_common_network(prepared, cloud=cloud, source_root=ROOT,
+            inventory_collector=lambda: inventory(cloud.state, intent), assert_lease=lambda: True)
+    assert [method for method, _ in cloud.calls] == ["GET"]
+
+
+def test_regional_readiness_does_not_reconcile_or_block_retained_subnets(monkeypatch, compiled):
+    _, intent, prepared = executor_fixture(monkeypatch, compiled)
+    state, _ = apply_native_arm(initial(), prepared["frozen_plan"], compiled)
+    intent["owned_resource_ids"] = prepared["frozen_plan"]["owned_resource_ids"]
+    replay = net.prepare_common_network(source_root=ROOT, desired=intent, inventory=inventory(state, intent),
+                                       regional_capabilities=endpoint_capabilities(services=[]))
+    assert replay["can_execute"] and replay["effects"] == []
+    assert replay["regional_service_endpoints"]["required_services"] == []
+    assert replay["expected_resources"] == {}
 
 
 def test_byo_is_not_preservation_proof_and_gateway_extensions_not_silently_dropped():
