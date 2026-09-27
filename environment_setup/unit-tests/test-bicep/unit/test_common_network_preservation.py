@@ -415,7 +415,7 @@ def test_created_resources_accept_only_explicit_read_only_fields_and_defaults(co
         value["type"] = net.resource_type(identifier)
         if "/subnets/" in identifier:
             props = value["properties"]
-            props.setdefault("privateEndpointNetworkPolicies", "Enabled")
+            props.setdefault("privateEndpointNetworkPolicies", "Disabled")
             props.setdefault("privateLinkServiceNetworkPolicies", "Enabled")
             props.update(defaultOutboundAccess=False, serviceEndpointPolicies=[], ipConfigurations=[])
             for endpoint in props["serviceEndpoints"]:
@@ -462,6 +462,159 @@ def executor_fixture(monkeypatch, compiled):
             assert method == "GET"
             return 200, {}, {"properties": {"provisioningState": "Succeeded"}}
     return Cloud(), intent, prepared
+
+
+def endpoint_scope(location="swedencentral", paired=("swedensouth",)):
+    return {"subscription_id": SUB, "location": location, "api_version": "2022-12-01",
+            "source": f"/subscriptions/{SUB}/locations", "paired_regions": list(paired)}
+
+
+def test_endpoint_scope_reads_only_exact_subscription_metadata():
+    calls = []
+    class Cloud:
+        def arm(self, method, path, version, allowed):
+            calls.append((method, path, version, allowed))
+            return 200, {}, {"value": [{"name": "swedencentral", "metadata": {
+                "pairedRegion": [{"name": "swedensouth"}]}}]}
+    assert net.collect_service_endpoint_scope(Cloud(), subscription_id=SUB, location="swedencentral") == endpoint_scope()
+    assert calls == [("GET", f"/subscriptions/{SUB}/locations", "2022-12-01", (200,))]
+
+
+@pytest.mark.parametrize("body", [
+    {}, {"value": [], "nextLink": "https://unreviewed.invalid/"},
+    {"value": [{"name": "eastus", "metadata": {"pairedRegion": []}}]},
+    {"value": [{"name": "swedencentral", "metadata": {}}]},
+    {"value": [{"name": "swedencentral", "metadata": {"pairedRegion": [{"name": "*"}]}}]},
+    {"value": [{"name": "swedencentral", "metadata": {"pairedRegion": [
+        {"name": "swedensouth"}, {"name": "eastus"}]}}]},
+])
+def test_endpoint_scope_rejects_incomplete_or_unbounded_metadata(body):
+    class Cloud:
+        def arm(self, *args, **kwargs):
+            return 200, {}, body
+    with pytest.raises(net.PreservationError):
+        net.collect_service_endpoint_scope(Cloud(), subscription_id=SUB, location="swedencentral")
+
+
+@pytest.mark.parametrize("service,locations", [
+    ("Microsoft.Storage", ["swedensouth", "swedencentral"]),
+    ("Microsoft.KeyVault", ["*"]), ("Microsoft.CognitiveServices", ["*"]),
+    ("Microsoft.ContainerRegistry", ["*"]),
+])
+def test_native_endpoint_location_expansion_is_scoped_not_discarded(service, locations):
+    identifier = VNET + "/subnets/new"
+    expected = {"properties": {"addressPrefix": "10.1.1.0/26", "serviceEndpoints": [
+        {"service": service, "locations": ["swedencentral"]}]}}
+    actual = resource(identifier, copy.deepcopy(expected["properties"]))
+    actual["properties"]["privateEndpointNetworkPolicies"] = "Disabled"
+    actual["properties"]["serviceEndpoints"][0].update(locations=locations, provisioningState="Succeeded")
+    planned = {"desired": {"vnet_id": VNET}, "deployment_parameters": {"location": "swedencentral"}}
+    net._verify_created_resource(identifier, actual, expected, planned, endpoint_scope=endpoint_scope())
+    for changed in (["swedencentral", "eastus"], ["*","eastus"], [], ["swedencentral"] * 2):
+        altered = copy.deepcopy(actual)
+        altered["properties"]["serviceEndpoints"][0]["locations"] = changed
+        with pytest.raises(net.PreservationError):
+            net._verify_created_resource(identifier, altered, expected, planned, endpoint_scope=endpoint_scope())
+    with pytest.raises(net.PreservationError):
+        net._verify_created_resource(identifier, actual, expected, planned,
+                                     endpoint_scope={**endpoint_scope(), "subscription_id": "other"})
+    with pytest.raises(net.PreservationError):
+        net._verify_created_resource(identifier, actual, expected, planned,
+                                     endpoint_scope={**endpoint_scope(), "source": "https://unreviewed.invalid/"})
+    with pytest.raises(net.PreservationError):
+        net._verify_created_resource(identifier, actual, expected, planned)
+
+
+@pytest.mark.parametrize("mutation", ["route", "nsg", "policy", "outbound", "unknown", "endpoint-field"])
+def test_new_subnet_normalization_preserves_writable_and_unknown_fields(mutation):
+    identifier = VNET + "/subnets/new"
+    props = {"addressPrefix": "10.1.1.0/26", "privateEndpointNetworkPolicies": "Enabled",
+             "defaultOutboundAccess": False, "serviceEndpoints": [
+                 {"service": "Microsoft.KeyVault", "locations": ["swedencentral"]}]}
+    actual = resource(identifier, copy.deepcopy(props))
+    changes = {"route": ("routeTable", {"id": "unapproved"}),
+               "nsg": ("networkSecurityGroup", {"id": NSG + "unapproved"}),
+               "policy": ("privateEndpointNetworkPolicies", "Disabled"),
+               "outbound": ("defaultOutboundAccess", True),
+               "unknown": ("futurePolicy", True)}
+    if mutation == "endpoint-field":
+        actual["properties"]["serviceEndpoints"][0]["futurePolicy"] = True
+    else:
+        key, value = changes[mutation]
+        actual["properties"][key] = value
+    planned = {"desired": {"vnet_id": VNET}, "deployment_parameters": {"location": "swedencentral"}}
+    with pytest.raises(net.PreservationError):
+        net._verify_created_resource(identifier, actual, {"properties": props}, planned,
+                                     endpoint_scope=endpoint_scope())
+
+
+def test_retained_subnet_parent_etag_rollover_preserves_every_other_property(compiled):
+    state, intent = initial(), desired()
+    dns = state[VNET]["properties"]["subnets"][1]
+    dns["properties"]["delegations"][0]["etag"] = state[VNET]["etag"]
+    dns["properties"]["serviceAssociationLinks"] = [
+        {"id": dns["id"] + "/serviceAssociationLinks/resolver", "etag": state[VNET]["etag"],
+         "properties": {"linkedResourceType": "Microsoft.Network/dnsResolvers", "allowDelete": False}}]
+    state[dns["id"]] = copy.deepcopy(dns)
+    before = inventory(state, intent)
+    planned = plan(state, intent)
+    state, _ = apply_native_arm(state, planned, compiled)
+    state[VNET]["etag"] = 'W/"parent-child-write"'
+    for child in state[VNET]["properties"]["subnets"]:
+        child["etag"] = state[VNET]["etag"]
+        for collection in ("delegations", "serviceAssociationLinks"):
+            for item in child["properties"].get(collection, []):
+                if "etag" in item:
+                    item["etag"] = state[VNET]["etag"]
+        state[child["id"]] = copy.deepcopy(child)
+    expected = net.expected_resource_bodies(compiled, planned)
+    assert net.verify_common_network(planned, before=before, after=inventory(state, intent),
+                                     expected_resources=expected)["preserved"]
+    for key, value in (("routeTable", {"id": "changed"}), ("privateEndpointNetworkPolicies", "Enabled"),
+                       ("futurePolicy", True)):
+        changed = copy.deepcopy(state)
+        child = changed[VNET]["properties"]["subnets"][0]
+        child["properties"][key] = value
+        changed[child["id"]] = copy.deepcopy(child)
+        with pytest.raises(net.PreservationError):
+            net.verify_common_network(planned, before=before, after=inventory(changed, intent),
+                                      expected_resources=expected)
+    changed = copy.deepcopy(state)
+    dns = changed[VNET]["properties"]["subnets"][1]
+    dns["properties"]["serviceAssociationLinks"][0]["properties"]["allowDelete"] = True
+    changed[dns["id"]] = copy.deepcopy(dns)
+    with pytest.raises(net.PreservationError):
+        net.verify_common_network(planned, before=before, after=inventory(changed, intent),
+                                  expected_resources=expected)
+
+
+def test_executor_journals_exact_before_and_request_before_put(monkeypatch, compiled):
+    cloud, intent, prepared = executor_fixture(monkeypatch, compiled)
+    entries = []
+    def journal(entry):
+        entries.append(copy.deepcopy(entry))
+        if entry["phase"] == "network-submit":
+            assert all(method != "PUT" for method, _ in cloud.calls)
+            assert entry["before"] == inventory(cloud.state, intent)
+            assert entry["before_sha256"] == prepared["frozen_plan"]["snapshot_sha256"]
+            assert entry["request_sha256"]
+    net.execute_common_network(prepared, cloud=cloud, source_root=ROOT,
+        inventory_collector=lambda: inventory(cloud.state, intent), assert_lease=lambda: True, journal=journal)
+    assert [entry["phase"] for entry in entries] == [
+        "network-preflight", "network-submit", "network-poll", "network-verification"]
+
+
+def test_before_journal_failure_prevents_network_put(monkeypatch, compiled):
+    cloud, intent, prepared = executor_fixture(monkeypatch, compiled)
+    error = OSError("journal unavailable")
+    def journal(entry):
+        if entry["phase"] == "network-submit":
+            raise error
+    with pytest.raises(OSError) as raised:
+        net.execute_common_network(prepared, cloud=cloud, source_root=ROOT,
+            inventory_collector=lambda: inventory(cloud.state, intent), assert_lease=lambda: True, journal=journal)
+    assert raised.value is error
+    assert all(method != "PUT" for method, _ in cloud.calls)
 
 
 def test_native_executor_revalidates_then_deploys_and_proves_retention(monkeypatch, compiled):

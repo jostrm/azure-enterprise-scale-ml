@@ -339,6 +339,41 @@ def collect_service_endpoint_capabilities(cloud, *, subscription_id, location):
             "api_version": API_VERSION, "source": path, "services": sorted(names, key=str.lower)}
 
 
+def collect_service_endpoint_scope(cloud, *, subscription_id, location):
+    """Freeze ARM region-pair metadata, not an inferred or arbitrary superset."""
+    _endpoint_capability_scope(subscription_id, location)
+    path = f"/subscriptions/{subscription_id.lower()}/locations"
+    status, _, body = cloud.arm("GET", path, "2022-12-01", allowed=(200,))
+    require(status == 200 and isinstance(body, dict) and isinstance(body.get("value"), list)
+            and not body.get("nextLink"), "complete-network-location-metadata-required")
+    rows = [row for row in body["value"] if isinstance(row, dict)
+            and row.get("name", "").lower() == location.lower()]
+    require(len(rows) == 1 and isinstance(rows[0].get("metadata"), dict)
+            and isinstance(rows[0]["metadata"].get("pairedRegion"), list),
+            "network-region-pair-metadata-required")
+    pairs = rows[0]["metadata"]["pairedRegion"]
+    require(all(isinstance(row, dict) and isinstance(row.get("name"), str) for row in pairs),
+            "network-region-pair-metadata-required")
+    scope = {"subscription_id": subscription_id.lower(), "location": location.lower(),
+             "api_version": "2022-12-01", "source": path,
+             "paired_regions": sorted(row["name"].lower() for row in pairs)}
+    _validate_endpoint_scope(scope, subscription_id.lower(), location.lower())
+    return scope
+
+
+def _validate_endpoint_scope(scope, subscription_id, location):
+    require(isinstance(scope, dict) and set(scope) == {
+        "subscription_id", "location", "api_version", "source", "paired_regions"}
+        and scope["subscription_id"] == subscription_id and scope["location"] == location
+        and scope["api_version"] == "2022-12-01"
+        and scope["source"] == f"/subscriptions/{subscription_id}/locations",
+        "network-endpoint-location-scope-mismatch")
+    pairs = scope["paired_regions"]
+    require(isinstance(pairs, list) and len(pairs) <= 1
+            and all(isinstance(value, str) and re.fullmatch(r"[a-z0-9]+", value)
+                    and value != location for value in pairs), "invalid-network-region-pair")
+
+
 def validate_common_network_region(desired, capabilities, *, subnets=None):
     """Read-only readiness for canonical or actually planned NEW subnets.
 
@@ -593,18 +628,13 @@ def _subnet_write_properties(properties):
     for name in ("ipConfigurations", "privateEndpoints", "serviceAssociationLinks", "resourceNavigationLinks", "ipConfigurationProfiles"):
         require(props.pop(name, None) in (None, []), "unexpected-new-subnet-association:" + name)
     for key, default in {"serviceEndpoints": [], "delegations": [], "serviceEndpointPolicies": [], "ipAllocations": [],
-                         "privateEndpointNetworkPolicies": "Enabled", "privateLinkServiceNetworkPolicies": "Enabled"}.items():
+                         "privateEndpointNetworkPolicies": "Disabled", "privateLinkServiceNetworkPolicies": "Enabled"}.items():
         props.setdefault(key, default)
     for key in ("networkSecurityGroup", "routeTable", "natGateway"):
         if props.get(key) is None:
             props.pop(key, None)
         elif isinstance(props[key], dict) and set(props[key]) == {"id"}:
             props[key]["id"] = props[key]["id"].lower()
-    # This API allows omitted outbound-access to receive the platform default;
-    # both historic true and the private-subnet rollout's false are documented.
-    if "defaultOutboundAccess" in props:
-        outbound = props.pop("defaultOutboundAccess")
-        require(outbound is None or type(outbound) is bool, "invalid-subnet-outbound-default")
     if props.get("sharingScope") is None:
         props.pop("sharingScope", None)
     for endpoint in props["serviceEndpoints"]:
@@ -619,6 +649,34 @@ def _subnet_write_properties(properties):
         delegation["properties"].pop("actions", None)
     props["delegations"].sort(key=lambda item: item["name"])
     return props
+
+
+def _normalize_subnet_response(current, frozen, plan, endpoint_scope):
+    # Only an OMITTED outbound policy may acquire a platform default. An explicit
+    # request remains a writable policy and must compare exactly.
+    if "defaultOutboundAccess" not in frozen and "defaultOutboundAccess" in current:
+        outbound = current.pop("defaultOutboundAccess")
+        require(outbound is None or type(outbound) is bool,
+                "invalid-subnet-outbound-default")
+    if endpoint_scope is not None:
+        location = plan["deployment_parameters"]["location"].lower()
+        _validate_endpoint_scope(endpoint_scope, resource_id(plan["desired"]["vnet_id"]).split("/")[2], location)
+        expected = {item["service"]: item for item in frozen["serviceEndpoints"]}
+        for item in current["serviceEndpoints"]:
+            requested = expected.get(item["service"], {}).get("locations")
+            locations = item.get("locations")
+            # These services are global; Storage's regional endpoint includes
+            # exactly its ARM-advertised paired region (not Storage.Global).
+            # See virtual-network-service-endpoints-overview and
+            # storage-network-security#access-from-a-paired-region on Learn.
+            if requested == [location] and (
+                item["service"] in ("Microsoft.KeyVault", "Microsoft.CognitiveServices", "Microsoft.ContainerRegistry")
+                and locations == ["*"]
+                or item["service"] == "Microsoft.Storage"
+                and locations == sorted([location, *endpoint_scope["paired_regions"]])
+            ):
+                item["locations"] = requested.copy()
+    return current
 
 
 def _nsg_write_properties(properties, *, associations):
@@ -646,7 +704,7 @@ def _nsg_write_properties(properties, *, associations):
     return props
 
 
-def _verify_created_resource(identifier, actual, expected, plan):
+def _verify_created_resource(identifier, actual, expected, plan, *, endpoint_scope=None):
     _validate_existing(actual, identifier)
     require(set(actual) <= {"id", "name", "type", "etag", "systemData", "location", "tags", "properties"},
             "unexpected-new-network-resource-field")
@@ -662,6 +720,7 @@ def _verify_created_resource(identifier, actual, expected, plan):
         require(actual_value == expected_value, "created-network-" + key + "-mismatch")
     if kind == "microsoft.network/virtualnetworks/subnets":
         current, frozen = _subnet_write_properties(actual["properties"]), _subnet_write_properties(expected["properties"])
+        current = _normalize_subnet_response(current, frozen, plan, endpoint_scope)
     elif kind == "microsoft.network/networksecuritygroups":
         associations = _planned_associations(plan, identifier)
         current = _nsg_write_properties(actual["properties"], associations=associations)
@@ -684,36 +743,67 @@ def _verify_created_resource(identifier, actual, expected, plan):
     require(current == frozen, "created-network-write-properties-mismatch:" + identifier)
 
 
-def verify_common_network(plan, *, before, after, expected_resources=None):
+def _retained_subnet_unchanged(old, new, old_parent, new_parent, *, additions):
+    if old == new:
+        return True
+    if not additions or not isinstance(new, dict):
+        return False
+    old, new = copy.deepcopy(old), copy.deepcopy(new)
+    # Network RP propagates its parent etag to every embedded subnet on a child
+    # write. Accept only that exact rollover; never ignore independent etags or
+    # any configuration, association, unknown field, or provisioning state.
+    if (old.get("etag") != old_parent.get("etag") or new.get("etag") != new_parent.get("etag")
+            or not old.get("etag") or not new.get("etag")):
+        return False
+    old.pop("etag")
+    new.pop("etag")
+    for collection in ("delegations", "serviceAssociationLinks"):
+        previous = old["properties"].get(collection, [])
+        current = new["properties"].get(collection, [])
+        if not isinstance(previous, list) or not isinstance(current, list) or len(previous) != len(current):
+            return False
+        for left, right in zip(previous, current):
+            if (isinstance(left, dict) and isinstance(right, dict)
+                    and left.get("etag") == old_parent["etag"] and right.get("etag") == new_parent["etag"]):
+                left.pop("etag")
+                right.pop("etag")
+    return old == new
+
+
+def verify_common_network(plan, *, before, after, expected_resources=None, endpoint_scope=None):
     """Post-deploy native GET proof; retain evidence and do not roll back on failure."""
     require(digest(before) == plan["snapshot_sha256"], "network-before-evidence-mismatch")
     require(after.get("complete") is True, "complete-post-deployment-inventory-required")
     identifier = resource_id(plan["desired"]["vnet_id"])
     actual = after["resources"]
+    old_parent, new_parent = before["resources"].get(identifier), actual.get(identifier)
+    _validate_existing(new_parent, identifier)
+    added = {key for key in plan["mutation_resource_ids"] if "/subnets/" in key}
     for key, value in before["resources"].items():
         if value is None or resource_id(key) == identifier:
             continue
-        same = (_retained_nsg_unchanged(value, actual.get(key), _planned_associations(plan, resource_id(key)))
-                if resource_type(key) == "microsoft.network/networksecuritygroups" else actual.get(key) == value)
+        if key.startswith(identifier + "/subnets/") and old_parent:
+            same = _retained_subnet_unchanged(value, actual.get(key), old_parent, new_parent, additions=added)
+        else:
+            same = (_retained_nsg_unchanged(value, actual.get(key), _planned_associations(plan, resource_id(key)))
+                    if resource_type(key) == "microsoft.network/networksecuritygroups" else actual.get(key) == value)
         require(same, "retained-network-resource-changed:" + key)
-    old_parent, new_parent = before["resources"].get(identifier), actual.get(identifier)
-    _validate_existing(new_parent, identifier)
     if old_parent:
         old, new = copy.deepcopy(old_parent), copy.deepcopy(new_parent)
         old.pop("etag", None)
         new.pop("etag", None)
         old_subnets = {resource_id(s["id"]): s for s in old["properties"].pop("subnets")}
         new_subnets = {resource_id(s["id"]): s for s in new["properties"].pop("subnets")}
-        require(old == new and all(new_subnets.get(k) == v for k, v in old_subnets.items()),
+        require(old == new and all(_retained_subnet_unchanged(v, new_subnets.get(k), old_parent, new_parent,
+                                                            additions=added) for k, v in old_subnets.items()),
                 "retained-vnet-configuration-changed")
-        added = {key for key in plan["mutation_resource_ids"] if "/subnets/" in key}
         require(set(new_subnets) == set(old_subnets) | added, "unexpected-subnet-addition-or-removal")
     expected = expected_resources if expected_resources is not None else _base_expected_resources(plan)
     require(set(expected) == set(plan["mutation_resource_ids"]), "frozen-compiled-resource-bodies-required")
     require(all(expected.get(key) == value for key, value in _base_expected_resources(plan).items()),
             "frozen-canonical-resource-body-mismatch")
     for key in plan["mutation_resource_ids"]:
-        _verify_created_resource(key, actual.get(key), expected[key], plan)
+        _verify_created_resource(key, actual.get(key), expected[key], plan, endpoint_scope=endpoint_scope)
     parent_subnets = {resource_id(item["id"]): item for item in new_parent["properties"].get("subnets", [])}
     for key in plan["mutation_resource_ids"]:
         if resource_type(key) == "microsoft.network/virtualnetworks/subnets":
@@ -737,12 +827,14 @@ def _deployment_parameters(template, parameters):
 
 
 def prepare_common_network(*, source_root, desired, inventory, expected_payload_sha256=None, bicep=None,
-                           regional_capabilities=None):
+                           regional_capabilities=None, endpoint_scope=None):
     """Coordinator hook after it resolves its saved scope into template parameters."""
     template, proof = _compile_capability(source_root, expected_payload_sha256=expected_payload_sha256, bicep=bicep)
     identifier = resource_id(desired["vnet_id"])
     require(identifier in inventory["resources"], "incomplete-network-inventory")
     plan = plan_common_network(vnet=inventory["resources"][identifier], desired=desired, inventory=inventory)
+    if endpoint_scope is not None:
+        _validate_endpoint_scope(endpoint_scope, identifier.split("/")[2], plan["deployment_parameters"]["location"].lower())
     _deployment_parameters(template, plan["deployment_parameters"])
     regional = (validate_common_network_region(desired, regional_capabilities,
                 subnets=plan["deployment_parameters"]["preservationPlan"]["createSubnets"])
@@ -751,12 +843,12 @@ def prepare_common_network(*, source_root, desired, inventory, expected_payload_
             "blockers": regional["blockers"] if regional is not None else [], "commands": [],
             "effects": [{"kind": "create-network-resource", "resource_id": key}
                         for key in plan["mutation_resource_ids"]],
-            "regional_service_endpoints": regional,
+            "regional_service_endpoints": regional, "endpoint_scope": copy.deepcopy(endpoint_scope),
             "frozen_plan": plan, "expected_resources": expected_resource_bodies(template, plan), "source": proof}
 
 
 def execute_common_network(prepared, *, cloud, source_root, inventory_collector, assert_lease,
-                           bicep=None, poll_interval=5, max_polls=180, sleeper=time.sleep):
+                           bicep=None, poll_interval=5, max_polls=180, sleeper=time.sleep, journal=None):
     """Native ARM executor; no auth, shell deployment, deletion, RG or MI creation.
 
     The coordinator owns the durable intent/journal and hub lease. Its collector
@@ -766,6 +858,10 @@ def execute_common_network(prepared, *, cloud, source_root, inventory_collector,
     Every mutation is preceded by a fresh, read-only regional endpoint preflight;
     failure prevents the entire deployment, including its NSG writes.
     """
+    def record(phase, **evidence):
+        if journal is not None:
+            journal({"phase": phase, **evidence})
+    record("network-preflight")
     require(prepared.get("can_execute") is True and not prepared.get("blockers"), "network-plan-not-executable")
     require(type(max_polls) is int and max_polls > 0 and poll_interval >= 0, "bounded-network-polling-required")
     plan = prepared["frozen_plan"]
@@ -784,6 +880,13 @@ def execute_common_network(prepared, *, cloud, source_root, inventory_collector,
     name = "afnet-" + digest({"factory": plan["desired"]["factory_id"], "vnet": identifier})[:24]
     deployment_id = f"/subscriptions/{subscription_id}/providers/Microsoft.Resources/deployments/{name}"
     regional = None
+    endpoint_scope = prepared.get("endpoint_scope")
+    if endpoint_scope is not None:
+        current_scope = collect_service_endpoint_scope(cloud, subscription_id=subscription_id,
+                                                       location=plan["deployment_parameters"]["location"])
+        require(current_scope == endpoint_scope, "network-endpoint-location-metadata-changed")
+    request = {"location": plan["deployment_parameters"]["location"],
+               "properties": {"mode": "Incremental", "template": template, "parameters": parameters}}
     if plan["mutation_resource_ids"]:
         capabilities = collect_service_endpoint_capabilities(cloud, subscription_id=subscription_id,
                                                              location=plan["deployment_parameters"]["location"])
@@ -792,11 +895,11 @@ def execute_common_network(prepared, *, cloud, source_root, inventory_collector,
         if not regional["can_execute"]:
             raise RegionalServiceEndpointError(regional)
         require(assert_lease() is True, "shared-hub-lease-required")
-        status, _, _ = cloud.arm("PUT", deployment_id, "2022-09-01", data={
-            "location": plan["deployment_parameters"]["location"],
-            "properties": {"mode": "Incremental", "template": template, "parameters": parameters}},
-            allowed=(200, 201, 202))
+        record("network-submit", before=before, before_sha256=digest(before),
+               deployment_id=deployment_id, request_sha256=digest(request))
+        status, _, _ = cloud.arm("PUT", deployment_id, "2022-09-01", data=request, allowed=(200, 201, 202))
         require(status in (200, 201, 202), "network-deployment-outcome-unknown")
+        record("network-poll")
         for _ in range(max_polls):
             require(assert_lease() is True, "shared-hub-lease-lost-retain-evidence")
             status, _, deployment = cloud.arm("GET", deployment_id, "2022-09-01", allowed=(200,))
@@ -809,7 +912,9 @@ def execute_common_network(prepared, *, cloud, source_root, inventory_collector,
         else:
             raise PreservationError("network-deployment-pending-retain-evidence")
     require(assert_lease() is True, "shared-hub-lease-lost-retain-evidence")
-    evidence = verify_common_network(plan, before=before, after=inventory_collector(), expected_resources=expected)
+    record("network-verification", before=before, before_sha256=digest(before))
+    evidence = verify_common_network(plan, before=before, after=inventory_collector(), expected_resources=expected,
+                                     endpoint_scope=endpoint_scope)
     common_subnet_id = identifier + "/subnets/" + plan["deployment_parameters"]["common_subnet_name"].lower()
     return {"succeeded": True, "outputs": {"vnet_id": identifier, "admin_subnet_id": common_subnet_id,
             "owned_resource_ids": plan["owned_resource_ids"], "preservation_evidence": evidence,
