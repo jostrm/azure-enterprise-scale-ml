@@ -1264,6 +1264,30 @@ def test_gateway_health_unknown_fields_or_shapes_are_not_silently_discarded(work
     assert not runtime.writes
 
 
+@pytest.mark.parametrize("addresses", [[], ["172.31.240.2"], ["2001:db8::1"]])
+def test_gateway_allocated_client_addresses_are_read_only_telemetry(workspace, addresses):
+    runtime, identifier, args = service_gateway_route_fixture(workspace)
+    gateway = runtime.resources[identifier]
+    gateway["properties"]["vpnClientConfiguration"]["vpnClientConnectionHealth"]["allocatedIpAddresses"] = addresses
+    before = copy.deepcopy(gateway)
+    result = core._gateway_configuration(gateway)
+    assert "vpnClientConnectionHealth" not in result["properties"]["vpnClientConfiguration"]
+    assert gateway == before
+    plan = core.prepare(**args, runtime=runtime)
+    assert plan["can_execute"]
+    assert not runtime.writes
+
+
+@pytest.mark.parametrize("addresses", [None, "172.31.240.2", [True], ["invalid"], ["172.31.240.2", "172.31.240.2"]])
+def test_gateway_allocated_client_addresses_reject_malformed_telemetry(workspace, addresses):
+    runtime, identifier, _ = service_gateway_route_fixture(workspace)
+    gateway = runtime.resources[identifier]
+    gateway["properties"]["vpnClientConfiguration"]["vpnClientConnectionHealth"]["allocatedIpAddresses"] = addresses
+    with pytest.raises(core.PrerequisiteError, match="unsupported-client-health"):
+        core._gateway_configuration(gateway)
+    assert not runtime.writes
+
+
 def test_gateway_route_blocker_cannot_be_overridden_in_reviewed_plan(workspace):
     runtime, _, args = gateway_route_review_fixture(workspace)
     plan = core.prepare(**args, runtime=runtime)

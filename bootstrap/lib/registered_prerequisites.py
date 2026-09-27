@@ -566,9 +566,19 @@ def _gateway_configuration(gateway):
     if isinstance(vpn, dict) and "vpnClientConnectionHealth" in vpn:
         health = vpn["vpnClientConnectionHealth"]
         counters = {"vpnClientConnectionsCount", "totalIngressBytesTransferred", "totalEgressBytesTransferred"}
-        require(isinstance(health, dict) and set(health) == counters
-                and all(type(value) is int and value >= 0 for value in health.values()),
+        require(isinstance(health, dict) and counters <= set(health) <= counters | {"allocatedIpAddresses"}
+                and all(type(health[key]) is int and health[key] >= 0 for key in counters),
                 "existing-gateway-unsupported-client-health")
+        if "allocatedIpAddresses" in health:
+            addresses = health["allocatedIpAddresses"]
+            require(isinstance(addresses, list) and all(isinstance(value, str) for value in addresses)
+                    and len(addresses) == len(set(addresses)), "existing-gateway-unsupported-client-health")
+            try:
+                parsed = [ipaddress.ip_address(value) for value in addresses]
+            except ValueError:
+                raise PrerequisiteError("existing-gateway-unsupported-client-health") from None
+            require(all(str(address) == value for address, value in zip(parsed, addresses)),
+                    "existing-gateway-unsupported-client-health")
         del vpn["vpnClientConnectionHealth"]
     return result
 
