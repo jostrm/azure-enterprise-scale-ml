@@ -719,7 +719,9 @@ class Cloud:
         cached = self.tokens.get(key)
         # Budget for the 90-second request timeout plus clock skew, on every use.
         if cached is None or cached["expires_at"] <= time.time() + 120:
-            args = ["account", "get-access-token", "--resource", audience]
+            # Match the CLI cache entry renewed by Graph's standard /.default scope.
+            resource = audience.rstrip("/") if audience == "https://graph.microsoft.com/" else audience
+            args = ["account", "get-access-token", "--resource", resource]
             # --tenant alone still uses the default CLI user, which may belong to
             # the separate Azure deployment tenant rather than the ADO tenant.
             subscription = self._ado_subscription(tenant) if audience == ADO_AUDIENCE else target["subscription_id"]

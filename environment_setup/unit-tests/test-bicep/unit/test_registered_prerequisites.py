@@ -85,6 +85,37 @@ def graph_transport(monkeypatch):
     return state
 
 
+def test_graph_token_uses_canonical_cli_resource_after_interactive_login(graph_transport):
+    state = graph_transport
+    state.cloud.graph("GET", "groups")
+    command = state.commands[0]
+    assert command[command.index("--resource") + 1] == "https://graph.microsoft.com"
+    assert command[command.index("--subscription") + 1] == SUB
+    assert len(state.commands) == 1 and len(state.calls) == 1
+
+
+def test_graph_does_not_reuse_the_trailing_slash_cli_cache_entry(graph_transport):
+    state = graph_transport
+    original = state.cloud.command_runner
+
+    def separate_cache_entries(argv, **kwargs):
+        state.status = 401 if argv[argv.index("--resource") + 1].endswith("/") else 200
+        return original(argv, **kwargs)
+
+    state.cloud.command_runner = separate_cache_entries
+    state.cloud.graph("GET", "groups")
+    assert len(state.commands) == 1 and len(state.calls) == 1
+
+
+def test_canonical_graph_resource_still_propagates_401_without_retry(graph_transport):
+    state = graph_transport
+    state.status = 401
+    with pytest.raises(core.PrerequisiteError, match="graph-request-failed-401"):
+        state.cloud.graph("GET", "groups")
+    assert state.commands[0][state.commands[0].index("--resource") + 1] == "https://graph.microsoft.com"
+    assert len(state.commands) == 1 and len(state.calls) == 1
+
+
 @pytest.mark.parametrize("elapsed", [3479, 3480, 3599, 3601])
 @pytest.mark.parametrize("audience", [core.GRAPH, "00000003-0000-0000-c000-000000000000"])
 def test_graph_token_cache_refreshes_before_each_request(graph_transport, elapsed, audience):
