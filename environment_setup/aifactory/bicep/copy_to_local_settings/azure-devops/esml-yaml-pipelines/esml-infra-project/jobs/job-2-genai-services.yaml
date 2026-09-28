@@ -3736,6 +3736,10 @@ steps:
     RBAC_KEYVAULT_SUBSCRIPTION: $(admin_bicep_input_keyvault_subscription)
     RBAC_SP_SECRET_NAME: $(project_service_principal_OID_seeding_kv_name)
     RBAC_LAKE_PREFIX: $(commonLakeNamePrefixMax8chars)
+    RBAC_LAKE_ACCOUNT: $(datalakeName_param)
+    RBAC_LAKE_CONTAINER: $(lakeContainerName)
+    RBAC_PROJECT_LAKE_ACCESS: $(enableProjectLakeAccess)
+    RBAC_GATEWAY_ONLY: $(deployOnlyAIGatewayNetworking)
     RBAC_PROJECT_PREFIX: $(projectPrefix)
     RBAC_PROJECT_SUFFIX: $(projectSuffix)
     RBAC_AML_EXISTS: $(amlExists)
@@ -3813,13 +3817,38 @@ steps:
      --parameters inputKeyvaultSubscription="$RBAC_KEYVAULT_SUBSCRIPTION" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="${RBAC_SP_SECRET_NAME:-}" \
      --parameters commonLakeNamePrefixMax8chars="${RBAC_LAKE_PREFIX:-}" \
+     --parameters datalakeName_param="${RBAC_LAKE_ACCOUNT:-}" \
+     --parameters lakeContainerName="${RBAC_LAKE_CONTAINER:-lake3}" \
+     --parameters enableProjectLakeAccess="${RBAC_PROJECT_LAKE_ACCESS:-true}" \
+     --parameters deployOnlyAIGatewayNetworking="${RBAC_GATEWAY_ONLY:-false}" \
      --parameters projectPrefix="${RBAC_PROJECT_PREFIX:-}" \
      --parameters projectSuffix="${RBAC_PROJECT_SUFFIX:-}" \
      --parameters amlExists="${RBAC_AML_EXISTS:-false}" \
      --parameters aiHubExists="${RBAC_HUB_EXISTS:-false}" \
      --parameters existingAcrPushUserPrincipals="${RBAC_ACR_USER_PRINCIPALS:-}" \
      --parameters existingAcrPushSPPrincipals="${RBAC_ACR_SP_PRINCIPALS:-}" \
-     --parameters disableSubnetJoinAction="${RBAC_DISABLE_SUBNET_JOIN:-false}"
+     --parameters disableSubnetJoinAction="${RBAC_DISABLE_SUBNET_JOIN:-false}" \
+     --query properties.outputs.projectLakeAccess.value --output json | tee project-lake-access.json
+     echo "##vso[task.setvariable variable=projectLakeAccessContractReady]true"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: AzureCLI@2
+  displayName: '102-project-lake-access'
+  # Runs on the same private agent and approved service connection as task 101.
+  # Opt out with enableProjectLakeAccess=false; legacy folders require an explicit
+  # projectLakeAccessLegacyLayout=true. Neither option migrates existing data.
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_101_rbac_common_rg'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
+  env:
+    PROJECT_LAKE_CONTRACT_READY: $(projectLakeAccessContractReady)
+    PROJECT_LAKE_ACCESS_ENABLED: $(enableProjectLakeAccess)
+    PROJECT_LAKE_GATEWAY_ONLY: $(deployOnlyAIGatewayNetworking)
+    PROJECT_LAKE_LEGACY_LAYOUT: $(projectLakeAccessLegacyLayout)
+    PROJECT_LAKE_AML_ENABLED: $(enableAzureMachineLearning)
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: pscore
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/Invoke-ProjectLakeAccess.ps1'
+    arguments: '-ContractPath "./project-lake-access.json" -Execute'
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '69a-Validate-Subnet-For-NetworkInjection'

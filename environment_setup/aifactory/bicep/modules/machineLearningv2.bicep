@@ -162,7 +162,7 @@ resource azureMLv2Dev 'Microsoft.MachineLearningServices/workspaces@2025-07-01-p
   tags: tags
   properties: {
     allowRoleAssignmentOnRG: true
-    imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}'
+    imageBuildCompute: 'p${projectNumber}-m01${locationSuffix}-${env}'
     friendlyName: name
     description: 'Azure Machine Learning v2, managed networking, not using legacy V1 mode'
     // dependent resources
@@ -223,7 +223,7 @@ resource amlv2TestProd 'Microsoft.MachineLearningServices/workspaces@2025-07-01-
   tags: tags
   properties: {
     allowRoleAssignmentOnRG: true
-    imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}'
+    imageBuildCompute: 'p${projectNumber}-m01${locationSuffix}-${env}'
     friendlyName: name
     description: 'Azure Machine Learning v2, managed networking, not using legacy V1 mode'
     // dependent resources

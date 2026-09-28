@@ -93,6 +93,11 @@ param projectServicePrincipleOID_SeedingKeyvaultName string
 // Data Lake parameters
 param datalakeName_param string = ''
 param commonLakeNamePrefixMax8chars string
+@description('Provision project-scoped lake ACLs in the authenticated private CI runner after deployment; no data-plane deploymentScript is created.')
+param enableProjectLakeAccess bool = true
+@description('Gateway-only common deployments have no common lake.')
+param deployOnlyAIGatewayNetworking bool = false
+param lakeContainerName string = 'lake3'
 
 // Enable flags
 @description('Enable AI Foundry Hub deployment')
@@ -233,24 +238,24 @@ var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0
 var amlWithRandom = take('aml-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${cleanRandomValue}${resourceSuffix}',64)
 var amlName_Static = addAzureMachineLearning ? amlWithRandom : 'aml-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
 
-resource amlREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if (!amlExists && enableAzureMachineLearning) {
+resource amlREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if (enableAzureMachineLearning) {
   name: amlName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 #disable-next-line BCP318
-var var_amlPrincipalId = (!amlExists && enableAzureMachineLearning) ? amlREF.identity.principalId : ''
+var var_amlPrincipalId = enableAzureMachineLearning ? amlREF.identity.principalId : ''
 
 // ============== AI HUB Principal ID ==============
 var aifWithRandom = take('aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${cleanRandomValue}${resourceSuffix}',64)
 var aiHubName_Static = addAIFoundryHub ? aifWithRandom : 'aif-hub-${projectNumber}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
 
-resource aiHubREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if (!aiHubExists && enableAIFoundryHub) {
+resource aiHubREF 'Microsoft.MachineLearningServices/workspaces@2024-10-01-preview' existing = if (enableAIFoundryHub) {
   name: aiHubName_Static
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
 }
 
 #disable-next-line BCP318
-var var_aiHubPrincipalId = (!aiHubExists && enableAIFoundryHub) ? aiHubREF.identity.principalId : ''
+var var_aiHubPrincipalId = enableAIFoundryHub ? aiHubREF.identity.principalId : ''
 
 // ============================================================================
 // DATA LAKE REFERENCE
@@ -367,7 +372,7 @@ module logAnalyticsReaderProjectMembers '../modules/logAnalyticsRbacReader.bicep
 
 // ============== DATA LAKE ACCESS ==============
 // RBAC for Data Lake - AI Foundry Integration
-module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!aiHubExists && enableAIFoundryHub) {
+module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!enableProjectLakeAccess && !deployOnlyAIGatewayNetworking && !aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('08b-rbacLake4Prj${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -385,7 +390,7 @@ module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!ai
 }
 
 // RBAC for Data Lake - Azure ML Integration
-module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!amlExists && enableAzureMachineLearning) {
+module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!enableProjectLakeAccess && !deployOnlyAIGatewayNetworking && !amlExists && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('08b-rbacLake4Amlv2${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -424,7 +429,27 @@ output acrUserPrincipalsFiltered int = length(userIdsFiltered)
 output acrSPPrincipalsFiltered int = length(spAndMiFiltered)
 
 @description('Common Resource Group Data Lake RBAC deployment status')
-output commonDataLakeRbacDeployed bool = (!aiHubExists && enableAIFoundryHub) || (!amlExists && enableAzureMachineLearning)
+output commonDataLakeRbacDeployed bool = !enableProjectLakeAccess && !deployOnlyAIGatewayNetworking && ((!aiHubExists && enableAIFoundryHub) || (!amlExists && enableAzureMachineLearning))
+
+// ARM cannot provision ADLS directories or ACLs. The postdeployment runner consumes
+// this contract; an empty override means discover exactly one HNS account in this RG,
+// never guess a storage name from a potentially stale naming-prefix default.
+output projectLakeAccess object = {
+  enabled: enableProjectLakeAccess && !deployOnlyAIGatewayNetworking
+  subscriptionId: subscriptionIdDevTestProd
+  tenantId: tenant().tenantId
+  storageResourceGroup: commonResourceGroup
+  projectResourceGroup: targetResourceGroup
+  storageAccount: datalakeName_param
+  fileSystem: lakeContainerName
+  project: 'project${projectNumber}'
+  environment: env
+  projectManagedIdentityObjectId: var_miPrj_PrincipalId
+  managedIdentityObjectIds: union(spAndMiUnique, empty(var_aiHubPrincipalId) ? [] : [var_aiHubPrincipalId])
+  userObjectIds: useAdGroups ? [] : userIdsUnique
+  groupObjectIds: useAdGroups ? userIdsUnique : []
+  readOnlyObjectIds: empty(var_amlPrincipalId) ? [] : [var_amlPrincipalId]
+}
 
 @description('RBAC Common RG Phase 8b deployment completed successfully')
 output rbacCommonRgPhaseCompleted bool = true

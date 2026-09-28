@@ -17,6 +17,7 @@ param project_resourcegroup_name string
 param project_service_principle_oid string
 param user_object_ids string
 param storage_account_name_datalake string = ''
+param lakeContainerName string = 'lake3'
 param useAdGroups bool = false
 @description('Contributor role ID for RBAC assignments. Default is the built-in Contributor role.')
 param contributorRoleId string = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
@@ -120,16 +121,19 @@ resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-p
 resource common_datalake 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storage_account_name_datalake
 }
+resource projectLakeContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' existing = {
+  name: '${common_datalake.name}/default/${lakeContainerName}'
+}
 
 resource readerDatalakeStorage 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids_array_Safe)):{
-  name: guid('${user_object_ids_array_Safe[i]}-reader-${bastion_service_name}-${resourceGroup().id}')
+  name: guid(projectLakeContainer.id, user_object_ids_array_Safe[i], readerRoleDefinitionId)
   properties: {
     roleDefinitionId: readerRoleDefinition.id
     principalId: user_object_ids_array_Safe[i]
     principalType:useAdGroups? 'Group':'User'
     description:'Reader to USER with OID  ${user_object_ids_array_Safe[i]} for DATALAKE storage: ${storage_account_name_datalake}'
   }
-  scope:common_datalake
+  scope:projectLakeContainer
 }]
 
 // RG's

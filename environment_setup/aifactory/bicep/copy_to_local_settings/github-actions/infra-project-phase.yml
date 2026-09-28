@@ -216,6 +216,10 @@ jobs:
       privDnsResourceGroup_param: ${{ vars.PRIV_DNS_RESOURCE_GROUP_PARAM || '' }}
       commonResourceGroup_param: ${{ vars.COMMON_RESOURCE_GROUP_PARAM || '' }}
       datalakeName_param: ${{ vars.DATALAKE_NAME_PARAM || '' }}
+      enableProjectLakeAccess: ${{ vars.ENABLE_PROJECT_LAKE_ACCESS || 'true' }}
+      projectLakeAccessLegacyLayout: ${{ vars.PROJECT_LAKE_ACCESS_LEGACY_LAYOUT || 'false' }}
+      deployOnlyAIGatewayNetworking: ${{ vars.DEPLOY_ONLY_AIGATEWAY_NETWORKING || 'false' }}
+      lakeContainerName: ${{ vars.LAKE_CONTAINER_NAME || 'lake3' }}
       kvNameFromCOMMON_param: ${{ vars.KV_NAME_FROM_COMMON_PARAM || '' }}
 
       # BYO overrides
@@ -2872,10 +2876,12 @@ jobs:
               --parameters addAISearch="${{ env.addAISearch }}" \
               --parameters skipExistingRoleAssignments="${{ env.skipACRAssignments }}"
       - name: 101-rbac-common-rg
-        if: inputs.phase == 'infra' && (env.deleteAllServicesForProject != 'true')
+        id: common_rbac
+        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && env.debug_disable_101_rbac_common_rg != 'true' && env.debug_disable_61_foundation != 'true' && env.debug_disable_62_core_infrastructure != 'true'
         continue-on-error: true
         shell: bash
         run: |
+            set -euo pipefail
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
 
             # Compute effective RBAC flags: only true if the feature is enabled AND the resource
@@ -2923,13 +2929,30 @@ jobs:
               --parameters inputKeyvaultSubscription="${{ env.admin_bicep_input_keyvault_subscription }}" \
               --parameters projectServicePrincipleOID_SeedingKeyvaultName="${{ env.project_service_principal_OID_seeding_kv_name }}" \
               --parameters commonLakeNamePrefixMax8chars="${{ env.LAKE_PREFIX }}" \
+              --parameters datalakeName_param="$datalakeName_param" \
+              --parameters lakeContainerName="$lakeContainerName" \
+              --parameters enableProjectLakeAccess="$enableProjectLakeAccess" \
+              --parameters deployOnlyAIGatewayNetworking="$deployOnlyAIGatewayNetworking" \
               --parameters projectPrefix="${{ env.projectPrefix }}" \
               --parameters projectSuffix="${{ env.projectSuffix }}" \
               --parameters amlExists="${{ env.amlExists }}" \
               --parameters aiHubExists="${{ env.aiHubExists }}" \
               --parameters existingAcrPushUserPrincipals="${{ env.existingAcrPushUserPrincipals }}" \
               --parameters existingAcrPushSPPrincipals="${{ env.existingAcrPushSPPrincipals }}" \
-              --parameters disableSubnetJoinAction="${{ env.disableSubnetJoinAction }}"
+              --parameters disableSubnetJoinAction="${{ env.disableSubnetJoinAction }}" \
+              --query properties.outputs.projectLakeAccess.value --output json | tee project-lake-access.json
+
+      - name: 102-project-lake-access
+        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && env.debug_disable_101_rbac_common_rg != 'true' && env.debug_disable_61_foundation != 'true' && env.debug_disable_62_core_infrastructure != 'true'
+        shell: pwsh
+        env:
+          PROJECT_LAKE_CONTRACT_READY: ${{ steps.common_rbac.outcome == 'success' }}
+          PROJECT_LAKE_ACCESS_ENABLED: ${{ env.enableProjectLakeAccess }}
+          PROJECT_LAKE_GATEWAY_ONLY: ${{ env.deployOnlyAIGatewayNetworking }}
+          PROJECT_LAKE_LEGACY_LAYOUT: ${{ env.projectLakeAccessLegacyLayout }}
+          PROJECT_LAKE_AML_ENABLED: ${{ env.enableAzureMachineLearning }}
+        run: |
+          & "./azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/Invoke-ProjectLakeAccess.ps1" -ContractPath "./project-lake-access.json" -Execute
 
       - name: 69-Purge-Soft-Deleted-Foundry-Before-Create
         # A soft-deleted Cognitive Services (AI Foundry) account blocks recreation with the same name:

@@ -4,12 +4,13 @@
 
 param (
     # required parameters
-    [Parameter(Mandatory = $true, HelpMessage = "Specifies the secret for service principal")][string]$spSecret,
+    [Parameter(Mandatory = $false, HelpMessage = "Deprecated: use preauthenticated Azure CLI and Az PowerShell contexts")][string]$spSecret,
     [Parameter(Mandatory=$false, HelpMessage="Specifies the App id for service principal")][string]$spID,
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$tenantID,
     [Parameter(Mandatory = $false, HelpMessage = "Specifies the secret for service principal")][string]$subscriptionID,
     [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory datalake name")][string]$storageAccount,
-    [Parameter(Mandatory=$false, HelpMessage="Override the default ESML datalake container called: lake3")][string]$adlsgen2filesystem,
+    [Parameter(Mandatory = $true)][string]$storageResourceGroup,
+    [Parameter(Mandatory=$false, HelpMessage="Override the default ESML datalake container called: lake3")][string]$adlsgen2filesystem = 'lake3',
     [Parameter(Mandatory = $false, HelpMessage = "Array of user Object Ids")][string]$userObjectIds,
     [Parameter(Mandatory = $false, HelpMessage = "Project service principle OID esml-project001-sp-oid")][string]$projectSPObjectID,
     [Parameter(Mandatory = $false, HelpMessage = "Common service principle OID common")][string]$commonSPObjectID,
@@ -23,34 +24,19 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Region location prefix in ESML settings: [weu,uks,swe,sdc]")][string]$locationSuffix,
     [Parameter(Mandatory = $false, HelpMessage = "Region location in ESML settings: [westeurope, swedencentral, uksouth]")][string]$location,
     [Parameter(Mandatory = $false, HelpMessage = "ESML Projectnumber, three digits: 001")][string]$projectNumber,
-    [Parameter(Mandatory = $false, HelpMessage = "ESML AIFactory environment: [dev,test,prod]")][string]$env,
+    [Parameter(Mandatory = $true, HelpMessage = "ESML AIFactory environment: [dev,test,prod]")][ValidateSet('dev','test','prod')][string]$env,
     [Parameter(Mandatory = $false, HelpMessage = "BYOvNet Resource Group - BYOVnet")][string]$BYOvNetResourceGroup,
     [Parameter(Mandatory = $false, HelpMessage = "BYOvNet vNet Name")][string]$BYOvNetName,
-    [Parameter(Mandatory = $false, HelpMessage = "useADGroups instead of User ObjectID")][bool]$useADGroups
+    [Parameter(Mandatory = $false, HelpMessage = "useADGroups instead of User ObjectID")][bool]$useADGroups,
+    [string[]]$managedIdentityObjectIds = @(),
+    [string[]]$readOnlyObjectIds = @(),
+    [switch]$LegacyLayout,
+    [switch]$Execute
 )
 
-if (-not [String]::IsNullOrEmpty($spSecret)) {
-  Write-Host "The spID parameter is not null or empty. trying to authenticate to Azure with Service principal"
-  #Write-Host "The spID: ${spID}"
-  #Write-Host "The tenantID: ${tenantID}"
-    
-  $SecureStringPwd = $spSecret | ConvertTo-SecureString -AsPlainText -Force
-  $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $spID, $SecureStringPwd
-  Connect-AzAccount -ServicePrincipal -Credential $credential -Tenant $tenantID
-  $context = Get-AzSubscription -SubscriptionId $subscriptionID
-  Set-AzContext $context
-  Write-Host "Now connected & logged in with SP successfully!"
-
-  if ($(Get-AzContext).Subscription -ne "") {
-    write-host "Successfully logged in as $($(Get-AzContext).Account) to $($(Get-AzContext).Subscription)"
-  }
-  else {
-    Write-Host "Failed to login to Azure with Service Principal. Exiting..."
-  }
-
-  
-}else {
-  Write-Host "The spID parameter is null or empty. Running under other authentication that SP"
+$ErrorActionPreference = 'Stop'
+if ($spSecret) {
+  throw 'Secret-based login is no longer supported. Authenticate the approved deployment identity in Azure CLI and Az PowerShell first.'
 }
 
 # EDIT per your convention if it differs from ESML AIFactory defaults
@@ -59,6 +45,39 @@ $deplName2 = '26-add-esml-project-member-2'
 $projectXXX = "project"+$projectNumber
 $common_rg = "${commonRGNamePrefix}esml-common-${locationSuffix}-${env}${aifactorySuffixRG}" # dc-heroes-esml-common-weu-dev-001
 $project_rg = "${commonRGNamePrefix}esml-project${projectNumber}-${locationSuffix}-${env}${aifactorySuffixRG}-rg"
+$userObjectIdsArray = @($userObjectIds -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Sort-Object -Unique)
+$aclParameters = @{
+  tenantID = $tenantID
+  subscriptionID = $subscriptionID
+  storageAccount = $storageAccount
+  storageResourceGroup = $storageResourceGroup
+  adlsgen2filesystem = $adlsgen2filesystem
+  projectXXX = $projectXXX
+  environment = $env
+  userObjectIds = $(if ($useADGroups) { @() } else { $userObjectIdsArray })
+  projectSPObjectID = $projectSPObjectID
+  projectADGroupObjectId = $(if ($useADGroups) { (@($projectADGroupObjectId) + $userObjectIdsArray | Where-Object { $_ }) -join ',' } else { $projectADGroupObjectId })
+  managedIdentityObjectIds = $managedIdentityObjectIds
+  readOnlyObjectIds = $readOnlyObjectIds
+  LegacyLayout = $LegacyLayout
+}
+$aclScript = Join-Path $PSScriptRoot '25-add-users-to-datalake-acl-rbac.ps1'
+# Validate and preview lake access before any ARM or Key Vault mutation.
+& $aclScript @aclParameters
+if (-not $Execute) {
+  Write-Host 'Preview only. Supply -Execute to apply project-member ARM roles, lake ACLs and Key Vault policy.'
+  return
+}
+$context = Get-AzContext
+if (-not $context -or $context.Subscription.Id -ne $subscriptionID -or $context.Tenant.Id -ne $tenantID) {
+  throw 'Az PowerShell context must already target the requested subscription and tenant. No account context is changed automatically.'
+}
+if ($storageResourceGroup -ne $common_rg) {
+  throw 'This legacy ARM member caller requires the lake in its resolved common RG. For a BYO lake in another RG, run 25-add-users-to-datalake-acl-rbac.ps1 directly with its exact storageResourceGroup.'
+}
+if ($userObjectIdsArray.Count -gt 0 -and [string]::IsNullOrWhiteSpace($projectKeyvaultName)) {
+  throw 'projectKeyvaultName is required when applying the legacy member Key Vault access policy.'
+}
 Write-Host "Common RG" $common_rg
 Write-Host "Project RG" $project_rg
 
@@ -89,8 +108,7 @@ for ($i=0; $i -lt $userObjectIds.Length; $i++) {
 
 if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
   Write-Host "Running BYOVnet logic - addUserAsProjectMemberByoVnet"
-  Set-AzDefault -ResourceGroupName $BYOvNetResourceGroup
-  New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMemberByoVnet.bicep" `
+  New-AzResourceGroupDeployment -TemplateFile (Join-Path $PSScriptRoot '../modules/addUserAsProjectMemberByoVnet.bicep') `
   -Name $deplName1 `
   -ResourceGroupName $BYOvNetResourceGroup `
   -project_service_principle_oid $projectSPObjectID `
@@ -101,8 +119,7 @@ if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
   -Verbose
 
   Write-Host "Running BYOVnet logic - addUserAsProjectMemberByoVnetRGs"
-  Set-AzDefault -ResourceGroupName $common_rg
-  New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMemberByoVnetRGs.bicep" `
+  New-AzResourceGroupDeployment -TemplateFile (Join-Path $PSScriptRoot '../modules/addUserAsProjectMemberByoVnetRGs.bicep') `
   -Name $deplName2 `
   -ResourceGroupName $common_rg `
   -project_resourcegroup_name $project_rg `
@@ -110,12 +127,13 @@ if (-not [String]::IsNullOrEmpty($BYOvNetName)) {
   -user_object_ids $userObjectIds `
   -bastion_service_name $bastion_service_name `
   -storage_account_name_datalake $storageAccount `
+  -lakeContainerName $adlsgen2filesystem `
   -useADGroups $useADGroups `
   -Verbose
 }
 else{
   Write-Host "Running standard logic (not BYOVnet logic)..."
-  New-AzResourceGroupDeployment -TemplateFile "../../azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/addUserAsProjectMember.bicep" `
+  New-AzResourceGroupDeployment -TemplateFile (Join-Path $PSScriptRoot '../modules/addUserAsProjectMember.bicep') `
   -Name $deplName1 `
   -ResourceGroupName $common_rg `
   -project_resourcegroup_name $project_rg `
@@ -125,6 +143,7 @@ else{
   -user_object_ids $userObjectIds `
   -bastion_service_name $bastion_service_name `
   -storage_account_name_datalake $storageAccount `
+  -lakeContainerName $adlsgen2filesystem `
   -useADGroups $useADGroups `
   -Verbose
 
@@ -148,12 +167,13 @@ Write-Host "commonSPObjectID: $commonSPObjectID"
 Write-Host "commonADgroupObjectID: $commonADgroupObjectID"
 Write-Host "projectADGroupObjectId: $projectADGroupObjectId"
 
-Write-Host "Not running add-users-to-datalake-acl"
+& $aclScript @aclParameters -Execute
 
-& ".\25-add-users-to-datalake-acl-rbac.ps1" -spSecret $spSecret -spID $spID -tenantID $tenantID -storageAccount $storageAccount -adlsgen2filesystem $adlsgen2filesystem -projectXXX $projectXXX -userObjectIds $userObjectIdsArray -projectSPObjectID $projectSPObjectID -commonSPObjectID $commonSPObjectID -commonADgroupObjectID $commonADgroupObjectID -projectADGroupObjectId $projectADGroupObjectId
-
-Write-Host "25-add-users-to-kv-get-list-access-policy"
-
-& ".\25-add-users-to-kv-get-list-access-policy.ps1" -spSecret $spSecret -spID $spID -tenantID $tenantID -subscriptionID $subscriptionID -userObjectIds $userObjectIdsArray -projectOrCoreteam 'project' -keyvaultName $projectKeyvaultName
+Write-Host "Applying project Key Vault get/list policy with the existing Az context"
+# The legacy helper requires secret-login parameters; preserve its policy operation
+# without reauthenticating or making a secret mandatory for this caller.
+foreach ($targetObjectID in $userObjectIdsArray) {
+  Set-AzKeyVaultAccessPolicy -VaultName $projectKeyvaultName -ObjectId $targetObjectID -PermissionsToSecrets get,list -BypassObjectIdValidation
+}
 
 Write-Host "Finished!"

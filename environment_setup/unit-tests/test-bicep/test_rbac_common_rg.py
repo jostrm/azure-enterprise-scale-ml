@@ -82,6 +82,7 @@ class TestCommonRbacScript(unittest.TestCase):
         environment.update(values)
         # A shell function captures exact argv; no Azure CLI or cloud access is used.
         mock_az = (
+            "tee() { cat; }\n"
             "az() {\n"
             "  printf 'AZ_ARG:%s\\0' \"$@\"\n"
             f'  if [ "$1" = account ]; then return {account_exit}; fi\n'

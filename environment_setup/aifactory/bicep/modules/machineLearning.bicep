@@ -252,7 +252,7 @@ resource machineLearningStudio 'Microsoft.MachineLearningServices/workspaces@202
 
     // configuration for workspaces with private link endpoint
     allowRoleAssignmentOnRG: true
-    imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}' //'cluster001'
+    imageBuildCompute: 'p${projectNumber}-m01${locationSuffix}-${env}'
     publicNetworkAccess: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)?'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
     allowPublicAccessWhenBehindVnet: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? true: allowPublicAccessWhenBehindVnet // Allows controlled public access through IP allow lists while maintaining VNet integration
     systemDatastoresAuthMode: 'identity'
@@ -290,7 +290,7 @@ resource machineLearningStudioTestProd 'Microsoft.MachineLearningServices/worksp
 
     // configuration for workspaces with private link endpoint
     allowRoleAssignmentOnRG: true
-    imageBuildCompute: '${name}/p${projectNumber}-m01${locationSuffix}-${env}' //'cluster001'
+    imageBuildCompute: 'p${projectNumber}-m01${locationSuffix}-${env}'
     publicNetworkAccess:(!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? 'Enabled': 'Disabled' // Disabled:The workspace can only be accessed through private endpoints. No IP Whitelisting possible.
     allowPublicAccessWhenBehindVnet: (!empty(ipWhitelist_array) || enablePublicAccessWithPerimeter)? true: allowPublicAccessWhenBehindVnet // Allows controlled public access through IP allow lists while maintaining VNet integration
     systemDatastoresAuthMode: 'identity'

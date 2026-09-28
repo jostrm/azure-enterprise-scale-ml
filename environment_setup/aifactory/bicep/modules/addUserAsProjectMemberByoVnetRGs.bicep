@@ -11,6 +11,7 @@
 @description('Optional: resource group, usually called: dashboards, where on subscription where Azure Dashboards are stored centrally (Dashboards hub), or locally.')
 param dashboard_resourcegroup_name string = 'dashboards'
 param storage_account_name_datalake string
+param lakeContainerName string = 'lake3'
 param bastion_service_name string
 param project_resourcegroup_name string
 param user_object_ids string
@@ -64,15 +65,18 @@ resource readerUserBastion 'Microsoft.Authorization/roleAssignments@2020-04-01-p
 resource common_datalake 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storage_account_name_datalake
 }
+resource projectLakeContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' existing = {
+  name: '${common_datalake.name}/default/${lakeContainerName}'
+}
 resource readerDatalakeStorage 'Microsoft.Authorization/roleAssignments@2020-04-01-preview' = [for i in range(0, length(user_object_ids_array_Safe)):{
-  name: guid('${user_object_ids_array_Safe[i]}-reader-${bastion_service_name}-${resourceGroup().id}')
+  name: guid(projectLakeContainer.id, user_object_ids_array_Safe[i], readerRoleDefinitionId)
   properties: {
     roleDefinitionId: readerRoleDefinition.id
     principalId: user_object_ids_array_Safe[i]
     principalType:useAdGroups? 'Group':'User'
     description:'Reader to USER with OID  ${user_object_ids_array_Safe[i]} for DATALAKE storage: ${storage_account_name_datalake}'
   }
-  scope:common_datalake
+  scope:projectLakeContainer
 }]
 
 // RG's 
