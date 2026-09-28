@@ -765,7 +765,7 @@ class PlanCloud(FakeCloud):
         return super().request(method, url, audience, data, headers, allowed)
 
 
-def simple_plan_closure(cloud, scopes):
+def simple_plan_closure(cloud, scopes, resource_versions=None):
     resources = {key: body for key, body in cloud.bodies.items() if key != GROUP.lower()}
     return ({"providers": {}, "collections": {}, "groups": {GROUP.lower(): {}},
              "resources": {key: {"type": "microsoft.network/publicipaddresses", "api_version": "2024-05-01",
@@ -851,6 +851,10 @@ class ClosureCloud(FakeCloud):
             {"resourceType": "networkSecurityGroups", "apiVersions": ["2024-05-01"]},
             {"resourceType": "networkSecurityGroups/securityRules", "apiVersions": ["2024-05-01"]},
         ]}
+
+    def provider_operations(self, namespace):
+        return [namespace.lower() + "/" + row["resourceType"].lower() + "/" + action
+                for row in self.provider_schema(namespace)["resourceTypes"] for action in ("read", "write", "delete")]
 
     def list_resources(self, scope):
         return [copy.deepcopy(self.bodies[NSG.lower()])] + self.extra_inventory

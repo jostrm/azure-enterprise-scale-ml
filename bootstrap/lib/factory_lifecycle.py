@@ -41,6 +41,11 @@ GUID = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
 RG_ID = re.compile(r"/subscriptions/(" + GUID + r")/resourceGroups/([A-Za-z0-9_.()-]{1,90})", re.I)
 RESOURCE_ID = re.compile(RG_ID.pattern + r"/providers/([A-Za-z0-9.]+)/([A-Za-z0-9]+)/([A-Za-z0-9_.()-]{1,128})", re.I)
 NESTED_ID = re.compile(RG_ID.pattern + r"/providers/[A-Za-z0-9.]+(?:/[A-Za-z0-9_.()%-]+/[A-Za-z0-9_.()%-]+)+", re.I)
+SUBSCRIPTION_RESOURCE_ID = re.compile(r"/subscriptions/(" + GUID
+    + r")/providers/[A-Za-z0-9.]+(?:/[A-Za-z0-9_.()%-]+/[A-Za-z0-9_.()%-]+)+", re.I)
+EXACT_BOOTSTRAP_CONTRACT = "exact-bootstrap-resources-v2"
+PRESERVATION_PERMIT_CONTRACT = "reviewed-bootstrap-preservation-v1"
+NON_RESOURCE_METADATA = {"microsoft.compute/virtualmachines/metricdefinitions"}
 TAG_KEYS = {"factory_id": "aifactory.factory_id", "scaleset_id": "aifactory.scaleset_id",
             "project_id": "aifactory.project_id"}
 # These ARM types have no independently managed child-resource collections.
@@ -343,6 +348,8 @@ def validate_deployment_plan(document):
         isinstance(key, str) and key == key.lower() and NESTED_ID.fullmatch(key)
         and isinstance(value, dict) and guid(value.get("run_id")) and hash_value(value.get("receipt_hash"))
         for key, value in known.items()), "invalid-known-ownership-evidence")
+    if plan.get("bootstrap_foundation", {}).get("contract") == EXACT_BOOTSTRAP_CONTRACT:
+        validate_exact_bootstrap(document)
     steps, projects, common, seen = plan["steps"], set(), set(), set()
     allowed_scopes = {value.lower() for value in document["locks"]["scopes"]}
     for step in steps:
@@ -544,6 +551,9 @@ def capabilities():
         "scoped_group_ownership_receipt": "resource-group-ownership-v1",
         "network_preservation": "preserve-v1-runtime-proof",
         "bootstrap_ownership": "created-group-ownership-v1",
+        "bootstrap_resource_ownership": EXACT_BOOTSTRAP_CONTRACT,
+        "bootstrap_preservation_permit": PRESERVATION_PERMIT_CONTRACT,
+        "resource_closure": "arm-resource-only-closure-v2",
         "delete_leaf_types": sorted(LEAF_TYPES), "delete_empty_owned_resource_groups": True,
         "delete_owned_resource_groups": "arm-provider-closure-v1",
         "factory_cohort": "physical-lease-cohort-v1",
@@ -865,6 +875,21 @@ class Cloud:
                 "incomplete-provider-schema")
         return body
 
+    def provider_operations(self, namespace):
+        _, _, body = self.request("GET", ARM + "/providers/Microsoft.Authorization/providerOperations/"
+                                  + quote(namespace, safe=".")
+                                  + "?api-version=2022-04-01&%24expand=resourceTypes", ARM)
+        require(isinstance(body, dict) and isinstance(body.get("operations"), list)
+                and isinstance(body.get("resourceTypes"), list), "incomplete-provider-operations")
+        operations = list(body["operations"])
+        for row in body["resourceTypes"]:
+            require(isinstance(row, dict) and isinstance(row.get("operations"), list),
+                    "incomplete-provider-operations")
+            operations.extend(row["operations"])
+        require(all(isinstance(row, dict) and isinstance(row.get("name"), str) for row in operations),
+                "incomplete-provider-operations")
+        return sorted({row["name"].lower() for row in operations if row.get("isDataAction") is not True})
+
     def collection(self, path, api_version, *, extension=False):
         url = ARM + quote(path, safe="/().-_") + "?api-version=" + api_version
         if "/microsoft.authorization/" in path.lower():
@@ -885,6 +910,16 @@ class Cloud:
                 require(extension and isinstance(code, str) and code in UNSUPPORTED_COLLECTION_CODES
                         and not ("error" in body and "code" in body), "unsupported-child-inventory-endpoint")
                 return [], code
+            # This Key Vault ARM collection returns a JSON-encoded array,
+            # rather than the normal ARM ListResult envelope.
+            if (path.lower().endswith("/eventgridfilters") and isinstance(body, str)
+                    and resource_type_from_id(path + "/entry") == "microsoft.keyvault/vaults/eventgridfilters"):
+                try:
+                    decoded = json.loads(body)
+                except ValueError:
+                    raise Blocked("incomplete-child-inventory") from None
+                require(isinstance(decoded, list), "incomplete-child-inventory")
+                body = {"value": decoded}
             require(isinstance(body, dict) and isinstance(body.get("value"), list),
                     "incomplete-child-inventory")
             for row in body["value"]:
@@ -909,14 +944,38 @@ class Cloud:
         return template
 
 
-def collect_resource_closure(cloud, scopes):
+def resource_references(body):
+    """Resource IDs are dependencies, including provider-owned external links."""
+    result = set()
+
+    def visit(value):
+        if isinstance(value, dict):
+            for item in value.values():
+                visit(item)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item)
+        elif isinstance(value, str) and value.lower().startswith("/subscriptions/"):
+            require(RG_ID.fullmatch(value) or NESTED_ID.fullmatch(value)
+                    or SUBSCRIPTION_RESOURCE_ID.fullmatch(value)
+                    or re.fullmatch(r"/subscriptions/" + GUID, value, re.I),
+                    "invalid-resource-reference")
+            result.add(value.lower())
+
+    visit(body)
+    return result
+
+
+def collect_resource_closure(cloud, scopes, resource_versions=None):
     """Complete registered child-resource closure, including scoped extensions.
 
     Unsupported list endpoints fail closed. Known inline ARM child operations
     are covered by the full parent body fingerprint, not invented resources.
     """
-    schemas, versions, bodies = {}, {}, {}
-    closure = {"providers": {}, "collections": {}, "resources": {}, "groups": {}}
+    schemas, operations, resource_capabilities, versions, bodies = {}, {}, {}, {}, {}
+    closure = {"providers": {}, "collections": {}, "resources": {}, "groups": {}, "references": {}, "inline": {}}
+    resource_versions = resource_versions or {}
+    scope_ids = {scope.lower() for scope in scopes}
     singleton = {
         "microsoft.storage/storageaccounts/blobservices": "default",
         "microsoft.storage/storageaccounts/fileservices": "default",
@@ -924,7 +983,7 @@ def collect_resource_closure(cloud, scopes):
         "microsoft.storage/storageaccounts/tableservices": "default",
         "microsoft.storage/storageaccounts/managementpolicies": "default",
     }
-    inline = {"microsoft.keyvault/vaults/accesspolicies"}
+    inline = {"microsoft.keyvault/vaults/accesspolicies", "microsoft.network/virtualnetworks/subnets/delegations"}
     terminal_extensions = {kind.lower() for kind, _ in EXTENSION_COLLECTIONS}
 
     def provider(namespace):
@@ -936,15 +995,40 @@ def collect_resource_closure(cloud, scopes):
                 require(isinstance(row, dict) and isinstance(row.get("resourceType"), str)
                         and isinstance(row.get("apiVersions"), list), "incomplete-provider-schema")
                 entries[row["resourceType"].lower()] = row["apiVersions"]
+                resource_capabilities[key + "/" + row["resourceType"].lower()] = {
+                    value.strip().lower() for value in str(row.get("capabilities", "")).split(",")}
             schemas[key] = entries
-            closure["providers"][key] = digest(body)
+            operations[key] = set(cloud.provider_operations(namespace))
+            require(operations[key] and all(isinstance(name, str) and name.startswith(key + "/")
+                                            for name in operations[key]), "incomplete-provider-operations")
+            closure["providers"][key] = digest({"schema": body, "operations": sorted(operations[key])})
         return schemas[key]
 
-    def version(kind):
+    def resource_kind(kind):
+        if kind in NON_RESOURCE_METADATA:
+            return "metadata"
+        namespace, relative = kind.split("/", 1)
+        provider(namespace)
+        names = operations[namespace.lower()]
+        reads = kind.lower() + "/read" in names
+        writes = any(kind.lower() + "/" + action in names for action in ("write", "delete"))
+        if reads and writes:
+            return "resource"
+        if not any(name.startswith(kind.lower() + "/") for name in names):
+            require("supportstags" in resource_capabilities.get(kind.lower(), set()),
+                    "provider-resource-kind-unclassified")
+            return "resource"
+        require(reads or not writes and kind.lower() + "/action" in names,
+                "provider-resource-kind-unclassified")
+        return "readonly" if reads else "operation"
+
+    def version(kind, parent_api=None):
         namespace, relative = kind.split("/", 1)
         available = provider(namespace).get(relative.lower(), [])
         stable = sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value)), reverse=True)
         fallback = sorted((value for value in available if re.fullmatch(r"\d{4}-\d{2}-\d{2}-preview", value)), reverse=True)
+        if not stable and not fallback and parent_api and resource_kind(kind) != "operation":
+            return parent_api
         require(stable or fallback, "resource-api-version-not-discoverable")
         return (stable or fallback)[0]
 
@@ -962,7 +1046,7 @@ def collect_resource_closure(cloud, scopes):
         for row in rows:
             resource_id = row["id"].lower()
             if resource_id not in versions:
-                versions[resource_id] = api
+                versions[resource_id] = resource_versions.get(resource_id, api)
                 queue.append(row["id"])
 
     def extensions(scope):
@@ -985,7 +1069,7 @@ def collect_resource_closure(cloud, scopes):
         for row in roots:
             resource_id = row["id"]
             require(arm_scope(resource_id) == scope.lower(), "inventory-escaped-resource-group")
-            api = version(resource_type_from_id(resource_id))
+            api = resource_versions.get(resource_id.lower()) or version(resource_type_from_id(resource_id))
             if resource_id.lower() not in versions:
                 versions[resource_id.lower()] = api
                 queue.append(resource_id)
@@ -1002,8 +1086,24 @@ def collect_resource_closure(cloud, scopes):
         _, headers, body = cloud.arm("GET", resource_id, api)
         require(isinstance(body, dict) and body.get("id", "").lower() == key, "resource-closure-identity-mismatch")
         bodies[key] = body
+        require(not body.get("type") or body["type"].lower() == kind, "resource-closure-type-mismatch")
         closure["resources"][key] = {"type": kind, "api_version": api, "body_hash": digest(body),
                                     "etag": body.get("etag") or next((v for k, v in headers.items() if k.lower() == "etag"), None)}
+        references = resource_references(body)
+        closure["references"][key] = sorted(references - {key})
+        for reference in sorted(references):
+            match = RG_ID.match(reference)
+            if (reference == key or reference in versions or not match
+                    or match.group().lower() not in scope_ids or RG_ID.fullmatch(reference)):
+                continue
+            referenced_kind = resource_type_from_id(reference)
+            if referenced_kind in inline:
+                closure["inline"][reference] = {"parent_id": reference.rsplit("/", 2)[0]}
+                continue
+            require(resource_kind(referenced_kind) in ("resource", "readonly"), "resource-reference-is-operation")
+            parent_api = api if referenced_kind.split("/")[0] == kind.split("/")[0] else None
+            versions[reference] = resource_versions.get(reference) or version(referenced_kind, parent_api)
+            queue.append(reference)
         if kind in terminal_extensions:
             continue
         namespace, relative = kind.split("/", 1)
@@ -1014,9 +1114,17 @@ def collect_resource_closure(cloud, scopes):
             full_type = namespace + "/" + child
             if full_type in inline:
                 closure["collections"][key + "/" + tail] = {"inline_parent_hash": digest(body)}
-            else:
-                add_collection(resource_id + "/" + tail, version(full_type), single=singleton.get(full_type))
+                continue
+            if resource_kind(full_type) != "resource":
+                closure["collections"][key + "/" + tail] = {"non_resource_metadata": full_type}
+                continue
+            add_collection(resource_id + "/" + tail, version(full_type), single=singleton.get(full_type))
         extensions(resource_id)
+    for reference, metadata in closure["inline"].items():
+        parent = metadata["parent_id"]
+        require(parent in bodies and reference in resource_references(bodies[parent]),
+                "inline-resource-parent-unverified")
+        metadata["parent_body_hash"] = digest(bodies[parent])
     return closure, bodies
 
 
@@ -1791,7 +1899,7 @@ def project_run_request(document):
     }
 
 
-def arm_changes(body):
+def arm_changes(body, unchanged_resources=None):
     require(isinstance(body, dict) and body.get("status") in (None, "Succeeded") and not body.get("error"),
             "arm-what-if-failed-or-incomplete")
     properties = body.get("properties", body)
@@ -1799,6 +1907,17 @@ def arm_changes(body):
             and isinstance(properties.get("changes"), list), "complete-arm-what-if-required")
     result = []
     for change in properties["changes"]:
+        if change.get("changeType") == "Ignore":
+            identifier = change.get("resourceId", "").lower()
+            proof = (unchanged_resources or {}).get(identifier)
+            require(isinstance(proof, dict) and hash_value(proof.get("body_hash"))
+                    and (change.get("after") is None or change.get("before") == change.get("after"))
+                    and not change.get("delta")
+                    and not change.get("error") and not change.get("unsupportedReason"),
+                    "ignored-resource-requires-exact-instance-proof")
+            result.append({"resource_id": identifier, "change_type": "NoChange",
+                           "before_hash": proof["body_hash"], "after_hash": proof["body_hash"]})
+            continue
         require(change.get("changeType") in ("Create", "Modify", "NoChange"), "unresolved-or-destructive-arm-what-if")
         require(isinstance(change.get("resourceId"), str), "invalid-arm-what-if-resource")
         result.append({"resource_id": change["resourceId"].lower(), "change_type": change["changeType"],
@@ -1841,8 +1960,12 @@ def verify_preserved_network(cloud, document, step, source_root, *, template=Non
         require(digest(template) == step["template_hash"], "compiled-template-hash-mismatch")
         helper.validate_compiled_capability(template)
         desired = json.loads(canonical(proof["desired"]))
+        network_scope = arm_scope(desired["vnet_id"])
         require(desired["factory_id"] == document["target"]["factory_id"]
-                and arm_scope(desired["vnet_id"]) == str(step.get("resource_group", "")).lower(),
+                and network_scope in {scope.lower() for scope in document["locks"]["scopes"]}
+                and network_scope in {scope.lower() for scope in step["resource_groups"]}
+                and (step["scope"] == "subscription"
+                     or network_scope == str(step.get("resource_group", "")).lower()),
                 "runtime-network-preservation-target-mismatch")
         parameters = step["parameters"]
         replay = parameters.get("preservationPlan", {})
@@ -1961,7 +2084,9 @@ def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep):
                 break
         else:
             raise Blocked("arm-what-if-incomplete")
-    return arm_changes(response)
+    foundation = document.get("deployment", {}).get("bootstrap_foundation", {})
+    resources = (foundation["resources"] if foundation.get("contract") == EXACT_BOOTSTRAP_CONTRACT else {})
+    return arm_changes(response, resources)
 
 
 def frozen_step(cloud, document, step, source_root):
@@ -2019,10 +2144,245 @@ def combined_plan_payload(cloud, document, source_root):
     return {"location": target["region"], "properties": {"mode": "Incremental", "template": outer, "parameters": parameters}}
 
 
+def validate_preservation_permit(document):
+    foundation = document["deployment"]["bootstrap_foundation"]
+    permit = foundation.get("preservation_permit")
+    require(isinstance(permit, dict) and permit.get("contract") == PRESERVATION_PERMIT_CONTRACT
+            and permit.get("approved") is True and guid(permit.get("review_id"))
+            and hash_value(permit.get("owner_hash")) and guid(permit.get("workflow_id"))
+            and permit.get("approval_hash") == digest({key: value for key, value in permit.items()
+                                                     if key != "approval_hash"}),
+            "reviewed-preservation-consent-required")
+    proposal = permit.get("proposal")
+    require(isinstance(proposal, dict) and permit.get("proposal_hash") == digest(proposal)
+            and proposal.get("owner_hash") == permit["owner_hash"]
+            and proposal.get("workflow_id") == permit["workflow_id"] == foundation["workflow_id"]
+            and proposal.get("source_commit") == document["source"]["commit"]
+            and hash_value(proposal.get("bootstrap_hash"))
+            and proposal.get("operator_id") == document["identity"]["object_id"]
+            and proposal.get("deployment_object_id") == document["identity"]["deployment_object_id"]
+            and proposal.get("scopes") == sorted(foundation["groups"])
+            and isinstance(proposal.get("target"), dict)
+            and all(proposal.get("target", {}).get(key) == document["target"][key] for key in
+                    ("factory_id", "scaleset_id", "subscription_id", "tenant_id", "region"))
+            and all(proposal.get(key) == [] for key in ("writes", "deletes", "ownership_grants")),
+            "reviewed-preservation-context-mismatch")
+    runner = proposal.get("runner", {})
+    require(isinstance(runner, dict), "reviewed-preservation-runner-proof-required")
+    vm = runner.get("resource_id", "")
+    resources = proposal.get("resources")
+    require(isinstance(vm, str) and NESTED_ID.fullmatch(vm)
+            and resource_type_from_id(vm) == "microsoft.compute/virtualmachines"
+            and vm in foundation["resources"] and isinstance(foundation["resources"][vm], dict)
+            and foundation["resources"][vm].get("disposition") == "preserve"
+            and hash_value(runner.get("request_hash"))
+            and hash_value(runner.get("body_hash"))
+            and runner["body_hash"] == foundation["resources"][vm].get("body_hash")
+            and runner.get("receipt_hash") == digest(foundation["resources"][vm].get("receipt"))
+            and isinstance(resources, dict) and len(resources) == 2
+            and all(isinstance(key, str) and isinstance(row, dict) for key, row in resources.items()),
+            "reviewed-preservation-runner-proof-required")
+    extension = vm + "/extensions/mde.linux"
+    commands = [key for key in resources if re.fullmatch(
+        re.escape(vm) + r"/runcommands/register-aifactory-gha-\d{14}-\d+", key)]
+    require(len(commands) == 1 and set(resources) == {extension, commands[0]},
+            "reviewed-preservation-exact-children-required")
+    ext, command = resources[extension], resources[commands[0]]
+    require(ext.get("type") == "microsoft.compute/virtualmachines/extensions"
+            and ext.get("publisher") == "Microsoft.Azure.AzureDefenderForServers"
+            and ext.get("extension_type") == "MDE.Linux" and ext.get("provisioning_state") in ("Failed", "Succeeded")
+            and command.get("type") == "microsoft.compute/virtualmachines/runcommands"
+            and command.get("provisioning_state") == command.get("execution_state") == "Succeeded"
+            and type(command.get("exit_code")) is int and command["exit_code"] == 0
+            and hash_value(command.get("script_sha256"))
+            and all(row.get("scope") == arm_scope(vm) for row in resources.values())
+            and isinstance(proposal.get("warnings"), list)
+            and all(isinstance(row, dict) for row in proposal["warnings"]) and any(
+                row.get("resource_id") == extension and row.get("code") == "defender-security-readiness-unverified"
+                and row.get("provisioning_state") == ext["provisioning_state"] for row in proposal["warnings"]),
+            "reviewed-preservation-state-or-security-warning-required")
+    return permit
+
+
+def validate_exact_bootstrap(document):
+    proof = document["deployment"]["bootstrap_foundation"]
+    target = document["target"]
+    require(document["operation"] in ("create-factory", "create-scaleset", "deploy-project")
+            and proof.get("contract") == EXACT_BOOTSTRAP_CONTRACT
+            and proof.get("source_commit") == document["source"]["commit"]
+            and hash_value(proof.get("evidence_hash")) and guid(proof.get("workflow_id")),
+            "exact-bootstrap-source-proof-required")
+    groups, resources = proof.get("groups"), proof.get("resources")
+    scopes = {scope.lower() for scope in document["locks"]["scopes"]}
+    require(isinstance(groups, dict) and groups and set(groups) <= scopes
+            and isinstance(resources, dict) and set(groups) <= set(resources),
+            "exact-bootstrap-scopes-required")
+    permit = validate_preservation_permit(document) if "preservation_permit" in proof else None
+    permit_rows = permit["proposal"]["resources"] if permit else {}
+    require(set(permit_rows) <= set(resources), "reviewed-preservation-resources-missing")
+    for group, receipt in groups.items():
+        require(group == group.lower() and RG_ID.fullmatch(group) and isinstance(receipt, dict)
+                and guid(receipt.get("plan_id")) and hash_value(receipt.get("plan_hash")),
+                "created-bootstrap-group-receipt-required")
+    for identifier, row in resources.items():
+        require(isinstance(identifier, str) and identifier == identifier.lower()
+                and (RG_ID.fullmatch(identifier) or NESTED_ID.fullmatch(identifier))
+                and arm_scope(identifier) in groups and isinstance(row, dict),
+                "exact-bootstrap-resource-scope-required")
+        kind = "microsoft.resources/resourcegroups" if identifier in groups else resource_type_from_id(identifier)
+        require(row.get("type") == kind and row.get("scope") == arm_scope(identifier)
+                and isinstance(row.get("api_version"), str)
+                and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-preview)?", row["api_version"])
+                and hash_value(row.get("body_hash")) and "etag" in row
+                and (row["etag"] is None or isinstance(row["etag"], str) and 0 < len(row["etag"]) <= 1024),
+                "exact-bootstrap-resource-instance-required")
+        if row.get("preservation") == "reviewed-instance":
+            require(identifier in permit_rows and identifier not in groups
+                    and row.get("disposition") == "preserve" and "owner" not in row and "receipt" not in row
+                    and row.get("permit_hash") == permit["approval_hash"]
+                    and all(row.get(key) == permit_rows[identifier].get(key)
+                            for key in ("type", "scope", "api_version", "body_hash", "etag")),
+                    "reviewed-preservation-cannot-grant-ownership")
+            continue
+        require(identifier not in permit_rows and "permit_hash" not in row,
+                "reviewed-preservation-cannot-grant-ownership")
+        receipt = row.get("receipt")
+        require(isinstance(receipt, dict) and guid(receipt.get("plan_id"))
+                and hash_value(receipt.get("plan_hash")) and hash_value(receipt.get("receipt_hash"))
+                and isinstance(receipt.get("resource_id"), str),
+                "exact-bootstrap-consumed-receipt-required")
+        origin = receipt["resource_id"]
+        require(origin in resources and arm_scope(origin) == row["scope"], "bootstrap-receipt-resource-mismatch")
+        disposition = row.get("disposition")
+        require(disposition in ("owned", "preserve"), "bootstrap-resource-disposition-required")
+        if disposition == "owned":
+            owner = row.get("owner")
+            require(origin == identifier and isinstance(owner, dict) and set(owner) <= set(TAG_KEYS)
+                    and all(owner.get(key) == target[key] for key in ("factory_id", "scaleset_id"))
+                    and ("project_id" not in owner or re.fullmatch(r"\d{3}", owner["project_id"])),
+                    "exact-bootstrap-resource-owner-required")
+        else:
+            require("owner" not in row and identifier not in groups
+                    and (origin == identifier or identifier.startswith(origin + "/"))
+                    and row.get("preservation") in ("bootstrap-prerequisite", "provider-readonly"),
+                    "bootstrap-preservation-cannot-authorize-ownership")
+            if origin != identifier:
+                require(row["preservation"] == "provider-readonly",
+                        "bootstrap-dependent-requires-exact-receipt")
+        if identifier in groups:
+            require(disposition == "owned" and all(receipt[key] == groups[identifier][key]
+                    for key in ("plan_id", "plan_hash")), "bootstrap-group-proof-conflict")
+    return proof
+
+
+def bootstrap_resource_versions(document):
+    proof = document.get("deployment", {}).get("bootstrap_foundation", {})
+    return {key: row["api_version"] for key, row in proof.get("resources", {}).items()
+            if proof.get("contract") == EXACT_BOOTSTRAP_CONTRACT}
+
+
+def exact_bootstrap_snapshot(cloud, document):
+    proof = validate_exact_bootstrap(document)
+    closure, bodies = collect_resource_closure(cloud, sorted(proof["groups"]),
+                                               bootstrap_resource_versions(document))
+    require(set(bodies) == set(proof["resources"]), "bootstrap-exact-resource-inventory-changed")
+    if "preservation_permit" in proof:
+        permit = validate_preservation_permit(document)
+        proposal = permit["proposal"]
+        for identifier, row in proposal["resources"].items():
+            props = bodies[identifier].get("properties", {})
+            require(props.get("provisioningState") == row["provisioning_state"],
+                    "reviewed-preservation-instance-state-changed")
+            if row["type"].endswith("/extensions"):
+                require(props.get("publisher") == row["publisher"] and props.get("type") == row["extension_type"]
+                        and props.get("settings", {}).get("azureResourceId", "").lower() == proposal["runner"]["resource_id"],
+                        "reviewed-defender-instance-changed")
+            else:
+                script = clean_path(Path(__file__).parent / "runner-registration.sh").read_text(encoding="utf-8").strip()
+                require(hashlib.sha256(script.encode()).hexdigest() == row["script_sha256"]
+                        and props.get("source", {}).get("script", "").replace("\r\n", "\n").strip() == script,
+                        "reviewed-registration-source-changed")
+                _, _, expanded = cloud.request("GET", ARM + identifier + "?api-version=" + row["api_version"]
+                                               + "&%24expand=instanceView", ARM)
+                instance = expanded.get("properties", {}).get("instanceView", {})
+                require(instance.get("executionState") == "Succeeded" and instance.get("exitCode") == 0,
+                        "reviewed-registration-execution-not-terminal")
+                expanded.get("properties", {}).pop("instanceView", None)
+                require(digest(expanded) == row["body_hash"], "reviewed-registration-instance-changed")
+    result = {}
+    expected = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
+    for group in proof["groups"]:
+        verify_group_ownership(bodies[group], expected, bodies)
+    for identifier, row in proof["resources"].items():
+        metadata = (closure["groups"] if identifier in proof["groups"] else closure["resources"])[identifier]
+        require(metadata["body_hash"] == row["body_hash"] and metadata.get("etag") == row["etag"],
+                "bootstrap-resource-instance-changed")
+        tags = bodies[identifier].get("tags") or {}
+        require(not str(tags.get("aifactory.shared", "")).lower() == "true"
+                and all(tags.get(TAG_KEYS[key], value) == value for key, value in expected.items()),
+                "bootstrap-resource-ownership-conflict")
+        if row["disposition"] == "preserve":
+            if row["preservation"] == "provider-readonly":
+                names = set(cloud.provider_operations(row["type"].split("/")[0]))
+                require(row["type"] + "/read" in names
+                        and not any(row["type"] + "/" + action in names for action in ("write", "delete")),
+                        "bootstrap-provider-child-is-writable")
+            result[identifier] = {"body_hash": row["body_hash"], "preserve": True}
+        else:
+            require(all(tags.get(TAG_KEYS[key], value) == value for key, value in row["owner"].items()),
+                    "bootstrap-resource-ownership-conflict")
+            result[identifier] = {"body_hash": row["body_hash"], "owner": row["owner"]}
+    return result
+
+
+def verify_bootstrap_preservation(document, changes):
+    proof = document["deployment"].get("bootstrap_foundation", {})
+    if proof.get("contract") != EXACT_BOOTSTRAP_CONTRACT:
+        return
+    retained = {key for key, row in proof["resources"].items() if row["disposition"] == "preserve"}
+    require(not any(change["change_type"] != "NoChange" and any(
+        change["resource_id"].lower() == key or change["resource_id"].lower().startswith(key + "/")
+        for key in retained) for change in changes), "bootstrap-prerequisite-write-forbidden")
+
+
+def verify_bootstrap_final_closure(document, closure, bodies=None):
+    proof = document["deployment"].get("bootstrap_foundation", {})
+    if proof.get("contract") != EXACT_BOOTSTRAP_CONTRACT:
+        return set()
+    preserved = {key for key, row in proof["resources"].items() if row["disposition"] == "preserve"}
+    if not preserved:
+        return preserved
+    require(isinstance(closure, dict) and isinstance(closure.get("resources"), dict)
+            and isinstance(closure.get("groups"), dict), "bootstrap-final-closure-required")
+    resources, groups = closure["resources"], closure["groups"]
+    scopes = {scope.lower() for scope in document["locks"]["scopes"]}
+    require(set(groups) == scopes and not set(groups) & set(resources)
+            and all(isinstance(row, dict) and hash_value(row.get("body_hash")) for row in groups.values())
+            and all(isinstance(key, str) and key == key.lower() and arm_scope(key) in scopes
+                    and isinstance(row, dict) for key, row in resources.items()),
+            "bootstrap-final-closure-scope-mismatch")
+    expected = {key for key in proof["resources"] if any(key == parent or key.startswith(parent + "/")
+                                                       for parent in preserved)}
+    require(expected <= set(resources), "bootstrap-preserved-resource-missing-after-deployment")
+    protected = {key for key in resources if any(key == parent or key.startswith(parent + "/")
+                                               for parent in preserved)}
+    require(protected <= set(proof["resources"]), "bootstrap-preserved-descendant-unreviewed")
+    if bodies is not None:
+        require(set(bodies) == set(resources) | set(groups), "bootstrap-final-closure-body-incomplete")
+    for key in protected:
+        require(all(resources[key].get(field) == proof["resources"][key].get(field)
+                    for field in ("type", "api_version", "body_hash", "etag"))
+                and (bodies is None or digest(bodies[key]) == resources[key]["body_hash"]),
+                "bootstrap-preserved-resource-changed-during-deployment")
+    return preserved
+
+
 def bootstrap_ownership_snapshot(cloud, document):
     proof = document["deployment"].get("bootstrap_foundation")
     if proof is None:
         return {}
+    if proof.get("contract") == EXACT_BOOTSTRAP_CONTRACT:
+        return exact_bootstrap_snapshot(cloud, document)
     require(isinstance(proof, dict) and proof.get("contract") == "created-group-ownership-v1"
             and isinstance(proof.get("groups"), dict), "created-bootstrap-groups-proof-required")
     for group, receipt in proof["groups"].items():
@@ -2044,10 +2404,7 @@ def bootstrap_ownership_snapshot(cloud, document):
             require(all(tagged.get(key) == value for key, value in expected.items()),
                     "bootstrap-resource-ownership-conflict")
             continue
-        owner = inherited_new_resource_owner(identifier, bodies)
-        require(all(owner.get(key) == value for key, value in expected.items()),
-                "bootstrap-descendant-ownership-unverified")
-        result[identifier] = {"owner": owner, "body_hash": metadata["body_hash"]}
+        raise Blocked("exact-bootstrap-resource-proof-required")
     return result
 
 
@@ -2059,6 +2416,11 @@ def freeze_deployment_plan(cloud, document, source_root):
         require(not any(key.startswith("runs/" + document["run_id"] + ".") for key in state["records"]),
                 "single-writer-run-already-submitted")
     source_root = verify_source(cloud, source_root, document["source"])
+    return _freeze_deployment_contents(cloud, document, source_root)
+
+
+def _freeze_deployment_contents(cloud, document, source_root):
+    """Read-only content preflight; only freeze_deployment_plan verifies publication."""
     cloud.verify_identity()
     result = json.loads(canonical(document["deployment"]))
     draft = {**document, "deployment": result}
@@ -2071,6 +2433,7 @@ def freeze_deployment_plan(cloud, document, source_root):
         verify_preserved_network(cloud, draft, step, source_root, template=template, freeze=True)
     payload = combined_plan_payload(cloud, draft, source_root)
     result["changes"] = evaluate_what_if(cloud, draft, {"id": "factory", "scope": "subscription"}, payload)
+    verify_bootstrap_preservation(draft, result["changes"])
     result["configuration_hash"] = digest(document["config"])
     return result
 
@@ -2117,18 +2480,25 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         previous_owners, previous_receipts = {}, {}
         modified_ids = {row["resource_id"].lower() for row in document["deployment"]["changes"]
                         if row["change_type"] != "NoChange"}
+        preserved_ids = {key for key, row in bootstrap_owners.items() if row.get("preserve") is True}
+        verify_bootstrap_preservation(document, document["deployment"]["changes"])
         existing_scopes = []
         for scope in document["locks"]["scopes"]:
             status, _, group = cloud.arm("GET", scope, RG_API, allowed=(200, 404))
             if status == 200:
                 existing_scopes.append(scope)
         if existing_scopes:
-            closure, current_bodies = collect_resource_closure(cloud, existing_scopes)
+            closure, current_bodies = collect_resource_closure(cloud, existing_scopes,
+                                                               bootstrap_resource_versions(document))
             for scope in existing_scopes:
                 verify_group_ownership(current_bodies[scope.lower()],
                                        {key: document["target"][key] for key in ("factory_id", "scaleset_id")}, current_bodies)
             before_ids.update(closure["resources"])
             for key, metadata in closure["resources"].items():
+                if key in preserved_ids:
+                    require(metadata["body_hash"] == bootstrap_owners[key]["body_hash"],
+                            "bootstrap-preserved-resource-instance-changed")
+                    continue
                 tags = current_bodies[key].get("tags") or {}
                 owner = {field: tags[TAG_KEYS[field]] for field in TAG_KEYS if TAG_KEYS[field] in tags}
                 if all(field in owner for field in ("factory_id", "scaleset_id")):
@@ -2184,7 +2554,9 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
             receipt["deployments"].append({"step_id": step["id"], "id": child_endpoint.removeprefix(ARM), "status": "succeeded"})
         receipt.pop("pending_deployment", None)
         persist()
-        closure, bodies = collect_resource_closure(cloud, document["locks"]["scopes"])
+        closure, bodies = collect_resource_closure(cloud, document["locks"]["scopes"],
+                                                   bootstrap_resource_versions(document))
+        verify_bootstrap_final_closure(document, closure, bodies)
         for scope in document["locks"]["scopes"]:
             body = bodies[scope.lower()]
             verify_group_ownership(body,
@@ -2200,6 +2572,8 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         for resource_id, body in bodies.items():
             if resource_id in closure["groups"]:
                 continue
+            if resource_id in preserved_ids:
+                continue
             tags = body.get("tags") or {}
             owner = {key: tags[TAG_KEYS[key]] for key in TAG_KEYS if TAG_KEYS[key] in tags}
             if not owner and resource_id in previous_owners:
@@ -2214,6 +2588,14 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
             receipt["ownership"].append({"resource_id": resource_id, "owner": owner,
                                          **closure["resources"][resource_id]})
         receipt["inventory_closure_hash"] = digest(closure)
+        foundation = document["deployment"].get("bootstrap_foundation", {})
+        if foundation.get("contract") == EXACT_BOOTSTRAP_CONTRACT:
+            receipt["bootstrap_preserved"] = {
+                key: row for key, row in foundation["resources"].items() if row["disposition"] == "preserve"}
+            if "preservation_permit" in foundation:
+                receipt["bootstrap_preservation_permit"] = foundation["preservation_permit"]
+            if preserved_ids:
+                receipt["bootstrap_final_closure"] = closure
         require(receipt["ownership"] or receipt["resource_groups"], "post-deployment-owned-inventory-empty")
         require(set(document["target"]["project_ids"]) <= {
             row["owner"].get("project_id") for row in receipt["ownership"] + receipt["resource_groups"]},
@@ -2251,6 +2633,30 @@ def verify_worker_receipt(locks, document):
     require(all(step.get("status") == "succeeded" for step in result["deployments"])
             and isinstance(result.get("ownership"), list)
             and hash_value(result.get("inventory_closure_hash")), "scoped-worker-evidence-incomplete")
+    foundation = document["deployment"].get("bootstrap_foundation", {})
+    if foundation.get("contract") == EXACT_BOOTSTRAP_CONTRACT:
+        preserved = {key: row for key, row in foundation["resources"].items() if row["disposition"] == "preserve"}
+        require(result.get("bootstrap_preserved") == preserved,
+            "scoped-worker-preservation-evidence-incomplete")
+        require(result.get("bootstrap_preservation_permit") == foundation.get("preservation_permit"),
+                "scoped-worker-reviewed-preservation-incomplete")
+        if preserved:
+            closure = result.get("bootstrap_final_closure")
+            require(isinstance(closure, dict) and digest(closure) == result["inventory_closure_hash"],
+                    "scoped-worker-final-preservation-closure-unverified")
+            verify_bootstrap_final_closure(document, closure)
+            ownership = result["ownership"]
+            require(all(isinstance(row, dict) and isinstance(row.get("resource_id"), str) for row in ownership),
+                    "scoped-worker-final-ownership-unverified")
+            identifiers = [row["resource_id"].lower() for row in ownership]
+            require(len(set(identifiers)) == len(identifiers)
+                    and set(identifiers) == set(closure["resources"]) - set(preserved)
+                    and all(all(row.get(field) == closure["resources"][row["resource_id"].lower()].get(field)
+                                for field in ("type", "api_version", "body_hash", "etag")) for row in ownership)
+                    and all(row["body_hash"] == closure["groups"][row["resource_id"].lower()].get("body_hash")
+                            and row.get("etag") == closure["groups"][row["resource_id"].lower()].get("etag")
+                            for row in groups),
+                    "scoped-worker-final-ownership-unverified")
     return result
 
 
