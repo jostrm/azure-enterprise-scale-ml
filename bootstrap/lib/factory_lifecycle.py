@@ -12,18 +12,22 @@ from __future__ import annotations
 import argparse
 import base64
 import ctypes
+import errno
 import hashlib
 import importlib.util
 import json
 import os
 import re
 import shutil
+import socket
+import ssl
 import subprocess
 import sys
 import time
 import types
 import zlib
 from datetime import datetime, timezone
+from http.client import IncompleteRead
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urlencode, urlsplit
@@ -35,6 +39,11 @@ CONTRACT = 1
 MAX_DOCUMENT = 8 * 1024 * 1024
 RECEIPT_REPLACE_ATTEMPTS = 20
 RECEIPT_REPLACE_RETRY_SECONDS = 0.25
+READ_TRANSPORT_ATTEMPTS = 3
+READ_TRANSPORT_RETRY_DELAYS = (0.25, 0.5)
+# A retry-admission budget, not cancellation of an in-flight socket operation.
+READ_TRANSPORT_RETRY_WINDOW_SECONDS = 180
+REMOTE_SOCKET_TIMEOUT_SECONDS = 60
 ARM = "https://management.azure.com"
 SOURCE_ORIGIN = "https://github.com/jostrm/azure-enterprise-scale-ml"
 GUID = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
@@ -584,7 +593,7 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 class Cloud:
-    """No shell expansion, CLI output passthrough, interactive auth or retries."""
+    """No shell expansion, CLI output passthrough, interactive auth or write retries."""
 
     def __init__(self, document, command_runner=None, opener=None, expected_object_id=None):
         self.document = document
@@ -736,21 +745,60 @@ class Cloud:
             allowed_hosts.add(urlsplit(self.document["locks"]["account_url"]).netloc)
         require(parsed.scheme == "https" and parsed.netloc in allowed_hosts and not parsed.username
                 and not parsed.password and not parsed.fragment, "untrusted-service-endpoint")
-        request_headers = {"Authorization": "Bearer " + self.token(audience), "Content-Type": "application/json"}
-        request_headers.update(headers or {})
         body = canonical(data) if data is not None else None
-        request = Request(url, method=method, data=body, headers=request_headers)
-        try:
-            response = self.opener.open(request, timeout=60)
-        except HTTPError as error:
-            if error.code not in allowed:
-                raise Blocked("remote-request-failed-" + str(error.code)) from None
-            response = error
-        except (URLError, OSError, TimeoutError):
-            raise Blocked("remote-request-unverified") from None
-        with response:
-            status, response_headers = response.code, dict(response.headers)
-            raw = response.read(MAX_DOCUMENT + 1)
+        readonly = method in ("GET", "HEAD")
+        attempts = READ_TRANSPORT_ATTEMPTS if readonly else 1
+        started = time.monotonic()
+        deadline = started + READ_TRANSPORT_RETRY_WINDOW_SECONDS
+        for attempt in range(1, attempts + 1):
+            # Revalidate/refresh the identity token after any backoff.
+            request_headers = {"Authorization": "Bearer " + self.token(audience), "Content-Type": "application/json"}
+            request_headers.update(headers or {})
+            request = Request(url, method=method, data=body, headers=request_headers)
+            remaining = deadline - time.monotonic()
+            require(not readonly or remaining > 0, "remote-request-unverified")
+            timeout = min(REMOTE_SOCKET_TIMEOUT_SECONDS, remaining) if readonly else REMOTE_SOCKET_TIMEOUT_SECONDS
+            try:
+                try:
+                    response = self.opener.open(request, timeout=timeout)
+                except HTTPError as error:
+                    if error.code not in allowed:
+                        try:
+                            error.close()
+                        finally:
+                            raise Blocked("remote-request-failed-" + str(error.code)) from None
+                    response = error
+                with response:
+                    status, response_headers = response.code, dict(response.headers)
+                    raw = response.read(MAX_DOCUMENT + 1)
+                break
+            except (URLError, OSError, IncompleteRead) as error:
+                reason = error.reason if isinstance(error, URLError) else error
+                if isinstance(reason, (ssl.SSLError, PermissionError)):
+                    transient = False
+                elif isinstance(reason, socket.gaierror):
+                    transient = reason.errno == socket.EAI_AGAIN
+                else:
+                    transient = isinstance(reason, (TimeoutError, ConnectionResetError, ConnectionAbortedError,
+                                                     ConnectionRefusedError, BrokenPipeError, IncompleteRead)) or (
+                        isinstance(reason, OSError) and reason.errno in (
+                            errno.ETIMEDOUT, errno.ECONNRESET, errno.ECONNABORTED, errno.ECONNREFUSED,
+                            errno.ENETUNREACH, errno.EHOSTUNREACH, errno.ENETDOWN, errno.EPIPE))
+                delay = READ_TRANSPORT_RETRY_DELAYS[attempt - 1] if attempt < attempts else 0
+                retry = readonly and transient and attempt < attempts and time.monotonic() + delay < deadline
+                api = parse_qs(parsed.query).get("api-version", [])
+                api = api[0] if len(api) == 1 and re.fullmatch(
+                    r"(?:\d{4}-\d{2}-\d{2}(?:-preview)?|\d+\.\d+(?:-preview(?:\.\d+)?)?)", api[0]) else None
+                print(json.dumps({
+                    "event": "remote-request-transport-failure", "method": method, "host": parsed.hostname,
+                    "path": parsed.path, "api_version": api, "attempt": attempt,
+                    "exception_type": type(error).__name__, "reason_type": type(reason).__name__,
+                    "errno": reason.errno if isinstance(reason, OSError) and type(reason.errno) is int else None,
+                    "elapsed_seconds": round(time.monotonic() - started, 3), "retrying": retry,
+                }, sort_keys=True), file=sys.stderr, flush=True)
+                if not retry:
+                    raise Blocked("remote-request-unverified") from None
+                time.sleep(delay)
         require(status in allowed, "unexpected-remote-status")
         require(len(raw) <= MAX_DOCUMENT, "remote-response-too-large")
         if not raw:

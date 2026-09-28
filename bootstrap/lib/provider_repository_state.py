@@ -20,6 +20,7 @@ PROTOCOL = "aifactory-single-writer-v1"
 WARNING = "Bypassing lock, due to issues, dont do parallell updates on same AI Factory"
 HUB_WARNING = "Do not make concurrent changes to a shared hub, including from other repositories; repository claims do not provide global exclusion."
 MAX_BYTES = 8 * 1024 * 1024
+STATE_READ_ATTEMPTS = 3
 
 
 def canonical(value):
@@ -85,6 +86,14 @@ class ProviderState:
         return result
 
     def read(self):
+        """Restart only a moving-ref snapshot; never retry a write or a failed guard."""
+        for _ in range(STATE_READ_ATTEMPTS):
+            snapshot = self._read_snapshot()
+            if snapshot is not None:
+                return snapshot
+        raise self.error("single-writer-state-changed")
+
+    def _read_snapshot(self):
         self.private()
         head = self.head()
         if head is None:
@@ -120,7 +129,8 @@ class ProviderState:
         self.require(isinstance(value, dict) and set(value) == {"schema", "repository", "enrollment", "active", "records"}
                      and value["schema"] == 1 and value["repository"] == self.route["repository"]
                      and isinstance(value["records"], dict), "single-writer-state-invalid")
-        self.require(self.head() == head, "single-writer-state-changed")
+        if self.head() != head:
+            return None
         return head, value
 
     def empty(self):
