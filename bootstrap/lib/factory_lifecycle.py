@@ -49,11 +49,28 @@ SOURCE_ORIGIN = "https://github.com/jostrm/azure-enterprise-scale-ml"
 GUID = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
 RG_ID = re.compile(r"/subscriptions/(" + GUID + r")/resourceGroups/([A-Za-z0-9_.()-]{1,90})", re.I)
 RESOURCE_ID = re.compile(RG_ID.pattern + r"/providers/([A-Za-z0-9.]+)/([A-Za-z0-9]+)/([A-Za-z0-9_.()-]{1,128})", re.I)
-NESTED_ID = re.compile(RG_ID.pattern + r"/providers/[A-Za-z0-9.]+(?:/[A-Za-z0-9_.()%-]+/[A-Za-z0-9_.()%-]+)+", re.I)
+ARM_SEGMENT = r"(?!\.{1,2}(?:/|$))[A-Za-z0-9_.()-]+"
+ARM_RESOURCE_PATH = r"/providers/[A-Za-z0-9.]+(?:/" + ARM_SEGMENT + "/" + ARM_SEGMENT + r")+"
+# DNS apex/wildcard names are literal ARM names, not URL syntax or arbitrary child types.
+DNS_ZONE_NAME = r"[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*"
+DNS_WILDCARD_NAME = r"\*(?:\.[A-Za-z0-9_-]+)*"
+DNS_SPECIAL_NAME = r"(?:@|" + DNS_WILDCARD_NAME + ")"
+# CNAME cannot coexist with the SOA at the apex; NS and SOA cannot be wildcards.
+DNS_RECORD_PATH = (r"/providers/Microsoft.Network/(?:privateDnsZones/" + DNS_ZONE_NAME
+                   + r"/(?:SOA/@|CNAME/" + DNS_WILDCARD_NAME
+                   + r"|(?:A|AAAA|MX|PTR|SRV|TXT)/" + DNS_SPECIAL_NAME + r")"
+                   + r"|dnsZones/" + DNS_ZONE_NAME
+                   + r"/(?:(?:SOA|NS)/@|CNAME/" + DNS_WILDCARD_NAME
+                   + r"|(?:A|AAAA|CAA|MX|PTR|SRV|TXT)/" + DNS_SPECIAL_NAME + r"))"
+                   + r"(?:" + ARM_RESOURCE_PATH + r")*")
+NESTED_ID = re.compile(RG_ID.pattern + r"(?:" + ARM_RESOURCE_PATH + "|" + DNS_RECORD_PATH + ")", re.I)
 SUBSCRIPTION_RESOURCE_ID = re.compile(r"/subscriptions/(" + GUID
     + r")/providers/[A-Za-z0-9.]+(?:/[A-Za-z0-9_.()%-]+/[A-Za-z0-9_.()%-]+)+", re.I)
 EXACT_BOOTSTRAP_CONTRACT = "exact-bootstrap-resources-v2"
 PRESERVATION_PERMIT_CONTRACT = "reviewed-bootstrap-preservation-v1"
+DNS_SOA_PERMIT_CONTRACT = "reviewed-bootstrap-dns-soa-preservation-v1"
+DNS_SOA_ZONE_ID = re.compile(RG_ID.pattern + r"/providers/Microsoft.Network/privateDnsZones/" + DNS_ZONE_NAME, re.I)
+DNS_RECORD_TYPES = ("a", "aaaa", "cname", "mx", "ptr", "soa", "srv", "txt")
 NON_RESOURCE_METADATA = {"microsoft.compute/virtualmachines/metricdefinitions"}
 TAG_KEYS = {"factory_id": "aifactory.factory_id", "scaleset_id": "aifactory.scaleset_id",
             "project_id": "aifactory.project_id"}
@@ -562,6 +579,7 @@ def capabilities():
         "bootstrap_ownership": "created-group-ownership-v1",
         "bootstrap_resource_ownership": EXACT_BOOTSTRAP_CONTRACT,
         "bootstrap_preservation_permit": PRESERVATION_PERMIT_CONTRACT,
+        "bootstrap_dns_soa_preservation_permit": DNS_SOA_PERMIT_CONTRACT,
         "resource_closure": "arm-resource-only-closure-v2",
         "delete_leaf_types": sorted(LEAF_TYPES), "delete_empty_owned_resource_groups": True,
         "delete_owned_resource_groups": "arm-provider-closure-v1",
@@ -1004,6 +1022,8 @@ def resource_references(body):
             for item in value:
                 visit(item)
         elif isinstance(value, str) and value.lower().startswith("/subscriptions/"):
+            require("%" not in value and not any(part in (".", "..") for part in value.split("/")),
+                    "invalid-resource-reference")
             require(RG_ID.fullmatch(value) or NESTED_ID.fullmatch(value)
                     or SUBSCRIPTION_RESOURCE_ID.fullmatch(value)
                     or re.fullmatch(r"/subscriptions/" + GUID, value, re.I),
@@ -1031,7 +1051,13 @@ def collect_resource_closure(cloud, scopes, resource_versions=None):
         "microsoft.storage/storageaccounts/tableservices": "default",
         "microsoft.storage/storageaccounts/managementpolicies": "default",
     }
-    inline = {"microsoft.keyvault/vaults/accesspolicies", "microsoft.network/virtualnetworks/subnets/delegations"}
+    # Audited ARM embedded collections, not independently addressable resources.
+    # VirtualNetworkGatewayPropertiesFormat owns VirtualNetworkGatewayIPConfiguration.
+    inline = {
+        "microsoft.keyvault/vaults/accesspolicies": ("properties", "accessPolicies"),
+        "microsoft.network/virtualnetworks/subnets/delegations": ("properties", "delegations"),
+        "microsoft.network/virtualnetworkgateways/ipconfigurations": ("properties", "ipConfigurations"),
+    }
     terminal_extensions = {kind.lower() for kind, _ in EXTENSION_COLLECTIONS}
 
     def provider(namespace):
@@ -1146,8 +1172,11 @@ def collect_resource_closure(cloud, scopes, resource_versions=None):
                 continue
             referenced_kind = resource_type_from_id(reference)
             if referenced_kind in inline:
-                closure["inline"][reference] = {"parent_id": reference.rsplit("/", 2)[0]}
-                continue
+                parent = reference.rsplit("/", 2)[0]
+                closure["inline"][reference] = {"parent_id": parent}
+                if parent in versions:
+                    continue
+                reference, referenced_kind = parent, resource_type_from_id(parent)
             require(resource_kind(referenced_kind) in ("resource", "readonly"), "resource-reference-is-operation")
             parent_api = api if referenced_kind.split("/")[0] == kind.split("/")[0] else None
             versions[reference] = resource_versions.get(reference) or version(referenced_kind, parent_api)
@@ -1170,7 +1199,12 @@ def collect_resource_closure(cloud, scopes, resource_versions=None):
         extensions(resource_id)
     for reference, metadata in closure["inline"].items():
         parent = metadata["parent_id"]
-        require(parent in bodies and reference in resource_references(bodies[parent]),
+        entries = bodies.get(parent)
+        for field in inline[resource_type_from_id(reference)]:
+            entries = entries.get(field) if isinstance(entries, dict) else None
+        require(isinstance(entries, list) and sum(
+                    isinstance(row, dict) and isinstance(row.get("id"), str)
+                    and row["id"].lower() == reference for row in entries) == 1,
                 "inline-resource-parent-unverified")
         metadata["parent_body_hash"] = digest(bodies[parent])
     return closure, bodies
@@ -2252,6 +2286,154 @@ def validate_preservation_permit(document):
     return permit
 
 
+def has_dns_soa_permit(proof):
+    return ("dns_soa_preservation_permit" in proof or "dns_soa_baseline" in proof
+            or any(isinstance(row, dict) and row.get("preservation") == "reviewed-dns-soa-instance"
+                   for row in proof.get("resources", {}).values()))
+
+
+def validate_dns_zone_receipt(receipt, parent, operator_id):
+    fields = {"resource_id", "receipt_hash", "plan_id", "plan_hash"}
+    require(isinstance(receipt, dict) and set(receipt) in (fields, fields | {"basis"})
+            and receipt["resource_id"] == parent and guid(receipt["plan_id"])
+            and hash_value(receipt["plan_hash"]) and hash_value(receipt["receipt_hash"]),
+            "dns-soa-exact-preserved-parent-required")
+    if "basis" not in receipt:
+        return
+    basis = receipt["basis"]
+    hashes = {"approved_current_review_sha256", "native_plan_hash", "source_payload_sha256",
+              "recovery_archive_hash", "success_receipt_hash", "baseline_body_hash"}
+    require(isinstance(basis, dict) and set(basis) == hashes | {
+                "contract", "plan_id", "plan_hash", "operator_id", "resource_id", "provenance"}
+            and basis["contract"] == "accepted-current-prerequisite-baseline-v1"
+            and basis["plan_id"] == receipt["plan_id"] and basis["plan_hash"] == receipt["plan_hash"]
+            and guid(basis["operator_id"]) and basis["operator_id"] == operator_id
+            and basis["resource_id"] == parent and all(hash_value(basis[key]) for key in hashes)
+            and receipt["receipt_hash"] == digest(basis)
+            and isinstance(basis["provenance"], dict)
+            and set(basis["provenance"]) == {"native_effect_index", "native_effect_hash"}
+            and type(basis["provenance"]["native_effect_index"]) is int
+            and 10 <= basis["provenance"]["native_effect_index"] < 131
+            and hash_value(basis["provenance"]["native_effect_hash"]),
+            "dns-soa-parent-baseline-witness-invalid")
+
+
+def validate_dns_soa_preservation_permit(document):
+    """Present-state consent only; the protected baseline proves the parent, not SOA ownership."""
+    proof = document["deployment"]["bootstrap_foundation"]
+    require(proof.get("contract") == EXACT_BOOTSTRAP_CONTRACT
+            and document["operation"] in ("create-factory", "create-scaleset", "deploy-project"),
+            "dns-soa-preservation-operation-required")
+    permit = proof.get("dns_soa_preservation_permit")
+    require(isinstance(permit, dict) and set(permit) == {
+        "contract", "approved", "review_id", "owner_hash", "workflow_id", "proposal_hash", "proposal", "approval_hash"}
+        and permit["contract"] == DNS_SOA_PERMIT_CONTRACT and permit["approved"] is True
+        and guid(permit["review_id"]) and hash_value(permit["owner_hash"])
+        and guid(permit["workflow_id"]) and permit["approval_hash"] == digest({
+            key: value for key, value in permit.items() if key != "approval_hash"}),
+        "dns-soa-preservation-consent-required")
+    proposal, baseline = permit["proposal"], proof.get("dns_soa_baseline")
+    require(isinstance(baseline, dict) and set(baseline) == {"owner_hash", "workflow_id", "bootstrap_hash", "zones"}
+            and baseline["owner_hash"] == permit["owner_hash"]
+            and baseline["workflow_id"] == permit["workflow_id"] == proof.get("workflow_id")
+            and hash_value(baseline["bootstrap_hash"]) and baseline["bootstrap_hash"] == proof.get("evidence_hash")
+            and isinstance(baseline["zones"], dict) and 1 <= len(baseline["zones"]) <= 128,
+            "dns-soa-original-zone-baseline-required")
+    require(isinstance(proposal, dict) and set(proposal) == {
+        "consent", "owner_hash", "workflow_id", "source_commit", "operator_id", "deployment_object_id",
+        "target", "scopes", "bootstrap_hash", "baseline_hash", "parents", "resources",
+        "writes", "deletes", "ownership_grants"}
+        and permit["proposal_hash"] == digest(proposal)
+        and proposal["consent"] == "present-state-preserve-only"
+        and proposal["owner_hash"] == baseline["owner_hash"]
+        and proposal["workflow_id"] == baseline["workflow_id"]
+        and proposal["bootstrap_hash"] == baseline["bootstrap_hash"]
+        and proposal["baseline_hash"] == digest(baseline)
+        and proposal["source_commit"] == document["source"]["commit"] == proof.get("source_commit")
+        and proposal["operator_id"] == document["identity"]["object_id"]
+        and proposal["deployment_object_id"] == document["identity"]["deployment_object_id"]
+        and proposal["target"] == document["target"]
+        and proposal["scopes"] == sorted(proof["groups"]) == sorted({scope.lower() for scope in document["locks"]["scopes"]})
+        and all(proposal[key] == [] for key in ("writes", "deletes", "ownership_grants")),
+        "dns-soa-preservation-context-mismatch")
+    parents, resources = proposal["parents"], proposal["resources"]
+    require(isinstance(parents, dict) and isinstance(resources, dict)
+            and set(parents) == set(baseline["zones"])
+            and all(isinstance(key, str) and key == key.lower() and DNS_SOA_ZONE_ID.fullmatch(key)
+                    and arm_scope(key) in proof["groups"] for key in parents)
+            and set(resources) == {key + "/soa/@" for key in parents}
+            and set(resources) == {key for key, row in proof["resources"].items()
+                                  if isinstance(row, dict) and row.get("preservation") == "reviewed-dns-soa-instance"}
+            and not set(resources) & set(document["deployment"].get("known_ownership", {})),
+            "dns-soa-exact-apices-required")
+    fields = {"type", "scope", "api_version", "body_hash", "etag"}
+    for parent, entry in parents.items():
+        original = baseline["zones"][parent]
+        require(isinstance(original, dict) and set(original) == fields | {"disposition", "preservation", "receipt"}
+                and original == proof["resources"].get(parent)
+                and original["type"] == "microsoft.network/privatednszones" and original["scope"] == arm_scope(parent)
+                and isinstance(original["api_version"], str)
+                and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-preview)?", original["api_version"])
+                and hash_value(original["body_hash"])
+                and (original["etag"] is None or isinstance(original["etag"], str) and 0 < len(original["etag"]) <= 1024)
+                and original["disposition"] == "preserve" and original["preservation"] == "bootstrap-prerequisite"
+                and isinstance(entry, dict) and set(entry) == {"baseline_hash", "record_set_inventory_hash"}
+                and entry["baseline_hash"] == digest(original) and hash_value(entry["record_set_inventory_hash"]),
+                "dns-soa-exact-preserved-parent-required")
+        validate_dns_zone_receipt(original["receipt"], parent, proposal["operator_id"])
+        identifier = parent + "/soa/@"
+        row, actual = resources[identifier], proof["resources"].get(identifier)
+        require(isinstance(row, dict) and set(row) == fields | {"parent_id"} and row["parent_id"] == parent
+                and row["type"] == "microsoft.network/privatednszones/soa" and row["scope"] == arm_scope(parent)
+                and isinstance(row["api_version"], str)
+                and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-preview)?", row["api_version"])
+                and hash_value(row["body_hash"])
+                and (row["etag"] is None or isinstance(row["etag"], str) and 0 < len(row["etag"]) <= 1024)
+                and isinstance(actual, dict) and actual == {
+                    **{field: row[field] for field in fields}, "disposition": "preserve",
+                    "preservation": "reviewed-dns-soa-instance", "permit_hash": permit["approval_hash"]},
+                "dns-soa-preservation-cannot-grant-ownership")
+    return permit
+
+
+def dns_record_set_inventory(closure, parent):
+    """Fingerprint all eight independently collected private-DNS record-set types."""
+    require(isinstance(closure, dict) and isinstance(closure.get("collections"), dict)
+            and isinstance(closure.get("resources"), dict), "dns-soa-record-set-inventory-required")
+    collections, resources = {}, {}
+    for kind in DNS_RECORD_TYPES:
+        path = parent + "/" + kind
+        entry = closure["collections"].get(path)
+        require(isinstance(entry, dict) and set(entry) == {"api_version", "ids", "body_hash", "unsupported"}
+                and entry["unsupported"] is None and hash_value(entry["body_hash"])
+                and isinstance(entry["api_version"], str)
+                and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-preview)?", entry["api_version"])
+                and isinstance(entry["ids"], list)
+                and all(isinstance(key, str) and key == key.lower() and NESTED_ID.fullmatch(key)
+                        and key.rsplit("/", 1)[0] == path for key in entry["ids"])
+                and entry["ids"] == sorted(set(entry["ids"])), "dns-soa-record-set-inventory-required")
+        rows = {key: row for key, row in closure["resources"].items() if key.rsplit("/", 1)[0] == path}
+        require(set(rows) == set(entry["ids"]) and all(isinstance(row, dict)
+                and row.get("type") == "microsoft.network/privatednszones/" + kind
+                and hash_value(row.get("body_hash")) for row in rows.values()),
+                "dns-soa-record-set-inventory-incomplete")
+        collections[path], resources = entry, {**resources, **rows}
+    require(collections[parent + "/soa"]["ids"] == [parent + "/soa/@"], "dns-soa-exact-apices-required")
+    return {"collections": collections, "resources": resources}
+
+
+def verify_dns_soa_preservation(document, closure):
+    proof = document["deployment"]["bootstrap_foundation"]
+    permit = validate_dns_soa_preservation_permit(document)
+    for parent, entry in permit["proposal"]["parents"].items():
+        require(digest(dns_record_set_inventory(closure, parent)) == entry["record_set_inventory_hash"],
+                "dns-soa-record-set-inventory-changed")
+        for identifier in (parent, parent + "/soa/@"):
+            metadata = closure["resources"].get(identifier)
+            require(isinstance(metadata, dict) and all(metadata.get(field) == proof["resources"][identifier][field]
+                    for field in ("type", "api_version", "body_hash", "etag")), "dns-soa-preserved-instance-changed")
+
+
 def validate_exact_bootstrap(document):
     proof = document["deployment"]["bootstrap_foundation"]
     target = document["target"]
@@ -2267,6 +2449,9 @@ def validate_exact_bootstrap(document):
             "exact-bootstrap-scopes-required")
     permit = validate_preservation_permit(document) if "preservation_permit" in proof else None
     permit_rows = permit["proposal"]["resources"] if permit else {}
+    dns_permit = validate_dns_soa_preservation_permit(document) if has_dns_soa_permit(proof) else None
+    dns_rows = dns_permit["proposal"]["resources"] if dns_permit else {}
+    require(not set(dns_rows) & set(permit_rows), "dns-soa-permits-must-be-independent")
     require(set(permit_rows) <= set(resources), "reviewed-preservation-resources-missing")
     for group, receipt in groups.items():
         require(group == group.lower() and RG_ID.fullmatch(group) and isinstance(receipt, dict)
@@ -2284,6 +2469,9 @@ def validate_exact_bootstrap(document):
                 and hash_value(row.get("body_hash")) and "etag" in row
                 and (row["etag"] is None or isinstance(row["etag"], str) and 0 < len(row["etag"]) <= 1024),
                 "exact-bootstrap-resource-instance-required")
+        if row.get("preservation") == "reviewed-dns-soa-instance":
+            require(identifier in dns_rows, "dns-soa-preservation-consent-required")
+            continue
         if row.get("preservation") == "reviewed-instance":
             require(identifier in permit_rows and identifier not in groups
                     and row.get("disposition") == "preserve" and "owner" not in row and "receipt" not in row
@@ -2334,6 +2522,8 @@ def exact_bootstrap_snapshot(cloud, document):
     closure, bodies = collect_resource_closure(cloud, sorted(proof["groups"]),
                                                bootstrap_resource_versions(document))
     require(set(bodies) == set(proof["resources"]), "bootstrap-exact-resource-inventory-changed")
+    if has_dns_soa_permit(proof):
+        verify_dns_soa_preservation(document, closure)
     if "preservation_permit" in proof:
         permit = validate_preservation_permit(document)
         proposal = permit["proposal"]
@@ -2387,6 +2577,8 @@ def verify_bootstrap_preservation(document, changes):
     proof = document["deployment"].get("bootstrap_foundation", {})
     if proof.get("contract") != EXACT_BOOTSTRAP_CONTRACT:
         return
+    if has_dns_soa_permit(proof):
+        validate_exact_bootstrap(document)
     retained = {key for key, row in proof["resources"].items() if row["disposition"] == "preserve"}
     require(not any(change["change_type"] != "NoChange" and any(
         change["resource_id"].lower() == key or change["resource_id"].lower().startswith(key + "/")
@@ -2397,6 +2589,9 @@ def verify_bootstrap_final_closure(document, closure, bodies=None):
     proof = document["deployment"].get("bootstrap_foundation", {})
     if proof.get("contract") != EXACT_BOOTSTRAP_CONTRACT:
         return set()
+    if has_dns_soa_permit(proof):
+        validate_exact_bootstrap(document)
+        verify_dns_soa_preservation(document, closure)
     preserved = {key for key, row in proof["resources"].items() if row["disposition"] == "preserve"}
     if not preserved:
         return preserved
@@ -2642,6 +2837,9 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
                 key: row for key, row in foundation["resources"].items() if row["disposition"] == "preserve"}
             if "preservation_permit" in foundation:
                 receipt["bootstrap_preservation_permit"] = foundation["preservation_permit"]
+            if "dns_soa_preservation_permit" in foundation:
+                receipt["bootstrap_dns_soa_preservation_permit"] = foundation["dns_soa_preservation_permit"]
+                receipt["bootstrap_dns_soa_baseline"] = foundation["dns_soa_baseline"]
             if preserved_ids:
                 receipt["bootstrap_final_closure"] = closure
         require(receipt["ownership"] or receipt["resource_groups"], "post-deployment-owned-inventory-empty")
@@ -2683,6 +2881,11 @@ def verify_worker_receipt(locks, document):
             and hash_value(result.get("inventory_closure_hash")), "scoped-worker-evidence-incomplete")
     foundation = document["deployment"].get("bootstrap_foundation", {})
     if foundation.get("contract") == EXACT_BOOTSTRAP_CONTRACT:
+        if has_dns_soa_permit(foundation):
+            validate_exact_bootstrap(document)
+        require(result.get("bootstrap_dns_soa_preservation_permit") == foundation.get("dns_soa_preservation_permit")
+                and result.get("bootstrap_dns_soa_baseline") == foundation.get("dns_soa_baseline"),
+                "scoped-worker-dns-soa-preservation-incomplete")
         preserved = {key: row for key, row in foundation["resources"].items() if row["disposition"] == "preserve"}
         require(result.get("bootstrap_preserved") == preserved,
             "scoped-worker-preservation-evidence-incomplete")
