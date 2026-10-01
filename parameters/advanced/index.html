@@ -692,6 +692,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#capacity-only-service-fallbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capacity-only service fallbacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#identity-secrets-and-lifecycle" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1737,6 +1748,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#capacity-only-service-fallbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capacity-only service fallbacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#identity-secrets-and-lifecycle" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2158,6 +2180,66 @@ override the workflow's final Stage/Prod <code>standard</code> fallback.
 <code>ADMIN_AI_SEARCH_TIER</code> is another spelling consumed by preflight, not a
 safe rename of every workflow input. Likewise, semantic tier and Azure ML
 principal-ID compatibility spellings coexist in the template.</p>
+<h3 id="capacity-only-service-fallbacks">Capacity-only service fallbacks<a class="headerlink" href="#capacity-only-service-fallbacks" title="Permanent link">&para;</a></h3>
+<p>Both ADO and GitHub Actions isolate AI Search, PostgreSQL Flexible Server and
+Container Apps from their cognitive/database/compute batches. Each has <strong>three
+separately visible attempt steps</strong> immediately after its batch. Only recognized
+regional/SKU capacity failures schedule another attempt; unrelated errors fail
+immediately, and exhausted candidates fail the pipeline before downstream
+deployments. Attempts 2 and 3 wait <strong>240 seconds at their start</strong> when scheduled.
+Successful attempts export the effective SKU (and PostgreSQL tier) for later steps.
+The existing JSON-array names <code>skuAISearchDevArray</code> and
+<code>skuAISearchStageProdArray</code> remain supported alongside the comma-separated
+<code>skuArrayAISearchDev</code> / <code>skuArrayAISearchStageProd</code> names. A customized spelling
+takes precedence over the unchanged default; differing custom values fail
+validation rather than silently discarding either configuration.
+Container Apps detected before the run retain their existing application images
+and configuration. Retry reconciliation uses the original existence flags, so
+only resources absent at the start are reapplied unless explicitly opted in.</p>
+<p>The selected Dev or Stage/Prod SKU is tried first, followed by the remaining
+configured candidates in array order. Defaults are:</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Selected defaults (Dev / Stage/Prod)</th>
+<th>Candidate arrays (both environments)</th>
+<th>Retry switch</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AI Search</td>
+<td><code>basic</code> / <code>standard</code></td>
+<td><code>basic,standard,standard2</code></td>
+<td><code>aisearchRetryCapcityArray</code></td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td><code>Standard_B1ms</code> / <code>Standard_B1ms</code></td>
+<td><code>Standard_B1ms,Standard_B2s,Standard_B2ms</code></td>
+<td><code>postgreSQLRetryCapacityArray</code></td>
+</tr>
+<tr>
+<td>Container Apps</td>
+<td><code>Consumption</code> / <code>Consumption</code></td>
+<td><code>Consumption,D4,D8</code></td>
+<td><code>containerAppsRetryCapacityArray</code></td>
+</tr>
+</tbody>
+</table>
+<p>Configure <code>skuArray&lt;Service&gt;Dev</code> / <code>skuArray&lt;Service&gt;StageProd</code> alongside
+<code>sku&lt;Service&gt;Dev</code> / <code>sku&lt;Service&gt;StageProd</code>. All retry switches default to <code>true</code>;
+<code>false</code> attempts only the selected SKU and fails on its first error. Keep the
+existing <strong><code>Capcity</code> spelling</strong> in the AI Search switch. The generated inventory
+below lists the corresponding GitHub uppercase variable names.</p>
+<p>Attempts honor the infra phase, deletion and service/debug switches, retaining
+the cognitive/database capability-host debug override used by ADO. AI Search
+also runs when private Foundry requires it (<code>enableAIFoundry=true</code> and
+<code>enablePublicGenAIAccess!=true</code>), even if <code>enableAISearch=false</code>. Preflight quota
+headroom checks are <strong>not a capacity guarantee</strong>. Container Apps fallback from
+<code>Consumption</code> to <code>D4</code> or <code>D8</code> changes to <strong>dedicated workload-profile pricing</strong>;
+review costs before enabling these candidates.</p>
 <p>ADO has separate Dev/Stage/Prod seeding-vault coordinates and service connections.
 GHA commonly uses one seeding-vault variable name with environment-specific
 overrides. Review the collision table rather than copying one value into all
@@ -2399,11 +2481,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">346</td>
+<td style="text-align: right;">357</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">344</td>
+<td style="text-align: right;">357</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2419,15 +2501,15 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">350</td>
+<td style="text-align: right;">361</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 130, 367; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 131, 368; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 369, 393; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 135, 380; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 136, 381; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 382, 406; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -3103,7 +3185,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter yaml:admin_aiSearchTier --><!-- parameter json.dev:admin_aiSearchTier --><code>admin_aiSearchTier</code></td>
-<td><code>ADMIN_AISEARCH_TIER</code>, <code>ADMIN_AI_SEARCH_TIER</code></td>
+<td><code>ADMIN_AISEARCH_TIER</code></td>
 <td>M</td>
 <td>Y: <code>"basic"</code><br>J.dev: <code>"basic"</code></td>
 <td>AI Search SKU tier mandatory: AI Search SKU tier ensure: 'free' is not allowed when using private endpoints. ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2']</td>
@@ -3235,6 +3317,13 @@ reported, not silently represented as multiple settings.</p>
 <td>AI Factory minor version keep-as-is: 2025-09-20: 24 = release/v1.24</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:aisearchRetryCapcityArray --><!-- parameter json.dev:aisearchRetryCapcityArray --><code>aisearchRetryCapcityArray</code></td>
+<td><code>AISEARCH_RETRY_CAPCITY_ARRAY</code></td>
+<td>O</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Validate all candidates' quota headroom and retry only Azure AI Search capacity failures.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:aseSku --><!-- parameter json.dev:aseSku --><code>aseSku</code></td>
 <td><code>ASE_SKU</code></td>
 <td>O</td>
@@ -3289,6 +3378,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>""</code><br>J.dev: <code>""</code></td>
 <td>BYO common resource group name otherwise: provide a custom name for the common resource group.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:containerAppsRetryCapacityArray --><!-- parameter json.dev:containerAppsRetryCapacityArray --><code>containerAppsRetryCapacityArray</code></td>
+<td><code>CONTAINER_APPS_RETRY_CAPACITY_ARRAY</code></td>
+<td>O</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Retry only Container Apps capacity failures, with 240 seconds before attempts 2 and 3.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:cosmosKind --><!-- parameter json.dev:cosmosKind --><code>cosmosKind</code></td>
@@ -3380,6 +3476,13 @@ reported, not silently represented as multiple settings.</p>
 <td>C</td>
 <td>Y: <code>"email_adress_only"</code><br>J.dev: <code>"email_adress_only"</code></td>
 <td>PostgreSQL admin emails mandatory: if enablePostgreSQL:'true' ensure: valid comma-separated email addresses.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:postgreSQLRetryCapacityArray --><!-- parameter json.dev:postgreSQLRetryCapacityArray --><code>postgreSQLRetryCapacityArray</code></td>
+<td><code>POSTGRESQL_RETRY_CAPACITY_ARRAY</code></td>
+<td>O</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Retry only PostgreSQL regional/SKU capacity failures, with 240 seconds before attempts 2 and 3.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:prod_admin_bicep_input_keyvault_subscription --><!-- parameter json.dev:prod_admin_bicep_input_keyvault_subscription --><code>prod_admin_bicep_input_keyvault_subscription</code></td>
@@ -4223,28 +4326,28 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter yaml:skuAISearchDev --><!-- parameter json.dev:skuAISearchDev --><code>skuAISearchDev</code></td>
-<td><code>ADMIN_AISEARCH_TIER</code>, <code>SKU_AISEARCH_DEV</code> (not in .env template)</td>
+<td><code>ADMIN_AISEARCH_TIER</code>, <code>SKU_AISEARCH_DEV</code></td>
 <td>O</td>
 <td>Y: <code>"basic"</code><br>J.dev: <code>"basic"</code></td>
 <td>AI Search SKU Dev ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] ('free' not allowed with private endpoints)</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:skuAISearchDevArray --><!-- parameter json.dev:skuAISearchDevArray --><code>skuAISearchDevArray</code></td>
-<td>No verified binding</td>
+<td><code>SKU_AI_SEARCH_DEV_ARRAY</code></td>
 <td>O</td>
 <td>Y: <code>"[\"basic\",\"standard\",\"standard2\"]"</code><br>J.dev: <code>["basic","standard","standard2"]</code></td>
 <td>Sku aisearch dev array.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:skuAISearchStageProd --><!-- parameter json.dev:skuAISearchStageProd --><code>skuAISearchStageProd</code></td>
-<td><code>ADMIN_AISEARCH_TIER</code>, <code>SKU_AISEARCH_STAGEPROD</code> (not in .env template)</td>
+<td><code>ADMIN_AISEARCH_TIER</code>, <code>SKU_AISEARCH_STAGEPROD</code></td>
 <td>O</td>
 <td>Y: <code>"standard"</code><br>J.dev: <code>"standard"</code></td>
 <td>AI Search SKU Stage/Prod</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:skuAISearchStageProdArray --><!-- parameter json.dev:skuAISearchStageProdArray --><code>skuAISearchStageProdArray</code></td>
-<td>No verified binding</td>
+<td><code>SKU_AI_SEARCH_STAGE_PROD_ARRAY</code></td>
 <td>O</td>
 <td>Y: <code>"[\"basic\",\"standard\",\"standard2\"]"</code><br>J.dev: <code>["basic","standard","standard2"]</code></td>
 <td>Sku aisearch stage prod array.</td>
@@ -4276,6 +4379,48 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>""</code><br>J.dev: <code>""</code></td>
 <td>AKS test/prod node VM size keep-as-is: empty=template default Standard_DS13-2_v2.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skuArrayAISearchDev --><!-- parameter json.dev:skuArrayAISearchDev --><code>skuArrayAISearchDev</code></td>
+<td><code>SKU_ARRAY_AISEARCH_DEV</code></td>
+<td>O</td>
+<td>Y: <code>"basic,standard,standard2"</code><br>J.dev: <code>"basic,standard,standard2"</code></td>
+<td>Ordered fallback SKUs; the configured Dev SKU is attempted first.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skuArrayAISearchStageProd --><!-- parameter json.dev:skuArrayAISearchStageProd --><code>skuArrayAISearchStageProd</code></td>
+<td><code>SKU_ARRAY_AISEARCH_STAGEPROD</code></td>
+<td>O</td>
+<td>Y: <code>"basic,standard,standard2"</code><br>J.dev: <code>"basic,standard,standard2"</code></td>
+<td>Ordered fallback SKUs; the configured Stage/Prod SKU is attempted first.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skuArrayContainerAppsDev --><!-- parameter json.dev:skuArrayContainerAppsDev --><code>skuArrayContainerAppsDev</code></td>
+<td><code>SKU_ARRAY_CONTAINER_APPS_DEV</code></td>
+<td>O</td>
+<td>Y: <code>"Consumption,D4,D8"</code><br>J.dev: <code>"Consumption,D4,D8"</code></td>
+<td>Ordered capacity fallback profiles; D4/D8 use dedicated pricing.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skuArrayContainerAppsStageProd --><!-- parameter json.dev:skuArrayContainerAppsStageProd --><code>skuArrayContainerAppsStageProd</code></td>
+<td><code>SKU_ARRAY_CONTAINER_APPS_STAGEPROD</code></td>
+<td>O</td>
+<td>Y: <code>"Consumption,D4,D8"</code><br>J.dev: <code>"Consumption,D4,D8"</code></td>
+<td>Ordered capacity fallback profiles; D4/D8 use dedicated pricing.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skuArrayPostgreSQLDev --><!-- parameter json.dev:skuArrayPostgreSQLDev --><code>skuArrayPostgreSQLDev</code></td>
+<td><code>SKU_ARRAY_POSTGRESQL_DEV</code></td>
+<td>O</td>
+<td>Y: <code>"Standard_B1ms,Standard_B2s,Standard_B2ms"</code><br>J.dev: <code>"Standard_B1ms,Standard_B2s,Standard_B2ms"</code></td>
+<td>Ordered capacity fallback SKUs; the selected Dev SKU is attempted first.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skuArrayPostgreSQLStageProd --><!-- parameter json.dev:skuArrayPostgreSQLStageProd --><code>skuArrayPostgreSQLStageProd</code></td>
+<td><code>SKU_ARRAY_POSTGRESQL_STAGEPROD</code></td>
+<td>O</td>
+<td>Y: <code>"Standard_B1ms,Standard_B2s,Standard_B2ms"</code><br>J.dev: <code>"Standard_B1ms,Standard_B2s,Standard_B2ms"</code></td>
+<td>Ordered capacity fallback SKUs; the selected Stage/Prod SKU is attempted first.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:skuAzureMLDev --><!-- parameter json.dev:skuAzureMLDev --><code>skuAzureMLDev</code></td>
@@ -4318,6 +4463,20 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>"S1"</code><br>J.dev: <code>"S1"</code></td>
 <td>Bot Service SKU Stage/Prod</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skuContainerAppsDev --><!-- parameter json.dev:skuContainerAppsDev --><code>skuContainerAppsDev</code></td>
+<td><code>SKU_CONTAINER_APPS_DEV</code></td>
+<td>O</td>
+<td>Y: <code>"Consumption"</code><br>J.dev: <code>"Consumption"</code></td>
+<td>Container Apps workload profile Dev ['Consumption','D4','D8']</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skuContainerAppsStageProd --><!-- parameter json.dev:skuContainerAppsStageProd --><code>skuContainerAppsStageProd</code></td>
+<td><code>SKU_CONTAINER_APPS_STAGEPROD</code></td>
+<td>O</td>
+<td>Y: <code>"Consumption"</code><br>J.dev: <code>"Consumption"</code></td>
+<td>Container Apps workload profile Stage/Prod</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:skuContentSafetyDev --><!-- parameter json.dev:skuContentSafetyDev --><code>skuContentSafetyDev</code></td>
@@ -5023,7 +5182,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter env:ADMIN_AI_SEARCH_TIER --><code>ADMIN_AI_SEARCH_TIER</code></td>
-<td><code>admin_aiSearchTier</code></td>
+<td>No verified counterpart</td>
 <td>M</td>
 <td><code>"basic"</code></td>
 <td>AI Search SKU tier mandatory: AI Search SKU tier ensure: 'free' is not allowed when using private endpoints. ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2']</td>
@@ -5169,6 +5328,13 @@ reported, not silently represented as multiple settings.</p>
 <td>AI Factory minor version keep-as-is: 2025-09-20: 24 = release/v1.24</td>
 </tr>
 <tr>
+<td><!-- parameter env:AISEARCH_RETRY_CAPCITY_ARRAY --><code>AISEARCH_RETRY_CAPCITY_ARRAY</code></td>
+<td><code>aisearchRetryCapcityArray</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Validate every candidate quota and retry only recognized capacity failures after four minutes.</td>
+</tr>
+<tr>
 <td><!-- parameter env:AISEARCH_SEMANTIC_TIER --><code>AISEARCH_SEMANTIC_TIER</code></td>
 <td><code>admin_semanticSearchTier</code></td>
 <td>M</td>
@@ -5244,6 +5410,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>""</code></td>
 <td>BYO common resource group name otherwise: provide a custom name for the common resource group.</td>
+</tr>
+<tr>
+<td><!-- parameter env:CONTAINER_APPS_RETRY_CAPACITY_ARRAY --><code>CONTAINER_APPS_RETRY_CAPACITY_ARRAY</code></td>
+<td><code>containerAppsRetryCapacityArray</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Retry only Container Apps capacity errors, waiting 240 seconds before attempts 2 and 3.</td>
 </tr>
 <tr>
 <td><!-- parameter env:COSMOS_KIND --><code>COSMOS_KIND</code></td>
@@ -5370,6 +5543,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>""</code></td>
 <td>Project organizational department name keep-as-is: Unicode text, max 200 characters; identical across environments, independent of cost center. No factory inheritance or Azure tag writes.</td>
+</tr>
+<tr>
+<td><!-- parameter env:POSTGRESQL_RETRY_CAPACITY_ARRAY --><code>POSTGRESQL_RETRY_CAPACITY_ARRAY</code></td>
+<td><code>postgreSQLRetryCapacityArray</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Retry only PostgreSQL capacity errors, waiting 240 seconds before attempts 2 and 3.</td>
 </tr>
 <tr>
 <td><!-- parameter env:POSTGRES_ADMIN_EMAILS --><code>POSTGRES_ADMIN_EMAILS</code></td>
@@ -6604,6 +6784,20 @@ reported, not silently represented as multiple settings.</p>
 <td>Enable AKS for Azure ML inference mandatory: if ENABLE_AZURE_MACHINE_LEARNING:'true'</td>
 </tr>
 <tr>
+<td><!-- parameter env:SKU_AISEARCH_DEV --><code>SKU_AISEARCH_DEV</code></td>
+<td><code>skuAISearchDev</code></td>
+<td>O</td>
+<td><code>"basic"</code></td>
+<td>AI Search SKU for Dev. Must be included in SKU_ARRAY_AISEARCH_DEV when retry is enabled.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKU_AISEARCH_STAGEPROD --><code>SKU_AISEARCH_STAGEPROD</code></td>
+<td><code>skuAISearchStageProd</code></td>
+<td>O</td>
+<td><code>"standard"</code></td>
+<td>AI Search SKU for Stage and Prod. Must be included in SKU_ARRAY_AISEARCH_STAGEPROD when retry is enabled.</td>
+</tr>
+<tr>
 <td><!-- parameter env:SKU_AISERVICES_DEV --><code>SKU_AISERVICES_DEV</code></td>
 <td><code>skuAIServicesDev</code></td>
 <td>O</td>
@@ -6619,14 +6813,14 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter env:SKU_AI_SEARCH_DEV_ARRAY --><code>SKU_AI_SEARCH_DEV_ARRAY</code></td>
-<td>No verified counterpart</td>
+<td><code>skuAISearchDevArray</code></td>
 <td>O</td>
 <td><code>"[\"basic\",\"standard\",\"standard2\"]"</code></td>
 <td>Sku ai search dev array.</td>
 </tr>
 <tr>
 <td><!-- parameter env:SKU_AI_SEARCH_STAGE_PROD_ARRAY --><code>SKU_AI_SEARCH_STAGE_PROD_ARRAY</code></td>
-<td>No verified counterpart</td>
+<td><code>skuAISearchStageProdArray</code></td>
 <td>O</td>
 <td><code>"[\"basic\",\"standard\",\"standard2\"]"</code></td>
 <td>Sku ai search stage prod array.</td>
@@ -6644,6 +6838,48 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>""</code></td>
 <td>AKS SKU Stage/Prod</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKU_ARRAY_AISEARCH_DEV --><code>SKU_ARRAY_AISEARCH_DEV</code></td>
+<td><code>skuArrayAISearchDev</code></td>
+<td>O</td>
+<td><code>"basic,standard,standard2"</code></td>
+<td>Ordered Azure AI Search capacity fallback candidates (one to three SKUs).</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKU_ARRAY_AISEARCH_STAGEPROD --><code>SKU_ARRAY_AISEARCH_STAGEPROD</code></td>
+<td><code>skuArrayAISearchStageProd</code></td>
+<td>O</td>
+<td><code>"basic,standard,standard2"</code></td>
+<td>Ordered Azure AI Search capacity fallback candidates (one to three SKUs).</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKU_ARRAY_CONTAINER_APPS_DEV --><code>SKU_ARRAY_CONTAINER_APPS_DEV</code></td>
+<td><code>skuArrayContainerAppsDev</code></td>
+<td>O</td>
+<td><code>"Consumption,D4,D8"</code></td>
+<td>Ordered capacity fallback profiles; D4/D8 have dedicated pricing.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKU_ARRAY_CONTAINER_APPS_STAGEPROD --><code>SKU_ARRAY_CONTAINER_APPS_STAGEPROD</code></td>
+<td><code>skuArrayContainerAppsStageProd</code></td>
+<td>O</td>
+<td><code>"Consumption,D4,D8"</code></td>
+<td>Ordered capacity fallback profiles; D4/D8 have dedicated pricing.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKU_ARRAY_POSTGRESQL_DEV --><code>SKU_ARRAY_POSTGRESQL_DEV</code></td>
+<td><code>skuArrayPostgreSQLDev</code></td>
+<td>O</td>
+<td><code>"Standard_B1ms,Standard_B2s,Standard_B2ms"</code></td>
+<td>Ordered regional/SKU capacity fallback candidates; selected Dev SKU first.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKU_ARRAY_POSTGRESQL_STAGEPROD --><code>SKU_ARRAY_POSTGRESQL_STAGEPROD</code></td>
+<td><code>skuArrayPostgreSQLStageProd</code></td>
+<td>O</td>
+<td><code>"Standard_B1ms,Standard_B2s,Standard_B2ms"</code></td>
+<td>Ordered regional/SKU capacity fallback candidates; selected Stage/Prod SKU first.</td>
 </tr>
 <tr>
 <td><!-- parameter env:SKU_AZUREML_DEV --><code>SKU_AZUREML_DEV</code></td>
@@ -6686,6 +6922,20 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"S1"</code></td>
 <td>Bot Service SKU Stage/Prod</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKU_CONTAINER_APPS_DEV --><code>SKU_CONTAINER_APPS_DEV</code></td>
+<td><code>skuContainerAppsDev</code></td>
+<td>O</td>
+<td><code>"Consumption"</code></td>
+<td>Container Apps workload profile Dev ['Consumption','D4','D8'].</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKU_CONTAINER_APPS_STAGEPROD --><code>SKU_CONTAINER_APPS_STAGEPROD</code></td>
+<td><code>skuContainerAppsStageProd</code></td>
+<td>O</td>
+<td><code>"Consumption"</code></td>
+<td>Container Apps workload profile Stage/Prod.</td>
 </tr>
 <tr>
 <td><!-- parameter env:SKU_CONTENTSAFETY_DEV --><code>SKU_CONTENTSAFETY_DEV</code></td>
