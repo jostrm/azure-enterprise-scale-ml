@@ -24,7 +24,7 @@ from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
 from azure_esml.base_layer import (
     AzureMLCLIBackend, AzureMLSDKBackend, BlobFolderCatalog, LocalFolderCatalog, MLBackend, WorkspaceTarget,
 )
-from azure_esml.base_layer.azure_ml import _deployment_entity
+from azure_esml.base_layer.azure_ml import _component_id, _deployment_entity
 
 
 TARGET = WorkspaceTarget(
@@ -35,6 +35,14 @@ COMPONENT_ID = (
     f"/providers/Microsoft.MachineLearningServices/workspaces/{TARGET.workspace_name}"
     "/components/transform/versions/1"
 )
+
+
+@pytest.mark.parametrize("prefix", ["", "azureml:"])
+def test_component_ids_accept_cli_scheme_without_discarding_workspace_scope(prefix):
+    definition = {"name": "transform", "version": "1"}
+    assert _component_id({"id": prefix + COMPONENT_ID}, definition, TARGET) == COMPONENT_ID
+    with pytest.raises(ValueError, match="workspace/name/version"):
+        _component_id({"id": prefix + COMPONENT_ID.replace("/workspace-test/", "/other/")}, definition, TARGET)
 DATA = {
     "name": "records", "version": "1", "type": "uri_folder",
     "path": "azureml://datastores/inputstore/paths/records/", "tags": {"purpose": "test"},
@@ -172,6 +180,11 @@ def backend(request):
     client.jobs.create_or_update.return_value = deepcopy(JOB)
     client.jobs.get.return_value = deepcopy(JOB)
     client.jobs.list.return_value = iter([deepcopy(JOB), deepcopy(JOB)])
+    def download(*, name, download_path, output_name):
+        folder = Path(download_path) / "named-outputs" / output_name
+        folder.mkdir(parents=True)
+        (folder / "result.txt").write_text("fixture", encoding="utf-8")
+    client.jobs.download.side_effect = download
     client.batch_endpoints.invoke.return_value = deepcopy(JOB)
     return AzureMLSDKBackend(TARGET, client=client), client
 
@@ -212,6 +225,23 @@ def test_datastore_lookup_is_read_only(backend):
         assert not transport.documents
     else:
         transport.datastores.create_or_update.assert_not_called()
+
+
+def test_register_pipeline_component_is_new_version_only(backend, documents, workspace):
+    adapter, transport = backend
+    if not isinstance(transport, CLIRunner):
+        transport.components.get.side_effect = ResourceNotFoundError("missing")
+        transport.components.create_or_update.return_value = {
+            "name": documents.component["name"], "version": documents.component["version"],
+            "id": COMPONENT_ID, "type": "pipeline",
+        }
+    result = adapter.register_component(documents.component, workspace)
+    assert result["id"] == COMPONENT_ID
+    existing(transport, "component", {**documents.component, "id": COMPONENT_ID})
+    if not isinstance(transport, CLIRunner):
+        transport.components.get.side_effect = None
+    with pytest.raises(ValueError, match="already exists"):
+        adapter.register_component(documents.component, workspace)
 
 
 def existing(transport, group, value):
@@ -400,8 +430,12 @@ def test_invoke_named_data_outputs_and_literals_wire_compatibility(backend, work
         wire = schema(context={"base_path": workspace}).load({
             "input_data": arguments["inputs"], "output_data": arguments["outputs"],
         })
-    assert wire["inputData"]["count"] == {"jobInputType": "Literal", "value": 3}
-    assert wire["inputData"]["enabled"] == {"jobInputType": "Literal", "value": False}
+    string_literals = not isinstance(wire, dict)
+    if string_literals:
+        wire = wire.serialize()
+    assert wire["inputData"]["count"] == {"jobInputType": "Literal", "value": "3" if string_literals else 3}
+    assert wire["inputData"]["enabled"] == {"jobInputType": "Literal", "value": "False" if string_literals else False}
+    assert wire["inputData"]["threshold"] == {"jobInputType": "Literal", "value": "0.5" if string_literals else 0.5}
     assert wire["inputData"]["source"] == {"jobInputType": "UriFolder", "uri": DATA["path"]}
     assert wire["outputData"]["result"]["uri"] == outputs["result"]["path"]
     assert inputs["count"] == 3
@@ -585,7 +619,7 @@ def test_windows_cli_shim_uses_python_not_command_shell(monkeypatch, workspace):
     run = Mock(return_value=SimpleNamespace(stdout="{}"))
     monkeypatch.setattr(subprocess, "run", run)
     AzureMLCLIBackend._run(["az", "ml", "job", "download", "--download-path", 'a & echo "bad"'])
-    assert run.call_args.args[0][:4] == [str(workspace / "python.exe"), "-I", "-m", "azure.cli"]
+    assert run.call_args.args[0][:6] == [str(workspace / "python.exe"), "-X", "utf8", "-I", "-m", "azure.cli"]
     assert run.call_args.args[0][-1] == 'a & echo "bad"'
 
 

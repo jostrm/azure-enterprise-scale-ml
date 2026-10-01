@@ -450,7 +450,7 @@ def _workflow_output(args, event):
 
     event = redact_secrets(event, args.api_key)
     if args.json:
-        print(json.dumps(event, ensure_ascii=False, separators=(",", ":")), flush=True)
+        _print_json(event, compact=True, flush=True)
     else:
         # JSON-escape server strings even in human-readable terminal output.
         label = json.dumps(f"{event['repository']} run {event['run_id']} attempt {event['run_attempt']}", ensure_ascii=True)
@@ -1045,8 +1045,22 @@ def confirmed_emit(result: dict[str, Any], *, runtime: bool) -> int:
     return emit(result)
 
 
+def _print_json(value: Any, *, file=None, compact: bool = False, flush: bool = False) -> None:
+    output = sys.stdout if file is None else file
+    options = {"separators": (",", ":")} if compact else {"indent": 2, "sort_keys": True}
+    text = json.dumps(value, ensure_ascii=False, **options)
+    encoding = getattr(output, "encoding", None)
+    if encoding:
+        try:
+            # Preflight strictly, even when the stream silently replaces unsupported characters.
+            text.encode(encoding)
+        except UnicodeEncodeError:
+            text = json.dumps(value, ensure_ascii=True, **options)
+    print(text, file=output, flush=flush)
+
+
 def emit(value: Any, exit_code: int = EXIT_OK) -> int:
-    print(json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False))
+    _print_json(value)
     return exit_code
 
 
@@ -1056,7 +1070,7 @@ def _error(code: int, message: str, exc: APIError | None = None) -> int:
         payload["error"]["status"] = exc.status
     if exc and exc.details is not None:
         payload["error"]["details"] = redact_secrets(exc.details, os.getenv(API_KEY_ENV))
-    print(json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False), file=sys.stderr)
+    _print_json(payload, file=sys.stderr)
     return code
 
 

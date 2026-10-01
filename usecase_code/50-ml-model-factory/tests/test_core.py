@@ -51,6 +51,22 @@ class ConfigTests(unittest.TestCase):
 
 
 class PipelineTests(unittest.TestCase):
+    def test_prepare_emits_object_options_for_mltable_parquet_reader(self):
+        import pandas as pd
+        import yaml
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "fixture.csv"
+            pd.DataFrame({
+                "Pclass": [1, 2, 3, 1] * 25, "Sex": ["female", "male"] * 50,
+                "Age": list(range(100)), "Survived": [1, 0] * 50,
+            }).to_csv(source, index=False)
+            prepare(SCENARIO, source, root / "prepared")
+            for split in ("train", "validation", "test"):
+                descriptor = yaml.safe_load((root / "prepared" / split / "MLTable").read_text())
+                self.assertEqual(descriptor["transformations"], [{"read_parquet": {}}])
+
     def test_tabular_local_lifecycle(self):
         import pandas as pd
         from ml_model_factory.training import train

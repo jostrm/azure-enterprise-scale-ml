@@ -13,6 +13,17 @@ from ml_model_factory.lake import identifier, relative_key
 ENVIRONMENTS = ("dev", "test", "prod")
 
 
+def _validate_environment(environment, field: str):
+    if not isinstance(environment, str) or not re.fullmatch(
+            r"(?:azureml:[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+"
+            r"|azureml://registries/[A-Za-z0-9_.-]+/environments/[A-Za-z0-9_.-]+/versions/[A-Za-z0-9_.-]+)",
+            environment):
+        raise ValueError(f"{field} must pin an existing Azure ML environment name and version")
+    version = environment.rsplit("/", 1)[-1] if environment.startswith("azureml://") else environment.rsplit(":", 1)[-1]
+    if version.lower() in ("latest", "active"):
+        raise ValueError(f"{field} must be an immutable version")
+
+
 @dataclass(frozen=True)
 class DatasetSettings:
     name: str
@@ -130,11 +141,7 @@ class LakeSettings:
             "tenant_id", "subscription_id", "resource_group", "workspace_name",
         )})
         identifier(runtime.get("compute"), "compute")
-        environment = runtime.get("environment")
-        if not isinstance(environment, str) or not re.fullmatch(r"azureml:[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+", environment):
-            raise ValueError("runtime.environment must pin an existing Azure ML environment name and version")
-        if environment.rsplit(":", 1)[1].lower() in ("latest", "active"):
-            raise ValueError("runtime.environment must be an immutable version")
+        _validate_environment(runtime.get("environment"), "runtime.environment")
         models = []
         entries = document.get("models")
         if not isinstance(entries, list) or not entries:
@@ -143,7 +150,20 @@ class LakeSettings:
             if not isinstance(entry, dict) or type(entry.get("model_number")) is not int or entry["model_number"] < 1:
                 raise ValueError("Every model needs a positive model_number")
             model_folder = identifier(entry.get("model_folder_name"), "model_folder")
-            alias = identifier(entry.get("model_short_alias", f"M{entry['model_number']}"), "model_alias")
+            naming_style = entry.get("naming_style", "legacy")
+            if naming_style not in ("legacy", "model-prefix"):
+                raise ValueError("Model naming_style must be legacy or model-prefix")
+            default_alias = f"M{entry['model_number']:02d}" if naming_style == "model-prefix" else f"M{entry['model_number']}"
+            alias = identifier(entry.get("model_short_alias", default_alias), "model_alias")
+            if naming_style == "model-prefix" and not re.fullmatch(r"M\d{2,3}", alias):
+                raise ValueError("model-prefix model_short_alias must be M followed by 2-3 digits, for example M01")
+            if "compute" in entry:
+                if not isinstance(entry["compute"], str):
+                    raise ValueError("Model compute must be an explicit compute name")
+                identifier(entry["compute"], "model_compute")
+            for environment_key in ("environment", "evaluation_environment", "inference_environment"):
+                if environment_key in entry:
+                    _validate_environment(entry[environment_key], f"model.{environment_key}")
             use_case = identifier(entry.get("use_case", model_folder), "use_case")
             if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{1,62}", use_case):
                 raise ValueError("use_case must be a lowercase lake identifier of 2-63 characters")

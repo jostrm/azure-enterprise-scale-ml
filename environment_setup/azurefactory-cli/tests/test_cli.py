@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import os
 import subprocess
@@ -8,11 +9,12 @@ import threading
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import urlparse
 
 import pytest
 
-from azurefactory.cli import compare_openapi, contract_issues, main
+from azurefactory.cli import _error, _workflow_output, compare_openapi, contract_issues, main, preview_emit
 
 DRAFT_ID = "22222222-2222-2222-2222-222222222222"
 CONFIRMATION_ID = "11111111-1111-1111-1111-111111111111"
@@ -235,6 +237,75 @@ def test_cli_subprocess_help_and_json_health(server):
     )
     assert result.returncode == 0
     assert json.loads(result.stdout)["status"] == "ok"
+
+
+@pytest.mark.parametrize("encoding,errors", [
+    (None, None), ("utf-8", "strict"), ("cp1252", "strict"),
+    ("ascii", "strict"), ("cp1252", "replace"), ("cp1252", "backslashreplace"),
+])
+@pytest.mark.parametrize("surface", ["preview", "error", "workflow"])
+def test_json_output_preserves_unicode(monkeypatch, encoding, errors, surface):
+    message = 'dev \u2192 prod; caf\u00e9 \u20ac \u6f22 \U0001f680; "C:\\factory"'
+    value = {"can_execute": False, "blockers": [message], "\u6f22": message}
+    output = (io.TextIOWrapper(io.BytesIO(), encoding=encoding, errors=errors)
+              if encoding else io.StringIO())
+    with monkeypatch.context() as patch:
+        patch.setattr(sys, "stderr" if surface == "error" else "stdout", output)
+        if surface == "preview":
+            assert preview_emit(value) == 3
+        elif surface == "error":
+            assert _error(5, message) == 5
+            value = {"ok": False, "error": {"message": message, "type": "Error"}}
+        else:
+            value = {"event_type": "snapshot", "status": "completed",
+                     "conclusion": "success", "message": message}
+            _workflow_output(SimpleNamespace(json=True, api_key=None), value)
+            if encoding:
+                assert output.buffer.getvalue(), "Streaming events must be flushed immediately."
+    output.flush()
+    text = output.buffer.getvalue().decode(encoding) if encoding else output.getvalue()
+    assert json.loads(text) == value
+    if encoding in (None, "utf-8"):
+        assert message.split(";")[0] in text
+    else:
+        assert text.isascii()
+    if surface == "workflow":
+        assert len(text.splitlines()) == 1
+
+
+@pytest.mark.parametrize("encoding", ["cp1252", "ascii", "utf-8"])
+def test_legacy_blocked_preview_subprocess_preserves_exit_and_unicode(encoding):
+    preview = {"can_execute": False, "summary": "dev \u2192 prod",
+               "blockers": ["Needs approval \U0001f680"], "\u6f22": "caf\u00e9"}
+    script = """
+import json
+import sys
+from types import SimpleNamespace
+from azurefactory import cli
+
+draft, preview = json.loads(sys.argv[1])
+api = SimpleNamespace(
+    project_deployments=lambda folder: {"drafts": [draft]},
+    project_deployment_prepare=lambda body: preview,
+)
+cli.client = lambda args: api
+sys.exit(cli.main([
+    "legacy", "prepare", "--folder", r"C:\\consumer\\azurefactory",
+    "--draft-id", draft["id"], "--patch", "--aifactory-version", "125",
+]))
+"""
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1] / "src")
+    env["PYTHONIOENCODING"] = encoding + ":strict"
+    result = subprocess.run(
+        [sys.executable, "-B", "-c", script, json.dumps([legacy_draft(), preview])],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, check=False,
+    )
+    assert result.stderr == b""
+    assert result.returncode == 3
+    text = result.stdout.decode(encoding)
+    assert json.loads(text) == preview
+    assert ("\u2192" in text) is (encoding == "utf-8")
 
 
 def test_registered_workflow_single_writer_requires_review_per_stage(server, tmp_path, capsys):

@@ -3,18 +3,18 @@
   "contract_version": 1,
   "action": "create-factory",
   "factory_kind": "ai",
-  "factory_key": "central-ai-sweden",
-  "target_prefix": "central-",
-  "target_region": "swedencentral",
-  "aifactory_version": "main",
+  "factory_key": "${FACTORY_KEY}",
+  "target_prefix": "${FACTORY_PREFIX}",
+  "target_region": "${FACTORY_REGION}",
+  "aifactory_version": "${AIFACTORY_VERSION}",
   "scale_sets": [
     {
       "environment": "dev",
       "suffix": "001",
       "subscription_id": "${DEV_SUBSCRIPTION_ID}",
       "tenant_id": "${TENANT_ID}",
-      "orchestrator": "gha",
-      "network": {"vnet_cidr": "172.16.0.0/18", "max_projects": 3}
+      "orchestrator": "${ORCHESTRATOR}",
+      "network": {"vnet_cidr": "${DEV_VNET_CIDR}", "max_projects": 3}
     }
   ]
 }

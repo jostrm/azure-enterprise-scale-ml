@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable, Mapping
 import json
 import os
 from pathlib import Path
+import re
 from urllib.parse import parse_qs, urlsplit
 
 REQUEST_TIMEOUT = 180
@@ -163,7 +164,25 @@ def with_evidence(conversation: list[dict[str, str]], findings: list[dict]) -> l
     return result
 
 
+def conversational_reply(conversation: list[dict[str, str]]) -> str | None:
+    """Handle only whole-message social turns without making factual claims."""
+    if not conversation or conversation[-1].get("role") != "user":
+        return None
+    text = conversation[-1].get("content")
+    if not isinstance(text, str) or len(text) > 80:
+        return None
+    phrase = " ".join(re.sub(r"[.!?]+$", "", text.strip()).casefold().split())
+    if phrase in {"hi", "hello", "hey", "hej", "good morning", "good afternoon", "good evening"}:
+        return "Hi! How can I help you today?"
+    if phrase in {"thanks", "thank you", "thank you very much", "tack"}:
+        return "You're welcome!"
+    return None
+
+
 async def execute(run, spec: dict, conversation: list[dict[str, str]]) -> str:
+    reply = conversational_reply(conversation)
+    if reply is not None:
+        return reply
     if spec["framework"] == "multi-agent" or not spec.get("members"):
         return await run(spec, conversation)
     async with credential() as identity, openai_client(identity) as client:

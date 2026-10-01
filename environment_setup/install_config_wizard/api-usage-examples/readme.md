@@ -5,6 +5,168 @@ against Tkinter widgets, MAUI views, generated configuration files or shell
 launchers. These examples and the [Azure Factory CLI / Python SDK](../../azurefactory-cli/readme.md)
 use the same HTTP API.
 
+## Quickstart: CONFIGURE one factory and default project locally
+
+**Use the existing `azurefactory` CLI; no new CLI is needed.** Choose the CLI
+path **or** the direct API path below, not both against the same factory identity.
+Both prepare one AI factory in your chosen region, one DEV/001 scale set and
+default **project001**. A separately approved confirm saves local configuration
+drafts. Neither path deploys Azure resources, creates a subscription, publishes
+Git, enrolls a provider or changes the host's current Azure account.
+
+| Boundary | Existing CLI commands | Result |
+|---|---|---|
+| **CONFIGURE (local)** | `factory create`, review, `catalog confirm --yes` | Saves factory/scale/project **drafts**, no Azure provision |
+| **DEPLOY (cloud, explicit)** | Separate `runtime deploy` preview, review, `runtime confirm --yes` | May provision/change Azure resources and execute provider workflows |
+
+This quickstart stops at **CONFIGURE**. An existing `DRAFT` factory is already
+registered: `factory create` is not an idempotent "open existing" command.
+Do not create the same key/prefix/region again, reset/delete its register, or
+re-add its default project to obtain a demo.
+
+### 1. Connect and supply the target
+
+The approved API must already be running. From this repository's root, install
+the existing stdlib-only package into your chosen Python 3.10+ environment:
+
+```powershell
+python -m pip install -e .\environment_setup\azurefactory-cli
+if ($LASTEXITCODE -ne 0) { throw 'CLI installation failed.' }
+Set-Location .\environment_setup\install_config_wizard\api-usage-examples
+$env:AIFACTORY_API_URL = Read-Host 'Authorized API URL (for example http://127.0.0.1:8765)'
+# Supply AIFACTORY_API_KEY privately through your approved secret mechanism.
+$env:FACTORY_FOLDER = Read-Host 'Fresh isolated API-host demo root ending in azurefactory'
+$env:FACTORY_KEY = Read-Host 'New readable factory key'
+$env:FACTORY_PREFIX = Read-Host 'Approved factory prefix'
+$env:FACTORY_REGION = Read-Host 'Azure region name'
+$env:DEV_SUBSCRIPTION_ID = Read-Host 'Target DEV subscription UUID'
+$env:TENANT_ID = Read-Host 'Target tenant UUID'
+$env:DEV_VNET_CIDR = Read-Host 'Approved non-overlapping DEV VNet CIDR'
+$env:ORCHESTRATOR = Read-Host 'Provider: ado or gha'
+$env:AIFACTORY_VERSION = 'main' # Or an explicitly approved registered version 125+.
+New-Item -ItemType Directory -Force .local | Out-Null
+azurefactory health
+if ($LASTEXITCODE -ne 0) { throw 'API host is unavailable.' }
+azurefactory doctor
+if ($LASTEXITCODE -ne 0) { throw 'API compatibility check failed; do not prepare.' }
+$beforeText = azurefactory catalog list --folder $env:FACTORY_FOLDER
+if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect the selected demo catalog.' }
+$before = ($beforeText -join "`n") | ConvertFrom-Json
+if ($before.contract_version -ne 1 -or $before.mode -ne 'catalog' -or @($before.factories).Count -ne 0) {
+  throw 'Use a fresh isolated azurefactory root; do not recreate an occupied factory.'
+}
+```
+
+For this demo, `FACTORY_FOLDER` must exist **on the API host** and be a fresh
+isolated, empty `azurefactory` root, never the actual consumer's register or a
+legacy `aifactory` root. Ask the host operator to create that separate empty
+directory; do not copy `register.json`, saved factories, bindings or credentials
+from the actual register. An empty existing directory is sufficient; there is
+no extra CLI initialization command. The clients cannot upload a folder.
+The read-only catalog check above must show `mode:"catalog"` and zero factories.
+If a selected register already contains the requested key or prefix/region,
+treat it as a conflict and select a new isolated demo root/identity; do not retry
+creation against the occupied identity. To inspect the actual existing draft
+instead, use `catalog list` and the exact-selection inspector, without a create.
+Isolation protects local catalog state; it is **not** an Azure sandbox and does
+not authorize deployment to the supplied subscription.
+CIDR capacity is three projects in this tutorial so later scenarios can
+add 002 and 003. The API validates region/network constraints. Do not treat
+default settings or a successful `doctor` as evidence of deployment readiness.
+
+### 2A. Prepare through the existing CLI
+
+```powershell
+azurefactory factory create --folder $env:FACTORY_FOLDER --factory-key $env:FACTORY_KEY `
+  --prefix $env:FACTORY_PREFIX --region $env:FACTORY_REGION --kind ai `
+  --environment dev --suffix 001 --subscription-id $env:DEV_SUBSCRIPTION_ID `
+  --tenant-id $env:TENANT_ID --orchestrator $env:ORCHESTRATOR `
+  --vnet-cidr $env:DEV_VNET_CIDR --max-projects 3 --aifactory-version $env:AIFACTORY_VERSION `
+  --save-receipt .local\factory.cli.receipt.json
+if ($LASTEXITCODE -ne 0) { throw 'Stop: inspect blockers/errors; do not confirm.' }
+```
+
+Omitting `--project-number`, `--initial-project-json` and `--common-only` delegates
+default project001 to the API. Do **not** immediately run `project add --number
+001`. Review the complete printed preview and receipt: requested region, prefix,
+tenant/subscription, DEV/001, one project001 with the matching scale UUID,
+effects, warnings, source revision, blockers, expiry and `operation_mode`.
+
+**Stop for a human approval of that exact configuration-only preview.** Only in
+a separate invocation after approval:
+
+```powershell
+azurefactory catalog confirm --receipt .local\factory.cli.receipt.json --yes
+if ($LASTEXITCODE -ne 0) { throw 'Inspect host state before any retry.' }
+python .\python\inspect_factory.py --folder $env:FACTORY_FOLDER `
+  --factory-key $env:FACTORY_KEY --environment dev --suffix 001 --project-number 001
+if ($LASTEXITCODE -ne 0) { throw 'Saved scope could not be verified; do not create it again.' }
+```
+
+### 2B. Alternatively, prepare through the direct API example
+
+`python\create_factory.py` is a narrow tutorial adapter over the **existing**
+`AzureFactoryClient` and review-receipt helpers, not another HTTP client or CLI
+product. It uses the same template as section 1's raw Node/PowerShell calls:
+
+```powershell
+python .\python\render_request.py .\requests\01-create-factory.json --out .local\factory.api.request.json
+if ($LASTEXITCODE -ne 0) { throw 'Request rendering failed.' }
+python .\python\create_factory.py --request .local\factory.api.request.json `
+  --receipt .local\factory.api.receipt.json
+if ($LASTEXITCODE -ne 0) { throw 'Stop: inspect the blocked preview or error; do not confirm.' }
+```
+
+It calls POST `/api/v1/factory-catalog/prepare` (`CatalogPrepare`), requires
+contract 1 and `operation_mode:"configuration"`, checks requested identity and
+one DEV/001/default-project001 placement, then writes a CLI-compatible receipt
+exclusively. It shows the complete nonsecret request/preview, and refuses
+runtime actions, project overrides, expired/blocked previews and existing
+receipt files. It does not confirm automatically.
+
+**Stop for the same human review.** Only after explicit approval:
+
+```powershell
+python .\python\create_factory.py --confirm --receipt .local\factory.api.receipt.json --yes
+if ($LASTEXITCODE -ne 0) { throw 'Inspect host state before any retry.' }
+```
+
+Confirmation calls POST `/api/v1/factory-catalog/confirm` (`CatalogConfirm`):
+`{folder,contract_version:1,confirmation_id}`. Expect
+`{contract_version:1,catalog:<CatalogSummary>,job:null}`, **not** a job ID.
+The example then GETs `/api/v1/factory-catalog?folder=...`, verifies the exact
+reviewed factory/scale/project UUIDs and placement, and prints
+`phase:"configuration-saved"`. Configuration confirmation is synchronous; an
+unexpected runtime job is an error, never permission to poll/deploy.
+
+The receipt binds the request, preview, API URL, operation and expiry. It is not
+a signed approval or per-user authorization; your service must enforce that.
+Lost replies, conflicts and malformed results are never automatically retried.
+Use new request/receipt filenames for a new review, not an overwritten approval.
+
+### 3. Continue only with the intended scenario
+
+Use [exact IDs](#2-discover-exact-ids-before-adding-scale-sets-and-projects) and
+fresh revisions. Existing numbered templates cover clone-to-region, DEV scale
+set 002, project002 in the existing scale and project003 in the new scale.
+[Typed parameter editing](#3-update-project-resources-using-the-schema-not-guessed-field-names)
+updates saved configuration only. [STAGE placement and deployment](#configuration-is-not-deployment)
+are separate reviews; adding placement is **not** promotion in Azure. For
+asynchronous deployment observation, use the existing CLI's
+[bounded polling](#jobs-errors-and-approval-lifecycle), not a new deployment client.
+
+**Evidence boundary:** this tutorial's unit tests use synthetic/offline responses.
+Neither passing tests, local validation, `can_execute:true`, nor a saved catalog
+draft proves that Azure has been provisioned. Provisioning and Git publication
+require their own explicitly approved runtime/provider workflows and evidence.
+
+**DEPLOY is a different step, not the next automatic quickstart command.**
+The configured factory/project remains a draft. Before cloud execution, complete
+and review the exact target's settings, provider binding, source publication,
+coordination, identity and runner prerequisites. `runtime deploy` prepares a
+runtime preview; only a separate approved `runtime confirm --yes` can execute
+it. Do not run it merely to complete a recording of local configuration.
+
 ## Monitoring reports without collection or deployment
 
 With the sibling CLI/SDK installed and an approved local API already running:
@@ -63,8 +225,8 @@ For an operator-provided host using port 64979, the addresses would be:
 - Swagger: <http://127.0.0.1:64979/docs>
 - Health: <http://127.0.0.1:64979/health>
 
-That port is an example, not a stable MAUI endpoint; it was **not listening**
-during this update. **GET `/api/v1/schema`** (not POST) describes
+That port is an example, not a stable MAUI endpoint. These examples do not assert
+that any particular host is listening. **GET `/api/v1/schema`** (not POST) describes
 **wizard fields**, not HTTP routes. API version `1.0.0` alone is not a sufficient
 compatibility check: the clients also depend on catalog contract **1**, typed
 parameter endpoints and legacy project-deployment acknowledgement **2**.
@@ -89,7 +251,7 @@ alone does not update an executable.
 
 | Scenario | API flow | What it actually does |
 |---|---|---|
-| Create an AI Factory in region X | Catalog `create-factory` prepare, then confirm | Saves factory identity and explicit scale-set definitions; no Azure resources |
+| Create an AI Factory in region X | Catalog `create-factory` prepare, then confirm | Saves factory identity, explicit scales and one default project001 when `initial_project` is omitted; no Azure resources |
 | Clone factory X to region Y | Catalog `clone` prepare, then confirm | Copies/rebinds configuration with new IDs; not resource, model, secret or data replication |
 | Add DEV scale set 002 | Catalog `create-scale-set` prepare, then confirm | Registers a scale set; does not deploy common infrastructure |
 | Add a project in existing scale set 001 | Catalog `add-project` prepare, then confirm | Creates the logical project and explicit DEV placement |
@@ -102,14 +264,16 @@ alone does not update an executable.
 | Create and deploy a new factory plus its first project | Full-bootstrap prepare, then start | Common infrastructure **and** initial project, repository creation/changes, commits/pushes, identity setup and pipeline dispatch |
 | Move legacy configuration to the Azure Factory register | Catalog `migrate` with an explicit source folder | Reviewed local copy migration; not migration of Azure resources |
 
-**Current runtime limits are intentional.** The Tkinter catalog runtime blocks
-common-only creation, GHA dispatch without atomic reviewed-commit support, and
-shared-remote execution without supported namespaced authentication templates.
-Runtime deployment additionally requires an explicit reviewed pipeline binding,
-Azure Blob lock enrollment, exact Azure identity, published source and supported
-parameter/runtime capabilities. A template below may therefore produce blockers
-instead of an executable preview. Honor them. Configuration examples use GHA;
-this does not claim that their catalog runtime deployment is supported.
+**Runtime is capability- and target-dependent.** Common-only, GHA and shared-remote
+deployment require supported namespaced scoped routes, an explicit deployment
+principal and a hosted/self-hosted Linux runner. Older route contracts may block
+these requests; selecting an orchestrator is not proof of runtime support.
+Deployment also requires a reviewed pipeline binding, supported coordination
+enrollment (Azure Blob leases or explicitly governed repository single-writer
+state), exact Azure identity, published source and matching parameter/runtime
+capabilities. A template below may therefore produce blockers
+instead of an executable preview. Honor them. Some configuration templates use
+GHA; this does not claim that their catalog runtime deployment is supported.
 
 Do not substitute `/operations/project-deployments` for a blocked catalog
 deployment: those endpoints deliberately reject catalog roots. Do not silently
@@ -132,9 +296,15 @@ an alternative with stronger workflow guards and no Node/PowerShell dependency.
 Run these commands from **this examples folder**:
 
 ```powershell
-$env:AIFACTORY_API_URL = 'http://127.0.0.1:64979'
+$env:AIFACTORY_API_URL = Read-Host 'Operator-provided API URL'
 # Set AIFACTORY_API_KEY through your approved secret mechanism, not a committed file.
-$env:FACTORY_FOLDER = 'C:\AIPlatform\azurefactory'
+$env:FACTORY_FOLDER = Read-Host 'Absolute API-host azurefactory register root'
+$env:FACTORY_KEY = Read-Host 'New readable factory key'
+$env:FACTORY_PREFIX = Read-Host 'Approved factory prefix'
+$env:FACTORY_REGION = Read-Host 'Azure region name'
+$env:DEV_VNET_CIDR = Read-Host 'Approved DEV VNet CIDR'
+$env:ORCHESTRATOR = Read-Host 'Provider: ado or gha'
+$env:AIFACTORY_VERSION = 'main'
 $env:DEV_SUBSCRIPTION_ID = '<actual-dev-subscription-uuid>'
 $env:STAGE_SUBSCRIPTION_ID = '<actual-stage-subscription-uuid>'
 $env:TENANT_ID = '<actual-tenant-uuid>'
@@ -156,10 +326,15 @@ credentials, path escapes and redirects; they do not retry requests.
 
 ## 1. Create a factory in a chosen region
 
-Edit `requests\01-create-factory.json` for your approved prefix, readable
-factory key, region, orchestrator, network capacity and source version.
-`main` is explicit in the example; use your approved published version instead
-when required. CIDRs are illustrations, not an allocation recommendation.
+This is the raw HTTP equivalent of the quickstart, not another creation step to
+run after it. Render `requests\01-create-factory.json` with your approved prefix,
+readable key, region, orchestrator, CIDR and version environment values. Change
+the integer `max_projects` only after reviewing network capacity.
+Use your approved registered version 125+ or `main`.
+`initial_project` is deliberately omitted: current AI creation includes default
+project001 in the submitted DEV/001 scale. Explicit `initial_project:null` would
+instead request common-only; it is not the same as omission.
+CIDRs elsewhere are illustrations, not an allocation recommendation.
 Do not copy them into a peered network without reviewing overlap.
 
 The renderer substitutes `${VARIABLE}` in **parsed JSON strings**. It preserves
@@ -193,7 +368,15 @@ if ($preview.contract_version -ne 1 -or $preview.operation_mode -ne 'configurati
 $env:CONFIRMATION_ID = $preview.confirmation_id
 python .\python\render_request.py .\requests\catalog-confirm.json --out .local\create-confirm.json
 node .\node\request.mjs --method POST --path /api/v1/factory-catalog/confirm `
-  --body .local\create-confirm.json --allow-write
+  --body .local\create-confirm.json --allow-write > .local\create-result.json
+if ($LASTEXITCODE -ne 0) { throw 'Confirmation failed; inspect host state before retrying.' }
+$created = Get-Content .local\create-result.json -Raw | ConvertFrom-Json
+if ($created.contract_version -ne 1 -or $null -eq $created.catalog -or $null -ne $created.job) {
+  throw 'Unexpected confirmation shape; do not automatically retry or start polling.'
+}
+python .\python\inspect_factory.py --folder $env:FACTORY_FOLDER `
+  --factory-key $env:FACTORY_KEY --environment dev --suffix 001 --project-number 001
+if ($LASTEXITCODE -ne 0) { throw 'Saved default project/placement could not be verified.' }
 ```
 
 The same raw operation in PowerShell is:
@@ -230,7 +413,7 @@ change; do not cache revision hashes indefinitely or select the first factory.
 $text = node .\node\request.mjs --path /api/v1/factory-catalog --query "folder=$env:FACTORY_FOLDER"
 if ($LASTEXITCODE -ne 0) { throw 'Cannot read the catalog.' }
 $catalog = ($text -join "`n") | ConvertFrom-Json
-$factories = @($catalog.factories | Where-Object key -eq 'central-ai-sweden')
+$factories = @($catalog.factories | Where-Object key -eq $env:FACTORY_KEY)
 if ($factories.Count -ne 1) { throw 'Select exactly one factory.' }
 $factory = $factories[0]
 $scales = @($factory.scale_sets | Where-Object { $_.environment -eq 'dev' -and $_.suffix -eq '001' })
@@ -248,8 +431,8 @@ filenames in `.local` for each review.
 |---|---|
 | `02-clone-factory.json` | Source `FACTORY_ID`; changes region and prefix. Default `include_projects:"none"`; opt into `"all"` only to copy project definitions. Review copied networking and new IDs. Bindings/credentials require separate setup. |
 | `03-add-dev-scaleset-002.json` | Current factory/revision; after confirm select the new DEV/002 UUID into `DEV_SCALESET_002_ID`. |
-| `04-add-project-existing-scaleset.json` | Uses `DEV_SCALESET_001_ID`, project number 001. |
-| `05-add-project-new-scaleset.json` | First confirm scenario 03, refresh revision and IDs; then create project 002 in DEV/002. |
+| `04-add-project-existing-scaleset.json` | Uses `DEV_SCALESET_001_ID`, new project number 002; creation already supplied project001. |
+| `05-add-project-new-scaleset.json` | First confirm scenario 03, refresh revision and IDs; then create project 003 in DEV/002. Number 002 is already used if scenario 04 ran. |
 | `06-add-stage-scaleset-001.json` | Explicit STAGE subscription/network; save its UUID as `STAGE_SCALESET_001_ID`. |
 | `07-add-project-stage-placement.json` | Select the existing logical project's UUID as `PROJECT_ID`; adds STAGE without creating a second logical project. |
 | `08-deploy-catalog-project-stage.json` | Review STAGE parameters/binding first. This is a **runtime** preview; confirmation can execute billable actions. Runtime blockers may prevent execution. |
@@ -268,7 +451,7 @@ the [sibling CLI package](../../azurefactory-cli/readme.md):
 
 ```powershell
 python .\python\inspect_factory.py --folder $env:FACTORY_FOLDER `
-  --factory-key central-ai-sweden --environment dev --suffix 001 --project-number 001 `
+  --factory-key $env:FACTORY_KEY --environment dev --suffix 001 --project-number 001 `
   --auth-status --parameters
 ```
 
@@ -463,10 +646,30 @@ push and dispatch pipelines. Stage/Prod require separate later review.
 Use finite polling deadlines and persist the returned job ID. A client timeout
 or Ctrl+C does not cancel a server job. Re-read state before considering another
 write; never blindly retry a start after a lost HTTP response. Preview IDs are
-owner-bound and expiring (currently ten minutes); changed scope, source,
+owner-bound and expiring; use the returned `expires_at`, not a hard-coded lifetime.
+Changed scope, source,
 configuration or expired consent requires another explicit review, not automatic
 re-preparation/approval. Reconciliation is a separately reviewed operation, not
 permission to rerun a failed deployment.
+
+Catalog **configuration** confirmations return `catalog` plus `job:null`; do not
+poll them. Only a separately approved **runtime** confirmation returns
+`catalog:null` and a nested `job` object. Its ID is `result.job.id`, not a guessed
+top-level `job_id`. For an already authorized runtime job, use the existing CLI:
+
+```powershell
+# Set JOB_ID from the exact runtime-confirm response; no prepare/start here.
+azurefactory runtime poll --folder $env:FACTORY_FOLDER --job-id $env:JOB_ID `
+  --poll-timeout 300 --poll-interval 2
+if ($LASTEXITCODE -ne 0) { throw 'Job failed/interrupted/timed out; inspect before considering another action.' }
+azurefactory runtime logs --folder $env:FACTORY_FOLDER --job-id $env:JOB_ID --cursor 0
+```
+
+The deadline bounds observation, not execution. Per-request HTTP timeout also
+applies. A custom UX must validate `job.id`, action and exact target IDs, accept
+only the documented statuses, and stop at its deadline. Check provider pipeline
+and Azure resource results separately before claiming provisioning; legacy
+`submitted` is explicitly not deployment success.
 
 The raw clients emit JSON to stdout and errors to stderr. Exit codes: **0**
 successful HTTP result, **2** argument/transport/HTTP/JSON error, **3** blocked
@@ -504,7 +707,7 @@ The same design works whether Tkinter, MAUI or your service manages the host.
 
 `requests` holds JSON templates; `scenarios.json` maps every template to its
 actual POST route and canonical request model. `python` contains safe rendering,
-schema-to-patch, read-only inspection and guarded JSON-configuration SDK examples;
+schema-to-patch, read-only inspection, two-phase catalog creation and guarded JSON-configuration SDK examples;
 `node` and `powershell` contain raw REST consumers.
 `.local` is ignored for generated requests/reviews, but ignore rules are not
 encryption or access control. Protect and delete local artifacts appropriately.
@@ -512,7 +715,9 @@ encryption or access control. Protect and delete local artifacts appropriately.
 Run the existing pytest runner from this folder:
 
 ```powershell
-python -m pytest .\tests -q
+python -m pytest .\tests ..\..\azurefactory-cli\tests\test_cli.py `
+  ..\..\azurefactory-cli\tests\test_client.py ..\..\azurefactory-cli\tests\test_reviews.py `
+  ..\..\azurefactory-cli\tests\test_quickstart_examples.py -q --basetemp .local\pytest-work
 ```
 
 Optionally validate every template against the backend Python API's Pydantic models

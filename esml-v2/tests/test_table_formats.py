@@ -76,6 +76,8 @@ def test_real_roundtrip_preserves_csv_labels_values_and_not_index(workdir, forma
         assert metadata["protocol"] is None
         assert not (destination / "_delta_log").exists()
         assert "read_parquet" in (destination / "MLTable").read_text()
+        assert yaml.safe_load((destination / "MLTable").read_text())["transformations"] == [{"read_parquet": {}}]
+        assert "MLTable" in metadata["files"]
         pd.testing.assert_frame_equal(pd.read_parquet(destination / "data.parquet"), result)
 
 

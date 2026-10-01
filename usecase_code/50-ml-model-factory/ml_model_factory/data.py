@@ -167,7 +167,7 @@ def prepare(scenario: dict, input_path: Path, output: Path) -> dict:
         folder.mkdir()
         rows.to_parquet(folder / "data.parquet", index=False)
         (folder / "MLTable").write_text(
-            "paths:\n  - file: ./data.parquet\ntransformations:\n  - read_parquet:\n", encoding="utf-8"
+            "paths:\n  - file: ./data.parquet\ntransformations:\n  - read_parquet: {}\n", encoding="utf-8"
         )
     if scenario["name"] == "titanic":
         frame.to_parquet(output / "titanic.parquet", index=False)

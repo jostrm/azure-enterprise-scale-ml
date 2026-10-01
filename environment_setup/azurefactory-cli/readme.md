@@ -9,8 +9,8 @@ cd <repo>\environment_setup\azurefactory-cli
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e .
-$env:AIFACTORY_API_URL = "http://127.0.0.1:64979"   # or omit for http://127.0.0.1:8765
-$env:AIFACTORY_API_KEY = "<per-process local API key>"
+$env:AIFACTORY_API_URL = Read-Host 'Operator-provided API URL (default source port is 8765)'
+# Set AIFACTORY_API_KEY privately through your approved secret mechanism.
 ```
 
 The API key is sent only as `X-API-Key`; the CLI does not log or store it. Plain `http` is accepted only for loopback hosts. `https` is also accepted. Redirects, URL credentials and absolute endpoint escapes are rejected.
@@ -19,10 +19,95 @@ Server reference: canonical Tkinter API source `<tkinter-repository>\src\api.py`
 `build-windows.ps1` invokes Tkinter's `build-api.ps1` and packages the resulting
 `aifactory-api.exe`, not a separate REST implementation. The packaged host uses
 a random loopback port and per-process key. This source/build relationship does
-not certify a running binary: the example port 64979 was not listening during
-this update. Obtain the actual URL/key from your operator and run `doctor`
+not certify a running binary or assert that a particular port is listening.
+Obtain the actual URL/key from your operator and run `doctor`
 against that host. Local API authentication is distinct from both the Azure CLI
 identity on the host and a user's approval to save or deploy.
+
+## Quickstart: CONFIGURE a factory with default project001 locally
+
+Use **this existing CLI**, not another CLI or a deployment shell fallback. The
+[API tutorial's connection step](../install_config_wizard/api-usage-examples/readme.md#1-connect-and-supply-the-target)
+sets the operator-provided API URL/key and user-supplied
+`FACTORY_FOLDER`, `FACTORY_KEY`, `FACTORY_PREFIX`, `FACTORY_REGION`,
+`DEV_SUBSCRIPTION_ID`, `TENANT_ID`, `DEV_VNET_CIDR`, `ORCHESTRATOR` and
+`AIFACTORY_VERSION`. From the repository root the installation command is
+`python -m pip install -e .\environment_setup\azurefactory-cli`.
+
+For this quickstart, use a **fresh isolated demo** `azurefactory` directory that
+already exists **on the API host**, not the actual consumer's register or a
+legacy `aifactory` root. The host operator creates only a separate empty
+directory; do not copy an existing register, saved factories, bindings or
+credentials. No additional CLI initialization command is needed.
+An existing `DRAFT` factory already occupies its key and prefix/region:
+`factory create` does not reopen/upsert it. On conflict, inspect it read-only or
+choose a fresh isolated demo root/identity; never reset/delete the actual register
+or rerun creation against the occupied identity.
+
+**CONFIGURE means local drafts. DEPLOY means explicit cloud execution.**
+These commands may
+persist previews/drafts but do **not** deploy, publish Git, enroll a provider,
+create subscriptions or change the host's Azure account:
+
+```powershell
+azurefactory health
+if ($LASTEXITCODE -ne 0) { throw 'API unavailable.' }
+azurefactory doctor
+if ($LASTEXITCODE -ne 0) { throw 'Incompatible API; stop.' }
+$beforeText = azurefactory catalog list --folder $env:FACTORY_FOLDER
+if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect the selected demo catalog.' }
+$before = ($beforeText -join "`n") | ConvertFrom-Json
+if ($before.contract_version -ne 1 -or $before.mode -ne 'catalog' -or @($before.factories).Count -ne 0) {
+  throw 'Use a fresh isolated azurefactory root; do not recreate an occupied factory.'
+}
+azurefactory factory create --folder $env:FACTORY_FOLDER --factory-key $env:FACTORY_KEY `
+  --prefix $env:FACTORY_PREFIX --region $env:FACTORY_REGION --kind ai `
+  --environment dev --suffix 001 --subscription-id $env:DEV_SUBSCRIPTION_ID `
+  --tenant-id $env:TENANT_ID --orchestrator $env:ORCHESTRATOR `
+  --vnet-cidr $env:DEV_VNET_CIDR --max-projects 3 --aifactory-version $env:AIFACTORY_VERSION `
+  --save-receipt .\factory.receipt.json
+if ($LASTEXITCODE -ne 0) { throw 'Review errors/blockers; do not confirm.' }
+```
+
+Omission of project flags means exactly one initial AI project001, selected by
+the backend and placed in DEV/001. Review the target's IDs, region, subscription,
+tenant, network, project placement, effects/warnings/blockers and expiry.
+Require contract 1 and configuration mode; defaults are not verified deployment
+readiness. **Stop for human approval of that exact preview.** Only afterward,
+in a separate invocation:
+
+```powershell
+azurefactory catalog confirm --receipt .\factory.receipt.json --yes
+if ($LASTEXITCODE -ne 0) { throw 'Inspect host state; never blindly retry confirmation.' }
+azurefactory catalog list --folder $env:FACTORY_FOLDER
+if ($LASTEXITCODE -ne 0) { throw 'Cannot verify the saved register.' }
+```
+
+Expect `contract_version:1`, `catalog:<CatalogSummary>` and `job:null`, not a
+runtime job. Check the exact factory UUID from the preview and its project001
+placement in the returned catalog. Do **not** add project001 again. The
+[executable direct API equivalent](../install_config_wizard/api-usage-examples/readme.md#2b-alternatively-prepare-through-the-direct-api-example)
+reuses this package and receipt helpers, verifies the saved UUIDs with a fresh
+GET, and does not start Azure deployment. Choose one creation path only.
+
+For the remaining scenario sequence, reuse the existing commands below:
+`factory clone` for another region; `scaleset add --environment dev --suffix
+002`; `project add --number 002` in existing DEV/001 or `--number 003` in new
+DEV/002 if both scenarios run; `parameters get/prepare/confirm` for saved
+resource changes. STAGE requires its own scale set, `project add-placements`,
+reviewed target parameters/enrollment and separately approved `runtime deploy`.
+Placement alone is not Azure promotion; legacy update/promote is a separate
+contract. Observe runtime jobs with `runtime poll --poll-timeout 300
+--poll-interval 2`; a timeout does not cancel the job. No runtime confirm is part
+of this quickstart.
+
+Offline test success, local validation and saved drafts are **not** evidence of
+Azure provision or Git publication. A blocked deployment must remain blocked,
+not be rerouted through legacy/bootstrap commands.
+The isolated directory protects local state; it is not an Azure sandbox.
+`runtime deploy` only prepares a separate cloud/runtime preview; an explicitly
+approved `runtime confirm --yes` executes it. Neither belongs in the local
+configuration recording's happy-path.
 
 ## Core commands
 
@@ -166,7 +251,7 @@ azurefactory project add --folder C:\factory --factory-id <uuid> --number 002 --
 azurefactory catalog confirm --receipt .\project.receipt.json --yes
 
 azurefactory factory clone --folder C:\factory --factory-id <uuid> --prefix aif-copy --region swedencentral --include-projects all --save-receipt .\clone.receipt.json
-azurefactory scaleset add --folder C:\factory --factory-id <uuid> --environment stage --suffix 002 --subscription-id <uuid> --tenant-id <uuid> --orchestrator ado --vnet-cidr 172.20.0.0/18 --save-receipt .\scaleset.receipt.json
+azurefactory scaleset add --folder C:\factory --factory-id <uuid> --environment stage --suffix 001 --subscription-id <uuid> --tenant-id <uuid> --orchestrator ado --vnet-cidr 172.20.0.0/18 --save-receipt .\scaleset.receipt.json
 azurefactory project add-placements --folder C:\factory --factory-id <uuid> --project-id <uuid> --placement stage=<scale-set-uuid> --save-receipt .\placement.receipt.json
 
 azurefactory runtime deploy --folder C:\factory --factory-id <uuid> --scale-set-id <uuid> --project-id <uuid> --version-ref main --save-receipt .\deploy.receipt.json
@@ -208,10 +293,20 @@ omit `initial_project` for the default or pass `None` for common-only.
 For a project in a **new DEV scale set 002**, first run `scaleset add` with
 `--environment dev --suffix 002` and an approved non-overlapping CIDR, confirm
 that configuration, then refresh `catalog list`. Pass the returned DEV/002 UUID
-to `project add --number 002 --placement dev=<new-scale-set-uuid>`. For an existing
-DEV/001 use that scale set's UUID instead. The two writes are not atomic.
+to `project add --number 003 --placement dev=<new-scale-set-uuid>` when the earlier
+existing-scale example already created 002. If running only the new-scale
+scenario, 002 is available instead. For existing DEV/001 use that scale set's
+UUID. Project numbers are unique across the factory; the two writes are not atomic.
 
-Catalog placements register where a logical project may live (`project add-placements`). They do not run update/promote. Catalog runtime deployment is `runtime deploy` and uses `/api/v1/factory-catalog/prepare` with `action=deploy`, then `runtime confirm`; it never uses legacy deployment endpoints. Current server runtime blockers are preserved in CLI output, including common-only deploy unsupported, GHA atomic dispatch missing, and shared-remote deploy unsupported. Some configuration templates default to GHA, but deployment still surfaces these blockers instead of switching route.
+Catalog placements register where a logical project may live (`project add-placements`).
+They do not run update/promote. Catalog runtime deployment is `runtime deploy`
+and uses `/api/v1/factory-catalog/prepare` with `action=deploy`, then `runtime
+confirm`; it never uses legacy deployment endpoints. Current server blockers are
+preserved in CLI output. Common-only, GHA and shared-remote execution require a
+supported scoped route, explicit deployment principal and Linux runner, as well
+as reviewed bindings, coordination enrollment, published source and exact Azure
+identity. Do not infer runtime support from a configuration template's provider
+or switch routes to bypass blockers.
 
 Typed parameter editing keeps catalog source and ARM schema revisions explicit:
 

@@ -13,6 +13,7 @@ import argparse
 import base64
 import ctypes
 import errno
+import fnmatch
 import hashlib
 import importlib.util
 import json
@@ -36,6 +37,8 @@ from uuid import uuid4
 
 
 CONTRACT = 1
+SELECTIVE_PROJECT_DELETE = "selective-project-resources-v1"
+PROJECT_NETWORK_TYPES = {"microsoft.network/networksecuritygroups", "microsoft.network/routetables"}
 MAX_DOCUMENT = 8 * 1024 * 1024
 RECEIPT_REPLACE_ATTEMPTS = 20
 RECEIPT_REPLACE_RETRY_SECONDS = 0.25
@@ -118,17 +121,53 @@ ADO_FILES = {
 }
 
 
+def safe_instance_diagnostic(code, value):
+    if (code not in ("bootstrap-resource-instance-changed", "scoped-github-run-failed", "scoped-ado-run-failed")
+            or type(value) is not dict
+            or set(value) != {"resource_id", "failed_comparisons"}):
+        return None
+    identifier, fields = value["resource_id"], value["failed_comparisons"]
+    if (type(identifier) is not str or not 1 <= len(identifier) <= 2048
+            or type(fields) is not list or not 1 <= len(fields) <= 2
+            or any(type(field) is not str or field not in ("body_hash", "etag") for field in fields)
+            or len(set(fields)) != len(fields)):
+        return None
+    pattern = (r"/subscriptions/" + GUID + r"/resourcegroups/[A-Za-z0-9_.()-]{1,90}"
+               r"(?:/providers/[A-Za-z0-9.]+(?:/[A-Za-z0-9_.()-]+/[A-Za-z0-9_.()@-]+)+)?")
+    if not re.fullmatch(pattern, identifier, re.I | re.A) or any(part in (".", "..") for part in identifier.split("/")):
+        return None
+    return {"resource_id": identifier,
+            "failed_comparisons": [field for field in ("body_hash", "etag") if field in fields]}
+
+
 class Blocked(ValueError):
     """A stable, non-secret error code suitable for a persistent receipt."""
 
-    def __init__(self, code):
+    def __init__(self, code, *, error_diagnostic=None):
         self.code = code
+        self.error_diagnostic = safe_instance_diagnostic(code, error_diagnostic)
         super().__init__(code)
 
 
 def require(condition, code):
     if not condition:
         raise Blocked(code)
+
+
+def require_bootstrap_instance(identifier, **comparisons):
+    failed = [field for field, matches in comparisons.items() if not matches]
+    if failed:
+        raise Blocked("bootstrap-resource-instance-changed", error_diagnostic={
+            "resource_id": identifier, "failed_comparisons": failed})
+
+
+def failure_fields(error, fallback):
+    code = error.code if isinstance(error, Blocked) else fallback
+    result = {"error_code": code}
+    detail = safe_instance_diagnostic(code, getattr(error, "error_diagnostic", None))
+    if detail is not None:
+        result["error_diagnostic"] = detail
+    return result
 
 
 def canonical(value):
@@ -479,6 +518,8 @@ def protect_coordination_storage(document):
 
 
 def validate_deletion(document):
+    if "deletion_scope" in document:
+        return validate_project_deletion(document)
     data = document.get("deletion")
     require(isinstance(data, dict) and data.get("inventory_complete") is True, "complete-inventory-required")
     require(data.get("revision") == document["manifest_revision"], "inventory-revision-mismatch")
@@ -583,6 +624,7 @@ def capabilities():
         "resource_closure": "arm-resource-only-closure-v2",
         "delete_leaf_types": sorted(LEAF_TYPES), "delete_empty_owned_resource_groups": True,
         "delete_owned_resource_groups": "arm-provider-closure-v1",
+        "selective_project_deletion": SELECTIVE_PROJECT_DELETE,
         "factory_cohort": "physical-lease-cohort-v1",
         "creation": "frozen-arm-deployment-plan-v1", "shared_remote_namespaced_auth": True,
         "blockers": {
@@ -1322,6 +1364,359 @@ def freeze_deletion_inventory(cloud, document, ownership_records):
     return result
 
 
+def project_deletion_policy(document):
+    scope = document.get("deletion_scope")
+    require(isinstance(scope, dict) and set(scope) == {
+        "kind", "contract", "project_id", "project_number", "options", "registered_resource_ids"}
+        and scope.get("kind") == "project" and scope.get("contract") == SELECTIVE_PROJECT_DELETE
+        and guid(scope.get("project_id"))
+        and document["target"]["project_ids"] == [scope.get("project_number")],
+        "exact-project-deletion-scope-required")
+    options = scope.get("options")
+    require(isinstance(options, dict) and set(options) == {
+        "environments", "include_project_subnets", "include_keyvault_and_resource_group"}
+        and type(options.get("include_project_subnets")) is bool
+        and type(options.get("include_keyvault_and_resource_group")) is bool,
+        "explicit-project-deletion-options-required")
+    envs = options.get("environments")
+    require(isinstance(envs, list) and envs and all(env in ("dev", "stage", "prod") for env in envs)
+            and len(set(envs)) == len(envs) and document["target"]["environment"] in envs,
+            "explicit-project-environments-required")
+    registered = scope.get("registered_resource_ids")
+    require(isinstance(registered, list) and registered and all(isinstance(item, str)
+            and (RG_ID.fullmatch(item) or NESTED_ID.fullmatch(item)) for item in registered)
+            and len(set(item.lower() for item in registered)) == len(registered),
+            "registered-project-ownership-required")
+    review = document.get("reviewed_scope")
+    require(isinstance(review, dict) and review.get("factory_id") == document["target"]["factory_id"]
+            and review.get("project_id") == scope["project_id"] and review.get("deletion_options") == options
+            and hash_value(review.get("expected_revision")), "project-reviewed-scope-mismatch")
+    return options
+
+
+def project_delete_roots(data):
+    entries = [*data["resource_groups"], *data["resources"]]
+    deleted = {item["id"].lower(): item for item in entries if item["delete"]}
+    roots = {key: item for key, item in deleted.items()
+             if not any(key.startswith(parent + "/") for parent in deleted if parent != key)}
+    plan = []
+    for key, item in roots.items():
+        references = {ref.lower() for child in entries if child["id"].lower() == key
+                      or child["id"].lower().startswith(key + "/") for ref in child.get("depends_on", [])}
+        dependencies = [other for other in roots if other != key
+                        and any(ref == other or ref.startswith(other + "/") for ref in references)]
+        plan.append({**item, "depends_on": dependencies})
+    return deletion_order(plan)
+
+
+def project_resource_shared(body):
+    require(isinstance(body.get("tags") or {}, dict), "malformed-project-ownership-tags")
+    return any(key.lower() == "aifactory.shared" and str(value).lower() == "true"
+               for key, value in (body.get("tags") or {}).items())
+
+
+def project_resource_dependencies(body):
+    key = body["id"].lower()
+    references = resource_references(body)
+    if str(body.get("type", "")).lower() in PROJECT_NETWORK_TYPES | {"microsoft.network/virtualnetworks"}:
+        # Subnets are reverse links or separately inventoried child bodies.
+        references -= resource_references((body.get("properties") or {}).get("subnets", []))
+    return sorted(ref for ref in references if RG_ID.match(ref) and ref != key and not ref.startswith(key + "/"))
+
+
+def validate_project_deletion(document):
+    options = project_deletion_policy(document)
+    data, target = document.get("deletion"), document["target"]
+    require(isinstance(data, dict) and data.get("inventory_mode") == SELECTIVE_PROJECT_DELETE
+            and data.get("inventory_complete") is True and data.get("revision") == document["manifest_revision"],
+            "complete-project-inventory-required")
+    groups, resources = data.get("resource_groups"), data.get("resources")
+    require(isinstance(groups, list) and groups and isinstance(resources, list)
+            and all(isinstance(item, dict) for item in groups + resources), "invalid-project-inventory")
+    require(data.get("inventory_hash") == digest(resources)
+            and isinstance(data.get("closure"), dict) and data.get("closure_hash") == digest(data["closure"]),
+            "project-inventory-hash-mismatch")
+    bodies = data.get("bodies")
+    require(isinstance(bodies, dict), "project-retention-proof-required")
+    writable = {value.lower() for value in document["locks"]["scopes"]}
+    scopes = writable | {value.lower() for value in document["locks"]["common_dependencies"]}
+    group_ids = {str(item.get("id", "")).lower() for item in groups}
+    require(group_ids == scopes, "project-inventory-scope-mismatch")
+    project_group = str(data.get("project_resource_group", "")).lower()
+    registered = {item.lower() for item in document["deletion_scope"]["registered_resource_ids"]}
+    require(project_group in writable & registered and RG_ID.fullmatch(project_group),
+            "registered-exact-project-group-required")
+    owner = {key: target[key] for key in ("factory_id", "scaleset_id")}
+    owner["project_id"] = document["deletion_scope"]["project_number"]
+    entries = {str(item.get("id", "")).lower(): item for item in groups + resources}
+    require(len(entries) == len(groups + resources) and set(bodies) == set(entries),
+            "duplicate-or-incomplete-project-inventory")
+    require(any(item.get("delete") is True for item in entries.values()), "nonempty-delete-allowlist-required")
+    for identifier, item in entries.items():
+        is_group = identifier in group_ids
+        require((RG_ID if is_group else NESTED_ID).fullmatch(identifier)
+                and arm_scope(identifier) in scopes and type(item.get("delete")) is bool
+                and hash_value(item.get("body_hash")) and item["body_hash"] == digest(bodies[identifier]),
+                "invalid-project-resource-proof")
+        require(item.get("etag") is None or isinstance(item["etag"], str), "invalid-project-resource-etag")
+        if not is_group:
+            require(item.get("type") == resource_type_from_id(identifier)
+                    and isinstance(item.get("api_version"), str)
+                    and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-preview)?", item["api_version"]),
+                    "invalid-project-resource-type")
+        require(isinstance(item.get("depends_on"), list)
+                and item["depends_on"] == project_resource_dependencies(bodies[identifier]),
+                "explicit-project-dependencies-required")
+        if identifier == project_group:
+            require(item.get("owner") == owner and item["delete"] == options["include_keyvault_and_resource_group"],
+                    "project-resource-group-policy-mismatch")
+        if not item["delete"]:
+            continue
+        require(arm_scope(identifier) in writable and item.get("owner") == owner
+                and not project_resource_shared(bodies[identifier]),
+                "shared-or-foreign-project-delete-forbidden")
+        if is_group:
+            require(identifier == project_group, "common-or-other-resource-group-delete-forbidden")
+        else:
+            kind = item["type"]
+            subnet = kind == "microsoft.network/virtualnetworks/subnets"
+            require(kind != "microsoft.network/virtualnetworks", "project-vnet-delete-forbidden")
+            network = any((identifier == entry or identifier.startswith(entry + "/"))
+                          and resource_type_from_id(entry) in PROJECT_NETWORK_TYPES for entry in registered)
+            require(arm_scope(identifier) == project_group or subnet and identifier in registered or network,
+                    "outside-project-service-delete-forbidden")
+            require(not network or options["include_project_subnets"], "retained-project-network-delete-forbidden")
+            require(not subnet or options["include_project_subnets"], "retained-subnet-delete-forbidden")
+            require(not kind.startswith("microsoft.keyvault/vaults")
+                    or options["include_keyvault_and_resource_group"], "retained-keyvault-delete-forbidden")
+        require(all(child["delete"] for key, child in entries.items() if key.startswith(identifier + "/")),
+                "retained-child-cascade-forbidden")
+        cascades = managed_group_cascades(bodies[identifier], target["subscription_id"])
+        require(cascades <= ({project_group} if options["include_keyvault_and_resource_group"] else set()),
+                "implicit-managed-group-not-authorized")
+    deleted = {key for key, item in entries.items() if item["delete"]}
+    for key, item in entries.items():
+        require(item["delete"] or not any(ref.lower() in deleted for ref in item["depends_on"]),
+                "retained-project-dependency-delete-forbidden")
+    protect_coordination_storage(document)
+    project_delete_roots(data)
+
+
+def project_owner(cloud, document, body, records, cache):
+    require(isinstance(body.get("tags") or {}, dict), "malformed-project-ownership-tags")
+    tags = {key.lower(): str(value) for key, value in (body.get("tags") or {}).items()}
+    owner = {key: tags[tag] for key, tag in TAG_KEYS.items() if tag in tags}
+    logical = tags.get("aifactory.logical_project_id")
+    if logical and owner.get("project_id") == document["deletion_scope"]["project_number"]:
+        require(logical == document["deletion_scope"]["project_id"], "logical-project-owner-mismatch")
+    if owner:
+        return {"owner": owner, "ownership_source": "tags"}
+    key = body["id"].lower()
+    record = records.get(key, {})
+    if record.get("ownership_source") == "deployment-receipt":
+        evidence = record.get("ownership_evidence")
+        verified = verified_receipt_owner(BlobLocks(cloud, document), evidence, key, digest(body), cache)
+        require(verified == record.get("owner"), "project-receipt-owner-mismatch")
+        return {"owner": verified, "ownership_source": "deployment-receipt", "ownership_evidence": evidence}
+    return {"owner": {}, "ownership_source": "retained-unowned"}
+
+
+def verify_project_permissions(cloud, data):
+    for item in project_delete_roots(data):
+        _, _, body = cloud.request("GET", ARM + quote(item["id"], safe="/().-_")
+                                   + "/providers/Microsoft.Authorization/permissions?api-version=2022-04-01", ARM)
+        require(isinstance(body, dict) and isinstance(body.get("value"), list) and not body.get("nextLink"),
+                "complete-project-delete-permissions-required")
+        action = ("microsoft.resources/subscriptions/resourcegroups/delete" if RG_ID.fullmatch(item["id"])
+                  else item["type"] + "/delete")
+        allowed = False
+        for row in body["value"]:
+            require(isinstance(row, dict) and isinstance(row.get("actions"), list)
+                    and isinstance(row.get("notActions"), list)
+                    and all(isinstance(value, str) for value in row["actions"] + row["notActions"]),
+                    "malformed-project-delete-permissions")
+            allowed |= (any(fnmatch.fnmatchcase(action, value.lower()) for value in row["actions"])
+                        and not any(fnmatch.fnmatchcase(action, value.lower()) for value in row["notActions"]))
+        require(allowed, "project-delete-permission-required")
+
+
+def freeze_project_deletion(cloud, document, ownership_records):
+    options = project_deletion_policy(document)
+    cloud.verify_identity()
+    BlobLocks(cloud, document).verify_enrollment()
+    scopes = sorted(set(document["locks"]["scopes"] + document["locks"]["common_dependencies"]), key=str.lower)
+    closure, bodies = collect_resource_closure(cloud, scopes)
+    records = {key.lower(): value for key, value in ownership_records.items()}
+    owner = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
+    owner["project_id"] = document["deletion_scope"]["project_number"]
+    registered = {item.lower() for item in document["deletion_scope"]["registered_resource_ids"]}
+    entries, cache = {}, {}
+    for key, body in bodies.items():
+        group = key in closure["groups"]
+        metadata = closure["groups"][key] if group else closure["resources"][key]
+        proof = project_owner(cloud, document, body, records, cache)
+        entries[key] = {"id": body["id"], **metadata, **proof, "delete": False,
+                        "depends_on": project_resource_dependencies(body)}
+    matches = [key for key in closure["groups"] if entries[key]["owner"] == owner and key in registered]
+    require(len(matches) == 1, "one-exact-owned-project-resource-group-required")
+    project_group = matches[0]
+    writable = {item.lower() for item in document["locks"]["scopes"]}
+    for key, item in entries.items():
+        body, kind = bodies[key], item.get("type", "")
+        in_project = arm_scope(key) == project_group
+        shared = project_resource_shared(body)
+        if options["include_project_subnets"] and kind == "microsoft.network/virtualnetworks/subnets":
+            require(key not in registered or bool(item["owner"]) or shared,
+                    "registered-subnet-ownership-unverified")
+            if item["owner"] == owner and not shared:
+                require((in_project or key in registered) and arm_scope(key) in writable,
+                        "registered-writable-project-subnet-required")
+        if in_project:
+            require(item["owner"] == owner and not shared, "project-group-ownership-incomplete-or-shared")
+        if item["owner"] != owner or shared or arm_scope(key) not in writable:
+            continue
+        if key in closure["groups"]:
+            item["delete"] = key == project_group and options["include_keyvault_and_resource_group"]
+        elif kind == "microsoft.network/virtualnetworks/subnets":
+            item["delete"] = options["include_project_subnets"] and (in_project or key in registered)
+        elif kind == "microsoft.network/virtualnetworks":
+            item["delete"] = False
+        elif any((key == entry or key.startswith(entry + "/"))
+                 and resource_type_from_id(entry) in PROJECT_NETWORK_TYPES for entry in registered):
+            item["delete"] = options["include_project_subnets"]
+        elif kind.startswith("microsoft.keyvault/vaults"):
+            item["delete"] = in_project and options["include_keyvault_and_resource_group"]
+        else:
+            item["delete"] = in_project
+    # Preserve necessary dependencies and every ancestor of a retained resource.
+    # Never silently widen deletion to make a dependency graph executable.
+    changed = True
+    while changed:
+        changed = False
+        for key, item in entries.items():
+            if item["delete"]:
+                continue
+            for candidate, other in entries.items():
+                if other["delete"] and (key.startswith(candidate + "/")
+                                       or candidate in item["depends_on"]
+                                       or candidate.startswith(key + "/") and item.get("type")
+                                       not in (None, "microsoft.network/virtualnetworks")):
+                    other["delete"] = False
+                    changed = True
+    if options["include_project_subnets"]:
+        require(all(item["delete"] for key, item in entries.items()
+                    if item.get("type") == "microsoft.network/virtualnetworks/subnets"
+                    and item["owner"] == owner and not project_resource_shared(bodies[key])),
+                "project-subnet-retained-dependency-conflict")
+        for key in registered & set(entries):
+            if entries[key].get("type") in PROJECT_NETWORK_TYPES and entries[key]["owner"] == owner:
+                require(all(child["owner"] == owner and not project_resource_shared(bodies[identifier])
+                            for identifier, child in entries.items() if identifier == key or identifier.startswith(key + "/")),
+                        "project-network-child-ownership-unverified")
+    result = {"inventory_mode": SELECTIVE_PROJECT_DELETE, "inventory_complete": True,
+              "revision": document["manifest_revision"], "project_resource_group": bodies[project_group]["id"],
+              "resource_groups": [entries[key] for key in sorted(closure["groups"])],
+              "resources": [entries[key] for key in sorted(closure["resources"])],
+              "closure": closure, "closure_hash": digest(closure), "bodies": bodies}
+    result["inventory_hash"] = digest(result["resources"])
+    validate_project_deletion({**document, "deletion": result})
+    for scope in scopes:
+        cloud.assert_no_active_deployments(scope)
+    require(not any(item.get("type") in ("microsoft.authorization/locks", "microsoft.authorization/denyassignments")
+                    for item in result["resources"]), "project-delete-lock-or-deny-assignment-present")
+    verify_project_permissions(cloud, result)
+    return result
+
+
+def _without_deleted_children(body, removed):
+    if isinstance(body, list):
+        return [_without_deleted_children(item, removed) for item in body
+                if not isinstance(item, dict) or str(item.get("id", "")).lower() not in removed]
+    if isinstance(body, dict):
+        return {key: _without_deleted_children(value, removed) for key, value in body.items() if key.lower() != "etag"}
+    return body
+
+
+def verify_project_inventory(cloud, document, removed=()):
+    data = document["deletion"]
+    removed = {item.lower() for item in removed}
+    scopes = [row["id"] for row in data["resource_groups"] if row["id"].lower() not in removed]
+    closure, bodies = collect_resource_closure(cloud, scopes)
+    expected = data["closure"]
+    if not removed:
+        require(closure == expected, "project-complete-inventory-changed")
+    for namespace, value in closure["providers"].items():
+        require(expected["providers"].get(namespace) == value, "project-provider-schema-changed")
+    require(set(bodies) == set(data["bodies"]) - removed, "project-resource-closure-changed")
+    for key, body in bodies.items():
+        before = data["bodies"][key]
+        backlinks = (str(before.get("type", "")).lower() in PROJECT_NETWORK_TYPES
+                     and bool(resource_references((before.get("properties") or {}).get("subnets", [])) & removed))
+        if any(identifier.startswith(key + "/") for identifier in removed) or backlinks:
+            require(_without_deleted_children(body, removed) == _without_deleted_children(before, removed),
+                    "project-retained-parent-changed")
+        else:
+            require(digest(body) == digest(before), "project-resource-instance-changed")
+    expected_collections = {key: value for key, value in expected["collections"].items()
+                            if not any(key == item or key.startswith(item + "/") for item in removed)}
+    require(set(closure["collections"]) == set(expected_collections), "project-child-collections-changed")
+    for key, value in closure["collections"].items():
+        old = expected_collections[key]
+        for field in ("api_version", "unsupported", "not_applicable", "non_resource_metadata"):
+            require(value.get(field) == old.get(field), "project-child-collection-contract-changed")
+        require(value.get("ids") == ([item for item in old["ids"] if item not in removed] if "ids" in old else None),
+                "project-child-inventory-changed")
+    cache = {}
+    for item in data["resource_groups"] + data["resources"]:
+        key = item["id"].lower()
+        if key in removed:
+            continue
+        if item.get("ownership_source") == "tags":
+            verify_ownership(bodies[key], item["owner"])
+        elif item.get("ownership_source") == "deployment-receipt":
+            require(verified_receipt_owner(BlobLocks(cloud, document), item["ownership_evidence"], key,
+                    item["body_hash"], cache) == item["owner"], "project-ownership-receipt-changed")
+    for scope in scopes:
+        cloud.assert_no_active_deployments(scope)
+    return bodies
+
+
+def delete_project_resources(cloud, locks, document, receipt, persist, sleep=time.sleep):
+    validate_project_deletion(document)
+    locks.authorize(document)
+    verify_project_inventory(cloud, document)
+    verify_project_permissions(cloud, document["deletion"])
+    removed = set()
+    entries = document["deletion"]["resource_groups"] + document["deletion"]["resources"]
+    for item in project_delete_roots(document["deletion"]):
+        locks.authorize(document)
+        locks.assert_held()
+        cloud.verify_identity()
+        cloud.assert_no_active_runs(locks.enrollment)
+        verify_project_inventory(cloud, document, removed)
+        locks.authorize(document)
+        receipt.update(mutation_started=True, pending_resource=item["id"])
+        persist()
+        api = RG_API if RG_ID.fullmatch(item["id"]) else item["api_version"]
+        cloud.arm("DELETE", item["id"], api, allowed=(200, 202, 204),
+                  headers={"If-Match": item["etag"]} if item.get("etag") else None)
+        wait_absent(cloud, locks, item["id"], api, sleep)
+        affected = [row for row in entries if row["id"].lower() == item["id"].lower()
+                    or row["id"].lower().startswith(item["id"].lower() + "/")]
+        for row in affected:
+            wait_absent(cloud, locks, row["id"], RG_API if RG_ID.fullmatch(row["id"]) else row["api_version"], sleep)
+            removed.add(row["id"].lower())
+            receipt["deleted_resources"].append(row["id"])
+        receipt.pop("pending_resource", None)
+        persist()
+    locks.assert_held()
+    cloud.verify_identity()
+    verify_project_inventory(cloud, document, removed)
+    receipt["deletion_scope"] = document["deletion_scope"]
+    receipt["retained_resources"] = sorted(row["id"] for row in entries if not row["delete"])
+    persist()
+
+
 def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache):
     require(isinstance(evidence, dict) and guid(evidence.get("run_id"))
             and hash_value(evidence.get("receipt_hash")), "child-ownership-evidence-required")
@@ -1334,7 +1729,8 @@ def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache):
                 "child-ownership-receipt-unverified")
         cache[cache_key] = receipt
     receipt = cache[cache_key]
-    matches = [row for row in receipt.get("ownership", []) if row.get("resource_id", "").lower() == resource_id.lower()]
+    records = receipt.get("resource_groups", []) if RG_ID.fullmatch(resource_id) else receipt.get("ownership", [])
+    matches = [row for row in records if row.get("resource_id", "").lower() == resource_id.lower()]
     require(len(matches) == 1 and matches[0].get("body_hash") == body_hash, "child-instance-ownership-unverified")
     owner = matches[0].get("owner")
     require(isinstance(owner, dict) and all(receipt.get("target", {}).get(key) == owner.get(key)
@@ -2553,8 +2949,8 @@ def exact_bootstrap_snapshot(cloud, document):
         verify_group_ownership(bodies[group], expected, bodies)
     for identifier, row in proof["resources"].items():
         metadata = (closure["groups"] if identifier in proof["groups"] else closure["resources"])[identifier]
-        require(metadata["body_hash"] == row["body_hash"] and metadata.get("etag") == row["etag"],
-                "bootstrap-resource-instance-changed")
+        require_bootstrap_instance(identifier, body_hash=metadata["body_hash"] == row["body_hash"],
+                                   etag=metadata.get("etag") == row["etag"])
         tags = bodies[identifier].get("tags") or {}
         require(not str(tags.get("aifactory.shared", "")).lower() == "true"
                 and all(tags.get(TAG_KEYS[key], value) == value for key, value in expected.items()),
@@ -2749,8 +3145,8 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
                 else:
                     evidence = document["deployment"].get("known_ownership", {}).get(key, {})
                     if not evidence and key in bootstrap_owners:
-                        require(bootstrap_owners[key]["body_hash"] == metadata["body_hash"],
-                                "bootstrap-resource-instance-changed")
+                        require_bootstrap_instance(
+                            key, body_hash=bootstrap_owners[key]["body_hash"] == metadata["body_hash"])
                         previous_owners[key] = bootstrap_owners[key]["owner"]
                     else:
                         previous_owners[key] = verified_receipt_owner(locks, evidence, key, metadata["body_hash"], previous_receipts)
@@ -2851,7 +3247,7 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         persist()
     except BaseException as error:
         receipt["status"] = "reconciliation-required"
-        receipt["error_code"] = error.code if isinstance(error, Blocked) else "unexpected-worker-failure"
+        receipt.update(failure_fields(error, "unexpected-worker-failure"))
         persist()
     finally:
         cloud.tokens.clear()
@@ -2915,6 +3311,29 @@ def protected_worker_envelope(document, locks):
     raw = canonical({"manifest": document, "lease_context": locks.held})
     require(len(raw) <= MAX_DOCUMENT, "protected-worker-envelope-too-large")
     return raw
+
+
+def failed_worker_diagnostic(locks, document):
+    """Read bound failure metadata without granting success or cleanup authority."""
+    try:
+        status, _, result = locks.request("GET", "runs/" + document["run_id"] + ".worker.json")
+    except (Blocked, OSError, KeyError, TypeError, ValueError):
+        return None
+    if (status != 200 or type(result) is not dict or type(result.get("schema")) is not int
+            or result["schema"] != 1 or result.get("status") != "reconciliation-required"
+            or result.get("error_code") != "bootstrap-resource-instance-changed"
+            or type(result.get("mutation_started")) is not bool
+            or result.get("run_id") != document["run_id"]
+            or result.get("manifest_hash") != document["manifest_hash"]
+            or result.get("source_commit") != document["source"]["commit"]
+            or result.get("target") != document["target"]):
+        return None
+    detail = safe_instance_diagnostic(result["error_code"], result.get("error_diagnostic"))
+    foundation = document["deployment"].get("bootstrap_foundation")
+    resources = foundation.get("resources") if type(foundation) is dict else None
+    if detail is None or type(resources) is not dict or detail["resource_id"].lower() not in resources:
+        return None
+    return detail
 
 
 def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=time.sleep):
@@ -2999,7 +3418,8 @@ def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=t
     github("DELETE", "/git/refs/tags/" + tag)
     receipt["remote_artifacts_cleaned"] = True
     persist()
-    require(result.get("conclusion") == "success", "scoped-github-run-failed")
+    if result.get("conclusion") != "success":
+        raise Blocked("scoped-github-run-failed", error_diagnostic=failed_worker_diagnostic(locks, document))
     receipt["worker_receipt"] = verify_worker_receipt(locks, document)
 
 
@@ -3065,7 +3485,8 @@ def ado_scoped(cloud, locks, document, source_root, receipt, persist, sleep=time
                 "scoped-ado-run-commit-mismatch")
         if result.get("state") == "completed":
             receipt["remote_terminal"] = True
-            require(result.get("result") == "succeeded", "scoped-ado-run-failed")
+            if result.get("result") != "succeeded":
+                raise Blocked("scoped-ado-run-failed", error_diagnostic=failed_worker_diagnostic(locks, document))
             receipt["worker_receipt"] = verify_worker_receipt(locks, document)
             return
         require(result.get("state") in ("inProgress", "canceling"), "scoped-ado-state-unverified")
@@ -3191,13 +3612,23 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
     require(not any(isinstance(document, dict) and single_writer(document) for document in documents),
             "single-writer-cohort-not-supported")
     documents = json.loads(canonical(documents))
+    selective = all(document.get("deletion_scope", {}).get("contract") == SELECTIVE_PROJECT_DELETE for document in documents)
     for document in documents:
         validate_manifest(document)
-        require(document["operation"] == "delete" and
+        require(document["operation"] == "delete" and (selective or
                 document["deletion"].get("inventory_mode") == "arm-provider-closure-v1"
                 and all(row["delete"] for row in document["deletion"]["resource_groups"] +
-                        document["deletion"]["resources"]), "cohort-whole-owned-groups-required")
+                        document["deletion"]["resources"])), "cohort-whole-owned-groups-required")
     first = documents[0]
+    if selective:
+        require(all(document["reviewed_scope"] == first["reviewed_scope"]
+                    and document["deletion_scope"]["options"] == first["deletion_scope"]["options"]
+                    and document["deletion_scope"]["project_id"] == first["deletion_scope"]["project_id"]
+                    and document["deletion_scope"]["project_number"] == first["deletion_scope"]["project_number"]
+                    for document in documents), "cohort-project-policy-mismatch")
+        require(sorted(document["target"]["environment"] for document in documents)
+                == sorted(first["deletion_scope"]["options"]["environments"]),
+                "cohort-project-environments-incomplete")
     require(all(document["target"]["factory_id"] == first["target"]["factory_id"] for document in documents),
             "cohort-factory-mismatch")
     require(all(document["source"] == first["source"] for document in documents), "cohort-source-mismatch")
@@ -3215,7 +3646,7 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
     clouds = [cloud_factory(document) for document in documents]
     members = [lock_factory(cloud, document) for cloud, document in zip(clouds, documents)]
     union = _CohortLeases(members)
-    aggregate = {"schema": 1, "operation": "delete-factory",
+    aggregate = {"schema": 1, "operation": "delete-project" if selective else "delete-factory",
                  "cohort_hash": digest(sorted(document["manifest_hash"] for document in documents)),
                  "factory_id": first["target"]["factory_id"], "source_commit": first["source"]["commit"],
                  "source_ref": first["source"]["ref"], "status": "validating", "started_at": utc_now(),
@@ -3259,7 +3690,11 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
             cloud.assert_no_active_runs(locks.enrollment)
             for scope in document["locks"]["scopes"] + document["locks"]["common_dependencies"]:
                 cloud.assert_no_active_deployments(scope)
-            verify_full_inventory(cloud, document)
+            if selective:
+                verify_project_inventory(cloud, document)
+                verify_project_permissions(cloud, document["deletion"])
+            else:
+                verify_full_inventory(cloud, document)
         union.assert_held()
         for document in documents:
             validate_manifest(document)
@@ -3277,7 +3712,10 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         for locks, document in zip(members, documents):
             locks.authorize(document)
         for cloud, locks, document, receipt in zip(clouds, members, documents, aggregate["children"]):
-            delete_owned_groups(cloud, locks, document, receipt, persist)
+            if selective:
+                delete_project_resources(cloud, locks, document, receipt, persist)
+            else:
+                delete_owned_groups(cloud, locks, document, receipt, persist)
             receipt["status"] = "succeeded"
             receipt["finished_at"] = utc_now()
             persist()
@@ -3289,17 +3727,20 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         persist()
     except BaseException as error:
         aggregate["status"] = "reconciliation-required" if claim_attempted else "blocked"
-        aggregate["error_code"] = error.code if isinstance(error, Blocked) else "unexpected-runtime-failure"
+        aggregate.update(failure_fields(error, "unexpected-runtime-failure"))
         if not claim_attempted:
             try:
                 union.release()
             except (Blocked, OSError):
                 aggregate["status"] = "reconciliation-required"
                 aggregate["error_code"] = "lock-release-reconciliation-required"
+                aggregate.pop("error_diagnostic", None)
         for receipt in aggregate["children"]:
             if receipt["status"] != "succeeded":
                 receipt["status"] = aggregate["status"]
                 receipt["error_code"] = aggregate["error_code"]
+                if "error_diagnostic" in aggregate:
+                    receipt["error_diagnostic"] = aggregate["error_diagnostic"]
         aggregate["finished_at"] = utc_now()
         try:
             persist()
@@ -3364,7 +3805,11 @@ def execute(document, source_root, execution_root, receipt_path, cloud=None, loc
             cloud.assert_no_active_deployments(scope)
         cloud.assert_no_active_runs(locks.enrollment)
         if document["operation"] == "delete":
-            if document["deletion"].get("inventory_mode") == "arm-provider-closure-v1":
+            if document.get("deletion_scope"):
+                require(document["deletion_scope"]["options"]["environments"] == [document["target"]["environment"]],
+                        "multi-environment-project-cohort-required")
+                delete_project_resources(cloud, locks, document, receipt, persist)
+            elif document["deletion"].get("inventory_mode") == "arm-provider-closure-v1":
                 delete_owned_groups(cloud, locks, document, receipt, persist)
             else:
                 delete_resources(cloud, locks, document, receipt, persist)
@@ -3386,12 +3831,13 @@ def execute(document, source_root, execution_root, receipt_path, cloud=None, loc
         return receipt
     except BaseException as error:
         receipt["status"] = "reconciliation-required" if receipt["mutation_started"] else "blocked"
-        receipt["error_code"] = error.code if isinstance(error, Blocked) else "unexpected-runtime-failure"
+        receipt.update(failure_fields(error, "unexpected-runtime-failure"))
         if not receipt["mutation_started"]:
             try:
                 locks.release()
             except Blocked:
                 receipt["error_code"] = "lock-release-reconciliation-required"
+                receipt.pop("error_diagnostic", None)
         receipt["locks_retained"] = sorted(locks.held)
         try:
             persist()
@@ -3497,8 +3943,8 @@ def main(argv=None):
         return 0 if output.get("status") not in ("blocked", "reconciliation-required") else 2
     except (Blocked, OSError, KeyError, TypeError, ValueError):
         error = sys.exc_info()[1]
-        print(json.dumps({"status": "blocked", "error_code": error.code if isinstance(error, Blocked)
-                          else "invalid-runtime-input"}, separators=(",", ":")))
+        print(json.dumps({"status": "blocked", **failure_fields(error, "invalid-runtime-input")},
+                         separators=(",", ":")))
         return 2
 
 

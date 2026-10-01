@@ -30,6 +30,10 @@ def test_one_dataset_always_has_bronze_silver_gold_and_gold_only_training(tmp_pa
     assert plan.manifest["bronze_mode"] == "raw"
     assert "/gold/splits/train/" in plan.document["outputs"]["train"]["path"]
     assert "/gold/table/" in plan.document["outputs"]["gold"]["path"]
+    for name in ("silver_ds01_diabetes", "gold", "train", "validation", "test"):
+        assert plan.document["outputs"][name]["mode"] == "upload"
+    for name in ("bronze_ds01_diabetes", "prepared", "model", "report"):
+        assert plan.document["outputs"][name]["mode"] == "rw_mount"
     for key in ("bronze2silver_ds01_diabetes", "merge", "split"):
         config = load_json(plan.base_path / "code" / "configs" / (key + ".json"))
         assert config["table_format"] == "delta" and config["require_gold"]
@@ -66,6 +70,26 @@ def test_parquet_is_an_explicit_compatible_output_choice(tmp_path):
     plan = ESMLProject(LakeSettings.from_dict(document)).create_pipeline(
         PipelineType.IN_2_GOLD, PipelineRequest("2026-09-14", "parquet"), output=tmp_path / "job")
     assert plan.manifest["table_format"] == plan.manifest["aml_table_format"] == "parquet"
+    assert all(value["mode"] == "rw_mount" for value in plan.document["outputs"].values())
+
+
+def test_delta_medallion_with_parquet_automl_adapter_uses_upload_only_for_delta(tmp_path):
+    document = settings()
+    document["models"][0]["aml_table_format"] = "parquet"
+    document["models"][0].setdefault("automl", {}).setdefault("limits", {})["max_trials"] = 3
+    document["models"][0]["automl"]["limits"]["timeout_minutes"] = 20
+    plan = ESMLProject(LakeSettings.from_dict(document)).create_pipeline(
+        PipelineType.IN_2_GOLD_TRAINING_AUTOML, PipelineRequest("2026-09-28", "delta-upload"),
+        output=tmp_path / "job")
+    assert plan.document["outputs"]["silver_ds01_diabetes"]["mode"] == "upload"
+    assert plan.document["outputs"]["gold"]["mode"] == "upload"
+    for name in ("train", "validation", "test"):
+        assert plan.document["outputs"][name]["mode"] == "rw_mount"
+    assert plan.document["jobs"]["train"]["training"] == {
+        "enable_stack_ensemble": False, "enable_vote_ensemble": False,
+    }
+    assert plan.document["jobs"]["train"]["limits"]["trial_timeout_minutes"] == 10
+    assert plan.to_sdk()._validate().passed
 
 
 @pytest.mark.parametrize("format", ["csv", "xlsx", "raw", None])

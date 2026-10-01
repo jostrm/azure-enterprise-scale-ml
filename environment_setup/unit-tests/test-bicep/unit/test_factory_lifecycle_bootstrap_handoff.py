@@ -1,7 +1,9 @@
 """Exact bootstrap receipts never grant ownership through an RG prefix."""
 
+import base64
 import copy
 import hashlib
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -12,6 +14,8 @@ import pytest
 from .test_factory_lifecycle import (
     fl, ClosureCloud, CORE_OWNER, GROUP, NSG, RULE, scoped_manifest, no_real_services,
     PlanCloud, RESOURCE, ROOT, simple_plan_closure, seal, owned_group_manifest,
+    FakeCloud, manifest, setup_execute, workspace,
+    scoped_enrollment, TENANT, SUB, COMMON,
 )
 
 
@@ -72,6 +76,252 @@ def test_exact_bootstrap_instance_and_source_changes_block(defect):
         row["body_hash"] = fl.digest(cloud.bodies[RULE.lower()])
     with pytest.raises(fl.Blocked):
         fl.bootstrap_ownership_snapshot(cloud, document)
+
+
+@pytest.mark.parametrize("fields", [["body_hash"], ["etag"], ["body_hash", "etag"]])
+def test_instance_diagnostic_names_exact_comparisons_without_values(fields):
+    cloud = ClosureCloud()
+    document = exact_document(cloud)
+    baseline = document["deployment"]["bootstrap_foundation"]["resources"][RULE.lower()]
+    if "body_hash" in fields:
+        cloud.bodies[RULE.lower()]["properties"]["priority"] = "sensitive-raw-property"
+    if "etag" in fields:
+        baseline["etag"] = "sensitive-etag-value"
+    with pytest.raises(fl.Blocked) as raised:
+        fl.bootstrap_ownership_snapshot(cloud, document)
+    error = raised.value
+    assert error.code == str(error) == "bootstrap-resource-instance-changed"
+    assert fl.failure_fields(error, "unused") == {
+        "error_code": error.code,
+        "error_diagnostic": {"resource_id": RULE.lower(), "failed_comparisons": fields}}
+    text = json.dumps(fl.failure_fields(error, "unused"))
+    assert "sensitive" not in text and baseline["body_hash"] not in text
+
+
+@pytest.mark.parametrize("identifier", [
+    RULE + "?token=private", RULE + "#private", RULE + "\nprivate", RULE + "/../private",
+    RULE + "/%61/private", "https://management.azure.com" + RULE, RULE + "K",
+    "/subscriptions/not-a-guid/resourcegroups/private", RULE + "x" * 2048,
+])
+def test_instance_diagnostic_rejects_noncanonical_resource_identifiers(identifier):
+    with pytest.raises(fl.Blocked) as raised:
+        fl.require_bootstrap_instance(identifier, body_hash=False, etag=True)
+    assert fl.failure_fields(raised.value, "unused") == {"error_code": "bootstrap-resource-instance-changed"}
+
+
+@pytest.mark.parametrize("identifier", [
+    GROUP, RULE, GROUP + "/providers/Microsoft.Network/privateDnsZones/example.internal/SOA/@",
+])
+def test_instance_diagnostic_accepts_group_nested_resource_and_dns_record(identifier):
+    fl.require_bootstrap_instance(identifier, body_hash=True, etag=True)
+    with pytest.raises(fl.Blocked) as raised:
+        fl.require_bootstrap_instance(identifier, body_hash=True, etag=False)
+    assert raised.value.error_diagnostic == {"resource_id": identifier, "failed_comparisons": ["etag"]}
+
+
+@pytest.mark.parametrize("detail", [
+    None, {"resource_id": RULE, "failed_comparisons": []},
+    {"resource_id": RULE, "failed_comparisons": ["body_hash", "body_hash"]},
+    {"resource_id": RULE, "failed_comparisons": ["raw-secret"]},
+    {"resource_id": RULE, "failed_comparisons": "body_hash"},
+    {"resource_id": RULE, "failed_comparisons": [{}]},
+    {"resource_id": RULE, "failed_comparisons": ["etag"], "body": "private"},
+])
+def test_instance_diagnostic_is_closed_and_revalidated_before_serialization(detail):
+    error = fl.Blocked("bootstrap-resource-instance-changed")
+    error.error_diagnostic = detail
+    assert fl.failure_fields(error, "unused") == {"error_code": error.code}
+    unrelated = fl.Blocked("other-code", error_diagnostic={
+        "resource_id": RULE, "failed_comparisons": ["etag"]})
+    assert fl.failure_fields(unrelated, "unused") == {"error_code": "other-code"}
+
+
+def _instance_failure(*args, **kwargs):
+    fl.require_bootstrap_instance(RULE.lower(), body_hash=False, etag=True)
+
+
+def test_instance_diagnostic_survives_native_cli_without_stderr(monkeypatch, capsys):
+    monkeypatch.setattr(fl, "read_manifest", _instance_failure)
+    assert fl.main(["inspect", "--stdin-manifest"]) == 2
+    captured = capsys.readouterr()
+    assert not captured.err
+    assert json.loads(captured.out) == {
+        "status": "blocked", "error_code": "bootstrap-resource-instance-changed",
+        "error_diagnostic": {"resource_id": RULE.lower(), "failed_comparisons": ["body_hash"]}}
+
+
+def test_instance_diagnostic_survives_worker_receipt_before_arm_write(monkeypatch):
+    document, templates = scoped_manifest()
+    cloud = PlanCloud(document, templates)
+    document["locks"]["coordination_hash"] = fl.digest(cloud.enrollment)
+    seal(document)
+    locks = fl.BlobLocks(cloud, document)
+    locks.acquire()
+    locks.claim_run()
+    monkeypatch.setattr(fl, "_verify_source", lambda cloud, root, source, **kwargs: root)
+    monkeypatch.setattr(fl, "bootstrap_ownership_snapshot", _instance_failure)
+    result = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
+                                     ROOT, document["run_id"], document["manifest_hash"], cloud=cloud, sleep=Mock())
+    assert result["status"] == "reconciliation-required"
+    assert result["mutation_started"] is False and not cloud.arm_writes
+    assert result["error_code"] == "bootstrap-resource-instance-changed"
+    assert result["error_diagnostic"] == {
+        "resource_id": RULE.lower(), "failed_comparisons": ["body_hash"]}
+    assert cloud.runs["runs/" + document["run_id"] + ".worker.json"]["error_diagnostic"] == result["error_diagnostic"]
+
+
+def test_instance_diagnostic_survives_parent_receipt_without_authorizing_retry(monkeypatch, workspace):
+    document, cloud = manifest(), FakeCloud()
+    source, execution, path = setup_execute(monkeypatch, workspace)
+    monkeypatch.setattr(fl, "delete_resources", _instance_failure)
+    result = fl.execute(document, source, execution, path, cloud=cloud)
+    assert result["status"] == "blocked" and result["mutation_started"] is False
+    assert not cloud.deleted
+    assert result["error_code"] == "bootstrap-resource-instance-changed"
+    assert json.loads(path.read_text())["error_diagnostic"] == {
+        "resource_id": RULE.lower(), "failed_comparisons": ["body_hash"]}
+
+
+def _remote_failure_case(monkeypatch, workspace, route, defect=None, remote_success=False):
+    document, _ = scoped_manifest(route=route)
+    foundation_cloud = ClosureCloud()
+    foundation = exact_document(foundation_cloud)
+    document["deployment"]["bootstrap_foundation"] = foundation["deployment"]["bootstrap_foundation"]
+    document["deployment"]["bootstrap_ownership"] = fl.bootstrap_ownership_snapshot(foundation_cloud, foundation)
+    cloud = FakeCloud()
+    cloud.bodies[COMMON.lower()] = {"id": COMMON, "type": "Microsoft.Resources/resourceGroups"}
+    cloud.enrollment = scoped_enrollment(document)
+    document["locks"]["coordination_hash"] = fl.digest(cloud.enrollment)
+    seal(document)
+    detail = {"resource_id": RULE.lower(), "failed_comparisons": ["body_hash", "etag"]}
+    worker = {"schema": 1, "run_id": document["run_id"], "manifest_hash": document["manifest_hash"],
+              "source_commit": document["source"]["commit"], "target": copy.deepcopy(document["target"]),
+              "status": "reconciliation-required", "mutation_started": False,
+              "error_code": "bootstrap-resource-instance-changed", "error_diagnostic": copy.deepcopy(detail),
+              "raw_response": "worker-secret-never-copy"}
+    if defect in ("run_id", "manifest_hash", "source_commit"):
+        worker[defect] = "foreign"
+    elif defect == "target":
+        worker["target"]["factory_id"] = "foreign"
+    elif defect in ("status", "error_code", "schema", "mutation_started"):
+        worker[defect] = "unverified"
+    elif defect == "successful-receipt":
+        worker["status"] = "succeeded"
+    elif defect == "boolean-schema":
+        worker["schema"] = True
+    elif defect == "outside-proof":
+        worker["error_diagnostic"]["resource_id"] = RESOURCE
+    elif defect == "raw-value":
+        worker["error_diagnostic"]["etag"] = "worker-secret-never-copy"
+    elif defect == "legacy":
+        worker.pop("error_diagnostic")
+    if defect == "malformed":
+        worker = []
+    blob = "runs/" + document["run_id"] + ".worker.json"
+    if defect != "missing":
+        cloud.runs[blob] = worker
+    template = (ROOT / "bootstrap" / "templates" / ("factory-lifecycle-" + route + ".yml")).read_text().strip()
+    original_request = cloud.request
+    worker_reads = []
+
+    def request(method, url, audience, data=None, **kwargs):
+        if method == "GET" and blob in url:
+            worker_reads.append(url)
+            if defect == "read-error":
+                raise fl.Blocked("remote-request-unverified")
+            if defect == "read-oserror":
+                raise OSError("transport-private-value-never-copy")
+            if defect == "read-valueerror":
+                raise ValueError("malformed-private-value-never-copy")
+            if defect == "non-200":
+                return 404, {}, worker
+        if not url.startswith("https://dev.azure.com/"):
+            return original_request(method, url, audience, data, **kwargs)
+        if "/serviceendpoint/endpoints?" in url:
+            result = {"value": [{"name": document["route"]["auth_namespace"],
+                                "authorization": {"scheme": "WorkloadIdentityFederation",
+                                                  "parameters": {"tenantid": TENANT}},
+                                "data": {"subscriptionId": SUB}}]}
+        elif "/items?" in url:
+            result = {"content": template}
+        elif "/build/definitions?" in url:
+            result = {"value": [{"id": 7, "repository": {"name": "consumer"},
+                                "process": {"yamlFilename": fl.SCOPED_ADO}}]}
+        elif method == "POST":
+            assert "/pipelines/7/runs?" in url
+            result = {"id": 43}
+        else:
+            assert "/pipelines/7/runs/43?" in url
+            result = {"state": "completed", "result": "succeeded" if remote_success else "failed",
+                      "resources": {"repositories": {"self": {"version": document["route"]["commit"]}}}}
+        return 200, {}, result
+
+    def command(argv, cwd=None, data=None):
+        if argv[:2] == ["git", "show"]:
+            return template
+        if argv == ["gh", "api", "user", "--hostname", "github.com"]:
+            return json.dumps({"id": 71})
+        if argv[:3] in (["gh", "secret", "set"], ["gh", "secret", "delete"]):
+            return ""
+        method, endpoint = argv[3:5]
+        if "/contents/" in endpoint:
+            return json.dumps({"encoding": "base64", "content": base64.b64encode(template.encode()).decode()})
+        if "/git/trees/" in endpoint:
+            return json.dumps({"tree": [{"path": "azure-enterprise-scale-ml", "mode": "160000",
+                                        "sha": document["source"]["commit"]}]})
+        if "/workflow" in endpoint and "/runs?" in endpoint:
+            return json.dumps({"workflow_runs": [{"id": 42,
+                "display_title": "factory-lifecycle [" + document["run_id"] + "]",
+                "head_sha": document["route"]["commit"]}]})
+        if "/actions/runs/" in endpoint:
+            return json.dumps({"status": "completed", "conclusion": "success" if remote_success else "failure",
+                               "head_sha": document["route"]["commit"]})
+        if "/git/ref/tags/" in endpoint:
+            return json.dumps({"object": {"sha": document["route"]["commit"]}})
+        assert method in ("POST", "DELETE")
+        return ""
+
+    cloud.request = request
+    cloud.command = command
+    source, execution, path = setup_execute(monkeypatch, workspace)
+    result = fl.execute(document, source, execution, path, cloud=cloud)
+    return SimpleNamespace(result=result, stored=json.loads(path.read_text()), worker_reads=worker_reads,
+                           detail=detail, cloud=cloud, blob=blob)
+
+
+@pytest.mark.parametrize("route", ["gha", "ado"])
+@pytest.mark.parametrize("defect", [
+    None, "missing", "malformed", "read-error", "read-oserror", "read-valueerror", "non-200",
+    "run_id", "manifest_hash", "source_commit", "target", "status", "successful-receipt",
+    "error_code", "schema", "boolean-schema", "mutation_started", "outside-proof", "raw-value", "legacy",
+])
+def test_real_remote_failure_retrieves_only_bound_diagnostic_and_preserves_failure(monkeypatch, workspace, route, defect):
+    case = _remote_failure_case(monkeypatch, workspace, route, defect)
+    expected_code = "scoped-github-run-failed" if route == "gha" else "scoped-ado-run-failed"
+    assert len(case.worker_reads) == 1, case.result.get("error_code")
+    for result in (case.result, case.stored):
+        assert result["error_code"] == expected_code
+        assert result["status"] == "reconciliation-required" and result["mutation_started"] is True
+        assert result["remote_terminal"] is True and result["locks_retained"]
+        assert "worker_receipt" not in result
+        assert "worker-secret" not in json.dumps(result)
+        assert "private-value" not in json.dumps(result)
+        if defect is None:
+            assert result["error_diagnostic"] == case.detail
+        else:
+            assert "error_diagnostic" not in result
+    if route == "gha":
+        assert case.result["remote_artifacts_cleaned"] is True
+    assert not any(method == "PUT" and url.endswith(case.blob) for method, url, _, _ in case.cloud.calls)
+
+
+@pytest.mark.parametrize("route", ["gha", "ado"])
+def test_real_remote_success_cannot_accept_diagnostic_bearing_failed_worker(monkeypatch, workspace, route):
+    case = _remote_failure_case(monkeypatch, workspace, route, remote_success=True)
+    assert len(case.worker_reads) == 1
+    assert case.result["status"] == "reconciliation-required"
+    assert case.result["error_code"] == "scoped-worker-receipt-unverified"
+    assert "error_diagnostic" not in case.result and "worker_receipt" not in case.result
 
 
 def test_preserved_prerequisite_never_has_an_owner_or_accepts_writes():

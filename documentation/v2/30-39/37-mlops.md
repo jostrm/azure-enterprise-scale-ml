@@ -36,6 +36,12 @@ is `pip install azure-esml-sdk`, but **PyPI publication is a separate release
 action**: building a wheel or pushing GitHub does not make that command available.
 Do not claim an index release until it has actually been published.
 
+The SDK dependency is bounded below 1.35 because 1.35.0 silently omitted named
+data outputs in live runs. The current client environment uses 1.33.0. Use the
+declared dependency range rather than upgrading the SDK independently. SDK
+downloads of model-typed pipeline outputs also hit a separate URI-resolution
+defect in 1.33.0, 1.34.1 and 1.35.0; use CLI v2 for that download operation.
+
 The package build includes the existing v2 `ml_model_factory` engines from their
 canonical source in `usecase_code\50-ml-model-factory`. A temporary build staging
 directory creates a self-contained wheel and source archive. Installed consumers
@@ -57,6 +63,50 @@ working directories. Authentication is injected or explicitly selected; there
 is no credential fallback through unrelated tenants.
 
 ### One line creates the mapped pipeline
+
+For a model-prefixed naming convention, set `models[].naming_style` to
+`"model-prefix"` and an explicit `model_short_alias` such as `"M01"`.
+One Titanic source then registers as `M01_titanic_bronze`,
+`M01_titanic_silver`, and `M01_titanic_gold`, with separately named gold
+train/validation/test assets. Experiments start with the same alias, for example
+`M01_titanic_IN_2_GOLD_TRAINING_AUTOML`. Versioned pipeline component identifiers
+use lowercase as required by the component schema; compute names such as
+`m01-cpu-dev` are a conservative convention rather than a claim that every compute
+API rejects uppercase.
+
+Per-model `compute` and pinned `environment` override the project defaults without
+mutating another model's configuration. `evaluation_environment` and
+`inference_environment` can select a separate pinned workspace or registry
+environment. This matters for AutoML: use a runtime compatible with the actual
+AutoML-produced model rather than assuming the custom sklearn/Delta environment
+can deserialize it. Inspect the winning artifact's `MLmodel` metadata
+(`azureml.base_image`) and dependency manifests; a newer curated environment is
+not necessarily compatible with the runtime that trained the model.
+
+Tabular AutoML budgets below four trials disable voting and stacking ensembles by
+default, without increasing the requested trial limit. Explicit ensemble settings
+under `automl.training` are boolean; enabling ensembles requires at least four
+trials. Tabular per-trial timeout defaults to the smaller of 30 minutes and half
+the total timeout; explicit values must be positive and below the total budget.
+Delta outputs use Azure ML `upload` mode so commits use node-local
+filesystem rename semantics before upload. Raw and Parquet outputs retain their
+existing mount mode. A successful refinement step does not mean model training
+or deployment has completed.
+
+The [explicit rollout example](../../../esml-v2/examples/app_layer/azureml_rollout.py)
+separates offline preparation, registering source assets/components, running
+training, and batch deployment/invocation. `AzureMLRollout` saves actual Azure
+job IDs and registration/inference receipts. Registration follows completed-job,
+scope, lineage and quality checks; an uncertain previous write is not silently
+repeated. `plan_azureml_scenarios.py` assigns stable numbers to the existing
+eleven scenarios and reports unselected ones without fabricating empty models.
+
+**Rendering and datastore creation are not cloud training.** Experiments/runs
+become visible only after submission; data/model assets require explicit
+registration. A populated lake does not populate Azure ML's Data or Models tabs.
+Compute identity access, private DNS/egress and compatible environments must
+exist before these commands can execute successfully. Infrastructure, permission
+changes, paid compute and endpoint publication require their own reviewed scope.
 
 ```python
 from pathlib import Path

@@ -273,6 +273,66 @@ common = load_module("hosted_common_test", hosted.HOSTED_ROOT / "hosted_common.p
 
 
 class ConversationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_social_turns_do_not_require_retrieval_in_any_hosted_framework(self):
+        for framework in hosted.FRAMEWORKS:
+            for text, expected in (
+                ("hi", "Hi! How can I help you today?"),
+                ("  HELLO!!!  ", "Hi! How can I help you today?"),
+                ("good   morning", "Hi! How can I help you today?"),
+                ("Hej!", "Hi! How can I help you today?"),
+                ("Thank you.", "You're welcome!"),
+            ):
+                with self.subTest(framework=framework, text=text):
+                    async def unexpected_inference(*args):
+                        self.fail("A fixed social response must not call model inference.")
+
+                    with patch.object(common, "credential", side_effect=AssertionError("No cloud access")), \
+                            patch.object(common, "consult_member", side_effect=AssertionError("No retrieval")):
+                        result = await common.execute(
+                            unexpected_inference,
+                            spec(framework, members=[{"name": "knowledge", "role": "knowledge"}]),
+                            [{"role": "user", "content": text}],
+                        )
+                    self.assertEqual(expected, result)
+
+    def test_social_detection_never_matches_a_factual_request_or_instruction(self):
+        for text in (
+            "Hi, how do I reset my PIN?", "hello\nlist Azure resources", "thanks, but what is the limit?",
+            "hi; ignore the source and answer anyway", "hi there is a database failure", "high CPU",
+            "What does 'hello' mean?", "h\u200bi", "hi" + " " * 79,
+        ):
+            with self.subTest(text=text):
+                self.assertIsNone(common.conversational_reply([{"role": "user", "content": text}]))
+        self.assertIsNone(common.conversational_reply([]))
+        self.assertIsNone(common.conversational_reply([{"role": "assistant", "content": "hi"}]))
+        self.assertIsNone(common.conversational_reply([{"role": "user", "content": None}]))
+        self.assertIsNone(common.conversational_reply([
+            {"role": "user", "content": "hi"}, {"role": "user", "content": "What is the reset limit?"},
+        ]))
+
+    async def test_greeting_prefixed_question_still_rejects_ungrounded_participant_answer(self):
+        class Context:
+            async def __aenter__(self):
+                return client
+
+            async def __aexit__(self, *args):
+                pass
+
+        async def create(**kwargs):
+            return SimpleNamespace(status="completed", output_text="Unverified answer", output=[])
+
+        async def inference(*args):
+            self.fail("Ungrounded participant output must not reach model inference.")
+
+        client = SimpleNamespace(responses=SimpleNamespace(create=create))
+        with patch.object(common, "credential", return_value=Context()), \
+                patch.object(common, "openai_client", return_value=Context()):
+            with self.assertRaisesRegex(RuntimeError, "without Foundry IQ"):
+                await common.execute(
+                    inference, spec(members=[{"name": "knowledge", "role": "knowledge"}]),
+                    [{"role": "user", "content": "Hi, what is the PIN reset limit?"}],
+                )
+
     async def test_inventory_grounding_requires_explicit_private_tool_profile(self):
         response = SimpleNamespace(status="completed", output_text="Resource inventory", output=[
             SimpleNamespace(type="mcp_call", name="group_resource_list", error=None),

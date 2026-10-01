@@ -4,9 +4,9 @@
 
 **[v1.25 release notes](RELEASE_125.md)** &nbsp; / &nbsp; **[Main-only change](#2-what-is-genuinely-main-only)** &nbsp; / &nbsp; **[Roadmap candidates](#4-unscheduled-roadmap-candidates-and-acceptance-gates)** &nbsp; / &nbsp; **[Workshop sequencing](#5-proposed-workshop-sequencing-october-2026-march-2027)**
 
-**Evidence snapshot:** 23 September 2026.  
+**Evidence snapshot:** 30 September 2026; cumulative v1.25 assessment retained from 23 September.  
 **Baseline requested:** [RELEASE_124.md](RELEASE_124.md), including v1.24.1.  
-**Published main reviewed:** [`76727432ba47e8e9b8fcf314f0eada0066b7e6c7`](https://github.com/jostrm/azure-enterprise-scale-ml/tree/76727432ba47e8e9b8fcf314f0eada0066b7e6c7).  
+**Published main reviewed:** [`7b8605c2d97017ecce84043f5047e43c69add152`](https://github.com/jostrm/azure-enterprise-scale-ml/tree/7b8605c2d97017ecce84043f5047e43c69add152).  
 **v1.25 comparison point:** [`1bd9020e009036427763a0f66b2b2449ca38f288`](https://github.com/jostrm/azure-enterprise-scale-ml/tree/1bd9020e009036427763a0f66b2b2449ca38f288).
 
 This document compares the supplied v1.24 notes with published `main` and also isolates what is newer than the accompanying [v1.25 notes](RELEASE_125.md). It does not turn already implemented features into future promises. The original `RELEASE_124.md` is unchanged.
@@ -20,10 +20,10 @@ This document compares the supplied v1.24 notes with published `main` and also i
 | Main-only | Committed beyond that release in published `main` |
 | Candidate / gap | Proposed or incomplete work; no committed delivery date or owner |
 
-Published `main` is **exactly one commit ahead** of the requested release branch, with **zero release-only commits**. Most of the cumulative progress since v1.24 therefore belongs in v1.25, not in a future-release column.
+Published `main` is **30 commits ahead** of the requested release branch, with **zero release-only commits**. The exact `release/v1.25` branch remains at the commit documented in [RELEASE_125.md](RELEASE_125.md). Since the previous main snapshot, **29 additional commits** have landed; they are not part of that v1.25 snapshot.
 
 > [!IMPORTANT]
-> **Already implemented is not the same as adopted.** The roadmap separates source capabilities, the one verified main-only change and proposals that still need owners and acceptance criteria.
+> **Already implemented is not the same as adopted.** The roadmap separates published source changes, installed/runtime adoption and proposals that still need owners and acceptance criteria. A published repair is not evidence that a workbook was refreshed or a deployment completed.
 
 ---
 
@@ -43,11 +43,17 @@ Published `main` is **exactly one commit ahead** of the requested release branch
 
 Detailed scope, representative commits and migration caveats are in [RELEASE_125.md](RELEASE_125.md). Existing persona groups, CMEK, MI-only setup, per-environment SKUs and baseline FinOps are not new announcements.
 
+### What "personas" means in the v1.24.1 summary
+
+These are **team responsibilities and identity/access groupings**, not LLM personalities or system prompts. With `use_ad_groups: "true"`, configuration supplies Entra security-group ObjectIDs for project/core-team membership. Pipeline parameters pass this as `useAdGroups`; RBAC modules use `principalType: 'Group'` rather than `'User'`. The `personas_project_esml`, `personas_project_genai_1` and `personas_core_team` strings describe persona names; changing a label alone is not a new access policy.
+
+The documented project groupings include team lead, data scientist and front-end roles for ESML, and the GenAI grouping adds Foundry, agentic and data-operations responsibilities. Effective permissions still depend on the actual resource assignments, scope and group membership. See the [persona specification][personas], [configuration parameters][persona-config] and [example RBAC module][persona-rbac].
+
 ## 2. What is genuinely main-only?
 
 ### Native workbook defaults and resource-group cost charts
 
-Commit [`76727432`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/76727432ba47e8e9b8fcf314f0eada0066b7e6c7), dated **20 September 2026**, is the entire published-main delta beyond the requested release.
+Commit [`76727432`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/76727432ba47e8e9b8fcf314f0eada0066b7e6c7), dated **20 September 2026**, was the entire published-main delta at the previous snapshot. It remains part of the current comparison.
 
 - Workbook coverage dropdown defaults use lowercase `false`/`true`, matching the expected parameter values.
 - A sole Foundry/OpenAI account in the exact project resource group is selected automatically; multiple accounts still require an explicit choice.
@@ -59,12 +65,28 @@ The commit changes four files: the [dashboard guide][dashboards], `myProjectWork
 
 **Adoption implication:** review the dashboard-only plan and refresh the approved scope rather than assume a full infrastructure redeployment is required. Confirm actual rendering, account selection, evidence sources and cost scope in the target environment.
 
+### Additional published changes through 29 September
+
+The following groups summarize the additional published commit history, not a claim that every affected live workflow has completed.
+
+| Area | Published changes | Representative commits |
+|---|---|---|
+| Native monitoring | Project workbook/pipeline integration; subsequent token-account selection and scope normalization corrections | [`c241a6c9`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/c241a6c9e6df36824112864dd6147fdcfbe9eb3e), [`a7e3ab35`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/a7e3ab3538e9101d92f4ac21756e90a12a919273) |
+| Provider lifecycle and CLI | Read-only GitHub workflow monitoring, repository/enrollment reviews, packaged lifecycle helpers and explicit single-writer workflow integration | [`a4c8b98d`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/a4c8b98d3fffb77ad98efd08e776a045cc6dd42e), [`3c1470d3`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/3c1470d37d28b9f7df3855d839db5f5eecc7da58), [`56259608`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/562596086556f8a9277234c12d4a8dbc374ead65) |
+| Diagnostics and plan selection | Broader default diagnostics without changing resource reuse; Defender plan selection remains opt-in | [`622570e9`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/622570e96f9dceadf8e65ad160c2efcba8d2fc51), [`5175a628`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/5175a628eb62316c2db1d0801f3d0a727fd200b0) |
+| Bootstrap evidence and identity | Durable prerequisite failure evidence, reviewed identity retention during token refresh, canonical Microsoft Graph resource and bounded transient read retries | [`5c9b5a61`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/5c9b5a61b78137e1dd78c4d3e35c5dbd1a7c752a), [`b6145b82`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/b6145b82115ede80d4112acea7a3405a3d836ac0), [`6710a576`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/6710a576c3f61541973b6f040f36eabd5ba9c4d0), [`bbb70a2d`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/bbb70a2d489dda0f7b9bd9dad51834d21fa41ed6) |
+| Network preservation | Reviewed VPN route additions, regional endpoint validation, exact bootstrap ownership and independent DNS SOA preservation | [`f5d8f861`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/f5d8f8612c8cc4dec26aba58ddaafde58d6515dd), [`d09cc6d2`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/d09cc6d27d5cc6d0e42778ce02918218006b116e), [`5785f7e0`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/5785f7e00fdc14c21cab5e1e14b9fe51d8a51183), [`7b8605c2`](https://github.com/jostrm/azure-enterprise-scale-ml/commit/7b8605c2d97017ecce84043f5047e43c69add152) |
+
+**Token-workbook adoption:** current source serializes account inventory as text, uses a scalar account selector and normalizes scalar/legacy JSON selections before accepting the resource scope. An already deployed workbook can still contain the older invalid-scope behavior until an approved dashboard refresh. Neither this documentation update nor local source coverage refreshes Azure.
+
+**Current main guidance:** [Setup][current-setup], [updates][current-update], [ITSM/API prerequisites][current-itsm] and [monitoring][current-dashboards]. These links are pinned to the new snapshot; the cumulative v1.25 links elsewhere remain pinned to their original release evidence.
+
 ## 3. Reconcile the old v1.24 roadmap
 
 | Old roadmap item | Current assessment | Remaining work / decision |
 |---|---|---|
 | GitHub Actions parity | Substantial configuration and pipeline alignment exists | Resolve documented registered-runtime provider and atomic-dispatch gaps |
-| Enhanced dashboards | Delivered assets in v1.25 plus the main-only native cost/default fix | Complete representative Portal and tenant adoption checks; supply application instrumentation |
+| Enhanced dashboards | Delivered assets in v1.25 plus main-only native cost/default and token-scope fixes | Complete representative Portal and tenant adoption checks; supply application instrumentation |
 | Persona re-enablement | Entra groups/personas were already described in the v1.24.1 patch | Specify any additional persona behavior before treating it as a new feature |
 | Email integration | Report generation exists; authenticated report-email delivery is not implemented | Select identity, delivery channel, distribution controls and attachment policy |
 | Enhanced security | Scoped identity, private networking and read-only MCP improvements are concrete | Validate each deployment's permissions and controls; no blanket compliance guarantee |
@@ -102,18 +124,25 @@ Subscription vending is an integration discussion, not a completed customer-spec
 
 **Explicit version selection matters:** the reviewed release still contains legacy create default `124`, configuration minor version `24` and some older Bicep fallbacks. Use an approved target and the effective configuration, not a blanket assumption that all defaults are 1.25. ESML v2 is a new API; storage switches do not move data or grant RBAC.
 
-**Published main versus this local checkout:** at the snapshot, local `main` is `d44105e1`, three commits ahead and seven behind `origin/main`. Its local-only commits are `f82fcef3` (runner/enrollment/monitoring), `0a4a5bb1` (storage selection) and `d44105e1` (project dashboards). Related topics also appear under different upstream commits; neither local subjects nor dirty files are evidence of additional published features.
+**Published main versus this local checkout:** at the 30 September snapshot, local `main` is `168bb3fa`, one commit ahead and two behind published `main`. Its local-only commit concerns isolated project lake access and AML image-build compute. Published `bbb70a2d` and `7b8605c2` are not ancestors of that local HEAD. Neither local subjects nor dirty files are evidence of additional published features; do not reset or overwrite this work to adopt the published repairs.
 
 The working tree has extensive existing modifications. They are excluded from these notes. The separate branch `release/v.1.25` is also excluded. No branch checkout, merge, reset or publication is part of this documentation task.
 
 To reproduce the exact published comparison:
 
 ```powershell
-git rev-list --left-right --count 1bd9020e009036427763a0f66b2b2449ca38f288...76727432ba47e8e9b8fcf314f0eada0066b7e6c7
-git log --format=fuller 1bd9020e009036427763a0f66b2b2449ca38f288..76727432ba47e8e9b8fcf314f0eada0066b7e6c7
-git diff --stat 1bd9020e009036427763a0f66b2b2449ca38f288 76727432ba47e8e9b8fcf314f0eada0066b7e6c7
+git rev-list --left-right --count 1bd9020e009036427763a0f66b2b2449ca38f288...7b8605c2d97017ecce84043f5047e43c69add152
+git log --format=fuller 1bd9020e009036427763a0f66b2b2449ca38f288..7b8605c2d97017ecce84043f5047e43c69add152
+git diff --stat 1bd9020e009036427763a0f66b2b2449ca38f288 7b8605c2d97017ecce84043f5047e43c69add152
 ```
 
+[current-setup]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/7b8605c2d97017ecce84043f5047e43c69add152/documentation/v2/20-29/24-end-2-end-setup.md
+[current-update]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/7b8605c2d97017ecce84043f5047e43c69add152/documentation/v2/20-29/26-update-AIFactory.md
+[current-itsm]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/7b8605c2d97017ecce84043f5047e43c69add152/documentation/v2/20-29/29-ITSM-integrated.md
+[current-dashboards]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/7b8605c2d97017ecce84043f5047e43c69add152/documentation/v2/30-39/32-dashboards.md
+[personas]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/7b8605c2d97017ecce84043f5047e43c69add152/documentation/v2/20-29/25-personas-aifactory.md
+[persona-config]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/7b8605c2d97017ecce84043f5047e43c69add152/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/variables/variables.yaml
+[persona-rbac]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/7b8605c2d97017ecce84043f5047e43c69add152/environment_setup/aifactory/bicep/modules/addUserAsCoreteamBYOVnet.bicep
 [setup]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/1bd9020e009036427763a0f66b2b2449ca38f288/documentation/v2/20-29/24-end-2-end-setup.md
 [update]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/1bd9020e009036427763a0f66b2b2449ca38f288/documentation/v2/20-29/26-update-AIFactory.md
 [json]: https://github.com/jostrm/azure-enterprise-scale-ml/blob/1bd9020e009036427763a0f66b2b2449ca38f288/environment_setup/aifactory/bicep/copy_to_local_settings/pipeline-config/readme.md

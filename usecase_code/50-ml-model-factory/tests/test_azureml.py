@@ -57,6 +57,39 @@ class AzureMLTests(unittest.TestCase):
             **overrides,
         }
 
+    def test_small_automl_budget_disables_ensembles_without_raising_trial_limit(self):
+        from ml_model_factory.azureml import _automl
+        for task in ("classification", "regression", "forecasting"):
+            for standalone in (True, False):
+                with self.subTest(task=task, standalone=standalone):
+                    scenario = {**self.scenario, "task": task, "automl": {"limits": {"max_trials": 3}},
+                                "forecast": {"time_column": "date", "horizon": 12}}
+                    job = _automl(scenario, self.runtime, standalone=standalone)
+                    self.assertEqual(job["limits"]["max_trials"], 3)
+                    self.assertEqual(job["training"], {"enable_stack_ensemble": False, "enable_vote_ensemble": False})
+        self.assertNotIn("training", _automl(self.scenario, self.runtime, standalone=False))
+
+    def test_explicit_ensemble_policy_is_not_silently_overridden(self):
+        from ml_model_factory.azureml import _automl
+        for training in ({"enable_stack_ensemble": True}, {"enable_vote_ensemble": "false"},
+                         {"unexpected": False}):
+            scenario = {**self.scenario, "automl": {"limits": {"max_trials": 3}, "training": training}}
+            with self.assertRaises(ValueError):
+                _automl(scenario, self.runtime, standalone=False)
+        scenario = {**self.scenario, "automl": {"training": {"enable_stack_ensemble": False}}}
+        self.assertEqual(_automl(scenario, self.runtime, standalone=False)["training"], {"enable_stack_ensemble": False})
+
+    def test_automl_trial_timeout_is_strictly_below_total_budget(self):
+        from ml_model_factory.azureml import _automl
+        scenario = {**self.scenario, "automl": {"limits": {"timeout_minutes": 20, "max_trials": 3}}}
+        job = _automl(scenario, self.runtime, standalone=False)
+        self.assertEqual(job["limits"]["timeout_minutes"], 20)
+        self.assertEqual(job["limits"]["trial_timeout_minutes"], 10)
+        for invalid in (0, -1, 20, 30, True, "10", float("inf"), float("nan")):
+            with self.subTest(timeout=invalid), self.assertRaises(ValueError):
+                _automl({**scenario, "automl": {"limits": {"timeout_minutes": 20, "trial_timeout_minutes": invalid}}},
+                        self.runtime, standalone=False)
+
     def test_lake_is_optional_and_does_not_change_default_output_allocation(self):
         paths, standalone = self.document("custom")
         pipeline = yaml.safe_load(Path(paths["pipeline"]).read_text(encoding="utf-8"))

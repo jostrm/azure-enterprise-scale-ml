@@ -74,6 +74,10 @@ class MLBackend(ABC):
         """Register a model; omit version to let Azure assign a candidate version."""
 
     @abstractmethod
+    def register_component(self, definition: dict, base_path: Path) -> dict:
+        """Register a new pinned component version; never replace an existing version."""
+
+    @abstractmethod
     def publish(
         self, component: dict, endpoint: dict, deployment: dict, base_path: Path, *,
         reuse_component: bool = False,

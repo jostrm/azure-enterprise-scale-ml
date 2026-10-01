@@ -134,6 +134,25 @@ There is no process-global conversation store. Clients must continue the same
 Foundry conversation to retain platform history. Images, attachments and complete
 tool-call histories are not reconstructed.
 
+### Greetings and startup logs
+
+Whole-message greetings such as `hi` and simple thanks receive fixed, nonfactual
+responses in the shared host, without model or retrieval calls. A greeting
+followed by a question still takes the normal evidence-checked path; missing or
+failed grounding is not accepted as a successful answer.
+
+`INFO hypercorn.error: Running on http://0.0.0.0:8088` is a normal startup message,
+despite the logger's name. It describes the container's internal listener, not
+an instruction to open public HTTP access.
+
+`Responses resilience: DISABLED` is a separate SDK warning: an in-flight
+`store=true` response is not automatically recovered/marked failed after an
+ungraceful process crash. It is not evidence of an invocation exception.
+These samples do not enable durable response recovery merely to silence this
+warning; that requires a separately designed persistence/recovery configuration.
+Inspect the invocation's actual exception and request/session ID when diagnosing
+an HTTP 500.
+
 ### Offline package and local run
 
 From `usecase_code\40-agent-factory`, with Python 3.13:

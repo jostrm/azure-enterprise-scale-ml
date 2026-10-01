@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import re
 import shutil
 import tempfile
@@ -145,6 +146,28 @@ def _automl(scenario: dict, runtime: dict, *, standalone: bool) -> dict:
     limits.setdefault("max_trials", 4)
     limits.setdefault("max_concurrent_trials", 1)
     limits.setdefault("timeout_minutes", 60)
+    if type(limits["max_trials"]) is not int or limits["max_trials"] < 1:
+        raise ValueError("AutoML max_trials must be a positive integer")
+    timeout = limits["timeout_minutes"]
+    if type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError("AutoML timeout_minutes must be finite and positive")
+    if not image:
+        limits.setdefault("trial_timeout_minutes", min(30, timeout / 2))
+        trial_timeout = limits["trial_timeout_minutes"]
+        if (type(trial_timeout) not in (int, float) or not math.isfinite(trial_timeout)
+                or not 0 < trial_timeout < timeout):
+            raise ValueError("AutoML trial_timeout_minutes must be positive and less than timeout_minutes")
+    training = copy.deepcopy(settings.get("training", {}))
+    ensemble_flags = {"enable_stack_ensemble", "enable_vote_ensemble"}
+    if (not isinstance(training, dict) or set(training) - ensemble_flags
+            or any(type(value) is not bool for value in training.values())):
+        raise ValueError("AutoML training supports boolean enable_stack_ensemble and enable_vote_ensemble")
+    if image and training:
+        raise ValueError("Tabular AutoML ensemble settings do not apply to image tasks")
+    if not image and limits["max_trials"] < 4:
+        if any(training.values()):
+            raise ValueError("Use max_trials >= 4 for ensembles, or explicitly disable ensembles for a smaller budget")
+        training.update({flag: False for flag in ensemble_flags})
     compute = runtime.get("gpu_compute") if image else runtime.get("compute")
     if not compute:
         raise ValueError("runtime.gpu_compute is required for image AutoML" if image
@@ -174,6 +197,8 @@ def _automl(scenario: dict, runtime: dict, *, standalone: bool) -> dict:
         result["validation_data"] = "${{parent.jobs.prepare.outputs.validation}}"
     if not image:
         result["featurization"] = {"mode": "auto"}
+        if training:
+            result["training"] = training
     if task == "forecasting":
         forecast = scenario.get("forecast", {})
         if not forecast.get("time_column") or not forecast.get("horizon"):

@@ -64,6 +64,12 @@ def example_environment():
         "LEGACY_FACTORY_FOLDER": r"C:\factory-examples\legacy\aifactory",
         "NEW_REPO_ROOT": r"C:\factory-examples\new-bootstrap",
         "CATALOG_REVISION": "a" * 64,
+        "FACTORY_KEY": "central-ai-sweden",
+        "FACTORY_PREFIX": "central-",
+        "FACTORY_REGION": "swedencentral",
+        "AIFACTORY_VERSION": "main",
+        "ORCHESTRATOR": "ado",
+        "DEV_VNET_CIDR": "172.16.0.0/18",
         "GITHUB_REPOSITORY": "example-org/new-factory",
         "TEAM_MEMBER_EMAIL": "platform@example.com",
         "TEAM_GROUP_NAME": "central-cloud",
@@ -94,6 +100,18 @@ def test_templates_render_as_typed_json(filename):
 
 def test_manifest_covers_every_template():
     assert set(SCENARIOS) == {path.name for path in (ROOT / "requests").glob("*.json")}
+
+
+def test_sequential_examples_do_not_recreate_the_default_project():
+    create = renderer.render(json.loads((ROOT / "requests" / "01-create-factory.json").read_text()),
+                             example_environment())
+    assert create["factory_kind"] == "ai"
+    assert "initial_project" not in create and "project" not in create
+    assert create["scale_sets"][0]["network"]["max_projects"] == 3
+    numbers = ["001"]
+    for name in ("04-add-project-existing-scaleset.json", "05-add-project-new-scaleset.json"):
+        numbers.append(json.loads((ROOT / "requests" / name).read_text())["project"]["number"])
+    assert numbers == ["001", "002", "003"]
 
 
 def test_renderer_preserves_escaping_and_types():

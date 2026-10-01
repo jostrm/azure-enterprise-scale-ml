@@ -184,6 +184,7 @@ class ESMLProject:
         return asset
 
     def register_outputs(self, plan, job_name: str) -> list[dict]:
+        from azure_esml.base_layer.uris import same_data_path
         job = self._backend().get_job(job_name)
         assert_scope(job.get("tags", {}), self.settings.scope)
         if job.get("status") not in ("Completed", "Succeeded"):
@@ -200,7 +201,7 @@ class ESMLProject:
             if not output:
                 raise ValueError("Data asset manifest must identify its named pipeline output")
             actual = job.get("outputs", {}).get(output)
-            if not isinstance(actual, dict) or actual.get("path") != asset["path"]:
+            if not isinstance(actual, dict) or not same_data_path(actual.get("path"), asset["path"], self.target):
                 raise ValueError(f"Completed job output {output!r} differs from the planned lake path")
             definition = {key: value for key, value in asset.items() if key != "output"}
             definitions.append(definition)
@@ -248,13 +249,22 @@ class ESMLProject:
         result = self._backend().publish(
             component, {"name": name, "tags": self.settings.scope},
             {"name": deployment_name or f"release-{version}",
-             "settings": {"default_compute": self.settings.runtime["compute"],
+             "settings": {"default_compute": plan.document["settings"]["default_compute"],
                           "continue_on_step_failure": False,
                           "force_rerun": plan.document["settings"].get("force_rerun", False)},
              "tags": self.settings.scope},
             plan.base_path,
         )
         return {**result, "plan_sha256": canonical_hash(plan.document)}
+
+    def register_pipeline(self, plan, *, version: str) -> dict:
+        """Register the generated training or inference graph as a v2 pipeline component."""
+        self._verify_document(plan.document, plan.base_path)
+        self._verify_selected_datastore()
+        kind = PipelineType(plan.manifest["pipeline_type"])
+        naming = ESMLNaming(self.settings, self.settings.model(plan.manifest.get("model_number")))
+        definition = plan.as_component(naming.component(kind), version)
+        return self._backend().register_component(definition, plan.base_path)
 
     def invoke_pipeline(self, plan, published: dict) -> dict:
         if published.get("plan_sha256") != canonical_hash(plan.document):

@@ -415,7 +415,7 @@ class PortableTableStore(ITableStore):
             pq.write_table(arrow, destination / "data.parquet")
             (destination / "MLTable").write_text(
                 "paths:\n  - file: ./data.parquet\n"
-                "transformations:\n  - read_parquet:\n", encoding="utf-8",
+                "transformations:\n  - read_parquet: {}\n", encoding="utf-8",
             )
             metadata = self.table_info(destination)
         hints = {

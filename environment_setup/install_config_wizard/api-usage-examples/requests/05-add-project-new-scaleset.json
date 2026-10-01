@@ -5,7 +5,7 @@
   "factory_id": "${FACTORY_ID}",
   "expected_revision": "${CATALOG_REVISION}",
   "project": {
-    "number": "002",
+    "number": "003",
     "display_name": "Document intelligence",
     "placements": [{"environment": "dev", "scale_set_id": "${DEV_SCALESET_002_ID}"}]
   }

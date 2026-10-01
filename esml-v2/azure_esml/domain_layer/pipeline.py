@@ -1,7 +1,7 @@
 """Offline, SDK/CLI-identical Azure ML v2 medallion pipeline planning."""
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import base64
 import hashlib
 from io import StringIO
@@ -151,6 +151,22 @@ class ESMLPipelineFactory:
         if not isinstance(pipeline_type, PipelineType) or not isinstance(request, PipelineRequest):
             raise TypeError("Use PipelineType and PipelineRequest")
         settings, model = self.settings, self.settings.model(model_number)
+        runtime = deepcopy({**settings.runtime, **{
+            key: model.options[key] for key in ("compute", "environment") if key in model.options
+        }})
+        job_identity = runtime.get("job_identity")
+        if "job_identity" in runtime:
+            if (not isinstance(job_identity, dict) or job_identity.get("type") != "managed"
+                    or set(job_identity) - {"type", "client_id"}):
+                raise ValueError("runtime.job_identity must specify type managed and an optional client_id")
+            if "client_id" in job_identity and (
+                    not isinstance(job_identity["client_id"], str)
+                    or not re.fullmatch(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}",
+                                        job_identity["client_id"])):
+                raise ValueError("runtime.job_identity.client_id must be a UUID")
+        command_timeout = runtime.get("command_timeout_seconds")
+        if "command_timeout_seconds" in runtime and (type(command_timeout) is not int or command_timeout <= 0):
+            raise ValueError("runtime.command_timeout_seconds must be a positive integer")
         if pipeline_type.is_inference and request.model_version is None:
             raise ValueError("Inference requires an explicit registered model_version")
         if (pipeline_type.is_training or pipeline_type.is_inference) and not model.features:
@@ -175,7 +191,7 @@ class ESMLPipelineFactory:
             "model_version": request.model_version, "serving": "batch",
             "prefix": settings.storage.get("prefix", "mlops/v1"), "storage": settings.storage,
         }, scenario)
-        naming = ESMLNaming(settings, model)
+        naming = ESMLNaming(settings, replace(model, datasets=datasets))
         tags = {**settings.scope, "run_id": request.run_id, "data_version": request.version,
                 "snapshot_id": request.snapshot}
         if pipeline_type.is_training:
@@ -207,7 +223,7 @@ class ESMLPipelineFactory:
             "display_name": naming.experiment(pipeline_type), "experiment_name": naming.experiment(pipeline_type),
             "tags": {**tags, "esml_pipeline_type": pipeline_type.value,
                      "esml_table_format": config["table_format"], "esml_aml_table_format": config["aml_table_format"]},
-            "settings": {"default_compute": "azureml:" + settings.runtime["compute"],
+            "settings": {"default_compute": "azureml:" + runtime["compute"],
                          "default_datastore": "azureml:" + settings.storage["datastore"],
                          "continue_on_step_failure": False, "force_rerun": not request.allow_reuse},
             "inputs": dict(common), "outputs": {}, "jobs": {},
@@ -219,6 +235,7 @@ class ESMLPipelineFactory:
             "schema": "esml.pipeline-plan/v2", "pipeline_type": pipeline_type.value,
             **settings.scope, "use_case": model.use_case, "model_name": scenario["model_name"],
             "model_number": model.number,
+            "compute": runtime["compute"], "environment_asset": runtime["environment"],
             "request": deepcopy(config["request"]), "datasets": [value.name for value in datasets],
             "discovery": discovery, "paths": {"sources": {}, "outputs": {}},
             "snapshot_ref": layout.azureml_uri("training_snapshot"),
@@ -244,14 +261,16 @@ class ESMLPipelineFactory:
                 project_folder=settings.project_folder, model_folder=model.folder, dataset=dataset.name)
 
         def expose(name, key, kind="uri_folder", *, dataset=None, stage=None):
-            document["outputs"][name] = {"type": kind, "path": uri(key), "mode": "rw_mount"}
+            medallion = stage or ("gold" if name in ("gold", "train", "validation", "test") else name)
+            representation = (config["aml_table_format"] if name in ("train", "validation", "test")
+                              else "raw" if medallion == "bronze" and config["bronze_mode"] == "raw"
+                              else config["table_format"] if medallion in ("gold", "silver")
+                              else "parquet" if name == "prepared" else "artifact")
+            # Delta commits require local filesystem rename semantics, not a Blob FUSE mount.
+            document["outputs"][name] = {"type": kind, "path": uri(key),
+                                         "mode": "upload" if representation == "delta" else "rw_mount"}
             manifest["paths"]["outputs"][name] = uri(key)
             if kind != "mlflow_model":
-                medallion = stage or ("gold" if name in ("gold", "train", "validation", "test") else name)
-                representation = (config["aml_table_format"] if name in ("train", "validation", "test")
-                                  else "raw" if medallion == "bronze" and config["bronze_mode"] == "raw"
-                                  else config["table_format"] if medallion in ("gold", "silver")
-                                  else "parquet" if name == "prepared" else "artifact")
                 manifest["data_assets"].append({
                     "name": naming.data(stage or name, dataset=dataset, inference=pipeline_type.is_inference),
                     "version": request.run_id, "path": uri(key), "type": kind,
@@ -286,11 +305,13 @@ class ESMLPipelineFactory:
                     override is None or override.engine != "databricks"):
                 raise ValueError(f"All-DBX pipeline requires an explicit Databricks component for {step.value}")
             bindings = {name: value for name, (_, value) in inputs.items()}
-            compute = settings.runtime["compute"]
+            compute = runtime["compute"]
             if step == StepType.TRAINING_AUTOML and override is None:
-                automl = _automl(scenario, settings.runtime, standalone=False)
+                automl = _automl(scenario, runtime, standalone=False)
                 automl.update(training_data=bindings["train"], validation_data=bindings["validation"])
                 automl["outputs"]["best_model"] = outputs["best_model"][1]
+                if job_identity is not None:
+                    automl["identity"] = deepcopy(job_identity)
                 document["jobs"][key] = automl
                 manifest["steps"][key] = {"step": step.value, "engine": "azureml", "override": False, "dataset": None}
                 return {"best_model": _binding(f"jobs.{key}.outputs", "best_model")}
@@ -349,8 +370,13 @@ class ESMLPipelineFactory:
                     ("esml_environment", "environment"),
                 ):
                     command += " --" + flag + ' "${{inputs.' + name + '}}"'
+                environment_key = {
+                    StepType.EVALUATE: "evaluation_environment",
+                    StepType.INFERENCE_GOLD: "inference_environment",
+                }.get(step, "environment")
                 component = {
-                    "type": "command", "code": "./code", "environment": settings.runtime["environment"],
+                    "type": "command", "code": "./code",
+                    "environment": model.options.get(environment_key, runtime["environment"]),
                     "is_deterministic": request.allow_reuse, "command": command,
                     "inputs": {name: {"type": kind} for name, kind in input_types.items()},
                     "outputs": {name: {"type": kind} for name, kind in output_types.items()},
@@ -360,6 +386,10 @@ class ESMLPipelineFactory:
                 "compute": compute if compute.startswith("azureml:") else "azureml:" + compute,
                 "inputs": bindings, "outputs": {name: value for name, (_, value) in outputs.items()},
             }
+            if job_identity is not None:
+                document["jobs"][key]["identity"] = deepcopy(job_identity)
+            if command_timeout is not None:
+                document["jobs"][key]["limits"] = {"timeout": command_timeout}
             manifest["steps"][key] = {"step": step.value, "dataset": dataset.name if dataset else None,
                                       "engine": override.engine if override else "azureml",
                                       "override": override is not None}

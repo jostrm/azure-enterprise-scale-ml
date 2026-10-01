@@ -190,8 +190,10 @@ def _data_definition(definition: dict) -> dict:
     return doc
 
 
-def _match_data(existing, doc: dict) -> None:
-    if any(_field(existing, key) != doc[key] for key in ("name", "version", "path", "type")):
+def _match_data(existing, doc: dict, target: WorkspaceTarget) -> None:
+    from .uris import same_data_path
+    if (any(_field(existing, key) != doc[key] for key in ("name", "version", "type"))
+            or not same_data_path(_field(existing, "path"), doc["path"], target)):
         raise ValueError("Existing data version differs; refusing to overwrite")
     tags = _field(existing, "tags") or {}
     if tags != doc["tags"]:
@@ -243,6 +245,8 @@ def _component_id(component, definition: dict, target: WorkspaceTarget) -> str:
         f"/components/{definition['name']}/versions/{definition['version']}"
     )
     actual = _field(component, "id")
+    if isinstance(actual, str) and actual.startswith("azureml:"):
+        actual = actual.removeprefix("azureml:")
     if not isinstance(actual, str) or actual.lower() != expected.lower():
         raise ValueError("Published component ID does not match the requested workspace/name/version")
     return actual
@@ -336,7 +340,7 @@ def _deployment_entity(document: dict, base_path: Path):
     entity = load_batch_deployment(StringIO(_yaml(fields)), relative_origin=_origin(base_path))
     if not isinstance(entity, PipelineComponentBatchDeployment):
         raise ValueError("A pipeline component batch deployment is required")
-    # SDK 1.35's public generic loader rejects pipeline-specific settings.
+    # The public generic loader rejects pipeline-specific settings.
     # Its pipeline loader validates those settings with the actual pipeline schema.
     if settings is not None:
         entity = PipelineComponentBatchDeployment._load(data=document, yaml_path=_origin(base_path))
@@ -379,9 +383,16 @@ class AzureMLSDKBackend(MLBackend):
         self.client = client
 
     @classmethod
-    def from_cli(cls, target: WorkspaceTarget):
+    def from_cli(cls, target: WorkspaceTarget, *, subscription_bound: bool = False):
         from azure.identity import AzureCliCredential
 
+        if type(subscription_bound) is not bool:
+            raise ValueError("subscription_bound must be a boolean")
+        if subscription_bound:
+            # Validate the subscription's tenant before avoiding CLI's mutually
+            # exclusive --tenant/--subscription token arguments.
+            AzureMLCLIBackend(target)._check()
+            return cls(target, credential=AzureCliCredential(subscription=target.subscription_id, process_timeout=60))
         return cls(target, credential=AzureCliCredential(tenant_id=target.tenant_id, process_timeout=60))
 
     @classmethod
@@ -408,7 +419,10 @@ class AzureMLSDKBackend(MLBackend):
 
     def download_job(self, name: str, destination: Path, output_name: str) -> None:
         name, output_name = _name(name), _name(output_name, "output_name")
-        self.client.jobs.download(name=name, download_path=str(_download_destination(destination)), output_name=output_name)
+        destination = _download_destination(destination)
+        self.client.jobs.download(name=name, download_path=str(destination), output_name=output_name)
+        if not any(path.is_file() for path in destination.rglob("*")):
+            raise RuntimeError(f"Azure ML SDK downloaded no files for named output {output_name!r}")
 
     def get_datastore(self, name: str) -> dict:
         return _datastore(self.client.datastores.get(name=_name(name)))
@@ -436,7 +450,7 @@ class AzureMLSDKBackend(MLBackend):
             existing = self.client.data.get(name=doc["name"], version=doc["version"])
         except ResourceNotFoundError:
             return _asset(self.client.data.create_or_update(entity))
-        _match_data(existing, doc)
+        _match_data(existing, doc, self.target)
         return _asset(existing)
 
     def get_data(self, name: str, version: str) -> dict:
@@ -449,6 +463,18 @@ class AzureMLSDKBackend(MLBackend):
         from azure.ai.ml.entities import Model
 
         return _asset(self.client.models.create_or_update(Model(**_model_definition(definition))))
+
+    def register_component(self, definition: dict, base_path: Path) -> dict:
+        from azure.ai.ml import load_component
+        from azure.core.exceptions import ResourceNotFoundError
+        document = _document(definition)
+        name, version = _name(document.get("name")), _version(document.get("version"))
+        component = load_component(StringIO(_yaml(document)), relative_origin=_origin(base_path))
+        try:
+            self.client.components.get(name=name, version=version)
+        except ResourceNotFoundError:
+            return _asset(self.client.components.create_or_update(component))
+        raise ValueError("Component version already exists; choose a new release version")
 
     def publish(
         self, component: dict, endpoint: dict, deployment: dict, base_path: Path, *,
@@ -512,7 +538,7 @@ class AzureMLCLIBackend(MLBackend):
             python = next((path for path in candidates if path.is_file()), None)
             if python is None:
                 raise RuntimeError("Cannot safely run the Azure CLI batch shim; its python.exe was not found")
-            command = [str(python), "-I", "-m", "azure.cli"]
+            command = [str(python), "-X", "utf8", "-I", "-m", "azure.cli"]
         result = subprocess.run(
             [*command, *argv[1:]], shell=False, check=True, capture_output=True, text=True,
             encoding="utf-8", env={**os.environ, "AZURE_EXTENSION_USE_DYNAMIC_INSTALL": "no"},
@@ -564,7 +590,26 @@ class AzureMLCLIBackend(MLBackend):
             result = self._call(group, "show", *arguments)
         except subprocess.CalledProcessError as error:
             # Never interpret authentication, permissions or transport errors as absence.
-            if re.search(r"(?m)^ERROR:\s*\((?:ResourceNotFound|AssetNotFound|NotFound)\)", error.stderr or ""):
+            message = error.stderr or ""
+            missing = re.search(
+                r"(?m)^ERROR:\s*\((?:ResourceNotFound|AssetNotFound|NotFound)\)"
+                r"|^\s*Code:\s*(?:ResourceNotFound|AssetNotFound|NotFound|NotFoundError)\s*$"
+                r"|^Error Code:\s*UserError/NotFoundError\s*$", message,
+            )
+            if group == "job" and len(arguments) == 2 and arguments[0] == "--name":
+                missing = missing or re.search(
+                    rf"(?m)^ERROR:\s*\(UserError\)\s+Job {re.escape(arguments[1])} not found\.\s*$", message,
+                )
+            if group == "component" and len(arguments) >= 2 and arguments[0] == "--name":
+                version_suffix = (
+                    rf"(?: \(version: {re.escape(arguments[3])}\))?"
+                    if len(arguments) == 4 and arguments[2] == "--version" else ""
+                )
+                missing = missing or re.search(
+                    rf"(?m)^ERROR:\s*\(UserError\)\s+Not found component {re.escape(arguments[1])}{version_suffix}\.\s*$",
+                    message,
+                )
+            if missing:
                 return None
             raise
         if not isinstance(result, dict) or not result.get("name"):
@@ -582,7 +627,12 @@ class AzureMLCLIBackend(MLBackend):
         return _job(self._create("job", _document(document), base_path))
 
     def get_job(self, name: str) -> dict:
-        return _job(self._call("job", "show", "--name", _name(name)))
+        from azure.core.exceptions import ResourceNotFoundError
+        name = _name(name)
+        result = self._get_optional("job", "--name", name)
+        if result is None:
+            raise ResourceNotFoundError(f"Azure ML job {name!r} does not exist")
+        return _job(result)
 
     def list_jobs(self, limit: int = 100) -> list[dict]:
         limit = _limit(limit)
@@ -627,7 +677,7 @@ class AzureMLCLIBackend(MLBackend):
         doc = _data_definition(definition)
         existing = self._get_optional("data", "--name", doc["name"], "--version", doc["version"])
         if existing is not None:
-            _match_data(existing, doc)
+            _match_data(existing, doc, self.target)
             return _asset(existing)
         return _asset(self._create("data", doc, Path.cwd()))
 
@@ -642,6 +692,14 @@ class AzureMLCLIBackend(MLBackend):
     def register_model(self, definition: dict) -> dict:
         return _asset(self._create("model", _model_definition(definition), Path.cwd()))
 
+    def register_component(self, definition: dict, base_path: Path) -> dict:
+        from azure.ai.ml import load_component
+        document = _document(definition)
+        name, version = _name(document.get("name")), _version(document.get("version"))
+        load_component(StringIO(_yaml(document)), relative_origin=_origin(base_path))
+        if self._get_optional("component", "--name", name, "--version", version) is not None:
+            raise ValueError("Component version already exists; choose a new release version")
+        return _asset(self._create("component", document, base_path))
     def publish(
         self, component: dict, endpoint: dict, deployment: dict, base_path: Path, *,
         reuse_component: bool = False,
