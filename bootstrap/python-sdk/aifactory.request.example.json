@@ -1,0 +1,23 @@
+{
+  "folder": "C:\\[replace-with-approved-api-host-parent]\\azurefactory",
+  "contract_version": 1,
+  "action": "create-factory",
+  "factory_kind": "ai",
+  "factory_key": "team-ai",
+  "target_prefix": "team-",
+  "target_region": "swedencentral",
+  "aifactory_version": "main",
+  "scale_sets": [
+    {
+      "environment": "dev",
+      "suffix": "001",
+      "subscription_id": "[replace-with-subscription-uuid]",
+      "tenant_id": "[replace-with-tenant-uuid]",
+      "orchestrator": "gha",
+      "network": {
+        "vnet_cidr": "[replace-with-approved-non-overlapping-cidr]",
+        "max_projects": 3
+      }
+    }
+  ]
+}

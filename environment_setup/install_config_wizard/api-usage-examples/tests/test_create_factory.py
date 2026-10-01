@@ -141,6 +141,19 @@ def test_preview_rejects_missing_or_changed_default_project(example, artifacts, 
     assert not list(artifacts.iterdir())
 
 
+def test_placement_evidence_does_not_change_the_reviewed_scope(example, artifacts):
+    client = Client()
+    for factory in (client.preview["target"], client.catalog["factories"][0]):
+        factory["projects"][0]["placements"][0].update(
+            deployment_state="unknown", deployment_detail="Deployment evidence has not been evaluated.",
+        )
+    path = artifacts / "review.json"
+    result, code = example.prepare_factory(client, request(), path)
+    assert code == 0 and result["project_id"] == PROJECT_ID
+    result = example.confirm_factory(client, path, approved=True)
+    assert result["project_id"] == PROJECT_ID and result["deployment_started"] is False
+
+
 @pytest.mark.parametrize("issue", ["runtime", "no-target", "extra-project", "subscription", "expired", "contract"])
 def test_preview_safety_contract_is_required(example, artifacts, issue):
     client = Client()
@@ -210,6 +223,16 @@ def test_configuration_confirm_rejects_runtime_or_malformed_result(example, arti
     example.prepare_factory(client, request(), path)
     client.confirmation.update(change)
     with pytest.raises(example.FailureError):
+        example.confirm_factory(client, path, approved=True)
+    assert [item[0] for item in client.calls] == ["prepare", "confirm"]
+
+
+def test_configuration_confirm_requires_explicit_null_job(example, artifacts):
+    client = Client()
+    path = artifacts / "review.json"
+    example.prepare_factory(client, request(), path)
+    del client.confirmation["job"]
+    with pytest.raises(example.FailureError, match="job:null"):
         example.confirm_factory(client, path, approved=True)
     assert [item[0] for item in client.calls] == ["prepare", "confirm"]
 

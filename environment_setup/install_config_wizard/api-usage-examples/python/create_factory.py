@@ -95,8 +95,10 @@ def check_target(target, request):
     factory_id, scale_id, project_id = (
         require_uuid(target.get("id")), require_uuid(scale.get("id")), require_uuid(project.get("id")),
     )
-    if (project.get("number") != "001"
-            or project.get("placements") != [{"environment": "dev", "scale_set_id": scale_id}]):
+    placements = project.get("placements")
+    if (project.get("number") != "001" or not isinstance(placements, list) or len(placements) != 1
+            or not isinstance(placements[0], dict) or placements[0].get("environment") != "dev"
+            or placements[0].get("scale_set_id") != scale_id):
         raise FailureError("Expected exactly default project001 placed in the new DEV/001 scale set.")
     return {"factory_id": factory_id, "scale_set_id": scale_id, "project_id": project_id}
 
@@ -145,7 +147,7 @@ def confirm_factory(client, receipt_path, *, approved=False):
     expected_scope = check_create_preview(receipt["preview"], request)
     result = client.catalog_confirm(receipt["folder"], receipt["confirmation_id"])
     if (not isinstance(result, dict) or type(result.get("contract_version")) is not int
-            or result["contract_version"] != 1 or result.get("job") is not None
+            or result["contract_version"] != 1 or "job" not in result or result["job"] is not None
             or not isinstance(result.get("catalog"), dict)):
         raise FailureError("Expected catalog-only confirmation, job:null. Inspect host state; never retry blindly.")
     check_catalog(result["catalog"])

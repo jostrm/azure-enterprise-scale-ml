@@ -144,6 +144,66 @@ a signed approval or per-user authorization; your service must enforce that.
 Lost replies, conflicts and malformed results are never automatically retried.
 Use new request/receipt filenames for a new review, not an overwritten approval.
 
+### 2C. Copy the Python SDK starter to your consumer repo root
+
+Use an **already registered/bootstrap-configured consumer repo** with its initialized
+`azure-enterprise-scale-ml` submodule; this does not bootstrap or enroll providers.
+Obtain **approved updated starter and submodule support assets** first; the new
+starter folder may not yet exist in public clones. The commands below assume an
+approved updated checkout. If supplied in a tutorial bundle, copy the same two
+starter files from its `bootstrap\python-sdk` folder instead.
+From the consumer root, copy **only these two files**. All support code stays in the
+submodule, located relative to the copied script, not the working directory:
+
+```powershell
+Copy-Item .\azure-enterprise-scale-ml\bootstrap\python-sdk\aifactory_sdk.py .
+Copy-Item .\azure-enterprise-scale-ml\bootstrap\python-sdk\aifactory.request.example.json .\aifactory.request.json
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .\azure-enterprise-scale-ml\environment_setup\azurefactory-cli
+if ($LASTEXITCODE -ne 0) { throw 'SDK installation failed.' }
+.\.venv\Scripts\python.exe .\aifactory_sdk.py --help
+```
+
+Edit **every `[replace-…]` placeholder** in the renamed `aifactory.request.json`: an
+absolute Windows `azurefactory` folder **on the API host**, canonical nonzero tenant
+and subscription UUIDs, and an approved non-overlapping CIDR. Review the nonsecret
+`team-ai` / `team-`, `swedencentral`, `main`, `gha`, DEV/001 and capacity-three
+defaults too. Use a fresh isolated host folder and unused identity as in section 1;
+do not recreate an existing factory or add its existing/default project001 again.
+The request deliberately omits `initial_project`, letting the API create project001.
+
+The approved API must already be running (Tkinter **Quick setup → Start API host**).
+Use the actual URL and **the same authorized API key as that server**, supplied
+privately; never put a key/token in JSON, code or Git:
+
+```powershell
+$env:AIFACTORY_API_URL = Read-Host 'Authorized running API URL'
+$env:AIFACTORY_API_KEY = Read-Host 'Same API key as the server' -MaskInput
+.\.venv\Scripts\python.exe .\aifactory_sdk.py --request .\aifactory.request.json `
+  --receipt .\factory.receipt.json
+if ($LASTEXITCODE -ne 0) { throw 'Stop: inspect blockers/errors; do not confirm.' }
+```
+
+`-MaskInput` requires PowerShell 7+. Keep `aifactory.request.json` and
+`factory.receipt.json` private: exclude them and `.venv` from the **consumer's**
+Git tracking and restrict local access; submodule ignore rules do not protect
+consumer-root files.
+
+**Prepare is configuration-only. Stop and obtain a separate human approval** of
+the complete exact preview/receipt (including scope, blockers and expiry). Only
+after that approval, in a separate invocation:
+
+```powershell
+.\.venv\Scripts\python.exe .\aifactory_sdk.py --confirm --receipt .\factory.receipt.json --yes
+if ($LASTEXITCODE -ne 0) { throw 'Inspect host state before any retry.' }
+Remove-Item Env:AIFACTORY_API_KEY
+```
+
+This thin starter calls the existing SDK-backed `python\create_factory.py` main,
+retaining its request/receipt guards and exact saved-UUID verification. It is not a
+new CLI or HTTP client, does not fetch code, and runs no Bash bootstrap, Azure
+deployment or Git publication. `--help` needs neither the SDK nor the submodule.
+
 ### 3. Continue only with the intended scenario
 
 Use [exact IDs](#2-discover-exact-ids-before-adding-scale-sets-and-projects) and
