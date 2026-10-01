@@ -1,26 +1,31 @@
 # End-to-end setup: Azure Factory and AI projects
 
-> Start with [AI Factory tutorial — Take2: UX first, version 1.25+](28-tutorial-walkthrough.md). **Delivered: the 10:31 Part 1 interface/read-only API and CLI video, 13 snippets, and a 23-slide companion deck with four embedded clips.** The guide contains the measured chapter index and a director/teacher manuscript for the full project001 Function, project003, regional expansion and clone scenarios. **Those runtime chapters and the complete end-to-end film remain unfinished.** Producer prerequisites stay separate from the spoken foundation lesson; the collapsed archive preserves the original walkthrough and technical references.
+> For an introduction to the app interface and read-only API/CLI operations, see
+> the [AI Factory tutorial (version 1.25+)](28-tutorial-walkthrough.md).
 >
 > For the Monitor-only, FinOps-focused companion, see [AI Factory tutorial: FinOps monitoring](tutorial-fiops.md).
-
-> **21 September review-only update:** the v1.25 source-cache prerequisite is resolved. Both Dev001 project reviews remain blocked on ADO binding and Blob-lock enrollment; no deployment was started. [Current readiness and recovery workflow](28-tutorial-walkthrough.md#21-september-review-only-readiness-update).
 
 Use the **Enterprise Scale AI Factory** app or its API to configure factories,
 review and trigger IaC pipelines, monitor Azure resources, promote projects from
 Dev to Stage/Prod, and manage tickets. Configuration, deployment and monitoring
 are separate operations; a saved definition is not a deployed resource.
 
+Start by [choosing a setup path](#choose-the-setup-path), then follow the
+[shell-first](#shell-first-new-registered-consumer-v125--main) or
+[app-first](#app-first-the-same-configuration-and-execution-contracts) instructions.
+The [legacy setup](#existing-single-factory-setup) section covers existing
+single-factory repositories.
+
 ## Two common workflows
 
-- **ITSM/Own Cloud portal integrated (fully automated):** Teams order projects through ServiceNow,
+- **ITSM or self-service portal integration:** Teams order projects through ServiceNow,
   Jira Service Management or their own cloud portal. A trusted automation runner
   calls the AI Factory API to prepare the exact configuration, apply the team's
   approval policy, confirm execution and track the job. With identities,
   permissions, pipeline bindings and approvals established, this can run without
   manual intervention. The desktop's local API is not a public ITSM endpoint;
   use an authenticated integration, not an exposed loopback port.
-  - See How to integrate the AI Factory to your "cloud portal", by using the AI Factory CLI/API here [Integate with callback](./29-ITSM-integrated.md)
+  See [ITSM integration with callbacks](./29-ITSM-integrated.md) for the CLI/API workflow.
 - **Core-team managed:** The core team uses the
   [Enterprise Scale AI Factory app](../../../environment_setup/install_config_wizard/maui/readme.md)
   to configure from the ticket, review and trigger the pipeline, and follow its
@@ -32,9 +37,10 @@ are separate operations; a saved definition is not a deployed resource.
 
 ## Choose the setup path
 
-An external connectivity hub does **not** require the Configuration Wizard, and
-GitHub is not inherently less automated than Azure DevOps. The distinction is
-the chosen workflow's permissions and implementation, not the Git provider.
+Choose a workflow based on your permissions and network topology. Full bootstrap
+supports both GitHub Actions and Azure DevOps, including external connectivity
+hubs. Use the Configuration Wizard when administrators have already supplied the
+required infrastructure and identities.
 
 | Path | Use it for | Prerequisite handling |
 |---|---|---|
@@ -43,15 +49,13 @@ the chosen workflow's permissions and implementation, not the Git provider.
 | **Configuration Wizard** | Restricted teams using prerequisites supplied by their administrators | Consumes precreated identities, groups, vault and connectivity references |
 | **Factory Catalog** | Optional inventory, configuration editing and scoped operations | Not a mandatory handoff to finish Full bootstrap |
 
-The Start Guide should route an external hub to **Full bootstrap**, not force
-the Wizard. An older installed app/API may still show the former restriction;
-editing or updating this document does not upgrade that installation.
+For an external hub, select **Full bootstrap** in the Start Guide. If that option
+is unavailable, update to a compatible app/API version before continuing.
 
 ### How the scripted Azure DevOps setup automates prerequisites
 
-The historical single-factory ADO setup is a **scripted privileged bootstrap**,
-not evidence that the MAUI Wizard or Catalog performed the provisioning.
-Its entrypoint is
+The legacy single-factory Azure DevOps setup uses a **scripted privileged
+bootstrap**. Its entrypoint is
 [`ADO-create-new-aifactory-scaleset.sh`](../../../bootstrap/ADO-create-new-aifactory-scaleset.sh);
 the GitHub counterpart is
 [`GHA-create-new-aifactory-scaleset.sh`](../../../bootstrap/GHA-create-new-aifactory-scaleset.sh).
@@ -68,23 +72,22 @@ The shared `aif_scaleset_main` invokes the following helpers:
 | `aif_prepare_external_access_hub` / `aif_ensure_vpn_access_hub` | Prepare the external hub and create a missing VPN gateway or reuse an existing one |
 | `aif_configure_ado` / `aif_configure_github_identity` | Configure provider-specific authentication and automation |
 
-That is why the operator did not need to supply `azure_machinelearning_sp_oid`,
-create the group manually, or open a configuration form to seed a vault.
-The script still needs authenticated administrative authority and the intended
-tenant, subscriptions, repository and hub coordinates; automation does not grant
-missing permissions.
+These helpers resolve `azure_machinelearning_sp_oid`, create or reuse the team
+group, and prepare the seed vault. Provide authenticated administrative access
+and the intended tenant, subscriptions, repository and hub details before running
+the script.
 
-Do not run a legacy full-bootstrap script over an existing registered
-`azurefactory` draft to bypass a modern blocker. The modern route preserves
-saved configuration, reviews each stage's exact effects, and separates local
-configuration approval from cloud/provider execution.
+For an existing registered `azurefactory` draft, continue through the registered
+workflow rather than running a legacy full-bootstrap script over it. This
+preserves saved configuration and keeps configuration approval separate from
+cloud/provider execution.
 
 ### What the local-change review means
 
 **Review exact local changes** approves configuration persistence, not deployment.
 `org-department-id` and `org-department-name` are project metadata: with an initial
-project selected, supplied values belong to that project's organization data and
-must not be reported as unprovisioned infrastructure. With explicit common-only
+project selected, supplied values are saved with that project's organization
+data; they do not provision infrastructure. With explicit common-only
 creation there is no project to attach them to, so the review identifies them as
 not included in that save.
 
@@ -92,8 +95,8 @@ not included in that save.
 are **Key Vault secret names/references**, not secret values. A supplied reference
 is saved at its appropriate common/project scope; this does not create the
 referenced secret. The passwordless managed-identity bootstrap clears unused
-service-principal secret references. Do not invent secrets or populate them merely
-to remove a deferred-field warning.
+service-principal secret references. Supply secret references only when required
+by your selected authentication method.
 
 ### Current integrated-hub limitation
 
@@ -101,8 +104,8 @@ The registered combination `access_hub_mode=integrated` with
 `setup_hub_access=true`, including the default Simple topology, is currently
 blocked. A retained shared lock account cannot put its single canonical private
 endpoint into a factory-owned common VNet without a compatible network, DNS and
-deletion-ownership contract. Removing a guard or silently converting the saved
-topology to external is not a fix.
+deletion-ownership contract. Use an explicitly configured external hub or no-hub
+setup instead, and review the resulting network configuration before execution.
 
 The external-hub path uses a retained, nondelegated **hub** private-endpoint
 subnet, not the first factory's runner/spoke subnet. Additional factories must
@@ -111,10 +114,9 @@ transitive. The hub can be in the same subscription as the factories.
 No-hub mode (`integrated` with `setup_hub_access=false`) skips shared hub-lock
 storage; it does not mean an external hub was precreated.
 
-Full default-chain live provisioning has not been demonstrated by the current
-development changes. A matching reviewed source, API and app package is required;
-local helper availability is not proof that the selected public source contains
-those helpers.
+Use compatible source, API and app versions that support your selected topology.
+Confirm that the required helpers are available in the selected published source
+before preparing a deployment.
 
 ### Private connection discovery requires execution approval
 
@@ -142,17 +144,16 @@ remote command to work around missing connectivity.
 Selecting another submodule branch changes the shared code/templates; it does **not**
 rename, migrate or replace configuration storage. A repository originally created
 with `aifactory\variables.json` therefore remains a supported legacy repository
-when its submodule moves to `release/v1.25` or `main`. This is why existing
-repositories such as Spider can track current PURPLE code while retaining the
-single `aifactory` folder. Migration is a separate catalog operation with its own
-preview and confirmation.
+when its submodule moves to `release/v1.25` or `main`. Existing repositories can
+therefore update the shared source while retaining the single `aifactory` folder.
+Migration is a separate catalog operation with its own preview and confirmation.
 
 ### Modern Simple/Full Bash creation is configure-first
 
 For a **new** consumer, `GHA-create-new-aifactory-scaleset.sh`,
 `ADO-create-new-aifactory-scaleset.sh` and the `ALL` dispatcher route
 `main`/`125` or later versions to the authenticated local API's shared
-registered-creation adapter, **before** the historical bootstrap's Azure, GitHub,
+registered-creation adapter, **before** the legacy bootstrap's Azure, GitHub,
 repository or template-copy operations. A new consumer defaults to `main`; an
 explicit `124` or an existing saved legacy version preserves the legacy route.
 The same guard applies when directly sourcing the shared Bash library. The `ALL`
@@ -189,7 +190,7 @@ again. Unrelated files, links and existing registers remain blocked.
 `--yes`, `--prepare-only` and `--no-wait` **never** approve a modern configuration
 or start deployment. A compatible API and the shared `azurefactory` SDK are
 required; missing `initial-project-v1` or `draft-scale-identity-v1` capabilities fail closed rather than falling back to legacy
-templates. Unsupported historical environment switches are reported, not ignored.
+templates. Unsupported legacy environment switches are reported, not ignored.
 Simple keeps its fixed Dev001 scale set; an explicit project number is sent as
 `initial_project`, not as an unsupported Simple configuration field.
 
@@ -207,14 +208,13 @@ This consumes the same server-held configuration receipt as
 `POST /api/v1/creation/confirm`; it is not a bootstrap start.
 Confirmation creates the canonical register, factory, scale set and selected
 initial project's `variables.json` through the shared catalog transaction.
-This is **configuration only**, not successful full infrastructure bootstrap:
-repository publication, identity creation, binding/enrollment, runners and cloud
-resources have not been provisioned. The Simple/Full workflow can retain the
-resulting scope and prepare the next explicitly reviewed privileged stage;
-there is no required switch to Catalog or the restricted Wizard.
+This step saves **configuration only**. Repository publication, identity creation,
+binding/enrollment, runner setup and cloud deployment are separate operations.
+Continue in the Simple/Full workflow to prepare the next explicitly reviewed
+privileged stage; no switch to Catalog or the restricted Wizard is required.
 Published source/ref checks and protected manifests remain mandatory; this path
-does not install or publish dirty source. For explicit common-only creation use
-`azurefactory factory create --common-only` instead.
+does not install or publish uncommitted source changes. For explicit common-only
+creation use `azurefactory factory create --common-only` instead.
 
 The registered adapter accepts `AIF_ACCESS_HUB_MODE=integrated|external`
 (`i|e` also work). External mode requires all four explicit
@@ -244,14 +244,20 @@ tenant and operator identity. This does not sign in, switch accounts or retry an
 HTTP write after a 401; an unexpected authentication failure still stops the
 stage and retains its recovery evidence.
 
+<details>
+<summary>Advanced reference: privileged prerequisites and shared-hub foundation</summary>
+
 #### Privileged prerequisite engine contract
+
+This section is a reference for administrators and automation authors. For the
+standard setup workflow, continue to [Setup in three steps](#setup-in-three-steps).
 
 `bootstrap/lib/registered_prerequisites.py` provides read-only `prepare(...)`
 and one-use `execute(...)` for a **separately approved privileged stage**, not
 for restricted Wizard deployment. It binds the exact register bytes and reviewed
 local source payload, Entra group/member discovery, seed-vault configuration,
 resource IDs, proposed mutations, and physical lease scopes. Its source fingerprint
-includes unpublished bytes; it does not claim they are present on GitHub `main`.
+includes local changes and is separate from published-source verification.
 Identity/federation enrollment remains the audited `factory_enrollment.py` stage;
 new group or identity identifiers require a fresh downstream review.
 `capabilities()` explicitly advertises only the after-common prerequisite stage,
@@ -261,11 +267,11 @@ stage readiness, and preconditions. Execution returns stage results, nonsecret
 outputs, changed/uncertain state, and the durable receipt path.
 `verify_source_snapshot(...)` verifies an explicitly pinned five-file local
 helper bundle and its loaded dependencies; missing helpers or changed bytes fail
-before cloud discovery. Provenance says `published_ref_verified=false`, not
-“published main.” A native package may use this only under its existing explicit
+before cloud discovery. Local verification records `published_ref_verified=false`.
+A native package may use this only under its existing explicit
 trusted-source/consent policy. It does not relax the independent published-source
-checks for common/project deployment. Packaging an old accelerator commit without
-the helper does not provide this capability.
+checks for common/project deployment. The installed package must include the
+required helper.
 
 External RGs are retained dependencies, never owned/enrolled/deleted factory
 scopes. Existing gateways are discovered by their actual VNet attachment and
@@ -274,23 +280,22 @@ Incompatible shared gateways require review of the exact resource; generated
 names are never substituted. New gateway, resolver, DNS links, explicit peerings,
 and common-VNet Bastion Developer effects are visible before approval.
 
-**This engine is not a cold-start bootstrap completion claim.** New shared hubs
-use the first-artifact Blob foundation below; explicitly supplied legacy
-factory-common ADLS `factorymeta` coordinates remain supported unchanged, with
-no automatic migration and no claim of cross-factory shared-hub protection.
+**New shared hubs require the Blob foundation stage described below.** Explicitly
+supplied legacy factory-common ADLS `factorymeta` coordinates remain supported
+unchanged, without automatic migration or cross-factory shared-hub protection.
 The prefix-first coordinator supplies minimum foundation and explicitly preserved
 networking before later common workloads. Its network12 replay requires the
 `preserve-v1-runtime-proof` zero-write contract, not a BYO flag or an assumption
 that an incremental VNet deployment preserves subnets. Integrated shared-hub
-ownership remains blocked as described above. Missing prerequisites are blockers,
-not simulated success. Interrupted
+ownership remains blocked as described above. Resolve missing prerequisites before
+continuing. Interrupted
 execution retains durable local/cloud receipts and infinite physical leases;
 inspect and reconcile them explicitly. No automatic retry, rollback, lease break,
 repository publication, sign-in, or catalog mutation is performed by the engine.
 
-**23 September approved shared-hub foundation:** one GHA *or* ADO repository
-per factory is sufficient. Multiple factories can share one retained connectivity
-RG/hub/VPN in the same Dev subscription (or an external hub subscription).
+**Shared-hub foundation:** use one GitHub Actions or Azure DevOps repository per
+factory. Multiple factories can share one retained connectivity resource group,
+hub and VPN in the same Dev subscription or an external hub subscription.
 `bootstrap/lib/hub_lock_foundation.py` provides the independent first stage:
 
 - `prepare(source_root=..., tenant_id=..., hub_resource_group_id=..., location=...,
@@ -328,10 +333,11 @@ RG/hub/VPN in the same Dev subscription (or an external hub subscription).
   and rule, whether this execution created it (unknown after a lost account-PUT
   response), and whether it was reused unchanged. Existing rules must not be
   removed on reuse; no cleanup/removal is authorized by foundation approval.
-- Private transition is explicitly **pending**, with account/container scopes
-  and missing approved PE, DNS and authenticated private-path evidence. The
-  helper does not implement or claim provider-runner reachability verification
-  and never disables the approved public path while that evidence is missing.
+- The transition to private access is a **separate step** requiring an approved
+  private endpoint, DNS configuration and authenticated private-path evidence for
+  the account/container scopes. The foundation helper does not verify
+  provider-runner reachability and keeps the approved public path until the
+  required evidence is available.
   An already private account is reused unchanged only with bootstrap data-plane
   reachability; this does not certify runners.
   Receipts retain cleanup instructions: a separately approved endpoint must
@@ -364,17 +370,21 @@ ready and must succeed before resource creation. A failure, timeout or expired
 review stops storage creation and retains reconciliation evidence; it never
 unregisters the provider or silently changes subscriptions.
 
+</details>
+
+### Registered folder layout
+
 The shared starter is `bootstrap/templates/azurefactory/register.json`: a valid
 version-2 register with **zero factories**, empty configurations and empty bindings.
 It deliberately contains no example IDs, tenant/subscription values, projects,
-pipeline bindings or deployment claims. The following is an **illustrative
+pipeline bindings or deployed-resource records. The following is an **illustrative
 projection after explicit catalog configuration**, not a tree copied by bootstrap:
 
 ```text
 azurefactory\
   register.json
   factories\
-    ai-spider\
+    acme-ai\
       factory.json
       pipelines\
         ado.json
@@ -418,7 +428,7 @@ an existing register byte-for-byte after storage-envelope checks; full validatio
 of populated definitions remains the catalog API's responsibility. Malformed JSON,
 unsupported envelopes, linked paths, mixed layouts and nonempty unregistered
 destinations fail without overwriting user files. No readable projection or
-`variables.json` is manufactured. Add/import real metadata through the catalog
+`variables.json` is generated. Add or import your metadata through the catalog
 before expecting the illustrated factory, scale-set and project files.
 
 An existing sibling `aifactory\variables.json`, including a legacy Dev-only
@@ -461,9 +471,8 @@ pipelines, root bindings or existing `aifactory\variables.json`.
 ### Shell-first: new registered consumer (v1.25+ / main)
 
 Use an existing consumer Git repository with the shared source as a submodule.
-No desktop app is required. **Check the actual source before running it**:
-updating this guide or another checkout does not update your nested submodule.
-From the consumer root in Git Bash:
+No desktop app is required. **Confirm the submodule version and required
+entrypoint** before running setup. From the consumer root in Git Bash:
 
 ```bash
 git -C ./azure-enterprise-scale-ml status --short --branch
@@ -472,15 +481,15 @@ test -f ./azure-enterprise-scale-ml/01-start-v125-and-above.sh
 bash ./azure-enterprise-scale-ml/01-start-v125-and-above.sh
 ```
 
-If the file is missing, stop: that checkout is stale. Obtain the approved source
+If the file is missing, obtain a compatible approved source version
 through your normal reviewed Git workflow, preserving local edits; do not fall
 back to `00-start.sh` or `124`. An explicitly reviewed separate source checkout can
 also be invoked from the consumer root with `--consumer-root "$PWD"`. The command
 prints its source path, branch, commit, dirty status and helper-payload digest;
 it never fetches, checks out a branch, pulls, commits or pushes.
-That report identifies the **local helper payload**, not a certification that a
-published release or API binary contains it. The factory's separately selected
-source version is reviewed during configuration and frozen for runtime execution.
+That report identifies the **local helper payload**. The factory's separately
+selected source version is reviewed during configuration and frozen for runtime
+execution.
 
 This new entrypoint installs `azurefactory.sh`, both scoped provider wrappers,
 their supporting libraries and the same Python SDK/CLI locally, then initializes
@@ -490,8 +499,8 @@ helper refresh: changed helper files are backed up under `.aifactory-backups`,
 while register configuration, projections, saved versions, workflows, `.env`
 and an existing `.gitignore` remain untouched. `--refresh-only` skips register
 initialization. Review ignore rules yourself and keep backups/receipts private.
-It does not run the old destructive template copier and refuses a legacy
-`aifactory` destination rather than silently migrating it.
+It does not run the legacy template copier or overwrite a legacy `aifactory`
+destination. Use explicit migration for an existing legacy repository.
 
 **Start the supported API without opening a GUI.** The CLI is a client, not a
 second catalog writer. Run `bash ./azurefactory.sh api instructions` for the
@@ -499,11 +508,11 @@ startup/discovery instructions. In a separate terminal use your approved current
 Tkinter backend checkout, install its documented Python prerequisites, set
 `AIFACTORY_API_KEY` privately, and run `python -m src.api`. Its default address is
 `http://127.0.0.1:8765`. Set the same key in your client terminal and set
-`AIFACTORY_API_URL` only when using another authorized address. Do not scrape a
-desktop process or assume a stale MAUI port. A current server implementing the
-initial-project contract is required; starting an old installed API does not
-upgrade its behavior. `doctor` and factory creation require its live OpenAPI
-`CatalogPrepare.initial_project` field; older servers fail before creation prepare.
+`AIFACTORY_API_URL` only when using another authorized address. Use the endpoint
+reported by the API's startup/discovery instructions. The server must support
+the initial-project contract: `doctor` and factory creation require its live
+OpenAPI `CatalogPrepare.initial_project` field. Update incompatible servers before
+preparing factory creation.
 
 ```bash
 bash ./azurefactory.sh health
@@ -511,8 +520,8 @@ bash ./azurefactory.sh doctor
 bash ./azurefactory.sh factory create --help
 ```
 
-**Configure a real factory next, not another empty register.** Supply your real
-approved tenant/subscription, region, prefix, network and provider; no values are
+**Configure your factory.** Supply your approved tenant/subscription, region,
+prefix, network and provider; no values are
 inferred from a signed-in Azure account. The following uses shell variables you
 set to those approved values, and a native API-host folder path (Git Bash on
 Windows: `FACTORY_FOLDER="$(cygpath -w "$PWD/azurefactory")"`):
@@ -532,7 +541,7 @@ factory, scale set and **one initial project, default `project001`**. An explici
 001 and 003. This example explicitly selects version `125`; `main` is a supported
 development choice. Omitting `--aifactory-version` delegates to the API's registered
 default, never a legacy `124` fallback. Existing saved versions are not changed by helper refresh.
-No initial tenant, subscription or project is fabricated by register initialization.
+Register initialization leaves tenant, subscription and project configuration empty.
 
 For multiple scale sets use `--scale-set-json`; if more than one submitted scale
 has the same environment, select the initial placement with `--initial-project-json`,
@@ -550,9 +559,10 @@ bash ./azurefactory.sh catalog confirm --receipt ./factory.receipt.json --yes
 bash ./azurefactory.sh catalog list --folder "$FACTORY_FOLDER"
 ```
 
-Confirmation saves real registered configuration/projections; it creates no Azure
-resources. Do not immediately add project001 again. Configure additional projects
-with `project add`, and use the returned exact UUIDs for later operations.
+Confirmation saves the registered configuration and generated projections; it
+creates no Azure resources. The initial project is already included, so add only
+additional projects with `project add`, and use the returned exact UUIDs for
+later operations.
 Enrollment, parameter review and `runtime deploy`/`runtime confirm` remain
 separate, explicitly reviewed operations. Scoped Bash execution still requires
 the protected manifest and existing binding, source and approval checks.
@@ -608,8 +618,8 @@ that does not replace the new register layout.
 
 Existing installations are never migrated automatically. Preview migration into
 a separate empty `azurefactory` folder and confirm it explicitly; the source
-configuration remains unchanged. Use a matching published app/API/provider
-version; updating this guide does not update an installed binary.
+configuration remains unchanged. Before migrating, install compatible published
+app, API and provider versions.
 
 New registered Full bootstrap saves directly into `azurefactory`; it does not
 require a subsequent migration. Only a separately created legacy `aifactory`
@@ -621,7 +631,7 @@ Azure ownership or authorize deployment.
 [Installation and classic wizard](../../../environment_setup/install_config_wizard/readme.md)
 
 <details>
-<summary>LEGACY folder structure &amp; setup</summary>
+<summary>Legacy folder structure and setup</summary>
 
 The instructions below describe existing single-factory repositories rooted at
 `aifactory`. They remain supported; do not rename that folder in place.
@@ -638,34 +648,44 @@ repository\
 ## Existing single-factory setup
 
 > [!IMPORTANT]
-> See the new bootstrap template repository - even more automated way to setup Enterprise Scale AIFactory's. (This section is still valid and good to read)
-> [Enterprise Scale AIFactory - Template repo using the AI Factory as submodule](https://github.com/jostrm/azure-enterprise-scale-ml-usage)
+> For an automated starting point, use the
+> [AI Factory template repository](https://github.com/jostrm/azure-enterprise-scale-ml-usage),
+> which includes the shared AI Factory source as a submodule. The instructions
+> below remain applicable to existing single-factory repositories.
 
 ## Prerequisites
-[Prerequisites](../10-19/12-prerequisites-setup.md) for Azure and Azure Devops/Github
 
-### Prerequisite setup tools:  on your laptop (for both option A) Azure Devops and B) Github):
-- **Git Bash**: https://git-scm.com/downloads e.g. GNU bash, version 5.2.37 or above
-    - **Purpose**: The install script runs in bash terminal (Git bash)
-    - **Note Mac/Linux**: It has been seen that Ubuntu bash (sames that comes with Mac OS), additional libraries will be needed to be installed
-    - **Version**: 5.2.37
-    ```bash
-    bash --version
-    ```` 
-### Prerequisite setup tools: on your laptop (for Option B - Github)
-- **Github CLI**: https://cli.github.com/
-    - **Purpose**: The .env file will push those values as Github secrets and variables, and create Github environments Dev, Stage, Production
-    - **Version**: 2.71.0 or above
-        ```bash
-           gh --version
-        ```` 
-### Prerequisite (Optional But Highly Recommended) - AI Factory Configuration Wizard
+Review the [Azure and Azure DevOps/GitHub prerequisites](../10-19/12-prerequisites-setup.md)
+before starting.
+
+### Local tools for Azure DevOps and GitHub Actions
+
+Install [Git Bash](https://git-scm.com/downloads) on Windows, using GNU Bash
+5.2.37 or later. The setup scripts run in Bash. On macOS or Linux, use a
+compatible Bash installation and install the required dependencies.
+
+```bash
+bash --version
+```
+
+### Additional tool for GitHub Actions
+
+Install [GitHub CLI](https://cli.github.com/) 2.71.0 or later. The setup scripts
+use it to publish applicable `.env` values as GitHub secrets and variables and
+create the Dev, Stage and Production environments.
+
+```bash
+gh --version
+```
+
+### Optional: AI Factory Configuration Wizard
 
 For Windows 11, use the [**AI Factory Configuration Wizard (MAUI) installer and quick start**](../../../environment_setup/install_config_wizard/maui/readme.md).
 The installer includes the local Python API; a separate Python installation is not needed.
 The [classic Tkinter wizard](../../../environment_setup/install_config_wizard/readme.md) remains available for Windows, macOS, and Linux.
 
-## Setup options: 
+## Setup options
+
 For restricted teams with administrator-provided prerequisites, use the
 [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md).
 For privileged create-or-reuse provisioning, use Full bootstrap instead.
@@ -755,14 +775,18 @@ Private Resolver, and peers each AI Factory environment VNet to the access hub.
 
 > **Two common workflows**
 >
-> - **ITSM-integrated (fully automated):** Many teams integrate the AI Factory pipelines directly with their ITSM system (ServiceNow, Jira Service Management, etc.), so that project teams can "order" an AI Factory project via a self-service ticket — triggering the pipeline with 100% automation and zero manual intervention.
-> - **Core-team managed:** Other teams prefer to route tickets to the AI Factory core team, who then uses the [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md) to generate the correct configuration from the ticket information and trigger the pipeline on behalf of the requesting team.
+> - **ITSM-integrated:** Teams request projects through a self-service ticket.
+>   An authenticated integration prepares the configuration and triggers the
+>   pipeline according to the organization's approval policy.
+> - **Core-team managed:** The AI Factory core team uses the
+>   [Configuration Wizard](../../../environment_setup/install_config_wizard/readme.md)
+>   to prepare configuration from the ticket and review the pipeline execution.
 
 ### Naming constraints
 
 Azure deployment names are limited to 64 characters. When configuring prefixes in your `.env` file, keep this in mind:
-- Keep AIFACTORY_PREFIX and PROJECT_PREFIX short (6 characters or less recommended)
-- Environment-specific prefixes (DEV_NETWORK_ENV, STAGE_NETWORK_ENV, PROD_NETWORK_ENV) add to the total length
+- Keep `AIFACTORY_PREFIX` and `PROJECT_PREFIX` short (6 characters or fewer recommended)
+- Environment-specific prefixes (`DEV_NETWORK_ENV`, `STAGE_NETWORK_ENV`, `PROD_NETWORK_ENV`) add to the total length
 - Longer prefixes can cause deployment names to exceed the 64-character limit
 
 The Configuration Wizard validates prefix lengths and warns if deployment names would be truncated. If you configure prefixes manually, use shorter values to ensure all resource names deploy correctly.
@@ -775,30 +799,36 @@ The Configuration Wizard validates prefix lengths and warns if deployment names 
 
 [Setup AIFactory — Infra Automation (GitHub Actions + Bicep)](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md)
 
-## Result: 
-This is what you will get:
+## Result
+
+After deployment, use these references to understand the factory's resources and
+architecture:
 
 [AIFactory overview](../10-19/15-aifactory-overview.md)
 
 [AIFactory architecture diagrams](../10-19/11-architecture-diagrams.md) 
 
-## Advanced Configuration: Standalone VS Hub-connected centralized private DNS zones
+## Advanced configuration: standalone or hub-connected private DNS
 
-### When to choose What? 
-Recommended approach is to combine `BYOvNet` with `Hub-Connected & Centralized private DNS zones`. This enables all 4 access modes: `Peering, VPN, Bastion, Whitelisting user IP's` and separates the networking from the AI Factory common area, to your centralized Hub (Hub/Spoke).
-- **Scenarios**: Production scenario.
+### Choose a network topology
 
-But if you want simplicity or want to setup an AI Factory in an isolated bubble - not involving your Hub, choose `Standalone` mode. 
-- Standalone mode is still secured with private networking, and you can reach the UI portals (Azure AI Foundry, Azure Machine Learning) via either: `VPN, Bastion, Whitelisting user IP's`
-- **Scenarios**: 
-    1) Testing out the AI Factory accelerator
-    2) Setup an AIFactory for a temporary workshop, that needs to have high security.
-    3) If it is not possible to connect it to your HUB, for various reasons.
+For production, combine `BYOvNet` with **hub-connected networking and centralized
+private DNS zones**. This separates shared connectivity from the AI Factory
+common resources and supports peering, VPN, Bastion and approved client-IP access.
+
+Use **standalone mode** for an isolated factory that does not connect to your
+central hub, such as an evaluation or temporary workshop. Standalone mode still
+uses private networking; configure VPN, Bastion or approved client-IP access as
+appropriate to reach Azure AI Foundry and Azure Machine Learning.
 
 ### Standalone
-For `Standalone mode` using the *AI Factory common resource group* for both `Virtual Network, Network Security Groups, Private DNS zones` set the values as below: `true, subscriptionId and resourceGroupName` where your centralized Private DNS zones resides. This is usually your Hub subscription and platform-connectivity resource group.
 
-```python
+In standalone mode, the **AI Factory common resource group** contains the virtual
+network, network security groups and private DNS zones. Set
+`CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB="false"`. The hub DNS subscription and resource
+group values are required only when centralized hub DNS is enabled.
+
+```bash
   # HUB vs STANDALONE
   
   CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB="false" # <optional>Centralized DNS via Hub policy<default>false<keep-as-is> <otherwise> true, uses central private DNS zones in HUB resource group managed by Azure Policy.
@@ -806,55 +836,57 @@ For `Standalone mode` using the *AI Factory common resource group* for both `Vir
   PRIV_DNS_RESOURCE_GROUP_PARAM="<todo>" # <optional>Hub DNS resource group<default><todo>_ResourceGroup_name<mandatory> if CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB:'true' <ensure> Hub connectivity resource group.
 ```
 
-### Hub-Connected & Centralized private DNS zones
-For `Hub-connected mode` using your own *Hub resource group* for both `Private DNS zones` 
-Set values as below, e.g. where your centralized Private DNS zones resides. This is usually your Hub subscription and platform-connectivity resource group.
+### Hub-connected networking and centralized private DNS zones
+
+Set `CENTRAL_DNS_ZONE_BY_POLICY_IN_HUB="true"` and provide the subscription ID
+and resource group containing your centralized private DNS zones. These are
+typically in the hub subscription's platform-connectivity resource group.
 
 ![AI Factory Configuration Wizard](../../../environment_setup/install_config_wizard/images/aifactory-config-wizard-02.png)
 
-## Config: EntraID groups to Personas
+## Config: Microsoft Entra groups and personas
 
-How-to Create EntraID groups, Connect to Personas, Add info to seeding keyvault: 
-
-[Ask your AI Factory core team to read this](../10-19/16-ad-groups-personas.md)
+See [Microsoft Entra groups and personas](../10-19/16-ad-groups-personas.md) for
+instructions on creating groups, mapping them to personas and adding the required
+information to the seeding Key Vault.
 
 ## Config: WebApp (post deployment of WebApp)
 
-### Authentication (Webapp)
-- **Identity provider:** Microsoft EntraID
-- **Client secret setting**:  
-    - Service principal: Project specific, see project keyvault `esml-project-sp-003` 
-- **Issuer URL**: https://sts.windows.net/`your_tenantId`/v2.0
-    - See project keyvault for tenant id.
-- **Tenant requirement**
-    - Allow requests only from the issuer tenant
+### Authentication (WebApp)
 
-### Authentication (In EntraID) - API permissions
-- The service principal, Authentication page for, `esml-project-sp-003`, needs to have API permissions, delegated, in Microsoft Graph:
-    - **User.Read**
-        - Sign in an read user profile
-    - **offline_access**
-        - Maintain data you have given it access to (such as login token, if offline)
+| Setting | Value |
+|---|---|
+| Identity provider | Microsoft Entra ID |
+| Client secret | Use the project-specific service principal; see the project Key Vault entry, for example `esml-project-sp-003`. |
+| Issuer URL | `https://sts.windows.net/<your-tenant-id>/v2.0`, using the tenant ID from the project Key Vault. |
+| Tenant requirement | Allow requests only from the issuer tenant. |
 
-### Authentication (In EntraID) - Redirect URL
-Redirect url is on the same page, where checkbox is, and should be: 
- 
-https://`webapp-prj003-your-web-app-name-001`.azurewebsites.net/.auth/login/aad/callback
+### Authentication (Microsoft Entra ID): API permissions
+
+Configure the project app registration with the following delegated Microsoft
+Graph permissions:
+
+- **User.Read:** Sign in and read the user profile.
+- **offline_access:** Maintain access to data the user has authorized.
+
+### Authentication (Microsoft Entra ID): redirect URL
+
+On the app registration's **Authentication** page, configure a Web redirect URI
+using your deployed WebApp hostname:
+
+```text
+https://<your-web-app-name>.azurewebsites.net/.auth/login/aad/callback
+```
 
 ### Networking (WebApp)
-- You can choose to run the WebApp within the subnet: `snet-esml-cmn-001-scoring` 
 
-# Deprecated setup
-- Deprecated 2025-03: [Azure Devops - Classic](../10-19/13-setup-aifactory.md)
-    - No new features will be added for this option. Use YAML option instead.
-    - Very detailed setup info with screenshots (Azure Devops classic)
-        - [Setup AIFactory - Infra Automation (AzureDevops classic + BICEP)](../10-19/13-setup-aifactory.md)
+You can configure the WebApp to use the `snet-esml-cmn-001-scoring` subnet.
 
-</details>
+## Deprecated setup
 
-<details>
-<summary>Archive — original tutorial introduction, preserved before Take2</summary>
-
-> Start with [AI Factory tutorial - MAUI UX](28-tutorial-walkthrough.md), the recorded three-phase walkthrough: Tutorial Mode, the menu tour, existing-project updates, regional expansion, and reviewed API/CLI examples. It includes source-grounded Q1–Q4 answers on folder routing, platform credential storage, tutorial/API state, and source-preserving COPY migration; saved drafts and previews are not deployment success.
+The [Azure DevOps Classic setup](../10-19/13-setup-aifactory.md) was deprecated in
+March 2025 and receives no new features. Use the YAML pipeline setup for new
+deployments. The Classic guide remains available as a reference for existing
+installations.
 
 </details>

@@ -10,53 +10,63 @@ retry, cancel, approve, or redeploy a workflow. Workflow monitoring also does no
 replace the separate factory setup, deployment approval, or deployment-coordination
 requirements.
 
+Start with the [prerequisites](#prerequisites-and-scope), then use the
+[CLI examples](#cli-examples), [Python callback](#python-callback-subscription),
+or [API subscription](#api-current-status-and-sse). The
+[ITSM processing example](#itsm-processing-example) shows how to associate events
+with a change record.
+
+<details>
+<summary>Before monitoring: create a factory and dispatch a deployment</summary>
+
 ## Creating a factory is a separate workflow
 
-This chapter starts with an existing GitHub workflow run. It is **not by itself
-an end-to-end Full bootstrap tutorial**: installing the CLI and subscribing to
-events does not create a repository, identity, hub, VPN Gateway, common
-infrastructure, initial project, or laptop VPN connection.
+Workflow monitoring starts with an existing GitHub Actions run. To create a new
+factory first, follow the [end-to-end setup guide](24-end-2-end-setup.md).
+Installing the CLI and subscribing to events does not provision infrastructure
+or configure a VPN client. The following API reference summarizes the separate
+creation and deployment stages for automation authors.
 
 For a new factory, inspect the running API's `/openapi.json` and
 `azurefactory bootstrap capabilities` before selecting a creation route.
-In the current source API, `main` and v1.25+ use this sequence:
+For compatible APIs, `main` and v1.25+ use this sequence:
 
 | Phase | Factory API | Result |
 |---|---|---|
 | Prepare local configuration | `POST /api/v1/creation/prepare` with `contract_version:1`, `mode:"full-bootstrap"`, consumer `folder`, `orchestrator:"gha"`, `factory_key`, and `config` | Reviewable local configuration; no Azure deployment |
 | Confirm local configuration | `POST /api/v1/creation/confirm` with `contract_version:1`, the returned canonical `folder`, and `confirmation_id` | Saved register, scale set and initial project |
 | Prepare privileged bootstrap | `POST /api/v1/creation/workflows/prepare` with `contract_version:1`, `creation_mode:"full-bootstrap"`, exact saved `scope`, `expected_revision`, and original `bootstrap_config` | First stage's effects, commands, blockers and expiring confirmation |
-| Execute a reviewed stage | `POST /api/v1/creation/workflows/start` with `folder`, `workflow_id` and `confirmation_id` | Stage job; not proof of completed infrastructure |
+| Execute a reviewed stage | `POST /api/v1/creation/workflows/start` with `folder`, `workflow_id` and `confirmation_id` | Stage job; follow its status and verify the result |
 | Observe and review the next stage | `GET /api/v1/creation/workflows/{workflow_id}?folder=...`, then `POST /api/v1/creation/workflows/{workflow_id}/prepare-next` with `folder` and any required `connection_request` | Further separately reviewed stages; stop on blockers or uncertainty |
 | Monitor a dispatched GitHub run | The exact-run status/SSE endpoints below | Observed pipeline status and conclusion |
 
-Use the IDs and revision returned by the saved catalog, not display names or
-fabricated UUIDs. Preserve the original creation form for later stage review.
+Use the IDs and revision returned by the saved catalog rather than display names
+or sample UUIDs. Preserve the original creation form for later stage review.
 The consumer `folder` may be an existing Git repository; confirmation uses the
 canonical `azurefactory` child returned by prepare. The `config.repo_root`
 identifies the consumer repository, not that child.
 
-**Version boundary:** the current source backend rejects
+**Version compatibility:** the backend rejects
 `POST /api/v1/creation/bootstrap/prepare` for `main`/v1.25+ with HTTP 409.
-That launcher route is restricted to explicit v1.24. Consequently, an example
-using `azurefactory bootstrap prepare` or `12-full-bootstrap-gha.json` with
-`main` is not a runnable modern deployment recipe. Do not downgrade to v1.24,
-invoke a launcher directly, or switch to legacy deployment routes to bypass
-this response. Use the modern creation/workflow endpoints through the Factory
-API or `azurefactory request`; this is still a CLI/API-only workflow.
+That launcher route, including `azurefactory bootstrap prepare`, is restricted
+to explicit v1.24. For registered-layout creation, use the creation/workflow
+endpoints through the Factory API or `azurefactory request`. Resolve version
+incompatibilities before continuing; do not bypass them by switching to a legacy
+deployment route.
 
-For **an independent factory with its own hub**, use
-`access_hub_mode:"integrated"` and `setup_hub_access:true`, and leave external-hub
-references empty. `setup_hub_access:false` means **no owned hub**, not "create a
-standalone owned hub." Review non-overlapping factory, hub and VPN-client address
-ranges. Bootstrap can require additional explicit coordination/network settings;
-honor the actual stage preview rather than assuming that a saved configuration
-proves the entire topology is executable.
+Choose the network topology using the
+[setup guide](24-end-2-end-setup.md#choose-the-setup-path), including its
+[integrated-hub limitation](24-end-2-end-setup.md#current-integrated-hub-limitation).
+`access_hub_mode:"integrated"` with `setup_hub_access:true` describes an owned
+hub, but support depends on the selected release and workflow.
+`setup_hub_access:false` means **no owned hub**. Review non-overlapping factory,
+hub and VPN-client address ranges, and resolve all coordination and network
+blockers in the stage preview before execution.
 
 VPN Gateway provisioning and Azure VPN Client profile import/connection are
 different operations. `setup_hub_access` does not install/import a laptop VPN
-profile or prove connectivity. Do not promise CLI/API-only laptop VPN setup
-without a supported client-configuration operation in the running API.
+profile or verify connectivity. Configure and connect the VPN client separately
+unless the running API explicitly supports that operation.
 
 Retain each verified GitHub run ID from deployment evidence. A local
 configuration confirmation ID, bootstrap workflow UUID or job UUID is **not**
@@ -78,7 +88,7 @@ Here `--write --yes` authorizes this HTTP POST, **not** a later deployment.
 `creation.json` contains the request from the first row above. Its `config`
 uses the fields of the running API's `BootstrapConfig`, including the explicit
 subscription, tenant, region, prefix, scale/project numbers, repository,
-team identity, real cost center and network ranges. Keep the API key out of this
+team identity, cost center and network ranges. Keep the API key out of this
 file. Review `operation_mode:"configuration"`, `can_execute`, `blockers`, the
 complete `target`, `mapped_settings`, `deferred_fields` and warnings before saving.
 
@@ -100,8 +110,8 @@ azurefactory --timeout 180 request POST /api/v1/creation/workflows/prepare \
   --body-json workflow-prepare.json --write --yes > workflow-preview.json
 ```
 
-Review this **separate** privileged preview. It may create billable resources,
-identities, repository content, environments and pipeline configuration.
+Review this **separate** privileged preview. Its execution may create billable
+resources, identities, repository content, environments and pipeline configuration.
 Only an approved executable preview with no blockers can be started:
 
 ```bash
@@ -116,21 +126,63 @@ and canonical `folder`. The request acknowledges **one stage**, not all remainin
 stages. At an `awaiting-review` boundary, prepare the next stage with a separate
 `prepare-next` request and review its actual effects. A successful start response
 or CLI exit code can describe a queued job; inspect the workflow status.
-Never automate `start` immediately after every `prepare-next` without reviewing
-scope, effects, warnings, blockers and expiry.
+An automated approval policy must evaluate the scope, effects, warnings, blockers
+and expiry of every stage before authorizing `start`.
+
+### Resume monitoring after a CLI interruption
+
+Keep the canonical folder, workflow UUID, approved source commit and each stage
+response outside the consumer's tracked configuration. After a terminal or client
+session closes, reconnect to the same authorized API and read the
+saved workflow **before** submitting another write:
+
+```bash
+azurefactory request GET "/api/v1/creation/workflows/<workflow-id>" \
+  --query 'folder=C:\path\to\consumer\azurefactory'
+```
+
+- `queued` or `running`: observe the existing job; do not submit `start` again.
+- `awaiting-review`: prepare the next stage and inspect its fresh preview.
+- `blocked`: resolve the stated blocker, then prepare again without reusing an
+  expired confirmation.
+- `uncertain`: preserve the attempt's receipts and use only its supported reviewed
+  reconciliation route.
+- `succeeded`: inspect the completed stages and their receipts; VPN client
+  connectivity must be checked separately when your topology requires it.
+
+A workflow's `stage` can still name the stage that just completed while its
+message says to review the next one. Use `prepare-next` to obtain that next
+review; do not infer a new start request from the previous stage's name.
+
+A read can briefly return HTTP 409 with
+`Another catalog operation owns the configuration lock; retry.` while a
+publication is committing. Retry **only that status read**, with a bounded
+deadline. A temporary read error does not mean publication failed. Never
+repeat a mutating `start` or publication merely because its status observer
+disconnected.
+
+Preserve the API's configured ownership mode across restarts. An explicitly
+configured desktop host owner and a standalone API-key owner are not
+interchangeable. If an existing workflow unexpectedly returns HTTP 404 after a
+restart or preparation call, confirm the API's owner and connection settings
+before continuing. Preserve the workflow and its evidence rather than creating
+a replacement or changing database ownership.
+
+Active bootstrap stages must use their protected, reviewed source commit, not
+the latest `main` commit. For a "locally cached lifecycle helper" error, check
+that the required pinned source is available and that the API is using the
+correct workflow owner before changing the submodule.
 
 ### Source compatibility and stopped bootstrap runs
 
-Use mutually compatible, published backend and accelerator revisions. A developer
-checkout can contain an unpublished bundled helper even when its branch is
-named `main`. The runtime checks actual helper bytes, not just branch names.
+Use compatible, published backend and accelerator revisions. The runtime checks
+helper contents as well as source references.
 For example,
 `published-prefix-bootstrap-helper-mismatch:lib/common_network_preservation.py`
 means the API's reviewed helper differs from the requested published accelerator.
-Use a compatible clean backend checkout/build, or publish the reviewed matching
-source through the normal release process. Do not change expected hashes, copy
-unpublished helper files into the consumer, reset somebody else's working tree,
-or disable verification to make preparation pass.
+Install compatible published versions through your normal update process.
+Preserve local changes and the active workflow's source pin. Do not modify
+expected hashes, substitute unpublished helpers or disable verification.
 
 If a stage reports `status:"uncertain"`, `is_terminal:true`, and
 `requires_review:false`, stop. Preserve the workflow ID, scope/revision, start
@@ -140,23 +192,16 @@ the start, create a competing workflow, or provision missing resources directly.
 Use only a supported reconciliation operation applicable to that exact failure.
 Read-only monitoring and inventory do not authorize recovery.
 
-**Live trial, 2026-09-25:** a Full bootstrap using published backend
-`0eaf80984cc882ed8c19e5991f341109dad82bec` and accelerator `main` at
-`5175a628eb62316c2db1d0801f3d0a727fd200b0` saved a modern configuration and
-completed repository initialization. The following `minimum-foundation` stage
-became terminal `uncertain`. The status response exposed no underlying exception,
-and no native receipt for that foundation plan was present. No GitHub workflow
-run had been dispatched. This trial therefore **did not establish successful
-end-to-end provisioning, VPN connectivity, or delivery of a completion callback**.
-The API needs actionable failure evidence and a supported reconciliation path
-for this case before this chapter can claim unattended recovery. Absence of a
-receipt is not, by itself, proof that every remote side effect is absent.
+### Diagnose an interrupted bootstrap stage
+
+Use the workflow status, native receipts and catalog-scoped diagnostics together.
+A missing receipt does not establish whether a remote operation took effect.
 The legacy `/api/v1/operations/overview` route rejects a modern catalog root
 with HTTP 409; it is not a substitute for exact catalog-scoped diagnostics.
 Do not interpret that rejected inventory request as an empty Azure inventory.
 
-**Native preflight evidence:** updated prerequisite helpers retain an exclusive,
-single-use local receipt before volatile source, input and cloud revalidation.
+**Preflight receipts:** compatible prerequisite helpers retain an exclusive,
+single-use local receipt before source, input and cloud revalidation.
 Known preflight failures retain `status:"rejected"`, `phase:"preflight"`,
 `cloud_writes_started:false` and a bounded diagnostic code, while still raising
 the original failure. Reusing the same plan is refused even if that transient
@@ -166,8 +211,8 @@ Before enabling a mutating transport, the helper durably records
 write intent, not proof that a resource was created. An incomplete `preflight`
 receipt or a missing historical receipt is not a successful stage, and does not
 by itself authorize retry. Use an applicable API reconciliation operation that
-checks the original source, plan, ownership and live state. Native helper changes
-must also be included in the backend's verified bundle before the API uses them.
+checks the original source, plan, ownership and live state. The backend's
+verified helper bundle must support the required recovery operation.
 
 Provider registration GETs include Azure's mutable discovery catalogue. Native
 execution freshness excludes only `resourceTypes` and `authorizations` from
@@ -178,7 +223,7 @@ Registration state, provider identity/policy, unknown fields, all actual resourc
 observations and the exact effects/APIs remain checked. This avoids treating an
 unrelated advertised API version as a change to the reviewed resource deployment.
 
-The repaired API has a deliberately narrow legacy recovery contract:
+Where supported by the running API, the legacy foundation-recovery route is:
 `POST /api/v1/creation/workflows/{workflow_id}/prepare-foundation-recovery`,
 then `.../confirm-foundation-recovery`. It applies only to an audited
 `minimum-foundation` attempt with consumed consent and no native receipt, after
@@ -195,19 +240,44 @@ use its new confirmation ID for `start`. Recovery confirmation itself neither
 provisions resources nor proves the old attempt succeeded. It also does not
 repin the consumer submodule or rewrite the initializer's published-source proof.
 
-**Repair trial, 2026-09-25:** the audited reconciliation completed without cloud
-writes, then a separately reviewed fresh `minimum-foundation` execution succeeded:
-both resource groups, the VNet and deployment managed identity were verified in
-the native receipt. The next `prerequisites` preview stopped with
-`graph-request-failed-403`; no start was submitted for that blocked stage.
+### Resolve identity and policy prerequisites
+
+If a prerequisite preview reports `graph-request-failed-403`, verify the
+configured tenant, subscription and bootstrap identity first.
 Successful Azure Resource Manager access does not establish Microsoft Graph
 directory permissions. An authorized tenant administrator must resolve the
 denial for the bootstrap operator/application in the configured tenant before
 a fresh prerequisite review. The planner requires user/group access and, where
 selected workloads need first-party service principals, application access.
-Do not switch identities, substitute a group or bypass Graph discovery to turn
-this blocked preview into success. Hub/VPN provisioning, laptop VPN import and
-GitHub completion callbacks were still **not reached** in this repaired trial.
+Do not bypass directory checks or substitute an unreviewed identity or group.
+If the deployment target needs correcting, retain the original resources and
+history, and review the replacement scope separately.
+
+Some public-IP policies require the Azure feature
+`Microsoft.Network/AllowBringYourOwnPublicIpAddress`. If the preview identifies
+this prerequisite, use the supported feature-registration and recovery workflow
+with explicit approval. Preserve the policy and any completed operations; resume
+only the unexecuted effects authorized by the recovery preview.
+
+### Verify the Factory result as well as the Azure deployment
+
+An Azure Resource Manager deployment can succeed while Factory verification
+fails. For example, "Workflow did not reach a successful review boundary"
+requires investigation of the stage status and diagnostic receipts, not an
+automatic redeployment.
+
+Check the receipt's phase, deployment identity and diagnostic code, together with
+the protected before-state inventory and live resource state. Successful creation
+of new resources does not establish that existing resources were preserved.
+Keep the original receipt and source pin unchanged.
+
+Recovery that verifies preservation requires the complete original inventory
+matching the recorded hashes. If that evidence is unavailable, stop unless the
+installed API provides a separately reviewed recovery operation for that case.
+A helper update or a new inventory snapshot does not retroactively validate an
+older attempt, and neither authorizes replaying a succeeded deployment.
+
+</details>
 
 ## Prerequisites and scope
 
@@ -271,11 +341,10 @@ the API host before starting it. Monitoring never launches sign-in for you.
 **If you use the packaged MAUI app or an operator-managed API:** obtain the
 authorized URL and key from the host/operator instead of generating a new client
 key. MAUI starts its bundled API on a dynamically selected loopback port with a
-per-process key. Neither `8765` nor the example port `64979` is a guaranteed MAUI
-port, and connection settings may change after restart. This guide does not
-provide a MAUI key-export UI or command; do not scrape another process's
-environment. For a standalone integration without an operator-provided
-connection, use the source-backend setup above.
+per-process key, so connection settings may change after restart. Use the app's
+supported connection controls or obtain the settings from its operator. For a
+standalone integration without an operator-provided connection, use the
+source-backend setup above.
 
 See [API host and connection guidance](../../../environment_setup/install_config_wizard/api-usage-examples/readme.md#which-api)
 for the relationship between the source backend and packaged desktop API.
@@ -365,9 +434,9 @@ within the same running backend. Separate API processes are not a distributed
 leader election service: deploy a single monitoring backend per integration
 unless you explicitly coordinate multiple instances.
 
-## Does GitHub already have callbacks?
+## GitHub webhooks and API subscriptions
 
-Yes. GitHub supports `workflow_run` webhooks, including these actions:
+GitHub supports `workflow_run` webhooks, including these actions:
 
 | Event/action | Meaning |
 |---|---|
@@ -384,9 +453,8 @@ reads GitHub's REST API and publishes **observed changes** to subscribers throug
 Server-Sent Events (SSE). No public listener, inbound firewall exception, tunnel,
 or custom callback step in every workflow is needed.
 
-This is not a GitHub webhook receiver. A future signed-webhook adapter can feed
-the same event model, but webhook registration and delivery are not required by
-the implementation described here.
+These endpoints are not a GitHub webhook receiver. They require no webhook
+registration; incoming webhooks would need a separate integration.
 
 ### Status is not the result
 
@@ -494,8 +562,7 @@ not let you add an arbitrary `X-API-Key` header.
 For a portal, prefer an authenticated server-side proxy that keeps the AI Factory
 API key private and relays only authorized run events. An authorized client that
 already manages the credential can use a streaming HTTP client with headers.
-Do not disable the desktop API's access checks or expose its loopback listener
-publicly just to make a browser example work.
+Keep the desktop API's access checks enabled and its loopback listener private.
 
 ## CLI examples
 
@@ -615,34 +682,33 @@ integration logic.
 
 ## Source and release locations
 
-The purple repository carries the shared monitor in
+This repository contains the shared monitor in
 `bootstrap/lib/workflow_run_monitor.py`, CLI/SDK support under
 `environment_setup/azurefactory-cli`, tests, and this document on both `main`
 and `release/v.1.25`.
 
 The backend Python API used by the AI Factory Configuration Wizard is maintained
-separately from this SDK. MAUI and its typed client live in
-`ESAIF.ConfigWizard` and `ESAIF.DomainLayer`. Updating only a purple submodule does
-not update an already running or previously packaged desktop/API binary:
-consumers need the matching API build. An old API returning 404 is an upgrade
-requirement, not a successful subscription.
+separately from this SDK. Install compatible API and desktop app versions when
+updating the shared source or SDK; a submodule update does not update those
+installations. If a workflow endpoint returns 404, confirm the URL and API
+version before subscribing.
 
-## Tests
+<details>
+<summary>Contributor reference: workflow-monitoring tests</summary>
 
-From either purple branch checkout, using the repository's existing Python test
+From a supported branch checkout, using the repository's existing Python test
 environment:
 
 ```powershell
-python -m pytest environment_setup\unit-tests\test-bicep\unit\test_workflow_run_monitor.py -q
-python -m pytest environment_setup\azurefactory-cli\tests\test_workflow_events.py -q
+python -m pytest environment_setup\unit-tests\test-bicep\unit\test_workflow_run_monitor.py environment_setup\azurefactory-cli\tests\test_workflow_events.py -q
 ```
 
 The tests inject GitHub responses instead of calling GitHub. They cover observed
 transitions, shared reads, initial unavailability, scoped cursor replay, reruns,
-rate limiting, persistence, cancellation, and stale completion history.
-The canonical API repository additionally has `tests/test_workflow_runs.py`
-and `tests/test_workflow_run_ui.py`; the Domain/MAUI repositories have dedicated
-workflow client and ViewModel tests. These are not live deployment tests.
+rate limiting, persistence, cancellation, and stale completion history. They
+exercise monitoring behavior without deploying Azure resources.
+
+</details>
 
 ## References
 

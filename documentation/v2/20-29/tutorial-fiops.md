@@ -1,42 +1,35 @@
 # AI Factory tutorial: FinOps monitoring
 
-**Recording: 16 September 2026 · Spider consumer · native Tkinter Monitor dashboard**
+Use the **Monitor** dashboard in the Tkinter app to review resource inventory,
+model usage, quota signals and project costs. This walkthrough covers read-only
+monitoring and report generation, not deployment or cost-control actions.
+It does not change resource configuration, quotas, throttling, schedules, email
+delivery or Blob storage.
 
-This companion walkthrough covers only **Monitor**. It uses the Spider consumer's
-active legacy `aifactory` folder and live, read-only Azure observations. It is not
-a deployment tutorial: no resource configuration, quota change, schedule, email,
-blob upload, or throttling action is performed.
+## Before you begin
 
-## Tutorial assets
+Open your configured factory in the Tkinter app and select the intended project
+and environment. Existing single-factory repositories use the `aifactory` folder.
+For live reports, sign in with the Azure permissions required to read the selected
+resources and cost data. Confirm the tenant and subscription before proceeding.
 
-Keep these assets outside the repository with the local tutorial material:
-
-```text
-tutorial\
-  ppt\Tkinter-tutorial-monitoring.pptx
-  ppt\AI Factory tutorial - Monitoring.pptx
-  video\AI-Factory-tutorial-monitoring.mp4
-  video\tkinter\Tkinter-tutorial-monitoring-screen-recording.mp4
-  video\snippets\monitor-phase-1-observe.mp4
-  video\snippets\monitor-phase-2-finops.mp4
-  image-screenshots\tkinter\
-```
-
-The recording is intentionally split into two phases. Read each source and
-observation-time label before treating a chart or a table as evidence.
+Follow the two phases below: inspect current observations, then generate a
+reviewed FinOps report. Check each chart's data source and observation time.
+Sample, cached and live data serve different purposes and should not be treated
+as interchangeable.
 
 ## Phase 1: observe before acting
 
 1. Open **Dashboards > AI Factory - overview** for the configured project,
    scale-set, and environment counts. Saved plans are not deployed resources.
 2. Open **Capacity issues**. If `preflight-status.json` is absent, capacity is
-   explicitly **unknown**. No issue is not a capacity approval.
+   explicitly **unknown**. An empty issue list does not confirm available capacity.
 3. Open **Lifecycle & services**. Cached data remains labeled cached; refresh is
    the only Azure inventory collection action. Short or single observations do
    not prove an object's age.
 4. Open **Models & Quota**. Capacity and token traffic are separate signals.
-   The dashboard presents verified scoped TPM pools separately from unavailable
-   capacity evidence, never adding allocations together.
+   Review verified, scoped tokens-per-minute (TPM) pools separately from
+   unavailable capacity data; do not combine unrelated quota allocations.
 5. Use **Token popularity** for observed input plus output token totals. Choose
    **This month** or **This year** only to change the observation window, not the
    allocation or billing scope.
@@ -64,7 +57,7 @@ observation-time label before treating a chart or a table as evidence.
 
 | Report | Question answered | Important limitation |
 |---|---|---|
-| Foundry token / PAYGO / PTU | What observed account token demand exists, and what do configured pricing/PTU assumptions estimate? | Pricing, cache rate, user count, and PTU sizing are assumptions; they are not billing truth or per-model measured utilization. |
+| Foundry token / PAYGO / PTU | What is the observed account token demand, and how do pay-as-you-go (PAYGO) and provisioned throughput unit (PTU) estimates compare? | Pricing, cache rate, user count and PTU sizing are assumptions, not billed costs or measured per-model utilization. |
 | Project and cost-center showback | Which tagged project/cost center incurred billed usage in the selected period? | Showback creates visibility and accountability, not a billing transfer. A failed forecast remains unavailable. |
 | Foundry / OpenAI / AI Search usage | Which observed deployment-level request and token measurements are available? | Sessions are summed hourly activity, not period-wide distinct users. Missing telemetry is unavailable, not zero. |
 
@@ -83,24 +76,24 @@ edit a previous request. A live request requires exact target identifiers,
 dispatcher verifies the selected Azure CLI tenant/subscription before live
 execution. Azure PowerShell reports also require their own signed-in context.
 
-The live Foundry usage worker uses the selected subscription to obtain the Azure
-CLI token. Azure CLI rejects token requests that specify both `--tenant` and
-`--subscription`; strict monitoring mode continues to validate the resulting
-token tenant and object identity.
+Live Foundry usage reports authenticate against the selected subscription and
+validate the token's tenant and identity. If authentication fails, correct the
+Azure CLI context and prepare a fresh report request.
 
-## Recorded Spider evidence
+## Interpret the results
 
-The recording showed the following live observations for the selected 30-day
-period. They are examples from one consumer environment, not reusable forecasts:
+Compare metrics only when their time window, resource scope and source match.
+Use the following distinctions when interpreting a report:
 
-| Observation | Recorded value | Interpretation |
-|---|---:|---|
-| gpt-5.1 input tokens | 338,692 | Observed telemetry |
-| gpt-5.1 output tokens | 27,324 | Observed telemetry |
-| gpt-5.1 total tokens | 366,016 | Input plus output telemetry |
-| Project 001 showback actual | USD 61.43 | Azure Cost Management result for the selected period |
-| Showback forecast | Unavailable | Incomplete forecast response, never substituted with zero |
-| Verified quota pools | Unavailable | Scope/unit evidence was insufficient; no TPM fact was presented |
+| Result | How to interpret it |
+|---|---|
+| Input and output tokens | Observed telemetry for the selected scope and period, not a billing total. |
+| Total tokens | Input plus output tokens within the same observation scope. |
+| Showback actual | Azure Cost Management usage assigned to the selected project or cost center. |
+| Unavailable forecast | An incomplete or failed forecast, not zero expected spend. |
+| Unavailable quota pool | Insufficient scope or unit evidence; capacity and headroom remain unknown. |
+
+### Track a quota request
 
 The quota-ticket button remains disabled until a verified pool is selected. When
 enabled, **Request TPM for this pool** saves a private local tracking draft only;
