@@ -1,0 +1,99 @@
+parameters:
+  - name: serviceConnection
+    type: string
+  - name: service
+    type: string
+  - name: displayNamePrefix
+    type: string
+  - name: serviceCondition
+    type: string
+  - name: capacityState
+    type: string
+  - name: templateFile
+    type: string
+  - name: deploymentName
+    type: string
+
+steps:
+- task: AzureCLI@2
+  displayName: '${{ parameters.displayNamePrefix }}-attempt-1'
+  condition: and(succeeded(), ${{ parameters.serviceCondition }})
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    failOnStandardError: false
+    inlineScript: |
+      python scripts/deploy-capacity-resource.py \
+        --service "${{ parameters.service }}" --attempt 1 --provider ado \
+        --template-file "${{ parameters.templateFile }}" \
+        --parameters-file "../../../../aifactory/parameters/dynamicNetworkParams.json" \
+        --subscription "$(dev_test_prod_sub_id)" --location "$(admin_location)" \
+        --deployment-name "${{ parameters.deploymentName }}"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+  # Nonsecret variables are automatically exported (uppercased) by ADO.
+  # Explicit bindings also forward these inputs when held as secret variables.
+  env:
+    technical_admins_ad_object_id: $(technical_admins_ad_object_id)
+    technical_admins_email: $(technical_admins_email)
+    project_IP_whitelist: $(project_IP_whitelist)
+    project_service_principal_OID_seeding_kv_name: $(project_service_principal_OID_seeding_kv_name)
+    admin_bicep_kv_fw: $(admin_bicep_kv_fw)
+    admin_bicep_kv_fw_rg: $(admin_bicep_kv_fw_rg)
+    admin_bicep_input_keyvault_subscription: $(admin_bicep_input_keyvault_subscription)
+    ${{ if eq(parameters.service, 'postgresql') }}:
+      postgreSQLVersion: '17'
+
+- task: AzureCLI@2
+  displayName: '${{ parameters.displayNamePrefix }}-attempt-2'
+  condition: and(succeeded(), ${{ parameters.serviceCondition }}, eq(variables['${{ parameters.capacityState }}'], '2'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    failOnStandardError: false
+    inlineScript: |
+      python scripts/deploy-capacity-resource.py \
+        --service "${{ parameters.service }}" --attempt 2 --provider ado \
+        --template-file "${{ parameters.templateFile }}" \
+        --parameters-file "../../../../aifactory/parameters/dynamicNetworkParams.json" \
+        --subscription "$(dev_test_prod_sub_id)" --location "$(admin_location)" \
+        --deployment-name "${{ parameters.deploymentName }}"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+  env:
+    technical_admins_ad_object_id: $(technical_admins_ad_object_id)
+    technical_admins_email: $(technical_admins_email)
+    project_IP_whitelist: $(project_IP_whitelist)
+    project_service_principal_OID_seeding_kv_name: $(project_service_principal_OID_seeding_kv_name)
+    admin_bicep_kv_fw: $(admin_bicep_kv_fw)
+    admin_bicep_kv_fw_rg: $(admin_bicep_kv_fw_rg)
+    admin_bicep_input_keyvault_subscription: $(admin_bicep_input_keyvault_subscription)
+    ${{ if eq(parameters.service, 'postgresql') }}:
+      postgreSQLVersion: '17'
+
+- task: AzureCLI@2
+  displayName: '${{ parameters.displayNamePrefix }}-attempt-3'
+  condition: and(succeeded(), ${{ parameters.serviceCondition }}, eq(variables['${{ parameters.capacityState }}'], '3'))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    failOnStandardError: false
+    inlineScript: |
+      python scripts/deploy-capacity-resource.py \
+        --service "${{ parameters.service }}" --attempt 3 --provider ado \
+        --template-file "${{ parameters.templateFile }}" \
+        --parameters-file "../../../../aifactory/parameters/dynamicNetworkParams.json" \
+        --subscription "$(dev_test_prod_sub_id)" --location "$(admin_location)" \
+        --deployment-name "${{ parameters.deploymentName }}"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+  env:
+    technical_admins_ad_object_id: $(technical_admins_ad_object_id)
+    technical_admins_email: $(technical_admins_email)
+    project_IP_whitelist: $(project_IP_whitelist)
+    project_service_principal_OID_seeding_kv_name: $(project_service_principal_OID_seeding_kv_name)
+    admin_bicep_kv_fw: $(admin_bicep_kv_fw)
+    admin_bicep_kv_fw_rg: $(admin_bicep_kv_fw_rg)
+    admin_bicep_input_keyvault_subscription: $(admin_bicep_input_keyvault_subscription)
+    ${{ if eq(parameters.service, 'postgresql') }}:
+      postgreSQLVersion: '17'

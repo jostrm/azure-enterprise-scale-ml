@@ -118,7 +118,6 @@ param projectNumber string
 param location string
 @description('Optional AI Search region override. Empty deploys Search in the project region.')
 param aiSearchLocation string = ''
-var effectiveAISearchLocation = empty(aiSearchLocation) ? location : aiSearchLocation
 
 @description('Location suffix (e.g., "weu", "swc")')
 param locationSuffix string
@@ -152,6 +151,9 @@ param enableAIServices bool = true
 
 @description('Enable AI Search deployment')
 param enableAISearch bool = true
+
+@description('Deploy Search in this batch. Set false when 03b-ai-search deploys it separately; preserves implicit private Foundry Search requirements.')
+param deployAISearch bool = true
 
 @description('Enable specific service deployments')
 param enableAzureOpenAI bool = false
@@ -375,10 +377,6 @@ var processedIpRulesAIServices = [for ip in ipWhitelist_array: {
   action: 'Allow'
   value: trim(ip)
 }]
-var processedIpRulesAISearch = [for ip in ipWhitelist_array: {
-  action: 'Allow'
-  value: trim(ip)
-}]
 var processedIpRulesSa = [for ip in ipWhitelist_array: {
   action: 'Allow'
   value: trim(ip)
@@ -422,9 +420,6 @@ var var_csDocIntelligence_dnsConfig = csDocIntelligence.outputs.dnsConfig
 
 #disable-next-line BCP318
 var var_csAzureOpenAI_dnsConfig = csAzureOpenAI.outputs.dnsConfig
-
-#disable-next-line BCP318
-var var_aiSearchService_dnsConfig = needsAISearch ? (!empty(aiSearchService.outputs.dnsConfig[0].name) ? aiSearchService.outputs.dnsConfig : []) : []
 
 #disable-next-line BCP318
 var var_sa4AIsearch_dnsConfig = sa4AIsearch.outputs.dnsConfig
@@ -574,7 +569,6 @@ module csDocIntelligence '../modules/csDocIntelligence.bicep' = if(enableAIDocIn
 }
 
 // ============== CMK CONFIGURATION ==============
-var cmkForAISearch = cmk && !cmkDisableForAISearch
 var cmkIdentityId = resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)
 
 // Construct Key Vault URI properly (avoid reference() function which causes deployment issues)
@@ -674,18 +668,6 @@ module sa4AIsearch '../modules/storageAccount.bicep' = if(!storageAccount2001Exi
   ]
 }
 
-// Build shared private links array for AI Search
-// Group IDs: blob, openai_account, cognitiveservices_account, foundry_account (via aiSearchSharedPrivateLinkFoundry.bicep)
-// 'account' (AI Services) removed - AI Services is included in AI Foundry, and the quota is 4 distinct group IDs.
-var sharedPrivateLinksForAISearch = enableAISearchSharedPrivateLink ? [
-  {
-    privateLinkResourceId: resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.Storage/storageAccounts', storageAccount2001Name)
-    groupId: 'blob'
-    requestMessage: 'AI Search shared private link to blob storage'
-    resourceRegion: location
-  }
-] : []
-
 // AI Search Service
 // NOTE: This module intentionally runs even when the AI Search already exists
 // (aiSearchExists=true). Gating on !aiSearchExists previously skipped the whole
@@ -694,43 +676,49 @@ var sharedPrivateLinksForAISearch = enableAISearchSharedPrivateLink ? [
 // that stale config forever. The deployment is idempotent for a stable name +
 // SKU, so re-running safely re-enforces publicNetworkAccess='Disabled' (private)
 // whenever enablePublicGenAIAccess and enablePublicAccessWithPerimeter are false.
-module aiSearchService '../modules/aiSearch.bicep' = if (needsAISearch) {
-  name: take('03-AzureAISearch4${deploymentProjSpecificUniqueSuffix}', 64)
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+module aiSearchService '../modules/services/aiSearchDeployment.bicep' = if (needsAISearch && deployAISearch) {
+  name: take('03-search-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
-    aiSearchName: safeNameAISearch
-    location: effectiveAISearchLocation
-    privateEndpointLocation: location
-    replicaCount: aiSearchReplicaCount
-    partitionCount: aiSearchPartitionCount
-    privateEndpointName: '${safeNameAISearch}-pend'
-    vnetName: vnetNameFull
-    vnetResourceGroupName: vnetResourceGroupName
-    subnetName: defaultSubnet
-    tags: tagsProject
-    semanticSearchTier: semanticSearchTier
-    publicNetworkAccess: enablePublicGenAIAccess
-    skuName: aiSearchSKUName
-    enableSharedPrivateLink: !empty(sharedPrivateLinksForAISearch)? true: false
-    sharedPrivateLinks: sharedPrivateLinksForAISearch
-    approveStorageSharedLinks: false //enableAISearchSharedPrivateLink
-    storageAccountNameForSharedLinks: enableAISearchSharedPrivateLink ? storageAccount2001Name : ''
-    approveAiServicesSharedLink: false // need to be done last in pipeline...(enableAISearchSharedPrivateLink && enableAIServices)
-    aiServicesNameForSharedLink: (enableAISearchSharedPrivateLink && enableAIServices) ? aiServicesName : ''
-    ipRules: empty(processedIpRulesAISearch) ? [] : processedIpRulesAISearch
-    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-    managedIdentities: {
-    systemAssigned: true
-    userAssignedResourceIds: union(
-      !empty(miPrjName) ? [resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)] : [],
-      !empty(miACAName) ? [resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)] : []
-      )
+    context: {
+      subscriptionId: subscriptionIdDevTestProd
+      targetResourceGroup: targetResourceGroup
+      commonResourceGroup: commonResourceGroup
+      vnetName: vnetNameFull
+      vnetResourceGroupName: vnetResourceGroupName
+      privateLinksDnsZones: privateLinksDnsZones
+      names: {
+        miPrjName: miPrjName
+        miACAName: miACAName
+        defaultSubnet: defaultSubnet
+        storageAccount2001Name: storageAccount2001Name
+        aiServicesName: aiServicesName
+        laWorkspaceName: laWorkspaceName
+      }
     }
-    // CMK encryption parameters
-    cmk: cmkForAISearch
-    cmkKeyName: cmkForAISearch ? cmkKeyName : ''
-    cmkKeyVaultUri: cmkForAISearch ? cmkKeyVaultUri : ''
-    cmkIdentityId: cmkForAISearch ? cmkIdentityId : ''
+    deploymentSuffix: deploymentProjSpecificUniqueSuffix
+    aiSearchName: safeNameAISearch
+    location: location
+    aiSearchLocation: aiSearchLocation
+    aiSearchReplicaCount: aiSearchReplicaCount
+    aiSearchPartitionCount: aiSearchPartitionCount
+    tagsProject: tagsProject
+    semanticSearchTier: semanticSearchTier
+    enablePublicGenAIAccess: enablePublicGenAIAccess
+    skuName: aiSearchSKUName
+    aiSearchExists: aiSearchExists
+    enableAISearchSharedPrivateLink: enableAISearchSharedPrivateLink
+    enableAIServices: enableAIServices
+    IPwhiteList: IPwhiteList
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
+    skipDiagAISearch: skipDiagAISearch
+    diagnosticSettingLevel: diagnosticSettingLevel
+    cmk: cmk
+    cmkDisableForAISearch: cmkDisableForAISearch
+    cmkKeyName: cmkKeyName
+    admin_bicep_kv_fw: admin_bicep_kv_fw
+    admin_bicep_kv_fw_rg: admin_bicep_kv_fw_rg
+    admin_bicep_input_keyvault_subscription: admin_bicep_input_keyvault_subscription
   }
   dependsOn: [
     projectResourceGroupExists
@@ -802,26 +790,8 @@ module getAISearchInfo '../modules/get-aisearch-info.bicep' = {
   params: {
     aiSearchName: safeNameAISearch
     aiSearchExists: aiSearchExists
-    aiSearchEnabled: needsAISearch
+    aiSearchEnabled: needsAISearch && (deployAISearch || aiSearchExists)
   }
-}
-
-// CMK RBAC: Assign Key Vault Crypto Service Encryption User role to AI Search System-Assigned MI
-// Only runs when AI Search is newly deployed (!aiSearchExists) and CMK is enabled for AI Search
-#disable-next-line BCP073
-module aiSearchCmkRbac '../modules/kvRbacSingleAssignment.bicep' = if (!aiSearchExists && needsAISearch && cmkForAISearch) {
-  name: take('03-aiSearchCmkRbac-${deploymentProjSpecificUniqueSuffix}', 64)
-  scope: resourceGroup(admin_bicep_input_keyvault_subscription, admin_bicep_kv_fw_rg)
-  params: {
-    keyVaultName: admin_bicep_kv_fw
-    principalId: aiSearchService!.outputs.principalId
-    keyVaultRoleId: 'e147488a-f6f5-4113-8e2d-b22465e65bf6' // Key Vault Crypto Service Encryption User
-    assignmentName: 'cmk-rbac-aisearch-${safeNameAISearch}'
-    principalType: 'ServicePrincipal'
-  }
-  dependsOn: [
-    aiSearchService
-  ]
 }
 
 // Azure OpenAI - with conditional AI Search principal ID
@@ -935,20 +905,6 @@ module privateDnsAzureOpenAI '../modules/privateDns.bicep' = if(!openaiExists &&
   ]
 }
 
-// AI Search Service Private DNS
-module privateDnsAiSearchService '../modules/privateDns.bicep' = if(!aiSearchExists && !centralDnsZoneByPolicyInHub && needsAISearch) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('03-privDnsAISearch${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    dnsConfig: var_aiSearchService_dnsConfig
-    privateLinksDnsZones: privateLinksDnsZones
-  }
-  dependsOn: [
-    CmnZones
-    projectResourceGroupExists
-  ]
-}
-
 // Storage for AI Search Private DNS
 module privateDnsStorageGenAI '../modules/privateDns.bicep' = if(!storageAccount2001Exists && centralDnsZoneByPolicyInHub == false) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -1045,20 +1001,6 @@ module docIntelligenceDiagnostics '../modules/diagnostics/cognitiveServicesDiagn
   }
   dependsOn: [
     csDocIntelligence
-  ]
-}
-
-// AI Search Diagnostic Settings
-module aiSearchDiagnostics '../modules/diagnostics/aiSearchDiagnostics.bicep' = if (needsAISearch && !skipDiagAISearch) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('03-diagAISearch-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    searchServiceName: safeNameAISearch
-    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
-    diagnosticSettingLevel: diagnosticSettingLevel
-  }
-  dependsOn: [
-    aiSearchService
   ]
 }
 

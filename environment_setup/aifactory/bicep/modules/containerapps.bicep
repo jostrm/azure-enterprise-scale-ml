@@ -17,6 +17,8 @@ param wlMinCountDedicated int = 1
 param wlMaxCount int = 5
 param wlProfileDedicatedName string = 'D4' // 'D4', 'D8', 'D16', 'D32', 'D64', 'E4', 'E8'
 param wlProfileGPUConsumptionName string = 'Consumption-GPU-NC24-A100'
+@allowed(['Consumption', 'D4', 'D8'])
+param workloadProfileType string = 'Consumption'
 import { managedIdentityAllType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
 @description('Optional. The managed identity definition for this resource.')
 param managedIdentities managedIdentityAllType?
@@ -42,6 +44,7 @@ module containerAppsEnvironment 'containerappsEnv.bicep' = {
     wlMaxCount: wlMaxCount
     wlProfileDedicatedName: wlProfileDedicatedName
     wlProfileGPUConsumptionName: wlProfileGPUConsumptionName
+    workloadProfileType: workloadProfileType
     managedIdentities: managedIdentities
   }
 }
@@ -50,4 +53,3 @@ output defaultDomain string = containerAppsEnvironment.outputs.defaultDomain
 output environmentName string = containerAppsEnvironment.outputs.name
 output environmentId string = containerAppsEnvironment.outputs.id
 output dnsConfig array = containerAppsEnvironment.outputs.dnsConfig
-

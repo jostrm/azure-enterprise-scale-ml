@@ -315,6 +315,7 @@ if command -v cygpath >/dev/null; then export TMPDIR="$(cygpath -u "$PF_TEST_ROO
             "PF_TEST_SEARCH_JSON": search_json or json.dumps({"value": [{"name": {"value": "basic"}, "limit": 1, "currentValue": 1}]}),
             "AIFACTORY_REPORT_TENANT_ID": TENANT, "AIFACTORY_REPORT_JOB": "services-infra",
             "ENABLE_AI_FOUNDRY": "false", "ENABLE_AI_SEARCH": "true", "ADMIN_AI_SEARCH_TIER": "basic",
+            "AISEARCH_RETRY_CAPCITY_ARRAY": "false",
             "PREFLIGHT_AZ_RETRIES": "1",
         })
         report_directory = report_directory or self.work / "reports"

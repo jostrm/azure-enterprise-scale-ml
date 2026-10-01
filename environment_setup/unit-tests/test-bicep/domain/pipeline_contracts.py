@@ -110,6 +110,10 @@ COMMON_MODULE_FLAGS = {
     "13-rgLevel.bicep": "enableAdminVM enablePublicAccessWithPerimeter enableDatafactoryCommon",
 }
 PARAMETER_ALIASES = {"enableBingSearch": "enableBing", "enableCaphost": "enableAFoundryCaphost"}
+ISOLATED_RESOURCE_FLAGS = {
+    ("04-databases.bicep", "enablePostgreSQL"),
+    ("05-compute-services.bicep", "enableContainerApps"),
+}
 
 
 def load_pipeline(path: Path) -> dict:
@@ -206,6 +210,8 @@ def forwarding_errors(pipeline: dict, platform: str, required: dict[str, str] = 
             for parameter in flags.split():
                 source = PARAMETER_ALIASES.get(parameter, parameter)
                 expected = f"$({source})" if platform == "ado" else "${{ env." + source + " }}"
+                if (module, parameter) in ISOLATED_RESOURCE_FLAGS:
+                    expected = "false"
                 actual = deployment.parameters.get(parameter)
                 if actual != expected:
                     errors.append(f"{platform}/{deployment.name}: {parameter} must forward {source}; got {actual!r}")

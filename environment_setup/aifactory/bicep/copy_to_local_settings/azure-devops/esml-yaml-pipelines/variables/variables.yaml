@@ -281,9 +281,12 @@ variables:
   # --- Cognitive Services (03) ---
   skuAISearchDev: "basic" # AI Search SKU Dev ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] ('free' not allowed with private endpoints)
   skuAISearchStageProd: "standard" # AI Search SKU Stage/Prod
-  # Three ordered candidates for future capacity fallback only (v1.25+/main); no runtime retries enabled.
+  # Compatibility JSON-array spellings. A customized alias overrides an unchanged default; conflicting custom arrays fail validation.
   skuAISearchDevArray: '["basic","standard","standard2"]'
   skuAISearchStageProdArray: '["basic","standard","standard2"]'
+  skuArrayAISearchDev: "basic,standard,standard2" # Ordered fallback SKUs; the configured Dev SKU is attempted first.
+  skuArrayAISearchStageProd: "basic,standard,standard2" # Ordered fallback SKUs; the configured Stage/Prod SKU is attempted first.
+  aisearchRetryCapcityArray: "true" # Validate all candidates' quota headroom and retry only Azure AI Search capacity failures.
   aiSearchLocation: "" # <optional>AI Search region override. Empty keeps the project region; use another supported region only when regional Search capacity is unavailable.
   skuAIServicesDev: "S0" # Azure AI Services (multi-service account) SKU Dev
   skuAIServicesStageProd: "S0" # Azure AI Services (multi-service account) SKU Stage/Prod
@@ -302,6 +305,9 @@ variables:
   # --- Databases (04) ---
   skuPostgreSQLDev: "Standard_B1ms" # PostgreSQL compute SKU Dev
   skuPostgreSQLStageProd: "Standard_B1ms" # PostgreSQL compute SKU Stage/Prod
+  skuArrayPostgreSQLDev: "Standard_B1ms,Standard_B2s,Standard_B2ms" # Ordered capacity fallback SKUs; the selected Dev SKU is attempted first.
+  skuArrayPostgreSQLStageProd: "Standard_B1ms,Standard_B2s,Standard_B2ms" # Ordered capacity fallback SKUs; the selected Stage/Prod SKU is attempted first.
+  postgreSQLRetryCapacityArray: "true" # Retry only PostgreSQL regional/SKU capacity failures, with 240 seconds before attempts 2 and 3.
   skuTierPostgreSQLDev: "Burstable" # PostgreSQL tier Dev ['Burstable','GeneralPurpose','MemoryOptimized']
   skuTierPostgreSQLStageProd: "Burstable" # PostgreSQL tier Stage/Prod
   skuRedisDev: "Standard" # Redis SKU Dev ['Basic','Standard','Premium']
@@ -321,6 +327,11 @@ variables:
   skuFunctionStageProd: "EP1" # Function plan SKU Stage/Prod
   skuTierFunctionDev: "ElasticPremium" # Function plan tier Dev
   skuTierFunctionStageProd: "ElasticPremium" # Function plan tier Stage/Prod
+  skuContainerAppsDev: "Consumption" # Container Apps workload profile Dev ['Consumption','D4','D8']
+  skuContainerAppsStageProd: "Consumption" # Container Apps workload profile Stage/Prod
+  skuArrayContainerAppsDev: "Consumption,D4,D8" # Ordered capacity fallback profiles; D4/D8 use dedicated pricing.
+  skuArrayContainerAppsStageProd: "Consumption,D4,D8" # Ordered capacity fallback profiles; D4/D8 use dedicated pricing.
+  containerAppsRetryCapacityArray: "true" # Retry only Container Apps capacity failures, with 240 seconds before attempts 2 and 3.
   # --- ML / Data platform (07) ---
   skuAzureMLDev: "basic" # Azure ML workspace SKU Dev ['basic','standard']
   skuAzureMLStageProd: "basic" # Azure ML workspace SKU Stage/Prod

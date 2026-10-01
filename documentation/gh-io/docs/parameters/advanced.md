@@ -99,6 +99,47 @@ override the workflow's final Stage/Prod `standard` fallback.
 safe rename of every workflow input. Likewise, semantic tier and Azure ML
 principal-ID compatibility spellings coexist in the template.
 
+### Capacity-only service fallbacks
+
+Both ADO and GitHub Actions isolate AI Search, PostgreSQL Flexible Server and
+Container Apps from their cognitive/database/compute batches. Each has **three
+separately visible attempt steps** immediately after its batch. Only recognized
+regional/SKU capacity failures schedule another attempt; unrelated errors fail
+immediately, and exhausted candidates fail the pipeline before downstream
+deployments. Attempts 2 and 3 wait **240 seconds at their start** when scheduled.
+Successful attempts export the effective SKU (and PostgreSQL tier) for later steps.
+The existing JSON-array names `skuAISearchDevArray` and
+`skuAISearchStageProdArray` remain supported alongside the comma-separated
+`skuArrayAISearchDev` / `skuArrayAISearchStageProd` names. A customized spelling
+takes precedence over the unchanged default; differing custom values fail
+validation rather than silently discarding either configuration.
+Container Apps detected before the run retain their existing application images
+and configuration. Retry reconciliation uses the original existence flags, so
+only resources absent at the start are reapplied unless explicitly opted in.
+
+The selected Dev or Stage/Prod SKU is tried first, followed by the remaining
+configured candidates in array order. Defaults are:
+
+| Service | Selected defaults (Dev / Stage/Prod) | Candidate arrays (both environments) | Retry switch |
+|---|---|---|---|
+| AI Search | `basic` / `standard` | `basic,standard,standard2` | `aisearchRetryCapcityArray` |
+| PostgreSQL | `Standard_B1ms` / `Standard_B1ms` | `Standard_B1ms,Standard_B2s,Standard_B2ms` | `postgreSQLRetryCapacityArray` |
+| Container Apps | `Consumption` / `Consumption` | `Consumption,D4,D8` | `containerAppsRetryCapacityArray` |
+
+Configure `skuArray<Service>Dev` / `skuArray<Service>StageProd` alongside
+`sku<Service>Dev` / `sku<Service>StageProd`. All retry switches default to `true`;
+`false` attempts only the selected SKU and fails on its first error. Keep the
+existing **`Capcity` spelling** in the AI Search switch. The generated inventory
+below lists the corresponding GitHub uppercase variable names.
+
+Attempts honor the infra phase, deletion and service/debug switches, retaining
+the cognitive/database capability-host debug override used by ADO. AI Search
+also runs when private Foundry requires it (`enableAIFoundry=true` and
+`enablePublicGenAIAccess!=true`), even if `enableAISearch=false`. Preflight quota
+headroom checks are **not a capacity guarantee**. Container Apps fallback from
+`Consumption` to `D4` or `D8` changes to **dedicated workload-profile pricing**;
+review costs before enabling these candidates.
+
 ADO has separate Dev/Stage/Prod seeding-vault coordinates and service connections.
 GHA commonly uses one seeding-vault variable name with environment-specific
 overrides. Review the collision table rather than copying one value into all
@@ -285,18 +326,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 346 |
-| `env` | 344 |
+| `yaml` | 357 |
+| `env` | 357 |
 | `bootstrap` | 86 |
 | `helper` | 17 |
 | `state` | 44 |
-| `json.dev` | 350 |
+| `json.dev` | 361 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 130, 367; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 131, 368; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 369, 393; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 135, 380; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 136, 381; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 382, 406; one reference row.
 
 ## YAML and variables.json reference
 
@@ -403,7 +444,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter json.dev:GITHUB_USE_SSH -->`GITHUB_USE_SSH` | `GITHUB_USE_SSH` | O | Y: absent<br>J.dev: `"false"` | Use SSH for git operations otherwise: true, use SSH instead of HTTPS. |
 | <!-- parameter yaml:aca_w_registry_image --><!-- parameter json.dev:aca_w_registry_image -->`aca_w_registry_image` | `ACA_W_REGISTRY_IMAGE` | O | Y: `"mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"`<br>J.dev: `"mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"` | Container Apps default image otherwise: replace with your own ACR image. |
 | <!-- parameter yaml:adminUsername --><!-- parameter json.dev:adminUsername -->`adminUsername` | `ADMIN_USERNAME` | O | Y: `"esmladmin"`<br>J.dev: `"esmladmin"` | VM admin username |
-| <!-- parameter yaml:admin_aiSearchTier --><!-- parameter json.dev:admin_aiSearchTier -->`admin_aiSearchTier` | `ADMIN_AISEARCH_TIER`, `ADMIN_AI_SEARCH_TIER` | M | Y: `"basic"`<br>J.dev: `"basic"` | AI Search SKU tier mandatory: AI Search SKU tier ensure: 'free' is not allowed when using private endpoints. ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2'] |
+| <!-- parameter yaml:admin_aiSearchTier --><!-- parameter json.dev:admin_aiSearchTier -->`admin_aiSearchTier` | `ADMIN_AISEARCH_TIER` | M | Y: `"basic"`<br>J.dev: `"basic"` | AI Search SKU tier mandatory: AI Search SKU tier ensure: 'free' is not allowed when using private endpoints. ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2'] |
 | <!-- parameter yaml:admin_aifactoryPrefixRG --><!-- parameter json.dev:admin_aifactoryPrefixRG -->`admin_aifactoryPrefixRG` | `AIFACTORY_PREFIX` | O | Y: `"mrvel-1-"`<br>J.dev: `"mrvel-1-"` | AI Factory resource group prefix keep-as-is: Max 6 chars. otherwise: set your company prefix, e.g. "acme-ai-", "contoso-". |
 | <!-- parameter yaml:admin_aifactorySuffixRG --><!-- parameter json.dev:admin_aifactorySuffixRG -->`admin_aifactorySuffixRG` | `AIFACTORY_SUFFIX` | M | Y: `"-001"`<br>J.dev: `"-001"` | AI Factory scaleset suffix mandatory: AI Factory scaleset suffix keep-as-is: For 1st scaleset. otherwise: increment to '-002', '-003' for additional scalesets. |
 | <!-- parameter yaml:admin_commonResourceSuffix --><!-- parameter json.dev:admin_commonResourceSuffix -->`admin_commonResourceSuffix` | `ADMIN_COMMON_RESOURCE_SUFFIX` | O | Y: `"-001"`<br>J.dev: `"-001"` | Common resources suffix otherwise: change to reprovision new services in the same common RG while keeping old ones. |
@@ -422,6 +463,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:aifactory_salt_random --><!-- parameter json.dev:aifactory_salt_random -->`aifactory_salt_random` | `AIFACTORY_SALT_RANDOM` | O | Y: `""`<br>J.dev: `""` | Leave empty. 10-character unique random value derived from User-Assigned Managed Identity. Auto-populated by the pipeline. keep-as-is: Leave empty. 10-character unique random value derived from User-Assigned Managed Identity. Auto-populated by the pipeline. |
 | <!-- parameter yaml:aifactory_version_major --><!-- parameter json.dev:aifactory_version_major -->`aifactory_version_major` | `AIFACTORY_VERSION_MAJOR` | O | Y: `"1"`<br>J.dev: `"1"` | AI Factory major version keep-as-is: Used to determine which bicep files to use. |
 | <!-- parameter yaml:aifactory_version_minor --><!-- parameter json.dev:aifactory_version_minor -->`aifactory_version_minor` | `AIFACTORY_VERSION_MINOR` | O | Y: `"24"`<br>J.dev: `"24"` | AI Factory minor version keep-as-is: 2025-09-20: 24 = release/v1.24 |
+| <!-- parameter yaml:aisearchRetryCapcityArray --><!-- parameter json.dev:aisearchRetryCapcityArray -->`aisearchRetryCapcityArray` | `AISEARCH_RETRY_CAPCITY_ARRAY` | O | Y: `"true"`<br>J.dev: `"true"` | Validate all candidates' quota headroom and retry only Azure AI Search capacity failures. |
 | <!-- parameter yaml:aseSku --><!-- parameter json.dev:aseSku -->`aseSku` | `ASE_SKU` | O | Y: `"IsolatedV2"`<br>J.dev: `"IsolatedV2"` | App Service Environment SKU keep-as-is: Used only if byoASEv3:'true' or a dedicated ASE is provisioned. |
 | <!-- parameter yaml:aseSkuCode --><!-- parameter json.dev:aseSkuCode -->`aseSkuCode` | `ASE_SKU_CODE` | O | Y: `"I1v2"`<br>J.dev: `"I1v2"` | App Service Environment SKU code |
 | <!-- parameter yaml:aseSkuWorkers --><!-- parameter json.dev:aseSkuWorkers -->`aseSkuWorkers` | `ASE_SKU_WORKERS` | O | Y: `1`<br>J.dev: `1` | App Service Environment worker count |
@@ -430,6 +472,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:bingCustomSearchSku --><!-- parameter json.dev:bingCustomSearchSku -->`bingCustomSearchSku` | `BING_CUSTOM_SEARCH_SKU` | O | Y: `"G2"`<br>J.dev: `"G2"` | Bing Custom Search SKU keep-as-is: ['G2'] G2 is custom search with grounding. |
 | <!-- parameter yaml:commonLakeNamePrefixMax8chars --><!-- parameter json.dev:commonLakeNamePrefixMax8chars -->`commonLakeNamePrefixMax8chars` | `COMMON_LAKE_NAME_PREFIX_MAX8CHARS` (not in .env template), `LAKE_PREFIX` | O | Y: `"mrvel"`<br>J.dev: `"mrvel"` | Data lake storage name prefix keep-as-is: Max 8 characters. |
 | <!-- parameter yaml:commonResourceGroup_param --><!-- parameter json.dev:commonResourceGroup_param -->`commonResourceGroup_param` | `COMMON_RESOURCE_GROUP_PARAM` | O | Y: `""`<br>J.dev: `""` | BYO common resource group name otherwise: provide a custom name for the common resource group. |
+| <!-- parameter yaml:containerAppsRetryCapacityArray --><!-- parameter json.dev:containerAppsRetryCapacityArray -->`containerAppsRetryCapacityArray` | `CONTAINER_APPS_RETRY_CAPACITY_ARRAY` | O | Y: `"true"`<br>J.dev: `"true"` | Retry only Container Apps capacity failures, with 240 seconds before attempts 2 and 3. |
 | <!-- parameter yaml:cosmosKind --><!-- parameter json.dev:cosmosKind -->`cosmosKind` | `COSMOS_KIND` | O | Y: `"GlobalDocumentDB"`<br>J.dev: `"GlobalDocumentDB"` | Cosmos DB kind otherwise: "MongoDB". |
 | <!-- parameter yaml:datalakeName_param --><!-- parameter json.dev:datalakeName_param -->`datalakeName_param` | `DATALAKE_NAME_PARAM` | O | Y: `""`<br>J.dev: `""` | BYO data lake storage account name otherwise: provide a custom storage account name. |
 | <!-- parameter yaml:dev_admin_bicep_input_keyvault_subscription --><!-- parameter json.dev:dev_admin_bicep_input_keyvault_subscription -->`dev_admin_bicep_input_keyvault_subscription` | `AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID` | M | Y: `"<todo>_SubID"`<br>J.dev: `"<todo>_SubID"` | DEV seeding KV subscription ID mandatory: DEV seeding KV subscription ID ensure: subscription where the DEV seeding Key Vault resides. |
@@ -443,6 +486,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:org-department-id --><!-- parameter json.dev:org-department-id -->`org-department-id` | `ORG_DEPARTMENT_ID` | O | Y: `""`<br>J.dev: `""` | Project organizational department ID keep-as-is: Text, max 128 characters, not necessarily a GUID; identical across environments. No identity or authentication effect. |
 | <!-- parameter yaml:org-department-name --><!-- parameter json.dev:org-department-name -->`org-department-name` | `ORG_DEPARTMENT_NAME` | O | Y: `""`<br>J.dev: `""` | Project organizational department name keep-as-is: Unicode text, max 200 characters; identical across environments, independent of cost center. No factory inheritance or Azure tag writes. |
 | <!-- parameter yaml:postGresAdminEmails --><!-- parameter json.dev:postGresAdminEmails -->`postGresAdminEmails` | `POSTGRES_ADMIN_EMAILS` | C | Y: `"email_adress_only"`<br>J.dev: `"email_adress_only"` | PostgreSQL admin emails mandatory: if enablePostgreSQL:'true' ensure: valid comma-separated email addresses. |
+| <!-- parameter yaml:postgreSQLRetryCapacityArray --><!-- parameter json.dev:postgreSQLRetryCapacityArray -->`postgreSQLRetryCapacityArray` | `POSTGRESQL_RETRY_CAPACITY_ARRAY` | O | Y: `"true"`<br>J.dev: `"true"` | Retry only PostgreSQL regional/SKU capacity failures, with 240 seconds before attempts 2 and 3. |
 | <!-- parameter yaml:prod_admin_bicep_input_keyvault_subscription --><!-- parameter json.dev:prod_admin_bicep_input_keyvault_subscription -->`prod_admin_bicep_input_keyvault_subscription` | `AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID` | C | Y: `"<todo>_SubID"`<br>J.dev: `"<todo>_SubID"` | PROD seeding KV subscription ID mandatory: PROD seeding KV subscription ID ensure: subscription where the PROD seeding Key Vault resides. Required when deploying that environment. |
 | <!-- parameter yaml:prod_admin_bicep_kv_fw --><!-- parameter json.dev:prod_admin_bicep_kv_fw -->`prod_admin_bicep_kv_fw` | `AIFACTORY_SEEDING_KEYVAULT_NAME` | C | Y: `"<todo>_Name_Prod"`<br>J.dev: `"<todo>_Name_Prod"` | PROD seeding KV name mandatory: PROD seeding KV name ensure: Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID. Required when deploying that environment. |
 | <!-- parameter yaml:prod_admin_bicep_kv_fw_rg --><!-- parameter json.dev:prod_admin_bicep_kv_fw_rg -->`prod_admin_bicep_kv_fw_rg` | `AIFACTORY_SEEDING_KEYVAULT_RG` | C | Y: `"<todo>_ResourceGroup_Prod"`<br>J.dev: `"<todo>_ResourceGroup_Prod"` | PROD seeding KV resource group mandatory: PROD seeding KV resource group ensure: resource group where the PROD seeding Key Vault resides. Required when deploying that environment. |
@@ -572,20 +616,28 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:aksOutboundType --><!-- parameter json.dev:aksOutboundType -->`aksOutboundType` | `AKS_OUTBOUND_TYPE` | O | Y: `"loadBalancer"`<br>J.dev: `"loadBalancer"` | AKS outbound traffic type otherwise: userDefinedRouting, if you have Azure Firewall and UDR configured. |
 | <!-- parameter yaml:aksPrivateDNSZone --><!-- parameter json.dev:aksPrivateDNSZone -->`aksPrivateDNSZone` | `AKS_PRIVATE_DNS_ZONE` | O | Y: `"system"`<br>J.dev: `"system"` | AKS private DNS zone otherwise: "none" or full resource ID of a private DNS zone. |
 | <!-- parameter yaml:aksSkuName --><!-- parameter json.dev:aksSkuName -->`aksSkuName` | `AKS_SKU_NAME` | O | Y: `"Base"`<br>J.dev: `"Base"` | AKS SKU name otherwise: "Standard" for production workloads. |
-| <!-- parameter yaml:skuAISearchDev --><!-- parameter json.dev:skuAISearchDev -->`skuAISearchDev` | `ADMIN_AISEARCH_TIER`, `SKU_AISEARCH_DEV` (not in .env template) | O | Y: `"basic"`<br>J.dev: `"basic"` | AI Search SKU Dev ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] ('free' not allowed with private endpoints) |
-| <!-- parameter yaml:skuAISearchDevArray --><!-- parameter json.dev:skuAISearchDevArray -->`skuAISearchDevArray` | No verified binding | O | Y: `"[\"basic\",\"standard\",\"standard2\"]"`<br>J.dev: `["basic","standard","standard2"]` | Sku aisearch dev array. |
-| <!-- parameter yaml:skuAISearchStageProd --><!-- parameter json.dev:skuAISearchStageProd -->`skuAISearchStageProd` | `ADMIN_AISEARCH_TIER`, `SKU_AISEARCH_STAGEPROD` (not in .env template) | O | Y: `"standard"`<br>J.dev: `"standard"` | AI Search SKU Stage/Prod |
-| <!-- parameter yaml:skuAISearchStageProdArray --><!-- parameter json.dev:skuAISearchStageProdArray -->`skuAISearchStageProdArray` | No verified binding | O | Y: `"[\"basic\",\"standard\",\"standard2\"]"`<br>J.dev: `["basic","standard","standard2"]` | Sku aisearch stage prod array. |
+| <!-- parameter yaml:skuAISearchDev --><!-- parameter json.dev:skuAISearchDev -->`skuAISearchDev` | `ADMIN_AISEARCH_TIER`, `SKU_AISEARCH_DEV` | O | Y: `"basic"`<br>J.dev: `"basic"` | AI Search SKU Dev ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] ('free' not allowed with private endpoints) |
+| <!-- parameter yaml:skuAISearchDevArray --><!-- parameter json.dev:skuAISearchDevArray -->`skuAISearchDevArray` | `SKU_AI_SEARCH_DEV_ARRAY` | O | Y: `"[\"basic\",\"standard\",\"standard2\"]"`<br>J.dev: `["basic","standard","standard2"]` | Sku aisearch dev array. |
+| <!-- parameter yaml:skuAISearchStageProd --><!-- parameter json.dev:skuAISearchStageProd -->`skuAISearchStageProd` | `ADMIN_AISEARCH_TIER`, `SKU_AISEARCH_STAGEPROD` | O | Y: `"standard"`<br>J.dev: `"standard"` | AI Search SKU Stage/Prod |
+| <!-- parameter yaml:skuAISearchStageProdArray --><!-- parameter json.dev:skuAISearchStageProdArray -->`skuAISearchStageProdArray` | `SKU_AI_SEARCH_STAGE_PROD_ARRAY` | O | Y: `"[\"basic\",\"standard\",\"standard2\"]"`<br>J.dev: `["basic","standard","standard2"]` | Sku aisearch stage prod array. |
 | <!-- parameter yaml:skuAIServicesDev --><!-- parameter json.dev:skuAIServicesDev -->`skuAIServicesDev` | `SKU_AISERVICES_DEV` | O | Y: `"S0"`<br>J.dev: `"S0"` | Azure AI Services (multi-service account) SKU Dev |
 | <!-- parameter yaml:skuAIServicesStageProd --><!-- parameter json.dev:skuAIServicesStageProd -->`skuAIServicesStageProd` | `SKU_AISERVICES_STAGEPROD` | O | Y: `"S0"`<br>J.dev: `"S0"` | Azure AI Services (multi-service account) SKU Stage/Prod |
 | <!-- parameter yaml:skuAksDev --><!-- parameter json.dev:skuAksDev -->`skuAksDev` | `SKU_AKS_DEV` | O | Y: `"Standard_D4s_v5"`<br>J.dev: `"Standard_D4s_v5"` | AKS dev node VM size keep-as-is: empty=template default Standard_B4ms. |
 | <!-- parameter yaml:skuAksStageProd --><!-- parameter json.dev:skuAksStageProd -->`skuAksStageProd` | `SKU_AKS_STAGEPROD` | O | Y: `""`<br>J.dev: `""` | AKS test/prod node VM size keep-as-is: empty=template default Standard_DS13-2_v2. |
+| <!-- parameter yaml:skuArrayAISearchDev --><!-- parameter json.dev:skuArrayAISearchDev -->`skuArrayAISearchDev` | `SKU_ARRAY_AISEARCH_DEV` | O | Y: `"basic,standard,standard2"`<br>J.dev: `"basic,standard,standard2"` | Ordered fallback SKUs; the configured Dev SKU is attempted first. |
+| <!-- parameter yaml:skuArrayAISearchStageProd --><!-- parameter json.dev:skuArrayAISearchStageProd -->`skuArrayAISearchStageProd` | `SKU_ARRAY_AISEARCH_STAGEPROD` | O | Y: `"basic,standard,standard2"`<br>J.dev: `"basic,standard,standard2"` | Ordered fallback SKUs; the configured Stage/Prod SKU is attempted first. |
+| <!-- parameter yaml:skuArrayContainerAppsDev --><!-- parameter json.dev:skuArrayContainerAppsDev -->`skuArrayContainerAppsDev` | `SKU_ARRAY_CONTAINER_APPS_DEV` | O | Y: `"Consumption,D4,D8"`<br>J.dev: `"Consumption,D4,D8"` | Ordered capacity fallback profiles; D4/D8 use dedicated pricing. |
+| <!-- parameter yaml:skuArrayContainerAppsStageProd --><!-- parameter json.dev:skuArrayContainerAppsStageProd -->`skuArrayContainerAppsStageProd` | `SKU_ARRAY_CONTAINER_APPS_STAGEPROD` | O | Y: `"Consumption,D4,D8"`<br>J.dev: `"Consumption,D4,D8"` | Ordered capacity fallback profiles; D4/D8 use dedicated pricing. |
+| <!-- parameter yaml:skuArrayPostgreSQLDev --><!-- parameter json.dev:skuArrayPostgreSQLDev -->`skuArrayPostgreSQLDev` | `SKU_ARRAY_POSTGRESQL_DEV` | O | Y: `"Standard_B1ms,Standard_B2s,Standard_B2ms"`<br>J.dev: `"Standard_B1ms,Standard_B2s,Standard_B2ms"` | Ordered capacity fallback SKUs; the selected Dev SKU is attempted first. |
+| <!-- parameter yaml:skuArrayPostgreSQLStageProd --><!-- parameter json.dev:skuArrayPostgreSQLStageProd -->`skuArrayPostgreSQLStageProd` | `SKU_ARRAY_POSTGRESQL_STAGEPROD` | O | Y: `"Standard_B1ms,Standard_B2s,Standard_B2ms"`<br>J.dev: `"Standard_B1ms,Standard_B2s,Standard_B2ms"` | Ordered capacity fallback SKUs; the selected Stage/Prod SKU is attempted first. |
 | <!-- parameter yaml:skuAzureMLDev --><!-- parameter json.dev:skuAzureMLDev -->`skuAzureMLDev` | `SKU_AZUREML_DEV` | O | Y: `"basic"`<br>J.dev: `"basic"` | Azure ML workspace SKU Dev ['basic','standard'] |
 | <!-- parameter yaml:skuAzureMLStageProd --><!-- parameter json.dev:skuAzureMLStageProd -->`skuAzureMLStageProd` | `SKU_AZUREML_STAGEPROD` | O | Y: `"basic"`<br>J.dev: `"basic"` | Azure ML workspace SKU Stage/Prod |
 | <!-- parameter yaml:skuBingDev --><!-- parameter json.dev:skuBingDev -->`skuBingDev` | `SKU_BING_DEV` | O | Y: `"G2"`<br>J.dev: `"G2"` | Bing Custom Search SKU Dev ['G2'] |
 | <!-- parameter yaml:skuBingStageProd --><!-- parameter json.dev:skuBingStageProd -->`skuBingStageProd` | `SKU_BING_STAGEPROD` | O | Y: `"G2"`<br>J.dev: `"G2"` | Bing Custom Search SKU Stage/Prod |
 | <!-- parameter yaml:skuBotServiceDev --><!-- parameter json.dev:skuBotServiceDev -->`skuBotServiceDev` | `SKU_BOTSERVICE_DEV` | O | Y: `"S1"`<br>J.dev: `"S1"` | Bot Service SKU Dev ['F0','S1'] |
 | <!-- parameter yaml:skuBotServiceStageProd --><!-- parameter json.dev:skuBotServiceStageProd -->`skuBotServiceStageProd` | `SKU_BOTSERVICE_STAGEPROD` | O | Y: `"S1"`<br>J.dev: `"S1"` | Bot Service SKU Stage/Prod |
+| <!-- parameter yaml:skuContainerAppsDev --><!-- parameter json.dev:skuContainerAppsDev -->`skuContainerAppsDev` | `SKU_CONTAINER_APPS_DEV` | O | Y: `"Consumption"`<br>J.dev: `"Consumption"` | Container Apps workload profile Dev ['Consumption','D4','D8'] |
+| <!-- parameter yaml:skuContainerAppsStageProd --><!-- parameter json.dev:skuContainerAppsStageProd -->`skuContainerAppsStageProd` | `SKU_CONTAINER_APPS_STAGEPROD` | O | Y: `"Consumption"`<br>J.dev: `"Consumption"` | Container Apps workload profile Stage/Prod |
 | <!-- parameter yaml:skuContentSafetyDev --><!-- parameter json.dev:skuContentSafetyDev -->`skuContentSafetyDev` | `SKU_CONTENTSAFETY_DEV` | O | Y: `"S0"`<br>J.dev: `"S0"` | Content Safety SKU Dev |
 | <!-- parameter yaml:skuContentSafetyStageProd --><!-- parameter json.dev:skuContentSafetyStageProd -->`skuContentSafetyStageProd` | `SKU_CONTENTSAFETY_STAGEPROD` | O | Y: `"S0"`<br>J.dev: `"S0"` | Content Safety SKU Stage/Prod |
 | <!-- parameter yaml:skuDatabricksDev --><!-- parameter json.dev:skuDatabricksDev -->`skuDatabricksDev` | `SKU_DATABRICKS_DEV` | O | Y: `"premium"`<br>J.dev: `"premium"` | Databricks SKU Dev ['trial','premium'] |
@@ -699,7 +751,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 |---|---|---|---|---|
 | <!-- parameter env:ACA_W_REGISTRY_IMAGE -->`ACA_W_REGISTRY_IMAGE` | `aca_w_registry_image` | O | `"mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"` | Container Apps default registry image |
 | <!-- parameter env:ADMIN_AISEARCH_TIER -->`ADMIN_AISEARCH_TIER` | `admin_aiSearchTier`, `skuAISearchDev`, `skuAISearchStageProd` | M | `"basic"` | AI Search SKU tier mandatory: AI Search SKU tier ensure: 'free' is not allowed when using private endpoints. ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] |
-| <!-- parameter env:ADMIN_AI_SEARCH_TIER -->`ADMIN_AI_SEARCH_TIER` | `admin_aiSearchTier` | M | `"basic"` | AI Search SKU tier mandatory: AI Search SKU tier ensure: 'free' is not allowed when using private endpoints. ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] |
+| <!-- parameter env:ADMIN_AI_SEARCH_TIER -->`ADMIN_AI_SEARCH_TIER` | No verified counterpart | M | `"basic"` | AI Search SKU tier mandatory: AI Search SKU tier ensure: 'free' is not allowed when using private endpoints. ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] |
 | <!-- parameter env:ADMIN_COMMON_RESOURCE_SUFFIX -->`ADMIN_COMMON_RESOURCE_SUFFIX` | `admin_commonResourceSuffix` | O | `"-001"` | Common resources suffix otherwise: change to reprovision new services in the same common RG while keeping old ones. |
 | <!-- parameter env:ADMIN_HYBRID_BENEFIT -->`ADMIN_HYBRID_BENEFIT` | `admin_hybridBenefit` | O | `"true"` | Azure Hybrid Benefit for VMs otherwise: true, if you have eligible Windows licenses with Software Assurance (pay-as-you-go avoided). |
 | <!-- parameter env:ADMIN_IP_FW -->`ADMIN_IP_FW` | `admin_ip_fw` | O | `""` | Admin IP for firewall rules keep-as-is: Used by GHA runner to whitelist its own IP. |
@@ -720,6 +772,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:AIFACTORY_SUFFIX -->`AIFACTORY_SUFFIX` | `admin_aifactorySuffixRG` | M | `"-001"` | AI Factory scaleset suffix mandatory: AI Factory scaleset suffix keep-as-is: For 1st scaleset. otherwise: increment to '-002', '-003' for additional scalesets. |
 | <!-- parameter env:AIFACTORY_VERSION_MAJOR -->`AIFACTORY_VERSION_MAJOR` | `aifactory_version_major` | O | `"1"` | AI Factory major version keep-as-is: Used to determine which bicep files to use. |
 | <!-- parameter env:AIFACTORY_VERSION_MINOR -->`AIFACTORY_VERSION_MINOR` | `aifactory_version_minor` | O | `"24"` | AI Factory minor version keep-as-is: 2025-09-20: 24 = release/v1.24 |
+| <!-- parameter env:AISEARCH_RETRY_CAPCITY_ARRAY -->`AISEARCH_RETRY_CAPCITY_ARRAY` | `aisearchRetryCapcityArray` | O | `"true"` | Validate every candidate quota and retry only recognized capacity failures after four minutes. |
 | <!-- parameter env:AISEARCH_SEMANTIC_TIER -->`AISEARCH_SEMANTIC_TIER` | `admin_semanticSearchTier` | M | `"free"` | Semantic search tier mandatory: Semantic search tier |
 | <!-- parameter env:AI_SEARCH_LOCATION -->`AI_SEARCH_LOCATION` | `aiSearchLocation` | O | `""` | AI Search region override. Empty keeps AIFACTORY_LOCATION. |
 | <!-- parameter env:AML_STUDIO_UI_PRIVATE -->`AML_STUDIO_UI_PRIVATE` | `AMLStudioUIPrivate` | O | `"true"` | AML Studio UI private access otherwise: false, only data plane is private; control plane is public. |
@@ -731,6 +784,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:BASTION_SUBSCRIPTION_RESOURCE_GROUP -->`BASTION_SUBSCRIPTION_RESOURCE_GROUP` | `bastion_subscription_resource_group` | O | `""` | Bastion resource group override for common RG RBAC keep-as-is: Empty uses the common resource group. |
 | <!-- parameter env:BING_CUSTOM_SEARCH_SKU -->`BING_CUSTOM_SEARCH_SKU` | `bingCustomSearchSku` | O | `"G2"` | Bing Custom Search SKU |
 | <!-- parameter env:COMMON_RESOURCE_GROUP_PARAM -->`COMMON_RESOURCE_GROUP_PARAM` | `commonResourceGroup_param` | O | `""` | BYO common resource group name otherwise: provide a custom name for the common resource group. |
+| <!-- parameter env:CONTAINER_APPS_RETRY_CAPACITY_ARRAY -->`CONTAINER_APPS_RETRY_CAPACITY_ARRAY` | `containerAppsRetryCapacityArray` | O | `"true"` | Retry only Container Apps capacity errors, waiting 240 seconds before attempts 2 and 3. |
 | <!-- parameter env:COSMOS_KIND -->`COSMOS_KIND` | `cosmosKind` | O | `"GlobalDocumentDB"` | Cosmos DB kind otherwise: MongoDB. |
 | <!-- parameter env:DATALAKE_NAME_PARAM -->`DATALAKE_NAME_PARAM` | `datalakeName_param` | O | `""` | BYO data lake storage account name otherwise: provide a custom storage account name. |
 | <!-- parameter env:DEV_SUBSCRIPTION_ID -->`DEV_SUBSCRIPTION_ID` | `dev_sub_id` | M | `"<todo>"` | DEV subscription ID mandatory: DEV subscription ID |
@@ -749,6 +803,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:MAX_RETRY_ATTEMPTS -->`MAX_RETRY_ATTEMPTS` | `maxRetryAttempts` | O | `"2"` | Maximum retry attempts keep-as-is: Valid values: 1, 2, or 3. |
 | <!-- parameter env:ORG_DEPARTMENT_ID -->`ORG_DEPARTMENT_ID` | `org-department-id` | O | `""` | Project organizational department ID keep-as-is: Text, max 128 characters, not necessarily a GUID; identical across environments. No identity or authentication effect. |
 | <!-- parameter env:ORG_DEPARTMENT_NAME -->`ORG_DEPARTMENT_NAME` | `org-department-name` | O | `""` | Project organizational department name keep-as-is: Unicode text, max 200 characters; identical across environments, independent of cost center. No factory inheritance or Azure tag writes. |
+| <!-- parameter env:POSTGRESQL_RETRY_CAPACITY_ARRAY -->`POSTGRESQL_RETRY_CAPACITY_ARRAY` | `postgreSQLRetryCapacityArray` | O | `"true"` | Retry only PostgreSQL capacity errors, waiting 240 seconds before attempts 2 and 3. |
 | <!-- parameter env:POSTGRES_ADMIN_EMAILS -->`POSTGRES_ADMIN_EMAILS` | `postGresAdminEmails` | C | `""` | PostgreSQL administrator email(s) mandatory: if ENABLE_POSTGRESQL:'true' ensure: single email address for the PostgreSQL administrator. |
 | <!-- parameter env:PROD_SUBSCRIPTION_ID -->`PROD_SUBSCRIPTION_ID` | `prod_sub_id` | C | `"<todo>"` | PROD subscription ID recommended: separate subscription from DEV. otherwise: can reuse DEV_SUBSCRIPTION_ID. Required when deploying that environment. |
 | <!-- parameter env:PROJECT_NUMBER -->`PROJECT_NUMBER` | `project_number_000` | M | `"001"` | Project number mandatory: Project number keep-as-is: For 1st project. otherwise: increment to '002', '003', etc. |
@@ -934,18 +989,28 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:AKS_SKU_NAME -->`AKS_SKU_NAME` | `aksSkuName` | O | `"Base"` | AKS SKU name otherwise: Standard for production. |
 | <!-- parameter env:AKS_SKU_TIER -->`AKS_SKU_TIER` | No verified counterpart | O | `"Standard"` | AKS SKU tier otherwise: Free or Premium. |
 | <!-- parameter env:ENABLE_AKS_FOR_AZURE_ML -->`ENABLE_AKS_FOR_AZURE_ML` | `enableAksForAzureML` | C | `"true"` | Enable AKS for Azure ML inference mandatory: if ENABLE_AZURE_MACHINE_LEARNING:'true' |
+| <!-- parameter env:SKU_AISEARCH_DEV -->`SKU_AISEARCH_DEV` | `skuAISearchDev` | O | `"basic"` | AI Search SKU for Dev. Must be included in SKU_ARRAY_AISEARCH_DEV when retry is enabled. |
+| <!-- parameter env:SKU_AISEARCH_STAGEPROD -->`SKU_AISEARCH_STAGEPROD` | `skuAISearchStageProd` | O | `"standard"` | AI Search SKU for Stage and Prod. Must be included in SKU_ARRAY_AISEARCH_STAGEPROD when retry is enabled. |
 | <!-- parameter env:SKU_AISERVICES_DEV -->`SKU_AISERVICES_DEV` | `skuAIServicesDev` | O | `"S0"` | Azure AI Services (multi-service account) SKU Dev |
 | <!-- parameter env:SKU_AISERVICES_STAGEPROD -->`SKU_AISERVICES_STAGEPROD` | `skuAIServicesStageProd` | O | `"S0"` | Azure AI Services SKU Stage/Prod |
-| <!-- parameter env:SKU_AI_SEARCH_DEV_ARRAY -->`SKU_AI_SEARCH_DEV_ARRAY` | No verified counterpart | O | `"[\"basic\",\"standard\",\"standard2\"]"` | Sku ai search dev array. |
-| <!-- parameter env:SKU_AI_SEARCH_STAGE_PROD_ARRAY -->`SKU_AI_SEARCH_STAGE_PROD_ARRAY` | No verified counterpart | O | `"[\"basic\",\"standard\",\"standard2\"]"` | Sku ai search stage prod array. |
+| <!-- parameter env:SKU_AI_SEARCH_DEV_ARRAY -->`SKU_AI_SEARCH_DEV_ARRAY` | `skuAISearchDevArray` | O | `"[\"basic\",\"standard\",\"standard2\"]"` | Sku ai search dev array. |
+| <!-- parameter env:SKU_AI_SEARCH_STAGE_PROD_ARRAY -->`SKU_AI_SEARCH_STAGE_PROD_ARRAY` | `skuAISearchStageProdArray` | O | `"[\"basic\",\"standard\",\"standard2\"]"` | Sku ai search stage prod array. |
 | <!-- parameter env:SKU_AKS_DEV -->`SKU_AKS_DEV` | `skuAksDev` | O | `""` | AKS SKU Dev keep-as-is: Leave empty for managed/auto SKU. |
 | <!-- parameter env:SKU_AKS_STAGEPROD -->`SKU_AKS_STAGEPROD` | `skuAksStageProd` | O | `""` | AKS SKU Stage/Prod |
+| <!-- parameter env:SKU_ARRAY_AISEARCH_DEV -->`SKU_ARRAY_AISEARCH_DEV` | `skuArrayAISearchDev` | O | `"basic,standard,standard2"` | Ordered Azure AI Search capacity fallback candidates (one to three SKUs). |
+| <!-- parameter env:SKU_ARRAY_AISEARCH_STAGEPROD -->`SKU_ARRAY_AISEARCH_STAGEPROD` | `skuArrayAISearchStageProd` | O | `"basic,standard,standard2"` | Ordered Azure AI Search capacity fallback candidates (one to three SKUs). |
+| <!-- parameter env:SKU_ARRAY_CONTAINER_APPS_DEV -->`SKU_ARRAY_CONTAINER_APPS_DEV` | `skuArrayContainerAppsDev` | O | `"Consumption,D4,D8"` | Ordered capacity fallback profiles; D4/D8 have dedicated pricing. |
+| <!-- parameter env:SKU_ARRAY_CONTAINER_APPS_STAGEPROD -->`SKU_ARRAY_CONTAINER_APPS_STAGEPROD` | `skuArrayContainerAppsStageProd` | O | `"Consumption,D4,D8"` | Ordered capacity fallback profiles; D4/D8 have dedicated pricing. |
+| <!-- parameter env:SKU_ARRAY_POSTGRESQL_DEV -->`SKU_ARRAY_POSTGRESQL_DEV` | `skuArrayPostgreSQLDev` | O | `"Standard_B1ms,Standard_B2s,Standard_B2ms"` | Ordered regional/SKU capacity fallback candidates; selected Dev SKU first. |
+| <!-- parameter env:SKU_ARRAY_POSTGRESQL_STAGEPROD -->`SKU_ARRAY_POSTGRESQL_STAGEPROD` | `skuArrayPostgreSQLStageProd` | O | `"Standard_B1ms,Standard_B2s,Standard_B2ms"` | Ordered regional/SKU capacity fallback candidates; selected Stage/Prod SKU first. |
 | <!-- parameter env:SKU_AZUREML_DEV -->`SKU_AZUREML_DEV` | `skuAzureMLDev` | O | `"basic"` | Azure ML workspace SKU Dev |
 | <!-- parameter env:SKU_AZUREML_STAGEPROD -->`SKU_AZUREML_STAGEPROD` | `skuAzureMLStageProd` | O | `"basic"` | Azure ML workspace SKU Stage/Prod |
 | <!-- parameter env:SKU_BING_DEV -->`SKU_BING_DEV` | `skuBingDev` | O | `"G2"` | Bing Custom Search SKU Dev keep-as-is: ['G2'] |
 | <!-- parameter env:SKU_BING_STAGEPROD -->`SKU_BING_STAGEPROD` | `skuBingStageProd` | O | `"G2"` | Bing Custom Search SKU Stage/Prod |
 | <!-- parameter env:SKU_BOTSERVICE_DEV -->`SKU_BOTSERVICE_DEV` | `skuBotServiceDev` | O | `"S1"` | Bot Service SKU Dev keep-as-is: ['F0','S1'] |
 | <!-- parameter env:SKU_BOTSERVICE_STAGEPROD -->`SKU_BOTSERVICE_STAGEPROD` | `skuBotServiceStageProd` | O | `"S1"` | Bot Service SKU Stage/Prod |
+| <!-- parameter env:SKU_CONTAINER_APPS_DEV -->`SKU_CONTAINER_APPS_DEV` | `skuContainerAppsDev` | O | `"Consumption"` | Container Apps workload profile Dev ['Consumption','D4','D8']. |
+| <!-- parameter env:SKU_CONTAINER_APPS_STAGEPROD -->`SKU_CONTAINER_APPS_STAGEPROD` | `skuContainerAppsStageProd` | O | `"Consumption"` | Container Apps workload profile Stage/Prod. |
 | <!-- parameter env:SKU_CONTENTSAFETY_DEV -->`SKU_CONTENTSAFETY_DEV` | `skuContentSafetyDev` | O | `"S0"` | Content Safety SKU Dev |
 | <!-- parameter env:SKU_CONTENTSAFETY_STAGEPROD -->`SKU_CONTENTSAFETY_STAGEPROD` | `skuContentSafetyStageProd` | O | `"S0"` | Content Safety SKU Stage/Prod |
 | <!-- parameter env:SKU_DATABRICKS_DEV -->`SKU_DATABRICKS_DEV` | `skuDatabricksDev` | O | `"premium"` | Databricks workspace SKU Dev keep-as-is: ['standard','premium','trial'] |

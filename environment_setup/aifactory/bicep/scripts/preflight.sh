@@ -6,7 +6,8 @@
 # locally) to FAIL FAST with a clear reason BEFORE any Bicep deployment starts.
 #
 # What it checks (per target subscription + region):
-#   1. Azure AI Search SKU quota         (Microsoft.Search usages REST)
+#   1. Capacity candidate configuration (Search, PostgreSQL, Container Apps)
+#      Azure AI Search SKU quota         (Microsoft.Search usages REST)
 #   2. Model deployment quota            (az cognitiveservices usage list)
 #   3. Cognitive Services quota headroom (Microsoft.CognitiveServices usages)
 #   4. Elasticsearch policy / RP block   (deny-policy heuristic + RP state)
@@ -24,7 +25,7 @@
 #
 # Exit codes:
 #   0  no FAIL findings (deploy may proceed)            -> pipeline continues
-#   1  one or more FAIL findings                        -> pipeline ABORTS
+#   1  FAIL findings or mandatory capacity validation   -> pipeline ABORTS
 #   2  non-CIDR warnings AND --strict was supplied      -> pipeline ABORTS
 # Address-planning CIDR_* findings are always advisory, including under --strict.
 #
@@ -35,6 +36,7 @@
 # =============================================================================
 
 set -uo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ai-search-capacity-retry.sh"
 
 # -----------------------------------------------------------------------------
 # 0. Defaults / flags
@@ -44,6 +46,8 @@ STRICT="false"
 # (the task still succeeds, exit 0). Temporary safety valve while the preflight
 # checks are being tuned so a false-positive cannot block deployments.
 # Override via env PREFLIGHT_WARN_ONLY=false or flag --no-warn-only to re-enable hard failures.
+# Invalid capacity configuration and unconfirmed Search retry candidate quota
+# are hard gates even in WARN_ONLY mode; explicit lookup/region skips bypass quota.
 WARN_ONLY="${PREFLIGHT_WARN_ONLY:-true}"
 SKIP="${PREFLIGHT_SKIP:-false}"
 # SKIP_AZURE: run only the static config checks (no `az` calls at all).
@@ -68,7 +72,7 @@ Usage: preflight.sh [options]
   --subscription <id>      Check only this subscription id (single env)
   --location <region>      Override Azure region (e.g. eastus2)
   --strict                 Treat non-CIDR WARN-only result as failure (exit 2)
-  --warn-only              Report FAILs but never abort the task (exit 0) [default]
+  --warn-only              Advisory FAILs (mandatory capacity gates still block) [default]
   --no-warn-only           Enforce hard failures: any FAIL aborts (exit 1)
   --skip-azure-lookups     Skip every check that needs an 'az' call (config-only)
   --skip-regional          Skip only the live regional-readiness block (quotas, provider/region)
@@ -110,6 +114,7 @@ fi
 if [ -z "$OVERRIDE_SUB" ] && [ -n "${dev_test_prod_sub_id:-}" ]; then
   OVERRIDE_SUB="$dev_test_prod_sub_id"
 fi
+[ "$ONLY_ENV" != "stage" ] || ONLY_ENV="test"
 
 # -----------------------------------------------------------------------------
 # 1. CI annotation helpers (surface WHY in the ADO / GitHub UI)
@@ -136,6 +141,9 @@ CIDR_WARN_COUNT=0
 FINDINGS=()   # "SEVERITY|CODE|MESSAGE|HINT"
 REPORT_FINDINGS=() # NUL-delimited at EXIT; preserve each finding's subscription.
 REPORT_COMPLETED="false"
+CAPACITY_CONFIG_INVALID="false"
+AI_SEARCH_RETRY_PREFLIGHT_FAILED="false"
+SEARCH_RETRY_REQUIRED="false"
 
 record_report_finding() {
   [ -n "${PREFLIGHT_REPORT_DIR:-}" ] || return 0
@@ -203,21 +211,8 @@ if [ "$SKIP" = "true" ]; then
   exit 0
 fi
 
-if ! command -v az >/dev/null 2>&1; then
-  echo "preflight: Azure CLI ('az') not found -> skipping Azure checks (non-blocking)."
-  exit 0
-fi
-if ! az account show --output none 2>/dev/null; then
-  echo "preflight: not logged in to Azure ('az account show' failed) -> skipping Azure checks (non-blocking)."
-  exit 0
-fi
-
-# Azure CLI ships with Python, so one of these is virtually always present.
+# Resolve configuration before any Azure lookup, including the login guard.
 PYBIN="$(command -v python3 2>/dev/null || command -v python 2>/dev/null || true)"
-if [ -z "$PYBIN" ]; then
-  echo "preflight: no python/python3 interpreter found -> skipping Azure checks (non-blocking)."
-  exit 0
-fi
 
 # -----------------------------------------------------------------------------
 # 4. Settings file auto-detection + parsers
@@ -286,6 +281,32 @@ getval() { # $1 camel  $2 UPPER  $3 default
   printf '%s' "$def"
 }
 
+get_capacity_value() { # Preserve explicitly empty values so validation can reject them.
+  local camel="$1" upper="$2" def="${3-}"
+  local automatic_upper="${camel^^}"
+  if [[ -v "$camel" ]]; then printf '%s' "${!camel}"; return; fi
+  if [[ -v "$automatic_upper" ]]; then printf '%s' "${!automatic_upper}"; return; fi
+  if [[ -v "$upper" ]]; then printf '%s' "${!upper}"; return; fi
+  if [ -n "$VARS_YAML" ] && grep -qE "^[[:space:]]*$camel[[:space:]]*:" "$VARS_YAML"; then
+    local val
+    val="$(grep -E "^[[:space:]]*$camel[[:space:]]*:" "$VARS_YAML" | head -n1)"
+    val="${val#*:}"
+    val="$(printf '%s' "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    # Preserve JSON arrays inside YAML strings, including escaped double quotes.
+    case "$val" in
+      \'*) val="${val#\'}"; val="${val%%\'*}" ;;
+      \"*) val="${val#\"}"; val="${val%\"*}"; val="${val//\\\"/\"}"; val="${val//\\\\/\\}" ;;
+      *) val="${val%%#*}" ;;
+    esac
+    printf '%s' "$val"; return
+  fi
+  if [ -n "$ENV_FILE" ] && grep -qE "^[[:space:]]*$upper[[:space:]]*=" "$ENV_FILE"; then
+    dotenv_get "$upper"; return
+  fi
+  [ "$#" -ge 3 ] || return 1
+  printf '%s' "$def"
+}
+
 is_true() { case "$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')" in true|1|yes|y) return 0;; *) return 1;; esac; }
 lc() { printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]'; }
 
@@ -298,7 +319,15 @@ LOCATION="$OVERRIDE_LOCATION"
 ONLY_DEV="$(getval aifactory_common_only_dev_environment AIFACTORY_COMMON_ONLY_DEV_ENVIRONMENT false)"
 
 ENABLE_AI_SEARCH="$(getval enableAISearch ENABLE_AI_SEARCH true)"
-AI_SEARCH_TIER="$(getval admin_aiSearchTier ADMIN_AI_SEARCH_TIER basic)"
+AI_SEARCH_SKU_DEV="$(get_capacity_value skuAISearchDev SKU_AISEARCH_DEV "$(getval admin_aiSearchTier ADMIN_AISEARCH_TIER basic)")"
+AI_SEARCH_SKU_STAGE_PROD="$(get_capacity_value skuAISearchStageProd SKU_AISEARCH_STAGEPROD "$(getval admin_aiSearchTier ADMIN_AISEARCH_TIER standard)")"
+AI_SEARCH_SKU_ARRAY_DEV="$(get_capacity_value skuArrayAISearchDev SKU_ARRAY_AISEARCH_DEV)" || unset AI_SEARCH_SKU_ARRAY_DEV
+AI_SEARCH_SKU_ARRAY_STAGE_PROD="$(get_capacity_value skuArrayAISearchStageProd SKU_ARRAY_AISEARCH_STAGEPROD)" || unset AI_SEARCH_SKU_ARRAY_STAGE_PROD
+AI_SEARCH_SKU_ARRAY_LEGACY_DEV="$(get_capacity_value skuAISearchDevArray SKU_AI_SEARCH_DEV_ARRAY '')"
+AI_SEARCH_SKU_ARRAY_LEGACY_STAGE_PROD="$(get_capacity_value skuAISearchStageProdArray SKU_AI_SEARCH_STAGE_PROD_ARRAY '')"
+AI_SEARCH_RETRY_CAPACITY_ARRAY="$(get_capacity_value aisearchRetryCapcityArray AISEARCH_RETRY_CAPCITY_ARRAY true)"
+AI_SEARCH_LOCATION_OVERRIDE="$(getval aiSearchLocation AI_SEARCH_LOCATION '')"
+AI_SEARCH_TIER="$AI_SEARCH_SKU_DEV"
 ENABLE_AI_FOUNDRY="$(getval enableAIFoundry ENABLE_AI_FOUNDRY true)"
 ENABLE_FOUNDRY_CAPHOST="$(getval enableAFoundryCaphost ENABLE_FOUNDRY_CAPHOST true)"
 ENABLE_AOAI="$(getval enableAzureOpenAI ENABLE_AZURE_OPENAI false)"
@@ -367,6 +396,19 @@ AKS_FW_IP="$(getval aksAzureFirewallPrivateIp AKS_AZURE_FIREWALL_PRIVATE_IP '')"
 # --- Additional service enables (DB / app / regional readiness) ---
 ENABLE_REDIS="$(getval enableRedisCache ENABLE_REDIS_CACHE false)"
 ENABLE_POSTGRES="$(getval enablePostgreSQL ENABLE_POSTGRESQL false)"
+POSTGRES_SKU_DEV="$(get_capacity_value skuPostgreSQLDev SKU_POSTGRESQL_DEV Standard_B1ms)"
+POSTGRES_SKU_STAGE_PROD="$(get_capacity_value skuPostgreSQLStageProd SKU_POSTGRESQL_STAGEPROD Standard_B1ms)"
+POSTGRES_TIER_DEV="$(get_capacity_value skuTierPostgreSQLDev SKU_TIER_POSTGRESQL_DEV Burstable)"
+POSTGRES_TIER_STAGE_PROD="$(get_capacity_value skuTierPostgreSQLStageProd SKU_TIER_POSTGRESQL_STAGEPROD Burstable)"
+POSTGRES_SKU_ARRAY_DEV="$(get_capacity_value skuArrayPostgreSQLDev SKU_ARRAY_POSTGRESQL_DEV Standard_B1ms,Standard_B2s,Standard_B2ms)"
+POSTGRES_SKU_ARRAY_STAGE_PROD="$(get_capacity_value skuArrayPostgreSQLStageProd SKU_ARRAY_POSTGRESQL_STAGEPROD Standard_B1ms,Standard_B2s,Standard_B2ms)"
+POSTGRES_RETRY_CAPACITY_ARRAY="$(get_capacity_value postgreSQLRetryCapacityArray POSTGRESQL_RETRY_CAPACITY_ARRAY true)"
+ENABLE_CONTAINER_APPS="$(getval enableContainerApps ENABLE_CONTAINER_APPS false)"
+CONTAINER_APPS_SKU_DEV="$(get_capacity_value skuContainerAppsDev SKU_CONTAINER_APPS_DEV Consumption)"
+CONTAINER_APPS_SKU_STAGE_PROD="$(get_capacity_value skuContainerAppsStageProd SKU_CONTAINER_APPS_STAGEPROD Consumption)"
+CONTAINER_APPS_SKU_ARRAY_DEV="$(get_capacity_value skuArrayContainerAppsDev SKU_ARRAY_CONTAINER_APPS_DEV Consumption,D4,D8)"
+CONTAINER_APPS_SKU_ARRAY_STAGE_PROD="$(get_capacity_value skuArrayContainerAppsStageProd SKU_ARRAY_CONTAINER_APPS_STAGEPROD Consumption,D4,D8)"
+CONTAINER_APPS_RETRY_CAPACITY_ARRAY="$(get_capacity_value containerAppsRetryCapacityArray CONTAINER_APPS_RETRY_CAPACITY_ARRAY true)"
 ENABLE_SQLDB="$(getval enableSQLDatabase ENABLE_SQL_DATABASE false)"
 ENABLE_WEBAPP="$(getval enableWebApp ENABLE_WEB_APP false)"
 ENABLE_FUNCTION="$(getval enableFunction ENABLE_FUNCTION false)"
@@ -390,14 +432,20 @@ PROD_SUB="$(getval prod_sub_id PROD_SUBSCRIPTION_ID '')"
 valid_sub() { case "$(lc "${1:-}")" in ''|*'<todo>'*|*todo*|'-') return 1;; *) return 0;; esac; }
 
 TARGETS=()  # "env|subId"
+CONFIG_ENVS=()
+if [ -n "$ONLY_ENV" ]; then
+  CONFIG_ENVS+=("$ONLY_ENV")
+else
+  CONFIG_ENVS+=(dev)
+  is_true "$ONLY_DEV" || CONFIG_ENVS+=(test prod)
+fi
 if [ -n "$OVERRIDE_SUB" ] && valid_sub "$OVERRIDE_SUB"; then
-  TARGETS+=("${ONLY_ENV:-current}|$OVERRIDE_SUB")
+  for config_env in "${CONFIG_ENVS[@]}"; do TARGETS+=("$config_env|$OVERRIDE_SUB"); done
 else
   add_target() { # $1 env  $2 sub
     [ -n "$ONLY_ENV" ] && [ "$ONLY_ENV" != "$1" ] && return 0
     valid_sub "$2" || return 0
-    # de-dup identical subscription ids
-    local t; for t in "${TARGETS[@]:-}"; do [ "${t#*|}" = "$2" ] && return 0; done
+    # Different environments can use different SKUs on the same subscription.
     TARGETS+=("$1|$2")
   }
   add_target dev "$DEV_SUB"
@@ -462,64 +510,86 @@ az_capture() { # args: az subcommand + flags
   done
 }
 
-check_ai_search_quota() { # $1 subId
+check_ai_search_quota() { # $1 subId $2 sku
   is_true "$ENABLE_AI_SEARCH" || return 0
-  local sub="$1" sku url payload limit cur avail search_discovery_valid
-  sku="$(lc "$AI_SEARCH_TIER")"
-  url="https://management.azure.com/subscriptions/$sub/providers/Microsoft.Search/locations/$LOCATION/usages?api-version=2025-05-01"
-  az_capture rest --method get --url "$url" -o json; payload="$AZ_OUT"
+  local sub="$1" sku url payload limit cur avail search_discovery_valid search_location
+  sku="$(aif_capacity_normalize "${2:-$AI_SEARCH_TIER}")"
+  local AI_SEARCH_TIER="$sku" # Report this candidate, not the original selected SKU.
+  search_location="${AI_SEARCH_LOCATION_OVERRIDE:-$LOCATION}"
+  url="https://management.azure.com/subscriptions/$sub/providers/Microsoft.Search/locations/$search_location/usages?api-version=2025-05-01"
+  local lookup_status
+  if az_capture rest --method get --url "$url" -o json; then lookup_status=0; else lookup_status=$?; fi
+  payload="$AZ_OUT"
   if [ -n "$AZ_TRANSIENT" ]; then
-    add_finding WARN SEARCH_QUOTA_UNVALIDATED "Cannot validate Azure AI Search quota in '$LOCATION' at this moment (transient Azure error/timeout after retries)." \
+    add_finding WARN SEARCH_QUOTA_UNVALIDATED "Cannot validate Azure AI Search SKU '$sku' quota in '$search_location' at this moment (transient Azure error/timeout after retries)." \
       "Re-run preflight shortly. Manual check: az rest --method get --url '$url'"
-    return 0
+    return 2
   fi
-  if [ -z "$payload" ]; then
-    add_finding WARN SEARCH_QUOTA_LOOKUP "Could not read Azure AI Search usage for '$LOCATION' (sub $sub)." \
+  if [ "$lookup_status" -ne 0 ] || [ -z "$payload" ]; then
+    add_finding WARN SEARCH_QUOTA_LOOKUP "Could not read Azure AI Search SKU '$sku' usage for '$search_location' (sub $sub)." \
       "Verify Microsoft.Search is registered and the identity has Reader on the subscription."
-    return 0
+    return 2
   fi
   # find usage entry whose name.value matches the sku (case-insensitive)
-  read -r limit cur search_discovery_valid < <(printf '%s' "$payload" | az_jq_search "$sku" | tr -d '\r')
-  # strip any stray non-digits (e.g. a CR from a Windows/Git-Bash python emitting CRLF)
-  limit="${limit//[^0-9]/}"; cur="${cur//[^0-9]/}"
-  if [ -z "$limit" ]; then
-    add_finding WARN SEARCH_SKU_UNAVAILABLE "Azure AI Search SKU '$AI_SEARCH_TIER' is not listed for '$LOCATION'." \
+  limit=""; cur=""; search_discovery_valid=""
+  read -r limit cur search_discovery_valid < <(printf '%s' "$payload" | az_jq_search "$sku" | tr -d '\r') || true
+  if [ "$search_discovery_valid" != "true" ]; then
+    add_finding WARN SEARCH_QUOTA_UNVALIDATED \
+      "Azure AI Search SKU '$sku' quota response in '$search_location' is malformed or missing numeric quota values." \
+      "Re-run preflight; the usage response must include nonnegative numeric limit and currentValue."
+    return 2
+  fi
+  if [ "$limit" = "MISSING" ]; then
+    add_finding WARN SEARCH_SKU_UNAVAILABLE "Azure AI Search SKU '$sku' is not listed for '$search_location'." \
       "Pick a supported SKU/region for Azure AI Search."
-    return 0
+    return 1
   fi
   record_report_finding PASS SEARCH_SKU_AVAILABLE "SKU listed; live capacity is not established."
-  avail=$(( limit - ${cur:-0} ))
+  avail=$(( limit - cur ))
   if [ "$limit" -le 0 ] || [ "$avail" -le 0 ]; then
     add_finding FAIL SEARCH_QUOTA_AT_LIMIT \
-      "Azure AI Search SKU '$AI_SEARCH_TIER' quota in '$LOCATION' is exhausted (used $cur of $limit)." \
+      "Azure AI Search SKU '$sku' quota in '$search_location' is exhausted (used $cur of $limit)." \
       "Request a quota increase or pick another region/SKU."
+    return 1
   else
-    echo "  [OK] AI Search '$AI_SEARCH_TIER' in $LOCATION: $avail of $limit available."
+    echo "  [OK] AI Search '$sku' in $search_location: $avail of $limit available."
     record_report_finding PASS SEARCH_QUOTA_HEADROOM "Quota headroom; live capacity is not established."
   fi
 }
 
-# helper: parse Microsoft.Search usages JSON via az/python and emit "limit currentValue"
+# Emit "limit currentValue valid"; malformed data never establishes quota headroom.
 az_jq_search() { # stdin=json  $1=sku(lower)
   local _in; _in="$(cat)"
   PF_JSON="$_in" "$PYBIN" - "$1" <<'PY' 2>/dev/null || true
-import os, sys, json
+import os, sys, json, math
 sku = sys.argv[1].lower()
 try:
     data = json.loads(os.environ.get("PF_JSON", "") or "")
-except Exception:
-    sys.exit(0)
-items = data.get("value") if isinstance(data, dict) else None
-if not isinstance(items, list):
-    sys.exit(0)
-for it in items:
-    name = (it.get("name") or {})
-    val = str(name.get("value", "")).lower()
-    if val == sku:
-        print(int(it.get("limit", 0)), int(it.get("currentValue", 0)))
-        break
-else:
-    print("MISSING MISSING true")
+    items = data.get("value") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        raise ValueError("Missing usage catalogue")
+    matches = []
+    for it in items:
+        if not isinstance(it, dict) or not isinstance(it.get("name"), dict):
+            raise ValueError("Malformed usage entry")
+        name = it["name"].get("value")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("Malformed usage name")
+        if name.strip().lower() == sku:
+            matches.append(it)
+    if not matches:
+        print("MISSING MISSING true")
+    else:
+        if len(matches) != 1:
+            raise ValueError("Ambiguous usage entry")
+        values = [matches[0].get(key) for key in ("limit", "currentValue")]
+        for value in values:
+            if (type(value) not in (int, float) or not math.isfinite(value)
+                    or value < 0 or value > 2**63 - 1 or int(value) != value):
+                raise ValueError("Invalid quota value")
+        print(int(values[0]), int(values[1]), "true")
+except (ValueError, TypeError, OverflowError):
+    print("INVALID INVALID false")
 PY
 }
 
@@ -710,6 +780,106 @@ check_resource_providers() { # $1 subId
 # 7b. STATIC config / BYO / networking / observability / security checks
 #     (no Azure calls; subscription-independent; run once)
 # =============================================================================
+
+aif_postgresql_tier() {
+  local sku
+  sku="$(aif_capacity_normalize "${1:-}")"
+  [[ "$sku" =~ ^standard_([bde])[0-9]+[a-z0-9_]*$ ]] || return 1
+  case "${BASH_REMATCH[1]}" in
+    b) printf 'burstable' ;;
+    d) printf 'generalpurpose' ;;
+    e) printf 'memoryoptimized' ;;
+  esac
+}
+
+check_capacity_profile() { # resource label, code prefix, selected, candidates, switch, optional PG tier
+  local label="$1" code="$2" selected="$3" configured="$4" retry="$5" tier="${6:-}"
+  local candidates candidate derived_tier
+  if ! candidates="$(aif_capacity_candidate_order "$selected" "$configured" "$retry" "$label" 2>&1)"; then
+    add_finding FAIL "${code}_RETRY_CONFIG_INVALID" \
+      "[$envname] $label capacity configuration is invalid: $candidates" \
+      "Use a valid retry switch and one to three unique nonempty SKUs including the selected SKU."
+    CAPACITY_CONFIG_INVALID="true"
+    return 0
+  fi
+  while IFS= read -r candidate; do
+    case "$code" in
+      SEARCH)
+        case "$candidate" in free|basic|standard|standard2|standard3|storage_optimized_l1|storage_optimized_l2) continue;; esac
+        ;;
+      POSTGRES)
+        if derived_tier="$(aif_postgresql_tier "$candidate")"; then continue; fi
+        ;;
+      CONTAINER_APPS)
+        case "$candidate" in consumption|d4|d8) continue;; esac
+        ;;
+    esac
+    add_finding FAIL "${code}_RETRY_CONFIG_INVALID" \
+      "[$envname] $label candidate '$candidate' is not a supported configuration." \
+      "PostgreSQL requires a derivable Standard_B/D/E SKU family; Container Apps supports Consumption, D4 and D8."
+    CAPACITY_CONFIG_INVALID="true"
+  done <<< "$candidates"
+  if [ "$code" = "POSTGRES" ] && derived_tier="$(aif_postgresql_tier "$selected")"; then
+    if [ "$(aif_capacity_normalize "$tier")" != "$derived_tier" ]; then
+      add_finding FAIL POSTGRES_RETRY_CONFIG_INVALID \
+        "[$envname] PostgreSQL selected SKU '$selected' requires tier '$derived_tier', not '$tier'." \
+        "Match the selected SKU tier: B=Burstable, D=GeneralPurpose, E=MemoryOptimized."
+      CAPACITY_CONFIG_INVALID="true"
+    fi
+  fi
+}
+
+check_capacity_configuration() {
+  local envname sub="" suffix
+  for envname in "${CONFIG_ENVS[@]}"; do
+    case "$envname" in
+      dev) suffix=DEV ;;
+      test|prod) suffix=STAGE_PROD ;;
+      *)
+        add_finding FAIL CAPACITY_CONFIG_INVALID "Unknown target environment '$envname'." "Use dev, test/stage or prod."
+        CAPACITY_CONFIG_INVALID="true"
+        continue
+        ;;
+    esac
+    local search_sku="AI_SEARCH_SKU_$suffix" search_array="AI_SEARCH_SKU_ARRAY_$suffix"
+    local search_legacy="AI_SEARCH_SKU_ARRAY_LEGACY_$suffix"
+    local pg_sku="POSTGRES_SKU_$suffix" pg_array="POSTGRES_SKU_ARRAY_$suffix" pg_tier="POSTGRES_TIER_$suffix"
+    local aca_sku="CONTAINER_APPS_SKU_$suffix" aca_array="CONTAINER_APPS_SKU_ARRAY_$suffix"
+    if is_true "$ENABLE_AI_SEARCH"; then
+      local AI_SEARCH_TIER="${!search_sku}"
+      local resolved_array="" resolution_valid=true
+      if aif_ai_search_retry_enabled "$AI_SEARCH_RETRY_CAPACITY_ARRAY"; then
+        SEARCH_RETRY_REQUIRED="true"
+        local -a resolver_args=(--resolve-search-array --legacy "${!search_legacy}")
+        if [[ -v "$search_array" ]]; then resolver_args+=(--primary "${!search_array}"); fi
+        if [ -z "$PYBIN" ]; then
+          resolved_array="Python is required to resolve AI Search capacity arrays."
+          resolution_valid=false
+        elif ! resolved_array="$("$PYBIN" "$SCRIPT_DIR/deploy-capacity-resource.py" "${resolver_args[@]}" 2>&1)"; then
+          resolution_valid=false
+        else
+          printf -v "$search_array" '%s' "$resolved_array"
+        fi
+        if [ "$resolution_valid" = false ]; then
+          add_finding FAIL SEARCH_RETRY_CONFIG_INVALID \
+            "[$envname] Azure AI Search capacity configuration is invalid: $resolved_array" \
+            "Set compatible skuArrayAISearch and skuAISearchArray values and ensure Python and the capacity runner are available."
+          CAPACITY_CONFIG_INVALID="true"
+        fi
+      fi
+      if [ "$resolution_valid" = true ]; then
+        check_capacity_profile "Azure AI Search" SEARCH "${!search_sku}" "${!search_array-}" "$AI_SEARCH_RETRY_CAPACITY_ARRAY"
+      fi
+    fi
+    is_true "$ENABLE_POSTGRES" && check_capacity_profile "PostgreSQL" POSTGRES "${!pg_sku}" "${!pg_array}" "$POSTGRES_RETRY_CAPACITY_ARRAY" "${!pg_tier}"
+    is_true "$ENABLE_CONTAINER_APPS" && check_capacity_profile "Container Apps" CONTAINER_APPS "${!aca_sku}" "${!aca_array}" "$CONTAINER_APPS_RETRY_CAPACITY_ARRAY"
+  done
+  if is_true "$ENABLE_POSTGRES" || is_true "$ENABLE_CONTAINER_APPS"; then
+    echo "  [INFO] PostgreSQL/Container Apps: static candidate and provider-region checks only; per-SKU quota headroom and live allocation capacity are not confirmed."
+    echo "         Container Apps environments retain Consumption alongside any selected dedicated profile."
+  fi
+  return 0
+}
 
 # A value is "unset" if empty or still holding a <todo>/<optional> placeholder
 # token. Note: <xxx> and <network_env> are legitimate pipeline templating tokens
@@ -1079,7 +1249,7 @@ echo "============================================================"
 echo "   AI Factory PREFLIGHT"
 echo "   region            : $LOCATION"
 echo "   only-dev          : $ONLY_DEV"
-echo "   AI Search         : enabled=$ENABLE_AI_SEARCH tier=$AI_SEARCH_TIER"
+echo "   AI Search         : enabled=$ENABLE_AI_SEARCH dev=$AI_SEARCH_SKU_DEV stage/prod=$AI_SEARCH_SKU_STAGE_PROD retry=$AI_SEARCH_RETRY_CAPACITY_ARRAY"
 echo "   AI Foundry        : $ENABLE_AI_FOUNDRY   capability host: $ENABLE_FOUNDRY_CAPHOST"
 echo "   Cosmos DB         : $ENABLE_COSMOS       Elasticsearch: $ENABLE_ELASTIC"
 echo "   model deployments : ${#MODELS[@]} -> ${MODELS[*]:-none}"
@@ -1087,6 +1257,9 @@ echo "   target envs       : ${TARGETS[*]:-none}"
 echo "============================================================"
 
 # --- Static config categories (subscription-independent; run once) -----------
+echo ""
+echo "=== Config: capacity retry candidates ==="
+check_capacity_configuration
 echo ""
 echo "=== Config: variables.yaml placeholders ==="
 check_config_placeholders
@@ -1114,9 +1287,40 @@ if [ "$SKIP_AZURE" = "true" ]; then
   echo "(Azure lookups skipped: --skip-azure-lookups / PREFLIGHT_SKIP_AZURE_LOOKUPS — only static config checks ran.)"
 fi
 
+AZURE_READY="true"
+if [ "$CAPACITY_CONFIG_INVALID" = "true" ]; then
+  AZURE_READY="false"
+  echo "preflight: invalid capacity configuration -> no Azure lookups performed."
+elif [ "$SKIP_AZURE" != "true" ]; then
+  azure_unavailable=""
+  if ! command -v az >/dev/null 2>&1; then
+    azure_unavailable="Azure CLI ('az') not found."
+  elif ! az account show --output none 2>/dev/null; then
+    azure_unavailable="Cannot read the current Azure account."
+  elif [ -z "$PYBIN" ]; then
+    azure_unavailable="No python/python3 interpreter found."
+  fi
+  if [ -n "$azure_unavailable" ]; then
+    AZURE_READY="false"
+    echo "preflight: $azure_unavailable Azure checks cannot run."
+    if [ "$SEARCH_RETRY_REQUIRED" = "true" ] && [ "$SKIP_REGIONAL" != "true" ]; then
+      add_finding WARN SEARCH_QUOTA_UNVALIDATED "$azure_unavailable Search candidate quota headroom cannot be confirmed." \
+        "Restore read-only Azure access, or deliberately use --skip-azure-lookups / --skip-regional."
+      AI_SEARCH_RETRY_PREFLIGHT_FAILED="true"
+    fi
+  fi
+fi
+if [ "${#TARGETS[@]}" -eq 0 ] && [ "$SEARCH_RETRY_REQUIRED" = "true" ] && \
+   [ "$SKIP_AZURE" != "true" ] && [ "$SKIP_REGIONAL" != "true" ]; then
+  add_finding WARN SEARCH_QUOTA_UNVALIDATED \
+    "No target subscription resolved; Search candidate quota headroom cannot be confirmed." \
+    "Set target subscription ids or deliberately use --skip-azure-lookups / --skip-regional."
+  AI_SEARCH_RETRY_PREFLIGHT_FAILED="true"
+fi
+
 for t in "${TARGETS[@]:-}"; do
   [ -n "$t" ] || continue
-  [ "$SKIP_AZURE" = "true" ] && break
+  if [ "$SKIP_AZURE" = "true" ] || [ "$AZURE_READY" != "true" ]; then break; fi
   envname="${t%%|*}"; sub="${t#*|}"
   echo ""
   echo "--- [$envname] subscription $sub ----------------------------------------"
@@ -1124,6 +1328,12 @@ for t in "${TARGETS[@]:-}"; do
     add_finding WARN SUB_NO_ACCESS \
       "Cannot select subscription $sub for env '$envname' (no access from this identity) — skipped." \
       "This is expected when a dev service connection cannot read test/prod. Run preflight from each environment's pipeline stage."
+    if [ "$SEARCH_RETRY_REQUIRED" = "true" ] && [ "$SKIP_REGIONAL" != "true" ]; then
+      add_finding WARN SEARCH_QUOTA_UNVALIDATED \
+        "Cannot select subscription $sub for '$envname'; Search candidate quota headroom cannot be confirmed." \
+        "Run preflight with read access to each targeted subscription."
+      AI_SEARCH_RETRY_PREFLIGHT_FAILED="true"
+    fi
     continue
   fi
 
@@ -1146,17 +1356,37 @@ for t in "${TARGETS[@]:-}"; do
   is_true "$ENABLE_WEBAPP" || is_true "$ENABLE_FUNCTION" && check_provider_region Microsoft.Web sites "Azure App Service / Functions" WEB
   is_true "$ENABLE_REDIS"     && check_provider_region Microsoft.Cache            Redis             "Azure Cache for Redis"          REDIS
   is_true "$ENABLE_POSTGRES"  && check_provider_region Microsoft.DBforPostgreSQL  flexibleServers   "Azure Database for PostgreSQL"  POSTGRES
+  is_true "$ENABLE_CONTAINER_APPS" && check_provider_region Microsoft.App managedEnvironments "Azure Container Apps environments" CONTAINER_APPS
   is_true "$ENABLE_SQLDB"     && check_provider_region Microsoft.Sql              servers           "Azure SQL Database"             SQL
   is_true "$ENABLE_ELASTIC"   && check_provider_region Microsoft.Elastic          monitors          "Elasticsearch (Elastic Cloud)"  ELASTIC
 
   echo ""
   echo "=== Regional readiness: quotas & service availability ==="
-  check_ai_search_quota "$sub"
+  if [ "$envname" = "dev" ]; then
+    AI_SEARCH_TIER="$AI_SEARCH_SKU_DEV"
+    ai_search_retry_array="${AI_SEARCH_SKU_ARRAY_DEV-}"
+  else
+    AI_SEARCH_TIER="$AI_SEARCH_SKU_STAGE_PROD"
+    ai_search_retry_array="${AI_SEARCH_SKU_ARRAY_STAGE_PROD-}"
+  fi
+  if is_true "$ENABLE_AI_SEARCH"; then
+    if ai_search_candidates="$(aif_ai_search_candidate_order "$AI_SEARCH_TIER" "$ai_search_retry_array" "$AI_SEARCH_RETRY_CAPACITY_ARRAY")"; then
+      while IFS= read -r ai_search_candidate; do
+        if ! check_ai_search_quota "$sub" "$ai_search_candidate"; then
+          if [ "$SEARCH_RETRY_REQUIRED" = "true" ]; then AI_SEARCH_RETRY_PREFLIGHT_FAILED="true"; fi
+        fi
+      done <<< "$ai_search_candidates"
+    else
+      add_finding FAIL SEARCH_RETRY_CONFIG_INVALID \
+        "Azure AI Search retry candidates must be one to three unique SKUs and include the selected SKU." \
+        "Set the selected SKU and its retry array to one to three unique Azure AI Search SKUs."
+      CAPACITY_CONFIG_INVALID="true"
+    fi
+  fi
   check_model_quota "$sub"
   check_cs_headroom "$sub"
   check_cosmos_region
 done
-
 
 # -----------------------------------------------------------------------------
 # 9. Report + exit
@@ -1172,6 +1402,17 @@ if [ "${#FINDINGS[@]}" -gt 0 ]; then
     echo " [$sev] $code: $msg"
     [ -n "$hint" ] && echo "         hint: $hint"
   done
+fi
+
+if [ "$CAPACITY_CONFIG_INVALID" = "true" ]; then
+  ci_error "Capacity retry configuration is invalid; deployment is blocked even with WARN_ONLY."
+  echo "preflight FAILED: invalid capacity retry configuration (exit 1)."
+  exit 1
+fi
+if [ "$AI_SEARCH_RETRY_PREFLIGHT_FAILED" = "true" ]; then
+  ci_error "Azure AI Search retry capacity preflight failed; every configured candidate must have confirmed quota headroom before deployment."
+  echo "preflight FAILED: Search candidate quota headroom was not confirmed (exit 1)."
+  exit 1
 fi
 
 if [ "$FAIL_COUNT" -gt 0 ]; then

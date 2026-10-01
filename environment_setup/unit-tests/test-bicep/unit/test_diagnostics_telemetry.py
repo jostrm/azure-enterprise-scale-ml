@@ -16,6 +16,8 @@ COGNITIVE_DIAGNOSTICS = BICEP / "modules/diagnostics/cognitiveServicesDiagnostic
 SEARCH_DIAGNOSTICS = BICEP / "modules/diagnostics/aiSearchDiagnostics.bicep"
 OPENAI = BICEP / "modules/csOpenAI.bicep"
 COGNITIVE_SERVICES = BICEP / "esml-genai-1/03-cognitive-services.bicep"
+SEARCH_DEPLOYMENT = BICEP / "modules/services/aiSearchDeployment.bicep"
+SEARCH_ENTRYPOINT = BICEP / "esml-genai-1/03b-ai-search.bicep"
 FOUNDRY_V4 = BICEP / "esml-genai-1/09-ai-foundry-2025-v4.bicep"
 DIAGNOSTIC_MODULES = (
     "azureMachineLearningDiagnostics",
@@ -25,7 +27,9 @@ DIAGNOSTIC_MODULES = (
 )
 GOLD_ENTRYPOINTS = (
     "03-cognitive-services.bicep",
+    "03b-ai-search.bicep",
     "05-compute-services.bicep",
+    "05b-container-apps.bicep",
     "07-ml-data-platform.bicep",
     "09-ai-foundry-2025-v3.bicep",
     "09-ai-foundry-2025-v4.bicep",
@@ -84,6 +88,8 @@ class TestDiagnosticsTelemetry(unittest.TestCase):
         cls.search_diagnostics = SEARCH_DIAGNOSTICS.read_text(encoding="utf-8")
         cls.openai = OPENAI.read_text(encoding="utf-8")
         cls.cognitive_services = COGNITIVE_SERVICES.read_text(encoding="utf-8")
+        cls.search_deployment = SEARCH_DEPLOYMENT.read_text(encoding="utf-8")
+        cls.search_entrypoint = SEARCH_ENTRYPOINT.read_text(encoding="utf-8")
         cls.foundry_v4 = FOUNDRY_V4.read_text(encoding="utf-8")
 
     def test_foundry_usage_categories_are_enabled_at_every_tier(self) -> None:
@@ -136,13 +142,26 @@ class TestDiagnosticsTelemetry(unittest.TestCase):
             self.cognitive_services,
         )
         condition = re.search(
-            r"module\s+aiSearchDiagnostics\s+'[^']+'\s*=\s*if\s*\((.*?)\)\s*\{",
-            self.cognitive_services,
+            r"module\s+diagnostics\s+'[^']*aiSearchDiagnostics\.bicep'\s*=\s*if\s*\((.*?)\)\s*\{",
+            self.search_deployment,
             re.DOTALL,
         )
         self.assertIsNotNone(condition, "AI Search diagnostics must have an explicit condition")
-        self.assertEqual(re.sub(r"\s+", "", condition.group(1)), "needsAISearch&&!skipDiagAISearch")
+        self.assertEqual(re.sub(r"\s+", "", condition.group(1)), "!skipDiagAISearch")
         self.assertNotIn("aiSearchExists", condition.group(1))
+        for source, expected in (
+            (self.cognitive_services, "needsAISearch&&deployAISearch"),
+            (self.search_entrypoint, "needsAISearch"),
+        ):
+            with self.subTest(entrypoint=expected):
+                orchestration = re.search(
+                    r"module\s+\w+\s+'[^']*aiSearchDeployment\.bicep'\s*=\s*if\s*\((.*?)\)\s*\{(.*?)\n\}",
+                    source, re.DOTALL,
+                )
+                self.assertIsNotNone(orchestration)
+                self.assertEqual(re.sub(r"\s+", "", orchestration.group(1)), expected)
+                self.assertIn("skipDiagAISearch: skipDiagAISearch", orchestration.group(2))
+                self.assertIn("diagnosticSettingLevel: diagnosticSettingLevel", orchestration.group(2))
 
     def test_affected_entrypoints_default_to_gold_without_removing_tier_options(self) -> None:
         for name in GOLD_ENTRYPOINTS:
