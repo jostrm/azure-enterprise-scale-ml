@@ -56,6 +56,24 @@ steps:
     AIFACTORY_REPORT_TENANT_ID: $(tenantId)
     admin_location: $(admin_location)
     admin_aiSearchTier: $(admin_aiSearchTier)
+    skuAISearchDev: $(skuAISearchDev)
+    skuAISearchStageProd: $(skuAISearchStageProd)
+    skuArrayAISearchDev: $(skuArrayAISearchDev)
+    skuArrayAISearchStageProd: $(skuArrayAISearchStageProd)
+    aisearchRetryCapcityArray: $(aisearchRetryCapcityArray)
+    aiSearchLocation: $(aiSearchLocation)
+    skuPostgreSQLDev: $(skuPostgreSQLDev)
+    skuPostgreSQLStageProd: $(skuPostgreSQLStageProd)
+    skuArrayPostgreSQLDev: $(skuArrayPostgreSQLDev)
+    skuArrayPostgreSQLStageProd: $(skuArrayPostgreSQLStageProd)
+    postgreSQLRetryCapacityArray: $(postgreSQLRetryCapacityArray)
+    skuTierPostgreSQLDev: $(skuTierPostgreSQLDev)
+    skuTierPostgreSQLStageProd: $(skuTierPostgreSQLStageProd)
+    skuContainerAppsDev: $(skuContainerAppsDev)
+    skuContainerAppsStageProd: $(skuContainerAppsStageProd)
+    skuArrayContainerAppsDev: $(skuArrayContainerAppsDev)
+    skuArrayContainerAppsStageProd: $(skuArrayContainerAppsStageProd)
+    containerAppsRetryCapacityArray: $(containerAppsRetryCapacityArray)
     enableAISearch: $(enableAISearch)
     enableAIFoundry: $(enableAIFoundry)
     enableAFoundryCaphost: $(enableAFoundryCaphost)
@@ -2991,6 +3009,7 @@ steps:
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters enableAIServices="$(enableAIServices)" \
      --parameters enableAISearch="$(enableAISearch)" \
+     --parameters deployAISearch=false \
      --parameters skuAISearchDev="$(skuAISearchDev)" \
      --parameters skuAISearchStageProd="$(skuAISearchStageProd)" \
      --parameters aiSearchLocation="$(aiSearchLocation)" \
@@ -3046,6 +3065,15 @@ steps:
      --parameters addAISearch="$(addAISearch)" \
      --parameters enablePublicNetworkAccessForCognitive="$(allowPublicAccessWhenBehindVnet)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- template: job-capacity-resource.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    service: ai-search
+    displayNamePrefix: '63b-ai-search'
+    serviceCondition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), or(eq(variables['enableAISearch'], 'true'), and(eq(variables['enableAIFoundry'], 'true'), ne(variables['enablePublicGenAIAccess'], 'true'))), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+    capacityState: AIF_AISEARCH_CAPACITY_NEXT
+    templateFile: 'esml-genai-1/03b-ai-search.bicep'
+    deploymentName: 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)PrjDepl-63b-ai-search'
 - task: AzureCLI@2
   displayName: '64-databases'
   condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_64_databases'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
@@ -3105,7 +3133,7 @@ steps:
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
      --parameters enableCosmosDB="$(enableCosmosDB)" \
      --parameters cosmosKind="$(cosmosKind)" \
-     --parameters enablePostgreSQL="$(enablePostgreSQL)" \
+     --parameters enablePostgreSQL=false \
      --parameters postgreSQLVersion="17" \
      --parameters enableRedisCache="$(enableRedisCache)" \
      --parameters enableSQLDatabase="$(enableSQLDatabase)" \
@@ -3133,6 +3161,15 @@ steps:
      --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
      --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- template: job-capacity-resource.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    service: postgresql
+    displayNamePrefix: '64b-postgresql'
+    serviceCondition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enablePostgreSQL'], 'true'), or(ne(variables['debug_disable_64_databases'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+    capacityState: AIF_POSTGRESQL_CAPACITY_NEXT
+    templateFile: 'esml-genai-1/04b-postgresql.bicep'
+    deploymentName: 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)PrjDepl-64b-postgresql'
 - task: AzureCLI@2
   displayName: '65-compute-services'
   condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_65_compute_services'], 'true'), succeeded())
@@ -3198,7 +3235,7 @@ steps:
      --parameters applicationInsightExists="$(applicationInsightExists)" \
      --parameters randomValue="$(deployment_random_value)" \
      --parameters aifactorySalt10char="$(aifactory_salt_random)" \
-     --parameters enableContainerApps="$(enableContainerApps)" \
+     --parameters enableContainerApps=false \
      --parameters enableFunction="$(enableFunction)" \
      --parameters enableWebApp="$(enableWebApp)" \
      --parameters enableBingSearch="$(enableBing)" \
@@ -3234,6 +3271,15 @@ steps:
      --parameters aksOutboundType="$(aksOutboundType)" \
      --parameters aksPrivateDNSZone="$(aksPrivateDNSZone)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- template: job-capacity-resource.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    service: container-apps
+    displayNamePrefix: '65b-container-apps'
+    serviceCondition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['enableContainerApps'], 'true'), ne(variables['debug_disable_65_compute_services'], 'true'))
+    capacityState: AIF_CONTAINERAPPS_CAPACITY_NEXT
+    templateFile: 'esml-genai-1/05b-container-apps.bicep'
+    deploymentName: 'esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)PrjDepl-65b-container-apps'
 - task: AzureCLI@2
   displayName: '66-ai-platform'
   condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_66_ai_platform'], 'true'), succeeded())

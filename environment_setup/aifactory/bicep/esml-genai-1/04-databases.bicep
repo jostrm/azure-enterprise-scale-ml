@@ -358,8 +358,6 @@ var spAndMiArray = spAndMI2Array.outputs.spAndMiArray
 #disable-next-line BCP318
 var var_cosmosdb_dnsConfig = cosmosdb.outputs.dnsConfig
 #disable-next-line BCP318
-var var_postgreSQL_dnsConfig = postgreSQL.outputs.dnsConfig
-#disable-next-line BCP318
 var var_redisCache_dnsConfig = redisCache.outputs.dnsConfig
 #disable-next-line BCP318
 var var_sqlServer_dnsConfig = sqlServer.outputs.dnsConfig
@@ -501,60 +499,47 @@ module privateDnsCosmos '../modules/privateDns.bicep' = if(!cosmosDBExists && !c
 
 // ============== POSTGRESQL ==============
 
-module postgreSQL '../modules/databases/postgreSQL/pgFlexibleServer.bicep' = if(!postgreSQLExists && enablePostgreSQL) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('04-PostgreSQL4${deploymentProjSpecificUniqueSuffix}', 64)
+module postgreSQL '../modules/services/postgresqlDeployment.bicep' = if(!postgreSQLExists && enablePostgreSQL) {
+  name: take('04-postgresql-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
-    name: postgreSQLName
+    context: {
+      subscriptionId: subscriptionIdDevTestProd
+      targetResourceGroup: targetResourceGroup
+      commonResourceGroup: commonResourceGroup
+      vnetName: vnetNameFull
+      vnetResourceGroupName: vnetResourceGroupName
+      privateLinksDnsZones: privateLinksDnsZones
+      names: {
+        postgreSQLName: postgreSQLName
+        miPrjName: miPrjName
+        defaultSubnet: defaultSubnet
+        keyvaultName: keyvaultName
+        laWorkspaceName: laWorkspaceName
+      }
+    }
+    deploymentSuffix: deploymentProjSpecificUniqueSuffix
     location: location
-    tags: tagsProject
-    vnetName: vnetNameFull
-    vnetResourceGroupName: vnetResourceGroupName
-    subnetNamePend: defaultSubnet
-    keyvaultName: keyvaultName
-    createPrivateEndpoint: enablePublicAccessWithPerimeter ? false : true
-    sku: postgreSQLSKU
-    storage: postgreSQLStorage
-    version: postgreSQLVersion
-    tenantId: tenant().tenantId
+    tagsProject: tagsProject
+    postgreSQLSKU: postgreSQLSKU
+    postgreSQLStorage: postgreSQLStorage
+    postgreSQLVersion: postgreSQLVersion
     useAdGroups: useAdGroups
-    highAvailability: postgreSQLHighAvailability
-    availabilityZone: postgresAvailabilityZone
-    useCMK: cmk
-    keyVaultKeyId: cmk ? cmkKvUri : ''
-    cmkUserAssignedIdentityId: cmk ? cmkIdentityId : ''
-  }
-  dependsOn: [
-    existingTargetRG
-  ]
-}
-
-module postgreSQLRbac '../modules/databases/postgreSQL/pgFlexibleServerRbac.bicep' = if(!postgreSQLExists && enablePostgreSQL) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('04-PostgreSQLRbac4${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    postgreSqlServerName: postgreSQLName
-    useAdGroups: useAdGroups
+    postgreSQLHighAvailability: postgreSQLHighAvailability
+    postgresAvailabilityZone: postgresAvailabilityZone
+    cmk: cmk
+    cmkKeyName: cmkKeyName
+    admin_bicep_kv_fw: admin_bicep_kv_fw
+    admin_bicep_kv_fw_rg: admin_bicep_kv_fw_rg
+    admin_bicep_input_keyvault_subscription: admin_bicep_input_keyvault_subscription
     usersOrAdGroupArray: p011_genai_team_lead_array
     servicePrincipleAndMIArray: spAndMiArray
     adminNames: postGresAdminEmailsArray
-  }
-  dependsOn: [
-    postgreSQL
-    spAndMI2Array
-  ]
-}
-
-module privateDnsPostGreSQL '../modules/privateDns.bicep' = if(!postgreSQLExists && !centralDnsZoneByPolicyInHub && enablePostgreSQL && !enablePublicAccessWithPerimeter) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('04-privDnsPGres${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    dnsConfig: var_postgreSQL_dnsConfig
-    privateLinksDnsZones:privateLinksDnsZones
+    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
+    centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
+    diagnosticSettingLevel: diagnosticSettingLevel
   }
   dependsOn: [
     existingTargetRG
-    postgreSQL
   ]
 }
 
@@ -728,20 +713,6 @@ module cosmosDbDiagnostics '../modules/diagnostics/cosmosDbDiagnostics.bicep' = 
   }
   dependsOn: [
     cosmosdb
-  ]
-}
-
-// PostgreSQL Diagnostic Settings
-module postgresqlDiagnostics '../modules/diagnostics/postgresqlDiagnostics.bicep' = if (!postgreSQLExists && enablePostgreSQL) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('04-diagPostgreSQL-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    postgresqlServerName: postgreSQLName
-    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
-    diagnosticSettingLevel: diagnosticSettingLevel
-  }
-  dependsOn: [
-    postgreSQL
   ]
 }
 

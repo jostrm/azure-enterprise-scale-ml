@@ -44,13 +44,16 @@ param keyVaultKeyId string = ''
 @description('The user assigned identity ID for customer managed key encryption. Required when useCMK is true.')
 param cmkUserAssignedIdentityId string = ''
 
-var identityType = systemAssignedIdentity 
-  ? (!empty(userAssignedIdentities) ? 'SystemAssigned, UserAssigned' : 'SystemAssigned') 
-  : (!empty(userAssignedIdentities) ? 'UserAssigned' : 'None')
+var effectiveUserAssignedIdentities = union(userAssignedIdentities, useCMK && !empty(cmkUserAssignedIdentityId) ? {
+  '${cmkUserAssignedIdentityId}': {}
+} : {})
+var identityType = systemAssignedIdentity
+  ? (!empty(effectiveUserAssignedIdentities) ? 'SystemAssigned, UserAssigned' : 'SystemAssigned')
+  : (!empty(effectiveUserAssignedIdentities) ? 'UserAssigned' : 'None')
 
 var identity = identityType != 'None' ? {
   type: identityType
-  userAssignedIdentities: !empty(userAssignedIdentities) ? userAssignedIdentities : {}
+  userAssignedIdentities: !empty(effectiveUserAssignedIdentities) ? effectiveUserAssignedIdentities : {}
 } : {}
 
 var seed = uniqueString(resourceGroup().id, subscription().subscriptionId, deployment().name)
@@ -68,6 +71,8 @@ var dbNameToUse = !empty(databaseNames) ? first(databaseNames) : defaultDbName
 resource postgreSQLFlex 'Microsoft.DBforPostgreSQL/flexibleServers@2024-11-01-preview' = {
   name: name
   location: location //'Sweden Central'
+  tags: tags
+  identity: identityType != 'None' ? identity : null
   sku: sku
   properties: {
     replica: {
@@ -91,7 +96,7 @@ resource postgreSQLFlex 'Microsoft.DBforPostgreSQL/flexibleServers@2024-11-01-pr
     }
     version: version
     administratorLogin: administratorLogin
-    administratorLoginPassword: loginPwd
+    administratorLoginPassword: resourceExists ? null : loginPwd
     availabilityZone: '1'
     backup: {
       backupRetentionDays: 7
@@ -193,7 +198,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: keyvaultName
 }
 
-resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
+resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = if (!resourceExists) {
   parent: keyVault
   name: connectionStringKey
   properties: {
@@ -206,11 +211,16 @@ resource pgflexConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2024-11
 }
 
 var keyVaultPermissions = {
-  secrets: [ 
+  keys: [
     'get'
-    'wrap key'
-    'unwrap key'
+    'wrapKey'
+    'unwrapKey'
   ]
+}
+
+resource cmkIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = if (useCMK) {
+  name: last(split(cmkUserAssignedIdentityId, '/'))
+  scope: resourceGroup(split(cmkUserAssignedIdentityId, '/')[2], split(cmkUserAssignedIdentityId, '/')[4])
 }
 
 resource keyVaultAccessPolicyAdditionalGroup 'Microsoft.KeyVault/vaults/accessPolicies@2023-07-01' = if(useCMK)  {
@@ -218,7 +228,7 @@ resource keyVaultAccessPolicyAdditionalGroup 'Microsoft.KeyVault/vaults/accessPo
   name:'add'
   properties: {
     accessPolicies: [{
-      objectId: postgreSQLFlex.identity.principalId
+      objectId: cmkIdentity!.properties.principalId
       permissions: keyVaultPermissions
       tenantId: subscription().tenantId
     }]

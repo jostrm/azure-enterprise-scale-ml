@@ -24,6 +24,8 @@ param wlProfileGPUConsumptionName string = 'Consumption-GPU-NC24-A100'
 param wlMinCountServerless int = 0
 param wlMinCountDedicated int = 1
 param wlMaxCount int = 5
+@allowed(['Consumption', 'D4', 'D8'])
+param workloadProfileType string = 'Consumption'
 
 // TODO: Expose these parameters to the user
 param wlProfileDedicatedGPUName string = 'Dedicated-GPU-NC24-A100'
@@ -87,13 +89,14 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2025-01-01'
         name: 'Consumption'
         workloadProfileType: 'Consumption' //THIS IS REQUIRED TO ADD PRIVATE ENDPOINTS
       }
-      //{ TODO: FAILS as of 2025-07: ManagedCluster failed to provision node pools for dedicated
-//      name: 'Dedicated'
-//      workloadProfileType: wlProfileDedicatedName
-//      minimumCount: wlMinCountDedicated
-//      maximumCount: wlMaxCount
-//    }
-
+      ...(workloadProfileType != 'Consumption' ? [
+        {
+          name: 'aifactory-dedicated'
+          workloadProfileType: workloadProfileType
+          minimumCount: wlMinCountDedicated
+          maximumCount: wlMaxCount
+        }
+      ] : [])
     ]
     zoneRedundant: zoneRedundant
     vnetConfiguration: {
@@ -151,4 +154,3 @@ output dnsConfig array = [
     id:createPrivateEndpoint? containerAppsEnvironment.id: ''
   }
 ]
-

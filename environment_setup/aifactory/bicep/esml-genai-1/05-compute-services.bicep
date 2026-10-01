@@ -285,6 +285,12 @@ param byoAseFullResourceId string = ''
 param byoAseAppServicePlanResourceId string = ''
 
 // Container Apps settings
+@allowed(['Consumption', 'D4', 'D8'])
+param skuContainerAppsDev string = 'Consumption'
+@allowed(['Consumption', 'D4', 'D8'])
+param skuContainerAppsStageProd string = 'Consumption'
+@description('Reapply Container Apps configuration when the resources already exist. Defaults to the legacy skip-existing behavior.')
+param updateExistingContainerApps bool = false
 param wlMinCountServerless int = 0
 param wlMinCountDedicated int = 1
 param wlMaxCount int = 100
@@ -298,20 +304,6 @@ param containerCpuCoreCount int = 1
 param aca_a_registry_image string = ''
 param aca_w_registry_image string = ''
 param aca_default_image string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
-var imageRegistryTypeA = !empty(aca_a_registry_image) 
-  ? (contains(aca_a_registry_image, 'mcr.microsoft.com') 
-      ? 'ms' 
-      : contains(aca_a_registry_image, 'docker.io') 
-        ? 'dockerhub' 
-        : 'private')
-  : 'ms'  // Default to 'ms' when using default image
-var imageRegistryTypeW = !empty(aca_w_registry_image) 
-  ? (contains(aca_w_registry_image, 'mcr.microsoft.com') 
-      ? 'ms' 
-      : contains(aca_w_registry_image, 'docker.io') 
-        ? 'dockerhub' 
-        : 'private')
-  : 'ms'  // Default to 'ms' when using default image
 
 // Custom domains for Container Apps
 param acaCustomDomainsArray array = []
@@ -455,7 +447,6 @@ var aifV2Name = namingConvention.outputs.aifV2PrjName
 
 // Computed variables using naming convention outputs
 var deploymentProjSpecificUniqueSuffix = '${projectName}${env}${randomSalt}'
-var var_acr_cmn_or_prj = useCommonACR ? acrCommonName : acrProjectName
 
 // Subnet names from naming convention
 var genaiSubnetName = namingConvention.outputs.genaiSubnetName
@@ -615,17 +606,6 @@ var var_webAppPrincipalId = enableWebApp && !webAppExists? webapp.outputs.princi
 #disable-next-line BCP318
 var var_functionPrincipalId= enableFunction && !functionAppExists? function.outputs.principalId: ''
 
-// Container App API domain/endpoint - using simplified logic
-#disable-next-line BCP318
-var var_containerAppApiDomain = enableContainerApps && !containerAppAExists? acaApi.outputs.SERVICE_ACA_URI: ''
-
-// Create IP security restrictions array with VNet CIDR first, then dynamically add whitelist IPs
-var ipSecurityRestrictions = [for ip in ipWhitelist_array: {
-  name: replace(replace(ip, ',', ''), '/', '_')  // Replace commas with nothing and slashes with underscores
-  ipAddressRange: ip
-  action: 'Allow'
-}]
-
 var allowedOrigins = [
   'https://portal.azure.com'
   'https://ms.portal.azure.com'
@@ -659,9 +639,6 @@ var var_webapp_dnsConfig = enableWebApp && !webAppExists? webapp.outputs.dnsConf
 //     resourceId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.App/managedEnvironments/${containerAppsEnvName}'
 //   }
 // ]
-
-#disable-next-line BCP318
-var var_containerAppsEnv_dnsConfig = enableContainerApps && !containerAppsEnvExists? containerAppsEnv.outputs.dnsConfig: []
 
 // var var_function_dnsConfig = [
 //   {
@@ -712,17 +689,6 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
 }
 
-// Assumes the principals exists.
-module getACAMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
-  name: take('03-getACAMI-${deploymentProjSpecificUniqueSuffix}', 64)
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  params: {
-    managedIdentityName: miACAName
-  }
-}
-
-var miAcaPrincipalId = getACAMIPrincipalId.outputs.principalId
-
 // ============== SUBNET DELEGATIONS ==============
 
 // Subnet delegation for Web Apps and Function Apps
@@ -750,11 +716,11 @@ module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!fun
   }
 }
 
-// Subnet delegation for Container Apps OR Foundry agent network injection.
+// Container Apps delegates its subnet in the shared service module. This path is only for Foundry agent network injection.
 // Only runs when a dedicated ACA subnet exists (acaSubnetId or aca2SubnetId).
 // Never delegates the genai subnet — private endpoints need it undelegated.
 var acaDelegationSubnetName = !empty(acaSubnetName) ? acaSubnetName : aca2SubnetName
-module subnetDelegationAca '../modules/subnetDelegation.bicep' = if (((!containerAppsEnvExists && enableContainerApps) || (!aiFoundryV2Exists && !disableAgentNetworkInjection)) && (!empty(acaSubnetId) || !empty(aca2SubnetId))) {
+module subnetDelegationAca '../modules/subnetDelegation.bicep' = if ((!aiFoundryV2Exists && !disableAgentNetworkInjection) && (!empty(acaSubnetId) || !empty(aca2SubnetId))) {
   name: take('05-snetDelegACA${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(vnetResourceGroupName)
   params: {
@@ -964,166 +930,84 @@ module rbacForFunctionMSI '../modules/functionRbac.bicep' = if(!functionAppExist
 
 // ============== CONTAINER APPS ENVIRONMENT ==============
 
-module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvExists && enableContainerApps) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('05-aca-env-${deploymentProjSpecificUniqueSuffix}', 64)
+module containerApps '../modules/services/containerAppsDeployment.bicep' = if(enableContainerApps) {
+  name: take('05-container-apps-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
-    name: containerAppsEnvName
+    context: {
+      subscriptionId: subscriptionIdDevTestProd
+      targetResourceGroup: targetResourceGroup
+      commonResourceGroup: commonResourceGroup
+      projectName: projectName
+      vnetName: vnetNameFull
+      vnetResourceGroupName: vnetResourceGroupName
+      privateLinksDnsZones: privateLinksDnsZones
+      names: {
+        containerAppsEnvName: containerAppsEnvName
+        containerAppAName: containerAppAName
+        containerAppWName: containerAppWName
+        miPrjName: miPrjName
+        miACAName: miACAName
+        defaultSubnet: defaultSubnet
+        acaSubnetName: acaSubnetName
+        aca2SubnetName: aca2SubnetName
+        laWorkspaceName: laWorkspaceName
+        applicationInsightName: applicationInsightName
+        keyvaultName: keyvaultName
+        acrCommonName: acrCommonName
+        acrProjectName: acrProjectName
+        aiServicesName: namingConvention.outputs.aiServicesName
+        bingName: bingName
+        aifV1ProjectName: aifV1ProjectName
+      }
+    }
+    deploymentSuffix: deploymentProjSpecificUniqueSuffix
     location: location
-    tags: tagsProject
-    logAnalyticsWorkspaceName: laWorkspaceName
-    logAnalyticsWorkspaceRG: commonResourceGroup
-    applicationInsightsName: applicationInsightName
+    locationSuffix: locationSuffix
+    env: env
+    resourceSuffix: resourceSuffix
+    tagsProject: tagsProject
+    workloadProfileType: env == 'dev' ? skuContainerAppsDev : skuContainerAppsStageProd
+    containerAppsEnvExists: containerAppsEnvExists
+    containerAppAExists: containerAppAExists
+    containerAppWExists: containerAppWExists
+    updateExistingContainerApps: updateExistingContainerApps
+    delegateSubnet: !empty(acaSubnetId) || !empty(aca2SubnetId)
     enablePublicGenAIAccess: enablePublicGenAIAccess
     enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-    vnetName: vnetNameFull
-    vnetResourceGroupName: vnetResourceGroupName
-    subnetNamePend: defaultSubnet
-    subnetAcaDedicatedName: acaSubnetName // at least /23
+    centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
     wlMinCountServerless: wlMinCountServerless
     wlMinCountDedicated: wlMinCountDedicated
     wlMaxCount: wlMaxCount
     wlProfileDedicatedName: wlProfileDedicatedName
     wlProfileGPUConsumptionName: wlProfileGPUConsumptionName
-    managedIdentities: {
-      systemAssigned: true
-      userAssignedResourceIds: concat(
-        !empty(miPrjName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)) : [],
-        !empty(miACAName) ? array(resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)) : []
-      )
-    }
+    acaAppWorkloadProfileName: acaAppWorkloadProfileName
+    containerCpuCoreCount: containerCpuCoreCount
+    containerMemory: containerMemory
+    aca_a_registry_image: aca_a_registry_image
+    aca_w_registry_image: aca_w_registry_image
+    aca_default_image: aca_default_image
+    acaCustomDomainsArray: acaCustomDomainsArray
+    IPwhiteList: IPwhiteList
+    useCommonACR: useCommonACR
+    enableAISearch: enableAISearch
+    aiSearchName: aiSearchName
+    enableAIServices: enableAIServices
+    enableBingSearch: enableBingSearch
+    openAiApiVersion: openAiApiVersion
+    diagnosticSettingLevel: diagnosticSettingLevel
   }
   dependsOn: [
     existingTargetRG
+    subnetDelegationServerFarm
     subnetDelegationAca
   ]
 }
 
-module privateDnscontainerAppsEnv '../modules/privateDns.bicep' = if(!containerAppsEnvExists && !centralDnsZoneByPolicyInHub && enableContainerApps && !enablePublicAccessWithPerimeter) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('05-privDnsACAEnv${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    dnsConfig: var_containerAppsEnv_dnsConfig
-    privateLinksDnsZones: privateLinksDnsZones
-  }
-  dependsOn: [
-    existingTargetRG
-    containerAppsEnv
-  ]
-}
-
 // ============================================================================
-// SPECIAL - Get API key of existing MI. Needs static name in existing
+// Stable suffix for the existing common Log Analytics workspace.
 // ============================================================================
 #disable-next-line BCP318
 var uniqueInAIFenv_Static = substring(uniqueString(commonResourceGroupRef.id), 0, 5)
-#disable-next-line BCP081
-var bingName_Static = 'bing-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv_Static}${resourceSuffix}'
-
-#disable-next-line BCP081
-resource bingREF 'Microsoft.Bing/accounts@2020-06-10' existing = if(enableBingSearch) {
-  name: bingName_Static
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-}
-#disable-next-line BCP318 BCP422
-var var_bing_api_Key = enableBingSearch? bingREF.listKeys().key1:'BCP318'
-
-// ============== CONTAINER APPS - API ==============
-
-module acaApi '../modules/containerappApi.bicep' = if(!containerAppAExists && enableContainerApps) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('05-aca-a-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    name: containerAppAName
-    location: location
-    tags: tagsProject
-    ipSecurityRestrictions: enablePublicGenAIAccess ? ipSecurityRestrictions : []
-    allowedOrigins: allowedOrigins
-    enablePublicGenAIAccess: enablePublicGenAIAccess
-    enablePublicAccessWithPerimeter: enablePublicAccessWithPerimeter
-    vnetName: vnetNameFull
-    vnetResourceGroupName: vnetResourceGroupName
-    subnetNamePend: defaultSubnet
-    subnetAcaDedicatedName: acaSubnetName
-    customDomains: acaCustomDomainsArray
-    resourceGroupName: targetResourceGroup
-    identityId: miAcaPrincipalId // Using the variable instead of module output
-    identityName: miACAName
-    containerRegistryName: var_acr_cmn_or_prj
-    containerAppsEnvironmentName: containerAppsEnvName // Using direct name instead of module output
-    containerAppsEnvironmentId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.App/managedEnvironments/${containerAppsEnvName}'
-    openAiDeploymentName: 'gpt'
-    openAiEvalDeploymentName: 'gpt-evals'
-    openAiEmbeddingDeploymentName: 'text-embedding-ada-002'
-    openAiEndpoint: 'https://${aiServicesName}.cognitiveservices.azure.com/'
-    openAiName: aiServicesName
-    openAiType: 'azure'
-    openAiApiVersion: openAiApiVersion
-    aiSearchEndpoint: 'https://${aiSearchName}.search.windows.net'
-    aiSearchIndexName: 'index-${projectName}-${resourceSuffix}'
-    appinsightsConnectionstring: 'InstrumentationKey=${applicationInsightName}'
-    bingName: bingName
-    bingApiEndpoint: 'https://api.bing.microsoft.com/v7.0/search'
-    bingApiKey: var_bing_api_Key // 'placeholder-key' Simplified
-    aiProjectName: aifV1ProjectName
-    subscriptionId: subscriptionIdDevTestProd
-    appWorkloadProfileName: acaAppWorkloadProfileName
-    containerCpuCoreCount: containerCpuCoreCount
-    containerMemory: containerMemory
-    keyVaultUrl: 'https://${keyvaultName}.${environment().suffixes.keyvaultDns}'
-    imageName: !empty(aca_a_registry_image) ? aca_a_registry_image : aca_default_image
-    imageRegistryType: !empty(aca_a_registry_image) ? imageRegistryTypeA : 'ms'
-  }
-  dependsOn: [
-    containerAppsEnv
-  ]
-}
-
-// ============== CONTAINER APPS - WEB ==============
-
-module acaWebApp '../modules/containerappWeb.bicep' = if(!containerAppWExists && enableContainerApps) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('05-aca-w-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    location: location
-    tags: tagsProject
-    name: containerAppWName
-    apiEndpoint: 'https://${containerAppAName}.${var_containerAppApiDomain}' // Using computed domain variable
-    allowedOrigins: allowedOrigins
-    containerAppsEnvironmentName: containerAppsEnvName // Using direct name
-    containerAppsEnvironmentId: '${subscription().subscriptionId}/resourceGroups/${targetResourceGroup}/providers/Microsoft.App/managedEnvironments/${containerAppsEnvName}'
-    containerRegistryName: var_acr_cmn_or_prj
-    identityId: miAcaPrincipalId // Using the variable instead of module output
-    identityName: miACAName
-    appWorkloadProfileName: acaAppWorkloadProfileName
-    containerCpuCoreCount: containerCpuCoreCount
-    containerMemory: containerMemory
-    keyVaultUrl: 'https://${keyvaultName}.${environment().suffixes.keyvaultDns}'
-    imageName: !empty(aca_w_registry_image) ? aca_w_registry_image : aca_default_image
-    imageRegistryType: !empty(aca_w_registry_image) ? imageRegistryTypeW : 'ms'
-  }
-  dependsOn: [
-    containerAppsEnv    
-  ]
-}
-
-// ============== RBAC FOR CONTAINER APPS ==============
-
-module rbacForContainerAppsMI '../modules/containerappRbac.bicep' = if (enableContainerApps) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('05rbacACAMI${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    aiSearchName: enableAISearch ? aiSearchName : ''
-    appInsightsName: applicationInsightName
-    principalIdMI: miAcaPrincipalId // Using the variable instead of module output
-    resourceGroupId: existingTargetRG.id
-  }
-  dependsOn: [
-    containerAppsEnv
-    acaApi
-  ]
-}
-
 // ============== AZURE KUBERNETES SERVICE (AKS) ==============
 
 // AKS CMK: Disk Encryption Set Configuration
@@ -1305,34 +1189,6 @@ module functionAppDiagnostics '../modules/diagnostics/functionAppsDiagnostics.bi
   ]
 }
 
-// Container Apps API Diagnostic Settings
-module containerAppApiDiagnostics '../modules/diagnostics/containerAppsDiagnostics.bicep' = if (!containerAppAExists && enableContainerApps) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('05-diagContainerAppAPI-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    containerAppName: containerAppAName
-    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
-    diagnosticSettingLevel: diagnosticSettingLevel
-  }
-  dependsOn: [
-    acaApi
-  ]
-}
-
-// Container Apps Web Diagnostic Settings
-module containerAppWebDiagnostics '../modules/diagnostics/containerAppsDiagnostics.bicep' = if (!containerAppWExists && enableContainerApps) {
-  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
-  name: take('05-diagContainerAppWeb-${deploymentProjSpecificUniqueSuffix}', 64)
-  params: {
-    containerAppName: containerAppWName
-    logAnalyticsWorkspaceId: logAnalyticsWorkspace.id
-    diagnosticSettingLevel: diagnosticSettingLevel
-  }
-  dependsOn: [
-    acaWebApp
-  ]
-}
-
 // ============== OUTPUTS - Simplified ==============
 // Note: Outputs simplified to avoid conditional module reference issues
 // Resource information should be retrieved through Azure CLI queries after deployment
@@ -1344,13 +1200,13 @@ output webAppDeployed bool = (!webAppExists && enableWebApp)
 output functionAppDeployed bool = (!functionAppExists && enableFunction)
 
 @description('Container Apps Environment deployment status')
-output containerAppsEnvDeployed bool = (!containerAppsEnvExists && enableContainerApps)
+output containerAppsEnvDeployed bool = ((!containerAppsEnvExists || updateExistingContainerApps) && enableContainerApps)
 
 @description('Container App API deployment status')
-output containerAppADeployed bool = (!containerAppAExists && enableContainerApps)
+output containerAppADeployed bool = ((!containerAppAExists || updateExistingContainerApps) && enableContainerApps)
 
 @description('Container App Web deployment status')
-output containerAppWDeployed bool = (!containerAppWExists && enableContainerApps)
+output containerAppWDeployed bool = ((!containerAppWExists || updateExistingContainerApps) && enableContainerApps)
 
 @description('ACR RBAC verification status for Container Apps')
 output acrRbacVerified bool = enableContainerApps

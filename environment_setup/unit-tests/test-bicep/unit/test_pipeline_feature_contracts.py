@@ -13,7 +13,7 @@ from domain.pipeline_contracts import (
     ADO_COMMON, ADO_GATEWAY, ADO_PROJECT, ADO_SERVICES, COMMON_FLAGS,
     COMMON_MODULE_FLAGS, CONFIG_ONLY_EXCEPTIONS, DEFAULT_EXCEPTIONS, FEATURES,
     GATEWAY_FLAGS, GHA_COMMON, GHA_GATEWAY, GHA_PHASE, GHA_PROJECT, MODULE_FLAGS,
-    PARAMETER_ALIASES,
+    PARAMETER_ALIASES, ISOLATED_RESOURCE_FLAGS,
     deployments, evaluate, forwarding_errors, inventory_errors, load_pipeline,
     objects,
 )
@@ -105,6 +105,8 @@ def test_secondary_debug_rbac_and_dashboard_references_do_not_cross_wire_feature
                 continue
             actual = task_reference(actual, deployment.step)
             expected = f"$({runtime})" if platform == "ado" else "${{ env." + runtime + " }}"
+            if (deployment.module, parameter) in ISOLATED_RESOURCE_FLAGS:
+                expected = "false"
             assert actual == expected, f"{platform}/{deployment.name}/{parameter}: {actual!r} != {expected!r}"
 
 
