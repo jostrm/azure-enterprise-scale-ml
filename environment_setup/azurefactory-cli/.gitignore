@@ -4,6 +4,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+/output/
 *.receipt.json
 *.review.json
 *.private.json
