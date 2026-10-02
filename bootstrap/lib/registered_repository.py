@@ -21,6 +21,7 @@ import release_version
 SHARED_URL = "https://github.com/jostrm/azure-enterprise-scale-ml"
 SHARED_PATH = "azure-enterprise-scale-ml"
 LOCK_REF = "refs/heads/aifactory-initializer-lock"
+DEFAULT_GITHUB_ENVIRONMENTS = ("Dev", "Stage", "Prod")
 require = enrollment.require
 
 
@@ -219,7 +220,7 @@ def prepare(*, consumer_root, scope, bootstrap_config, expected_revision, runtim
         if provider == "ado":
             private_project = runtime.private_project()
     pipeline = runtime.pipeline(remote) if provider == "ado" else None
-    namespace, environment = None, None
+    namespace, environment, environments = None, None, {}
     if provider == "gha":
         binding = document.get("bindings", {}).get(scope["factory_id"], {}).get(provider, {})
         old_target = next((item for item in binding.get("targets", [])
@@ -231,9 +232,18 @@ def prepare(*, consumer_root, scope, bootstrap_config, expected_revision, runtim
                               "factory": target["tenant_id"] + ":" + scope["factory_id"],
                               "subscription": target["subscription_id"], "scale": scope["scale_set_id"],
                               "repository": url.lower(), "provider": provider})
-        namespace = execution.get("auth_namespace") or "aifactory-" + enrollment.digest(namespace_seed)[:20]
+        legacy_namespace = "aifactory-" + enrollment.digest(namespace_seed)[:20]
+        namespace = execution.get("auth_namespace") or (legacy_namespace if binding else "Dev")
         require(re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", namespace), "invalid-auth-namespace")
-        environment = runtime.environment(namespace) if remote else None
+        if not binding and remote:
+            require(runtime.environment(legacy_namespace) is None,
+                    "unbound-legacy-github-environment-requires-reconciliation")
+        names = (namespace,) if binding else DEFAULT_GITHUB_ENVIRONMENTS
+        environments = {name: runtime.environment(name) if remote else None for name in names}
+        for name, observed in environments.items():
+            require(observed is None or observed.get("name") == name,
+                    "github-environment-case-differs-from-reviewed-binding")
+        environment = environments[namespace]
     existing = (root / ".git").exists()
     head = runtime.git(root, "rev-parse", "--verify", "HEAD", missing=True) if existing else None
     branch = runtime.git(root, "symbolic-ref", "--short", "HEAD", missing=True) if existing else None
@@ -266,15 +276,17 @@ def prepare(*, consumer_root, scope, bootstrap_config, expected_revision, runtim
             "existing_git": existing, "head": head, "origin": origin, "remote_id": remote.get("id") if remote else None,
             "gitmodules_sha256": modules_hash,
             "pipeline": pipeline,
-            "auth_namespace": namespace, "environment": environment,
+            "auth_namespace": namespace, "environment": environment, "environments": environments,
             "remote_sha": remote_sha, "source": {"url": SHARED_URL, "ref": source_ref, "sha": sha,
                                                 "verification": "published-remote-ref", "assets": source_assets},
             "application_helper_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             "effects": ["Create or reuse exactly one reviewed provider repository.",
                         "Initialize missing Git metadata without replacing existing saved files or the user's index.",
                         "Pin the published accelerator submodule and its scoped provider workflow/private probe, not the saved draft.",
-                        "For GitHub, create or reuse only environment " + (namespace or "(not applicable)") +
-                        " through create-or-return; preserve existing protection and branch policies unchanged.",
+                        "For GitHub, create or reuse only environments " + (", ".join(environments) or "(not applicable)") +
+                        " through create-or-return; preserve existing protection and branch policies unchanged. " +
+                        "Bind only the selected Dev deployment to " + (namespace or "(not applicable)") +
+                        "; do not deploy Stage or Prod.",
                         "For Azure DevOps, create or reuse the exact repository-bound lifecycle YAML pipeline."],
             "can_execute": True, "blockers": []}
     if config.get("coordination_mode") == "single-writer":
@@ -294,7 +306,8 @@ def execute(plan, *, state_dir, runtime=None):
     fresh = prepare(consumer_root=plan["consumer_root"], scope=plan["scope"],
                     bootstrap_config=plan["config"], expected_revision=plan["expected_revision"], runtime=runtime)
     for key in ("register_hash", "existing_git", "head", "origin", "remote_id", "remote_sha", "source",
-                "application_helper_sha256", "gitmodules_sha256", "pipeline", "auth_namespace", "environment"):
+                "application_helper_sha256", "gitmodules_sha256", "pipeline", "auth_namespace", "environment",
+                "environments"):
         require(fresh[key] == plan[key], "repository-discovery-changed:" + key)
     if plan["config"].get("coordination_mode") == "single-writer":
         require(fresh.get("private_project") == plan.get("private_project"), "repository-private-project-changed")
@@ -403,14 +416,22 @@ def execute(plan, *, state_dir, runtime=None):
                     == receipt["provider_serialization"]["sha"] + "\t" + LOCK_REF, "provider-initializer-lock-not-held")
             receipt["pipeline_id"] = runtime.ensure_pipeline()["id"]
         else:
-            require(runtime.git(root, "ls-remote", plan["repository"], LOCK_REF).strip()
-                    == receipt["provider_serialization"]["sha"] + "\t" + LOCK_REF, "provider-initializer-lock-not-held")
-            receipt["environment"] = runtime.ensure_environment(plan["auth_namespace"], plan["environment"])
+            receipt["environments"] = {}
+            for name, expected in plan["environments"].items():
+                require(runtime.git(root, "ls-remote", plan["repository"], LOCK_REF).strip()
+                        == receipt["provider_serialization"]["sha"] + "\t" + LOCK_REF, "provider-initializer-lock-not-held")
+                receipt["environments"][name] = runtime.ensure_environment(name, expected)
+                require(receipt["environments"][name].get("name") == name, "github-environment-name-not-verified")
+                prerequisites._persist(receipt_path, receipt)
+            receipt["environment"] = receipt["environments"][plan["auth_namespace"]]
         require(hashlib.sha256((root / "azurefactory" / "register.json").read_bytes()).hexdigest() == plan["register_hash"],
                 "saved-draft-changed")
         receipt.update(status="succeeded", reconciliation_required=False,
                        outputs={"repository": {"url": plan["repository"], "provider": plan["provider"],
-                                               "commit": commit, "source": plan["source"]},
+                                               "commit": commit, "source": plan["source"],
+                                               **({"auth_namespace": plan["auth_namespace"],
+                                                   "environment_names": list(receipt["environments"])}
+                                                  if plan["provider"] == "gha" else {})},
                                 "bindings": {"published_source": dict(plan["source"])},
                                 "provider_serialization": receipt["provider_serialization"]})
         prerequisites._persist(receipt_path, receipt)

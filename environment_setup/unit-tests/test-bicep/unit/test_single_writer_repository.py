@@ -76,7 +76,8 @@ def test_ado_private_project_check_uses_selected_project_and_ado_tenant():
 
 
 @pytest.mark.parametrize("provider", ["gha", "ado"])
-def test_single_writer_execute_selects_only_mode_template_and_preserves_register(workspace, provider):
+@pytest.mark.parametrize("environment_failure", [None, "Stage"])
+def test_single_writer_execute_selects_only_mode_template_and_preserves_register(workspace, provider, environment_failure):
     consumer, state = workspace[0], workspace[1]
     scope = scope_of(consumer, provider)
     saved = (consumer / "azurefactory" / "register.json").read_bytes()
@@ -85,7 +86,7 @@ def test_single_writer_execute_selects_only_mode_template_and_preserves_register
     relative = "bootstrap/templates/factory-lifecycle-single-writer-" + provider + ".yml"
     content = b"# AIFACTORY_SINGLE_WRITER_CONTRACT=provider-repository-cas-v1\nreviewed: true\n"
     assets = {relative: hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()}
-    refs, remote, calls = {}, {}, []
+    refs, remote, calls, environments = {}, {}, [], []
 
     def git(root, *args, **kwargs):
         calls.append(args)
@@ -110,21 +111,116 @@ def test_single_writer_execute_selects_only_mode_template_and_preserves_register
             refs[ref] = sha
         return ""
 
+    def ensure_environment(name, expected):
+        assert expected is None
+        environments.append(name)
+        if name == environment_failure:
+            raise repository.enrollment.EnrollmentError("fixture-environment-response-lost")
+        return {"id": len(environments), "name": name}
+
     runtime = SimpleNamespace(discover=lambda: remote or None, source_assets=lambda sha: assets,
                               private_project=lambda: {"id": "project", "name": "project", "visibility": "private"},
                               pipeline=lambda remote: None, ensure_pipeline=lambda: {"id": 9},
                               git=git, create=lambda: remote.update(id=7, private=True, project={"visibility": "private"}),
-                              set_initial_default_branch=lambda: None, ensure_environment=lambda name, expected: {"name": name})
+                              set_initial_default_branch=lambda: None, ensure_environment=ensure_environment)
     plan = repository.prepare(consumer_root=consumer, scope=scope, expected_revision="reviewed",
                               bootstrap_config=config | {"coordination_mode": "single-writer"}, runtime=runtime)
     assert any("private repository" in warning for warning in plan["warnings"])
     if provider == "gha":
-        assert plan["auth_namespace"] == "aifactory-" + repository.enrollment.digest({
-            "repository": plan["repository"].lower(), "provider": "gha", "coordination_mode": "single-writer"})[:20]
+        assert plan["auth_namespace"] == "Dev"
+        assert plan["environments"] == {"Dev": None, "Stage": None, "Prod": None}
     result = repository.execute(plan, state_dir=state, runtime=runtime)
+    if provider == "gha" and environment_failure:
+        assert result["status"] == "uncertain" and result["reconciliation_required"]
+        assert result["error"] == "fixture-environment-response-lost"
+        assert result["environments"] == {"Dev": {"id": 1, "name": "Dev"}}
+        assert environments == ["Dev", "Stage"]
+        assert (consumer / "azurefactory" / "register.json").read_bytes() == saved
+        return
     assert result["status"] == "succeeded", result
     target = ".github/workflows/factory-lifecycle.yml" if provider == "gha" else "aifactory/pipelines/factory-lifecycle.yml"
     assert (consumer / target).read_bytes() == content
     assert not (consumer / ".azurefactory" / "hub_private_probe.py").exists()
     assert (consumer / "azurefactory" / "register.json").read_bytes() == saved
     assert not any("register.json" in " ".join(args) for args in calls)
+    assert environments == (["Dev", "Stage", "Prod"] if provider == "gha" else [])
+    if provider == "gha":
+        assert result["environment"] == {"id": 1, "name": "Dev"}
+        assert set(result["environments"]) == {"Dev", "Stage", "Prod"}
+        assert result["outputs"]["repository"]["auth_namespace"] == "Dev"
+        assert result["outputs"]["repository"]["environment_names"] == ["Dev", "Stage", "Prod"]
+
+
+def environment_plan(workspace, mode, namespace=None, inventory=None):
+    consumer = workspace[0]
+    scope = scope_of(consumer)
+    path = consumer / "azurefactory" / "register.json"
+    if namespace:
+        document = json.loads(path.read_bytes())
+        document["bindings"][scope["factory_id"]] = {"gha": {
+            "auth_namespace": namespace, "targets": [{"scale_set_id": scope["scale_set_id"]}]}}
+        path.write_bytes(repository.enrollment.canonical(document))
+    calls = []
+    inventory = {} if inventory is None else inventory
+
+    def environment(name):
+        calls.append(("environment", name))
+        return inventory.get(name)
+
+    def git(root, *args, **kwargs):
+        calls.append(args)
+        assert args[0] == "ls-remote"
+        return "b" * 40 + "\trefs/heads/main" if args[1] == repository.SHARED_URL else ""
+
+    runtime = SimpleNamespace(discover=lambda: {"id": 7, "private": True},
+                              source_assets=lambda sha: {}, environment=environment, git=git)
+    plan = repository.prepare(consumer_root=consumer, scope=scope, expected_revision="reviewed",
+                              bootstrap_config={"github_repository": "example/factory",
+                                                "coordination_mode": mode}, runtime=runtime)
+    return plan, runtime, calls
+
+
+@pytest.mark.parametrize("mode", ["blob", "single-writer"])
+@pytest.mark.parametrize("namespace", ["aifactory-02a422b83f37fb909eef", "aifactory-d4dca79af763816549f2", "Custom-Dev"])
+def test_existing_environment_binding_is_never_migrated(workspace, mode, namespace):
+    protected = {"id": 22702243755, "node_id": "EN_fixture", "name": namespace,
+                 "protection_rules": [{"type": "required_reviewers"}]}
+    plan, _, calls = environment_plan(workspace, mode, namespace, {namespace: protected})
+    assert plan["auth_namespace"] == namespace
+    assert plan["environment"] == protected
+    assert plan["environments"] == {namespace: protected}
+    assert [call for call in calls if call[0] == "environment"] == [("environment", namespace)]
+
+
+@pytest.mark.parametrize("mode", ["blob", "single-writer"])
+def test_new_factory_reviews_all_default_environment_protections(workspace, mode):
+    inventory = {"Dev": {"id": 7, "name": "Dev", "protection_rules": [{"type": "wait_timer"}]},
+                 "Prod": {"id": 9, "name": "Prod", "deployment_branch_policy": {"protected_branches": True}}}
+    plan, _, _ = environment_plan(workspace, mode, inventory=inventory)
+    assert plan["auth_namespace"] == "Dev"
+    assert plan["environments"] == {name: inventory.get(name) for name in ("Dev", "Stage", "Prod")}
+    assert plan["environment"]["id"] == 7
+
+
+def test_default_environment_policy_drift_blocks_before_repository_writes(workspace):
+    inventory = {"Prod": {"id": 9, "name": "Prod", "protection_rules": []}}
+    plan, runtime, calls = environment_plan(workspace, "single-writer", inventory=inventory)
+    inventory["Prod"] = {**inventory["Prod"], "protection_rules": [{"type": "required_reviewers"}]}
+    with pytest.raises(repository.enrollment.EnrollmentError, match="repository-discovery-changed:environments"):
+        repository.execute(plan, state_dir=workspace[1], runtime=runtime)
+    assert all(call[0] in ("ls-remote", "environment") for call in calls)
+
+
+def test_unbound_legacy_environment_requires_reconciliation(workspace):
+    legacy = "aifactory-" + repository.enrollment.digest({
+        "repository": "https://github.com/example/factory", "provider": "gha",
+        "coordination_mode": "single-writer"})[:20]
+    with pytest.raises(repository.enrollment.EnrollmentError,
+                       match="unbound-legacy-github-environment-requires-reconciliation"):
+        environment_plan(workspace, "single-writer", inventory={legacy: {"id": 7, "name": legacy}})
+
+
+def test_new_default_case_conflict_is_not_a_rename(workspace):
+    with pytest.raises(repository.enrollment.EnrollmentError,
+                       match="github-environment-case-differs-from-reviewed-binding"):
+        environment_plan(workspace, "single-writer", inventory={"Dev": {"id": 7, "name": "dev"}})

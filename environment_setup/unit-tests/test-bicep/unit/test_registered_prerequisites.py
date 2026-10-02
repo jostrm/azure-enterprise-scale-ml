@@ -594,6 +594,109 @@ def test_group_and_vault_execute_with_durable_proof_and_one_use(workspace):
     assert runtime.writes == writes
 
 
+@pytest.mark.parametrize("include_member_fields", [False, True])
+def test_explicit_group_reuse_preserves_members_without_user_lookup(workspace, monkeypatch, include_member_fields):
+    runtime = Runtime()
+    runtime.members[GROUP] = []
+    args = arguments(workspace, team_group_id=GROUP)
+    if not include_member_fields:
+        args["bootstrap_config"].pop("team_group_name")
+        args["bootstrap_config"].pop("team_member_email")
+    groups, members = copy.deepcopy(runtime.groups), copy.deepcopy(runtime.members)
+    graph = runtime.graph
+    reads = []
+
+    def group_read_only(method, path, *args, **kwargs):
+        assert method == "GET" and path == (
+            "groups/" + GROUP + "?$select=id,displayName,securityEnabled,mailEnabled,isAssignableToRole,groupTypes")
+        reads.append(path)
+        return graph(method, path, *args, **kwargs)
+
+    monkeypatch.setattr(runtime, "graph", group_read_only)
+    plan = core.prepare(**args, runtime=runtime)
+    assert plan["can_execute"] and plan["bindings"]["team_group_id"] == GROUP
+    assert not any(effect["kind"].startswith("group-") for effect in plan["effects"])
+    assert "/tenants/" + TENANT + "/groups/" + GROUP in plan["lock_scopes"]
+    assert next(scope["permissions"] for scope in plan["auth_scopes"]
+                if scope["service"] == "graph") == ["Group.Read.All"]
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded", result
+    assert result["bindings"]["team_group_id"] == GROUP
+    assert reads and runtime.groups == groups and runtime.members == members
+    assert not any(write[0] == "graph" for write in runtime.writes)
+
+
+@pytest.mark.parametrize("identifier", ["not-a-guid", "00000000-0000-0000-0000-000000000000", 1, True])
+def test_explicit_group_rejects_invalid_id_before_graph(workspace, monkeypatch, identifier):
+    runtime = Runtime()
+    monkeypatch.setattr(runtime, "graph", lambda *args, **kwargs: pytest.fail("invalid ID reached Graph"))
+    with pytest.raises(core.PrerequisiteError, match="invalid-guid"):
+        core.prepare(**arguments(workspace, team_group_id=identifier), runtime=runtime)
+    assert not runtime.writes
+
+
+@pytest.mark.parametrize("response", [None, {}, [], {"id": MEMBER}, {"id": "not-a-guid"}])
+def test_explicit_group_requires_exact_group_response(workspace, monkeypatch, response):
+    runtime = Runtime()
+    monkeypatch.setattr(runtime, "graph", lambda *args, **kwargs: copy.deepcopy(response))
+    with pytest.raises(core.PrerequisiteError, match="explicit-entra-team-group-id-mismatch"):
+        core.prepare(**arguments(workspace, team_group_id=GROUP), runtime=runtime)
+    assert not runtime.writes
+
+
+def test_explicit_group_missing_never_falls_back_to_name_creation(workspace, monkeypatch):
+    runtime = Runtime(group_exists=False)
+    reads = []
+
+    def missing(method, path, *args, **kwargs):
+        reads.append((method, path))
+        assert method == "GET" and path.startswith("groups/" + GROUP + "?")
+        raise core.PrerequisiteError("graph-request-failed-404")
+
+    monkeypatch.setattr(runtime, "graph", missing)
+    with pytest.raises(core.PrerequisiteError, match="graph-request-failed-404"):
+        core.prepare(**arguments(workspace, team_group_id=GROUP), runtime=runtime)
+    assert len(reads) == 1 and not runtime.writes
+
+
+def test_explicit_group_reuse_rejects_wrong_token_tenant(graph_transport):
+    graph_transport.claims = {"tid": EXTERNAL}
+    builder = core.Builder(graph_transport.cloud)
+    with pytest.raises(core.PrerequisiteError, match="graph-token-tenant-or-lifetime-mismatch"):
+        core._group(builder, {"team_group_id": GROUP}, {"tenant_id": TENANT})
+    assert not graph_transport.calls and not builder.effects
+
+
+def test_explicit_group_reuse_rejects_configured_tenant_mismatch(workspace):
+    runtime = Runtime()
+    with pytest.raises(core.PrerequisiteError, match="registered-config-mismatch:tenant_id"):
+        core.prepare(**arguments(workspace, team_group_id=GROUP, tenant_id=EXTERNAL), runtime=runtime)
+    assert not runtime.writes
+
+
+def test_name_selected_group_still_adds_reviewed_missing_member(workspace):
+    runtime = Runtime()
+    runtime.members[GROUP] = []
+    plan = core.prepare(**arguments(workspace), runtime=runtime)
+    assert {"kind": "group-member-add", "group_id": GROUP, "member_id": MEMBER} in plan["effects"]
+    assert next(scope["permissions"] for scope in plan["auth_scopes"]
+                if scope["service"] == "graph") == ["Group.ReadWrite.All", "User.Read.All"]
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded", result
+    assert runtime.members[GROUP] == [MEMBER]
+
+
+@pytest.mark.parametrize("field,code", [
+    ("team_group_name", "team-group-name-required"), ("team_member_email", "team-member-email-required")])
+def test_name_selected_group_still_requires_name_and_member(workspace, field, code):
+    runtime = Runtime()
+    args = arguments(workspace)
+    args["bootstrap_config"].pop(field)
+    with pytest.raises(core.PrerequisiteError, match=code):
+        core.prepare(**args, runtime=runtime)
+    assert not runtime.writes
+
+
 def test_external_network_plan_never_enrolls_or_tags_hub_as_owned(workspace):
     runtime = Runtime()
     plan = core.prepare(**external_arguments(workspace), runtime=runtime)
@@ -1468,12 +1571,18 @@ def test_existing_gateway_requires_verified_private_dns_resolver(workspace):
                for x in plan["blockers"])
 
 
-@pytest.mark.parametrize("field,value", [("isAssignableToRole", True), ("groupTypes", ["DynamicMembership"])])
-def test_role_assignable_or_dynamic_group_is_not_a_bootstrap_team(workspace, field, value):
+@pytest.mark.parametrize("explicit_group", [False, True])
+@pytest.mark.parametrize("field,value,code", [
+    ("isAssignableToRole", True, "cannot-be-role-assignable-or-dynamic"),
+    ("groupTypes", ["DynamicMembership"], "cannot-be-role-assignable-or-dynamic"),
+    ("securityEnabled", False, "must-be-nonmail-security-group"),
+    ("mailEnabled", True, "must-be-nonmail-security-group"),
+])
+def test_role_assignable_or_dynamic_group_is_not_a_bootstrap_team(workspace, field, value, code, explicit_group):
     runtime = Runtime()
     runtime.groups[GROUP][field] = value
-    with pytest.raises(core.PrerequisiteError, match="cannot-be-role-assignable-or-dynamic"):
-        core.prepare(**arguments(workspace), runtime=runtime)
+    with pytest.raises(core.PrerequisiteError, match=code):
+        core.prepare(**arguments(workspace, **({"team_group_id": GROUP} if explicit_group else {})), runtime=runtime)
     assert not runtime.writes
 
 

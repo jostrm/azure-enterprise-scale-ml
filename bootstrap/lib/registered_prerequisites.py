@@ -313,12 +313,15 @@ class Builder:
 
 
 def _group(builder, config, target):
-    member = builder.graph("users/" + quote(config["team_member_email"], safe="") + "?$select=id")
-    member_id = _guid(member.get("id"))
-    if config.get("team_group_id"):
+    explicit_group = bool(config.get("team_group_id"))
+    if explicit_group:
         group_id = _guid(config["team_group_id"])
         group = builder.graph("groups/" + group_id + "?$select=id,displayName,securityEnabled,mailEnabled,isAssignableToRole,groupTypes")
+        require(isinstance(group, dict) and group.get("id") == group_id,
+                "explicit-entra-team-group-id-mismatch")
     else:
+        member = builder.graph("users/" + quote(config["team_member_email"], safe="") + "?$select=id")
+        member_id = _guid(member.get("id"))
         name = config["team_group_name"]
         rows = builder.graph("groups?$filter=" + quote("displayName eq '" + name.replace("'", "''") + "'", safe="")
                              + "&$select=id,displayName,securityEnabled,mailEnabled,isAssignableToRole,groupTypes").get("value", [])
@@ -330,6 +333,8 @@ def _group(builder, config, target):
                 "entra-team-group-must-be-nonmail-security-group")
         require(not group.get("isAssignableToRole") and "DynamicMembership" not in group.get("groupTypes", []),
                 "entra-team-group-cannot-be-role-assignable-or-dynamic")
+        if explicit_group:
+            return group_id
         members = builder.graph("groups/" + group_id + "/members?$select=id").get("value", [])
         if not any(x.get("id") == member_id for x in members):
             builder.effects.append({"kind": "group-member-add", "group_id": group_id, "member_id": member_id})
@@ -1087,10 +1092,13 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
         require(config.get(field, value) == value, "registered-config-mismatch:" + field)
     require(config.get("access_hub_mode") in ("integrated", "external"), "explicit-access-hub-mode-required")
     require(type(config.get("setup_hub_access")) is bool, "explicit-setup-hub-access-required")
-    require(isinstance(config.get("team_group_name"), str) and 1 <= len(config["team_group_name"]) <= 128
-            and not any(ord(c) < 32 for c in config["team_group_name"]), "team-group-name-required")
-    require(isinstance(config.get("team_member_email"), str)
-            and re.fullmatch(r"[^@\s/]+@[^@\s/]+", config["team_member_email"]), "team-member-email-required")
+    if config.get("team_group_id"):
+        _guid(config["team_group_id"])
+    else:
+        require(isinstance(config.get("team_group_name"), str) and 1 <= len(config["team_group_name"]) <= 128
+                and not any(ord(c) < 32 for c in config["team_group_name"]), "team-group-name-required")
+        require(isinstance(config.get("team_member_email"), str)
+                and re.fullmatch(r"[^@\s/]+@[^@\s/]+", config["team_member_email"]), "team-member-email-required")
     require(re.fullmatch(r"[a-z0-9]{2,16}", str(context.get("location_short", ""))), "location-short-required")
     mode = context.get("coordination_mode", "factory-common")
     require(config.get("coordination_mode", "blob") in ("blob", "single-writer"),
@@ -1245,8 +1253,10 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                 effect["kind"] == "gateway-route-append" and effect["executable"]
                 for effect in builder.effects),
         })
-    locks = sorted(set(owned + hub_scopes + provider_scopes + ["/tenants/" + target["tenant_id"] + "/groups/" +
-                                           digest(config["team_group_name"].casefold())]))
+    group_scope = (_guid(config["team_group_id"]) if config.get("team_group_id")
+                   else digest(config["team_group_name"].casefold()))
+    locks = sorted(set(owned + hub_scopes + provider_scopes +
+                       ["/tenants/" + target["tenant_id"] + "/groups/" + group_scope]))
     plan = {"contract_version": CONTRACT_VERSION, "stage": "privileged-prerequisites",
             "execution_mode": "privileged-bootstrap", "plan_id": str(uuid4()),
             "prepared_at": time.time(), "expires_at": time.time() + 900,
@@ -1274,7 +1284,8 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                            if value in provider_scopes else "external-retained")}
             for value in sorted(set(owned + hub_scopes + provider_scopes))
         ] + gateway_auth_scopes + [{"service": "graph", "tenant_id": target["tenant_id"],
-              "permissions": ["Group.ReadWrite.All", "User.Read.All"] +
+              "permissions": (["Group.Read.All"] if config.get("team_group_id")
+                              else ["Group.ReadWrite.All", "User.Read.All"]) +
                   (["Application.ReadWrite.All"] if config.get("first_party_apps") else [])},
              *([{"service": "storage", "scope": container_id,
                  "purpose": "physical-leases-and-durable-stage-proofs-only"}] if account else

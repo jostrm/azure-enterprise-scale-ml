@@ -341,7 +341,7 @@ MAUI's Full bootstrap has two distinct API phases:
 
 | Phase | MAUI API | CLI surface |
 | --- | --- | --- |
-| Save configuration | `POST /api/v1/creation/prepare`, then `/creation/confirm` | Registered creation launcher (API-backed); generic `api call` also exposes these routes |
+| Save configuration | `POST /api/v1/creation/prepare`, then `/creation/confirm` | Registered creation launcher (API-backed); generic `request` also exposes these routes |
 | Prepare deployment | `POST /api/v1/creation/workflows/prepare` | `bootstrap workflow prepare` |
 | Approve exact stage | `POST /api/v1/creation/workflows/start` | `bootstrap workflow start` |
 | Observe actual progress | `GET /api/v1/creation/workflows/{id}` | `bootstrap workflow status` |
@@ -352,6 +352,13 @@ through the catalog API. It does not supply all Full bootstrap inputs or prove
 that prerequisites have already been created. Do not recreate an occupied
 factory to change routes: read its saved scope and use the compatible backend
 workflow with an explicitly reviewed bootstrap configuration.
+
+With matching updated API and accelerator helpers, a new registered GitHub factory
+reviews and creates missing `Dev`, `Stage` and `Prod` environments, binding only its
+initial Dev deployment to `Dev`. Creating the other two environments does not
+deploy Stage/Prod or create subscriptions. Existing custom/hashed environment
+bindings and protection rules are retained, not migrated. An unbound historical
+hashed environment or conflicting capitalization requires explicit reconciliation.
 
 The interactive registered Full bootstrap launcher asks for an optional existing
 Entra team-group object ID before configuration preparation. Leave it blank to
