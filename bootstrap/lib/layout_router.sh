@@ -20,6 +20,7 @@ AIF_DUAL_LAYOUT_LIBRARIES=(
   factory_enrollment.py
   factory_enrollment_entry.py
   factory_lifecycle.py
+  github_environments.py
   layout_router.sh
   project_deployment.py
   project_environment.py
@@ -289,6 +290,7 @@ aif_ensure_control_bundle_gitignore() {
     "!/lib/factory_enrollment.py"
     "!/lib/factory_enrollment_entry.py"
     "!/lib/factory_lifecycle.py"
+    "!/lib/github_environments.py"
     "!/lib/layout_router.sh"
     "!/lib/project_deployment.py"
     "!/lib/project_environment.py"

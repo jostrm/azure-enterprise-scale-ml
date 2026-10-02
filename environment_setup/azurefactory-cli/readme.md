@@ -1,6 +1,13 @@
 # azurefactory-cli
 
-Stdlib-only Python SDK and CLI for the local AzureFactory configuration API, plus reviewed Azure/provider enrollment. Catalog/configuration commands target the Tkinter/MAUI Python server API; `enrollment plan|ensure` instead use the canonical local enrollment core and explicit Azure/provider authentication. Start with the [runnable API scenarios](../install_config_wizard/api-usage-examples/readme.md) for complete prerequisites, exact UUID selection and central-cloud-team integration guidance.
+Stdlib-only Python SDK and CLI for the local AzureFactory API. Like MAUI, the CLI
+uses the shared Python API for registered Full bootstrap: the server owns the
+provisioning stages, and the client prepares, approves and observes them.
+Advanced `enrollment plan|ensure|plan-and-publish` commands instead use the local
+enrollment core with explicit Azure/provider authentication; they are not an
+additional prerequisite for API-managed Full bootstrap. Start with the
+[runnable API scenarios](../install_config_wizard/api-usage-examples/readme.md)
+for prerequisites, exact UUID selection and central-cloud-team integration.
 
 ## Install
 
@@ -321,7 +328,100 @@ Send only changed fields in `params.json`; use `--unset` only for an intentional
 removal. `--request-json <file>` alternatively accepts a complete typed request,
 including the output of the API examples' `parameter_patch.py`.
 
-Full bootstrap is separate from catalog create and includes common infrastructure plus the initial project:
+### Registered Full bootstrap: the same API as MAUI
+
+Full bootstrap is separate from a configuration-only catalog create. Do not
+require an existing runner, every future resource group, a separate hub VNet for
+integrated mode, or a manually published enrollment binding merely because the
+direct catalog-runtime route requires those things. The server's bootstrap
+workflow reviews and provisions its own prerequisites. Existing resources still
+need matching scope, ownership and permissions.
+
+MAUI's Full bootstrap has two distinct API phases:
+
+| Phase | MAUI API | CLI surface |
+| --- | --- | --- |
+| Save configuration | `POST /api/v1/creation/prepare`, then `/creation/confirm` | Registered creation launcher (API-backed); generic `api call` also exposes these routes |
+| Prepare deployment | `POST /api/v1/creation/workflows/prepare` | `bootstrap workflow prepare` |
+| Approve exact stage | `POST /api/v1/creation/workflows/start` | `bootstrap workflow start` |
+| Observe actual progress | `GET /api/v1/creation/workflows/{id}` | `bootstrap workflow status` |
+| Review next stage | `POST /api/v1/creation/workflows/{id}/prepare-next` | `bootstrap workflow next` |
+
+The existing `factory create` / `catalog confirm` tutorial saves a catalog draft
+through the catalog API. It does not supply all Full bootstrap inputs or prove
+that prerequisites have already been created. Do not recreate an occupied
+factory to change routes: read its saved scope and use the compatible backend
+workflow with an explicitly reviewed bootstrap configuration.
+
+The interactive registered Full bootstrap launcher asks for an optional existing
+Entra team-group object ID before configuration preparation. Leave it blank to
+find/create the named team during bootstrap, or set `AIF_TEAM_GROUP_ID` upfront
+to reuse a group without membership changes. Non-interactive requests are not
+prompted. The current API still requires `team_group_name` and
+`team_member_email` in its Full form, even with a supplied group ID; do not invent
+values or silently drop required API fields.
+
+For deployment, `workflow-request.json` contains `contract_version: 1`,
+`operation: "create-factory"`, `execution_mode: "privileged-bootstrap"`,
+`creation_mode: "full-bootstrap"`, the exact saved `scope` (`folder`, `factory_id`,
+`scale_set_id`, optional `project_id`), `expected_revision` from **`catalog list`'s
+`revision`**, and `bootstrap_config`. Read the API's capabilities and schema for
+the complete bootstrap configuration; do not substitute enrollment options.
+Set `bootstrap_config.coordination_mode` explicitly to `"single-writer"` for a
+reviewed private-repository, no-Blob-coordination deployment. Do not silently
+migrate an existing Blob-bound factory or infer support from the client version.
+
+```powershell
+azurefactory bootstrap capabilities
+azurefactory bootstrap workflow prepare --request-json .\workflow-request.json --save-receipt .\stage-01.receipt.json
+# Review the exact server-returned stage, scope, effects and blockers first.
+azurefactory bootstrap workflow start --receipt .\stage-01.receipt.json --yes
+azurefactory bootstrap workflow status --folder C:\repos\consumer\azurefactory --workflow-id <returned-workflow-uuid>
+# Only when status requires_review is true, prepare the next stage:
+azurefactory bootstrap workflow next --folder C:\repos\consumer\azurefactory --workflow-id <returned-workflow-uuid> --save-receipt .\stage-02.receipt.json
+```
+
+These commands remain API clients: do not invoke local Azure provisioning as a
+fallback. The server determines the stage order and can include repository
+initialization, identity/RG/network foundation, runner registration, connection,
+publication and common/project deployment. Which stages are supported depends
+on the running API and reviewed source. A queued job or a successful individual
+stage is not proof that the entire factory is deployed.
+
+Per-stage approval remains the default. With a compatible API, opt in to one
+bounded Full bootstrap approval instead:
+
+```powershell
+azurefactory bootstrap workflow prepare --whole-workflow --request-json .\workflow-request.json --save-receipt .\workflow.receipt.json
+# Review review.workflow_authorization, all stage effects and review.cost_preview.
+azurefactory bootstrap workflow start --receipt .\workflow.receipt.json --yes
+azurefactory bootstrap workflow status --folder C:\repos\consumer\azurefactory --workflow-id <returned-workflow-uuid>
+```
+
+The API must return the `bounded-full-bootstrap-v1` authorization for the exact
+saved scope and source revision. The CLI validates its content hash and expiry
+before saving or starting the receipt; it does not silently fall back to
+per-stage approval or run a client loop approving future receipts. The server
+owns continuation within the approved scope. Changed inputs, source or scope,
+expired approval, and failed or uncertain stages remain stops requiring review
+or reconciliation.
+
+`review.cost_preview` inventories the saved factory's selected workloads and
+infrastructure. It is advisory and outside the backend authorization hash.
+Missing prices are reported explicitly; an unavailable or partial estimate is
+not a complete factory total and does not block deployment.
+
+If the API reports a safely resumable boundary, `bootstrap workflow continue`
+accepts the original `--folder`, `--workflow-id` and `--authorization-hash`.
+This resumes already-consumed approval only; it is not a retry command for a
+failed or in-flight stage. The separate advanced enrollment convenience wrapper
+below authorizes only enrollment and binding publication, not Full bootstrap.
+
+### Launcher-based bootstrap API
+
+The older `bootstrap prepare/start/status` family targets
+`/api/v1/creation/bootstrap/*`, not MAUI's registered staged workflow above.
+Do not switch to it to bypass a blocked registered stage.
 
 MAUI's **Copy common details** uses the same API as
 `azurefactory bootstrap config --state-json .\wizard-state.json --mapping-mode common-details`.
@@ -349,12 +449,15 @@ operation as configuration-only factory creation.
 
 ## Enroll a registered factory / scale set
 
+This is the separate advanced enrollment route, not the normal prerequisite
+sequence to impose on API-managed Full bootstrap.
+
 First create/add the exact target through `factory create` / `scaleset add` and
 the separate `catalog confirm` flow. Refresh `catalog list` and select its UUIDs.
 Enrollment requires a **schema-2 consumer repository containing
 `azurefactory/register.json`**; an inactive starter, legacy `aifactory` folder,
 subscription from the active `az` context, or `.env` defaults are not substitutes.
-Neither enrollment command needs a running local API or API key. `plan` makes
+Neither `plan` nor `ensure` needs a running local API or API key. `plan` makes
 read-only Azure/provider calls; `ensure` can create billable/additional resources.
 Use an already authenticated, explicitly scoped Azure CLI profile and, for GHA,
 GitHub CLI authentication. The core never signs in or switches subscriptions.
@@ -447,7 +550,7 @@ the CLI derives its `folder` as `<consumer-root>\azurefactory`.
 
 ```powershell
 azurefactory catalog list --folder <consumer-repo>\azurefactory
-azurefactory enrollment prepare-binding --result .\stage.enrollment-result.json --expected-revision <catalog-source-revision> --save-receipt .\stage.binding.receipt.json
+azurefactory enrollment prepare-binding --result .\stage.enrollment-result.json --expected-revision <catalog-list-revision> --save-receipt .\stage.binding.receipt.json
 # STOP: independently review the exact candidate, factory, revision and API preview.
 azurefactory catalog confirm --receipt .\stage.binding.receipt.json --yes
 # Equivalent binding-only confirmation, instead of the preceding command:
@@ -461,6 +564,80 @@ confirmation enforces the server's protected payload/concurrency checks.
 The CLI never writes `register.json` or silently rewrites a binding. Enrollment
 readiness and binding publication are **not** actual deployed-resource readiness;
 runtime preparation must still verify live state.
+
+### Convenience: plan and publish with one bounded approval
+
+The source CLI also provides `enrollment plan-and-publish`. The published
+**v0.47.1 wizard/release binaries are not updated by this source change**.
+Use a CLI installed from this updated checkout and a compatible local catalog API
+that can access the same schema-2 consumer. This is enrollment and binding
+publication, **not full bootstrap or runtime deployment**.
+
+For a **new** binding, omit all Blob-specific options (including
+`public_network_access` from the example above) to default this convenience flow
+to `single-writer`. It uses private provider Git state, no Blob account/data RBAC.
+An existing binding's mode or explicit Blob options are preserved; the original
+`plan` / `ensure` commands keep their existing defaults. A single-writer repository
+must be private. The explicit governance attestation covers serialized provisioning,
+one designated repository writer and shared-hub changes by other repositories;
+it provides no cross-repository exclusion.
+
+The saved factory setting must already match that mode. An absent saved
+`coordination_mode` means Blob in the API, not permission to migrate. The wrapper
+rejects a mismatch before planning or provisioning; configure the intended
+mode through the reviewed catalog API first. It never edits the register to
+make publication succeed.
+
+```powershell
+# Read-only review, including informational cost drivers; exits 3 (approval required).
+azurefactory enrollment plan-and-publish --consumer-root C:\repos\consumer --factory-id <factory-uuid> --scale-set-id <scale-set-uuid> --environment stage --options .\enrollment-options.json --artifact-dir .\stage-review --acknowledge-exclusive-writer-governance
+
+# One explicit approval of the selected scopes/roles, creation and publication.
+azurefactory enrollment plan-and-publish --consumer-root C:\repos\consumer --factory-id <factory-uuid> --scale-set-id <scale-set-uuid> --environment stage --options .\enrollment-options.json --artifact-dir .\stage-publish --expected-orchestrator gha --acknowledge-exclusive-writer-governance --yes
+```
+
+The artifact directory must not exist and its parent must exist. Without
+`create_resource_group_ids` in the **options JSON**, the wrapper derives creation
+permission only for the exact selected writable factory RGs and an explicitly
+selected new identity RG, excluding dependencies and other registered owners.
+These writable selections declare ownership of missing groups; existing factory
+groups still require matching factory/scaleset ownership tags. No arbitrary shared
+dependency, default shared coordination RG, reusable identity RG or subscription
+role grant is silently authorized. Use `"create_resource_group_ids": []` to disable
+automatic RG creation. Explicit creation options and explicit RG role definitions
+remain subject to the original core validation and live rights/deny checks.
+New UAMI creation is already supported by the core; `identity_id` still means
+strict reuse, never a create fallback.
+Before planning, registered `owned_resource_ids` are also checked across all
+factories and scale sets, including those with no binding and no existing Azure
+group. Missing resources do not make another registered owner's scope available.
+
+The wrapper persists effective options, the integrity-bound enrollment plan/result,
+cost preview, exact API binding receipt, pre-mutation intent files and final outcome.
+It prints the cost preview and plan to stderr **before resource writes** and emits
+one final result on stdout. Costs are **unpriced informational drivers**, based on
+the selected region, coordination mode, requested storage SKU and runner. No price
+service or dollar estimate is required; workload services, usage, AI tokens,
+discounts and existing/shared infrastructure costs are explicitly excluded and
+must be reviewed with effective deployment parameters before runtime deployment.
+Pricing links are included; missing pricing never blocks enrollment.
+
+Before ensure, the wrapper reads the current catalog revision (optionally pinned
+with `--expected-revision`). It invokes the unchanged reviewed ensure, then prepares
+and validates the exact candidate/receipt before confirming that receipt. Cloud
+state/register changes, governance/ownership failures, absent GitHub Environments,
+private routing failures, repository claims and API blockers remain real stops,
+not success fallbacks. GitHub Environments must be provisioned separately;
+enrollment may create an absent ADO federated service connection but does not
+authorize all pipelines, create/register runners or install networking.
+
+There is **no automatic mutation retry, replan or rollback**. Partial or uncertain
+work is saved; inspect artifacts, provider claims and live state before retrying.
+After a completed ensure and blocked publication, use the saved `result.json` with
+the separate `prepare-binding` / `publish` flow above, refreshing the catalog
+revision as needed. An intent without its corresponding result means work may
+have happened: do not blindly replay it. `published: true` only means the API
+accepted binding publication; `runtime_ready` remains false.
 
 ### Equivalent Bash entrypoints and runner helpers
 

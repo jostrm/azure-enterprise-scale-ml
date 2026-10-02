@@ -6,13 +6,17 @@ import importlib
 import importlib.util
 from pathlib import Path
 import re
+from types import SimpleNamespace
 
 from .client import redact_secrets
 from .errors import APIError, BlockedError, ConfigError, FailureError
+from .review import load_receipt, validate_preview, write_receipt
 
 
 PLAN_FORMAT = "azurefactory-enrollment-plan-v1"
 RESULT_FORMAT = "azurefactory-enrollment-result-v1"
+BLOB_OPTIONS = {"coordination_storage_mode", "coordination_account_creation", "coordination_account_id",
+                "coordination_resource_group_id", "container", "coordination_blob", "public_network_access"}
 
 
 @lru_cache(maxsize=1)
@@ -212,3 +216,213 @@ def binding_request(result_path, expected_revision):
         return {"folder": str(Path(request["consumer_root"]) / "azurefactory"), "contract_version": 1,
                 "action": "configure-binding", "factory_id": request["target"]["factory_id"],
                 "expected_revision": expected_revision, "binding": binding}
+
+
+def convenience_request(args):
+    """Apply opt-in convenience defaults without changing low-level callers."""
+    implementation = core()
+    options = read_document(args.options)
+    implementation.require(isinstance(options, dict), "invalid-enrollment-options")
+    document = read_document(Path(args.consumer_root) / "azurefactory" / "register.json")
+    if "coordination_mode" not in options:
+        binding = document.get("bindings", {}).get(args.factory_id, {}).get(args.expected_orchestrator)
+        if binding is None:
+            factory = implementation._one(document.get("factories"), "id", implementation.guid(args.factory_id),
+                                         "exact-registered-factory-required")
+            scale = implementation._one(factory.get("scale_sets"), "id", implementation.guid(args.scale_set_id),
+                                       "exact-registered-scaleset-required")
+            binding = document.get("bindings", {}).get(factory["id"], {}).get(scale.get("orchestrator"))
+        mode = (binding["locks"].get("coordination_mode", "blob") if binding else
+                "blob" if BLOB_OPTIONS.intersection(options) else "single-writer")
+        options = {**options, "coordination_mode": mode}
+    request = implementation.load_request(args.consumer_root, args.factory_id, args.scale_set_id,
+                                         args.environment, options)
+    if args.expected_orchestrator and args.expected_orchestrator != request["route"]["kind"]:
+        raise ConfigError("orchestrator-mismatch")
+    if "create_resource_group_ids" not in options:
+        selected = request["target"]
+        shared = set(request["common_dependencies"])
+        for entry in request["existing_bindings"]:
+            for target in entry["binding"]["targets"]:
+                shared.update(implementation.rg_id(x) for x in target.get("common_dependency_ids", []))
+                if entry["factory_id"] != selected["factory_id"] or target["scale_set_id"] != selected["scaleset_id"]:
+                   shared.update(implementation.rg_id(x) for x in target["resource_group_ids"])
+        # Exact writable selections declare the new owner; live ownership checks
+        # still reject every existing unowned/conflicting group before any writes.
+        creation = set(request["scopes"]) - shared
+        identity_group = request["identity_id"].split("/providers/")[0]
+        if (not request["reuse_identity"] and options.get("identity_resource_group_id")
+                and identity_group not in shared
+                and identity_group != request.get("account_id", "").split("/providers/")[0]):
+            creation.add(identity_group)
+        if creation:
+            options = {**options, "create_resource_group_ids": sorted(creation),
+                      "approved_group_creation_scope": "/subscriptions/" + selected["subscription_id"]}
+            request = implementation.load_request(args.consumer_root, args.factory_id, args.scale_set_id,
+                                                 args.environment, options)
+    implementation.require(document == read_document(Path(args.consumer_root) / "azurefactory" / "register.json"),
+                           "consumer-or-request-changed")
+    validate_registered_intent(document, request)
+    return request
+
+
+def validate_registered_intent(document, request):
+    """Reject known catalog publication conflicts before creating Azure resources."""
+    implementation = core()
+    selected = request["target"]
+    settings = document["configurations"][selected["factory_id"]]["factory"]
+    implementation.require(isinstance(settings, dict), "registered-factory-settings-required")
+    saved_mode = settings.get("coordination_mode", "blob")
+    implementation.require(saved_mode in ("blob", "single-writer"), "invalid-saved-coordination-mode")
+    implementation.require(saved_mode == request.get("coordination_mode", "blob"),
+                           "saved-coordination-mode-conflict-configure-through-api-first")
+    writable = set(request["scopes"]) | set(request["create_resource_group_ids"])
+    if not request["reuse_identity"]:
+        writable.add(request["identity_id"].split("/providers/")[0])
+    for factory in document["factories"]:
+        for scale in factory["scale_sets"]:
+            if factory["id"] == selected["factory_id"] and scale["id"] == selected["scaleset_id"]:
+                continue
+            owned = scale.get("owned_resource_ids", [])
+            implementation.require(isinstance(owned, list) and all(isinstance(item, str) for item in owned),
+                                   "invalid-registered-owned-resources")
+            groups = {implementation.rg_id("/".join(item.split("/")[:5])) for item in owned}
+            implementation.require(not groups.intersection(writable), "registered-resource-group-owner-conflict")
+
+
+def cost_preview(request):
+    """An offline, explicitly unpriced preview of what enrollment actually creates."""
+    single = request.get("coordination_mode") == "single-writer"
+    services = [
+        {"service": "Resource groups and managed identity federation", "enabled": True,
+         "region": request["target"]["region"], "sku": None,
+         "resource_group_ids": request["create_resource_group_ids"], "identity_id": request["identity_id"],
+         "drivers": ["Management-plane prerequisites only; workload resources are not deployed by enrollment."]},
+        {"service": "Coordination Blob storage", "enabled": not single,
+         "region": request["target"]["region"] if not single else None,
+         "sku": ((request.get("coordination_account_creation") or {}).get("sku", {}).get("name")
+                or ("Standard_LRS" if not single and request.get("coordination_storage_mode") == "dedicated"
+                    else None)),
+         "sku_basis": "Requested new account only; an existing account is reused unchanged.",
+         "drivers": [] if single else ["Stored GB, transactions, redundancy, transfer and private networking."],
+         "pricing_url": "https://azure.microsoft.com/pricing/details/storage/blobs/"},
+        {"service": "GitHub Actions" if request["route"]["kind"] == "gha" else "Azure Pipelines",
+         "enabled": True, "runner": request["route"]["runner"], "sku": None,
+         "drivers": ["Plan allowances, execution minutes; self-hosted compute/networking are provisioned separately.",
+                    "Private provider Git state is used; no coordination storage or Blob data RBAC." if single
+                    else "Blob leases coordinate writers."],
+         "pricing_url": ("https://docs.github.com/billing/managing-billing-for-your-products/managing-billing-for-github-actions"
+                        if request["route"]["kind"] == "gha" else
+                        "https://azure.microsoft.com/pricing/details/devops/azure-devops-services/")},
+    ]
+    return {"format": "azurefactory-enrollment-cost-preview-v1", "informational": True, "status": "unpriced",
+            "region": request["target"]["region"], "request_hash": core().digest(request),
+            "estimated_total": None, "services": services,
+            "limitations": ["No retail pricing service is required or contacted; this is not a dollar estimate.",
+                           "Existing resource SKUs/regions and usage are not inferred from creation defaults.",
+                           "Full workload services/SKUs, AI tokens, capacity, discounts, taxes and shared costs are not "
+                           "known from enrollment options and are excluded. Review the effective deployment parameters "
+                           "before the separately approved runtime deployment."],
+            "pricing_url": "https://azure.microsoft.com/pricing/calculator/"}
+
+
+def plan_and_publish(args, api, report):
+    """One bounded consent; unchanged plan/ensure and receipt validation contracts."""
+    with guarded():
+        folder = Path(args.artifact_dir).resolve()
+        if folder.exists() or folder.is_symlink() or not folder.parent.is_dir():
+            raise ConfigError("--artifact-dir must be a new directory with an existing parent.")
+        request = convenience_request(args)
+        folder.mkdir()
+        paths = {name: str(folder / filename) for name, filename in (
+            ("options", "options.json"), ("plan", "plan.json"), ("result", "result.json"),
+            ("cost", "cost-preview.json"), ("receipt", "binding.receipt.json"),
+            ("ensure_intent", "ensure-intent.json"),
+            ("intent", "publication-intent.json"), ("publication", "publication.json"),
+            ("outcome", "outcome.json"))}
+        phase, writes_attempted, publication_attempted = "plan", False, False
+
+        def finish(status, **fields):
+            outcome = {"status": status, "phase": phase, "published": False, "runtime_ready": False,
+                      "artifacts": paths, "reconciliation_required": False, **fields}
+            write_document(paths["outcome"], seal(outcome))
+            return outcome
+
+        try:
+            write_document(paths["options"], request["options"])
+            preview = cost_preview(request)
+            write_document(paths["cost"], preview)
+            report({"cost_preview": preview, "approval_scope": {
+                "target": request["target"], "create_resource_group_ids": request["create_resource_group_ids"],
+                "identity_id": request["identity_id"], "deployment_roles": request["deployment_roles"],
+                "coordination_mode": request.get("coordination_mode", "blob"),
+                "note": "--yes approves only this bounded request, never subscription-wide role grants."}})
+            local = SimpleNamespace(**vars(args))
+            local.options, local.save_plan = paths["options"], paths["plan"]
+            review = plan(local)
+            reviewed_request, _ = validate_artifact(read_document(paths["plan"]), PLAN_FORMAT)
+            core().require(reviewed_request == request, "consumer-or-request-changed")
+            report({"enrollment_plan": review})
+            if review.get("can_ensure") is not True or review.get("blockers"):
+                return finish("blocked", blockers=review.get("blockers", []))
+            if not args.yes:
+                return finish("approval-required")
+            phase = "catalog-preflight"
+            catalog_folder = str(Path(request["consumer_root"]) / "azurefactory")
+            catalog = api.catalog_list(catalog_folder)
+            revision = catalog.get("revision")
+            core().require(isinstance(revision, str) and re.fullmatch(r"[a-f0-9]{64}", revision),
+                          "catalog-revision-required")
+            core().require(not args.expected_revision or args.expected_revision == revision,
+                          "catalog-revision-changed")
+            phase = "ensure"
+            write_document(paths["ensure_intent"], seal({
+                "status": "enrollment-pending-or-uncertain", "plan_hash": review["plan_hash"],
+                "expected_catalog_revision": revision,
+                "note": "If result.json is absent, inspect live/provider state before retrying. No automatic retry."}))
+            writes_attempted = True
+            local.plan, local.save_result, local.expected_plan = paths["plan"], paths["result"], review["plan_hash"]
+            result = ensure(local)
+            if (result.get("enrollment_complete") is not True or result.get("blockers")
+                   or result.get("reconciliation_required")):
+                return finish("blocked", result=result,
+                             reconciliation_required=bool(result.get("changed") or result.get("reconciliation_required")))
+            phase = "prepare-binding"
+            body = binding_request(paths["result"], revision)
+            prepared = api.catalog_prepare(body)
+            write_receipt(paths["receipt"], client=api, purpose="catalog-confirm", operation="enrollment-binding",
+                         request_body=body, preview=prepared)
+            if prepared.get("can_execute") is not True or prepared.get("blockers"):
+                return finish("blocked", blockers=prepared.get("blockers", []), enrollment_complete=True)
+            validate_preview(prepared)
+            receipt = load_receipt(paths["receipt"], client=api, purpose="catalog-confirm", operation_mode="configuration")
+            core().require(receipt["operation"] == "enrollment-binding" and receipt["request"] == body,
+                          "enrollment-publication-receipt-changed")
+            phase = "publish"
+            write_document(paths["intent"], seal({
+                "status": "publication-pending-or-uncertain", "receipt_hash": core().digest(receipt),
+                "confirmation_id": receipt["confirmation_id"],
+                "note": "If publication.json is absent, inspect the API catalog before retrying. No automatic retry."}))
+            publication_attempted = True
+            published = api.catalog_confirm(receipt["folder"], receipt["confirmation_id"])
+            write_document(paths["publication"], published)
+            if (type(published.get("contract_version")) is not int or published["contract_version"] != 1
+                   or not isinstance(published.get("catalog"), dict) or published.get("job") is not None):
+                raise FailureError("Invalid publication response; inspect the catalog before retrying.")
+            return finish("published", published=True, enrollment_complete=True)
+        except (APIError, core().EnrollmentError, OSError, ValueError, KeyError, TypeError, AttributeError,
+                RecursionError, KeyboardInterrupt) as exc:
+            # Persist conservative uncertainty even if the response was lost. Never
+            # retry a mutation or erase the core/provider's pending claim.
+            code = exc.code if isinstance(exc, core().EnrollmentError) else getattr(exc, "message", "")
+            if not isinstance(code, str) or not re.fullmatch(r"[a-z0-9-]{1,120}", code):
+                code = "enrollment-or-publication-failed"
+            try:
+                finish("failed", reconciliation_required=writes_attempted,
+                      publication_uncertain=publication_attempted, error=code)
+            except (APIError, core().EnrollmentError, OSError):
+                raise FailureError("Could not persist enrollment outcome; inspect intent files and live state before retrying.") from None
+            if writes_attempted:
+                raise FailureError("Enrollment/publication stopped; inspect saved artifacts and live state before retrying. "
+                                  "No rollback or automatic mutation retry was attempted.") from None
+            raise

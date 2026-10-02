@@ -146,18 +146,14 @@ function Import-Dependencies {
         "subnetCalc_v2.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
             if ($env:GITHUB_ACTIONS -eq 'true') {
-                Install-DependencyIfMissing -Name Subnet -RequiredVersion $subnetVersion
-                Import-Module Subnet -RequiredVersion $subnetVersion -Force
                 break
             }
             Install-DependencyIfMissing -Name Az.Accounts -RequiredVersion $azAccountsVersion
             Install-DependencyIfMissing -Name Az.Resources -RequiredVersion $azResourcesVersion
             Install-DependencyIfMissing -Name Az.Network -RequiredVersion $azNetworkVersion
-            Install-DependencyIfMissing -Name Subnet -RequiredVersion $subnetVersion
             Import-CompatibleAzAccounts
             Import-Module Az.Resources -RequiredVersion $azResourcesVersion -Force
             Import-Module Az.Network -RequiredVersion $azNetworkVersion -Force
-            Import-Module Subnet -RequiredVersion $subnetVersion -Force
         }
         Default {
             Write-Error "Sorry, could not match caller name with any switch conditions..."

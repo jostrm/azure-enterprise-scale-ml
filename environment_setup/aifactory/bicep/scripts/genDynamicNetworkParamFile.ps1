@@ -486,20 +486,9 @@ if ($BYO_subnets_bool -eq $false) {
         -OutputName 'aksSubnetId'
 
     if ([string]::IsNullOrEmpty($aksSubnetId)) {
-        Write-Host "##vso[task.logissue type=warning]AksSubnetId is null or empty. This will likely cause deployment issues. Please delete the 3 project subnets (snt-prj001-genai,snt-prj001-aks,snt-prj001-aca), and set runNetworkingVar=True again."
-        Write-Host "You may need to clean your project resource group first:"
-        Write-Host "- 1) Azure portal: Delete all service in the resource group except keyvault. The private endpoint for keyvault is blocking deletion of a subnet."
-        Write-Host "- 2) Azure portal: Delete the 3 or more subnets(snt-prj001-genai,snt-prj001-aks,snt-prj001-aca) in the COMMON resource group"
-        Write-Host "- 3) ADO variable.yaml: Remove the value in the variable aifactory_salt_random in ADO variable.yaml"
-        Write-Host "- 4) Azure portal:recreate the private endpoint later,after deployment, manually. Example name of pend: kv-p00X-eus2-dev-qoygy01-pend."
-        Write-Host "- 5) POST deployment, add the value to variable aifactory_salt_random"
-    
-
-        # A) Fail the pipeline when aksSubnetId is missing:
-        # Write-Host "##vso[task.complete result=Failed;]AksSubnetId is null or empty. The AKS deployment will fail without a valid subnet ID."
-        #
-        # B) provide a default or dummy value to allow the template to be created
-        $aksSubnetId = "MISSING_REQUIRED_SUBNET_ID"
+        Write-Host "##vso[task.logissue type=error]AKS subnet output is missing from '$($deploymentPrefix)SubnetDeplProj' in '$lookupResourceGroup'."
+        Write-Host "Verify the project/environment and deployment result, then rerun with runNetworkingVar=True to reuse existing subnets and allocate only missing ranges."
+        Write-Host "Do not delete or renumber existing subnets, services, or private endpoints to recover an allocation failure."
         exit 1
     }
 

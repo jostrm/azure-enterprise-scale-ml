@@ -1,8 +1,7 @@
 # Description:
 #   This script is used to generate ARM parameters that contain subnet addressprefix specifications.
-#   The generation is based on a caluclation performed on an existing virtual network. If gaps are detected these
-#   will be filled. If no gaps are found, the subnets are appended to the end of the vnet subnet list. The required subnets
-#   are specified in the $requiredSubnets PSObject.
+#   Allocate aligned free IPv4 gaps, preserving existing subnet identities and ranges.
+#   Allocation is deterministic for a given Azure inventory; deployments sharing a VNet must be serialized.
 
 param (
     # Optional JSON files (backwards compatibility)
@@ -38,6 +37,7 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Virtual network resource group base")][string]$vnetResourceGroupBase,
     [Parameter(Mandatory = $false, HelpMessage = "Virtual network resource group parameter override")][string]$vnetResourceGroup_param,
     [Parameter(Mandatory = $false, HelpMessage = "Virtual network full name parameter override")][string]$vnetNameFull_param,
+    [Parameter(Mandatory = $false, HelpMessage = "Project number used in deployed subnet names, e.g. 001; otherwise read from the JSON parameters")][string]$projectNumber,
 
     # Optional subnet CIDR overrides (defaults match legacy values for projectTypeADO=all)
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for GenAI subnet when projectType=all")][string]$genaiSubnetCidrAll = '25',
@@ -50,236 +50,146 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for DBX private subnet when projectType=all")][string]$dbxPrivSubnetCidrAll = '26'
 )
 
-filter ConvertTo-BinaryIP {
-    [CmdletBinding()]
-    [OutputType([String])]
-    param (
-        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
-        [string]$IPAddress
-    )
-    try {
-        $ipObj = [System.Net.IPAddress]::Parse($IPAddress)
-        $binaryOctets = $ipObj.GetAddressBytes() | ForEach-Object {
-            [Convert]::ToString($_, 2).PadLeft(8, '0')
-        }
-        Write-Output ($binaryOctets -join '.')
-    } catch {
-        Write-Error "Invalid IP address: $IPAddress"
+$ErrorActionPreference = 'Stop'
+
+function ConvertTo-IPv4Range {
+    param([Parameter(Mandatory = $true)][string]$Cidr)
+    if ($Cidr -notmatch '^(\d{1,3}\.){3}\d{1,3}/(0|[1-9]|[12]\d|3[0-2])$') {
+        throw "Invalid IPv4 CIDR '$Cidr'; IPv6 allocation is not supported."
     }
+    $address, $mask = $Cidr.Split('/')
+    [uint64]$start = 0
+    foreach ($octet in $address.Split('.')) {
+        if ([int]$octet -gt 255 -or ([int]$octet).ToString() -ne $octet) {
+            throw "Invalid IPv4 CIDR '$Cidr'."
+        }
+        $start = $start * 256 + [int]$octet
+    }
+    [uint64]$size = [math]::Pow(2, 32 - [int]$mask)
+    if ($start % $size -ne 0) { throw "IPv4 CIDR '$Cidr' is not network-aligned." }
+    # Exclusive ends use UInt64 so 255.255.255.255 never wraps around.
+    [pscustomobject]@{ Start = $start; End = $start + $size; Cidr = $Cidr }
 }
 
-filter ConvertTo-DottedDecimalIP {
-    [CmdletBinding()]
-    [OutputType([System.Net.IPAddress])]
-    param(
-        [Parameter(Mandatory = $true, Position = 0, ValueFromPipeline = $true)]
-        [String]$IPAddress
-    )
-    switch -regex ($IPAddress) {
-        '^([01]{8}\.){3}[01]{8}$' {
-            [Byte[]]$bytes = $IPAddress -split '\.' | ForEach-Object {
-                [Convert]::ToByte($_, 2)
-            }
-            Write-Output ([System.Net.IPAddress]::new($bytes))
-        }
-        '^\d+$' {
-            $int = [UInt32]$IPAddress
-            [Byte[]]$bytes = @(
-                ($int -shr 24) -band 0xFF
-                ($int -shr 16) -band 0xFF
-                ($int -shr 8)  -band 0xFF
-                $int           -band 0xFF
-            )
-            Write-Output ([System.Net.IPAddress]::new($bytes))
-        }
-        default { Write-Error "Cannot convert this format: $IPAddress" }
-    }
+function ConvertFrom-IPv4Number {
+    param([uint64]$Number)
+    return (@(($Number -shr 24) -band 255; ($Number -shr 16) -band 255;
+        ($Number -shr 8) -band 255; $Number -band 255) -join '.')
 }
 
-function Find-NextIpAddress {
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$ipAddress
-    )
-    $ip = [System.Net.IPAddress]::Parse($ipAddress)
-    $bytes = $ip.GetAddressBytes()
-    [array]::Reverse($bytes)
-    $intIp = [BitConverter]::ToUInt32($bytes, 0)
-    $intIp++
-    $nextBytes = [BitConverter]::GetBytes($intIp)
-    [array]::Reverse($nextBytes)
-    return ([System.Net.IPAddress]::new($nextBytes)).ToString()
-}
-
-function Get-SubnetFitting {
-    param (
-        [Parameter(Mandatory = $true)][string]$addressSpace,
-        [Parameter(Mandatory = $true)][string]$cidrNotation,
-        [Parameter(Mandatory = $false)][string]$endAddress,
-        [Parameter(Mandatory = $false)][string]$excludeAddress = "None"
-    )
-    $addressSpaceIp, $addressSpaceCidr = $addressSpace -split "/"
-    $possibleValues = @()
-    $lastBroadcast = (Get-Subnet $addressSpaceIp -MaskBits $addressSpaceCidr).BroadcastAddress.IPAddressToString
-    $startIp = $addressSpaceIp
-
-    while ($true) {
-        $subnet = Get-Subnet $startIp -MaskBits $cidrNotation
-        $networkAddress = $subnet.NetworkAddress.IPAddressToString
-
-        if ($endAddress -and $networkAddress -eq $endAddress) { break }
-
-        if ($networkAddress -ne $excludeAddress) {
-            $possibleValues += $networkAddress
-        }
-
-        $currentBroadcast = $subnet.BroadcastAddress.IPAddressToString
-        if ($currentBroadcast -eq $lastBroadcast) { break }
-
-        $startIp = Find-NextIpAddress $currentBroadcast
-    }
-    return ,$possibleValues
-}
-
-function Get-CidrValidity {
-    <#
-    .SYNOPSIS
-    Checks if the given subnet cidr expression is valid within an address space
-    Returns booleans
-    
-    .PARAMETER subnetCidr
-    A string value that represents a possible subnet
-
-    .PARAMETER possibleValues
-    An array with all valid values. Such an array is calculated with the Get-SubnetFitting function
-    
-    .EXAMPLE
-    Get-CidrValidity  subnetCidr "10.100.1.0" possibleValues $(Get-SubnetFitting  -addressSpace "10.100.0.0/16" -cidrNotation "/24")
-    #>
-    param (
-        $subnetCidr,
-        $possibleValues
-    )
-    if ($possibleValues.Contains($subnetCidr)) {
-        return $true
-    }
-    else {
-        return $false
-    }
-}
-
-function Find-GapsInVnet {
-    param (
-        [Parameter(Mandatory = $true)]$vnetObj,
-        [Parameter(Mandatory = $true)]$cidrs
-    )
-
-    $gaps = [PSCustomObject]@{
-        allocatableNetworks = [PSCustomObject]@{}
-    }
-
-    # Prepare unique CIDRs to calculate
-    $cidrsToCalculate = @($cidrs.GetEnumerator() | ForEach-Object { $_.value }) | Select-Object -Unique
-    foreach ($cidr in $cidrsToCalculate) {
-        $gaps.allocatableNetworks | Add-Member -Name $cidr -Type NoteProperty -Value @()
-    }
-
-    $vnetAddressSpaceSize = $vnetObj.AddressSpace.AddressPrefixes[0].split("/")[1]
-    $existingSubnetCidrNotations = @($vnetObj.Subnets | ForEach-Object { $_.AddressPrefix } | Sort-Object)
-    $existingSubnetAddresses = @($existingSubnetCidrNotations | ForEach-Object { $_.Split("/")[0] })
-
-    for ($index = 0; $index -lt $existingSubnetCidrNotations.Count; $index++) {
-        $current = $existingSubnetCidrNotations[$index]
-        $address, $cidr = $current -split "/"
-        $subnetObj = Get-Subnet $address -MaskBits $cidr
-        $nextAddress = Find-NextIpAddress -ipAddress $subnetObj.BroadcastAddress.IPAddressToString
-
-        $endAddress = $null
-        if ($index + 1 -lt $existingSubnetCidrNotations.Count) {
-            $endAddress = $existingSubnetCidrNotations[$index + 1].split("/")[0]
-        }
-
-        foreach ($calcCidr in $cidrsToCalculate) {
-            if (-not $existingSubnetAddresses.Contains($nextAddress)) {
-                $identifiedSubnetRanges = Get-SubnetFitting `
-                    -addressSpace "$nextAddress/$vnetAddressSpaceSize" `
-                    -cidrNotation $calcCidr `
-                    -endAddress $endAddress `
-                    -excludeAddress $address `
-                    -ErrorAction Stop
-                foreach ($x in $identifiedSubnetRanges) {
-                    $gaps.allocatableNetworks.$calcCidr += $x
-                }
-            }
-        }
-    }
-    return $gaps
-}
 function New-SubnetScheme {
-    param (
-        [Parameter(Mandatory = $true)]$map,
-        [Parameter(Mandatory = $true)]$startIp,
-        [Parameter(Mandatory = $true)]$possibleValuesMap,
-        [Parameter(Mandatory = $false)][int]$maxRetries = 10
+    param(
+        [Parameter(Mandatory = $true)][hashtable]$map,
+        [Parameter(Mandatory = $true)]$vnetObj,
+        [Parameter(Mandatory = $true)][string]$projectNumber
     )
-    # Sort by subnet size descending (largest first = lowest CIDR number first, e.g. /23 before /26)
-    $sortedSubnetMap = $map.GetEnumerator() | Sort-Object -Property Value
-    $allocatedIps = @()
-    $result = @{}
-    $startIpVnet = ($startIp -split '\.')[0..1] -join '.' # More robust vNet prefix
-    $retryCount = @{}
-
-    for ($index = 0; $index -lt $sortedSubnetMap.Count; $index++) {
-        $currentKey = $sortedSubnetMap[$index].Key
-        $currentValue = $sortedSubnetMap[$index].Value
-
-        # Initialize retry counter for this subnet if not exists
-        if (-not $retryCount.ContainsKey($currentKey)) {
-            $retryCount[$currentKey] = 0
+    if ($projectNumber -notmatch '^\d{1,3}$') {
+        throw "A projectNumber of one to three digits is required to preserve deployed subnet identities."
+    }
+    $suffixes = @{
+        aksSubnetCidr = 'aks'; aks2SubnetCidr = 'aks-002'
+        acaSubnetCidr = 'aca'; aca2SubnetCidr = 'aca-002'
+        genaiSubnetCidr = 'genai'; webappSubnetCidr = 'webapp'
+        dbxPubSubnetCidr = 'dbxpub'; dbxPrivSubnetCidr = 'dbxpriv'
+    }
+    foreach ($entry in $map.GetEnumerator()) {
+        if (-not $suffixes.ContainsKey($entry.Key) -or
+            [string]$entry.Value -notmatch '^([1-9]|[12]\d|3[0-2])$') {
+            throw "Invalid subnet mask or parameter '$($entry.Key)=$($entry.Value)'."
         }
+    }
+    $spaces = @($vnetObj.AddressSpace.AddressPrefixes | ForEach-Object {
+        ConvertTo-IPv4Range $_
+    } | Sort-Object Start)
+    if ($spaces.Count -eq 0) { throw "VNet has no IPv4 address prefixes." }
+    for ($i = 1; $i -lt $spaces.Count; $i++) {
+        if ($spaces[$i].Start -lt $spaces[$i - 1].End) {
+            throw "VNet address prefixes overlap."
+        }
+    }
+    if ($null -eq $vnetObj.Subnets) { throw "VNet subnet inventory is missing." }
+    $occupied = @()
+    $byName = @{}
+    foreach ($subnet in $vnetObj.Subnets) {
+        if ([string]::IsNullOrWhiteSpace($subnet.Name) -or $byName.ContainsKey($subnet.Name)) {
+            throw "VNet inventory contains a missing or duplicate subnet name."
+        }
+        $prefixes = @()
+        if ($null -ne $subnet.AddressPrefixes) { $prefixes += @($subnet.AddressPrefixes) }
+        if ($null -ne $subnet.AddressPrefix) { $prefixes += @($subnet.AddressPrefix) }
+        foreach ($prefix in $prefixes) {
+            if ($prefix -isnot [string] -or [string]::IsNullOrWhiteSpace($prefix)) {
+                throw "Subnet '$($subnet.Name)' contains an invalid IPv4 CIDR value."
+            }
+        }
+        $prefixes = @($prefixes | Select-Object -Unique)
+        if ($prefixes.Count -eq 0) { throw "Subnet '$($subnet.Name)' has no address prefixes." }
+        $ranges = @($prefixes | ForEach-Object { ConvertTo-IPv4Range $_ })
+        foreach ($range in $ranges) {
+            if (-not @($spaces | Where-Object {
+                $range.Start -ge $_.Start -and $range.End -le $_.End
+            }).Count) { throw "Subnet '$($subnet.Name)' is outside the VNet address prefixes." }
+            $occupied += $range
+        }
+        $byName[$subnet.Name] = $ranges
+    }
+    $occupied = @($occupied | Sort-Object Start)
+    for ($i = 1; $i -lt $occupied.Count; $i++) {
+        if ($occupied[$i].Start -lt $occupied[$i - 1].End) {
+            throw "Existing subnet address prefixes overlap."
+        }
+    }
 
-        # If value is just a subnet mask (e.g., '24'), calculate CIDR
-        if ($currentValue -match '^\d{1,2}$') {
-            $subnet = Get-Subnet $startIp -MaskBits $currentValue
-            $valid = Get-CidrValidity -subnetCidr $startIp -possibleValues $possibleValuesMap[$currentValue]
-
-            if ($valid -and ($allocatedIps -notcontains $startIp)) {
-                $result[$currentKey] = "$startIp/$currentValue"
-                $allocatedIps += $startIp
-                $startIp = Find-NextIpAddress $subnet.BroadcastAddress.IPAddressToString
-                # Reset retry counter on success
-                $retryCount[$currentKey] = 0
-            } else {
-                $retryCount[$currentKey]++
-                
-                if ($retryCount[$currentKey] -gt $maxRetries) {
-                    Write-Host "Warning: Maximum retry attempts ($maxRetries) reached for subnet $currentKey. Skipping to next subnet."
-                    continue
-                }
-                
-                $startIp = Find-NextIpAddress $subnet.BroadcastAddress.IPAddressToString
-                $currentVnet = ($startIp -split '\.')[0..1] -join '.'
-                Write-Host "Start vNet $startIpVnet"
-                Write-Host "Current vNet $currentVnet"
-                if ($startIpVnet -ne $currentVnet) {
-                    Write-Host "Error! Full vNet, cannot Find-NextIpAddress. Create new vNet or increase existing vNet - $startIpVnet"
+    $result = @{}
+    # Preserve even a legacy size that differs from today's defaults; never resize a deployed subnet.
+    foreach ($key in $map.Keys) {
+        $name = "snt-prj$projectNumber-$($suffixes[$key])"
+        if ($byName.ContainsKey($name)) {
+            if ($byName[$name].Count -ne 1) {
+                throw "Project subnet '$name' has multiple prefixes; the Bicep addressPrefix parameter requires one."
+            }
+            $result[$key] = $byName[$name][0].Cidr
+        }
+    }
+    # Match the registered API projection: largest first, then logical key (aca before aca2).
+    foreach ($entry in ($map.GetEnumerator() | Sort-Object @{Expression = { [int]$_.Value }},
+        @{Expression = { $_.Key -replace 'SubnetCidr$', '' }})) {
+        if ($result.ContainsKey($entry.Key)) { continue }
+        [uint64]$size = [math]::Pow(2, 32 - [int]$entry.Value)
+        $chosen = $null
+        foreach ($space in $spaces) {
+            [uint64]$cursor = $space.Start
+            $blocks = @($occupied | Where-Object {
+                $_.Start -ge $space.Start -and $_.End -le $space.End
+            } | Sort-Object Start)
+            # The sentinel also checks the free tail and an entirely empty prefix.
+            foreach ($block in @($blocks) + @([pscustomobject]@{ Start = $space.End; End = $space.End })) {
+                [uint64]$aligned = [math]::Ceiling($cursor / $size) * $size
+                if ($aligned + $size -le $block.Start) {
+                    $chosen = [pscustomobject]@{ Start = $aligned; End = $aligned + $size }
                     break
                 }
-                # Decrement $index to retry the same subnet with the new IP address
-                $index--
-                continue
+                $cursor = $block.End
             }
-        } else {
-            # Already a full CIDR, just assign
-            $result[$currentKey] = $currentValue
+            if ($null -ne $chosen) { break }
         }
+        if ($null -eq $chosen) {
+            throw "No aligned free /$($entry.Value) range for '$($entry.Key)' in VNet; exhausted or fragmented. Existing subnets were not changed."
+        }
+        $result[$entry.Key] = "$(ConvertFrom-IPv4Number $chosen.Start)/$($entry.Value)"
+        $occupied += $chosen
     }
     return $result
 }
-Import-Module -Name "./modules/pipelineFunctions.psm1"
+
+Import-Module -Name (Join-Path $PSScriptRoot 'modules/pipelineFunctions.psm1')
 Import-Dependencies
 
 # This function will convert the parameters nest of the arm tempate parameters file to global variables
+if (($bicepPar1 -or $bicepPar2 -or $bicepPar3 -or $bicepPar4 -or $bicepPar5) -and
+    -not ($bicepPar1 -and $bicepPar2 -and $bicepPar3 -and $bicepPar4 -and $bicepPar5)) {
+    throw "Supply all five JSON parameter files or use inline parameters only."
+}
 if ($bicepPar1 -and $bicepPar2 -and $bicepPar3 -and $bicepPar4 -and $bicepPar5) {
     Write-Host "Loading parameters from JSON files..."
     $jsonParameters1 = Get-Content -Path $bicepPar1 | ConvertFrom-Json
@@ -288,12 +198,17 @@ if ($bicepPar1 -and $bicepPar2 -and $bicepPar3 -and $bicepPar4 -and $bicepPar5) 
     $jsonParameters4 = Get-Content -Path $bicepPar4 | ConvertFrom-Json
     $jsonParameters5 = Get-Content -Path $bicepPar5 | ConvertFrom-Json
 
-    # all values that are present in parameters.json will be converted to variables
-    ConvertTo-Variables -InputObject $jsonParameters1
-    ConvertTo-Variables -InputObject $jsonParameters2
-    ConvertTo-Variables -InputObject $jsonParameters3
-    ConvertTo-Variables -InputObject $jsonParameters4
-    ConvertTo-Variables -InputObject $jsonParameters5
+    # Module-scoped globals are shadowed by script parameters. Load supported
+    # parameters locally, in file order, without overriding explicit arguments.
+    foreach ($parameters in @($jsonParameters1, $jsonParameters2, $jsonParameters3, $jsonParameters4, $jsonParameters5)) {
+        if ($null -eq $parameters.parameters) { throw "JSON input is missing its parameters object." }
+        foreach ($parameter in $parameters.parameters.PSObject.Properties) {
+            if ($MyInvocation.MyCommand.Parameters.ContainsKey($parameter.Name) -and
+                -not $PSBoundParameters.ContainsKey($parameter.Name)) {
+                Set-Variable -Scope Script -Name $parameter.Name -Value $parameter.Value.value
+            }
+        }
+    }
 }
 else {
     Write-Host "Using inline parameters instead of JSON files..."
@@ -353,7 +268,8 @@ $vnetObj = $null
 
 $hasAzureContext = $env:GITHUB_ACTIONS -eq 'true'
 if (-not $hasAzureContext) {
-    $hasAzureContext = $(Get-AzContext).Subscription -ne ""
+    $context = Get-AzContext
+    $hasAzureContext = $null -ne $context.Subscription -and $context.Subscription.Id -eq $subscriptionId
 }
 if ($hasAzureContext) {
     if ($env:GITHUB_ACTIONS -eq 'true') {
@@ -410,17 +326,7 @@ if ($hasAzureContext) {
             }
         }
         else {
-            write-host "projectTypeADO=not supported value: '$($projectTypeADO)'"
-            $requiredSubnets = [PsObject]@{
-                genaiSubnetCidr   = $genaiSubnetCidrAll
-                aksSubnetCidr     = $aksSubnetCidrAll # 26 is min Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
-                aks2SubnetCidr    = $aks2SubnetCidrAll # AKS: 24 since 26 provides error on 1 node cluster. Azure CNI, Kubenet. Pre***allocated IPs 29 exceeds IPs available 27 in Subnet Cidr 10.77.41.0/27
-                acaSubnetCidr     = $acaSubnetCidrAll # Workload Profiles Environment: Minimum subnet size is /27. Consumption Only Environment: Minimum subnet size is /23
-                aca2SubnetCidr    = $aca2SubnetCidrAll # AI foundry project (v2, est 2025): The recommended size of the delegated Agent subnet is /24 (256 addresses) due to the delegation of the subnet to Microsoft.App/environment. Subnets smaller than /23 are rejected at provisioning time—the control plane can’t allocate enough addresses for the infrastructure scale sets—so the Cognitive Services RP keeps the account in Creating
-                webappSubnetCidr  = $webappSubnetCidrAll # Dedicated App Service/Function VNet integration subnet (Microsoft.Web/serverFarms delegation). Min /28; /27 = 32 addresses
-                dbxPubSubnetCidr  = $dbxPubSubnetCidrAll # 23-26
-                dbxPrivSubnetCidr = $dbxPrivSubnetCidrAll # 23-26
-            }
+            throw "Unsupported projectTypeADO '$projectTypeADO'. Expected esml, genai-1 or all."
         }
     }
 
@@ -452,6 +358,7 @@ if ($hasAzureContext) {
     elseif ($PSBoundParameters.ContainsKey('commonResourceSuffix') -and $commonResourceSuffix) {
         # Already set from inline parameter
     }
+    if ($locationADO) { $location = $locationADO }
 
     $vnetName = if ($null -eq $vnetNameFull_param -or $vnetNameFull_param -eq "" ) 
     {
@@ -487,19 +394,7 @@ if ($hasAzureContext) {
         $vnetObj = Get-AzVirtualNetwork -ResourceGroupName $vnetResourceGroup -Name $vnetName
     }
 
-    $lastAllocatedNetwork, $lastAllocatedCidr = @($vnetObj.Subnets | Sort-Object { $_.AddressPrefix.split("/")[0] -as [Version]} -Bottom 1)[0].AddressPrefix.split("/") # JOSTRM fixed sort (version and no CIDR, instead of "string sort" and CIDR)
-    $startIp  = Find-NextIpAddress $(Get-Subnet $lastAllocatedNetwork -MaskBits $lastAllocatedCidr).BroadcastAddress.IPAddressToString
-    
-    Write-Host "01 lastAllocatedNetwork: $($lastAllocatedNetwork)"
-    Write-Host "02 lastAllocatedCidr: $($lastAllocatedCidr)"
-    Write-Host "03 startIp: $($startIp)"
-
-    $possibleValuesForCidrNotations = @{}
-    $requiredSubnets.values | Select-Object -Unique | Sort-Object -Property Value | Foreach-Object {
-        $possibleValuesForCidrNotations[$_] = Get-SubnetFitting -addressSpace $vnetObj.AddressSpace.AddressPrefixes[0] -cidrNotation $_
-    }
-
-    $result = New-SubnetScheme -map $requiredSubnets -startIp $startIp -possibleValuesMap $possibleValuesForCidrNotations
+    $result = New-SubnetScheme -map $requiredSubnets -vnetObj $vnetObj -projectNumber $projectNumber
     Write-Host "Result:"
     Write-Host "Resource group for vNet: $($vnetResourceGroup)"
     Write-Host "vNet: $($vnetName)"
@@ -675,5 +570,5 @@ if ($hasAzureContext) {
     Write-host "Parameter: vnetResourceGroup is: $vnetResourceGroup"
 
 }else{
-    write-host "Failed to login"
+    throw "No authenticated Azure context for subscription '$subscriptionId'."
 }

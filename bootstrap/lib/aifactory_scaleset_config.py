@@ -431,14 +431,26 @@ def simple_mode_hub_subnets(cidr: str, existing: list[dict[str, Any]],
     occupied = [ipaddress.ip_network(value) for value in planned.values()]
     occupied.extend(ipaddress.ip_network(prefix) for subnet in existing
                     for prefix in (subnet.get("addressPrefixes") or [subnet.get("addressPrefix")]))
-    cursor = max(int(subnet.broadcast_address) for subnet in occupied) + 1
-    # subnetCalc_v2 appends largest-first after the highest subnet. Account for
-    # alignment, not just the total address budget.
-    for prefix in (23, 23, 24, 25, 26, 26, 26, 27):
+    # Match subnetCalc_v2's aligned first-fit policy without moving existing project 001.
+    requests = [(23, "aca"), (23, "aca-002"), (24, "aks-002"), (25, "genai"),
+                (26, "aks"), (26, "dbxpriv"), (26, "dbxpub"), (27, "webapp")]
+    names = {subnet["name"].lower() for subnet in existing}
+    for prefix, suffix in requests:
+        if f"snt-prj001-{suffix}" in names:
+            continue
         size = 1 << (32 - prefix)
-        cursor = ((cursor + size - 1) // size) * size + size
-    if cursor - 1 > int(network.broadcast_address):
-        raise ValueError("Existing subnets leave no room for the full Simple Mode project; use a fresh scale set")
+        cursor = int(network.network_address)
+        blocks = sorted((int(subnet.network_address), int(subnet.broadcast_address) + 1)
+                        for subnet in occupied)
+        end = int(network.broadcast_address) + 1
+        for start, stop in [*blocks, (end, end)]:
+            aligned = ((cursor + size - 1) // size) * size
+            if aligned + size <= start:
+                occupied.append(ipaddress.ip_network((aligned, prefix)))
+                break
+            cursor = max(cursor, stop)
+        else:
+            raise ValueError("Existing subnets leave no room for the full Simple Mode project; use a fresh scale set")
     return planned
 
 
@@ -814,8 +826,8 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
         **plan,
         "project_number_000": state["project_number"],
         "project_IP_whitelist": state.get("ip_allowlist", ""),
-        "technical_admins_ad_object_id": group_id,
-        "technical_admins_email": state["team_group_name"],
+        "technical_admins_ad_object_id": state.get("admin_group_id") or group_id,
+        "technical_admins_email": state.get("admin_member_email") or state["team_group_name"],
         "project_service_principal_AppID_seeding_kv_name": project_sp.get("app_id", ""),
         "project_service_principal_OID_seeding_kv_name": project_sp.get("object_id", ""),
         "project_service_principal_Secret_seeding_kv_name": project_sp.get("secret", ""),
@@ -831,11 +843,12 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
         values.update(simple_mode_values(
             state.get("cost_center") or "123456", state.get("simple_project_resources_json"),
             state.get("github_repository_visibility") or "private"))
-        values["technical_admins_email"] = state.get("team_member_email") or state["team_group_name"]
+        values["technical_admins_email"] = state.get("admin_member_email") or state.get("team_member_email") or state["team_group_name"]
         # GHA passes tags directly to ARM, so resolve the cost center rather than
         # exporting ADO's $(...) expressions into GitHub Actions.
         tags = {"CostCenter": values["tag_costcenter"], "AIF-Scaleset": state["scaleset_suffix"],
-                "AIF-Environment": "dev", "AIF-Project Owners": values["technical_admins_email"]}
+                "AIF-Environment": "dev",
+                "AIF-Project Owners": state.get("team_member_email") or state["team_group_name"]}
         values["tags"] = json.dumps({**tags, "Description": "AI Factory common"})
         values["tagsProject"] = json.dumps({**tags, "AIFactory project": "001"})
     return values
@@ -979,7 +992,7 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         env_values.update(simple_mode_env_values(common))
         env_values["TAGS"] = common["tags"]
         env_values["TAGS_PROJECT"] = common["tagsProject"]
-        env_values["PROJECT_MEMBERS_EMAILS"] = common["technical_admins_email"]
+        env_values["PROJECT_MEMBERS_EMAILS"] = state.get("team_member_email") or state["team_group_name"]
     env_values.update({env: common[key] for key, env in PROJECT_ORGANIZATION_ENV.items() if key in common})
     for key, name in (("github_runner_name", "GHA_RUNNER_NAME"), ("github_runner_label", "GHA_RUNNER_LABEL")):
         if state.get(key):

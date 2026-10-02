@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from uuid import UUID
 
 import release_version
 
@@ -217,6 +218,16 @@ def creation_input(args, root, version, environ):
             raise ValueError("External hub requires explicit reviewed coordinates: " + ", ".join(missing_external))
     elif any(config.get(key) for key in external_fields):
         raise ValueError("External hub coordinates require AIF_ACCESS_HUB_MODE=external; they are never silently ignored.")
+    if not simple and not config.get("team_group_id") and not args.non_interactive and sys.stdin.isatty():
+        group_id = input("Existing Entra team group object ID (blank: find/create the named group during bootstrap): ").strip()
+        if group_id:
+            try:
+                parsed = UUID(group_id)
+            except ValueError:
+                raise ValueError("Supply a canonical nonzero Entra group object ID, not its name.") from None
+            if not parsed.int or str(parsed) != group_id:
+                raise ValueError("Supply a canonical nonzero Entra group object ID, not its name.")
+            config["team_group_id"] = group_id
     required = ["subscription_id", "tenant_id", "factory_prefix", "location",
                 "team_member_email", "team_group_name"]
     required += (["github_repository"] if args.provider == "gha" else
@@ -324,8 +335,11 @@ def prepare(args, root, version):
     wrapper = Path(__file__).resolve().parents[1] / "azurefactory.sh"
     if wrapper.is_file():
         print(f'Or use: bash "{wrapper.as_posix()}" catalog confirm --receipt "{receipt_path}" --yes')
-    print("After confirmation, inspect catalog IDs and generated project variables; complete enrollment/binding separately.")
-    print("Deploy only after a NEW runtime prepare/review/confirm with exact factory, scale-set and project IDs.")
+    print("After confirmation, inspect catalog IDs and generated project variables.")
+    print("Full bootstrap uses the same API workflow as MAUI: azurefactory bootstrap workflow prepare/start/status/next.")
+    print("Provide the saved scope, current catalog revision and complete reviewed bootstrap_config; do not create the factory again.")
+    print("The API reviews its own prerequisites. Separate local enrollment is not an additional Full bootstrap requirement.")
+    print("For an already enrolled direct-runtime route, use a NEW runtime prepare/review/confirm with exact saved IDs.")
     print("Published source/ref verification and protected manifests remain mandatory for runtime; no dirty source is installed or published.")
     if os.environ.get("AIF_SUBMODULE_REF"):
         print("AIF_SUBMODULE_REF is not executed or installed by configuration; select and verify it in the separate runtime review.")

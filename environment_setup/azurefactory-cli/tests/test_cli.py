@@ -308,9 +308,14 @@ sys.exit(cli.main([
     assert ("\u2192" in text) is (encoding == "utf-8")
 
 
-def test_registered_workflow_single_writer_requires_review_per_stage(server, tmp_path, capsys):
+def test_registered_workflow_single_writer_requires_review_per_stage(server, tmp_path, capsys, monkeypatch):
+    def no_local_enrollment():
+        pytest.fail("API-managed Full bootstrap must not provision through the local enrollment core.")
+
+    monkeypatch.setattr("azurefactory.enrollment.core", no_local_enrollment)
     args = ["--api-url", server, "--api-key", "fixture-key", "bootstrap", "workflow"]
     body = {"contract_version": 1, "creation_mode": "full-bootstrap",
+            "operation": "create-factory", "execution_mode": "privileged-bootstrap",
             "scope": WORKFLOW_SCOPE, "expected_revision": "a" * 64,
             "bootstrap_config": {"coordination_mode": "single-writer", "access_hub_mode": "external"}}
     request = tmp_path / "request.json"
@@ -333,6 +338,12 @@ def test_registered_workflow_single_writer_requires_review_per_stage(server, tmp
     assert main([*args, "next", "--folder", WORKFLOW_SCOPE["folder"], "--workflow-id", WORKFLOW_ID,
                  "--save-receipt", str(next_receipt)]) == 2
     assert len(Handler.records) == 4
+    assert [item["route"] for item in Handler.records] == [
+        "/api/v1/creation/workflows/prepare",
+        "/api/v1/creation/workflows/start",
+        f"/api/v1/creation/workflows/{WORKFLOW_ID}",
+        f"/api/v1/creation/workflows/{WORKFLOW_ID}/prepare-next",
+    ]
 
 
 @pytest.mark.parametrize("identifier", ["../start", "00000000-0000-0000-0000-000000000000", "wrong"])

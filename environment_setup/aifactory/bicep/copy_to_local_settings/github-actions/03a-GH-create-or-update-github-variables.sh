@@ -67,12 +67,13 @@ increment_counter() {
 
 # Function to check if a variable exists
 check_variable_exists() {
-  gh api repos/$GITHUB_NEW_REPO/environments/$1/variables/$2 > /dev/null 2>&1
+  gh api "repos/$GITHUB_NEW_REPO/environments/$(github_environment_url "$1")/variables/$2" > /dev/null 2>&1
 }
 
 # Function to create or update a variable
 create_or_update_variable() {
-  local env=$1
+  local env
+  env="$(github_environment_name "$1")"
   local name=$2
   local value=$3
   
@@ -92,21 +93,22 @@ create_or_update_variable() {
   if [[ "$run_current_op" != "true" ]]; then
     return
   fi
-  if check_variable_exists $env $name; then
-    gh api --method PATCH -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/$env/variables/$name -f value="$value"
+  if check_variable_exists "$env" "$name"; then
+    gh api --method PATCH -H "Accept: application/vnd.github+json" "repos/$GITHUB_NEW_REPO/environments/$(github_environment_url "$env")/variables/$name" -f value="$value"
   else
-    gh api --method POST -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/$env/variables -f name=$name -f value="$value"
+    gh api --method POST -H "Accept: application/vnd.github+json" "repos/$GITHUB_NEW_REPO/environments/$(github_environment_url "$env")/variables" -f name="$name" -f value="$value"
   fi
 }
 
 # Function to check if a secret exists
 check_secret_exists() {
-  gh secret list --repo $GITHUB_NEW_REPO --env $1 | grep -q $2
+  gh secret list --repo "$GITHUB_NEW_REPO" --env "$1" | grep -q "$2"
 }
 
 # Function to create or update a secret
 create_or_update_secret() {
-  local env=$1
+  local env
+  env="$(github_environment_name "$1")"
   local name=$2
   local value=$3
   
@@ -125,10 +127,10 @@ create_or_update_secret() {
   if [[ "$run_current_op" != "true" ]]; then
     return
   fi
-  if check_secret_exists $env $name; then
-    gh secret set $name --repo $GITHUB_NEW_REPO --env $env --body "$value"
+  if check_secret_exists "$env" "$name"; then
+    gh secret set "$name" --repo "$GITHUB_NEW_REPO" --env "$env" --body "$value"
   else
-    gh secret set $name --repo $GITHUB_NEW_REPO --env $env --body "$value"
+    gh secret set "$name" --repo "$GITHUB_NEW_REPO" --env "$env" --body "$value"
   fi
 }
 
@@ -647,6 +649,30 @@ echo -e "${YELLOW}  - Watch the [operation_number] output to find the right star
 echo -e "${GREEN}================================================${NC}"
 echo ""
 
+script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+environment_helper=""
+for candidate in \
+  "$script_directory/azure-enterprise-scale-ml/bootstrap/lib/github_environments.py" \
+  "$script_directory/../../../../../bootstrap/lib/github_environments.py"; do
+  if [[ -f "$candidate" ]]; then environment_helper="$candidate"; break; fi
+done
+[[ -n "$environment_helper" ]] || { echo "Missing GitHub environment helper; update the shared submodule."; exit 1; }
+if command -v python >/dev/null 2>&1 && python --version >/dev/null 2>&1; then
+  environment_python=(python)
+elif command -v py >/dev/null 2>&1 && py -3 --version >/dev/null 2>&1; then
+  environment_python=(py -3)
+else
+  environment_python=(python3)
+fi
+AIFACTORY_GITHUB_ENVIRONMENTS="$("${environment_python[@]}" "$environment_helper" \
+  --repository "$GITHUB_NEW_REPO" --ensure "${selected_environments[@]}")"
+export AIFACTORY_GITHUB_ENVIRONMENTS
+github_environment_name() {
+  "${environment_python[@]}" -c 'import json, os, sys; sys.stdout.write(json.loads(os.environ["AIFACTORY_GITHUB_ENVIRONMENTS"])[sys.argv[1]])' "$1"
+}
+github_environment_url() {
+  "${environment_python[@]}" -c 'import sys; from urllib.parse import quote; sys.stdout.write(quote(sys.argv[1], safe=""))' "$1"
+}
 for var_name in "${repo_level_vars[@]}"; do
   var_value="${!var_name}"
   # Strip outer single quotes from TAGS and TAGS_PROJECT
@@ -658,7 +684,6 @@ for var_name in "${repo_level_vars[@]}"; do
 done
 
 for env in "${selected_environments[@]}"; do
-  gh api --method PUT -H "Accept: application/vnd.github+json" repos/$GITHUB_NEW_REPO/environments/$env
   create_or_update_variable "$env" "AZURE_ENV_NAME" "$(get_azure_env_name "$env")"
 done
 

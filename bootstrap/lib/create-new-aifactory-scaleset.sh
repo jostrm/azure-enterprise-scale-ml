@@ -44,6 +44,10 @@ Common non-interactive variables:
   AIF_TEAM_GROUP_NAME=acme-ai-prj001-team
   AIF_TEAM_MEMBER_EMAIL=jostrm@microsoft.com
   AIF_TEAM_GROUP_ID=<existing-group-object-id>
+  AIF_ADMIN_GROUP_MODE=team|separate
+  AIF_ADMIN_GROUP_ID=<existing-admin-group-object-id>
+  AIF_ADMIN_GROUP_NAME=acme-ai-admins
+  AIF_ADMIN_MEMBER_EMAIL=admin@contoso.com
   AIF_AZURE_ML_PRINCIPAL_ID=<existing-enterprise-app-object-id>
   AIF_DATABRICKS_PRINCIPAL_ID=<existing-enterprise-app-object-id>
   AIF_ADMIN_VM_SIZE=Standard_D2s_v5
@@ -189,6 +193,7 @@ aif_prompt_value() {
     read -r -p "$(aif_prompt "$prompt$suffix: ")" output
     output="${output:-$default_value}"
     [[ "$required" != "true" || -n "$output" ]] || aif_warn "A value is required."
+    [[ "$required" == "true" ]] || break
   done
 }
 
@@ -760,6 +765,25 @@ aif_collect_answers() {
   AIF_TEAM_GROUP_NAME="${AIF_TEAM_GROUP_NAME:-${AIF_PREFIX%-}prj${AIF_PROJECT_NUMBER}-team}"
   aif_prompt_value AIF_TEAM_GROUP_NAME "Entra security group for the initial team" "$AIF_TEAM_GROUP_NAME"
   aif_prompt_value AIF_TEAM_MEMBER_EMAIL "Initial team member" "$current_user"
+  AIF_ADMIN_GROUP_ID="${AIF_ADMIN_GROUP_ID:-}"
+  AIF_ADMIN_GROUP_NAME="${AIF_ADMIN_GROUP_NAME:-}"
+  AIF_ADMIN_MEMBER_EMAIL="${AIF_ADMIN_MEMBER_EMAIL:-}"
+  AIF_ADMIN_GROUP_MODE="${AIF_ADMIN_GROUP_MODE:-}"
+  local admin_group_default=team
+  [[ -z "$AIF_ADMIN_GROUP_ID$AIF_ADMIN_GROUP_NAME$AIF_ADMIN_MEMBER_EMAIL" ]] || admin_group_default=separate
+  aif_prompt_choice AIF_ADMIN_GROUP_MODE \
+    "Technical administrators: reuse initial team (team) or separate Entra group (separate)" \
+    "$admin_group_default" "team separate"
+  if [[ "$AIF_ADMIN_GROUP_MODE" == separate ]]; then
+    aif_prompt_value AIF_ADMIN_GROUP_ID "Existing administrators group object ID (blank to create/ensure by name)" "" false
+    if [[ -z "$AIF_ADMIN_GROUP_ID" ]]; then
+      aif_prompt_value AIF_ADMIN_GROUP_NAME "Entra administrators security group" "${AIF_PREFIX%-}-admins"
+      aif_prompt_value AIF_ADMIN_MEMBER_EMAIL "Initial administrators group member" "$current_user"
+    fi
+  elif [[ -n "$AIF_ADMIN_GROUP_ID$AIF_ADMIN_GROUP_NAME$AIF_ADMIN_MEMBER_EMAIL" ]]; then
+    aif_error "Separate administrator group inputs require AIF_ADMIN_GROUP_MODE=separate." >&2
+    exit 1
+  fi
 
   aif_section "03 / Seeding Key Vault"
   aif_info "v1.24 still requires a seeding Key Vault shell, but service-principal secrets are optional."
@@ -1527,28 +1551,46 @@ PY
   aif_ensure_control_bundle_gitignore "$AIF_REPO_ROOT"
 }
 
+aif_ensure_resource_group() {
+  local subscription="$1" name="$2" location="$3" purpose="$4" exists
+  if [[ "$AIF_DRY_RUN" != "true" ]]; then
+    exists="$(az group exists --subscription "$subscription" --name "$name" --output tsv)" || return
+    case "${exists//$'\r'/}" in
+      true) return 0 ;;
+      false) ;;
+      *) aif_error "Could not verify whether resource group '$name' exists." >&2; return 1 ;;
+    esac
+  fi
+  local -a tags=()
+  [[ -z "$purpose" ]] || tags=(--tags "Purpose=$purpose")
+  aif_mutate az group create \
+    --subscription "$subscription" \
+    --name "$name" \
+    --location "$location" \
+    "${tags[@]}" \
+    --output none
+}
+
 aif_ensure_bootstrap_identity() {
   aif_section "09 / Deployment identity"
-  aif_mutate az group create \
-    --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
-    --name "$AIF_BOOTSTRAP_RESOURCE_GROUP" \
-    --location "$AIF_LOCATION" \
-    --tags Purpose=AIFactoryBootstrap \
-    --output none
+  aif_ensure_resource_group "$AIF_DEV_SUBSCRIPTION_ID" "$AIF_BOOTSTRAP_RESOURCE_GROUP" \
+    "$AIF_LOCATION" AIFactoryBootstrap
 
   if [[ "$AIF_IDENTITY_MODE" == "c" ]]; then
-    if [[ "$AIF_DRY_RUN" != "true" ]] &&
-       ! az identity show \
-         --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
-         --resource-group "$AIF_BOOTSTRAP_RESOURCE_GROUP" \
-         --name "$AIF_DEPLOYMENT_IDENTITY_NAME" \
-         --output none 2>/dev/null; then
-      az identity create \
+    if [[ "$AIF_DRY_RUN" != "true" ]]; then
+      local existing_identity
+      existing_identity="$(az identity list \
         --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
         --resource-group "$AIF_BOOTSTRAP_RESOURCE_GROUP" \
-        --name "$AIF_DEPLOYMENT_IDENTITY_NAME" \
-        --location "$AIF_LOCATION" \
-        --output none
+        --query "[?name=='$AIF_DEPLOYMENT_IDENTITY_NAME'].name" --output tsv)" || return
+      if [[ -z "${existing_identity//$'\r'/}" ]]; then
+        az identity create \
+          --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
+          --resource-group "$AIF_BOOTSTRAP_RESOURCE_GROUP" \
+          --name "$AIF_DEPLOYMENT_IDENTITY_NAME" \
+          --location "$AIF_LOCATION" \
+          --output none
+      fi
     fi
     AIF_MI_RESOURCE_ID="/subscriptions/$AIF_DEV_SUBSCRIPTION_ID/resourceGroups/$AIF_BOOTSTRAP_RESOURCE_GROUP/providers/Microsoft.ManagedIdentity/userAssignedIdentities/$AIF_DEPLOYMENT_IDENTITY_NAME"
     AIF_IDENTITY_SUBSCRIPTION_ID="$AIF_DEV_SUBSCRIPTION_ID"
@@ -1623,12 +1665,8 @@ print(value["name"])
 aif_ensure_seeding_keyvault() {
   aif_section "10 / Seeding Key Vault"
   if [[ "$AIF_SEEDING_MODE" == "c" ]]; then
-    aif_mutate az group create \
-      --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
-      --name "$AIF_SEEDING_RESOURCE_GROUP" \
-      --location "$AIF_LOCATION" \
-      --tags Purpose=AIFactorySeeding \
-      --output none
+    aif_ensure_resource_group "$AIF_DEV_SUBSCRIPTION_ID" "$AIF_SEEDING_RESOURCE_GROUP" \
+      "$AIF_LOCATION" AIFactorySeeding
     if [[ "$AIF_DRY_RUN" != "true" ]] &&
        ! az keyvault show \
          --subscription "$AIF_DEV_SUBSCRIPTION_ID" \
@@ -1735,6 +1773,19 @@ aif_ensure_team_group() {
     az ad group member add --group "$AIF_TEAM_GROUP_ID" --member-id "$member_id"
   fi
   aif_success "Team group '$AIF_TEAM_GROUP_NAME' contains '$AIF_TEAM_MEMBER_EMAIL'."
+}
+
+aif_ensure_admin_group() {
+  if [[ "${AIF_ADMIN_GROUP_MODE:-team}" == team ]]; then
+    AIF_ADMIN_GROUP_ID="$AIF_TEAM_GROUP_ID"
+    return 0
+  fi
+  local AIF_TEAM_GROUP_ID="$AIF_ADMIN_GROUP_ID"
+  local AIF_TEAM_GROUP_NAME="$AIF_ADMIN_GROUP_NAME"
+  local AIF_TEAM_MEMBER_EMAIL="$AIF_ADMIN_MEMBER_EMAIL"
+  # Reuse the same create-if-absent checks and Graph permission requirements.
+  aif_ensure_team_group
+  AIF_ADMIN_GROUP_ID="$AIF_TEAM_GROUP_ID"
 }
 
 aif_set_keyvault_secret() {
@@ -1852,11 +1903,8 @@ print(json.dumps(json.load(open(sys.argv[1], encoding="utf-8"))["zones"], separa
       --name "$AIF_HUB_VNET_NAME" \
       --output none
   fi
-  aif_mutate az group create \
-    --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
-    --name "$AIF_HUB_RESOURCE_GROUP" \
-    --location "$AIF_LOCATION" \
-    --output none
+  aif_ensure_resource_group "$AIF_HUB_SUBSCRIPTION_ID" "$AIF_HUB_RESOURCE_GROUP" \
+    "$AIF_LOCATION" ""
   aif_mutate az deployment group create \
     --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
     --resource-group "$AIF_HUB_RESOURCE_GROUP" \
@@ -2194,12 +2242,8 @@ aif_ensure_access_hub_vnet() {
     --wait \
     --output none \
     --only-show-errors
-  az group create \
-    --subscription "$hub_subscription" \
-    --name "$hub_resource_group" \
-    --location "$AIF_LOCATION" \
-    --tags Purpose=AIFactoryConnectivity \
-    --output none
+  aif_ensure_resource_group "$hub_subscription" "$hub_resource_group" \
+    "$AIF_LOCATION" AIFactoryConnectivity
 
   if [[ "$mode" == "external" ]]; then
     if ! az network vnet show \
@@ -2591,7 +2635,8 @@ aif_write_state_and_configure() {
     "$AIF_ADMIN_VM_SIZE" "${AIF_SIMPLE_MODE:-false}" "${AIF_COST_CENTER:-}" \
     "$AIF_TEAM_MEMBER_EMAIL" "${AIF_SIMPLE_PROJECT_RESOURCES_JSON:-}" \
     "${GITHUB_REPOSITORY_VISIBILITY:-private}" "${AIF_ENABLE_APPLICATION_GATEWAY-true}" \
-    "$AIF_RUNNER_VM_OS" "${GHA_RUNNER_NAME:-}" "${GHA_RUNNER_LABEL:-}" <<'PY'
+    "$AIF_RUNNER_VM_OS" "${GHA_RUNNER_NAME:-}" "${GHA_RUNNER_LABEL:-}" \
+    "${AIF_ADMIN_GROUP_ID:-}" "${AIF_ADMIN_MEMBER_EMAIL:-}" <<'PY'
 import json
 import sys
 
@@ -2615,6 +2660,7 @@ keys = (
     "enable_application_gateway",
     "runner_vm_os",
     "github_runner_name", "github_runner_label",
+    "admin_group_id", "admin_member_email",
 )
 values = dict(zip(keys, sys.argv[2:]))
 values["dev_service_connection"] = values["ado_service_connection"]
@@ -3100,14 +3146,15 @@ aif_configure_ado() {
 aif_configure_github_identity() {
   aif_section "13 / GitHub deployment identity"
   [[ "$AIF_DRY_RUN" != "true" ]] || return 0
-  local github_environment credential_name subject
-  for github_environment in dev stage prod; do
-    gh api --method PUT "repos/$GITHUB_REPOSITORY/environments/$github_environment" >/dev/null
-  done
+  local github_environment logical_environment credential_name subject existing_credential
+  AIFACTORY_GITHUB_ENVIRONMENTS="$("${AIF_PYTHON[@]}" "$AIF_SCALESET_LIB_DIR/github_environments.py" \
+    --repository "$GITHUB_REPOSITORY" --ensure dev stage prod)" || return
+  export AIFACTORY_GITHUB_ENVIRONMENTS
+  AIF_GITHUB_DEV_ENVIRONMENT="$(aif_github_environment_name dev)"
   if [[ "$AIF_IDENTITY_MODE" == "sp" ]]; then
-    if gh secret list --repo "$GITHUB_REPOSITORY" --env dev |
+    if gh secret list --repo "$GITHUB_REPOSITORY" --env "$AIF_GITHUB_DEV_ENVIRONMENT" |
        awk '$1 == "AZURE_CLIENT_ID" { found=1 } END { exit !found }'; then
-      gh secret delete AZURE_CLIENT_ID --repo "$GITHUB_REPOSITORY" --env dev
+      gh secret delete AZURE_CLIENT_ID --repo "$GITHUB_REPOSITORY" --env "$AIF_GITHUB_DEV_ENVIRONMENT"
     fi
     AZURE_CLIENT_ID="$AIF_IDENTITY_CLIENT_ID" \
     AZURE_CLIENT_SECRET="$AIF_SP_CLIENT_SECRET" \
@@ -3125,17 +3172,27 @@ print(json.dumps({
 PY
         gh secret set AZURE_CREDENTIALS \
           --repo "$GITHUB_REPOSITORY" \
-          --env dev
+          --env "$AIF_GITHUB_DEV_ENVIRONMENT"
   else
-    for github_environment in dev stage prod; do
-      credential_name="github-${AIF_SCALESET_SUFFIX}-${github_environment}"
-      subject="repo:$GITHUB_REPOSITORY:environment:$github_environment"
-      if ! az identity federated-credential show \
+    for logical_environment in dev stage prod; do
+      github_environment="$(aif_github_environment_name "$logical_environment")"
+      credential_name="github-${AIF_SCALESET_SUFFIX}-${logical_environment}"
+      subject="repo:$GITHUB_REPOSITORY:environment:${github_environment//:/%3A}"
+      existing_credential="$(az identity federated-credential list \
         --subscription "$AIF_IDENTITY_SUBSCRIPTION_ID" \
         --resource-group "$AIF_IDENTITY_RESOURCE_GROUP" \
         --identity-name "$AIF_IDENTITY_NAME" \
-        --name "$credential_name" \
-        --output none 2>/dev/null; then
+        --query "[?name=='$credential_name']" --output json)" || return
+      if ! printf '%s' "$existing_credential" | "${AIF_PYTHON[@]}" -c '
+import json, sys
+value = json.load(sys.stdin)
+if not value:
+    raise SystemExit(3)
+if len(value) != 1 or value[0].get("subject") != sys.argv[1] or value[0].get("issuer") != "https://token.actions.githubusercontent.com" or value[0].get("audiences") != ["api://AzureADTokenExchange"]:
+    raise SystemExit("Existing GitHub federation differs; review migration explicitly. No credential was changed.")
+' "$subject"; then
+        # Missing is safe to create; a different deployed subject is not safe to replace.
+        [[ "$existing_credential" =~ ^[[:space:]]*\[[[:space:]]*\][[:space:]]*$ ]] || return 1
         az identity federated-credential create \
           --subscription "$AIF_IDENTITY_SUBSCRIPTION_ID" \
           --resource-group "$AIF_IDENTITY_RESOURCE_GROUP" \
@@ -3149,9 +3206,13 @@ PY
     done
     gh secret set AZURE_CLIENT_ID \
       --repo "$GITHUB_REPOSITORY" \
-      --env dev \
+      --env "$AIF_GITHUB_DEV_ENVIRONMENT" \
       --body "$AIF_IDENTITY_CLIENT_ID"
   fi
+}
+
+aif_github_environment_name() {
+  "${AIF_PYTHON[@]}" -c 'import json, os, sys; sys.stdout.write(json.loads(os.environ["AIFACTORY_GITHUB_ENVIRONMENTS"])[sys.argv[1]])' "$1"
 }
 
 aif_publish_github_configuration() {
@@ -3161,7 +3222,7 @@ aif_publish_github_configuration() {
   printf 'd\n\n\nn\n' | bash ./10-GH-create-or-update-github-variables.sh
   gh secret set AIFACTORY_CONFIG_JSON \
     --repo "$GITHUB_REPOSITORY" \
-    --env dev \
+    --env "$AIF_GITHUB_DEV_ENVIRONMENT" \
     < aifactory/variables.json
   local stale_variable
   for stale_variable in \
@@ -3185,11 +3246,11 @@ aif_publish_github_configuration() {
     done
   fi
   if [[ "$AIF_IDENTITY_MODE" != "sp" ]]; then
-    if gh secret list --repo "$GITHUB_REPOSITORY" --env dev |
+    if gh secret list --repo "$GITHUB_REPOSITORY" --env "$AIF_GITHUB_DEV_ENVIRONMENT" |
        awk '$1 == "AZURE_CREDENTIALS" { found=1 } END { exit !found }'; then
       gh secret delete AZURE_CREDENTIALS \
         --repo "$GITHUB_REPOSITORY" \
-        --env dev
+        --env "$AIF_GITHUB_DEV_ENVIRONMENT"
     fi
   fi
   aif_verify_github_configuration
@@ -3198,11 +3259,11 @@ aif_publish_github_configuration() {
 aif_verify_github_configuration() {
   local actual
   actual="$(gh variable get AZURE_SUBSCRIPTION_ID \
-    --repo "$GITHUB_REPOSITORY" --env dev)"
+    --repo "$GITHUB_REPOSITORY" --env "$AIF_GITHUB_DEV_ENVIRONMENT")"
   [[ "$actual" == "$AIF_DEV_SUBSCRIPTION_ID" ]] ||
     { aif_error "GitHub dev/AZURE_SUBSCRIPTION_ID was not updated."; exit 1; }
   actual="$(gh variable get AIFACTORY_LOCATION \
-    --repo "$GITHUB_REPOSITORY" --env dev)"
+    --repo "$GITHUB_REPOSITORY" --env "$AIF_GITHUB_DEV_ENVIRONMENT")"
   [[ "$actual" == "$AIF_LOCATION" ]] ||
     { aif_error "GitHub dev/AIFACTORY_LOCATION was not updated."; exit 1; }
   actual="$(gh variable get AIFACTORY_PREFIX --repo "$GITHUB_REPOSITORY")"
@@ -3240,7 +3301,7 @@ aif_verify_github_configuration() {
     required_secrets+=(AZURE_CLIENT_ID)
   fi
   local secret_names required_secret
-  secret_names="$(gh secret list --repo "$GITHUB_REPOSITORY" --env dev | awk '{print $1}')"
+  secret_names="$(gh secret list --repo "$GITHUB_REPOSITORY" --env "$AIF_GITHUB_DEV_ENVIRONMENT" | awk '{print $1}')"
   for required_secret in "${required_secrets[@]}"; do
     if ! grep -qxF "$required_secret" <<< "$secret_names"; then
       aif_error "GitHub environment secret '$required_secret' is missing." >&2
@@ -4131,6 +4192,7 @@ PY
   aif_ensure_bootstrap_identity
   aif_ensure_seeding_keyvault
   aif_ensure_team_group
+  aif_ensure_admin_group
   aif_seed_optional_project_sp
   aif_ensure_private_dns_policy_assignment
   if [[ "$AIF_ROUTE" == "ado" ]]; then

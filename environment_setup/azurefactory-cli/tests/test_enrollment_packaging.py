@@ -64,8 +64,10 @@ def test_wheel_and_sdist_install_with_bundled_canonical_core_outside_source(tmp_
              str(artifact)], outside, env)
         executable = scripts / ("azurefactory.exe" if os.name == "nt" else "azurefactory")
         output = run([str(executable), "enrollment", "--help"], outside, env)
-        assert "prepare-binding" in output and "ensure" in output
+        assert "prepare-binding" in output and "ensure" in output and "plan-and-publish" in output
         run([str(executable), "enrollment", "ensure", "--help"], outside, env)
+        output = run([str(executable), "enrollment", "plan-and-publish", "--help"], outside, env)
+        assert "--artifact-dir" in output and "--acknowledge-exclusive-writer-governance" in output
         location = run([str(python), "-c",
                         "from azurefactory.enrollment import core; print(core().__file__)"], outside, env).strip()
         assert Path(location).is_relative_to(installed)

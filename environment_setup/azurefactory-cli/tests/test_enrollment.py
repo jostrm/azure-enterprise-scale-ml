@@ -295,7 +295,7 @@ def test_bundle_and_copy_rules_include_all_helpers():
     router = (ROOT / "bootstrap" / "lib" / "layout_router.sh").read_text()
     ignore = (ROOT / "bootstrap" / ".gitignore.template").read_text()
     assert "\n!/lib/\n" in ignore and '"!/lib/"' in router
-    for name in ("factory_enrollment.py", "factory_enrollment_entry.py", "project_environment.py", "runner-prerequisites.ps1",
+    for name in ("factory_enrollment.py", "factory_enrollment_entry.py", "github_environments.py", "project_environment.py", "runner-prerequisites.ps1",
                  "runner-prerequisites.sh", "runner-registration.ps1", "runner-registration.sh",
                  "runner_bootstrap.py", "runner-only-registration.sh"):
         assert "\n  " + name + "\n" in router
@@ -303,3 +303,271 @@ def test_bundle_and_copy_rules_include_all_helpers():
         assert "\n!/lib/" + name + "\n" in ignore
     copier = (ROOT / "bootstrap" / "01-aif-copy-aifactory-templates.sh").read_text()
     assert '"azurefactory-cli/setup.py"' in copier
+
+
+@pytest.fixture
+def convenience(selected, monkeypatch):
+    selected.options.pop("public_network_access")
+    selected.options_file.write_bytes(CORE.canonical(selected.options))
+    document = json.loads(selected.register.read_text())
+    document["configurations"] = {IDS["factory"]: {"factory": {"coordination_mode": "single-writer"}}}
+    selected.register.write_bytes(CORE.canonical(document))
+    selected.artifacts = selected.folder / "run"
+    selected.combined = ["enrollment", "plan-and-publish", *selected.flags,
+                         "--artifact-dir", str(selected.artifacts)]
+    selected.api_calls = []
+
+    def listing(self, folder):
+        selected.api_calls.append("list")
+        return {"contract_version": 1, "mode": "catalog", "revision": "a" * 64, "factories": []}
+
+    def prepare(self, body):
+        selected.api_calls.append("prepare")
+        assert (selected.artifacts / "result.json").is_file()
+        return {"contract_version": 1, "confirmation_id": IDS["factory"],
+                "expires_at": "2099-01-01T00:00:00Z", "can_execute": True, "blockers": [],
+                "operation_mode": "configuration", "source_revision": body["expected_revision"],
+                "binding": body["binding"], "target": {"id": body["factory_id"]}}
+
+    def confirm(self, folder, confirmation):
+        selected.api_calls.append("confirm")
+        assert (selected.artifacts / "publication-intent.json").is_file()
+        return {"contract_version": 1, "catalog": {}, "job": None}
+
+    monkeypatch.setattr(AzureFactoryClient, "catalog_list", listing)
+    monkeypatch.setattr(AzureFactoryClient, "catalog_prepare", prepare)
+    monkeypatch.setattr(AzureFactoryClient, "catalog_confirm", confirm)
+    return selected
+
+
+def test_plan_and_publish_one_consent_exact_scope_and_offline_cost(convenience, capsys):
+    before = convenience.register.read_bytes()
+    assert main([*convenience.combined, ACK, "--yes"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["published"] is True and result["runtime_ready"] is False
+    assert convenience.api_calls == ["list", "prepare", "confirm"]
+    plan = json.loads((convenience.artifacts / "plan.json").read_text())
+    request = plan["request"]
+    assert request["coordination_mode"] == "single-writer"
+    assert request["create_resource_group_ids"] == [SCOPE]
+    assert request["approved_group_creation_scope"] == "/subscriptions/" + IDS["subscription"]
+    assert request["deployment_roles"][0]["scope"] == SCOPE
+    assert "account_id" not in request
+    cost = json.loads((convenience.artifacts / "cost-preview.json").read_text())
+    assert cost["status"] == "unpriced" and cost["estimated_total"] is None
+    assert cost["region"] == "swedencentral"
+    assert cost["services"][1]["enabled"] is False and cost["services"][1]["sku"] is None
+    assert output.err.index("cost_preview") < output.err.index("enrollment_plan")
+    assert before == convenience.register.read_bytes()
+    assert json.loads((convenience.artifacts / "outcome.json").read_text())["published"] is True
+
+
+@pytest.mark.parametrize("flags, status", [([ACK], "approval-required"), (["--yes"], "blocked")])
+def test_wrapper_never_invents_approval_or_governance(convenience, capsys, flags, status):
+    assert main([*convenience.combined, *flags]) == 3
+    assert json.loads(capsys.readouterr().out)["status"] == status
+    assert convenience.api_calls == []
+    assert not any(call[0] == "ensure" for call in convenience.calls)
+    assert (convenience.artifacts / "plan.json").exists()
+
+
+def test_wrapper_cost_and_intent_are_saved_before_mutation(convenience, monkeypatch):
+    original = CORE.ensure
+
+    def check(*args, **kwargs):
+        assert (convenience.artifacts / "cost-preview.json").is_file()
+        assert (convenience.artifacts / "plan.json").is_file()
+        assert (convenience.artifacts / "ensure-intent.json").is_file()
+        return original(*args, **kwargs)
+    monkeypatch.setattr(CORE, "ensure", check)
+    assert main([*convenience.combined, ACK, "--yes"]) == 0
+
+
+@pytest.mark.parametrize("explicit", [{"coordination_mode": "blob"}, {"public_network_access": "Disabled"}])
+def test_wrapper_preserves_explicit_blob_options(convenience, capsys, explicit):
+    document = json.loads(convenience.register.read_text())
+    document["configurations"][IDS["factory"]]["factory"] = {"coordination_mode": "blob"}
+    convenience.register.write_bytes(CORE.canonical(document))
+    convenience.options_file.write_bytes(CORE.canonical(convenience.options | explicit))
+    assert main([*convenience.combined, ACK]) == 3
+    capsys.readouterr()
+    request = json.loads((convenience.artifacts / "plan.json").read_text())["request"]
+    assert request["options"]["coordination_mode"] == "blob"
+    assert request["create_resource_group_ids"] == [SCOPE]
+    assert request["account_id"].split("/providers/")[0] not in request["create_resource_group_ids"]
+    cost = json.loads((convenience.artifacts / "cost-preview.json").read_text())
+    assert cost["services"][1]["enabled"] is True and cost["services"][1]["sku"] == "Standard_LRS"
+
+
+def test_wrapper_preserves_existing_blob_binding_without_mode_option(convenience):
+    request = CORE.load_request(convenience.consumer, IDS["factory"], IDS["scale"], "stage",
+                                convenience.options | {"public_network_access": "Disabled"})
+    identity = {"id": request["identity_id"], "principal_id": IDS["principal"], "client_id": IDS["client"],
+                "tenant_id": IDS["tenant"]}
+    binding = CORE.binding_candidate(request, identity, {"revision": 1})
+    doc = json.loads(convenience.register.read_text())
+    doc["bindings"] = {IDS["factory"]: {"gha": binding}}
+    doc["configurations"][IDS["factory"]]["factory"] = {"coordination_mode": "blob"}
+    convenience.register.write_bytes(CORE.canonical(doc))
+    assert main([*convenience.combined, ACK]) == 3
+    request = json.loads((convenience.artifacts / "plan.json").read_text())["request"]
+    assert request["options"]["coordination_mode"] == "blob"
+
+
+@pytest.mark.parametrize("reuse", [True, False])
+def test_auto_creation_excludes_dependencies_and_reused_identity_groups(convenience, reuse):
+    dependency, identity_group = SCOPE + "-shared", SCOPE + "-identity"
+    extra = {"common_dependency_ids": [dependency]}
+    if reuse:
+        extra["identity_id"] = identity_group + "/providers/Microsoft.ManagedIdentity/userAssignedIdentities/reused"
+    else:
+        extra["identity_resource_group_id"] = identity_group
+    convenience.options_file.write_bytes(CORE.canonical(convenience.options | extra))
+    assert main([*convenience.combined, ACK]) == 3
+    request = json.loads((convenience.artifacts / "plan.json").read_text())["request"]
+    assert request["create_resource_group_ids"] == ([SCOPE] if reuse else [SCOPE, identity_group])
+    assert dependency not in request["create_resource_group_ids"]
+
+
+def test_auto_creation_never_turns_shared_identity_dependency_into_owned_group(convenience):
+    dependency = SCOPE + "-shared"
+    convenience.options_file.write_bytes(CORE.canonical(convenience.options | {
+        "common_dependency_ids": [dependency], "identity_resource_group_id": dependency}))
+    assert main([*convenience.combined, ACK]) == 3
+    request = json.loads((convenience.artifacts / "plan.json").read_text())["request"]
+    assert request["create_resource_group_ids"] == [SCOPE]
+
+
+@pytest.mark.parametrize("settings", [{}, {"coordination_mode": "blob"}, {"coordination_mode": "invalid"}])
+def test_wrapper_rejects_saved_coordination_mismatch_before_cloud(convenience, settings):
+    document = json.loads(convenience.register.read_text())
+    document["configurations"][IDS["factory"]]["factory"] = settings
+    convenience.register.write_bytes(CORE.canonical(document))
+    assert main([*convenience.combined, ACK, "--yes"]) in (2, 3)
+    assert convenience.calls == [] and convenience.api_calls == []
+    assert not convenience.artifacts.exists()
+
+
+def test_wrapper_rejects_register_drift_between_convenience_and_plan(convenience, monkeypatch):
+    original = enrollment.plan
+
+    def changed(args):
+        document = json.loads(convenience.register.read_text())
+        document["configurations"][IDS["factory"]]["factory"]["coordination_mode"] = "blob"
+        convenience.register.write_bytes(CORE.canonical(document))
+        return original(args)
+
+    monkeypatch.setattr(enrollment, "plan", changed)
+    assert main([*convenience.combined, ACK, "--yes"]) == 3
+    assert not any(call[0] == "ensure" for call in convenience.calls)
+    assert convenience.api_calls == []
+
+
+@pytest.mark.parametrize("other_factory", [False, True])
+@pytest.mark.parametrize("identity_only", [False, True])
+@pytest.mark.parametrize("explicit_creation", [False, True])
+def test_wrapper_rejects_unbound_registered_group_ownership(
+        convenience, other_factory, identity_only, explicit_creation):
+    document = json.loads(convenience.register.read_text())
+    group = SCOPE + "-identity" if identity_only else SCOPE
+    owner = copy.deepcopy(document["factories"][0])
+    owner["scale_sets"][0]["id"] = str(uuid5(NAMESPACE_URL, "other-scale"))
+    # Inventory can contain a nested resource rather than an RG.
+    owner["scale_sets"][0]["owned_resource_ids"] = [
+        group.replace("/resourcegroups/", "/resourceGroups/") + "/providers/Microsoft.Network/virtualNetworks/owned"]
+    if other_factory:
+        owner["id"] = str(uuid5(NAMESPACE_URL, "other-factory"))
+        document["factories"].append(owner)
+    else:
+        document["factories"][0]["scale_sets"].extend(owner["scale_sets"])
+    convenience.register.write_bytes(CORE.canonical(document))
+    options = {**convenience.options}
+    if identity_only:
+        options["identity_resource_group_id"] = group
+    if explicit_creation:
+        options.update(create_resource_group_ids=[group],
+                       approved_group_creation_scope="/subscriptions/" + IDS["subscription"])
+    convenience.options_file.write_bytes(CORE.canonical(options))
+    assert main([*convenience.combined, ACK, "--yes"]) == 3
+    assert convenience.calls == [] and convenience.api_calls == []
+
+
+def test_wrapper_respects_explicit_empty_creation_and_rejects_broad_roles(convenience):
+    convenience.options_file.write_bytes(CORE.canonical(convenience.options | {"create_resource_group_ids": []}))
+    assert main([*convenience.combined, ACK]) == 3
+    request = json.loads((convenience.artifacts / "plan.json").read_text())["request"]
+    assert request["create_resource_group_ids"] == []
+    assert request["approved_group_creation_scope"] is None
+    convenience.options_file.write_bytes(CORE.canonical(convenience.options | {
+        "deployment_roles": [{"scope": "/subscriptions/" + IDS["subscription"], "role_definition_id": IDS["role"]}]}))
+    flags = [*convenience.combined[:-1], str(convenience.folder / "invalid"), ACK, "--yes"]
+    assert main(flags) == 2
+    assert not any(call[0] == "ensure" for call in convenience.calls)
+
+
+def test_wrapper_refuses_existing_artifact_directory(convenience):
+    convenience.artifacts.mkdir()
+    assert main([*convenience.combined, ACK, "--yes"]) == 2
+    assert convenience.calls == [] and convenience.api_calls == []
+
+
+def test_catalog_revision_preflight_blocks_before_ensure(convenience):
+    assert main([*convenience.combined, ACK, "--yes", "--expected-revision", "f" * 64]) == 3
+    assert convenience.api_calls == ["list"]
+    assert not any(call[0] == "ensure" for call in convenience.calls)
+    outcome = json.loads((convenience.artifacts / "outcome.json").read_text())
+    assert outcome["phase"] == "catalog-preflight" and outcome["reconciliation_required"] is False
+
+
+def test_wrapper_requires_catalog_revision_not_preview_revision(convenience, monkeypatch):
+    monkeypatch.setattr(AzureFactoryClient, "catalog_list", lambda *args: {"source_revision": "a" * 64})
+    assert main([*convenience.combined, ACK, "--yes"]) == 2
+    assert not any(call[0] == "ensure" for call in convenience.calls)
+
+
+@pytest.mark.parametrize("phase", ["ensure", "prepare", "confirm"])
+def test_wrapper_persists_partial_or_uncertain_failure_without_retry(convenience, monkeypatch, phase):
+    from azurefactory.errors import RequestTimeout
+
+    def fail(*args, **kwargs):
+        if phase != "ensure":
+            convenience.api_calls.append(phase)
+        raise RequestTimeout("must-never-be-printed")
+    if phase == "ensure":
+        monkeypatch.setattr(CORE, "ensure", lambda *a, **kw: {
+            "status": "blocked", "changed": True, "enrollment_complete": False,
+            "reconciliation_required": True, "error": "post-create-rights-not-verified"})
+    else:
+        monkeypatch.setattr(AzureFactoryClient, "catalog_" + phase, fail)
+    assert main([*convenience.combined, ACK, "--yes"]) == 5
+    outcome = json.loads((convenience.artifacts / "outcome.json").read_text())
+    assert outcome["published"] is False and outcome["reconciliation_required"] is True
+    assert convenience.api_calls.count("confirm") == (1 if phase == "confirm" else 0)
+    if phase == "confirm":
+        assert outcome["publication_uncertain"] is True
+        assert (convenience.artifacts / "publication-intent.json").is_file()
+        assert not (convenience.artifacts / "publication.json").exists()
+    if phase == "ensure":
+        assert json.loads((convenience.artifacts / "result.json").read_text())["result"]["changed"] is True
+
+
+def test_wrapper_blocked_binding_receipt_never_publishes(convenience, monkeypatch):
+    monkeypatch.setattr(AzureFactoryClient, "catalog_prepare", lambda *a: {
+        "can_execute": False, "blockers": ["protected-source-not-ready"]})
+    assert main([*convenience.combined, ACK, "--yes"]) == 3
+    assert "confirm" not in convenience.api_calls
+    assert (convenience.artifacts / "binding.receipt.json").is_file()
+
+
+def test_wrapper_rejects_changed_binding_preview(convenience, monkeypatch):
+    original = AzureFactoryClient.catalog_prepare
+
+    def changed(self, body):
+        result = original(self, copy.deepcopy(body))
+        result["binding"]["writer_id"] = "different"
+        return result
+    monkeypatch.setattr(AzureFactoryClient, "catalog_prepare", changed)
+    assert main([*convenience.combined, ACK, "--yes"]) == 5
+    assert "confirm" not in convenience.api_calls
+    assert not (convenience.artifacts / "publication-intent.json").exists()

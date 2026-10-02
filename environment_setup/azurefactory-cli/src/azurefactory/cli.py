@@ -142,7 +142,7 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--environment", choices=("dev", "stage", "prod"), required=name == "plan")
         command.add_argument("--expected-orchestrator", choices=("ado", "gha"), help="Block a different registered provider.")
         command.add_argument("--acknowledge-exclusive-writer-governance", action="store_true",
-                             help="Actual administrator attestation that ALL writers enforce physical leases; not a default.")
+                             help="Attest serialized provisioning and ALL writers' Blob leases or exclusive repository/shared-hub governance; never automatic.")
         if name == "plan":
             command.add_argument("--save-plan", help="New non-secret, integrity-bound local review file; never overwritten.")
         else:
@@ -153,11 +153,22 @@ def build_parser() -> argparse.ArgumentParser:
     binding = add_simple(enroll_sub, "prepare-binding", cmd_enrollment_binding,
                          help="Prepare the exact ensure candidate with the local catalog API; never publish directly.")
     binding.add_argument("--result", required=True, help="Artifact written by enrollment ensure --save-result.")
-    binding.add_argument("--expected-revision", required=True, help="Current catalog source_revision, not the enrollment hash.")
+    binding.add_argument("--expected-revision", required=True, help="Current catalog list revision, not the enrollment hash.")
     binding.add_argument("--save-receipt", required=True, help="New API receipt for a separate catalog confirm --yes.")
     publish = add_simple(enroll_sub, "publish", cmd_enrollment_publish,
                          help="Confirm only a separately reviewed binding API receipt.")
     add_receipt_and_yes(publish)
+    combined = add_simple(enroll_sub, "plan-and-publish", cmd_enrollment_plan_and_publish,
+                          help="Plan, ensure, prepare-binding and publish one bounded scope; no runtime deployment.")
+    for field in ("consumer-root", "factory-id", "scale-set-id", "options", "artifact-dir"):
+        combined.add_argument("--" + field, required=True)
+    combined.add_argument("--environment", choices=("dev", "stage", "prod"), required=True)
+    combined.add_argument("--expected-orchestrator", choices=("ado", "gha"))
+    combined.add_argument("--expected-revision", help="Optional pinned catalog source_revision; otherwise read before ensure.")
+    combined.add_argument("--acknowledge-exclusive-writer-governance", action="store_true",
+                          help="Administrator attestation of serialized provisioning and exclusive repository/shared-hub governance (or Blob leases).")
+    combined.add_argument("--yes", action="store_true",
+                          help="Approve this exact scope once, including bounded RG/identity creation and binding publication; without it only plan.")
     doctor = add_simple(sub, "doctor", cmd_doctor)
     doctor.add_argument("--local-openapi", help="Optional OpenAPI snapshot to compare with the live API.")
     schema = add_simple(sub, "schema", cmd_schema)
@@ -317,11 +328,13 @@ def build_parser() -> argparse.ArgumentParser:
     boot_status.add_argument("--wait", action="store_true")
     add_poll_args(boot_status)
 
-    workflow = bootstrap_sub.add_parser("workflow", help="Registered staged bootstrap; each start needs its own reviewed receipt.")
+    workflow = bootstrap_sub.add_parser("workflow", help="Registered bootstrap with per-stage or opt-in bounded whole-workflow approval.")
     workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
     workflow_prepare = add_simple(workflow_sub, "prepare", cmd_creation_workflow_prepare)
     workflow_prepare.add_argument("--request-json", required=True, help="Exact CreationWorkflowPrepare JSON; coordination mode belongs in bootstrap_config.")
     workflow_prepare.add_argument("--save-receipt")
+    workflow_prepare.add_argument("--whole-workflow", action="store_true",
+                                  help="Review one bounded Full bootstrap authorization; the API owns stage continuation.")
     workflow_next = add_simple(workflow_sub, "next", cmd_creation_workflow_next)
     workflow_next.add_argument("--folder", required=True)
     workflow_next.add_argument("--workflow-id", required=True)
@@ -331,6 +344,11 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_status = add_simple(workflow_sub, "status", cmd_creation_workflow_status)
     workflow_status.add_argument("--folder", required=True)
     workflow_status.add_argument("--workflow-id", required=True)
+    workflow_continue = add_simple(workflow_sub, "continue", cmd_creation_workflow_continue)
+    workflow_continue.add_argument("--folder", required=True)
+    workflow_continue.add_argument("--workflow-id", required=True)
+    workflow_continue.add_argument("--authorization-hash", required=True,
+                                   help="Resume already-consumed consent at a verified boundary; never retries a failed/in-flight stage.")
 
     legacy = sub.add_parser("legacy", help="Legacy project update/promote deployments for legacy roots only; never catalog roots.")
     legacy_sub = legacy.add_subparsers(dest="legacy_command", required=True)
@@ -568,6 +586,15 @@ def cmd_enrollment_publish(args):
             raise ConfigError("Enrollment publish accepts only a separately prepared enrollment binding receipt.")
         result = client(args).catalog_confirm(receipt["folder"], receipt["confirmation_id"])
         return confirmed_emit(result, runtime=False)
+
+
+def cmd_enrollment_plan_and_publish(args):
+    result = enrollment.plan_and_publish(
+        args, client(args), lambda value: _print_json(redact_secrets(value, args.api_key), file=sys.stderr, flush=True))
+    code = EXIT_OK if result.get("published") is True else EXIT_BLOCKED
+    if result.get("reconciliation_required"):
+        code = EXIT_FAILURE
+    return emit(redact_secrets(result, args.api_key), code)
 
 
 def cmd_schema(args):
@@ -831,6 +858,8 @@ def cmd_bootstrap_status(args):
 def cmd_creation_workflow_prepare(args):
     ensure_receipt_target_available(args)
     body = read_json_file(args.request_json)
+    if args.whole_workflow:
+        body["approval_mode"] = "whole-workflow"
     result = client(args).creation_workflow_prepare(body)
     maybe_save_receipt(args, result, body, "creation-workflow-start", operation="creation-workflow")
     return preview_emit(result)
@@ -848,7 +877,9 @@ def cmd_creation_workflow_start(args):
     require_yes(args)
     api = client(args)
     receipt = load_receipt(args.receipt, api, "creation-workflow-start")
-    result = api.creation_workflow_start(receipt["folder"], receipt["preview"]["workflow_id"], receipt["confirmation_id"])
+    authorization = receipt["preview"].get("review", {}).get("workflow_authorization")
+    result = api.creation_workflow_start(receipt["folder"], receipt["preview"]["workflow_id"], receipt["confirmation_id"],
+                                        **({"authorization_hash": authorization["authorization_hash"]} if authorization else {}))
     if result.get("scope") != receipt["preview"]["scope"]:
         raise FailureError("Workflow start returned a different scope. Inspect state; do not submit again.")
     return workflow_status_emit(result, receipt["folder"], receipt["preview"]["workflow_id"])
@@ -856,6 +887,11 @@ def cmd_creation_workflow_start(args):
 
 def cmd_creation_workflow_status(args):
     result = client(args).creation_workflow_status(args.folder, args.workflow_id)
+    return workflow_status_emit(result, args.folder, args.workflow_id)
+
+
+def cmd_creation_workflow_continue(args):
+    result = client(args).creation_workflow_continue(args.folder, args.workflow_id, args.authorization_hash)
     return workflow_status_emit(result, args.folder, args.workflow_id)
 
 

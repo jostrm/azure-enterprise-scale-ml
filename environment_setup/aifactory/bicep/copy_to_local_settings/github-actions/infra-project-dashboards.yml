@@ -88,7 +88,7 @@ jobs:
   dashboards:
     name: Dashboard-only ${{ inputs.mode }}
     needs: configure
-    environment: ${{ inputs.environment }}
+    environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}')[inputs.environment] }}
     runs-on: ${{ fromJSON(needs.configure.outputs.runs_on) }}
     timeout-minutes: 60
     steps:

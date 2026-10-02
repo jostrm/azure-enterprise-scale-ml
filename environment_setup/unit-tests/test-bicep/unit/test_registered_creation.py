@@ -72,6 +72,43 @@ def test_form_mapping_preserves_identity_and_only_selected_project(tmp_path, pro
     assert "settings" not in body  # canonical API owns preset/settings projection
 
 
+@pytest.mark.parametrize("group_id", ["", "33333333-3333-3333-3333-333333333333"])
+def test_full_bootstrap_prompts_for_group_route_before_api(tmp_path, monkeypatch, group_id):
+    args = CREATION.parser().parse_args(["gha"])
+    monkeypatch.setattr(CREATION.sys.stdin, "isatty", lambda: True)
+    prompts = []
+
+    def answer(prompt):
+        prompts.append(prompt)
+        return group_id
+
+    monkeypatch.setattr("builtins.input", answer)
+    body = CREATION.creation_input(args, tmp_path, "main", input_env())
+    assert body["config"].get("team_group_id", "") == group_id
+    assert len(prompts) == 1 and "Entra team group object ID" in prompts[0]
+
+
+@pytest.mark.parametrize("group_id", ["my-team", "00000000-0000-0000-0000-000000000000"])
+def test_full_bootstrap_rejects_invalid_prompted_group_id(tmp_path, monkeypatch, group_id):
+    args = CREATION.parser().parse_args(["gha"])
+    monkeypatch.setattr(CREATION.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda _: group_id)
+    with pytest.raises(ValueError, match="canonical nonzero Entra group"):
+        CREATION.creation_input(args, tmp_path, "main", input_env())
+
+
+@pytest.mark.parametrize("simple,non_interactive,supplied", [
+    (True, False, False), (False, True, False), (False, False, True),
+])
+def test_group_prompt_preserves_noninteractive_simple_and_explicit_inputs(
+        tmp_path, monkeypatch, simple, non_interactive, supplied):
+    args = CREATION.parser().parse_args(["gha", *(["--non-interactive"] if non_interactive else [])])
+    monkeypatch.setattr(CREATION.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("Unexpected group prompt"))
+    extra = {"AIF_TEAM_GROUP_ID": "33333333-3333-3333-3333-333333333333"} if supplied else {}
+    CREATION.creation_input(args, tmp_path, "main", input_env(simple=simple, **extra))
+
+
 @pytest.mark.skipif(not BASH, reason="Git Bash unavailable")
 @pytest.mark.parametrize("hub", [None, "false"])
 @pytest.mark.parametrize("provider,simple", [("GHA", True), ("GHA", False), ("ADO", False)])
@@ -235,6 +272,8 @@ def test_review_uses_shared_sdk_receipt_and_never_confirms(tmp_path, monkeypatch
     assert not list(root.iterdir())
     output = capsys.readouterr().out
     assert "NOT DEPLOYED" in output and "runtime prepare/review/confirm" in output
+    assert "same API workflow as MAUI" in output
+    assert "complete enrollment/binding separately" not in output
 
 
 @pytest.mark.parametrize("changed", [

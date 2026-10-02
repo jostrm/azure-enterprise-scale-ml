@@ -23,7 +23,7 @@ def main(argv=None):
         command.add_argument("--environment", choices=("dev", "stage", "prod"), required=True)
         command.add_argument("--options", required=True, help="Closed, non-secret enrollment options JSON file.")
         command.add_argument("--acknowledge-exclusive-writer-governance", action="store_true",
-                             help="Actual administrator attestation that ALL writers enforce physical leases.")
+                             help="Attest serialized provisioning and ALL writers' Blob leases or exclusive repository/shared-hub governance.")
         if name == "ensure":
             command.add_argument("--expected-plan", required=True, help="plan_hash from the separate approved plan.")
             command.add_argument("--yes", action="store_true", required=True)

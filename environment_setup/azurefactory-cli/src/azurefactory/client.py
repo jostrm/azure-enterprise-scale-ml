@@ -432,10 +432,18 @@ class AzureFactoryClient:
             "POST", f"/api/v1/creation/workflows/{identifier}/prepare-next",
             body={"folder": folder}), "workflow next")
 
-    def creation_workflow_start(self, folder: str, workflow_id: str, confirmation_id: str) -> dict[str, Any]:
+    def creation_workflow_start(self, folder: str, workflow_id: str, confirmation_id: str,
+                                *, authorization_hash: str | None = None) -> dict[str, Any]:
         return self._object(self.request("POST", "/api/v1/creation/workflows/start", body={
             "folder": folder, "workflow_id": self._workflow_id(workflow_id),
-            "confirmation_id": confirmation_id}), "workflow start")
+            "confirmation_id": confirmation_id,
+            **({"authorization_hash": authorization_hash} if authorization_hash else {})}), "workflow start")
+
+    def creation_workflow_continue(self, folder: str, workflow_id: str, authorization_hash: str) -> dict[str, Any]:
+        identifier = self._workflow_id(workflow_id)
+        return self._object(self.request("POST", f"/api/v1/creation/workflows/{identifier}/continue",
+                                        body={"folder": folder, "authorization_hash": authorization_hash}),
+                            "workflow continue")
 
     def creation_workflow_status(self, folder: str, workflow_id: str) -> dict[str, Any]:
         identifier = self._workflow_id(workflow_id)

@@ -58,7 +58,7 @@ permissions:
 jobs:
   deploy-project:
     name: Project ${{ inputs.phase }}
-    environment: ${{ inputs.environment }}
+    environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}')[inputs.environment] }}
     runs-on: ${{ fromJSON(inputs.runs_on) }}
     defaults:
       run:
@@ -998,6 +998,7 @@ jobs:
             -env "${{ env.dev_test_prod }}" `
             -subscriptionId "${{ env.dev_test_prod_sub_id }}" `
             -prjResourceSuffix "${{ env.admin_prjResourceSuffix }}" `
+            -projectNumber "${{ env.project_number_000 }}" `
             -aifactorySuffixRGADO "${{ env.admin_aifactorySuffixRG }}" `
             -commonRGNamePrefixVar "${{ env.admin_aifactoryPrefixRG }}" `
             -commonResourceSuffixADO "${{ env.admin_commonResourceSuffix }}" `

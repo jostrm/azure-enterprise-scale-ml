@@ -199,6 +199,22 @@ def validate_bindings(request: dict[str, Any], preview: dict[str, Any], purpose:
                 raise ConfigError("Workflow preview changed the requested saved scope or revision.")
         elif preview["workflow_id"] != request.get("workflow_id"):
             raise ConfigError("Workflow preview changed the workflow ID.")
+        authorization = preview["review"].get("workflow_authorization")
+        if request.get("approval_mode") == "whole-workflow":
+            if (not isinstance(authorization, dict) or authorization.get("contract") != "bounded-full-bootstrap-v1"
+                    or authorization.get("workflow_id") != preview["workflow_id"]
+                    or authorization.get("scope") != preview["scope"]
+                    or authorization.get("source_revision") != preview["source_revision"]
+                    or not authorization.get("stages") or not authorization.get("target")
+                    or not authorization.get("template_fingerprint")
+                    or not authorization.get("program_fingerprint")
+                    or parse_expires_at(authorization.get("expires_at")) <= datetime.now(timezone.utc)):
+                raise ConfigError("API did not return the requested bounded whole-workflow authorization.")
+            if authorization.get("authorization_hash") != canonical_json_hash(
+                    {key: value for key, value in authorization.items() if key != "authorization_hash"}):
+                raise ConfigError("Whole-workflow authorization hash does not match its reviewed content.")
+        elif authorization:
+            raise ConfigError("API expanded per-stage consent into whole-workflow approval.")
     elif purpose == "bootstrap-start":
         if operation != "bootstrap" or preview.get("flow") != "full-bootstrap":
             raise ConfigError("Expected an explicitly reviewed full-bootstrap flow.")

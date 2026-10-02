@@ -16,7 +16,7 @@ on:
 jobs:
   deploy:
     name: AI Gateway
-    environment: ${{ inputs.environment }}
+    environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}')[inputs.environment] }}
     runs-on: ubuntu-latest
     env:
       AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}

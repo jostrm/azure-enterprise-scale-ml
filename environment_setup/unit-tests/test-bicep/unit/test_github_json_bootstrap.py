@@ -24,6 +24,144 @@ IDENTITY = {
     "GITHUB_NEW_REPO": "example/new-repo",
     "GITHUB_NEW_REPO_VISIBILITY": "private",
 }
+
+
+@pytest.fixture
+def github_environments(monkeypatch):
+    monkeypatch.syspath_prepend(str(ROOT / "bootstrap" / "lib"))
+    import github_environments
+    return github_environments
+
+
+def test_new_github_environments_are_canonical(github_environments):
+    assert github_environments.resolve([]) == {"dev": "Dev", "stage": "Stage", "prod": "Prod"}
+
+
+def test_existing_github_environment_case_is_preserved(github_environments):
+    assert github_environments.resolve(["dev", "Stage", "PROD"]) == {
+        "dev": "dev", "stage": "Stage", "prod": "PROD"}
+
+
+def test_named_github_bindings_do_not_require_enrollment_for_bootstrap(github_environments):
+    assert github_environments.resolve(["aifactory-existing"]) == github_environments.DEFAULTS
+    mapping = {"dev": "aifactory-existing", "stage": "Stage", "prod": "Prod"}
+    assert github_environments.resolve(["aifactory-existing"], requested=mapping) == mapping
+    assert github_environments.resolve(["aifactory-existing"], saved=mapping) == mapping
+
+
+@pytest.mark.parametrize("saved,requested,names", [
+    ({"dev": "dev", "stage": "stage", "prod": "prod"},
+     {"dev": "Dev", "stage": "Stage", "prod": "Prod"}, ["dev"]),
+    ({"dev": "Dev", "stage": "Stage", "prod": "Prod"}, None, ["dev"]),
+    (None, {"dev": "Dev", "stage": "Dev", "prod": "Prod"}, []),
+    (None, {"dev": "Dev"}, []),
+])
+def test_github_environment_migration_never_happens_implicitly(github_environments, saved, requested, names):
+    with pytest.raises(github_environments.EnrollmentError):
+        github_environments.resolve(names, saved, requested)
+
+
+def test_github_environment_mapping_is_persisted_and_verified(github_environments):
+    class Cloud:
+        read_only = True
+        variable = None
+
+        def command(self, args):
+            assert args[-1].endswith("/environments?per_page=100")
+            return '[{"environments":[{"name":"dev"}]}]'
+
+        def gh(self, method, endpoint, body=None, allowed=()):
+            if method == "GET":
+                return (200, {}, {"value": self.variable}) if self.variable else (404, {}, None)
+            assert method == "POST"
+            assert endpoint.endswith("/actions/variables")
+            assert body["name"] == github_environments.VARIABLE
+            self.variable = body["value"]
+            return 201, {}, None
+
+    class Repository:
+        config = {"github_repository": "example/factory"}
+        cloud = Cloud()
+        calls = []
+        def environment(self, name):
+            return {"name": "dev", "protection_rules": ["keep"]} if name == "dev" else None
+        def ensure_environment(self, name, expected):
+            self.calls.append((name, expected))
+            return expected or {"name": name}
+
+    repository = Repository()
+    mapping = github_environments.ensure(repository, ["dev", "stage", "prod"])
+    assert mapping == {"dev": "dev", "stage": "Stage", "prod": "Prod"}
+    assert repository.calls[0] == ("dev", {"name": "dev", "protection_rules": ["keep"]})
+    assert json.loads(repository.cloud.variable) == mapping
+
+
+@pytest.mark.parametrize("mode", ["existing", "raced", "absent", "changed", "error", "unverified"])
+def test_environment_creation_preserves_protection_and_verifies_graphql(github_environments, mode):
+    name = "Team: Dev/blue"
+    protected = {"name": name, "node_id": "environment-node", "protection_rules": ["keep"]}
+    calls = []
+
+    class Cloud:
+        read_only = True
+        created = False
+
+        def gh(self, method, endpoint, body=None, allowed=()):
+            calls.append((method, endpoint))
+            assert method == "GET"
+            if endpoint.endswith("/environments/Team%3A%20Dev%2Fblue"):
+                if mode in ("existing", "raced", "changed") or self.created:
+                    value = dict(protected)
+                    if mode == "changed":
+                        value["protection_rules"] = ["different"]
+                    if mode == "unverified":
+                        value["node_id"] = "different"
+                    return 200, {}, value
+                return 404, {}, None
+            assert endpoint == "repos/example/factory"
+            return 200, {}, {"node_id": "repository-node"}
+
+        def command(self, args, data):
+            assert args == ["gh", "api", "--hostname", "github.com", "--method", "POST",
+                            "graphql", "--input", "-"]
+            payload = json.loads(data)
+            assert payload["variables"] == {"repository": "repository-node", "name": name}
+            assert "createEnvironment" in payload["query"]
+            calls.append(("POST", "graphql"))
+            self.created = True
+            return json.dumps({"errors": ["denied"]} if mode == "error" else {
+                "data": {"createEnvironment": {"environment": {"id": "environment-node", "name": name}}}})
+
+    repository = github_environments.Repository("example/factory")
+    repository.cloud = Cloud()
+    expected = protected if mode in ("existing", "changed") else None
+    if mode in ("changed", "error", "unverified"):
+        with pytest.raises(github_environments.EnrollmentError):
+            repository.ensure_environment(name, expected)
+    else:
+        assert repository.ensure_environment(name, expected) == protected
+    assert calls.count(("POST", "graphql")) == int(mode in ("absent", "error", "unverified"))
+
+
+def test_environment_helper_needs_no_registered_factory_modules(tmp_path):
+    for name in ("github_environments.py", "factory_enrollment.py"):
+        shutil.copyfile(ROOT / "bootstrap/lib" / name, tmp_path / name)
+    env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+    result = subprocess.run([sys.executable, str(tmp_path / "github_environments.py"), "--help"],
+                            cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    assert "--ensure" in result.stdout
+
+
+def test_github_workflow_jobs_use_mapping_not_azure_environment_selector():
+    templates = ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions"
+    for name in ("infra-common.yml", "infra-project.yml", "infra-project-phase.yml",
+                 "infra-project-dashboards.yml", "infra-ai-gateway.yml"):
+        document = yaml.safe_load((templates / name).read_text(encoding="utf-8"))
+        environments = [job["environment"] for job in document["jobs"].values() if "environment" in job]
+        assert environments, name
+        assert all("vars.AIFACTORY_GITHUB_ENVIRONMENTS" in value for value in environments), name
+
 MARKER = (
     '"${PYTHON[@]}" - "$CONFIG_FILE" "$CONFIG_TEMPLATE_FILE" "$RUNNER_LABEL" '
     '"$state_dir/current.env" <<\'PY\'\n'
@@ -430,6 +568,174 @@ def bash_executable():
     return bash
 
 
+def bootstrap_function(name):
+    source = (ROOT / "bootstrap/lib/create-new-aifactory-scaleset.sh").read_text(encoding="utf-8")
+    return re.search(r"^" + name + r"\(\) \{.*?^\}$", source, re.M | re.S)[0]
+
+
+@pytest.mark.parametrize("mapping", [
+    {"dev": "Dev", "stage": "Stage", "prod": "Prod"},
+    {"dev": "Team: Dev/blue", "stage": "Stage", "prod": "Prod"},
+])
+def test_environment_shell_helpers_preserve_exact_names(bash_executable, mapping):
+    source = (ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/"
+              "03a-GH-create-or-update-github-variables.sh").read_text(encoding="utf-8")
+    helpers = "\n".join(re.search(r"^" + name + r"\(\) \{.*?^\}", source, re.M | re.S)[0]
+                        for name in ("github_environment_name", "github_environment_url"))
+    python = shlex.quote(Path(sys.executable).as_posix())
+    script = (f"set -euo pipefail\nAIF_PYTHON=({python})\nenvironment_python=({python})\n"
+              + bootstrap_function("aif_github_environment_name") + "\n" + helpers
+              + '\nprintf "<%s>\\n" "$(aif_github_environment_name dev)" '
+                '"$(github_environment_name dev)" "$(github_environment_url "$(github_environment_name dev)")"\n')
+    result = subprocess.run([bash_executable, "-c", script], capture_output=True,
+                            env=dict(os.environ, AIFACTORY_GITHUB_ENVIRONMENTS=json.dumps(mapping)), timeout=30)
+    from urllib.parse import quote
+    assert result.returncode == 0, result.stderr.decode()
+    assert result.stdout.decode() == f"<{mapping['dev']}>\n<{mapping['dev']}>\n<{quote(mapping['dev'], safe='')}>\n"
+
+
+@pytest.mark.parametrize("purpose", ["AIFactoryBootstrap", ""])
+@pytest.mark.parametrize("exists,expected_creates", [("true", 0), ("false", 1), ("error", 0), ("unknown", 0)])
+def test_bootstrap_resource_group_is_create_if_absent(bash_executable, exists, expected_creates, purpose):
+    script = """
+set -euo pipefail
+AIF_DRY_RUN=false
+aif_error() { :; }
+aif_mutate() { "$@"; }
+az() {
+  case "$1 $2" in
+    "group exists") [[ "$AIF_TEST_EXISTS" != error ]] || return 9; printf '%s\\r\\n' "$AIF_TEST_EXISTS" ;;
+    "group create") printf 'CREATE:%s\\n' "$*" ;;
+    *) return 99 ;;
+  esac
+}
+""" + bootstrap_function("aif_ensure_resource_group") + """
+aif_ensure_resource_group subscription existing-rg location "$AIF_TEST_PURPOSE"
+"""
+    result = subprocess.run([bash_executable, "-c", script], capture_output=True, text=True,
+                            env=dict(os.environ, AIF_TEST_EXISTS=exists, AIF_TEST_PURPOSE=purpose), timeout=30)
+    assert result.stdout.count("CREATE") == expected_creates
+    assert (result.returncode == 0) == (exists in ("true", "false"))
+    assert ("--tags Purpose=" in result.stdout) == bool(expected_creates and purpose)
+
+
+@pytest.mark.parametrize("name", ["aif_ensure_bootstrap_identity", "aif_ensure_seeding_keyvault",
+                                 "aif_prepare_hub_dns", "aif_ensure_access_hub_vnet"])
+def test_persistent_bootstrap_resource_groups_share_safe_absence_check(name):
+    source = bootstrap_function(name)
+    assert "aif_ensure_resource_group " in source
+    assert "az group create" not in source
+
+
+@pytest.mark.parametrize("existing", ["present", "absent", "error"])
+def test_bootstrap_identity_only_creates_after_successful_absence_check(bash_executable, existing):
+    script = """
+set -euo pipefail
+AIF_DRY_RUN=false AIF_IDENTITY_MODE=c AIF_DEPLOYMENT_IDENTITY_NAME=deployment-mi
+AIF_DEV_SUBSCRIPTION_ID=dev AIF_STAGE_SUBSCRIPTION_ID=dev AIF_PROD_SUBSCRIPTION_ID=dev
+AIF_BOOTSTRAP_RESOURCE_GROUP=bootstrap-rg AIF_LOCATION=swedencentral
+AIF_TOPOLOGY=s AIF_ACCESS_HUB_MODE=integrated
+aif_section() { :; }
+aif_success() { :; }
+aif_ensure_resource_group() { :; }
+aif_ensure_role_assignment() { :; }
+az() {
+  case "$1 $2" in
+    "identity list")
+      case "$AIF_TEST_IDENTITY" in
+        present) printf 'deployment-mi\\r\\n' ;;
+        absent) : ;;
+        error) return 9 ;;
+      esac ;;
+    "identity create") printf 'CREATE\\n' ;;
+    "identity show") printf 'client-id\\nprincipal-id\\n' ;;
+    *) return 99 ;;
+  esac
+}
+""" + bootstrap_function("aif_ensure_bootstrap_identity") + "\naif_ensure_bootstrap_identity\n"
+    result = subprocess.run([bash_executable, "-c", script], capture_output=True, text=True,
+                            env=dict(os.environ, AIF_TEST_IDENTITY=existing), timeout=30)
+    assert result.stdout.count("CREATE") == int(existing == "absent")
+    assert (result.returncode == 0) == (existing != "error")
+
+
+@pytest.mark.parametrize("failure", [False, True])
+def test_separate_admin_group_preserves_team_and_propagates_failure(bash_executable, failure):
+    script = """
+set -euo pipefail
+AIF_ADMIN_GROUP_MODE=separate AIF_ADMIN_GROUP_ID=admin-input
+AIF_ADMIN_GROUP_NAME=admins AIF_ADMIN_MEMBER_EMAIL=admin@example.org
+AIF_TEAM_GROUP_ID=team-id AIF_TEAM_GROUP_NAME=team AIF_TEAM_MEMBER_EMAIL=team@example.org
+aif_ensure_team_group() {
+  [[ "$AIF_TEAM_GROUP_ID/$AIF_TEAM_GROUP_NAME/$AIF_TEAM_MEMBER_EMAIL" == "admin-input/admins/admin@example.org" ]]
+  [[ "$AIF_TEST_FAILURE" != true ]]
+  AIF_TEAM_GROUP_ID=admin-result
+}
+""" + bootstrap_function("aif_ensure_admin_group") + """
+aif_ensure_admin_group
+printf '%s\\n' "$AIF_TEAM_GROUP_ID/$AIF_TEAM_GROUP_NAME/$AIF_TEAM_MEMBER_EMAIL/$AIF_ADMIN_GROUP_ID"
+"""
+    result = subprocess.run([bash_executable, "-c", script], capture_output=True, text=True,
+                            env=dict(os.environ, AIF_TEST_FAILURE=str(failure).lower()), timeout=30)
+    assert (result.returncode == 0) == (not failure)
+    assert result.stdout == ("" if failure else "team-id/team/team@example.org/admin-result\n")
+
+
+@pytest.mark.parametrize("mode", ["absent", "matching", "wrong-subject", "wrong-issuer", "wrong-audience", "error"])
+def test_bootstrap_federation_never_overwrites_a_conflicting_binding(bash_executable, mode):
+    python = shlex.quote(Path(sys.executable).as_posix())
+    script = f"""
+set -euo pipefail
+AIF_PYTHON=(test_python)
+AIF_DRY_RUN=false AIF_IDENTITY_MODE=c AIF_SCALESET_LIB_DIR=unused AIF_SCALESET_SUFFIX=001
+AIF_IDENTITY_SUBSCRIPTION_ID=subscription AIF_IDENTITY_RESOURCE_GROUP=bootstrap-rg
+AIF_IDENTITY_NAME=deployment-mi AIF_IDENTITY_CLIENT_ID=client-id GITHUB_REPOSITORY=example/factory
+aif_section() {{ :; }}
+test_python() {{
+  if [[ "$1" == */github_environments.py ]]; then
+    printf '%s' '{{"dev":"Dev: Blue","stage":"Stage","prod":"Prod"}}'
+  else
+    {python} "$@"
+  fi
+}}
+gh() {{ printf 'GH:%s\\n' "$*"; }}
+az() {{
+  case "$1 $2 $3" in
+    "identity federated-credential list")
+      [[ "$AIF_TEST_FEDERATION" != error ]] || return 9
+      local name=Prod
+      case "$*" in
+        *github-001-dev*) name="Dev%3A Blue" ;;
+        *github-001-stage*) name=Stage ;;
+      esac
+      {python} -c '
+import json, os, sys
+mode = os.environ["AIF_TEST_FEDERATION"]
+value = {{"subject": "repo:example/factory:environment:" + sys.argv[1],
+          "issuer": "https://token.actions.githubusercontent.com",
+          "audiences": ["api://AzureADTokenExchange"]}}
+if mode.startswith("wrong-"):
+    key = {{"wrong-subject": "subject", "wrong-issuer": "issuer", "wrong-audience": "audiences"}}[mode]
+    value[key] = ["different"] if key == "audiences" else "different"
+print(json.dumps([] if mode == "absent" else [value]))
+' "$name" ;;
+    "identity federated-credential create") printf 'CREATE:%s\\n' "$*" ;;
+    *) return 99 ;;
+  esac
+}}
+""" + bootstrap_function("aif_github_environment_name") + "\n" + bootstrap_function(
+        "aif_configure_github_identity") + "\naif_configure_github_identity\n"
+    result = subprocess.run([bash_executable, "-c", script], capture_output=True, text=True,
+                            env=dict(os.environ, AIF_TEST_FEDERATION=mode), timeout=30)
+    successful = mode in ("absent", "matching")
+    assert (result.returncode == 0) == successful, result.stderr
+    assert result.stdout.count("CREATE:") == (3 if mode == "absent" else 0)
+    assert ("GH:secret set AZURE_CLIENT_ID --repo example/factory --env Dev: Blue " in result.stdout) == successful
+    if mode == "absent":
+        assert "--subject repo:example/factory:environment:Dev%3A Blue" in result.stdout
+    assert "update" not in result.stdout and "delete" not in result.stdout
+
+
 def run_sync_blocks(tmp_path, bash_executable, answer, *, use_json="y", update=None, uploader_exit=0):
     text = LAUNCHER.read_text(encoding="utf-8")
     function = text.split("confirm_update_github_variables() {", 1)[1].split(
@@ -532,10 +838,15 @@ def test_bulk_sync_failure_stops_before_secret_upload_or_dispatch(tmp_path, bash
     assert "GH:" not in result.stdout
 
 
-def test_modified_launcher_has_valid_bash_syntax(bash_executable):
+@pytest.mark.parametrize("path", [
+    LAUNCHER,
+    ROOT / "bootstrap/lib/create-new-aifactory-scaleset.sh",
+    ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/03a-GH-create-or-update-github-variables.sh",
+])
+def test_modified_launcher_has_valid_bash_syntax(bash_executable, path):
     result = subprocess.run(
         [bash_executable, "--noprofile", "--norc", "-n"],
-        input=LAUNCHER.read_text(encoding="utf-8"), capture_output=True, text=True,
+        input=path.read_text(encoding="utf-8"), capture_output=True, text=True,
         timeout=30, check=False,
     )
     assert result.returncode == 0, result.stderr

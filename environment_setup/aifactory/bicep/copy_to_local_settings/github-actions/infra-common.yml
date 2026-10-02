@@ -32,7 +32,7 @@ jobs:
   common-dev:
     name: Dev Common
     if: ${{ github.event.inputs.deploy_dev == 'true' }}
-    environment: dev
+    environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}').dev }}
     runs-on: ubuntu-latest
     env:
       AIFACTORY_REPORT_JOB: common-dev
@@ -419,7 +419,7 @@ jobs:
     name: Stage Common
     needs: common-dev
     if: ${{ github.event.inputs.deploy_stage == 'true' && needs.common-dev.result == 'success' }}
-    environment: stage
+    environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}').stage }}
     runs-on: ubuntu-latest
     env:
       AIFACTORY_REPORT_JOB: common-stage
@@ -805,7 +805,7 @@ jobs:
       - common-dev
       - common-stage
     if: ${{ github.event.inputs.deploy_prod == 'true' && ((github.event.inputs.deploy_stage == 'true' && needs.common-stage.result == 'success') || (github.event.inputs.deploy_stage != 'true' && needs.common-dev.result == 'success')) }}
-    environment: prod
+    environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}').prod }}
     runs-on: ubuntu-latest
     env:
       AIFACTORY_REPORT_JOB: common-prod

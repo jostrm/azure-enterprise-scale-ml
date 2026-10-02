@@ -104,6 +104,53 @@ def state() -> dict[str, object]:
 
 
 class TestScaleSetConfiguration(unittest.TestCase):
+    def test_simple_integrated_access_avoids_advanced_tail_allocation_blocker(self) -> None:
+        cidr = "172.16.0.0/20"
+        common = CONFIG.subnet_plan(cidr)
+        existing = [{"name": key, "addressPrefix": value}
+                    for key, value in common.items() if key.endswith("_cidr") and key != "common_vnet_cidr"]
+        for application_gateway in (False, True):
+            plan = CONFIG.simple_mode_hub_subnets(cidr, existing, application_gateway)
+            self.assertEqual(plan["GatewaySubnet"], "172.16.1.0/27")
+            self.assertEqual(plan["snet-dns-private-resolver"], "172.16.1.32/28")
+            self.assertLess(ipaddress.ip_network(plan["GatewaySubnet"]).broadcast_address,
+                            ipaddress.ip_network(cidr).broadcast_address)
+        tail = str(list(ipaddress.ip_network(cidr).subnets(new_prefix=27))[-1])
+        with self.assertRaisesRegex(ValueError, "already has another range"):
+            CONFIG.simple_mode_hub_subnets(cidr, existing + [{"name": "GatewaySubnet", "addressPrefix": tail}])
+
+    def test_separate_admin_group_does_not_replace_project_members(self) -> None:
+        values = state()
+        original = CONFIG.common_values(values)
+        values.update(admin_group_id="77777777-7777-7777-7777-777777777777",
+                      admin_member_email="admin@example.org")
+        result = CONFIG.common_values(values)
+        self.assertEqual(result["technical_admins_ad_object_id"], values["admin_group_id"])
+        self.assertEqual(result["technical_admins_email"], values["admin_member_email"])
+        for key, value in original.items():
+            if key not in ("technical_admins_ad_object_id", "technical_admins_email"):
+                self.assertEqual(result[key], value, key)
+
+    def test_simple_admin_group_preserves_project_contact_and_ownership(self) -> None:
+        with tempfile.TemporaryDirectory(prefix=".admin-config-", dir=ROOT) as directory:
+            root = Path(directory)
+            (root / "aifactory").mkdir()
+            (root / "aifactory/variables.json").write_text('{"dev": {}}', encoding="utf-8")
+            (root / ".env").write_text("", encoding="utf-8")
+            values = dict(state(), simple_mode=True, dev_vnet_cidr="172.16.0.0/20",
+                          team_member_email="team@example.org",
+                          admin_group_id="77777777-7777-7777-7777-777777777777",
+                          admin_member_email="admin@example.org")
+            CONFIG.apply_gha(root, values)
+            document = json.loads((root / "aifactory/variables.json").read_text())["dev"]
+            self.assertEqual(document["technical_admins_ad_object_id"], values["admin_group_id"])
+            self.assertEqual(document["technical_admins_email"], "admin@example.org")
+            for key in ("tags", "tagsProject"):
+                self.assertEqual(json.loads(document[key])["AIF-Project Owners"], "team@example.org")
+            env = (root / ".env").read_text()
+            self.assertIn('PROJECT_MEMBERS_EMAILS="team@example.org"', env)
+            self.assertIn(f'PROJECT_MEMBERS="{values["team_group_id"]}"', env)
+
     def test_runner_vm_os_controls_only_legacy_admin_vm_creation(self) -> None:
         values = state()
         values["add_bastion"] = "false"

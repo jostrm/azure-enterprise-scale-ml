@@ -20,6 +20,7 @@ CONTROL_LIBRARIES = (
     "aifactory_private_dns.py", "aifactory_scaleset_config.py",
     "aifactory_vpn_profile.py", "create-new-aifactory-scaleset.sh",
     "factory_enrollment.py", "factory_enrollment_entry.py", "factory_lifecycle.py",
+    "github_environments.py",
     "layout_router.sh", "project_deployment.py", "project_environment.py",
     "registered_creation.py",
     "release_version.py", "release_version.sh",
@@ -308,9 +309,16 @@ def test_launcher_bundle_round_trip_preserves_all_control_entrypoints(tmp_path):
     assert ignore.startswith("/*\ncredentials.json\n")
     (destination / "lib/local-package.bin").write_bytes(b"ignored")
     subprocess.run(["git", "-C", str(destination), "init", "--quiet"], check=True)
-    assert subprocess.run(
-        ["git", "-C", str(destination), "check-ignore", "--quiet",
-         "lib/layout_router.sh"]).returncode == 1
+    for name in CONTROL_LIBRARIES:
+        assert subprocess.run(
+            ["git", "-C", str(destination), "check-ignore", "--quiet",
+             "lib/" + name]).returncode == 1
+    helper = subprocess.run(
+        [sys.executable, "-E", str(destination / "lib/github_environments.py"), "--help"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=30,
+    )
+    assert helper.returncode == 0, helper.stderr
+    assert "--repository" in helper.stdout and "--ensure" in helper.stdout
     assert subprocess.run(
         ["git", "-C", str(destination), "check-ignore", "--quiet",
          "lib/local-package.bin"]).returncode == 0

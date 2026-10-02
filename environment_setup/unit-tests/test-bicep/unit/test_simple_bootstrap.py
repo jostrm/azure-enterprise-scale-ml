@@ -236,57 +236,30 @@ def test_integrated_reservations_are_idempotent_and_reject_conflicting_gateways(
     with pytest.raises(ValueError, match="overlaps"):
         CONFIG.simple_mode_hub_subnets("172.16.0.0/20", [
             {"name": "unrelated", "addressPrefix": "172.16.1.0/24"}])
+    assert CONFIG.simple_mode_hub_subnets("172.16.0.0/20", [
+        {"name": "unrelated-high-subnet", "addressPrefix": "172.16.15.0/26"}]) == plan
     with pytest.raises(ValueError, match="no room"):
         CONFIG.simple_mode_hub_subnets("172.16.0.0/20", [
-            {"name": "unrelated-high-subnet", "addressPrefix": "172.16.15.0/26"}])
+            {"name": "occupied-middle", "addressPrefix": "172.16.4.0/22"},
+            {"name": "occupied-high", "addressPrefix": "172.16.8.0/21"}])
 
 
-def test_real_append_allocator_fits_full_project_after_low_gateway_and_resolver():
-    executable = shutil.which("pwsh")
-    if not executable:
-        pytest.skip("PowerShell required for extracted allocator checks")
-    allocator = ROOT / "environment_setup/aifactory/bicep/scripts/subnetCalc_v2.ps1"
-    code = r"""
-$ErrorActionPreference='Stop'
-$ast=[System.Management.Automation.Language.Parser]::ParseFile('__ALLOCATOR__',[ref]$null,[ref]$null)
-$ast.FindAll({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst]},$false) |
-  ForEach-Object { . ([scriptblock]::Create($_.Extent.Text)) }
-function Get-Subnet {
-  param([string]$IPAddress,[int]$MaskBits)
-  $bytes=[System.Net.IPAddress]::Parse($IPAddress).GetAddressBytes()
-  [array]::Reverse($bytes)
-  $n=[BitConverter]::ToUInt32($bytes,0)
-  $size=[math]::Pow(2,32-$MaskBits)
-  $first=[uint32]([math]::Floor($n/$size)*$size)
-  [pscustomobject]@{
-    NetworkAddress=ConvertTo-DottedDecimalIP "$first"
-    BroadcastAddress=ConvertTo-DottedDecimalIP "$([uint32]($first+$size-1))"
-  }
-}
-$required=@{}
-foreach($p in $ast.ParamBlock.Parameters) {
-  $name=$p.Name.VariablePath.UserPath
-  if($name -like '*SubnetCidrAll') {
-    $required[$name -replace 'All$','']=$p.DefaultValue.SafeGetValue()
-  }
-}
-$possible=@{}
-$required.Values | Select-Object -Unique | ForEach-Object {
-  $possible[$_]=Get-SubnetFitting -addressSpace '172.16.0.0/20' -cidrNotation $_
-}
-$result=New-SubnetScheme -map $required -startIp '172.16.3.0' -possibleValuesMap $possible 6>$null
-ConvertTo-Json -InputObject $result -Compress
-""".replace("__ALLOCATOR__", str(allocator).replace("'", "''"))
-    result = subprocess.run([executable, "-NoProfile", "-NonInteractive", "-Command", code],
-                            capture_output=True, text=True, timeout=30)
-    assert result.returncode == 0, result.stderr
-    project = [ipaddress.ip_network(value) for value in json.loads(result.stdout).values()]
-    assert sorted(subnet.prefixlen for subnet in project) == [23, 23, 24, 25, 26, 26, 26, 27]
-    common = [ipaddress.ip_network(f"172.16.0.{i * 64}/26") for i in range(4)]
-    hub = [ipaddress.ip_network(prefix) for prefix in CONFIG.simple_mode_hub_subnets("172.16.0.0/20", []).values()]
-    subnets = common + hub + project
-    assert all(subnet.subnet_of(ipaddress.ip_network("172.16.0.0/20")) for subnet in subnets)
-    assert not any(a.overlaps(b) for i, a in enumerate(subnets) for b in subnets[i + 1:])
+def test_real_gap_allocator_fits_full_project_after_low_gateway_and_resolver():
+    spec = importlib.util.spec_from_file_location(
+        "subnet_capacity", Path(__file__).with_name("test_subnet_scaling_capacity.py"))
+    allocator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(allocator)
+
+    reserved = [allocator.subnet(f"common{i}", f"172.16.0.{i * 64}/26") for i in range(4)]
+    plan = CONFIG.simple_mode_hub_subnets("172.16.0.0/20", reserved)
+    reserved += [allocator.subnet(name, prefix) for name, prefix in plan.items()]
+    vnet = allocator.inventory(("172.16.0.0/20",), reserved)
+    result = allocator.allocate(vnet)
+    assert sorted(ipaddress.ip_network(value).prefixlen for value in result.values()) == [23, 23, 24, 25, 26, 26, 26, 27]
+    allocator.assert_disjoint(vnet, result)
+    allocator.deploy_inventory(vnet, result)
+    assert CONFIG.simple_mode_hub_subnets("172.16.0.0/20", vnet["subnets"]) == plan
+    assert allocator.allocate(vnet) == result
 
 
 def test_simple_optin_defaults_and_advanced_preservation():

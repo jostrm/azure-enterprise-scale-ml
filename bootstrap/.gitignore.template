@@ -24,6 +24,7 @@ lib/
 !/lib/factory_enrollment.py
 !/lib/factory_enrollment_entry.py
 !/lib/factory_lifecycle.py
+!/lib/github_environments.py
 !/lib/layout_router.sh
 !/lib/project_deployment.py
 !/lib/project_environment.py
