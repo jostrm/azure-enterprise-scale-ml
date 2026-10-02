@@ -19,12 +19,16 @@ The **AI Factory Configuration Wizard** is a guided, form-based desktop tool tha
 - **Speeds up first-time setup** — no need to read through a large configuration file to find what to change
 - **ITSM-friendly** — core teams can generate the correct configuration directly from a service ticket and trigger the pipeline on behalf of the requesting team. Or get the "initial full configuration", where the ITSM tickets only contain the *project specifics* such as *which resources a team wants to order* e.g. have enabled=true (checkboxes in Wizard)
 
-## Download
+## Download - Version `0.47.1`
 
-The Windows v047 package includes **Quick setup > Start API host** and the
-current CLI catalog configuration contract, including the default initial
-project. Linux and macOS downloads below are unchanged by this Windows update;
-do not assume they support the same API workflow.
+Release `v0.47.1`, published 2026-10-02, contains the Tkinter wizard for
+Windows x86-64, Linux x86-64 and macOS Apple Silicon (arm64). The Windows
+package includes **Quick setup > Start API host**, explicit API-port selection,
+and the current CLI catalog configuration contract. Do not assume the Linux
+and macOS packages support the same API workflow. The macOS archive is not an
+Intel/universal build.
+Archive checksums are in [SHA256SUMS.txt](SHA256SUMS.txt); source commit,
+architecture and build provenance are in [release-manifest.json](release-manifest.json).
 
 | Platform | File | Package |
 |---|---|---|
@@ -133,7 +137,7 @@ It does not deploy Azure resources, start a deployment job, or publish to GitHub
 | Requirement | Details |
 |-------------|---------|
 | **OS** | macOS 12 Monterey or later recommended (macOS 11 Big Sur minimum). |
-| **Architecture** | Apple Silicon (arm64) and Intel (x86-64). The binary is built for the architecture of the GitHub Actions runner (currently Apple Silicon — `macos-latest`). |
+| **Architecture** | Apple Silicon (arm64). This release does not include an Intel (x86-64) or universal macOS binary. |
 | **Python** | **Not required.** Python is bundled inside the binary. |
 | **Tkinter** | Bundled via PyInstaller. No separate install needed. |
 
