@@ -19,23 +19,31 @@ The **AI Factory Configuration Wizard** is a guided, form-based desktop tool tha
 - **Speeds up first-time setup** — no need to read through a large configuration file to find what to change
 - **ITSM-friendly** — core teams can generate the correct configuration directly from a service ticket and trigger the pipeline on behalf of the requesting team. Or get the "initial full configuration", where the ITSM tickets only contain the *project specifics* such as *which resources a team wants to order* e.g. have enabled=true (checkboxes in Wizard)
 
-## Download - Version `0.44`
+## Download
 
-Stable Version 2026-06-30 is version `0.44`
+The Windows v047 package includes **Quick setup > Start API host** and the
+current CLI catalog configuration contract, including the default initial
+project. Linux and macOS downloads below are unchanged by this Windows update;
+do not assume they support the same API workflow.
 
-| Platform | File |
-|---|---|
-| Windows | [aifactory-config-windows.zip](windows/aifactory-config-windows.zip) |
-| Linux | [aifactory-config-linux.tar.gz](linux/aifactory-config-linux.tar.gz) |
-| macOS | [aifactory-config-macos.tar.gz](macos/aifactory-config-macos.tar.gz) |
+| Platform | File | Package |
+|---|---|---|
+| Windows x64 | [aifactory-config-windows.zip](windows/aifactory-config-windows.zip) | v047, complete executable and `_internal` runtime folder |
+| Linux | [aifactory-config-linux.tar.gz](linux/aifactory-config-linux.tar.gz) | Existing archive, unchanged |
+| macOS | [aifactory-config-macos.tar.gz](macos/aifactory-config-macos.tar.gz) | Existing archive, unchanged |
+
+Windows download integrity: [SHA256SUMS.txt](windows/SHA256SUMS.txt).
+Build provenance: [release-manifest.json](windows/release-manifest.json).
 
 ### ⚠️ Security warning on first run
 
-The app is not yet signed with a commercial certificate. Your OS may show a warning the first time you run it — this is expected. The source code is fully open and auditable in this repository.
+The app is not yet signed with a commercial certificate. Your OS may show a
+warning the first time you run it. Verify the download and follow your
+organization's software approval policy; do not disable endpoint protection.
 
 **Windows — "Windows protected your PC" (SmartScreen)**
-1. Click **More info**
-2. Click **Run anyway**
+If the application is blocked, obtain approval through your organization's
+normal process before running it.
 
 **macOS — "cannot be opened because it is from an unidentified developer"**
 1. Right-click (or Control-click) the app
@@ -74,11 +82,49 @@ In most cases you do **not** need Python installed — just download, extract, a
 | **Python** | **Not required.** Python is bundled inside the `.exe`. |
 
 ### Run
-1. Download [`aifactory-config-windows (3).zip`](windows/aifactory-config-windows%20%283%29.zip).
+1. Download [`aifactory-config-windows.zip`](windows/aifactory-config-windows.zip).
 2. Extract the archive (right-click → *Extract All…*).
-3. Double-click **`aifactory-config.exe`**.
+3. Open the extracted `aifactory-config` folder and double-click **`aifactory-config.exe`**.
+   Keep the `_internal` folder beside it; copying only the executable will not work.
 
-> **Windows SmartScreen warning?**  The first run may show a "Windows protected your PC" prompt because the binary is unsigned. Click *More info* → *Run anyway*.
+> **Windows SmartScreen warning?** The binary is unsigned. Use your organization's
+> approval process rather than changing Windows security settings.
+
+### Windows CLI tutorial: start the packaged API
+
+The packaged wizard includes its Python runtime and API. A private backend source
+checkout is **not** required. The separate CLI needs Python and PowerShell 7.3+.
+
+1. Open **Quick setup > Start API host**.
+2. Enter a private API key in the masked authentication dialog, unless you already
+   supplied `AIFACTORY_API_KEY` to the wizard process.
+3. Copy the **actual API host URL** from the success dialog or status bar. Keep the
+   wizard open. Configure the CLI with that URL and the same private key.
+4. Run the CLI's `health`, `doctor`, and authenticated `catalog list` commands
+   before preparing a configuration. Stop if a compatibility or authorization
+   check fails; do not fall back to another running API.
+
+The default is `http://127.0.0.1:8765`. If another application owns that port,
+leave it running and launch a separate wizard with an explicitly selected
+available port. From the extracted archive's parent folder:
+
+```powershell
+$env:AIFACTORY_API_KEY = Read-Host "Choose a private API key" -MaskInput
+Start-Process .\aifactory-config\aifactory-config.exe -ArgumentList "--api-port", "0"
+```
+
+Then use **Quick setup > Start API host** as above. `--api-port 0` asks Windows
+to select an available loopback port; it does not start the API by itself.
+An explicit port such as `--api-port 18765` is also supported. There is no
+automatic fallback if an explicitly selected port is occupied.
+
+In the same PowerShell session, set `AIFACTORY_API_URL` to the URL displayed by
+this wizard. Do not use port `0` as a client URL. Never put API keys in source
+files, screenshots, recordings, receipts, or Git.
+
+The tutorial's factory confirmation saves a **local configuration draft** with
+one default project001 when no initial-project override is given.
+It does not deploy Azure resources, start a deployment job, or publish to GitHub.
 
 ---
 
@@ -258,4 +304,3 @@ bash 10-GH-create-or-update-github-variables.sh
 > **TODO** — detailed scaleset wizard screenshots and field-by-field guidance to be added.
 
 ---
-

@@ -446,6 +446,12 @@ def test_api_instructions_are_offline_and_never_reveal_key(monkeypatch, capsys):
     assert "private-key-not-for-output" not in output
     result = json.loads(output)
     assert result["desktop_required"] is False
+    assert result["backend_checkout_required"] is False
+    assert result["windows_download"].endswith("/environment_setup/install_config_wizard/readme.md")
+    assert "extract the entire" in result["start"][0]
+    assert any("Quick setup > Start API host" in step for step in result["start"])
+    assert any("actual URL" in step for step in result["start"])
+    assert any("--api-port 0" in step for step in result["start"])
     assert any("python -m src.api" in step for step in result["start"])
 
 

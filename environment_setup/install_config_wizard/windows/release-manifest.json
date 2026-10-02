@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "application_version": "v047",
+  "package_revision": "2026-10-02-api-port",
+  "platform": "windows",
+  "architecture": "AMD64",
+  "archive": "aifactory-config-windows.zip",
+  "bytes": 55842400,
+  "sha256": "5ebd8c960dcc3526d74edec5a1287c2799e8ca2f06ed21c5babc6f99b59f05e8",
+  "signed": false,
+  "build": {
+    "environment": "local Windows build",
+    "python": "3.13.15",
+    "pyinstaller": "6.22.2",
+    "specification": "aifactory-config.spec",
+    "format": "onedir"
+  },
+  "source": {
+    "repository": "https://github.com/jostrm/azure-aifactory-config",
+    "base_commit": "b93511f322a89cf3b5e90ab32393bb10957d46fb",
+    "tree": "e4f9df60627f48c2a7753d1c116a40811bf07f67",
+    "patch_summary": "Explicit --api-port option for Quick setup; default 8765 preserved.",
+    "accelerator_commit": "d8f7f1de1727ecdb1dc75ebb1454e7f02e9defef"
+  },
+  "verified_workflow": {
+    "extracted_package": true,
+    "api_started_from_quick_setup": true,
+    "private_api_key_required": true,
+    "current_cli_health_and_doctor": true,
+    "catalog_contract_version": 1,
+    "configuration_prepare_confirm_readback": true,
+    "default_project": "001",
+    "integrated_hub_settings_persisted": true,
+    "deployment_job_created": false
+  }
+}
