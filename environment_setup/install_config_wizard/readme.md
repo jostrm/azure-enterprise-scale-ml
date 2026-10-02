@@ -22,19 +22,19 @@ The **AI Factory Configuration Wizard** is a guided, form-based desktop tool tha
 ## Download - Version `0.47.1`
 
 Release `v0.47.1`, published 2026-10-02, contains the Tkinter wizard for
-Windows x86-64, Linux x86-64 and macOS Apple Silicon (arm64). The Windows
-package includes **Quick setup > Start API host**, explicit API-port selection,
-and the current CLI catalog configuration contract. Do not assume the Linux
-and macOS packages support the same API workflow. The macOS archive is not an
-Intel/universal build.
+Windows x86-64, Linux x86-64 and macOS Apple Silicon (arm64). All three
+archives are the exact published assets from
+[GitHub Actions run 36972008996](https://github.com/jostrm/azure-aifactory-config/actions/runs/36972008996),
+built from source commit `cccab033106c012ed0dec6323fda6ca782694546`.
+The macOS archive is not an Intel/universal build.
 Archive checksums are in [SHA256SUMS.txt](SHA256SUMS.txt); source commit,
 architecture and build provenance are in [release-manifest.json](release-manifest.json).
 
 | Platform | File | Package |
 |---|---|---|
-| Windows x64 | [aifactory-config-windows.zip](windows/aifactory-config-windows.zip) | v047, complete executable and `_internal` runtime folder |
-| Linux | [aifactory-config-linux.tar.gz](linux/aifactory-config-linux.tar.gz) | Existing archive, unchanged |
-| macOS | [aifactory-config-macos.tar.gz](macos/aifactory-config-macos.tar.gz) | Existing archive, unchanged |
+| Windows x64 | [aifactory-config-windows.zip](windows/aifactory-config-windows.zip) | v0.47.1, complete executable and `_internal` runtime folder |
+| Linux x86-64 | [aifactory-config-linux.tar.gz](linux/aifactory-config-linux.tar.gz) | v0.47.1, self-contained executable |
+| macOS arm64 | [aifactory-config-macos.tar.gz](macos/aifactory-config-macos.tar.gz) | v0.47.1, self-contained executable |
 
 Windows download integrity: [SHA256SUMS.txt](windows/SHA256SUMS.txt).
 Build provenance: [release-manifest.json](windows/release-manifest.json).
@@ -108,27 +108,15 @@ checkout is **not** required. The separate CLI needs Python and PowerShell 7.3+.
    before preparing a configuration. Stop if a compatibility or authorization
    check fails; do not fall back to another running API.
 
-The default is `http://127.0.0.1:8765`. If another application owns that port,
-leave it running and launch a separate wizard with an explicitly selected
-available port. From the extracted archive's parent folder:
+This release uses `http://127.0.0.1:8765` and does **not** support `--api-port`.
+It replaces the earlier custom Windows package that offered that option.
+If another application owns port 8765, stop this setup and resolve the conflict
+with that application's owner; do not connect the CLI to an unverified API.
 
-```powershell
-$env:AIFACTORY_API_KEY = Read-Host "Choose a private API key" -MaskInput
-Start-Process .\aifactory-config\aifactory-config.exe -ArgumentList "--api-port", "0"
-```
-
-Then use **Quick setup > Start API host** as above. `--api-port 0` asks Windows
-to select an available loopback port; it does not start the API by itself.
-An explicit port such as `--api-port 18765` is also supported. There is no
-automatic fallback if an explicitly selected port is occupied.
-
-In the same PowerShell session, set `AIFACTORY_API_URL` to the URL displayed by
-this wizard. Do not use port `0` as a client URL. Never put API keys in source
-files, screenshots, recordings, receipts, or Git.
-
-The tutorial's factory confirmation saves a **local configuration draft** with
-one default project001 when no initial-project override is given.
-It does not deploy Azure resources, start a deployment job, or publish to GitHub.
+Set `AIFACTORY_API_URL` in the CLI's PowerShell session to the URL displayed by
+this wizard. Never put API keys in source files, screenshots, recordings,
+receipts, or Git. CLI compatibility must be checked against this exact release;
+the previous custom Windows package's workflow results do not apply.
 
 ---
 
