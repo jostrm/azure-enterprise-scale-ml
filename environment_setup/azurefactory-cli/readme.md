@@ -180,6 +180,67 @@ azurefactory catalog settings --folder C:\factory --factory-id <uuid> --scale-se
 azurefactory parameters get --folder C:\factory --factory-id <uuid> --scale-set-id <uuid>
 ```
 
+### Read-only deployment preflight
+
+`preflight` **complements**, rather than replaces, `health` (API availability) and
+`doctor` (API compatibility). It sends exactly one authenticated
+**POST `/api/v1/creation/preflight`**, using the same API URL and `X-API-Key`.
+It does not run local `az`/`gh`, prepare/start a workflow, provision resources,
+save configuration, or fall back to a deployment route. No `--yes` is required.
+HTTP 404/405 means a newer API is needed; it is never reported as ready.
+
+Save this minimal request as `preflight-request.json` on the CLI machine,
+replacing `bootstrap_config` with the intended bootstrap inputs. Empty inputs
+are valid transport JSON, not a claim of deployment readiness:
+
+```json
+{"contract_version":1,"orchestrator":"gha","bootstrap_config":{}}
+```
+
+```powershell
+azurefactory health
+azurefactory doctor
+azurefactory --timeout 180 preflight --request-json .\preflight-request.json --save-report .\preflight.report.json
+# Alternative: assess an existing workflow request without preparing it.
+azurefactory --timeout 180 bootstrap workflow prepare --preflight --request-json .\workflow-request.json
+```
+
+Cloud checks can exceed 30 seconds, so both preflight forms default to a
+180-second request timeout; health, doctor and all other commands retain their
+30-second default. An explicit global `--timeout` **before the command**, even
+`--timeout 30`, always takes precedence. Preflight never automatically retries.
+Timeout or Ctrl+C exits
+nonzero without implying readiness and does not create/approve a workflow.
+
+The closed request requires `contract_version: 1` and a `bootstrap_config`
+object; `orchestrator` is `gha` (default) or `ado`. Optional fields are `settings`
+(object), `scope` (`folder`, `factory_id`, `scale_set_id`, `project_id`) and
+`expected_revision`. Existing workflow-prepare fields `operation`,
+`execution_mode`, `creation_mode`, `mode`, `approval_mode`, its known alias `approval_scope`,
+`authorization_valid_for_seconds` and `bootstrap_public_ipv4` are also accepted
+and forwarded, **not interpreted as consent**; approval policy fields are left
+to the API and never authorize preflight. Unknown request fields are rejected.
+
+Output preserves the API JSON report, redacting secret fields and the API key:
+`contract_version: 1`, `kind: "deployment-preflight"`, `read_only: true`,
+`authorization: false`, `status: "ready"|"blocked"|"incomplete"`, boolean `ready`,
+`generated_at`, `input_hash`, `source`, `target`, `checks`, `cost_preview` (object
+or null), and `limitations`. Checks contain `id`, `category`, `status`
+(`passed|warning|blocked|unknown|skipped`), boolean `blocking`, `message`,
+`evidence` and `remediation`. The input fingerprint must be 64 lowercase hex
+characters and check IDs must be unique. Exit 0 requires a valid ready report
+with at least one check and no blocking checks; a nonblocking warning can still
+exit 0. Not-ready reports exit
+3; malformed/incompatible reports and transport errors exit nonzero.
+
+`--save-report` optionally writes the redacted JSON to a **new** file, including
+valid blocked/incomplete reports; it never overwrites a report or receipt.
+The alias rejects `--save-receipt` and `--whole-workflow`; `--save-report` on
+workflow preparation requires `--preflight`. A preflight report is **not approval,
+a spend cap, or a deployment capture/receipt**. Cost previews are advisory, and
+readiness is only evidence at the reported time; separate reviewed preparation
+and explicit approval remain necessary to deploy.
+
 ## Edit a legacy JSON project's configuration, without deployment
 
 `config review` / `config save` are for an **exact legacy project** loaded from

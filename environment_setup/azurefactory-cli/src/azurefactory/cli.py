@@ -91,10 +91,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="azurefactory", description="Safe CLI for the local AzureFactory API.")
     parser.add_argument("--api-url", default=os.getenv(API_URL_ENV), help=f"API base URL (env {API_URL_ENV}, default loopback:8765).")
     parser.add_argument("--api-key", default=os.getenv(API_KEY_ENV), help=f"API key value (env {API_KEY_ENV}); never logged or stored.")
-    parser.add_argument("--timeout", type=positive_float, default=30.0, help="Per-request timeout seconds.")
+    parser.add_argument("--timeout", type=positive_float,
+                        help="Per-request timeout seconds (default 180 for preflight, 30 otherwise).")
     sub = parser.add_subparsers(dest="command")
 
     add_simple(sub, "health", cmd_health)
+    preflight = add_simple(sub, "preflight", cmd_preflight,
+                           help="Read-only deployment readiness; complements health/doctor, never approves or provisions.")
+    preflight.add_argument("--request-json", required=True, help="Deployment preflight or workflow-prepare JSON file.")
+    preflight.add_argument("--save-report", help="Save redacted report JSON to a new file, never an approval receipt.")
     workflow = sub.add_parser("workflow", help="Read-only GitHub Actions status and events; never dispatch or rerun.")
     workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
     for name, handler in (("status", cmd_workflow_status), ("watch", cmd_workflow_watch)):
@@ -332,6 +337,9 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
     workflow_prepare = add_simple(workflow_sub, "prepare", cmd_creation_workflow_prepare)
     workflow_prepare.add_argument("--request-json", required=True, help="Exact CreationWorkflowPrepare JSON; coordination mode belongs in bootstrap_config.")
+    workflow_prepare.add_argument("--preflight", action="store_true",
+                                  help="Call only read-only /creation/preflight; never prepare a workflow.")
+    workflow_prepare.add_argument("--save-report", help="With --preflight only: new redacted report JSON file.")
     workflow_prepare.add_argument("--save-receipt")
     workflow_prepare.add_argument("--whole-workflow", action="store_true",
                                   help="Review one bounded Full bootstrap authorization; the API owns stage continuation.")
@@ -455,12 +463,32 @@ def positive_float(value: str) -> float:
     return result
 
 
-def client(args) -> AzureFactoryClient:
-    return AzureFactoryClient(args.api_url, args.api_key, args.timeout)
+def client(args, *, default_timeout: float = 30.0) -> AzureFactoryClient:
+    timeout = args.timeout if args.timeout is not None else default_timeout
+    return AzureFactoryClient(args.api_url, args.api_key, timeout)
 
 
 def cmd_health(args):
     return emit(client(args).health())
+
+
+def cmd_preflight(args):
+    if getattr(args, "save_receipt", None) or getattr(args, "whole_workflow", False):
+        raise ConfigError("Preflight cannot use --save-receipt or --whole-workflow; it grants no approval.")
+    if args.save_report and os.path.lexists(args.save_report):
+        raise ConfigError("Refusing to overwrite an existing preflight report or receipt.")
+    api = client(args, default_timeout=180.0)
+    report = redact_secrets(api.preflight(read_json_file(args.request_json)), api.api_key)
+    if args.save_report:
+        try:
+            with open(args.save_report, "x", encoding="utf-8") as handle:
+                json.dump(report, handle, indent=2, sort_keys=True, allow_nan=False)
+                handle.write("\n")
+        except FileExistsError:
+            raise ConfigError("Refusing to overwrite an existing preflight report or receipt.") from None
+        except OSError:
+            raise ConfigError("Cannot write the preflight report file.") from None
+    return emit(report, EXIT_OK if report["ready"] else EXIT_BLOCKED)
 
 
 def _workflow_output(args, event):
@@ -856,6 +884,10 @@ def cmd_bootstrap_status(args):
 
 
 def cmd_creation_workflow_prepare(args):
+    if args.preflight:
+        return cmd_preflight(args)
+    if args.save_report:
+        raise ConfigError("--save-report requires --preflight; use --save-receipt for workflow preparation.")
     ensure_receipt_target_available(args)
     body = read_json_file(args.request_json)
     if args.whole_workflow:

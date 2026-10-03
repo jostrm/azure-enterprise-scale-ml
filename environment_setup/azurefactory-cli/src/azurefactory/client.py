@@ -15,7 +15,7 @@ from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
 from uuid import UUID
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
-from .errors import APIError, AuthError, ConfigError, RedirectError, RequestTimeout
+from .errors import APIError, AuthError, ConfigError, FailureError, RedirectError, RequestTimeout
 from .workflow_events import WorkflowRunEvent
 
 DEFAULT_API_URL = "http://127.0.0.1:8765"
@@ -185,6 +185,26 @@ class AzureFactoryClient:
 
     def health(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/health", require_key=False), "health")
+
+    def preflight(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Read readiness from the shared API; never prepare, authorize or provision."""
+        from .preflight import preflight_request, validate_preflight_report
+
+        request = preflight_request(body)
+        try:
+            report = self.request("POST", "/api/v1/creation/preflight", body=request)
+        except APIError as exc:
+            if exc.status in (404, 405):
+                raise APIError(
+                    "Preflight requires a newer API supporting POST /api/v1/creation/preflight; no fallback was attempted.",
+                    status=exc.status,
+                ) from None
+            raise
+        try:
+            validate_preflight_report(report)
+        except FailureError as exc:
+            raise FailureError(exc.message, details=redact_secrets(report, self.api_key)) from None
+        return report
 
     def openapi(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/openapi.json", require_key=False), "openapi")
