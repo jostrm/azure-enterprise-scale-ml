@@ -53,8 +53,18 @@
   "factory": {
     "api_url": "http://127.0.0.1:8765",
     "folder": "/state/azurefactory",
+    "operation_signing_secret_url": null,
     "writes_enabled": false,
     "allowed_write_environments": ["dev"]
+  },
+  "actions": {
+    "enabled_skills": []
+  },
+  "costs": {},
+  "workloads": {
+    "enabled_skills": [],
+    "repository_root": "..\\..\\..",
+    "profiles": {}
   },
   "auth": {
     "client_id": null,
@@ -63,7 +73,7 @@
       {
         "object_id": "4e6f97b5-7140-40eb-b030-c31d73072197",
         "scopes": ["project001-dev"],
-        "permissions": ["knowledge.read", "factory.read", "config.write", "knowledge.refresh"]
+        "permissions": ["knowledge.read", "factory.read", "config.write", "knowledge.refresh", "cost.read"]
       }
     ]
   }

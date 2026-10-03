@@ -76,6 +76,7 @@ $ResourceProviders = @(
 'Microsoft.PowerPlatform'
 'Microsoft.Media'
 'Microsoft.AlertsManagement'
+'Microsoft.CloudHealth'
 )
 
 $sub = Select-AzSubscription $SubscriptionName -ErrorAction SilentlyContinue -WarningAction SilentlyContinue

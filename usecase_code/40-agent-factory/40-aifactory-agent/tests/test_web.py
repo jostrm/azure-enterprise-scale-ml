@@ -114,6 +114,8 @@ def test_default_configuration_is_fail_closed_without_azure_calls(monkeypatch):
         assert response.json()["checks"] == {"authentication": "unconfigured", "knowledge": "not_checked"}
         for method, path, body in [
             ("GET", "/api/context", None),
+            ("GET", "/api/skills?scope_key=project001-dev", None),
+            ("GET", "/api/templates?scope_key=project001-dev", None),
             ("POST", "/api/chat", {"question": "Question", "audience": "platform", "scope_key": "project001-dev"}),
             ("POST", "/api/operations/propose", {"scope_key": "project001-dev", "settings": {
                 "department_name": "Research", "department_id": None,
@@ -176,6 +178,9 @@ def test_mocked_readiness_explicitly_limits_its_claim(isolated):
     ("POST", f"/api/operations/{OPERATION_ID}/approve", {"plan_hash": HASH}),
     ("POST", f"/api/operations/{OPERATION_ID}/execute", None),
     ("POST", f"/api/operations/{OPERATION_ID}/cancel", None),
+    ("POST", f"/api/operations/{OPERATION_ID}/continue", {"plan_hash": HASH, "observation_hash": HASH}),
+    ("POST", "/api/skills/create-agent-oftype-for-project/propose", {"scope_key": "project001-dev", "arguments": {}}),
+    ("POST", "/api/skills/create-ml-model-oftype-for-project/propose", {"scope_key": "project001-dev", "arguments": {}}),
 ])
 def test_every_private_route_requires_a_bearer_token(isolated, method, path, body):
     app, knowledge, store = isolated
@@ -238,7 +243,9 @@ def test_chat_is_sync_scoped_and_audience_never_grants_access(authenticated, pri
         })
         assert response.status_code == 200
         factory.return_value.answer.assert_called_once_with("Question", audience, principal, "project001-dev")
-        factory.assert_called_once_with(app.state.settings, knowledge)
+        factory.assert_called_once()
+        assert factory.call_args.args == (app.state.settings, knowledge)
+        assert callable(factory.call_args.kwargs["tool_factory"])
         denied = client.post("/api/chat", json={
             "question": "Question", "audience": audience, "scope_key": "project002-dev",
         })
@@ -362,7 +369,10 @@ def test_user_proposal_injects_same_store_and_never_approves_or_executes(proposa
             "department_name": "Research", "department_id": None,
         }})
         assert response.status_code == 201 and response.json() == pending
-    factory.assert_called_once_with(app.state.settings, principal, "project001-dev", operation_store=store)
+    factory.assert_called_once()
+    assert factory.call_args.args == (app.state.settings, principal, "project001-dev")
+    assert factory.call_args.kwargs["operation_store"] is store
+    assert callable(factory.call_args.kwargs["cost_factory"])
     tools.prepare_settings.assert_called_once_with({"settings": {"department_name": "Research", "department_id": None}})
     tools.execute.assert_not_called()
     tools.execute_operation.assert_not_called()
@@ -501,7 +511,10 @@ def test_execute_uses_persisted_scope_and_real_tools_interface(authenticated, pr
     with TestClient(app) as client:
         response = client.post(f"/api/operations/{OPERATION_ID}/execute")
         assert response.status_code == 200 and response.json()["status"] == "succeeded"
-    factory.assert_called_once_with(app.state.settings, principal, "project001-dev", operation_store=store)
+    factory.assert_called_once()
+    assert factory.call_args.args == (app.state.settings, principal, "project001-dev")
+    assert factory.call_args.kwargs["operation_store"] is store
+    assert callable(factory.call_args.kwargs["cost_factory"])
     tools.execute_operation.assert_called_once_with(record)
     store.approve.assert_not_called()
 
@@ -583,6 +596,7 @@ def test_frontend_javascript_syntax():
 @pytest.mark.parametrize("mode", [
     "blocked", "pkce", "bad-state", "authenticated", "approval", "cancel-disabled",
     "discard", "out-of-sync", "reindex", "user-proposal", "proposal-blocked", "proposal-api-unavailable",
+    "skill-cost", "skill-action", "skill-delete",
 ])
 def test_mocked_browser_pkce_safe_rendering_and_separate_approval(mode):
     # Node's built-in VM/crypto exercise the shipped script; all HTTP/DOM objects are unit-test mocks.
@@ -608,6 +622,8 @@ class Element {
     this._text = "";
     this.value = "";
     this.disabled = false;
+    this.dataset = {};
+    this.checked = false;
   }
   set textContent(value) { this._text = String(value); this.children = []; }
   get textContent() { return this._text + this.children.map(child => child.textContent).join(""); }
@@ -643,10 +659,12 @@ let resolveLate;
 const hash = "a".repeat(64);
 const operationId = "33333333-3333-4333-8333-333333333333";
 const operation = () => ({
-  id: operationId, correlation_id: operationId, tool_name: "factory_prepare_settings",
+  id: operationId, correlation_id: operationId, tool_name: mode === "skill-delete" ? "delete-aifactory"
+    : mode === "skill-action" ? "add-project-to-aifactory" : "factory_prepare_settings",
   scope_key: "project001-dev", scope: {factory: "factory", project: "001", environment: "dev"},
   factory_api_url: "https://factory-api.example",
-  request: {settings: {department_name: "Research"}}, preview: {can_execute: true},
+  request: {settings: {department_name: "Research"}},
+  preview: {can_execute: true, ...(mode === "skill-delete" ? {confirmation_phrase: "DELETE factory-ai"} : {})},
   affected_resources: [], created_at: "2026-10-03", expires_at: "2026-10-04",
   status: operationStatus, plan_hash: hash, progress: {phase: operationStatus},
 });
@@ -654,12 +672,22 @@ const context = {
   scopes: [{key: "project001-dev", label: "factory / 001 / dev",
     scope: {factory: "factory", project: "001", environment: "dev", tenant_id: config.tenant_id,
       subscription_id: clientId, resource_group: "project-rg"},
-    permissions: ["knowledge.read", "factory.read", "config.write"]}],
+    permissions: ["knowledge.read", "factory.read", "config.write", "project.add", "factory.delete", "cost.read"]}],
   settings: {writes_enabled: !["cancel-disabled", "proposal-blocked"].includes(mode)},
   capabilities: {
     model_read_only: true, proposal_creation: true,
+    skills_supported: mode.startsWith("skill-"),
     proposal_blockers: mode === "proposal-blocked" ? ["writes_disabled", "factory_target_unconfigured"] : [],
   },
+};
+const skill = {
+  name: mode === "skill-cost" ? "get-aifactory-common-estimated-azure-idle-running-cost" : "add-project-to-aifactory",
+  command: "/skill", label: "Factory skill",
+  kind: mode === "skill-cost" ? "monitoring" : "action", available: true, blockers: [],
+  arguments_schema: {type: "object", additionalProperties: false,
+    properties: mode === "skill-cost" ? {resource_group: {type: "string", title: "Resource group"}}
+      : {project_number: {type: "string"}, display_name: {type: "string"}},
+    required: mode === "skill-cost" ? ["resource_group"] : ["project_number", "display_name"]},
 };
 const answer = {
   answer: '<img src=x onerror="steal()"> [S1]', scope_key: "project001-dev", audience: "project",
@@ -683,6 +711,14 @@ const sandbox = {
       token_type: "Bearer", access_token: "UNIT_TEST_ACCESS_TOKEN", expires_in: 3600,
     });
     if (url === "/api/context") return response(context);
+    if (url.startsWith("/api/skills?")) return response({scope_key: "project001-dev", skills: [skill]});
+    if (url.startsWith("/api/skills/") && url.endsWith("/run")) {
+      return response({ok: true, data: {basis: "actual", source: "Cost Analysis", coverage: "partial"}});
+    }
+    if (url.startsWith("/api/skills/") && url.endsWith("/propose")) {
+      proposalCreated = true;
+      return response(operation());
+    }
     if (url.startsWith("/api/knowledge/status")) return response({
       status: {
         status: mode === "out-of-sync" ? "index_out_of_sync" : mode === "reindex" ? "reindex_required" : "ready",
@@ -691,7 +727,7 @@ const sandbox = {
       },
     });
     if (url === "/api/operations") return response({
-      operations: ["approval", "cancel-disabled"].includes(mode) || proposalCreated ? [operation()] : [],
+      operations: ["approval", "cancel-disabled", "skill-delete"].includes(mode) || proposalCreated ? [operation()] : [],
     });
     if (url === "/api/operations/propose") {
       if (mode === "proposal-api-unavailable") return {ok: false, status: 503, json: async () => ({
@@ -767,7 +803,43 @@ function descendants(element) {
     assert.equal(exchangeBody.has("client_secret"), false);
     assert(calls.filter(call => call.url.startsWith("/api/") && call.url !== "/api/public-config")
       .every(call => call.options.headers.Authorization === "Bearer UNIT_TEST_ACCESS_TOKEN"));
-    if (mode === "proposal-blocked") {
+    if (["skill-cost", "skill-action"].includes(mode)) {
+      await waitFor(() => calls.some(call => call.url.startsWith("/api/skills?")));
+      ui("skill-selector").value = skill.name;
+      await dispatch(ui("skill-selector"), "change");
+      if (mode === "skill-cost") ui("skill-arg-resource_group").value = "common-rg";
+      else {
+        ui("skill-arg-project_number").value = "002";
+        ui("skill-arg-display_name").value = "Research";
+      }
+      await dispatch(ui("skill-form"), "submit");
+      const submitted = calls.find(call => call.url.startsWith("/api/skills/") && call.options.method === "POST");
+      assert(submitted.url.endsWith(mode === "skill-cost" ? "/run" : "/propose"));
+      assert.equal(JSON.parse(submitted.body).scope_key, "project001-dev");
+      if (mode === "skill-cost") await waitFor(() => ui("skill-result").textContent.includes("Cost Analysis"));
+      else await waitFor(() => ui("proposed-plans").textContent.includes("Pending review"));
+      assert(!calls.some(call => call.url.endsWith("/approve") || call.url.endsWith("/execute")));
+    } else if (mode === "skill-delete") {
+      await waitFor(() => ui("proposed-plans").textContent.includes("DELETE factory-ai"));
+      const form = descendants(ui("proposed-plans")).find(child => child.tagName === "form");
+      const hashInput = ui("hash-" + operationId);
+      const phraseInput = ui("phrase-" + operationId);
+      const approve = descendants(form).find(child => child.tagName === "button");
+      hashInput.value = hash;
+      await dispatch(hashInput, "input");
+      assert.equal(approve.disabled, true);
+      phraseInput.value = "WRONG";
+      await dispatch(phraseInput, "input");
+      assert.equal(approve.disabled, true);
+      phraseInput.value = "DELETE factory-ai";
+      await dispatch(phraseInput, "input");
+      assert.equal(approve.disabled, false);
+      await dispatch(form, "submit");
+      await waitFor(() => calls.some(call => call.url.endsWith("/approve")));
+      assert.deepEqual(JSON.parse(calls.find(call => call.url.endsWith("/approve")).body),
+        {plan_hash: hash, confirmation_phrase: "DELETE factory-ai"});
+      assert(!calls.some(call => call.url.endsWith("/execute")));
+    } else if (mode === "proposal-blocked") {
       assert.equal(ui("propose").disabled, true);
       assert.equal(ui("department-name").disabled, true);
       assert(ui("proposal-status").textContent.includes("configuration writes are disabled"));

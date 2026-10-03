@@ -1,0 +1,2033 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": "2026-09-01-preview",
+  "description": "AI Factory health signal catalog. Each profile classifies one Azure resource type (optionally by kind or hierarchical namespace) and lists curated Azure Monitor platform-metric signals. Thresholds are defaults; override them per deployment with signal overrides.",
+  "projectSharedProfiles": [
+    "loganalytics",
+    "adls-gen2"
+  ],
+  "commonResourceFlags": [
+    "enableAdminVM",
+    "enableDatafactoryCommon"
+  ],
+  "layers": [
+    {
+      "key": "genai",
+      "displayName": "Generative AI and agents",
+      "impact": "Standard",
+      "description": "Foundry account and projects, model deployments, AI Search, Cosmos DB agent state, Bot Service and AI services."
+    },
+    {
+      "key": "data",
+      "displayName": "Data storage and databases",
+      "impact": "Standard",
+      "description": "Project storage accounts, data lakes and relational or cache databases."
+    },
+    {
+      "key": "analytics",
+      "displayName": "Machine learning and analytics",
+      "impact": "Standard",
+      "description": "Azure Machine Learning, AKS, Databricks and Data Factory."
+    },
+    {
+      "key": "apps",
+      "displayName": "Applications and integration",
+      "impact": "Standard",
+      "description": "Container Apps, App Service, Logic Apps, Event Hubs and API Management."
+    },
+    {
+      "key": "security",
+      "displayName": "Security and secrets",
+      "impact": "Standard",
+      "description": "Key Vaults holding project secrets and keys."
+    },
+    {
+      "key": "observability",
+      "displayName": "Observability",
+      "impact": "Limited",
+      "description": "Application Insights and Log Analytics. Limited impact: an observability problem degrades but never fails the workload."
+    },
+    {
+      "key": "shared",
+      "displayName": "Shared AI Factory services",
+      "impact": "Limited",
+      "description": "Common resource group services that a project depends on (Log Analytics and the data lake)."
+    },
+    {
+      "key": "compute",
+      "displayName": "Virtual machines",
+      "impact": "Limited",
+      "description": "Admin (DSVM) and build-agent virtual machines in the common resource group."
+    },
+    {
+      "key": "projects",
+      "displayName": "AI Factory projects",
+      "impact": "Standard",
+      "description": "Nested project health models, one per AI Factory project."
+    }
+  ],
+  "excludedTypes": [
+    "microsoft.network/privateendpoints",
+    "microsoft.network/networkinterfaces",
+    "microsoft.network/privatednszones",
+    "microsoft.network/privatednszones/virtualnetworklinks",
+    "microsoft.network/networksecuritygroups",
+    "microsoft.network/networkintentpolicies",
+    "microsoft.network/publicipaddresses",
+    "microsoft.network/natgateways",
+    "microsoft.network/virtualnetworks",
+    "microsoft.network/bastionhosts",
+    "microsoft.compute/disks",
+    "microsoft.compute/virtualmachines/extensions",
+    "microsoft.compute/virtualmachines/runcommands",
+    "microsoft.devtestlab/schedules",
+    "microsoft.managedidentity/userassignedidentities",
+    "microsoft.eventgrid/systemtopics",
+    "microsoft.insights/actiongroups",
+    "microsoft.insights/workbooks",
+    "microsoft.insights/datacollectionrules",
+    "microsoft.insights/scheduledqueryrules",
+    "microsoft.insights/metricalerts",
+    "microsoft.alertsmanagement/smartdetectoralertrules",
+    "microsoft.portal/dashboards",
+    "microsoft.machinelearningservices/workspaces/batchendpoints",
+    "microsoft.machinelearningservices/workspaces/batchendpoints/deployments",
+    "microsoft.machinelearningservices/workspaces/onlineendpoints",
+    "microsoft.machinelearningservices/workspaces/onlineendpoints/deployments",
+    "microsoft.machinelearningservices/workspaces/computes",
+    "microsoft.operationsmanagement/solutions",
+    "microsoft.automation/automationaccounts/runbooks",
+    "microsoft.sql/servers"
+  ],
+  "nonResourceFlags": {
+    "enableAMPLS": "Azure Monitor Private Link Scope lives in the hub subscription and is telemetry network plumbing, not a project or common workload resource.",
+    "enableAIFactoryHub": "Configuration intent only; it deploys nothing.",
+    "enablePublicGenAIAccess": "Network access setting applied to the modelled AI services.",
+    "enablePublicAccessWithPerimeter": "Network perimeter setting applied to the modelled AI services.",
+    "enableDeleteForDisabledResources": "Pipeline lifecycle switch, not a resource.",
+    "enableDefenderforAISubLevel": "Microsoft Defender for Cloud plan setting, not a monitored resource.",
+    "enableDefenderforAIResourceLevel": "Microsoft Defender for Cloud plan setting, not a monitored resource.",
+    "enableAISearchSharedPrivateLink": "Networking option of the modelled AI Search service.",
+    "enableRetries": "Pipeline retry switch, not a resource.",
+    "enableAppInsightsDashboard": "Portal dashboard; it is not a runtime dependency of the workload.",
+    "enableElasticsearch": "Elastic Cloud (Microsoft.Elastic) is a partner SaaS without Azure Monitor platform metrics; monitor it in Elastic.",
+    "ENABLE_KONG": "Kong edge proxy is a container workload with no dedicated Azure resource type; its hosting platform and the modelled API Management carry its health."
+  },
+  "notMonitorable": {
+    "microsoft.containerregistry/registries": "Verified on the test factory: Azure Resource Health returns HTTP 422 (not supported) for container registries, and the registry Transactions metric exposes no documented failure response types. Monitor image pulls through the consuming AKS, Azure ML and Container Apps entities; add a signal here once a failure dimension value is validated.",
+    "microsoft.app/jobs": "Verified on the test factory: Azure Resource Health returns HTTP 422 (not supported) for Container Apps jobs, and the Executions metric's 'state' values could not be confirmed (no executions in 30 days). Add a failed-execution signal here once a state value is validated."
+  },
+  "profiles": [
+    {
+      "key": "foundry",
+      "displayName": "AI Foundry account",
+      "description": "Foundry (AIServices) account hosting model deployments. Availability is gated by request volume so a few failed calls in a quiet period do not page anyone.",
+      "match": {
+        "type": "microsoft.cognitiveservices/accounts",
+        "kinds": [
+          "AIServices"
+        ]
+      },
+      "layer": "genai",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enableAIFoundry",
+        "enableAIServices"
+      ],
+      "signals": [
+        {
+          "name": "model-availability",
+          "displayName": "Model availability (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.cognitiveservices/accounts",
+          "metricName": "ModelAvailabilityRate",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "LessThanOrEqual",
+              "threshold": 99
+            },
+            "unhealthyRule": {
+              "operator": "LessThanOrEqual",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "model-traffic-gate",
+          "displayName": "Model requests minimum-traffic gate (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.cognitiveservices/accounts",
+          "metricName": "ModelRequests",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "unhealthyRule": {
+              "operator": "GreaterThanOrEqual",
+              "threshold": 20
+            }
+          }
+        },
+        {
+          "name": "throttled-calls",
+          "displayName": "Throttled calls, HTTP 429 (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.cognitiveservices/accounts",
+          "metricName": "BlockedCalls",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 10
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 100
+            }
+          }
+        },
+        {
+          "name": "server-errors",
+          "displayName": "Server errors, HTTP 5xx (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.cognitiveservices/accounts",
+          "metricName": "ServerErrors",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 50
+            }
+          }
+        },
+        {
+          "name": "provisioned-utilization",
+          "displayName": "Provisioned (PTU) utilization (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.cognitiveservices/accounts",
+          "metricName": "ProvisionedUtilization",
+          "aggregationType": "Maximum",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThanOrEqual",
+              "threshold": 90
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThanOrEqual",
+              "threshold": 100
+            }
+          }
+        }
+      ],
+      "signalAggregationGroups": [
+        {
+          "name": "model-availability-gate",
+          "displayName": "Model availability with minimum traffic",
+          "aggregationType": "BestOf",
+          "members": [
+            "model-availability",
+            "model-traffic-gate"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "openai",
+      "displayName": "Azure OpenAI account",
+      "description": "Standalone Azure OpenAI account; same gated availability as Foundry.",
+      "match": {
+        "type": "microsoft.cognitiveservices/accounts",
+        "kinds": [
+          "OpenAI"
+        ]
+      },
+      "layer": "genai",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enableAzureOpenAI"
+      ],
+      "inherits": "foundry"
+    },
+    {
+      "key": "ai-service",
+      "displayName": "Azure AI service",
+      "description": "Single-purpose AI services (Vision, Speech, Document Intelligence, Content Safety, Language, Translator).",
+      "match": {
+        "type": "microsoft.cognitiveservices/accounts",
+        "kinds": [
+          "CognitiveServices",
+          "ComputerVision",
+          "ContentSafety",
+          "Face",
+          "FormRecognizer",
+          "SpeechServices",
+          "TextAnalytics",
+          "TextTranslation",
+          "ContentUnderstanding"
+        ]
+      },
+      "layer": "genai",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enableAzureAIVision",
+        "enableAzureSpeech",
+        "enableAIDocIntelligence",
+        "enableContentSafety"
+      ],
+      "signals": [
+        {
+          "name": "server-errors",
+          "displayName": "Server errors, HTTP 5xx (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.cognitiveservices/accounts",
+          "metricName": "ServerErrors",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 50
+            }
+          }
+        },
+        {
+          "name": "throttled-calls",
+          "displayName": "Throttled calls, HTTP 429 (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.cognitiveservices/accounts",
+          "metricName": "BlockedCalls",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 10
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 100
+            }
+          }
+        },
+        {
+          "name": "latency",
+          "displayName": "Latency (ms)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.cognitiveservices/accounts",
+          "metricName": "Latency",
+          "aggregationType": "Average",
+          "dataUnit": "MilliSeconds",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 5000
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 15000
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "foundry-project",
+      "displayName": "AI Foundry project",
+      "description": "Foundry project with the standard-agent capability host (Cosmos DB threads, AI Search vectors, project storage). Resource Health is not available for this child resource.",
+      "match": {
+        "type": "microsoft.cognitiveservices/accounts/projects"
+      },
+      "layer": "genai",
+      "impact": "Standard",
+      "resourceHealth": "Disabled",
+      "enableFlags": [
+        "enableAFoundryCaphost",
+        "enableAIFactoryCreatedDefaultProjectForAIFv2"
+      ],
+      "signals": [
+        {
+          "name": "agent-response-failures",
+          "displayName": "Failed agent responses (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.cognitiveservices/accounts/projects",
+          "metricName": "AgentResponses",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "dimensionFilter": "ResponseStatus eq 'failed'",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 3
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 20
+            }
+          }
+        },
+        {
+          "name": "thread-store-throttling",
+          "displayName": "Agent thread store (Cosmos DB) throttled requests (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.cognitiveservices/accounts/projects",
+          "metricName": "CosmosDbThrottledRequests",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 0
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 25
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "search",
+      "displayName": "AI Search",
+      "description": "Capability-host vector store and retrieval index.",
+      "match": {
+        "type": "microsoft.search/searchservices"
+      },
+      "layer": "genai",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enableAISearch"
+      ],
+      "signals": [
+        {
+          "name": "throttled-queries",
+          "displayName": "Throttled search queries (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.search/searchservices",
+          "metricName": "ThrottledSearchQueriesPercentage",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 10
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 25
+            }
+          }
+        },
+        {
+          "name": "search-latency",
+          "displayName": "Search latency (seconds)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.search/searchservices",
+          "metricName": "SearchLatency",
+          "aggregationType": "Average",
+          "dataUnit": "Seconds",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 2
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "cosmos",
+      "displayName": "Cosmos DB",
+      "description": "Capability-host thread and agent-history store.",
+      "match": {
+        "type": "microsoft.documentdb/databaseaccounts"
+      },
+      "layer": "genai",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enableCosmosDB"
+      ],
+      "signals": [
+        {
+          "name": "service-availability",
+          "displayName": "Service availability (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.documentdb/databaseaccounts",
+          "metricName": "ServiceAvailability",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT1H",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "LessThan",
+              "threshold": 99
+            },
+            "unhealthyRule": {
+              "operator": "LessThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "throttled-requests",
+          "displayName": "Throttled requests, HTTP 429 (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.documentdb/databaseaccounts",
+          "metricName": "ThrottledRequestPercentage",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 1
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 10
+            }
+          }
+        },
+        {
+          "name": "server-side-latency",
+          "displayName": "Server-side latency (ms)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.documentdb/databaseaccounts",
+          "metricName": "ServerSideLatency",
+          "aggregationType": "Average",
+          "dataUnit": "MilliSeconds",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 100
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 500
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "bot",
+      "displayName": "Bot Service",
+      "description": "Channel endpoint for Foundry agents (Teams, web chat). Resource Health is not used because Bot Service is a global resource.",
+      "match": {
+        "type": "microsoft.botservice/botservices"
+      },
+      "layer": "genai",
+      "impact": "Standard",
+      "resourceHealth": "Disabled",
+      "enableFlags": [
+        "enableBotService"
+      ],
+      "signals": [
+        {
+          "name": "server-errors",
+          "displayName": "Channel requests with HTTP 5xx (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.botservice/botservices",
+          "metricName": "RequestsTraffic",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "dimensionFilter": "StatusCodeClass eq '5xx'",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 50
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "bing",
+      "displayName": "Grounding with Bing",
+      "description": "Bing grounding / custom search account used by agents.",
+      "match": {
+        "type": "microsoft.bing/accounts"
+      },
+      "layer": "genai",
+      "impact": "Standard",
+      "resourceHealth": "Disabled",
+      "enableFlags": [
+        "enableBing",
+        "enableBingCustomSearch"
+      ],
+      "signals": [
+        {
+          "name": "server-errors",
+          "displayName": "Server errors (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.bing/accounts",
+          "metricName": "ServerErrors",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 50
+            }
+          }
+        },
+        {
+          "name": "latency",
+          "displayName": "Latency (ms)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.bing/accounts",
+          "metricName": "Latency",
+          "aggregationType": "Average",
+          "dataUnit": "MilliSeconds",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 5000
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 15000
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "storage",
+      "displayName": "Storage account",
+      "description": "Project blob/file storage, including the capability-host file store. Client errors such as 404 are normal and are not treated as failures.",
+      "match": {
+        "type": "microsoft.storage/storageaccounts",
+        "hns": false
+      },
+      "layer": "data",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [],
+      "signals": [
+        {
+          "name": "availability",
+          "displayName": "Availability (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.storage/storageaccounts",
+          "metricName": "Availability",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "LessThan",
+              "threshold": 99
+            },
+            "unhealthyRule": {
+              "operator": "LessThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "e2e-latency",
+          "displayName": "Successful end-to-end latency (ms)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.storage/storageaccounts",
+          "metricName": "SuccessE2ELatency",
+          "aggregationType": "Average",
+          "dataUnit": "MilliSeconds",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 1000
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 5000
+            }
+          }
+        },
+        {
+          "name": "throttled-transactions",
+          "displayName": "Throttled transactions (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.storage/storageaccounts",
+          "metricName": "Transactions",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "dimensionFilter": "ResponseType eq 'ClientThrottlingError' or ResponseType eq 'ServerBusyError'",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 10
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 100
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "adls-gen2",
+      "displayName": "Data lake (ADLS Gen2)",
+      "description": "Storage account with hierarchical namespace: the AI Factory data lake.",
+      "match": {
+        "type": "microsoft.storage/storageaccounts",
+        "hns": true
+      },
+      "layer": "data",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [],
+      "inherits": "storage"
+    },
+    {
+      "key": "postgres-flexible",
+      "displayName": "PostgreSQL flexible server",
+      "match": {
+        "type": "microsoft.dbforpostgresql/flexibleservers"
+      },
+      "layer": "data",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enablePostgreSQL"
+      ],
+      "signals": [
+        {
+          "name": "database-alive",
+          "displayName": "Database is alive (1 = alive)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.dbforpostgresql/flexibleservers",
+          "metricName": "is_db_alive",
+          "aggregationType": "Minimum",
+          "dataUnit": "Count",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "unhealthyRule": {
+              "operator": "LessThan",
+              "threshold": 1
+            }
+          }
+        },
+        {
+          "name": "cpu",
+          "displayName": "CPU (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.dbforpostgresql/flexibleservers",
+          "metricName": "cpu_percent",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 80
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "memory",
+          "displayName": "Memory (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.dbforpostgresql/flexibleservers",
+          "metricName": "memory_percent",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 85
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "storage",
+          "displayName": "Storage used (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.dbforpostgresql/flexibleservers",
+          "metricName": "storage_percent",
+          "aggregationType": "Maximum",
+          "dataUnit": "Percent",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 80
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 90
+            }
+          }
+        },
+        {
+          "name": "failed-connections",
+          "displayName": "Failed connections (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.dbforpostgresql/flexibleservers",
+          "metricName": "connections_failed",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 10
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 50
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "redis",
+      "displayName": "Azure Cache for Redis",
+      "match": {
+        "type": "microsoft.cache/redis"
+      },
+      "layer": "data",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enableRedisCache"
+      ],
+      "signals": [
+        {
+          "name": "server-load",
+          "displayName": "Server load (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.cache/redis",
+          "metricName": "serverLoad",
+          "aggregationType": "Maximum",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 70
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 90
+            }
+          }
+        },
+        {
+          "name": "used-memory",
+          "displayName": "Used memory (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.cache/redis",
+          "metricName": "usedmemorypercentage",
+          "aggregationType": "Maximum",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 80
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 95
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "sql-database",
+      "displayName": "Azure SQL Database",
+      "match": {
+        "type": "microsoft.sql/servers/databases"
+      },
+      "layer": "data",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enableSQLDatabase"
+      ],
+      "signals": [
+        {
+          "name": "availability",
+          "displayName": "Availability (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.sql/servers/databases",
+          "metricName": "availability",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "LessThan",
+              "threshold": 99
+            },
+            "unhealthyRule": {
+              "operator": "LessThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "cpu",
+          "displayName": "CPU (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.sql/servers/databases",
+          "metricName": "cpu_percent",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 80
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "storage",
+          "displayName": "Storage used (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.sql/servers/databases",
+          "metricName": "storage_percent",
+          "aggregationType": "Maximum",
+          "dataUnit": "Percent",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 80
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 90
+            }
+          }
+        },
+        {
+          "name": "failed-connections",
+          "displayName": "Failed connections (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.sql/servers/databases",
+          "metricName": "connection_failed",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 10
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 50
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "keyvault",
+      "displayName": "Key Vault",
+      "match": {
+        "type": "microsoft.keyvault/vaults"
+      },
+      "layer": "security",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [],
+      "signals": [
+        {
+          "name": "availability",
+          "displayName": "Availability (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.keyvault/vaults",
+          "metricName": "Availability",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "LessThan",
+              "threshold": 99
+            },
+            "unhealthyRule": {
+              "operator": "LessThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "saturation",
+          "displayName": "Vault saturation (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.keyvault/vaults",
+          "metricName": "SaturationShoebox",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 75
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 90
+            }
+          }
+        },
+        {
+          "name": "api-latency",
+          "displayName": "Service API latency (ms)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.keyvault/vaults",
+          "metricName": "ServiceApiLatency",
+          "aggregationType": "Average",
+          "dataUnit": "MilliSeconds",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 1000
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 5000
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "aml",
+      "displayName": "Azure Machine Learning workspace",
+      "match": {
+        "type": "microsoft.machinelearningservices/workspaces"
+      },
+      "layer": "analytics",
+      "impact": "Standard",
+      "resourceHealth": "Disabled",
+      "enableFlags": [
+        "enableAzureMachineLearning",
+        "enableAIFoundryHub"
+      ],
+      "signals": [
+        {
+          "name": "failed-runs",
+          "displayName": "Failed runs (count per hour)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.machinelearningservices/workspaces",
+          "metricName": "Failed Runs",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT1H",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 2
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 10
+            }
+          }
+        },
+        {
+          "name": "model-deploy-failures",
+          "displayName": "Failed model deployments (count per hour)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.machinelearningservices/workspaces",
+          "metricName": "Model Deploy Failed",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT1H",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 0
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 3
+            }
+          }
+        },
+        {
+          "name": "unusable-nodes",
+          "displayName": "Unusable compute nodes (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.machinelearningservices/workspaces",
+          "metricName": "Unusable Nodes",
+          "aggregationType": "Maximum",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 0
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 2
+            }
+          }
+        },
+        {
+          "name": "quota-utilization",
+          "displayName": "Compute quota utilization (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.machinelearningservices/workspaces",
+          "metricName": "Quota Utilization Percentage",
+          "aggregationType": "Maximum",
+          "dataUnit": "Percent",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 85
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 95
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "aks",
+      "displayName": "AKS cluster",
+      "description": "AKS for Azure ML inference or standalone workloads.",
+      "match": {
+        "type": "microsoft.containerservice/managedclusters"
+      },
+      "layer": "analytics",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enableAKS",
+        "enableAksForAzureML"
+      ],
+      "signals": [
+        {
+          "name": "node-cpu",
+          "displayName": "Node CPU (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.containerservice/managedclusters",
+          "metricName": "node_cpu_usage_percentage",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 80
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "node-memory",
+          "displayName": "Node memory working set (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.containerservice/managedclusters",
+          "metricName": "node_memory_working_set_percentage",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 80
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "node-disk",
+          "displayName": "Node disk used (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.containerservice/managedclusters",
+          "metricName": "node_disk_usage_percentage",
+          "aggregationType": "Maximum",
+          "dataUnit": "Percent",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 80
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 90
+            }
+          }
+        },
+        {
+          "name": "unschedulable-pods",
+          "displayName": "Unschedulable pods (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.containerservice/managedclusters",
+          "metricName": "cluster_autoscaler_unschedulable_pods_count",
+          "aggregationType": "Average",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 0
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "databricks",
+      "displayName": "Azure Databricks workspace",
+      "description": "Databricks workspaces emit no Azure Monitor platform metrics and Azure Resource Health is not supported for them (both verified on the test factory). Health comes from Databricks diagnostic logs in Log Analytics (opt-in with --log-signals).",
+      "match": {
+        "type": "microsoft.databricks/workspaces"
+      },
+      "layer": "analytics",
+      "impact": "Standard",
+      "resourceHealth": "Disabled",
+      "enableFlags": [
+        "enableDatabricks"
+      ],
+      "signals": [],
+      "logAnalyticsTables": [
+        "DatabricksJobs"
+      ],
+      "noSourceHint": "Azure Databricks workspaces emit no platform metrics and do not support Resource Health. Send the workspace's 'jobs' diagnostic logs (DatabricksJobs) to Log Analytics and redeploy with --log-signals to model them.",
+      "logAnalyticsSignals": [
+        {
+          "name": "failed-job-runs",
+          "displayName": "Failed Databricks job runs (count per hour)",
+          "signalKind": "LogAnalyticsQuery",
+          "queryText": "let resource = '__RESOURCE_ID__';\nlet flowing = toscalar(DatabricksJobs | where TimeGenerated > ago(1d) and _ResourceId =~ resource | count) > 0;\nDatabricksJobs\n| where TimeGenerated > ago(1h) and _ResourceId =~ resource\n| summarize FailedRuns = countif(ActionName == 'runFailed')\n| where flowing",
+          "valueColumnName": "FailedRuns",
+          "dataUnit": "Count",
+          "timeGrain": "PT1H",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 0
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "datafactory",
+      "displayName": "Data Factory",
+      "match": {
+        "type": "microsoft.datafactory/factories"
+      },
+      "layer": "analytics",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enableDatafactory",
+        "enableDatafactoryCommon"
+      ],
+      "signals": [
+        {
+          "name": "pipeline-failures",
+          "displayName": "Failed pipeline runs (count per hour)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.datafactory/factories",
+          "metricName": "PipelineFailedRuns",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT1H",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 0
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            }
+          }
+        },
+        {
+          "name": "trigger-failures",
+          "displayName": "Failed trigger runs (count per hour)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.datafactory/factories",
+          "metricName": "TriggerFailedRuns",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT1H",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 0
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "containerapps-env",
+      "displayName": "Container Apps environment",
+      "match": {
+        "type": "microsoft.app/managedenvironments"
+      },
+      "layer": "apps",
+      "impact": "Standard",
+      "resourceHealth": "Disabled",
+      "enableFlags": [
+        "enableContainerApps"
+      ],
+      "signals": [
+        {
+          "name": "cores-quota",
+          "displayName": "Environment cores quota utilization (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.app/managedenvironments",
+          "metricName": "EnvCoresQuotaUtilization",
+          "aggregationType": "Maximum",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 80
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 95
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "containerapp",
+      "displayName": "Container app",
+      "description": "Agent front ends, the private Azure MCP server and other project apps. Scale-to-zero apps simply report no data.",
+      "match": {
+        "type": "microsoft.app/containerapps"
+      },
+      "layer": "apps",
+      "impact": "Standard",
+      "resourceHealth": "Disabled",
+      "enableFlags": [
+        "enableContainerApps",
+        "enableAzureMcpServer"
+      ],
+      "signals": [
+        {
+          "name": "server-errors",
+          "displayName": "Requests with HTTP 5xx (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.app/containerapps",
+          "metricName": "Requests",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "dimensionFilter": "statusCodeCategory eq '5xx'",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 50
+            }
+          }
+        },
+        {
+          "name": "cpu",
+          "displayName": "CPU (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.app/containerapps",
+          "metricName": "CpuPercentage",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 80
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "memory",
+          "displayName": "Memory (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.app/containerapps",
+          "metricName": "MemoryPercentage",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 80
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "response-time",
+          "displayName": "Response time (ms)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.app/containerapps",
+          "metricName": "ResponseTime",
+          "aggregationType": "Average",
+          "dataUnit": "MilliSeconds",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 10000
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 30000
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "webapp",
+      "displayName": "App Service / Function app",
+      "match": {
+        "type": "microsoft.web/sites"
+      },
+      "layer": "apps",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enableWebApp",
+        "enableFunction"
+      ],
+      "signals": [
+        {
+          "name": "http-5xx",
+          "displayName": "HTTP 5xx (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.web/sites",
+          "metricName": "Http5xx",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 50
+            }
+          }
+        },
+        {
+          "name": "health-check",
+          "displayName": "Health check status (% healthy instances)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.web/sites",
+          "metricName": "HealthCheckStatus",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "LessThan",
+              "threshold": 100
+            },
+            "unhealthyRule": {
+              "operator": "LessThan",
+              "threshold": 50
+            }
+          }
+        },
+        {
+          "name": "response-time",
+          "displayName": "Response time (seconds)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.web/sites",
+          "metricName": "HttpResponseTime",
+          "aggregationType": "Average",
+          "dataUnit": "Seconds",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 15
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "logicapp",
+      "displayName": "Logic App",
+      "match": {
+        "type": "microsoft.logic/workflows"
+      },
+      "layer": "apps",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enableLogicApps"
+      ],
+      "signals": [
+        {
+          "name": "runs-failed",
+          "displayName": "Failed runs (count per hour)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.logic/workflows",
+          "metricName": "RunsFailed",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT1H",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 0
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            }
+          }
+        },
+        {
+          "name": "triggers-failed",
+          "displayName": "Failed triggers (count per hour)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.logic/workflows",
+          "metricName": "TriggersFailed",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT1H",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 0
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "eventhub",
+      "displayName": "Event Hubs namespace",
+      "match": {
+        "type": "microsoft.eventhub/namespaces"
+      },
+      "layer": "apps",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "enableEventHubs"
+      ],
+      "signals": [
+        {
+          "name": "server-errors",
+          "displayName": "Server errors (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.eventhub/namespaces",
+          "metricName": "ServerErrors",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 5
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 50
+            }
+          }
+        },
+        {
+          "name": "throttled-requests",
+          "displayName": "Throttled requests (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.eventhub/namespaces",
+          "metricName": "ThrottledRequests",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 10
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 100
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "apim",
+      "displayName": "API Management (AI gateway)",
+      "match": {
+        "type": "microsoft.apimanagement/service"
+      },
+      "layer": "apps",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [
+        "ENABLE_APIM"
+      ],
+      "signals": [
+        {
+          "name": "capacity",
+          "displayName": "Gateway capacity (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.apimanagement/service",
+          "metricName": "Capacity",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 75
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 90
+            }
+          }
+        },
+        {
+          "name": "gateway-5xx",
+          "displayName": "Gateway responses with HTTP 5xx (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.apimanagement/service",
+          "metricName": "Requests",
+          "aggregationType": "Total",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "dimensionFilter": "GatewayResponseCodeCategory eq '5xx'",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 10
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 100
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "appinsights",
+      "displayName": "Application Insights",
+      "description": "Workload telemetry: request, exception and dependency failures reported by the project's apps and agents.",
+      "match": {
+        "type": "microsoft.insights/components"
+      },
+      "layer": "observability",
+      "impact": "Standard",
+      "resourceHealth": "Disabled",
+      "enableFlags": [
+        "enableApplicationInsights"
+      ],
+      "signals": [
+        {
+          "name": "failed-requests",
+          "displayName": "Failed requests (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.insights/components",
+          "metricName": "requests/failed",
+          "aggregationType": "Count",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 10
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 100
+            }
+          }
+        },
+        {
+          "name": "server-exceptions",
+          "displayName": "Server exceptions (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.insights/components",
+          "metricName": "exceptions/server",
+          "aggregationType": "Count",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 25
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 250
+            }
+          }
+        },
+        {
+          "name": "failed-dependencies",
+          "displayName": "Failed dependency calls (count)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.insights/components",
+          "metricName": "dependencies/failed",
+          "aggregationType": "Count",
+          "dataUnit": "Count",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 25
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 250
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "loganalytics",
+      "displayName": "Log Analytics workspace",
+      "match": {
+        "type": "microsoft.operationalinsights/workspaces"
+      },
+      "layer": "observability",
+      "impact": "Standard",
+      "resourceHealth": "Enabled",
+      "enableFlags": [],
+      "signals": [
+        {
+          "name": "query-availability",
+          "displayName": "Query availability (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.operationalinsights/workspaces",
+          "metricName": "AvailabilityRate_Query",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "LessThan",
+              "threshold": 99
+            },
+            "unhealthyRule": {
+              "operator": "LessThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "ingestion-latency",
+          "displayName": "Ingestion time (seconds)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.operationalinsights/workspaces",
+          "metricName": "Ingestion Time",
+          "aggregationType": "Average",
+          "dataUnit": "Seconds",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT15M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 300
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 900
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "vm",
+      "displayName": "Virtual machine",
+      "description": "Admin DSVM and self-hosted build agents. Resource Health is disabled by default because the DSVM auto-shutdown deallocates it nightly; a deallocated VM reports no availability data instead of failing.",
+      "match": {
+        "type": "microsoft.compute/virtualmachines"
+      },
+      "layer": "compute",
+      "impact": "Limited",
+      "resourceHealth": "Disabled",
+      "enableFlags": [
+        "enableAdminVM"
+      ],
+      "signals": [
+        {
+          "name": "vm-availability",
+          "displayName": "VM availability (1 = available)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.compute/virtualmachines",
+          "metricName": "VmAvailabilityMetric",
+          "aggregationType": "Minimum",
+          "dataUnit": "Count",
+          "timeGrain": "PT5M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "unhealthyRule": {
+              "operator": "LessThan",
+              "threshold": 1
+            }
+          }
+        },
+        {
+          "name": "cpu",
+          "displayName": "CPU (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.compute/virtualmachines",
+          "metricName": "Percentage CPU",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 85
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 95
+            }
+          }
+        },
+        {
+          "name": "available-memory",
+          "displayName": "Available memory (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.compute/virtualmachines",
+          "metricName": "Available Memory Percentage",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "LessThan",
+              "threshold": 15
+            },
+            "unhealthyRule": {
+              "operator": "LessThan",
+              "threshold": 5
+            }
+          }
+        },
+        {
+          "name": "os-disk-iops",
+          "displayName": "OS disk IOPS consumed (%)",
+          "signalKind": "AzureResourceMetric",
+          "metricNamespace": "microsoft.compute/virtualmachines",
+          "metricName": "OS Disk IOPS Consumed Percentage",
+          "aggregationType": "Average",
+          "dataUnit": "Percent",
+          "timeGrain": "PT15M",
+          "refreshInterval": "PT5M",
+          "evaluationRules": {
+            "degradedRule": {
+              "operator": "GreaterThan",
+              "threshold": 90
+            },
+            "unhealthyRule": {
+              "operator": "GreaterThan",
+              "threshold": 98
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "health-model",
+      "displayName": "Nested health model",
+      "description": "A project health model nested in the factory (common) model. Its root entity state rolls up; it needs no signals.",
+      "match": {
+        "type": "microsoft.cloudhealth/healthmodels"
+      },
+      "layer": "projects",
+      "impact": "Standard",
+      "resourceHealth": "Disabled",
+      "nestedModel": true,
+      "enableFlags": [],
+      "signals": []
+    }
+  ]
+}

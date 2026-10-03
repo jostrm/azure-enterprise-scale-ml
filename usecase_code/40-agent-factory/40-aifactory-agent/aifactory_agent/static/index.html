@@ -80,9 +80,27 @@
           <ol id="citations" class="citations"></ol>
           <div id="tool-activity" class="muted"></div>
         </section>
+        <section class="card" aria-labelledby="skills-heading">
+          <h2 id="skills-heading">Factory actions and cost monitoring</h2>
+          <p class="muted">Cost reports are read-only. Factory actions prepare a saved plan here; they never run from chat. Creation uses an approved private hub/VPN/default-project configuration. Deletion requires the exact resource list, plan hash and deletion phrase, and preserves Entra security groups.</p>
+          <form id="skill-form">
+            <label for="skill-selector">Skill</label>
+            <select id="skill-selector" disabled>
+              <option value="">Sign in to see the skills for your scope</option>
+            </select>
+            <p id="skill-description" class="muted"></p>
+            <div id="skill-arguments"></div>
+            <button id="run-skill" type="submit" disabled>Choose a skill</button>
+          </form>
+          <p id="skill-status" role="status">Sign in and select an authorized scope.</p>
+          <button id="discover-templates" type="button" class="secondary" disabled>Browse approved agent and ML template types</button>
+          <p class="muted">Agent type is an immediate source-folder name; target is its exact Foundry project resource ID. ML type is a folder under batch, online or streaming; choose that mode and its approved Azure ML workspace or project resource group ID. Training submission is not a deployed model endpoint.</p>
+          <div id="template-result"></div>
+          <div id="skill-result" class="answer" aria-live="polite"></div>
+        </section>
         <section class="card" aria-labelledby="plans-heading">
           <h2 id="plans-heading">Department metadata plans · not executed</h2>
-          <p class="muted">Chat is read-only. Only you can request a scoped plan here. This changes display metadata only, not Azure resources or IAM. Review the exact target, changes and expiry; approve the exact hash, then execute separately. Azure deployment and destructive actions are unsupported.</p>
+          <p class="muted">Chat is read-only. This form changes display metadata only, not Azure resources or IAM. The Factory skills above have their own permissions and reviewed targets. Review the exact target, changes and expiry; approve the exact hash, then execute separately.</p>
           <form id="proposal-form">
             <label for="department-name">Department display name</label>
             <input id="department-name" type="text" maxlength="200" autocomplete="off" disabled>

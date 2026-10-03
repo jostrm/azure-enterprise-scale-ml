@@ -1,0 +1,1492 @@
+[
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/microsoft.alertsmanagement/smartDetectorAlertRules/Failure Anomalies - ain-prj001-sdc-dev-bltsc-001",
+  "name": "Failure Anomalies - ain-prj001-sdc-dev-bltsc-001",
+  "type": "microsoft.alertsmanagement/smartdetectoralertrules",
+  "kind": "",
+  "location": "global",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.App/containerApps/aif-mcp-project001-dev",
+  "name": "aif-mcp-project001-dev",
+  "type": "microsoft.app/containerapps",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.App/containerApps/aifactory-agent-project001-dev",
+  "name": "aifactory-agent-project001-dev",
+  "type": "microsoft.app/containerapps",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.App/jobs/aifactory-agent-refresh-dev",
+  "name": "aifactory-agent-refresh-dev",
+  "type": "microsoft.app/jobs",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.App/managedEnvironments/aif-mcp-project001-dev-env",
+  "name": "aif-mcp-project001-dev-env",
+  "type": "microsoft.app/managedenvironments",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.BotService/botServices/bot-001-sdc-dev-bltsc-001",
+  "name": "bot-001-sdc-dev-bltsc-001",
+  "type": "microsoft.botservice/botservices",
+  "kind": "azurebot",
+  "location": "global",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.CognitiveServices/accounts/aif2bltscaae001dev",
+  "name": "aif2bltscaae001dev",
+  "type": "microsoft.cognitiveservices/accounts",
+  "kind": "AIServices",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.CognitiveServices/accounts/aif2bltscaae001dev/projects/aif2-p001bltdev",
+  "name": "aif2bltscaae001dev/aif2-p001bltdev",
+  "type": "microsoft.cognitiveservices/accounts/projects",
+  "kind": "AIServices",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/SPIDER-ESML-COMMON-SDC-DEV-001/providers/Microsoft.Compute/disks/dsvm-cmn-sdc-dev-001_OsDisk_1_9715b235aeec4cf88195c184b0b9a1c5",
+  "name": "dsvm-cmn-sdc-dev-001_OsDisk_1_9715b235aeec4cf88195c184b0b9a1c5",
+  "type": "microsoft.compute/disks",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/SPIDER-ESML-COMMON-SDC-DEV-001/providers/Microsoft.Compute/disks/dsvm-cmn-sdc-dev-001_disk2_88e65960e03841ee9ee455a196849f18",
+  "name": "dsvm-cmn-sdc-dev-001_disk2_88e65960e03841ee9ee455a196849f18",
+  "type": "microsoft.compute/disks",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/SPIDER-ESML-COMMON-SDC-DEV-001/providers/Microsoft.Compute/disks/runner-ado-sdc-dev-001-os",
+  "name": "runner-ado-sdc-dev-001-os",
+  "type": "microsoft.compute/disks",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/SPIDER-ESML-COMMON-SDC-DEV-001/providers/Microsoft.Compute/virtualMachines/RUNNER-ADO-SDC-DEV-001",
+  "name": "runner-ado-sdc-dev-001",
+  "type": "microsoft.compute/virtualmachines",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/dsvm-cmn-sdc-dev-001",
+  "name": "dsvm-cmn-sdc-dev-001",
+  "type": "microsoft.compute/virtualmachines",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/SPIDER-ESML-COMMON-SDC-DEV-001/providers/Microsoft.Compute/virtualMachines/dsvm-cmn-sdc-dev-001/extensions/MDE.Windows",
+  "name": "MDE.Windows",
+  "type": "microsoft.compute/virtualmachines/extensions",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/SPIDER-ESML-COMMON-SDC-DEV-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/extensions/MDE.Linux",
+  "name": "MDE.Linux",
+  "type": "microsoft.compute/virtualmachines/extensions",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/dsvm-cmn-sdc-dev-001/extensions/AADLoginForWindows",
+  "name": "AADLoginForWindows",
+  "type": "microsoft.compute/virtualmachines/extensions",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/dsvm-cmn-sdc-dev-001/runCommands/register-aifactory-ado-agent",
+  "name": "register-aifactory-ado-agent",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/runCommands/inspect-aifactory-recovery-20260918",
+  "name": "inspect-aifactory-recovery-20260918",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/runCommands/register-aifactory-ado-take2-20260918",
+  "name": "register-aifactory-ado-take2-20260918",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/runCommands/resume-aifactory-ado-take2-20260918",
+  "name": "resume-aifactory-ado-take2-20260918",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/runCommands/resume-aifactory-ado-take2-20260918-2",
+  "name": "resume-aifactory-ado-take2-20260918-2",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/runCommands/stop-exact-package-scan-20260918",
+  "name": "stop-exact-package-scan-20260918",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/runCommands/verify-aifactory-ado-take2-20260918",
+  "name": "verify-aifactory-ado-take2-20260918",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/runCommands/verify-aifactory-ado-take2-20260918-2",
+  "name": "verify-aifactory-ado-take2-20260918-2",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/runCommands/verify-aifactory-ado-take2-20260918-3",
+  "name": "verify-aifactory-ado-take2-20260918-3",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/runCommands/verify-aifactory-ado-take2-20260918-4",
+  "name": "verify-aifactory-ado-take2-20260918-4",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/runCommands/verify-aifactory-ado-take2-20260918-5",
+  "name": "verify-aifactory-ado-take2-20260918-5",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/runCommands/verify-aifactory-ado-take2-20260918-6",
+  "name": "verify-aifactory-ado-take2-20260918-6",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/runner-ado-sdc-dev-001/runCommands/verify-completed-aifactory-ado-20260918",
+  "name": "verify-completed-aifactory-ado-20260918",
+  "type": "microsoft.compute/virtualmachines/runcommands",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.ContainerRegistry/registries/acrcommonbltscsdc001dev",
+  "name": "acrcommonbltscsdc001dev",
+  "type": "microsoft.containerregistry/registries",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.ContainerService/managedClusters/aks001-sdc-dev",
+  "name": "aks001-sdc-dev",
+  "type": "microsoft.containerservice/managedclusters",
+  "kind": "Base",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Databricks/workspaces/dbx-001-sdc-dev-bltsc-001",
+  "name": "dbx-001-sdc-dev-bltsc-001",
+  "type": "microsoft.databricks/workspaces",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.DataFactory/factories/adf-001-sdc-dev-bltsc-001",
+  "name": "adf-001-sdc-dev-bltsc-001",
+  "type": "microsoft.datafactory/factories",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.DevTestLab/schedules/shutdown-computevm-dsvm-cmn-sdc-dev-001",
+  "name": "shutdown-computevm-dsvm-cmn-sdc-dev-001",
+  "type": "microsoft.devtestlab/schedules",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-prj001-sdc-dev-bltsc-001",
+  "name": "cosmos-prj001-sdc-dev-bltsc-001",
+  "type": "microsoft.documentdb/databaseaccounts",
+  "kind": "GlobalDocumentDB",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.EventGrid/systemTopics/mrvelbltscesml001dev-95821a12-fc6e-405a-8c4b-0418e4a98bd2",
+  "name": "mrvelbltscesml001dev-95821a12-fc6e-405a-8c4b-0418e4a98bd2",
+  "type": "microsoft.eventgrid/systemtopics",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.EventGrid/systemTopics/spiderbltscesml001dev-bcdd776c-5b02-4e4e-8afd-cf6dc9fb892f",
+  "name": "spiderbltscesml001dev-bcdd776c-5b02-4e4e-8afd-cf6dc9fb892f",
+  "type": "microsoft.eventgrid/systemtopics",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.EventGrid/systemTopics/saprj001sdcbltsc1001dev-197ad584-0c06-4b95-86e6-5966fd95bb22",
+  "name": "saprj001sdcbltsc1001dev-197ad584-0c06-4b95-86e6-5966fd95bb22",
+  "type": "microsoft.eventgrid/systemtopics",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.EventGrid/systemTopics/saprj001sdcbltsc2001dev-3ae1dc3c-fc53-4710-93d1-4bc52accac8a",
+  "name": "saprj001sdcbltsc2001dev-3ae1dc3c-fc53-4710-93d1-4bc52accac8a",
+  "type": "microsoft.eventgrid/systemtopics",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/microsoft.insights/actiongroups/Application Insights Smart Detection",
+  "name": "Application Insights Smart Detection",
+  "type": "microsoft.insights/actiongroups",
+  "kind": "",
+  "location": "global",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Insights/components/ain-prj001-sdc-dev-bltsc-001",
+  "name": "ain-prj001-sdc-dev-bltsc-001",
+  "type": "microsoft.insights/components",
+  "kind": "web",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Insights/workbooks/648f8ca0-ca3f-5a43-bb8a-262fba10e8cd",
+  "name": "648f8ca0-ca3f-5a43-bb8a-262fba10e8cd",
+  "type": "microsoft.insights/workbooks",
+  "kind": "shared",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.KeyVault/vaults/kv-cmnadmdev-bltsc-001",
+  "name": "kv-cmnadmdev-bltsc-001",
+  "type": "microsoft.keyvault/vaults",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.KeyVault/vaults/kv-cmndev-bltsc-001",
+  "name": "kv-cmndev-bltsc-001",
+  "type": "microsoft.keyvault/vaults",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.KeyVault/vaults/kv-p001-sdc-dev-bltsc01",
+  "name": "kv-p001-sdc-dev-bltsc01",
+  "type": "microsoft.keyvault/vaults",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.MachineLearningServices/workspaces/aml-001-sdc-dev-bltsc-001",
+  "name": "aml-001-sdc-dev-bltsc-001",
+  "type": "microsoft.machinelearningservices/workspaces",
+  "kind": "Default",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.MachineLearningServices/workspaces/aml-001-sdc-dev-bltsc-001/batchEndpoints/m02-diabetes-batch-gold",
+  "name": "m02-diabetes-batch-gold",
+  "type": "microsoft.machinelearningservices/workspaces/batchendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.MachineLearningServices/workspaces/aml-001-sdc-dev-bltsc-001/batchEndpoints/m02-diabetes-batch-gold/deployments/release-2026092802",
+  "name": "release-2026092802",
+  "type": "microsoft.machinelearningservices/workspaces/batchendpoints/deployments",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/bot-001-sdc-dev-bltsc-001-identity",
+  "name": "bot-001-sdc-dev-bltsc-001-identity",
+  "type": "microsoft.managedidentity/userassignedidentities",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mi-aca-prj001-sdc-dev-bltscaae9d5aa21-001",
+  "name": "mi-aca-prj001-sdc-dev-bltscaae9d5aa21-001",
+  "type": "microsoft.managedidentity/userassignedidentities",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mi-aifactory-agent-dev",
+  "name": "mi-aifactory-agent-dev",
+  "type": "microsoft.managedidentity/userassignedidentities",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mi-aifactory-agent-refresh-dev",
+  "name": "mi-aifactory-agent-refresh-dev",
+  "type": "microsoft.managedidentity/userassignedidentities",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mi-prj001-sdc-dev-bltscaae9d5aa21-001",
+  "name": "mi-prj001-sdc-dev-bltscaae9d5aa21-001",
+  "type": "microsoft.managedidentity/userassignedidentities",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/natGateways/nat-prj001-aml-dev",
+  "name": "nat-prj001-aml-dev",
+  "type": "microsoft.network/natgateways",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkIntentPolicies/adb-swedencentral-dp-to-cp-pl-6d3b87e2df9178c7b4de5c2a",
+  "name": "adb-swedencentral-dp-to-cp-pl-6d3b87e2df9178c7b4de5c2a",
+  "type": "microsoft.network/networkintentpolicies",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkIntentPolicies/adb-swedencentral-dp-to-cp-pl-811ff16436b688a4218fb6a7",
+  "name": "adb-swedencentral-dp-to-cp-pl-811ff16436b688a4218fb6a7",
+  "type": "microsoft.network/networkintentpolicies",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkIntentPolicies/adb-swedencentral-dp-to-cp-pl-a23074dbfc05aadc6bc2570d",
+  "name": "adb-swedencentral-dp-to-cp-pl-a23074dbfc05aadc6bc2570d",
+  "type": "microsoft.network/networkintentpolicies",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkIntentPolicies/adb-swedencentral-dp-to-cp-pl-cecdaa0d370c9c677d7e92f6",
+  "name": "adb-swedencentral-dp-to-cp-pl-cecdaa0d370c9c677d7e92f6",
+  "type": "microsoft.network/networkintentpolicies",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/dsvm-cmn-sdc-dev-001-nic-32n35",
+  "name": "dsvm-cmn-sdc-dev-001-nic-32n35",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-acr-cmnsdc-containerreg-to-vnt-esmlcmn-nic",
+  "name": "pend-acr-cmnsdc-containerreg-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-kv-cmnadmdev-bltsc-001-to-vnt-esmlcmn-nic",
+  "name": "pend-kv-cmnadmdev-bltsc-001-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-kv-cmndev-bltsc-001-to-vnt-esmlcmn-nic",
+  "name": "pend-kv-cmndev-bltsc-001-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-kvspidersdc001-to-vnt-esmlcmn-sdc-dev-.nic.f7c27d7d-cb51-4924-bdb6-40b2259e2dbd",
+  "name": "pend-kvspidersdc001-to-vnt-esmlcmn-sdc-dev-.nic.f7c27d7d-cb51-4924-bdb6-40b2259e2dbd",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-mrvelbltscesml001dev-blob-to-vnt-esmlcmn-nic",
+  "name": "pend-mrvelbltscesml001dev-blob-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-mrvelbltscesml001dev-dfs-to-vnt-esmlcmn-nic",
+  "name": "pend-mrvelbltscesml001dev-dfs-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-mrvelbltscesml001dev-file-to-vnt-esmlcmn-nic",
+  "name": "pend-mrvelbltscesml001dev-file-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-mrvelbltscesml001dev-queue-to-vnt-esmlcmn-nic",
+  "name": "pend-mrvelbltscesml001dev-queue-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-mrvelbltscesml001dev-table-to-vnt-esmlcmn-nic",
+  "name": "pend-mrvelbltscesml001dev-table-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-spiderbltscesml001dev-blob-to-vnt-esmlcmn-nic",
+  "name": "pend-spiderbltscesml001dev-blob-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-spiderbltscesml001dev-dfs-to-vnt-esmlcmn-nic",
+  "name": "pend-spiderbltscesml001dev-dfs-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-spiderbltscesml001dev-file-to-vnt-esmlcmn-nic",
+  "name": "pend-spiderbltscesml001dev-file-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-spiderbltscesml001dev-queue-to-vnt-esmlcmn-nic",
+  "name": "pend-spiderbltscesml001dev-queue-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/pend-spiderbltscesml001dev-table-to-vnt-esmlcmn-nic",
+  "name": "pend-spiderbltscesml001dev-table-to-vnt-esmlcmn-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkInterfaces/runner-ado-sdc-dev-001-nic",
+  "name": "runner-ado-sdc-dev-001-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/adf-001-sdc-dev-bltsc-001-dataFactory-pend-nic",
+  "name": "adf-001-sdc-dev-bltsc-001-dataFactory-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/adf-001-sdc-dev-bltsc-001-portal-pend-nic",
+  "name": "adf-001-sdc-dev-bltsc-001-portal-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/aif-mcp-project001-dev-pe.nic.e752af3c-7738-4268-9f67-79a1a0d44d60",
+  "name": "aif-mcp-project001-dev-pe.nic.e752af3c-7738-4268-9f67-79a1a0d44d60",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/aif2bltscaae001dev-pend-nic",
+  "name": "aif2bltscaae001dev-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/aisearchprj001sdcdevbltscaae9d5aa21001-pend-nic",
+  "name": "aisearchprj001sdcdevbltscaae9d5aa21001-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/aml-001-sdc-dev-bltsc-001-pend-nic",
+  "name": "aml-001-sdc-dev-bltsc-001-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/cosmos-prj001-sdc-dev-bltsc-001-pend-nic",
+  "name": "cosmos-prj001-sdc-dev-bltsc-001-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/kv-p001-sdc-dev-bltsc01-pend-nic",
+  "name": "kv-p001-sdc-dev-bltsc01-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/saprj001sdcbltsc1001dev-blob-pend-nic",
+  "name": "saprj001sdcbltsc1001dev-blob-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/saprj001sdcbltsc1001dev-file-pend-nic",
+  "name": "saprj001sdcbltsc1001dev-file-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/saprj001sdcbltsc1001dev-queue-pend-nic",
+  "name": "saprj001sdcbltsc1001dev-queue-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/saprj001sdcbltsc1001dev-table-pend-nic",
+  "name": "saprj001sdcbltsc1001dev-table-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/saprj001sdcbltsc2001dev-blob-pend-nic",
+  "name": "saprj001sdcbltsc2001dev-blob-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/saprj001sdcbltsc2001dev-file-pend-nic",
+  "name": "saprj001sdcbltsc2001dev-file-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/saprj001sdcbltsc2001dev-queue-pend-nic",
+  "name": "saprj001sdcbltsc2001dev-queue-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/networkInterfaces/saprj001sdcbltsc2001dev-table-pend-nic",
+  "name": "saprj001sdcbltsc2001dev-table-pend-nic",
+  "type": "microsoft.network/networkinterfaces",
+  "kind": "Regular",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/aca-nsg-prj001-sdc-dev",
+  "name": "aca-nsg-prj001-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/aca-nsg-prj002-sdc-dev",
+  "name": "aca-nsg-prj002-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/aca2-nsg-prj001-sdc-dev",
+  "name": "aca2-nsg-prj001-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/aca2-nsg-prj002-sdc-dev",
+  "name": "aca2-nsg-prj002-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/aks-nsg-prj001-sdc-dev",
+  "name": "aks-nsg-prj001-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/aks-nsg-prj002-sdc-dev",
+  "name": "aks-nsg-prj002-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/aks2-nsg-prj001-sdc-dev",
+  "name": "aks2-nsg-prj001-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/aks2-nsg-prj002-sdc-dev",
+  "name": "aks2-nsg-prj002-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/dbx-nsg-prj001-sdc-dev",
+  "name": "dbx-nsg-prj001-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/dbx-nsg-prj002-sdc-dev",
+  "name": "dbx-nsg-prj002-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/genai-nsg-prj001-sdc-dev",
+  "name": "genai-nsg-prj001-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/genai-nsg-prj002-sdc-dev",
+  "name": "genai-nsg-prj002-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/nsg-AzureBastionSubnet",
+  "name": "nsg-AzureBastionSubnet",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/nsg-snet-esml-cmn-001",
+  "name": "nsg-snet-esml-cmn-001",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/nsg-snet-esml-cmn-001-scoring",
+  "name": "nsg-snet-esml-cmn-001-scoring",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/nsg-snet-esml-cmn-pbi-001",
+  "name": "nsg-snet-esml-cmn-pbi-001",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/runner-ado-sdc-dev-001-nsg",
+  "name": "runner-ado-sdc-dev-001-nsg",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/webapp-nsg-prj001-sdc-dev",
+  "name": "webapp-nsg-prj001-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/networkSecurityGroups/webapp-nsg-prj002-sdc-dev",
+  "name": "webapp-nsg-prj002-sdc-dev",
+  "type": "microsoft.network/networksecuritygroups",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-acr-cmnsdc-containerreg-to-vnt-esmlcmn",
+  "name": "pend-acr-cmnsdc-containerreg-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-kv-cmnadmdev-bltsc-001-to-vnt-esmlcmn",
+  "name": "pend-kv-cmnadmdev-bltsc-001-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-kv-cmndev-bltsc-001-to-vnt-esmlcmn",
+  "name": "pend-kv-cmndev-bltsc-001-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-kvspidersdc001-to-vnt-esmlcmn-sdc-dev-001",
+  "name": "pend-kvspidersdc001-to-vnt-esmlcmn-sdc-dev-001",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-mrvelbltscesml001dev-blob-to-vnt-esmlcmn",
+  "name": "pend-mrvelbltscesml001dev-blob-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-mrvelbltscesml001dev-dfs-to-vnt-esmlcmn",
+  "name": "pend-mrvelbltscesml001dev-dfs-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-mrvelbltscesml001dev-file-to-vnt-esmlcmn",
+  "name": "pend-mrvelbltscesml001dev-file-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-mrvelbltscesml001dev-queue-to-vnt-esmlcmn",
+  "name": "pend-mrvelbltscesml001dev-queue-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-mrvelbltscesml001dev-table-to-vnt-esmlcmn",
+  "name": "pend-mrvelbltscesml001dev-table-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-spiderbltscesml001dev-blob-to-vnt-esmlcmn",
+  "name": "pend-spiderbltscesml001dev-blob-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-spiderbltscesml001dev-dfs-to-vnt-esmlcmn",
+  "name": "pend-spiderbltscesml001dev-dfs-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-spiderbltscesml001dev-file-to-vnt-esmlcmn",
+  "name": "pend-spiderbltscesml001dev-file-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-spiderbltscesml001dev-queue-to-vnt-esmlcmn",
+  "name": "pend-spiderbltscesml001dev-queue-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/privateEndpoints/pend-spiderbltscesml001dev-table-to-vnt-esmlcmn",
+  "name": "pend-spiderbltscesml001dev-table-to-vnt-esmlcmn",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/adf-001-sdc-dev-bltsc-001-dataFactory-pend",
+  "name": "adf-001-sdc-dev-bltsc-001-dataFactory-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/adf-001-sdc-dev-bltsc-001-portal-pend",
+  "name": "adf-001-sdc-dev-bltsc-001-portal-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/aif-mcp-project001-dev-pe",
+  "name": "aif-mcp-project001-dev-pe",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/aif2bltscaae001dev-pend",
+  "name": "aif2bltscaae001dev-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/aisearchprj001sdcdevbltscaae9d5aa21001-pend",
+  "name": "aisearchprj001sdcdevbltscaae9d5aa21001-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/aml-001-sdc-dev-bltsc-001-pend",
+  "name": "aml-001-sdc-dev-bltsc-001-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/cosmos-prj001-sdc-dev-bltsc-001-pend",
+  "name": "cosmos-prj001-sdc-dev-bltsc-001-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/kv-p001-sdc-dev-bltsc01-pend",
+  "name": "kv-p001-sdc-dev-bltsc01-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/saprj001sdcbltsc1001dev-blob-pend",
+  "name": "saprj001sdcbltsc1001dev-blob-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/saprj001sdcbltsc1001dev-file-pend",
+  "name": "saprj001sdcbltsc1001dev-file-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/saprj001sdcbltsc1001dev-queue-pend",
+  "name": "saprj001sdcbltsc1001dev-queue-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/saprj001sdcbltsc1001dev-table-pend",
+  "name": "saprj001sdcbltsc1001dev-table-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/saprj001sdcbltsc2001dev-blob-pend",
+  "name": "saprj001sdcbltsc2001dev-blob-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/saprj001sdcbltsc2001dev-file-pend",
+  "name": "saprj001sdcbltsc2001dev-file-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/saprj001sdcbltsc2001dev-queue-pend",
+  "name": "saprj001sdcbltsc2001dev-queue-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/privateEndpoints/saprj001sdcbltsc2001dev-table-pend",
+  "name": "saprj001sdcbltsc2001dev-table-pend",
+  "type": "microsoft.network/privateendpoints",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Network/publicIPAddresses/pip-prj001-aml-egress-dev",
+  "name": "pip-prj001-aml-egress-dev",
+  "type": "microsoft.network/publicipaddresses",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Network/virtualNetworks/vnt-esmlcmn-sdc-dev-001",
+  "name": "vnt-esmlcmn-sdc-dev-001",
+  "type": "microsoft.network/virtualnetworks",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.OperationalInsights/workspaces/la-cmn-sdc-dev-bltsc-001",
+  "name": "la-cmn-sdc-dev-bltsc-001",
+  "type": "microsoft.operationalinsights/workspaces",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Portal/dashboards/AIFactory-spider-sdc-001-dash-01",
+  "name": "AIFactory-spider-sdc-001-dash-01",
+  "type": "microsoft.portal/dashboards",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Portal/dashboards/dash-prj001-dev-sdc",
+  "name": "dash-prj001-dev-sdc",
+  "type": "microsoft.portal/dashboards",
+  "kind": "",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Search/searchServices/aisearchprj001sdcdevbltscaae9d5aa21001",
+  "name": "aisearchprj001sdcdevbltscaae9d5aa21001",
+  "type": "microsoft.search/searchservices",
+  "kind": "",
+  "location": "northeurope",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": null
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Storage/storageAccounts/mrvelbltscesml001dev",
+  "name": "mrvelbltscesml001dev",
+  "type": "microsoft.storage/storageaccounts",
+  "kind": "StorageV2",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": 1
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Storage/storageAccounts/spiderbltscesml001dev",
+  "name": "spiderbltscesml001dev",
+  "type": "microsoft.storage/storageaccounts",
+  "kind": "StorageV2",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "tags": {},
+  "hns": 1
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Storage/storageAccounts/saprj001sdcbltsc1001dev",
+  "name": "saprj001sdcbltsc1001dev",
+  "type": "microsoft.storage/storageaccounts",
+  "kind": "StorageV2",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": 0
+ },
+ {
+  "id": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.Storage/storageAccounts/saprj001sdcbltsc2001dev",
+  "name": "saprj001sdcbltsc2001dev",
+  "type": "microsoft.storage/storageaccounts",
+  "kind": "StorageV2",
+  "location": "swedencentral",
+  "resourceGroup": "spider-esml-project001-sdc-dev-001-rg",
+  "tags": {},
+  "hns": 0
+ }
+]

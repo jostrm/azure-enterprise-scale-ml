@@ -12,10 +12,11 @@ import pytest
 from azurefactory.errors import APIError, RequestTimeout
 
 from aifactory_agent import tools
-from aifactory_agent.operations import MemoryOperationBackend, OperationStore
+from aifactory_agent.operations import BlobOperationBackend, MemoryOperationBackend, OperationStore
 from aifactory_agent.security import Principal
 from aifactory_agent.tools import CONFIGURE_TOOL, FactoryTools
 from test_security import CALLER, FACTORY, PROJECT, SCALE, SCOPE, SUBSCRIPTION, TENANT, principal, settings
+from test_signing import FakeBlobContainer, FakeVault, KeyVaultRecordSigner, signing_settings, signer, vault
 
 
 REVISION = "a" * 64
@@ -131,6 +132,7 @@ def test_descriptors_are_strict_and_never_offer_approval(adapter):
     descriptors = adapter.descriptors()
     assert {item["name"] for item in descriptors} == {
         "factory_health", "factory_capabilities", "factory_catalog", "factory_settings", "factory_cli_health",
+        "factory_operation_status",
     }
     for definition in descriptors:
         assert definition["type"] == "function" and definition["strict"] is True
@@ -401,4 +403,26 @@ def test_local_approval_expiry_is_checked_again_before_confirm(adapter, api, sto
     monkeypatch.setattr(tools, "datetime", DelayedDateTime)
     result = store.execute(principal, operation["id"], adapter.execute_operation)
     assert result["status"] == "failed"
+    assert not any(call[0] == "catalog_confirm" for call in api.calls)
+
+
+def test_production_signer_must_be_ready_before_any_factory_preparation(settings, principal, api):
+    container = FakeBlobContainer()
+    store = OperationStore(settings, backend=BlobOperationBackend(settings, container=container))
+    result = FactoryTools(settings, principal, SCOPE, operation_store=store).prepare_settings({
+        "settings": {"department_name": "Research", "department_id": None},
+    })
+    assert result["ok"] is False and result["error"]["status_code"] == 503
+    assert api.calls == [] and container.data == {}
+
+
+def test_real_signer_readiness_and_signed_proposal_before_confirmation(signing_settings, principal, api, signer):
+    container = FakeBlobContainer()
+    store = OperationStore(signing_settings, backend=BlobOperationBackend(signing_settings, container=container, signer=signer))
+    adapter = FactoryTools(signing_settings, principal, SCOPE, operation_store=store)
+    result = adapter.prepare_settings({"settings": {"department_name": "Research", "department_id": None}})
+    assert result["ok"] is True and result["data"]["status"] == "pending"
+    stored = json.loads(container.data[store._key(principal, result["data"]["id"])])
+    signer.verify(stored)
+    assert any(call[0] == "catalog_prepare" for call in api.calls)
     assert not any(call[0] == "catalog_confirm" for call in api.calls)

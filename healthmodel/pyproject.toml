@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aifactory-healthmodel"
+version = "0.1.0"
+description = "Azure Monitor health models for the Enterprise Scale AI Factory (project and common resource groups)."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8", "PyYAML>=6"]
+
+[project.scripts]
+aif-healthmodel = "aifactory_healthmodel.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+aifactory_healthmodel = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "tests"]
+addopts = "-q"
+markers = [
+    "azure: live Azure integration tests (opt-in with AIF_HEALTHMODEL_LIVE=1)",
+]

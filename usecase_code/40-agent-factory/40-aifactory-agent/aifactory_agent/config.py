@@ -10,6 +10,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .actions import ActionSettings
+from .costs import CostSettings
+from .workloads import WorkloadSettings
+
 
 class ClosedModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -27,7 +31,10 @@ class Scope(ClosedModel):
 class Grant(ClosedModel):
     object_id: UUID
     scopes: list[str] = Field(min_length=1)
-    permissions: list[Literal["knowledge.read", "factory.read", "config.write", "knowledge.refresh"]]
+    permissions: list[Literal[
+        "knowledge.read", "factory.read", "config.write", "knowledge.refresh",
+        "factory.create", "factory.delete", "project.add", "cost.read", "agent.create", "model.create",
+    ]]
 
 
 class AzureSettings(ClosedModel):
@@ -78,6 +85,7 @@ class KnowledgeSettings(ClosedModel):
 class FactorySettings(ClosedModel):
     api_url: str = "http://127.0.0.1:8765"
     api_key_secret_url: str | None = None
+    operation_signing_secret_url: str | None = None
     folder: str
     factory_id: UUID | None = None
     scale_set_id: UUID | None = None
@@ -102,6 +110,9 @@ class Settings(ClosedModel):
     knowledge: KnowledgeSettings
     factory: FactorySettings
     auth: AuthSettings
+    actions: ActionSettings = Field(default_factory=ActionSettings)
+    costs: CostSettings = Field(default_factory=CostSettings)
+    workloads: WorkloadSettings = Field(default_factory=WorkloadSettings)
     agent_name: str = Field(default="enterprise-scale-ai-factory", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9-]{1,62}$")
     agent_version: str | None = None
     max_tool_rounds: int = Field(default=6, ge=1, le=12)
@@ -118,6 +129,13 @@ class Settings(ClosedModel):
         for grant in self.auth.grants:
             if any(key not in self.scopes for key in grant.scopes):
                 raise ValueError("An access grant references an unknown scope.")
+        configured_skill_scopes = (
+            set(self.actions.bootstrap_profiles) | set(self.actions.deletion_resource_groups)
+            | set(self.costs.common_resource_groups)
+            | set(self.workloads.profiles)
+        )
+        if configured_skill_scopes - self.scopes.keys():
+            raise ValueError("Skill target configuration references an unknown scope.")
         if any(not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", key) for key in self.scopes):
             raise ValueError("Scope keys must be safe identifiers.")
         return self
@@ -134,7 +152,13 @@ def load_settings(path: str | Path | None = None) -> Settings:
     if not root.is_absolute():
         root = (selected.parent / root).resolve()
     knowledge = settings.knowledge.model_copy(update={"repository_root": root})
-    return settings.model_copy(update={"knowledge": knowledge})
+    updates = {"knowledge": knowledge}
+    if settings.workloads.repository_root:
+        workload_root = Path(settings.workloads.repository_root)
+        if not workload_root.is_absolute():
+            workload_root = (selected.parent / workload_root).resolve()
+        updates["workloads"] = settings.workloads.model_copy(update={"repository_root": str(workload_root)})
+    return settings.model_copy(update=updates)
 
 
 def credential(settings: Settings):

@@ -1,5 +1,28 @@
 {
   "schema_version": 1,
+  "skill_discovery": {
+    "endpoint": "GET /api/skills?scope_key={authorized_scope}",
+    "schemas": "The authenticated response is the authoritative closed argument schema and per-skill setup blockers.",
+    "monitoring": "POST /api/skills/{name}/run; read-only, cost.read and factory.read required.",
+    "actions": "POST /api/skills/{name}/propose; creates a signed caller/scope-bound pending plan only.",
+    "approval": "POST /api/operations/{id}/approve with exact plan_hash; deletion additionally requires the exact confirmation_phrase.",
+    "execution": "POST /api/operations/{id}/execute; persisted approvals only, one-use CAS, never raw request bodies.",
+    "status": "GET /api/operations/{id}/status; read-only underlying job observation, never automatic write retry.",
+    "continuation": "POST /api/operations/{id}/continue with exact original plan_hash and current observation_hash; one-use CAS within the original Full bootstrap authorization only."
+  },
+  "skills": [
+    {"command": "/create-private-aifactory-full-bootstrap-private-with-own-hub-vpn-and-default-proj", "model_callable": false, "permission": "factory.create", "basis": "Server-approved private hub, explicit VPN client pool and default-project Full bootstrap profile."},
+    {"command": "/delete-aifactory", "model_callable": false, "permission": "factory.delete", "basis": "Explicit authorized deletion manifest and phrase; preserve Entra security groups."},
+    {"command": "/add-project-to-aifactory", "model_callable": false, "permission": "project.add", "basis": "Configured factory/scale set; distinguish saved project configuration from Azure deployment."},
+    {"command": "/get-default-project-estimated-azure-idle-running-cost", "model_callable": true, "permission": "cost.read", "basis": "Default variables.json enabled resources/SKUs and sourced retail baseline, separate from actual Azure Cost Analysis."},
+    {"command": "/get-aifactory-common-estimated-azure-idle-running-cost", "model_callable": true, "permission": "cost.read", "basis": "Explicit authorized common resource group, provisioned baseline and separate actual billing."},
+    {"command": "/get-monthtly-forecasted-project-estimated-azure-cost", "model_callable": true, "permission": "cost.read", "basis": "Exact project resource group, UTC monthly actual and Azure forecast; unknown data is not zero."},
+    {"command": "/get-aifactory-health", "model_callable": true, "permission": "factory.read", "basis": "Existing Factory API health; no changes."},
+    {"command": "/get-aifactory-settings", "model_callable": true, "permission": "factory.read", "basis": "Exact server-selected Factory settings; no scope override."},
+    {"command": "/get-aifactory-operation-status", "model_callable": true, "permission": "factory.read", "basis": "Caller-owned persisted operation and bound job in the active scope; no arbitrary job polling."},
+    {"command": "/create-agent-oftype-for-project", "model_callable": false, "permission": "agent.create", "basis": "Immediate approved purple agent type plus exact Foundry project ARM ID, one version; no implicit routing."},
+    {"command": "/create-ml-model-oftype-for-project", "model_callable": false, "permission": "model.create", "basis": "Immediate approved ML template type and serving_mode plus exact project/workspace ARM ID; asynchronous training, no implicit serving promotion."}
+  ],
   "scope_resolution": "Authenticated caller and server-configured scope key resolve tenant, subscription, resource group, factory, project and environment. The model cannot supply scope overrides.",
   "read_output_schema": {
     "oneOf": [
@@ -103,6 +126,54 @@
       "timeout_seconds": 65,
       "retry": "None.",
       "approval": "No write approval; arbitrary shell/executables are not supported."
+    },
+    {
+      "name": "factory_operation_status",
+      "purpose": "Read a caller-owned saved operation and observe its bound backend job without replaying writes.",
+      "input_schema": {"type": "object", "required": ["operation_id"], "properties": {"operation_id": {"type": "string", "format": "uuid"}}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read", "The operation's dedicated action permission"],
+      "scope": "Persisted requesting caller, active scope and exact job binding.",
+      "changes_state": "May persist a signed observation; never starts, confirms or continues a Factory job.",
+      "timeout_seconds": 60,
+      "retry": "Read-only status may be queried again; writes are never replayed.",
+      "approval": "No new write approval."
+    },
+    {
+      "name": "cost_default_project_idle",
+      "purpose": "Estimate every enabled default project component from pinned variables.json and compare with separate actual MTD Azure billing.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read", "cost.read"],
+      "scope": "Canonical server-pinned defaults and exact configured project resource group.",
+      "changes_state": false,
+      "timeout_seconds": 30,
+      "retry": "No synthetic cost or ranking fallback; bounded read pagination only.",
+      "approval": "No write approval; Azure billing read access is independently required."
+    },
+    {
+      "name": "cost_common_idle",
+      "purpose": "Estimate provisioned fixed components in an approved common resource group and show separate actual MTD billing.",
+      "input_schema": {"type": "object", "required": ["resource_group"], "properties": {"resource_group": {"type": "string", "pattern": "^[A-Za-z0-9_.()-]{1,90}$"}}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read", "cost.read"],
+      "scope": "Exact common-resource-group allowlist for the active scope; no subscription override.",
+      "changes_state": false,
+      "timeout_seconds": 30,
+      "retry": "Read-only requests; unknown or ambiguous meters stay unpriced.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "cost_monthly_project_forecast",
+      "purpose": "Read actual MTD and Azure's full-month forecast without extrapolation or double-counting actual costs.",
+      "input_schema": {"type": "object", "required": ["resource_group"], "properties": {"resource_group": {"type": "string", "pattern": "^[A-Za-z0-9_.()-]{1,90}$"}}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read", "cost.read"],
+      "scope": "Exact active project resource group.",
+      "changes_state": false,
+      "timeout_seconds": 30,
+      "retry": "Read-only billing requests; unavailable forecasts never become invented projections.",
+      "approval": "No write approval."
     },
     {
       "name": "factory_prepare_settings",

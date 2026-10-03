@@ -34,6 +34,13 @@ def test_unknown_scope_grant_rejected():
         Settings.model_validate(config)
 
 
+def test_unknown_scope_skill_targets_rejected():
+    config = json.loads(EXAMPLE.read_text())
+    config["costs"] = {"common_resource_groups": {"other-project": ["common-rg"]}}
+    with pytest.raises(ValidationError):
+        Settings.model_validate(config)
+
+
 def test_non_https_credentials_endpoint_rejected():
     config = json.loads(EXAMPLE.read_text())
     config["azure"]["search_endpoint"] = "https://user:password@example.com"

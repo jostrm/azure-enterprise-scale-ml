@@ -7,7 +7,7 @@ import subprocess
 import sys
 import unicodedata
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Callable
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from .config import Settings, credential
 from .security import Principal, authorize
+from .ports import CostPort, FactoryApiPort, OperationStorePort, WorkloadPort
 
 
 CONFIGURE_TOOL = "factory_prepare_settings"
@@ -202,11 +203,18 @@ def _scoped_catalog(settings, scope_key, catalog):
 class FactoryTools:
     """Backend grants constrain a shared API key, not an OBO/per-user Factory credential."""
 
-    def __init__(self, settings: Settings, principal: Principal, scope_key: str, cred=None, *, operation_store=None):
+    def __init__(self, settings: Settings, principal: Principal, scope_key: str, cred=None, *,
+                 operation_store: OperationStorePort | None = None,
+                 client_factory: Callable[[str, str, int], FactoryApiPort] | None = None,
+                 key_provider: Callable[[], str | None] | None = None,
+                 cost_factory: Callable[[Settings, Principal, str, object], CostPort] | None = None,
+                 workload_factory: Callable[[Settings, Principal, str, OperationStorePort], WorkloadPort] | None = None):
         self.settings, self.principal, self.scope_key = settings, principal, scope_key
         self.cred = cred
         self.operation_store = operation_store
         self._api_key = None
+        self.client_factory, self.key_provider, self.cost_factory = client_factory, key_provider, cost_factory
+        self.workload_factory = workload_factory
 
     def descriptors(self) -> list[dict]:
         definitions = []
@@ -223,6 +231,19 @@ class FactoryTools:
             reads = {}
         for name, description in reads.items():
             definitions.append(self._descriptor(name, description, NoArguments))
+        if reads:
+            from .skills import OperationStatusArguments
+            definitions.append(self._descriptor("factory_operation_status",
+                                                "Read this caller's persisted operation and bound job status in the active scope.",
+                                                OperationStatusArguments))
+        try:
+            authorize(self.settings, self.principal, self.scope_key, "factory.read")
+            authorize(self.settings, self.principal, self.scope_key, "cost.read")
+        except PermissionError:
+            pass
+        else:
+            from .costs import cost_descriptors
+            definitions.extend(cost_descriptors())
         return definitions
 
     @staticmethod
@@ -232,12 +253,15 @@ class FactoryTools:
         return {"type": "function", "name": name, "description": description,
                 "parameters": parameters, "strict": True}
 
-    def _client(self, *, authenticated=True):
+    def _client(self, *, authenticated=True) -> FactoryApiPort:
         if authenticated:
             if self._api_key is None:
-                self._api_key = self._load_key()
+                self._api_key = self.key_provider() if self.key_provider is not None else self._load_key()
             if not self._api_key:
                 raise ToolError("factory_auth_unconfigured", "Configure a Factory API key secret reference or process environment key.", 503)
+        if self.client_factory is not None:
+            return self.client_factory(self.settings.factory.api_url, self._api_key or "",
+                                       min(self.settings.factory.timeout_seconds, TIMEOUT_CAP_SECONDS))
         return AzureFactoryClient(
             base_url=self.settings.factory.api_url,
             api_key=self._api_key or "",
@@ -301,7 +325,104 @@ class FactoryTools:
         return result
 
     def execute(self, name: str, args: dict) -> dict:
+        from .costs import COST_TOOL_TO_SKILL, CostSkills
+        if name == "factory_operation_status":
+            try:
+                from .operations import OperationStore
+                from .skills import OperationStatusArguments
+                authorize(self.settings, self.principal, self.scope_key, "factory.read")
+                arguments = OperationStatusArguments.model_validate(args)
+                if self.operation_store is None:
+                    self.operation_store = OperationStore(self.settings, self.cred)
+                record = self.operation_store.read(self.principal, arguments.operation_id)
+                if record["scope_key"] != self.scope_key:
+                    raise PermissionError("The operation belongs to another active scope.")
+                observed = self.operation_store.observe(self.principal, arguments.operation_id, self.status_operation)
+                return {"ok": True, "data": observed}
+            except PermissionError:
+                return self._error("forbidden", "The saved operation is not authorized in this exact scope.", 403)
+            except ValidationError:
+                return self._error("invalid_arguments", "An exact saved operation ID is required.", 400)
+            except ToolError as exc:
+                return self._error(exc.code, str(exc), exc.status_code)
+        if isinstance(name, str) and name in COST_TOOL_TO_SKILL:
+            try:
+                costs = (self.cost_factory(self.settings, self.principal, self.scope_key, self.cred)
+                         if self.cost_factory is not None else
+                         CostSkills(self.settings, self.principal, self.scope_key, cred=self.cred))
+                authorize(self.settings, self.principal, self.scope_key, "factory.read")
+                authorize(self.settings, self.principal, self.scope_key, "cost.read")
+                return costs.execute(COST_TOOL_TO_SKILL[name], args)
+            except PermissionError:
+                return self._error("forbidden", "The caller lacks cost access for this exact scope.", 403)
+            except ValidationError:
+                return self._error("invalid_arguments", "Arguments do not match the closed cost schema.", 400)
+            except ToolError as exc:
+                return self._error(exc.code, str(exc), exc.status_code)
         return self._execute(name, args, allow_prepare=False)
+
+    def prepare_skill(self, name: str, args: dict) -> dict:
+        """Explicit authenticated user request only; never part of model dispatch."""
+        from .actions import ActionSkills
+        from .skills import ACTION_SKILLS, WORKLOAD_SKILLS, SKILL_PERMISSIONS, argument_model, normalize_skill
+        name = normalize_skill(name)
+        if name not in (*ACTION_SKILLS, *WORKLOAD_SKILLS):
+            raise ToolError("unsupported_operation", "Monitoring skills cannot prepare Factory actions.", 400)
+        authorize(self.settings, self.principal, self.scope_key, "factory.read")
+        authorize(self.settings, self.principal, self.scope_key, SKILL_PERMISSIONS[name])
+        if not self.settings.factory.writes_enabled:
+            raise ToolError("writes_disabled", "Factory actions are disabled.", 503)
+        enabled = (self.settings.workloads.enabled_skills if name in WORKLOAD_SKILLS
+                   else self.settings.actions.enabled_skills)
+        if name not in enabled:
+            raise ToolError("skill_disabled", "This Factory action is disabled by the deployment operator.", 503)
+        try:
+            argument_model(name).model_validate(args)
+        except ValidationError:
+            raise ToolError("invalid_arguments", "Arguments do not match the closed action schema.", 400) from None
+        if self.operation_store is None:
+            from .operations import OperationStore
+            self.operation_store = OperationStore(self.settings, self.cred)
+        self.operation_store.ensure_ready()
+        if name in WORKLOAD_SKILLS:
+            return self._workloads().prepare(name, args)
+        return ActionSkills(self.settings, self.principal, self.scope_key,
+                            self._client(), self.operation_store).prepare(name, args)
+
+    def _workloads(self) -> WorkloadPort:
+        if self.operation_store is None:
+            from .operations import OperationStore
+            self.operation_store = OperationStore(self.settings, self.cred)
+        if self.workload_factory is not None:
+            return self.workload_factory(self.settings, self.principal, self.scope_key, self.operation_store)
+        from .workloads import WorkloadSkills
+        return WorkloadSkills(self.settings, self.principal, self.scope_key, self.operation_store)
+
+    def status_operation(self, operation: dict) -> dict:
+        from .actions import ActionSkills
+        from .skills import ACTION_SKILLS, WORKLOAD_SKILLS, SKILL_PERMISSIONS
+        if operation.get("tool_name") not in (*ACTION_SKILLS, *WORKLOAD_SKILLS):
+            raise ToolError("unsupported_operation", "This operation has no asynchronous Factory job.", 400)
+        authorize(self.settings, self.principal, self.scope_key, "factory.read")
+        authorize(self.settings, self.principal, self.scope_key, SKILL_PERMISSIONS[operation["tool_name"]])
+        if operation["tool_name"] in WORKLOAD_SKILLS:
+            return self._workloads().status(operation)
+        return ActionSkills(self.settings, self.principal, self.scope_key,
+                            self._client(), self.operation_store).status(operation)
+
+    def continue_operation(self, operation: dict) -> dict:
+        from .actions import CREATE, ActionSkills
+        if operation.get("tool_name") != CREATE:
+            raise ToolError("unsupported_operation", "Only a paused approved Full bootstrap can be continued.", 400)
+        authorize(self.settings, self.principal, self.scope_key, "factory.read")
+        authorize(self.settings, self.principal, self.scope_key, "factory.create")
+        from .operations import OperationError
+        try:
+            client = self._client()
+        except ToolError as exc:
+            raise OperationError(exc.code, str(exc), exc.status_code) from None
+        return ActionSkills(self.settings, self.principal, self.scope_key,
+                            client, self.operation_store).continue_operation(operation)
 
     def prepare_settings(self, args: dict) -> dict:
         """Authenticated backend proposal endpoint only; not a model-callable tool."""
@@ -425,6 +546,22 @@ class FactoryTools:
     def execute_operation(self, operation: dict) -> dict:
         """Only the authenticated approval endpoint supplies a persisted approved operation."""
         from .operations import OperationError, plan_hash
+        from .skills import ACTION_SKILLS, WORKLOAD_SKILLS
+        if operation.get("tool_name") in WORKLOAD_SKILLS:
+            try:
+                return self._workloads().execute_operation(operation)
+            except OperationError:
+                raise
+            except ToolError as exc:
+                raise OperationError(exc.code, str(exc), exc.status_code) from None
+        if operation.get("tool_name") in ACTION_SKILLS:
+            from .actions import ActionSkills
+            try:
+                client = self._client()
+            except ToolError as exc:
+                raise OperationError(exc.code, str(exc), exc.status_code) from None
+            return ActionSkills(self.settings, self.principal, self.scope_key,
+                                client, self.operation_store).execute_operation(operation)
         if (
             operation.get("status") != "executing" or operation.get("tool_name") != CONFIGURE_TOOL
             or operation.get("tenant_id") != self.principal.tenant_id

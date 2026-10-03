@@ -1,0 +1,161 @@
+# Optional step: Azure Monitor health model for an AI Factory project and/or its common resource group.
+# Copy to .github/workflows/infra-project-healthmodel.yml in the consumer. Run it after infra-project,
+# or call it from infra-project.yml as a final job:
+#   health_model:
+#     needs: deploy_foundry
+#     if: ${{ needs.deploy_foundry.result == 'success' }}
+#     uses: ./.github/workflows/infra-project-healthmodel.yml
+#     with: { environment: ${{ inputs.environment }}, project_number: '001', mode: deploy }
+#     secrets: inherit
+# Uses the same OIDC identity as infra-project (AZURE_CLIENT_ID, TENANT_ID, vars.AZURE_SUBSCRIPTION_ID).
+# The identity needs deployment write on the target RG(s), roleAssignments/write for the Monitoring
+# Reader grant to the model identity, and */register/action only with register_provider.
+# Plan is read-only; deploy is idempotent (Incremental). Requires Python 3.10+ and Azure CLI with Bicep.
+name: infra-project-healthmodel
+run-name: Health model ${{ inputs.environment }} project${{ inputs.project_number }} (${{ inputs.mode }}, ${{ inputs.scope }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Selected GitHub environment (stage deploys Azure test)
+        type: choice
+        required: true
+        default: dev
+        options: [dev, stage, prod]
+      project_number:
+        description: Exact project number assertion
+        type: string
+        required: true
+        default: '001'
+      config_file:
+        description: Persistent consumer-relative variables.json
+        type: string
+        required: true
+        default: aifactory/variables.json
+      scope:
+        description: project RG model, common RG model, or both (common nests the project model)
+        type: choice
+        required: true
+        default: all
+        options: [project, common, all]
+      mode:
+        description: Plan is read-only; deploy creates or refreshes the health model(s)
+        type: choice
+        required: true
+        default: plan
+        options: [plan, deploy]
+      register_provider:
+        description: Register Microsoft.CloudHealth when it is not registered
+        type: boolean
+        required: false
+        default: false
+      prune:
+        description: Remove entities this tool created for resources that no longer exist
+        type: boolean
+        required: false
+        default: false
+      alert_emails:
+        description: Comma-separated e-mails for a health-alert action group (empty = no notifications)
+        type: string
+        required: false
+        default: ''
+      runner:
+        description: Runner for this ARM-only job
+        type: choice
+        required: false
+        default: github-hosted
+        options: [github-hosted, self-hosted]
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      project_number:
+        type: string
+        required: true
+      config_file:
+        type: string
+        required: false
+        default: aifactory/variables.json
+      scope:
+        type: string
+        required: false
+        default: all
+      mode:
+        type: string
+        required: false
+        default: plan
+      register_provider:
+        type: boolean
+        required: false
+        default: false
+      prune:
+        type: boolean
+        required: false
+        default: false
+      alert_emails:
+        type: string
+        required: false
+        default: ''
+      runner:
+        type: string
+        required: false
+        default: github-hosted
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  healthmodel:
+    name: Azure Monitor health model (${{ inputs.mode }}, ${{ inputs.scope }})
+    environment: ${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || '{"dev":"dev","stage":"stage","prod":"prod"}')[inputs.environment] }}
+    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Sign in with the existing environment OIDC identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Health model ${{ inputs.mode }}
+        shell: pwsh
+        env:
+          CONSUMER_ROOT: ${{ github.workspace }}
+          CONFIG_FILE: ${{ inputs.config_file }}
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          PROJECT_NUMBER: ${{ inputs.project_number }}
+          HM_MODE: ${{ inputs.mode }}
+          HM_SCOPE: ${{ inputs.scope }}
+          HM_REGISTER_PROVIDER: ${{ inputs.register_provider }}
+          HM_PRUNE: ${{ inputs.prune }}
+          HM_ALERT_EMAILS: ${{ inputs.alert_emails }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:HM_MODE -notin @('plan', 'deploy')) { throw 'mode must be plan or deploy' }
+          if ($env:HM_SCOPE -notin @('project', 'common', 'all')) { throw 'scope must be project, common or all' }
+          $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+          if (-not $python) { $python = Get-Command python3 -CommandType Application -ErrorAction Stop }
+          $tool = Join-Path $env:CONSUMER_ROOT 'azure-enterprise-scale-ml/healthmodel/aif_healthmodel.py'
+          $extra = @()
+          if ($env:HM_MODE -eq 'deploy') {
+            if ($env:HM_REGISTER_PROVIDER -ieq 'true') { $extra += '--register-provider' }
+            if ($env:HM_PRUNE -ieq 'true') { $extra += '--prune' }
+          } else {
+            $extra += '--what-if'
+          }
+          foreach ($email in ($env:HM_ALERT_EMAILS -split ',')) {
+            if ($email.Trim()) { $extra += @('--alert-email', $email.Trim()) }
+          }
+          & $python.Source $tool $env:HM_MODE --consumer-root $env:CONSUMER_ROOT --variables-json $env:CONFIG_FILE --environment $env:TARGET_ENVIRONMENT --project $env:PROJECT_NUMBER --scope $env:HM_SCOPE @extra
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($env:HM_MODE -eq 'deploy' -and $env:HM_SCOPE -ne 'common') {
+            & $python.Source $tool status --consumer-root $env:CONSUMER_ROOT --variables-json $env:CONFIG_FILE --environment $env:TARGET_ENVIRONMENT --project $env:PROJECT_NUMBER --scope project
+          }
+          exit 0

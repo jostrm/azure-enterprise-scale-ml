@@ -15,6 +15,8 @@ from azure.core.exceptions import ResourceNotFoundError
 from azure.storage.blob import BlobServiceClient
 
 from aifactory_agent.config import credential, load_settings
+from aifactory_agent.costs import DEFAULT_VARIABLES_RELATIVE_PATH, default_template_source
+from aifactory_agent.workloads import package_sources
 
 BASE = Path(__file__).resolve().parent
 IMAGE = "mcr.microsoft.com/azure-cli@sha256:e3768dde8142efa45d8f356a317aaac77abd7da15ba3719b0a150e9453f251db"
@@ -47,6 +49,16 @@ def package(settings, client_id: str, destination: Path) -> dict:
     cloud["azure"]["credential"] = "managed_identity"
     cloud["azure"]["managed_identity_client_id"] = client_id
     cloud["knowledge"]["repository_root"] = "/tmp/agent-app/repository"
+    workload_sources = list(package_sources(settings))
+    cloud["workloads"]["repository_root"] = "/tmp/agent-app/workload_sources"
+    template, template_hash = default_template_source(root, settings.costs)
+    if template.is_symlink() or template.stat().st_size > 2_000_000:
+        raise RuntimeError("The approved cost template must be a bounded regular file.")
+    with template.open("rb") as stream:
+        if hashlib.file_digest(stream, "sha256").hexdigest() != template_hash.lower():
+            raise RuntimeError("The default cost template changed from its trusted SHA-256 pin.")
+    cloud["costs"]["default_variables_path"] = DEFAULT_VARIABLES_RELATIVE_PATH.as_posix()
+    cloud["costs"]["default_variables_sha256"] = template_hash.lower()
     if settings.azure.application_insights_name:
         scope = next(iter(settings.scopes.values()))
         monitoring = az("resource", "show", "--subscription", str(scope.subscription_id),
@@ -78,6 +90,13 @@ def package(settings, client_id: str, destination: Path) -> dict:
         archive.add(root / "environment_setup" / "azurefactory-cli" / "src",
                     arcname="repository/environment_setup/azurefactory-cli/src",
                     filter=normalize)
+        archive.add(template, arcname="repository/" + DEFAULT_VARIABLES_RELATIVE_PATH.as_posix(), filter=normalize)
+        workload_directory = tarfile.TarInfo("workload_sources")
+        workload_directory.type = tarfile.DIRTYPE
+        workload_directory.mode = 0o755
+        archive.addfile(workload_directory)
+        for source, relative in workload_sources:
+            archive.add(source, arcname=relative, recursive=False, filter=normalize)
         # Only the configured text corpus is packaged; never copy the checkout or .git.
         for pattern in settings.knowledge.includes:
             for path in root.glob(pattern):

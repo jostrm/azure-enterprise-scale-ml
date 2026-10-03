@@ -15,7 +15,8 @@ are distinct operations.
   not another provisioning engine. An unavailable endpoint is reported as a
   blocker, never mocked into success.
 - The initial deployment enables one explicit DEV scope. No subscription-wide
-  write, arbitrary shell, destructive operation or audience-based elevation.
+  write, arbitrary shell or audience-based elevation. Factory actions stay
+  disabled until their dedicated grants and reviewed server-side targets exist.
 - The application managed identity has no Azure Contributor or Owner grant.
   Search read and Foundry inference use their supported service-level roles;
   application scope filters and user grants remain mandatory.
@@ -156,6 +157,54 @@ readiness while sign-in or knowledge is blocked.
 
 ## Authentication, tools and approvals
 
+### OOAD and dependency injection
+
+`aifactory_agent\ports.py` defines structural interfaces for knowledge,
+model sessions, Factory API/tools, cost reporting, audit and operation storage.
+`AgentServices` is the per-agent composition root. `AgentDependencies` supplies
+constructor-injected factories and authentication; HTTP handlers and operator
+CLI use these services rather than constructing cloud clients themselves.
+`AgentServiceFactory` is an abstract factory interface, with `AgentFactory`
+creating independent compositions from explicit configuration profiles.
+
+```python
+from aifactory_agent.config import load_settings
+from aifactory_agent.services import AgentFactory
+from aifactory_agent.web import create_app
+
+factory = AgentFactory({
+    "platform": load_settings("platform.config.json"),
+    "reviewer": load_settings("reviewer.config.json"),
+})
+platform = factory.create("platform")
+reviewer = factory.create("reviewer")
+platform_app = create_app(platform.settings, services=platform)
+reviewer_app = create_app(reviewer.settings, services=reviewer)
+```
+
+Each configuration specifies its own agent name/model, scopes, grants and
+knowledge ownership. Use separate owned indexes/containers where corpus policies
+differ. Knowledge and approval services have a per-agent lazy lifetime; caller
+and scope-bound tool/cost adapters are created per request. There is no global
+singleton that stores a principal, credential-bearing API session, approval or
+conversation history. Operation records are isolated in an agent namespace,
+and that namespace is covered by the plan hash and record signature. Old
+unnamespaced approvals are not migrated or replayed automatically; prepare anew.
+
+New capabilities are developed with failing interface tests first, then real
+adapters and green tests. Fakes implement the same interfaces without cloud
+construction or monkeypatching production authorization. Use Factory/Strategy
+for selecting implementations, Adapter for SDK boundaries, and Command/State
+for persisted operations. Do not add every pattern speculatively.
+
+This follows the [Azure Well-Architected Framework](https://learn.microsoft.com/en-us/azure/well-architected/)
+and [cloud design patterns](https://learn.microsoft.com/en-us/azure/architecture/patterns/):
+least privilege and signed approvals (security), explicit uncertain outcomes and
+bounded retries (reliability), async job observations (performance), sourced
+cost coverage (cost optimization), and immutable bundles/tests/audit
+(operational excellence). This is design alignment, not a claim of a completed
+Well-Architected production assessment.
+
 Configure `auth.client_id`, `auth.audience`, `required_scope` and exact object-ID
 grants before web use. Entra tokens are checked for the configured tenant,
 issuer, audience, validity and delegated scope. No browser-provided user ID,
@@ -174,6 +223,132 @@ configuration changes require a persisted, caller/scope/revision-bound plan,
 expiry, explicit approval of the exact plan hash, and a one-use execution state.
 The model cannot approve. Drift or uncertain execution stops the workflow;
 lost replies are not permission to replay a non-idempotent write.
+
+### Factory skills
+
+The authenticated **Factory actions and cost monitoring** panel exposes eleven
+named skills. These are agent capabilities, not shell aliases or automatic
+permissions:
+
+| Command | Behavior |
+| --- | --- |
+| `/create-private-aifactory-full-bootstrap-private-with-own-hub-vpn-and-default-proj` | Prepare Full bootstrap from an approved server-side private hub/VPN/default-project profile. |
+| `/delete-aifactory` | Prepare whole-factory deletion against an explicitly authorized resource manifest; preserve Entra security groups. |
+| `/add-project-to-aifactory` | Prepare a new project in the configured factory and scale set. Configuration persistence and Azure deployment are reported separately. |
+| `/get-default-project-estimated-azure-idle-running-cost` | Estimate provisioned project baseline from the canonical default `variables.json`, including enabled services and selected SKUs, and compare with Azure Cost Analysis. |
+| `/get-aifactory-common-estimated-azure-idle-running-cost` | Analyze a supplied common resource group only when it is explicitly authorized for the active scope. |
+| `/get-monthtly-forecasted-project-estimated-azure-cost` | Read actual and forecast monthly project costs for the active project's resource group. The correctly spelled `monthly` alias is also accepted. |
+| `/get-aifactory-health` | Read the existing Factory API health without changing configuration. |
+| `/get-aifactory-settings` | Read only the exact server-selected factory/project/environment settings. |
+| `/get-aifactory-operation-status` | Observe an operation owned by the requesting user in the active scope; never accept an arbitrary backend job or folder. |
+| `/create-agent-oftype-for-project` | Select an immediate agent-template folder and the exact approved Foundry project resource ID; prepare one version without changing routing. |
+| `/create-ml-model-oftype-for-project` | Select an immediate ML template folder, `batch`/`online`/`streaming` mode, and the exact approved workspace or project resource group ID; prepare asynchronous training without implicit registration or serving promotion. |
+
+Action permissions are distinct: `factory.create`, `factory.delete` and
+`project.add`, `agent.create` and `model.create`. Department `config.write`
+does **not** grant any of them.
+Monitoring requires `cost.read` and `factory.read`. All grants are checked
+against the requesting caller and exact active scope; selecting the Platform
+view grants nothing.
+
+`GET /api/skills?scope_key=...` returns closed argument schemas and setup
+blockers. Read-only reports use `POST /api/skills/{name}/run`. Actions use
+`POST /api/skills/{name}/propose` to create a pending signed Blob record, then
+the existing separate hash approval and one-use execution endpoints. There is
+no raw-plan execution endpoint and no action preparation from model chat.
+Deletion additionally requires the exact backend-provided confirmation phrase.
+Unknown, running and paused jobs are never presented as completed. Status
+observation does not retry, re-confirm or automatically continue a write.
+An interrupted approved Full bootstrap can be explicitly continued through
+`POST /api/operations/{id}/continue` with the original `plan_hash` and the
+current paused-stage `observation_hash`. The store claims that observation once
+with Blob CAS. Continuation preserves the initial approval and job binding,
+validates the original whole-workflow authorization and expiry, and refuses
+changed scope, recovery, stale observations and uncertain write replay.
+
+Configure `actions.enabled_skills` explicitly, keyed
+`actions.bootstrap_profiles` for creation, and
+`actions.deletion_resource_groups` for whole-factory deletion. A bootstrap
+profile must pin the backend program, source assets and normalized workflow
+input hash, identify every approved resource group/deployment identity, and
+specify the private hub, nonoverlapping VPN pool and provider repository bounds.
+An existing project grant is not permission to create or delete an entire factory.
+`factory.operation_signing_secret_url` must identify a dedicated Key Vault
+HMAC secret, separate from the Factory API credential. Deployment profiles are
+server configuration, never model-supplied JSON.
+
+`costs.common_resource_groups` is an explicit resource-group name allowlist
+keyed by authorized scope. `costs.currency` defaults to USD; estimates never
+convert or combine currencies. The checked-in default template is
+`environment_setup\aifactory\variables.json`, pinned by SHA-256 and included
+in the offline application bundle. A template override additionally requires
+`costs.default_variables_sha256`; a changed/unpinned template fails closed.
+Grant the execution identity resource Reader and the appropriate Azure Cost
+Management read access only on approved billing targets. The skills do not
+grant roles or elevate the caller.
+
+### Project-template workload strategies
+
+`GET /api/templates?scope_key=...` discovers actual immediate source-folder types,
+with exact configured targets and explicit blockers. Agent templates come from
+`usecase_code\40-agent-factory`; shared helpers, generated folders and empty
+placeholders are not deployable agent types. ML templates come from
+`usecase_code\50-ml-model-factory\batch`, `online` and `streaming`. The same
+type name can appear in more than one mode, so `serving_mode` is required.
+
+```json
+{
+  "scope_key": "project001-dev",
+  "arguments": {
+    "type": "41-single-agent",
+    "project_resource_id": "/subscriptions/<subscription>/resourceGroups/<project-rg>/providers/Microsoft.CognitiveServices/accounts/<account>/projects/<project>"
+  }
+}
+```
+
+```json
+{
+  "scope_key": "project001-dev",
+  "arguments": {
+    "type": "regression",
+    "serving_mode": "batch",
+    "project_resource_id": "/subscriptions/<subscription>/resourceGroups/<project-rg>/providers/Microsoft.MachineLearningServices/workspaces/<workspace>"
+  }
+}
+```
+
+Send these to the corresponding `/api/skills/{name}/propose` endpoint, not
+directly to execution. Every selection requires a server-approved
+`workloads.profiles[scope_key]` entry and `workloads.enabled_skills`.
+Profiles specify `profile_id`, `kind`, `type`, `family`,
+`project_resource_id`, and a credential-free repository-relative `config_path`.
+Agent profiles select one `catalog_selection` and `agent_prefix`; hosted
+profiles also select explicit runtime/source and output bounds. Model profiles
+select `serving_mode`, canonical `scenario_path`, `training_mode` and
+`output_directory`. Neither caller text nor folder names select an arbitrary
+module, command, repository path, compute or deployment identity.
+
+`TemplateCatalog` is an interface and `WorkloadAdapter` an abstract Strategy
+with typed plans/results. Constructor-injected `WorkloadRegistry` instances
+select real prompt/hosted/AML adapters; they reuse the purple factories rather
+than introduce another provisioning engine. Source/config manifests and exact
+project IDs are hash-bound to the signed approval and revalidated before use.
+Creation uses the purple SDK directly and does not require a Factory API key.
+
+The thin cloud bundle includes only approved-profile source types and their
+required code/configuration; it does not copy datasets, private/generated
+files or the entire checkout. Unconfigured types are discoverable only when
+the full approved source tree is separately available. Missing SDKs, profiles,
+source/configuration or permissions are blockers, never placeholder success.
+Agent version creation is not endpoint routing. Training submission is not a
+completed/registered model or an online deployment; these phases remain explicit.
+
+Idle running cost means the provisioned baseline with no workload traffic; it
+does not assert measured inactivity. Retail/template estimates, Cost Analysis
+actual charges and Azure forecasts remain separate, with currency, period,
+source, assumptions and missing-price/data coverage surfaced explicitly.
+An unpriced enabled resource or unavailable billing data is **unknown**, not
+zero cost. Do not infer a price from a similar SKU or mix currencies.
 
 Operation history/audit data lives in the owned private Blob container. Record
 the requester, scope, operation, correlation ID, timestamps and observed outcome,

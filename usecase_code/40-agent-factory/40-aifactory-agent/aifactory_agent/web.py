@@ -22,10 +22,17 @@ from .foundry import Conversation
 from .knowledge import IndexingError, Knowledge, OwnershipError
 from .operations import OperationStore
 from .security import Principal, authorize
+from .services import AgentDependencies, AgentServices
+from .ports import KnowledgePort, OperationStorePort
 from .tools import CONFIGURE_TOOL, FactoryTools, SettingsChanges, ToolError
+from .skills import (
+    ACTION_SKILLS, WORKLOAD_SKILLS, COST_SKILLS, DIAGNOSTIC_SKILLS, SKILL_PERMISSIONS,
+    argument_model, normalize_skill, skill_catalog,
+)
 
 STATIC = Path(__file__).with_name("static")
-PERMISSIONS = ("knowledge.read", "factory.read", "config.write", "knowledge.refresh")
+PERMISSIONS = ("knowledge.read", "factory.read", "config.write", "knowledge.refresh",
+               "factory.create", "factory.delete", "project.add", "cost.read", "agent.create", "model.create")
 
 
 class ChatRequest(BaseModel):
@@ -45,6 +52,7 @@ class ChatRequest(BaseModel):
 class ApprovalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     plan_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    confirmation_phrase: str | None = Field(default=None, min_length=1, max_length=1024)
 
 
 class ProposalRequest(BaseModel):
@@ -53,17 +61,36 @@ class ProposalRequest(BaseModel):
     settings: SettingsChanges
 
 
+class SkillRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    scope_key: str = Field(pattern=r"^[A-Za-z0-9_-]{1,80}$")
+    arguments: dict[str, object]
+
+
+class ContinuationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    plan_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    observation_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
 def get_settings(request: Request) -> Settings:
     return request.app.state.settings
 
 
-def get_knowledge(settings: Annotated[Settings, Depends(get_settings)]) -> Knowledge:
-    return Knowledge(settings)
+def get_services(request: Request, settings: Annotated[Settings, Depends(get_settings)]) -> AgentServices:
+    services = request.app.state.services
+    if services.settings != settings:
+        services = AgentServices(settings, dependencies=services.dependencies)
+        request.app.state.services = services
+    return services
 
 
-def get_operation_store(settings: Annotated[Settings, Depends(get_settings)]) -> OperationStore:
-    # OperationStore defaults to durable Blob storage; no in-memory production fallback.
-    return OperationStore(settings)
+def get_knowledge(services: Annotated[AgentServices, Depends(get_services)]) -> KnowledgePort:
+    return services.knowledge()
+
+
+def get_operation_store(services: Annotated[AgentServices, Depends(get_services)]) -> OperationStorePort:
+    return services.operation_store()
 
 
 def _auth_configured(settings: Settings) -> bool:
@@ -92,6 +119,7 @@ def _auth_configured(settings: Settings) -> bool:
 
 def get_principal(
     request: Request, settings: Annotated[Settings, Depends(get_settings)],
+    services: Annotated[AgentServices, Depends(get_services)],
 ) -> Principal:
     if not _auth_configured(settings):
         raise security.AuthenticationUnavailable("Entra registration is unconfigured.")
@@ -99,7 +127,7 @@ def get_principal(
     parts = headers[0].split() if len(headers) == 1 else []
     if len(parts) != 2 or parts[0].lower() != "bearer":
         raise security.AuthenticationError("A bearer access token is required.")
-    return security.principal_from_token(settings, parts[1])
+    return services.authenticate(parts[1])
 
 
 def _failure(code: str, message: str, status: int, *, headers=None) -> JSONResponse:
@@ -113,20 +141,44 @@ def _knowledge_ready(status: dict) -> bool:
         and status["indexed_document_count"] > 0
         and status.get("reconciliation_pending") is False
         and ("search_document_count" not in status
-             or status["search_document_count"] == status["indexed_document_count"])
+             or (type(status["search_document_count"]) is int
+                 and status["search_document_count"] == status["indexed_document_count"]))
     )
 
 
 def get_readiness_knowledge(
     settings: Annotated[Settings, Depends(get_settings)],
-) -> Knowledge | None:
-    return Knowledge(settings) if _auth_configured(settings) else None
+    services: Annotated[AgentServices, Depends(get_services)],
+) -> KnowledgePort | None:
+    return services.knowledge() if _auth_configured(settings) else None
 
 
-def create_app(settings: Settings) -> FastAPI:
+def create_app(settings: Settings, *, services: AgentServices | None = None) -> FastAPI:
     app = FastAPI(title="Enterprise Scale AI Factory Agent", docs_url=None, redoc_url=None,
                   openapi_url=None, debug=False)
     app.state.settings = settings
+    if services is not None and services.settings != settings:
+        raise ValueError("Injected agent services must match this application's settings.")
+    if services is None:
+        from .costs import CostSkills
+        from .workloads import WorkloadSkills
+        cost_factory = lambda current, principal, scope: CostSkills(current, principal, scope)
+        workload_factory = lambda current, principal, scope, store: WorkloadSkills(current, principal, scope, store)
+        dependencies = AgentDependencies(
+            knowledge_factory=lambda current: Knowledge(current),
+            operation_store_factory=lambda current: OperationStore(current, namespace=current.agent_name),
+            tool_factory=lambda current, principal, scope, store:
+                FactoryTools(current, principal, scope, operation_store=store,
+                             cost_factory=lambda configured, caller, key, cred: cost_factory(configured, caller, key),
+                             workload_factory=workload_factory),
+            cost_factory=cost_factory,
+            workload_factory=workload_factory,
+            conversation_factory=lambda current, knowledge, tools: Conversation(
+                current, knowledge, tool_factory=tools),
+            authenticate=lambda current, token: security.principal_from_token(current, token),
+        )
+        services = AgentServices(settings, dependencies=dependencies)
+    app.state.services = services
     inline_scripts = re.findall(r"<script>(.*?)</script>", (STATIC / "index.html").read_text("utf-8"), re.S)
     hashes = " ".join(
         "'sha256-" + base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode("ascii") + "'"
@@ -183,6 +235,10 @@ def create_app(settings: Settings) -> FastAPI:
             "factory_configuration": "The existing Factory API configuration or credential dependency is unavailable.",
             "factory_timeout": "The existing Factory API timed out. Inspect persisted plans before submitting again.",
             "factory_api_error": "The existing Factory API request failed. No API host is provisioned by this service.",
+            "skill_disabled": "This Factory action must be enabled for the exact target by the deployment operator.",
+            "operation_signing_unconfigured": "A dedicated Key Vault operation-signing secret must be configured.",
+            "cost_scope_mismatch": "The selected resource group is outside this scope's authorized cost targets.",
+            "cost_unavailable": "Azure Cost Analysis is unavailable for this target. Check billing access and data availability.",
         }
         return _failure(code, blockers.get(code, messages.get(exc.status_code, "The operation could not be confirmed.")),
                         exc.status_code)
@@ -269,7 +325,9 @@ def create_app(settings: Settings) -> FastAPI:
                          "writes_enabled": current.factory.writes_enabled},
             "capabilities": {"model_read_only": True, "proposal_creation": True,
                              "proposal_blockers": proposal_blockers,
-                             "destructive_actions": False, "underlying_job_cancellation": False},
+                             "destructive_actions": "delete-aifactory" in current.actions.enabled_skills
+                             and current.factory.writes_enabled,
+                             "skills_supported": True, "underlying_job_cancellation": False},
         }
 
     @app.post("/api/chat")
@@ -278,9 +336,10 @@ def create_app(settings: Settings) -> FastAPI:
         principal: Annotated[Principal, Depends(get_principal)],
         current: Annotated[Settings, Depends(get_settings)],
         knowledge: Annotated[Knowledge, Depends(get_knowledge)],
+        services: Annotated[AgentServices, Depends(get_services)],
     ):
         authorize(current, principal, body.scope_key, "knowledge.read")
-        return Conversation(current, knowledge).answer(body.question, body.audience, principal, body.scope_key)
+        return services.conversation(knowledge).answer(body.question, body.audience, principal, body.scope_key)
 
     @app.get("/api/knowledge/status")
     def knowledge_status(
@@ -301,12 +360,95 @@ def create_app(settings: Settings) -> FastAPI:
     ):
         return {"operations": store.list(principal)}
 
+    @app.get("/api/skills")
+    def skills(
+        scope_key: Annotated[str, Query(pattern=r"^[A-Za-z0-9_-]{1,80}$")],
+        principal: Annotated[Principal, Depends(get_principal)],
+        current: Annotated[Settings, Depends(get_settings)],
+    ):
+        return {"scope_key": scope_key, "skills": skill_catalog(current, principal, scope_key)}
+
+    @app.get("/api/templates")
+    def templates(
+        scope_key: Annotated[str, Query(pattern=r"^[A-Za-z0-9_-]{1,80}$")],
+        principal: Annotated[Principal, Depends(get_principal)],
+        current: Annotated[Settings, Depends(get_settings)],
+        store: Annotated[OperationStore, Depends(get_operation_store)],
+        services: Annotated[AgentServices, Depends(get_services)],
+    ):
+        authorize(current, principal, scope_key, "factory.read")
+        return {"scope_key": scope_key, "templates": services.workloads(principal, scope_key, store=store).discover(),
+                "coverage": "Only source types available in the approved purple source tree/bundle are discoverable; profiles and dependencies are required for creation."}
+
+    @app.post("/api/skills/{skill_name}/run")
+    def run_monitoring_skill(
+        skill_name: str, body: SkillRequest,
+        principal: Annotated[Principal, Depends(get_principal)],
+        current: Annotated[Settings, Depends(get_settings)],
+        store: Annotated[OperationStore, Depends(get_operation_store)],
+        services: Annotated[AgentServices, Depends(get_services)],
+    ):
+        name = normalize_skill(skill_name)
+        if name not in COST_SKILLS and name not in DIAGNOSTIC_SKILLS:
+            raise ToolError("approval_required", "Factory actions require a separate plan, approval and execution.", 409)
+        authorize(current, principal, body.scope_key, "factory.read")
+        authorize(current, principal, body.scope_key, SKILL_PERMISSIONS[name])
+        if name in DIAGNOSTIC_SKILLS:
+            from pydantic import ValidationError
+            try:
+                args = argument_model(name).model_validate(body.arguments)
+            except ValidationError:
+                raise ToolError("invalid_arguments", "Arguments do not match the closed diagnostic schema.", 400) from None
+            if name == DIAGNOSTIC_SKILLS[2]:
+                record = store.read(principal, args.operation_id)
+                if record["scope_key"] != body.scope_key:
+                    raise PermissionError("The saved operation belongs to another active scope.")
+                record = store.observe(principal, args.operation_id, lambda stored:
+                    services.tools(principal, body.scope_key, store=store).status_operation(stored))
+                return {"ok": True, "data": record}
+            tool_name = "factory_health" if name == DIAGNOSTIC_SKILLS[0] else "factory_settings"
+            result = services.tools(principal, body.scope_key, store=store).execute(tool_name, body.arguments)
+            if not isinstance(result, dict) or result.get("ok") is not True:
+                error = result.get("error", {}) if isinstance(result, dict) else {}
+                raise ToolError(error.get("code", "factory_api_error"), "Factory diagnostics are unavailable.",
+                                error.get("status_code", 503))
+            return result
+        result = services.costs(principal, body.scope_key).execute(name, body.arguments)
+        if not isinstance(result, dict) or result.get("ok") is not True:
+            raise ToolError("cost_unavailable", "Azure cost analysis did not confirm a report.", 503)
+        return result
+
+    @app.post("/api/skills/{skill_name}/propose", status_code=201)
+    def propose_skill(
+        skill_name: str, body: SkillRequest,
+        principal: Annotated[Principal, Depends(get_principal)],
+        current: Annotated[Settings, Depends(get_settings)],
+        store: Annotated[OperationStore, Depends(get_operation_store)],
+        services: Annotated[AgentServices, Depends(get_services)],
+    ):
+        name = normalize_skill(skill_name)
+        if name not in (*ACTION_SKILLS, *WORKLOAD_SKILLS):
+            raise ToolError("unsupported_operation", "Monitoring skills run read-only and do not create approval plans.", 400)
+        authorize(current, principal, body.scope_key, "factory.read")
+        authorize(current, principal, body.scope_key, SKILL_PERMISSIONS[name])
+        tools = services.tools(principal, body.scope_key, store=store)
+        record = tools.prepare_skill(name, body.arguments)
+        if (
+            not isinstance(record, dict) or record.get("status") != "pending"
+            or record.get("scope_key") != body.scope_key or record.get("tool_name") != name
+            or record.get("tenant_id") != principal.tenant_id or record.get("object_id") != principal.object_id
+            or not re.fullmatch(r"[a-f0-9]{64}", str(record.get("plan_hash", "")))
+        ):
+            raise RuntimeError("The skill backend did not confirm a caller-bound pending plan.")
+        return record
+
     @app.post("/api/operations/propose", status_code=201)
     def propose_operation(
         body: ProposalRequest,
         principal: Annotated[Principal, Depends(get_principal)],
         current: Annotated[Settings, Depends(get_settings)],
         store: Annotated[OperationStore, Depends(get_operation_store)],
+        services: Annotated[AgentServices, Depends(get_services)],
     ):
         authorize(current, principal, body.scope_key, "config.write")
         authorize(current, principal, body.scope_key, "factory.read")
@@ -314,7 +456,7 @@ def create_app(settings: Settings) -> FastAPI:
             raise ToolError("writes_disabled", "Configuration writes are disabled.", 503)
         if not all((current.factory.factory_id, current.factory.scale_set_id, current.factory.project_id)):
             raise ToolError("factory_target_unconfigured", "Exact server target identifiers are required.", 503)
-        tools = FactoryTools(current, principal, body.scope_key, operation_store=store)
+        tools = services.tools(principal, body.scope_key, store=store)
         result = tools.prepare_settings({"settings": body.settings.model_dump(mode="json")})
         if not isinstance(result, dict):
             raise RuntimeError("The proposal backend returned an invalid envelope.")
@@ -351,6 +493,9 @@ def create_app(settings: Settings) -> FastAPI:
         principal: Annotated[Principal, Depends(get_principal)],
         store: Annotated[OperationStore, Depends(get_operation_store)],
     ):
+        if body.confirmation_phrase is not None:
+            return store.approve(principal, operation_id, body.plan_hash,
+                                 confirmation_phrase=body.confirmation_phrase)
         return store.approve(principal, operation_id, body.plan_hash)
 
     @app.post("/api/operations/{operation_id}/execute")
@@ -359,9 +504,10 @@ def create_app(settings: Settings) -> FastAPI:
         principal: Annotated[Principal, Depends(get_principal)],
         current: Annotated[Settings, Depends(get_settings)],
         store: Annotated[OperationStore, Depends(get_operation_store)],
+        services: Annotated[AgentServices, Depends(get_services)],
     ):
         def execute_record(record):
-            tools = FactoryTools(current, principal, record["scope_key"], operation_store=store)
+            tools = services.tools(principal, record["scope_key"], store=store)
             return tools.execute_operation(record)
 
         record = store.execute(principal, operation_id, execute_record)
@@ -381,6 +527,35 @@ def create_app(settings: Settings) -> FastAPI:
         store: Annotated[OperationStore, Depends(get_operation_store)],
     ):
         return store.cancel(principal, operation_id)
+
+    @app.get("/api/operations/{operation_id}/status")
+    def operation_status(
+        operation_id: str, principal: Annotated[Principal, Depends(get_principal)],
+        current: Annotated[Settings, Depends(get_settings)],
+        store: Annotated[OperationStore, Depends(get_operation_store)],
+        services: Annotated[AgentServices, Depends(get_services)],
+    ):
+        def observe_record(record):
+            return services.tools(principal, record["scope_key"], store=store).status_operation(record)
+        return store.observe(principal, operation_id, observe_record)
+
+    @app.post("/api/operations/{operation_id}/continue")
+    def continue_operation(
+        operation_id: str, body: ContinuationRequest,
+        principal: Annotated[Principal, Depends(get_principal)],
+        current: Annotated[Settings, Depends(get_settings)],
+        store: Annotated[OperationStore, Depends(get_operation_store)],
+        services: Annotated[AgentServices, Depends(get_services)],
+    ):
+        def continue_record(record):
+            return services.tools(principal, record["scope_key"], store=store).continue_operation(record)
+        record = store.continue_operation(principal, operation_id, body.plan_hash, body.observation_hash, continue_record)
+        if record["status"] in ("failed", "uncertain"):
+            return JSONResponse({"operation": record, "error": {
+                "code": "continuation_" + record["status"],
+                "message": "Continuation could not be confirmed. Inspect the saved operation; do not retry.",
+            }}, status_code=503)
+        return record
 
     @app.get("/")
     def frontend():

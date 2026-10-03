@@ -12,6 +12,7 @@ from azurefactory.errors import RequestTimeout
 from aifactory_agent.operations import BlobOperationBackend, MemoryOperationBackend, OperationError, OperationStore
 from aifactory_agent.security import Principal
 from aifactory_agent.tools import CONFIGURE_TOOL
+from test_signing import FakeBlobContainer, FakeVault, KeyVaultRecordSigner, VERSION_1, VERSION_2, signing_settings, signer, vault
 from test_security import CALLER, CLIENT, SCOPE, TENANT, principal, settings
 from test_tools import preview, request
 
@@ -194,8 +195,9 @@ def test_disabled_writes_fail_even_for_previously_approved_plan(settings, backen
     assert error.value.code == "writes_disabled" and error.value.status_code == 503
 
 
-def test_blob_backend_uses_etag_cas_and_separate_immutable_audit(settings):
+def test_blob_backend_uses_etag_cas_and_separate_immutable_audit(signing_settings, signer):
     uploads = []
+    signed_record = signer.sign({"id": "record"})
     class Blob:
         def __init__(self, name):
             self.name = name
@@ -203,17 +205,20 @@ def test_blob_backend_uses_etag_cas_and_separate_immutable_audit(settings):
             uploads.append((self.name, json.loads(body), kwargs))
             return {"etag": '"version-2"'}
         def download_blob(self):
-            return SimpleNamespace(readall=lambda: b'{"id":"record"}', properties=SimpleNamespace(etag='"version-1"'))
+            return SimpleNamespace(readall=lambda: json.dumps(signed_record).encode("utf-8"),
+                                   properties=SimpleNamespace(etag='"version-1"'))
     container = SimpleNamespace(get_blob_client=lambda name: Blob(name),
                                 list_blobs=lambda **kwargs: [SimpleNamespace(name="operations/caller/id.json")])
-    backend = BlobOperationBackend(settings, container=container)
-    assert backend.read("operations/caller/id.json") == ({"id": "record"}, '"version-1"')
+    backend = BlobOperationBackend(signing_settings, container=container, signer=signer)
+    assert backend.read("operations/caller/id.json") == (signed_record, '"version-1"')
     backend.create("operations/caller/id.json", {"id": "record"})
     backend.replace("operations/caller/id.json", {"id": "updated"}, '"version-1"')
     backend.audit({"tenant_id": TENANT, "object_id": CALLER, "operation_id": "record", "event": "approved"})
     assert uploads[0][2] == {"overwrite": False}
     assert uploads[1][2] == {"overwrite": True, "etag": '"version-1"', "match_condition": MatchConditions.IfNotModified}
     assert uploads[2][0].startswith("audit/") and uploads[2][2] == {"overwrite": False}
+    for _, record, _ in uploads:
+        signer.verify(record)
 
 
 def test_changed_factory_api_url_invalidates_approval(settings, backend, operation, principal):
@@ -264,3 +269,75 @@ def test_production_backend_never_falls_back_to_memory(settings, monkeypatch):
     assert store.backend.container is container
     assert captured == [{"account_url": settings.azure.storage_endpoint,
                          "container_name": settings.azure.storage_container, "credential": cred}]
+
+
+@pytest.fixture
+def signed_store(signing_settings, signer):
+    container = FakeBlobContainer()
+    backend = BlobOperationBackend(signing_settings, container=container, signer=signer)
+    return OperationStore(signing_settings, backend=backend), container
+
+
+def test_signed_blob_store_protects_approval_and_execution_metadata(signed_store, signing_settings, signer, principal):
+    store, container = signed_store
+    pending = store.propose(principal, SCOPE, CONFIGURE_TOOL, request(signing_settings), preview())
+    approved = store.approve(principal, pending["id"], pending["plan_hash"])
+    assert approved["signature"] != pending["signature"]
+    assert approved["approval"]["object_id"] == principal.object_id
+    assert approved["approval"]["plan_hash"] == approved["plan_hash"]
+    signer.verify(approved)
+    def execute(record):
+        assert record["status"] == "executing"
+        signer.verify(record)
+        return {"ok": True, "data": {"saved": True}}
+    result = store.execute(principal, pending["id"], execute)
+    assert result["status"] == "succeeded"
+    signer.verify(result)
+    with pytest.raises(RuntimeError):
+        signer.verify({key: value for key, value in result.items() if key != "progress"})
+    stored = json.loads(container.data[store._key(principal, result["id"])])
+    assert stored["outcome"] == {"ok": True, "data": {"saved": True}}
+    signer.verify(stored)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("status", "approved"), ("object_id", CLIENT), ("tenant_id", CLIENT),
+    ("scope_key", "project002-dev"), ("scope", {"project": "002"}),
+    ("outcome", {"ok": True}), ("approval", {"object_id": CALLER, "plan_hash": "forged"}),
+])
+def test_blob_contributor_cannot_forge_entire_operation(signed_store, signing_settings, principal, field, value):
+    from aifactory_agent.operations import plan_hash
+    store, container = signed_store
+    pending = store.propose(principal, SCOPE, CONFIGURE_TOOL, request(signing_settings), preview())
+    key = store._key(principal, pending["id"])
+    attacker = json.loads(container.data[key])
+    attacker[field] = value
+    attacker["plan_hash"] = plan_hash(attacker)
+    container.data[key] = json.dumps(attacker).encode("utf-8")
+    with pytest.raises(OperationError) as error:
+        store.execute(principal, pending["id"], lambda _: pytest.fail("tampered approval must not execute"))
+    assert error.value.code == "operation_integrity_failed" and error.value.status_code == 503
+
+
+def test_blob_store_rotation_preserves_old_records_and_signs_new_status(signed_store, signing_settings, vault, principal):
+    store, container = signed_store
+    pending = store.propose(principal, SCOPE, CONFIGURE_TOOL, request(signing_settings), preview())
+    assert pending["signing_key_version"] == VERSION_1
+    vault.current_version = VERSION_2
+    approved = store.approve(principal, pending["id"], pending["plan_hash"])
+    assert approved["signing_key_version"] == VERSION_2
+    assert store.read(principal, pending["id"])["status"] == "approved"
+
+
+def test_missing_production_key_cannot_propose_or_accept_unsigned_approval(settings, principal):
+    container = FakeBlobContainer()
+    store = OperationStore(settings, backend=BlobOperationBackend(settings, container=container))
+    with pytest.raises(OperationError) as error:
+        store.propose(principal, SCOPE, CONFIGURE_TOOL, request(settings), preview())
+    assert error.value.status_code == 503
+    assert container.data == {}
+    unsigned = {"status": "approved"}
+    container.data[store._key(principal, "99999999-9999-4999-8999-999999999999")] = json.dumps(unsigned).encode("utf-8")
+    container.versions[next(iter(container.data))] = "1"
+    with pytest.raises(OperationError):
+        store.execute(principal, "99999999-9999-4999-8999-999999999999", lambda _: pytest.fail("unsigned"))

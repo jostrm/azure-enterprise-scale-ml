@@ -1,0 +1,132 @@
+# Optional step: Azure Monitor health model for an AI Factory project and/or its common resource group.
+# Copy beside infra-project-genai.yaml (the bootstrap copies this folder). Run it after the project
+# pipeline, or chain it with the pipeline-resource trigger below. Plan is read-only; deploy is
+# idempotent (Incremental) and safe to re-run after every project deployment.
+# Requires Python 3.10+, PowerShell Core and Azure CLI with Bicep. Microsoft-hosted agents work:
+# every call is an Azure Resource Manager operation, so no private-network agent is needed.
+# Service connection permissions: read on the project and common RGs, deployment write on the target
+# RG(s), Microsoft.Authorization/roleAssignments/write (Monitoring Reader for the model identity) and,
+# only with registerProvider, */register/action on the subscription.
+trigger: none
+pr: none
+
+# Uncomment to run automatically after every successful project pipeline run (dev by default):
+# resources:
+#   pipelines:
+#     - pipeline: project
+#       source: infra-project-genai   # the name of your project pipeline definition in Azure DevOps
+#       trigger: true
+
+parameters:
+  - name: environment
+    displayName: Selected environment (stage deploys Azure test)
+    type: string
+    default: dev
+    values: [dev, stage, test, prod]
+  - name: projectNumber
+    displayName: Exact project number assertion
+    type: string
+    default: '001'
+  - name: configFile
+    displayName: Persistent consumer-relative variables.json
+    type: string
+    default: aifactory/variables.json
+  - name: scope
+    displayName: project RG model, common RG model, or both (common nests the project model)
+    type: string
+    default: all
+    values: [project, common, all]
+  - name: mode
+    displayName: Plan is read-only; deploy creates or refreshes the health model(s)
+    type: string
+    default: plan
+    values: [plan, deploy]
+  - name: registerProvider
+    displayName: Register Microsoft.CloudHealth when the subscription has not registered it
+    type: boolean
+    default: false
+  - name: prune
+    displayName: Remove entities this tool created for resources that no longer exist
+    type: boolean
+    default: false
+  - name: alertEmails
+    displayName: Comma-separated e-mails for a health-alert action group (empty = alerts without notifications)
+    type: string
+    default: ''
+  - name: runnerSelection
+    type: string
+    default: microsoft-hosted
+    values: [microsoft-hosted, self-hosted]
+  - name: selfHostedPool
+    type: string
+    default: Default
+  - name: serviceConnection
+    displayName: Existing connection override (empty uses the per-environment connection from variables.yaml)
+    type: string
+    default: ''
+
+variables:
+  - template: ../variables/variables.yaml
+  - name: healthModelServiceConnection
+    ${{ if ne(parameters.serviceConnection, '') }}:
+      value: ${{ parameters.serviceConnection }}
+    ${{ elseif eq(parameters.environment, 'dev') }}:
+      value: ${{ variables.dev_service_connection }}
+    ${{ elseif eq(parameters.environment, 'prod') }}:
+      value: ${{ variables.prod_service_connection }}
+    ${{ else }}:
+      value: ${{ variables.test_service_connection }}
+
+jobs:
+  - job: HealthModel
+    displayName: Azure Monitor health model ${{ parameters.mode }} (${{ parameters.scope }})
+    timeoutInMinutes: 60
+    pool:
+      ${{ if eq(parameters.runnerSelection, 'self-hosted') }}:
+        name: ${{ parameters.selfHostedPool }}
+      ${{ else }}:
+        vmImage: windows-2022
+    steps:
+      - checkout: self
+        submodules: recursive
+        persistCredentials: false
+      - task: AzureCLI@2
+        displayName: Health model ${{ parameters.mode }}
+        inputs:
+          azureSubscription: ${{ variables.healthModelServiceConnection }}
+          scriptType: pscore
+          scriptLocation: inlineScript
+          addSpnToEnvironment: false
+          visibleAzLogin: false
+          inlineScript: |
+            $ErrorActionPreference = 'Stop'
+            $python = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+            if (-not $python) { $python = Get-Command python3 -CommandType Application -ErrorAction Stop }
+            $tool = Join-Path $env:CONSUMER_ROOT 'azure-enterprise-scale-ml/healthmodel/aif_healthmodel.py'
+            $extra = @()
+            if ($env:HM_MODE -eq 'deploy') {
+              if ($env:HM_REGISTER_PROVIDER -ieq 'true') { $extra += '--register-provider' }
+              if ($env:HM_PRUNE -ieq 'true') { $extra += '--prune' }
+            } else {
+              $extra += '--what-if'
+            }
+            foreach ($email in ($env:HM_ALERT_EMAILS -split ',')) {
+              if ($email.Trim()) { $extra += @('--alert-email', $email.Trim()) }
+            }
+            & $python.Source $tool $env:HM_MODE --consumer-root $env:CONSUMER_ROOT --variables-json $env:CONFIG_FILE --environment $env:TARGET_ENVIRONMENT --project $env:PROJECT_NUMBER --scope $env:HM_SCOPE @extra
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            if ($env:HM_MODE -eq 'deploy' -and $env:HM_SCOPE -ne 'common') {
+              # Informational: new role assignments can take minutes before every signal reports data.
+              & $python.Source $tool status --consumer-root $env:CONSUMER_ROOT --variables-json $env:CONFIG_FILE --environment $env:TARGET_ENVIRONMENT --project $env:PROJECT_NUMBER --scope project
+            }
+            exit 0
+        env:
+          CONSUMER_ROOT: $(Build.SourcesDirectory)
+          CONFIG_FILE: ${{ parameters.configFile }}
+          TARGET_ENVIRONMENT: ${{ parameters.environment }}
+          PROJECT_NUMBER: ${{ parameters.projectNumber }}
+          HM_MODE: ${{ parameters.mode }}
+          HM_SCOPE: ${{ parameters.scope }}
+          HM_REGISTER_PROVIDER: ${{ parameters.registerProvider }}
+          HM_PRUNE: ${{ parameters.prune }}
+          HM_ALERT_EMAILS: ${{ parameters.alertEmails }}

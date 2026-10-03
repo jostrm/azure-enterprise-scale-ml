@@ -1,0 +1,11588 @@
+{
+ "_about": "Metric definitions captured 2026-10-03 with 'az monitor metrics list-definitions' from the AI Factory test environment (live) and, for types absent there, from the Microsoft Learn Azure Monitor supported-metrics reference (docs). Used by tests to prove every catalog signal names a real metric, aggregation and time grain.",
+ "microsoft.apimanagement/service": {
+  "metrics": {
+   "BackendDuration": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Location",
+     "Hostname",
+     "ApiId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "Capacity": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "Location"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "Duration": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Location",
+     "Hostname",
+     "ApiId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "Requests": {
+    "aggregations": [
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Location",
+     "Hostname",
+     "LastErrorReason",
+     "BackendResponseCode",
+     "GatewayResponseCode",
+     "BackendResponseCodeCategory",
+     "GatewayResponseCodeCategory",
+     "ApiId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "docs"
+ },
+ "microsoft.app/containerapps": {
+  "metrics": {
+   "CoresQuotaUsed": {
+    "aggregations": [
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "revisionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "podName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "GpuUtilizationPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "revisionName",
+     "podName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "MemoryPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "podName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "Replicas": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Requests": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName",
+     "podName",
+     "statusCodeCategory",
+     "statusCode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ResiliencyConnectTimeouts": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ResiliencyEjectedHosts": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ResiliencyEjectionsAborted": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ResiliencyRequestRetries": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ResiliencyRequestTimeouts": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ResiliencyRequestsPendingConnectionPool": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ResponseTime": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "statusCodeCategory",
+     "statusCode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "RestartCount": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName",
+     "podName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "RxBytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName",
+     "podName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "TotalCoresQuotaUsed": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TxBytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName",
+     "podName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "UsageNanoCores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName",
+     "podName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "NanoCores"
+   },
+   "WorkingSetBytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "revisionName",
+     "podName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.app/jobs": {
+  "metrics": {
+   "Executions": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "state",
+     "jobName",
+     "executionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "RequestedBytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "state",
+     "jobName",
+     "executionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "RequestedCores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "state",
+     "jobName",
+     "executionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Cores"
+   },
+   "RestartCount": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "state",
+     "jobName",
+     "executionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "RxBytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "state",
+     "jobName",
+     "executionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "TxBytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "state",
+     "jobName",
+     "executionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "UsageBytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "state",
+     "jobName",
+     "executionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "UsageNanoCores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "state",
+     "jobName",
+     "executionName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "NanoCores"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.app/managedenvironments": {
+  "metrics": {
+   "EnvCoresQuotaLimit": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "EnvCoresQuotaUtilization": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "IngressCpuPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "podName",
+     "nodeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "IngressMemoryPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "podName",
+     "nodeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "IngressUsageBytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "podName",
+     "nodeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "IngressUsageNanoCores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "podName",
+     "nodeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "NanoCores"
+   },
+   "NodeCount": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "workloadProfileName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.bing/accounts": {
+  "metrics": {
+   "Latency": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ApiName",
+     "ServingRegion",
+     "StatusCode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "ServerErrors": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "ServingRegion",
+     "StatusCode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TotalCalls": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "ServingRegion",
+     "StatusCode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TotalErrors": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "ServingRegion",
+     "StatusCode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "docs"
+ },
+ "microsoft.botservice/botservices": {
+  "metrics": {
+   "RequestLatency": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Operation",
+     "Authentication",
+     "Protocol",
+     "DataCenter"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "RequestsTraffic": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Operation",
+     "Authentication",
+     "Protocol",
+     "StatusCode",
+     "StatusCodeClass",
+     "DataCenter"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.cache/redis": {
+  "metrics": {
+   "allpercentprocessortime": {
+    "aggregations": [
+     "Maximum"
+    ],
+    "dimensions": [
+     "ShardId",
+     "Port",
+     "Primary"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "errors": {
+    "aggregations": [
+     "Maximum"
+    ],
+    "dimensions": [
+     "ShardId",
+     "ErrorType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "serverLoad": {
+    "aggregations": [
+     "Maximum"
+    ],
+    "dimensions": [
+     "ShardId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "usedmemorypercentage": {
+    "aggregations": [
+     "Maximum"
+    ],
+    "dimensions": [
+     "ShardId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   }
+  },
+  "source": "docs"
+ },
+ "microsoft.cognitiveservices/accounts": {
+  "metrics": {
+   "ActiveTokens": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "ServiceTierRequest",
+     "ServiceTierResponse"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AnnotatedPages": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AzureOpenAIAvailabilityRate": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "StreamType",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "AzureOpenAIContextTokensCacheMatchRate": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "AzureOpenAINormalizedTBTInMS": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "ServiceTierRequest",
+     "ServiceTierResponse"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "AzureOpenAINormalizedTTFTInMS": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "ServiceTierRequest",
+     "ServiceTierResponse"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "AzureOpenAIProvisionedManagedUtilization": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Region",
+     "StreamType",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "AzureOpenAIProvisionedManagedUtilizationV2": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Region",
+     "StreamType",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "AzureOpenAIRequests": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "StreamType",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "StatusCode",
+     "IsSpillover",
+     "ServiceTierRequest",
+     "ServiceTierResponse"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AzureOpenAITTLTInMS": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "ServiceTierRequest",
+     "ServiceTierResponse"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "AzureOpenAITimeToResponse": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "StreamType",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "StatusCode",
+     "ServiceTierRequest",
+     "ServiceTierResponse"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "AzureOpenAITokenPerSecond": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "ServiceTierRequest",
+     "ServiceTierResponse"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "BlockedCalls": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "RatelimitKey"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ClientErrors": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "RatelimitKey"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ContentSafetyImageAnalyzeRequestCount": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ContentSafetyTextAnalyzeRequestCount": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "DataIn": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "DataOut": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "FaceApiTransactions": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "FeatureName",
+     "UsageChannel",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "FineTunedTrainingHours": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "ModelDeploymentName",
+     "FeatureName",
+     "UsageChannel",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "FoundryModelEstimatedCost": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "ProjectId",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Unspecified"
+   },
+   "GeneratedImages": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GeneratedTokens": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "ModelDeploymentName",
+     "FeatureName",
+     "UsageChannel",
+     "Region",
+     "ModelVersion",
+     "ServiceTierRequest",
+     "ServiceTierResponse"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "InputTokens": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Latency": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "RatelimitKey"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "ModelAvailabilityRate": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "ModelRequests": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "StreamType",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "StatusCode",
+     "IsSpillover",
+     "ServiceTierRequest",
+     "ServiceTierResponse"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ModelRouterFallbackCount": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ModelDeploymentName",
+     "ModelName",
+     "Region",
+     "RouterMode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ModelRouterLatency": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ModelDeploymentName",
+     "ModelName",
+     "Region",
+     "RouterMode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "ModelRouterRequests": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ModelDeploymentName",
+     "ModelName",
+     "Region",
+     "RouterMode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ModelRouterSourceModelFallback": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ModelDeploymentName",
+     "ModelName",
+     "Region",
+     "RouterMode",
+     "SourceModelName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ModelRouterSuccessfulRequests": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ModelDeploymentName",
+     "ModelName",
+     "Region",
+     "RouterMode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "NormalizedTimeBetweenTokens": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "StreamType",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "NormalizedTimeToFirstToken": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "StreamType",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "OneDocumentCharactersTranslated": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "FeatureName",
+     "UsageChannel",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "OneDocumentCustomCharactersTranslated": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "FeatureName",
+     "UsageChannel",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "OutputTokens": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ProcessedAudioMinutes": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "FeatureName",
+     "UsageChannel",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ProcessedDocumentPages": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "FeatureName",
+     "UsageChannel",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ProcessedImageCount": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "FeatureName",
+     "UsageChannel",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ProcessedPromptTokens": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "ModelDeploymentName",
+     "FeatureName",
+     "UsageChannel",
+     "Region",
+     "ModelVersion",
+     "ServiceTierRequest",
+     "ServiceTierResponse"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ProcessedVideoMinutes": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "FeatureName",
+     "UsageChannel",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ProvisionedUtilization": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "RAIHarmfulRequests": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "ApiName",
+     "TextType",
+     "Category",
+     "Severity"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "RAIRejectedRequests": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "ApiName",
+     "TextType",
+     "Category"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "RAISystemEvent": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Region",
+     "EventType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "RAITotalRequests": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "ApiName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Ratelimit": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Region",
+     "RatelimitKey"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "RealtimeUsageTime": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Region",
+     "ModelDeploymentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ServerErrors": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "RatelimitKey"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "SuccessRate": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "RatelimitKey"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "SuccessfulCalls": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "RatelimitKey"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TimeToLastByte": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "StreamType",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "TimeToResponse": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "StreamType",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "StatusCode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "TokenTransaction": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "ModelDeploymentName",
+     "FeatureName",
+     "UsageChannel",
+     "Region",
+     "ModelVersion",
+     "ServiceTierRequest",
+     "ServiceTierResponse"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Tokens": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "FeatureName",
+     "UsageChannel",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TokensPerSecond": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "StreamType",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TotalCalls": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "RatelimitKey"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TotalErrors": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region",
+     "RatelimitKey"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TotalPages": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TotalTokenCalls": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "OperationName",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TotalTokens": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "cacheReadInputTokens": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "ContextLength"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ephemeral1hInputTokens": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "ContextLength"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ephemeral5mInputTokens": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "Region",
+     "ModelDeploymentName",
+     "ModelName",
+     "ModelVersion",
+     "ContextLength"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.cognitiveservices/accounts/projects": {
+  "metrics": {
+   "AgentEvents": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "EventType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentInputTokens": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "AgentId",
+     "ModelName",
+     "TokenType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentMessages": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "EventType",
+     "ThreadId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentModelCacheReadTokens": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "AgentName",
+     "AgentVersion",
+     "ModelDeploymentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentModelCacheWriteTokens": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "AgentName",
+     "AgentVersion",
+     "ModelDeploymentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentModelEstimatedCost": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "AgentName",
+     "AgentVersion",
+     "ModelDeploymentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Unspecified"
+   },
+   "AgentModelOutputTokens": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "AgentName",
+     "AgentVersion",
+     "ModelDeploymentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentModelUncachedInputTokens": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "AgentName",
+     "AgentVersion",
+     "ModelDeploymentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentOutputTokens": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "AgentId",
+     "ModelName",
+     "TokenType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentResponses": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "AgentId",
+     "ModelName",
+     "ResponseStatus"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentRuns": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "AgentId",
+     "ModelName",
+     "RunStatus",
+     "StatusCode",
+     "ThreadId",
+     "StreamType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentThreads": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "EventType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentToolCalls": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "AgentId",
+     "ModelName",
+     "ToolName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentUsageIndexedFiles": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "ErrorCode",
+     "Status",
+     "VectorStoreId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentsHostedMemoryUsage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "AgentId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AgentsHostedvCPUUsage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "AgentId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CosmosDbRequestUnits": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "ContainerName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CosmosDbThrottledRequests": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "ContainerName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuCapacityMillicores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "Region",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuMemoryCapacityMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "Region",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuMemoryUtilizationMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "Region",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuMemoryUtilizationPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "Region",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuUtilization": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "runId",
+     "Region",
+     "NodeId",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuUtilizationMillicores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "Region",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuUtilizationPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "Region",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "DiskAvailMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "DiskReadMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "DiskUsedMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "DiskWriteMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuCapacityMilliGPUs": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "Region",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuEnergyJoules": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "runId",
+     "rootRunId",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuMemoryCapacityMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "Region",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuMemoryUtilization": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "runId",
+     "NodeId",
+     "DeviceId",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuMemoryUtilizationMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "Region",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuMemoryUtilizationPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "Region",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuUtilization": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "runId",
+     "NodeId",
+     "DeviceId",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuUtilizationMilliGPUs": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "Region",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuUtilizationPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "Region",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "IBReceiveMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName",
+     "DeviceId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "IBTransmitMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName",
+     "DeviceId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "NetworkInputMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName",
+     "DeviceId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "NetworkOutputMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName",
+     "DeviceId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "SearchRetrievalRequests": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "ResourceType",
+     "IndexName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "SearchStoragePerKnowledgeBase": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "IndexName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "StorageAPIFailureCount": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "StorageAPISuccessCount": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ToolboxCallToolCalls": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "ToolboxName",
+     "ToolboxVersion",
+     "Status"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ToolboxToolSearchCalls": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "ToolboxName",
+     "ToolboxVersion",
+     "Status"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ToolboxToolSearchEnabled": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "ToolboxName",
+     "ToolboxVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ToolboxToolSearchResults": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "ToolboxName",
+     "ToolboxVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ToolboxToolsDeferred": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "ToolboxName",
+     "ToolboxVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ToolboxToolsVisible": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "ToolboxName",
+     "ToolboxVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.compute/virtualmachines": {
+  "metrics": {
+   "Available Memory Bytes": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "Available Memory Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "CPU Credits Consumed": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CPU Credits Remaining": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Data Disk Bandwidth Consumed Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "Data Disk IOPS Consumed Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "Data Disk Latency": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "Data Disk Max Burst Bandwidth": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Data Disk Max Burst IOPS": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Data Disk Queue Depth": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Data Disk Read Bytes/sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "BytesPerSecond"
+   },
+   "Data Disk Read Operations/Sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "Data Disk Target Bandwidth": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Data Disk Target IOPS": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Data Disk Used Burst BPS Credits Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "Data Disk Used Burst IO Credits Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "Data Disk Write Bytes/sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "BytesPerSecond"
+   },
+   "Data Disk Write Operations/Sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "Disk Read Bytes": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "Disk Read Operations/Sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "Disk Write Bytes": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "Disk Write Operations/Sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "Inbound Flows": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Inbound Flows Maximum Creation Rate": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "Network In": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "Network In Total": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "Network Out": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "Network Out Total": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "OS Disk Bandwidth Consumed Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "OS Disk IOPS Consumed Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "OS Disk Latency": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "OS Disk Max Burst Bandwidth": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "OS Disk Max Burst IOPS": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "OS Disk Queue Depth": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "OS Disk Read Bytes/sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "BytesPerSecond"
+   },
+   "OS Disk Read Operations/Sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "OS Disk Target Bandwidth": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "OS Disk Target IOPS": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "OS Disk Used Burst BPS Credits Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "OS Disk Used Burst IO Credits Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "OS Disk Write Bytes/sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "BytesPerSecond"
+   },
+   "OS Disk Write Operations/Sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "Outbound Flows": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Outbound Flows Maximum Creation Rate": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "Percentage CPU": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "Premium Data Disk Cache Read Hit": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "Premium Data Disk Cache Read Miss": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LUN"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "Premium OS Disk Cache Read Hit": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "Premium OS Disk Cache Read Miss": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "Temp Disk Latency": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "Temp Disk Queue Depth": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Temp Disk Read Bytes/sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "BytesPerSecond"
+   },
+   "Temp Disk Read Operations/Sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "Temp Disk Write Bytes/sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "BytesPerSecond"
+   },
+   "Temp Disk Write Operations/Sec": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "VM Cached Bandwidth Consumed Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "VM Cached IOPS Consumed Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "VM Local Used Burst BPS Credits Percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "VM Local Used Burst IO Credits Percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "VM Remote Used Burst BPS Credits Percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "VM Remote Used Burst IO Credits Percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "VM Uncached Bandwidth Consumed Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "VM Uncached IOPS Consumed Percentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "VmAvailabilityMetric": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Context"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.containerregistry/registries": {
+  "metrics": {
+   "AgentPoolCPUTime": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Seconds"
+   },
+   "DataTransfer": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "RunDuration": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "StorageUsed": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "Geolocation"
+    ],
+    "timeGrains": [
+     "PT1H"
+    ],
+    "unit": "Bytes"
+   },
+   "SuccessfulPullCount": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "SuccessfulPushCount": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TotalPullCount": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TotalPushCount": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Transactions": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "ApiName",
+     "ResponseType",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.containerservice/managedclusters": {
+  "metrics": {
+   "apiserver_cpu_usage_percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Percent"
+   },
+   "apiserver_current_inflight_requests": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [
+     "requestKind"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Count"
+   },
+   "apiserver_flowcontrol_executing_seats": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [
+     "priority_level"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Count"
+   },
+   "apiserver_memory_usage_percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Percent"
+   },
+   "cluster_autoscaler_cluster_safe_to_autoscale": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Count"
+   },
+   "cluster_autoscaler_scale_down_in_cooldown": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Count"
+   },
+   "cluster_autoscaler_unneeded_nodes_count": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Count"
+   },
+   "cluster_autoscaler_unschedulable_pods_count": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Count"
+   },
+   "etcd_cpu_usage_percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "partition"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Percent"
+   },
+   "etcd_database_usage_percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "partition"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Percent"
+   },
+   "etcd_memory_usage_percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "partition"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Percent"
+   },
+   "kube_node_status_allocatable_cpu_cores": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Count"
+   },
+   "kube_node_status_allocatable_memory_bytes": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Bytes"
+   },
+   "kube_node_status_condition": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [
+     "condition",
+     "status",
+     "status2",
+     "node"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Count"
+   },
+   "kube_pod_status_phase": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [
+     "phase",
+     "namespace",
+     "pod"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Count"
+   },
+   "kube_pod_status_ready": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [
+     "namespace",
+     "pod",
+     "condition"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Count"
+   },
+   "node_cpu_usage_millicores": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "node",
+     "nodepool"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "MilliCores"
+   },
+   "node_cpu_usage_percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "node",
+     "nodepool"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Percent"
+   },
+   "node_disk_usage_bytes": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "node",
+     "nodepool",
+     "device"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Bytes"
+   },
+   "node_disk_usage_percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "node",
+     "nodepool",
+     "device"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Percent"
+   },
+   "node_memory_rss_bytes": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "node",
+     "nodepool"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Bytes"
+   },
+   "node_memory_rss_percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "node",
+     "nodepool"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Percent"
+   },
+   "node_memory_working_set_bytes": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "node",
+     "nodepool"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Bytes"
+   },
+   "node_memory_working_set_percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "node",
+     "nodepool"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Percent"
+   },
+   "node_network_in_bytes": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "node",
+     "nodepool"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Bytes"
+   },
+   "node_network_out_bytes": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "node",
+     "nodepool"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "Bytes"
+   },
+   "scheduler_schedule_attempts_rate": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "result"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H"
+    ],
+    "unit": "CountPerSecond"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.databricks/workspaces": {
+  "metrics": {},
+  "source": "live"
+ },
+ "microsoft.datafactory/factories": {
+  "metrics": {
+   "ActivityCancelledRuns": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ActivityType",
+     "PipelineName",
+     "FailureType",
+     "Name"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ActivityFailedRuns": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ActivityType",
+     "PipelineName",
+     "FailureType",
+     "Name"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ActivitySucceededRuns": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ActivityType",
+     "PipelineName",
+     "FailureType",
+     "Name"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "FactorySizeInGbUnits": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "IntegrationRuntimeAvailableMemory": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "IntegrationRuntimeName",
+     "NodeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "IntegrationRuntimeAvailableNodeNumber": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "IntegrationRuntimeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "IntegrationRuntimeAverageTaskPickupDelay": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "IntegrationRuntimeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Seconds"
+   },
+   "IntegrationRuntimeCpuPercentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "IntegrationRuntimeName",
+     "NodeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "IntegrationRuntimeQueueLength": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "IntegrationRuntimeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "MaxAllowedFactorySizeInGbUnits": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "MaxAllowedResourceCount": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "PipelineCancelledRuns": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "FailureType",
+     "CancelledBy",
+     "Name"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "PipelineElapsedTimeRuns": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "Name"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "PipelineFailedRuns": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "FailureType",
+     "Name"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "PipelineSucceededRuns": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "FailureType",
+     "Name"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ResourceCount": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TriggerCancelledRuns": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Name",
+     "FailureType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TriggerFailedRuns": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Name",
+     "FailureType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TriggerSucceededRuns": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Name",
+     "FailureType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.dbforpostgresql/flexibleservers": {
+  "metrics": {
+   "active_connections": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ServerName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "connections_failed": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "ServerName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "cpu_percent": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ServerName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "is_db_alive": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ServerName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "memory_percent": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ServerName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "storage_percent": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "ServerName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   }
+  },
+  "source": "docs"
+ },
+ "microsoft.documentdb/databaseaccounts": {
+  "metrics": {
+   "AddRegion": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AutoscaleMaxThroughput": {
+    "aggregations": [
+     "Maximum"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AutoscaledRU": {
+    "aggregations": [
+     "Maximum"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName",
+     "PhysicalPartitionId",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "AvailableStorage": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [
+     "CollectionName",
+     "DatabaseName",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "BackupModeUpdate": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "BackupMode"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "BackupPolicyIntervalUpdate": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "BackupIntervalInHours"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "BackupPolicyRedundancyUpdate": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "BackupRedundancy"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "BackupPolicyRetentionUpdate": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "BackupRetentionIntervalInHours"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "BackupPolicyUpdate": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "BackupPolicy"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ContinuousTierUpdate": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "ContinuousBackupTier"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CreateAccount": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "DataUsage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "CollectionName",
+     "DatabaseName",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "DataUsageV2": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "CollectionName",
+     "DatabaseName",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "DedicatedGatewayAverageCPUUsage": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "DedicatedGatewayAverageMemoryUsage": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "DedicatedGatewayCPUUsage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "DedicatedGatewayMaximumCPUUsage": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "DedicatedGatewayMemoryUsage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "DedicatedGatewayRequests": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName",
+     "CacheExercised",
+     "OperationName",
+     "Region",
+     "CacheHit"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "DeleteAccount": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GlobalSecondaryIndexCatchupGapInMinutes": {
+    "aggregations": [
+     "Maximum"
+    ],
+    "dimensions": [
+     "Region",
+     "TargetContainerName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GlobalSecondaryIndexPropagationLatencyInSeconds": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "Region",
+     "TargetContainerName",
+     "TargetContainerStatus"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "IndexUsage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "CollectionName",
+     "DatabaseName",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "IndexUsageV2": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "CollectionName",
+     "DatabaseName",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "IntegratedCacheEvictedEntriesSize": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "IntegratedCacheItemExpirationCount": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "IntegratedCacheItemHitRate": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "IntegratedCacheQueryExpirationCount": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "IntegratedCacheQueryHitRate": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "MetadataRequests": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName",
+     "Region",
+     "StatusCode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "NormalizedRUConsumption": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "CollectionName",
+     "DatabaseName",
+     "Region",
+     "PartitionKeyRangeId",
+     "CollectionRid",
+     "PhysicalPartitionId",
+     "OfferOwnerRid"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "OfflineRegion": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "Region",
+     "StatusCode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "OnlineRegion": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "Region",
+     "StatusCode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "PartitionGlobalWriteStatus": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "WriteStatus",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "PhysicalPartitionCount": {
+    "aggregations": [
+     "Maximum"
+    ],
+    "dimensions": [
+     "CollectionName",
+     "DatabaseName",
+     "IsSharedThroughputOffer",
+     "OfferOwnerRid",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "PhysicalPartitionSizeInfo": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [
+     "CollectionName",
+     "DatabaseName",
+     "PhysicalPartitionId",
+     "OfferOwnerRid",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "PhysicalPartitionThroughputInfo": {
+    "aggregations": [
+     "Maximum"
+    ],
+    "dimensions": [
+     "CollectionName",
+     "DatabaseName",
+     "PhysicalPartitionId",
+     "OfferOwnerRid",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ProvisionedThroughput": {
+    "aggregations": [
+     "Maximum"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName",
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "RegionFailover": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "RemoveRegion": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "Region"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ReplicationLatency": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "SourceRegion",
+     "TargetRegion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "ServerSideLatency": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName",
+     "Region",
+     "ConnectionMode",
+     "OperationType",
+     "PublicAPIType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "ServerSideLatencyDirect": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName",
+     "Region",
+     "OperationType",
+     "PublicAPIType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "ServerSideLatencyGateway": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName",
+     "Region",
+     "OperationType",
+     "PublicAPIType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "ServiceAvailability": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "SqlContainerCreate": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "ResourceName",
+     "ChildResourceName"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "SqlContainerDelete": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "ResourceName",
+     "ChildResourceName"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "SqlContainerThroughputUpdate": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "ResourceName",
+     "ChildResourceName"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "SqlContainerUpdate": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "ResourceName",
+     "ChildResourceName"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "SqlDatabaseCreate": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "ResourceName"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "SqlDatabaseDelete": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "ResourceName"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "SqlDatabaseThroughputUpdate": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "ResourceName"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "SqlDatabaseUpdate": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "ResourceName"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ThrottledRequestPercentage": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName",
+     "Region",
+     "OperationType",
+     "Status",
+     "CapacityType",
+     "PriorityLevel",
+     "ConnectionMode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "TotalRequestUnits": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Total"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName",
+     "Region",
+     "StatusCode",
+     "OperationType",
+     "Status",
+     "CapacityType",
+     "PriorityLevel"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TotalRequestUnitsPreview": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Total"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName",
+     "Region",
+     "StatusCode",
+     "OperationType",
+     "Status",
+     "CapacityType",
+     "PriorityLevel",
+     "ThroughputBucket"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TotalRequests": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName",
+     "Region",
+     "StatusCode",
+     "OperationType",
+     "Status",
+     "CapacityType",
+     "PriorityLevel",
+     "ConnectionMode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TotalRequestsPreview": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "DatabaseName",
+     "CollectionName",
+     "Region",
+     "StatusCode",
+     "OperationType",
+     "Status",
+     "PriorityLevel",
+     "ThroughputBucket"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "UpdateAccountKeys": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "KeyType"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "UpdateAccountNetworkSettings": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "UpdateAccountReplicationSettings": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "UpdateDiagnosticsSettings": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "DiagnosticSettingsName",
+     "ResourceGroupName"
+    ],
+    "timeGrains": [
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.eventhub/namespaces": {
+  "metrics": {
+   "IncomingMessages": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "EntityName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "NamespaceCpuUsage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Replica"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "ServerErrors": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "EntityName",
+     "OperationResult"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ThrottledRequests": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "EntityName",
+     "OperationResult"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "UserErrors": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "EntityName",
+     "OperationResult"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "docs"
+ },
+ "microsoft.insights/components": {
+  "metrics": {
+   "availabilityResults/availabilityPercentage": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "availabilityResult/name",
+     "availabilityResult/location"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "availabilityResults/count": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "availabilityResult/name",
+     "availabilityResult/location",
+     "availabilityResult/success"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "availabilityResults/duration": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "availabilityResult/name",
+     "availabilityResult/location",
+     "availabilityResult/success"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "browserTimings/networkDuration": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "browserTimings/processingDuration": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "browserTimings/receiveDuration": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "browserTimings/sendDuration": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "browserTimings/totalDuration": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "dependencies/count": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "dependency/type",
+     "dependency/performanceBucket",
+     "dependency/success",
+     "dependency/target",
+     "dependency/resultCode",
+     "operation/synthetic",
+     "cloud/roleInstance",
+     "cloud/roleName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "dependencies/duration": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "dependency/type",
+     "dependency/performanceBucket",
+     "dependency/success",
+     "dependency/target",
+     "dependency/resultCode",
+     "operation/synthetic",
+     "cloud/roleInstance",
+     "cloud/roleName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "dependencies/failed": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "dependency/type",
+     "dependency/performanceBucket",
+     "dependency/target",
+     "dependency/resultCode",
+     "operation/synthetic",
+     "cloud/roleInstance",
+     "cloud/roleName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "exceptions/browser": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "cloud/roleName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "exceptions/count": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "cloud/roleName",
+     "cloud/roleInstance",
+     "client/type"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "exceptions/server": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "cloud/roleName",
+     "cloud/roleInstance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "pageViews/count": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "operation/synthetic",
+     "cloud/roleName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "pageViews/duration": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "operation/synthetic",
+     "cloud/roleName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "performanceCounters/exceptionsPerSecond": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "cloud/roleInstance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "performanceCounters/memoryAvailableBytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "cloud/roleInstance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "performanceCounters/processCpuPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "cloud/roleInstance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "performanceCounters/processIOBytesPerSecond": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "cloud/roleInstance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "BytesPerSecond"
+   },
+   "performanceCounters/processPrivateBytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "cloud/roleInstance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "performanceCounters/processorCpuPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "cloud/roleInstance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "performanceCounters/requestExecutionTime": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "cloud/roleInstance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "performanceCounters/requestsInQueue": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "cloud/roleInstance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "performanceCounters/requestsPerSecond": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "cloud/roleInstance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "requests/count": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "request/performanceBucket",
+     "request/resultCode",
+     "operation/synthetic",
+     "cloud/roleInstance",
+     "request/success",
+     "cloud/roleName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "requests/duration": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "request/performanceBucket",
+     "request/resultCode",
+     "operation/synthetic",
+     "cloud/roleInstance",
+     "request/success",
+     "cloud/roleName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "requests/failed": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "request/performanceBucket",
+     "request/resultCode",
+     "operation/synthetic",
+     "cloud/roleInstance",
+     "cloud/roleName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "requests/rate": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "request/performanceBucket",
+     "request/resultCode",
+     "operation/synthetic",
+     "cloud/roleInstance",
+     "request/success",
+     "cloud/roleName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "traces/count": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "trace/severityLevel",
+     "operation/synthetic",
+     "cloud/roleName",
+     "cloud/roleInstance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.keyvault/vaults": {
+  "metrics": {
+   "Availability": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ActivityType",
+     "ActivityName",
+     "StatusCode",
+     "StatusCodeClass"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "SaturationShoebox": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "ActivityType",
+     "ActivityName",
+     "TransactionType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "ServiceApiHit": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ActivityType",
+     "ActivityName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ServiceApiLatency": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ActivityType",
+     "ActivityName",
+     "StatusCode",
+     "StatusCodeClass"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "ServiceApiResult": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "ActivityType",
+     "ActivityName",
+     "StatusCode",
+     "StatusCodeClass"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.logic/workflows": {
+  "metrics": {
+   "ActionsFailed": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "RunFailurePercentage": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "RunsFailed": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "RunsSucceeded": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "TriggersFailed": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "docs"
+ },
+ "microsoft.machinelearningservices/workspaces": {
+  "metrics": {
+   "Active Cores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Active Nodes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Agents": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "EventType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Cancel Requested Runs": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "RunType",
+     "PublishedPipelineId",
+     "ComputeType",
+     "PipelineStepType",
+     "ExperimentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Cancelled Runs": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "RunType",
+     "PublishedPipelineId",
+     "ComputeType",
+     "PipelineStepType",
+     "ExperimentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Completed Runs": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "RunType",
+     "PublishedPipelineId",
+     "ComputeType",
+     "PipelineStepType",
+     "ExperimentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuCapacityMillicores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuMemoryCapacityMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuMemoryUtilizationMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuMemoryUtilizationPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuUtilization": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "runId",
+     "NodeId",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuUtilizationMillicores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "CpuUtilizationPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "DiskAvailMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "DiskReadMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "DiskUsedMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "DiskWriteMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Errors": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Failed Runs": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "RunType",
+     "PublishedPipelineId",
+     "ComputeType",
+     "PipelineStepType",
+     "ExperimentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Finalizing Runs": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "RunType",
+     "PublishedPipelineId",
+     "ComputeType",
+     "PipelineStepType",
+     "ExperimentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuCapacityMilliGPUs": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuEnergyJoules": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "runId",
+     "rootRunId",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuMemoryCapacityMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuMemoryUtilization": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "runId",
+     "NodeId",
+     "DeviceId",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuMemoryUtilizationMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuMemoryUtilizationPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuUtilization": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "runId",
+     "NodeId",
+     "DeviceId",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuUtilizationMilliGPUs": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "GpuUtilizationPercentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "DeviceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "IBReceiveMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName",
+     "DeviceId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "IBTransmitMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName",
+     "DeviceId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Idle Cores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Idle Nodes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "IndexedFiles": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "ErrorCode",
+     "Status",
+     "VectorStoreId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Leaving Cores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Leaving Nodes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Messages": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "EventType",
+     "ThreadId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Model Deploy Failed": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "StatusCode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Model Deploy Started": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Model Deploy Succeeded": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Model Register Failed": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "StatusCode"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Model Register Succeeded": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "NetworkInputMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName",
+     "DeviceId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "NetworkOutputMegabytes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName",
+     "DeviceId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Not Responding Runs": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "RunType",
+     "PublishedPipelineId",
+     "ComputeType",
+     "PipelineStepType",
+     "ExperimentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Not Started Runs": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "RunType",
+     "PublishedPipelineId",
+     "ComputeType",
+     "PipelineStepType",
+     "ExperimentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Preempted Cores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Preempted Nodes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Preparing Runs": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "RunType",
+     "PublishedPipelineId",
+     "ComputeType",
+     "PipelineStepType",
+     "ExperimentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Provisioning Runs": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "RunType",
+     "PublishedPipelineId",
+     "ComputeType",
+     "PipelineStepType",
+     "ExperimentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Queued Runs": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "RunType",
+     "PublishedPipelineId",
+     "ComputeType",
+     "PipelineStepType",
+     "ExperimentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Quota Utilization Percentage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName",
+     "VmFamilyName",
+     "VmPriority"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Runs": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "AgentId",
+     "RunStatus",
+     "StatusCode",
+     "StreamType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Started Runs": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "RunType",
+     "PublishedPipelineId",
+     "ComputeType",
+     "PipelineStepType",
+     "ExperimentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Starting Runs": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "RunType",
+     "PublishedPipelineId",
+     "ComputeType",
+     "PipelineStepType",
+     "ExperimentName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "StorageAPIFailureCount": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "StorageAPISuccessCount": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "RunId",
+     "InstanceId",
+     "ComputeName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Threads": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "EventType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Tokens": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "AgentId",
+     "TokenType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ToolCalls": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "AgentId",
+     "ToolName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Total Cores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Total Nodes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Unusable Cores": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Unusable Nodes": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario",
+     "ClusterName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Warnings": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "Scenario"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.operationalinsights/workspaces": {
+  "metrics": {
+   "AvailabilityRate_Query": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "BytesExported": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LogAnalyticsDataExportDestinationType",
+     "LogAnalyticsDataExportRuleName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "Event": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Source",
+     "EventLog",
+     "Computer",
+     "EventCategory",
+     "EventLevel",
+     "EventLevelName",
+     "EventID"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ExportFailed": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LogAnalyticsDataExportDestinationType",
+     "LogAnalyticsDataExportRuleName",
+     "LogAnalyticsDataExportErrorType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Heartbeat": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Computer",
+     "OSType",
+     "Version",
+     "SourceComputerId"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Ingestion Time": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "Table Name"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Seconds"
+   },
+   "Ingestion Volume": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [
+     "Table Name"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Query Count": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Query Failure Count": {
+    "aggregations": [
+     "Count"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "RecordsExported": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "LogAnalyticsDataExportDestinationType",
+     "LogAnalyticsDataExportRuleName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Update": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [
+     "Computer",
+     "Product",
+     "Classification",
+     "UpdateState",
+     "Optional",
+     "Approved"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.search/searchservices": {
+  "metrics": {
+   "IndexStorageUsage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "IndexName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "IndexVectorUsage": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "IndexName"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "PerRequestComputeConsumption": {
+    "aggregations": [
+     "Average",
+     "Total"
+    ],
+    "dimensions": [
+     "Status",
+     "IndexName",
+     "EventType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "SearchLatency": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Seconds"
+   },
+   "SearchQueriesPerSecond": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "CountPerSecond"
+   },
+   "SkillExecutionCount": {
+    "aggregations": [
+     "Count",
+     "Total"
+    ],
+    "dimensions": [
+     "DataSourceName",
+     "Failed",
+     "IndexerName",
+     "SkillName",
+     "SkillsetName",
+     "SkillType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "ThrottledSearchQueriesPercentage": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "None",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.sql/servers/databases": {
+  "metrics": {
+   "availability": {
+    "aggregations": [
+     "Average",
+     "Count",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "connection_failed": {
+    "aggregations": [
+     "Count",
+     "Total"
+    ],
+    "dimensions": [
+     "Error",
+     "ValidatedDriverNameAndVersion"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "cpu_percent": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "deadlock": {
+    "aggregations": [
+     "Count",
+     "Total"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "storage_percent": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "workers_percent": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   }
+  },
+  "source": "docs"
+ },
+ "microsoft.storage/storageaccounts": {
+  "metrics": {
+   "Availability": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "GeoType",
+     "ApiName",
+     "Authentication"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "Egress": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "GeoType",
+     "ApiName",
+     "Authentication"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "Ingress": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum",
+     "Total"
+    ],
+    "dimensions": [
+     "GeoType",
+     "ApiName",
+     "Authentication"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   },
+   "MigrationProgress": {
+    "aggregations": [
+     "Average",
+     "Maximum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Percent"
+   },
+   "ReplicationLagSeconds": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Seconds"
+   },
+   "SuccessE2ELatency": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "GeoType",
+     "ApiName",
+     "Authentication"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "SuccessServerLatency": {
+    "aggregations": [
+     "Average",
+     "Maximum",
+     "Minimum"
+    ],
+    "dimensions": [
+     "GeoType",
+     "ApiName",
+     "Authentication"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "MilliSeconds"
+   },
+   "Transactions": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "ResponseType",
+     "GeoType",
+     "ApiName",
+     "Authentication",
+     "TransactionType"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "UsedCapacity": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [],
+    "timeGrains": [
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Bytes"
+   }
+  },
+  "source": "live"
+ },
+ "microsoft.web/sites": {
+  "metrics": {
+   "FunctionExecutionCount": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "Instance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "HealthCheckStatus": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "Instance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "Http5xx": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "Instance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   },
+   "HttpResponseTime": {
+    "aggregations": [
+     "Average"
+    ],
+    "dimensions": [
+     "Instance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Seconds"
+   },
+   "Requests": {
+    "aggregations": [
+     "Total"
+    ],
+    "dimensions": [
+     "Instance"
+    ],
+    "timeGrains": [
+     "PT1M",
+     "PT5M",
+     "PT15M",
+     "PT30M",
+     "PT1H",
+     "PT6H",
+     "PT12H",
+     "P1D"
+    ],
+    "unit": "Count"
+   }
+  },
+  "source": "docs"
+ }
+}

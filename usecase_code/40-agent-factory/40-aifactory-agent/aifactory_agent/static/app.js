@@ -28,11 +28,16 @@
     proposalMessage: "",
     refreshing: false,
     operations: [],
+    skills: [],
+    skillBusy: false,
   };
   const statusLabels = {
     pending: "Pending review — not approved or executed",
     approved: "Approved — execution not started",
     executing: "Executing — completion not confirmed",
+    continuing: "Continuing approved workflow — completion not confirmed",
+    running: "Factory job running — completion not confirmed",
+    awaiting_continuation: "Factory workflow paused — completion not confirmed",
     succeeded: "Succeeded — backend confirmed completion",
     failed: "Failed — no successful completion confirmed",
     uncertain: "Uncertain — completion unknown; do not retry",
@@ -82,6 +87,8 @@
     state.expiresAt = 0;
     state.context = null;
     state.operations = [];
+    state.skills = [];
+    state.skillBusy = false;
     state.busy = false;
     state.proposalBusy = false;
     state.proposalMessage = "";
@@ -98,6 +105,9 @@
     ui("question-count").textContent = "0 / 8000 characters";
     ui("department-name").value = "";
     ui("department-id").value = "";
+    ui("skill-result").replaceChildren();
+    ui("template-result").replaceChildren();
+    renderSkills();
     updateControls();
   }
 
@@ -121,6 +131,13 @@
     ui("proposal-status").textContent = blocker || (state.proposalBusy
       ? "Preparing a scoped preview; no approval or execution has been requested."
       : state.proposalMessage || "Ready to request a pending plan. The server will verify the exact target and existing API/storage availability.");
+    const skill = selectedSkill();
+    ui("skill-selector").disabled = !authenticated || !state.skills.length || state.skillBusy;
+    ui("discover-templates").disabled = !authenticated || !permitted("factory.read") || state.skillBusy;
+    ui("run-skill").disabled = !skill || skill.available !== true || state.skillBusy;
+    ui("run-skill").textContent = state.skillBusy ? "Waiting for the backend…"
+      : !skill ? "Choose a skill" : skill.kind === "action" ? "Prepare plan · do not execute"
+        : skill.kind === "diagnostic" ? "Read Factory status" : "Read cost report";
     for (const audience of ["platform", "project"]) {
       const selected = audience === state.audience;
       ui("view-" + audience).setAttribute("aria-pressed", String(selected));
@@ -437,12 +454,141 @@
     return element;
   }
 
-  async function operate(operation, action, button, hash) {
+  function selectedSkill() {
+    return state.skills.find((skill) => skill.name === ui("skill-selector").value);
+  }
+
+  function renderSkills() {
+    const selected = ui("skill-selector").value;
+    ui("skill-selector").replaceChildren(...state.skills.map((skill) => {
+      const option = node("option", skill.label);
+      option.value = skill.name;
+      return option;
+    }));
+    if (!state.skills.length) ui("skill-selector").append(node("option", "No skills loaded for this scope"));
+    if (state.skills.some((skill) => skill.name === selected)) ui("skill-selector").value = selected;
+    renderSkillArguments();
+  }
+
+  function renderSkillArguments() {
+    ui("skill-arguments").replaceChildren();
+    const skill = selectedSkill();
+    ui("skill-description").textContent = skill ? skill.command : "";
+    if (!skill) {
+      ui("skill-status").textContent = "Sign in and select an authorized scope.";
+      return;
+    }
+    const schema = skill.arguments_schema || {};
+    for (const [key, definition] of Object.entries(schema.properties || {})) {
+      const types = definition.anyOf || [definition];
+      const typed = types.find((item) => item.type && item.type !== "null") || definition;
+      let input;
+      if (typed.enum) {
+        input = node("select");
+        for (const value of typed.enum) {
+          const option = node("option", value);
+          option.value = value;
+          input.append(option);
+        }
+      } else {
+        input = node("input");
+        input.type = typed.type === "boolean" ? "checkbox"
+          : ["integer", "number"].includes(typed.type) ? "number" : "text";
+        if (typed.maxLength) input.maxLength = typed.maxLength;
+        if (typed.minimum !== undefined) input.min = String(typed.minimum);
+        if (typed.maximum !== undefined) input.max = String(typed.maximum);
+        input.autocomplete = "off";
+      }
+      input.id = "skill-arg-" + key;
+      input.dataset.argument = key;
+      input.dataset.valueType = typed.type || "string";
+      input.required = (schema.required || []).includes(key) && typed.type !== "boolean";
+      input.disabled = skill.available !== true;
+      if (definition.default !== undefined && definition.default !== null) {
+        if (typed.type === "boolean") input.checked = definition.default;
+        else input.value = String(definition.default);
+      }
+      const label = node("label", definition.title || key.replace(/_/g, " "));
+      label.htmlFor = input.id;
+      ui("skill-arguments").append(label, input);
+      if (definition.description) ui("skill-arguments").append(node("p", definition.description, "muted"));
+    }
+    ui("skill-status").textContent = skill.available
+      ? skill.kind === "action" ? "Ready to prepare a scoped plan. Approval and execution are separate."
+        : skill.kind === "diagnostic" ? "Ready for a read-only Factory observation."
+          : "Ready for read-only analysis. Unknown prices and missing billing data are not zero cost."
+      : "Blocked: " + (skill.blockers || []).join(", ") + ". Ask the deployment operator to finish the scoped setup.";
+  }
+
+  async function runSkill(event) {
+    event.preventDefault();
+    const skill = selectedSkill();
+    if (!skill || skill.available !== true || state.skillBusy) return;
+    const args = {};
+    for (const key of Object.keys(skill.arguments_schema?.properties || {})) {
+      const input = ui("skill-arg-" + key);
+      if (input.dataset.valueType === "boolean") args[key] = input.checked;
+      else if (["integer", "number"].includes(input.dataset.valueType)) {
+        if (input.value !== "") args[key] = Number(input.value);
+      } else if (input.value.trim() !== "") args[key] = input.value.trim();
+    }
+    const scopeKey = state.scopeKey;
+    state.skillBusy = true;
+    showError("");
+    ui("skill-result").replaceChildren();
+    updateControls();
+    try {
+      const route = skill.kind === "action" ? "propose" : "run";
+      const result = await api("/api/skills/" + encodeURIComponent(skill.name) + "/" + route, {
+        method: "POST", body: {scope_key: scopeKey, arguments: args},
+      });
+      if (scopeKey !== state.scopeKey) return;
+      if (skill.kind === "action") {
+        state.operations = state.operations.filter((item) => item.id !== result.id).concat(result);
+        ui("skill-status").textContent = "Pending plan saved: " + result.id + ". Review below; it is not approved or executed.";
+        renderOperations();
+      } else {
+        ui("skill-status").textContent = skill.kind === "diagnostic" ? "Read-only Factory observation received."
+          : "Read-only cost analysis received. Estimates, actual charges and forecasts have different bases.";
+        ui("skill-result").append(details(skill.kind === "diagnostic" ? "Factory observation"
+          : "Cost analysis, sources, assumptions and coverage", result.data || result));
+      }
+    } catch (error) {
+      showError(error.message);
+      ui("skill-status").textContent = "No new result confirmed. Inspect saved plans before submitting an action again.";
+    } finally {
+      state.skillBusy = false;
+      updateControls();
+    }
+  }
+
+  async function discoverTemplates() {
+    if (!state.token || !permitted("factory.read") || state.skillBusy) return;
+    const scopeKey = state.scopeKey;
+    state.skillBusy = true;
+    showError("");
+    updateControls();
+    try {
+      const result = await api("/api/templates?scope_key=" + encodeURIComponent(scopeKey));
+      if (scopeKey !== state.scopeKey) return;
+      ui("template-result").replaceChildren(details("Source types, exact targets and creation blockers", result));
+    } catch (error) {
+      showError(error.message);
+    } finally {
+      state.skillBusy = false;
+      updateControls();
+    }
+  }
+
+  async function operate(operation, action, button, hash, confirmationPhrase) {
     button.disabled = true;
     showError("");
     try {
       await api("/api/operations/" + encodeURIComponent(operation.id) + "/" + action, {
-        method: "POST", ...(action === "approve" ? {body: {plan_hash: hash}} : {}),
+        method: "POST", ...(action === "approve" ? {body: {plan_hash: hash,
+          ...(confirmationPhrase ? {confirmation_phrase: confirmationPhrase} : {})}} : {}),
+        ...(action === "continue" ? {body: {plan_hash: operation.plan_hash,
+          observation_hash: operation.progress.observation_hash}} : {}),
       });
       await refresh();
     } catch (error) {
@@ -475,7 +621,22 @@
     }));
     if (operation.progress) card.append(details("Persisted progress", operation.progress));
     if (operation.outcome) card.append(details("Backend execution result", operation.outcome));
-    if (proposed && permitted("config.write") && permitted("factory.read")) {
+    if (operation.observation) card.append(details("Latest read-only job observation", operation.observation));
+    const actionPermission = {
+      "delete-aifactory": "factory.delete", "add-project-to-aifactory": "project.add",
+      "create-private-aifactory-full-bootstrap-private-with-own-hub-vpn-and-default-proj": "factory.create",
+      "create-agent-oftype-for-project": "agent.create",
+      "create-ml-model-oftype-for-project": "model.create",
+    }[operation.tool_name] || "config.write";
+    if (operation.status === "awaiting_continuation" && operation.progress?.continuation_allowed
+        && permitted("factory.create") && permitted("factory.read") && state.context.settings.writes_enabled) {
+      card.append(node("p", "Continue only within the original approved plan and this exact paused-stage observation. New scope or recovery requires a new plan.", "muted"));
+      const continuation = node("button", "Continue this approved workflow");
+      continuation.type = "button";
+      continuation.addEventListener("click", () => { void operate(operation, "continue", continuation); });
+      card.append(continuation);
+    }
+    if (proposed && permitted(actionPermission) && permitted("factory.read")) {
       if (!state.context.settings.writes_enabled) {
         card.append(node("p", "Configuration writes are disabled. This unexecuted plan can still be cancelled.", "muted"));
       } else if (operation.status === "pending") {
@@ -492,15 +653,31 @@
         const approve = node("button", "Approve this exact plan");
         approve.type = "submit";
         approve.disabled = true;
-        input.addEventListener("input", () => { approve.disabled = input.value !== operation.plan_hash; });
+        const phrase = operation.preview?.confirmation_phrase;
+        let phraseInput;
+        if (operation.tool_name === "delete-aifactory") {
+          phraseInput = node("input");
+          phraseInput.type = "text";
+          phraseInput.required = true;
+          phraseInput.autocomplete = "off";
+          phraseInput.id = "phrase-" + operation.id;
+          const phraseLabel = node("label", "To authorize deletion, type: " + (phrase || "Deletion phrase unavailable"));
+          phraseLabel.htmlFor = phraseInput.id;
+          form.append(phraseLabel, phraseInput);
+        }
+        const validApproval = () => input.value === operation.plan_hash
+          && (!phraseInput || (typeof phrase === "string" && phraseInput.value === phrase));
+        input.addEventListener("input", () => { approve.disabled = !validApproval(); });
+        if (phraseInput) phraseInput.addEventListener("input", () => { approve.disabled = !validApproval(); });
         form.append(labelElement, input, approve);
         form.addEventListener("submit", (event) => {
           event.preventDefault();
-          if (input.value === operation.plan_hash) void operate(operation, "approve", approve, input.value);
+          if (validApproval()) void operate(operation, "approve", approve, input.value, phraseInput?.value);
         });
         card.append(form);
       } else if (operation.status === "approved") {
-        const execute = node("button", "Execute approved metadata change");
+        const execute = node("button", operation.tool_name === "factory_prepare_settings"
+          ? "Execute approved metadata change" : "Execute this approved Factory operation");
         execute.type = "button";
         execute.addEventListener("click", () => { void operate(operation, "execute", execute); });
         card.append(execute);
@@ -532,10 +709,27 @@
     const refreshedScope = state.scopeKey;
     updateControls();
     try {
-      const jobs = [api("/api/operations").then((result) => {
+      const jobs = [api("/api/operations").then(async (result) => {
         state.operations = result.operations;
         renderOperations();
+        const observations = await Promise.allSettled(result.operations.filter((operation) =>
+          operation.scope_key === refreshedScope && ["running", "awaiting_continuation"].includes(operation.status)
+        ).map(async (operation) => {
+          const observed = await api("/api/operations/" + encodeURIComponent(operation.id) + "/status");
+          state.operations = state.operations.filter((item) => item.id !== observed.id).concat(observed);
+          renderOperations();
+        }));
+        const failure = observations.find((observation) => observation.status === "rejected");
+        if (failure) throw failure.reason;
       })];
+      if (state.context.capabilities?.skills_supported && permitted("factory.read")) {
+        const scopeKey = state.scopeKey;
+        jobs.push(api("/api/skills?scope_key=" + encodeURIComponent(scopeKey)).then((result) => {
+          if (scopeKey !== state.scopeKey) return;
+          state.skills = result.skills;
+          renderSkills();
+        }));
+      }
       if (permitted("knowledge.read")) {
         const scopeKey = state.scopeKey;
         jobs.push(api("/api/knowledge/status?scope_key=" + encodeURIComponent(scopeKey)).then((result) => {
@@ -603,6 +797,9 @@
   ui("sign-out").addEventListener("click", clearSession);
   ui("question-form").addEventListener("submit", (event) => { void ask(event); });
   ui("proposal-form").addEventListener("submit", (event) => { void propose(event); });
+  ui("skill-form").addEventListener("submit", (event) => { void runSkill(event); });
+  ui("skill-selector").addEventListener("change", () => { renderSkillArguments(); updateControls(); });
+  ui("discover-templates").addEventListener("click", () => { void discoverTemplates(); });
   for (const id of ["department-name", "department-id"]) {
     ui(id).addEventListener("input", updateControls);
   }
@@ -613,6 +810,10 @@
   ui("scope-selector").addEventListener("change", () => {
     state.scopeKey = ui("scope-selector").value;
     state.proposalMessage = "";
+    state.skills = [];
+    renderSkills();
+    ui("skill-result").replaceChildren();
+    ui("template-result").replaceChildren();
     renderScope();
     saveSelection();
     renderOperations();
@@ -635,7 +836,7 @@
     if (state.token && Date.now() >= state.expiresAt) {
       clearSession();
       showError("Your access token expired. Sign in again; tokens are not persisted or silently refreshed.");
-    } else if (state.operations.some((operation) => operation.status === "executing")) {
+    } else if (state.operations.some((operation) => ["executing", "continuing", "running"].includes(operation.status))) {
       void refresh().catch((error) => showError(error.message));
     }
   }, 10000);
