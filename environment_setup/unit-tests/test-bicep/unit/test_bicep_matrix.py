@@ -198,6 +198,8 @@ def test_dynamic_production_entrypoints_include_common_genai_and_both_gateways()
     assert "environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v4.bicep" in relative
     assert "environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/main.bicep" in relative
     assert "environment_setup/aigateway/kong/main.bicep" in relative
+    for capacity_template in ("03b-ai-search", "04b-postgresql", "05b-container-apps"):
+        assert f"environment_setup/aifactory/bicep/esml-genai-1/{capacity_template}.bicep" in relative
     registry_modules = set()
     reachable = reachable_templates(paths, config.REPO_ROOT, registry_modules)
     assert set(paths) < set(reachable)
@@ -246,6 +248,120 @@ def test_entrypoint_inventory_adds_new_roots_and_fails_on_unresolved_references(
         pipeline.write_text('--template-file "esml-genai-1/missing.bicep"\n', encoding="utf-8")
         with pytest.raises(MatrixError, match="Missing"):
             discover_entrypoints(repo)
+
+
+@pytest.fixture
+def parameterized_pipeline(tmp_path):
+    base = tmp_path / "environment_setup" / "aifactory" / "bicep"
+    source = base / "copy_to_local_settings"
+    (source / "github-actions").mkdir(parents=True)
+    jobs = source / "azure-devops" / "jobs"
+    jobs.mkdir(parents=True)
+    (base / "esml-genai-1").mkdir()
+    for name in ("first", "second"):
+        (base / "esml-genai-1" / f"{name}.bicep").write_text(
+            "param enableFuture bool = true\n", encoding="utf-8")
+    (jobs / "deploy.yaml").write_text(
+        "parameters:\n- name: templateFile\n  type: string\n"
+        "steps:\n- bash: |\n"
+        '    deploy --template-file "${{ parameters.templateFile }}"\n',
+        encoding="utf-8",
+    )
+    return tmp_path, base, jobs
+
+
+@pytest.mark.parametrize("reference", [
+    "jobs/deploy.yaml", "./jobs/deploy.yaml", "jobs\\deploy.yaml",
+    "/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/jobs/deploy.yaml",
+])
+def test_parameterized_entrypoints_resolve_each_local_caller_not_unrelated_parameters(
+    parameterized_pipeline, reference,
+):
+    repo, base, jobs = parameterized_pipeline
+    (jobs.parent / "pipeline.yaml").write_text(
+        "steps:\n"
+        f"- template: {reference}\n"
+        "  parameters:\n    templateFile: esml-genai-1/first.bicep\n"
+        "- ${{ if eq(parameters.enableSecond, true) }}:\n"
+        "  - template: jobs/deploy.yaml\n"
+        "    parameters:\n      templateFile: esml-genai-1/second.bicep\n"
+        "- template: unrelated/deploy.yaml\n"
+        "  parameters:\n    templateFile: do-not-inventory.bicep\n",
+        encoding="utf-8",
+    )
+    assert discover_entrypoints(repo) == [
+        base / "esml-genai-1" / "first.bicep", base / "esml-genai-1" / "second.bicep",
+    ]
+
+
+def test_parameterized_entrypoints_use_declared_default_only_when_caller_omits_value(parameterized_pipeline):
+    repo, base, jobs = parameterized_pipeline
+    path = jobs / "deploy.yaml"
+    path.write_text(path.read_text(encoding="utf-8").replace(
+        "  type: string\n", "  type: string\n  default: esml-genai-1/first.bicep\n"),
+        encoding="utf-8")
+    (jobs / "pipeline.yaml").write_text(
+        "steps:\n- template: deploy.yaml\n"
+        "- template: deploy.yaml\n"
+        "  parameters:\n    templateFile: esml-genai-1/second.bicep\n",
+        encoding="utf-8",
+    )
+    assert discover_entrypoints(repo) == [
+        base / "esml-genai-1" / "first.bicep", base / "esml-genai-1" / "second.bicep",
+    ]
+
+
+@pytest.mark.parametrize(("binding", "error"), [
+    ("", "Unresolved"),
+    ("    templateFile: ''\n", "Unresolved"),
+    ("    templateFile: 42\n", "Unresolved"),
+    ("    templateFile: $(templateFile)\n", "Unresolved"),
+    ("    templateFile: ${{ parameters.forwarded }}\n", "Unresolved"),
+    ("    templateFile: environment_setup/$(dynamic).bicep\n", "Unresolved"),
+    ("    templateFile: esml-genai-1/missing.bicep\n", "Missing"),
+    ("    templateFile: environment_setup/../../outside.bicep\n", "out-of-repository"),
+    ("    templateFile: esml-genai-1/first.bicep\n"
+     "    templateFile: esml-genai-1/second.bicep\n", "duplicate key"),
+])
+def test_parameterized_entrypoints_fail_on_any_unresolved_or_invalid_caller(
+    parameterized_pipeline, binding, error,
+):
+    repo, _, jobs = parameterized_pipeline
+    (jobs / "pipeline.yaml").write_text(
+        "steps:\n- template: deploy.yaml\n"
+        "  parameters:\n    templateFile: esml-genai-1/first.bicep\n"
+        "- template: deploy.yaml\n  parameters:\n" + binding,
+        encoding="utf-8",
+    )
+    with pytest.raises(MatrixError, match=error):
+        discover_entrypoints(repo)
+
+
+def test_parameterized_entrypoints_without_callers_fail_instead_of_being_skipped(parameterized_pipeline):
+    repo, _, _ = parameterized_pipeline
+    with pytest.raises(MatrixError, match="No local callers"):
+        discover_entrypoints(repo)
+
+
+@pytest.mark.parametrize("declaration", [
+    "null", "42", "{templateFile: esml-genai-1/first.bicep}",
+    "[{name: templateFile, type: object}]", "[{name: other, type: string}]",
+])
+def test_parameterized_entrypoints_require_a_declared_string_parameter(parameterized_pipeline, declaration):
+    repo, _, jobs = parameterized_pipeline
+    (jobs / "deploy.yaml").write_text(
+        f"parameters: {declaration}\n"
+        "steps:\n- bash: |\n"
+        '    deploy --template-file "${{ parameters.templateFile }}"\n',
+        encoding="utf-8",
+    )
+    (jobs / "pipeline.yaml").write_text(
+        "steps:\n- template: deploy.yaml\n"
+        "  parameters:\n    templateFile: esml-genai-1/first.bicep\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(MatrixError, match="Unresolved template-file parameter"):
+        discover_entrypoints(repo)
 
 
 def test_missing_bicep_is_a_failed_gate_with_report_not_a_skip():

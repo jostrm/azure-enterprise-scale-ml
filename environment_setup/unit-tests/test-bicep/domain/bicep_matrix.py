@@ -23,7 +23,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
 
+import yaml
+
 from base import config
+from base.yaml_config import UniqueKeyLoader
 
 
 class MatrixError(ValueError):
@@ -57,8 +60,10 @@ REQUIRED_INPUT_FIXTURES = {
     }],
 }
 LIMITS = [
-    "Scope: literal --template-file entrypoints in the committed GHA/ADO pipeline "
-    "templates and every reachable local Bicep/ARM module; not orphaned/retired templates. "
+    "Scope: literal --template-file entrypoints and direct ADO parameter references "
+    "bound by local template callers (or declared defaults) in committed GHA/ADO "
+    "pipeline templates, plus every reachable local Bicep/ARM module; not orphaned/retired templates. "
+    "Unresolved or forwarded dynamic template paths fail; this is not full ADO expression evaluation. "
     "Registry module references are reported and require a pre-populated Bicep cache; "
     "--no-restore fails when a dependency is absent.",
     "Flags: all entrypoint bool parameters and true/false-string parameters. "
@@ -82,11 +87,72 @@ LIMITS = [
 ]
 
 
+def _yaml_mappings(value: Any) -> Iterator[dict]:
+    if isinstance(value, dict):
+        yield value
+        for child in value.values():
+            yield from _yaml_mappings(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _yaml_mappings(child)
+
+
+def _ado_parameter_values(
+    template: Path, parameter: str, documents: dict[Path, Any], repo: Path,
+) -> list[str]:
+    document = documents[template]
+    declarations = document.get("parameters", []) if isinstance(document, dict) else []
+    if not isinstance(declarations, list):
+        raise MatrixError(f"Unresolved template-file parameter declaration in {template}: {parameter}")
+    definitions = [item for item in declarations
+                   if isinstance(item, dict) and item.get("name") == parameter]
+    if len(definitions) != 1 or definitions[0].get("type") != "string":
+        raise MatrixError(f"Unresolved template-file parameter in {template}: {parameter}")
+    values: set[str] = set()
+    for caller, document in documents.items():
+        for mapping in _yaml_mappings(document):
+            reference = mapping.get("template")
+            if not isinstance(reference, str) or any(char in reference for char in "$@"):
+                continue
+            reference = reference.replace("\\", "/")
+            target = (repo / reference.lstrip("/") if reference.startswith("/")
+                      else caller.parent / reference)
+            if target.resolve() != template.resolve():
+                continue
+            bindings = mapping.get("parameters", {})
+            value = (bindings.get(parameter, definitions[0].get("default"))
+                     if isinstance(bindings, dict) else None)
+            if not isinstance(value, str) or not value.strip() or any(char in value for char in "$`"):
+                raise MatrixError(
+                    f"Unresolved template-file parameter {parameter} for {template} in {caller}: {value!r}")
+            values.add(value)
+    if not values:
+        raise MatrixError(f"No local callers bind template-file parameter {parameter} in {template}")
+    return sorted(values)
+
+
+def _entrypoint_path(reference: str, pipeline: Path, repo: Path, base: Path) -> Path:
+    ref = reference.replace("\\", "/")
+    if "environment_setup/" in ref:
+        candidate = repo / ref[ref.index("environment_setup/"):]
+    elif ref.startswith(("esml-common/", "esml-genai-1/")):
+        candidate = base / ref
+    else:
+        raise MatrixError(f"Unresolved template-file reference in {pipeline}: {ref}")
+    candidate = candidate.resolve()
+    if not candidate.is_relative_to(repo.resolve()) or not candidate.is_file():
+        raise MatrixError(f"Missing or out-of-repository entrypoint: {candidate}")
+    if candidate.suffix != ".bicep":
+        raise MatrixError(f"Unsupported entrypoint type: {candidate}")
+    return candidate
+
+
 def discover_entrypoints(repo: Path) -> list[Path]:
-    """Find literal deployment roots from both committed pipeline template trees."""
+    """Find literal roots and direct, statically bound ADO template parameters."""
     base = repo / "environment_setup" / "aifactory" / "bicep"
     source = base / "copy_to_local_settings"
     roots: set[Path] = set()
+    ado_documents: dict[Path, Any] | None = None
     for directory in (source / "github-actions", source / "azure-devops"):
         if not directory.is_dir():
             raise MatrixError(f"Missing pipeline template directory: {directory}")
@@ -99,19 +165,21 @@ def discover_entrypoints(repo: Path) -> list[Path]:
                 match = re.search(r"""--template-file(?:\s+|=)(["'])(.+?)\1""", line)
                 if not match:
                     raise MatrixError(f"Unsupported template-file reference in {path}: {line.strip()}")
-                ref = match[2].replace("\\", "/")
-                if "environment_setup/" in ref:
-                    candidate = repo / ref[ref.index("environment_setup/"):]
-                elif ref.startswith(("esml-common/", "esml-genai-1/")):
-                    candidate = base / ref
-                else:
-                    raise MatrixError(f"Unresolved template-file reference in {path}: {ref}")
-                candidate = candidate.resolve()
-                if not candidate.is_relative_to(repo.resolve()) or not candidate.is_file():
-                    raise MatrixError(f"Missing or out-of-repository entrypoint: {candidate}")
-                if candidate.suffix != ".bicep":
-                    raise MatrixError(f"Unsupported entrypoint type: {candidate}")
-                roots.add(candidate)
+                references = [match[2]]
+                parameter = re.fullmatch(r"\$\{\{\s*parameters\.(\w+)\s*\}\}", match[2])
+                if parameter and directory.name == "azure-devops":
+                    if ado_documents is None:
+                        ado_documents = {}
+                        for caller in sorted(directory.rglob("*")):
+                            if caller.suffix in {".yaml", ".yml"}:
+                                try:
+                                    ado_documents[caller] = yaml.load(
+                                        caller.read_text(encoding="utf-8-sig"), Loader=UniqueKeyLoader)
+                                except yaml.YAMLError as exc:
+                                    raise MatrixError(f"Invalid pipeline YAML in {caller}: {exc}") from exc
+                    references = _ado_parameter_values(path, parameter[1], ado_documents, repo)
+                for reference in references:
+                    roots.add(_entrypoint_path(reference, path, repo, base))
     if not roots:
         raise MatrixError("No production Bicep entrypoints discovered")
     return sorted(roots)

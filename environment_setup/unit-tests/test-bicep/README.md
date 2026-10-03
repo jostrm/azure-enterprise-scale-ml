@@ -40,6 +40,8 @@ The checks are **IaC / unit / ubuntu-22.04**, **IaC / unit / windows-2022**,
 - **Syntax:** parse YAML without silently accepting duplicate keys, compile Python
   syntax without executing it, and run Bash `-n` without executing scripts.
 - **Bicep:** discover active deployment entrypoints from the pipeline templates,
+  including direct Azure DevOps template parameters resolved from each local
+  caller's literal binding (or the declared default when omitted),
   compile their real referenced modules, then validate a generated boolean
   parameter matrix against the emitted ARM schemas. Reports distinguish
   entrypoint flags from nested modules, required-default differences and matrix
@@ -86,7 +88,9 @@ combinations, not the exponential Cartesian product of every flag, SKU, region,
 tenant and network setting. Compiler/schema acceptance does not execute ARM
 resource conditions or prove that a combination can deploy. Parsed pipeline
 gates cover specific dependencies; they do not emulate the complete Azure
-Pipelines template-expansion service.
+Pipelines template-expansion service. Entrypoint discovery rejects unresolved,
+forwarded/dynamic, missing, or out-of-repository template paths rather than
+silently dropping them from coverage.
 
 `feature-contract-coverage.json` explicitly reports known exceptions:
 `ENABLE_AI_FACTORY_HUB` is configuration intent, while `ENABLE_AMPLS` and
