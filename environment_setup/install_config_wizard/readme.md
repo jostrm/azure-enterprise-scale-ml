@@ -19,22 +19,27 @@ The **AI Factory Configuration Wizard** is a guided, form-based desktop tool tha
 - **Speeds up first-time setup** — no need to read through a large configuration file to find what to change
 - **ITSM-friendly** — core teams can generate the correct configuration directly from a service ticket and trigger the pipeline on behalf of the requesting team. Or get the "initial full configuration", where the ITSM tickets only contain the *project specifics* such as *which resources a team wants to order* e.g. have enabled=true (checkboxes in Wizard)
 
-## Download - Version `0.47.1`
+<a id="download"></a>
 
-Release `v0.47.1`, published 2026-10-02, contains the Tkinter wizard for
+## Download - Version `0.47.2`
+
+Release [v0.47.2](https://github.com/jostrm/azure-aifactory-config/releases/tag/v0.47.2),
+published 2026-10-02 (UTC), contains the Tkinter wizard and embedded API for
 Windows x86-64, Linux x86-64 and macOS Apple Silicon (arm64). All three
 archives are the exact published assets from
-[GitHub Actions run 36972008996](https://github.com/jostrm/azure-aifactory-config/actions/runs/36972008996),
-built from source commit `cccab033106c012ed0dec6323fda6ca782694546`.
+[GitHub Actions run 37069980067](https://github.com/jostrm/azure-aifactory-config/actions/runs/37069980067),
+built from source commit `3b83b5d6ba400f31656ef44cdd6a990a30364e4d`.
 The macOS archive is not an Intel/universal build.
 Archive checksums are in [SHA256SUMS.txt](SHA256SUMS.txt); source commit,
 architecture and build provenance are in [release-manifest.json](release-manifest.json).
+The downloads below are hosted in this public repository; access to the source
+repository is not required.
 
 | Platform | File | Package |
 |---|---|---|
-| Windows x64 | [aifactory-config-windows.zip](windows/aifactory-config-windows.zip) | v0.47.1, complete executable and `_internal` runtime folder |
-| Linux x86-64 | [aifactory-config-linux.tar.gz](linux/aifactory-config-linux.tar.gz) | v0.47.1, self-contained executable |
-| macOS arm64 | [aifactory-config-macos.tar.gz](macos/aifactory-config-macos.tar.gz) | v0.47.1, self-contained executable |
+| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip) | v0.47.2, complete executable and `_internal` runtime folder |
+| Linux x86-64 | [aifactory-config-linux.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/linux/aifactory-config-linux.tar.gz) | v0.47.2, self-contained executable |
+| macOS arm64 | [aifactory-config-macos.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/macos/aifactory-config-macos.tar.gz) | v0.47.2, self-contained executable |
 
 Windows download integrity: [SHA256SUMS.txt](windows/SHA256SUMS.txt).
 Build provenance: [release-manifest.json](windows/release-manifest.json).
@@ -86,7 +91,7 @@ In most cases you do **not** need Python installed — just download, extract, a
 | **Python** | **Not required.** Python is bundled inside the `.exe`. |
 
 ### Run
-1. Download [`aifactory-config-windows.zip`](windows/aifactory-config-windows.zip).
+1. Download [`aifactory-config-windows.zip`](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip).
 2. Extract the archive (right-click → *Extract All…*).
 3. Open the extracted `aifactory-config` folder and double-click **`aifactory-config.exe`**.
    Keep the `_internal` folder beside it; copying only the executable will not work.
@@ -108,10 +113,17 @@ checkout is **not** required. The separate CLI needs Python and PowerShell 7.3+.
    before preparing a configuration. Stop if a compatibility or authorization
    check fails; do not fall back to another running API.
 
-This release uses `http://127.0.0.1:8765` and does **not** support `--api-port`.
-It replaces the earlier custom Windows package that offered that option.
-If another application owns port 8765, stop this setup and resolve the conflict
-with that application's owner; do not connect the CLI to an unverified API.
+This release defaults to `http://127.0.0.1:8765` and supports `--api-port`.
+To select an available loopback port, launch the extracted wizard from PowerShell
+before opening **Quick setup > Start API host**:
+
+```powershell
+.\aifactory-config.exe --api-port 0
+```
+
+Use `--api-port 18765` to request a specific port instead. Always copy the actual
+URL shown after startup. If the requested port is unavailable, stop this setup
+and choose another port; do not connect the CLI to an unverified API.
 
 Set `AIFACTORY_API_URL` in the CLI's PowerShell session to the URL displayed by
 this wizard. Never put API keys in source files, screenshots, recordings,

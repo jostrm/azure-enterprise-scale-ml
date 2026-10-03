@@ -1,42 +1,42 @@
 {
-  "version": "v0.47.1",
-  "source_commit": "cccab033106c012ed0dec6323fda6ca782694546",
+  "version": "v0.47.2",
+  "source_commit": "3b83b5d6ba400f31656ef44cdd6a990a30364e4d",
   "artifacts": [
     {
-      "version": "v0.47.1",
-      "source_commit": "cccab033106c012ed0dec6323fda6ca782694546",
+      "version": "v0.47.2",
+      "source_commit": "3b83b5d6ba400f31656ef44cdd6a990a30364e4d",
       "accelerator_commit": "d8f7f1de1727ecdb1dc75ebb1454e7f02e9defef",
       "platform": "windows",
       "architecture": "AMD64",
       "python": "3.13.15",
       "archive": "aifactory-config-windows.zip",
-      "bytes": 41131443,
-      "sha256": "5fb423d0026ecfac640d382988ecd886f3494d166ff6060a0153519d1a3d4c2b",
-      "run_id": "36972008996"
+      "bytes": 41184838,
+      "sha256": "a048e1bcfb450a6fc5525cc6207bf30ae1c55ca652eec45aeb2ebcb3e8413362",
+      "run_id": "37069980067"
     },
     {
-      "version": "v0.47.1",
-      "source_commit": "cccab033106c012ed0dec6323fda6ca782694546",
+      "version": "v0.47.2",
+      "source_commit": "3b83b5d6ba400f31656ef44cdd6a990a30364e4d",
       "accelerator_commit": "d8f7f1de1727ecdb1dc75ebb1454e7f02e9defef",
       "platform": "linux",
       "architecture": "x86_64",
       "python": "3.13.15",
       "archive": "aifactory-config-linux.tar.gz",
-      "bytes": 57613895,
-      "sha256": "1267406eee3f816f90b0a1d909032fe139a3e8343066c6d323668a1817ed2a34",
-      "run_id": "36972008996"
+      "bytes": 57666689,
+      "sha256": "f04b4ddb2414eba1678b9b98a47da7835e2137c17ced8cd5fb3c5f4c07f5374b",
+      "run_id": "37069980067"
     },
     {
-      "version": "v0.47.1",
-      "source_commit": "cccab033106c012ed0dec6323fda6ca782694546",
+      "version": "v0.47.2",
+      "source_commit": "3b83b5d6ba400f31656ef44cdd6a990a30364e4d",
       "accelerator_commit": "d8f7f1de1727ecdb1dc75ebb1454e7f02e9defef",
       "platform": "macos",
       "architecture": "arm64",
       "python": "3.13.15",
       "archive": "aifactory-config-macos.tar.gz",
-      "bytes": 37920180,
-      "sha256": "73d5ea53abd7e40226f7fb03f695b1bf7cc07e3ddd631e25c3d5e88f573381a5",
-      "run_id": "36972008996"
+      "bytes": 37974275,
+      "sha256": "a339687c4b7601b117103c7eda376e2c5b8d4179ca8a79a9fc6902888763fb5b",
+      "run_id": "37069980067"
     }
   ]
 }
