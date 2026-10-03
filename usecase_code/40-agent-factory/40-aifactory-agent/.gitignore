@@ -1,0 +1,7 @@
+.venv/
+.state/
+.build/
+config.local.json
+*.log
+__pycache__/
+.pytest_cache/

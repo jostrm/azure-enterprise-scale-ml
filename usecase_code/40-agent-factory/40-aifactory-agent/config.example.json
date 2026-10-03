@@ -1,0 +1,70 @@
+{
+  "location": "swedencentral",
+  "scopes": {
+    "project001-dev": {
+      "tenant_id": "c157e61b-4a1e-488c-9a0c-d9a23e864a65",
+      "subscription_id": "f0fe8b33-73bf-41e4-9997-e3920d793c06",
+      "resource_group": "spider-esml-project001-sdc-dev-001-rg",
+      "factory": "spider",
+      "project": "001",
+      "environment": "dev"
+    }
+  },
+  "azure": {
+    "foundry_account": "aif2bltscaae001dev",
+    "foundry_project": "aif2-p001bltdev",
+    "project_endpoint": "https://aif2bltscaae001dev.services.ai.azure.com/api/projects/aif2-p001bltdev",
+    "openai_endpoint": "https://aif2bltscaae001dev.openai.azure.com/openai/v1",
+    "model_deployment": "aifactory-agent-gpt-6-1-sol",
+    "model_name": "gpt-6.1-sol",
+    "model_version": "2026-09-29",
+    "embedding_deployment": "text-embedding-3-large",
+    "embedding_dimensions": 1536,
+    "search_endpoint": "https://aisearchprj001sdcdevbltscaae9d5aa21001.search.windows.net",
+    "search_index": "enterprise-scale-ai-factory-v1",
+    "storage_endpoint": "https://saprj001sdcbltsc2001dev.blob.core.windows.net",
+    "storage_container": "aifactory-agent",
+    "credential": "cli",
+    "application_insights_name": "ain-prj001-sdc-dev-bltsc-001"
+  },
+  "knowledge": {
+    "top_k": 3,
+    "repository_root": "..\\..\\..",
+    "source_base_url": "https://github.com/jostrm/azure-enterprise-scale-ml/blob/main",
+    "includes": [
+      "documentation/v2/**/*.md",
+      "usecase_code/30-machine-learning/**/*.md",
+      "usecase_code/20-agent-foundry/**/*.md",
+      "usecase_code/20-agent-foundry/**/*.py",
+      "usecase_code/40-agent-factory/readme.md",
+      "usecase_code/40-agent-factory/agent_factory/readme.md",
+      "environment_setup/azurefactory-cli/readme.md",
+      "environment_setup/install_config_wizard/api-usage-examples/**/*.md",
+      "bootstrap/python-sdk/*.py",
+      "RELEASE_*.md"
+    ],
+    "excludes": [
+      "**/.git/**", "**/.env*", "**/*secret*", "**/*credential*",
+      "**/__pycache__/**", "**/node_modules/**", "**/.venv/**",
+      "**/output/**", "**/dist/**", "**/build/**", "**/tests/**",
+      "**/.local/**", "**/_legacy/**", "**/*eval*"
+    ]
+  },
+  "factory": {
+    "api_url": "http://127.0.0.1:8765",
+    "folder": "/state/azurefactory",
+    "writes_enabled": false,
+    "allowed_write_environments": ["dev"]
+  },
+  "auth": {
+    "client_id": null,
+    "audience": null,
+    "grants": [
+      {
+        "object_id": "4e6f97b5-7140-40eb-b030-c31d73072197",
+        "scopes": ["project001-dev"],
+        "permissions": ["knowledge.read", "factory.read", "config.write", "knowledge.refresh"]
+      }
+    ]
+  }
+}

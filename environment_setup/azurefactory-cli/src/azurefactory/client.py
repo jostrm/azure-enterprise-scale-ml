@@ -16,6 +16,7 @@ from uuid import UUID
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from .errors import APIError, AuthError, ConfigError, FailureError, RedirectError, RequestTimeout
+from .monitoring_saved import SavedMonitoringClient
 from .workflow_events import WorkflowRunEvent
 
 DEFAULT_API_URL = "http://127.0.0.1:8765"
@@ -105,7 +106,7 @@ class _NoRedirect(HTTPRedirectHandler):
 
 
 @dataclass(frozen=True)
-class AzureFactoryClient:
+class AzureFactoryClient(SavedMonitoringClient):
     """Small SDK returning JSON objects, with CSV for canonical monitoring export."""
 
     base_url: str | None = None

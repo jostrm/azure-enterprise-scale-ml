@@ -973,6 +973,65 @@ The six IDs remain `agent-value`, `showback`, `foundry-tokens`, `foundry-usage`,
 outcomes and verified realized value are distinct; token volume is not value.
 Actual/amortized bills and estimates remain separate.
 
+#### Saved evidence: read, summary and report
+
+Use a **matching API release** with `POST /api/v1/monitoring/evidence/read`
+(`aifactory.monitoring-evidence.v1`) and the canonical summary/report reducers.
+These are the shared backend contracts used by pinkAPI/MAUI, not a copied backend
+or a new collection implementation. Updating the CLI alone does not update an
+older running API. The installed consumer `azurefactory.sh` wrapper exposes these
+same package commands.
+
+Select the registered UUIDs from `catalog list`, not factory labels, scale
+suffixes or project numbers. `--folder` is an existing register on the API host;
+the host enforces the current authenticated identity and authorized placements.
+Omitted UUID selectors include all authorized placements in that folder.
+
+```powershell
+azurefactory monitoring saved read --folder $env:FACTORY_FOLDER --factory-id $env:FACTORY_ID
+azurefactory monitoring saved summary --folder $env:FACTORY_FOLDER `
+  --factory-id $env:FACTORY_ID --scale-set-id $env:SCALE_SET_ID --project-id $env:PROJECT_ID `
+  --start-date 2026-09-01 --end-date 2026-09-22
+azurefactory monitoring saved report --folder $env:FACTORY_FOLDER `
+  --factory-id $env:FACTORY_ID --report showback `
+  --start-date 2026-09-01 --end-date 2026-09-22
+```
+
+`read` prints the complete canonical evidence envelope: `status`, `rows`,
+`scopes`, `snapshots`, `native_bindings`, `window`, `warnings`, `source_errors`
+and contract. Saved summary/report first read that envelope, then send only
+available `rows`, `native_bindings`, `"source": "live"` and the **unchanged**
+date bounds to the existing reducer (plus `report_id` for a report). Output is
+`{"status": ..., "evidence": <unchanged envelope>, "summary": <API response>}`
+or the same wrapper with `report`. Original row timestamps, snapshot source,
+collection/save times, observed windows and source errors remain intact;
+`saved_at` and response generation are never substituted for observation time.
+
+`absent` exits 0 as an explicit empty discovery, with a null summary/report and
+no reducer call: it is **not a healthy zero**. `incompatible`/`unavailable` exit 5
+and also skip reduction. Partial source failures with surviving data remain in
+JSON and visible stderr warnings; they do not hide the successful evidence.
+HTTP/contract failures are nonzero, with no retry or fallback. No saved command
+collects, imports, saves, runs automation/report jobs, uploads or writes files.
+Missing evidence never falls back to live Azure collection or sample data.
+The existing explicit sample and supplied-row commands remain unchanged.
+
+SDK equivalents (the context accepts only `folder`, optional `factory_id`,
+`scale_set_id`, `project_id`, `start_date`, `end_date`):
+
+```python
+context = {"folder": factory_folder, "factory_id": factory_id,
+           "start_date": "2026-09-01", "end_date": "2026-09-22"}
+evidence = client.monitoring_evidence_read(context)
+summary = client.monitoring_saved_summary(context)
+report = client.monitoring_saved_report(context, report_id="showback")
+```
+
+Each SDK pipeline preserves nonavailable states in its returned wrapper; callers
+must inspect `status`. Date bounds are paired inclusive UTC dates (1-90 days);
+omitting both keeps the server's unbounded saved-source selection, not a live
+lookback or a client-generated observation clock.
+
 ```powershell
 azurefactory request GET /api/v1/schema
 azurefactory request POST /api/v1/future/resource --body-json .\payload.json --write --yes

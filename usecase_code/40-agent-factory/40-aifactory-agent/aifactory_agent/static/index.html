@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script>
+  (() => {
+    const param = new URLSearchParams(window.location.search).get("scoutTheme");
+    const theme =
+      param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  })();
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Enterprise Scale AI Factory Agent</title>
+  <link rel="stylesheet" href="/static/theme.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">ENTERPRISE SCALE · AI FACTORY</p>
+      <h1>Factory Agent</h1>
+      <p class="muted">Evidence-backed guidance. Explicitly governed actions.</p>
+    </div>
+    <div class="auth-controls">
+      <span id="auth-status" role="status">Not signed in</span>
+      <button id="sign-in" type="button" disabled>Sign in with Microsoft</button>
+      <button id="sign-out" class="secondary" type="button" hidden>Clear session</button>
+    </div>
+  </header>
+  <main>
+    <section id="setup-blocker" class="notice" aria-labelledby="setup-heading">
+      <h2 id="setup-heading">Checking sign-in setup</h2>
+      <p id="setup-message">Loading the public authentication configuration. No factory scopes are public.</p>
+    </section>
+    <p id="error-message" class="error" role="alert" hidden></p>
+    <div class="workspace">
+      <aside class="card scope-panel" aria-label="Workspace controls">
+        <h2>Your workspace</h2>
+        <label for="scope-selector">Active factory / project / environment</label>
+        <select id="scope-selector" disabled>
+          <option value="">Sign in to see authorized scopes</option>
+        </select>
+        <dl id="scope-details" class="metadata"></dl>
+        <h3>Explanation view</h3>
+        <div class="view-controls" role="group" aria-label="Explanation audience">
+          <button type="button" id="view-platform" class="secondary" aria-pressed="false">Platform team</button>
+          <button type="button" id="view-project" aria-pressed="true">Project team</button>
+        </div>
+        <p id="view-help" class="muted">Project guidance emphasizes use-case onboarding and self-service.</p>
+        <p class="muted">The view changes explanations, never permissions. The selected scope applies to every request.</p>
+        <section aria-labelledby="knowledge-heading">
+          <h3 id="knowledge-heading">Knowledge freshness</h3>
+          <p id="knowledge-status" role="status">Sign in to inspect knowledge.</p>
+          <button id="refresh-status" class="secondary" type="button" disabled>Check status and history</button>
+          <p class="muted">Ingestion refresh is an external approved-operator task, not a browser action.</p>
+        </section>
+      </aside>
+      <div class="content">
+        <section class="card" aria-labelledby="question-heading">
+          <h2 id="question-heading">Ask the Factory expert</h2>
+          <form id="question-form">
+            <label for="question">Architecture, onboarding, operations or updates</label>
+            <textarea id="question" rows="6" maxlength="8000" required disabled
+              placeholder="Ask a question about the active scope. Documentation does not prove what is deployed."></textarea>
+            <div class="form-footer">
+              <span id="question-count" class="muted">0 / 8000 characters</span>
+              <button id="ask" type="submit" disabled>Ask agent</button>
+            </div>
+          </form>
+          <p id="request-status" role="status">Sign in and choose an authorized scope to start.</p>
+        </section>
+        <section class="card" aria-labelledby="answer-heading">
+          <h2 id="answer-heading">Answer and evidence</h2>
+          <p id="answer-context" class="muted"></p>
+          <div id="answer" class="answer" aria-live="polite">No answer requested yet.</div>
+          <h3>Sources</h3>
+          <p class="muted">Current guidance, historical release notes and live observations are separate evidence types. Installed version remains unknown without a live observation.</p>
+          <ol id="citations" class="citations"></ol>
+          <div id="tool-activity" class="muted"></div>
+        </section>
+        <section class="card" aria-labelledby="plans-heading">
+          <h2 id="plans-heading">Department metadata plans · not executed</h2>
+          <p class="muted">Chat is read-only. Only you can request a scoped plan here. This changes display metadata only, not Azure resources or IAM. Review the exact target, changes and expiry; approve the exact hash, then execute separately. Azure deployment and destructive actions are unsupported.</p>
+          <form id="proposal-form">
+            <label for="department-name">Department display name</label>
+            <input id="department-name" type="text" maxlength="200" autocomplete="off" disabled>
+            <label for="department-id">Department identifier</label>
+            <input id="department-id" type="text" maxlength="128" autocomplete="off" disabled>
+            <p class="muted">Leave a field blank to keep it unchanged. At least one field is required. The target is the active workspace scope; arbitrary configuration keys are not accepted.</p>
+            <button id="propose" type="submit" disabled>Propose metadata plan · do not execute</button>
+          </form>
+          <p id="proposal-status" role="status">Blocked until approved Entra sign-in. The server must also enable configuration writes, configure exact factory/scale-set/project identifiers, and reach the existing Factory API. No separate API host is provisioned.</p>
+          <div id="proposed-plans">Sign in to inspect your persisted plans.</div>
+        </section>
+        <section class="card" aria-labelledby="history-heading">
+          <h2 id="history-heading">Execution progress and history</h2>
+          <p class="muted">Started is not completed. Failed or uncertain confirmations must not be replayed. Cancelling a pending plan does not cancel an underlying job.</p>
+          <div id="operation-history">No operation history loaded.</div>
+        </section>
+      </div>
+    </div>
+  </main>
+  <footer>Tenant-bound Entra sign-in · scoped evidence · server-enforced approvals · no tokens stored in the browser</footer>
+</body>
+</html>

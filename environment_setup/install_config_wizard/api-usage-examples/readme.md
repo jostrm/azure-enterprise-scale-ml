@@ -268,6 +268,51 @@ For live imports, supply an explicitly reviewed canonical request with
 is inferred. Estimates are not bills; modeled benefit is not verified realized
 value, and model tokens are not business outcomes.
 
+### Discover saved observations without collecting
+
+The CLI/SDK also reads the shared pinkAPI/MAUI saved-evidence contract. A
+**matching API release** must expose `POST /api/v1/monitoring/evidence/read`
+with `aifactory.monitoring-evidence.v1`, plus the existing summary/report
+reducers. An older API is not upgraded by installing this CLI; errors never
+trigger a collection, sample fallback or legacy report execution.
+
+Use `catalog list` to select exact registered UUIDs. The folder exists on the
+API host, where current identity and placement authorization are enforced.
+Omit optional UUID selectors for all authorized placements in that folder:
+
+```powershell
+azurefactory monitoring saved read --folder $env:FACTORY_FOLDER --factory-id $env:FACTORY_ID
+azurefactory monitoring saved summary --folder $env:FACTORY_FOLDER `
+  --factory-id $env:FACTORY_ID --scale-set-id $env:SCALE_SET_ID --project-id $env:PROJECT_ID `
+  --start-date 2026-09-01 --end-date 2026-09-22
+azurefactory monitoring saved report --folder $env:FACTORY_FOLDER `
+  --factory-id $env:FACTORY_ID --report showback `
+  --start-date 2026-09-01 --end-date 2026-09-22
+```
+
+The read request contains `folder` and optional `factory_id`, `scale_set_id`,
+`project_id`, `start_date`, `end_date`. `read` returns the complete canonical
+envelope. Summary/report return `{status, evidence, summary}` or
+`{status, evidence, report}`: the untouched evidence envelope alongside the
+canonical projection. Only available saved `rows` and `native_bindings` are
+passed to the reducer with `source: live`, the same unmodified date bounds,
+and `report_id` for a report. All row timestamps, source/snapshot metadata,
+windows and `source_errors` survive; saving or reading is not collection time.
+
+An `absent` read exits 0 explicitly, with null summary/report and no reduction;
+it is not healthy zero activity. `unavailable`/`incompatible` exit 5 with no
+reduction. Source failures alongside surviving data stay visible as stderr
+warnings and structured evidence diagnostics. HTTP/contract errors fail without
+retry or fallback. These commands only print responses: no collectors, imports,
+saved-file writes or report/automation jobs. Existing sample commands above
+remain a separate mode.
+
+SDK calls are `client.monitoring_evidence_read(context)`,
+`client.monitoring_saved_summary(context)` and
+`client.monitoring_saved_report(context, report_id="showback")`.
+Inspect their returned `status`; nonavailable pipelines retain evidence and a
+null projection. See the [saved-evidence CLI reference](../../azurefactory-cli/readme.md#saved-evidence-read-summary-and-report).
+
 ## Which API?
 
 These examples use **the backend Python API used by the AI Factory Configuration

@@ -15,6 +15,7 @@ from .client import API_KEY_ENV, API_URL_ENV, AzureFactoryClient, canonical_json
 from .configuration import ConfigurationDraft
 from . import enrollment
 from .errors import APIError, BlockedError, ConfigError, FailureError, RequestTimeout
+from .monitoring_saved import register_saved_commands
 from .review import load_receipt as review_load_receipt
 from .review import parse_expires_at, validate_preview, write_receipt
 
@@ -144,6 +145,7 @@ def build_parser() -> argparse.ArgumentParser:
     monitoring = sub.add_parser("monitoring", help="Canonical evidence reports; no collectors, deployments or cloud jobs.")
     monitoring_sub = monitoring.add_subparsers(dest="monitoring_command", required=True)
     add_simple(monitoring_sub, "catalog", cmd_monitoring_catalog)
+    register_saved_commands(monitoring_sub)
     for action in ("summary", "report", "export"):
         command = add_simple(monitoring_sub, action, cmd_monitoring)
         command.add_argument("--request", help="Exact canonical request JSON, including explicit source and supplied live observations.")

@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "scope_resolution": "Authenticated caller and server-configured scope key resolve tenant, subscription, resource group, factory, project and environment. The model cannot supply scope overrides.",
+  "read_output_schema": {
+    "oneOf": [
+      {"type": "object", "required": ["ok", "data"], "properties": {"ok": {"const": true}, "data": {"type": "object"}}},
+      {"type": "object", "required": ["ok", "error"], "properties": {"ok": {"const": false}, "error": {"type": "object", "required": ["code", "message", "status_code"]}}}
+    ]
+  },
+  "tools": [
+    {
+      "name": "knowledge_search",
+      "purpose": "Retrieve repository evidence using hybrid Search and configured semantic ranking.",
+      "input_schema": {"type": "object", "required": ["query"], "properties": {"query": {"type": "string", "minLength": 1, "maxLength": 4000}}, "additionalProperties": false},
+      "output_schema": {"type": "object", "required": ["source_type", "evidence"], "properties": {"source_type": {"const": "repository_evidence"}, "evidence": {"type": "array", "items": {"type": "object", "required": ["citation_id", "content", "source_path", "heading", "source_type", "current_history"]}}}},
+      "required_permissions": ["knowledge.read"],
+      "scope": "Exact authorized active scope, enforced as a Search prefilter.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "Embedding throttles may retry twice; semantic/Search failures surface without ranking fallback.",
+      "approval": "No write approval; authenticated grant required."
+    },
+    {
+      "name": "knowledge_status",
+      "purpose": "Observe committed ingestion state, live document count and freshness.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema": {"type": "object", "required": ["status"], "properties": {"status": {"type": "string"}}},
+      "required_permissions": ["knowledge.read"],
+      "scope": "Owned corpus for the active authorized deployment.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "Read SDK policies only.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "azure_live_state",
+      "purpose": "Observe actual Azure resources and model deployments; installed Factory version remains unknown.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema": {"type": "object", "required": ["source_type", "observed_at", "scope", "models", "resources", "installed_factory_version"]},
+      "required_permissions": ["factory.read"],
+      "scope": "Exact configured subscription and resource group, never a model-selected endpoint.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "None; errors surface.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "factory_health",
+      "purpose": "Read the real existing Factory API health.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read"],
+      "scope": "Configured Factory API URL only.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "None.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "factory_capabilities",
+      "purpose": "Read the actual existing Factory creation capabilities through its SDK.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read"],
+      "scope": "Configured API and active grant; capabilities do not grant authority.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "None.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "factory_catalog",
+      "purpose": "Read and filter the real catalog to the exact configured IDs and authorized placement.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read"],
+      "scope": "Server-selected catalog folder, factory, scale set, project and placement.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "None.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "factory_settings",
+      "purpose": "Read the exact supported Factory configuration and source revision.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read"],
+      "scope": "Same exact configured IDs, verified against the live catalog.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "None.",
+      "approval": "No write approval."
+    },
+    {
+      "name": "factory_cli_health",
+      "purpose": "Actually invoke the existing azurefactory CLI health command.",
+      "input_schema": {"type": "object", "properties": {}, "additionalProperties": false},
+      "output_schema_reference": "read_output_schema",
+      "required_permissions": ["factory.read"],
+      "scope": "Configured API URL, fixed Python module and validated argument array.",
+      "changes_state": false,
+      "timeout_seconds": 65,
+      "retry": "None.",
+      "approval": "No write approval; arbitrary shell/executables are not supported."
+    },
+    {
+      "name": "factory_prepare_settings",
+      "model_callable": false,
+      "purpose": "Prepare a real configuration-only department metadata plan from the authenticated proposal endpoint.",
+      "input_schema": {
+        "type": "object", "required": ["settings"], "additionalProperties": false,
+        "properties": {"settings": {"type": "object", "required": ["department_name", "department_id"], "additionalProperties": false, "properties": {"department_name": {"type": ["string", "null"], "maxLength": 200}, "department_id": {"type": ["string", "null"], "maxLength": 128}}}}
+      },
+      "output_schema": {"type": "object", "required": ["id", "plan_hash", "scope_key", "status", "expires_at", "affected_resources"]},
+      "required_permissions": ["factory.read", "config.write"],
+      "scope": "Exact configured single DEV placement; backend validates underlying preview and revision.",
+      "changes_state": "Creates a pending plan/review, never confirms Factory changes.",
+      "timeout_seconds": 60,
+      "retry": "Never automatically replay prepare/confirm writes.",
+      "approval": "Separate authenticated approval of the exact hash; execution uses Blob ETag CAS and one-use state. Destructive and infrastructure deployment operations are not exposed."
+    }
+  ]
+}
