@@ -118,6 +118,71 @@ configuration recording's happy-path.
 
 ## Core commands
 
+### Delete a whole factory's Azure resources
+
+`delete-aifactory` uses only the shared API's named deletion routes, never local
+`az`/`gh`, legacy scripts or a catalog fallback. An older API without
+`delete-aifactory-v1` is blocked. This is **Azure resource deletion**, not removal
+of a saved factory entry.
+Repository-only single-writer deletion availability depends on published backend
+support and the exact preview's `can_execute` result; the named API capability
+alone does not establish readiness. A blocked preview remains blocked; do not
+change coordination settings, run separate deletions or use another route to
+bypass it.
+
+The factory's existing enrollment must also explicitly permit deletion
+(`allow_delete=true`). A confirmation prompt does not grant that permission.
+New enrollment defaults to disallowing deletion; have an authorized operator
+review that governance setting rather than bypassing it.
+
+First select the exact factory UUID and current `source_revision` from
+`azurefactory catalog list --folder $env:FACTORY_FOLDER`, then prepare:
+
+```powershell
+azurefactory delete-aifactory prepare --folder $env:FACTORY_FOLDER `
+  --factory-id $env:FACTORY_ID --expected-revision $env:CATALOG_REVISION `
+  --save-receipt .\delete-factory.receipt.json
+```
+
+Preparation does not delete anything. Review **all** listed scale sets, resource
+groups, subscriptions, tenants, exact `delete`/`retain` resource IDs, source
+version, warnings and expiry. The backend must explicitly acknowledge Entra
+security-group preservation and saved-configuration handling. Repositories,
+subscription-level configuration and outside-group dependencies are not claimed
+deleted; the backend's retained-resource warnings describe the limitations.
+Empty, narrowed, inconsistent or broadened manifests cannot be confirmed.
+The review reports the backend's saved-configuration handling explicitly:
+the current backend removes the local catalog registration/configuration only
+after verified whole-factory deletion succeeds, and retains it on failure.
+Entra security groups and Git history remain preserved.
+
+After a human approves that exact review, run a separate command:
+
+```powershell
+azurefactory delete-aifactory confirm --receipt .\delete-factory.receipt.json
+```
+
+The terminal displays “Are you sure…” and the complete review before asking
+whether to continue and requiring the exact server phrase, `DELETE <factory key>`.
+`--yes` alone **never** deletes. Declining, end-of-input or a wrong phrase sends
+no confirmation. Without an interactive terminal, both `--yes` and
+`--confirmation-phrase` containing the exact reviewed server phrase are required.
+These flags do not replace human/session approval when an assistant runs tools.
+The CLI sends the receipt-bound **server** preview hash, not a regenerated
+approval. Receipts are bound to the API URL, folder, factory, revision and expiry;
+existing receipt files are never overwritten.
+
+Observe the returned job without retrying deletion:
+
+```powershell
+azurefactory delete-aifactory status --folder $env:FACTORY_FOLDER --job-id $env:DELETE_JOB_ID
+```
+
+A timeout is an **unknown outcome**, not cancellation or permission to retry.
+Inspect server state before further action; confirmation is never retried
+automatically. Tests use mocked transport only and do not establish Azure
+deletion success.
+
 ### Shell-first registered onboarding
 
 From the root of an existing consumer Git repository, with a **current approved**

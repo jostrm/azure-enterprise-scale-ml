@@ -5,20 +5,18 @@ reviewed IaC execution, Azure monitoring, project operations and tickets.
 
 ## Install
 
-1. Download **all four files** below and keep them together in one local folder. These are direct download links.
+1. Open the [matched desktop release](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/desktop-v0.47.6) and download the **1.0.1 Setup EXE and all its `.bin` parts** into one folder.
 2. Double-click the setup EXE and follow the short wizard. It installs for your Windows account; administrator rights are not normally required.
 3. Open **Enterprise Scale AI Factory** from Start. The app starts its bundled local API automatically.
 
-| Download | Size |
+| Download | Version |
 | --- | --- |
-| [Setup EXE](https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_config_wizard/maui/ESAIF.ConfigWizard-1.0.0-win-x64-setup.exe) | 2.3 MB |
-| [Data part 1](https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_config_wizard/maui/ESAIF.ConfigWizard-1.0.0-win-x64-setup-1.bin) | 93.7 MB |
-| [Data part 2](https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_config_wizard/maui/ESAIF.ConfigWizard-1.0.0-win-x64-setup-2.bin) | 96.0 MB |
-| [Data part 3](https://raw.githubusercontent.com/jostrm/azure-enterprise-scale-ml/main/environment_setup/install_config_wizard/maui/ESAIF.ConfigWizard-1.0.0-win-x64-setup-3.bin) | 33.3 MB |
+| [Setup EXE](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/ESAIF.ConfigWizard-1.0.1-win-x64-setup.exe) | MAUI 1.0.1 |
+| [All required data parts](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/desktop-v0.47.6) | Match the Setup EXE filename |
 
-**Yes, all three data parts and the Setup EXE are required.** The `.bin` files contain the compressed application and bundled runtimes. They are not optional downloads or your personal data. The installer is split to stay below GitHub's file-size limit.
+**All data parts and the Setup EXE are required.** The `.bin` files contain the compressed application and included components. They are not optional downloads or your personal data.
 
-Keep all four files together with their original filenames, then run **only the Setup EXE**. It reads the three data parts automatically. [SHA256SUMS.txt](SHA256SUMS.txt) lists the expected hashes; compare a download with `Get-FileHash .\filename -Algorithm SHA256`.
+Keep the files together with their original filenames, then run **only the Setup EXE**. It reads the data parts automatically. [MAUI-SHA256SUMS.txt](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/MAUI-SHA256SUMS.txt) lists their hashes; compare a download with `Get-FileHash .\filename -Algorithm SHA256`. This installer includes the matched v0.47.6 API.
 
 **Unsigned preview:** Windows SmartScreen or your organization's application policy may warn or block installation. Verify the download source and hashes. Follow your organization's approval process; do not disable security controls. This is not a Microsoft Store or signed enterprise deployment package.
 

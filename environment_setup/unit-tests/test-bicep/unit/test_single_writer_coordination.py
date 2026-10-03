@@ -370,11 +370,318 @@ def test_non_blob_mode_is_reviewed_and_unsupported_operations_block(monkeypatch)
         fl.validate_manifest(tl.seal(document))
     document["locks"].pop("inherited_leases")
     document["operation"] = "delete"
-    with pytest.raises(fl.Blocked, match="scoped-deployment"):
+    with pytest.raises(fl.Blocked, match="whole-owned-groups"):
         fl.validate_manifest(tl.seal(document))
-    with pytest.raises(fl.Blocked, match="cohort-not-supported"):
+    with pytest.raises(fl.Blocked, match="whole-owned-groups"):
         fl.execute_cohort([document], "unread", "unread", "unread")
     assert not provider.calls and not cloud.arm_writes
+
+
+def deletion_setup(kind="gha", count=2, search=False, storage=False):
+    if search or storage:
+        cloud = tl.EmbeddedStoragePECCloud() if storage else tl.SearchDeletionCloud()
+        document = tl.manifest()
+        document["deletion"] = fl.freeze_deletion_inventory(cloud, document, getattr(cloud, "ownership_records", {}))
+        documents = [tl.seal(document)]
+    else:
+        documents, cloud = tl.cohort_fixture()
+        documents = documents[:count]
+    repository = "https://github.com/org/consumer" if kind == "gha" else "https://dev.azure.com/org/project/_git/consumer"
+    route = {**documents[0]["route"], "kind": kind, "repository": repository}
+    enrolled = cloud.enrollment
+    enrolled.update(protocol="aifactory-single-writer-v1", enforcement="repository-exclusive-writer")
+    enrolled["writers"] = {route["writer_id"]: {key: route[key] for key in ("kind", "repository", "shared_remote")}}
+    for scope in enrolled["scopes"].values():
+        scope["writers"] = [route["writer_id"]]
+    provider = Provider(repository)
+    provider.set_state({"schema": 1, "repository": repository, "enrollment": enrolled,
+                        "active": None, "records": copy.deepcopy(cloud.runs)})
+    cloud.state_request = provider.call
+    cloud.request = lambda *args, **kwargs: pytest.fail("Deletion never uses Blob or Graph")
+    for document in documents:
+        document["route"] = copy.deepcopy(route)
+        document["locks"] = ps.coordinates(repository) | {
+            "coordination_hash": fl.digest(enrolled), "revision": enrolled["revision"],
+            "scopes": document["locks"]["scopes"], "common_dependencies": document["locks"]["common_dependencies"]}
+        tl.seal(document)
+    return documents, provider, cloud
+
+
+def run_deletion(monkeypatch, workspace, documents, cloud):
+    monkeypatch.setattr(fl, "verify_source", lambda cloud, root, source: root)
+    return fl.execute_cohort(documents, workspace / "source", workspace / "execution", workspace / "execution" / "receipt.json",
+                             cloud_factory=lambda document: cloud)
+
+
+@pytest.mark.parametrize("kind", ["gha", "ado"])
+@pytest.mark.parametrize("count", [1, 2])
+def test_repository_deletion_atomically_claims_full_union_and_persists_exact_receipts(monkeypatch, workspace, kind, count):
+    documents, provider, cloud = deletion_setup(kind, count)
+    scopes = {scope.lower() for document in documents for scope in
+              document["locks"]["scopes"] + document["locks"]["common_dependencies"]}
+    for document in documents:
+        assert fl.freeze_deletion_inventory(cloud, document, {}) == document["deletion"]
+    assert all(method == "GET" for method, _, _ in provider.calls)
+
+    def before_delete(resource):
+        state = provider.state()
+        active = state["active"]
+        assert active["kind"] == "deletion-cohort"
+        assert set(active["context"]) >= scopes | {"factory/factory-a"}
+        assert active["owner_hash"] == fl.digest({key: value for key, value in active.items() if key != "owner_hash"})
+        for document in documents:
+            assert "scaleset/factory-a/" + document["target"]["scaleset_id"] in active["context"]
+            assert state["records"]["runs/" + document["run_id"] + ".claim.json"]["manifest_hash"] == document["manifest_hash"]
+    cloud.before_delete = before_delete
+    result = run_deletion(monkeypatch, workspace, documents[::-1], cloud)
+    assert result["status"] == "succeeded", result
+    assert provider.state()["active"] is None and not result["lock_retained"]
+    records = provider.state()["records"]
+    assert records["cohorts/" + result["cohort_hash"] + ".json"]["status"] == "succeeded"
+    for document in documents:
+        receipt = records["runs/" + document["run_id"] + ".json"]
+        assert receipt["status"] == "succeeded" and receipt["lock_retained"] is False
+        assert receipt["source_commit"] == document["source"]["commit"]
+        assert set(receipt["deleted_resources"]) == {
+            row["id"] for row in document["deletion"]["resources"] + document["deletion"]["resource_groups"]}
+        assert "runs/" + document["run_id"] + ".worker.json" not in records
+    assert "synthetic-not-a-credential" not in json.dumps(records)
+    assert not cloud.leases
+
+
+@pytest.mark.parametrize("failure", ["inventory", "private", "unregistered", "revision", "identity", "source"])
+def test_repository_deletion_preclaim_failure_has_no_azure_writes(monkeypatch, workspace, failure):
+    documents, provider, cloud = deletion_setup()
+    if failure == "inventory":
+        cloud.bodies[tl.NSG.lower()]["etag"] = '"changed"'
+    if failure == "private":
+        provider.public = True
+    if failure in ("revision", "unregistered"):
+        state = provider.state()
+        if failure == "revision":
+            state["enrollment"]["revision"] += 1
+        else:
+            state["enrollment"]["scopes"].pop(tl.GROUP.lower())
+        provider.set_state(state)
+    if failure == "identity":
+        cloud.bodies[tl.NSG.lower()]["identity"] = {"principalId": tl.IDENTITY}
+    if failure == "source":
+        def verify_source(*args):
+            raise fl.Blocked("published-single-writer-adapter-mismatch")
+        monkeypatch.setattr(fl, "verify_source", verify_source)
+        result = fl.execute_cohort(documents, workspace / "source", workspace / "execution", workspace / "execution" / "receipt.json",
+                                  cloud_factory=lambda document: cloud)
+    else:
+        result = run_deletion(monkeypatch, workspace, documents, cloud)
+    assert result["status"] == "blocked", result
+    assert not cloud.deleted
+    assert provider.state()["active"] is None
+
+
+@pytest.mark.parametrize("failure", ["delete", "lost-delete-response", "claim-response", "release-response", "owner", "revision"])
+def test_repository_deletion_uncertainty_retains_reservations_or_requires_reconciliation(monkeypatch, workspace, failure):
+    documents, provider, cloud = deletion_setup()
+    if failure == "delete":
+        cloud.fail_delete = True
+    if failure == "lost-delete-response":
+        cloud.delete_response_uncertain = True
+    if failure == "claim-response":
+        provider.uncertain = True
+    if failure in ("owner", "revision"):
+        def change_state(resource):
+            state = provider.state()
+            if failure == "owner":
+                state["active"]["claim_id"] = "someone-else"
+            else:
+                state["enrollment"]["revision"] += 1
+            provider.set_state(state)
+        cloud.after_delete = change_state
+    if failure == "release-response":
+        original = provider.call
+        def call(kind, method, endpoint, body, allowed):
+            if body and "/git/blobs" in endpoint:
+                candidate = json.loads(base64.b64decode(body["content"]))
+                if candidate["active"] is None and any(name.startswith("cohorts/") for name in candidate["records"]):
+                    provider.uncertain = True
+            return original(kind, method, endpoint, body, allowed)
+        cloud.state_request = call
+    result = run_deletion(monkeypatch, workspace, documents, cloud)
+    assert result["status"] == "reconciliation-required", result
+    assert result["lock_retained"]
+    if failure != "release-response":
+        assert provider.state()["active"]
+    if failure == "claim-response":
+        assert not cloud.deleted
+    if failure in ("owner", "revision"):
+        assert len(cloud.deleted) == 1
+
+
+@pytest.mark.parametrize("kind", ["gha", "ado"])
+def test_repository_deletion_concurrent_cohorts_use_one_atomic_cas_without_partial_claims(kind):
+    documents, provider, cloud = deletion_setup(kind)
+    winner_documents = copy.deepcopy(documents)
+    for document in winner_documents:
+        document["run_id"] = str(uuid4())
+        tl.seal(document)
+    winner = fl._RepositoryDeletionCohort([fl._RepositoryDeletionMember(cloud, d) for d in winner_documents])
+    loser = fl._RepositoryDeletionCohort([fl._RepositoryDeletionMember(cloud, d) for d in documents])
+    provider.contender = winner.acquire
+    with pytest.raises(en.EnrollmentError, match="conflict|fast-forward"):
+        loser.acquire()
+    assert provider.state()["active"] == winner.active
+    with pytest.raises(fl.Blocked, match="reconciliation"):
+        loser.abort([], {})
+    winner.assert_held()
+    assert not cloud.deleted
+
+
+def test_repository_deletion_search_links_are_removed_before_group_with_real_receipt_reader(monkeypatch, workspace):
+    documents, provider, cloud = deletion_setup(search=True)
+    result = run_deletion(monkeypatch, workspace, documents, cloud)
+    assert result["status"] == "succeeded", result
+    deleted = [identifier.lower() for identifier in cloud.deleted]
+    assert deleted.index(cloud.link.lower()) < deleted.index(tl.GROUP.lower())
+    assert provider.state()["active"] is None
+
+
+@pytest.mark.parametrize("defect", [None, "drift", "auto-removed"])
+def test_repository_deletion_embedded_storage_connection_retains_strict_parent_guards(monkeypatch, workspace, defect):
+    documents, provider, cloud = deletion_setup(storage=True)
+    cloud.storage_defect = defect
+    result = run_deletion(monkeypatch, workspace, documents, cloud)
+    deleted = [identifier for method, identifier in cloud.events if method == "DELETE"]
+    assert cloud.connection.lower() not in deleted
+    if defect:
+        assert result["status"] == "reconciliation-required", result
+        assert result["error_code"] == "complete-resource-closure-changed"
+        assert deleted == [cloud.link.lower()] and provider.state()["active"]
+    else:
+        assert result["status"] == "succeeded", result
+        assert deleted == [cloud.link.lower(), tl.GROUP.lower()]
+        assert cloud.connection.lower() in {value.lower() for value in result["children"][0]["deleted_resources"]}
+        assert provider.state()["active"] is None and not cloud.bodies
+
+
+def test_repository_deletion_source_and_repository_cohort_mismatches_fail_before_claim(monkeypatch, workspace):
+    documents, provider, cloud = deletion_setup()
+    documents[1]["source"]["commit"] = "f" * 40
+    tl.seal(documents[1])
+    with pytest.raises(fl.Blocked, match="cohort-source"):
+        run_deletion(monkeypatch, workspace, documents, cloud)
+    assert provider.state()["active"] is None and not cloud.deleted
+
+
+def test_repository_deletion_cannot_mutate_graph(monkeypatch):
+    documents, _, _ = deletion_setup(count=1)
+    cloud = fl.Cloud(documents[0], command_runner=lambda *args, **kwargs: pytest.fail("No commands"),
+                     opener=SimpleNamespace(open=lambda *args, **kwargs: pytest.fail("No HTTP")))
+    for host in ("graph.microsoft.com", "graph.windows.net"):
+        for method in ("POST", "PATCH", "DELETE"):
+            with pytest.raises(fl.Blocked, match="entra"):
+                cloud.request(method, "https://" + host + "/v1.0/groups/test", "https://" + host)
+
+
+@pytest.mark.parametrize("kind", ["gha", "ado"])
+def test_overlapping_factories_cannot_reserve_shared_dependency_concurrently(kind):
+    documents, provider, cloud = deletion_setup(kind)
+    other = documents.pop()
+    old_factory = other["target"]["factory_id"]
+    other["target"]["factory_id"] = "factory-b"
+    group = other["locks"]["scopes"][0].lower()
+    state = provider.state()
+    state["enrollment"]["scopes"][group]["target"]["factory_id"] = "factory-b"
+    for key, body in cloud.bodies.items():
+        if fl.arm_scope(key) == group:
+            body["tags"]["aifactory.factory_id"] = "factory-b"
+    provider.set_state(state)
+    for document in [*documents, other]:
+        document["locks"]["coordination_hash"] = fl.digest(state["enrollment"])
+        document["deletion"] = fl.freeze_deletion_inventory(cloud, document, {})
+        tl.seal(document)
+    first = fl._RepositoryDeletionCohort([fl._RepositoryDeletionMember(cloud, d) for d in documents])
+    second = fl._RepositoryDeletionCohort([fl._RepositoryDeletionMember(cloud, other)])
+    assert old_factory != other["target"]["factory_id"]
+    assert set(map(str.lower, documents[0]["locks"]["common_dependencies"])) & set(
+        map(str.lower, other["locks"]["common_dependencies"]))
+    provider.contender = second.acquire
+    with pytest.raises(en.EnrollmentError, match="conflict|fast-forward"):
+        first.acquire()
+    assert provider.state()["active"] == second.active
+    assert provider.state()["active"]["context"].get("factory/factory-b")
+    second.assert_held()
+    assert not cloud.deleted
+
+
+@pytest.mark.parametrize("defect", ["source", "deleted", "claim", "reappeared", "receipt-response"])
+def test_repository_deletion_terminal_evidence_is_verified_before_releasing(monkeypatch, workspace, defect):
+    documents, provider, cloud = deletion_setup(count=1)
+    original = fl._RepositoryDeletionCohort.release
+
+    def release(cohort):
+        state = provider.state()
+        name = "runs/" + documents[0]["run_id"] + ".json"
+        if defect == "source":
+            state["records"][name]["source_commit"] = "f" * 40
+        if defect == "deleted":
+            state["records"][name]["deleted_resources"].pop()
+        if defect == "claim":
+            state["records"][name]["execution_claim"]["claim_id"] = str(uuid4())
+        if defect == "reappeared":
+            group = documents[0]["locks"]["scopes"][0]
+            cloud.bodies[group.lower()] = {"id": group, "properties": {"provisioningState": "Succeeded"}}
+        if defect != "receipt-response":
+            provider.set_state(state)
+        return original(cohort)
+    monkeypatch.setattr(fl._RepositoryDeletionCohort, "release", release)
+    if defect == "receipt-response":
+        cloud.after_delete = lambda resource: setattr(provider, "uncertain", True)
+    result = run_deletion(monkeypatch, workspace, documents, cloud)
+    assert result["status"] == "reconciliation-required", result
+    assert result["lock_retained"] and provider.state()["active"]
+
+
+def test_single_writer_direct_delete_uses_same_cohort_protocol(monkeypatch, workspace):
+    documents, provider, cloud = deletion_setup(count=1)
+    monkeypatch.setattr(fl, "verify_source", lambda cloud, root, source: root)
+    receipt = workspace / "execution" / "single.json"
+    result = fl.execute(documents[0], workspace / "source", receipt.parent, receipt, cloud=cloud)
+    assert result["status"] == "succeeded", result
+    assert json.loads(receipt.read_text()) == result
+    assert provider.state()["active"] is None
+
+
+def test_repository_deletion_preserves_and_uses_untaggable_child_worker_receipt(monkeypatch, workspace):
+    documents, provider, cloud = deletion_setup(count=1)
+    document = documents[0]
+    key = tl.RULE.lower()
+    cloud.bodies[key].pop("tags")
+    run = str(uuid4())
+    receipt = {"schema": 1, "run_id": run, "status": "succeeded", "manifest_hash": "e" * 64,
+               "target": tl.CORE_OWNER, "ownership": [{
+                   "resource_id": tl.RULE, "owner": tl.CORE_OWNER, "body_hash": fl.digest(cloud.bodies[key])}]}
+    state = provider.state()
+    name = "runs/" + run + ".worker.json"
+    state["records"][name] = receipt
+    provider.set_state(state)
+    evidence = {key: {"owner": tl.CORE_OWNER, "ownership_source": "deployment-receipt",
+                     "ownership_evidence": {"run_id": run, "receipt_hash": fl.digest(receipt)}}}
+    document["deletion"] = fl.freeze_deletion_inventory(cloud, document, evidence)
+    tl.seal(document)
+    result = run_deletion(monkeypatch, workspace, documents, cloud)
+    assert result["status"] == "succeeded", result
+    assert provider.state()["records"][name] == receipt
+
+
+def test_repository_deletion_does_not_override_enrollment_delete_denial(monkeypatch, workspace):
+    documents, provider, cloud = deletion_setup(count=1)
+    state = provider.state()
+    state["enrollment"]["scopes"][tl.GROUP.lower()]["allow_delete"] = False
+    provider.set_state(state)
+    documents[0]["locks"]["coordination_hash"] = fl.digest(state["enrollment"])
+    tl.seal(documents[0])
+    result = run_deletion(monkeypatch, workspace, documents, cloud)
+    assert result["error_code"] == "physical-target-deletion-not-enrolled"
+    assert not cloud.deleted and provider.state()["active"] is None
 
 
 def test_distinct_templates_scope_provider_credentials_and_keep_blob_permissions():

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import base64
 import copy
+from datetime import datetime
 import hashlib
 import ipaddress
 import json
@@ -42,6 +43,9 @@ import release_version
 CONTRACT_VERSION = 1
 NETWORK_API = "2024-05-01"
 DNS_API = "2022-07-01"
+POLICY_API = "2022-06-01"
+POLICY_DEFINITION_API = "2023-04-01"
+EXEMPTION_API = "2022-07-01-preview"
 GATEWAY_ROUTE_APPEND_LIMITATION = "gateway-route-append-strong-if-match-unverified"
 # VirtualNetworkGateways_CreateOrUpdate has no documented If-Match precondition;
 # UpdateTags (PATCH) cannot update routes. An ETag alone is not a CAS guarantee.
@@ -88,6 +92,7 @@ CONFIG_KEYS = {
     "access_hub_subscription_id", "access_hub_resource_group", "access_hub_vnet_name",
     "access_hub_vnet_cidr", "vpn_client_cidr", "dev_vnet_cidr",
     "first_party_apps", "resource_providers", "coordination_mode",
+    "dns_policy_exemption_assignment_ids", "dns_policy_exemption_expires_on",
 }
 FIRST_PARTY_APPS = {"azure-machine-learning": "0736f41a-0425-4b46-bdb5-1563eff02385",
                     "databricks": "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"}
@@ -310,6 +315,288 @@ class Builder:
         elif existing.get("properties", {}).get("provisioningState", "Succeeded") != "Succeeded":
             self.blockers.append("existing-resource-not-ready:" + identifier)
         return existing
+
+
+def dns_policy_exemption_inputs(config, subscription_id):
+    """Explicit JSON-string list for generated string-field clients; no legacy knob."""
+    try:
+        ids = json.loads(config.get("dns_policy_exemption_assignment_ids", "[]"))
+    except (ValueError, TypeError):
+        raise PrerequisiteError("dns-policy-assignment-json-list-required") from None
+    pattern = (r"/subscriptions/" + re.escape(subscription_id)
+               + r"/providers/Microsoft\.Authorization/policyAssignments/[A-Za-z0-9_.-]{1,64}")
+    require(isinstance(ids, list) and len(ids) <= 16
+            and all(isinstance(item, str) and re.fullmatch(pattern, item, re.I) for item in ids)
+            and len({item.lower() for item in ids}) == len(ids),
+            "dns-policy-exact-target-subscription-assignments-required")
+    expiry = config.get("dns_policy_exemption_expires_on", "")
+    require(isinstance(expiry, str) and (not expiry or ids), "dns-policy-expiry-requires-assignment")
+    if expiry:
+        require(re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", expiry),
+                "dns-policy-expiry-utc-required")
+        try:
+            expires_at = datetime.fromisoformat(expiry.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            raise PrerequisiteError("dns-policy-expiry-utc-required") from None
+        require(expires_at > time.time(), "dns-policy-exemption-expired")
+    return sorted(ids, key=str.lower), expiry
+
+
+class _DnsPolicyEvidence:
+    MAX_DEFINITIONS = 128
+    MAX_READS = 256
+    MAX_EVIDENCE_BYTES = 8 * 1024 * 1024
+    READ_SECONDS = 120
+
+    def __init__(self, builder, subscription):
+        self.builder, self.subscription = builder, subscription
+        self.deadline = time.monotonic() + self.READ_SECONDS
+        self.documents = {}
+        self.evidence_bytes = 0
+
+    def read(self, identifier, api=POLICY_API, query=""):
+        require(time.monotonic() < self.deadline, "dns-policy-read-deadline-exceeded")
+        if identifier.lower() not in self.documents:
+            require(len(self.documents) < self.MAX_READS, "dns-policy-read-limit-exceeded")
+            if identifier.lower().startswith("/subscriptions/"):
+                value = self.builder.read(identifier, api)
+            else:
+                _, _, value = self.builder.runtime.http(
+                    "GET", enrollment.ARM + identifier + "?api-version=" + api + query, enrollment.ARM + "/")
+                self.builder.observations.append({"kind": "dns-policy-definition", "id": identifier, "value": value})
+            require(time.monotonic() < self.deadline, "dns-policy-read-deadline-exceeded")
+            require(isinstance(value, dict) and str(value.get("id", "")).lower() == identifier.lower(),
+                    "dns-policy-definition-missing-or-mismatched")
+            self.evidence_bytes += len(canonical(value))
+            require(self.evidence_bytes <= self.MAX_EVIDENCE_BYTES, "dns-policy-evidence-size-limit")
+            self.documents[identifier.lower()] = value
+        return self.documents[identifier.lower()]
+
+    def definition(self, identifier, *, initiative=False):
+        kinds = "policyDefinitions|policySetDefinitions" if initiative else "policyDefinitions"
+        match = re.fullmatch(
+            r"(?:(/subscriptions/" + re.escape(self.subscription) + r")|"
+            r"(/providers/Microsoft\.Management/managementGroups/[A-Za-z0-9_.()-]{1,90}))?"
+            r"/providers/Microsoft\.Authorization/(" + kinds + r")/[A-Za-z0-9_.-]{1,128}",
+            identifier if isinstance(identifier, str) else "", re.I)
+        require(match is not None, "dns-policy-definition-scope-or-kind-unsupported")
+        if match[2]:
+            group = self.read(match[2], "2020-05-01", "&$expand=children&$recurse=true")
+            pending = list(group.get("properties", {}).get("children", []))
+            found, count = False, 0
+            while pending:
+                child = pending.pop()
+                count += 1
+                require(count <= 4096 and isinstance(child, dict), "dns-policy-ancestor-inventory-unbounded")
+                found |= (str(child.get("id", "")).lower() == "/subscriptions/" + self.subscription.lower()
+                          or str(child.get("type", "")).lower() == "/subscriptions"
+                          and str(child.get("name", "")).lower() == self.subscription.lower())
+                children = child.get("children", [])
+                require(isinstance(children, list), "dns-policy-ancestor-inventory-invalid")
+                pending.extend(children)
+            require(found, "dns-policy-definition-management-group-not-ancestor")
+        return self.read(identifier, POLICY_DEFINITION_API)
+
+
+def _dns_parameter_expression(value, parameters, unresolved):
+    if isinstance(value, str) and value.startswith("["):
+        match = re.fullmatch(r"\[\s*parameters\(\s*'([^']+)'\s*\)\s*\]", value, re.I)
+        key = match[1].casefold() if match else None
+        if key is None or key not in parameters:
+            unresolved.append(value)
+            return None
+        return copy.deepcopy(parameters[key])
+    if isinstance(value, dict):
+        return {key: _dns_parameter_expression(item, parameters, unresolved) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_dns_parameter_expression(item, parameters, unresolved) for item in value]
+    return copy.deepcopy(value)
+
+
+def _dns_parameters(definition, supplied, parent=None):
+    schema = definition.get("properties", {}).get("parameters", {})
+    require(isinstance(schema, dict) and isinstance(supplied, dict), "dns-policy-parameter-map-invalid")
+    require(all(isinstance(name, str) for name in [*schema, *supplied])
+            and len({name.casefold() for name in schema}) == len(schema)
+            and len({name.casefold() for name in supplied}) == len(supplied),
+            "dns-policy-parameter-name-ambiguous")
+    schema = {name.casefold(): value for name, value in schema.items()}
+    supplied = {name.casefold(): value for name, value in supplied.items()}
+    unresolved = sorted(set(supplied) - set(schema))
+    values = {}
+    for name, spec in schema.items():
+        require(isinstance(spec, dict), "dns-policy-parameter-schema-invalid")
+        if name in supplied:
+            entry = supplied[name]
+            require(isinstance(entry, dict) and "value" in entry, "dns-policy-parameter-value-required")
+            value = (_dns_parameter_expression(entry["value"], parent, unresolved) if parent is not None
+                     else copy.deepcopy(entry["value"]))
+        elif "defaultValue" in spec:
+            value = copy.deepcopy(spec["defaultValue"])
+        else:
+            unresolved.append(name)
+            continue
+        values[name] = value
+    return values, unresolved
+
+
+def _dns_private_endpoint_condition(condition, parameters):
+    if not isinstance(condition, dict):
+        return False
+    if isinstance(condition.get("allOf"), list):
+        return any(_dns_private_endpoint_condition(child, parameters) for child in condition["allOf"])
+    if isinstance(condition.get("anyOf"), list):
+        return bool(condition["anyOf"]) and all(
+            _dns_private_endpoint_condition(child, parameters) for child in condition["anyOf"])
+    unknown = []
+    equals = _dns_parameter_expression(condition.get("equals"), parameters, unknown)
+    return (not unknown and str(condition.get("field", "")).lower() == "type"
+            and isinstance(equals, str) and equals.lower() == "microsoft.network/privateendpoints")
+
+
+def _dns_selected(definition, parameters, unresolved, *, direct=False):
+    rule = definition.get("properties", {}).get("policyRule", {})
+    require(isinstance(rule, dict) and isinstance(rule.get("then"), dict), "dns-policy-rule-invalid")
+    then, unknown = rule["then"], []
+    effect = _dns_parameter_expression(then.get("effect"), parameters, unknown)
+    if isinstance(effect, str) and effect.lower() in (
+            "deny", "audit", "disabled", "auditifnotexists", "append", "modify", "manual", "denyaction"):
+        require(not direct, "dns-policy-private-endpoint-dns-dine-only")
+        return False
+    resource_type = _dns_parameter_expression(then.get("details", {}).get("type"), parameters, unknown)
+    endpoint = _dns_private_endpoint_condition(rule.get("if"), parameters)
+    dns_type = isinstance(resource_type, str) and resource_type.lower() == "microsoft.network/privateendpoints/privatednszonegroups"
+    dns = endpoint and dns_type
+    if (dns_type or endpoint) and (unknown or unresolved):
+        raise PrerequisiteError("dns-policy-selected-parameters-unresolved")
+    if dns:
+        require(isinstance(effect, str) and effect.lower() == "deployifnotexists",
+                "dns-policy-private-endpoint-dns-dine-only")
+    selected = dns and isinstance(effect, str) and effect.lower() == "deployifnotexists"
+    if direct:
+        require(selected, "dns-policy-private-endpoint-dns-dine-only")
+    return selected
+
+
+def _dns_definition_version(definition, requested):
+    if requested is None:
+        return
+    pattern = r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*|\*)\.(0|[1-9][0-9]*|\*)(-preview)?"
+    wanted = re.fullmatch(pattern, requested, re.I) if isinstance(requested, str) else None
+    properties = definition.get("properties", {})
+    version = properties.get("version") or properties.get("metadata", {}).get("version")
+    actual = re.fullmatch(pattern.replace("|\\*", ""), version, re.I) if isinstance(version, str) else None
+    require(wanted is not None and actual is not None
+            and all(part == "*" or part.lower() == value.lower()
+                    for part, value in zip(wanted.groups()[:3], actual.groups()[:3]))
+            and bool(wanted[4]) == bool(actual[4]), "dns-policy-version-selection-unsupported")
+
+
+def _dns_policy_selection(evidence, assignment):
+    props = assignment["properties"]
+    definition_id = props.get("policyDefinitionId", "")
+    definition = evidence.definition(definition_id, initiative=True)
+    _dns_definition_version(definition, props.get("definitionVersion"))
+    parameters, unresolved = _dns_parameters(definition, props.get("parameters", {}))
+    children, selected = [], []
+    if "/policysetdefinitions/" in definition_id.lower():
+        require(not unresolved, "dns-policy-initiative-parameters-unresolved")
+        refs = definition.get("properties", {}).get("policyDefinitions")
+        require(isinstance(refs, list) and 0 < len(refs) <= evidence.MAX_DEFINITIONS,
+                "dns-policy-initiative-definition-limit")
+        names = [item.get("policyDefinitionReferenceId") if isinstance(item, dict) else None for item in refs]
+        require(all(isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", name) for name in names)
+                and len({name.casefold() for name in names}) == len(names), "dns-policy-reference-id-ambiguous")
+        for ref in refs:
+            child = evidence.definition(ref.get("policyDefinitionId"))
+            _dns_definition_version(child, ref.get("definitionVersion"))
+            values, unknown = _dns_parameters(child, ref.get("parameters", {}), parameters)
+            chosen = _dns_selected(child, values, unknown)
+            children.append({"reference": ref["policyDefinitionReferenceId"], "definition": child,
+                             "parameters": values, "unresolved": unknown, "selected": chosen})
+            if chosen:
+                selected.append(ref["policyDefinitionReferenceId"])
+        require(selected, "dns-policy-initiative-has-no-verified-dns-dine-references")
+    else:
+        _dns_selected(definition, parameters, unresolved, direct=True)
+    return definition_id, sorted(selected), {"assignment": assignment, "definition": definition,
+        "parameters": parameters, "children": children, "selected_reference_ids": sorted(selected)}
+
+
+def _dns_exemption_matches(existing, identifier, properties):
+    actual = existing.get("properties", {})
+    refs = actual.get("policyDefinitionReferenceIds", [])
+    if not (isinstance(refs, list) and all(isinstance(ref, str) for ref in refs)
+            and len(refs) == len(set(refs)) and set(refs) == set(properties.get("policyDefinitionReferenceIds", []))):
+        return False
+    expiry, expected_expiry = actual.get("expiresOn") or "", properties.get("expiresOn") or ""
+    try:
+        equal_expiry = (datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+                        == datetime.fromisoformat(expected_expiry.replace("Z", "+00:00"))) if expiry and expected_expiry else expiry == expected_expiry
+    except (ValueError, AttributeError):
+        return False
+    return (str(existing.get("id", "")).lower() == identifier.lower()
+            and _contains(actual, {key: value for key, value in properties.items()
+                                   if key not in ("policyDefinitionReferenceIds", "expiresOn")})
+            and equal_expiry and not actual.get("resourceSelectors")
+            and actual.get("assignmentScopeValidation", "Default") == "Default")
+
+
+def dns_policy_exemptions(builder, config, target, context, owned, *, create=False):
+    ids, expiry = dns_policy_exemption_inputs(config, target["subscription_id"])
+    if not ids:
+        return []
+    common = (f"/subscriptions/{target['subscription_id']}/resourcegroups/{target['prefix']}esml-common-"
+              f"{context['location_short']}-dev-{target['suffix']}").lower()
+    project = context.get("project_resource_group_id", "").lower()
+    require(target.get("project_id") and project and set(owned) == {common, project}
+            and project == (f"/subscriptions/{target['subscription_id']}/resourcegroups/{target['prefix']}esml-project"
+                            f"{target['project_number']}-{context['location_short']}-dev-{target['suffix']}-rg").lower(),
+            "dns-policy-exact-common-and-selected-project-required")
+    reviews = []
+    evidence = _DnsPolicyEvidence(builder, target["subscription_id"])
+    for assignment_id in ids:
+        assignment = evidence.read(assignment_id)
+        require(isinstance(assignment, dict) and str(assignment.get("id", "")).lower() == assignment_id.lower(),
+                "dns-policy-assignment-missing-or-mismatched")
+        props = assignment.get("properties", {})
+        require(str(props.get("scope", "")).lower() == "/subscriptions/" + target["subscription_id"].lower()
+                and props.get("enforcementMode", "Default") == "Default"
+                and not any(props.get(key) for key in ("notScopes", "resourceSelectors", "overrides")),
+                "dns-policy-assignment-applicability-unknown")
+        definition_id, references, selection = _dns_policy_selection(evidence, assignment)
+        selection["read_documents"] = copy.deepcopy(evidence.documents)
+        for group in sorted(owned):
+            name = "aif-dns-" + digest({"scope": group, "assignment": assignment_id.lower()})[:32]
+            identifier = group + "/providers/Microsoft.Authorization/policyExemptions/" + name
+            properties = {"policyAssignmentId": assignment_id, "exemptionCategory": "Waiver",
+                          "displayName": "Reviewed AI Factory private endpoint DNS policy scope",
+                          "metadata": {"contract": "aifactory-dns-policy-exemption-v1",
+                                       "factory_id": target["factory_id"], "scale_set_id": target["scale_set_id"]}}
+            if expiry:
+                properties["expiresOn"] = expiry
+            if references:
+                properties["policyDefinitionReferenceIds"] = references
+            require(time.monotonic() < evidence.deadline, "dns-policy-read-deadline-exceeded")
+            existing = builder.read(identifier, EXEMPTION_API)
+            require(time.monotonic() < evidence.deadline, "dns-policy-read-deadline-exceeded")
+            if existing is not None:
+                require(_dns_exemption_matches(existing, identifier, properties),
+                        "dns-policy-existing-exemption-conflict")
+            elif create:
+                builder.ensure(identifier, EXEMPTION_API, {"properties": properties},
+                               ownership="factory-owned", already_read=True)
+            else:
+                require(context.get("bootstrap_phase") == "minimum-foundation",
+                        "dns-policy-exemption-missing-before-prerequisites")
+            reviews.append({"name": name, "id": identifier, "scope": group, "assignment_id": assignment_id,
+                            "category": "Waiver", "expires_on": expiry, "body": {"properties": properties},
+                            "policy_definition_id": definition_id,
+                            "policy_definition_reference_ids": references,
+                            "policy_evidence_ids": sorted({assignment_id.lower(), *evidence.documents}),
+                            "policy_evidence_hash": digest(selection)})
+    dns_policy_exemption_inputs(config, target["subscription_id"])
+    return reviews
 
 
 def _group(builder, config, target):
@@ -1172,6 +1459,7 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                     "existing-owned-resource-group-tags-mismatch:" + rg)
     minimum = context.get("bootstrap_phase") == "minimum-foundation"
     require(context.get("bootstrap_phase") in (None, "minimum-foundation"), "unknown-bootstrap-phase")
+    exemptions = dns_policy_exemptions(builder, config, target, context, owned, create=minimum)
     bindings = {"team_group_id": None if minimum else _group(builder, config, target), "seeding_keyvault_id": vault}
     if project_group:
         bindings["project_resource_group_id"] = project_group
@@ -1274,6 +1562,8 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                          else ["Legacy factory-common coordination is retained unchanged; it does not establish "
                           "cross-factory shared-hub coordination. Review a separate explicit migration."]
                          if mode == "factory-common" else [])}
+    if exemptions:
+        plan["dns_policy_exemptions"] = exemptions
     if any("retained_response_extensions" in effect for effect in builder.effects):
         plan["warnings"].append(GATEWAY_RESPONSE_EXTENSION_WARNING)
     plan.update(
@@ -1403,6 +1693,8 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
         fresh = prepare(source_root=plan["source"]["root"], consumer_root=plan["consumer_root"],
                         scope=plan["scope"], bootstrap_config=plan["bootstrap_config"],
                         expected_revision=plan["expected_revision"], context=plan["context"], runtime=runtime)
+        require(fresh.get("dns_policy_exemptions", []) == plan.get("dns_policy_exemptions", []),
+                "dns-policy-reviewed-exemptions-changed")
         for key in ("effects", "observations", "bindings", "lock_scopes", "blockers", "commands",
                     "auth_scopes", "source_hashes", "input_hash", "stages", "preconditions", "capabilities",
                     "warnings", "governance"):
@@ -1502,11 +1794,19 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
                     sleep(10)
                 require(current.get("registrationState") == "Registered", "resource-provider-registration-uncertain")
             elif kind == "arm-create":
+                if "/policyexemptions/" in effect["id"].lower():
+                    require(plan["context"].get("bootstrap_phase") == "minimum-foundation",
+                            "dns-policy-minimum-foundation-only")
+                    reviews = dns_policy_exemptions(Builder(runtime), plan["bootstrap_config"], target,
+                        plan["context"], sorted({_rg(x) for x in plan["context"]["owned_resource_group_ids"]}))
+                    require(reviews == plan["dns_policy_exemptions"], "dns-policy-evidence-changed-before-write")
                 status, _, _ = runtime.arm("GET", effect["id"], effect["api"], allowed=(200, 404))
                 require(status == 404, "resource-appeared-after-review:" + effect["id"])
                 runtime.arm("PUT", effect["id"], effect["api"], data=effect["body"], allowed=(200, 201, 202))
                 result = _wait(runtime, effect["id"], effect["api"], assert_held, sleep)
-                require(_contains(result, effect["body"]), "created-resource-verification-failed:" + effect["id"])
+                verified = (_dns_exemption_matches(result, effect["id"], effect["body"]["properties"])
+                            if "/policyexemptions/" in effect["id"].lower() else _contains(result, effect["body"]))
+                require(verified, "created-resource-verification-failed:" + effect["id"])
             elif kind == "group-create":
                 name = effect["body"]["displayName"]
                 path = "groups?$filter=" + quote("displayName eq '" + name.replace("'", "''") + "'", safe="") + "&$select=id"

@@ -966,6 +966,179 @@ def owned_group_manifest(cloud):
     return seal(document)
 
 
+class SearchDeletionCloud(CohortCloud):
+    search = GROUP + "/providers/Microsoft.Search/services/owned-search"
+    link = search + "/sharedPrivateLinkResources/owned-link"
+
+    def __init__(self, defect=None):
+        super().__init__()
+        self.defect = defect
+        self.bodies = {GROUP.lower(): self.bodies[GROUP.lower()]}
+        for identifier in (self.search, self.link):
+            self.bodies[identifier.lower()] = {
+                "id": identifier, "type": fl.resource_type_from_id(identifier), "etag": '"reviewed"',
+                "tags": {fl.TAG_KEYS[key]: value for key, value in CORE_OWNER.items()}, "properties": {}}
+        self.events = []
+
+    def provider_schema(self, namespace):
+        # Deliberately omit SPL from discovery: documented ARM collection wins.
+        return {"resourceTypes": [{"resourceType": "services", "apiVersions": ["2025-05-01"]}]}
+
+    def list_resources(self, scope):
+        return [copy.deepcopy(self.bodies[self.search.lower()])] if self.search.lower() in self.bodies else []
+
+    def collection(self, path, api_version, extension=False):
+        if path.lower() == self.search.lower() + "/sharedprivatelinkresources":
+            assert api_version == "2025-05-01" and not extension
+            fl.require(self.defect != "inventory", "unsupported-child-inventory-endpoint")
+            return [copy.deepcopy(self.bodies[self.link.lower()])] if self.link.lower() in self.bodies else [], None
+        assert extension
+        return [], None
+
+    def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
+        self.events.append((method, resource_id.lower()))
+        if method == "DELETE":
+            assert headers == {"If-Match": '"reviewed"'} or resource_id.lower() == GROUP.lower()
+            if resource_id.lower() == self.link.lower():
+                fl.require(self.defect != "failure", "delete-link-failed")
+                if self.defect == "timeout":
+                    return 202, {}, None
+                result = super().arm(method, resource_id, api_version, allowed, headers)
+                if self.defect == "drift":
+                    self.bodies[self.search.lower()]["etag"] = '"changed"'
+                return result
+            assert self.link.lower() not in self.bodies
+            assert ("GET", self.link.lower()) in self.events
+        return super().arm(method, resource_id, api_version, allowed, headers)
+
+
+@pytest.mark.parametrize("defect", [None, "failure", "timeout", "drift"])
+def test_factory_delete_explicit_search_links_before_group_and_fail_closed(defect):
+    from types import SimpleNamespace
+    cloud = SearchDeletionCloud(defect)
+    document = manifest()
+    document["deletion"] = fl.freeze_deletion_inventory(cloud, document, {})
+    receipt = {"deleted_resources": []}
+    locks = SimpleNamespace(authorize=lambda value: None, assert_held=lambda: None, enrollment=cloud.enrollment)
+    if defect:
+        with pytest.raises(fl.Blocked):
+            fl.delete_owned_groups(cloud, locks, document, receipt, lambda: None, sleep=lambda _: None)
+        assert not any(method == "DELETE" and identifier == GROUP.lower() for method, identifier in cloud.events)
+    else:
+        fl.delete_owned_groups(cloud, locks, document, receipt, lambda: None, sleep=lambda _: None)
+        deletes = [identifier for method, identifier in cloud.events if method == "DELETE"]
+        assert deletes == [cloud.link.lower(), GROUP.lower()]
+        assert not cloud.bodies
+        assert len(receipt["deleted_resources"]) == len(set(receipt["deleted_resources"]))
+    assert all("graph." not in identifier for _, identifier in cloud.events)
+
+
+class EmbeddedStoragePECCloud(SearchDeletionCloud):
+    storage = GROUP + "/providers/Microsoft.Storage/storageAccounts/ownedstorage"
+    connection = storage + "/privateEndpointConnections/owned-connection"
+
+    def __init__(self, defect=None):
+        super().__init__()
+        self.storage_defect = defect
+        connection = {"id": self.connection, "type": fl.resource_type_from_id(self.connection),
+                      "etag": '"reviewed"', "properties": {"privateLinkServiceConnectionState": {
+                          "status": "Approved", "description": "Reviewed connection"}}}
+        self.bodies[self.connection.lower()] = connection
+        self.bodies[self.storage.lower()] = {
+            "id": self.storage, "type": "Microsoft.Storage/storageAccounts", "etag": '"storage-before"',
+            "tags": {fl.TAG_KEYS[key]: value for key, value in CORE_OWNER.items()},
+            "properties": {"minimumTlsVersion": "TLS1_2", "privateEndpointConnections": [copy.deepcopy(connection)]}}
+        run = str(uuid4())
+        receipt = {"schema": 1, "run_id": run, "status": "succeeded", "manifest_hash": "e" * 64,
+                   "target": CORE_OWNER, "ownership": [{
+                       "resource_id": self.connection, "owner": CORE_OWNER, "body_hash": fl.digest(connection)}]}
+        self.runs["runs/" + run + ".worker.json"] = receipt
+        self.ownership_records = {self.connection.lower(): {
+            "owner": CORE_OWNER, "ownership_source": "deployment-receipt",
+            "ownership_evidence": {"run_id": run, "receipt_hash": fl.digest(receipt)}}}
+
+    def provider_schema(self, namespace):
+        if namespace.lower() == "microsoft.storage":
+            return {"resourceTypes": [
+                {"resourceType": kind, "apiVersions": ["2023-05-01"]}
+                for kind in ("storageAccounts", "storageAccounts/privateEndpointConnections")]}
+        return super().provider_schema(namespace)
+
+    def list_resources(self, scope):
+        return [*super().list_resources(scope),
+                *([copy.deepcopy(self.bodies[self.storage.lower()])] if self.storage.lower() in self.bodies else [])]
+
+    def collection(self, path, api_version, extension=False):
+        if path.lower() == self.storage.lower() + "/privateendpointconnections":
+            return ([copy.deepcopy(self.bodies[self.connection.lower()])]
+                    if self.connection.lower() in self.bodies else []), None
+        return super().collection(path, api_version, extension)
+
+    def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
+        result = super().arm(method, resource_id, api_version, allowed, headers)
+        if method == "DELETE" and resource_id.lower() in (self.connection.lower(), self.link.lower()):
+            parent = self.bodies[self.storage.lower()]
+            if resource_id.lower() == self.connection.lower() or self.storage_defect == "auto-removed":
+                self.bodies.pop(self.connection.lower(), None)
+                parent["properties"]["privateEndpointConnections"] = []
+                parent["etag"] = '"storage-after-connection-removal"'
+            if self.storage_defect == "drift":
+                parent["properties"]["minimumTlsVersion"] = "TLS1_0"
+        return result
+
+
+@pytest.mark.parametrize("defect", [None, "drift", "auto-removed"])
+def test_factory_delete_embedded_storage_connection_uses_group_cascade(monkeypatch, workspace, defect):
+    cloud = EmbeddedStoragePECCloud(defect)
+    document = manifest()
+    document["deletion"] = fl.freeze_deletion_inventory(cloud, document, cloud.ownership_records)
+    seal(document)
+    source, execution, path = setup_execute(monkeypatch, workspace)
+    result = fl.execute_cohort([document], source, execution, path, cloud_factory=lambda document: cloud)
+    deleted = [identifier for method, identifier in cloud.events if method == "DELETE"]
+    assert cloud.connection.lower() not in deleted
+    if defect:
+        assert result["status"] == "reconciliation-required", result
+        assert result["error_code"] == "complete-resource-closure-changed"
+        assert deleted == [cloud.link.lower()] and cloud.leases
+    else:
+        assert result["status"] == "succeeded", result
+        assert deleted == [cloud.link.lower(), GROUP.lower()]
+        assert cloud.connection.lower() in {value.lower() for value in result["children"][0]["deleted_resources"]}
+        assert not cloud.bodies and not cloud.leases
+
+
+def test_search_link_inventory_failure_is_not_empty_and_shared_is_preserved():
+    for defect in ("inventory", "shared"):
+        cloud = SearchDeletionCloud(defect)
+        if defect == "shared":
+            cloud.bodies[cloud.link.lower()]["tags"]["aifactory.shared"] = "true"
+        with pytest.raises(fl.Blocked):
+            fl.freeze_deletion_inventory(cloud, manifest(), {})
+        assert not cloud.deleted
+
+
+@pytest.mark.parametrize("identity_kind", ["uami", "system"])
+def test_factory_deletion_cannot_cut_off_executing_identity(identity_kind):
+    cloud = SearchDeletionCloud()
+    body = cloud.bodies[cloud.search.lower()]
+    if identity_kind == "uami":
+        body["properties"]["principalId"] = IDENTITY
+    else:
+        body["identity"] = {"type": "SystemAssigned", "principalId": IDENTITY}
+    with pytest.raises(fl.Blocked, match="executing-identity-in-deletion-scope"):
+        fl.freeze_deletion_inventory(cloud, manifest(), {})
+    assert not cloud.deleted
+
+
+@pytest.mark.parametrize("method", ["DELETE", "PATCH", "POST"])
+def test_factory_delete_route_hard_denies_graph_mutation_before_auth(method):
+    cloud = fl.Cloud(manifest(), opener=object(),
+                     command_runner=lambda *args, **kwargs: pytest.fail("No auth or command"))
+    with pytest.raises(fl.Blocked, match="entra-mutations-forbidden"):
+        cloud.request(method, "https://graph.microsoft.com/v1.0/groups/retained", "https://graph.microsoft.com")
+
+
 def test_cohort_holds_union_and_all_claims_before_first_delete_and_releases_once(monkeypatch, workspace):
     documents, cloud = cohort_fixture(other_subscription=True)
     original = copy.deepcopy(documents)

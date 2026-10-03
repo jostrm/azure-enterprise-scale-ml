@@ -84,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         return _error(130, "Interrupted.")
     except APIError as exc:
+        exc.message = redact_secrets(exc.message, args.api_key)
+        exc.details = redact_secrets(exc.details, args.api_key)
         return _error(exc.exit_code, exc.message, exc)
 
 
@@ -100,6 +102,26 @@ def build_parser() -> argparse.ArgumentParser:
                            help="Read-only deployment readiness; complements health/doctor, never approves or provisions.")
     preflight.add_argument("--request-json", required=True, help="Deployment preflight or workflow-prepare JSON file.")
     preflight.add_argument("--save-report", help="Save redacted report JSON to a new file, never an approval receipt.")
+    deletion_help = ("Deletes Azure resources and removes the saved factory only after confirmed success; "
+                     "Entra security groups and Git history are kept.")
+    deletion = sub.add_parser("delete-aifactory", help=deletion_help, description=deletion_help)
+    deletion_sub = deletion.add_subparsers(dest="deletion_command", required=True)
+    deletion_prepare = add_simple(deletion_sub, "prepare", cmd_delete_aifactory_prepare,
+                                  help="Preview exact deleted and retained resources; never delete.")
+    for field in ("folder", "factory-id", "expected-revision", "save-receipt"):
+        deletion_prepare.add_argument("--" + field, required=True)
+    deletion_prepare.add_argument("--version-ref", help="Optional approved source version.")
+    deletion_confirm = add_simple(deletion_sub, "confirm", cmd_delete_aifactory_confirm,
+                                  help="Show the saved review, then require its exact confirmation phrase.")
+    deletion_confirm.add_argument("--receipt", required=True, help="Unexpired receipt from delete-aifactory prepare.")
+    deletion_confirm.add_argument("--yes", action="store_true",
+                                  help="Required without a terminal, together with --confirmation-phrase; never enough alone.")
+    deletion_confirm.add_argument("--confirmation-phrase",
+                                  help="Exact server phrase from the reviewed receipt; required without a terminal.")
+    deletion_status = add_simple(deletion_sub, "status", cmd_delete_aifactory_status,
+                                 help="Read deletion progress without starting or retrying deletion.")
+    deletion_status.add_argument("--folder", required=True)
+    deletion_status.add_argument("--job-id", required=True)
     workflow = sub.add_parser("workflow", help="Read-only GitHub Actions status and events; never dispatch or rerun.")
     workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
     for name, handler in (("status", cmd_workflow_status), ("watch", cmd_workflow_watch)):
@@ -489,6 +511,106 @@ def cmd_preflight(args):
         except OSError:
             raise ConfigError("Cannot write the preflight report file.") from None
     return emit(report, EXIT_OK if report["ready"] else EXIT_BLOCKED)
+
+
+def _deletion_review(preview, folder):
+    print("Are you sure you want to delete this factory's Azure resources?", file=sys.stderr)
+    print("Review the exact deleted and retained resources below. Nothing has been deleted by this command.",
+          file=sys.stderr)
+    _print_json({
+        "Factory": preview["target"]["key"], "Factory ID": preview["factory_id"],
+        "Saved folder": folder, "Scope": "Whole factory, all scale sets",
+        "Source version": preview["source_version"], "Saved revision": preview["source_revision"],
+        "Expires": preview["expires_at"], "Server review fingerprint": preview["preview_hash"],
+        "Exact resource manifest (delete / retain)": preview["deletion_targets"],
+        "Retained Azure resources": preview["retained_resources"],
+        "Entra security groups preserved": preview["preserve_entra_groups"],
+        "Saved configuration after successful deletion": (
+            "Retained, as reported by the backend" if preview["retain_saved_configuration"]
+            else "REMOVED after verified success; retained on failure"),
+        "Other retained resources and cautions": preview["warnings"],
+        "Effects": preview["effects"],
+    }, file=sys.stderr, flush=True)
+
+
+def cmd_delete_aifactory_prepare(args):
+    from .factory_deletion import PURPOSE, validate_deletion_preview
+
+    if os.path.lexists(args.save_receipt):
+        raise ConfigError("Refusing to overwrite an existing deletion receipt.")
+    api = client(args)
+    request = {"contract_version": 1, "folder": args.folder,
+               "factory_id": args.factory_id, "expected_revision": args.expected_revision}
+    if args.version_ref is not None:
+        request["version_ref"] = args.version_ref
+    preview = redact_secrets(api.delete_aifactory_prepare(request), api.api_key)
+    request = redact_secrets(request, api.api_key)
+    try:
+        validate_deletion_preview(request, preview)
+    except BlockedError:
+        return emit(preview, EXIT_BLOCKED)
+    _deletion_review(preview, request["folder"])
+    try:
+        write_receipt(args.save_receipt, client=api, purpose=PURPOSE, operation="delete-aifactory",
+                      request_body=request, preview=preview)
+    except OSError:
+        raise ConfigError("Cannot write a new deletion receipt; nothing was confirmed.") from None
+    return emit(preview)
+
+
+def cmd_delete_aifactory_confirm(args):
+    from .factory_deletion import PURPOSE, validate_job
+
+    api = client(args)
+    try:
+        receipt = load_receipt(args.receipt, api, PURPOSE, operation_mode="runtime")
+    except (OSError, UnicodeError, ValueError, TypeError):
+        raise ConfigError("Cannot read a valid deletion receipt; nothing was confirmed.") from None
+    if redact_secrets(receipt, api.api_key) != receipt:
+        raise ConfigError("Deletion receipt contains sensitive values; prepare a new redacted review.")
+    preview = receipt["preview"]
+    _deletion_review(preview, receipt["folder"])
+    expected = preview["confirmation_phrase"]
+    if args.confirmation_phrase is not None and args.confirmation_phrase != expected:
+        raise ConfigError("Confirmation phrase does not exactly match the reviewed server phrase; nothing was confirmed.")
+    if sys.stdin.isatty():
+        try:
+            print("Continue with this exact review? [y/N]", file=sys.stderr, flush=True)
+            if input().strip().lower() not in ("y", "yes"):
+                raise BlockedError("Cancelled; no deletion request was sent.")
+            print("Type the exact confirmation phrase: " + json.dumps(expected, ensure_ascii=True),
+                  file=sys.stderr, flush=True)
+            phrase = input()
+        except EOFError:
+            raise BlockedError("Cancelled at end of input; no deletion request was sent.") from None
+    else:
+        if not args.yes or args.confirmation_phrase is None:
+            raise ConfigError("Without an interactive terminal, deletion requires both --yes and "
+                              "--confirmation-phrase matching the reviewed receipt; nothing was confirmed.")
+        phrase = args.confirmation_phrase
+    if phrase != expected:
+        raise ConfigError("Confirmation phrase does not exactly match the reviewed server phrase; nothing was confirmed.")
+    try:
+        result = redact_secrets(api.delete_aifactory_confirm(
+            folder=receipt["folder"], confirmation_id=receipt["confirmation_id"],
+            preview_hash=preview["preview_hash"], confirmation_phrase=phrase,
+        ), api.api_key)
+    except RequestTimeout:
+        raise RequestTimeout("Deletion confirmation timed out; its outcome is unknown. "
+                             "Inspect server state before any further action. No retry was attempted.") from None
+    if type(result.get("contract_version")) is not int or result["contract_version"] != 1:
+        raise FailureError("Deletion returned an incompatible confirmation. Inspect server state; do not retry.")
+    validate_job(result.get("job"), factory_id=receipt["request"]["factory_id"])
+    return emit(result, status_exit(result["job"]["status"]))
+
+
+def cmd_delete_aifactory_status(args):
+    from .factory_deletion import validate_job
+
+    api = client(args)
+    result = redact_secrets(api.delete_aifactory_status(args.folder, args.job_id), api.api_key)
+    validate_job(result, job_id=args.job_id)
+    return emit(result, status_exit(result["status"]))
 
 
 def _workflow_output(args, event):

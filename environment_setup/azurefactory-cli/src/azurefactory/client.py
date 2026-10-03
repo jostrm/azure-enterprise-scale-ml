@@ -209,6 +209,37 @@ class AzureFactoryClient:
     def openapi(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/openapi.json", require_key=False), "openapi")
 
+    def _factory_deletion_request(self, action: str, *, body=None, query=None) -> dict[str, Any]:
+        endpoint = f"/api/v1/operations/delete-aifactory/{action}"
+        try:
+            return self._object(self.request("GET" if action == "status" else "POST",
+                                            endpoint, body=body, query=query), "factory deletion")
+        except APIError as exc:
+            if exc.status in (404, 405):
+                raise APIError(
+                    "Factory deletion requires an API supporting the named delete-aifactory routes; "
+                    "no catalog or legacy fallback was attempted.", status=exc.status,
+                ) from None
+            raise
+
+    def delete_aifactory_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Prepare only; deletion requires a separate reviewed confirmation."""
+        from .factory_deletion import validate_request
+
+        validate_request(body)
+        return self._factory_deletion_request("prepare", body=body)
+
+    def delete_aifactory_confirm(self, *, folder: str, confirmation_id: str,
+                                preview_hash: str, confirmation_phrase: str) -> dict[str, Any]:
+        """Submit exactly one confirmation; never retry an uncertain result."""
+        return self._factory_deletion_request("confirm", body={
+            "contract_version": 1, "folder": folder, "confirmation_id": confirmation_id,
+            "preview_hash": preview_hash, "confirmation_phrase": confirmation_phrase,
+        })
+
+    def delete_aifactory_status(self, folder: str, job_id: str) -> dict[str, Any]:
+        return self._factory_deletion_request("status", query={"folder": folder, "job_id": job_id})
+
     def schema(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/api/v1/schema"), "schema")
 

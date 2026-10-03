@@ -404,6 +404,449 @@ def execute(plan, workspace, runtime):
                         acknowledge_exclusive_writer_governance=True, sleep=lambda _: pytest.fail("unexpected wait"))
 
 
+def dns_arguments(workspace):
+    args = arguments(workspace, dev_vnet_cidr="172.16.0.0/20")
+    project_id = "55555555-5555-5555-5555-555555555555"
+    path = workspace[0] / "azurefactory" / "register.json"
+    document = json.loads(path.read_text())
+    document["factories"][0]["projects"] = [{"id": project_id, "number": "001",
+        "placements": [{"environment": "dev", "scale_set_id": SCALE}]}]
+    path.write_bytes(core.canonical(document))
+    common = f"/subscriptions/{SUB}/resourcegroups/aif-esml-common-sdc-dev-001"
+    project = f"/subscriptions/{SUB}/resourcegroups/aif-esml-project001-sdc-dev-001-rg"
+    identity = common + "/providers/microsoft.managedidentity/userassignedidentities/writer"
+    args["scope"]["project_id"] = project_id
+    args["context"].update(bootstrap_phase="minimum-foundation", coordination_mode="provider", coordination={},
+        provider_serialization={"repository": "https://github.com/example/repo"},
+        owned_resource_group_ids=[common, project], project_resource_group_id=project,
+        integrated_vnet_id=common + "/providers/microsoft.network/virtualnetworks/common",
+        seeding_keyvault_id=common + "/providers/microsoft.keyvault/vaults/seed",
+        deployment_identity_id=identity, reuse_deployment_identity=True)
+    assignment = f"/subscriptions/{SUB}/providers/Microsoft.Authorization/policyAssignments/central-dns"
+    definition = f"/subscriptions/{SUB}/providers/Microsoft.Authorization/policyDefinitions/dns"
+    args["bootstrap_config"]["dns_policy_exemption_assignment_ids"] = json.dumps([assignment])
+    runtime = Runtime()
+    runtime.verify_provider_serialization = lambda proof: None
+    runtime.resources = {
+        identity: {"id": identity, "properties": {"tenantId": TENANT, "principalId": GROUP, "clientId": MEMBER}},
+        assignment.lower(): {"id": assignment, "properties": {"scope": f"/subscriptions/{SUB}",
+            "policyDefinitionId": definition}},
+        definition.lower(): {"id": definition, "properties": {"policyRule": {
+            "if": {"field": "type", "equals": "Microsoft.Network/privateEndpoints"},
+            "then": {"effect": "DeployIfNotExists", "details": {
+                "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups"}}}}},
+    }
+    return args, runtime, assignment, definition
+
+
+def test_dns_exact_review_and_minimum_order_before_network(workspace):
+    args, runtime, _, _ = dns_arguments(workspace)
+    plan = core.prepare(**args, runtime=runtime)
+    assert not runtime.writes
+    reviews = plan["dns_policy_exemptions"]
+    assert len(reviews) == 2 and {x["scope"] for x in reviews} == set(args["context"]["owned_resource_group_ids"])
+    assert all(x["category"] == "Waiver" and x["id"].startswith(x["scope"] + "/") for x in reviews)
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "succeeded"
+    writes = [x[2] for x in runtime.writes if x[0] == "arm"]
+    assert writes[:2] == sorted(args["context"]["owned_resource_group_ids"])
+    assert set(writes[2:4]) == {x["id"].lower() for x in reviews}
+    assert "/virtualnetworks/" in writes[4]
+    assert not any(x[0] == "graph" for x in runtime.writes)
+
+
+@pytest.mark.parametrize("builtin", [False, True])
+@pytest.mark.parametrize("effect", ["DeployIfNotExists", "Deny", "Disabled", None])
+def test_dns_definition_parameters_and_external_references(workspace, builtin, effect):
+    args, runtime, assignment, definition = dns_arguments(workspace)
+    policy = runtime.resources[definition.lower()]
+    policy["properties"]["parameters"] = {"effect": {"defaultValue": "Deny"},
+                                         "privateDnsZoneId": {"type": "String"}}
+    policy["properties"]["policyRule"]["then"]["effect"] = "[parameters('effect')]"
+    properties = runtime.resources[assignment.lower()]["properties"]
+    properties["parameters"] = {"effect": {"value": effect}, "privateDnsZoneId": {
+        "value": HUB_RG + "/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net"}}
+    if builtin:
+        definition = "/providers/Microsoft.Authorization/policyDefinitions/dns"
+        policy["id"] = properties["policyDefinitionId"] = definition
+        def http(method, url, audience):
+            assert method == "GET" and url == core.enrollment.ARM + definition + "?api-version=" + core.POLICY_DEFINITION_API
+            return 200, {}, copy.deepcopy(policy)
+        runtime.http = http
+    before = copy.deepcopy(runtime.resources)
+    if effect == "DeployIfNotExists":
+        plan = core.prepare(**args, runtime=runtime)
+        assert {x["scope"] for x in plan["dns_policy_exemptions"]} == set(args["context"]["owned_resource_group_ids"])
+        assert all(x["policy_definition_id"] == definition for x in plan["dns_policy_exemptions"])
+    else:
+        with pytest.raises(core.PrerequisiteError, match="dns-policy-private-endpoint-dns-dine-only"):
+            core.prepare(**args, runtime=runtime)
+    assert runtime.resources == before and not runtime.writes
+
+
+def test_dns_expiry_elapsed_after_review_blocks_before_any_write(workspace, monkeypatch):
+    args, runtime, _, _ = dns_arguments(workspace)
+    args["bootstrap_config"]["dns_policy_exemption_expires_on"] = "2099-01-01T00:00:00Z"
+    expiry = core.datetime.fromisoformat("2099-01-01T00:00:00+00:00").timestamp()
+    monkeypatch.setattr(core.time, "time", lambda: expiry - 10)
+    plan = core.prepare(**args, runtime=runtime)
+    monkeypatch.setattr(core.time, "time", lambda: expiry)
+    with pytest.raises(core.PrerequisiteError, match="dns-policy-exemption-expired"):
+        execute(plan, workspace, runtime)
+    assert not runtime.writes
+
+
+def test_dns_created_exemptions_get_verified_before_later_resources(workspace):
+    args, runtime, _, _ = dns_arguments(workspace)
+    plan = core.prepare(**args, runtime=runtime)
+    arm, events = runtime.arm, []
+    def recorded(method, identifier, *positional, **kwargs):
+        events.append((method, identifier.lower()))
+        return arm(method, identifier, *positional, **kwargs)
+    runtime.arm = recorded
+    assert execute(plan, workspace, runtime)["status"] == "succeeded"
+    network = next(i for i, (method, identifier) in enumerate(events) if method == "PUT" and "/virtualnetworks/" in identifier)
+    for exemption in plan["dns_policy_exemptions"]:
+        identifier = exemption["id"].lower()
+        put = events.index(("PUT", identifier))
+        assert ("GET", identifier) in events[put + 1:network]
+
+
+def dns_initiative_arguments(workspace):
+    args, runtime, assignment, definition = dns_arguments(workspace)
+    initiative = definition.replace("policyDefinitions/dns", "policySetDefinitions/Deploy-Private-DNS-Zones")
+    assignment_doc = runtime.resources[assignment.lower()]
+    assignment_doc["properties"]["policyDefinitionId"] = initiative
+    refs, selected = [], []
+    for index in range(59):
+        identifier = definition + str(index)
+        child = copy.deepcopy(runtime.resources[definition.lower()])
+        child["id"] = identifier
+        child["properties"]["parameters"] = {
+            "effect": {"type": "String", "defaultValue": "DeployIfNotExists"},
+            "privateDnsZoneId": {"type": "String"}}
+        child["properties"]["policyRule"]["then"]["effect"] = "[parameters('effect')]"
+        parameters = {"privateDnsZoneId": {"value": "[parameters('zone')]"}}
+        if index % 2:
+            parameters["effect"] = {"value": "[parameters('dnsEffect')]"}
+        if index >= 50:
+            child["properties"]["policyRule"]["then"]["effect"] = "Deny" if index < 54 else "Audit"
+        else:
+            selected.append("dns-" + str(index))
+        if index >= 57:
+            child["properties"]["policyRule"] = {
+                "if": {"field": "type", "equals": "Microsoft.Storage/storageAccounts"},
+                "then": {"effect": "DeployIfNotExists", "details": {"type": "Microsoft.Insights/diagnosticSettings"}}}
+        runtime.resources[identifier.lower()] = child
+        refs.append({"policyDefinitionId": identifier, "policyDefinitionReferenceId": "dns-" + str(index),
+                     "parameters": parameters})
+    runtime.resources[initiative.lower()] = {"id": initiative, "properties": {
+        "displayName": "Deploy-Private-DNS-Zones", "parameters": {
+            "dnsEffect": {"type": "String", "defaultValue": "DeployIfNotExists"},
+            "zone": {"type": "String", "defaultValue": HUB_RG + "/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net"}},
+        "policyDefinitions": refs}}
+    return args, runtime, assignment, initiative, refs, sorted(selected)
+
+
+def test_dns_59_definition_initiative_narrows_refs_and_verifies_before_network(workspace):
+    args, runtime, assignment, initiative, refs, selected = dns_initiative_arguments(workspace)
+    original_arm = runtime.arm
+    def versioned_arm(method, identifier, api, **kwargs):
+        if method == "GET" and "/policyassignments/" in identifier.lower():
+            assert api == "2022-06-01"
+        if method == "GET" and any(kind in identifier.lower() for kind in ("/policydefinitions/", "/policysetdefinitions/")):
+            assert api == "2023-04-01"
+        return original_arm(method, identifier, api, **kwargs)
+    runtime.arm = versioned_arm
+    before = copy.deepcopy(runtime.resources)
+    plan = core.prepare(**args, runtime=runtime)
+    assert len(refs) == 59 and len(selected) == 50 and not runtime.writes
+    for review in plan["dns_policy_exemptions"]:
+        assert review["body"]["properties"]["policyDefinitionReferenceIds"] == selected
+        assert review["policy_definition_reference_ids"] == selected
+        assert len(review["policy_evidence_ids"]) == 61
+        assert review["assignment_id"] == assignment and review["policy_definition_id"] == initiative
+    calls, arm = [], runtime.arm
+    def observed(method, identifier, *positional, **kwargs):
+        calls.append((method, identifier.lower()))
+        return arm(method, identifier, *positional, **kwargs)
+    runtime.arm = observed
+    assert execute(plan, workspace, runtime)["status"] == "succeeded"
+    writes = [identifier for method, identifier in calls if method == "PUT"]
+    assert writes[:2] == sorted(args["context"]["owned_resource_group_ids"])
+    assert set(writes[2:4]) == {item["id"].lower() for item in plan["dns_policy_exemptions"]}
+    network = next(i for i, (method, identifier) in enumerate(calls) if method == "PUT" and "/virtualnetworks/" in identifier)
+    for review in plan["dns_policy_exemptions"]:
+        put = calls.index(("PUT", review["id"].lower()))
+        assert ("GET", review["id"].lower()) in calls[put + 1:network]
+    assert all(runtime.resources[key] == value for key, value in before.items())
+
+
+@pytest.mark.parametrize("selector,version,allowed", [
+    ("1.*.*", "1.1.0", True), ("2.*.*", "2.0.1", True),
+    ("1.*.*-PREVIEW", "1.0.0-preview", True), ("1.1.*", "1.1.3", True),
+    ("1.1.0", "1.1.0", True), ("1.*.*", "2.0.0", False),
+    ("1.*.*", "1.0.0-preview", False), ("1.*.*-PREVIEW", "1.0.0", False),
+    ("latest", "1.0.0", False), ("1.*.*", None, False),
+])
+def test_dns_declared_version_must_match_observed_definition(selector, version, allowed):
+    definition = {"properties": {"version": version}}
+    if allowed:
+        core._dns_definition_version(definition, selector)
+    else:
+        with pytest.raises(core.PrerequisiteError, match="version-selection"):
+            core._dns_definition_version(definition, selector)
+
+
+def test_dns_initiative_pins_actual_wildcard_version_evidence(workspace):
+    args, runtime, _, initiative, refs, selected = dns_initiative_arguments(workspace)
+    for ref in runtime.resources[initiative.lower()]["properties"]["policyDefinitions"]:
+        ref["definitionVersion"] = "1.*.*"
+        runtime.resources[ref["policyDefinitionId"].lower()]["properties"]["version"] = "1.1.0"
+    plan = core.prepare(**args, runtime=runtime)
+    assert plan["can_execute"] and not runtime.writes
+    assert all(review["policy_definition_reference_ids"] == selected for review in plan["dns_policy_exemptions"])
+
+
+@pytest.mark.parametrize("effect", ["Deny", "Audit", "Disabled"])
+def test_dns_initiative_assignment_values_override_mapped_effect_but_not_child_defaults(workspace, effect):
+    args, runtime, assignment, _, _, _ = dns_initiative_arguments(workspace)
+    runtime.resources[assignment.lower()]["properties"]["parameters"] = {"dnsEffect": {"value": effect}}
+    plan = core.prepare(**args, runtime=runtime)
+    expected = sorted("dns-" + str(index) for index in range(0, 50, 2))
+    assert len(expected) == 25
+    assert all(review["policy_definition_reference_ids"] == expected for review in plan["dns_policy_exemptions"])
+    assert not runtime.writes
+
+
+@pytest.mark.parametrize("failure", ["put", "blanket-verification"])
+def test_dns_initiative_exemption_failure_halts_before_network(workspace, failure):
+    args, runtime, _, _, _, _ = dns_initiative_arguments(workspace)
+    plan = core.prepare(**args, runtime=runtime)
+    if failure == "put":
+        runtime.fail_write = lambda identifier: "/policyexemptions/" in identifier
+    else:
+        arm = runtime.arm
+        def corrupt(method, identifier, *args, **kwargs):
+            result = arm(method, identifier, *args, **kwargs)
+            if method == "PUT" and "/policyexemptions/" in identifier.lower():
+                del runtime.resources[identifier.lower()]["properties"]["policyDefinitionReferenceIds"]
+            return result
+        runtime.arm = corrupt
+    assert execute(plan, workspace, runtime)["status"] == "uncertain"
+    assert not any("/virtualnetworks/" in entry[2] for entry in runtime.writes)
+
+
+@pytest.mark.parametrize("change", ["unknown-parent", "unknown-child", "expression", "duplicate-ref",
+                                   "wrong-sub", "no-dns", "definition-limit", "read-limit", "byte-limit",
+                                   "read-deadline"])
+def test_dns_initiative_ambiguous_or_unbounded_discovery_fails_closed(workspace, monkeypatch, change):
+    args, runtime, assignment, initiative, refs, _ = dns_initiative_arguments(workspace)
+    if change == "unknown-parent":
+        refs[0]["parameters"]["privateDnsZoneId"]["value"] = "[parameters('missing')]"
+    elif change == "unknown-child":
+        child = runtime.resources[refs[0]["policyDefinitionId"].lower()]
+        child["properties"]["policyRule"]["then"]["effect"] = "[parameters('unknown')]"
+    elif change == "expression":
+        refs[0]["parameters"]["effect"] = {"value": "[concat('Deploy', 'IfNotExists')]"}
+    elif change == "duplicate-ref":
+        refs[1]["policyDefinitionReferenceId"] = refs[0]["policyDefinitionReferenceId"]
+    elif change == "wrong-sub":
+        refs[0]["policyDefinitionId"] = refs[0]["policyDefinitionId"].replace(SUB, EXTERNAL)
+    elif change == "no-dns":
+        for ref in refs:
+            runtime.resources[ref["policyDefinitionId"].lower()]["properties"]["policyRule"]["then"]["effect"] = "Deny"
+    elif change == "definition-limit":
+        refs.extend(copy.deepcopy(refs) * 2)
+    elif change == "read-limit":
+        monkeypatch.setattr(core._DnsPolicyEvidence, "MAX_READS", 2)
+    elif change == "byte-limit":
+        monkeypatch.setattr(core._DnsPolicyEvidence, "MAX_EVIDENCE_BYTES", 100)
+    else:
+        now, arm = [0], runtime.arm
+        monkeypatch.setattr(core.time, "monotonic", lambda: now[0])
+        def slow(*args, **kwargs):
+            result = arm(*args, **kwargs)
+            now[0] += 121
+            return result
+        runtime.arm = slow
+    with pytest.raises(core.PrerequisiteError):
+        core.prepare(**args, runtime=runtime)
+    assert not runtime.writes
+
+
+@pytest.mark.parametrize("scope", ["builtin", "management-group"])
+def test_dns_initiative_definition_documents_use_validated_arm_scope(workspace, scope):
+    args, runtime, assignment, initiative, refs, selected = dns_initiative_arguments(workspace)
+    group = "/providers/Microsoft.Management/managementGroups/landing-zone"
+    prefix = "" if scope == "builtin" else group
+    document = runtime.resources.pop(initiative.lower())
+    document["id"] = prefix + "/providers/Microsoft.Authorization/policySetDefinitions/Deploy-Private-DNS-Zones"
+    runtime.resources[assignment.lower()]["properties"]["policyDefinitionId"] = document["id"]
+    documents = {document["id"].lower(): document}
+    for ref in refs:
+        child = runtime.resources.pop(ref["policyDefinitionId"].lower())
+        name = child["id"].rsplit("/", 1)[1]
+        child["id"] = ref["policyDefinitionId"] = prefix + "/providers/Microsoft.Authorization/policyDefinitions/" + name
+        documents[child["id"].lower()] = child
+    if scope == "management-group":
+        documents[group.lower()] = {"id": group, "properties": {"children": [
+            {"id": group + "/child", "children": [{"id": "/subscriptions/" + SUB, "type": "/subscriptions"}]}]}}
+    reads = []
+    def http(method, url, audience):
+        assert method == "GET" and url.startswith(core.enrollment.ARM + "/providers/")
+        assert audience == core.enrollment.ARM + "/"
+        identifier = url.split("?")[0].removeprefix(core.enrollment.ARM).lower()
+        reads.append(identifier)
+        return 200, {}, copy.deepcopy(documents[identifier])
+    runtime.http = http
+    plan = core.prepare(**args, runtime=runtime)
+    assert plan["dns_policy_exemptions"][0]["policy_definition_reference_ids"] == selected
+    assert len(reads) == len(set(reads)) == 60 + (scope == "management-group")
+    assert not runtime.writes
+
+
+@pytest.mark.parametrize("change", ["selected", "excluded", "mapping", "initiative-default"])
+def test_dns_initiative_all_child_evidence_and_parameter_drift_blocks_execution(workspace, change):
+    args, runtime, _, initiative, refs, _ = dns_initiative_arguments(workspace)
+    plan = core.prepare(**args, runtime=runtime)
+    if change in ("selected", "excluded"):
+        child = runtime.resources[refs[0 if change == "selected" else 58]["policyDefinitionId"].lower()]
+        child["properties"]["description"] = "changed after review"
+    elif change == "mapping":
+        refs[0]["parameters"]["privateDnsZoneId"]["value"] = HUB_RG + "/providers/Microsoft.Network/privateDnsZones/other"
+    else:
+        runtime.resources[initiative.lower()]["properties"]["parameters"]["zone"]["defaultValue"] += "-changed"
+    with pytest.raises(core.PrerequisiteError):
+        execute(plan, workspace, runtime)
+    assert not runtime.writes
+
+
+def test_dns_initiative_expiry_during_discovery_cannot_produce_an_executable_plan(workspace, monkeypatch):
+    args, runtime, _, _, _, _ = dns_initiative_arguments(workspace)
+    args["bootstrap_config"]["dns_policy_exemption_expires_on"] = "2099-01-01T00:00:00Z"
+    expiry = core.datetime.fromisoformat("2099-01-01T00:00:00+00:00").timestamp()
+    now, arm = [expiry - 1], runtime.arm
+    monkeypatch.setattr(core.time, "time", lambda: now[0])
+    def elapsed(method, identifier, *args, **kwargs):
+        result = arm(method, identifier, *args, **kwargs)
+        if "/policydefinitions/" in identifier.lower():
+            now[0] = expiry
+        return result
+    runtime.arm = elapsed
+    with pytest.raises(core.PrerequisiteError, match="dns-policy-exemption-expired"):
+        core.prepare(**args, runtime=runtime)
+    assert not runtime.writes
+
+
+@pytest.mark.parametrize("change", [None, "blanket", "extra-deny", "missing", "duplicate", "expiry"])
+def test_dns_initiative_existing_exemption_requires_exact_refset_and_expiry(workspace, change):
+    args, runtime, _, _, _, selected = dns_initiative_arguments(workspace)
+    args["bootstrap_config"]["dns_policy_exemption_expires_on"] = "2099-01-01T00:00:00Z"
+    plan = core.prepare(**args, runtime=runtime)
+    for review in plan["dns_policy_exemptions"]:
+        document = {"id": review["id"], **copy.deepcopy(review["body"])}
+        document["properties"]["policyDefinitionReferenceIds"] = list(reversed(selected))
+        document["properties"]["expiresOn"] = "2099-01-01T00:00:00.0000000Z"
+        if change == "blanket":
+            del document["properties"]["policyDefinitionReferenceIds"]
+        elif change == "extra-deny":
+            document["properties"]["policyDefinitionReferenceIds"].append("dns-50")
+        elif change == "missing":
+            document["properties"]["policyDefinitionReferenceIds"].pop()
+        elif change == "duplicate":
+            document["properties"]["policyDefinitionReferenceIds"].append(selected[0])
+        elif change == "expiry":
+            document["properties"]["expiresOn"] = "2099-01-02T00:00:00Z"
+        runtime.resources[review["id"].lower()] = document
+    if change:
+        with pytest.raises(core.PrerequisiteError, match="dns-policy-existing-exemption-conflict"):
+            core.prepare(**args, runtime=runtime)
+    else:
+        fresh = core.prepare(**args, runtime=runtime)
+        assert not any("/policyexemptions/" in effect["id"].lower() for effect in fresh["effects"])
+    assert not runtime.writes
+
+
+@pytest.mark.parametrize("ancestor", [True, False])
+def test_dns_initiative_management_group_definition_must_be_verified_ancestor(workspace, ancestor):
+    args, runtime, _, _, refs, _ = dns_initiative_arguments(workspace)
+    group = "/providers/Microsoft.Management/managementGroups/landing-zone"
+    child = runtime.resources[refs[0]["policyDefinitionId"].lower()]
+    child["id"] = refs[0]["policyDefinitionId"] = group + "/providers/Microsoft.Authorization/policyDefinitions/dns"
+    documents = {group.lower(): {"id": group, "properties": {"children": [
+        {"id": "/subscriptions/" + (SUB if ancestor else EXTERNAL), "type": "/subscriptions"}]}},
+        child["id"].lower(): child}
+    def http(method, url, audience):
+        assert method == "GET" and url.startswith(core.enrollment.ARM + "/providers/")
+        assert audience == core.enrollment.ARM + "/"
+        return 200, {}, copy.deepcopy(documents[url.split("?")[0].removeprefix(core.enrollment.ARM).lower()])
+    runtime.http = http
+    if ancestor:
+        plan = core.prepare(**args, runtime=runtime)
+        assert group.lower() in plan["dns_policy_exemptions"][0]["policy_evidence_ids"]
+    else:
+        with pytest.raises(core.PrerequisiteError, match="management-group-not-ancestor"):
+            core.prepare(**args, runtime=runtime)
+    assert not runtime.writes
+
+
+@pytest.mark.parametrize("change", ["wrong-subscription", "missing", "deny", "initiative", "not-scope", "arbitrary-group"])
+def test_dns_scope_and_assignment_blockers(workspace, change):
+    args, runtime, assignment, definition = dns_arguments(workspace)
+    if change == "wrong-subscription":
+        args["bootstrap_config"]["dns_policy_exemption_assignment_ids"] = json.dumps([assignment.replace(SUB, EXTERNAL)])
+    elif change == "missing":
+        del runtime.resources[assignment.lower()]
+    elif change == "deny":
+        runtime.resources[definition.lower()]["properties"]["policyRule"]["then"]["effect"] = "Deny"
+    elif change == "initiative":
+        runtime.resources[assignment.lower()]["properties"]["policyDefinitionId"] = definition.replace("policyDefinitions", "policySetDefinitions")
+    elif change == "not-scope":
+        runtime.resources[assignment.lower()]["properties"]["notScopes"] = [args["context"]["owned_resource_group_ids"][0]]
+    else:
+        args["context"]["owned_resource_group_ids"].append(OWNED)
+    with pytest.raises(core.PrerequisiteError):
+        core.prepare(**args, runtime=runtime)
+    assert not runtime.writes
+
+
+@pytest.mark.parametrize("change", ["expiry", "policy-drift", "caller-drift", "existing-conflict", "put-failure", "verify-failure"])
+def test_dns_failures_never_advance(workspace, change, monkeypatch):
+    args, runtime, assignment, definition = dns_arguments(workspace)
+    plan = core.prepare(**args, runtime=runtime)
+    exemption = plan["dns_policy_exemptions"][0]
+    if change == "expiry":
+        args["bootstrap_config"]["dns_policy_exemption_expires_on"] = "2000-01-01T00:00:00Z"
+        with pytest.raises(core.PrerequisiteError):
+            core.prepare(**args, runtime=runtime)
+        return
+    if change == "policy-drift":
+        runtime.resources[definition.lower()]["properties"]["policyRule"]["then"]["effect"] = "Deny"
+    elif change == "caller-drift":
+        plan["bootstrap_config"]["dns_policy_exemption_expires_on"] = "2099-01-01T00:00:00Z"
+    elif change == "existing-conflict":
+        runtime.resources[exemption["id"].lower()] = {"properties": {"policyAssignmentId": "unrelated"}}
+    elif change == "put-failure":
+        runtime.fail_write = lambda identifier: "/policyexemptions/" in identifier
+    else:
+        arm = runtime.arm
+        def corrupt(method, identifier, *a, **kw):
+            result = arm(method, identifier, *a, **kw)
+            if method == "PUT" and "/policyexemptions/" in identifier.lower():
+                runtime.resources[identifier.lower()]["properties"]["exemptionCategory"] = "Mitigated"
+            return result
+        runtime.arm = corrupt
+    if change in ("put-failure", "verify-failure"):
+        result = execute(plan, workspace, runtime)
+        assert result["status"] == "uncertain"
+        assert not any("/virtualnetworks/" in x[2] for x in runtime.writes)
+    else:
+        with pytest.raises(core.PrerequisiteError):
+            execute(plan, workspace, runtime)
+        assert not runtime.writes
+
+
 def test_prepare_readonly_and_no_hub_is_independent(workspace):
     runtime = Runtime()
     consumer = workspace[0]

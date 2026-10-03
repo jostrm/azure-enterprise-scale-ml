@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
 import ctypes
 import errno
 import fnmatch
@@ -303,8 +304,12 @@ def _validate_manifest(document):
         require(all(locks.get(k) == v for k, v in repository_state_module().coordinates(repository).items())
                 and set(locks) <= {"provider", "coordination_mode", "repository", "state_ref", "coordination_hash",
                                    "revision", "scopes", "common_dependencies"}, "invalid-single-writer-coordinates")
-        require(document["operation"] != "delete" and "deployment" in document,
-                "single-writer-scoped-deployment-required")
+        if document["operation"] == "delete":
+            require("deployment" not in document and "deletion_scope" not in document
+                    and document.get("deletion", {}).get("inventory_mode") == "arm-provider-closure-v1",
+                    "single-writer-whole-owned-groups-required")
+        else:
+            require("deployment" in document, "single-writer-scoped-deployment-required")
     else:
         require(locks.get("provider") == "azure-blob-lease"
                 and locks.get("coordination_mode", "blob") == "blob", "distributed-lock-provider-required")
@@ -500,6 +505,8 @@ def validate_deployment_plan(document):
 
 def protect_coordination_storage(document):
     """Never destroy the account/RG that holds this operation's live leases."""
+    if single_writer(document):
+        return
     account = urlsplit(document["locks"]["account_url"]).hostname.split(".")[0].lower()
     suffix = "/providers/microsoft.storage/storageaccounts/" + account
     data = document["deletion"]
@@ -611,7 +618,8 @@ def capabilities():
         "local_preview": True, "distributed_lock": "azure-blob-infinite-lease-v1",
         "coordination_modes": ["blob", "single-writer"],
         "single_writer": "provider-repository-cas-v1",
-        "single_writer_operations": ["create-factory", "create-scaleset", "deploy-project"],
+        "single_writer_operations": ["create-factory", "create-scaleset", "deploy-project", "delete"],
+        "single_writer_deletion": "provider-repository-cas-cohort-v1",
         "project_routes": ["ado", "gha"],
         "project_environments": ["dev", "stage", "prod"],
         "scoped_worker_os": ["linux"], "scoped_runners": ["hosted", "self-hosted"],
@@ -624,6 +632,8 @@ def capabilities():
         "resource_closure": "arm-resource-only-closure-v2",
         "delete_leaf_types": sorted(LEAF_TYPES), "delete_empty_owned_resource_groups": True,
         "delete_owned_resource_groups": "arm-provider-closure-v1",
+        "factory_deletion_dependencies": "search-shared-private-links-first-v1",
+        "factory_deletion_coordination_modes": ["blob", "single-writer"],
         "selective_project_deletion": SELECTIVE_PROJECT_DELETE,
         "factory_cohort": "physical-lease-cohort-v1",
         "creation": "frozen-arm-deployment-plan-v1", "shared_remote_namespaced_auth": True,
@@ -800,6 +810,9 @@ class Cloud:
 
     def request(self, method, url, audience, data=None, headers=None, allowed=(200,)):
         parsed = urlsplit(url)
+        require(not (self.document.get("operation") == "delete"
+                     and (parsed.hostname or "").lower() in ("graph.microsoft.com", "graph.windows.net")),
+                "factory-deletion-entra-mutations-forbidden")
         allowed_hosts = {urlsplit(ARM).netloc, "dev.azure.com"}
         if not single_writer(self.document):
             allowed_hosts.add(urlsplit(self.document["locks"]["account_url"]).netloc)
@@ -1157,6 +1170,7 @@ def collect_resource_closure(cloud, scopes, resource_versions=None):
         else:
             rows, unsupported = cloud.collection(path, api, extension=extension)
         entry = {"api_version": api, "ids": sorted(row["id"].lower() for row in rows),
+                 "items": rows,
                  "body_hash": digest(rows), "unsupported": unsupported}
         closure["collections"][path.lower()] = entry
         for row in rows:
@@ -1181,6 +1195,7 @@ def collect_resource_closure(cloud, scopes, resource_versions=None):
         roots = cloud.list_resources(scope)
         closure["collections"][scope.lower() + "/resources"] = {
             "api_version": RG_API, "ids": sorted(row["id"].lower() for row in roots),
+            "items": sorted(roots, key=lambda row: row["id"].lower()),
             "body_hash": digest(sorted(roots, key=lambda row: row["id"].lower())), "unsupported": None}
         for row in roots:
             resource_id = row["id"]
@@ -1226,11 +1241,20 @@ def collect_resource_closure(cloud, scopes, resource_versions=None):
         if kind in terminal_extensions:
             continue
         namespace, relative = kind.split("/", 1)
+        if kind == "microsoft.search/searchservices":
+            # Search's ARM resource type is services, never searchServices.
+            raise Blocked("invalid-search-service-arm-resource-type")
+        if kind == "microsoft.search/services":
+            # This documented ARM child must be inventoried even when omitted
+            # from provider discovery; a failed list never means an empty list.
+            add_collection(resource_id + "/sharedPrivateLinkResources", "2025-05-01")
         for child in sorted(provider(namespace)):
             tail = child.removeprefix(relative + "/")
             if not child.startswith(relative + "/") or "/" in tail:
                 continue
             full_type = namespace + "/" + child
+            if full_type == "microsoft.search/services/sharedprivatelinkresources":
+                continue
             if full_type in inline:
                 closure["collections"][key + "/" + tail] = {"inline_parent_hash": digest(body)}
                 continue
@@ -1332,12 +1356,17 @@ def inherited_new_resource_owner(resource_id, bodies):
 def freeze_deletion_inventory(cloud, document, ownership_records):
     """Read-only exact RG inventory builder; untaggable owners need real receipts."""
     cloud.verify_identity()
-    BlobLocks(cloud, document).verify_enrollment()
+    reader = coordination(cloud, document)
+    reader.verify_enrollment()
+    if single_writer(document):
+        require(reader.state()[1]["active"] is None, "single-writer-repository-active-claim")
     scopes = document["locks"]["scopes"]
     closure, bodies = collect_resource_closure(cloud, scopes)
+    verify_deletion_identity(document, bodies)
     owner = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
     groups, resources = [], []
     for scope in scopes:
+        require(not project_resource_shared(bodies[scope.lower()]), "shared-resource-group-delete-forbidden")
         manager = verify_group_ownership(bodies[scope.lower()], owner, bodies)
         entry = {"id": scope, **closure["groups"][scope.lower()], "delete": True, "owner": owner}
         if manager:
@@ -1345,6 +1374,7 @@ def freeze_deletion_inventory(cloud, document, ownership_records):
         groups.append(entry)
     for resource_id, metadata in closure["resources"].items():
         body = bodies[resource_id]
+        require(not project_resource_shared(body), "shared-resource-delete-forbidden")
         tags = body.get("tags") or {}
         tagged = {key: tags[TAG_KEYS[key]] for key in TAG_KEYS if TAG_KEYS[key] in tags}
         if tagged:
@@ -1362,6 +1392,19 @@ def freeze_deletion_inventory(cloud, document, ownership_records):
     validate_deletion(draft)
     verify_full_inventory(cloud, draft)
     return result
+
+
+def verify_deletion_identity(document, bodies):
+    principal = str(document["identity"]["object_id"]).lower()
+    for body in bodies.values():
+        properties = body.get("properties") or {}
+        identity = body.get("identity") or {}
+        identifiers = [properties.get("principalId"), identity.get("principalId")]
+        identifiers.extend(value.get("principalId") for value in
+                           (identity.get("userAssignedIdentities") or {}).values()
+                           if isinstance(value, dict))
+        require(principal not in {str(value).lower() for value in identifiers if value},
+                "executing-identity-in-deletion-scope")
 
 
 def project_deletion_policy(document):
@@ -1546,6 +1589,7 @@ def freeze_project_deletion(cloud, document, ownership_records):
     BlobLocks(cloud, document).verify_enrollment()
     scopes = sorted(set(document["locks"]["scopes"] + document["locks"]["common_dependencies"]), key=str.lower)
     closure, bodies = collect_resource_closure(cloud, scopes)
+
     records = {key.lower(): value for key, value in ownership_records.items()}
     owner = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
     owner["project_id"] = document["deletion_scope"]["project_number"]
@@ -1739,35 +1783,53 @@ def verified_receipt_owner(locks, evidence, resource_id, body_hash, cache):
     return owner
 
 
-def verify_full_inventory(cloud, document, removed_groups=()):
+def verify_full_inventory(cloud, document, removed_groups=(), removed_resources=()):
     data = document["deletion"]
     removed = {scope.lower() for scope in removed_groups}
+    removed_children = {identifier.lower() for identifier in removed_resources}
+    require(removed_children <= {row["id"].lower() for row in data["resources"] if row["delete"]},
+            "unreviewed-removed-child")
     groups = [group for group in data["resource_groups"] if group["id"].lower() not in removed]
     scopes = [group["id"] for group in groups]
     if not scopes:
         return {}
     cascades = {}
     closure, bodies = collect_resource_closure(cloud, scopes)
+    verify_deletion_identity(document, bodies)
     expected = data["closure"]
     # Provider schemas are global to the subscription; retain only those still
     # required after an earlier approved resource group has been removed.
     for namespace, fingerprint in closure["providers"].items():
         require(expected["providers"].get(namespace) == fingerprint, "provider-schema-changed")
     for section in ("groups", "resources", "collections"):
-        retained = {key: value for key, value in expected[section].items() if arm_scope(key) not in removed}
+        retained = {}
+        for key, value in expected[section].items():
+            if arm_scope(key) in removed or key in removed_children or any(
+                    key.startswith(child + "/") for child in removed_children):
+                continue
+            value = copy.deepcopy(value)
+            if section == "collections" and set(value.get("ids", [])) & removed_children:
+                require(isinstance(value.get("items"), list), "frozen-child-collection-items-required")
+                value["items"] = [row for row in value["items"] if row["id"].lower() not in removed_children]
+                value["ids"] = [identifier for identifier in value["ids"] if identifier not in removed_children]
+                value["body_hash"] = digest(value["items"])
+            retained[key] = value
         require(closure[section] == retained, "complete-resource-closure-changed")
-    expected_ids = {item["id"].lower() for item in data["resources"] if arm_scope(item["id"]) not in removed}
+    expected_ids = {item["id"].lower() for item in data["resources"]
+                    if arm_scope(item["id"]) not in removed and item["id"].lower() not in removed_children}
     require(set(closure["resources"]) == expected_ids, "unlisted-child-or-extension-resource")
     for group in groups:
+        require(not project_resource_shared(bodies[group["id"].lower()]), "shared-resource-group-delete-forbidden")
         manager = verify_group_ownership(bodies[group["id"].lower()], group["owner"], bodies)
         require(not manager or group.get("ownership_source") == "managed-parent"
                 and group.get("managed_parent_id") == manager, "managed-group-ownership-not-reviewed")
         cloud.assert_no_active_deployments(group["id"])
     resources = {item["id"].lower(): item for item in data["resources"]}
     receipt_cache = {}
-    evidence_reader = BlobLocks(cloud, document)
+    evidence_reader = coordination(cloud, document)
     for key in expected_ids:
         item = resources[key]
+        require(not project_resource_shared(bodies[key]), "shared-resource-delete-forbidden")
         approved_groups = {group["id"].lower() for group in data["resource_groups"] if group["delete"]}
         managed = managed_group_cascades(bodies[key], document["target"]["subscription_id"])
         require(managed <= approved_groups,
@@ -1807,6 +1869,29 @@ def delete_owned_groups(cloud, locks, document, receipt, persist, sleep=time.sle
             if other != scope and other in planned:
                 planned[scope]["depends_on"].append(other)
     removed = []
+    removed_children = set()
+    # Only independently proven entries in the immutable manifest are eligible.
+    # Leave private endpoint connections to the reviewed RG cascade: deleting
+    # them individually changes embedded parent bodies before the next guard.
+    links = [item for item in resources if resource_type_from_id(item["id"]) ==
+             "microsoft.search/services/sharedprivatelinkresources"]
+    for item in deletion_order(links):
+        locks.authorize(document)
+        locks.assert_held()
+        cloud.verify_identity()
+        cloud.assert_no_active_runs(locks.enrollment)
+        verify_full_inventory(cloud, document, removed, removed_children)
+        locks.authorize(document)
+        locks.assert_held()
+        receipt.update(mutation_started=True, pending_resource=item["id"])
+        persist()
+        cloud.arm("DELETE", item["id"], item["api_version"], allowed=(200, 202, 204),
+                  headers={"If-Match": item["etag"]} if item.get("etag") else None)
+        wait_absent(cloud, locks, item["id"], item["api_version"], sleep)
+        removed_children.add(item["id"].lower())
+        receipt["deleted_resources"].append(item["id"])
+        receipt.pop("pending_resource", None)
+        persist()
     for group in deletion_order(list(planned.values())):
         if group["id"].lower() in {scope.lower() for scope in removed}:
             continue
@@ -1814,16 +1899,18 @@ def delete_owned_groups(cloud, locks, document, receipt, persist, sleep=time.sle
         locks.assert_held()
         cloud.verify_identity()
         cloud.assert_no_active_runs(locks.enrollment)
-        cascades = verify_full_inventory(cloud, document, removed)
+        cascades = verify_full_inventory(cloud, document, removed, removed_children)
         locks.authorize(document)
         locks.assert_held()
         receipt["mutation_started"] = True
         receipt["pending_resource_group"] = group["id"]
         persist()
-        cloud.arm("DELETE", group["id"], RG_API, allowed=(200, 202, 204))
+        approved = next(row for row in groups if row["id"].lower() == group["id"].lower())
+        cloud.arm("DELETE", group["id"], RG_API, allowed=(200, 202, 204),
+                  headers={"If-Match": approved["etag"]} if approved.get("etag") else None)
         wait_absent(cloud, locks, group["id"], RG_API, sleep)
         for item in resources:
-            if arm_scope(item["id"]) == group["id"].lower():
+            if arm_scope(item["id"]) == group["id"].lower() and item["id"].lower() not in removed_children:
                 wait_absent(cloud, locks, item["id"], item["api_version"], sleep)
                 receipt["deleted_resources"].append(item["id"])
         receipt["deleted_resources"].append(group["id"])
@@ -3523,6 +3610,222 @@ def write_receipt(path, receipt):
             time.sleep(RECEIPT_REPLACE_RETRY_SECONDS)
 
 
+class _RepositoryDeletionMember(RepositoryCoordination):
+    def assert_held(self):
+        self.cohort.assert_held()
+
+    def claim_run(self):
+        self.cohort.claim_runs()
+        self.authorize(self.document)
+
+
+class _RepositoryDeletionCohort:
+    """One Git CAS reserves the entire cohort, including its logical identities.
+
+    These reservations have no expiry. A fresh private-repository/state read is
+    the renewal observation; uncertain writes poison the shared store until an
+    operator reconciles it. Never acquire independent per-child reservations.
+    """
+
+    def __init__(self, members):
+        self.members = members
+        self.held, self.active = {}, None
+        self.claimed, self.closed = False, False
+        self.frozen = [canonical(member.document) for member in members]
+        first = members[0]
+        self.store = first.store
+        self.cohort_hash = digest(sorted(member.document["manifest_hash"] for member in members))
+        self.record = "cohorts/" + self.cohort_hash + ".json"
+        for member in members:
+            require(all(member.settings.get(key) == first.settings.get(key) for key in (
+                "provider", "coordination_mode", "repository", "state_ref", "coordination_hash", "revision"))
+                and all(member.document["route"].get(key) == first.document["route"].get(key)
+                        for key in ("kind", "repository", "writer_id", "shared_remote")),
+                "single-writer-cohort-authority-mismatch")
+            member.cohort, member.store = self, self.store
+
+    def _state(self):
+        require(not self.store.write_failed, "single-writer-write-reconciliation-required")
+        for member, frozen in zip(self.members, self.frozen):
+            require(canonical(member.document) == frozen, "claimed-manifest-changed")
+        head, value = self.members[0].state()
+        for member in self.members[1:]:
+            BlobLocks.verify_enrollment_document(member, value["enrollment"], "aifactory-single-writer-v1",
+                                                "repository-exclusive-writer")
+        self.observed_head = head
+        return head, value
+
+    def _active(self, value):
+        require(self.held and self.active is not None and value["active"] == self.active,
+                "single-writer-active-claim-changed")
+        for member in self.members:
+            expected = {scope.lower(): self.held[scope.lower()] for scope in
+                        member.settings["scopes"] + member.settings["common_dependencies"]}
+            require(member.held == expected, "single-writer-cohort-context-changed")
+
+    def acquire(self):
+        for member in self.members:
+            validate_manifest(member.document)
+        head, value = self._state()
+        require(value["active"] is None, "single-writer-repository-active-claim")
+        require(self.record not in value["records"] and not any(
+            key.startswith("runs/" + member.document["run_id"] + ".")
+            for member in self.members for key in value["records"]), "single-writer-run-already-submitted")
+        identifier = str(uuid4())
+        scopes = {scope.lower() for member in self.members for scope in
+                  member.settings["scopes"] + member.settings["common_dependencies"]}
+        logical = {"factory/" + member.document["target"]["factory_id"] for member in self.members}
+        logical.update("scaleset/" + member.document["target"]["factory_id"] + "/" +
+                       member.document["target"]["scaleset_id"] for member in self.members)
+        self.held = {scope: identifier for scope in sorted(scopes)}
+        active = {"kind": "deletion-cohort", "claim_id": identifier, "cohort_hash": self.cohort_hash,
+                  "revision": self.members[0].settings["revision"],
+                  "coordination_hash": self.members[0].settings["coordination_hash"],
+                  "context": {scope: identifier for scope in sorted(scopes | logical)},
+                  "manifests": sorted(member.document["manifest_hash"] for member in self.members)}
+        self.active = {**active, "owner_hash": digest(active)}
+        for member in self.members:
+            member.held = {scope.lower(): identifier for scope in
+                           member.settings["scopes"] + member.settings["common_dependencies"]}
+        # Record attempted ownership before the request: a lost response can
+        # still have installed every reservation, so cleanup must fail closed.
+        self.store.update(head, value, active=self.active)
+        self.assert_held()
+
+    def assert_held(self):
+        _, value = self._state()
+        self._active(value)
+
+    def claim_runs(self):
+        if self.claimed:
+            return
+        head, value = self._state()
+        self._active(value)
+        proofs = []
+        for member in self.members:
+            document = member.document
+            validate_manifest(document)
+            proof = {"schema": 1, "claim_id": str(uuid4()), "run_id": document["run_id"],
+                     "manifest_hash": document["manifest_hash"], "source": document["source"],
+                     "accepted_at": utc_now(), "lease_context_hash": digest(member.held)}
+            name = "runs/" + document["run_id"]
+            require(name + ".json" not in value["records"] and name + ".claim.json" not in value["records"],
+                    "single-writer-run-already-submitted")
+            value["records"][name + ".claim.json"] = proof
+            value["records"][name + ".json"] = {
+                "schema": 1, "run_id": document["run_id"], "state": "claimed",
+                "manifest_hash": document["manifest_hash"], "execution_claim": proof}
+            proofs.append(proof)
+        self.store.replace(head, value)
+        self.claimed = True
+        for member, proof in zip(self.members, proofs):
+            member.execution_claim = _ExecutionClaim(member.document, proof)
+
+    @staticmethod
+    def _receipt_content(receipt):
+        return {key: value for key, value in receipt.items()
+                if key not in ("updated_at", "locks_retained", "lock_retained")}
+
+    def _receipts(self, value, receipts, aggregate):
+        for member, receipt in zip(self.members, receipts):
+            if member.execution_claim is not None:
+                receipt["execution_claim"] = json.loads(member.execution_claim.proof)
+            name = "runs/" + member.document["run_id"] + ".json"
+            previous = value["records"].get(name, {})
+            require(receipt.get("run_id") == member.document["run_id"]
+                    and receipt.get("manifest_hash") == member.document["manifest_hash"]
+                    and receipt.get("target") == member.document["target"]
+                    and receipt.get("source_commit") == member.document["source"]["commit"]
+                    and receipt.get("cohort_hash") == self.cohort_hash,
+                    "single-writer-record-binding-mismatch")
+            if previous.get("status") in ("succeeded", "blocked", "reconciliation-required"):
+                require(self._receipt_content(previous) == self._receipt_content(receipt),
+                        "single-writer-terminal-record-immutable")
+            value["records"][name] = json.loads(canonical(receipt))
+        value["records"][self.record] = json.loads(canonical(aggregate))
+
+    def persist(self, receipts, aggregate):
+        if self.closed or not self.claimed:
+            return
+        head, value = self._state()
+        self._active(value)
+        self._receipts(value, receipts, aggregate)
+        self.store.replace(head, value)
+
+    def release(self):
+        if not self.held:
+            return
+        head, value = self._state()
+        self._active(value)
+        aggregate = value["records"].get(self.record, {})
+        first = self.members[0].document
+        require(self.claimed and aggregate.get("status") == "succeeded"
+                and aggregate.get("cohort_hash") == self.cohort_hash
+                and aggregate.get("factory_id") == first["target"]["factory_id"]
+                and aggregate.get("source_commit") == first["source"]["commit"]
+                and aggregate.get("source_ref") == first["source"]["ref"]
+                and len(aggregate.get("children", [])) == len(self.members),
+                "single-writer-claim-retained-reconciliation-required")
+        for member, child in zip(self.members, aggregate["children"]):
+            document = member.document
+            name = "runs/" + document["run_id"]
+            receipt = value["records"].get(name + ".json", {})
+            expected = {row["id"].lower() for row in document["deletion"]["resource_groups"] +
+                        document["deletion"]["resources"]}
+            deleted = receipt.get("deleted_resources", [])
+            require(receipt.get("status") == "succeeded" and receipt.get("operation") == "delete"
+                    and receipt == child and receipt.get("run_id") == document["run_id"]
+                    and receipt.get("manifest_revision") == document["manifest_revision"]
+                    and receipt.get("manifest_hash") == document["manifest_hash"]
+                    and receipt.get("target") == document["target"]
+                    and receipt.get("source_commit") == document["source"]["commit"]
+                    and receipt.get("source_ref") == document["source"]["ref"]
+                    and receipt.get("cohort_hash") == self.cohort_hash
+                    and receipt.get("execution_claim") == json.loads(member.execution_claim.proof)
+                    and value["records"].get(name + ".claim.json") == receipt["execution_claim"]
+                    and not any(key.startswith("pending_") for key in receipt)
+                    and len(deleted) == len(expected) and {key.lower() for key in deleted} == expected,
+                    "single-writer-deletion-receipt-incomplete")
+            member.cloud.verify_identity()
+            for row in document["deletion"]["resource_groups"] + document["deletion"]["resources"]:
+                status, _, _ = member.cloud.arm("GET", row["id"], row.get("api_version", RG_API),
+                                               allowed=(200, 404))
+                require(status == 404, "single-writer-terminal-deletion-unverified")
+        # Compare-and-swap against the same observed head after final absence
+        # checks. No worker receipt exists for local ARM deletion.
+        for member in self.members:
+            receipt = value["records"]["runs/" + member.document["run_id"] + ".json"]
+            receipt.update(lock_retained=False, locks_retained=[])
+        aggregate.update(lock_retained=False, locks_retained=[])
+        for receipt in aggregate["children"]:
+            receipt.update(lock_retained=False, locks_retained=[])
+        value["active"] = None
+        self.store.replace(head, value)
+        self._close()
+
+    def abort(self, receipts, aggregate):
+        if not self.held:
+            return
+        head, value = self._state()
+        self._active(value)
+        require(not any(receipt.get("mutation_started") for receipt in receipts),
+                "single-writer-claim-retained-reconciliation-required")
+        for receipt in receipts:
+            receipt.update(lock_retained=False, locks_retained=[])
+        aggregate.update(lock_retained=False, locks_retained=[])
+        self._receipts(value, receipts, aggregate)
+        value["active"] = None
+        self.store.replace(head, value)
+        self._close()
+
+    def _close(self):
+        self.closed = True
+        self.held.clear()
+        for member in self.members:
+            member.held.clear()
+            member.closed = True
+
+
 class _CohortLeases:
     def __init__(self, members):
         self.members = members
@@ -3606,11 +3909,9 @@ def _cohort_order(documents):
     return [by_hash[row["id"]] for row in deletion_order(plan)]
 
 
-def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_factory=Cloud, lock_factory=BlobLocks):
+def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_factory=Cloud, lock_factory=None):
     """Accept all factory children under the full physical union before deleting."""
     require(isinstance(documents, list) and documents, "nonempty-delete-cohort-required")
-    require(not any(isinstance(document, dict) and single_writer(document) for document in documents),
-            "single-writer-cohort-not-supported")
     documents = json.loads(canonical(documents))
     selective = all(document.get("deletion_scope", {}).get("contract") == SELECTIVE_PROJECT_DELETE for document in documents)
     for document in documents:
@@ -3620,6 +3921,9 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
                 and all(row["delete"] for row in document["deletion"]["resource_groups"] +
                         document["deletion"]["resources"])), "cohort-whole-owned-groups-required")
     first = documents[0]
+    repository_cohort = single_writer(first)
+    require(all(single_writer(document) == repository_cohort for document in documents),
+            "cohort-coordination-mode-mismatch")
     if selective:
         require(all(document["reviewed_scope"] == first["reviewed_scope"]
                     and document["deletion_scope"]["options"] == first["deletion_scope"]["options"]
@@ -3644,8 +3948,9 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
             and receipt_path.name not in {document["run_id"] + ".receipt.json" for document in documents},
             "new-isolated-receipt-required")
     clouds = [cloud_factory(document) for document in documents]
+    lock_factory = lock_factory or (_RepositoryDeletionMember if repository_cohort else BlobLocks)
     members = [lock_factory(cloud, document) for cloud, document in zip(clouds, documents)]
-    union = _CohortLeases(members)
+    union = (_RepositoryDeletionCohort if repository_cohort else _CohortLeases)(members)
     aggregate = {"schema": 1, "operation": "delete-project" if selective else "delete-factory",
                  "cohort_hash": digest(sorted(document["manifest_hash"] for document in documents)),
                  "factory_id": first["target"]["factory_id"], "source_commit": first["source"]["commit"],
@@ -3671,7 +3976,10 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
             receipt["updated_at"] = aggregate["updated_at"]
             receipt["locks_retained"] = sorted(union.held)
             receipt["lock_retained"] = bool(union.held)
-            if receipt["run_id"] in claimed:
+        if repository_cohort:
+            union.persist(aggregate["children"], aggregate)
+        for locks, receipt in zip(members, aggregate["children"]):
+            if not repository_cohort and receipt["run_id"] in claimed:
                 locks.store_receipt(receipt)
             write_receipt(execution_root / (receipt["run_id"] + ".receipt.json"), receipt)
         write_receipt(receipt_path, aggregate)
@@ -3695,6 +4003,9 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
                 verify_project_permissions(cloud, document["deletion"])
             else:
                 verify_full_inventory(cloud, document)
+                _, identity_inventory = collect_resource_closure(cloud, document["locks"]["scopes"])
+                for member in documents:
+                    verify_deletion_identity(member, identity_inventory)
         union.assert_held()
         for document in documents:
             validate_manifest(document)
@@ -3728,7 +4039,7 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
     except BaseException as error:
         aggregate["status"] = "reconciliation-required" if claim_attempted else "blocked"
         aggregate.update(failure_fields(error, "unexpected-runtime-failure"))
-        if not claim_attempted:
+        if not repository_cohort and not claim_attempted:
             try:
                 union.release()
             except (Blocked, OSError):
@@ -3741,6 +4052,12 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
                 receipt["error_code"] = aggregate["error_code"]
                 if "error_diagnostic" in aggregate:
                     receipt["error_diagnostic"] = aggregate["error_diagnostic"]
+        if repository_cohort and not any(row["mutation_started"] for row in aggregate["children"]):
+            try:
+                union.abort(aggregate["children"], aggregate)
+            except BaseException:
+                aggregate["status"] = "reconciliation-required"
+                aggregate["error_code"] = "single-writer-claim-retained-reconciliation-required"
         aggregate["finished_at"] = utc_now()
         try:
             persist()
@@ -3763,6 +4080,19 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
 def execute(document, source_root, execution_root, receipt_path, cloud=None, lock_factory=None):
     document = json.loads(canonical(document))
     validate_manifest(document)
+    if single_writer(document) and document["operation"] == "delete":
+        execution_root, receipt_path = clean_path(execution_root), clean_path(receipt_path)
+        require(not receipt_path.exists() and receipt_path.parent == execution_root, "new-isolated-receipt-required")
+        aggregate_path = Path(execution_root) / (document["run_id"] + ".cohort.json")
+        require(clean_path(receipt_path) != clean_path(aggregate_path), "new-isolated-receipt-required")
+        result = execute_cohort([document], source_root, execution_root, aggregate_path,
+                                cloud_factory=lambda frozen: cloud or Cloud(frozen), lock_factory=lock_factory)
+        receipt = result["children"][0]
+        if result["status"] != "succeeded":
+            receipt["status"] = result["status"]
+            receipt.update({key: result[key] for key in ("error_code", "error_diagnostic") if key in result})
+        write_receipt(receipt_path, receipt)
+        return receipt
     reasons = operation_blockers(document)
     require(not reasons, reasons[0] if reasons else "unsupported-operation")
     source_root, execution_root, receipt_path = clean_path(source_root), clean_path(execution_root), clean_path(receipt_path)

@@ -21,28 +21,28 @@ The **AI Factory Configuration Wizard** is a guided, form-based desktop tool tha
 
 <a id="download"></a>
 
-## Download - Version `0.47.2`
+## Download - Version `0.47.6`
 
-Release [v0.47.2](https://github.com/jostrm/azure-aifactory-config/releases/tag/v0.47.2),
-published 2026-10-02 (UTC), contains the Tkinter wizard and embedded API for
-Windows x86-64, Linux x86-64 and macOS Apple Silicon (arm64). All three
-archives are the exact published assets from
-[GitHub Actions run 37069980067](https://github.com/jostrm/azure-aifactory-config/actions/runs/37069980067),
-built from source commit `3b83b5d6ba400f31656ef44cdd6a990a30364e4d`.
-The macOS archive is not an Intel/universal build.
-Archive checksums are in [SHA256SUMS.txt](SHA256SUMS.txt); source commit,
-architecture and build provenance are in [release-manifest.json](release-manifest.json).
-The downloads below are hosted in this public repository; access to the source
-repository is not required.
+The [desktop release](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/desktop-v0.47.6)
+contains the Tkinter wizard and embedded API for Windows x86-64, Linux x86-64
+and macOS Apple Silicon (arm64), plus the matched MAUI Windows installer.
+The macOS archive is not an Intel/universal build. The release assets include
+`SHA256SUMS.txt` and `release-manifest.json` with exact source commits,
+architectures and build provenance. Access to the private API source repository
+is not required.
+
+Downloads are release assets rather than a later binary-only commit to `main`,
+so publishing them does not invalidate the API's pinned companion snapshot.
+Older archives retained in these source folders are not the current downloads.
 
 | Platform | File | Package |
 |---|---|---|
-| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip) | v0.47.2, complete executable and `_internal` runtime folder |
-| Linux x86-64 | [aifactory-config-linux.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/linux/aifactory-config-linux.tar.gz) | v0.47.2, self-contained executable |
-| macOS arm64 | [aifactory-config-macos.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/macos/aifactory-config-macos.tar.gz) | v0.47.2, self-contained executable |
+| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/aifactory-config-windows.zip) | v0.47.6, complete executable and `_internal` folder |
+| Linux x86-64 | [aifactory-config-linux.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/aifactory-config-linux.tar.gz) | v0.47.6, self-contained executable |
+| macOS arm64 | [aifactory-config-macos.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/aifactory-config-macos.tar.gz) | v0.47.6, self-contained executable |
 
-Windows download integrity: [SHA256SUMS.txt](windows/SHA256SUMS.txt).
-Build provenance: [release-manifest.json](windows/release-manifest.json).
+Download integrity: [SHA256SUMS.txt](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/SHA256SUMS.txt).
+Build provenance: [release-manifest.json](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/release-manifest.json).
 
 ### ⚠️ Security warning on first run
 

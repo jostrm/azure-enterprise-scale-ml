@@ -177,6 +177,12 @@ def validate_bindings(request: dict[str, Any], preview: dict[str, Any], purpose:
                     raise ConfigError("Binding preview must preserve the exact candidate, factory and catalog revision.")
         elif operation != "parameters":
             raise ConfigError("Parameter receipt operation does not match.")
+    elif purpose == "delete-aifactory-confirm":
+        from .factory_deletion import validate_deletion_preview
+
+        if operation != "delete-aifactory":
+            raise ConfigError("Deletion receipt operation does not match.")
+        validate_deletion_preview(request, preview)
     elif purpose == "creation-workflow-start":
         if operation != "creation-workflow" or type(preview.get("contract_version")) is not int or preview["contract_version"] != 1:
             raise ConfigError("Expected a registered creation workflow contract.")
