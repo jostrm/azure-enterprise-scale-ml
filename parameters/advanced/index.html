@@ -2489,7 +2489,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
-<td style="text-align: right;">86</td>
+<td style="text-align: right;">90</td>
 </tr>
 <tr>
 <td><code>helper</code></td>
@@ -2497,7 +2497,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>state</code></td>
-<td style="text-align: right;">44</td>
+<td style="text-align: right;">46</td>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
@@ -4991,7 +4991,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter yaml:technical_admins_email --><!-- parameter json.dev:technical_admins_email --><code>technical_admins_email</code></td>
-<td><code>AIF-Project Owners</code> (not in .env template), <code>PROJECT_MEMBERS_EMAILS</code></td>
+<td><code>PROJECT_MEMBERS_EMAILS</code></td>
 <td>O</td>
 <td>Y: <code>"&lt;todo&gt;_email_or_securitygroup_name"</code><br>J.dev: <code>"&lt;todo&gt;_email_or_securitygroup_name"</code></td>
 <td>Project team contact email or group name recommended: set for better project tracking.</td>
@@ -7974,6 +7974,30 @@ reported, not silently represented as multiple settings.</p>
 <td>Compatibility input; collection resets this to false. Access-hub Bastion is controlled separately.</td>
 </tr>
 <tr>
+<td><!-- parameter bootstrap:AIF_ADMIN_GROUP_ID --><code>AIF_ADMIN_GROUP_ID</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>Existing administrators group object ID (blank to create/ensure by name)</td>
+</tr>
+<tr>
+<td><!-- parameter bootstrap:AIF_ADMIN_GROUP_MODE --><code>AIF_ADMIN_GROUP_MODE</code></td>
+<td>O</td>
+<td><code>"$admin_group_default"</code></td>
+<td>Technical administrators: reuse initial team (team) or separate Entra group (separate); allowed: team separate</td>
+</tr>
+<tr>
+<td><!-- parameter bootstrap:AIF_ADMIN_GROUP_NAME --><code>AIF_ADMIN_GROUP_NAME</code></td>
+<td>O</td>
+<td><code>"${AIF_PREFIX%-}-admins"</code></td>
+<td>Entra administrators security group</td>
+</tr>
+<tr>
+<td><!-- parameter bootstrap:AIF_ADMIN_MEMBER_EMAIL --><code>AIF_ADMIN_MEMBER_EMAIL</code></td>
+<td>O</td>
+<td><code>"$current_user"</code></td>
+<td>Initial administrators group member</td>
+</tr>
+<tr>
 <td><!-- parameter bootstrap:AIF_ADMIN_VM_SIZE --><code>AIF_ADMIN_VM_SIZE</code></td>
 <td>O</td>
 <td><code>"$([[ \"$AIF_RUNNER_VM_OS\" == linux ]] &amp;&amp; echo Standard_D4s_v5 &amp;#124;&amp;#124; echo Standard_D2s_v5)"</code></td>
@@ -8458,6 +8482,18 @@ reported, not silently represented as multiple settings.</p>
 <td><code>apply_gha</code>, <code>common_values</code>; Add bastion</td>
 </tr>
 <tr>
+<td><!-- parameter state:admin_group_id --><code>admin_group_id</code></td>
+<td>O</td>
+<td><code>null</code></td>
+<td><code>common_values</code>; Admin group id</td>
+</tr>
+<tr>
+<td><!-- parameter state:admin_member_email --><code>admin_member_email</code></td>
+<td>O</td>
+<td><code>null</code></td>
+<td><code>common_values</code>; Admin member email</td>
+</tr>
+<tr>
 <td><!-- parameter state:admin_vm_size --><code>admin_vm_size</code></td>
 <td>O</td>
 <td><code>"Standard_D2s_v5"</code></td>
@@ -8695,7 +8731,7 @@ reported, not silently represented as multiple settings.</p>
 <td><!-- parameter state:team_member_email --><code>team_member_email</code></td>
 <td>O</td>
 <td><code>null</code></td>
-<td><code>common_values</code>; Team member email</td>
+<td><code>apply_gha</code>, <code>common_values</code>; Team member email</td>
 </tr>
 <tr>
 <td><!-- parameter state:tenant_id --><code>tenant_id</code></td>

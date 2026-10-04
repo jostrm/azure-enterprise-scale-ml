@@ -1473,6 +1473,69 @@ committed as a public JSON file.</p>
 the intended repository and Azure subscriptions. Pipeline authentication uses
 the configured OIDC/federated identity or the supported service-principal route.
 Keep credentials in the required secret stores, never in <code>.env.template</code> or docs.</p>
+<p>GitHub runner <strong>registration</strong> uses a short-lived token minted by authenticated
+<code>gh</code>; Azure managed identity/OIDC is the separate <strong>deployment</strong> login. A GitHub
+runner's name or online status cannot establish whether the historical <code>gh</code>
+session used an OAuth login, PAT or installation token. Newly provisioned Linux
+runner VMs have no managed identity attached. Existing Windows admin-VM identity
+settings are preserved.</p>
+<p>New full bootstrap creates GitHub environments <strong>Dev</strong>, <strong>Stage</strong>, <strong>Prod</strong>.
+The numeric <code>/settings/environments/&lt;id&gt;</code> URL is an environment ID, not its name.
+The repository variable <code>AIFACTORY_GITHUB_ENVIRONMENTS</code> maps the unchanged logical
+selectors <code>dev</code>, <code>stage</code>, <code>prod</code> to exact GitHub names; Azure still uses
+<code>dev</code>, <code>test</code>, <code>prod</code>. Existing lowercase environments keep their names and
+case-sensitive OIDC subjects. Updated workflows without the mapping retain
+their legacy lowercase behavior. No remote environment is renamed, deleted or
+stripped of protection rules. Other named environments are left untouched and do
+not require enrollment to run full bootstrap. To deliberately use a custom
+environment, supply a reviewed complete <code>AIFACTORY_GITHUB_ENVIRONMENTS</code> mapping,
+for example <code>{"dev":"aifactory-existing","stage":"Stage","prod":"Prod"}</code>. Bootstrap refuses
+to overwrite a saved mapping or a conflicting federated credential; changing
+either requires a separately reviewed migration.</p>
+<p>Full bootstrap can create/ensure its bootstrap resource group, deployment
+identity (<code>AIF_IDENTITY_MODE=c</code>), common infrastructure and missing Linux runner.
+<code>mi</code> and <code>sp</code> instead select existing identities. The runner-only preparation
+command intentionally requires the selected common resource group and subnet to
+exist; it is not full bootstrap.
+Advanced Mode reuses existing resource groups and deployment identities rather
+than recreating them. Simple Mode deliberately requires a fresh bootstrap/common
+scope; use Advanced Mode to resume an existing scope.
+All subscription IDs must already exist; bootstrap does not create subscriptions.
+The existing MAUI/API full-bootstrap route remains independent of optional
+registered exact-scope enrollment.</p>
+<p>The initial team group is created/ensured unless <code>AIF_TEAM_GROUP_ID</code> supplies an
+existing group. Technical administrators default to that team for compatibility.
+Choose <code>AIF_ADMIN_GROUP_MODE=separate</code> to supply <code>AIF_ADMIN_GROUP_ID</code>, or
+create/ensure <code>AIF_ADMIN_GROUP_NAME</code> with <code>AIF_ADMIN_MEMBER_EMAIL</code>.
+Supplied group IDs skip membership changes; creation/membership and role
+assignments still require the caller's normal Entra/Azure permissions.</p>
+<div class="admonition note">
+<p class="admonition-title">Integrated VPN and project allocation</p>
+<p><strong>Advanced Mode with integrated VPN</strong> keeps <code>GatewaySubnet</code> at the end of
+the common VNet. <code>subnetCalc_v2.ps1</code> now allocates aligned free IPv4 gaps
+across all VNet prefixes, largest subnet first with stable logical-name ties.
+Existing managed <code>snt-prj&lt;projectNumber&gt;-...</code> subnets retain their exact CIDRs, even when defaults
+change; other subnets are reserved, never renumbered. Exhaustion, fragmentation,
+malformed inventory, and unsupported multi-prefix project subnets fail before
+parameter output. Multiple IPv4 prefixes on unrelated subnets are reserved;
+IPv6 allocation is not supported. Serialize writers sharing the same VNet.
+<strong>Simple Mode</strong> instead reserves <code>172.16.1.0/27</code> for the gateway and
+<code>172.16.1.32/28</code> for DNS, and checks room for a full project in its fixed
+<code>172.16.0.0/20</code>, using the same gap policy rather than a tail cursor.
+The offline <code>10.113.0.0/18</code> regression retains gateway <code>10.113.63.224/27</code>
+and supports three full project allocations and repeat updates; client pool
+<code>172.31.240.0/24</code> is separate, not a VNet subnet. This is not Azure deployment proof.
+Do not change an integrated selection to an external hub to bypass allocation.</p>
+<p>Canonical GitHub Actions and ADO project templates pass the project number to
+the allocator in the accelerator submodule. Existing consumers must adopt the
+reviewed published accelerator revision and refreshed templates together.
+Registered Full bootstrap's API frozen project projection already uses free-gap
+allocation with exact project ownership checks, reading subnet sizes from the
+pinned PowerShell source rather than invoking its old append path. API creation
+sources snapshot <code>bootstrap</code> and <code>environment_setup/aifactory</code>; after publishing,
+synchronize the exact reviewed source and rebuild packaged clients where needed.
+Editing the canonical working tree does not update existing pinned snapshots.</p>
+</div>
 <p>The route template is
 <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/.env.template"><code>github-actions/.env.template</code></a>.
 It uses uppercase names; JSON/YAML often use different names. Do not mechanically
