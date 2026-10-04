@@ -2887,14 +2887,18 @@ def dns_record_set_inventory(closure, parent):
     for kind in DNS_RECORD_TYPES:
         path = parent + "/" + kind
         entry = closure["collections"].get(path)
-        require(isinstance(entry, dict) and set(entry) == {"api_version", "ids", "body_hash", "unsupported"}
+        require(isinstance(entry, dict) and set(entry) == {"api_version", "ids", "items", "body_hash", "unsupported"}
                 and entry["unsupported"] is None and hash_value(entry["body_hash"])
                 and isinstance(entry["api_version"], str)
                 and re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:-preview)?", entry["api_version"])
                 and isinstance(entry["ids"], list)
                 and all(isinstance(key, str) and key == key.lower() and NESTED_ID.fullmatch(key)
                         and key.rsplit("/", 1)[0] == path for key in entry["ids"])
-                and entry["ids"] == sorted(set(entry["ids"])), "dns-soa-record-set-inventory-required")
+                and entry["ids"] == sorted(set(entry["ids"]))
+                and isinstance(entry["items"], list)
+                and all(isinstance(row, dict) and isinstance(row.get("id"), str) for row in entry["items"])
+                and sorted(row["id"].lower() for row in entry["items"]) == entry["ids"]
+                and digest(entry["items"]) == entry["body_hash"], "dns-soa-record-set-inventory-required")
         rows = {key: row for key, row in closure["resources"].items() if key.rsplit("/", 1)[0] == path}
         require(set(rows) == set(entry["ids"]) and all(isinstance(row, dict)
                 and row.get("type") == "microsoft.network/privatednszones/" + kind

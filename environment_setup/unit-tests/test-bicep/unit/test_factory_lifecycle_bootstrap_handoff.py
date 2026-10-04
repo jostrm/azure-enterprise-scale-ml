@@ -1256,6 +1256,72 @@ def dns_consent():
     return add_dns_soa_consent(document, cloud, closure)
 
 
+def test_dns_soa_inventory_retains_all_collected_record_set_evidence(dns_consent):
+    case = dns_consent
+    inventory = fl.dns_record_set_inventory(case.closure, case.zone)
+    assert set(inventory["collections"]) == {case.zone + "/" + kind for kind in fl.DNS_RECORD_TYPES}
+    for path, entry in inventory["collections"].items():
+        assert entry == case.closure["collections"][path]
+        assert set(entry) == {"api_version", "ids", "items", "body_hash", "unsupported"}
+        assert entry["unsupported"] is None
+        assert entry["ids"] == sorted(row["id"].lower() for row in entry["items"])
+        assert entry["body_hash"] == fl.digest(entry["items"])
+        assert entry["items"] == ([case.cloud.bodies[case.soa]] if path.endswith("/soa") else [])
+    assert inventory["resources"] == {case.soa: case.closure["resources"][case.soa]}
+    assert fl.digest(inventory) == case.proposal["parents"][case.zone]["record_set_inventory_hash"]
+
+
+@pytest.mark.parametrize("defect", [
+    "missing-items", "null-items", "object-items", "non-object-item", "missing-id", "non-string-id",
+    "missing-item", "duplicate-item", "extra-item", "foreign-id", "body-hash", "extra-field",
+])
+def test_dns_soa_inventory_rejects_malformed_collection_items(dns_consent, defect):
+    case = dns_consent
+    closure = copy.deepcopy(case.closure)
+    entry = closure["collections"][case.zone + "/soa"]
+    if defect == "missing-items":
+        entry.pop("items")
+    elif defect == "null-items":
+        entry["items"] = None
+    elif defect == "object-items":
+        entry["items"] = {}
+    elif defect == "non-object-item":
+        entry["items"] = [None]
+    elif defect == "missing-id":
+        entry["items"][0].pop("id")
+    elif defect == "non-string-id":
+        entry["items"][0]["id"] = None
+    elif defect == "missing-item":
+        entry["items"] = []
+    elif defect == "duplicate-item":
+        entry["items"] *= 2
+    elif defect == "extra-item":
+        entry["items"].append({"id": case.zone + "/soa/other"})
+    elif defect == "foreign-id":
+        entry["items"][0]["id"] = DNS_APEX.replace("/reviewed/", "/foreign/")
+    elif defect == "body-hash":
+        entry["body_hash"] = "f" * 64
+    else:
+        entry["allow"] = True
+    if "items" in entry and defect != "body-hash":
+        entry["body_hash"] = fl.digest(entry["items"])
+    with pytest.raises(fl.Blocked, match="dns-soa-record-set-inventory-required"):
+        fl.dns_record_set_inventory(closure, case.zone)
+
+
+@pytest.mark.parametrize("resealed", [False, True])
+def test_dns_soa_collection_items_drift_cannot_reuse_consent(dns_consent, resealed):
+    case = dns_consent
+    closure = copy.deepcopy(case.closure)
+    entry = closure["collections"][case.zone + "/soa"]
+    entry["items"][0]["properties"]["ttl"] = 42
+    if resealed:
+        entry["body_hash"] = fl.digest(entry["items"])
+    error = "dns-soa-record-set-inventory-changed" if resealed else "dns-soa-record-set-inventory-required"
+    with pytest.raises(fl.Blocked, match=error):
+        fl.verify_dns_soa_preservation(case.document, closure)
+
+
 def test_dns_soa_consent_preserves_exact_present_instance_without_historical_authority(dns_consent):
     case = dns_consent
     snapshot = fl.bootstrap_ownership_snapshot(case.cloud, case.document)
@@ -1433,7 +1499,8 @@ def runner_and_dns_consent(reviewed_children, monkeypatch):
             path = DNS_ZONE.lower() + "/" + kind
             rows = [body for key, body in sorted(bodies.items()) if key.rsplit("/", 1)[0] == path]
             result["collections"][path] = {"api_version": "2024-06-01", "ids": [row["id"].lower() for row in rows],
-                                           "body_hash": fl.digest(rows), "unsupported": None}
+                                           "items": copy.deepcopy(rows), "body_hash": fl.digest(rows),
+                                           "unsupported": None}
         return result, bodies
     monkeypatch.setattr(fl, "collect_resource_closure", closure)
     result, _ = closure(case.cloud, [GROUP])

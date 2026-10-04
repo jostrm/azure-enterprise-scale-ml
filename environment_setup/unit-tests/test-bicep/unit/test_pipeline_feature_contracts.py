@@ -265,7 +265,10 @@ def test_github_project_only_orchestrator_passes_exact_target_and_phases(target,
     dispatch = pipeline["on"]["workflow_dispatch"]["inputs"]
     assert dispatch["environment"]["options"] == ["dev", "stage", "prod"]
     phase_job = document(GHA_PHASE)["jobs"]["deploy-project"]
-    assert phase_job["environment"] == "${{ inputs.environment }}"
+    assert phase_job["environment"] == (
+        "${{ fromJSON(vars.AIFACTORY_GITHUB_ENVIRONMENTS || "
+        "'{\"dev\":\"dev\",\"stage\":\"stage\",\"prod\":\"prod\"}')[inputs.environment] }}"
+    )
     context = {"inputs.environment": target, "inputs.deployment_id": "offline-reviewed-id",
                "vars.AZURE_ENV_NAME": "wrong-fallback"}
     assert evaluate(phase_job["env"]["dev_test_prod"], context) == internal

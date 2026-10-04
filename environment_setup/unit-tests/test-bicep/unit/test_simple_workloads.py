@@ -9,7 +9,7 @@ import sys
 
 import pytest
 
-from domain.pipeline_contracts import GHA_PHASE, evaluate, load_pipeline
+from domain.pipeline_contracts import GHA_PHASE, evaluate, load_pipeline, objects
 from unit.test_simple_bootstrap import CONFIG, LIB, ROOT, bash, settings
 
 
@@ -97,17 +97,24 @@ def test_linked_application_insights_are_conditional_workload_dependencies():
     assert "applicationInsights: existingAppInsights.id" in aml.read_text(encoding="utf-8")
 
 
-def test_compiled_container_apps_skip_search_rbac_when_search_is_unselected(tmp_path):
+@pytest.mark.parametrize("entrypoint", ["05-compute-services.bicep", "05b-container-apps.bicep"])
+def test_compiled_container_apps_skip_search_rbac_when_search_is_unselected(tmp_path, entrypoint):
     compiler = shutil.which("bicep")
     if not compiler:
         pytest.skip("Existing Bicep CLI required for cached offline compilation")
-    source = ROOT / "environment_setup/aifactory/bicep/esml-genai-1/05-compute-services.bicep"
+    source = ROOT / "environment_setup/aifactory/bicep/esml-genai-1" / entrypoint
     output = tmp_path / "compute.json"
     result = subprocess.run([compiler, "build", str(source), "--no-restore", "--outfile", str(output)],
                             capture_output=True, text=True, timeout=90)
     assert result.returncode == 0, result.stderr
     template = json.loads(output.read_text(encoding="utf-8"))
-    deployment = next(item for item in template["resources"] if "05rbacACAMI" in item["name"])
+    deployments = [
+        item for item in objects(template)
+        if item.get("type") == "Microsoft.Resources/deployments"
+        and "05rbacACAMI" in item.get("name", "")
+    ]
+    assert len(deployments) == 1
+    deployment = deployments[0]
     binding = deployment["properties"]["parameters"]["aiSearchName"]
     if isinstance(binding, dict):
         assert binding["value"].startswith("[if(parameters('enableAISearch'),")

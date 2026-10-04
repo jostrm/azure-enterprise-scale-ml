@@ -328,9 +328,9 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 |---|---:|
 | `yaml` | 357 |
 | `env` | 357 |
-| `bootstrap` | 86 |
+| `bootstrap` | 90 |
 | `helper` | 17 |
-| `state` | 44 |
+| `state` | 46 |
 | `json.dev` | 361 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
@@ -714,7 +714,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:project_service_principal_OID_seeding_kv_name --><!-- parameter json.dev:project_service_principal_OID_seeding_kv_name -->`project_service_principal_OID_seeding_kv_name` | `PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_OID` | C | Y: `"<optional>esml-project001-sp-oid"`<br>J.dev: `"<optional>esml-project001-sp-oid"` | Project SP OID secret name in seeding KV ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
 | <!-- parameter yaml:project_service_principal_Secret_seeding_kv_name --><!-- parameter json.dev:project_service_principal_Secret_seeding_kv_name -->`project_service_principal_Secret_seeding_kv_name` | `PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_S` | C | Y: `"<optional>esml-project001-sp-secret"`<br>J.dev: `"<optional>esml-project001-sp-secret"` | Project SP secret name in seeding KV ensure: name matches the secret in your Seeding Keyvault. Secret-name reference for the selected service-principal/seeding path; not a credential value. |
 | <!-- parameter yaml:technical_admins_ad_object_id --><!-- parameter json.dev:technical_admins_ad_object_id -->`technical_admins_ad_object_id` | `PROJECT_MEMBERS` | M | Y: `"<todo>_EntraID_ObjectID"`<br>J.dev: `"<todo>_EntraID_ObjectID"` | Project team Entra ID object ID(s) mandatory: Project team Entra ID object ID(s) ensure: comma-separated ObjectIDs of users or AD groups for the project team. |
-| <!-- parameter yaml:technical_admins_email --><!-- parameter json.dev:technical_admins_email -->`technical_admins_email` | `AIF-Project Owners` (not in .env template), `PROJECT_MEMBERS_EMAILS` | O | Y: `"<todo>_email_or_securitygroup_name"`<br>J.dev: `"<todo>_email_or_securitygroup_name"` | Project team contact email or group name recommended: set for better project tracking. |
+| <!-- parameter yaml:technical_admins_email --><!-- parameter json.dev:technical_admins_email -->`technical_admins_email` | `PROJECT_MEMBERS_EMAILS` | O | Y: `"<todo>_email_or_securitygroup_name"`<br>J.dev: `"<todo>_email_or_securitygroup_name"` | Project team contact email or group name recommended: set for better project tracking. |
 | <!-- parameter yaml:tenantId --><!-- parameter json.dev:tenantId -->`tenantId` | `TENANT_ID` | M | Y: `"<todo>_TenantId"`<br>J.dev: `"<todo>_TenantId"` | Azure tenant ID mandatory: Azure tenant ID ensure: find in Azure Portal &gt; Entra ID &gt; Overview (Directory ID). |
 | <!-- parameter yaml:test_seeding_kv_service_connection --><!-- parameter json.dev:test_seeding_kv_service_connection -->`test_seeding_kv_service_connection` | No verified binding | C | Y: `"<todo>_ado_service_connection"`<br>J.dev: `"<todo>_ado_service_connection"` | ADO service connection for STAGE seeding KV mandatory: ADO service connection for STAGE seeding KV ensure: name matches your service connection for the STAGE seeding KV subscription. otherwise: can be same as test_service_connection. Required when deploying that environment. |
 | <!-- parameter yaml:test_service_connection --><!-- parameter json.dev:test_service_connection -->`test_service_connection` | No verified binding | C | Y: `"<todo>_ado_service_connection"`<br>J.dev: `"<todo>_ado_service_connection"` | ADO service connection for STAGE mandatory: ADO service connection for STAGE ensure: name matches your Azure DevOps service connection for the STAGE subscription. Required when deploying that environment. |
@@ -1185,6 +1185,10 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIF_ACCESS_HUB_VNET_CIDR -->`AIF_ACCESS_HUB_VNET_CIDR` | C | `"10.240.0.0/22"` | External access-hub vNet CIDR |
 | <!-- parameter bootstrap:AIF_ACCESS_HUB_VNET_NAME -->`AIF_ACCESS_HUB_VNET_NAME` | C | `""` | Aif access hub vnet name override; see create launcher. |
 | <!-- parameter bootstrap:AIF_ADD_BASTION -->`AIF_ADD_BASTION` | O | `""` | Compatibility input; collection resets this to false. Access-hub Bastion is controlled separately. |
+| <!-- parameter bootstrap:AIF_ADMIN_GROUP_ID -->`AIF_ADMIN_GROUP_ID` | O | `""` | Existing administrators group object ID (blank to create/ensure by name) |
+| <!-- parameter bootstrap:AIF_ADMIN_GROUP_MODE -->`AIF_ADMIN_GROUP_MODE` | O | `"$admin_group_default"` | Technical administrators: reuse initial team (team) or separate Entra group (separate); allowed: team separate |
+| <!-- parameter bootstrap:AIF_ADMIN_GROUP_NAME -->`AIF_ADMIN_GROUP_NAME` | O | `"${AIF_PREFIX%-}-admins"` | Entra administrators security group |
+| <!-- parameter bootstrap:AIF_ADMIN_MEMBER_EMAIL -->`AIF_ADMIN_MEMBER_EMAIL` | O | `"$current_user"` | Initial administrators group member |
 | <!-- parameter bootstrap:AIF_ADMIN_VM_SIZE -->`AIF_ADMIN_VM_SIZE` | O | `"$([[ \"$AIF_RUNNER_VM_OS\" == linux ]] && echo Standard_D4s_v5 &#124;&#124; echo Standard_D2s_v5)"` | Self-hosted admin VM size |
 | <!-- parameter bootstrap:AIF_APP_GATEWAY_BACKEND_FQDN -->`AIF_APP_GATEWAY_BACKEND_FQDN` | C | `""` | Simple-mode distinct private HTTPS backend; trusted TLS and unauthenticated GET / returning 200-399. |
 | <!-- parameter bootstrap:AIF_APP_GATEWAY_CERT_SECRET_ID -->`AIF_APP_GATEWAY_CERT_SECRET_ID` | C | `""` | Simple-mode versionless Key Vault PFX certificate-secret URI, not a secret value. |
@@ -1275,6 +1279,8 @@ These exact fields are consumed by the Python helper's local `--state-file` API.
 |---|---|---|---|
 | <!-- parameter state:access_hub_mode -->`access_hub_mode` | O | `null` | `apply_gha`, `common_values`; Access hub mode |
 | <!-- parameter state:add_bastion -->`add_bastion` | C | Required lookup | `apply_gha`, `common_values`; Add bastion |
+| <!-- parameter state:admin_group_id -->`admin_group_id` | O | `null` | `common_values`; Admin group id |
+| <!-- parameter state:admin_member_email -->`admin_member_email` | O | `null` | `common_values`; Admin member email |
 | <!-- parameter state:admin_vm_size -->`admin_vm_size` | O | `"Standard_D2s_v5"` | `apply_gha`, `common_values`; Admin vm size |
 | <!-- parameter state:ado_agent_name -->`ado_agent_name` | O | `""` | `common_values`; Ado agent name |
 | <!-- parameter state:ado_agent_pool -->`ado_agent_pool` | O | `"Default"` | `common_values`; Ado agent pool |
@@ -1314,7 +1320,7 @@ These exact fields are consumed by the Python helper's local `--state-file` API.
 | <!-- parameter state:stage_subscription_id -->`stage_subscription_id` | C | Required lookup | `apply_gha`, `common_values`; Stage subscription id |
 | <!-- parameter state:team_group_id -->`team_group_id` | C | Required lookup | `apply_gha`, `common_values`; Team group id |
 | <!-- parameter state:team_group_name -->`team_group_name` | C | Required lookup | `apply_gha`, `common_values`; Team group name |
-| <!-- parameter state:team_member_email -->`team_member_email` | O | `null` | `common_values`; Team member email |
+| <!-- parameter state:team_member_email -->`team_member_email` | O | `null` | `apply_gha`, `common_values`; Team member email |
 | <!-- parameter state:tenant_id -->`tenant_id` | C | Required lookup | `apply_gha`, `common_values`; Tenant id |
 | <!-- parameter state:topology -->`topology` | C | Required lookup | `apply_gha`, `common_values`; Topology |
 

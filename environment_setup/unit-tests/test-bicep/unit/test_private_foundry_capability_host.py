@@ -207,13 +207,23 @@ class TestPrivateFoundryCapabilityHost(unittest.TestCase):
         )
 
     def test_search_can_use_an_alternate_region_without_moving_private_endpoint(self) -> None:
-        cognitive = FOUNDRY_TEMPLATES[0].read_text(encoding="utf-8")
+        search_deployment = (BICEP / "modules/services/aiSearchDeployment.bicep").read_text(encoding="utf-8")
         search_module = (BICEP / "modules/aiSearch.bicep").read_text(encoding="utf-8")
         ado_job = ADO_PROJECT_JOB.read_text(encoding="utf-8")
         gha = GHA_PROJECT.read_text(encoding="utf-8")
-        self.assertIn("param aiSearchLocation string = ''", cognitive)
-        self.assertIn("location: effectiveAISearchLocation", cognitive)
-        self.assertIn("privateEndpointLocation: location", cognitive)
+        for path in (FOUNDRY_TEMPLATES[0], BICEP / "esml-genai-1/03b-ai-search.bicep"):
+            with self.subTest(entrypoint=path.name):
+                source = path.read_text(encoding="utf-8")
+                self.assertIn("param aiSearchLocation string = ''", source)
+                deployment = re.search(
+                    r"module \w+ '\.\./modules/services/aiSearchDeployment\.bicep' = .*?\n}",
+                    source, re.S,
+                )
+                self.assertIsNotNone(deployment)
+                self.assertIn("aiSearchLocation: aiSearchLocation", deployment[0])
+                self.assertIn("location: location", deployment[0])
+        self.assertIn("location: empty(aiSearchLocation) ? location : aiSearchLocation", search_deployment)
+        self.assertIn("privateEndpointLocation: location", search_deployment)
         self.assertIn("param privateEndpointLocation string = location", search_module)
         self.assertIn("location: privateEndpointLocation", search_module)
         self.assertIn('--parameters aiSearchLocation="$(aiSearchLocation)"', ado_job)

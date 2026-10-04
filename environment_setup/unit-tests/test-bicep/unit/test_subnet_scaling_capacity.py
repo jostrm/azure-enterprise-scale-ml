@@ -89,7 +89,13 @@ if ($env:ALLOC_AZURE -in @('az', 'wrong-context')) {
         $env:ALLOC_INVENTORY | ConvertFrom-Json
     }
 }
-& $env:ALLOC_SCRIPT @parameters
+try {
+    & $env:ALLOC_SCRIPT @parameters
+} catch {
+    # Preserve the actual diagnostic without host-dependent ANSI wrapping.
+    [Console]::Error.WriteLine($_.Exception.Message)
+    exit 1
+}
 """
     try:
         run = subprocess.run(
