@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from .test_persona_access import BICEP, groups
+from .test_persona_access import BICEP, groups, policy
 from personas import inspect_manifest
 
 
@@ -34,6 +34,23 @@ def test_tutorial_example_has_nine_offline_bindings():
     assert report["lake"]["permissions"] == {"directories": "r-x", "files": "r--", "ancestors": "--x"}
     secret = report["custom_roles"]["vault-secrets"]["properties"]["permissions"][0]
     assert len(secret["dataActions"]) == 4
+
+
+def test_inspector_exports_complete_single_permission_role_bundles():
+    manifest = json.loads(EXAMPLE.read_text())
+    report = inspect_manifest.inspect_manifest(manifest)
+    roles = report["custom_roles"]
+    assert len(roles) == 15
+    assert all(len(item["properties"]["permissions"]) == 1 for item in roles.values())
+    expected = [item for key in policy.CATALOG["roles"]
+                for item in policy.role_definitions(
+                    key, manifest["common_scope"] if key == "workspace-observer" else manifest["project_scope"])]
+    assert roles == {item["key"]: item for item in expected}
+    assert roles["admin-metadata-read"]["properties"]["permissions"][0]["actions"] == ["*/read"]
+    assert roles["admin-additional-actions"]["properties"]["permissions"][0]["actions"] == [
+        "Microsoft.Authorization/locks/read", "Microsoft.Authorization/locks/write",
+        "Microsoft.Authorization/locks/delete",
+    ]
 
 
 @pytest.mark.parametrize("changed", [{"lake": None}, {"environment": "prod"}, {"schema": "wrong"}])

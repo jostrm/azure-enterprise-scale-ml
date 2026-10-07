@@ -43,6 +43,17 @@ definitions. These are catalogue definitions, not proof that those roles exist
 or are assigned. Only actual Azure discovery determines which service-data
 grants apply. A successful offline inspection is **not** approval to deploy.
 
+Azure custom roles accept exactly one permission block. Each logical management
+role is therefore a bundle: its primary definition, a `-metadata-read` sidecar,
+and, for admin, an `-additional-actions` sidecar for resource locks. The inspector
+lists all components; reconciliation assigns every component to the same group
+at the same approved scope. Their additive union preserves the policy's exact
+permissions and per-block exclusions; `NotActions` is not a deny across roles.
+Primary GUIDs/names (including existing single-block service/data roles) remain
+unchanged. Sidecars have deterministic owned GUIDs/names and the same RG
+assignable scope. The catalogue currently compiles nine logical custom roles
+into fifteen definitions; actual deployment still depends on discovered resources.
+
 ## 2. Understand the nine groups
 
 | ID | Persona | Main boundary |

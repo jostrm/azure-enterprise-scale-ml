@@ -116,6 +116,9 @@ class Azure:
         if args[:3] == ("deployment", "group", "create"):
             assert Path(arg("--template-file")).name == "custom-roles.bicep"
             definitions = json.loads(arg("--parameters").removeprefix("roles="))
+            if any(len(definition["properties"]["permissions"]) != 1 for definition in definitions):
+                raise AzureCLIError("Roles cannot contain more than one permission.",
+                                    status_code=400, error_code="RoleDefinitionMultiplePermissionsNotAllowed")
             for definition in definitions:
                 self.definitions = [item for item in self.definitions if item["name"] != definition["name"]]
                 self.definitions.append({"name": definition["name"], "id": definition["id"], **definition["properties"]})
@@ -233,11 +236,11 @@ def test_shared_data_bundle_is_assigned_only_to_discovered_project_services(azur
     assert search["roleDefinitionId"].endswith("/8ebe5a00-799e-43f5-93ac-243d3dce84a7")
     assert search["data_actions"] == policy.CATALOG["builtin_data_actions"]["search-index-data-contributor"]
     cognitive = next(item for item in grants if item["role_key"] == "cognitive-inference")
-    assert cognitive["roleDefinitionId"] == policy.role_definition("cognitive-inference", PROJECT)["id"].lower()
+    assert cognitive["roleDefinitionId"] == policy.role_definitions("cognitive-inference", PROJECT)[0]["id"].lower()
     assert cognitive["resource_kind"] == "AIServices"
     assert "no connection secrets" in cognitive["service_capabilities"]
     foundry = next(item for item in grants if item["role_key"] == "foundry-agent-author")
-    assert foundry["roleDefinitionId"] == policy.role_definition("foundry-agent-author", PROJECT)["id"].lower()
+    assert foundry["roleDefinitionId"] == policy.role_definitions("foundry-agent-author", PROJECT)[0]["id"].lower()
     assert "managed-agent identity blueprints" in foundry["service_capabilities"]
     cognitive["data_actions"].append("changed report only")
     assert "changed report only" not in policy.CATALOG["roles"]["cognitive-inference"]["dataActions"]
@@ -302,6 +305,59 @@ def test_apply_consumes_bicep_and_rerun_has_no_rbac_mutations(azure):
     assert second["state"] == "applied"
     assert len(azure.mutations) == count
     assert {item["id"] for item in second["assignments"]} == {item["id"] for item in first["assignments"]}
+
+
+def test_preview_and_apply_assign_every_component_at_the_same_principal_and_scope(azure):
+    preview = access.provision(manifest(), cli=azure)
+    definitions = {item["id"].lower(): item for item in preview["definitions"]}
+    assert all(len(item["properties"]["permissions"]) == 1 for item in definitions.values())
+    for persona in ("persona200", "persona201", "persona210", "persona211", "persona212", "persona213", "persona214"):
+        key = "admin" if persona in policy.CORE_PERSONAS else policy.CATALOG["personas"][persona]["management"]
+        targets = [item for item in preview["assignments"] if item["persona"] == persona and item["role_key"] == key]
+        expected = policy.role_definitions(key, PROJECT)
+        assert {item["roleDefinitionId"] for item in targets} == {item["id"].lower() for item in expected}
+        assert {item["scope"] for item in targets} == {PROJECT.lower()}
+        assert {item["principalId"] for item in targets} == {GROUPS[persona]}
+        assert all(item["roleDefinitionId"] in definitions for item in targets)
+    first = access.provision(manifest(), execute=True, cli=azure)
+    assert {item["id"] for item in first["assignments"]} == {item["id"] for item in preview["assignments"]}
+    before = len(azure.mutations)
+    second = access.provision(manifest(), execute=True, cli=azure)
+    assert len(azure.mutations) == before
+    assert all(item["status"] == "unchanged" for item in second["definitions"])
+    assert first["assignments"] == second["assignments"]
+
+
+def test_partial_deployment_reuses_existing_single_block_roles(azure):
+    azure.resources.append({
+        "id": (PROJECT + "/providers/Microsoft.CognitiveServices/accounts/project-ai").lower(),
+        "type": "Microsoft.CognitiveServices/accounts", "kind": "AIServices",
+    })
+    existing = [
+        policy.role_definitions(key, COMMON if key == "workspace-observer" else PROJECT)[0]
+        for key in ("vault-secrets", "cognitive-inference", "foundry-agent-author", "workspace-observer")
+    ]
+    azure.definitions.extend({"name": item["name"], "id": item["id"], **item["properties"]} for item in existing)
+    first = access.provision(manifest(), execute=True, cli=azure)
+    deployed = [item for call in azure.calls if call[:3] == ("deployment", "group", "create")
+                for item in json.loads(call[call.index("--parameters") + 1].removeprefix("roles="))]
+    assert not {item["id"] for item in existing} & {item["id"] for item in deployed}
+    assert len(deployed) == 11
+    assert len(first["definitions"]) == 15
+    before = len(azure.mutations)
+    second = access.provision(manifest(), execute=True, cli=azure)
+    assert first["assignments"] == second["assignments"]
+    assert len(azure.mutations) == before
+
+
+@pytest.mark.parametrize("component", [1, 2])
+def test_unowned_sidecar_collision_blocks_before_any_mutation(azure, component):
+    role = policy.role_definitions("admin", PROJECT)[component]
+    azure.definitions.append({"name": role["name"], **role["properties"],
+                              "description": "not owned", "permissions": [{"actions": ["*"]}]})
+    with pytest.raises(access.ProvisioningBlocked, match="not owned"):
+        access.provision(manifest(), execute=True, cli=azure)
+    assert not azure.mutations
 
 
 def test_equivalent_preexisting_grant_is_adopted_not_owned(azure):
@@ -621,7 +677,7 @@ def test_runtime_write_failure_propagates(azure):
 
 
 def test_custom_role_collision_is_not_adopted_or_overwritten(azure):
-    role = policy.role_definition("member", PROJECT)
+    role = policy.role_definitions("member", PROJECT)[0]
     azure.definitions.append({"name": role["name"], **role["properties"], "description": "somebody else's role"})
     with pytest.raises(access.ProvisioningBlocked, match="not owned"):
         access.provision(manifest(), execute=True, cli=azure)
@@ -629,7 +685,7 @@ def test_custom_role_collision_is_not_adopted_or_overwritten(azure):
 
 
 def test_descendant_only_unowned_role_guid_is_found_by_direct_get(azure):
-    role = policy.role_definition("member", PROJECT)
+    role = policy.role_definitions("member", PROJECT)[0]
     azure.definitions.append({"name": role["name"], **role["properties"],
                               "assignableScopes": [VAULT], "description": "another owner's role"})
     assert azure("role", "definition", "list", "--scope", PROJECT.lower(), "--subscription", SUB) == []
@@ -705,7 +761,7 @@ def test_deterministic_assignment_collision_is_not_overwritten(azure):
 
 
 def test_owned_custom_role_drift_is_reconciled(azure):
-    role = policy.role_definition("member", PROJECT)
+    role = policy.role_definitions("member", PROJECT)[0]
     azure.definitions.append({"name": role["name"], **role["properties"], "permissions": []})
     assert access.provision(manifest(), execute=True, cli=azure)["state"] == "applied"
     restored = next(item for item in azure.definitions if item["name"] == role["name"])

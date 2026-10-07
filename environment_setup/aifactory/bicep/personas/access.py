@@ -7,7 +7,7 @@ from pathlib import Path
 from .cli import azure_cli
 from .policy import (
     CATALOG, CORE_PERSONAS, PERSONA_IDS, SCHEMA, SECURITY_REVIEWS, SECURITY_REVIEW_REQUIREMENTS, arm_id, arm_scope_parts,
-    assignment, guid, resource_type, rg_scope, role_definition, validate_manifest, validate_scope, within,
+    assignment, guid, resource_type, rg_scope, role_definitions, validate_manifest, validate_scope, within,
 )
 from .reconcile import (
     assignment_content, audit_assignments, audit_definitions, check_privileges,
@@ -64,13 +64,14 @@ def _plan(manifest, scope, groups, resources):
     def grant(persona, key, target, definition_scope=None):
         subscription, _ = arm_scope_parts(target)
         if key in CATALOG["builtins"]:
-            role_id = f"/subscriptions/{subscription}/providers/Microsoft.Authorization/roleDefinitions/{CATALOG['builtins'][key]}"
+            role_ids = [f"/subscriptions/{subscription}/providers/Microsoft.Authorization/roleDefinitions/{CATALOG['builtins'][key]}"]
         else:
-            definition = role_definition(key, definition_scope or rg_scope(target))
-            definitions[definition["id"]] = definition
-            role_id = definition["id"]
-        planned = {**assignment(persona, groups[persona], role_id, target), "role_key": key}
-        assignments.append(planned)
+            bundle = role_definitions(key, definition_scope or rg_scope(target))
+            definitions.update((item["id"], item) for item in bundle)
+            role_ids = [item["id"] for item in bundle]
+        planned = [{**assignment(persona, groups[persona], role_id, target), "role_key": key}
+                   for role_id in role_ids]
+        assignments.extend(planned)
         return planned
 
     for root in (manifest["common_scope"], *manifest["connectivity_scopes"]):
@@ -103,13 +104,13 @@ def _plan(manifest, scope, groups, resources):
                 }:
                     continue
                 key = service["role"]
-                target = grant(persona, key, identity)
-                target.update({
-                    "service_data": True, "service_capabilities": service["capabilities"],
-                    "resource_kind": resource.get("kind"),
-                    "data_actions": list(CATALOG["builtin_data_actions"][key] if key in CATALOG["builtins"]
-                                         else CATALOG["roles"][key]["dataActions"]),
-                })
+                for target in grant(persona, key, identity):
+                    target.update({
+                        "service_data": True, "service_capabilities": service["capabilities"],
+                        "resource_kind": resource.get("kind"),
+                        "data_actions": list(CATALOG["builtin_data_actions"][key] if key in CATALOG["builtins"]
+                                             else CATALOG["roles"][key]["dataActions"]),
+                    })
     # Core groups share the project-admin data baseline, not only management RBAC.
     grant("persona216", "cost-reader", project)
     grant("persona216", "workspace-observer", manifest["log_analytics_resource_id"])

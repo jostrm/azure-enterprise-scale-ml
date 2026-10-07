@@ -239,6 +239,7 @@ def lake_authorized_path(lake):
 
 
 def role_permissions(key):
+    """Logical additive blocks; compile with role_definitions before deployment."""
     definition = CATALOG["roles"][key]
     exclusions = []
     if definition.get("management_exclusions"):
@@ -258,23 +259,33 @@ def role_permissions(key):
     return deepcopy(permissions)
 
 
-def role_definition(key, scope):
+def role_definitions(key, scope):
+    """Compile each additive block into one Azure role; assign the entire bundle."""
     if key not in CATALOG["roles"]:
         raise ValueError(f"Unknown custom role: {key}")
     scope = arm_id(scope, resource_group=True)
-    name = str(uuid5(NAMESPACE, f"role|{scope}|{key}"))
-    return {
-        "name": name,
-        "id": scope + "/providers/Microsoft.Authorization/roleDefinitions/" + name,
-        "key": key,
-        "properties": {
-            "roleName": f"AI Factory {key} {name}",
-            "description": f"{SCHEMA} owned role {key} {scope}",
-            "type": "CustomRole",
-            "assignableScopes": [scope],
-            "permissions": role_permissions(key),
-        },
-    }
+    components = [key] + [
+        f"{key}-{suffix}" for field, suffix in (
+            ("metadata_read", "metadata-read"), ("additional_actions", "additional-actions")
+        ) if CATALOG["roles"][key].get(field)
+    ]
+    definitions = []
+    for component, permission in zip(components, role_permissions(key), strict=True):
+        # Keep the primary GUID/name; sidecars must not merge NotActions across blocks.
+        name = str(uuid5(NAMESPACE, f"role|{scope}|{component}"))
+        definitions.append({
+            "name": name,
+            "id": scope + "/providers/Microsoft.Authorization/roleDefinitions/" + name,
+            "key": component,
+            "properties": {
+                "roleName": f"AI Factory {component} {name}",
+                "description": f"{SCHEMA} owned role {component} {scope}",
+                "type": "CustomRole",
+                "assignableScopes": [scope],
+                "permissions": [permission],
+            },
+        })
+    return definitions
 
 
 def assignment(persona, principal, role_id, scope):

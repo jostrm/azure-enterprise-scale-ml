@@ -23,10 +23,11 @@ def inspect_manifest(manifest):
         "personas": policy.CATALOG["personas"],
         "built_in_role_ids": policy.CATALOG["builtins"],
         "custom_roles": {
-            key: policy.role_definition(
+            definition["key"]: definition
+            for key in policy.CATALOG["roles"]
+            for definition in policy.role_definitions(
                 key, value["common_scope"] if key == "workspace-observer" else value["project_scope"]
             )
-            for key in policy.CATALOG["roles"]
         },
         "lake": {
             "authorized_path": policy.lake_authorized_path(value["lake"]),

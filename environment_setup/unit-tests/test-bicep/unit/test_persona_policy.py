@@ -4,6 +4,7 @@ from copy import deepcopy
 from fnmatch import fnmatchcase
 from pathlib import Path
 import sys
+from uuid import uuid5
 
 import pytest
 
@@ -35,7 +36,8 @@ def allows(role, operation, *, data=False):
     return any(
         any(fnmatchcase(operation.lower(), item.lower()) for item in permission[allowed])
         and not any(fnmatchcase(operation.lower(), item.lower()) for item in permission[excluded])
-        for permission in policy.role_permissions(role)
+        for definition in policy.role_definitions(role, PROJECT)
+        for permission in definition["properties"]["permissions"]
     )
 
 
@@ -186,6 +188,41 @@ def test_custom_role_operations_obey_azure_single_wildcard_limit():
         for permission in policy.role_permissions(key):
             for operations in permission.values():
                 assert all(operation.count("*") <= 1 for operation in operations), key
+
+
+@pytest.mark.parametrize("key", policy.CATALOG["roles"])
+def test_role_components_preserve_exact_logical_blocks_and_primary_identity(key):
+    definitions = policy.role_definitions(key, PROJECT)
+    assert definitions == policy.role_definitions(key, PROJECT.upper())
+    assert definitions != policy.role_definitions(key, COMMON)
+    assert all(len(item["properties"]["permissions"]) == 1 for item in definitions)
+    assert [item["properties"]["permissions"][0] for item in definitions] == policy.role_permissions(key)
+    assert len({item["id"] for item in definitions}) == len(definitions)
+    primary_name = str(uuid5(policy.NAMESPACE, f"role|{PROJECT.lower()}|{key}"))
+    assert definitions[0]["name"] == primary_name
+    assert definitions[0]["properties"]["roleName"] == f"AI Factory {key} {primary_name}"
+    for item in definitions:
+        assert item["properties"]["assignableScopes"] == [PROJECT.lower()]
+        assert item["properties"]["description"] == f"{policy.SCHEMA} owned role {item['key']} {PROJECT.lower()}"
+    definitions[0]["properties"]["permissions"][0]["actions"].append("mutated")
+    assert "mutated" not in policy.role_permissions(key)[0]["actions"]
+
+
+@pytest.mark.parametrize("key", ["member", "admin", "frontend", "ai", "database"])
+def test_compiled_management_bundle_restores_metadata_without_new_secret_or_data_grants(key):
+    for operation in ("Microsoft.Storage/storageAccounts/read", "Microsoft.KeyVault/vaults/read",
+                      "Microsoft.Authorization/roleAssignments/read",
+                      "Microsoft.ManagedIdentity/userAssignedIdentities/read"):
+        assert allows(key, operation)
+    metadata = policy.role_definitions(key, PROJECT)[1]["properties"]["permissions"][0]
+    assert metadata == {
+        "actions": ["*/read"], "notActions": ["Microsoft.OperationalInsights/workspaces/sharedKeys/read"],
+        "dataActions": [], "notDataActions": [],
+    }
+    for operation in ("Microsoft.KeyVault/vaults/secrets/getSecret/action",
+                      "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+                      "Microsoft.CognitiveServices/accounts/AIServices/connections/listSecrets/action"):
+        assert not allows(key, operation, data=True)
 
 
 @pytest.mark.parametrize("operation", [
@@ -342,9 +379,9 @@ def test_workspace_observer_has_no_shared_keys_secret_values_or_write():
 
 
 def test_identifiers_are_stable_and_scoped():
-    role = policy.role_definition("member", PROJECT)
-    assert policy.role_definition("member", PROJECT.upper()) == role
-    assert role != policy.role_definition("member", COMMON)
+    role = policy.role_definitions("member", PROJECT)[0]
+    assert policy.role_definitions("member", PROJECT.upper())[0] == role
+    assert role != policy.role_definitions("member", COMMON)[0]
     first = policy.assignment("persona210", TENANT, role["id"], PROJECT)
     assert first == policy.assignment("persona210", TENANT.upper(), role["id"].upper(), PROJECT.upper())
     assert first["id"] != policy.assignment("persona210", SUB, role["id"], PROJECT)["id"]
