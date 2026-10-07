@@ -16,6 +16,8 @@ param aksServiceCidr string = '10.0.0.0/16'
 param aksDnsServiceIP string = '10.0.0.10'
 param aksDockerBridgeCidr string = '172.17.0.1/16'
 param aksExists bool = false
+@description('True only for an independently verified Succeeded AML attachment to the expected AKS cluster')
+param aksComputeExists bool = false
 
 @description('Specifies the SKU name for the AKS cluster')
 @allowed([
@@ -207,23 +209,19 @@ module aksTestProd 'aksCluster.bicep' = if((env == 'test' || env == 'prod') && !
 // causing: "The resource '.../computes/<aksName>' is not defined in the template."
 // Merging into one resource with env-selected properties eliminates that collision,
 // so Azure ML deploys correctly with AKS in dev, test and prod.
-resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(ownSSL == 'disabled' && !empty(aksSubnetId)) {
+// Existing attachments contain server-owned immutable fields and cannot be replayed.
+resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/computes@2024-10-01-preview' = if(!aksComputeExists && ownSSL == 'disabled' && !empty(aksSubnetId)) {
   name: aksName
   parent: azureMLWorkspace
   location: location
   properties: {
     computeType: 'AKS'
     computeLocation: location
-    ...(!aksExists ? {
-      description: 'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
-    } : {})
+    description: 'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
     resourceId: aksResourceId
     properties: union({
       clusterPurpose: env == 'dev' ? 'DevTest' : 'FastProd'
       loadBalancerType: 'InternalLoadBalancer'
-    }, !aksExists ? {
-      agentCount: env == 'dev' ? aksNodes_dev : aksNodes_testProd
-      agentVmSize: env == 'dev' ? aksVmSku_dev : aksVmSku_testProd
       aksNetworkingConfiguration: {
         subnetId: aksSubnetId
         dnsServiceIP: aksDnsServiceIP
@@ -231,6 +229,9 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
         serviceCidr: aksServiceCidr
       }
       loadBalancerSubnet: aksSubnetName
+    }, !aksExists ? {
+      agentCount: env == 'dev' ? aksNodes_dev : aksNodes_testProd
+      agentVmSize: env == 'dev' ? aksVmSku_dev : aksVmSku_testProd
     } : {})
   }
   dependsOn: [

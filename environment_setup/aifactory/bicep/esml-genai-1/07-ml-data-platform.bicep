@@ -148,6 +148,8 @@ param projectSuffix string = resourceSuffix
 @description('Indicates if AML workspace already exists (set by pipeline)')
 param amlExists bool = false
 param aksExists bool = false
+@description('True only after verifying this workspace has a Succeeded AKS compute attached to the expected cluster')
+param aksComputeExists bool = false
 param dataFactoryExists bool = false
 @description('Indicates if Databricks workspace already exists (set by pipeline)')
 param databricksExists bool = false
@@ -531,6 +533,7 @@ module amlv2Aks '../modules/machineLearningAks.bicep' = if(enableAzureMachineLea
     cmk: cmk
     cmkKeyName: cmkKeyName
     aksExists: aksExists
+    aksComputeExists: aksComputeExists
     aksOutboundType: aksOutboundType
     aksPrivateDNSZone: aksPrivateDNSZone
     aksSkuName: aksSkuName
@@ -549,10 +552,11 @@ module amlv2Aks '../modules/machineLearningAks.bicep' = if(enableAzureMachineLea
     aksDnsServiceIP: aksDnsServiceIP
     aksServiceCidr: aksServiceCidr
     tags: tagsProject
-    aksVmSku_dev: aksExists ? '' : aks_dev_sku_param
-    aksVmSku_testProd: aksExists ? '' : aks_test_prod_sku_param
-    aksNodes_dev: aksExists ? 0 : aks_dev_nodes_param
-    aksNodes_testProd: aksExists ? 0 : aks_test_prod_nodes_param
+    // First attachment still needs configured defaults when the cluster already exists.
+    aksVmSku_dev: aks_dev_sku_param
+    aksVmSku_testProd: aks_test_prod_sku_param
+    aksNodes_dev: aks_dev_nodes_param
+    aksNodes_testProd: aks_test_prod_nodes_param
     kubernetesVersionAndOrchestrator: aksExists ? '' : aks_version_param
     kvName: keyvaultName
   }

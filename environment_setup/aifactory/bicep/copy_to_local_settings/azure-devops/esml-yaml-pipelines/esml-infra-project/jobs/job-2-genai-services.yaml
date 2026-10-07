@@ -3403,6 +3403,21 @@ steps:
     scriptLocation: inlineScript
     inlineScript: |
      az account set --subscription "$(dev_test_prod_sub_id)"
+     _aksComputeExists=false
+     if [ "$(enableAzureMachineLearning)" = "true" ] && [ "$(enableAksForAzureML)" = "true" ]; then
+       _aksComputeExists=$(python3 scripts/discover-aml-aks-attachment.py \
+         --subscription "$(dev_test_prod_sub_id)" \
+         --resource-group "$(admin_aifactoryPrefixRG)$(projectPrefix)project$(project_number_000)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)$(projectSuffix)" \
+         --common-resource-group "$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)" \
+         --project-number "$(project_number_000)" \
+         --location-suffix "$(admin_locationSuffix)" \
+         --environment "$(dev_test_prod)" \
+         --resource-suffix="$(admin_prjResourceSuffix)" \
+         --add-workspace="$(addAzureMachineLearning)" \
+         --salt="$(aifactory_salt_random)" \
+         --random-value="$(deployment_random_value)") || exit 1
+       echo "Verified AML AKS attachment exists: $_aksComputeExists"
+     fi
      az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-67-data-ml-platform" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -3460,6 +3475,7 @@ steps:
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters amlExists="$(amlExists)" \
      --parameters aksExists="$(aksExists)" \
+     --parameters aksComputeExists="$_aksComputeExists" \
      --parameters dataFactoryExists="$(dataFactoryExists)" \
      --parameters databricksExists="$(databricksExists)" \
      --parameters enableDatafactory="$(enableDatafactory)" \

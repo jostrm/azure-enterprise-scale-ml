@@ -2699,6 +2699,21 @@ jobs:
         shell: bash
         run: |
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+            _aksComputeExists=false
+            if [ "${{ env.enableAzureMachineLearning }}" = "true" ] && [ "${{ env.enableAksForAzureML }}" = "true" ]; then
+              _aksComputeExists=$(python3 azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/discover-aml-aks-attachment.py \
+                --subscription "${{ env.dev_test_prod_sub_id }}" \
+                --resource-group "${{ env.admin_aifactoryPrefixRG }}${{ env.projectPrefix }}project${{ env.project_number_000 }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}${{ env.projectSuffix }}" \
+                --common-resource-group "${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}" \
+                --project-number "${{ env.project_number_000 }}" \
+                --location-suffix "${{ env.admin_locationSuffix }}" \
+                --environment "${{ env.dev_test_prod }}" \
+                --resource-suffix="${{ env.admin_prjResourceSuffix }}" \
+                --add-workspace="${{ env.addAzureMachineLearning }}" \
+                --salt="${{ env.aifactory_salt_random }}" \
+                --random-value="${{ env.deployment_random_value }}") || exit 1
+              echo "Verified AML AKS attachment exists: $_aksComputeExists"
+            fi
             az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-67-data-ml-platform" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
@@ -2756,6 +2771,7 @@ jobs:
               --parameters projectServicePrincipleOID_SeedingKeyvaultName="${{ env.project_service_principal_OID_seeding_kv_name }}" \
               --parameters amlExists="${{ env.amlExists }}" \
               --parameters aksExists="${{ env.aksExists }}" \
+              --parameters aksComputeExists="$_aksComputeExists" \
               --parameters dataFactoryExists="${{ env.dataFactoryExists }}" \
               --parameters databricksExists="${{ env.databricksExists }}" \
               --parameters enableDatafactory="${{ env.enableDatafactory }}" \
