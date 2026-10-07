@@ -70,6 +70,7 @@ def invoke_allocator(vnet, *, azure="cli", json_project=None, json_parameters=No
             item.setdefault("provisioningState", "Succeeded")
     code = r"""
 $ErrorActionPreference = 'Stop'
+function global:Install-Module { throw 'Module installation is forbidden in offline tests' }
 $parameters = $env:ALLOC_PARAMETERS | ConvertFrom-Json -AsHashtable
 function global:az {
     if ($args[0] -eq 'rest') {
@@ -127,6 +128,7 @@ try {
             [pwsh, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", code],
             cwd=ROOT, capture_output=True, text=True, timeout=30,
             env={**os.environ, "GITHUB_ACTIONS": "true" if azure.startswith("cli") else "false",
+                 "AIFACTORY_USE_AZURE_CLI": "true" if azure == "ado-cli" else "false",
                  "ALLOC_AZURE": azure,
                  "ALLOC_CONTEXT": "wrong" if azure == "wrong-context" else "test-subscription",
                  "ALLOC_SCRIPT": str(ALLOCATOR), "ALLOC_INVENTORY": json.dumps(vnet),
@@ -189,7 +191,7 @@ def test_tail_gateway_three_projects_repeat_and_additions():
 
 
 @pytest.mark.parametrize("environment", ["dev", "test", "stage", "prod"])
-@pytest.mark.parametrize("azure", ["cli", "az"])
+@pytest.mark.parametrize("azure", ["cli", "az", "ado-cli"])
 def test_environment_and_provider_paths(environment, azure):
     vnet = integrated_inventory()
     result = allocate(vnet, env=environment, azure=azure)

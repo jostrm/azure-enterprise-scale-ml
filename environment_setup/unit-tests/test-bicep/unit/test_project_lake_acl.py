@@ -18,6 +18,21 @@ GROUP = "22222222-2222-2222-2222-222222222222"
 MI = "33333333-3333-3333-3333-333333333333"
 
 
+@pytest.mark.parametrize("acl", [None, "user::rwx,group::---,other::---"])
+def test_directory_creation_acl_is_explicit_and_does_not_replace_existing_paths(acl):
+    lake = ACCESS.Lake({})
+    calls = []
+    lake.request = lambda *args: calls.append(args)
+    if acl is None:
+        lake.mkdir("mlops")
+    else:
+        lake.mkdir("mlops", acl=acl)
+    headers = {"If-None-Match": "*", "Content-Length": "0"}
+    if acl is not None:
+        headers["x-ms-acl"] = acl
+    assert calls == [("PUT", "mlops", {"resource": "directory"}, headers)]
+
+
 def test_ancestor_acl_is_traversal_only_and_preserves_unrelated_entries():
     source = "user::rwx,group::r-x,other::---"
     result = ACCESS.merge_acl(source, [("user", USER, "--x"), ("group", GROUP, "--x")],

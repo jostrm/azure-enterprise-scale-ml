@@ -1,4 +1,4 @@
-"""Private Link contracts for Databricks and Event Hubs in the GenAI/ML project templates (ADO pipeline 43)."""
+"""Private data-service networking and RBAC contracts in the GenAI/ML project templates (ADO pipeline 43)."""
 
 import json
 import shutil
@@ -129,3 +129,40 @@ def test_basic_event_hubs_fail_fast_with_an_actionable_message(tmp_path):
     assert guard and guard[0] in sku
     functions = json.dumps(template.get("functions", []))
     assert "fail(" in functions and "Basic" in functions and "Standard" in functions
+
+
+def test_data_factory_rbac_uses_one_valid_factory_contributor_grant_per_principal(tmp_path):
+    template = compile_template(BICEP / "modules" / "datafactoryRBAC.bicep", tmp_path)
+    assignments = [item for item in resources(template)
+                   if item.get("type") == "Microsoft.Authorization/roleAssignments"]
+    assert len(assignments) == 4
+    assert template["variables"]["roleDataFactoryContributor"] == (
+        "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', "
+        "'673868aa-7521-48a0-acc6-0f60742d39f5')]")
+    assert "e5c9c5c8-8c8a-4f2d-9b9a-4b4b4b4b4b4b" not in json.dumps(template)
+    expected_names = {
+        "dataFactoryContributorUser": "adf-contributor",
+        "dataFactoryContributorServicePrincipal": "sp-adf-contributor",
+        "contributorUser": "contributor-adf",
+        "contributorServicePrincipal": "sp-contributor",
+    }
+    assert {item["copy"]["name"] for item in assignments} == set(expected_names)
+    for item in assignments:
+        name = item["copy"]["name"]
+        is_service_principal = name.endswith("ServicePrincipal")
+        is_factory_contributor = name.startswith("dataFactoryContributor")
+        properties = item["properties"]
+        assert item["scope"] == "[format('Microsoft.DataFactory/factories/{0}', parameters('datafactoryName'))]"
+        assert expected_names[name] in item["name"]
+        assert properties["roleDefinitionId"] == (
+            "[variables('roleDataFactoryContributor')]" if is_factory_contributor
+            else "[variables('roleContributor')]")
+        assert properties["principalType"] == (
+            "ServicePrincipal" if is_service_principal
+            else "[if(parameters('useAdGroups'), 'Group', 'User')]")
+        principal_array = "parameters('servicePrincipleAndMIArray')" if is_service_principal else "variables('allUsers')"
+        assert principal_array in properties["principalId"]
+        if is_factory_contributor:
+            assert "condition" not in item
+        else:
+            assert item["condition"] == "[not(parameters('disableContributorAccessForUsers'))]"
