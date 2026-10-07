@@ -95,7 +95,7 @@ CONFIG_KEYS = {
     "access_hub_vnet_cidr", "vpn_client_cidr", "dev_vnet_cidr",
     "first_party_apps", "resource_providers", "coordination_mode",
     "dns_policy_exemption_assignment_ids", "dns_policy_exemption_expires_on",
-    "persona_access_mode", "persona_access_manifest",
+    "enablePersonas", "persona_access_mode", "persona_access_manifest",
 }
 FIRST_PARTY_APPS = {"azure-machine-learning": "0736f41a-0425-4b46-bdb5-1563eff02385",
                     "databricks": "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"}
@@ -1510,7 +1510,8 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
     if persona_groups:
         bindings["persona_groups"] = persona_groups
         bindings["persona_manifest_sha256"] = digest(persona_manifest)
-        bindings.update({key: config[key] for key in registered_personas.FIELDS})
+        bindings.update({key: config[key] for key in registered_personas.FIELDS if key in config})
+        bindings.update(enablePersonas=True, persona_access_mode=persona_mode)
     if project_group:
         bindings["project_resource_group_id"] = project_group
     if not minimum and config.get("first_party_apps"):

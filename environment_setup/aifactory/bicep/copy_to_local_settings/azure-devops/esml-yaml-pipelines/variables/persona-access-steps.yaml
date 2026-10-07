@@ -21,5 +21,6 @@ steps:
       if ($LASTEXITCODE -ne 0) { throw "Persona access prerequisite/reconciliation failed. No legacy fallback is permitted." }
     workingDirectory: '$(System.DefaultWorkingDirectory)'
   env:
+    ENABLE_PERSONAS: $(enablePersonas)
     PERSONA_ACCESS_MODE: $(persona_access_mode)
     PERSONA_ACCESS_MANIFEST: $(persona_access_manifest)

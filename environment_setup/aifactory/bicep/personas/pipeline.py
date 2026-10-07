@@ -30,6 +30,7 @@ HUMAN_CHANNELS = (
     "RBAC_ADMINS_OID", "postGresAdminEmails", "POSTGRES_ADMIN_EMAILS",
 )
 ALIASES = {
+    "enablePersonas": "ENABLE_PERSONAS",
     "persona_access_mode": "PERSONA_ACCESS_MODE",
     "persona_access_manifest": "PERSONA_ACCESS_MANIFEST",
     "admin_aifactoryPrefixRG": "AIFACTORY_PREFIX",
@@ -69,6 +70,27 @@ def select_config(config: dict, environment: str) -> dict:
     return result
 
 
+def access_mode(values: dict) -> str:
+    missing = object()
+    enabled = value(values, "enablePersonas", missing)
+    if enabled is not missing:
+        if type(enabled) is bool:
+            return "groups-v1" if enabled else "legacy"
+        if isinstance(enabled, str) and enabled in ("true", "false"):
+            return "groups-v1" if enabled == "true" else "legacy"
+        raise ValueError("enablePersonas must be a boolean or the exact string true/false")
+    mode = value(values, "persona_access_mode", "legacy")
+    if mode not in ("legacy", "groups-v1"):
+        raise ValueError(f"Unsupported persona_access_mode {mode!r}; use legacy or groups-v1")
+    return mode
+
+
+def mode_variables(mode: str) -> dict:
+    enabled = str(mode == "groups-v1").lower()
+    return {"enablePersonas": enabled, "ENABLEPERSONAS": enabled, "ENABLE_PERSONAS": enabled,
+            "persona_access_mode": mode, "PERSONA_ACCESS_MODE": mode}
+
+
 def resolve_repo_path(path: str, root: Path) -> Path:
     # Manifest paths are always repository-relative, not relative to variables.json.
     normalized = path.replace("\\", "/")
@@ -81,9 +103,7 @@ def resolve_repo_path(path: str, root: Path) -> Path:
 
 
 def configuration(values: dict, environment: str, root: Path) -> tuple[str, dict | None]:
-    mode = str(value(values, "persona_access_mode", "legacy"))
-    if mode not in ("legacy", "groups-v1"):
-        raise ValueError(f"Unsupported persona_access_mode {mode!r}; use legacy or groups-v1")
+    mode = access_mode(values)
     environment = "test" if environment == "stage" else environment
     deployment_subscription(values, environment)
     if mode == "legacy":
@@ -148,8 +168,7 @@ def safe_variables(values: dict) -> dict:
     result = {name: "" for name in HUMAN_CHANNELS}
     result.update({name.upper(): "" for name in HUMAN_CHANNELS})
     result.update({
-        "persona_access_mode": "groups-v1",
-        "PERSONA_ACCESS_MODE": "groups-v1",
+        **mode_variables("groups-v1"),
         "disableContributorAccessForUsers": "true",
         "disableRBACAdminOnRGForUsers": "true",
         "use_ad_groups": "true", "useAdGroups": "true", "use_groups": "true",
@@ -198,10 +217,11 @@ def emit(variables: dict, output_format: str) -> None:
 def run(values: dict, environment: str, root: Path, scope: str, phase: str, cli=None) -> dict:
     mode, manifest = configuration(values, environment, root)
     if phase == "validate":
-        return {"mode": mode, "variables": safe_variables(values) if manifest else {}}
+        return {"mode": mode, "variables": safe_variables(values) if manifest else mode_variables(mode)}
     existing = guard_downgrade(values, environment, mode, cli)
     if mode == "legacy":
-        return {"mode": mode, "status": "unchanged", "variables": {"persona_preflight_ready": "true"}}
+        return {"mode": mode, "status": "unchanged",
+                "variables": {**mode_variables(mode), "persona_preflight_ready": "true"}}
     deleting = any(str(value(values, name)).lower() == "true"
                    for name in ("deleteAllForProject", "deleteAllServicesForProject"))
     if phase == "preflight":
@@ -241,9 +261,20 @@ def main() -> int:
     args = parser.parse_args()
     try:
         values = dict(os.environ)
+        # GitHub exposes an unset repository variable as an empty environment value.
+        for key in ("enablePersonas", "ENABLEPERSONAS", "ENABLE_PERSONAS"):
+            if values.get(key) == "":
+                values.pop(key)
         if args.config and not args.config.startswith("$("):
             config_path = Path(args.config.replace("\\", os.sep))
-            values.update(select_config(json.loads(config_path.read_text(encoding="utf-8-sig")), args.environment))
+            selected = select_config(json.loads(config_path.read_text(encoding="utf-8-sig")), args.environment)
+            # Explicit JSON persona settings outrank CI/template defaults, including old mode-only configs.
+            if any(key in selected for key in ("enablePersonas", "ENABLEPERSONAS", "ENABLE_PERSONAS",
+                                               "persona_access_mode", "PERSONA_ACCESS_MODE")):
+                for key in ("enablePersonas", "ENABLEPERSONAS", "ENABLE_PERSONAS",
+                            "persona_access_mode", "PERSONA_ACCESS_MODE"):
+                    values.pop(key, None)
+            values.update(selected)
         report = run(values, args.environment, Path(args.repo_root), args.scope, args.phase)
         emit(report.pop("variables"), args.format)
         print(json.dumps(report, default=str))

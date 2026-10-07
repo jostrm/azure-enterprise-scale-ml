@@ -203,7 +203,7 @@ def test_existing_marker_blocks_legacy_before_any_write(tmp_path):
 def test_legacy_keeps_original_principal_configuration(tmp_path):
     values = {**inputs(), "persona_access_mode": "legacy"}
     report = pipeline.run(values, "dev", tmp_path, "project", "preflight", Mock(return_value=False))
-    assert report["variables"] == {"persona_preflight_ready": "true"}
+    assert report["variables"] == {**pipeline.mode_variables("legacy"), "persona_preflight_ready": "true"}
     assert values["technical_admins_ad_object_id"] == "old-admin"
 
 

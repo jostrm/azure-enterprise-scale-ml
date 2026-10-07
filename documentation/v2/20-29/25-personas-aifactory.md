@@ -70,7 +70,10 @@ effective access.
 ## Opt-in nine-persona model (`groups-v1`)
 
 This model is an **unreleased opt-in source feature**, not a claim of live-tenant
-certification. `persona_access_mode` defaults to `legacy`. Adopting the new model
+certification. `enablePersonas` defaults to `false` in JSON/YAML (`ENABLE_PERSONAS=false`
+in deployment `.env`), preserving configured legacy human/group access. True derives
+`persona_access_mode=groups-v1`; false derives `legacy`. When the flag is absent,
+old explicit mode-only opt-ins remain supported. Adopting the new model
 requires a reviewed `persona_access_manifest` as well as updated provisioning
 scripts and pipelines. Never enable it by merely placing new groups into old
 `technical_admins_ad_object_id` or positional persona arrays.
@@ -251,7 +254,10 @@ and cached tokens require propagation before effective-access testing.
 
 ### Adoption, migration and rollback
 
-Keep `persona_access_mode: "legacy"` until a deliberate adoption is approved.
+Keep `enablePersonas: false` until a deliberate adoption is approved. Turning it
+off does not migrate a marked persona RG back to legacy: the downgrade guard
+remains fail-closed. For a Dev-only trial explicitly keep `stage_prod.enablePersonas`
+false; see the [configuration and migration guide](../../../environment_setup/aifactory/bicep/personas/readme.md).
 Create one manifest per project/environment and select it explicitly through
 `persona_access_manifest`; a dev manifest cannot authorize a test/prod run.
 Existing factory consumers need the updated Purple scripts and copied ADO/GHA
@@ -348,6 +354,7 @@ Merge these selectors into the full deployment `variables.json`:
 {
   "dev": {
     "persona_access_mode": "groups-v1",
+    "enablePersonas": true,
     "persona_access_manifest": "access/dev-project001.json",
     "project_number_000": "001"
   },

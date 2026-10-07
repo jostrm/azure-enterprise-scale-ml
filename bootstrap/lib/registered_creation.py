@@ -28,6 +28,7 @@ COMMON_FIELDS = {
     "AIF_VPN_CLIENT_CIDR": "vpn_client_cidr",
     "AIF_COORDINATION_MODE": "coordination_mode",
     "AIF_PERSONA_ACCESS_MODE": "persona_access_mode",
+    "AIF_ENABLE_PERSONAS": "enablePersonas",
     "AIF_PERSONA_ACCESS_MANIFEST": "persona_access_manifest",
 }
 FULL_FIELDS = {
@@ -185,7 +186,12 @@ def creation_input(args, root, version, environ):
     config = {target: environ[name] for name, target in fields.items() if environ.get(name)}
     if "AIF_PERSONA_ACCESS_MODE" in environ:
         config["persona_access_mode"] = environ["AIF_PERSONA_ACCESS_MODE"]
+    for name in ("ENABLE_PERSONAS", "AIF_ENABLE_PERSONAS"):
+        if name in environ:
+            config["enablePersonas"] = environ[name]
     persona_mode = registered_personas.mode(config)
+    config["enablePersonas"] = persona_mode == "groups-v1"
+    config["persona_access_mode"] = persona_mode
     if persona_mode == "groups-v1":
         config["persona_access_manifest"] = registered_personas.relative_manifest(config)
         for key in ("team_group_id", "team_group_name", "team_member_email"):

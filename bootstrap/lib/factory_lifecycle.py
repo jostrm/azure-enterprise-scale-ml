@@ -3243,7 +3243,7 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
                 marker = (group.get("tags") or {}).get("AIF-Persona-Access")
                 selected = persona_helper(source_root).selected_config(
                     document["config"], document["target"]["environment"])
-                require(not marker or marker == selected.get("persona_access_mode", "legacy"),
+                require(not marker or marker == persona_helper(source_root).mode(selected),
                         "persona-access-downgrade-forbidden")
                 if scope in document["locks"]["scopes"]:
                     existing_scopes.append(scope)

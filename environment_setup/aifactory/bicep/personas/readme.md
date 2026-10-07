@@ -140,14 +140,20 @@ fragment is not a complete deployment configuration:
 ```json
 {
   "dev": {
+    "enablePersonas": true,
     "persona_access_mode": "groups-v1",
     "persona_access_manifest": "access/dev-project001.json",
     "project_number_000": "001"
   },
+  "stage_prod": {
+    "enablePersonas": false
+  },
   "test": {
+    "enablePersonas": true,
     "persona_access_manifest": "access/test-project001.json"
   },
   "prod": {
+    "enablePersonas": true,
     "persona_access_manifest": "access/prod-project001.json"
   }
 }
@@ -158,6 +164,28 @@ Paths are literal and relative to the consumer repository root. Selection is
 manifest must match its environment, project and generated RG scopes. A new
 project needs a different seven-group project set and manifest; it reuses the
 two factory/environment core groups.
+
+New `variables.json` and `variables.yaml` templates default to `enablePersonas: false`;
+the deployment `.env.template` uses `ENABLE_PERSONAS=false`. False preserves all
+configured legacy user/group fields and derives `persona_access_mode=legacy`.
+True derives `groups-v1`, even if the template still says `persona_access_mode: legacy`,
+and requires the reviewed manifest and seeded groups. Only booleans or exact
+`true`/`false` strings are accepted; `"false"` is never treated as truthy.
+
+The pipeline CLI treats empty process-environment flag aliases as absent because
+GitHub represents an unset repository variable that way. Explicit empty JSON or
+direct configuration values remain invalid. An absent flag never turns an
+unsupported old `persona_access_mode` into legacy; the original mode is validated.
+
+When the flag is absent, existing explicit `persona_access_mode` settings remain
+supported. The configuration-preserving refresh keeps such opt-ins when introducing
+the new default. JSON persona settings override CI defaults. Set `stage_prod` to
+false for a Dev-only trial; explicitly enable other environments only with their
+own reviewed manifests. Bootstrap accepts `AIF_ENABLE_PERSONAS` or `ENABLE_PERSONAS`.
+The registered creation API must still advertise `persona-groups-v1`; the flag
+does not bypass that gate. RGs already marked `AIF-Persona-Access=groups-v1` reject
+false/legacy before deployment: switching the flag off is not a rollback or a
+permission migration. It never adds old broad groups to a persona project.
 
 Do not insert these group IDs into legacy `technical_admins_ad_object_id` or
 `groups_*` arrays. The new bridge clears legacy human grant channels and consumes

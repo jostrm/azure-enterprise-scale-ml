@@ -65,6 +65,7 @@ jobs:
         shell: pwsh
     env:
       AIFACTORY_REPORT_JOB: deploy-project-${{ inputs.phase }}
+      ENABLE_PERSONAS: ${{ vars.ENABLE_PERSONAS || '' }}
       persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
       persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
       AIFACTORY_CONFIG_JSON: ${{ !inputs.json_identity_auth && secrets[inputs.config_secret] || '' }}

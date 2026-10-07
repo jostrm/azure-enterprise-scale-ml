@@ -42,6 +42,7 @@ Common non-interactive variables:
   AIF_SCALESET_SUFFIX=001
   AIF_PROJECT_NUMBER=001
   AIF_PERSONA_ACCESS_MODE=legacy|groups-v1
+  AIF_ENABLE_PERSONAS=true|false (or ENABLE_PERSONAS; default false, overrides the old mode when supplied)
   AIF_PERSONA_ACCESS_MANIFEST=access/dev-project001.json
                          groups-v1 requires a reviewed repo-relative manifest and all
                          nine groups already published to its seeding vault.
@@ -4092,14 +4093,18 @@ aif_verify_common_resource_group() {
 
 aif_load_persona_configuration() {
   local persona_settings
-  persona_settings="$("${AIF_PYTHON[@]}" -B - "$AIF_REPO_ROOT" "${AIF_PERSONA_ACCESS_MODE:-}" "${AIF_PERSONA_ACCESS_MANIFEST:-}" "$AIF_SCALESET_LIB_DIR" <<'PY'
+  persona_settings="$("${AIF_PYTHON[@]}" -B - "$AIF_REPO_ROOT" "${AIF_PERSONA_ACCESS_MODE:-}" "${AIF_PERSONA_ACCESS_MANIFEST:-}" "$AIF_SCALESET_LIB_DIR" "${AIF_ENABLE_PERSONAS-${ENABLE_PERSONAS-}}" "${AIF_ENABLE_PERSONAS+x}${ENABLE_PERSONAS+x}" <<'PY'
 import json, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[4])
-from aifactory_scaleset_config import guard_persona_downgrade
+from aifactory_scaleset_config import guard_persona_downgrade, persona_mode
 path = Path(sys.argv[1]) / "aifactory/variables.json"
 values = json.loads(path.read_text(encoding="utf-8-sig")).get("dev", {}) if path.is_file() else {}
-mode = sys.argv[2] or values.get("persona_access_mode", "legacy")
+if sys.argv[2]:
+    values["persona_access_mode"] = sys.argv[2]
+if sys.argv[6]:
+    values["enablePersonas"] = sys.argv[5]
+mode = persona_mode(values)
 manifest = sys.argv[3] or values.get("persona_access_manifest", "")
 if mode not in ("legacy", "groups-v1"):
     raise SystemExit("Unsupported persona_access_mode; use legacy or groups-v1.")

@@ -1,5 +1,6 @@
 variables:
-  persona_access_mode: "legacy" # Explicit groups-v1 opts into seeded persona groups; never uses legacy human arrays.
+  enablePersonas: false # True selects groups-v1; false preserves configured legacy human/group grants.
+  persona_access_mode: "legacy" # Derived from enablePersonas; mode-only opt-in is supported when the flag is absent.
   persona_access_manifest: "" # Repository-relative reviewed manifest for this environment/project.
   persona_preflight_ready: "false"
   aifactory-dash-01: "" # <optional>Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard.<default>""

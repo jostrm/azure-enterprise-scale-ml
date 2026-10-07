@@ -1,5 +1,6 @@
 {
   "dev": {
+    "enablePersonas": false,
     "persona_access_mode": "legacy",
     "persona_access_manifest": "",
     "GITHUB_USERNAME": "",

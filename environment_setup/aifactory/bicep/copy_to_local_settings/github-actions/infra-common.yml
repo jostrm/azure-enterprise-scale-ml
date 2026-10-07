@@ -36,6 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AIFACTORY_REPORT_JOB: common-dev
+      ENABLE_PERSONAS: ${{ vars.ENABLE_PERSONAS || '' }}
       persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
       persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
       project_number_000: ${{ vars.PROJECT_NUMBER || '001' }}
@@ -445,6 +446,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AIFACTORY_REPORT_JOB: common-stage
+      ENABLE_PERSONAS: ${{ vars.ENABLE_PERSONAS || '' }}
       persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
       persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
       project_number_000: ${{ vars.PROJECT_NUMBER || '001' }}
@@ -853,6 +855,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AIFACTORY_REPORT_JOB: common-prod
+      ENABLE_PERSONAS: ${{ vars.ENABLE_PERSONAS || '' }}
       persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
       persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
       project_number_000: ${{ vars.PROJECT_NUMBER || '001' }}

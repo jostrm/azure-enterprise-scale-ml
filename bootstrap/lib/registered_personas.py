@@ -12,7 +12,7 @@ from urllib.parse import quote, unquote, urlsplit
 
 
 MARKER = "AIF-Persona-Access"
-FIELDS = ("persona_access_mode", "persona_access_manifest")
+FIELDS = ("enablePersonas", "persona_access_mode", "persona_access_manifest")
 HUMAN_PARAMETERS = {
     "technicaladminsobjectid", "technicaladminsemail", "technicalcontactid",
     "technicalcontactemail", "projectmembers", "projectmembersemails",
@@ -25,7 +25,17 @@ HUMAN_PARAMETERS = {
 
 
 def mode(values):
-    selected = values.get("persona_access_mode", "legacy")
+    # This helper is independently copied and source-pinned by protected workers.
+    for key in ("enablePersonas", "ENABLEPERSONAS", "ENABLE_PERSONAS"):
+        if key not in values:
+            continue
+        enabled = values[key]
+        if type(enabled) is bool:
+            return "groups-v1" if enabled else "legacy"
+        if isinstance(enabled, str) and enabled in ("true", "false"):
+            return "groups-v1" if enabled == "true" else "legacy"
+        raise ValueError("enablePersonas must be a boolean or the exact string true/false")
+    selected = values.get("persona_access_mode", values.get("PERSONA_ACCESS_MODE", "legacy"))
     if selected not in ("legacy", "groups-v1"):
         raise ValueError("persona_access_mode must be legacy or groups-v1")
     return selected

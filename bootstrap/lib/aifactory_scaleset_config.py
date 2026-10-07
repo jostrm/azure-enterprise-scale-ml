@@ -23,6 +23,23 @@ PROJECT_ORGANIZATION_FIELDS = {"org-department-name": 200, "org-department-id": 
 PROJECT_ORGANIZATION_ENV = {"org-department-name": "ORG_DEPARTMENT_NAME", "org-department-id": "ORG_DEPARTMENT_ID"}
 
 
+def persona_mode(values: dict[str, Any]) -> str:
+    """Keep mode-only configurations compatible; an explicit flag is authoritative."""
+    for key in ("enablePersonas", "ENABLEPERSONAS", "ENABLE_PERSONAS"):
+        if key not in values:
+            continue
+        enabled = values[key]
+        if type(enabled) is bool:
+            return "groups-v1" if enabled else "legacy"
+        if isinstance(enabled, str) and enabled in ("true", "false"):
+            return "groups-v1" if enabled == "true" else "legacy"
+        raise ValueError("enablePersonas must be a boolean or the exact string true/false")
+    mode = values.get("persona_access_mode", values.get("PERSONA_ACCESS_MODE", "legacy"))
+    if mode not in ("legacy", "groups-v1"):
+        raise ValueError("persona_access_mode must be legacy or groups-v1")
+    return mode
+
+
 def project_organization_values(*sources: dict[str, Any]) -> dict[str, str]:
     values = {}
     for source in sources:
@@ -615,6 +632,12 @@ def merge_yaml_template(template_path: Path, active_path: Path) -> None:
             active_values[match.group("key")] = value
             active_lines[match.group("key")] = line
 
+    if "enablePersonas" not in active_values and "persona_access_mode" in active_values:
+        active_values["enablePersonas"] = str(
+            persona_mode({"persona_access_mode": active_values["persona_access_mode"].strip("'\"")}) == "groups-v1"
+        ).lower()
+        active_lines["enablePersonas"] = "  enablePersonas: " + active_values["enablePersonas"]
+
     used: set[str] = set()
     result: list[str] = []
     for line in template_path.read_text(encoding="utf-8-sig").splitlines():
@@ -656,6 +679,11 @@ def merge_env_template(template_path: Path, active_path: Path) -> None:
         if match:
             value, _ = split_comment(match.group("rest"))
             active_values[match.group("key")] = value
+
+    if "ENABLE_PERSONAS" not in active_values and "PERSONA_ACCESS_MODE" in active_values:
+        active_values["ENABLE_PERSONAS"] = str(
+            persona_mode({"PERSONA_ACCESS_MODE": active_values["PERSONA_ACCESS_MODE"].strip("'\"")}) == "groups-v1"
+        ).lower()
 
     used: set[str] = set()
     result: list[str] = []
@@ -707,6 +735,19 @@ def merge_json_template(template_path: Path, active_path: Path) -> None:
 
     organization = project_organization_values(*(active[key] for key in ("dev", "stage_prod", "test", "prod") if key in active))
     merged = merge(template, active)
+    # Introducing a false template default must not downgrade a mode-only opt-in.
+    for environment in ("dev", "test", "prod"):
+        def selected(document):
+            values = dict(document.get("dev", {}))
+            if environment != "dev":
+                values.update(document.get("stage_prod", {}))
+                values.update(document.get(environment, {}))
+            return values
+        previous = selected(active)
+        if any(key in previous for key in ("enablePersonas", "persona_access_mode")):
+            enabled = persona_mode(previous) == "groups-v1"
+            if persona_mode(selected(merged)) != persona_mode(previous):
+                merged.setdefault(environment, {})["enablePersonas"] = enabled
     for section in ("dev", "stage_prod", "test", "prod"):
         if section in merged:
             merged[section].update(organization)
@@ -767,9 +808,7 @@ def environment_network_plan(dev_cidr: str) -> dict[str, str]:
 
 
 def common_values(state: dict[str, Any]) -> dict[str, Any]:
-    mode = state.get("persona_access_mode", "legacy")
-    if mode not in ("legacy", "groups-v1"):
-        raise ValueError("persona_access_mode must be legacy or groups-v1")
+    mode = persona_mode(state)
     plan = environment_network_plan(state["dev_vnet_cidr"])
     group_id = state.get("team_group_id", "") if mode == "legacy" else ""
     project_sp = state.get("project_sp_secret_names") or {}
@@ -854,6 +893,7 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
                 "AIF-Project Owners": state.get("team_member_email") or state["team_group_name"]}
         values["tags"] = json.dumps({**tags, "Description": "AI Factory common"})
         values["tagsProject"] = json.dumps({**tags, "AIFactory project": "001"})
+    values["enablePersonas"] = mode == "groups-v1"
     values["persona_access_mode"] = mode
     values["persona_access_manifest"] = state.get("persona_access_manifest", "")
     if mode == "groups-v1":
@@ -873,9 +913,11 @@ def guard_persona_downgrade(path: Path, state: dict[str, Any]) -> None:
     if not path.is_file():
         return
     original = json.loads(path.read_text(encoding="utf-8-sig"))
-    enabled = any(isinstance(section, dict) and section.get("persona_access_mode") == "groups-v1"
-                  for section in original.values())
-    if enabled and state.get("persona_access_mode", "legacy") != "groups-v1":
+    enabled = any(persona_mode({**original.get("dev", {}),
+                               **(original.get("stage_prod", {}) if environment != "dev" else {}),
+                               **original.get(environment, {})}) == "groups-v1"
+                  for environment in ("dev", "test", "prod"))
+    if enabled and persona_mode(state) != "groups-v1":
         raise ValueError("Refusing to replace groups-v1 with legacy; retain the reviewed persona manifest.")
 
 
@@ -1052,6 +1094,7 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         env_values["TAGS_PROJECT"] = common["tagsProject"]
         env_values["PROJECT_MEMBERS_EMAILS"] = state.get("team_member_email") or state["team_group_name"]
     env_values.update({env: common[key] for key, env in PROJECT_ORGANIZATION_ENV.items() if key in common})
+    env_values["ENABLE_PERSONAS"] = common["enablePersonas"]
     env_values["PERSONA_ACCESS_MODE"] = common["persona_access_mode"]
     env_values["PERSONA_ACCESS_MANIFEST"] = common["persona_access_manifest"]
     if common["persona_access_mode"] == "groups-v1":

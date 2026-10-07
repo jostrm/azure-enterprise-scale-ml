@@ -18,6 +18,8 @@ VARIABLE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 VARIABLE_ALIASES = {
     "aifactory-dash-01": "AIFACTORY_DASHBOARD_URL",
     "scaling-mode": "SCALING_MODE",
+    "ENABLE_PERSONAS": "enablePersonas",
+    "ENABLEPERSONAS": "enablePersonas",
 }
 GITHUB_IDENTITY_OUTPUTS = {
     "AZURE_CLIENT_ID": "azure_client_id",
@@ -236,7 +238,13 @@ def main() -> None:
 
     environment = args.environment
     values, section = selected_values(read_object(config, "root"), environment)
-    if values.get("persona_access_mode", "legacy") == "groups-v1":
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from personas.pipeline import access_mode, configuration, mode_variables, safe_variables
+    try:
+        mode = access_mode(values)
+    except ValueError as error:
+        fail(str(error))
+    if mode == "groups-v1":
         effective_environment = "test" if environment == "stage" else environment
         values["dev_test_prod"] = effective_environment
         for destination, source in (
@@ -247,10 +255,10 @@ def main() -> None:
         ):
             if source in values:
                 values[destination] = values[source]
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from personas.pipeline import configuration, safe_variables
     try:
         mode, manifest = configuration(values, environment, Path.cwd())
+        if any(key in values for key in ("enablePersonas", "persona_access_mode", "PERSONA_ACCESS_MODE")):
+            values.update(mode_variables(mode))
         if manifest is not None:
             values.update(safe_variables(values))
     except (ValueError, OSError, KeyError) as error:

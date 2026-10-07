@@ -315,6 +315,7 @@ repo_level_vars=(
   "AML_STUDIO_UI_PRIVATE"
   
   # === RBAC model ===
+  "ENABLE_PERSONAS"
   "PERSONA_ACCESS_MODE"
   "PERSONA_ACCESS_MANIFEST"
   "USE_AD_GROUPS"
