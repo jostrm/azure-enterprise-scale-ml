@@ -298,7 +298,8 @@ def provision_lake(manifest, groups, execute=False, cli=None):
     if acl_removals and adoption.get("execute_migration") is not True:
         raise ValueError("Legacy ACL removal requires adoption.execute_migration=true in addition to explicit principal approvals")
     for path in missing:
-        lake.mkdir(path)
+        # ADLS defaults may grant an untrusted owning group access to a new path.
+        lake.mkdir(path, acl="user::rwx,group::---,other::---")
         headers = lake.acl(path)
         # New paths are owned by the authenticated provisioning identity. Require
         # it in the reviewed admin inventory rather than implicitly trusting it.

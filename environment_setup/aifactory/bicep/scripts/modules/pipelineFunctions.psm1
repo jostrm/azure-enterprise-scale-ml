@@ -145,7 +145,7 @@ function Import-Dependencies {
         }
         "subnetCalc_v2.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            if ($env:GITHUB_ACTIONS -eq 'true') {
+            if ($env:GITHUB_ACTIONS -eq 'true' -or $env:AIFACTORY_USE_AZURE_CLI -eq 'true') {
                 break
             }
             Install-DependencyIfMissing -Name Az.Accounts -RequiredVersion $azAccountsVersion

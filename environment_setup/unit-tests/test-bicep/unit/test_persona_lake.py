@@ -51,9 +51,9 @@ class FakeLake:
             "x-ms-resource-type": "file" if path.endswith(".txt") else "directory", "ETag": "v1",
         }
 
-    def mkdir(self, path):
+    def mkdir(self, path, *, acl=None):
         self.writes.append(("mkdir", path))
-        self.values.setdefault(path, BASE)
+        self.values.setdefault(path, acl or BASE)
 
     def request(self, method, path="", query=None, headers=None):
         assert method == "PATCH" and headers["If-Match"] == "v1"
@@ -120,6 +120,27 @@ def test_ai_only_read_access_environment_boundary_idempotence(monkeypatch):
     lake.writes.clear()
     MODULE.provision_lake(manifest(), GROUPS, True, cli)
     assert lake.writes == []
+
+
+def test_new_paths_are_created_private_before_persona_acls(monkeypatch):
+    lake, _, cli = harness(monkeypatch)
+    lake.values = {"": "user::rwx,group::r-x,other::---"}
+    created = []
+    read_acl = lake.acl
+    lake.acl = lambda path: {**read_acl(path), "x-ms-group": "$superuser"}
+
+    def mkdir(path, *, acl=None):
+        created.append((path, acl))
+        lake.values[path] = acl or "user::rwx,group::r-x,other::---"
+
+    lake.mkdir = mkdir
+    report = MODULE.provision_lake(manifest(), GROUPS, True, cli)
+    assert report["state"] == "complete"
+    assert len(created) == len(LEAF.split("/"))
+    assert all(acl == BASE for _, acl in created)
+    assert f"group:{GROUPS['persona213']}:r-x" in lake.values[LEAF]
+    assert "group::---" in lake.values[LEAF]
+    assert "group::r-x" in lake.values[""]
 
 
 @pytest.mark.parametrize("changes", [

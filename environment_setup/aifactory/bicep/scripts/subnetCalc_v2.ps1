@@ -51,6 +51,7 @@ param (
 )
 
 $ErrorActionPreference = 'Stop'
+$useAzureCli = $env:GITHUB_ACTIONS -eq 'true' -or $env:AIFACTORY_USE_AZURE_CLI -eq 'true'
 
 function ConvertTo-IPv4Range {
     param([Parameter(Mandatory = $true)][string]$Cidr)
@@ -250,7 +251,7 @@ if ($PSBoundParameters.ContainsKey('vnetNameFull_param') -and $vnetNameFull_para
 if ( $useServicePrincipal -eq $null -or $useServicePrincipal -eq "" -or $useServicePrincipal -eq $false )
 {
     $useServicePrincipal = $false
-    Write-Host $(if ($env:GITHUB_ACTIONS -eq 'true') { "Using authenticated Azure CLI context" } else { "Using current AzContext (AzurePowerShell task service connection)" })
+    Write-Host $(if ($useAzureCli) { "Using authenticated Azure CLI context" } else { "Using current AzContext (AzurePowerShell task service connection)" })
 }
 else
 {
@@ -266,13 +267,13 @@ else
 }
 $vnetObj = $null
 
-$hasAzureContext = $env:GITHUB_ACTIONS -eq 'true'
+$hasAzureContext = $useAzureCli
 if (-not $hasAzureContext) {
     $context = Get-AzContext
     $hasAzureContext = $null -ne $context.Subscription -and $context.Subscription.Id -eq $subscriptionId
 }
 if ($hasAzureContext) {
-    if ($env:GITHUB_ACTIONS -eq 'true') {
+    if ($useAzureCli) {
         Write-Host "Using Azure CLI subscription '$subscriptionId'."
     }
     else {
@@ -378,7 +379,7 @@ if ($hasAzureContext) {
 
     Write-Host "vnetName: $($vnetName)"
     Write-Host "vnetResourceGroup: $($vnetResourceGroup)"
-    if ($env:GITHUB_ACTIONS -eq 'true') {
+    if ($useAzureCli) {
         $vnetJson = & az network vnet show `
             --subscription $subscriptionId `
             --resource-group $vnetResourceGroup `

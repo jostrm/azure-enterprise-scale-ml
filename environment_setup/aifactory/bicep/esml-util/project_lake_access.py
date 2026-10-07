@@ -140,9 +140,12 @@ class Lake:
     def acl(self, path):
         return self.request("HEAD", path, {"action": "getAccessControl"})[0]
 
-    def mkdir(self, path):
+    def mkdir(self, path, *, acl=None):
+        headers = {"If-None-Match": "*", "Content-Length": "0"}
+        if acl is not None:
+            headers["x-ms-acl"] = acl
         try:
-            self.request("PUT", path, {"resource": "directory"}, {"If-None-Match": "*", "Content-Length": "0"})
+            self.request("PUT", path, {"resource": "directory"}, headers)
         except HTTPError as error:
             if error.code != 409:
                 raise

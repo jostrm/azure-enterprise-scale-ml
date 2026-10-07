@@ -3,6 +3,9 @@ parameters:
     type: string
   - name: serviceConnectionSeeding
     type: string
+  - name: linuxRunner
+    type: boolean
+    default: false
   - name: phase
     type: string
     default: 'infra'
@@ -15,6 +18,7 @@ steps:
   displayName: '00_validate_self_hosted_build_agent'
   condition: and(succeeded(), eq(variables['useSelfHostedBuildAgent'], 'true'))
   inputs:
+    pwsh: ${{ parameters.linuxRunner }}
     targetType: inline
     script: |
       $missing = @('az', 'bash', 'git', 'python') | Where-Object {
@@ -308,6 +312,7 @@ steps:
   displayName: '00_check_for_submodule'
   condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
+    pwsh: ${{ parameters.linuxRunner }}
     targetType: 'inline'
     script: |
       Write-Host "=== MANUAL SUBMODULE INITIALIZATION ==="
@@ -362,7 +367,10 @@ steps:
   displayName: '00_generate_deployment_random_value'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: ps
+    ${{ if eq(parameters.linuxRunner, true) }}:
+      scriptType: pscore
+    ${{ else }}:
+      scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
       # Generate a random deployment ID for this entire pipeline run
@@ -379,7 +387,10 @@ steps:
   condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: ps
+    ${{ if eq(parameters.linuxRunner, true) }}:
+      scriptType: pscore
+    ${{ else }}:
+      scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
         Write-Host " - FOUNDRY"
@@ -647,7 +658,10 @@ steps:
   condition: and(succeeded(), eq(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnectionSeeding }}
-    scriptType: ps
+    ${{ if eq(parameters.linuxRunner, true) }}:
+      scriptType: pscore
+    ${{ else }}:
+      scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
      $ErrorActionPreference = 'Stop'
@@ -931,7 +945,10 @@ steps:
   displayName: '03b_create_temp_json_files'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: ps
+    ${{ if eq(parameters.linuxRunner, true) }}:
+      scriptType: pscore
+    ${{ else }}:
+      scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
       # Create temporary JSON files from YAML variables with correct filenames expected by task 04
@@ -1038,6 +1055,7 @@ steps:
   displayName: '04_debug_check_files_and_paths'
   condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
+    pwsh: ${{ parameters.linuxRunner }}
     targetType: 'inline'
     script: |
       Write-Host "=== DEBUG: Checking file paths and submodule checkout ==="
@@ -1088,7 +1106,10 @@ steps:
   condition: and(succeeded(), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: ps
+    ${{ if eq(parameters.linuxRunner, true) }}:
+      scriptType: pscore
+    ${{ else }}:
+      scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
       $ErrorActionPreference = 'Stop'
@@ -2742,7 +2763,10 @@ steps:
     ORPHAN_SCRIPT: $(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/cleanup-project-orphan-roles.py
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: ps
+    ${{ if eq(parameters.linuxRunner, true) }}:
+      scriptType: pscore
+    ${{ else }}:
+      scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
       $ErrorActionPreference = 'Stop'
@@ -3568,7 +3592,10 @@ steps:
   condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: ps
+    ${{ if eq(parameters.linuxRunner, true) }}:
+      scriptType: pscore
+    ${{ else }}:
+      scriptType: ps
     scriptLocation: inlineScript
     inlineScript: |
      $ErrorActionPreference = 'Stop'

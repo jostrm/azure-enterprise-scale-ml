@@ -186,6 +186,8 @@ developer-controlled workloads.
 AI humans get directory `r-x`, file `r--`, and ancestor `--x` only. Isolated
 ingestion identities own/write source data. A writer can own files and change
 ACLs, which is why this model does not silently give AI humans write access.
+New directories are created with owner-only access before the reviewed persona
+ACLs are applied; existing paths are not replaced or reset to those defaults.
 Keep lake credentials out of secrets/app settings readable by non-AI personas.
 Source copied into Search, agents or databases has a separate data boundary.
 

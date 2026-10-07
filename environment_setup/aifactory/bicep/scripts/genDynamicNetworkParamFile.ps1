@@ -298,7 +298,7 @@ function Save-FileToGitRepository {
     }
 }
 
-Import-Module -Name "./modules/pipelineFunctions.psm1"
+Import-Module -Name (Join-Path $PSScriptRoot 'modules/pipelineFunctions.psm1')
 Import-Dependencies
 
 $jsonParameters1 = Get-Content -Path $bicepPar1 | ConvertFrom-Json
