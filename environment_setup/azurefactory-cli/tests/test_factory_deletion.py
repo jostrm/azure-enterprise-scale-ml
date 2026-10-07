@@ -30,7 +30,42 @@ RESOURCE = GROUP + "/providers/Microsoft.Storage/storageAccounts/factorystore"
 PHRASE = "DELETE ai-demo"
 
 
+PROJECT_ID = "77777777-7777-4777-8777-777777777777"
+PROJECT_GROUP = f"/subscriptions/{SUBSCRIPTION}/resourceGroups/rg-project001-dev"
+HUB = f"/subscriptions/{SUBSCRIPTION}/resourceGroups/aifactory-connectivity"
+FLAGS = {"enableDeleteForDisabledResources": True, "deleteAllServicesForProject": True,
+         "deleteKeyvaultAlso": True, "deleteAllForProject": True}
+ORDER = ["foundry-capability-hosts", "target-project-search-shared-private-links",
+         "service-managed-lifecycle", "project-resources", "project-network"]
+
+
+def deletion_plan():
+    identity = {"factory_id": FACTORY, "scale_set_id": SCALE, "environment": "dev",
+                "subscription_id": SUBSCRIPTION, "tenant_id": TENANT, "run_id": JOB}
+    project = {"id": f"project:{SCALE}:{PROJECT_ID}", "kind": "project", **identity,
+               "resource_group_id": PROJECT_GROUP, "delete": [PROJECT_GROUP], "depends_on": [],
+               "project_id": PROJECT_ID, "project_number": "001",
+               "pipeline": {"provider": "gha", "repository": "https://github.com/org/repo", "ref": "refs/heads/main",
+                            "commit": "d" * 40, "definition": ".github/workflows/factory-lifecycle.yml",
+                            "run_scope": "environment"},
+               "inputs": dict(FLAGS), "lifecycle_order": list(ORDER)}
+    common = {"id": f"common:{SCALE}:0123456789abcdef", "kind": "common", **identity,
+              "resource_group_id": GROUP, "delete": [GROUP, RESOURCE], "depends_on": [project["id"]]}
+    plan = {"contract": "ordered-project-pipelines-v1", "factory_id": FACTORY,
+            "source_commit": "b" * 40, "policy": "all-projects-before-common",
+            "stages": [project, common], "protected_resources": [HUB], "retained_resources": []}
+    plan["plan_hash"] = canonical_json_hash(plan)
+    return plan
+
+
+def rehash(plan):
+    plan.pop("plan_hash", None)
+    plan["plan_hash"] = canonical_json_hash(plan)
+    return plan
+
+
 def preview():
+    plan = deletion_plan()
     return {
         "contract_version": 1, "capabilities": ["delete-aifactory-v1"],
         "confirmation_id": CONFIRMATION, "can_execute": True, "blockers": [],
@@ -43,19 +78,26 @@ def preview():
         "factory_id": FACTORY, "scale_set_id": None, "project_id": None,
         "target": {"id": FACTORY, "key": "ai-demo", "scale_sets": [
             {"id": SCALE, "environment": "dev", "subscription_id": SUBSCRIPTION, "tenant_id": TENANT},
-        ]},
+        ], "projects": [{"id": PROJECT_ID, "number": "001",
+                         "placements": [{"scale_set_id": SCALE, "environment": "dev"}]}]},
         "source_version": {"aifactory_version": "main", "requested_version": "main",
                            "branch": "main", "resolved_ref": "b" * 40},
-        "inventory": [{"resource_id": GROUP, "dependencies": []}, {"resource_id": RESOURCE, "dependencies": []}],
+        "inventory": [{"resource_id": item, "dependencies": []} for item in (PROJECT_GROUP, GROUP, RESOURCE)],
         "deletion_targets": [{
             "resource_group": "rg-factory-dev", "name": "rg-factory-dev", "resource_id": GROUP,
             "environment": "dev", "subscription_id": SUBSCRIPTION, "tenant_id": TENANT,
             "factory_id": FACTORY, "scale_set_id": SCALE, "project_id": None,
             "delete": [GROUP, RESOURCE], "retain": [],
+        }, {
+            "resource_group": "rg-project001-dev", "name": "rg-project001-dev", "resource_id": PROJECT_GROUP,
+            "environment": "dev", "subscription_id": SUBSCRIPTION, "tenant_id": TENANT,
+            "factory_id": FACTORY, "scale_set_id": SCALE, "project_id": None,
+            "delete": [PROJECT_GROUP], "retain": [],
         }],
         "deletion_options": None, "deletion_scope": "whole-factory",
         "preserve_entra_groups": True, "retain_saved_configuration": False,
-        "retained_resources": [], "preview_hash": "c" * 64, "confirmation_phrase": PHRASE,
+        "retained_resources": [HUB], "preview_hash": "c" * 64, "confirmation_phrase": PHRASE,
+        "deletion_plan": plan,
     }
 
 
@@ -134,6 +176,50 @@ def test_prepare_saves_bound_review_and_never_confirms(tmp_path, transport, caps
     assert "Are you sure" in output.err
     for value in (GROUP, RESOURCE, SUBSCRIPTION, TENANT):
         assert value in output.err
+    assert "all-projects-before-common" in output.err
+    assert "deleteAllForProject" in output.err and HUB in output.err
+    assert ".github/workflows/factory-lifecycle.yml" in output.err
+
+
+@pytest.mark.parametrize("defect", ["missing", "hash", "false-flag", "order", "common-first", "protected",
+                                    "uncovered", "foreign-scale", "lifecycle"])
+def test_unsafe_or_legacy_deletion_plan_is_rejected_before_confirmation(tmp_path, transport, capsys, defect):
+    plan = transport.preview["deletion_plan"]
+    project, common = plan["stages"]
+    if defect == "missing":
+        transport.preview.pop("deletion_plan")
+    elif defect == "hash":
+        plan["plan_hash"] = "0" * 64
+    else:
+        if defect == "false-flag":
+            project["inputs"]["deleteKeyvaultAlso"] = False
+        elif defect == "order":
+            common["depends_on"] = []
+        elif defect == "common-first":
+            plan["stages"] = [common, project]
+        elif defect == "protected":
+            plan["protected_resources"].append(GROUP)
+        elif defect == "uncovered":
+            common["delete"] = [GROUP]
+        elif defect == "foreign-scale":
+            project["scale_set_id"] = "88888888-8888-4888-8888-888888888888"
+        elif defect == "lifecycle":
+            project["lifecycle_order"] = ORDER[::-1]
+        plan.pop("plan_hash")
+        plan["plan_hash"] = canonical_json_hash(plan)
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+    assert len(transport.records) == 1
+
+
+def test_reconcile_uses_existing_job_only_and_never_dispatches(transport, capsys):
+    transport.job["status"] = "succeeded"
+    assert invoke("reconcile", "--folder", FOLDER, "--job-id", JOB) == 0
+    assert len(transport.records) == 1
+    assert transport.records[0]["url"] == BASE + ENDPOINT + "/reconcile"
+    assert transport.records[0]["method"] == "POST"
+    assert transport.records[0]["body"] == {"contract_version": 1, "folder": FOLDER, "job_id": JOB}
+    assert json.loads(capsys.readouterr().out)["id"] == JOB
 
 
 def test_nontty_exact_phrase_and_yes_sends_one_bound_confirmation(tmp_path, transport, capsys):
@@ -267,8 +353,10 @@ def test_incomplete_or_broadened_manifest_fails_closed(tmp_path, transport, chan
 def test_retained_group_with_deleted_child_is_rendered_and_bound(tmp_path, transport, capsys):
     p = transport.preview
     p["deletion_targets"][0].update(delete=[RESOURCE], retain=[GROUP])
-    p["retained_resources"] = [GROUP]
-    p["inventory"] = [p["inventory"][1]]
+    p["retained_resources"] = [GROUP, HUB]
+    p["inventory"] = [item for item in p["inventory"] if item["resource_id"] != GROUP]
+    p["deletion_plan"]["stages"][1]["delete"] = [RESOURCE]
+    rehash(p["deletion_plan"])
     assert prepare(tmp_path) == 0
     assert '"retain": [' in capsys.readouterr().err
 
@@ -297,6 +385,11 @@ def test_whole_factory_includes_multiple_environments_and_tenants(tmp_path, tran
         "resource_id": other_group, "delete": [other_group],
     })
     p["inventory"].append({"resource_id": other_group, "dependencies": []})
+    plan = p["deletion_plan"]
+    plan["stages"].append({**plan["stages"][1], "id": f"common:{JOB}:fedcba9876543210", "scale_set_id": JOB,
+                           "environment": "prod", "subscription_id": other_subscription, "tenant_id": other_tenant,
+                           "resource_group_id": other_group, "delete": [other_group]})
+    rehash(plan)
     assert prepare(tmp_path) == 0
     output = capsys.readouterr()
     for value in (SUBSCRIPTION, TENANT, other_subscription, other_tenant, "prod", other_group):

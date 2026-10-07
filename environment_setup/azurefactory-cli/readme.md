@@ -151,6 +151,17 @@ security-group preservation and saved-configuration handling. Repositories,
 subscription-level configuration and outside-group dependencies are not claimed
 deleted; the backend's retained-resource warnings describe the limitations.
 Empty, narrowed, inconsistent or broadened manifests cannot be confirmed.
+The review also shows the server's hashed `ordered-project-pipelines-v1`
+**deletion plan**, which the CLI rechecks before saving a receipt: one stage per
+registered project placement in every environment, run by the configured GHA/ADO
+lifecycle pipeline with `enableDeleteForDisabledResources`,
+`deleteAllServicesForProject`, `deleteKeyvaultAlso` and `deleteAllForProject`
+all boolean `true`; Foundry capability hosts, that project's Search shared private
+links, service-managed lifecycle, project resources and project network in that
+order; common stages waiting for every project stage; every reviewed deletion
+covered exactly once; and no overlap with protected hub, VPN, bootstrap or shared
+resources. A missing, legacy or modified plan is rejected; there is no local
+deletion fallback.
 The review reports the backend's saved-configuration handling explicitly:
 the current backend removes the local catalog registration/configuration only
 after verified whole-factory deletion succeeds, and retains it on failure.
@@ -180,8 +191,17 @@ azurefactory delete-aifactory status --folder $env:FACTORY_FOLDER --job-id $env:
 
 A timeout is an **unknown outcome**, not cancellation or permission to retry.
 Inspect server state before further action; confirmation is never retried
-automatically. Tests use mocked transport only and do not establish Azure
-deletion success.
+automatically. Status includes exact provider run IDs/links in `pipeline_runs`.
+If the API host stopped after the pipelines finished, finish the local catalog
+update from the existing verified receipts without dispatching anything:
+
+```powershell
+azurefactory delete-aifactory reconcile --folder $env:FACTORY_FOLDER --job-id $env:DELETE_JOB_ID
+```
+
+`reconcile` never dispatches a pipeline, retries an Azure delete or treats a
+denied/timed-out check as absence; partial or unknown runs stay blocked. Tests
+use mocked transport only and do not establish Azure deletion success.
 
 ### Shell-first registered onboarding
 
@@ -920,6 +940,51 @@ Tkinter/MAUI releases. Use `python -m azurefactory` if the console script is not
 on PATH.
 
 Use `client.request("GET", "/api/v1/...")` for future read resources. Generic CLI writes require `request POST ... --write --yes`.
+
+### Monitoring: Azure resource-group costs
+
+The API, MAUI Monitor, Tkinter Monitor and CLI use the same Azure Cost Management
+report. Select subscriptions explicitly; no command expands the scope to the
+tenant or uses the current Azure subscription as an implicit default.
+
+```powershell
+azurefactory monitoring resource-group-costs --subscription $env:SUBSCRIPTION_ID
+azurefactory monitoring resource-group-costs --subscription $env:DEV_SUBSCRIPTION_ID `
+  --subscription $env:PROD_SUBSCRIPTION_ID --month 2026-10 `
+  --folder $env:FACTORY_FOLDER --refresh
+```
+
+`--month` defaults to the API's current UTC calendar month. `--folder` supplies
+registered factory configuration as attribution evidence, not a deletion grant.
+The SDK equivalent is `client.resource_group_costs({"subscription_ids": [...]})`,
+using `POST /api/v1/monitoring/resource-group-costs`. The API host needs Azure
+resource read access and Cost Management Reader (or equivalent) at each selected
+scope; billing-account charge visibility policies can impose additional limits.
+Sharing a dashboard never grants underlying billing permissions.
+
+Actual is month-to-date **ActualCost**, with the reported data-through date.
+Forecast is the projected **full-month total**, including actuals, from Azure's
+Forecast API; never add actual to it again. Daily forecast responses are summed
+once, not guessed from usage or list prices. Azure forecast grouping is not
+supported: the service uses exact resource-group filters and marks unsupported,
+empty or inaccessible forecasts unavailable, never proportionally allocates them.
+Currency buckets remain separate. Data freshness includes retrieval time and
+Azure reporting delays; recent charges can arrive late or change.
+
+Inventory is reconciled with billed groups, including deleted groups with charges.
+Managed groups attributed through service ownership contribute once to their
+project/factory, not again to standalone Managed RGs. All AI Factories excludes
+separately classified hubs, bootstrap and unattributed managed groups. The overall
+selected-scope total includes all categories. Partial, stale or unavailable reports
+retain their status in JSON and return exit code **3**, rather than implying a
+complete successful report. The CLI does not recalculate or convert any totals.
+
+The report's `charts` array carries the same server-built chart data the desktop
+clients draw, one currency per chart: `factory-cost-<CUR>`, `project-cost-<CUR>`
+and `category-cost-<CUR>` (month-to-date actual, largest first, smaller slices
+combined into one labelled remainder) and `daily-cost-<CUR>` (daily actual cost
+for the trailing 30 days, or the whole selected past month; days Azure has not
+reported yet are `null`, not zero).
 
 ### Monitoring: canonical reports, not collector jobs
 

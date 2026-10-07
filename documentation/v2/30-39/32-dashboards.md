@@ -676,6 +676,52 @@ condition; this workflow does not provision those environments.
 
 ### 2a. Bicep dashboards and telemetry
 
+#### All AI Factories: retained connectivity-hub view
+
+`bootstrap/lib/all-factories-dashboard.bicep` adds a separate native Portal
+dashboard named `all-ai-factories`, displayed as **All AI Factories**. Its home
+is the explicitly selected reusable connectivity/hub resource group, **not**
+a factory common RG. Its stable resource ID is shared by every factory using
+that hub; existing per-factory and per-project dashboards are unchanged.
+
+`bootstrap/lib/all_factories_dashboard.py` supplies the independently reviewed
+`all-factories-dashboard` stage for initial deployment and subsequent updates.
+Run `prepare` only after the retained hub coordination foundation exists,
+passing explicit tenant, hub RG, location and nonempty selected subscription
+UUIDs. Review the frozen incremental deployment, then call `execute` with its
+exact plan hash and durable state directory. The stage verifies source bytes,
+current ownership and authenticated coordination access; revalidates under
+the physical hub lease; and verifies the deployed dashboard before issuing
+a successful receipt. `validate_receipt` binds that receipt to the exact
+reviewed scope, source and subscription selection. Unknown writes retain
+reconciliation evidence and the lease; do not automatically retry them.
+
+This additive stage does not silently alter an old hash-pinned bootstrap
+wrapper. A bootstrap/update caller must explicitly integrate its review,
+execution and receipt validation and include its complete `SOURCE_FILES`
+payload. A per-factory provisioning run must not infer or overwrite the hub's
+subscription selection. Existing coordination helpers and their source
+contracts are unchanged.
+
+The dashboard uses supported native Markdown parts with subscription Cost
+Analysis links. Select **Actual cost**, **This month**, and **Resource group**
+grouping. For forecast, filter the exact resource groups, remove grouping and
+enable the forecast view where supported; Forecast does not support grouping.
+Read currency from the native results. Resource-group billing updates dynamically
+(subject to billing ingestion delay), but native Azure views
+do not know the catalog's logical factory or Dev / Stage / Prod assignments
+(`test` can be a legacy physical Stage name). A subscription total is not a
+factories-only total. Keep hub/connectivity, bootstrap, managed and unowned
+charges separate unless the authoritative attribution contract includes them.
+
+**Not implemented by the native view:** arbitrary selected-subscription
+numeric aggregation, catalog-based factory/environment totals, or a combined
+factories forecast. A Portal dashboard cannot execute Python or read a local
+API. Use the shared cost-service clients for those attributed results; do not
+sum currencies, overlapping scopes, or actual plus a full-month forecast.
+Missing or unsupported forecast data is unavailable, never zero. No cost
+reader role assignment or other authorization grant is deployed here.
+
 The module inventory contains three portal-dashboard declarations. These are
 not three Foundry agent-ROI dashboards.
 

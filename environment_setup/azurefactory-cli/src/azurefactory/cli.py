@@ -123,6 +123,12 @@ def build_parser() -> argparse.ArgumentParser:
                                  help="Read deletion progress without starting or retrying deletion.")
     deletion_status.add_argument("--folder", required=True)
     deletion_status.add_argument("--job-id", required=True)
+    deletion_reconcile = add_simple(
+        deletion_sub, "reconcile", cmd_delete_aifactory_reconcile,
+        help="Resume local completion of an existing job from its verified pipeline receipts; never dispatch, "
+             "retry pipelines or call Azure.")
+    deletion_reconcile.add_argument("--folder", required=True)
+    deletion_reconcile.add_argument("--job-id", required=True)
     workflow = sub.add_parser("workflow", help="Read-only GitHub Actions status and events; never dispatch or rerun.")
     workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
     for name, handler in (("status", cmd_workflow_status), ("watch", cmd_workflow_watch)):
@@ -142,9 +148,17 @@ def build_parser() -> argparse.ArgumentParser:
     api_sub = api.add_subparsers(dest="api_command", required=True)
     add_simple(api_sub, "instructions", cmd_api_instructions,
                help="Print offline startup instructions and the selected URL; never print or persist credentials.")
-    monitoring = sub.add_parser("monitoring", help="Canonical evidence reports; no collectors, deployments or cloud jobs.")
+    monitoring = sub.add_parser("monitoring", help="Canonical evidence and read-only Azure cost reports; no deployments.")
     monitoring_sub = monitoring.add_subparsers(dest="monitoring_command", required=True)
     add_simple(monitoring_sub, "catalog", cmd_monitoring_catalog)
+    costs = add_simple(
+        monitoring_sub, "resource-group-costs", cmd_resource_group_costs,
+        help="Azure Cost Management actual and full-month forecast; explicitly selected subscriptions only.")
+    costs.add_argument("--subscription", dest="subscription_ids", action="append", required=True,
+                       help="Selected subscription UUID; repeat for multiple subscriptions.")
+    costs.add_argument("--month", help="Calendar month YYYY-MM; omitted uses the current UTC month on the API.")
+    costs.add_argument("--folder", help="Optional registered factory catalog folder on the API host.")
+    costs.add_argument("--refresh", action="store_true", help="Bypass the API's scoped read cache.")
     register_saved_commands(monitoring_sub)
     for action in ("summary", "report", "export"):
         command = add_simple(monitoring_sub, action, cmd_monitoring)
@@ -516,14 +530,21 @@ def cmd_preflight(args):
 
 
 def _deletion_review(preview, folder):
+    from .factory_deletion import describe_deletion_plan
+
     print("Are you sure you want to delete this factory's Azure resources?", file=sys.stderr)
     print("Review the exact deleted and retained resources below. Nothing has been deleted by this command.",
           file=sys.stderr)
+    plan = preview["deletion_plan"]
     _print_json({
         "Factory": preview["target"]["key"], "Factory ID": preview["factory_id"],
         "Saved folder": folder, "Scope": "Whole factory, all scale sets",
         "Source version": preview["source_version"], "Saved revision": preview["source_revision"],
         "Expires": preview["expires_at"], "Server review fingerprint": preview["preview_hash"],
+        "Ordered pipeline plan": {"Contract": plan["contract"], "Policy": plan["policy"],
+                                  "Plan fingerprint": plan["plan_hash"], "Pinned source": plan["source_commit"],
+                                  "Protected (never deleted)": plan["protected_resources"],
+                                  "Stages": describe_deletion_plan(plan)},
         "Exact resource manifest (delete / retain)": preview["deletion_targets"],
         "Retained Azure resources": preview["retained_resources"],
         "Entra security groups preserved": preview["preserve_entra_groups"],
@@ -615,6 +636,15 @@ def cmd_delete_aifactory_status(args):
     return emit(result, status_exit(result["status"]))
 
 
+def cmd_delete_aifactory_reconcile(args):
+    from .factory_deletion import validate_job
+
+    api = client(args)
+    result = redact_secrets(api.delete_aifactory_reconcile(args.folder, args.job_id), api.api_key)
+    validate_job(result, job_id=args.job_id)
+    return emit(result, status_exit(result["status"]))
+
+
 def _workflow_output(args, event):
     from .workflow_events import monitoring_unavailable
 
@@ -671,6 +701,20 @@ def cmd_workflow_watch(args):
 
 def cmd_monitoring_catalog(args):
     return emit(client(args).monitoring_catalog())
+
+
+def cmd_resource_group_costs(args):
+    body = {"subscription_ids": args.subscription_ids}
+    for field in ("month",):
+        if getattr(args, field) is not None:
+            body[field] = getattr(args, field)
+    if args.folder is not None:
+        body["aifactory_folder"] = args.folder
+    if args.refresh:
+        body["refresh"] = True
+    api = client(args, default_timeout=300.0)
+    result = redact_secrets(api.resource_group_costs(body), api.api_key)
+    return emit(result, EXIT_OK if result.get("status") in {"available", "empty"} else EXIT_BLOCKED)
 
 
 def cmd_monitoring(args):

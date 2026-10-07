@@ -11,6 +11,99 @@ from .errors import ConfigError, FailureError
 PURPOSE = "delete-aifactory-confirm"
 CAPABILITY = "delete-aifactory-v1"
 REQUEST_FIELDS = {"contract_version", "folder", "factory_id", "expected_revision", "version_ref"}
+PLAN_CONTRACT = "ordered-project-pipelines-v1"
+DELETE_FLAGS = {"enableDeleteForDisabledResources": True, "deleteAllServicesForProject": True,
+                "deleteKeyvaultAlso": True, "deleteAllForProject": True}
+PROJECT_ORDER = ["foundry-capability-hosts", "target-project-search-shared-private-links",
+                 "service-managed-lifecycle", "project-resources", "project-network"]
+PIPELINE_DEFINITIONS = {"gha": ".github/workflows/factory-lifecycle.yml",
+                        "ado": "aifactory/pipelines/factory-lifecycle.yml"}
+
+
+def _contains(parent: str, child: str) -> bool:
+    return child.lower() == parent.lower() or child.lower().startswith(parent.lower() + "/")
+
+
+def validate_deletion_plan(plan: Any, factory_id: str, scales: dict[str, Any], factory: dict[str, Any],
+                           targets: list[dict[str, Any]]) -> dict[str, Any]:
+    """Client-side recheck of the server's hashed ordered pipeline plan; never a local deletion plan."""
+    from .client import canonical_json_hash
+
+    def invalid(reason):
+        raise ConfigError("Unsafe or incompatible factory deletion plan: " + reason
+                          + ". Project teardown must use the reviewed GHA/ADO pipelines; no local fallback is allowed.")
+
+    if (not isinstance(plan, dict) or plan.get("contract") != PLAN_CONTRACT
+            or plan.get("factory_id") != factory_id or plan.get("policy") != "all-projects-before-common"
+            or not _hash(plan.get("plan_hash"))
+            or canonical_json_hash({key: value for key, value in plan.items() if key != "plan_hash"}) != plan["plan_hash"]
+            or not isinstance(plan.get("source_commit"), str) or not re.fullmatch(r"[0-9a-f]{40}", plan["source_commit"])):
+        invalid("missing, legacy or modified ordered-project-pipelines-v1 plan")
+    protected = plan.get("protected_resources")
+    if not isinstance(protected, list) or any(not _text(item) or not item.lower().startswith("/subscriptions/")
+                                              for item in protected):
+        invalid("missing protected-resource list")
+    stages = plan.get("stages")
+    if not isinstance(stages, list) or not stages or len({stage.get("id") for stage in stages
+                                                          if isinstance(stage, dict)}) != len(stages):
+        invalid("missing or duplicate stages")
+    reviewed = {}
+    for target in targets:
+        for entry in target["delete"]:
+            reviewed[entry.lower()] = target["scale_set_id"]
+    expected = {(placement.get("scale_set_id"), project.get("id"))
+                for project in factory.get("projects", []) if isinstance(project, dict)
+                for placement in project.get("placements", []) if isinstance(placement, dict)
+                if placement.get("scale_set_id") in scales}
+    projects, covered, seen_common = [], set(), False
+    for stage in stages:
+        if not isinstance(stage, dict) or stage.get("kind") not in ("project", "common"):
+            invalid("unknown stage")
+        scale = scales.get(stage.get("scale_set_id"))
+        if (scale is None or stage.get("factory_id") != factory_id
+                or any(stage.get(field) != scale[field] for field in ("environment", "subscription_id", "tenant_id"))):
+            invalid("a stage changed its factory, scale set, subscription or tenant")
+        deleted = stage.get("delete")
+        if not isinstance(deleted, list) or not deleted:
+            invalid("a stage has no exact deletions")
+        for entry in deleted:
+            if not _text(entry) or reviewed.get(entry.lower()) != scale["id"] or entry.lower() in covered:
+                invalid("stage deletions differ from the reviewed exact inventory")
+            covered.add(entry.lower())
+        if stage["kind"] == "project":
+            pipeline = stage.get("pipeline")
+            if (seen_common or stage.get("depends_on") != [] or stage.get("inputs") != DELETE_FLAGS
+                    or any(value is not True for value in stage["inputs"].values())
+                    or stage.get("lifecycle_order") != PROJECT_ORDER or not isinstance(pipeline, dict)
+                    or pipeline.get("provider") not in PIPELINE_DEFINITIONS
+                    or pipeline.get("definition") != PIPELINE_DEFINITIONS[pipeline["provider"]]
+                    or not _text(pipeline.get("repository")) or not _text(pipeline.get("ref"))
+                    or not re.fullmatch(r"[0-9a-f]{40}", str(pipeline.get("commit", "")))):
+                invalid("project pipelines need the pinned definition and all four boolean-true deletion flags "
+                        "before any common teardown")
+            projects.append(stage)
+        else:
+            seen_common = True
+    for stage in stages:
+        if stage["kind"] == "common" and stage.get("depends_on") != [item["id"] for item in projects]:
+            invalid("common teardown must wait for every project pipeline in every environment")
+    if ({(stage["scale_set_id"], stage.get("project_id")) for stage in projects} != expected
+            or len(projects) != len(expected)):
+        invalid("every registered project placement in every environment needs exactly one pipeline stage")
+    if covered != set(reviewed):
+        invalid("stages do not cover every reviewed deletion exactly once")
+    if any(_contains(entry, keep) or _contains(keep, entry) for entry in covered for keep in protected):
+        invalid("deletion overlaps protected hub, VPN, bootstrap or shared resources")
+    return plan
+
+
+def describe_deletion_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    return [{"Stage": stage["id"], "Kind": stage["kind"], "Environment": stage["environment"],
+             "Project": stage.get("project_number") or "common", "Resource group": stage["resource_group_id"],
+             "Deletes": stage["delete"], "Waits for": stage["depends_on"],
+             **({"Pipeline": stage["pipeline"], "Deletion flags": stage["inputs"],
+                 "Project teardown order": stage["lifecycle_order"]} if stage["kind"] == "project" else {})}
+            for stage in plan["stages"]]
 
 
 def _text(value: Any) -> bool:
@@ -132,10 +225,12 @@ def validate_deletion_preview(request: dict[str, Any], preview: Any) -> None:
         retained.update(members["retain"])
     if covered != set(scales):
         invalid("the manifest does not cover every scale set of the whole factory")
+    plan = validate_deletion_plan(preview.get("deletion_plan"), request["factory_id"], scales, factory, targets)
     listed_retained = preview["retained_resources"]
+    protected = {item.lower() for item in plan["protected_resources"]}
     if (len({item.lower() for item in listed_retained}) != len(listed_retained)
-            or {item.lower() for item in listed_retained} != retained):
-        invalid("retained resources differ from the exact target manifests")
+            or {item.lower() for item in listed_retained} != retained | protected):
+        invalid("retained resources differ from the exact target manifests and protected plan resources")
     inventory = preview.get("inventory")
     if not isinstance(inventory, list) or any(
             not isinstance(item, dict) or not _text(item.get("resource_id")) for item in inventory):

@@ -241,6 +241,11 @@ class AzureFactoryClient(SavedMonitoringClient):
     def delete_aifactory_status(self, folder: str, job_id: str) -> dict[str, Any]:
         return self._factory_deletion_request("status", query={"folder": folder, "job_id": job_id})
 
+    def delete_aifactory_reconcile(self, folder: str, job_id: str) -> dict[str, Any]:
+        """Server-side local completion from existing verified receipts; never redispatches pipelines."""
+        return self._factory_deletion_request("reconcile", body={
+            "contract_version": 1, "folder": folder, "job_id": job_id})
+
     def schema(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/api/v1/schema"), "schema")
 
@@ -280,6 +285,43 @@ class AzureFactoryClient(SavedMonitoringClient):
     def monitoring_catalog(self) -> dict[str, Any]:
         """Read canonical report/source capabilities; never start a collector."""
         return self._object(self.request("GET", "/api/v1/monitoring/catalog"), "monitoring catalog")
+
+    def resource_group_costs(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Read Azure billing for explicitly selected subscriptions; never allocate locally."""
+        if (not isinstance(request, dict)
+                or set(request) - {"subscription_ids", "month", "aifactory_folder", "refresh"}):
+            raise ConfigError("Resource-group costs require an explicit subscription_ids scope.")
+        subscriptions = request.get("subscription_ids")
+        if not isinstance(subscriptions, list) or not subscriptions:
+            raise ConfigError("Select at least one subscription_id; tenant-wide discovery is not supported.")
+        identities = set()
+        for value in subscriptions:
+            try:
+                identifier = UUID(value)
+                if not identifier.int or str(identifier) != value.lower():
+                    raise ValueError()
+            except (ValueError, TypeError, AttributeError):
+                raise ConfigError("Every selected subscription_id must be an Azure subscription UUID.") from None
+            if identifier in identities:
+                raise ConfigError("Select each subscription_id only once.")
+            identities.add(identifier)
+        if "month" in request:
+            value = request["month"]
+            try:
+                parsed = date.fromisoformat(value + "-01")
+            except (ValueError, TypeError):
+                raise ConfigError("Cost month must be YYYY-MM.") from None
+            if parsed.strftime("%Y-%m") != value:
+                raise ConfigError("Cost month must be YYYY-MM.")
+        if "refresh" in request and type(request["refresh"]) is not bool:
+            raise ConfigError("Cost refresh must be a boolean.")
+        if "aifactory_folder" in request and (
+                not isinstance(request["aifactory_folder"], str) or not request["aifactory_folder"].strip()
+                or _has_control(request["aifactory_folder"])):
+            raise ConfigError("Cost catalog folder must be a nonempty API-host path.")
+        return self._object(self.request(
+            "POST", "/api/v1/monitoring/resource-group-costs", body=request,
+        ), "resource-group cost report")
 
     def monitoring_report(self, request: dict[str, Any]) -> dict[str, Any]:
         """Calculate a report from explicit sample or supplied observation evidence."""
