@@ -1447,7 +1447,7 @@ steps:
         echo "Checking variable: aiFoundryV2ProjectExists, Value: false (AI Foundry V2 account not found)"
       fi
 
-      echo "##vso[task.setvariable variable=databricksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Azure.Databricks/workspaces" "$databricksName" "$suffixStandard")"
+      echo "##vso[task.setvariable variable=databricksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Databricks/workspaces" "$databricksName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=logicAppsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$logicAppsName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=eventHubsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.EventHub/namespaces" "$eventHubsName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=dataFactoryExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DataFactory/factories" "$dataFactoryName" "$suffixStandard")"

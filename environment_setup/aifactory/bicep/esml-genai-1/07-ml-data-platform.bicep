@@ -163,6 +163,8 @@ param skuDatabricksStageProd string = 'premium'
 var databricksSkuName = env == 'dev' ? skuDatabricksDev : skuDatabricksStageProd
 @description('Use custom VNet (customer-managed) for Databricks instead of managed networking')
 param useDatabricksCustomVNet bool = true
+@description('Create the regional Databricks browser_authentication private endpoint (web UI SSO). Keep exactly one per region per private DNS zone; set false when another workspace already provides it.')
+param enableDatabricksBrowserAuthPrivateEndpoint bool = true
 
 // Networking / AKS settings needed for AML & attached AKS
 param aksServiceCidr string = '10.0.0.0/16'
@@ -585,6 +587,25 @@ module databricks 'br/public:avm/res/databricks/workspace:0.12.0' = if(!databric
   ]
 }
 
+// Private workspaces (publicNetworkAccess 'Disabled' + 'NoAzureDatabricksRules') need Private Link for
+// UI/REST and for the cluster relay. Not gated on databricksExists so existing workspaces are repaired.
+module databricksPrivateEndpoints '../modules/databricksPrivateEndpoints.bicep' = if(enableDatabricks && !enablePublicAccessWithPerimeter) {
+  name: take('07-DbxPend-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    workspaceName: databricksName
+    location: location
+    tags: tagsProject
+    subnetResourceId: resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, genaiSubnetName)
+    // Central hub DNS: the DeployIfNotExists policy owns the zone groups.
+    privateDnsZoneResourceId: centralDnsZoneByPolicyInHub ? '' : privateLinksDnsZones.azuredatabricks.id
+    enableBrowserAuthentication: enableDatabricksBrowserAuthPrivateEndpoint
+  }
+  dependsOn: [
+    ...(!databricksExists && enableDatabricks ? [databricks] : [])
+  ]
+}
+
 // ============== MACHINE LEARNING RBAC + AML to access STORAGE ==============
 module rbacAmlv2Storage '../modules/rbacStorageAml.bicep' = if(!amlExists && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
@@ -672,3 +693,4 @@ output databricksDeployed bool = (!databricksExists && enableDatabricks)
 output databricksId string = (!databricksExists && enableDatabricks) ? databricks!.outputs.resourceId : ''
 output databricksNameOut string = (!databricksExists && enableDatabricks) ? databricks!.outputs.name : ''
 output databricksWorkspaceUrl string = (!databricksExists && enableDatabricks) ? databricks!.outputs.workspaceUrl : ''
+output databricksPrivateEndpointId string = (enableDatabricks && !enablePublicAccessWithPerimeter) ? databricksPrivateEndpoints!.outputs.uiApiPrivateEndpointId : ''

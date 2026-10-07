@@ -34,6 +34,12 @@ param skuEventHubsDev string = 'Basic'
 param skuEventHubsStageProd string = 'Basic'
 var eventHubSkuTier = env == 'dev' ? skuEventHubsDev : skuEventHubsStageProd
 
+// Basic supports neither private endpoints, IP/VNet network rules nor additional consumer groups,
+// which this namespace always uses: fail before submitting instead of failing in the resource provider.
+func requireEventHubNetworkedTier(tier 'Basic' | 'Standard' | 'Premium') 'Basic' | 'Standard' | 'Premium' => tier == 'Basic'
+  ? fail('DEPLOYMENT FAILED: Event Hubs Basic tier supports no private endpoints, network rules or extra consumer groups. Set skuEventHubsDev/skuEventHubsStageProd to Standard or Premium.')
+  : tier
+
 @description('Event Hub Namespace SKU capacity (throughput units)')
 param eventHubSkuCapacity int = 1
 
@@ -402,7 +408,7 @@ module eventHub 'br/public:avm/res/event-hub/namespace:0.14.0' = if(!eventHubsEx
     tags: tags
     
     // SKU configuration
-    skuName: eventHubSkuTier
+    skuName: requireEventHubNetworkedTier(eventHubSkuTier)
     skuCapacity: eventHubSkuCapacity
     
     // Managed identity configuration (AVM format)
@@ -420,9 +426,14 @@ module eventHub 'br/public:avm/res/event-hub/namespace:0.14.0' = if(!eventHubsEx
         name: '${eventHubName}-pend'
         customNetworkInterfaceName: '${eventHubName}-pend-nic'
         subnetResourceId: resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, genaiSubnetName)
-        privateDnsZoneResourceIds: [
-          privateLinksDnsZones.namespace
-        ]
+        // AVM 0.14 contract. Central hub DNS: the DeployIfNotExists policy owns the zone group.
+        privateDnsZoneGroup: centralDnsZoneByPolicyInHub ? null : {
+          privateDnsZoneGroupConfigs: [
+            {
+              privateDnsZoneResourceId: privateLinksDnsZones.namespace.id
+            }
+          ]
+        }
         tags: tags
       }
     ]
