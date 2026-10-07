@@ -166,3 +166,10 @@ def test_data_factory_rbac_uses_one_valid_factory_contributor_grant_per_principa
             assert "condition" not in item
         else:
             assert item["condition"] == "[not(parameters('disableContributorAccessForUsers'))]"
+
+
+def test_integration_insights_lookup_only_runs_for_deployed_standard_logic_app(tmp_path):
+    template = compile_template(GENAI / "11-integration.bicep", tmp_path)
+    lookup = deployment(template, "10-getAppInsights-")
+    logic_app = deployment(template, "11-LogicApps01-")
+    assert lookup.get("condition") == logic_app["condition"]

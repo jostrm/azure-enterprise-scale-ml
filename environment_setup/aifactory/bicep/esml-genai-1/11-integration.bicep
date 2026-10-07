@@ -382,7 +382,7 @@ module getProjectMIPrincipalId '../modules/get-managed-identity-info.bicep' = {
 }
 
 // Fetch Application Insights from NamingConvention, in same target resource group
-module getAppInsightsInfo '../modules/get-appinsights-info.bicep' = {
+module getAppInsightsInfo '../modules/get-appinsights-info.bicep' = if(logiAppType == 'Standard' && !logicAppsExists && enableLogicApps) {
   name: take('10-getAppInsights-${deploymentProjSpecificUniqueSuffix}', 64)
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
@@ -573,8 +573,8 @@ module logicAppStandard 'br/public:avm/res/web/site:0.21.0' = if(logiAppType == 
           FUNCTIONS_EXTENSION_VERSION: '~4'
           FUNCTIONS_WORKER_RUNTIME: runtime == 'dotnet' ? 'dotnet-isolated' : runtime
           WEBSITE_RUN_FROM_PACKAGE: '1'
-          APPINSIGHTS_INSTRUMENTATIONKEY: getAppInsightsInfo.outputs.instrumentationKey
-          APPLICATIONINSIGHTS_CONNECTION_STRING: getAppInsightsInfo.outputs.connectionString
+          APPINSIGHTS_INSTRUMENTATIONKEY: getAppInsightsInfo!.outputs.instrumentationKey
+          APPLICATIONINSIGHTS_CONNECTION_STRING: getAppInsightsInfo!.outputs.connectionString
           KeyVaultName: keyvaultName
           StorageAccountName: storageAccount1001Name
           EventHubNamespace: eventHubName
