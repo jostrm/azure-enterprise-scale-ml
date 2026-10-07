@@ -1,5 +1,9 @@
 #!/bin/bash
-set -e
+set -eo pipefail
+
+# Preserve ARM IDs when native Azure CLI is invoked from Git Bash.
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL='*'
 
 az account set --subscription "$dev_test_prod_sub_id"
 
@@ -25,6 +29,8 @@ echo "Target resource group: $projectResourceGroup"
 # Ultra mode: deleteAllForProject does everything from deleteAllServicesForProject PLUS deletes the project resource group itself
 # Safety flag: deleteKeyvaultAlso (default false) preserves the project Key Vault when deleteAllServicesForProject=true.
 #              Set to true to also delete the Key Vault (e.g. for a full teardown).
+# AIF_DELETE_PRESERVE_FOUNDATION retains the legacy GHA services-only foundation/network boundary.
+# Explicit deleteAllForProject=true overrides both retention flags.
 # Normalize to lowercase because ADO serializes unquoted YAML booleans as "True"/"False" (capital T/F)
 # and all bash comparisons in this script use lowercase "true"/"false"
 enableDeleteForDisabledResources=$(echo "${enableDeleteForDisabledResources:-false}" | tr '[:upper:]' '[:lower:]')
@@ -63,8 +69,74 @@ if [ "$enableDeleteForDisabledResources" != "true" ] && \
   echo "   Skipping all resource deletion - nothing will be removed."
   exit 0
 fi
+if [ "$deleteAllForProject" = "true" ]; then
+  deleteAllServicesForProject=true
+  deleteKeyvaultAlso=true
+fi
+
+preserve_foundation=$(echo "${AIF_DELETE_PRESERVE_FOUNDATION:-false}" | tr '[:upper:]' '[:lower:]')
+case "$preserve_foundation" in
+  true|false) ;;
+  *) echo "AIF_DELETE_PRESERVE_FOUNDATION must be true or false." >&2; exit 1 ;;
+esac
+if [ "$deleteAllForProject" = "true" ]; then
+  preserve_foundation=false
+fi
+
+deletion_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if command -v cygpath >/dev/null 2>&1; then
+  deletion_script_dir="$(cygpath -m "$deletion_script_dir")"
+fi
+aif_delete() {
+  local -a options=(
+    --subscription "$dev_test_prod_sub_id"
+    --resource-group "$projectResourceGroup"
+    --timeout-seconds "${AIF_DELETE_TIMEOUT_SECONDS:-1800}"
+    --poll-seconds "${AIF_DELETE_POLL_SECONDS:-15}"
+  )
+  if [ -n "${AIF_DELETE_REPORT_DIR:-}" ]; then
+    options+=(--report-dir "$AIF_DELETE_REPORT_DIR")
+  fi
+  python "$deletion_script_dir/project-deletion.py" "${options[@]}" "$@"
+}
+
+aif_delete_exit() {
+  local result="$1"
+  trap - EXIT
+  if [ -n "${AIF_DELETE_REPORT_DIR:-}" ]; then
+    if ! python - "$AIF_DELETE_REPORT_DIR" "$result" "$dev_test_prod_sub_id" "$projectResourceGroup" "$deleteAllForProject" <<'PY'
+import json
+import os
+from pathlib import Path
+import sys
+
+directory = Path(sys.argv[1])
+directory.mkdir(parents=True, exist_ok=True)
+document = {
+    "status": "succeeded" if sys.argv[2] == "0" else "failed",
+    "exitCode": int(sys.argv[2]),
+    "subscription": sys.argv[3],
+    "resourceGroup": sys.argv[4],
+    "fullProjectDeletion": sys.argv[5] == "true",
+}
+target = directory / "deletion-result.json"
+pending = target.with_suffix(".tmp")
+pending.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+os.replace(pending, target)
+PY
+    then
+      echo "Failed to write deletion outcome report." >&2
+      [ "$result" -ne 0 ] || result=1
+    fi
+  fi
+  exit "$result"
+}
+trap 'aif_delete_exit $?' EXIT
+
 if [ "$deleteAllServicesForProject" = "true" ]; then
-  if [ "$deleteKeyvaultAlso" = "true" ]; then
+  if [ "$preserve_foundation" = "true" ]; then
+    echo "Services-only cleanup: preserving foundation resources and common networking."
+  elif [ "$deleteKeyvaultAlso" = "true" ]; then
     echo "🔥 deleteAllServicesForProject=true + deleteKeyvaultAlso=true: EVERYTHING will be deleted including KeyVault, Storage, AppInsights, and networking resources in common RG"
   else
     echo "🔥 deleteAllServicesForProject=true (deleteKeyvaultAlso=false): EVERYTHING will be deleted EXCEPT KeyVault (Storage, AppInsights, and networking resources in common RG are deleted)"
@@ -181,6 +253,65 @@ delete_private_endpoints() {
       fi
     done <<< "$nic_list"
   fi
+}
+
+aif_service_may_exist() {
+  [ "${1,,}" = "true" ] || [ "$deleteAllServicesForProject" = "true" ]
+}
+
+declare -A aif_deleted_names
+record_deleted_resource() {
+  local variable="$1" name="$2" names_json
+  aif_deleted_names["$variable"]+="${name}"$'\n'
+  names_json=$(printf '%s' "${aif_deleted_names[$variable]}" | python -c \
+    'import json,sys; print(json.dumps(list(dict.fromkeys(sys.stdin.read().splitlines()))))')
+  echo "##vso[task.setvariable variable=${variable}ActualName]${name}"
+  echo "##vso[task.setvariable variable=${variable}Deleted]true"
+  echo "##vso[task.setvariable variable=${variable}DeletedNames]${names_json}"
+}
+
+delete_arm_services() {
+  local resource_type="$1" label="$2" actual_name_variable="$3" resource_names resource_name
+  shift 3
+  resource_names=$(aif_delete names --resource-type "$resource_type" "$@") || return $?
+  if [ -z "$resource_names" ]; then
+    echo "No matching $label resources remain in $projectResourceGroup."
+    return 0
+  fi
+  while IFS= read -r resource_name; do
+    [ -n "$resource_name" ] || continue
+    delete_private_endpoints "$resource_name" "$label"
+    aif_delete resource --resource-type "$resource_type" --name "$resource_name" || return $?
+    if [ -n "$actual_name_variable" ]; then
+      record_deleted_resource "${actual_name_variable%ActualName}" "$resource_name"
+    fi
+    echo "Confirmed deleted $label: $resource_name"
+  done <<< "$resource_names"
+}
+
+delete_orphan_service_endpoints() {
+  local prefix="$1" service_type="$2" endpoints endpoint parent state nics nic
+  endpoints=$(aif_delete names --resource-type "Microsoft.Network/privateEndpoints" --prefix "$prefix") || return $?
+  while IFS= read -r endpoint; do
+    [[ "$endpoint" == *-pend ]] || continue
+    parent="${endpoint%-pend}"
+    state=$(aif_delete state --resource-type "$service_type" --name "$parent") || return $?
+    if [ "$state" = "absent" ]; then
+      aif_delete resource --resource-type "Microsoft.Network/privateEndpoints" --name "$endpoint" || return $?
+    fi
+  done <<< "$endpoints"
+  nics=$(aif_delete names --resource-type "Microsoft.Network/networkInterfaces" --prefix "$prefix") || return $?
+  while IFS= read -r nic; do
+    [[ "$nic" == *-pend-nic ]] || continue
+    endpoint="${nic%-nic}"
+    parent="${endpoint%-pend}"
+    state=$(aif_delete state --resource-type "$service_type" --name "$parent") || return $?
+    [ "$state" = "absent" ] || continue
+    state=$(aif_delete state --resource-type "Microsoft.Network/privateEndpoints" --name "$endpoint") || return $?
+    if [ "$state" = "absent" ]; then
+      aif_delete resource --resource-type "Microsoft.Network/networkInterfaces" --name "$nic" || return $?
+    fi
+  done <<< "$nics"
 }
 
 # Function to delete storage account private endpoints
@@ -333,7 +464,7 @@ else
   skip_aisearch_deletion=false
 fi
 
-if [ "$skip_aisearch_deletion" = "false" ] && [ "$enableAISearch" = "false" ] && [ "$addAISearch" = "false" ] && [ "$aiSearchExists" = "true" ]; then
+if [ "$skip_aisearch_deletion" = "false" ] && [ "$enableAISearch" = "false" ] && [ "$addAISearch" = "false" ] && aif_service_may_exist "$aiSearchExists"; then
   echo "✓ AI Search is disabled but exists - proceeding with deletion"
   
   # Find AI Search resource
@@ -500,7 +631,7 @@ else
   skip_cosmosdb_deletion=false
 fi
 
-if [ "$skip_cosmosdb_deletion" = "false" ] && [ "$enableCosmosDB" = "false" ] && [ "$cosmosDBExists" = "true" ]; then
+if [ "$skip_cosmosdb_deletion" = "false" ] && [ "$enableCosmosDB" = "false" ] && aif_service_may_exist "$cosmosDBExists"; then
   echo "✓ Cosmos DB is disabled but exists - proceeding with deletion"
   
   cosmosDBName="cosmos-${projectName}-${locationSuffix}-${envName}"
@@ -557,7 +688,7 @@ echo "enableWebApp: $enableWebApp"
 echo "webAppExists: $webAppExists"
 echo "byoASEv3: $byoASEv3Val"
 
-if [ "$enableWebApp" = "false" ] && [ "$webAppExists" = "true" ]; then
+if [ "$enableWebApp" = "false" ] && aif_service_may_exist "$webAppExists"; then
   echo "✓ Web App is disabled but exists - proceeding with full deletion (pends, NICs, plan, app)"
   
   webAppName="webapp-${projectName}-${locationSuffix}-${envName}"
@@ -668,7 +799,7 @@ echo "enableFunction: $enableFunction"
 echo "functionAppExists: $functionAppExists"
 echo "byoASEv3: $byoASEv3Val"
 
-if [ "$enableFunction" = "false" ] && [ "$functionAppExists" = "true" ]; then
+if [ "$enableFunction" = "false" ] && aif_service_may_exist "$functionAppExists"; then
   echo "✓ Function App is disabled but exists - proceeding with full deletion (pends, NICs, plan, app)"
   
   functionAppName="func-${projectName}-${locationSuffix}-${envName}"
@@ -803,7 +934,7 @@ echo "containerAppWExists: $containerAppWExists"
 
 if [ "$enableContainerApps" = "false" ]; then
   # Delete Container App A
-  if [ "$containerAppAExists" = "true" ]; then
+  if aif_service_may_exist "$containerAppAExists"; then
     echo "✓ Container App A is disabled but exists - proceeding with deletion"
     
     containerAppAName="aca-a-${projectName}${locationSuffix}${envName}"
@@ -833,7 +964,7 @@ if [ "$enableContainerApps" = "false" ]; then
   fi
   
   # Delete Container App W
-  if [ "$containerAppWExists" = "true" ]; then
+  if aif_service_may_exist "$containerAppWExists"; then
     echo "✓ Container App W is disabled but exists - proceeding with deletion"
     
     containerAppWName="aca-w-${projectName}${locationSuffix}${envName}"
@@ -879,7 +1010,7 @@ echo "--- Container Apps Environment ---"
 echo "enableContainerApps: $enableContainerApps"
 echo "containerAppsEnvExists: $containerAppsEnvExists"
 
-if [ "$enableContainerApps" = "false" ] && [ "$containerAppsEnvExists" = "true" ]; then
+if [ "$enableContainerApps" = "false" ] && aif_service_may_exist "$containerAppsEnvExists"; then
   echo "✓ Container Apps Env is no longer needed - proceeding with deletion"
 
   acaEnvName="aca-env-${projectName}-${locationSuffix}-${envName}"
@@ -952,7 +1083,7 @@ echo "--- Logic Apps ---"
 echo "enableLogicApps: $enableLogicApps"
 echo "logicAppsExists: $logicAppsExists"
 
-if [ "$enableLogicApps" = "false" ] && [ "$logicAppsExists" = "true" ]; then
+if [ "$enableLogicApps" = "false" ] && aif_service_may_exist "$logicAppsExists"; then
   echo "✓ Logic Apps is disabled but exists - proceeding with deletion"
   
   logicAppName="logic-${projectName}-${locationSuffix}-${envName}"
@@ -1005,7 +1136,7 @@ echo "--- Event Hubs ---"
 echo "enableEventHubs: $enableEventHubs"
 echo "eventHubsExists: $eventHubsExists"
 
-if [ "$enableEventHubs" = "false" ] && [ "$eventHubsExists" = "true" ]; then
+if [ "$enableEventHubs" = "false" ] && aif_service_may_exist "$eventHubsExists"; then
   echo "✓ Event Hubs is disabled but exists - proceeding with deletion"
   
   eventHubName="eh-${projectNumber}-${locationSuffix}-${envName}"
@@ -1056,7 +1187,7 @@ echo "--- PostgreSQL ---"
 echo "enablePostgreSQL: $enablePostgreSQL"
 echo "postgreSQLExists: $postgreSQLExists"
 
-if [ "$enablePostgreSQL" = "false" ] && [ "$postgreSQLExists" = "true" ]; then
+if [ "$enablePostgreSQL" = "false" ] && aif_service_may_exist "$postgreSQLExists"; then
   echo "✓ PostgreSQL is disabled but exists - proceeding with deletion"
   
   postgresName="pg-flex-${projectName}-${locationSuffix}-${envName}"
@@ -1108,7 +1239,7 @@ echo "--- Redis Cache ---"
 echo "enableRedisCache: $enableRedisCache"
 echo "redisExists: $redisExists"
 
-if [ "$enableRedisCache" = "false" ] && [ "$redisExists" = "true" ]; then
+if [ "$enableRedisCache" = "false" ] && aif_service_may_exist "$redisExists"; then
   echo "✓ Redis Cache is disabled but exists - proceeding with deletion"
   
   redisName="redis-${projectName}-${locationSuffix}-${envName}"
@@ -1162,7 +1293,7 @@ echo "enableSQLDatabase: $enableSQLDatabase"
 echo "sqlServerExists: $sqlServerExists"
 echo "sqlDBExists: $sqlDBExists"
 
-if [ "$enableSQLDatabase" = "false" ] && [ "$sqlServerExists" = "true" ]; then
+if [ "$enableSQLDatabase" = "false" ] && aif_service_may_exist "$sqlServerExists"; then
   echo "✓ SQL Database is disabled but exists - proceeding with deletion"
   
   sqlServerName="sql-${projectName}-${locationSuffix}-${envName}"
@@ -1229,8 +1360,8 @@ fi
 # =============================================================================
 # DATABRICKS - Delete if disabled and exists
 # =============================================================================
-enableDatabricks="$enableDatabricks"
-databricksExists="$databricksExists"
+enableDatabricks=$(echo "${enableDatabricks:-true}" | tr '[:upper:]' '[:lower:]')
+databricksExists="${databricksExists:-unknown}"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enableDatabricks="false"; fi
 
@@ -1239,41 +1370,12 @@ echo "--- Databricks ---"
 echo "enableDatabricks: $enableDatabricks"
 echo "databricksExists: $databricksExists"
 
-if [ "$enableDatabricks" = "false" ] && [ "$databricksExists" = "true" ]; then
-  echo "✓ Databricks is disabled but exists - proceeding with deletion"
-  
-  databricksName="dbx-${projectNumber}-${locationSuffix}-${envName}"
-  
-  dbx_name=$(az databricks workspace list \
-    --resource-group "$projectResourceGroup" \
-    --query "[?starts_with(name, '${databricksName}')].name" \
-    -o tsv | head -n1)
-  
-  if [ -n "$dbx_name" ]; then
-    echo "Found Databricks: $dbx_name"
-    
-    # Always attempt to delete private endpoints (fail silently if not found)
-    delete_private_endpoints "$dbx_name" "Databricks"
-    
-    echo "Deleting Databricks: $dbx_name"
-    az databricks workspace delete \
-      --resource-group "$projectResourceGroup" \
-      --name "$dbx_name" \
-      --yes 2>&1
-    
-    if [ $? -eq 0 ]; then
-      echo "✅ Successfully deleted Databricks"
-      echo "##vso[task.setvariable variable=databricksExists]false"
-    else
-      echo "❌ Failed to delete Databricks"
-    fi
-  else
-    echo "⚠️  Databricks not found with prefix: $databricksName"
-  fi
+if [ "$enableDatabricks" = "false" ]; then
+  delete_arm_services "Microsoft.Databricks/workspaces" "Databricks" "" \
+    --prefix "dbx-${projectNumber}-${locationSuffix}-${envName}"
+  echo "##vso[task.setvariable variable=databricksExists]false"
 elif [ "$enableDatabricks" = "true" ]; then
   echo "ℹ️  Databricks is enabled - skipping deletion"
-elif [ "$databricksExists" = "false" ]; then
-  echo "ℹ️  Databricks doesn't exist - skipping deletion"
 else
   echo "ℹ️  Conditions not met for Databricks deletion"
 fi
@@ -1285,7 +1387,7 @@ fi
 enableAIFoundryHub="$enableAIFoundryHub"
 aifProjectExists="$aifProjectExists"
 # Normalize to lowercase (ADO may pass unquoted booleans as "True")
-enableAIFoundryHub=$(echo "${enableAIFoundryHub:-false}" | tr '[:upper:]' '[:lower:]')
+enableAIFoundryHub=$(echo "${enableAIFoundryHub:-true}" | tr '[:upper:]' '[:lower:]')
 aifProjectExists=$(echo "${aifProjectExists:-false}" | tr '[:upper:]' '[:lower:]')
 if [ "$deleteAllServicesForProject" = "true" ]; then enableAIFoundryHub="false"; fi
 
@@ -1294,42 +1396,10 @@ echo "--- AI Foundry V1 Project (deleted before AI Hub) ---"
 echo "enableAIFoundryHub: $enableAIFoundryHub"
 echo "aifProjectExists: $aifProjectExists"
 
-if [ "$enableAIFoundryHub" = "false" ] && [ "$aifProjectExists" = "true" ]; then
-  echo "✓ AI Foundry V1 project exists - proceeding with deletion (will go to soft-delete)"
-
-  # Support both old naming (aif-p-) and new naming (ai-prj)
-  aifProjectName1="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
-  aifProjectName2="ai-prj${projectNumber}"
-
-  aif_proj_name=$(az ml workspace list \
-    --resource-group "$projectResourceGroup" \
-    --query "[?starts_with(name, '${aifProjectName1}') || starts_with(name, '${aifProjectName2}')].name" \
-    -o tsv 2>/dev/null | head -n1)
-
-  if [ -n "$aif_proj_name" ]; then
-    echo "Found AI Foundry V1 Project: $aif_proj_name"
-    echo "##vso[task.setvariable variable=aifProjectActualName]$aif_proj_name"
-    # Delete any ML endpoints before deleting the workspace
-    echo "Checking for ML endpoints in workspace: $aif_proj_name"
-    endpoint_list=$(az ml online-endpoint list --workspace-name "$aif_proj_name" --resource-group "$projectResourceGroup" --query "[].name" -o tsv 2>/dev/null || echo "")
-    if [ -n "$endpoint_list" ]; then
-      while IFS= read -r ep_name; do
-        if [ -n "$ep_name" ]; then
-          echo "  Deleting ML endpoint: $ep_name"
-          az ml online-endpoint delete --workspace-name "$aif_proj_name" --resource-group "$projectResourceGroup" --name "$ep_name" --yes 2>&1 || echo "  Warning: Failed to delete endpoint $ep_name"
-        fi
-      done <<< "$endpoint_list"
-    fi
-    
-    delete_private_endpoints "$aif_proj_name" "AI Foundry V1 Project"
-    echo "Deleting AI Foundry V1 Project: $aif_proj_name"
-    az ml workspace delete \
-      --resource-group "$projectResourceGroup" \
-      --name "$aif_proj_name" \
-      --yes 2>&1 && echo "✅ Deleted AI Foundry V1 Project (soft-deleted)" || echo "⚠️  Could not delete AI Foundry V1 Project"
-  else
-    echo "⚠️  AI Foundry V1 Project not found with prefixes: $aifProjectName1 or $aifProjectName2"
-  fi
+if [ "$enableAIFoundryHub" = "false" ]; then
+  delete_arm_services "Microsoft.MachineLearningServices/workspaces" "AI Foundry V1 Project" "aifProjectActualName" \
+    --prefix "aif-p-${projectNumber}-1-${locationSuffix}-${envName}" \
+    --prefix "ai-prj${projectNumber}"
 else
   echo "ℹ️  AI Foundry V1 Project skipped (enableAIFoundryHub=$enableAIFoundryHub, aifProjectExists=$aifProjectExists)"
 fi
@@ -1347,42 +1417,10 @@ echo "--- AI Hub (AI Foundry V1) ---"
 echo "enableAIFoundryHub: $enableAIFoundryHub"
 echo "aiHubExists: $aiHubExists"
 
-if [ "$enableAIFoundryHub" = "false" ] && [ "$aiHubExists" = "true" ]; then
-  echo "✓ AI Hub exists - proceeding with deletion (will go to soft-delete)"
-
-  # Support both old naming (aif-hub-) and new naming (ai-hub-prj)
-  aiHubName1="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
-  aiHubName2="ai-hub-prj${projectNumber}"
-
-  ai_hub_name=$(az ml workspace list \
-    --resource-group "$projectResourceGroup" \
-    --query "[?starts_with(name, '${aiHubName1}') || starts_with(name, '${aiHubName2}')].name" \
-    -o tsv 2>/dev/null | head -n1)
-
-  if [ -n "$ai_hub_name" ]; then
-    echo "Found AI Hub: $ai_hub_name"
-    echo "##vso[task.setvariable variable=aiHubActualName]$ai_hub_name"
-    # Delete any ML endpoints before deleting the hub
-    echo "Checking for ML endpoints in hub: $ai_hub_name"
-    endpoint_list=$(az ml online-endpoint list --workspace-name "$ai_hub_name" --resource-group "$projectResourceGroup" --query "[].name" -o tsv 2>/dev/null || echo "")
-    if [ -n "$endpoint_list" ]; then
-      while IFS= read -r ep_name; do
-        if [ -n "$ep_name" ]; then
-          echo "  Deleting ML endpoint: $ep_name"
-          az ml online-endpoint delete --workspace-name "$ai_hub_name" --resource-group "$projectResourceGroup" --name "$ep_name" --yes 2>&1 || echo "  Warning: Failed to delete endpoint $ep_name"
-        fi
-      done <<< "$endpoint_list"
-    fi
-    
-    delete_private_endpoints "$ai_hub_name" "AI Hub"
-    echo "Deleting AI Hub: $ai_hub_name (soft-delete, purge by 04_Purge_SoftDeleted)"
-    az ml workspace delete \
-      --resource-group "$projectResourceGroup" \
-      --name "$ai_hub_name" \
-      --yes 2>&1 && echo "✅ Deleted AI Hub (soft-deleted)" || echo "⚠️  Could not delete AI Hub"
-  else
-    echo "⚠️  AI Hub not found with prefixes: $aiHubName1 or $aiHubName2"
-  fi
+if [ "$enableAIFoundryHub" = "false" ]; then
+  delete_arm_services "Microsoft.MachineLearningServices/workspaces" "AI Hub" "aiHubActualName" \
+    --prefix "aif-hub-${projectNumber}-${locationSuffix}-${envName}" \
+    --prefix "ai-hub-prj${projectNumber}"
 else
   echo "ℹ️  AI Hub skipped (enableAIFoundryHub=$enableAIFoundryHub, aiHubExists=$aiHubExists)"
 fi
@@ -1402,19 +1440,23 @@ echo "--- AI Foundry V2 Account ---"
 echo "enableAIFoundry: $enableAIFoundry"
 echo "aiFoundryV2Exists: $aiFoundryV2Exists"
 
-if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
+if [ "$enableAIFoundry" = "false" ]; then
   echo "✓ AI Foundry V2 account exists - proceeding with deletion (will go to soft-delete)"
 
   aiFoundryV2Prefix="aif2"
 
-  aif2_name=$(az resource list \
-    --resource-group "$projectResourceGroup" \
-    --resource-type "Microsoft.CognitiveServices/accounts" \
-    --query "[?starts_with(name, '${aiFoundryV2Prefix}')].name" \
-    -o tsv 2>/dev/null | head -n1)
+  aif2_names=$(aif_delete names --resource-type "Microsoft.CognitiveServices/accounts" \
+    --prefix "$aiFoundryV2Prefix")
 
-  if [ -n "$aif2_name" ]; then
+  while IFS= read -r aif2_name; do
+    [ -n "$aif2_name" ] || continue
     echo "Found AI Foundry V2 account: $aif2_name"
+    aif2_state=$(aif_delete state --resource-type "Microsoft.CognitiveServices/accounts" --name "$aif2_name")
+    if [ "$aif2_state" = "deleting" ] || [ "$aif2_state" = "absent" ]; then
+      aif_delete resource --resource-type "Microsoft.CognitiveServices/accounts" --name "$aif2_name"
+      record_deleted_resource aiFoundryV2 "$aif2_name"
+      continue
+    fi
 
     # --- PREREQUISITE: Delete capability hosts BEFORE account/projects ---
     # Per Microsoft guidance: "Before deleting an Account, delete the associated Account Capability Host.
@@ -1540,12 +1582,10 @@ if [ "$enableAIFoundry" = "false" ] && [ "$aiFoundryV2Exists" = "true" ]; then
 
     delete_private_endpoints "$aif2_name" "AI Foundry V2"
     echo "Deleting AI Foundry V2 account: $aif2_name (soft-delete, purge by 04_Purge_SoftDeleted)"
-    az cognitiveservices account delete \
-      --resource-group "$projectResourceGroup" \
-      --name "$aif2_name" 2>&1 && echo "✅ Deleted AI Foundry V2 (soft-deleted)" || echo "⚠️  Could not delete AI Foundry V2"
-  else
-    echo "⚠️  AI Foundry V2 account not found with prefix: $aiFoundryV2Prefix"
-  fi
+    aif_delete resource --resource-type "Microsoft.CognitiveServices/accounts" --name "$aif2_name"
+    record_deleted_resource aiFoundryV2 "$aif2_name"
+    echo "Confirmed AI Foundry V2 account deletion: $aif2_name"
+  done <<< "$aif2_names"
 else
   echo "ℹ️  AI Foundry V2 skipped (enableAIFoundry=$enableAIFoundry, aiFoundryV2Exists=$aiFoundryV2Exists)"
 fi
@@ -1556,7 +1596,7 @@ fi
 # =============================================================================
 enableAIServices="$enableAIServices"
 aiServicesExists="$aiServicesExists"
-enableAIServices=$(echo "${enableAIServices:-false}" | tr '[:upper:]' '[:lower:]')
+enableAIServices=$(echo "${enableAIServices:-true}" | tr '[:upper:]' '[:lower:]')
 aiServicesExists=$(echo "${aiServicesExists:-false}" | tr '[:upper:]' '[:lower:]')
 if [ "$deleteAllServicesForProject" = "true" ]; then enableAIServices="false"; fi
 
@@ -1565,27 +1605,9 @@ echo "--- AI Services Account ---"
 echo "enableAIServices: $enableAIServices"
 echo "aiServicesExists: $aiServicesExists"
 
-if [ "$enableAIServices" = "false" ] && [ "$aiServicesExists" = "true" ]; then
-  echo "✓ AI Services account exists - proceeding with deletion (will go to soft-delete)"
-
-  aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
-
-  aisvc_name=$(az resource list \
-    --resource-group "$projectResourceGroup" \
-    --resource-type "Microsoft.CognitiveServices/accounts" \
-    --query "[?starts_with(name, '${aiServicesPrefix}')].name" \
-    -o tsv 2>/dev/null | head -n1)
-
-  if [ -n "$aisvc_name" ]; then
-    echo "Found AI Services account: $aisvc_name"
-    delete_private_endpoints "$aisvc_name" "AI Services"
-    echo "Deleting AI Services account: $aisvc_name (soft-delete, purge by 04_Purge_SoftDeleted)"
-    az cognitiveservices account delete \
-      --resource-group "$projectResourceGroup" \
-      --name "$aisvc_name" 2>&1 && echo "✅ Deleted AI Services (soft-deleted)" || echo "⚠️  Could not delete AI Services"
-  else
-    echo "⚠️  AI Services account not found with prefix: $aiServicesPrefix"
-  fi
+if [ "$enableAIServices" = "false" ]; then
+  delete_arm_services "Microsoft.CognitiveServices/accounts" "AI Services" "aiServicesActualName" \
+    --prefix "aiservices${projectName}${locationSuffix}${envName}"
 else
   echo "ℹ️  AI Services skipped (enableAIServices=$enableAIServices, aiServicesExists=$aiServicesExists)"
 fi
@@ -1596,7 +1618,7 @@ fi
 # =============================================================================
 enableAzureOpenAI="$enableAzureOpenAI"
 openaiExists="$openaiExists"
-enableAzureOpenAI=$(echo "${enableAzureOpenAI:-false}" | tr '[:upper:]' '[:lower:]')
+enableAzureOpenAI=$(echo "${enableAzureOpenAI:-true}" | tr '[:upper:]' '[:lower:]')
 openaiExists=$(echo "${openaiExists:-false}" | tr '[:upper:]' '[:lower:]')
 if [ "$deleteAllServicesForProject" = "true" ]; then enableAzureOpenAI="false"; fi
 
@@ -1605,27 +1627,9 @@ echo "--- Azure OpenAI ---"
 echo "enableAzureOpenAI: $enableAzureOpenAI"
 echo "openaiExists: $openaiExists"
 
-if [ "$enableAzureOpenAI" = "false" ] && [ "$openaiExists" = "true" ]; then
-  echo "✓ Azure OpenAI account exists - proceeding with deletion (will go to soft-delete)"
-
-  openaiName="aoai-${projectName}-${locationSuffix}-${envName}"
-
-  aoai_name=$(az resource list \
-    --resource-group "$projectResourceGroup" \
-    --resource-type "Microsoft.CognitiveServices/accounts" \
-    --query "[?starts_with(name, '${openaiName}')].name" \
-    -o tsv 2>/dev/null | head -n1)
-
-  if [ -n "$aoai_name" ]; then
-    echo "Found Azure OpenAI account: $aoai_name"
-    delete_private_endpoints "$aoai_name" "Azure OpenAI"
-    echo "Deleting Azure OpenAI account: $aoai_name (soft-delete, purge by 04_Purge_SoftDeleted)"
-    az cognitiveservices account delete \
-      --resource-group "$projectResourceGroup" \
-      --name "$aoai_name" 2>&1 && echo "✅ Deleted Azure OpenAI (soft-deleted)" || echo "⚠️  Could not delete Azure OpenAI"
-  else
-    echo "⚠️  Azure OpenAI account not found with prefix: $openaiName"
-  fi
+if [ "$enableAzureOpenAI" = "false" ]; then
+  delete_arm_services "Microsoft.CognitiveServices/accounts" "Azure OpenAI" "openaiActualName" \
+    --prefix "aoai-${projectName}-${locationSuffix}-${envName}"
 else
   echo "ℹ️  Azure OpenAI skipped (enableAzureOpenAI=$enableAzureOpenAI, openaiExists=$openaiExists)"
 fi
@@ -1645,7 +1649,7 @@ echo "--- AKS for Azure ML (deleted before AML) ---"
 echo "enableAksForAzureML: $enableAksForAzureML"
 echo "aksExists: $aksExists"
 
-if [ "$enableAksForAzureML" = "false" ] && [ "$aksExists" = "true" ]; then
+if [ "$enableAksForAzureML" = "false" ] && aif_service_may_exist "$aksExists"; then
   echo "✓ AKS for Azure ML is disabled but exists - proceeding with deletion"
 
   aksName="aks${projectNumber}-${locationSuffix}-${envName}"
@@ -1686,54 +1690,13 @@ echo "--- Azure Machine Learning ---"
 echo "enableAzureMachineLearning: $enableAzureMachineLearning"
 echo "amlExists: $amlExists"
 
-if [ "$enableAzureMachineLearning" = "false" ] && [ "$amlExists" = "true" ]; then
-  echo "✓ Azure ML is disabled but exists - proceeding with deletion"
-
-  amlName="aml-${projectNumber}-${locationSuffix}-${envName}"
-
-  aml_name=$(az ml workspace list \
-    --resource-group "$projectResourceGroup" \
-    --query "[?starts_with(name, '${amlName}')].name" \
-    -o tsv | head -n1)
-
-  if [ -n "$aml_name" ]; then
-    echo "Found Azure ML workspace: $aml_name"
-    echo "##vso[task.setvariable variable=amlActualName]$aml_name"
-
-    # Delete any ML endpoints before deleting the workspace
-    echo "Checking for ML endpoints in workspace: $aml_name"
-    endpoint_list=$(az ml online-endpoint list --workspace-name "$aml_name" --resource-group "$projectResourceGroup" --query "[].name" -o tsv 2>/dev/null || echo "")
-    if [ -n "$endpoint_list" ]; then
-      while IFS= read -r ep_name; do
-        if [ -n "$ep_name" ]; then
-          echo "  Deleting ML endpoint: $ep_name"
-          az ml online-endpoint delete --workspace-name "$aml_name" --resource-group "$projectResourceGroup" --name "$ep_name" --yes 2>&1 || echo "  Warning: Failed to delete endpoint $ep_name"
-        fi
-      done <<< "$endpoint_list"
-    fi
-
-    # Always attempt to delete private endpoints (fail silently if not found)
-    delete_private_endpoints "$aml_name" "Azure ML"
-
-    echo "Deleting Azure ML workspace: $aml_name"
-    az ml workspace delete \
-      --resource-group "$projectResourceGroup" \
-      --name "$aml_name" \
-      --yes 2>&1
-
-    if [ $? -eq 0 ]; then
-      echo "✅ Successfully deleted Azure ML workspace"
-      echo "##vso[task.setvariable variable=amlExists]false"
-    else
-      echo "❌ Failed to delete Azure ML workspace"
-    fi
-  else
-    echo "⚠️  Azure ML workspace not found with prefix: $amlName"
-  fi
+enableAzureMachineLearning=$(echo "${enableAzureMachineLearning:-true}" | tr '[:upper:]' '[:lower:]')
+if [ "$enableAzureMachineLearning" = "false" ]; then
+  delete_arm_services "Microsoft.MachineLearningServices/workspaces" "Azure ML" "amlActualName" \
+    --prefix "aml-${projectNumber}-${locationSuffix}-${envName}"
+  echo "##vso[task.setvariable variable=amlExists]false"
 elif [ "$enableAzureMachineLearning" = "true" ]; then
   echo "ℹ️  Azure Machine Learning is enabled - skipping deletion"
-elif [ "$amlExists" = "false" ]; then
-  echo "ℹ️  Azure ML doesn't exist - skipping deletion"
 else
   echo "ℹ️  Conditions not met for Azure ML deletion"
 fi
@@ -1741,7 +1704,7 @@ fi
 # =============================================================================
 # DATA FACTORY - Delete if disabled and exists
 # =============================================================================
-enableDatafactory="$enableDatafactory"
+enableDatafactory=$(echo "${enableDatafactory:-true}" | tr '[:upper:]' '[:lower:]')
 dataFactoryExists="$dataFactoryExists"
 # When deleteAllServicesForProject=true, override enable_ flag
 if [ "$deleteAllServicesForProject" = "true" ]; then enableDatafactory="false"; fi
@@ -1751,41 +1714,12 @@ echo "--- Data Factory ---"
 echo "enableDatafactory: $enableDatafactory"
 echo "dataFactoryExists: $dataFactoryExists"
 
-if [ "$enableDatafactory" = "false" ] && [ "$dataFactoryExists" = "true" ]; then
-  echo "✓ Data Factory is disabled but exists - proceeding with deletion"
-  
-  adfName="adf-${projectNumber}-${locationSuffix}-${envName}"
-  
-  adf_name=$(az datafactory list \
-    --resource-group "$projectResourceGroup" \
-    --query "[?starts_with(name, '${adfName}')].name" \
-    -o tsv | head -n1)
-  
-  if [ -n "$adf_name" ]; then
-    echo "Found Data Factory: $adf_name"
-    
-    # Always attempt to delete private endpoints (fail silently if not found)
-    delete_private_endpoints "$adf_name" "Data Factory"
-    
-    echo "Deleting Data Factory: $adf_name"
-    az datafactory delete \
-      --resource-group "$projectResourceGroup" \
-      --name "$adf_name" \
-      --yes 2>&1
-    
-    if [ $? -eq 0 ]; then
-      echo "✅ Successfully deleted Data Factory"
-      echo "##vso[task.setvariable variable=dataFactoryExists]false"
-    else
-      echo "❌ Failed to delete Data Factory"
-    fi
-  else
-    echo "⚠️  Data Factory not found with prefix: $adfName"
-  fi
+if [ "$enableDatafactory" = "false" ]; then
+  delete_arm_services "Microsoft.DataFactory/factories" "Data Factory" "" \
+    --prefix "adf-${projectNumber}-${locationSuffix}-${envName}"
+  echo "##vso[task.setvariable variable=dataFactoryExists]false"
 elif [ "$enableDatafactory" = "true" ]; then
   echo "ℹ️  Data Factory is enabled - skipping deletion"
-elif [ "$dataFactoryExists" = "false" ]; then
-  echo "ℹ️  Data Factory doesn't exist - skipping deletion"
 else
   echo "ℹ️  Conditions not met for Data Factory deletion"
 fi
@@ -1803,7 +1737,7 @@ echo "--- Bot Service ---"
 echo "enableBotService: $enableBotService"
 echo "botServiceExists: $botServiceExists"
 
-if [ "$enableBotService" = "false" ] && [ "$botServiceExists" = "true" ]; then
+if [ "$enableBotService" = "false" ] && aif_service_may_exist "$botServiceExists"; then
   echo "✓ Bot Service is disabled but exists - proceeding with deletion"
 
   botServiceName="bot-${projectNumber}-${locationSuffix}-${envName}"
@@ -1880,7 +1814,7 @@ echo "--- VM / DSVM ---"
 echo "vmExists: $vmExists"
 echo "deleteAllServicesForProject: $deleteAllServicesForProject"
 
-if [ "$deleteAllServicesForProject" = "true" ] && [ "$vmExists" = "true" ]; then
+if [ "$deleteAllServicesForProject" = "true" ] && [ "$preserve_foundation" != "true" ]; then
   echo "✓ deleteAllServicesForProject=true and VM exists - proceeding with deletion"
 
   vmName="dsvm-${projectName}-${locationSuffix}-${envName}"
@@ -1922,7 +1856,7 @@ echo "--- ACR Project ---"
 echo "acrProjectExists: $acrProjectExists"
 echo "deleteAllServicesForProject: $deleteAllServicesForProject"
 
-if [ "$deleteAllServicesForProject" = "true" ] && [ "$acrProjectExists" = "true" ]; then
+if [ "$deleteAllServicesForProject" = "true" ] && [ "$preserve_foundation" != "true" ]; then
   echo "✓ deleteAllServicesForProject=true and ACR project exists - proceeding with deletion"
 
   acrName="acr${projectName}genai${locationSuffix}"
@@ -1969,7 +1903,7 @@ echo "--- Bing Search ---"
 echo "enableBing: $enableBing"
 echo "bingExists: $bingExists"
 
-if [ "$enableBing" = "false" ] && [ "$bingExists" = "true" ]; then
+if [ "$enableBing" = "false" ] && aif_service_may_exist "$bingExists"; then
   echo "✓ Bing Search is disabled but exists - proceeding with deletion"
   
   bingName="bing-${projectName}-${locationSuffix}-${envName}"
@@ -2239,11 +2173,17 @@ echo ""
 echo "=== Standard deletion completed ==="
 
 # =============================================================================
+# Retain GHA's service-owned orphan cleanup even when foundation resources are preserved.
+if [ "$preserve_foundation" = "true" ]; then
+  delete_orphan_service_endpoints "aif2" "Microsoft.CognitiveServices/accounts"
+  delete_orphan_service_endpoints "aisearch" "Microsoft.Search/searchServices"
+fi
+
 # COMPLETE DELETE MODE: deleteAllServicesForProject=true OR deleteAllForProject=true
 # Delete everything remaining in project RG + networking resources in common RG
 # =============================================================================
 
-if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "true" ]; then
+if { [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "true" ]; } && [ "$preserve_foundation" != "true" ]; then
   echo ""
   echo "🔥🔥🔥 ======================================== 🔥🔥🔥"
   if [ "$deleteAllForProject" = "true" ]; then
@@ -2431,21 +2371,7 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   # Step 2: Delete Application Insights
   echo ""
   echo "=== Step 2: Deleting Application Insights (all in resource group) ==="
-  # Use 'az resource list' as the primary query — it doesn't require the application-insights CLI
-  # extension and reliably surfaces both classic and workspace-based AI components.
-  app_insights=$(az resource list \
-    --resource-group "$projectResourceGroup" \
-    --resource-type "microsoft.insights/components" \
-    --query "[].name" \
-    -o tsv 2>/dev/null | tr -d '\r' || echo "")
-
-  # Fallback to the extension-based list in case the resource provider query was filtered out
-  if [ -z "$app_insights" ]; then
-    app_insights=$(az monitor app-insights component list \
-      --resource-group "$projectResourceGroup" \
-      --query "[].name" \
-      -o tsv 2>/dev/null | tr -d '\r' || echo "")
-  fi
+  app_insights=$(aif_delete names --resource-type "Microsoft.Insights/components")
 
   if [ -n "$app_insights" ]; then
     ai_count=$(echo "$app_insights" | wc -l)
@@ -2454,27 +2380,8 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
     while IFS= read -r ai_name; do
       if [ -n "$ai_name" ]; then
         echo "  Deleting Application Insights: $ai_name"
-        # NOTE: 'az monitor app-insights component delete' requires the application-insights
-        # extension AND does NOT support --yes (it has no prompt, but rejects the flag).
-        # Use 'az resource delete' which is built-in, non-interactive, and works for both
-        # classic and workspace-based components.
-        if az resource delete \
-          --resource-group "$projectResourceGroup" \
-          --resource-type "microsoft.insights/components" \
-          --name "$ai_name" 2>&1; then
-          echo "    ✓ Successfully deleted: $ai_name"
-        else
-          echo "    ✗ Failed to delete: $ai_name"
-          # Try with REST API as fallback
-          subscriptionId=$(az account show --query id -o tsv | tr -d '\r')
-          echo "    Attempting REST API force delete for $ai_name..."
-          if az rest --method DELETE \
-            --url "https://management.azure.com/subscriptions/${subscriptionId}/resourceGroups/${projectResourceGroup}/providers/microsoft.insights/components/${ai_name}?api-version=2020-02-02" 2>&1; then
-            echo "    ✓ REST API delete succeeded: $ai_name"
-          else
-            echo "    ✗ REST API delete also failed: $ai_name"
-          fi
-        fi
+        aif_delete resource --resource-type "Microsoft.Insights/components" --name "$ai_name"
+        echo "Confirmed Application Insights deletion: $ai_name"
       fi
     done <<< "$app_insights"
     echo "✓ Application Insights deletion completed"
@@ -2485,19 +2392,13 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   # Step 3: Delete Dashboards
   echo ""
   echo "=== Step 3: Deleting Dashboards ==="
-  dashboards=$(az portal dashboard list \
-    --resource-group "$projectResourceGroup" \
-    --query "[].name" \
-    -o tsv 2>/dev/null || echo "")
+  dashboards=$(aif_delete names --resource-type "Microsoft.Portal/dashboards")
   
   if [ -n "$dashboards" ]; then
     while IFS= read -r dash_name; do
       if [ -n "$dash_name" ]; then
         echo "Deleting dashboard: $dash_name"
-        az portal dashboard delete \
-          --resource-group "$projectResourceGroup" \
-          --name "$dash_name" \
-          --yes 2>&1 || echo "  Warning: Failed to delete $dash_name"
+        aif_delete resource --resource-type "Microsoft.Portal/dashboards" --name "$dash_name"
       fi
     done <<< "$dashboards"
     echo "✓ Dashboards deleted"
@@ -2916,16 +2817,20 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
         local _rg="$1" _vn="$2" _label="$3"
         local _max=24 _i=0 _state=""
         while [ "$_i" -lt "$_max" ]; do
-          _state=$(az network vnet show -g "$_rg" -n "$_vn" --query "provisioningState" -o tsv 2>/dev/null || echo "")
-          if [ "$_state" = "Succeeded" ] || [ -z "$_state" ]; then
+          _state=$(az network vnet show -g "$_rg" -n "$_vn" --query "provisioningState" -o tsv) || return $?
+          _state="${_state//$'\r'/}"
+          if [ "$_state" = "Succeeded" ]; then
             return 0
           fi
-          # Updating / Deleting / Failed — back off
+          if [ -z "$_state" ] || [ "$_state" = "Failed" ]; then
+            echo "Cannot mutate VNet $_rg/$_vn after $_label: state='$_state'." >&2
+            return 1
+          fi
           sleep 5
           _i=$((_i + 1))
         done
-        echo "    (waited $((_max * 5))s for vnet idle after $_label; last state=$_state — proceeding anyway)"
-        return 0
+        echo "Timed out waiting for VNet $_rg/$_vn after $_label; last state=$_state." >&2
+        return 1
       }
 
       while IFS= read -r vnet_name; do
@@ -3235,12 +3140,6 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
             nsg_deleted=true
             break
           fi
-          # Check whether it's already gone (NotFound on the show)
-          if ! az network nsg show -g "$commonResourceGroup" -n "$nsg_name" >/dev/null 2>&1; then
-            echo "  ✓ NSG $nsg_name no longer present (attempt $attempt)"
-            nsg_deleted=true
-            break
-          fi
           echo "  Attempt $attempt failed for $nsg_name — backing off 20s and retrying"
           sleep 20
         done
@@ -3273,7 +3172,7 @@ if [ "$deleteAllServicesForProject" = "true" ] || [ "$deleteAllForProject" = "tr
   fi
   echo "🔥 ======================================== 🔥"
 else
-  echo "ℹ️  deleteAllServicesForProject not enabled - skipping complete cleanup"
+  echo "Foundation cleanup not requested or preservation enabled - retaining foundation and common networking."
 fi
 
 # =============================================================================
@@ -3293,32 +3192,15 @@ if [ "$deleteAllForProject" = "true" ]; then
   echo "⚠️  All resources within will be permanently removed."
   echo ""
   
-  # Check if resource group exists
-  rg_exists=$(az group exists --name "$projectResourceGroup" 2>/dev/null || echo "false")
-  
-  if [ "$rg_exists" = "true" ]; then
-    echo "Deleting resource group: $projectResourceGroup"
-    
-    if az group delete \
-      --name "$projectResourceGroup" \
-      --subscription "$dev_test_prod_sub_id" \
-      --yes \
-      --no-wait 2>&1; then
-      echo "✓ Resource group deletion initiated (running in background)"
-      echo "ℹ️  Resource group deletion may take several minutes to complete"
-      echo "ℹ️  Check Azure Portal or run 'az group show --name $projectResourceGroup' to verify"
-    else
-      echo "❌ Failed to initiate resource group deletion"
-      echo "⚠️  You may need to manually delete the resource group from Azure Portal"
-    fi
-  else
-    echo "ℹ️  Resource group does not exist or already deleted: $projectResourceGroup"
-  fi
+  aif_delete verify-network --network-resource-group "$commonResourceGroup" \
+    --project-number "$projectNumber"
+  aif_delete group --confirm-resource-group "$projectResourceGroup"
+  echo "##vso[task.setvariable variable=aifProjectGroupDeletionConfirmed]true"
   
   echo ""
   echo "💀 ======================================== 💀"
   echo "💀 ULTRA DELETE MODE COMPLETED"
-  echo "💀 Resource group deletion initiated"
+  echo "Resource group and project networking deletion confirmed."
   echo "💀 ======================================== 💀"
 fi
 

@@ -169,7 +169,7 @@ stages:
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
     # dynamic network parameters, resource detection, and salt) are re-created.
     - deployment: ESGenAI_Foundry
-      condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded'))
+      condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded'),ne(dependencies.ESGenAI_Services.outputs['ESGenAI_Services.deletionMode.skipFoundry'], 'true'))
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
@@ -308,7 +308,7 @@ stages:
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
     # dynamic network parameters, resource detection, and salt) are re-created.
     - deployment: ESGenAI_Foundry
-      condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded'))
+      condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded'),ne(dependencies.ESGenAI_Services.outputs['ESGenAI_Services.deletionMode.skipFoundry'], 'true'))
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
@@ -449,7 +449,7 @@ stages:
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
     # dynamic network parameters, resource detection, and salt) are re-created.
     - deployment: ESGenAI_Foundry
-      condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded'))
+      condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded'),ne(dependencies.ESGenAI_Services.outputs['ESGenAI_Services.deletionMode.skipFoundry'], 'true'))
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
