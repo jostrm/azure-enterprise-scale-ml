@@ -40,6 +40,15 @@ def test_existing_cluster_attachment_omits_creation_only_sizes():
     assert "(env == 'test' || env == 'prod') && !aksExists" in source
 
 
+def test_existing_cluster_attachment_does_not_rewrite_immutable_description():
+    source = (BICEP / "modules" / "machineLearningAks.bicep").read_text()
+    compute = source[source.index("resource machineLearningCompute "):]
+    common, creation = compute.split("...(!aksExists ? {", 1)
+    assert "description:" not in common
+    description = creation.split("} : {})", 1)[0]
+    assert "description: 'Serve model ONLINE inference on AKS powered webservice." in description
+
+
 def test_approved_aks_defaults_match_all_variable_templates():
     expected = {
         "admin_aks_gpu_sku_dev_override": "Standard_D4s_v5",

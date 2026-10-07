@@ -214,7 +214,9 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
   properties: {
     computeType: 'AKS'
     computeLocation: location
-    description: 'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
+    ...(!aksExists ? {
+      description: 'Serve model ONLINE inference on AKS powered webservice. Defaults: Dev=${aksVmSku_dev}. TestProd=${aksVmSku_testProd}'
+    } : {})
     resourceId: aksResourceId
     properties: union({
       clusterPurpose: env == 'dev' ? 'DevTest' : 'FastProd'
