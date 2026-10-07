@@ -25,6 +25,7 @@ AIF_DUAL_LAYOUT_LIBRARIES=(
   project_deployment.py
   project_environment.py
   registered_creation.py
+  registered_personas.py
   release_version.py
   release_version.sh
   runner-prerequisites.ps1

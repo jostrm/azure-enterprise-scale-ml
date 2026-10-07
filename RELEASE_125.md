@@ -17,6 +17,15 @@ This release builds on v1.24 and its v1.24.1 patch. It adds new application patt
 > [!IMPORTANT]
 > **Choose your target explicitly.** Some version defaults still point to v1.24. Source availability does not imply deployment in your tenant. Review the [upgrade checklist](#upgrade-checklist-and-compatibility-caveats) before adopting.
 
+> **Persona support clarification (5 October 2026).** The snapshot's "Entra group
+> personas" means group-principal RBAC support and legacy persona-labelled
+> configuration, not a complete nine-persona permission policy. The new opt-in
+> `groups-v1` implementation is a post-snapshot source change; it is not included
+> in the reviewed `1bd9020e` snapshot or implicitly available in installed
+> desktop/API packages. See the [evidence-backed persona specification](documentation/v2/20-29/25-personas-aifactory.md)
+> for its permission matrix, privileged seeding prerequisite, compatibility
+> changes, migration gates and live-authorization validation requirements.
+
 **Explore:** [At a glance](#at-a-glance) · [Documentation](#start-here-new-and-updated-documentation) · [Setup and lifecycle](#configure-and-deploy-with-more-control) · [Desktop and API](#operate-from-desktop-cli-or-api) · [Agents](#build-with-agent-factory) · [ML and data](#build-with-ml-model-factory) · [Monitoring](#see-usage-cost-and-model-health-in-context) · [Gateway and fixes](#strengthen-gateway-and-private-platform-operations) · [Upgrade](#upgrade-checklist-and-compatibility-caveats)
 
 ## At a glance

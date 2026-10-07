@@ -93,11 +93,11 @@ def serialize(value: Any, variable_name: str) -> str:
 
 
 def selected_values(config: dict[str, Any], environment: str) -> tuple[dict[str, str], str]:
-    supported_keys = {"dev", "stage_prod", "_wizard"}
+    supported_keys = {"dev", "stage_prod", "test", "prod", "_wizard"}
     unknown_keys = set(config).difference(supported_keys)
     if unknown_keys:
         fail(
-            "The root object supports only 'dev', 'stage_prod' and '_wizard'; found "
+            "The root object supports only 'dev', 'stage_prod', 'test', 'prod' and '_wizard'; found "
             + ", ".join(sorted(unknown_keys))
             + "."
         )
@@ -110,6 +110,10 @@ def selected_values(config: dict[str, Any], environment: str) -> tuple[dict[str,
     section = "stage_prod" if environment != "dev" and "stage_prod" in config else "dev"
     section_values = read_object(config.get(section, {}), section)
     values = {**dev_values, **section_values} if section == "stage_prod" else dev_values
+    exact_environment = "test" if environment == "stage" else environment
+    if exact_environment != "dev" and exact_environment in config:
+        values = {**values, **read_object(config[exact_environment], exact_environment)}
+        section = exact_environment
     serialized: dict[str, str] = {}
     for name, value in values.items():
         if name in METADATA_KEYS:
@@ -232,6 +236,25 @@ def main() -> None:
 
     environment = args.environment
     values, section = selected_values(read_object(config, "root"), environment)
+    if values.get("persona_access_mode", "legacy") == "groups-v1":
+        effective_environment = "test" if environment == "stage" else environment
+        values["dev_test_prod"] = effective_environment
+        for destination, source in (
+            ("dev_test_prod_sub_id", f"{effective_environment}_sub_id"),
+            ("admin_bicep_input_keyvault_subscription", f"{effective_environment}_admin_bicep_input_keyvault_subscription"),
+            ("admin_bicep_kv_fw_rg", f"{effective_environment}_admin_bicep_kv_fw_rg"),
+            ("admin_bicep_kv_fw", f"{effective_environment}_admin_bicep_kv_fw"),
+        ):
+            if source in values:
+                values[destination] = values[source]
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from personas.pipeline import configuration, safe_variables
+    try:
+        mode, manifest = configuration(values, environment, Path.cwd())
+        if manifest is not None:
+            values.update(safe_variables(values))
+    except (ValueError, OSError, KeyError) as error:
+        fail(str(error))
     network_environment_key = {
         "dev": "network_env_dev",
         "stage": "network_env_stage",

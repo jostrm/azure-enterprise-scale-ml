@@ -60,6 +60,9 @@ param common_subnet_name string
 param tags object
 @description('Specifies the project specific tags that should be applied to newly created resources')
 param projecttags object
+@description('Legacy ESML direct deployment only. For groups-v1 use infra-project-genai/infra-project with enableAzureMachineLearning=true and the mandatory personas/pipeline.py lifecycle; this template cannot safely grant the new model.')
+@allowed(['legacy'])
+param personaAccessMode string = contains(projecttags, 'AIF-Persona-Access') ? projecttags['AIF-Persona-Access'] : (contains(tags, 'AIF-Persona-Access') ? tags['AIF-Persona-Access'] : 'legacy')
 @description('Deployment location.')
 param location string
 @description('Such as "weu" or "swc" (swedencentral datacenter).Reflected in resource group and sub-resources')

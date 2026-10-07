@@ -598,10 +598,10 @@ def update_json(path: Path, values: dict[str, Any]) -> None:
         raise ValueError(f"{path}: dev must be an object")
     for key, value in values.items():
         dev[key] = value
-    for section in ("dev", "stage_prod"):
+    for section in ("dev", "stage_prod", "test", "prod"):
         if section in document:
             document[section].update(organization)
-    project_organization_values(*(document[key] for key in ("dev", "stage_prod") if key in document))
+    project_organization_values(*(document[key] for key in ("dev", "stage_prod", "test", "prod") if key in document))
     path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
 
@@ -705,9 +705,9 @@ def merge_json_template(template_path: Path, active_path: Path) -> None:
             return merged
         return active_value
 
-    organization = project_organization_values(*(active[key] for key in ("dev", "stage_prod") if key in active))
+    organization = project_organization_values(*(active[key] for key in ("dev", "stage_prod", "test", "prod") if key in active))
     merged = merge(template, active)
-    for section in ("dev", "stage_prod"):
+    for section in ("dev", "stage_prod", "test", "prod"):
         if section in merged:
             merged[section].update(organization)
     active_path.write_text(
@@ -767,8 +767,11 @@ def environment_network_plan(dev_cidr: str) -> dict[str, str]:
 
 
 def common_values(state: dict[str, Any]) -> dict[str, Any]:
+    mode = state.get("persona_access_mode", "legacy")
+    if mode not in ("legacy", "groups-v1"):
+        raise ValueError("persona_access_mode must be legacy or groups-v1")
     plan = environment_network_plan(state["dev_vnet_cidr"])
-    group_id = state["team_group_id"]
+    group_id = state.get("team_group_id", "") if mode == "legacy" else ""
     project_sp = state.get("project_sp_secret_names") or {}
     hub = state["topology"] == "hs" or state.get("access_hub_mode") == "external"
     self_hosted = state.get("runner_mode") == "self-hosted"
@@ -831,8 +834,8 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
         "project_service_principal_AppID_seeding_kv_name": project_sp.get("app_id", ""),
         "project_service_principal_OID_seeding_kv_name": project_sp.get("object_id", ""),
         "project_service_principal_Secret_seeding_kv_name": project_sp.get("secret", ""),
-        "groups_project_members_genai_1": ",".join([group_id] * 5),
-        "groups_coreteam_members": ",".join([group_id] * 3),
+        "groups_project_members_genai_1": ",".join([group_id] * 5) if mode == "legacy" else "",
+        "groups_coreteam_members": ",".join([group_id] * 3) if mode == "legacy" else "",
     }
     if state.get("cost_center"):
         values.update({"tag_costceter_common": state["cost_center"], "tag_costcenter": state["cost_center"]})
@@ -851,13 +854,64 @@ def common_values(state: dict[str, Any]) -> dict[str, Any]:
                 "AIF-Project Owners": state.get("team_member_email") or state["team_group_name"]}
         values["tags"] = json.dumps({**tags, "Description": "AI Factory common"})
         values["tagsProject"] = json.dumps({**tags, "AIFactory project": "001"})
+    values["persona_access_mode"] = mode
+    values["persona_access_manifest"] = state.get("persona_access_manifest", "")
+    if mode == "groups-v1":
+        manifest = values["persona_access_manifest"].replace("\\", "/")
+        if not manifest or manifest.startswith("/") or re.match(r"^[A-Za-z]:", manifest) or ".." in manifest.split("/"):
+            raise ValueError("groups-v1 requires a repository-relative persona_access_manifest")
+        for key in ("technical_admins_ad_object_id", "technical_admins_email",
+                    "groups_project_members_genai_1", "groups_project_members_esml",
+                    "groups_coreteam_members"):
+            values[key] = ""
+        values["disableContributorAccessForUsers"] = "true"
+        values["disableRBACAdminOnRGForUsers"] = "true"
     return values
+
+
+def guard_persona_downgrade(path: Path, state: dict[str, Any]) -> None:
+    if not path.is_file():
+        return
+    original = json.loads(path.read_text(encoding="utf-8-sig"))
+    enabled = any(isinstance(section, dict) and section.get("persona_access_mode") == "groups-v1"
+                  for section in original.values())
+    if enabled and state.get("persona_access_mode", "legacy") != "groups-v1":
+        raise ValueError("Refusing to replace groups-v1 with legacy; retain the reviewed persona manifest.")
+
+
+def validate_simple_target(root: Path, mode: str = "legacy", manifest: str = "") -> None:
+    """Permit only a pre-staged persona manifest in an otherwise new Simple target."""
+    root = Path(os.path.abspath(root))
+    if mode not in ("legacy", "groups-v1"):
+        raise ValueError("persona_access_mode must be legacy or groups-v1")
+    if any(path.is_symlink() or (hasattr(path, "is_junction") and path.is_junction())
+           for path in (root, *root.parents)):
+        raise ValueError("Simple Mode target cannot traverse linked paths.")
+    if mode == "legacy":
+        if root.exists() and (not root.is_dir() or any(root.iterdir())):
+            raise ValueError("Simple Mode requires a new empty target folder; existing repositories are never modified.")
+        return
+    normalized = manifest.replace("\\", "/")
+    parts = normalized.split("/")
+    reserved = {".git", ".github", "aifactory", "azurefactory", "azure-enterprise-scale-ml",
+                ".azurefactory-tools", "lib", "ui", "templates"}
+    if (not normalized or normalized.startswith("/") or re.match(r"^[A-Za-z]:", normalized)
+            or any(part in ("", ".", "..") for part in parts) or parts[0].lower() in reserved):
+        raise ValueError("Simple Mode requires a repository-relative persona manifest outside generated folders.")
+    selected = root.joinpath(*parts)
+    if not root.is_dir() or not selected.is_file():
+        raise ValueError("Stage the reviewed persona manifest inside the Simple Mode target before bootstrap.")
+    allowed = {selected, *selected.parents}
+    for path in root.rglob("*"):
+        if (path.is_symlink() or (hasattr(path, "is_junction") and path.is_junction())
+                or path not in allowed or path.is_file() and path.stat().st_nlink != 1):
+            raise ValueError("Simple Mode target may contain only the reviewed persona manifest and its parent folders.")
 
 
 def selected_project_organization(json_path: Path, state: dict[str, Any]) -> dict[str, str]:
     """Do not carry the active project's ownership when bootstrap selects another project."""
     document = json.loads(json_path.read_text(encoding="utf-8-sig"))
-    existing = project_organization_values(*(document[key] for key in ("dev", "stage_prod") if key in document))
+    existing = project_organization_values(*(document[key] for key in ("dev", "stage_prod", "test", "prod") if key in document))
     selected = str(state["project_number"]).zfill(3)
     declared = str(document.get("dev", {}).get("project_number_000", "")).zfill(3)
     values = {key: "" for key in existing} if declared != selected else {}
@@ -866,6 +920,8 @@ def selected_project_organization(json_path: Path, state: dict[str, Any]) -> dic
 
 
 def apply_ado(repo_root: Path, state: dict[str, Any]) -> None:
+    guard_persona_downgrade(repo_root / "aifactory/variables.json", state)
+    common_values(state)
     yaml_path = (
         repo_root
         / "aifactory/esml-infra/azure-devops/bicep/yaml/variables/variables.yaml"
@@ -897,6 +953,8 @@ def apply_ado(repo_root: Path, state: dict[str, Any]) -> None:
 
 
 def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
+    guard_persona_downgrade(repo_root / "aifactory/variables.json", state)
+    common_values(state)
     env_path = repo_root / ".env"
     json_path = repo_root / "aifactory/variables.json"
     env_template_path = repo_root / ".env.template"
@@ -980,8 +1038,8 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         "PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_S": project_sp.get("secret", ""),
         "GROUPS_PROJECT_MEMBERS_GENAI_1": ",".join(
             [state["team_group_id"]] * 5
-        ),
-        "GROUPS_CORETEAM_MEMBERS": ",".join([state["team_group_id"]] * 3),
+        ) if common["persona_access_mode"] == "legacy" else "",
+        "GROUPS_CORETEAM_MEMBERS": ",".join([state["team_group_id"]] * 3) if common["persona_access_mode"] == "legacy" else "",
         "COMMON_VNET_CIDR": common["common_vnet_cidr"],
         "COMMON_SUBNET_CIDR": common["common_subnet_cidr"],
         "COMMON_SUBNET_SCORING_CIDR": common["common_subnet_scoring_cidr"],
@@ -994,6 +1052,15 @@ def apply_gha(repo_root: Path, state: dict[str, Any]) -> None:
         env_values["TAGS_PROJECT"] = common["tagsProject"]
         env_values["PROJECT_MEMBERS_EMAILS"] = state.get("team_member_email") or state["team_group_name"]
     env_values.update({env: common[key] for key, env in PROJECT_ORGANIZATION_ENV.items() if key in common})
+    env_values["PERSONA_ACCESS_MODE"] = common["persona_access_mode"]
+    env_values["PERSONA_ACCESS_MANIFEST"] = common["persona_access_manifest"]
+    if common["persona_access_mode"] == "groups-v1":
+        for key in ("PROJECT_MEMBERS", "PROJECT_MEMBERS_EMAILS",
+                    "GROUPS_PROJECT_MEMBERS_GENAI_1", "GROUPS_PROJECT_MEMBERS_ESML",
+                    "GROUPS_CORETEAM_MEMBERS"):
+            env_values[key] = ""
+        env_values["DISABLE_CONTRIBUTOR_ACCESS_FOR_USERS"] = "true"
+        env_values["DISABLE_RBAC_ADMIN_ON_RG_FOR_USERS"] = "true"
     for key, name in (("github_runner_name", "GHA_RUNNER_NAME"), ("github_runner_label", "GHA_RUNNER_LABEL")):
         if state.get(key):
             env_values[name] = state[key]

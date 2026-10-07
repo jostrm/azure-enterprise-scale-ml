@@ -40,6 +40,9 @@ param aifactorySalt10char string = ''
 param randomValue string
 param technicalAdminsObjectID string = ''
 param technicalAdminsEmail string = ''
+@allowed(['legacy', 'groups-v1'])
+@description('groups-v1 disables legacy human and lake workload grants; personas/pipeline.py reconciles reviewed policy after provisioning.')
+param personaAccessMode string = 'legacy'
 param subscriptionIdDevTestProd string = subscription().subscriptionId
 
 // ============================================================================
@@ -158,8 +161,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     randomValue: randomValue
     aifactorySuffixRG: aifactorySuffixRG
     commonRGNamePrefix: commonRGNamePrefix
-    technicalAdminsObjectID: technicalAdminsObjectID
-    technicalAdminsEmail: technicalAdminsEmail
+    technicalAdminsObjectID: personaAccessMode == 'groups-v1' ? '' : technicalAdminsObjectID
+    technicalAdminsEmail: personaAccessMode == 'groups-v1' ? '' : technicalAdminsEmail
     commonResourceGroupName: commonResourceGroup
     subscriptionIdDevTestProd: subscriptionIdDevTestProd
     acaSubnetId: acaSubnetId
@@ -372,7 +375,7 @@ module logAnalyticsReaderProjectMembers '../modules/logAnalyticsRbacReader.bicep
 
 // ============== DATA LAKE ACCESS ==============
 // RBAC for Data Lake - AI Foundry Integration
-module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!enableProjectLakeAccess && !deployOnlyAIGatewayNetworking && !aiHubExists && enableAIFoundryHub) {
+module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(personaAccessMode == 'legacy' && !enableProjectLakeAccess && !deployOnlyAIGatewayNetworking && !aiHubExists && enableAIFoundryHub) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('08b-rbacLake4Prj${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -390,7 +393,7 @@ module rbacLakeFirstTime '../esml-common/modules-common/lakeRBAC.bicep' = if(!en
 }
 
 // RBAC for Data Lake - Azure ML Integration
-module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(!enableProjectLakeAccess && !deployOnlyAIGatewayNetworking && !amlExists && enableAzureMachineLearning) {
+module rbacLakeAml '../esml-common/modules-common/lakeRBAC.bicep' = if(personaAccessMode == 'legacy' && !enableProjectLakeAccess && !deployOnlyAIGatewayNetworking && !amlExists && enableAzureMachineLearning) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('08b-rbacLake4Amlv2${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -429,13 +432,13 @@ output acrUserPrincipalsFiltered int = length(userIdsFiltered)
 output acrSPPrincipalsFiltered int = length(spAndMiFiltered)
 
 @description('Common Resource Group Data Lake RBAC deployment status')
-output commonDataLakeRbacDeployed bool = !enableProjectLakeAccess && !deployOnlyAIGatewayNetworking && ((!aiHubExists && enableAIFoundryHub) || (!amlExists && enableAzureMachineLearning))
+output commonDataLakeRbacDeployed bool = personaAccessMode == 'legacy' && !enableProjectLakeAccess && !deployOnlyAIGatewayNetworking && ((!aiHubExists && enableAIFoundryHub) || (!amlExists && enableAzureMachineLearning))
 
 // ARM cannot provision ADLS directories or ACLs. The postdeployment runner consumes
 // this contract; an empty override means discover exactly one HNS account in this RG,
 // never guess a storage name from a potentially stale naming-prefix default.
 output projectLakeAccess object = {
-  enabled: enableProjectLakeAccess && !deployOnlyAIGatewayNetworking
+  enabled: personaAccessMode == 'legacy' && enableProjectLakeAccess && !deployOnlyAIGatewayNetworking
   subscriptionId: subscriptionIdDevTestProd
   tenantId: tenant().tenantId
   storageResourceGroup: commonResourceGroup

@@ -36,6 +36,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AIFACTORY_REPORT_JOB: common-dev
+      persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
+      persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
+      project_number_000: ${{ vars.PROJECT_NUMBER || '001' }}
+      projectPrefix: ${{ vars.PROJECT_PREFIX || 'esml-' }}
+      projectSuffix: ${{ vars.PROJECT_SUFFIX || '-rg' }}
       dev_test_prod: dev
       dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}"
       network_env: "${{ vars.DEV_NETWORK_ENV || vars.NETWORK_ENV || 'dev' }}"
@@ -157,6 +162,14 @@ jobs:
       # any common resource is deployed. A non-zero exit aborts (::error::).
       # Set repo var PREFLIGHT_SKIP=true to bypass.
       # ---------------------------------------------------------------------
+      - name: Persona access preflight (mandatory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" \
+            --config "${{ inputs.use_json_config_override && inputs.config_file || '' }}" \
+            --environment dev --scope common --phase preflight --format github
+
       - name: Preflight quota & policy checks
         if: ${{ vars.PREFLIGHT_SKIP != 'true' }}
         shell: bash
@@ -223,7 +236,7 @@ jobs:
           if (-not $net) { $net = '${{ vars.NETWORK_ENV }}' }
           if (-not $net) { $net = $envName }
           "network_env=$net" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-          $tags = '${{ vars.TAGS }}'
+          $tags = $Env:tags
           if (-not $tags) { $tags = '{}' }
           "tags=$tags" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
 
@@ -240,6 +253,7 @@ jobs:
             --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
             --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
             --parameters esmlCommonOverride="${{ env.vnetResourceGroupBase }}" \
+            --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
             --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
             --parameters location="${{ env.admin_location }}" \
             --parameters tags='${{ env.tags }}' \
@@ -392,6 +406,14 @@ jobs:
             --parameters enableDatafactoryCommon="${{ env.enableDatafactoryCommon }}" \
             --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"
 
+      - name: Reconcile common persona access (mandatory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" \
+            --config "${{ inputs.use_json_config_override && inputs.config_file || '' }}" \
+            --environment dev --scope common --phase apply --format github
+
       - name: Report final pipeline job result (offline)
         if: always()
         continue-on-error: true
@@ -423,6 +445,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AIFACTORY_REPORT_JOB: common-stage
+      persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
+      persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
+      project_number_000: ${{ vars.PROJECT_NUMBER || '001' }}
+      projectPrefix: ${{ vars.PROJECT_PREFIX || 'esml-' }}
+      projectSuffix: ${{ vars.PROJECT_SUFFIX || '-rg' }}
       dev_test_prod: test
       dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}"
       network_env: "${{ vars.STAGE_NETWORK_ENV || vars.NETWORK_ENV || 'test' }}"
@@ -544,6 +571,14 @@ jobs:
       # any common resource is deployed. A non-zero exit aborts (::error::).
       # Set repo var PREFLIGHT_SKIP=true to bypass.
       # ---------------------------------------------------------------------
+      - name: Persona access preflight (mandatory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" \
+            --config "${{ inputs.use_json_config_override && inputs.config_file || '' }}" \
+            --environment test --scope common --phase preflight --format github
+
       - name: Preflight quota & policy checks
         if: ${{ vars.PREFLIGHT_SKIP != 'true' }}
         shell: bash
@@ -624,6 +659,7 @@ jobs:
             --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
             --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
             --parameters esmlCommonOverride="${{ env.vnetResourceGroupBase }}" \
+            --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
             --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
             --parameters location="${{ env.admin_location }}" \
             --parameters tags='${{ env.tags }}' \
@@ -776,6 +812,14 @@ jobs:
             --parameters enableDatafactoryCommon="${{ env.enableDatafactoryCommon }}" \
             --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"
 
+      - name: Reconcile common persona access (mandatory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" \
+            --config "${{ inputs.use_json_config_override && inputs.config_file || '' }}" \
+            --environment test --scope common --phase apply --format github
+
       - name: Report final pipeline job result (offline)
         if: always()
         continue-on-error: true
@@ -809,6 +853,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AIFACTORY_REPORT_JOB: common-prod
+      persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
+      persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
+      project_number_000: ${{ vars.PROJECT_NUMBER || '001' }}
+      projectPrefix: ${{ vars.PROJECT_PREFIX || 'esml-' }}
+      projectSuffix: ${{ vars.PROJECT_SUFFIX || '-rg' }}
       dev_test_prod: prod
       dev_test_prod_sub_id: "${{ vars.AZURE_SUBSCRIPTION_ID }}"
       network_env: "${{ vars.PROD_NETWORK_ENV || vars.NETWORK_ENV || 'prod' }}"
@@ -930,6 +979,14 @@ jobs:
       # any common resource is deployed. A non-zero exit aborts (::error::).
       # Set repo var PREFLIGHT_SKIP=true to bypass.
       # ---------------------------------------------------------------------
+      - name: Persona access preflight (mandatory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" \
+            --config "${{ inputs.use_json_config_override && inputs.config_file || '' }}" \
+            --environment prod --scope common --phase preflight --format github
+
       - name: Preflight quota & policy checks
         if: ${{ vars.PREFLIGHT_SKIP != 'true' }}
         shell: bash
@@ -1010,6 +1067,7 @@ jobs:
             --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
             --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
             --parameters esmlCommonOverride="${{ env.vnetResourceGroupBase }}" \
+            --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
             --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
             --parameters location="${{ env.admin_location }}" \
             --parameters tags='${{ env.tags }}' \
@@ -1161,6 +1219,14 @@ jobs:
             --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
             --parameters enableDatafactoryCommon="${{ env.enableDatafactoryCommon }}" \
             --parameters commonResourceName="${{ env.vnetResourceGroupBase }}"
+      - name: Reconcile common persona access (mandatory)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" \
+            --config "${{ inputs.use_json_config_override && inputs.config_file || '' }}" \
+            --environment prod --scope common --phase apply --format github
+
       - name: Report final pipeline job result (offline)
         if: always()
         continue-on-error: true

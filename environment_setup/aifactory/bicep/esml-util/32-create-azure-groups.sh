@@ -1,5 +1,53 @@
 #!/bin/bash
 
+# Explicit, noninteractive groups-v1 route (preview unless --execute).
+#   bash 32-create-azure-groups.sh --persona-manifest manifest.json \
+#       --operation discover --scope project
+#   bash 32-create-azure-groups.sh --persona-manifest manifest.json \
+#       --operation create --scope project --execute
+# Requires a separately authorized Entra admin; never use group creation from a
+# normal infrastructure pipeline. See ../personas/groups.py --help for naming,
+# permissions, immutable seed records and canonical-name adoption requirements.
+# No arguments retain the historical interactive route below unchanged.
+if [ "$#" -gt 0 ]; then
+    if [ "$1" != "--persona-manifest" ] || [ "$#" -lt 2 ] || [ -z "$2" ] || [[ "$2" == --* ]]; then
+        echo "Usage: $0 --persona-manifest PATH --operation discover|create [--scope common|project] [--execute]" >&2
+        exit 2
+    fi
+    persona_manifest="$2"
+    shift 2
+    persona_args=()
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --operation|--scope)
+                if [ "$#" -lt 2 ] || [ -z "$2" ] || [[ "$2" == --* ]]; then
+                    echo "Missing value for $1." >&2
+                    exit 2
+                fi
+                persona_args+=("$1" "$2")
+                shift 2
+                ;;
+            --execute|--help)
+                persona_args+=("$1")
+                shift
+                ;;
+            *)
+                echo "Invalid persona option: $1" >&2
+                exit 2
+                ;;
+        esac
+    done
+    script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)" || exit 1
+    if command -v python3 >/dev/null 2>&1; then
+        exec python3 "$script_dir/../personas/groups.py" --manifest "$persona_manifest" "${persona_args[@]}"
+    elif command -v python >/dev/null 2>&1; then
+        exec python "$script_dir/../personas/groups.py" --manifest "$persona_manifest" "${persona_args[@]}"
+    else
+        echo "Python 3 is required for --persona-manifest." >&2
+        exit 1
+    fi
+fi
+
 # ANSI color codes
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'

@@ -1,0 +1,234 @@
+{
+  "schema": "aifactory.persona-catalog/v1",
+  "personas": {
+    "persona200": {"name": "super-admin", "scope": "core", "management": "owner", "vault": "vault-secrets", "service_data": "project-ai"},
+    "persona201": {"name": "core-team", "scope": "core", "management": "contributor", "vault": "vault-secrets", "service_data": "project-ai"},
+    "persona210": {"name": "project-member", "scope": "project", "management": "member", "vault": "vault-secrets", "service_data": "project-ai"},
+    "persona211": {"name": "project-admin", "scope": "project", "management": "admin", "vault": "vault-secrets", "service_data": "project-ai"},
+    "persona212": {"name": "front-end-developer", "scope": "project", "management": "frontend", "vault": "vault-secrets"},
+    "persona213": {
+      "name": "ai-developer", "scope": "project", "management": "ai", "vault": "vault-secrets", "lake": "environment-read-acl",
+      "service_data": "project-ai"
+    },
+    "persona214": {"name": "database-developer", "scope": "project", "management": "database", "vault": "vault-secrets"},
+    "persona215": {"name": "network-security", "scope": "project", "management": "network-contributor", "vault": "key-vault-administrator"},
+    "persona216": {"name": "project-manager", "scope": "project", "management": "reader", "additional": ["cost-reader", "workspace-observer"]}
+  },
+  "service_data_bundles": {
+    "project-ai": [
+      {
+        "resource_type": "Microsoft.Search/searchServices",
+        "role": "search-index-data-contributor",
+        "capabilities": "Read/write project search-index documents, including the built-in role's elevated content-security read."
+      },
+      {
+        "resource_type": "Microsoft.CognitiveServices/accounts",
+        "role": "cognitive-inference",
+        "capabilities": "Listed Entra-authorized inference operations only: OpenAI, MaaS, Content Safety, document analysis, language, vision and realtime speech. This role adds no connection secrets, agent administration or custom-model training."
+      },
+      {
+        "resource_type": "Microsoft.CognitiveServices/accounts",
+        "kinds": ["AIServices", "OpenAI"],
+        "role": "foundry-agent-author",
+        "capabilities": "Author/read/update/delete Foundry agents and OpenAI assistants, threads, runs, messages, files and vector stores within this project-owned account and its projects. Includes metadata-only connections and service invocation; excludes connection secrets, managed-agent identity blueprints, access administration, evaluations and fine-tuning."
+      }
+    ]
+  },
+  "builtins": {
+    "owner": "8e3af657-a8ff-443c-a75c-2fe8c4bcb635",
+    "contributor": "b24988ac-6180-42a0-ab88-20f7382dd24c",
+    "reader": "acdd72a7-3385-48ef-bd42-f606fba81ae7",
+    "cost-reader": "72fafb9e-0641-4937-9268-a91bfd8191a3",
+    "network-contributor": "4d97b98b-1d4f-4787-a291-c67834d212e7",
+    "key-vault-administrator": "00482a5a-887f-4fb3-b363-3b7fe8e74483",
+    "search-index-data-contributor": "8ebe5a00-799e-43f5-93ac-243d3dce84a7"
+  },
+  "builtin_data_actions": {
+    "search-index-data-contributor": [
+      "Microsoft.Search/searchServices/indexes/documents/*",
+      "Microsoft.Search/searchServices/indexes/contentSecurity/elevatedOperations/read"
+    ]
+  },
+  "management_exclusions": [
+    "Microsoft.Authorization/*",
+    "Microsoft.Storage/*",
+    "Microsoft.KeyVault/*",
+    "Microsoft.ManagedIdentity/*",
+    "Microsoft.Blueprint/*",
+    "Microsoft.Solutions/*",
+    "Microsoft.Resources/deploymentStacks/*",
+    "Microsoft.Resources/subscriptions/resourceGroups/delete",
+    "Microsoft.Resources/subscriptions/resourceGroups/moveResources/action",
+    "Microsoft.Resources/subscriptions/resourceGroups/validateMoveResources/action",
+    "Microsoft.Compute/galleries/share/action",
+    "Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments/*",
+    "Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions/*",
+    "Microsoft.DocumentDB/databaseAccounts/mongodbRoleDefinitions/*",
+    "Microsoft.DocumentDB/databaseAccounts/mongodbUserDefinitions/*",
+    "Microsoft.DBforPostgreSQL/flexibleServers/administrators/*",
+    "Microsoft.Sql/servers/administrators/*",
+    "Microsoft.Sql/managedInstances/administrators/*",
+    "Microsoft.Sql/servers/azureADOnlyAuthentications/*",
+    "Microsoft.Sql/managedInstances/azureADOnlyAuthentications/*",
+    "Microsoft.Cache/redis/accessPolicies/*",
+    "Microsoft.Cache/redis/accessPolicyAssignments/*",
+    "Microsoft.MachineLearningServices/workspaces/listStorageAccountKeys/action",
+    "Microsoft.MachineLearningServices/workspaces/listKeys/action",
+    "Microsoft.MachineLearningServices/workspaces/connections/listsecrets/action",
+    "Microsoft.MachineLearningServices/workspaces/datastores/listsecrets/action",
+    "Microsoft.MachineLearningServices/workspaces/metadata/listsecrets/action",
+    "Microsoft.CognitiveServices/accounts/connections/listsecrets/action",
+    "Microsoft.CognitiveServices/accounts/projects/connections/listsecrets/action"
+  ],
+  "roles": {
+    "member": {"actions": ["*"], "management_exclusions": true, "metadata_read": true},
+    "admin": {
+      "actions": ["*"], "management_exclusions": true, "metadata_read": true,
+      "additional_actions": [
+        "Microsoft.Authorization/locks/read",
+        "Microsoft.Authorization/locks/write",
+        "Microsoft.Authorization/locks/delete"
+      ]
+    },
+    "frontend": {
+      "actions": [
+        "Microsoft.Web/*", "Microsoft.App/*", "Microsoft.ApiManagement/*",
+        "Microsoft.Resources/deployments/read", "Microsoft.Resources/deployments/write",
+        "Microsoft.Resources/deployments/validate/action", "Microsoft.Resources/deployments/whatIf/action",
+        "Microsoft.Resources/deployments/cancel/action"
+      ],
+      "management_exclusions": true, "metadata_read": true,
+      "providers": ["Microsoft.Web", "Microsoft.App", "Microsoft.ApiManagement"]
+    },
+    "ai": {
+      "actions": [
+        "Microsoft.App/*", "Microsoft.Search/*", "Microsoft.CognitiveServices/*", "Microsoft.MachineLearningServices/*", "Microsoft.ApiManagement/*",
+        "Microsoft.Resources/deployments/read", "Microsoft.Resources/deployments/write",
+        "Microsoft.Resources/deployments/validate/action", "Microsoft.Resources/deployments/whatIf/action",
+        "Microsoft.Resources/deployments/cancel/action"
+      ],
+      "management_exclusions": true, "metadata_read": true,
+      "providers": ["Microsoft.App", "Microsoft.Search", "Microsoft.CognitiveServices", "Microsoft.MachineLearningServices", "Microsoft.ApiManagement"]
+    },
+    "database": {
+      "actions": [
+        "Microsoft.DocumentDB/*", "Microsoft.Sql/*", "Microsoft.DBforPostgreSQL/*", "Microsoft.Cache/*", "Microsoft.Elastic/*",
+        "Microsoft.Resources/deployments/read", "Microsoft.Resources/deployments/write",
+        "Microsoft.Resources/deployments/validate/action", "Microsoft.Resources/deployments/whatIf/action",
+        "Microsoft.Resources/deployments/cancel/action"
+      ],
+      "management_exclusions": true, "metadata_read": true,
+      "providers": ["Microsoft.DocumentDB", "Microsoft.Sql", "Microsoft.DBforPostgreSQL", "Microsoft.Cache", "Microsoft.Elastic"]
+    },
+    "vault-secrets": {
+      "actions": ["Microsoft.KeyVault/vaults/read"],
+      "dataActions": [
+        "Microsoft.KeyVault/vaults/secrets/getSecret/action",
+        "Microsoft.KeyVault/vaults/secrets/readMetadata/action",
+        "Microsoft.KeyVault/vaults/secrets/setSecret/action",
+        "Microsoft.KeyVault/vaults/secrets/delete"
+      ]
+    },
+    "cognitive-inference": {
+      "actions": ["Microsoft.CognitiveServices/accounts/read"],
+      "dataActions": [
+        "Microsoft.CognitiveServices/accounts/OpenAI/deployments/chat/completions/action",
+        "Microsoft.CognitiveServices/accounts/OpenAI/deployments/completions/action",
+        "Microsoft.CognitiveServices/accounts/OpenAI/deployments/embeddings/action",
+        "Microsoft.CognitiveServices/accounts/OpenAI/deployments/audio/action",
+        "Microsoft.CognitiveServices/accounts/OpenAI/deployments/realtime/action",
+        "Microsoft.CognitiveServices/accounts/OpenAI/images/generations/action",
+        "Microsoft.CognitiveServices/accounts/OpenAI/responses/read",
+        "Microsoft.CognitiveServices/accounts/OpenAI/responses/write",
+        "Microsoft.CognitiveServices/accounts/OpenAI/responses/delete",
+        "Microsoft.CognitiveServices/accounts/MaaS/chat/completions/action",
+        "Microsoft.CognitiveServices/accounts/MaaS/completions/action",
+        "Microsoft.CognitiveServices/accounts/MaaS/embeddings/action",
+        "Microsoft.CognitiveServices/accounts/MaaS/images/embeddings/action",
+        "Microsoft.CognitiveServices/accounts/MaaS/images/generations/action",
+        "Microsoft.CognitiveServices/accounts/MaaS/info/read",
+        "Microsoft.CognitiveServices/accounts/MaaS/v1/chat/action",
+        "Microsoft.CognitiveServices/accounts/MaaS/v1/chat/completions/action",
+        "Microsoft.CognitiveServices/accounts/MaaS/v1/embed/action",
+        "Microsoft.CognitiveServices/accounts/MaaS/v1/rerank/action",
+        "Microsoft.CognitiveServices/accounts/ContentSafety/analyze/action",
+        "Microsoft.CognitiveServices/accounts/ContentSafety/text:analyze/action",
+        "Microsoft.CognitiveServices/accounts/ContentSafety/image:analyze/action",
+        "Microsoft.CognitiveServices/accounts/ContentSafety/imagewithtext:analyze/action",
+        "Microsoft.CognitiveServices/accounts/FormRecognizer/analysis/analyze/document/action",
+        "Microsoft.CognitiveServices/accounts/FormRecognizer/analysis/get/analyze/result/read",
+        "Microsoft.CognitiveServices/accounts/FormRecognizer/documentmodels/read",
+        "Microsoft.CognitiveServices/accounts/TextAnalytics/analyze/action",
+        "Microsoft.CognitiveServices/accounts/TextAnalytics/entities/action",
+        "Microsoft.CognitiveServices/accounts/TextAnalytics/keyphrases/action",
+        "Microsoft.CognitiveServices/accounts/TextAnalytics/languages/action",
+        "Microsoft.CognitiveServices/accounts/TextAnalytics/sentiment/action",
+        "Microsoft.CognitiveServices/accounts/ComputerVision/analyze/action",
+        "Microsoft.CognitiveServices/accounts/SpeechServices/unified-speech/frontend/action"
+      ]
+    },
+    "foundry-agent-author": {
+      "actions": [
+        "Microsoft.CognitiveServices/accounts/read",
+        "Microsoft.CognitiveServices/accounts/projects/read"
+      ],
+      "dataActions": [
+        "Microsoft.CognitiveServices/accounts/AIServices/agents/read",
+        "Microsoft.CognitiveServices/accounts/AIServices/agents/write",
+        "Microsoft.CognitiveServices/accounts/AIServices/agents/delete",
+        "Microsoft.CognitiveServices/accounts/AIServices/agents/state/enable/action",
+        "Microsoft.CognitiveServices/accounts/AIServices/agents/state/disable/action",
+        "Microsoft.CognitiveServices/accounts/AIServices/applications/invoke/action",
+        "Microsoft.CognitiveServices/accounts/AIServices/assets/read",
+        "Microsoft.CognitiveServices/accounts/AIServices/assets/write",
+        "Microsoft.CognitiveServices/accounts/AIServices/assets/delete",
+        "Microsoft.CognitiveServices/accounts/AIServices/connections/read",
+        "Microsoft.CognitiveServices/accounts/AIServices/deployments/read",
+        "Microsoft.CognitiveServices/accounts/AIServices/endpoints/interact/action",
+        "Microsoft.CognitiveServices/accounts/AIServices/endpoints/invoke/action",
+        "Microsoft.CognitiveServices/accounts/AIServices/index/entities/read",
+        "Microsoft.CognitiveServices/accounts/AIServices/responses/read",
+        "Microsoft.CognitiveServices/accounts/AIServices/responses/write",
+        "Microsoft.CognitiveServices/accounts/AIServices/responses/delete",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/read",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/write",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/delete",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/files/read",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/files/write",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/files/delete",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/threads/read",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/threads/write",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/threads/delete",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/threads/messages/read",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/threads/messages/write",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/threads/messages/delete",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/threads/messages/files/read",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/threads/runs/read",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/threads/runs/write",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/threads/runs/steps/read",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/vector_stores/read",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/vector_stores/write",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/vector_stores/delete",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/vector_stores/files/read",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/vector_stores/files/write",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/vector_stores/files/delete",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/vector_stores/file_batches/read",
+        "Microsoft.CognitiveServices/accounts/OpenAI/assistants/vector_stores/file_batches/write",
+        "Microsoft.CognitiveServices/accounts/OpenAI/files/read",
+        "Microsoft.CognitiveServices/accounts/OpenAI/files/write",
+        "Microsoft.CognitiveServices/accounts/OpenAI/files/delete"
+      ]
+    },
+    "workspace-observer": {
+      "actions": [
+        "Microsoft.OperationalInsights/workspaces/read",
+        "Microsoft.OperationalInsights/workspaces/query/read",
+        "Microsoft.OperationalInsights/workspaces/query/*/read",
+        "Microsoft.OperationalInsights/workspaces/analytics/query/action",
+        "Microsoft.OperationalInsights/workspaces/search/action",
+        "Microsoft.Insights/metrics/read",
+        "Microsoft.Insights/metricDefinitions/read"
+      ]
+    }
+  }
+}

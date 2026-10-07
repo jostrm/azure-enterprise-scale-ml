@@ -1,5 +1,7 @@
 {
   "dev": {
+    "persona_access_mode": "legacy",
+    "persona_access_manifest": "",
     "GITHUB_USERNAME": "",
     "GITHUB_USE_SSH": "false",
     "GITHUB_TEMPLATE_REPO": "azure/enterprise-scale-aifactory",

@@ -45,6 +45,13 @@ Detailed scope, representative commits and migration caveats are in [RELEASE_125
 
 ### What "personas" means in the v1.24.1 summary
 
+**Post-snapshot implementation:** the opt-in `groups-v1` nine-persona source model
+now has separate group bootstrap, bound seeding records, declarative permissions
+and common/project reconciliation. It is not a retroactive capability claim for
+v1.24.1/v1.25 snapshots or installed desktop/API packages. See the
+[current specification and adoption requirements](documentation/v2/20-29/25-personas-aifactory.md).
+Live tenant authorization remains an operator validation requirement.
+
 These are **team responsibilities and identity/access groupings**, not LLM personalities or system prompts. With `use_ad_groups: "true"`, configuration supplies Entra security-group ObjectIDs for project/core-team membership. Pipeline parameters pass this as `useAdGroups`; RBAC modules use `principalType: 'Group'` rather than `'User'`. The `personas_project_esml`, `personas_project_genai_1` and `personas_core_team` strings describe persona names; changing a label alone is not a new access policy.
 
 The documented project groupings include team lead, data scientist and front-end roles for ESML, and the GenAI grouping adds Foundry, agentic and data-operations responsibilities. Effective permissions still depend on the actual resource assignments, scope and group membership. See the [persona specification][personas], [configuration parameters][persona-config] and [example RBAC module][persona-rbac].

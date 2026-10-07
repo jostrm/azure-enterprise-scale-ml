@@ -158,7 +158,7 @@ resource lake 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     isHnsEnabled: true // DATALAKE
     //allowCrossTenantReplication: true  // Not supported if DATALAKE
     // isNfsV3Enabled: false // Not supported if DATALAKE
-    allowSharedKeyAccess: true
+    allowSharedKeyAccess: !(contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1')
     encryption: {
       keySource: cmk ? 'Microsoft.Keyvault' : 'Microsoft.Storage'
       identity: cmk ? {

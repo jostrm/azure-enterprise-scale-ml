@@ -63,7 +63,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' = {
   properties: {
     enabledForDeployment: true          // VMs can retrieve certificates
     enabledForTemplateDeployment: true  // ARM can retrieve values
-    enableRbacAuthorization: false       // Using RBAC
+    enableRbacAuthorization: contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1'
     enabledForDiskEncryption: false
     enableSoftDelete: true
     softDeleteRetentionInDays:enablePurgeProtection?soft_delete_days: null // Cannot update this: The property "softDeleteRetentionInDays" has been set already and it can't be modified.
@@ -77,7 +77,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' = {
       ipRules: ipRules
       virtualNetworkRules: rules
     }:null
-    accessPolicies: accessPolicies
+    accessPolicies: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? [] : accessPolicies
     sku: {
       name: 'standard'
       family: 'A'

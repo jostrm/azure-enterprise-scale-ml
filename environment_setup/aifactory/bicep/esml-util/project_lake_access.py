@@ -111,14 +111,15 @@ def merge_acl(current, grants, *, directory, defaults):
 
 
 class Lake:
-    def __init__(self, config):
+    def __init__(self, config, cli_runner=None):
         self.config = config
         self.token = None
+        self.cli = cli_runner or cli
 
     def request(self, method, path="", query=None, headers=None):
         if self.token is None or int(self.token["expires_on"]) < time.time() + 60:
-            self.token = cli("account", "get-access-token", "--subscription", self.config["subscription_id"],
-                             "--resource", "https://storage.azure.com/")
+            self.token = self.cli("account", "get-access-token", "--subscription", self.config["subscription_id"],
+                                 "--resource", "https://storage.azure.com/")
             if str(self.token["tenant"]).lower() != self.config["tenant_id"]:
                 raise ValueError("Storage token belongs to another tenant")
         url = f"https://{self.config['storage_account']}.dfs.core.windows.net/{self.config['filesystem']}"
@@ -151,7 +152,9 @@ class Lake:
                 raise ValueError(f"Existing path is not a directory: {path}") from error
 
     def paths(self, prefix):
-        query = {"resource": "filesystem", "directory": prefix, "recursive": "true", "maxResults": "5000"}
+        query = {"resource": "filesystem", "recursive": "true", "maxResults": "5000"}
+        if prefix:
+            query["directory"] = prefix
         while True:
             headers, result = self.request("GET", query=query)
             for item in result.get("paths", []):

@@ -125,7 +125,7 @@ resource sacc2 'Microsoft.Storage/storageAccounts@2025-06-01' = if(enablePublicS
     accessTier: 'Hot'
     publicNetworkAccess:'Enabled'
     allowCrossTenantReplication: true
-    allowSharedKeyAccess: true
+    allowSharedKeyAccess: !(contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1')
     allowBlobPublicAccess: false
     isHnsEnabled: false
     isNfsV3Enabled: false
@@ -221,7 +221,7 @@ resource sacc 'Microsoft.Storage/storageAccounts@2025-06-01' = if(!enablePublicS
     accessTier: 'Hot'
     publicNetworkAccess:'Disabled'
     allowCrossTenantReplication: allowCrossTenantReplication
-    allowSharedKeyAccess: enableLogicApps
+    allowSharedKeyAccess: enableLogicApps && !(contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1')
     allowBlobPublicAccess: false
     isHnsEnabled: false
     isNfsV3Enabled: false

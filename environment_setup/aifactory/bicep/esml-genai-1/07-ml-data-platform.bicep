@@ -163,6 +163,8 @@ param skuDatabricksStageProd string = 'premium'
 var databricksSkuName = env == 'dev' ? skuDatabricksDev : skuDatabricksStageProd
 @description('Use custom VNet (customer-managed) for Databricks instead of managed networking')
 param useDatabricksCustomVNet bool = true
+@description('Create the regional Databricks browser_authentication private endpoint (web UI SSO). Keep exactly one per region per private DNS zone; set false when another workspace already provides it.')
+param enableDatabricksBrowserAuthPrivateEndpoint bool = true
 
 // Networking / AKS settings needed for AML & attached AKS
 param aksServiceCidr string = '10.0.0.0/16'
@@ -263,8 +265,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     genaiSubnetId:genaiSubnetId
     aca2SubnetId: aca2SubnetId
     aks2SubnetId: aks2SubnetId
-    technicalAdminsObjectID: technicalAdminsObjectID
-    technicalAdminsEmail: technicalAdminsEmail
+    technicalAdminsObjectID: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? '' : technicalAdminsObjectID
+    technicalAdminsEmail: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? '' : technicalAdminsEmail
     addAzureMachineLearning: addAzureMachineLearning
   }
 }
@@ -576,12 +578,33 @@ module databricks 'br/public:avm/res/databricks/workspace:0.12.0' = if(!databric
     publicNetworkAccess: enablePublicAccessWithPerimeter? 'Enabled':'Disabled'
     // Set correct NSG rules based on public network access
     requiredNsgRules: enablePublicAccessWithPerimeter ? 'AllRules' : 'NoAzureDatabricksRules' // NoAzureServiceRules for internal use only, NoAzureDatabricksRules for private, AllRules: public
-    // Link to AML workspace if deployed in same run
-    amlWorkspaceResourceId: (!amlExists && enableAzureMachineLearning) ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.MachineLearningServices/workspaces', amlName) : ''
+    // Link to AML workspace if deployed in same run. Never for private factories: MLflow dual-tracking with a
+    // Private Link AML workspace is unsupported and breaks every Databricks MLflow run (see Microsoft Learn,
+    // how-to-use-mlflow-azure-databricks). Use exclusive tracking with azureml-mlflow instead.
+    amlWorkspaceResourceId: (enablePublicAccessWithPerimeter && !amlExists && enableAzureMachineLearning) ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.MachineLearningServices/workspaces', amlName) : ''
   }
   dependsOn: [
     ...(!amlExists && enableAzureMachineLearning ? [amlv2] : [])
     ...(!dataFactoryExists && enableDatafactory ? [dataFactory] : [])
+  ]
+}
+
+// Private workspaces (publicNetworkAccess 'Disabled' + 'NoAzureDatabricksRules') need Private Link for
+// UI/REST and for the cluster relay. Not gated on databricksExists so existing workspaces are repaired.
+module databricksPrivateEndpoints '../modules/databricksPrivateEndpoints.bicep' = if(enableDatabricks && !enablePublicAccessWithPerimeter) {
+  name: take('07-DbxPend-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
+  params: {
+    workspaceName: databricksName
+    location: location
+    tags: tagsProject
+    subnetResourceId: resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, genaiSubnetName)
+    // Central hub DNS: the DeployIfNotExists policy owns the zone groups.
+    privateDnsZoneResourceId: centralDnsZoneByPolicyInHub ? '' : privateLinksDnsZones.azuredatabricks.id
+    enableBrowserAuthentication: enableDatabricksBrowserAuthPrivateEndpoint
+  }
+  dependsOn: [
+    ...(!databricksExists && enableDatabricks ? [databricks] : [])
   ]
 }
 
@@ -672,3 +695,4 @@ output databricksDeployed bool = (!databricksExists && enableDatabricks)
 output databricksId string = (!databricksExists && enableDatabricks) ? databricks!.outputs.resourceId : ''
 output databricksNameOut string = (!databricksExists && enableDatabricks) ? databricks!.outputs.name : ''
 output databricksWorkspaceUrl string = (!databricksExists && enableDatabricks) ? databricks!.outputs.workspaceUrl : ''
+output databricksPrivateEndpointId string = (enableDatabricks && !enablePublicAccessWithPerimeter) ? databricksPrivateEndpoints!.outputs.uiApiPrivateEndpointId : ''

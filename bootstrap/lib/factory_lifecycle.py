@@ -351,14 +351,16 @@ def validate_blob_coordinates(locks):
 def validate_project(document):
     target, config = document["target"], document["config"]
     section = "dev" if target["environment"] == "dev" else "stage_prod"
-    values = config.get(section)
-    require(isinstance(values, dict), "exact-config-environment-required")
+    exact = "test" if target["environment"] == "stage" else target["environment"]
+    require(isinstance(config.get(section, config.get(exact)), dict), "exact-config-environment-required")
+    values = persona_helper(Path(__file__).resolve().parents[2]).selected_config(config, target["environment"])
+    identity_values = {**config.get(section, {}), **config.get(exact, {})}
     subscription_key = {"dev": "dev_sub_id", "stage": "test_sub_id", "prod": "prod_sub_id"}[target["environment"]]
     expected = {"tenantId": target["tenant_id"], subscription_key: target["subscription_id"],
                 "project_number_000": target["project_ids"][0], "admin_location": target["region"],
                 "admin_aifactoryPrefixRG": target["prefix"], "admin_aifactorySuffixRG": "-" + target["suffix"]}
     for key, value in expected.items():
-        actual = str(values.get(key, ""))
+        actual = str(identity_values.get(key, ""))
         if key in ("tenantId", subscription_key):
             actual, value = actual.lower(), value.lower()
         require(actual == value, "config-target-mismatch-" + key)
@@ -395,8 +397,9 @@ def validate_deployment_plan(document):
     section = "dev" if target["environment"] == "dev" else "stage_prod"
     values = config
     if "dev" in config or "stage_prod" in config:
-        require(isinstance(config.get(section), dict), "exact-config-environment-required")
-        values = config[section]
+        exact = "test" if target["environment"] == "stage" else target["environment"]
+        require(isinstance(config.get(section, config.get(exact)), dict), "exact-config-environment-required")
+        values = persona_helper(Path(__file__).resolve().parents[2]).selected_config(config, target["environment"])
     if "useSelfHostedBuildAgent" in values:
         require(str(values["useSelfHostedBuildAgent"]).lower() in ("true", "false")
                 and (str(values["useSelfHostedBuildAgent"]).lower() == "true") == (runner["kind"] == "self-hosted"),
@@ -622,6 +625,8 @@ def capabilities():
         "single_writer_deletion": "provider-repository-cas-cohort-v1",
         "project_routes": ["ado", "gha"],
         "project_environments": ["dev", "stage", "prod"],
+        "persona_access": "persona-groups-v1",
+        "persona_manifest_source": "reviewed-consumer-commit-frozen-in-protected-plan",
         "scoped_worker_os": ["linux"], "scoped_runners": ["hosted", "self-hosted"],
         "scoped_group_ownership_receipt": "resource-group-ownership-v1",
         "network_preservation": "preserve-v1-runtime-proof",
@@ -2438,7 +2443,7 @@ def ado_project(cloud, locks, document, source_root, receipt, persist, sleep=tim
 def project_run_request(document):
     target, route = document["target"], document["route"]
     config = canonical(document["config"]).decode("utf-8")
-    values = document["config"]["dev" if target["environment"] == "dev" else "stage_prod"]
+    values = persona_helper(Path(__file__).resolve().parents[2]).selected_config(document["config"], target["environment"])
     settings = {key: str(values.get(key, default)).lower() if isinstance(default, bool)
                 else str(values.get(key, default)) for key, default in {
                     "runNetworkingVar": True, "BYO_subnets": False, "useSelfHostedBuildAgent": False,
@@ -3154,6 +3159,7 @@ def _freeze_deployment_contents(cloud, document, source_root):
     cloud.verify_identity()
     result = json.loads(canonical(document["deployment"]))
     draft = {**document, "deployment": result}
+    persona_helper(source_root).freeze(cloud, draft, result, source_root)
     if "bootstrap_foundation" in result:
         result["bootstrap_ownership"] = bootstrap_ownership_snapshot(cloud, draft)
     for step in result["steps"]:
@@ -3166,6 +3172,23 @@ def _freeze_deployment_contents(cloud, document, source_root):
     verify_bootstrap_preservation(draft, result["changes"])
     result["configuration_hash"] = digest(document["config"])
     return result
+
+
+def persona_helper(source_root):
+    path = Path(source_root) / "bootstrap" / "lib" / "registered_personas.py"
+    if not path.is_file():
+        path = Path(__file__).with_name("registered_personas.py")
+    spec = importlib.util.spec_from_file_location("registered_personas_runtime", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def persona_worker(document, source_root, *, execute=False):
+    try:
+        return persona_helper(source_root).worker(document, source_root, execute=execute)
+    except (ValueError, RuntimeError, OSError) as error:
+        raise Blocked("persona-access-apply-failed" if execute else "persona-access-preflight-failed") from error
 
 
 def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cloud=None, sleep=time.sleep):
@@ -3203,6 +3226,7 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         locks.request("PUT", blob, data=receipt, headers={"x-ms-blob-type": "BlockBlob", "If-Match": "*"}, allowed=(201,))
 
     try:
+        persona_worker(document, source_root)
         bootstrap_owners = bootstrap_ownership_snapshot(cloud, document)
         require(bootstrap_owners == document["deployment"].get("bootstrap_ownership", {}),
                 "bootstrap-resource-inventory-changed-since-prepare")
@@ -3213,10 +3237,16 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         preserved_ids = {key for key, row in bootstrap_owners.items() if row.get("preserve") is True}
         verify_bootstrap_preservation(document, document["deployment"]["changes"])
         existing_scopes = []
-        for scope in document["locks"]["scopes"]:
+        for scope in document["locks"]["scopes"] + document["locks"]["common_dependencies"]:
             status, _, group = cloud.arm("GET", scope, RG_API, allowed=(200, 404))
             if status == 200:
-                existing_scopes.append(scope)
+                marker = (group.get("tags") or {}).get("AIF-Persona-Access")
+                selected = persona_helper(source_root).selected_config(
+                    document["config"], document["target"]["environment"])
+                require(not marker or marker == selected.get("persona_access_mode", "legacy"),
+                        "persona-access-downgrade-forbidden")
+                if scope in document["locks"]["scopes"]:
+                    existing_scopes.append(scope)
         if existing_scopes:
             closure, current_bodies = collect_resource_closure(cloud, existing_scopes,
                                                                bootstrap_resource_versions(document))
@@ -3283,6 +3313,10 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
                     "scoped-child-deployment-unverified")
             receipt["deployments"].append({"step_id": step["id"], "id": child_endpoint.removeprefix(ARM), "status": "succeeded"})
         receipt.pop("pending_deployment", None)
+        locks.assert_held()
+        cloud.verify_identity(require_default=True)
+        receipt["persona_access"] = persona_worker(document, source_root, execute=True)
+        locks.assert_held()
         persist()
         closure, bodies = collect_resource_closure(cloud, document["locks"]["scopes"],
                                                    bootstrap_resource_versions(document))

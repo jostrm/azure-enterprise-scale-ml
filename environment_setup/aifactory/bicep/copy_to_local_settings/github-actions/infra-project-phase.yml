@@ -65,6 +65,8 @@ jobs:
         shell: pwsh
     env:
       AIFACTORY_REPORT_JOB: deploy-project-${{ inputs.phase }}
+      persona_access_mode: ${{ vars.PERSONA_ACCESS_MODE || 'legacy' }}
+      persona_access_manifest: ${{ vars.PERSONA_ACCESS_MANIFEST || '' }}
       AIFACTORY_CONFIG_JSON: ${{ !inputs.json_identity_auth && secrets[inputs.config_secret] || '' }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       dev_test_prod: ${{ inputs.deployment_id != '' && (inputs.environment == 'stage' && 'test' || inputs.environment) || vars.AZURE_ENV_NAME }}
@@ -586,6 +588,12 @@ jobs:
       # Set repo var PREFLIGHT_SKIP=true to bypass, PREFLIGHT_STRICT=true to
       # also fail on warnings.
       # ---------------------------------------------------------------------
+      - name: Persona access preflight (mandatory in every phase)
+        shell: pwsh
+        run: |
+          python "./azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py" --config "${{ inputs.config_file }}" --environment "${{ inputs.environment }}" --scope project --phase preflight --format github
+          if ($LASTEXITCODE -ne 0) { throw "Persona access prerequisites failed; legacy fallback is prohibited." }
+
       - name: 00_Preflight_Quota_Policy_Checks
         if: ${{ inputs.phase == 'infra' && (vars.PREFLIGHT_SKIP != 'true') }}
         shell: bash
@@ -1115,7 +1123,7 @@ jobs:
               --parameters azureFirewallPrivateIp="${{ env.aksAzureFirewallPrivateIp }}"
 
       - name: 08_Remove_IP_From_Seeding_Keyvault_(Networking-END)
-        if: inputs.phase == 'infra' && (always() && env.disable_whitelisting_for_build_agents != 'true')
+        if: inputs.phase == 'infra' && env.persona_preflight_ready == 'true' && (always() && env.disable_whitelisting_for_build_agents != 'true')
         shell: bash
         run: |
             az account set --subscription "${{ env.admin_bicep_input_keyvault_subscription }}"
@@ -1981,7 +1989,7 @@ jobs:
 
       - name: Check and Delete Current Project Orphan Role Assignments
         # Shared cleanup proves project ownership and principal deletion before touching either RG.
-        if: inputs.phase == 'infra' && (success() && env.deleteAllServicesForProject != 'true')
+        if: inputs.phase == 'infra' && env.persona_access_mode != 'groups-v1' && (success() && env.deleteAllServicesForProject != 'true')
         shell: bash
         env:
           ORPHAN_SUBSCRIPTION_ID: ${{ env.dev_test_prod_sub_id }}
@@ -3019,6 +3027,7 @@ jobs:
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
               --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/08b-rbac-common-rg.bicep" \
+              --parameters personaAccessMode="${{ env.persona_access_mode }}" \
               --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
               --parameters env="${{ env.dev_test_prod }}" \
               --parameters projectNumber="${{ env.project_number_000 }}" \
@@ -3066,7 +3075,7 @@ jobs:
               --query properties.outputs.projectLakeAccess.value --output json | tee project-lake-access.json
 
       - name: 102-project-lake-access
-        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && env.debug_disable_101_rbac_common_rg != 'true' && env.debug_disable_61_foundation != 'true' && env.debug_disable_62_core_infrastructure != 'true'
+        if: inputs.phase == 'infra' && env.persona_access_mode != 'groups-v1' && env.deleteAllServicesForProject != 'true' && env.debug_disable_101_rbac_common_rg != 'true' && env.debug_disable_61_foundation != 'true' && env.debug_disable_62_core_infrastructure != 'true'
         shell: pwsh
         env:
           PROJECT_LAKE_CONTRACT_READY: ${{ steps.common_rbac.outcome == 'success' }}
@@ -4481,8 +4490,18 @@ jobs:
         run: |
             python3 "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-aifactory-dashboard.py"
 
+      - name: Reconcile common and project persona access (mandatory)
+        if: inputs.phase == 'foundry'
+        shell: pwsh
+        run: |
+          $bridge = "./azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py"
+          python $bridge --config "${{ inputs.config_file }}" --environment "${{ inputs.environment }}" --scope common --phase apply --format github
+          if ($LASTEXITCODE -ne 0) { throw "Common persona access reconciliation failed." }
+          python $bridge --config "${{ inputs.config_file }}" --environment "${{ inputs.environment }}" --scope project --phase apply --format github
+          if ($LASTEXITCODE -ne 0) { throw "Project persona access reconciliation failed." }
+
       - name: Remove runner IP from seeding Key Vault
-        if: always() && env.disable_whitelisting_for_build_agents != 'true'
+        if: always() && env.persona_preflight_ready == 'true' && env.disable_whitelisting_for_build_agents != 'true'
         shell: bash
         run: |
             az account set --subscription "${{ env.admin_bicep_input_keyvault_subscription }}"

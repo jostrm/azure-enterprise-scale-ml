@@ -168,8 +168,10 @@ stages:
     # AI Foundry runs in its own deployment job. The phase parameter excludes all infra
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
     # dynamic network parameters, resource detection, and salt) are re-created.
+    # Only a validated groups-v1 preflight may continue after best-effort RBAC warnings.
+    # Legacy retains its success-only gate; read the effective mode, including JSON overrides.
     - deployment: ESGenAI_Foundry
-      condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded'))
+      condition: and(not(canceled()),or(eq(dependencies.ESGenAI_Services.result, 'Succeeded'),and(eq(dependencies.ESGenAI_Services.result, 'SucceededWithIssues'),eq(dependencies.ESGenAI_Services.outputs['ESGenAI_Services.persona_project_preflight.persona_access_mode'], 'groups-v1'))))
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
@@ -308,7 +310,7 @@ stages:
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
     # dynamic network parameters, resource detection, and salt) are re-created.
     - deployment: ESGenAI_Foundry
-      condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded'))
+      condition: and(not(canceled()),or(eq(dependencies.ESGenAI_Services.result, 'Succeeded'),and(eq(dependencies.ESGenAI_Services.result, 'SucceededWithIssues'),eq(dependencies.ESGenAI_Services.outputs['ESGenAI_Services.persona_project_preflight.persona_access_mode'], 'groups-v1'))))
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240
@@ -449,7 +451,7 @@ stages:
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
     # dynamic network parameters, resource detection, and salt) are re-created.
     - deployment: ESGenAI_Foundry
-      condition: and(not(canceled()),in(dependencies.ESGenAI_Services.result, 'Succeeded'))
+      condition: and(not(canceled()),or(eq(dependencies.ESGenAI_Services.result, 'Succeeded'),and(eq(dependencies.ESGenAI_Services.result, 'SucceededWithIssues'),eq(dependencies.ESGenAI_Services.outputs['ESGenAI_Services.persona_project_preflight.persona_access_mode'], 'groups-v1'))))
       dependsOn: ESGenAI_Services
       displayName: Deploy AI Foundry (fresh agent budget)
       timeoutInMinutes: 240

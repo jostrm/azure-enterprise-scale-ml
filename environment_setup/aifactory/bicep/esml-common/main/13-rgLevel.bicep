@@ -212,10 +212,11 @@ var processedIpRules = [for ip in ipWhitelist_array: {
 }]
 
 var technicalAdminsObjectID_array = array(split(replace(technicalAdminsObjectID,'\\s+', ''),','))
-var technicalAdminsObjectID_array_safe = (empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
+var personaGroupsEnabled = contains(tags, 'AIF-Persona-Access') ? tags['AIF-Persona-Access'] == 'groups-v1' : false
+var technicalAdminsObjectID_array_safe = (personaGroupsEnabled || empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null') ? [] : technicalAdminsObjectID_array
 
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
-var technicalAdminsEmail_array_safe = (empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
+var technicalAdminsEmail_array_safe = (personaGroupsEnabled || empty(technicalAdminsEmail) || technicalAdminsEmail == 'null') ? [] : technicalAdminsEmail_array
 var sweden_central_adf_missing = false // (location == 'swedencentral')?true:false
 
 // Config regarding private DNS zones (Microsoft private DNS. If you have your ownd DNS server, see here: https://docs.microsoft.com/en-us/azure/machine-learning/how-to-custom-dns?tabs=azure-cli)
@@ -740,7 +741,7 @@ var secretAll = {
 }
 
 // AzureDatabricks - if set, and if this EnterpriseApplication already exists (can be that a project needs to be provisoned first..)
-module spDatabricksAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!empty(databricksOID) && !deployOnlyAIGatewayNetworking) {
+module spDatabricksAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !empty(databricksOID) && !deployOnlyAIGatewayNetworking) {
   scope: esmlCommonResourceGroup
   name: 'spDBXAPGet${uniqueInAIFenv}'
   params: {
@@ -764,7 +765,7 @@ resource externalKv 'Microsoft.KeyVault/vaults@2024-11-01' existing = if(!deploy
 var var_useCommonSP_OID = !empty(commonServicePrincipleOIDKey) && !contains(toLower(commonServicePrincipleOIDKey), '<todo>') && !contains(toLower(commonServicePrincipleOIDKey), '<optional>')
 var var_useCommonSP_ID = !empty(inputCommonSPIDKey) && !contains(toLower(inputCommonSPIDKey), '<todo>') && !contains(toLower(inputCommonSPIDKey), '<optional>')
 var var_useCommonSP_Secret = !empty(inputCommonSPSecretKey) && !contains(toLower(inputCommonSPSecretKey), '<todo>') && !contains(toLower(inputCommonSPSecretKey), '<optional>')
-module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking && var_useCommonSP_OID) {
+module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking && var_useCommonSP_OID) {
   scope: esmlCommonResourceGroup
   name: 'spCmnAPGet${uniqueInAIFenv}'
   params: {
@@ -780,7 +781,7 @@ module spCmnAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deplo
     spDatabricksAccessPolicyGet
   ]
 }
-module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking && enableDatafactoryCommon) {
+module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking && enableDatafactoryCommon) {
   scope: esmlCommonResourceGroup
   name: 'adfAPGet${uniqueInAIFenv}'
   params: {
@@ -798,7 +799,7 @@ module adfAccessPolicyGet '../../modules/kvCmnAccessPolicys.bicep' = if(!deployO
     spCmnAccessPolicyGet
   ]
 }
-module kvCmnAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking) {
+module kvCmnAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking) {
   scope: esmlCommonResourceGroup
   name: 'kvCmnAPTechContact${uniqueInAIFenv}'
   params: {
@@ -867,7 +868,7 @@ module kvAdmin '../../modules/keyVault.bicep' = if(!deployOnlyAIGatewayNetworkin
     subnetCommonDefaultResource
   ]
 }
-module kvAdminAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking){
+module kvAdminAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking){
   scope: esmlCommonResourceGroup
   name: '${kvAdminNoDash}AP${uniqueInAIFenv}' 
   params: {
@@ -881,7 +882,7 @@ module kvAdminAccessPolicyTechnicalContactAll '../../modules/kvCmnAccessPolicys.
     kvAdmin
   ]
 }
-module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking && var_useCommonSP_OID){
+module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking && var_useCommonSP_OID){
   scope: esmlCommonResourceGroup
   name: '${kvAdminNoDash}AP2${uniqueInAIFenv}'
   params: {
@@ -898,7 +899,7 @@ module kvAdminAccessPolicyCommonSP '../../modules/kvCmnAccessPolicys.bicep' = if
   ]
 }
 
-module kvAdminAccessPolicyGetADF '../../modules/kvCmnAccessPolicys.bicep' = if(!deployOnlyAIGatewayNetworking && enableDatafactoryCommon){
+module kvAdminAccessPolicyGetADF '../../modules/kvCmnAccessPolicys.bicep' = if(!personaGroupsEnabled && !deployOnlyAIGatewayNetworking && enableDatafactoryCommon){
   scope: esmlCommonResourceGroup
   name: '${kvAdminNoDash}APadf${uniqueInAIFenv}'
   params: {
