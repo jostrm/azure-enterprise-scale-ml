@@ -70,9 +70,12 @@ class Azure:
         if args[:2] == ("resource", "show"):
             return {"id": arg("--ids"), "type": policy.resource_type(arg("--ids"))}
         if args[:2] == ("keyvault", "show"):
-            return {"id": arg("--id"), "properties": {"enableRbacAuthorization": self.rbac,
+            assert set(args[2::2]) == {"--name", "--resource-group", "--subscription"}
+            identity = (f"/subscriptions/{arg('--subscription')}/resourceGroups/{arg('--resource-group')}"
+                        f"/providers/Microsoft.KeyVault/vaults/{arg('--name')}").lower()
+            return {"id": identity, "properties": {"enableRbacAuthorization": self.rbac,
                     "accessPolicies": self.policies, "tenantId": TENANT,
-                    **self.vault_overrides.get(arg("--id"), {})}}
+                    **self.vault_overrides.get(identity, {})}}
         if args[:3] == ("role", "definition", "list"):
             return deepcopy([item for item in self.definitions
                              if any(policy.within(arg("--scope"), scope)
@@ -158,6 +161,13 @@ def legacy_assignment(principal=TENANT, scope=PROJECT, role=None):
     return {"id": scope + "/providers/Microsoft.Authorization/roleAssignments/" + str(uuid4()),
             "scope": scope, "principalId": principal, "principalType": "Group",
             "roleDefinitionId": role or policy.CATALOG["builtins"]["contributor"], "description": "legacy"}
+
+
+def test_vault_metadata_uses_supported_cli_scope_arguments(azure):
+    access.provision(manifest(), execute=False, cli=azure)
+    calls = [call for call in azure.calls if call[:2] == ("keyvault", "show")]
+    assert calls == [("keyvault", "show", "--name", "project-vault",
+                      "--resource-group", "project-rg", "--subscription", SUB)]
 
 
 def test_preview_reads_only_and_plans_nine_personas(azure):

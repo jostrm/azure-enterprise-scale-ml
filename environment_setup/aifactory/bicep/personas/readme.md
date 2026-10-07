@@ -168,6 +168,9 @@ the protected seeding entries itself.
 Role-assignment inventory supports Azure CLI 2.71 through `az rest --method get`
 with ARM API `2022-04-01`; it does not use unsupported `--fill-principal-name` or
 `--fill-role-definition-name` switches or resolve principal names through Graph.
+Vault metadata reads use supported `--name`, `--resource-group` and
+`--subscription` selectors, then verify the returned ARM ID; `keyvault show --id`
+is not supported.
 Reconciliation reads every subscription-wide page for descendant grants, then
 every `atScope()` page for inherited grants (including management-group/tenant
 assignments). The lake audit uses the same paged inherited inventory at container

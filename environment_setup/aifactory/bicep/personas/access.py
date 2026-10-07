@@ -129,8 +129,9 @@ def _vault_checks(manifest, scope, resources, groups, cli):
         root = rg_scope(identity)
         if root not in roots or resource_type(identity) != "microsoft.keyvault/vaults":
             continue
-        subscription, _ = arm_scope_parts(identity)
-        vault = cli("keyvault", "show", "--id", identity, "--subscription", subscription)
+        subscription, group = arm_scope_parts(identity)
+        vault = cli("keyvault", "show", "--name", identity.rsplit("/", 1)[1],
+                    "--resource-group", group, "--subscription", subscription)
         if not isinstance(vault, dict) or arm_id(vault.get("id")) != identity:
             raise ValueError("Vault preflight returned a different resource")
         properties = vault.get("properties", {})
