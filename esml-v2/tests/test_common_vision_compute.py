@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2] / "usecase_code" / "50-ml-model-facto
 
 
 def test_explicit_custom_cpu_images_can_use_common_lake_without_fictitious_gpu(tmp_path):
-    scenario = load_json(ROOT / "scenarios" / "image-object-detection.json")
+    scenario = load_json(ROOT / "user-config" / "model" / "scenarios" / "image-object-detection.json")
     runtime = {"compute": "existing-cpu", "datastore": "common_lake",
                "input_data": "azureml://datastores/common_lake/paths/mlops/v1/projects/project001/dataset/in/"}
     bundle = render(scenario, runtime, tmp_path / "cpu", ROOT, mode="custom")

@@ -58,6 +58,24 @@ def test_build_stages_shared_engines_without_changing_cwd_or_maintaining_duplica
         assert (staging / "azure_esml" / "__init__.py").is_file()
         assert (staging / "ml_model_factory" / "selection.py").is_file()
         assert (staging / "LICENSE").is_file()
+        manifest = (staging / "MANIFEST.in").read_text(encoding="utf-8")
+        assert "include esml_build.py LICENSE pyproject.toml MANIFEST.in" in manifest
+        assert "recursive-include ml_model_factory *.py" in manifest
+        assert "recursive-include azure_esml *.py *.json py.typed" in manifest
+        policy = ROOT.parent / "usecase_code" / "50-ml-model-factory" / "user-config" / "model" / "model-selection.json"
+        assert (staging / "azure_esml" / "resources" / policy.name).read_bytes() == policy.read_bytes()
         assert not list(staging.rglob("*.pyc"))
     assert Path.cwd() == previous
     assert not staging.exists()
+
+
+def test_sdist_staging_uses_embedded_engines_and_policy_without_repository(monkeypatch):
+    import esml_build
+
+    with esml_build._source():
+        sdist = Path.cwd()
+        policy = (sdist / "azure_esml" / "resources" / "model-selection.json").read_bytes()
+        monkeypatch.setattr(esml_build, "ROOT", sdist)
+        with esml_build._source():
+            assert (Path.cwd() / "ml_model_factory" / "selection.py").is_file()
+            assert (Path.cwd() / "azure_esml" / "resources" / "model-selection.json").read_bytes() == policy

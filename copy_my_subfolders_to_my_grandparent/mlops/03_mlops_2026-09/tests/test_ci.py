@@ -111,6 +111,12 @@ class TrainingTests(unittest.TestCase):
         self.assertTrue((first / "pipeline.yml").exists())
         self.assertTrue((second / "pipeline.yml").exists())
 
+    def test_explicit_source_is_forwarded_to_renderer(self):
+        self.args.source = self.root
+        ci.train(self.args)
+        render = next(call.args for call in self.cli.call_args_list if call.args[0] == "render")
+        self.assertEqual(render[render.index("--source") + 1], str(self.root))
+
     def lake_runtime(self):
         runtime = json.loads(self.runtime.read_text())
         runtime["lake"] = {
@@ -242,7 +248,7 @@ class WorkflowTests(unittest.TestCase):
 class CoreContractTests(unittest.TestCase):
     def test_real_offline_validate_and_render_contract(self):
         from ml_model_factory.azureml import render
-        import ml_model_factory
+        from ml_model_factory.layout import source_root
 
         root = Path(__file__).parent / (".core-test-" + uuid4().hex)
         root.mkdir()
@@ -270,13 +276,85 @@ class CoreContractTests(unittest.TestCase):
             capture_output=True, text=True, check=True, timeout=60,
         )
         self.assertTrue(json.loads(completed.stdout)["valid"])
-        source = Path(ml_model_factory.__file__).resolve().parents[1]
+        source = source_root()
         bundle = root / "bundle"
         render(scenario, runtime, bundle, source, mode="custom")
         self.assertEqual(yaml.safe_load((bundle / "pipeline.yml").read_text())["type"], "pipeline")
         manifest = json.loads((bundle / "manifest.json").read_text())
         self.assertEqual(manifest["scenario_name"], "ci-contract")
         self.assertTrue(manifest["model_name"])
+
+
+class BootstrapTests(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location(
+            "mlops_bootstrap", Path(__file__).parents[1] / "scripts" / "bootstrap.py",
+        )
+        self.bootstrap = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.bootstrap)
+        self.root = Path(__file__).parent / (".bootstrap-test-" + uuid4().hex)
+        self.root.mkdir()
+        self.addCleanup(shutil.rmtree, self.root)
+        (self.root / "pyproject.toml").write_text("[project]\nname='fixture'\n", encoding="utf-8")
+
+    def test_installs_root_project_with_accelerator_source(self):
+        package = self.root / "accelerator" / "src" / "ml_model_factory"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        with patch.object(sys, "argv", [
+            "bootstrap.py", "--package", str(self.root), "--venv", str(self.root / ".venv"),
+        ]), patch.object(self.bootstrap.venv, "EnvBuilder") as builder, \
+                patch.object(self.bootstrap.subprocess, "run") as run:
+            self.bootstrap.main()
+        builder.return_value.create.assert_called_once_with((self.root / ".venv").resolve())
+        self.assertEqual(run.call_args.args[0][-1], f"{self.root.resolve()}[dev]")
+
+    def test_rejects_flat_or_unrelated_project_before_install(self):
+        with patch.object(sys, "argv", [
+            "bootstrap.py", "--package", str(self.root), "--venv", str(self.root / ".venv"),
+        ]), patch.object(self.bootstrap.venv, "EnvBuilder") as builder, \
+                self.assertRaises(SystemExit):
+            self.bootstrap.main()
+        builder.assert_not_called()
+
+
+class CheckoutDefaultsTests(unittest.TestCase):
+    def arguments(self, action, *extra):
+        arguments = ["ci.py", action, "--scenario", "scenario.json", "--runtime", "runtime.json", "--mode", "custom"]
+        if action == "deploy":
+            arguments += ["--model-id", "azureml:approved:1", "--approval-environment", "approved-dev"]
+        return [*arguments, *extra]
+
+    def test_default_outputs_use_validated_checkout(self):
+        root = Path(__file__).parents[1].resolve()
+        for action in ("train", "deploy"):
+            with self.subTest(action=action), patch.object(sys, "argv", self.arguments(action)), \
+                    patch("ml_model_factory.layout.source_root", return_value=root) as resolve, \
+                    patch.object(ci, action) as execute:
+                self.assertEqual(ci.main(), 0)
+                resolve.assert_called_once_with(None)
+                expected = root / "ml-environment" / "outputs"
+                if action == "deploy":
+                    expected /= "deploy"
+                self.assertEqual(Path(execute.call_args.args[0].output), expected)
+                self.assertEqual(execute.call_args.args[0].source, root)
+
+    def test_explicit_scratch_output_does_not_require_checkout_discovery(self):
+        with patch.object(sys, "argv", self.arguments("train", "--output", "generated")), \
+                patch("ml_model_factory.layout.source_root") as resolve, patch.object(ci, "train") as execute:
+            self.assertEqual(ci.main(), 0)
+        resolve.assert_not_called()
+        self.assertEqual(execute.call_args.args[0].output, "generated")
+
+    def test_explicit_wheel_source_is_validated_with_custom_output(self):
+        root = Path(__file__).parents[1].resolve()
+        with patch.object(sys, "argv", self.arguments("train", "--source", str(root), "--output", "generated")), \
+                patch("ml_model_factory.layout.source_root", return_value=root) as resolve, \
+                patch.object(ci, "train") as execute:
+            self.assertEqual(ci.main(), 0)
+        resolve.assert_called_once_with(root)
+        self.assertEqual(execute.call_args.args[0].source, root)
+        self.assertEqual(execute.call_args.args[0].output, "generated")
 
 
 if __name__ == "__main__":

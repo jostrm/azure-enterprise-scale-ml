@@ -20,6 +20,27 @@ See [MLOps and model tags](../../../documentation/v2/30-39/37-mlops.md)
 and [the lake layout](../../../documentation/v2/30-39/34-datalake-onboard-data.md)
 for the full execution and storage contracts.
 
+## Model-factory ownership layout
+
+Provision `--package usecase_code\50-ml-model-factory`; the root
+`pyproject.toml` installs `accelerator\src\ml_model_factory`. Keep `.venv` at
+that root, so the workflow Python defaults are unchanged. Customer scenarios
+live in `user-config\model\scenarios`, while reusable scripts and environments
+live under `accelerator`. Notebooks are under `usecase-type\batch`, `online`
+and `streaming`. Source data belongs in `data\in`, prepared data in `data\out`,
+and local model/report output in `ml-environment\outputs`.
+
+The workflows' explicit repository-workspace `generated` directories are CI
+staging/artifact paths, not canonical model-factory source or local-data defaults.
+Rendered job bundles retain self-contained internal package/script paths.
+
+Without `--output`, `ci.py train` writes to the validated checkout's
+`ml-environment\outputs`; `ci.py deploy` uses its `deploy` subfolder. Explicit
+outputs remain unchanged, and `ingest` still requires an explicit output
+(normally `data\in\<scenario>`). With an installed wheel outside the checkout,
+pass `--source <model-factory-root>` to train/deploy so rendering uses the
+reviewed templates rather than guessing from `site-packages`.
+
 ## Opt-in candidate/champion selection
 
 Without selection configured, training keeps the existing behavior: a successful
@@ -33,7 +54,7 @@ runtime JSON (no additional workflow inputs or SDK v1 configuration):
 ```json
 {
   "model_selection": {
-    "policy": "..\\model-selection.json",
+    "policy": "model\\model-selection.json",
     "champion_evaluation": "champions\\reviewed-comparison.json"
   }
 }
@@ -42,8 +63,9 @@ runtime JSON (no additional workflow inputs or SDK v1 configuration):
 Add this object alongside the existing runtime fields. Selection file paths
 resolve relative to the **runtime JSON's directory**, not the runner's working
 directory; absolute paths also work. Choose the paths for your checkout layout.
+The example assumes the runtime JSON is directly under `user-config`.
 The editable canonical policy is
-[`usecase_code/50-ml-model-factory/model-selection.json`](../../../usecase_code/50-ml-model-factory/model-selection.json).
+[`usecase_code/50-ml-model-factory/user-config/model/model-selection.json`](../../../usecase_code/50-ml-model-factory/user-config/model/model-selection.json).
 It has profiles for all seven supported tasks. Each selected metric has its own
 maximize/minimize direction and signed `min_delta`: positive requires improvement,
 negative allows a bounded regression. Absolute deltas use metric units; relative

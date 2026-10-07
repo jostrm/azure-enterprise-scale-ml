@@ -16,18 +16,20 @@ ROOT = Path(__file__).resolve().parent
 def _source():
     # The sdist already contains the engines; repository builds take their canonical source.
     engines = ROOT / "ml_model_factory"
+    policy = ROOT / "azure_esml" / "resources" / "model-selection.json"
     if not engines.is_dir():
-        engines = ROOT.parent / "usecase_code" / "50-ml-model-factory" / "ml_model_factory"
+        factory = ROOT.parent / "usecase_code" / "50-ml-model-factory"
+        engines = factory / "accelerator" / "src" / "ml_model_factory"
+        policy = factory / "user-config" / "model" / "model-selection.json"
     if not (engines / "__init__.py").is_file():
         raise RuntimeError("Shared v2 engine source is missing; build from the repository or complete sdist")
-    with tempfile.TemporaryDirectory(prefix="azure-esml-build-") as folder:
+    with tempfile.TemporaryDirectory(prefix=".azure-esml-build-", dir=ROOT) as folder:
         staging = Path(folder)
         for name in ("pyproject.toml", "esml_build.py", "MANIFEST.in", "LICENSE"):
             shutil.copy2(ROOT / name, staging / name)
         ignore = shutil.ignore_patterns("__pycache__", "*.pyc", ".*", "*.egg-info")
         shutil.copytree(ROOT / "azure_esml", staging / "azure_esml", ignore=ignore)
         shutil.copytree(engines, staging / "ml_model_factory", ignore=ignore)
-        policy = engines.parent / "model-selection.json"
         if policy.is_file():
             resources = staging / "azure_esml" / "resources"
             resources.mkdir(exist_ok=True)

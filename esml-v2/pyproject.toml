@@ -39,4 +39,4 @@ azure_esml = ["resources/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = [".", "../usecase_code/50-ml-model-factory"]
+pythonpath = [".", "../usecase_code/50-ml-model-factory/accelerator/src"]

@@ -3,7 +3,7 @@ targetScope = 'resourceGroup'
 @description('An existing Data Factory. This template deploys children only.')
 param factoryName string
 
-@description('Existing self-hosted IR with DNS/network access to Blob, ARM and optional Databricks endpoints.')
+@description('Existing SHIR, or a managed-VNet Azure IR with approved Blob managed private endpoints, with access to Blob, ARM and optional Databricks endpoints.')
 param integrationRuntimeName string
 
 @description('Storage Blob HTTPS endpoint, not a dfs endpoint.')
@@ -23,6 +23,9 @@ param namePrefix string = 'ml_factory'
 resource factory 'Microsoft.DataFactory/factories@2018-06-01' existing = {
   name: factoryName
 }
+
+// LakeLayout canonicalizes account_url without a trailing slash; accept either parameter form.
+var canonicalSinkEndpoint = endsWith(sinkBlobEndpoint, '/') ? substring(sinkBlobEndpoint, 0, length(sinkBlobEndpoint) - 1) : sinkBlobEndpoint
 
 var ir = {
   referenceName: integrationRuntimeName
@@ -153,7 +156,7 @@ var validateLake = {
   type: 'IfCondition'
   typeProperties: {
     expression: {
-      value: '@if(empty(pipeline().parameters.lakeParameters),true,and(equals(pipeline().parameters.lakeParameters.storageAccountUrl,\'${sinkBlobEndpoint}\'),and(equals(pipeline().parameters.sinkContainer,pipeline().parameters.lakeParameters.container),equals(pipeline().parameters.sinkFolder,pipeline().parameters.lakeParameters.paths.landing))))'
+      value: '@if(empty(pipeline().parameters.lakeParameters),true,and(equals(pipeline().parameters.lakeParameters.storageAccountUrl,\'${canonicalSinkEndpoint}\'),and(equals(pipeline().parameters.sinkContainer,pipeline().parameters.lakeParameters.container),equals(pipeline().parameters.sinkFolder,pipeline().parameters.lakeParameters.paths.landing))))'
       type: 'Expression'
     }
     ifTrueActivities: []

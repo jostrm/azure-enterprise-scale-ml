@@ -1,11 +1,133 @@
-# ML MODEL FACTORY
+# ML model factory
+
+**Purpose:** configure and run reusable machine-learning examples without editing shared accelerator code.
+**Ownership:** `user-config` and project copies of examples are user-editable; `accelerator` is maintainer-owned; `data/out` and `ml-environment` contain generated artifacts.
+**Status:** executable notebook templates exist for 124 of 126 use-case leaves (batch, online and streaming x seven tasks x six technologies) over shared engines for training, scoring, online serving, streaming, the ESML pipeline factory and Databricks. Dataset, licensing, compute and task-specific prerequisites still apply; cloud steps are explicit and a folder or template is not proof of a deployed model.
+
+## Folder layout
+
+```text
+50-ml-model-factory\
+├── .venv\                              Generated Python environment; stays at root
+├── user-config\                        User-editable project configuration
+│   ├── model\                          Model behavior and quality policy
+│   │   ├── scenarios\                  Shared dataset/features/target/split definitions
+│   │   ├── model-selection.json         Candidate/champion comparison rules
+│   │   ├── monitoring.example.json      Monitoring configuration template
+│   │   └── environments\                Optional custom dependency overrides
+│   ├── databricks\                      Customer Databricks configuration
+│   │   ├── job-template.json            Existing cluster/notebook/data references
+│   │   ├── inference-settings.example.json  Batch/online/streaming task settings
+│   │   └── azureml-step.example.json    Azure ML pipeline Databricks-step settings
+│   ├── esml-rollout.example.json        ESML pipeline-factory scenario bindings
+│   ├── storage-selection.example.json   Common or project storage selection
+│   └── lake.example.json                Lake layout configuration template
+├── usecase-type\                        User-facing examples by inference pattern
+│   ├── batch\                           Scheduled/on-demand bulk scoring to storage
+│   ├── online\                          Low-latency request/response inference
+│   └── streaming\                       Continuous or micro-batch event processing
+├── data\                                Local data, not Azure storage
+│   ├── in\                              Raw source datasets
+│   │   └── lake-data\                   Raw lake landing imports only
+│   └── out\                             Processed datasets
+│       └── lake-data\                   Complete local lake releases and provenance
+├── ml-environment\                      Generated execution/development artifacts
+│   ├── outputs\                         Models, reports, rendered jobs and receipts
+│   ├── mlruns\                          Local MLflow tracking
+│   ├── .pytest_cache\                    Pytest cache; created on demand
+│   └── *.egg-info\                       Generated package metadata
+└── accelerator\                         Maintainer-owned shared implementation
+    ├── src\                             Importable Python source
+    │   └── ml_model_factory\            Shared data/training/evaluation/serving engine
+    ├── scripts\                         SDK/CLI and pipeline execution entry points
+    ├── environments\                    Maintained dependency specifications
+    ├── databricks\                      Shared parameter-driven backend notebooks
+    ├── schemas\                         Configuration/report schema contracts
+    └── tests\                           Automated accelerator and integration tests
+        └── fixtures\                    Small, non-production test inputs
+```
+
+`pyproject.toml`, `setup.cfg`, this guide and ignore rules stay at the project root. Install from that root; the Python import remains `ml_model_factory`. `setup.cfg` directs generated package metadata into `ml-environment`; packaging tooling owns those files.
+
+Each serving category contains `classification`, `regression`, `timeseries-forecasting`, and the four `computer-vision` subtypes: `multi-class`, `multi-label`, `object-detection`, and `instance-segmentation`. Technology branches offer custom notebooks, AutoML notebooks/pipelines, Azure ML pipelines (the ESML pipeline factory for tabular tasks), Databricks notebooks and Azure ML pipelines with Databricks steps. Every leaf README states its route, prerequisites and limitations; see [use-case examples](#use-case-examples-and-shared-inference-engines).
+
+## Start here
+
+1. Copy the generic templates into your orange project without overwriting customer edits.
+2. Configure a scenario in `user-config\model\scenarios`; it is the single definition referenced by batch, online and streaming examples.
+3. Configure project/storage settings under `user-config`, place local raw data in `data\in`, then choose an example under `usecase-type`.
+4. Install declared dependencies in the root `.venv`; run existing local validation or render jobs before explicitly enabling a cloud operation.
+
+```powershell
+# From the 50-ml-model-factory root, using the intended Python environment:
+python -m pip install -e ".[train,azure,dev]"
+python -m ml_model_factory --help
+python -m ml_model_factory validate --scenario user-config\model\scenarios\diabetes.json
+python -m ml_model_factory storage-target --config user-config\runtime.local.json
+python -m pytest
+```
+
+The runtime example path above is customer-owned: create it from the storage example plus your existing project settings. There is no default subscription, workspace, compute or cluster chosen for you. Review required fields and commands in [user-config/readme.md](user-config/readme.md). Keep credentials in the platform's identity/secret facilities, never in JSON, notebooks or Git.
+
+## Ownership and customization
+
+| Location | User action |
+|---|---|
+| `user-config\model\scenarios` | Configure data source, target, features, split, algorithms, budgets and quality thresholds. |
+| `user-config\databricks` | Configure existing cluster, notebook, experiment and data references, pattern task settings and Azure ML Databricks-step settings; review all placeholders. |
+| `user-config\esml-rollout.example.json` | Copy to `esml-rollout.local.json` and add a reviewed source binding per scenario for ESML pipeline-factory leaves. |
+| `user-config\model\environments` | Add a reviewed dependency override only when required; normally select a pinned tested environment reference. |
+| `usecase-type` | Run or adapt thin project examples; reuse shared engines rather than copying their internals. |
+| `accelerator` | Maintainer changes only: implementation, wrappers, schemas, default dependencies and tests. |
+| `data\in` / `data\out` | Supply raw inputs / inspect generated processed datasets. |
+| `ml-environment` | Inspect generated models, reports and tracking; do not use artifacts as configuration. |
+
+Generic examples belong in purple; customer-specific copies belong in orange. Scenario validation rejects invalid feature/target combinations; renderers validate budgets and data bindings before submission. Dataset licensing and vision prerequisites are explicit gates, not automatic approvals.
+
+## Use-case examples and shared inference engines
+
+The [use-case tree](usecase-type/readme.md) has one generated notebook per supported leaf and
+configured scenario (192 notebooks for 124 of 126 leaves). Notebooks only orchestrate shared
+engines and keep every switch `False` until you opt in. AutoML forecasting is not offered for
+streaming because `forecast()` needs observed history with each request; use the custom
+seasonal-naive streaming example or AutoML batch/online scoring with explicit history.
+
+| Need | Shared command or component |
+|---|---|
+| Demo requests without labels | `sample-requests` writes `requests.parquet`, `labels.parquet` (held-out truth), `events.jsonl`, `online-request.json` and forecasting `history.parquet` |
+| Batch scoring | `score` locally; `serving-render/deploy/invoke --kind batch` (no-code batch endpoint or factory scoring job); ESML `GOLD_INFERENCE`; Databricks `batch-score` |
+| Online serving | `online-test` runs the Azure ML scoring entry point in-process; `serving-render/deploy/invoke/delete --kind online`; Databricks `register-serve` (Unity Catalog + Model Serving) |
+| Streaming | `stream-score` micro-batches (JSONL or Event Hubs with Azure AD identity, idempotent batches, checkpoints, quarantine); `stream-job` scheduled Azure ML micro-batch jobs; Databricks `stream-score` |
+| Azure ML pipelines | `render` (custom/AutoML, gated AutoML images with lake binding) and the ESML pipeline factory via `user-config/esml-rollout.example.json` |
+| Databricks | `databricks-job render/create/run` (multi-task jobs) and `databricks-pipeline render` (Azure ML steps running single Databricks tasks) |
+
+```powershell
+python -m ml_model_factory usecases --pattern online --task-folder classification
+python -m ml_model_factory usecase-examples            # check generated notebooks/READMEs
+python -m ml_model_factory sample-requests --scenario user-config\model\scenarios\diabetes.json `
+  --prepared data\out\diabetes\online-custom\prepared --output ml-environment\outputs\diabetes\online-custom\online\requests
+python -m ml_model_factory online-test --scenario user-config\model\scenarios\diabetes.json `
+  --model ml-environment\outputs\diabetes\online-custom\model `
+  --request ml-environment\outputs\diabetes\online-custom\online\requests\online-request.json
+```
+
+Commands that change Azure or Databricks resources preview by default and require
+`--execute`. Endpoint, schedule and streaming costs continue until you delete or stop them.
+
+## Local-data migration notes
+
+The former `data\<scenario>` sources are now under `data\in\<scenario>`. New notebook preparation writes to `data\out`, while models/reports go to `ml-environment\outputs`. Existing generated run bundles are preserved byte-for-byte, including their historical absolute-path metadata.
+
+The former `lake-data` is now `data\out\lake-data`. Its historical releases mix raw landing, refined data and provenance, so they remain intact to preserve manifest references. Only original landing files are also exposed under `data\in\lake-data`; the complete lake is not duplicated. The redundant top-level forecasting documentation has been consolidated into the batch forecasting branch.
+
+The code supports local MLflow storage under `ml-environment\mlruns` when configured. Old MLflow metadata may still reference the original artifact location; use recorded files directly or an explicit reviewed import rather than silently rewriting run history.
 
 ## Choose common or project data storage
 
 Set `use_common_datalake_storage` to the JSON boolean `true` for the common
 datalake, or `false` for the data account in the project resource group (not
 local disk and not the AML workspace's artifact account). Merge
-[`storage-selection.example.json`](storage-selection.example.json) into the
+[`storage-selection.example.json`](user-config/storage-selection.example.json) into the
 project discovery JSON, runtime JSON, or standalone lake configuration:
 
 ```json
@@ -43,8 +165,8 @@ asset references fail instead of silently reading another account. Prefer an
 account-independent `input_path` object key when switching frequently.
 
 ```powershell
-python -m ml_model_factory storage-target --config runtime.local.json
-python -m ml_model_factory discover --project project.json --output runtime.local.json
+python -m ml_model_factory storage-target --config user-config\runtime.local.json
+python -m ml_model_factory discover --project project.json --output user-config\runtime.local.json
 ```
 
 Changing the flag requires re-rendering saved jobs/schedules. Submission refuses
@@ -58,56 +180,9 @@ a supported HNS/ABFS or UC-Volume backend; selecting a non-HNS project account
 does not turn it into Gen2. Registered models, Foundry resources and compute stay
 in the project resource group.
 
-# How is the folder structure of these AI Factory ML templates ordered
-Evertyihng are generic templates. Not hardcoded examples. You can simply change to your data, and it will work - or prefferlby use the usecase_code\40-agent-factory to build ML-models from these templates.
-
-- SPEED: There are 3 categories of use cases: Batch, Online, Streaming
-- TYPE: Under each category, such as "Batch", we haeve different use case cateogories
-    - classification (tabular data)
-    - regression (tabular data)
-    - timeseries-forecasting (tabular data)
-    - computer-vision (image data)
-    - purposely not there: TEXT, VIDEO, SPEECH, since todays LLMs takes care of that.
-- TECHNOLOGY (IDE): Each usecase of speed and type you can pick differnt technology of your choice
-    - azure-automl: Azure Machine Learning AutoML
-    - azureml-pipeline: Azure Machine Learning Pipeline
-        - both via Python SDK v2, and CLI v2
-    - databricks-azureml-pipeline-step: Azure Machine Learning Pipeline step for Databricks Spark notebook called in Azure ML
-    - databricks-notebook: Databricks spar notebook
-    - notebook: Jupyter notebook in Python
-
-## Batch, Online or Streaming use cases
-- Batch use cases, meaning ml/dl-models deployed and served on Azure Machine Learning batch pipelines, or Databricks batch processing. Using Azure datafactory to load multiple rows from storage to a pipeline that does inferehces on all rows, and saves the result back to the stoage account.The compute is not up at start, but spins up a cluster that processes the data, then goes down again.
-- Online, meaning ml- or dl-models served on AKS or ContainerApps, or Azure ML Managed Online Endpoints, or Databricks equivalent that also have scale to zero cluster. Where a user or consuming applicaiton can call pass some data to a REST endpoint, and get a REST response back, in near real time. The compute is always up-and running, hot. 
-- Streaming, meaning models served via Azure Databricks strucured streadming or Azure Stream analtyics, both via Azure Eventhubs. The results are near real time, and can also be save to storage. 
-
-
-## You are an Enteprise Scale AI Factory Machine learning model developer
-
-Focus on using Azure machine learning AutoML, but also Databricks examples. 
-
-Machine learning models you should create will be scenarios (see Kaggle data) of simple examples of
-- classification, such as the "Youwld you surviced Titanic or not" with titanic.parquet data
-- regression, such as "risk of diabetes" or "risk of customer churn"
-- forecasting, such as "sales forecasting"  of orange juice, https://github.com/Azure/azureml-examples/tree/main/sdk/python/jobs/automl-standalone-jobs/automl-forecasting-orange-juice-sales
-- time-series foreacting: 
-- computer vision, such as: Multi-class image classification, Multi-label image classificaiton, object detectio, instance segmentaiton (all are supported in AutoML)
-
-Have both examples using AutoML, and without. AutoML v2, docs: https://learn.microsoft.com/en-us/azure/machine-learning/concept-automated-ml?view=azureml-api-2
-
-Create both Jyptuer notebook examples, Azure ML pipelines with Python, and with the CLI. 
-Here are some AutoML notebooks: https://github.com/Azure/azureml-examples/tree/main/sdk/python/jobs/automl-standalone-jobs
-
-Use only Azure machine learning V2 examples. 
-https://learn.microsoft.com/en-us/azure/machine-learning/?view=azureml-api-2
-Create each example with Python SDK, and with CLI v2. 
-Docs: https://learn.microsoft.com/en-us/azure/machine-learning/how-to-train-model?view=azureml-api-2&tabs=python
-
-Use Responsible AI tooling, on each model scenario: https://learn.microsoft.com/en-us/azure/machine-learning/concept-responsible-ai?view=azureml-api-2
-
 ## Winning-model comparison
 
-[`model-selection.json`](model-selection.json) defines the winning model with
+[`user-config\model\model-selection.json`](user-config/model/model-selection.json) defines the winning model with
 per-task selected metrics, maximize/minimize direction, signed improvement
 thresholds and absolute/relative comparison. All chosen metrics must pass; ties
 keep the champion by default. Classification includes AUC, accuracy, F1 and MCC;
@@ -115,9 +190,9 @@ regression includes RMSE, R2 and Spearman; forecasting and all four vision tasks
 have separate profiles.
 
 ```powershell
-python -m ml_model_factory compare-models --policy model-selection.json `
-  --candidate outputs\candidate\comparison.json --champion outputs\champion\comparison.json `
-  --output outputs\selection-decision.json
+python -m ml_model_factory compare-models --policy user-config\model\model-selection.json `
+  --candidate ml-environment\outputs\candidate\comparison.json --champion ml-environment\outputs\champion\comparison.json `
+  --output ml-environment\outputs\selection-decision.json
 ```
 
 Use `--no-champion` instead of `--champion` only for an explicit initial-model
@@ -148,13 +223,13 @@ training can omit unavailable scope, but never invents it.
 
 ```powershell
 # Preview only; no model or registry writes:
-python -m ml_model_factory tags --scenario scenarios\diabetes.json --context runtime.local.json --engine azureml --mode automl
+python -m ml_model_factory tags --scenario user-config\model\scenarios\diabetes.json --context user-config\runtime.local.json --engine azureml --mode automl
 
 # SDK v2 registration after the completed pipeline's evaluation gate:
-python scripts\azureml_sdk.py --runtime runtime.local.json register --job-name <completed-pipeline> --model-name diabetes-classification
+python accelerator\scripts\azureml_sdk.py --runtime user-config\runtime.local.json register --job-name <completed-pipeline> --model-name diabetes-classification
 
 # Alternative: same gate/tag builder, followed by CLI v2 model creation:
-python scripts\azureml_cli.py --runtime runtime.local.json --register-job <completed-pipeline> --model-name diabetes-classification
+python accelerator\scripts\azureml_cli.py --runtime user-config\runtime.local.json --register-job <completed-pipeline> --model-name diabetes-classification
 ```
 
 Do not execute both registration alternatives for the same intended version.
@@ -164,7 +239,7 @@ Local tags are written into `factory.json` and MLflow `MLmodel` metadata before
 publication; completed immutable runs are never edited in place.
 
 Databricks training accepts `model_context` JSON/path alongside `lake_config`.
-Import `databricks/model_tags.py` with the notebook. Its separately invoked
+Import `accelerator\databricks\model_tags.py` with the notebook. Its separately invoked
 `register_evaluated` helper verifies finished-run status, quality gate and model
 metadata before creating tagged registry versions. The Azure ML Databricks
 component accepts an optional JSON-file `model_context` input and forwards only
@@ -203,12 +278,12 @@ scenario features; images require explicit `features` or `image_statistics`.
 Reference data must remain fixed for the comparison.
 
 ```powershell
-python -m ml_model_factory monitor --scenario scenarios\diabetes.json `
-  --context runtime.local.json --config monitoring.local.json `
+python -m ml_model_factory monitor --scenario user-config\model\scenarios\diabetes.json `
+  --context user-config\runtime.local.json --config monitoring.local.json `
   --reference reference.parquet --current current.parquet `
   --reference-outcomes reference-outcomes.parquet `
   --predictions current-predictions.parquet --labels observed-labels.parquet `
-  --output outputs\monitoring\window-001
+  --output ml-environment\outputs\monitoring\window-001
 ```
 
 Reference outcomes contain `request_id`, `actual`, `prediction`, `model_version`.
@@ -244,11 +319,11 @@ Data scores from different metric families are not directly comparable.
 
 ```powershell
 # Preview only:
-python -m ml_model_factory monitor-publish --report outputs\monitoring\window-001\report.json
+python -m ml_model_factory monitor-publish --report ml-environment\outputs\monitoring\window-001\report.json
 
 # Explicit Azure write, only after reviewing target, identity, report and permissions:
-python -m ml_model_factory monitor-publish --report outputs\monitoring\window-001\report.json `
-  --runtime runtime.local.json --execute
+python -m ml_model_factory monitor-publish --report ml-environment\outputs\monitoring\window-001\report.json `
+  --runtime user-config\runtime.local.json --execute
 ```
 
 Publication requires an existing registered model version and an existing project
@@ -268,14 +343,14 @@ are a different signal. See the
 
 ### Scheduling
 
-Use the v2 monitoring job/schedule renderer in `scripts\monitoring_job.py`.
+Use the v2 monitoring job/schedule renderer in `accelerator\scripts\monitoring_job.py`.
 For example, after resolving the three credential-free Azure data URIs:
 
 ```powershell
-python scripts\monitoring_job.py render --runtime runtime.local.json --scenario scenarios\diabetes.json `
+python accelerator\scripts\monitoring_job.py render --runtime user-config\runtime.local.json --scenario user-config\model\scenarios\diabetes.json `
   --config-uri <current-window-config-uri> --reference-uri <fixed-baseline-uri> `
-  --current-uri <current-features-uri> --output outputs\monitoring-schedule --interval-hours 24
-python scripts\monitoring_job.py create --runtime runtime.local.json --schedule outputs\monitoring-schedule\schedule.yml
+  --current-uri <current-features-uri> --output ml-environment\outputs\monitoring-schedule --interval-hours 24
+python accelerator\scripts\monitoring_job.py create --runtime user-config\runtime.local.json --schedule ml-environment\outputs\monitoring-schedule\schedule.yml
 ```
 
 The second command previews by default; only `create --execute` or an explicit
@@ -287,7 +362,7 @@ current-window config; it never replaces old observation dates with its wall clo
 
 ### Dev activation prerequisites
 
-`scripts\activate_monitoring.py` previews an idempotent, Dev-only control-plane setup:
+`accelerator\scripts\activate_monitoring.py` previews an idempotent, Dev-only control-plane setup:
 an existing private project's `ml-model-factory` container, credentialless
 `ml_model_factory` datastore, container-scoped compute/workspace data access, and a
 workspace-scoped custom role limited to model-version metadata read/write.
@@ -295,8 +370,8 @@ It does not create jobs, registered models, inference endpoints or schedules.
 It never changes firewalls, public access, networking or subscription features.
 
 ```powershell
-python scripts\activate_monitoring.py --runtime runtime.local.json `
-  --storage-account <existing-project-storage2001> --output runtime-monitoring.local.json
+python accelerator\scripts\activate_monitoring.py --runtime user-config\runtime.local.json `
+  --storage-account <existing-project-storage2001> --output user-config\runtime-monitoring.local.json
 # Add --execute only after approving the printed target and role assignments.
 ```
 

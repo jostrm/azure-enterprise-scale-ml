@@ -1,0 +1,27 @@
+include MANIFEST.in pyproject.toml setup.cfg readme.md .gitignore .amlignore
+include accelerator/readme.md accelerator/src/readme.md
+recursive-include accelerator/src/ml_model_factory *.py readme.md
+recursive-include accelerator/scripts *.py readme.md
+recursive-include accelerator/databricks *.py readme.md
+recursive-include accelerator/environments *.yml *.yaml readme.md
+recursive-include accelerator/schemas *.json readme.md
+recursive-include accelerator/tests *.py readme.md
+recursive-include accelerator/tests/fixtures *.json
+recursive-include user-config readme.md *.example.json
+include user-config/model/model-selection.json user-config/databricks/job-template.json
+recursive-include user-config/model/scenarios *.json
+recursive-include usecase-type readme.md *.ipynb *.yml *.yaml
+prune .venv
+prune build
+prune dist
+prune data
+prune ml-environment
+prune outputs
+prune mlruns
+prune generated
+prune lake-data
+global-exclude *.py[cod] *.local.json .env kaggle.json
+global-exclude */.ipynb_checkpoints/*
+include data/readme.md data/in/readme.md data/out/readme.md
+include data/in/lake-data/readme.md data/out/lake-data/readme.md
+include ml-environment/readme.md ml-environment/outputs/readme.md ml-environment/mlruns/readme.md

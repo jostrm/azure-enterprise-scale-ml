@@ -277,8 +277,9 @@ def _train(args, output: Path) -> None:
             json.dump(runtime, stream, indent=2, allow_nan=False)
             stream.write("\n")
     cli("validate", "--scenario", args.scenario, "--runtime", runtime_path)
+    source = ["--source", str(args.source)] if getattr(args, "source", None) else []
     cli("render", "--scenario", args.scenario, "--runtime", runtime_path,
-        "--output", str(bundle), "--mode", args.mode)
+        "--output", str(bundle), "--mode", args.mode, *source)
     job_path = bundle / "pipeline.yml"
     if not job_path.is_file():
         raise RuntimeError("Renderer did not produce pipeline.yml")
@@ -334,8 +335,9 @@ def deploy(args) -> None:
     runtime = validate_runtime(load_json(Path(args.runtime)))
     bundle = Path(args.output) / ("bundle-" + uuid4().hex)
     cli("validate", "--scenario", args.scenario, "--runtime", args.runtime)
+    source = ["--source", str(args.source)] if getattr(args, "source", None) else []
     cli("render", "--scenario", args.scenario, "--runtime", args.runtime,
-        "--output", str(bundle), "--mode", args.mode)
+        "--output", str(bundle), "--mode", args.mode, *source)
     endpoint = deploy_model(runtime, bundle, args.model_id, args.kind)
     print(json.dumps({"endpoint": endpoint, "model_id": args.model_id, "kind": args.kind}))
 
@@ -352,7 +354,8 @@ def main() -> int:
     training = sub.add_parser("train")
     training.add_argument("--scenario", required=True)
     training.add_argument("--runtime", required=True)
-    training.add_argument("--output", default="generated")
+    training.add_argument("--output", help="Defaults to the checkout's ml-environment/outputs")
+    training.add_argument("--source", type=Path, help="Model-factory checkout root; required outside a checkout with a wheel")
     training.add_argument("--mode", choices=("automl", "custom"), required=True)
     training.add_argument("--ml-extension-version", default=ML_EXTENSION_VERSION,
                           choices=(ML_EXTENSION_VERSION,))
@@ -369,13 +372,21 @@ def main() -> int:
     deployment = sub.add_parser("deploy")
     deployment.add_argument("--scenario", required=True)
     deployment.add_argument("--runtime", required=True)
-    deployment.add_argument("--output", default="generated-deploy")
+    deployment.add_argument("--output", help="Defaults to the checkout's ml-environment/outputs/deploy")
+    deployment.add_argument("--source", type=Path, help="Model-factory checkout root; required outside a checkout with a wheel")
     deployment.add_argument("--mode", choices=("automl", "custom"), required=True)
     deployment.add_argument("--model-id", required=True)
     deployment.add_argument("--approval-environment", required=True)
     deployment.add_argument("--kind", choices=("online", "batch"), default="online")
     args = parser.parse_args()
     try:
+        if args.action in ("train", "deploy") and (args.source is not None or args.output is None):
+            from ml_model_factory.layout import source_root
+
+            args.source = source_root(args.source)
+            if args.output is None:
+                output = args.source / "ml-environment" / "outputs"
+                args.output = str(output / "deploy" if args.action == "deploy" else output)
         if args.action == "validate":
             extra = ["--runtime", args.runtime] if args.runtime else []
             print(cli("validate", "--scenario", args.scenario, *extra))

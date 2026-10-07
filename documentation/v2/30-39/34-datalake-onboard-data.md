@@ -304,19 +304,19 @@ and CLI v2, not the legacy SDK v1.
 1. Select a scenario and review its Kaggle license, authentication requirements,
    source schema and labels. A required-selection or license-review gate is not
    bypassed automatically.
-2. Copy `lake.example.json` to an ignored `lake.local.json`. Set project,
+2. Copy `user-config\lake.example.json` to an ignored `user-config\lake.local.json`. Set project,
    environment, use case, dataset version, snapshot ID and a unique run ID.
 3. Resolve the layout before writing data:
 
 ```powershell
-python -m ml_model_factory lake-plan --scenario scenarios\titanic.json --config lake.local.json
+python -m ml_model_factory lake-plan --scenario user-config\model\scenarios\titanic.json --config user-config\lake.local.json
 ```
 
 Download and run a custom-training example:
 
 ```powershell
-python -m ml_model_factory ingest --scenario scenarios\titanic.json --output data\titanic
-python -m ml_model_factory lake-train --scenario scenarios\titanic.json --config lake.local.json --root lake-data --input data\titanic\train.csv
+python -m ml_model_factory ingest --scenario user-config\model\scenarios\titanic.json --output data\in\titanic
+python -m ml_model_factory lake-train --scenario user-config\model\scenarios\titanic.json --config user-config\lake.local.json --root ml-environment\outputs\lake-data --input data\in\titanic\train.csv
 ```
 
 Titanic competition access requires your own authenticated Kaggle account and
@@ -328,12 +328,12 @@ model/evaluation run. It uses exclusive publication paths and checksum manifests
 Failed quality gates retain diagnostics but do not publish a successful model.
 `lake-train` is the custom-training route; AutoML uses the separate Azure job route.
 
-For inference, create a separate `scoring.local.json` with a fresh `run_id`,
+For inference, create a separate `user-config\scoring.local.json` with a fresh `run_id`,
 the exact `model_version`, and the intended serving pattern. Prepare an unlabeled
 request file and pass the model path returned by training:
 
 ```powershell
-python -m ml_model_factory lake-infer --scenario scenarios\titanic.json --config scoring.local.json --root lake-data --input requests.parquet --model "<committed-training-run>\model"
+python -m ml_model_factory lake-infer --scenario user-config\model\scenarios\titanic.json --config user-config\scoring.local.json --root ml-environment\outputs\lake-data --input data\in\requests.parquet --model "<committed-training-run>\model"
 ```
 
 Keep datasets, models, outputs, local configuration and the virtual environment
@@ -356,7 +356,7 @@ network policies; apply retention and regulatory controls separately.
 ### Preview-first publication
 
 ```powershell
-python -m ml_model_factory lake-publish --scenario scenarios\titanic.json --config lake.local.json --root lake-data --area training_snapshot
+python -m ml_model_factory lake-publish --scenario user-config\model\scenarios\titanic.json --config user-config\lake.local.json --root ml-environment\outputs\lake-data --area training_snapshot
 ```
 
 The default is a transfer plan, with no Azure writes. After approving the destination
@@ -423,9 +423,9 @@ Related legacy guidance:
 [supported use cases](32-use_cases-where_to_start.md).
 
 Implementation references:
-[`LakeLayout`](../../../usecase_code/50-ml-model-factory/ml_model_factory/lake.py),
-[local lifecycle](../../../usecase_code/50-ml-model-factory/ml_model_factory/lake_flow.py),
-[example configuration](../../../usecase_code/50-ml-model-factory/lake.example.json).
+[`LakeLayout`](../../../usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/lake.py),
+[local lifecycle](../../../usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/lake_flow.py),
+[example configuration](../../../usecase_code/50-ml-model-factory/user-config/lake.example.json).
 
 ## 8. Validate the complete lifecycle
 

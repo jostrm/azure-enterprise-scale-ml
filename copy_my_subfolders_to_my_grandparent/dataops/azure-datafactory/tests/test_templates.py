@@ -187,6 +187,13 @@ class BicepTests(unittest.TestCase):
         self.assertIn("lakeParameters.storageAccountUrl", self.source)
         self.assertNotIn("type: 'ExecuteDataFlow'", self.source)
 
+    def test_lake_destination_check_uses_canonical_sink_endpoint(self):
+        # LakeLayout strips a trailing slash; the documented example endpoint keeps one.
+        self.assertIn("storageAccountUrl,\\'${canonicalSinkEndpoint}\\'", self.source)
+        self.assertNotIn("storageAccountUrl,\\'${sinkBlobEndpoint}\\'", self.source)
+        variables = self.template.get("variables", {})
+        self.assertIn("canonicalSinkEndpoint", variables)
+
 
 if __name__ == "__main__":
     unittest.main()

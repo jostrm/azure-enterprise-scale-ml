@@ -293,7 +293,7 @@ grant roles or elevate the caller.
 with exact configured targets and explicit blockers. Agent templates come from
 `usecase_code\40-agent-factory`; shared helpers, generated folders and empty
 placeholders are not deployable agent types. ML templates come from
-`usecase_code\50-ml-model-factory\batch`, `online` and `streaming`. The same
+`usecase_code\50-ml-model-factory\usecase-type\batch`, `online` and `streaming`. The same
 type name can appear in more than one mode, so `serving_mode` is required.
 
 ```json

@@ -4,6 +4,9 @@
 - Used to prepare data for batch training and inference.
 - Reads project Blob storage into an explicit destination before orchestrating compute.
 - Model implementation: `usecase_code\50-ml-model-factory`.
+- Shared Python implementation: `accelerator\src\ml_model_factory` within that root;
+  editable scenarios: `user-config\model\scenarios`; local inputs: `data\in`.
+  The root `pyproject.toml` and `.venv` remain the install and Python entry points.
 
 ## Scope and prerequisites
 
@@ -21,15 +24,21 @@ credential exists and its UAMI is assigned to the factory; empty strings use the
 system-assigned managed identity. Source needs Storage Blob Data Reader and sink needs
 Storage Blob Data Contributor, granted separately by an administrator.
 
-`integrationRuntimeName` must identify an existing **self-hosted integration runtime (SHIR)**.
-It must have working private DNS, routes, TLS and outbound access to Blob and ARM; validate
+`integrationRuntimeName` must identify an existing integration runtime with private reach to Blob
+and ARM: a **self-hosted integration runtime (SHIR)**, or the factory's **managed virtual network
+Azure IR** (for example `AutoResolveIntegrationRuntime`) when approved managed private endpoints
+exist for the source and sink **Blob** endpoints. The managed-VNet route (Copy, ARM Web PUT/GET to
+Azure ML) was verified live on 2026-10-06 against a private factory, lake and workspace.
+A SHIR must have working private DNS, routes, TLS and outbound access to Blob and ARM; validate
 linked-service connectivity before queueing. Web activities explicitly set `connectVia`.
 An Azure DevOps agent or GitHub runner on a VM **is not an ADF integration runtime**.
 Installing a CI agent alone does not satisfy this prerequisite. No public-network fallback
 or firewall bypass is enabled here. The factory system identity used by ARM Web activities
 needs workspace-scoped permissions to create/read AML jobs; its identity is independent of
 the configurable Blob credential. Azure ML job/compute identity also needs input/output data
-access. No credentials are embedded in these templates.
+access (for credentialless datastores set `"identity": {"identityType": "Managed"}` in the ARM
+job payload so the compute identity, not ADF's identity, reads and writes data). No credentials
+are embedded in these templates.
 
 ## Manual install (administrator action; not performed automatically)
 
@@ -109,7 +118,7 @@ Copy and ARM payload behavior unchanged. No existing directories are renamed or 
 $python = 'usecase_code\50-ml-model-factory\.venv\Scripts\python.exe'
 & $python "$templates\prepare_run.py" --runtime runtime.json `
   --copy copy.local.json --job-payload job-payload.local.json `
-  --lake lake.local.json --scenario scenario.json --input-name raw `
+  --lake lake.local.json --scenario usecase_code\50-ml-model-factory\user-config\model\scenarios\titanic.json --input-name raw `
   --output generated\adf-run.json
 ```
 
@@ -121,7 +130,8 @@ The adapter uses **the shared `LakeLayout`, not a separate ADF naming convention
   separately reviewed binding rather than silently treating a folder as a file.
 * Sink is derived from `lake.storage.container` and the dataset-version `landing` key;
   optional Copy sink values are replaced. `filePattern` becomes the scenario filename.
-  The deployed sink linked service must use the same canonical `storage.account_url`.
+  The deployed sink linked service must use the same canonical `storage.account_url`
+  (a trailing `/` on `sinkBlobEndpoint` is ignored by the comparison).
   ADF's `ValidateLakeDestination` rejects account/container/prefix mismatches before Copy.
 * The **existing** named ARM input (`raw` by default) is explicitly rebound as `uri_file`
   to `LakeLayout.azureml_uri("landing") + scenario.dataset.file`. Its mode is preserved.
@@ -189,7 +199,7 @@ Test the linked service and its own SHIR `connectVia` route for private workspac
 This template references, but does not create or modify, that linked service.
 
 In addition to Copy parameters, pass `notebookPath`, `notebookInputPath`, `artifactRoot`,
-`scenarioPath` and `experimentPath`. Import the factory's `databricks\train.py` and point
+`scenarioPath` and `experimentPath`. Import the factory's `accelerator\databricks\train.py` and point
 `notebookPath` at that notebook. The activity passes its exact widget names:
 `input_path`, `artifact_root`, `scenario_path`, `experiment_path`, and optional `lake_config`.
 The `lakeConfig` pipeline string defaults to empty; existing callers do not need it.
@@ -214,7 +224,7 @@ this training activity.
 
 ### Databricks lake widgets and checkpoint storage
 
-For opt-in use, import `databricks\lake_utils.py` as a Python workspace file alongside the
+For opt-in use, import `accelerator\databricks\lake_utils.py` as a Python workspace file alongside the
 notebooks (or use the complete Databricks Git folder), and install the reviewed factory
 wheel containing `ml_model_factory.lake`. Legacy empty `lake_config` does not import the
 new helper. `lake_config` accepts the **lake object as JSON text** or a driver-readable JSON

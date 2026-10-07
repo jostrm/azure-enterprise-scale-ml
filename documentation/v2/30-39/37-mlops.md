@@ -43,7 +43,7 @@ downloads of model-typed pipeline outputs also hit a separate URI-resolution
 defect in 1.33.0, 1.34.1 and 1.35.0; use CLI v2 for that download operation.
 
 The package build includes the existing v2 `ml_model_factory` engines from their
-canonical source in `usecase_code\50-ml-model-factory`. A temporary build staging
+canonical source in `usecase_code\50-ml-model-factory\accelerator\src\ml_model_factory`. A temporary build staging
 directory creates a self-contained wheel and source archive. Installed consumers
 do not need that repository path, an editable checkout, or an unpublished second
 package. There is no second maintained copy of training/evaluation/selection code.
@@ -100,6 +100,22 @@ job IDs and registration/inference receipts. Registration follows completed-job,
 scope, lineage and quality checks; an uncertain previous write is not silently
 repeated. `plan_azureml_scenarios.py` assigns stable numbers to the existing
 eleven scenarios and reports unselected ones without fabricating empty models.
+It delegates to the package functions `settings_from_rollout_config` and
+`project_from_rollout_config` in `azure_esml.domain_layer.rollout`, which the
+model factory's ESML use-case notebooks reuse with
+[`esml-rollout.example.json`](../../../usecase_code/50-ml-model-factory/user-config/esml-rollout.example.json).
+`AzureMLRollout.submit_inference` submits a reviewed inference plan as a pipeline
+job once, as the alternative to pipeline-component batch endpoint invocation.
+
+### Use-case matrix in the model factory
+
+The model factory's [use-case tree](../../../usecase_code/50-ml-model-factory/usecase-type/readme.md)
+covers batch, online and streaming inference for seven tasks and six technologies
+(124 of 126 combinations; AutoML forecasting is not offered for streaming). Each
+leaf notebook reuses this pipeline factory, the factory renderer, the shared
+scoring/serving/streaming engines or the shared Databricks notebooks; generated
+notebooks and README status blocks come from one catalog
+(`python -m ml_model_factory usecases`).
 
 **Rendering and datastore creation are not cloud training.** Experiments/runs
 become visible only after submission; data/model assets require explicit
@@ -307,7 +323,7 @@ Record the source engine, immutable model version, run and artifact location.
 
 ### Scenario-to-model mapping
 
-The [scenario JSON files](../../../usecase_code/50-ml-model-factory/scenarios)
+The [scenario JSON files](../../../usecase_code/50-ml-model-factory/user-config/model/scenarios)
 are the source of truth for these names and task settings.
 
 | Scenario | Model name | Type | Source/access notes |
@@ -413,7 +429,7 @@ still means an Azure ML environment asset such as `azureml:training-runtime:3`.
 Preview tags without changing any model:
 
 ```powershell
-python -m ml_model_factory tags --scenario scenarios\diabetes.json --context runtime.local.json --engine azureml --mode automl
+python -m ml_model_factory tags --scenario user-config\model\scenarios\diabetes.json --context runtime.local.json --engine azureml --mode automl
 ```
 
 Model tags must agree with `runtime.lake` and the evaluated lake lineage:
@@ -442,7 +458,7 @@ model version rather than an in-place rewrite of the AutoML output.
 Databricks training accepts an optional `model_context` JSON/path widget and
 merges it with `lake_config`, rejecting conflicting identities. It tags the
 tracking run and model artifacts. The separately invoked
-`databricks/model_tags.py::register_evaluated(...)` verifies the finished run,
+`accelerator/databricks/model_tags.py::register_evaluated(...)` verifies the finished run,
 quality gate and model metadata before registering a tagged model **version**.
 It does not rewrite name-level registry tags or register automatically.
 
@@ -482,7 +498,7 @@ See the [visual lake hierarchy](34-datalake-onboard-data.md#1-the-design-at-a-gl
 
 ### Define the winning model in JSON
 
-Edit [`model-selection.json`](../../../usecase_code/50-ml-model-factory/model-selection.json)
+Edit [`user-config/model/model-selection.json`](../../../usecase_code/50-ml-model-factory/user-config/model/model-selection.json)
 in your orange model-factory copy. It replaces the ESML v1 comparison controller
 with a small shared Python/CLI policy, not a weighted sum of unrelated units.
 Use a different policy file per use case/environment when requirements differ.
@@ -547,14 +563,14 @@ on the final test set. Unscoped old reports need re-evaluation, not fabricated t
 
 ```powershell
 # Offline decision only: does not register, deploy, or change endpoint traffic.
-python -m ml_model_factory compare-models --policy model-selection.json `
-  --candidate outputs\candidate\comparison.json --champion outputs\champion\comparison.json `
-  --output outputs\selection-decision.json
+python -m ml_model_factory compare-models --policy user-config\model\model-selection.json `
+  --candidate ml-environment\outputs\candidate\comparison.json --champion ml-environment\outputs\champion\comparison.json `
+  --output ml-environment\outputs\selection-decision.json
 
 # Explicit first-model case; absolute quality and all selected metrics remain required.
-python -m ml_model_factory compare-models --policy model-selection.json `
-  --candidate outputs\candidate\comparison.json --no-champion `
-  --output outputs\initial-selection.json
+python -m ml_model_factory compare-models --policy user-config\model\model-selection.json `
+  --candidate ml-environment\outputs\candidate\comparison.json --no-champion `
+  --output ml-environment\outputs\initial-selection.json
 ```
 
 The decision is `candidate_wins`, `champion_kept`, or `blocked`, with each rule's
@@ -570,19 +586,19 @@ from ml_model_factory.config import load_json
 
 model_id = register(
     "completed-pipeline-job", load_json(Path("runtime.local.json")), "diabetes-classification",
-    selection_policy=load_json(Path("model-selection.json")),
-    champion_evaluation=load_json(Path(r"outputs\champion\comparison.json")),
-    decision_path=Path(r"outputs\selection-decision.json"),
+    selection_policy=load_json(Path(r"user-config\model\model-selection.json")),
+    champion_evaluation=load_json(Path(r"ml-environment\outputs\champion\comparison.json")),
+    decision_path=Path(r"ml-environment\outputs\selection-decision.json"),
 )
 ```
 
 The equivalent CLI v2 route is:
 
 ```powershell
-python scripts\azureml_cli.py --runtime runtime.local.json `
+python accelerator\scripts\azureml_cli.py --runtime runtime.local.json `
   --register-job completed-pipeline-job --model-name diabetes-classification `
-  --selection-policy model-selection.json --champion-evaluation outputs\champion\comparison.json `
-  --selection-output outputs\selection-decision.json
+  --selection-policy user-config\model\model-selection.json --champion-evaluation ml-environment\outputs\champion\comparison.json `
+  --selection-output ml-environment\outputs\selection-decision.json
 ```
 
 For an initial model, replace the champion argument with `no_champion=True` (SDK)
@@ -609,18 +625,18 @@ scenario JSON and a resolved runtime JSON. Runtime names existing resources;
 rendering does not provision a workspace, compute or datastore.
 
 ```powershell
-python -m ml_model_factory validate --scenario scenarios\titanic.json --runtime runtime.local.json
-python -m ml_model_factory render --scenario scenarios\titanic.json --runtime runtime.local.json --mode automl --output generated\titanic-automl
+python -m ml_model_factory validate --scenario user-config\model\scenarios\titanic.json --runtime runtime.local.json
+python -m ml_model_factory render --scenario user-config\model\scenarios\titanic.json --runtime runtime.local.json --mode automl --output ml-environment\outputs\titanic-automl
 ```
 
 Choose **one** submission route for a rendered job:
 
 ```powershell
 # Python SDK v2 through the shared factory entry point:
-python -m ml_model_factory submit --runtime runtime.local.json --job generated\titanic-automl\pipeline.yml
+python -m ml_model_factory submit --runtime runtime.local.json --job ml-environment\outputs\titanic-automl\pipeline.yml
 
 # Alternative CLI v2 entry point; do not also submit the same job above:
-python scripts\azureml_cli.py --runtime runtime.local.json --job generated\titanic-automl\pipeline.yml
+python accelerator\scripts\azureml_cli.py --runtime runtime.local.json --job ml-environment\outputs\titanic-automl\pipeline.yml
 ```
 
 Use `--mode custom` for custom training. Render into a new empty directory.
@@ -632,14 +648,14 @@ Registration is explicit and requires a completed factory pipeline plus its
 downloaded passing quality gate and matching lineage:
 
 ```powershell
-python scripts\azureml_sdk.py --runtime runtime.local.json register --job-name <completed-pipeline-name> --model-name titanic-survival
+python accelerator\scripts\azureml_sdk.py --runtime runtime.local.json register --job-name <completed-pipeline-name> --model-name titanic-survival
 ```
 
 The CLI v2 alternative uses the same gate and tag builder, then submits its model
 definition with `az ml model create`:
 
 ```powershell
-python scripts\azureml_cli.py --runtime runtime.local.json --register-job <completed-pipeline-name> --model-name titanic-survival
+python accelerator\scripts\azureml_cli.py --runtime runtime.local.json --register-job <completed-pipeline-name> --model-name titanic-survival
 ```
 
 Do not substitute a raw model registration command that bypasses these checks.
@@ -670,7 +686,7 @@ Enable the shared selection gate through environment-specific runtime JSON:
 ```json
 {
   "model_selection": {
-    "policy": "..\\..\\aifactory-usecase-code\\50-ml-model-factory\\model-selection.json",
+    "policy": "..\\..\\aifactory-usecase-code\\50-ml-model-factory\\user-config\\model\\model-selection.json",
     "champion_evaluation": "champions\\diabetes\\v3\\comparison.json"
   }
 }

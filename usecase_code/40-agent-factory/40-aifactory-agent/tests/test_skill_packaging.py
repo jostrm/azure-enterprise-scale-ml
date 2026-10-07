@@ -84,5 +84,5 @@ def test_bootstrap_prefers_approved_workload_provider_sources_to_shared_fallback
     script = (Path(deploy.__file__).parent / "infra" / "bootstrap.sh").read_text("utf-8")
     pythonpath = next(line for line in script.splitlines() if "/tmp/agent-deps:/tmp/agent-app:" in line)
     assert "workload_sources/usecase_code/40-agent-factory" in pythonpath
-    assert "workload_sources/usecase_code/50-ml-model-factory" in pythonpath
+    assert "workload_sources/usecase_code/50-ml-model-factory/accelerator/src" in pythonpath
     assert pythonpath.index("workload_sources/usecase_code/40-agent-factory") < pythonpath.index("/tmp/agent-app/shared")

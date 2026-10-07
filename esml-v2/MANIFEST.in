@@ -1,4 +1,4 @@
-include esml_build.py LICENSE pyproject.toml
+include esml_build.py LICENSE pyproject.toml MANIFEST.in
 recursive-include azure_esml *.py *.json py.typed
 recursive-include ml_model_factory *.py
 recursive-include examples *.py *.json *.ipynb

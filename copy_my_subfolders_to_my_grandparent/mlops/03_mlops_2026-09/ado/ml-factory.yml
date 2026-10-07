@@ -18,6 +18,7 @@ parameters:
     type: string
     default: copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09
   - name: scenario
+    displayName: Scenario name or user-config\model\scenarios JSON path
     type: string
   - name: runtime
     type: string

@@ -97,14 +97,14 @@ def repo():
     agent = root / "usecase_code" / "40-agent-factory"
     model = root / "usecase_code" / "50-ml-model-factory"
     for path in (agent / "41-single-agent", agent / "42-multi-agent",
-                 model / "batch" / "classification", model / "online" / "classification",
-                 model / "streaming" / "regression", agent / "agent_factory",
-                 model / "ml_model_factory", root / "profiles"):
+                 model / "usecase-type" / "batch" / "classification", model / "usecase-type" / "online" / "classification",
+                 model / "usecase-type" / "streaming" / "regression", agent / "agent_factory",
+                 model / "accelerator" / "src" / "ml_model_factory", root / "profiles"):
         path.mkdir(parents=True, exist_ok=True)
         (path / "source.py").write_text("SOURCE = 1\n", encoding="utf-8")
     (agent / "agent_factory" / "__init__.py").write_text("", encoding="utf-8")
     (agent / "agent_factory" / "prompt.py").write_text("PROMPT = 1\n", encoding="utf-8")
-    (model / "ml_model_factory" / "__init__.py").write_text("", encoding="utf-8")
+    (model / "accelerator" / "src" / "ml_model_factory" / "__init__.py").write_text("", encoding="utf-8")
     (model / "pyproject.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
     (root / "profiles" / "agent.json").write_text(json.dumps({
         "tenant_id": TENANT, "subscription_id": SUBSCRIPTION, "resource_group": "project001-dev",
@@ -122,8 +122,8 @@ def repo():
         "serving": {"instance_type": "Standard_DS3_v2", "instance_count": 1, "batch_instance_count": 1},
         "aifactory": "factory",
     }), encoding="utf-8")
-    scenario = model / "scenarios" / "classification.json"
-    scenario.parent.mkdir()
+    scenario = model / "user-config" / "model" / "scenarios" / "classification.json"
+    scenario.parent.mkdir(parents=True)
     scenario.write_text(json.dumps({
         "name": "titanic", "task": "classification", "target": "label", "features": ["feature"],
         "dataset": {"provider": "lake", "kind": "dataset"},
@@ -145,7 +145,7 @@ def configured(repo):
     model = WorkloadProfile(
         profile_id="approved-model", kind="model", type="classification", family="azureml",
         serving_mode="batch", project_resource_id=WORKSPACE, config_path="profiles\\runtime.json",
-        scenario_path="usecase_code\\50-ml-model-factory\\scenarios\\classification.json",
+        scenario_path="usecase_code\\50-ml-model-factory\\user-config\\model\\scenarios\\classification.json",
         training_mode="custom", output_directory="outputs",
     )
     workloads = WorkloadSettings(repository_root=str(repo), enabled_skills=list(WORKLOAD_SKILLS),
@@ -395,6 +395,8 @@ def test_package_sources_contains_provider_and_all_referenced_configs(configured
     assert "profiles/agent.json" in sources and "profiles/runtime.json" in sources
     assert "usecase_code/40-agent-factory/agent_factory/prompt.py" in sources
     assert "usecase_code/50-ml-model-factory/pyproject.toml" in sources
+    assert "usecase_code/50-ml-model-factory/accelerator/src/ml_model_factory/__init__.py" in sources
+    assert "usecase_code/50-ml-model-factory/user-config/model/scenarios/classification.json" in sources
     assert all(not Path(relative).is_absolute() and ".." not in Path(relative).parts for _, relative in packaged)
 
 
@@ -421,10 +423,10 @@ def copy_provider_sources(repo, kind):
     purple = Path(__file__).resolve().parents[4]
     family = "40-agent-factory" if kind == "agent" else "50-ml-model-factory"
     origin, destination = purple / "usecase_code" / family, repo / "usecase_code" / family
-    package = "agent_factory" if kind == "agent" else "ml_model_factory"
+    package = Path("agent_factory") if kind == "agent" else Path("accelerator") / "src" / "ml_model_factory"
     shutil.copytree(origin / package, destination / package, dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    for name in (("41-single-agent", "42-multi-agent") if kind == "agent" else ("scripts", "environments")):
+    for name in (("41-single-agent", "42-multi-agent") if kind == "agent" else ("accelerator\\scripts", "accelerator\\environments")):
         shutil.copytree(origin / name, destination / name, dirs_exist_ok=True,
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     for name in ("requirements.txt", "pyproject.toml"):
@@ -523,7 +525,7 @@ def test_real_model_strategy_unconfigured_inputs_never_submit(configured, repo, 
     elif change == "environment":
         runtime["environment"] = "azureml:latest"
     elif change == "scenario":
-        scenario = repo / "usecase_code" / "50-ml-model-factory" / "scenarios" / "classification.json"
+        scenario = repo / "usecase_code" / "50-ml-model-factory" / "user-config" / "model" / "scenarios" / "classification.json"
         scenario.write_text(json.dumps({"name": "bad", "task": "regression"}))
     elif change == "workspace":
         runtime["workspace_name"] = "arbitrary"
@@ -916,7 +918,9 @@ def test_actual_aml_renderer_uses_only_immutable_staged_approved_sources(configu
     ))
     settings, adapter, skills = default_skills(configured, repo, "model", monkeypatch)
     source = repo / "usecase_code" / "50-ml-model-factory"
-    package = source / "ml_model_factory"
+    package = source / "accelerator" / "src" / "ml_model_factory"
+    (package / "readme.md").write_text("Provider documentation is not executable job source.")
+    (package / "description.json").write_text('{"description":"Provider metadata"}')
     for relative in (".env.production", "private.json", "training-data.csv", ".git\\config",
                      "generated\\extra.py", "outputs\\extra.py", "private\\customer.py",
                      "secrets\\values.json", "credentials\\config.yml"):
@@ -933,7 +937,7 @@ def test_actual_aml_renderer_uses_only_immutable_staged_approved_sources(configu
 
     def render_from_approved_bytes(scenario, runtime, output, staged_source, mode):
         assert staged_source.resolve() != source.resolve()
-        assert (staged_source / "ml_model_factory" / "training.py").read_bytes() == original_code
+        assert (staged_source / "accelerator" / "src" / "ml_model_factory" / "training.py").read_bytes() == original_code
         assert not any("private-value" in path.read_text(errors="ignore")
                        for path in staged_source.rglob("*") if path.is_file())
         staged.append(staged_source)
@@ -944,6 +948,8 @@ def test_actual_aml_renderer_uses_only_immutable_staged_approved_sources(configu
     def submit(path, runtime):
         code = path.parent / "code"
         assert (code / "ml_model_factory" / "training.py").read_bytes() == original_code
+        assert not (code / "ml_model_factory" / "readme.md").exists()
+        assert not (code / "ml_model_factory" / "description.json").exists()
         assert not any("private-value" in item.read_text(errors="ignore")
                        for item in code.rglob("*") if item.is_file())
         submitted.append(path)
@@ -1025,10 +1031,10 @@ def test_approved_vision_renderer_normalization_is_verified_without_false_drift(
     ))
     settings, adapter, skills = default_skills(configured, repo, "model", monkeypatch)
     source = repo / "usecase_code" / "50-ml-model-factory"
-    template = source / "batch" / "computer-vision"
+    template = source / "usecase-type" / "batch" / "computer-vision"
     template.mkdir()
     (template / "source.py").write_text("SOURCE = 1")
-    scenario = source / "scenarios" / "image.json"
+    scenario = source / "user-config" / "model" / "scenarios" / "image.json"
     scenario.write_text(json.dumps({
         "name": "approved-image", "task": "image_classification",
         "dataset": {"provider": "lake", "kind": "dataset"},

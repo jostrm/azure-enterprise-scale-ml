@@ -408,7 +408,7 @@ def test_external_aml_table_format_override_preserves_gold_bound_projection(work
             assert descriptor["transformations"] == [{"read_delta_lake": {"version_as_of": 0}}]
         else:
             assert descriptor["paths"] == [{"file": "./data.parquet"}]
-            assert descriptor["transformations"] == [{"read_parquet": None}]
+            assert descriptor["transformations"] == [{"read_parquet": {}}]
         assert sha256(prepared / name / "data.parquet") == manifest["split_sha256"][name]
 
 

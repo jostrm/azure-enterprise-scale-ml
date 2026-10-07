@@ -288,7 +288,7 @@ class FileSystemTemplateCatalog:
                 and (root / "usecase_code" / "40-agent-factory").is_dir()):
             parents.append(("agent", None, _path(root, "usecase_code\\40-agent-factory")))
         if kind in (None, "model") and (root / "usecase_code" / "50-ml-model-factory").is_dir():
-            base = _path(root, "usecase_code\\50-ml-model-factory")
+            base = _path(root, "usecase_code\\50-ml-model-factory\\usecase-type")
             for mode in ("batch", "online", "streaming"):
                 if serving_mode in (None, mode) and (base / mode).is_dir():
                     parents.append(("model", mode, _path(root, str((base / mode).relative_to(root)))))
@@ -315,7 +315,7 @@ class FileSystemTemplateCatalog:
         if not any(item["type"] == type and item["mode"] == serving_mode
                    for item in self.types(kind, serving_mode)):
             _error("unsupported_workload_type", "That type/mode is not an actual nonempty immediate workload folder.", 400)
-        parent = "usecase_code\\40-agent-factory" if kind == "agent" else "usecase_code\\50-ml-model-factory\\" + serving_mode
+        parent = "usecase_code\\40-agent-factory" if kind == "agent" else "usecase_code\\50-ml-model-factory\\usecase-type\\" + serving_mode
         return Template(kind, type, serving_mode, _path(_root(self.settings), parent + "\\" + type))
 
 
@@ -355,7 +355,8 @@ def _approved_output(settings, profile):
 def _profile_input_paths(settings, profile, template) -> list[Path]:
     root = _root(settings)
     factory = root / "usecase_code" / ("40-agent-factory" if profile.kind == "agent" else "50-ml-model-factory")
-    package = factory / ("agent_factory" if profile.kind == "agent" else "ml_model_factory")
+    package = (factory / "agent_factory" if profile.kind == "agent"
+               else factory / "accelerator" / "src" / "ml_model_factory")
     if not package.is_dir():
         _error("workload_config_missing", "The approved in-process provider source package is absent.", 503)
     paths = _files(template.path, settings) + _files(package, settings)
@@ -373,8 +374,8 @@ def _profile_input_paths(settings, profile, template) -> list[Path]:
             paths.append(factory / filename)
     if profile.kind == "model":
         for directory in ("scripts", "environments"):
-            if (factory / directory).is_dir():
-                paths.extend(_files(factory / directory, settings))
+            if (factory / "accelerator" / directory).is_dir():
+                paths.extend(_files(factory / "accelerator" / directory, settings))
     for path in paths:
         if not _source_path_allowed(path.relative_to(root), file=True):
             _error("unsafe_source_path", "Every approved input must pass the same private/generated source-path policy.", 403)
@@ -742,7 +743,7 @@ class _ProviderAdapter(WorkloadAdapter):
         kind = context.profile.kind
         provider = "agent_factory" if kind == "agent" else "ml_model_factory"
         base = _root(context.settings) / "usecase_code" / ("40-agent-factory" if kind == "agent" else "50-ml-model-factory")
-        package = base / provider
+        package = base / provider if kind == "agent" else base / "accelerator" / "src" / provider
         # Static provider names under the hashed, server-approved root; never model-supplied modules.
         if name not in ("catalog", "config", "prompt", "hosted", "azureml", "tags", "storage_selection"):
             raise ValueError("Unsupported in-process provider module.")
@@ -999,7 +1000,7 @@ class AzureMLWorkloadAdapter(_ProviderAdapter):
         runtime = _target_config(context, document(context.profile.config_path))
         model_root = root / "usecase_code" / "50-ml-model-factory"
         scenario_path = root / _relative(context.profile.scenario_path)
-        if scenario_path.parent != model_root / "scenarios" or scenario_path.suffix != ".json":
+        if scenario_path.parent != model_root / "user-config" / "model" / "scenarios" or scenario_path.suffix != ".json":
             _error("workload_selection_invalid", "Select one canonical immediate ml-model-factory scenario JSON.", 503)
         scenario = document(context.profile.scenario_path)
         expected = {"classification": ("classification",), "regression": ("regression",),
@@ -1041,9 +1042,9 @@ class AzureMLWorkloadAdapter(_ProviderAdapter):
         scope = context.settings.scopes[context.scope_key]
         if tags != {"aifactory": scope.factory, "project": scope.project, "environment": scope.environment}:
             _error("workload_target_mismatch", "Model lineage must name the active factory/project/environment, not another scope.", 403)
-        for name in ("pyproject.toml", "scripts\\azureml_prepare.py", "scripts\\azureml_evaluate.py",
-                     "scripts\\azureml_sdk.py", "scripts\\azureml_cli.py", "environments\\azureml-custom.yml",
-                     "environments\\azureml-automl.yml", "environments\\azureml-vision.yml"):
+        for name in ("pyproject.toml", "accelerator\\scripts\\azureml_prepare.py", "accelerator\\scripts\\azureml_evaluate.py",
+                     "accelerator\\scripts\\azureml_sdk.py", "accelerator\\scripts\\azureml_cli.py", "accelerator\\environments\\azureml-custom.yml",
+                     "accelerator\\environments\\azureml-automl.yml", "accelerator\\environments\\azureml-vision.yml"):
             relative = str(model_root.relative_to(root) / name)
             if captured is None:
                 _path(root, relative)
@@ -1077,14 +1078,16 @@ class AzureMLWorkloadAdapter(_ProviderAdapter):
         work = self._output(context)
         stage, output = work / "approved-source", work / "rendered"
         source_files = {path.relative_to(source): data for path, data in captured.items() if path.is_relative_to(source)}
-        package = source / "ml_model_factory"
+        package = source / "accelerator" / "src" / "ml_model_factory"
         code_files = {
             Path("ml_model_factory") / path.relative_to(package): data
-            for path, data in captured.items() if path.is_relative_to(package)
+            for path, data in captured.items() if path.is_relative_to(package) and path.suffix == ".py"
         }
-        code_files[Path("pyproject.toml")] = captured[source / "pyproject.toml"]
+        code_files[Path("pyproject.toml")] = provider.bundle_metadata(
+            captured[source / "pyproject.toml"].decode("utf-8"),
+        ).encode("utf-8")
         for name in ("azureml_prepare.py", "azureml_evaluate.py", "azureml_sdk.py", "azureml_cli.py"):
-            code_files[Path("scripts") / name] = captured[source / "scripts" / name]
+            code_files[Path("scripts") / name] = captured[source / "accelerator" / "scripts" / name]
         rendered_scenario = copy.deepcopy(scenario)
         if rendered_scenario["task"].startswith("image_"):
             if rendered_scenario.get("vision", {}).get("image_base_uri"):

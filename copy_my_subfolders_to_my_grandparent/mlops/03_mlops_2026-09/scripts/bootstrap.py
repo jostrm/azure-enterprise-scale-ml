@@ -17,7 +17,8 @@ def main():
     parser.add_argument("--ml-extension-version", choices=("2.38.1",))
     args = parser.parse_args()
     package = Path(args.package).resolve()
-    if not (package / "pyproject.toml").is_file():
+    if not ((package / "pyproject.toml").is_file()
+            and (package / "accelerator" / "src" / "ml_model_factory" / "__init__.py").is_file()):
         parser.error("--package must point at usecase_code/50-ml-model-factory (or its copied location)")
     environment = Path(args.venv).resolve()
     if args.ml_extension_version and not re.fullmatch(r"\d+\.\d+\.\d+", args.ml_extension_version):

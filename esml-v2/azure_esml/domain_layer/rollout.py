@@ -19,6 +19,8 @@ SCENARIO_NUMBERS = {
     "image-multiclass": 8, "image-multilabel": 9,
     "image-object-detection": 10, "image-instance-segmentation": 11,
 }
+ROLLOUT_CONFIG_SCHEMA = "esml.azureml-rollout-config/v1"
+BLOCKED_DATASETS = ("required-selection", "license-review", "requires-license-review")
 
 
 def model_from_scenario(scenario: dict, *, input_path: str, compute: str, naming_style="model-prefix") -> dict:
@@ -42,6 +44,79 @@ def model_from_scenario(scenario: dict, *, input_path: str, compute: str, naming
         if key in scenario:
             model[key] = deepcopy(scenario[key])
     return model
+
+
+def settings_from_rollout_config(config: dict, scenarios: Path) -> tuple[dict, list[dict]]:
+    """Compile reviewed model-factory scenario bindings into esml.lake-settings/v2, offline.
+
+    `config` uses esml.azureml-rollout-config/v1: shared factory/storage/runtime settings
+    plus one reviewed source binding per selected scenario. Dataset selection/license
+    gates and the tabular-only ESML boundary are enforced; nothing is submitted.
+    """
+    if not isinstance(config, dict) or config.get("schema") != ROLLOUT_CONFIG_SCHEMA:
+        raise ValueError(f"Expected {ROLLOUT_CONFIG_SCHEMA} configuration")
+    chosen = config.get("scenarios")
+    if not isinstance(chosen, dict) or not chosen or set(chosen) - set(SCENARIO_NUMBERS):
+        raise ValueError("Choose explicit known scenarios with reviewed source bindings")
+    models, catalog = [], []
+    for name, number in SCENARIO_NUMBERS.items():
+        scenario = load_json(Path(scenarios) / f"{name}.json")
+        row = {"scenario": name, "model_number": number, "model_alias": f"M{number:02d}",
+               "task": scenario["task"], "dataset_status": scenario["dataset"].get("status"),
+               "selected": name in chosen}
+        if name in chosen:
+            source = chosen[name]
+            if scenario["dataset"].get("status") in BLOCKED_DATASETS:
+                raise ValueError(f"{name}: resolve the existing dataset selection/license gate first")
+            if scenario["task"].startswith("image_"):
+                raise ValueError(f"{name}: vision needs its ESML task-specific adapter; no tabular fallback")
+            if source.get("mode") not in ("custom", "automl"):
+                raise ValueError(f"{name}: binding mode must be custom or automl")
+            model = model_from_scenario(scenario, input_path=source["input_path"], compute=source["compute"])
+            if source["mode"] == "automl":
+                if not config.get("automl_evaluation_environment"):
+                    raise ValueError("AutoML bindings require a pinned automl_evaluation_environment")
+                model["evaluation_environment"] = config["automl_evaluation_environment"]
+                model["inference_environment"] = config["automl_evaluation_environment"]
+                model["inference_mode"] = "automl"
+            if "environment" in source:
+                model["environment"] = source["environment"]
+            if source.get("limits"):
+                model.setdefault("automl", {})["limits"] = source["limits"]
+            if "inference_history_path" in source:
+                # AutoML forecast scoring needs an explicit lake path of observed history.
+                model["inference_history_path"] = source["inference_history_path"]
+            models.append(model)
+            row.update(mode=source["mode"], compute=source["compute"], status="prepared_not_submitted")
+        else:
+            row["status"] = "not_selected"
+        catalog.append(row)
+    settings = {
+        "schema": "esml.lake-settings/v2", "aifactory": config["aifactory"],
+        "project_number": config["project_number"], "project_folder_name": f"project{config['project_number']:03d}",
+        "active_model": models[0]["model_number"], "models": models,
+        "runtime": deepcopy(config["runtime"]), "storage": deepcopy(config["storage"]),
+    }
+    for key in ("use_common_datalake_storage", "storage_targets"):
+        if key in config:
+            settings[key] = deepcopy(config[key])
+    return settings, catalog
+
+
+def project_from_rollout_config(config: dict, scenarios: Path, *, scenario: str, mode: str | None = None,
+                                base_path: Path | None = None, **dependencies) -> ESMLProject:
+    """Build an ESMLProject for one reviewed scenario binding, optionally overriding its mode."""
+    bindings = config.get("scenarios", {}) if isinstance(config, dict) else {}
+    if scenario not in bindings:
+        raise ValueError(f"Add a reviewed source binding for {scenario!r} to the rollout configuration")
+    binding = deepcopy(bindings[scenario])
+    if mode is not None:
+        if mode not in ("custom", "automl"):
+            raise ValueError("mode must be custom or automl")
+        binding["mode"] = mode
+    settings, _ = settings_from_rollout_config({**config, "scenarios": {scenario: binding}}, scenarios)
+    from .settings import LakeSettings
+    return ESMLProject(LakeSettings.from_dict(settings, base_path=base_path), **dependencies)
 
 
 class AzureMLRollout:
@@ -172,11 +247,41 @@ class AzureMLRollout:
         write_json(directory / "inference-request.json", result)
         return result
 
+    def _refuse_other_inference_route(self, directory: Path, route: str) -> None:
+        """Endpoint invocation and pipeline submission are alternatives for one reviewed plan, never both."""
+        other = {"pipeline": ("inference-invocation-intent.json", "inference-job.json"),
+                 "endpoint": ("inference-pipeline-intent.json", "inference-pipeline-job.json")}[route]
+        existing = [name for name in other if (directory / name).exists()]
+        if existing:
+            raise ValueError(f"This inference plan already used the other route ({', '.join(existing)}); "
+                             "reconcile that job instead of running inference twice")
+
+    def submit_inference(self, run_id: str) -> dict:
+        """Submit the reviewed inference plan as a pipeline job instead of publishing a batch endpoint.
+
+        This is the alternative when pipeline-component batch invocation is unavailable. The job
+        receipt is recorded once; an uncertain earlier submission must be reconciled, not repeated.
+        """
+        directory = self.output / identifier(run_id, "run_id")
+        receipt = directory / "inference-pipeline-job.json"
+        if receipt.exists():
+            return load_json(receipt)
+        self._refuse_other_inference_route(directory, "pipeline")
+        intent = directory / "inference-pipeline-intent.json"
+        if intent.exists():
+            raise ValueError("An earlier inference submission has an uncertain outcome; reconcile its job before retrying")
+        plan = self._plan(directory / "inference")
+        write_json(intent, {"pipeline": str(plan.yaml_path), "status": "submission_requested"})
+        job = self.project.execute_pipeline(plan)
+        write_json(receipt, job)
+        return job
+
     def deploy_and_invoke(self, run_id: str, *, component_version: str,
                           timeout_seconds=7200, poll_seconds=30) -> dict:
         directory = self.output / identifier(run_id, "run_id")
         if type(timeout_seconds) is not int or type(poll_seconds) is not int or timeout_seconds < 1 or poll_seconds < 1:
             raise ValueError("Bounded positive integer polling intervals are required")
+        self._refuse_other_inference_route(directory, "endpoint")
         plan = self._plan(directory / "inference")
         published_path = directory / "published-inference.json"
         published = (load_json(published_path) if published_path.exists()

@@ -1,0 +1,17 @@
+# online
+
+**Purpose:** Serve low-latency request/response inference through an endpoint.
+
+**Owner:** User-facing examples.
+
+**Edit/run guidance:** Customize project copies and their configuration; do not duplicate shared engine code.
+
+**Status:** Executable notebook templates exist for 42 of 42 leaf combinations below; each leaf README lists its route, prerequisites and limitations.
+
+[Scenario configuration](../../user-config/model/scenarios/readme.md) | [Shared execution code](../../accelerator/readme.md) | [Start here](../../readme.md)
+
+## References and examples
+
+## Serving behavior
+
+Online inference is request/response. Availability, latency and scale-to-zero support depend on the selected hosting service and configuration; no endpoint is created by this folder.

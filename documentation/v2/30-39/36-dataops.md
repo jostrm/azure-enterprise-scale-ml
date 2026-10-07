@@ -21,7 +21,7 @@ omitting the setting preserves the previous explicit storage configuration.
 For ML, add `storage_targets.common` and `storage_targets.project`, each with
 `account_name`, `resource_group`, `container`, and the matching existing AML
 `datastore`. An optional credential-free `account_url` supports the correct Azure
-cloud endpoint. See the [ML configuration example](../../../usecase_code/50-ml-model-factory/storage-selection.example.json).
+cloud endpoint. See the [ML configuration example](../../../usecase_code/50-ml-model-factory/user-config/storage-selection.example.json).
 The ESML v2 AppLayer lake settings accept the same option. Agent target selection
 uses the same boolean and account/resource-group/container profiles; Foundry and
 Search remain project-scoped.
@@ -257,8 +257,8 @@ initialize the new namespace or blindly upload stale data as current examples.
 
 ```powershell
 esml lake-seed --settings shared_lake_settings.local.json `
-  --source-root ..\usecase_code\50-ml-model-factory\data `
-  --scenario-root ..\usecase_code\50-ml-model-factory\scenarios `
+  --source-root ..\usecase_code\50-ml-model-factory\data\in `
+  --scenario-root ..\usecase_code\50-ml-model-factory\user-config\model\scenarios `
   --root outputs\shared-lake --version bootstrap-v2-001
 esml lake-publish --root outputs\shared-lake --plan outputs\shared-lake\publication-plan.json
 # After reviewing the exact account, paths, file count and bytes:
@@ -568,7 +568,7 @@ $templates = 'copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory'
 $python = 'usecase_code\50-ml-model-factory\.venv\Scripts\python.exe'
 & $python "$templates\prepare_run.py" --runtime runtime.local.json `
   --copy copy.local.json --job-payload job-payload.local.json `
-  --lake lake.local.json --scenario usecase_code\50-ml-model-factory\scenarios\titanic.json `
+  --lake lake.local.json --scenario usecase_code\50-ml-model-factory\user-config\model\scenarios\titanic.json `
   --input-name raw --output generated\adf-run.json
 ```
 
@@ -589,7 +589,10 @@ Avoid the legacy `AzureMLExecutePipeline` activity for these v2 job definitions.
 
 ## 6. Databricks and streaming
 
-The optional notebook activity calls the packaged `databricks\train.py` using
+The customer-editable Jobs template is `user-config\databricks\job-template.json`
+under the model-factory root; shared Databricks code lives in `accelerator\databricks`.
+
+The optional notebook activity calls the packaged `accelerator\databricks\train.py` using
 its actual widgets: `scenario_path`, `input_path`, `artifact_root`,
 `experiment_path`, and optional `lake_config` and `model_context`. The optional
 ADF `modelContext` parameter supplies model identity; alternatively include
@@ -622,7 +625,7 @@ The former placeholder list of five pipelines was not implemented functionality.
 Run the combined suite from `usecase_code\50-ml-model-factory`:
 
 ```powershell
-python -m pytest tests ..\..\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09\tests ..\..\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory\tests --junitxml=outputs\validation\lifecycle-results.xml -q
+python -m pytest accelerator\tests ..\..\copy_my_subfolders_to_my_grandparent\mlops\03_mlops_2026-09\tests ..\..\copy_my_subfolders_to_my_grandparent\dataops\azure-datafactory\tests --junitxml=ml-environment\outputs\validation\lifecycle-results.xml -q
 ```
 
 Local lifecycle tests execute ingestion/provenance, preparation, custom training,
