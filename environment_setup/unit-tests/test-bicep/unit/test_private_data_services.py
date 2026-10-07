@@ -94,6 +94,16 @@ def test_project_template_repairs_existing_and_new_private_databricks_workspaces
         "databricks_ui_api", "browser_authentication"}
 
 
+def test_private_databricks_is_never_linked_to_a_private_azure_ml_workspace(tmp_path):
+    # MLflow dual-tracking with a Private Link Azure ML workspace is unsupported: every MLflow
+    # run creation in Databricks fails ("Unable to connect to the linked AzureML workspace").
+    template = compile_template(GENAI / "07-ml-data-platform.bicep", tmp_path)
+    workspace = deployment(template, "07-Dbx-")
+    link = json.dumps(workspace["properties"]["parameters"]["amlWorkspaceResourceId"])
+    assert "enablePublicAccessWithPerimeter" in link
+    assert link.index("enablePublicAccessWithPerimeter") < link.index("Microsoft.MachineLearningServices/workspaces")
+
+
 def test_pipeline_detects_existing_databricks_by_its_real_resource_type():
     text = JOB2.read_text(encoding="utf-8")
     assert "Microsoft.Azure.Databricks/workspaces" not in text

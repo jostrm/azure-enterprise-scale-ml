@@ -578,8 +578,10 @@ module databricks 'br/public:avm/res/databricks/workspace:0.12.0' = if(!databric
     publicNetworkAccess: enablePublicAccessWithPerimeter? 'Enabled':'Disabled'
     // Set correct NSG rules based on public network access
     requiredNsgRules: enablePublicAccessWithPerimeter ? 'AllRules' : 'NoAzureDatabricksRules' // NoAzureServiceRules for internal use only, NoAzureDatabricksRules for private, AllRules: public
-    // Link to AML workspace if deployed in same run
-    amlWorkspaceResourceId: (!amlExists && enableAzureMachineLearning) ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.MachineLearningServices/workspaces', amlName) : ''
+    // Link to AML workspace if deployed in same run. Never for private factories: MLflow dual-tracking with a
+    // Private Link AML workspace is unsupported and breaks every Databricks MLflow run (see Microsoft Learn,
+    // how-to-use-mlflow-azure-databricks). Use exclusive tracking with azureml-mlflow instead.
+    amlWorkspaceResourceId: (enablePublicAccessWithPerimeter && !amlExists && enableAzureMachineLearning) ? resourceId(subscriptionIdDevTestProd, targetResourceGroup, 'Microsoft.MachineLearningServices/workspaces', amlName) : ''
   }
   dependsOn: [
     ...(!amlExists && enableAzureMachineLearning ? [amlv2] : [])
