@@ -3815,6 +3815,50 @@ aif_deploy_simple_application_gateway() {
   return 1
 }
 
+# Links the spoke to every shared hub private DNS zone with NXDOMAIN fallback to public DNS,
+# as the Bicep zone modules do. Without it, zones that stay empty (for example
+# privatelink.monitor.azure.com without an Azure Monitor Private Link Scope) make
+# Application Insights and other Azure Monitor endpoints unresolvable inside the spoke.
+# Existing links of this factory are reconciled so a re-run repairs earlier links.
+aif_link_spoke_private_dns_zones() {
+  local spoke_vnet_id="$1" link_name="$2" zone policy
+  while IFS= read -r zone; do
+    zone="${zone//$'\r'/}"
+    [[ -n "$zone" ]] || continue
+    if policy="$(az network private-dns link vnet show \
+      --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+      --resource-group "$AIF_HUB_RESOURCE_GROUP" \
+      --zone-name "$zone" \
+      --name "$link_name" \
+      --query resolutionPolicy \
+      --output tsv 2>/dev/null)"; then
+      if [[ "${policy//$'\r'/}" != "NxDomainRedirect" ]]; then
+        az network private-dns link vnet update \
+          --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+          --resource-group "$AIF_HUB_RESOURCE_GROUP" \
+          --zone-name "$zone" \
+          --name "$link_name" \
+          --resolution-policy NxDomainRedirect \
+          --output none
+      fi
+    else
+      az network private-dns link vnet create \
+        --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+        --resource-group "$AIF_HUB_RESOURCE_GROUP" \
+        --zone-name "$zone" \
+        --name "$link_name" \
+        --virtual-network "$spoke_vnet_id" \
+        --registration-enabled false \
+        --resolution-policy NxDomainRedirect \
+        --output none
+    fi
+  done < <(az network private-dns zone list \
+    --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
+    --resource-group "$AIF_HUB_RESOURCE_GROUP" \
+    --query '[].name' \
+    --output tsv)
+}
+
 aif_ensure_private_network_access() {
   local common_rg common_vnet common_subnet
   common_rg="${AIF_PREFIX}esml-common-${AIF_LOCATION_SHORT}-dev${AIF_SCALESET_SUFFIX_DASH}"
@@ -3895,30 +3939,7 @@ aif_ensure_private_network_access() {
         --output none
     fi
 
-    local zone link_name
-    link_name="link-${AIF_PREFIX%-}-dev-${AIF_SCALESET_SUFFIX}"
-    while IFS= read -r zone; do
-      [[ -n "$zone" ]] || continue
-      if ! az network private-dns link vnet show \
-        --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
-        --resource-group "$AIF_HUB_RESOURCE_GROUP" \
-        --zone-name "$zone" \
-        --name "$link_name" \
-        --output none 2>/dev/null; then
-        az network private-dns link vnet create \
-          --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
-          --resource-group "$AIF_HUB_RESOURCE_GROUP" \
-          --zone-name "$zone" \
-          --name "$link_name" \
-          --virtual-network "$spoke_vnet_id" \
-          --registration-enabled false \
-          --output none
-      fi
-    done < <(az network private-dns zone list \
-      --subscription "$AIF_HUB_SUBSCRIPTION_ID" \
-      --resource-group "$AIF_HUB_RESOURCE_GROUP" \
-      --query '[].name' \
-      --output tsv)
+    aif_link_spoke_private_dns_zones "$spoke_vnet_id" "link-${AIF_PREFIX%-}-dev-${AIF_SCALESET_SUFFIX}"
   elif [[ "$AIF_ACCESS_HUB_MODE" == "integrated" ]]; then
     if [[ "${AIF_SIMPLE_MODE:-false}" == "true" ]]; then
       aif_prepare_simple_integrated_subnets
