@@ -8,32 +8,52 @@ resources**; neither a saved setting nor a successful HTTP response proves that
 Azure resources were deleted.
 For users who prefer editing files, first read
 [file-first versus wrapper-first configuration](18-cli-and-api-and-usage.md#choose-how-to-author-configuration-file-first-or-wrapper-first).
-Deleting a JSON key or setting a service flag to false is not an alternative
-authorization path for the resource-deletion operations below.
+Deleting a JSON key or setting a service flag to false does **not** approve or
+perform resource deletion.
 
-## 1. Choose the removal intent, not just a command containing “delete”
+## 1. Choose what you want to remove
 
-Labels below describe source contracts, **not an installed binary or a live
-factory's readiness**.
+These labels describe the available commands and API features. Your installed
+version and factory still need to pass their own checks.
 
-| Intent | Exact surface | Support and effect |
+| What you want to do | Command or API action | Support and effect |
 |---|---|---|
-| Remove an explicit parameter override | `parameters prepare --unset`; `ParameterPatch.unset` | **implemented**, configuration only; separate parameter confirmation. Reverts to resolution/default behavior, not Azure deletion. |
-| Reset an incompatible parameter profile | `parameters prepare --reset-profile`; `reset_profile` | **implemented**, configuration only; requires reviewed template patches and current schema/source revisions. Not “reset Azure”. |
-| Remove never-deployed local configuration | Catalog actions `delete-draft-project`, `delete-draft-scale-set`, `delete-draft-factory` | **generic-access only**, guarded local configuration removal/archive; no Azure deletion or dispatch. |
-| Delete one project's resources in selected environments | Catalog action `delete-project` and explicit `deletion_options` | **generic-access only; conditional/blocked** by modern layout, source capabilities, ownership, inventory, bindings and coordination. |
-| Delete a selected scale set's reviewed runtime resources | Catalog action `delete-scale-set` | **generic-access only; conditional/blocked**. Review exact delete/retain inventory; do not assume every resource group is deleted. |
-| Delete an entire factory's reviewed Azure scope | `delete-aifactory prepare/confirm/status/reconcile` and named API/SDK methods | **implemented** interface; **conditional/blocked** execution. Requires compatible ordered project-pipeline runtime; projects finish before common teardown. |
-| Reconcile a previously confirmed whole-factory job | Named `delete-aifactory reconcile` | **implemented**, local completion from existing verified receipts, not redispatch or an Azure retry. |
+| Remove a custom parameter value | `parameters prepare --unset`; `ParameterPatch.unset` | **implemented**, settings only; confirm separately. Uses defaults or inherited values where available. No Azure deletion. |
+| Reset a saved parameter profile | `parameters prepare --reset-profile`; `reset_profile` | **implemented**, settings only; review replacement settings against the current version. Not “reset Azure”. |
+| Remove never-deployed local configuration | Catalog actions `delete-draft-project`, `delete-draft-scale-set`, `delete-draft-factory` | **generic-access only**, checked local removal with an archive; no Azure deletion or pipeline start. |
+| Delete one project's resources in selected environments | Catalog action `delete-project` and explicit `deletion_options` | **generic-access only; conditional/blocked** until the layout, installed features, resource ownership, permissions and deployment setup pass checks. |
+| Delete a selected scale set's Azure resources | Catalog action `delete-scale-set` | **generic-access only; conditional/blocked**. Review the exact list of resources to delete or keep; not every resource group is necessarily deleted. |
+| Delete an entire factory's reviewed Azure resources | `delete-aifactory prepare/confirm/status/reconcile` and named API/SDK methods | **implemented** interface; **conditional/blocked** execution. Requires compatible software; all project deletion pipelines finish before shared resources are removed. |
+| Finish local cleanup after a confirmed whole-factory deletion | Named `delete-aifactory reconcile` | **implemented**, uses saved, verified completion records. Does not restart pipelines or retry Azure deletion. |
+
+**generic-access only** means using the shared request commands shown below,
+rather than a dedicated deletion command.
 
 **not implemented:** friendly `project delete` or `scaleset delete` CLI commands,
 dedicated `AzureFactoryClient` project/scale-set/draft deletion methods, automatic
-“disable flag = delete” semantics, named whole-factory selective retention within
-owned groups, or a generic force/retry/cancel-on-timeout workflow. Use the exact
-generic catalog action where documented; never substitute legacy deployment or
-direct Azure deletion to bypass a blocker.
+“disable flag = delete” behavior, keeping selected resources inside groups being
+deleted by the whole-factory command, or a generic force/retry/cancel-on-timeout
+workflow. Never switch to legacy deployment or direct Azure deletion to bypass
+a blocker.
 
-### Source and runtime boundaries
+### Check compatibility before you start
+
+A newer CLI does not automatically upgrade the API or deployment software.
+Whole-factory deletion currently supports **Azure Blob storage coordination**;
+single-writer support for other deletions does not make this command available.
+The API checks compatibility and will block unsupported combinations. Do not
+change coordination mode to work around a failed check.
+
+Preparation can read real host, pipeline-provider and Azure information; it is
+not an offline simulation. Preflight checks readiness without making changes,
+but **does not approve deletion**. The optional offline tests in chapter 18 use
+test data. You do not need to run them or start a demo API to use an already
+approved host.
+
+<details>
+<summary>More info</summary>
+
+#### Reviewed software versions and compatibility checks
 
 This chapter checks the published API source at `d52463f` and accelerator CLI/SDK
 source at `eb077742`, including its deletion-plan validator and reconcile
@@ -50,13 +70,9 @@ pipeline support and is **not** selective project deletion. The API must check t
 selected immutable source and the actual enrolled coordination mode. There is no
 automatic switch from single-writer to Blob coordination.
 
-Preparation may inspect real host/provider/Azure state; it is not an offline
-simulation. Preflight is read-only readiness inspection, not consent and not
-deletion authorization. Offline regression tests use fixtures; see the optional
-test section in chapter 18. Neither running those tests nor starting a demo API
-is a prerequisite for operating an already authorized host.
+</details>
 
-## 2. Shared setup and exact catalog selection
+## 2. Set up and select your factory
 
 Chapter 18's mandatory Window B setup initializes `$ApiRoot`, `$AcceleratorRoot`,
 `$Python = Join-Path $ApiRoot '.venv\Scripts\python.exe'`,
@@ -68,17 +84,17 @@ The standalone demonstration uses loopback port `8876`; its empty demonstration
 root and public example key are **not a real deletion environment**. Before this
 chapter, set `AIFACTORY_API_URL` and `AIFACTORY_API_KEY` through your approved
 mechanism to the real owning host and identity; do not reuse the demonstration key.
-Connect only to that authorized host and enter its actual registered folder.
-Every API `folder` is a path **on the API
-host**, not a client-side upload. Preserve tenant, subscription, factory, scale-set
-and project identities; `DEV/001` and `STAGE/001` are different scopes.
+Connect only to that approved host and enter its actual registered folder.
+Every API `folder` is a path **on the computer running the API**, not a file
+upload. Check the tenant, subscription, factory, scale set and project carefully;
+`DEV/001` and `STAGE/001` are different targets.
 
 Run this local setup once per separately reviewed scenario. It creates a unique
 review directory under your local application data, outside Git checkouts,
 replaceable template folders and the operating-system temporary directory.
-Keep it private; receipts
-and inventory may contain sensitive infrastructure identifiers. Retain uncertain
-operation evidence rather than cleaning it up automatically.
+Keep it private: saved review files (receipts) and resource lists may contain
+sensitive identifiers. If an operation's result is uncertain, keep its files
+and results rather than cleaning them up automatically.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -99,9 +115,9 @@ function Write-NewJson([string]$Path, $Value) {
 $CatalogPath = Join-Path $ReviewDir 'catalog.json'
 ```
 
-**Choose ONE discovery interface**, not all three.
+**Choose ONE way to list your factories**, not all three.
 
-### CLI discovery
+### CLI
 
 ```powershell
 $Raw = & $Python -m azurefactory catalog list --folder $Folder
@@ -111,7 +127,7 @@ Write-NewJson $CatalogPath $Catalog
 $Catalog | ConvertTo-Json -Depth 100
 ```
 
-### REST discovery
+### REST
 
 ```powershell
 $Raw = & curl.exe --silent --show-error --fail-with-body --noproxy "*" --get `
@@ -123,7 +139,7 @@ Write-NewJson $CatalogPath $Catalog
 $Catalog | ConvertTo-Json -Depth 100
 ```
 
-### Python SDK discovery
+### Python SDK
 
 ```powershell
 @'
@@ -161,11 +177,12 @@ $ResultPath = Join-Path $ReviewDir 'confirmation-result.json'
 
 Choose **one** subsection below, then use the shared prepare/review/confirm
 walkthrough in section 4. For another operation, start again with a new workspace
-and refreshed catalog. Do not reuse revisions or receipts after a confirmed write.
+and a fresh factory list. Do not reuse an old review after saving a change.
 
-### A. Remove an override, or reset a parameter profile — no Azure deletion
+### A. Remove a custom parameter value, or reset saved settings — no Azure deletion
 
-Select a scale-set UUID and optionally a project UUID from the displayed factory:
+Select a scale set's unique ID (UUID) and optionally a project's ID from the
+displayed factory:
 
 ```powershell
 $ScaleSetId = Read-Host 'Exact scale-set UUID for this parameter scope'
@@ -176,8 +193,8 @@ $ConfirmRoute = '/api/v1/factory-catalog/parameters/confirm'
 $ParametersPath = Join-Path $ReviewDir 'parameters.json'
 ```
 
-**Choose ONE parameter read**; inspect template names and parameter fields before
-entering a removal. This read resolves the selected published schemas.
+**Choose ONE way to read the settings.** Check the returned template names and
+parameter fields before choosing what to remove.
 
 CLI:
 
@@ -228,13 +245,20 @@ if ($LASTEXITCODE -ne 0) { throw 'Parameter read failed.' }
 $Parameters = Get-Content -Raw -LiteralPath $ParametersPath | ConvertFrom-Json
 ```
 
-Build the exact `CatalogParameterPrepare` body. `reset_profile` does not permit
-omitting `templates`: this example resets the profile while supplying a reviewed
-empty patch for one actual template. Required unresolved fields can still block
-preparation; use chapter 19 for additional typed patches rather than guessing.
-**Reset discards every old parameter-profile context in the selected scale set,
+Build the request below using the names returned by your settings read.
+**Reset discards all old saved parameter settings in the selected scale set,
 even when a project is selected**, before saving the reviewed replacements.
-It is broader than unsetting one field; review that scope explicitly.
+It is broader than removing one custom value; review that choice carefully.
+
+<details>
+<summary>More info</summary>
+
+The request model is `CatalogParameterPrepare`. `reset_profile` still requires
+`templates`: this example supplies an empty change for one real template.
+Missing required values can block preparation. Use chapter 19 to supply
+additional settings rather than guessing.
+
+</details>
 
 ```powershell
 $Edit = Read-Host 'Choose unset or reset-profile'
@@ -257,20 +281,31 @@ if ($ProjectId) { $Body.project_id = $ProjectId }
 Write-NewJson $RequestPath $Body
 ```
 
-The shared generic CLI transport below is intentional. Friendly equivalents also
+The shared CLI request below is intentional. Dedicated parameter commands also
 exist: `parameters prepare --request-json` with a saved receipt, then a separate
 `parameters confirm --receipt ... --yes`. Do not mix a raw API preview with the
-CLI's typed receipt format. None of these configuration confirmations deploys.
+CLI's saved receipt format. **These confirmations save settings only; they do
+not deploy or delete Azure resources.**
 
-### B. Delete a draft project, scale set or factory — guarded local removal
+### B. Delete a draft project, scale set or factory — local files only
 
-Draft deletion requires the exact revision and verified `deployment_state:
-draft`. Deployed, unknown, interrupted or conflicting evidence is not a draft.
-Protected profiles, retained ownership, enrolled bindings, saved bootstrap
-references, and a logical project shared with another scale set can block
-removal. Confirmation rechecks evidence and file trees and archives only reviewed
-local configuration under the catalog's internal `draft-removals` area. It does
-not delete subscriptions, repositories, pipelines or Azure resources.
+The API must confirm that the item is still a draft (`deployment_state:
+draft`) and has not changed since review. Deployed, unknown, interrupted or
+conflicting deployment records are **not** treated as a draft.
+Removal can be blocked if deployment settings or other projects still use it.
+Confirmation checks the records and files again, then archives the reviewed
+local configuration in `draft-removals`. It does **not** delete subscriptions,
+repositories, pipelines or Azure resources.
+
+<details>
+<summary>More info</summary>
+
+Checks include the current revision, protected parameter profiles, retained
+resource ownership, registered pipeline connections, saved bootstrap references,
+and projects shared with other scale sets. These prevent draft removal from
+discarding settings still needed elsewhere.
+
+</details>
 
 ```powershell
 $Action = Read-Host 'Choose delete-draft-project, delete-draft-scale-set, or delete-draft-factory'
@@ -290,22 +325,32 @@ Write-NewJson $RequestPath $Body
 
 This is not the same as deleting an Azure project. The separate saved-creation
 configuration removal routes and legacy `/projects/delete` or `/scale-sets/delete`
-routes are not substitutes for this runtime deletion contract.
+routes cannot replace the Azure resource-deletion steps below.
 
-### C. Remove project resources — explicit environments and independent options
+### C. Delete project resources — choose environments and what to keep
 
-The exact model is `deletion_options: { environments,
-include_project_subnets, include_keyvault_and_resource_group }`. The two options
-are required **JSON booleans**, not `"true"`/`"false"` strings. Environments are a
-nonempty, unique subset of `dev`, `stage`, `prod`.
+Choose one or more environments: `dev`, `stage`, `prod`. Select each only once.
+Then make two separate choices:
 
-* `include_project_subnets: false` retains the project's scoped subnets; `true`
-  explicitly includes their cleanup. It does not authorize common-group deletion.
-* `include_keyvault_and_resource_group: false` retains the Key Vault/resource
-  group; `true` includes them in the reviewed project teardown. This is independent
-  of the subnet choice. Normal Azure soft-delete/retention still applies.
-* The exact delete/retain resource IDs, not these descriptions alone, govern
-  review. Unselected environments and other projects remain outside scope.
+* `include_project_subnets: false` keeps the project's subnets; `true` includes
+  their deletion. It does **not** approve deletion of the shared resource group.
+* `include_keyvault_and_resource_group: false` keeps the Key Vault and resource
+  group; `true` includes them in deletion. This is independent of the subnet
+  choice. Normal Azure soft-delete and retention rules still apply.
+* Review the exact resource IDs in the delete/keep lists. Other projects and
+  unselected environments are not included.
+
+**This operation can be blocked by the layout, installed features, resource
+ownership or permissions. It is not supported in single-writer mode.**
+Project deletion follows its own process; do not assume it runs the same
+ordered pipelines as whole-factory deletion.
+
+<details>
+<summary>More info</summary>
+
+The exact request model is `deletion_options: { environments,
+include_project_subnets, include_keyvault_and_resource_group }`. Both options
+must be **JSON booleans**, not `"true"`/`"false"` strings.
 
 This requires modern schema version 2 (`layout_version: 2` in catalog output),
 one exact registered placement for every selected environment, complete inventory
@@ -313,6 +358,8 @@ and ownership, enrolled deletion permission, and selected-source
 `selective-project-resources-v1` support. The current API blocks selective project
 deletion in single-writer mode. It uses the selective lifecycle path, **not** the
 named whole-factory ordered project-pipeline path.
+
+</details>
 
 ```powershell
 if ($Catalog.layout_version -ne 2) { throw 'Selective project deletion requires modern layout version 2.' }
@@ -342,22 +389,31 @@ $Body = @{
 Write-NewJson $RequestPath $Body
 ```
 
-No source scale-set UUID is needed here: the server resolves each exact placement
-from the project plus requested environments. An optional `scale_set_id` merely
-identifies an existing project placement; it must not expand or replace the
-environment selection. These controls do not consume or set legacy destructive
-flags. After verified group deletion, the API reconciles the selected placement
-and binding; removing all placements can remove the logical project's local
-configuration. Services-only deletion retains configuration. Neither removes the
-factory or its scale sets.
+You do not need to enter a scale-set ID here: the server finds it from the
+project and selected environments. These choices do not read or change legacy
+deletion flags.
 
-### D. Delete scale-set runtime resources
+After confirmed group deletion, the API updates the affected project's saved
+deployment settings. Removing the project from every environment can also remove
+its local configuration. Services-only deletion keeps that configuration.
+**Neither choice removes the factory or its scale sets.**
 
-Use an exact scale-set UUID and review the complete resulting inventory. This is
+<details>
+<summary>More info</summary>
+
+An optional `scale_set_id` identifies an existing project placement; it does not
+expand or replace `deletion_options.environments`. After verified deletion, the
+API updates the selected placement and pipeline binding.
+
+</details>
+
+### D. Delete a scale set's Azure resources
+
+Use the exact scale-set UUID and review the full resource list. This is
 not `delete-draft-scale-set`, and the project deletion options do not apply.
-Dependency closure, retained resources, runtime capabilities and active project
-placements can block it. A resource-group row in the preview is not by itself
-authorization to delete that group: inspect its `delete` and `retain` arrays.
+Resources needed elsewhere, resources to keep, unsupported software or active
+projects can block deletion. A resource-group row in the preview does not by
+itself approve that group's deletion: check its `delete` and `retain` lists.
 
 ```powershell
 $ScaleSetId = Read-Host 'Exact scale-set UUID whose runtime resources are to be reviewed'
@@ -369,12 +425,13 @@ $Body = @{
 Write-NewJson $RequestPath $Body
 ```
 
-## 4. Shared transport for A–D: prepare, STOP, then confirm once
+## 4. For A–D: prepare, STOP, then confirm once
 
 The request above is complete. **Choose ONE interface** for preparation and use
-its corresponding confirmation later. All generic unsafe CLI methods, including
-read-like POSTs and **prepare**, require `--write --yes`. These are transport
-acknowledgements, **not deployment consent** and not permission to skip review.
+its matching confirmation later. The generic CLI requires `--write --yes` for
+all POST requests, including **prepare** and POSTs that only read information.
+These flags allow the request to be sent; **they do not approve deployment or
+replace your review**.
 
 ### CLI — generic catalog/parameter access
 
@@ -389,7 +446,7 @@ $Preview | ConvertTo-Json -Depth 100
 if ($PrepareExit -ne 0) { throw 'Preparation blocked or failed; do not confirm.' }
 ```
 
-### REST — explicit JSON file, UTF-8 without BOM
+### REST — send the saved JSON request
 
 ```powershell
 $Raw = & curl.exe --silent --show-error --fail-with-body --noproxy "*" `
@@ -401,7 +458,7 @@ Write-NewJson $PreviewPath $Preview
 $Preview | ConvertTo-Json -Depth 100
 ```
 
-### Python SDK — actual generic methods
+### Python SDK
 
 ```powershell
 @'
@@ -421,12 +478,26 @@ $Preview = Get-Content -Raw -LiteralPath $PreviewPath | ConvertFrom-Json
 
 ### STOP — separate human review
 
-Do **not** paste confirmation immediately after preparation. Review the saved
-request and full preview, including target UUIDs, all environment/tenant/
-subscription identities, resolved source version, `source_revision`, expiry,
-`operation_mode`, effects, warnings, blockers and exact deletion targets. For
-project deletion, compare `deletion_options` and every delete/retain resource ID
-with the intended scope. A blocked/partial/unknown result is not approval.
+Do **not** paste confirmation immediately after preparation. Review the request
+and full preview:
+
+* Is this the right factory, project or scale set, in the right environments,
+  tenants and subscriptions?
+* Is it a settings-only change or an Azure deletion? Check `operation_mode`.
+* Are the listed changes, warnings and resources to delete or keep correct?
+  For project deletion, check `deletion_options` too.
+* Is the review still current and unexpired, with no blockers?
+
+**A blocked, incomplete or unknown result is not approval.**
+
+<details>
+<summary>More info</summary>
+
+Also check the exact target UUIDs, resolved software version, `source_revision`
+and expiry. These connect your approval to the specific settings and software
+that were reviewed.
+
+</details>
 
 Only after obtaining approval for that exact, unexpired review, run:
 
@@ -445,12 +516,19 @@ Write-NewJson $ConfirmPath @{
 }
 ```
 
-For these ordinary catalog project/scale/draft actions, the implemented
-confirmation body is **folder + contract_version + confirmation_id**. The server
-binds the request, exact options, owner, revision, expiry and frozen runtime
-evidence to that ID. It does **not** require the named factory deletion phrase
-and hash. Parameter edits use their separate confirmation endpoint. Confirmation
-remains single-use; a lost response does not authorize another call.
+**Confirm only once. If the response is lost, check the job instead of sending
+another confirmation.** Parameter edits use a separate confirmation endpoint,
+already selected by the example.
+
+<details>
+<summary>More info</summary>
+
+For these catalog project/scale/draft actions, the confirmation body is
+**folder + contract_version + confirmation_id**. The server associates that ID
+with the exact request, choices, owner, revision, expiry and saved deployment
+checks. It does not require the phrase and hash used for whole-factory deletion.
+
+</details>
 
 **Choose only the corresponding confirmation block; each can perform a write.**
 
@@ -493,17 +571,40 @@ print(json.dumps(result, indent=2))
 if ($LASTEXITCODE -ne 0) { throw 'Confirmation failed or outcome uncertain. Observe; do not retry.' }
 ```
 
-A configuration result can contain `catalog` and no runtime `job`. A runtime
-result contains `job.id`; preserve it and observe that job below.
+A settings-only result can contain `catalog` with no `job`. An Azure operation
+returns `job.id`; keep that ID and check its progress below.
 
-## 5. Named whole-factory deletion — separate, capability-gated workflow
+## 5. Delete a whole factory — separate compatibility checks and approval
 
-Start section 2 again for a new review workspace and fresh revision. **Do not use
-the ordinary confirmation in section 4 for this operation.** Named
-`delete-aifactory` is whole-factory scope, with no environment narrowing or
-project deletion options.
+Start section 2 again for a new review folder and a fresh factory list. **Do not
+use the confirmation in section 4 for this operation.** `delete-aifactory`
+applies to the whole factory, not a chosen environment or project.
 
-The review must expose and bind the following `deletion_retention_policy` to
+**This operation deletes whole resource groups. If a group contains a resource
+that must be kept, preparation is blocked.** It cannot mix deletion and retention
+within those groups. Listing a resource in configuration does not prove that it
+exists or that it will be preserved.
+
+Every registered project's configured **GitHub Actions (GHA) or Azure DevOps
+(ADO)** deletion pipeline must finish in every environment **before shared
+resource groups are removed**. Successful pipeline results and checks confirming
+that the exact resources are gone are both required. Starting a pipeline is not
+enough.
+
+**What stays:** Entra security groups and Git repositories/history. Reusable
+hub, VPN, connectivity, platform and bootstrap resources, coordination storage,
+the executing identity and private runners must stay outside deleted groups.
+Runners, environments, federated credentials, subscription metadata and
+subscription-level roles need separate review; this does not remove every
+external dependency. Key Vault purge is not performed. The factory registration
+and local configuration are removed only after verified success.
+
+<details>
+<summary>More info</summary>
+
+#### Required retention settings and pipeline order
+
+The review's `deletion_retention_policy` must match
 `deletion_plan.retention_policy`:
 
 | Field | Required value |
@@ -514,29 +615,18 @@ The review must expose and bind the following `deletion_retention_policy` to
 | `selective_retention_supported` | `false` |
 | `limitations` | Nonempty server-provided limitations, reviewed verbatim |
 
-This policy states requirements, not proof of runtime support. **Mixed retained
-resources inside groups being deleted block preparation.** Configuration
-references can exclude protected resources but cannot manufacture protected
-inventory or prove preservation.
+These fields describe the required behavior, not proof that the installed
+software supports it. Configuration references can exclude protected resources
+from deletion, but cannot establish the actual resource list or preservation.
 
-The frozen plan requires every registered project's configured **GHA or ADO**
-pipeline, in every environment, before any common group teardown. Each project
-stage has all four explicit flags true: `enableDeleteForDisabledResources`,
+Each project stage has all four explicit flags true: `enableDeleteForDisabledResources`,
 `deleteAllServicesForProject`, `deleteKeyvaultAlso`, `deleteAllForProject`.
 The required project order is capability hosts, target-project Search shared
 private links, service-managed lifecycle, project resources, then project network.
-Successful provider completion **and exact absence evidence** are required;
-dispatch alone is insufficient.
 
-Entra security groups and Git repositories/history are retained. Reusable
-hub/VPN/connectivity/platform/bootstrap resources, coordination storage, the
-executing identity and private runners must remain outside deleted groups.
-Provider runners/environments/federated credentials, subscription metadata and
-subscription-level roles require independent review; this is not “delete all
-external dependencies”. Key Vault purge is not performed. Only verified success
-removes the factory registration and local catalog configuration.
+</details>
 
-Build the named request without changing the selected source pin:
+Build the whole-factory request without changing the selected software version:
 
 ```powershell
 $WholeRequest = @{ contract_version=1; folder=$Folder; factory_id=$FactoryId; expected_revision=$Revision }
@@ -544,11 +634,11 @@ Write-NewJson $RequestPath $WholeRequest
 $ReceiptPath = Join-Path $ReviewDir 'whole-factory.receipt.json'
 ```
 
-**Choose ONE prepare interface.** The CLI saves a validated, typed receipt only
-for a compatible executable review; the REST/SDK examples preserve a raw preview.
-Neither is an approval.
+**Choose ONE way to prepare.** The CLI saves its review file only when
+compatibility and preparation checks pass. REST and SDK save the returned preview.
+**Neither file is an approval.**
 
-### CLI named prepare
+### CLI prepare
 
 ```powershell
 & $Python -m azurefactory delete-aifactory prepare --folder $Folder `
@@ -556,7 +646,7 @@ Neither is an approval.
 if ($LASTEXITCODE -ne 0) { throw 'Blocked or failed. Do not confirm or bypass the capability gate.' }
 ```
 
-### REST named prepare
+### REST prepare
 
 ```powershell
 $Raw = & curl.exe --silent --show-error --fail-with-body --noproxy "*" `
@@ -568,7 +658,7 @@ Write-NewJson $PreviewPath (($Raw -join "`n") | ConvertFrom-Json)
 Get-Content -Raw -LiteralPath $PreviewPath
 ```
 
-### SDK named prepare
+### SDK prepare
 
 ```powershell
 @'
@@ -584,16 +674,24 @@ print(json.dumps(preview, indent=2))
 if ($LASTEXITCODE -ne 0) { throw 'Preparation failed.' }
 ```
 
-### STOP — review the named plan, retention and exact phrase
+### STOP — review what will be deleted and kept
 
-Review all section 4 checks **plus** the complete ordered plan, source commit,
-pipeline repositories/definitions/refs, dependencies, plan hash, retained IDs,
-retention limitations and `confirmation_phrase`. No missing/old plan, broad
-inventory label or `can_execute` flag alone can replace that review.
+Complete the section 4 checks. Also review the full deletion plan, its order,
+the exact resources to keep, any limits on what can be preserved, and
+`confirmation_phrase`. **Do not proceed with a missing or outdated plan.**
+`can_execute` alone does not replace review or approval.
 
-For REST/SDK raw previews, this **offline client validation** additionally checks
-the named source contract; it sends no request. Use the chapter's reviewed SDK
-version, not an older validator from another checkout:
+<details>
+<summary>More info</summary>
+
+Check the selected source commit, pipeline repositories/definitions/refs,
+dependencies and plan hash. These identify the exact software, pipeline steps
+and saved plan being approved.
+
+</details>
+
+For a REST/SDK preview, run this additional **local check**. It does not send an
+API request. Use the SDK version described in this chapter, not an older copy:
 
 ```powershell
 @'
@@ -609,9 +707,9 @@ print("Client contract checks passed; human approval and server revalidation are
 if ($LASTEXITCODE -ne 0) { throw 'Named review is blocked, expired or incompatible.' }
 ```
 
-Do not run that raw-preview block for the CLI receipt: the CLI validates its own
-typed receipt. The SDK's dedicated prepare/confirm transport methods do not
-themselves substitute for the full human/client review.
+Do not run that preview check on a CLI receipt: the CLI checks its own file format.
+Calling the SDK's prepare/confirm methods does not replace these checks or
+human approval.
 
 ### Separate confirmation — choose ONE interface only after approval
 
@@ -671,20 +769,21 @@ print(json.dumps(result, indent=2))
 if ($LASTEXITCODE -ne 0) { throw 'Outcome may be uncertain. Observe; do not resend.' }
 ```
 
-The named REST/SDK contract requires **both** the server's `preview_hash` and
-exact `confirmation_phrase`, in addition to the confirmation ID. A generic
-catalog route cannot bypass the server's whole-factory proof requirement.
+The whole-factory REST/SDK request requires **both** the server's `preview_hash`
+and exact `confirmation_phrase`, as well as the confirmation ID. You cannot
+bypass these checks by sending the request through a generic catalog route.
 
-## 6. Observe and recover without repeating a write
+## 6. Check progress and recover without repeating deletion
 
 ### First find the exact job
 
 A lost confirm response is **unknown**, not “nothing happened”. Keep the request,
-preview/receipt, source version, owner/API identity, times and any result.
-Read catalog jobs for the same folder and authenticated owner; correlate the
-exact action/factory/project/scale/source revision and time. Never choose the
-first job. If correlation is ambiguous, stop and have the operator reconcile
-server/provider evidence; do not create a new confirmation as a diagnostic.
+preview or receipt, software version, account details, times and any result.
+List jobs for the same folder using the same API identity. Match the action,
+factory, project, scale set, version and time carefully. **Never choose the
+first job or confirm again just to see what happens.** If you cannot identify
+the job with confidence, stop and ask the operator to check the server and
+pipeline results.
 
 Choose ONE interface to discover jobs:
 
@@ -711,7 +810,7 @@ print(json.dumps(AzureFactoryClient().catalog_jobs(sys.argv[1]), indent=2))
 if ($LASTEXITCODE -ne 0) { throw 'Job discovery failed; outcome is not inferred.' }
 ```
 
-### Catalog/runtime status, logs and bounded polling
+### Read status and logs, or wait for progress
 
 ```powershell
 $JobId = Read-Host 'Exact correlated job UUID from the confirmation or owner-bound job list'
@@ -721,8 +820,8 @@ $JobId = Read-Host 'Exact correlated job UUID from the confirmation or owner-bou
     --poll-timeout 120 --poll-interval 5
 ```
 
-The `runtime` aliases read the **same catalog jobs**, not another execution
-engine. Use them instead if that matches your deployment workflow:
+The `runtime` commands below read the **same jobs**. They are an alternative
+spelling, not a separate deployment system:
 
 ```powershell
 & $Python -m azurefactory runtime status --folder $Folder --job-id $JobId
@@ -744,7 +843,7 @@ curl.exe --silent --show-error --fail-with-body --noproxy "*" --get `
 if ($LASTEXITCODE -ne 0) { throw 'Logs unavailable.' }
 ```
 
-SDK status/logs and local bounded polling (there is no dedicated SDK
+SDK status/logs and repeated checks with a time limit (there is no dedicated SDK
 `runtime_poll` method):
 
 ```powershell
@@ -768,16 +867,17 @@ while True:
 
 Catalog statuses are `queued`, `running`, `succeeded`, `failed`, `interrupted`.
 For whole-factory jobs also inspect `pipeline_runs`, `deletion_plan` and
-`reconciliation_required`. A provider event or a catalog configuration entry is
-not a substitute for the deletion job's verified scope/evidence.
+`reconciliation_required`. A pipeline event or saved configuration entry does
+not replace the deletion job's results and checks.
 
 Legacy status is different: **`submitted` means the local script exited zero**,
 not “the pipeline was submitted”, pipeline success or verified Azure deployment.
 Its `deployment_verified` remains false. A completed `--wait`, local exit code
-zero, missing logs, timeout, denied inventory or failed lookup cannot prove
-deletion or resource absence. Poll/watch deadlines stop observation only.
+zero, missing logs, timeout, access-denied response or failed lookup cannot prove
+that resources were deleted. **A polling or watch timeout only stops waiting;
+it does not cancel the job or make it safe to retry deletion.**
 
-### Named whole-factory status and reconciliation
+### Whole-factory status and finishing local cleanup
 
 Use only a job whose action is `delete-factory`. Choose ONE status interface:
 
@@ -803,14 +903,15 @@ print(json.dumps(AzureFactoryClient().delete_aifactory_status(sys.argv[1], sys.a
 '@ | & $Python - $Folder $JobId
 ```
 
-If execution finished but local completion was interrupted, the named reconcile
-operation can apply **existing verified exact pipeline/cohort receipts** and
-complete local catalog cleanup. It does not call Azure, redispatch, retry failed
-pipelines, invent absence evidence, or repair arbitrary partial deletion.
-Missing/incomplete receipts remain blocked. Preserve claims and receipts; never
-clear locks, re-enroll or force source changes as a recovery shortcut.
+If Azure deletion finished but local cleanup was interrupted, `reconcile` can
+use **saved, verified completion records for that exact job** to finish local
+catalog cleanup. **It does not call Azure, restart pipelines, retry failed
+deletions or assume missing resources are gone.** It cannot repair every partial
+deletion. Missing or incomplete records keep the operation blocked.
+Keep the job records and locks; never clear locks, register the setup again or
+force software changes as a recovery shortcut.
 
-After reviewing that existing job's evidence, choose ONE reconciliation interface:
+After reviewing that job's results, choose ONE way to finish local cleanup:
 
 ```powershell
 # CLI: local reconciliation, not another deletion approval.
@@ -824,7 +925,7 @@ Write-NewJson $ReconcilePath @{ contract_version=1; folder=$Folder; job_id=$JobI
 curl.exe --silent --show-error --fail-with-body --noproxy "*" --request POST `
     "$BaseUrl/api/v1/operations/delete-aifactory/reconcile" -H "X-API-Key: $env:AIFACTORY_API_KEY" `
     -H "Content-Type: application/json" --data-binary "@$ReconcilePath"
-if ($LASTEXITCODE -ne 0) { throw 'Reconciliation unavailable or incomplete; retain evidence.' }
+if ($LASTEXITCODE -ne 0) { throw 'Cleanup could not finish; keep the saved results.' }
 ```
 
 ```powershell
@@ -836,18 +937,19 @@ print(json.dumps(AzureFactoryClient().delete_aifactory_reconcile(sys.argv[1], sy
 '@ | & $Python - $Folder $JobId
 ```
 
-There is no corresponding friendly universal project/scale-set reconciliation
-command in this SDK/CLI. Observe their original jobs and use operator-supported
-receipt reconciliation; do not route them through the named factory reconciler.
-An expired **unused** review can be prepared again after refreshing scope. An
-uncertain **confirmed** operation must first be observed/reconciled.
+There is no equivalent general-purpose recovery command for projects or scale
+sets in this SDK/CLI. Check their original jobs and ask the operator to review
+the completion records; do not send them to the whole-factory reconciler.
+An expired **unused** review can be prepared again with current settings.
+An uncertain **confirmed** operation must be checked and resolved first.
 
-## 7. Optional operational observers — not deletion prerequisites
+## 7. Optional status and report commands
 
-Health/doctor/schema/auth checks establish host/API information, not live
-deployment success. Catalog inventory is registered configuration and recorded
-evidence; runtime prepare obtains its separate exact inventory. The following
-read-only probes are optional against an authorized real host:
+These commands are not required for deletion. Health, compatibility and sign-in
+checks tell you about the host and API, not whether deployment succeeded.
+The catalog lists saved configuration and deployment records; preparation for
+an Azure operation checks the actual resource list separately.
+Run these optional read-only checks only against an approved real host:
 
 ```powershell
 & $Python -m azurefactory health
@@ -859,9 +961,9 @@ $ObservedScaleSetId = Read-Host 'Exact scale-set UUID for the scoped Azure auth 
     --scale-set-id $ObservedScaleSetId
 ```
 
-### GitHub Actions status/watch — not an ADO watcher
+### GitHub Actions status/watch — not Azure DevOps
 
-Use the exact repository and run ID from a reviewed operation/provider receipt:
+Use the exact repository and run ID recorded for your operation:
 
 ```powershell
 $Repository = Read-Host 'Exact GitHub OWNER/REPO from the execution receipt'
@@ -871,12 +973,12 @@ $RunId = Read-Host 'Exact GitHub Actions numeric run ID'
     --timeout 120 --json
 ```
 
-Watch uses the read-only event feed; reconnecting that feed does not retry a
-workflow. Its `after` cursor resumes observations. Closing a watch does not
-cancel the provider run. These commands do not dispatch and do not monitor ADO.
-Use provider-specific operator evidence for ADO and the original catalog job.
+Watch follows a read-only stream of updates; reconnecting does not restart the
+workflow. Its `after` cursor resumes from an earlier update. Closing a watch
+does not cancel the run. These commands do not start pipelines and do not monitor
+ADO. For ADO, use Azure DevOps results and the original catalog job.
 
-### Sample reports, saved evidence and actual Azure billing are different
+### Sample reports, saved results and actual Azure billing are different
 
 ```powershell
 & $Python -m azurefactory monitoring catalog
@@ -893,15 +995,15 @@ Additional complete CLI examples (same initialized shell):
 & $Python -m azurefactory monitoring saved report --folder $Folder --factory-id $FactoryId --report showback
 ```
 
-`sample` is explicitly synthetic, not live cost or deployment evidence.
-`monitoring saved` reads existing authorized saved evidence and projects it
-through report calculations without collection/import/jobs. Unavailable,
-partial, stale or empty evidence must not be relabeled healthy or zero.
-The report source label `live` means supplied observation evidence; it does not
-silently start an Azure collector.
+`sample` uses demonstration data, not real costs or deployment results.
+`monitoring saved` reads saved results you are permitted to view and calculates
+reports; it does not collect or import new data or start jobs. Missing, incomplete,
+outdated or empty results do **not** mean everything is healthy or costs are zero.
+The report source label `live` means supplied observations, not an automatic
+Azure data collection.
 
 Actual resource-group costs make an **Azure Cost Management read** for explicitly
-selected subscriptions; run only with authorization for that read:
+selected subscriptions; run only with approval and permission to read those costs:
 
 ```powershell
 $CostSubscription = Read-Host 'Exact authorized subscription UUID for Azure billing reads'
@@ -910,13 +1012,17 @@ $CostMonth = Read-Host 'Billing month YYYY-MM'
     --month $CostMonth --folder $Folder
 ```
 
-Do not use billing lag or a zero/missing charge as proof of resource absence.
+Billing can arrive late. A zero or missing charge does not prove a resource is gone.
 
-### Verified REST and SDK observer mappings
+<details>
+<summary>More info</summary>
+
+### Matching REST endpoints and SDK methods
 
 `AzureFactoryClient()` uses the URL/key environment variables from chapter 18.
-All query/body paths are API-host paths. POST observers are read-only in purpose;
-generic CLI transport still requires `--write --yes` for them.
+All folder paths refer to the computer running the API. The POST status/report
+requests below only read information, but the generic CLI still requires
+`--write --yes` to send them.
 
 | CLI surface | REST | Actual SDK method |
 |---|---|---|
@@ -936,12 +1042,23 @@ generic CLI transport still requires `--write --yes` for them.
 | `monitoring report` | `POST /api/v1/monitoring/report`; e.g. `source: sample`, `report_id: showback` | `monitoring_report(body)` |
 | `monitoring summary` / `monitoring export` | `POST /api/v1/monitoring/summary` / `/api/v1/monitoring/export`; explicit source and required report/format fields | `monitoring_summary(body)` / `monitoring_export(body)`; CSV export returns text |
 | `monitoring saved read` | `POST /api/v1/monitoring/evidence/read`; `folder` plus exact optional scope IDs/date bounds | `monitoring_evidence_read(context)` |
-| `monitoring saved summary/report` | Read saved evidence, then POST `/api/v1/monitoring/summary` or `/report` only for available evidence; not `/saved/summary` | `monitoring_saved_summary(context)` / `monitoring_saved_report(context, report_id="showback")` |
+| `monitoring saved summary/report` | Read saved results, then POST `/api/v1/monitoring/summary` or `/report` only when results are available; not `/saved/summary` | `monitoring_saved_summary(context)` / `monitoring_saved_report(context, report_id="showback")` |
 | `monitoring resource-group-costs` | `POST /api/v1/monitoring/resource-group-costs`; `subscription_ids`, optional `month`, `aifactory_folder`, `refresh` | `resource_group_costs(body)` |
 
-## 8. Contract evidence and limitations
+</details>
 
-Canonical API source and tests (external repository, not duplicated schemas):
+## 8. Reference
+
+The examples describe supported commands, not a verified live deployment.
+No cloud operation, pipeline start, deletion, installation or version change
+was performed to write this chapter.
+
+<details>
+<summary>More info</summary>
+
+### Source references and review notes
+
+API source and tests (in the separate API repository):
 
 * [API guide](https://github.com/jostrm/azure-aifactory-config/blob/d52463f/docs/API.md)
   and [OpenAPI](https://github.com/jostrm/azure-aifactory-config/blob/d52463f/docs/openapi.json).
@@ -957,12 +1074,12 @@ Canonical API source and tests (external repository, not duplicated schemas):
   [runtime reconciliation](https://github.com/jostrm/azure-aifactory-config/blob/d52463f/src/catalog_runtime.py),
   and [retention/reconciliation tests](https://github.com/jostrm/azure-aifactory-config/blob/d52463f/tests/test_factory_deletion.py).
 
-Accelerator client and runtime evidence:
+Accelerator client and deployment implementation:
 
 * [CLI parser/handlers](../../../environment_setup/azurefactory-cli/src/azurefactory/cli.py),
   [SDK methods](../../../environment_setup/azurefactory-cli/src/azurefactory/client.py),
   [named deletion validator](../../../environment_setup/azurefactory-cli/src/azurefactory/factory_deletion.py),
-  [saved evidence adapter](../../../environment_setup/azurefactory-cli/src/azurefactory/monitoring_saved.py),
+  [saved results adapter](../../../environment_setup/azurefactory-cli/src/azurefactory/monitoring_saved.py),
   and [workflow event observer](../../../environment_setup/azurefactory-cli/src/azurefactory/workflow_events.py).
 * [Named deletion client tests](../../../environment_setup/azurefactory-cli/tests/test_factory_deletion.py),
   [operation-result tests](../../../environment_setup/azurefactory-cli/tests/test_operation_results.py),
@@ -973,8 +1090,8 @@ Bounded graph navigation was checked before writing: the API graph was current
 (`de669aa8…`, 566 indexed files); accelerator graph was fresh (`ae9853f9…`, 1,653
 files, 23 partial-syntax files). Static/resolved symbols and observed architecture
 notes guided direct source/test reads; graphs did not establish installed or
-Azure state. Published client additions were checked directly because original
-dirty-checkout graph/HEAD evidence alone did not cover every newer addition.
-Architecture notes are observations, not authorization or accepted deployment
-decisions. No cloud operation, dispatch, deletion, installation, source-pin
-change or live execution verification was performed to write this chapter.
+Azure state. Published client additions were checked directly because the
+original working-checkout graph and Git revision did not cover every newer
+addition. Architecture notes describe findings, not approval to deploy.
+
+</details>

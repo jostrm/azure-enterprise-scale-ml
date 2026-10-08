@@ -5,45 +5,51 @@ For removal and uncertain outcomes, use
 [20 — removal and recovery](20-cli-and-api-and-usage.md).
 Decide first between
 [file-first variables.json editing and wrapper-first operations](18-cli-and-api-and-usage.md#choose-how-to-author-configuration-file-first-or-wrapper-first).
-This chapter follows the wrapper-first path; hand-authored request/patch JSON
-is supported input, not a manual edit of registered catalog projections.
+This chapter uses commands and API calls to save changes. You can supply JSON
+request files, but do not edit the generated catalog files directly.
 [17 — earlier overview](17-cli-and-api-and-usage.md) remains historical context;
-its shorthand about promotion or completion is **not** a promotion/success contract.
+use this chapter's limits on promotion and deployment success.
 
 **Saved configuration is not deployed infrastructure.** A successful configuration
-confirmation returns a catalog and `job: null`. Runtime preparation is another
-review; runtime confirmation can create billable resources, publish Git changes
-and dispatch provider pipelines. Neither HTTP acceptance nor local process exit
-proves Azure deployment.
+confirmation saves settings only (`job: null`). Deployment needs a separate
+review and approval. Its confirmation can start pipelines, create billable
+resources and publish Git changes. An accepted request or finished local command
+does not by itself mean Azure deployment succeeded.
 
 ## Choose the intent
 
-These labels describe the inspected source, **not certification of your installed
-CLI/API or selected published runtime**. Run guide 18's compatibility checks
-against the actual host; keep a blocked operation blocked.
+These labels describe the checked source version. **Your installed tools may
+differ.** Run guide 18's compatibility checks; do not bypass a blocked operation.
 
 | Scenario / intent | Support and boundary |
 |---|---|
-| **A. New AI factory, own hub/VPN, project001, selected Dev/Stage/Prod** | **implemented**: configuration for explicit selected scale sets and one initial project. **conditional/blocked**: actual owned hub/VPN and workload provisioning require the separately reviewed registered bootstrap/runtime route and complete networking inputs. The short catalog request below is deliberately only partial configuration, not a full hub deployment recipe. |
-| **B. Add an AI Factory scale set** | **implemented**: `scaleset add` saves configuration, with separate project placement and runtime reviews. An AI Factory scale set is an environment/network/subscription deployment unit, **not Azure Virtual Machine Scale Sets (VMSS)**. |
-| **C. Put a project on the latest successful scale set** | **implemented**, opt-in: `environment=latest-successful` on supporting API/CLI versions. **not implemented**: selection by default when placement is omitted. |
-| **D. Promote captured successful Dev configuration/version to Stage, then Prod** | **not implemented** as that end-to-end contract. Explicit target placement, target parameters and runtime deployment are supported separately, but do not capture/copy a verified source deployment or enforce a Dev → Stage → Prod success chain. |
-| **E. Add/update settings or typed parameters; unset an override** | **implemented**: catalog typed parameter review/confirmation and legacy configuration review/save. Catalog settings writes are **generic-access only**. None of these is resource deletion. |
-| **F. Choose APIM versus Kong for an AI gateway** | **not implemented** as a unified first-class CLI/SDK/HTTP deployment choice. Later source adds conditional MCP/AI Gateway component pipeline support; Application Gateway is a different product and its registered workflow route is blocked. |
+| **A. New AI factory, own hub/VPN, project001, selected Dev/Stage/Prod** | **implemented**: save selected scale sets and an initial project. **conditional/blocked**: deploying the hub/VPN and resources needs complete network settings and separate approval. The short example saves only part of that configuration. |
+| **B. Add an AI Factory scale set** | **implemented**: `scaleset add` saves configuration. Adding a project and deploying are separate steps. An AI Factory scale set groups an environment, network and subscription; it is **not Azure Virtual Machine Scale Sets (VMSS)**. |
+| **C. Put a project on the latest successful scale set** | **implemented**, opt-in: request `environment=latest-successful`. **not implemented**: choosing it automatically when placement is omitted. |
+| **D. Promote captured successful Dev configuration/version to Stage, then Prod** | **not implemented**. You can choose a target, edit its settings and deploy separately. This does not copy a successful Dev deployment or require each environment to succeed before the next. |
+| **E. Add/update settings or typed parameters; unset an override** | **implemented**: review and save parameters or legacy configuration. Catalog settings writes are **generic-access only**: use a general API request rather than a dedicated command. None of these deletes Azure resources. |
+| **F. Choose APIM versus Kong for an AI gateway** | **not implemented** as one deployment choice. Newer source has **conditional/blocked** MCP/AI Gateway pipeline support. Application Gateway is a different product; its registered deployment workflow is blocked. |
 
-Choose **CLI** for operator/CI usage, the supported **`AzureFactoryClient` SDK**
-for Python/backend integration, or **REST** for a language-neutral trusted worker.
-They call the same governed backend; they are not three deployment engines.
-Do not embed its API key in browser code. There are no SDK methods named
-`scaleset_add`, `project_promote` or `gateway_deploy`.
+Choose **CLI** for terminal commands, the **`AzureFactoryClient` SDK** for Python
+helpers, or **REST** for direct HTTP requests from your application. All call the
+same API and follow the same approval rules; see [18](18-cli-and-api-and-usage.md).
+**Keep the API key out of browser code.**
+
+<details>
+<summary>More info</summary>
+
+Use a trusted backend or automation worker for API calls. There are no SDK
+methods named `scaleset_add`, `project_promote` or `gateway_deploy`.
+
+</details>
 
 ## 1. Connection and exact target selection
 
 Use Windows PowerShell **5.1+ or 7**. Run **guide 18's Window B setup in this same
-shell** to select compatible client tooling. Before real-factory operations,
+shell** to set up the client tools. Before real-factory operations,
 replace its demonstration URL/key through your approved secret mechanism with
 the **actual owning API host and key**. Do not operate a real factory through the
-public demonstration key or assume port 8876 is its operational host.
+public demonstration key or assume port 8876 is its real API address.
 That setup defines `$ApiRoot`, `$AcceleratorRoot`,
 `$Python = Join-Path $ApiRoot '.venv\Scripts\python.exe'`,
 `PYTHONPATH` pointing to `environment_setup\azurefactory-cli\src`, and
@@ -53,17 +59,16 @@ That setup defines `$ApiRoot`, `$AcceleratorRoot`,
 the actual existing catalog for B–F, or a separately approved new target for A.
 All `folder`, `repo_root` and configuration import paths sent to the API refer to
 the **API host**. Request files and receipts in this tutorial are **client-local**.
-The two machines need not share a filesystem, although these privileged API
-surfaces retain their local-host access restrictions. For A, the chosen new
-`azurefactory` directory must already exist and satisfy empty-root requirements;
+The API still restricts these administrative calls to local-host access.
+For A, the chosen new `azurefactory` directory must already exist and be empty;
 have the API-host operator create that directory first. For B-F select an
 existing registered root, not the empty smoke-test directory.
 
-Initialize these helpers once. They are tutorial-local PowerShell functions, not
-additional SDK methods. Store reviews under private local application data,
+Run these helper definitions once. They are PowerShell functions for this guide,
+not extra SDK methods. Store reviews under private local application data,
 outside Git checkouts, replaceable templates and temporary cleanup areas.
-Receipts and raw responses may contain sensitive configuration. Inspect inherited
-permissions before proceeding.
+Saved reviews and responses may contain sensitive settings. Check that only
+authorized people can read the folder.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -138,28 +143,35 @@ function Read-NewScale {
 }
 ```
 
-The `[0]` indexing above is **only after exact-ID filtering and a uniqueness
-check**. Never select `catalog.factories[0]` as an implicit target. UUIDs identify
-objects; `001` is a project number or scale-set suffix. `DEV/001`, `STAGE/001` and
-`PROD/001` are different scale sets. Public environment values are `dev`, `stage`,
-`prod`; some underlying Azure names use `test` for Stage.
+Choose the exact IDs displayed by the API, not the first item in a list.
+`DEV/001`, `STAGE/001` and `PROD/001` are different scale sets.
+
+<details>
+<summary>More info</summary>
+
+The helper uses `[0]` only after matching the requested ID and checking there is
+exactly one result. UUIDs identify objects; `001` is a project number or scale-set
+suffix. API environment values are `dev`, `stage`, `prod`; some Azure names use
+`test` for Stage.
+
+</details>
 
 ## 2. Shared three-interface prepare → review → confirm
 
 For each scenario below:
 
-1. Run its input constructor, which sets `$Request` and `$Operation`.
-2. Run **2.1** to create fresh local paths.
+1. Run its input example to set `$Request` and `$Operation`.
+2. Run **2.1** to create new local request and review files.
 3. Choose **one** prepare alternative: that scenario's friendly CLI command,
    **2.2 SDK**, or **2.3 REST**.
 4. **STOP** and review. Only after approval choose **one** confirmation in **2.4**.
 
 Do not run all alternatives against the same target. They are equivalent choices,
-not sequential steps. Refresh the catalog/revisions after every confirmed change.
+not sequential steps. Read the catalog again after every saved change.
 
 ### 2.1 Serialize the selected scenario
 
-The supported operations here are `factory-create`, `factory-clone`,
+This step saves the selected request as JSON. Supported operations are `factory-create`, `factory-clone`,
 `scaleset-add`, `project-add`, `project-add-placements`, `parameters` and
 `runtime-deploy`. Generic settings writes and bootstrap have separate sections.
 
@@ -187,10 +199,17 @@ $env:AIF_GUIDE_MODE = $Mode
 
 ### 2.2 SDK alternative — executable for A, B, C, D, E and runtime
 
-This uses actual supported methods. `factory_create_prepare` and
-`parameter_prepare` return transport-level previews; a returned dictionary alone
-is not validation. `validate_preview` and the receipt helper enforce the review
-contract. `review_catalog_prepare` also validates opt-in placement resolution.
+The example prepares a change, checks the preview and saves a review file.
+It does **not** approve or start the change.
+
+<details>
+<summary>More info</summary>
+
+`factory_create_prepare` and `parameter_prepare` return previews that still need
+checking. `validate_preview` and the receipt helper perform those checks.
+`review_catalog_prepare` also checks the selected target for automatic placement.
+
+</details>
 
 ```powershell
 @'
@@ -247,17 +266,30 @@ if ($Preview.contract_version -ne 1 -or $Preview.can_execute -ne $true -or
 ```
 
 This saves a **plain API preview**, not a CLI receipt. Use the REST confirmation
-below, not `catalog confirm --receipt` on this file. The small local checks do not
-replace the server's validation or your review of target/evidence. REST-only
-integrators must implement their own review storage and binding rules; they do
-not need the Python SDK merely to send HTTP requests.
+below, not `catalog confirm --receipt` on this file. Check the target and recorded
+results yourself; the script's checks do not replace your review or the API's checks.
 
-**STOP — obtain approval of this exact preview.** Check contract 1, operation mode,
-folder, factory/project/scale-set IDs, environment, tenant/subscription, version and
-resolved source commit, changes, network ownership, warnings, blockers and expiry.
-For automatic placement, also inspect resolved UUIDs and success evidence. A
-`can_execute: true` response is not permission. Receipts are private, expiring,
-scope-bound artifacts; checksums are not signatures or user authorization.
+<details>
+<summary>More info</summary>
+
+A REST-only application must keep its saved review tied to the exact request and
+API host. It does not need the Python SDK to send HTTP requests.
+
+</details>
+
+**STOP — review and approve this exact preview.** Check the target folder, IDs,
+environment, tenant/subscription, version, changes, network ownership, warnings
+and expiry. For automatic placement, check the chosen scale and its successful
+deployment records. **`can_execute: true` is not approval.** Keep review files private.
+
+<details>
+<summary>More info</summary>
+
+Also check contract 1, configuration versus runtime mode and the resolved source
+commit. Receipts expire and apply only to the reviewed target. Their checksums
+detect changes to the file; they are not signatures or user approval.
+
+</details>
 
 ### 2.4 Confirm only after approval — choose one
 
@@ -303,8 +335,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Inspect the outcome; never automatically retry
 
 **REST, following REST preparation:** review the original request and its saved
 API preview. Only after approval, type the exact confirmation ID you reviewed.
-The server rechecks the owner, revision, expiry, one-use authorization and frozen
-evidence. This does not use a CLI receipt or a Python helper.
+The server rechecks who prepared the change, whether anything changed, the expiry
+and the saved plan. Approval can be used only once. No CLI receipt or Python
+helper is needed.
 
 ```powershell
 $ReviewedRequest = Get-Content -LiteralPath $RequestPath -Raw | ConvertFrom-Json
@@ -335,22 +368,27 @@ if ($Mode -eq 'runtime' -and !$Result.job) { throw 'Missing runtime job; inspect
 $Result | ConvertTo-Json -Depth 100
 ```
 
-For configuration, read the catalog again and verify the **reviewed UUIDs and
-changes**, not simply the number of entries. The catalog's revision property is
-`revision`; parameter responses and previews use `source_revision`. Do not
-interchange them by guessing. A failure, timeout or lost response is not permission
-to re-prepare/re-confirm or switch interfaces.
+After saving configuration, read the catalog again and check the **exact IDs and
+changes**. **If a write fails, times out or loses its response, inspect the saved
+state before doing anything else. Do not repeat it or switch tools to retry it.**
+
+<details>
+<summary>More info</summary>
+
+Catalog responses use `revision`; parameter responses and previews use
+`source_revision`. Use the matching field, not a guessed or old value.
+
+</details>
 
 ## A. New factory + selected environments + project001
 
-This constructor lets the operator explicitly choose **any nonempty subset** of
-Dev/Stage/Prod, including all three, with one selected scale per environment.
-It creates exactly one logical initial project001 with those placements.
-The factory must have a fresh key/prefix/region combination. An occupied draft is
-not an upsert; inspect it rather than reset/recreate it.
+Choose one or more of **Dev, Stage and Prod**, with one scale set per environment.
+This saves one initial project001 and its selected locations. Use a new factory
+key/prefix/region combination. If a draft already exists, inspect it; creation
+does not update or reopen it.
 
-The own-hub setting below records intent only. It does **not** supply a complete
-VPN pool, hub topology, identities, repository or runner configuration. Review
+The own-hub setting below saves your choice only. It does **not** supply all
+VPN, network, identity, repository or runner settings. Review
 those separately under [registered Full bootstrap](#registered-full-bootstrap).
 No tenant or subscription is created by these inputs.
 
@@ -391,8 +429,7 @@ $InitialProjectPath = Write-ReviewJson $InitialProject 'initial-project'
 $SettingsPath = Write-ReviewJson $Settings 'settings'
 ```
 
-Run **2.1**, then choose this **CLI prepare**, **2.2 SDK** (uses
-`factory_create_prepare`) or **2.3 REST** (same complete `CatalogPrepare` payload).
+Run **2.1**, then choose this **CLI prepare**, **2.2 SDK** or **2.3 REST**.
 
 ```powershell
 & $Python -m azurefactory factory create --folder $FactoryFolder --factory-key $FactoryKey `
@@ -405,14 +442,22 @@ if ($LASTEXITCODE -ne 0) { throw 'Review creation blockers; do not confirm.' }
 
 **STOP.** Approve configuration only, then use one **2.4** confirmation. Re-read
 the catalog and verify project001 and all selected environment/suffix placements.
-Do not run `project add --number 001` afterward. Omitting the initial-project
-object also defaults to project001 on supported APIs, but this tutorial chooses
-its placements explicitly. `--common-only` is a different intent.
+Do not run `project add --number 001` afterward.
 
 Creating Stage/Prod **configuration**, or GitHub environments named `Dev`, `Stage`,
 `Prod`, does not deploy those environments. The registered bootstrap workflow
-targets its exact initial Dev scope; do not claim this short request provisions
-three complete environments in one transaction.
+deploys its selected initial Dev target. This short request does not deploy three
+complete environments at once.
+
+<details>
+<summary>More info</summary>
+
+The SDK example uses `factory_create_prepare`; REST sends a `CatalogPrepare`
+request. On supported APIs, omitting the initial-project object also defaults to
+project001. This example chooses its locations explicitly. `--common-only` instead
+requests configuration without an initial project.
+
+</details>
 
 ### Clone configuration to a new factory identity or region
 
@@ -449,9 +494,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Clone configuration review is blocked.' }
 ```
 
 **STOP**, obtain approval and use the corresponding **2.4** confirmation.
-Read back the new UUIDs. Revisit addressing, inherited settings and provider
-binding before a separate runtime review; a renamed/relocated draft is not ready
-merely because its configuration was accepted.
+Check the new IDs, network addresses, copied settings and pipeline connection
+before a separate deployment review. A saved clone is not a deployed factory.
 
 ## B. Add a scale set, then optionally a project
 
@@ -482,10 +526,17 @@ Run **2.1**, then this CLI alternative or the shared SDK/REST alternative:
 if ($LASTEXITCODE -ne 0) { throw 'Scale-set preview blocked.' }
 ```
 
-**STOP**, then approve and confirm using **2.4**. No VMSS, common infrastructure or
-project is deployed by that write. Re-read the catalog and explicitly select the
-new scale UUID before another operation. SDK uses `review_catalog_prepare` with
-`action: "create-scale-set"`; there is no dedicated `scaleset_add` SDK method.
+**STOP**, then approve and confirm using **2.4**. This saves settings only; it does
+not deploy VMSS, shared infrastructure or a project. Read the catalog again and
+select the new scale UUID before another operation.
+
+<details>
+<summary>More info</summary>
+
+The SDK uses `review_catalog_prepare` with `action: "create-scale-set"`.
+There is no dedicated `scaleset_add` SDK method.
+
+</details>
 
 ### Add a different project to an existing or newly saved scale
 
@@ -516,16 +567,22 @@ Run **2.1**, then one prepare alternative:
 if ($LASTEXITCODE -ne 0) { throw 'Project preview blocked.' }
 ```
 
-**STOP**, then **2.4** after approval. For SDK/REST use the same constructed body
-through **2.2/2.3**. Configuration of the scale and project is not atomic across
-these two writes. Deployment is the separate runtime section below.
-The server checks number collisions in the exact selected placements and
-layout-2 project home. Do not impose a different factory-wide uniqueness rule.
+**STOP**, then **2.4** after approval. For SDK/REST, send the same request through
+**2.2/2.3**. Saving the scale and saving the project are separate changes, not one
+all-or-nothing step. Deployment comes later.
+
+<details>
+<summary>More info</summary>
+
+The server checks project-number conflicts in the selected locations and layout-2
+project home. Do not add a different factory-wide uniqueness rule.
+
+</details>
 
 ## C. Explicit latest-successful placement
 
-**Implemented opt-in; not default behavior.** Build the new-project request in B,
-then, **before 2.1 or any prepare**, explicitly replace only its placement selector:
+**Implemented opt-in; not default behavior.** Build the new-project request in B.
+Then, **before 2.1 or any prepare**, change its placement choice:
 
 ```powershell
 $Environment = $Scope.scale.environment
@@ -540,37 +597,43 @@ Run **2.1**, then choose this complete CLI command or the shared **2.2 SDK /
 & $Python -m azurefactory project add --folder $FactoryFolder --factory-id $FactoryId `
     --number $Number --display-name $DisplayName --placement $Placement `
     --expected-revision $Scope.catalog.revision --save-receipt $ReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Automatic placement is blocked; inspect its evidence requirements.' }
+if ($LASTEXITCODE -ne 0) { throw 'Automatic placement is blocked; review the reported deployment checks.' }
 ```
 
 The chosen existing scale in the input helper identifies
 the requested environment, **not** the final automatic target.
 
-The API selects eligible recorded verified **common** deployment evidence in the
-selected factory/environment/version and checks capacity/scope. It does not sort
-suffixes client-side, probe all Azure resources anew, or regard drafts, inventory,
-local zero exit or `submitted` as success. Review
-`latest-successful-placement-v1` and `resolved_placements`: exact UUID, source
-commit, job/completion and evidence hash. CLI/receipt validation and
-`review_catalog_prepare` reject missing or contradictory resolution.
+The API chooses a scale with recorded successful **common** deployment results
+for the requested factory, environment and version, with room for the project.
+It does not simply choose the highest suffix. Saved drafts, a list of resources,
+a finished local command or `submitted` do not count as deployment success.
 
-**STOP**, then approve the exact resolved target through **2.4**. Confirmation
-never silently reselects a newer candidate. No eligible scale is a blocker, not
+<details>
+<summary>More info</summary>
+
+Selection uses recorded deployments, not a fresh scan of all Azure resources.
+Review `latest-successful-placement-v1` and `resolved_placements`, including the
+exact UUID, source commit, completed job and `evidence_hash`. The CLI, receipt
+checks and `review_catalog_prepare` reject missing or conflicting selection details.
+
+</details>
+
+**STOP**, then approve the chosen target through **2.4**. Confirmation does not
+silently switch to a newer scale. If no scale qualifies, stop; that is not
 permission to create one or guess an ID. Omitting `--placement` fails; it does
 not mean latest-successful. The same explicit selector is supported on
 `project add-placements` by replacing D's placement value, but is not promotion.
 
 ## D. Explicit Stage/Prod placement is not captured promotion
 
-**Not implemented:** a supported operation that captures Dev's successful
-configuration/version/source receipt and promotes that immutable capture through
-Stage and Prod. There is no `project promote` command or `project_promote` SDK
-method. A runtime `--version-ref` selects code; it does not capture/copy resource
-configuration, data, models or source-environment success.
+**Not implemented:** copying a saved snapshot of a successful Dev deployment,
+including its settings and version, through Stage and Prod. There is no
+`project promote` command or `project_promote` SDK method. `--version-ref` chooses
+code; it does not copy settings, data, models or a previous deployment's success.
 
-The limited alternative is to create the target scale with B if absent, add the
-logical project's missing target placement below, edit **target** parameters with
-E, then separately deploy the target. Each step needs its own review.
+Instead, create the target scale with B if needed, add the project's target
+location below, edit **target** parameters with E, then deploy separately.
+Each step needs its own review.
 
 ```powershell
 $Scope = Read-Target -Project
@@ -600,16 +663,16 @@ Run **2.1**, then choose this CLI, **2.2 SDK** or **2.3 REST**:
 if ($LASTEXITCODE -ne 0) { throw 'Target placement preview blocked.' }
 ```
 
-**STOP**, then **2.4** after approval. For Prod, repeat target selection and review
-explicitly; do not describe this repetition as a built-in Stage-success gate.
-Do not route catalog roots through legacy deployment to bypass a blocker.
+**STOP**, then **2.4** after approval. For Prod, choose and review the target again.
+This does not automatically require Stage to have succeeded.
+Do not use legacy deployment to bypass a blocked catalog operation.
 
 ## E. Add/update a parameter, unset an override, or edit settings
 
 ### Typed resource parameters — all three interfaces
 
-Read the actual target's published template schema. Do not guess resource flag
-names from a slide, old template or another factory version. For common-only
+Read the available parameters for the actual target and version. Do not guess
+names from a slide or old template. For common-only
 parameters omit project selection and `--project-id`; this example targets a
 project that is already placed in the selected scale.
 
@@ -656,16 +719,18 @@ Run **2.1**, then this CLI or **2.2 SDK / 2.3 REST**. The latter use
 if ($LASTEXITCODE -ne 0) { throw 'Parameter preview blocked.' }
 ```
 
-**STOP**, then the matching parameter confirmation in **2.4** after approval.
-This merges only selected changes and preserves other values. `unset` removes a
-saved override; it is not `null`, resource deletion, or necessarily disabling the
-effective resource. Inherited/default values and required schema fields still
-matter. A disabled resource flag does not promise deletion of an existing Azure
-resource. Follow the reviewed runtime plan for deployment and guide 20 for removal.
-Do not silently use `--reset-profile` to make an incompatible schema pass.
-An explicitly approved `reset_profile` discards **every old protected parameter
-context in that scale set**, even when `project_id` selects one project; it is not
-a project-only reset. Review that broader configuration loss separately.
+**STOP**, then use the parameter confirmation in **2.4** after approval.
+Only the chosen values change. `unset` removes a saved override, so an inherited
+or default value may apply instead. It is not the same as `null`.
+**Neither `unset` nor a disabled resource flag promises to delete an Azure
+resource.** Use a separate deployment review, or guide 20 for removal.
+
+**Do not use `--reset-profile` just to get past an error.** `reset_profile`
+discards **all old protected parameter settings in that scale set**, even when
+`project_id` selects one project. Review that wider loss of settings separately.
+
+<details>
+<summary>More info</summary>
 
 SDK read equivalent: `client.catalog_parameters(folder, factory_id, scale_set_id,
 project_id)`. REST read equivalent: `GET /api/v1/factory-catalog/parameters` with
@@ -673,17 +738,28 @@ those exact query names. Guide 18 shows read-request mechanics. The complete
 prepare/confirm alternatives above share the parsed schema revisions; no helper
 installation or hand-built JSON string is required.
 
+</details>
+
 ### Catalog settings — generic-access only
 
-`catalog settings` / `catalog_settings` is a **read**, not a setter. There is no
-friendly `settings set` command. `action: "configure-settings"` uses the generic
-catalog API. The specialized catalog receipt helper does not accept a settings
-operation label; do not invent one.
+`catalog settings` / `catalog_settings` only **reads** settings. There is no
+`settings set` command; use a general API request with
+`action: "configure-settings"`. This flow saves a plain preview, **not a receipt
+you can pass to CLI `catalog confirm`**.
 
-Select an exact scope, read `field_keys` and `revision`, and send only intended
-nonsecret scalar replacements. This example edits scale-level settings; add a
-validated `project_id` only for project settings, or omit `scale_set_id` for
-factory-only settings. Identity/network/version fields are separately managed.
+Choose the target, read `field_keys` and `revision`, and send only the values you
+want to replace. Do not include secrets. This example changes scale-level
+settings; factory identity, network addresses and version use separate operations.
+
+<details>
+<summary>More info</summary>
+
+Settings accept individual scalar values, not arbitrary nested objects. For
+project settings, add a checked `project_id`; for factory settings, omit
+`scale_set_id`. The specialized catalog receipt helper has no settings operation
+label, so do not invent one.
+
+</details>
 
 ```powershell
 $Scope = Read-Target
@@ -719,9 +795,9 @@ it is not confirmation. SDK equivalent is
 `client.catalog_prepare(parsed_request)` followed by `validate_preview(preview)`;
 REST is the same JSON to `POST /api/v1/factory-catalog/prepare`.
 
-**STOP — review exact settings, scope, revision and expiry and obtain approval.**
-The server binds and rechecks the protected preview. Do not edit the saved
-preview or regenerate it silently. Only then:
+**STOP — review the settings, target, revision and expiry, then obtain approval.**
+The server checks that the saved preview still applies. Do not edit or silently
+replace that preview. Only after approval:
 
 ```powershell
 $SettingsPreview = Get-Content -LiteralPath $SettingsPreviewPath -Raw | ConvertFrom-Json
@@ -744,32 +820,46 @@ settings patch deletes a key or resource.
 
 ### Other existing catalog configuration actions
 
-These are **generic-access only** SDK/CLI operations, not additional friendly
-commands. They use `POST /api/v1/factory-catalog/prepare` with a closed
-`CatalogPrepare` request, then the separately reviewed `/confirm`. Use plain
-saved API previews, as in the settings workflow, not an invented specialized
-`write_receipt` operation name. The model in the selected host's OpenAPI is
-authoritative for required fields and forbidden combinations.
+These advanced actions are **generic-access only**: use general API requests,
+not dedicated CLI commands. They need the same separate review and confirmation
+as settings changes.
+
+<details>
+<summary>More info</summary>
+
+Use `POST /api/v1/factory-catalog/prepare` with a `CatalogPrepare` request,
+then separately approve `/confirm`. Save plain API previews, as above; do not
+invent a specialized `write_receipt` operation. Check the selected host's OpenAPI
+for required fields and allowed combinations.
 
 | Action | When to choose it | Scope / boundary |
 | --- | --- | --- |
-| `migrate` | Explicitly register legacy configuration, or copy it into a separate empty modern root | Same-root legacy registration uses `folder`; copy migration uses destination `folder` plus explicit `source_folder`. Preserve UUIDs/source files. Never run both roots as independent writers of the same Azure targets. No deployed ownership is inferred. |
-| `correct-draft-scale-identity` | Correct a mistaken tenant/subscription on an eligible empty draft | Exact `factory_id`, `scale_set_id`, `expected_revision`, and `draft_identity` containing tenant/subscription UUIDs. Bound, owned, placed or previously executed targets are blocked; not a migration of deployed resources. |
-| `configure-binding` | Save a separately reviewed provider execution binding | Exact factory and typed `RuntimeBinding`; use the enrollment candidate workflow below rather than guessing repository, runner, principal or lock coordinates. |
+| `migrate` | Register legacy configuration, or copy it into a separate empty modern folder | Same-folder registration uses `folder`; copying uses destination `folder` plus `source_folder`. Preserve UUIDs/source files. Never let both copies independently change the same Azure targets. This does not prove ownership of deployed resources. |
+| `correct-draft-scale-identity` | Fix a tenant/subscription on an eligible empty draft | Supply `factory_id`, `scale_set_id`, `expected_revision` and `draft_identity` with tenant/subscription UUIDs. Targets with bindings, ownership, project placements or previous execution are blocked. This does not move deployed resources. |
+| `configure-binding` | Save a reviewed pipeline connection | Supply the exact factory and a `RuntimeBinding`. Use the enrollment steps below rather than guessing repository, runner, identity or coordination settings. |
 
 The SDK uses `catalog_prepare(parsed_body)` and `catalog_confirm(folder,
 confirmation_id)`. The generic CLI uses `request POST` with `--body-json`,
 `--write --yes`; these flags acknowledge that single HTTP request, not approval
-for a later runtime operation. Generic transport does not relax server guards.
+for a later deployment. General API requests still follow the server's safety checks.
+
+</details>
 
 ## Separate runtime deployment — after configuration approval
 
-This is the closest supported target deployment for B/D/E, **not captured
-promotion**. Runtime preparation uses `action: "deploy"` on the catalog API.
-It can be blocked by binding, ownership, coordination, published source, host
-identity, principal, runner, networking or provider capability checks. Common-only,
-GHA and shared-remote execution require the compatible scoped implementation;
-configuration acceptance alone never establishes that support.
+Use this to deploy the selected target after B/D/E. **It is not captured
+promotion.** The API checks the pipeline connection, permissions, ownership,
+version, runner and networking. A saved configuration does not mean those checks
+will pass.
+
+<details>
+<summary>More info</summary>
+
+Runtime preparation uses `action: "deploy"`. Common-only, GHA and shared-remote
+deployment need compatible runtime support, including coordination and exact
+deployment identity checks. Do not switch routes to bypass a blocker.
+
+</details>
 
 ```powershell
 $Scope = Read-Target -Project -RequirePlacement
@@ -796,8 +886,8 @@ Run **2.1**, then choose this CLI, **2.2 SDK** (`review_catalog_prepare`) or
 if ($LASTEXITCODE -ne 0) { throw 'Runtime blocked; no legacy/bootstrap fallback.' }
 ```
 
-For B's **common-only** scale-set deployment, use this constructor **instead of**
-the project constructor above, then run **2.1** and the following CLI command
+For B's **common-only** scale-set deployment, use these inputs **instead of**
+the project inputs above, then run **2.1** and the following CLI command
 (or the same **2.2 SDK / 2.3 REST** alternatives). This is still conditional on
 the reviewed runtime's common-only support:
 
@@ -825,12 +915,12 @@ After **2.1**, the common-only CLI prepare is:
 if ($LASTEXITCODE -ne 0) { throw 'Common runtime blocked; do not switch routes to bypass it.' }
 ```
 
-**STOP — this is a cloud/runtime approval, not another configuration save.**
+**STOP — this approval starts deployment, not just a configuration save.**
 Only after approval use **2.4**, whose CLI branch is `runtime confirm`. Omitting
 `project_id` deliberately selects common-only deployment, not every project; use
 that only with a separately reviewed supported common route.
 
-Inspect the returned job, then observe its exact ID:
+Check the returned job, then follow its exact ID:
 
 ```powershell
 $JobsText = & $Python -m azurefactory catalog jobs --folder $FactoryFolder
@@ -849,26 +939,38 @@ if ($LASTEXITCODE -ne 0) { throw 'Inspect the reported job state, not a retry in
 if ($LASTEXITCODE -ne 0) { throw 'Deadline/failure/uncertainty: inspect state; do not redispatch.' }
 ```
 
-SDK observation is `catalog_job(folder, job_id)` / `catalog_terminal(folder,
+**A timeout stops waiting; it does not cancel deployment.** Check the pipeline's
+deployment results, exact version/target and catalog status before claiming success.
+
+<details>
+<summary>More info</summary>
+
+SDK status calls are `catalog_job(folder, job_id)` / `catalog_terminal(folder,
 job_id, cursor)`; REST is `GET /api/v1/factory-catalog/jobs/{job_id}?folder=...`
 and `/api/v1/factory-catalog/terminal` with `folder`, `job_id`, `cursor`.
-Timeout stops waiting; it does not cancel work. Verify provider/worker deployment
-evidence, exact source/target and catalog lifecycle before claiming success.
+
+</details>
 
 ## Registered Full bootstrap
 
-**Conditional/blocked**, with complete operator-reviewed inputs. This is the staged
-`bootstrap workflow ...` family, not the older launcher-based `bootstrap ...`
-family. It can review and create its own prerequisites; do not impose advanced
-manual enrollment as a universal prerequisite or use either route as a bypass.
-It may provision identities, groups, network foundation, runners and common/project
-resources, create repositories, commit/push and dispatch pipelines.
+**Conditional/blocked**: provide complete settings reviewed by the operator.
+Use `bootstrap workflow ...`, not the older `bootstrap ...` launcher commands.
+This workflow can set up its own prerequisites; advanced manual enrollment is
+not always needed. **It can create billable resources, identities, groups,
+networks and runners, create repositories, commit/push and start pipelines.**
+Do not use another route to bypass a blocker.
 
-First save compatible registered configuration through A or the registered
-creation API. The latter is **generic-access only** in CLI/SDK:
+First save the factory configuration through A or the registered creation API.
+**Do not recreate an existing factory to switch routes.**
+
+<details>
+<summary>More info</summary>
+
+The registered creation API is **generic-access only** in CLI/SDK:
 `POST /api/v1/creation/prepare`, then separately approved `/creation/confirm`.
-It is not `bootstrap_prepare`, which targets the legacy launcher endpoint.
-Do not recreate an occupied factory merely to switch routes.
+It is not `bootstrap_prepare`, which calls the legacy launcher API.
+
+</details>
 
 ### Discover and provide the complete bootstrap configuration
 
@@ -879,28 +981,36 @@ if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect bootstrap capabilities.' }
 if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect bootstrap schema.' }
 ```
 
-Read `bootstrap_fields` (including `required`), defaults and supported regions in
-capabilities, `BootstrapConfig` / `WorkflowBootstrapConfig` and
-`CreationWorkflowPrepare` in the live OpenAPI, and the canonical API guide in
-`$ApiRoot\docs\API.md`. Mandatory BootstrapConfig keys include
+Use the commands above to check required fields, defaults and supported regions.
+Provide a real, complete JSON configuration file reviewed by the operator—not a
+sample with placeholder accounts or network addresses.
+
+<details>
+<summary>More info</summary>
+
+Read `bootstrap_fields` (including `required`) in capabilities and
+`BootstrapConfig` / `WorkflowBootstrapConfig` / `CreationWorkflowPrepare` in the
+live OpenAPI. The API reference is `$ApiRoot\docs\API.md`. Required keys include
 `subscription_id`, `tenant_id`, `scale_set_number`, `repo_root`,
 `team_member_email`, `team_group_name`; route validation adds the GHA repository
 or ADO organization/project/repository/service connection and ADO connected tenant.
-Use real approved values; a supplied existing team-group ID does not remove the
-current API's required team name/member-email fields.
+A supplied existing team-group ID does not remove the current API's required
+team name/member-email fields.
+
+</details>
 
 For A's **owned** hub/VPN, explicitly review `setup_hub_access: true`,
 `access_hub_mode: "integrated"`, Dev VNet CIDR and `vpn_client_cidr`, DNS/network
-ownership, region, subscription, project001, provider/repository, identity and runner
-choices. Integrated mode is not an instruction to invent a second hub VNet.
-External hub mode is different. The workflow does not install a VPN client or
-prove workstation connectivity. Hosted runners need appropriate private access.
+ownership, region, subscription, project001, repository, identity and runner.
+Integrated mode does not need an invented second hub VNet. External hub mode is
+different. **This does not install a VPN client or check your workstation's
+connection.** Hosted runners need suitable private-network access.
 
-Choose `coordination_mode` explicitly. `single-writer` requires approved exclusive
-writer/private-repository governance; `blob` has its own enrollment/network
-prerequisites. Never change a bound factory's mode just to unblock deployment.
-The configuration file below is **operator supplied** after this review, not a
-hidden file shipped by this guide:
+Choose `coordination_mode` deliberately. `single-writer` requires a private
+repository and an approved setup where only one writer changes the factory;
+`blob` has separate coordination/network requirements. **Do not change an existing
+binding's mode just to unblock deployment.** The file below is supplied by your
+operator after review; it is not included with this guide.
 
 ```powershell
 $Scope = Read-Target -Project -RequirePlacement
@@ -935,9 +1045,13 @@ $PreflightReportPath = Join-Path $ReviewRoot ('preflight-' + [guid]::NewGuid().T
 if ($LASTEXITCODE -ne 0) { throw 'Preflight blocked/incomplete; inspect it before preparing.' }
 ```
 
-The local checks above are not full schema/Azure validation. Server preflight is
-read-only, may query Azure/provider state, and creates no authorization. Its cost
-estimate is advisory, possibly partial, not a spend cap or deployment receipt.
+The script's local checks are not a full Azure check. Server preflight reads
+Azure/provider state but **does not approve or start deployment**. Its cost
+estimate may be incomplete; it is not a spending limit.
+
+<details>
+<summary>More info</summary>
+
 An equivalent CLI entry point accepts the workflow request itself; choose this
 instead of the preceding `preflight` call, not as another approval step:
 
@@ -948,6 +1062,8 @@ $AlternateReportPath = Join-Path $ReviewRoot ('preflight-' + [guid]::NewGuid().T
 if ($LASTEXITCODE -ne 0) { throw 'Readiness is blocked or incomplete; this created no workflow approval.' }
 ```
 
+</details>
+
 ### Per-stage workflow: prepare, approve, observe, next
 
 ```powershell
@@ -957,7 +1073,7 @@ $WorkflowReceiptPath = Join-Path $ReviewRoot ('stage-' + [guid]::NewGuid().ToStr
 if ($LASTEXITCODE -ne 0) { throw 'Workflow preparation blocked.' }
 ```
 
-**STOP — approve the exact stage, scope, source, commands, effects and expiry.**
+**STOP — review and approve this stage's target, version, commands, changes and expiry.**
 Only then:
 
 ```powershell
@@ -969,8 +1085,8 @@ $WorkflowId = $WorkflowReceipt.preview.workflow_id
 if ($LASTEXITCODE -ne 0) { throw 'Inspect the reported workflow boundary.' }
 ```
 
-Wait/observe until the server explicitly reports `requires_review: true`; do not
-infer the next stage from a local command exit. Then prepare a fresh receipt:
+Check status until the server reports `requires_review: true`. A finished local
+command does not mean the next stage is ready. Then prepare a new review:
 
 ```powershell
 $WorkflowReceiptPath = Join-Path $ReviewRoot ('stage-' + [guid]::NewGuid().ToString('N') + '.json')
@@ -981,11 +1097,12 @@ if ($LASTEXITCODE -ne 0) { throw 'No confirmable next stage.' }
 
 **STOP again.** Review this new stage before separately using the earlier `start`
 command with this new receipt. Never automate a loop that approves every stage.
-An individual stage or queued job is not the entire factory's deployment result.
+One completed stage or queued job does not mean the entire factory is deployed.
 
 ### Optional bounded whole-workflow approval
 
-Instead of the per-stage initial prepare, choose this explicitly:
+Optionally approve the listed workflow stages together, instead of one at a time.
+This is a separate choice—not an extra step after per-stage preparation:
 
 ```powershell
 $WorkflowReceiptPath = Join-Path $ReviewRoot ('whole-workflow-' + [guid]::NewGuid().ToString('N') + '.json')
@@ -994,15 +1111,24 @@ $WorkflowReceiptPath = Join-Path $ReviewRoot ('whole-workflow-' + [guid]::NewGui
 if ($LASTEXITCODE -ne 0) { throw 'Bounded approval unsupported/blocked; no silent fallback.' }
 ```
 
-**STOP.** Review `review.workflow_authorization` with contract
-`bounded-full-bootstrap-v1`, all stages/effects, exact scope/source/program and
-template fingerprints, expiry and hash, plus advisory `review.cost_preview`.
-Only after approval run the separate `bootstrap workflow start` above.
-The **server**, not a client approval loop, owns continuation. Changed inputs,
-expired approval, failed or uncertain stages require review/reconciliation.
+**STOP.** Review all listed stages, targets, changes, expiry and the cost estimate.
+Only after approval run `bootstrap workflow start` above. The server then manages
+the approved stages; do not build a script that blindly approves later steps.
+**Changed inputs, expired approval, failure or an uncertain result mean stop and
+review the state.**
 
-Only if the server reports a **safely resumable boundary**, use the original
-consumed authorization, not a new approval or a retry:
+<details>
+<summary>More info</summary>
+
+Check `review.workflow_authorization`, contract `bounded-full-bootstrap-v1`,
+the source/program/template fingerprints, expiry and hash.
+`review.cost_preview` is an estimate, not a spending limit.
+
+</details>
+
+Use the following command **only when the server says the workflow can safely
+continue**. It resumes the existing approval; it is not a retry for a failed or
+running stage:
 
 ```powershell
 $WorkflowReceipt = Get-Content -LiteralPath $WorkflowReceiptPath -Raw | ConvertFrom-Json
@@ -1016,11 +1142,15 @@ if ($LASTEXITCODE -ne 0) { throw 'Inspect state; never loop continue on failure.
 
 ### Registered workflow SDK/REST mapping
 
-These are real methods/routes; the same reviewed JSON and server responses apply.
-For a custom SDK/REST worker, validate previews and use `write_receipt` /
+For an application using SDK or REST, the equivalent calls are below.
+
+<details>
+<summary>More info</summary>
+
+Use the same reviewed JSON. For SDK receipt handling, use `write_receipt` /
 `load_receipt` with purpose `creation-workflow-start`, operation
-`creation-workflow`, before explicit approval/start. This also validates bounded
-authorization hashes; `validate_preview` alone does not validate that contract.
+`creation-workflow` before approval/start. This also checks whole-workflow
+approval hashes; `validate_preview` alone does not perform that check.
 
 | Step | Supported SDK | HTTP contract |
 |---|---|---|
@@ -1032,17 +1162,22 @@ authorization hashes; `validate_preview` alone does not validate that contract.
 | Next review | `creation_workflow_next(folder, workflow_id)` | `POST /api/v1/creation/workflows/{id}/prepare-next`: `{"folder": ...}` |
 | Safe continuation only | `creation_workflow_continue(folder, workflow_id, authorization_hash)` | `POST /api/v1/creation/workflows/{id}/continue`: `folder`, original `authorization_hash` |
 
+</details>
+
 ## Advanced enrollment is a separate local-core workflow
 
-`enrollment plan`, `ensure` and `plan-and-publish` call the **local enrollment core**
-with explicitly authenticated Azure/provider tools. They are **not equivalent
-REST/`AzureFactoryClient` enrollment contracts**. Plan can read cloud state;
-ensure can provision billable resources and grant roles. Neither creates every
-runner/network resource or deploys workloads.
+These optional commands set up a pipeline connection using local Azure/provider
+tools. **They are not a replacement for Full bootstrap or workload deployment,
+and there is no matching REST/`AzureFactoryClient` enrollment flow.**
+`plan` reads cloud state; **`ensure` can create billable resources and grant roles**.
+An administrator must first arrange that writers do not make conflicting changes.
 
-Only use this advanced route deliberately, with a schema-2 consumer repository,
-exact registered scope and administrator-established serialized/exclusive-writer
-governance. Read the closed options schema and
+<details>
+<summary>More info</summary>
+
+Use `enrollment plan`, `ensure` and `plan-and-publish` only with explicitly
+authenticated tools, a schema-2 consumer repository and the exact registered
+target. They do not create every runner/network resource. Read the options schema and
 [canonical enrollment reference](../../../environment_setup/azurefactory-cli/readme.md#enroll-a-registered-factory--scale-set)
 for required repository/ref, writable/dependency RG IDs, roles, runner, ADO tenant,
 identity and coordination options. Do not put credentials in options JSON.
@@ -1061,8 +1196,8 @@ $EnrollmentResultPath = Join-Path $ReviewRoot ('enrollment-result-' + [guid]::Ne
 if ($LASTEXITCODE -ne 0) { throw 'Enrollment plan blocked.' }
 ```
 
-The governance flag is an **administrator attestation**, not a way to create
-governance. Omit this route if that attestation is not true.
+The governance flag confirms that an administrator has already arranged safe,
+nonconflicting writes. It does not set that up. Do not use it if that is untrue.
 
 **STOP — independently approve the plan, role scopes, resource creation, hashes
 and limitations.** Only then:
@@ -1073,8 +1208,8 @@ and limitations.** Only then:
 if ($LASTEXITCODE -ne 0) { throw 'Inspect enrollment outcome; do not re-plan/retry automatically.' }
 ```
 
-Ensure returns a **binding candidate**, not a deployment. For its independent
-publication review:
+Ensure returns a proposed pipeline connection (**binding candidate**), not a
+deployment. Review saving that connection separately:
 
 ```powershell
 $Catalog = Read-Catalog
@@ -1096,9 +1231,9 @@ This final binding portion is catalog `action: "configure-binding"` plus catalog
 confirm; `catalog confirm` is an alternative to `enrollment publish`, not another
 step. It does not imply SDK parity for provisioning.
 
-`plan-and-publish` is an alternative bounded convenience path, **not an extra step
-after the sequence above**. With the same explicit inputs and governance, first
-review its nonmutating plan (exit 3 means approval required):
+`plan-and-publish` combines enrollment and saving the connection. It is an
+alternative, **not an extra step after the sequence above**. With the same inputs
+and safe-writer setup, first review its read-only plan (exit 3 means approval required):
 
 ```powershell
 $CombinedReviewDir = Join-Path $ReviewRoot ('combined-review-' + [guid]::NewGuid().ToString('N'))
@@ -1123,15 +1258,16 @@ if ($LASTEXITCODE -ne 0) { throw 'Inspect saved artifacts and server state; no a
 
 The convenience flow's new-binding/no-Blob-options default can be single-writer;
 original plan/ensure defaults differ. Saved factory mode must already agree.
-It must not migrate an existing binding, rewrite the register to fit, infer an
-Azure subscription from the current account, or weaken shared-hub governance.
+It must not change an existing binding's mode, rewrite the register to fit, guess
+the subscription from the current account, or bypass shared-hub safety rules.
+
+</details>
 
 ## Legacy configuration and legacy deployment are separate contracts
 
 Use this only for a real legacy `aifactory` root, not an `azurefactory` catalog.
-Legacy configuration review/save requires an exact persistent JSON project and
-preserves its opaque `_json_source` metadata. Do not construct a lossy full-state
-replacement or edit identity/private fields.
+Choose the exact saved JSON project. Let the tools preserve its `_json_source`
+metadata; do not edit that metadata, identity fields or private fields yourself.
 
 ```powershell
 $LegacyFolder = Read-Host 'Exact legacy aifactory folder on the API host'
@@ -1149,8 +1285,8 @@ $LegacyChangesPath = Write-ReviewJson (Get-Content -LiteralPath $ChangesSourcePa
 if ($LASTEXITCODE -ne 0) { throw 'Legacy configuration review failed.' }
 ```
 
-**STOP — inspect actual patch values, `review_id`, `can_save`, changed fields,
-warnings, validation and write choice.** Only after approval:
+**STOP — check the changed values, `review_id`, `can_save`, warnings and what will
+be saved.** Only after approval:
 
 ```powershell
 $ReviewId = Read-Host 'Exact approved review_id from config review'
@@ -1159,13 +1295,20 @@ $ReviewId = Read-Host 'Exact approved review_id from config review'
 if ($LASTEXITCODE -ne 0) { throw 'Inspect persistent state; never blindly repeat save.' }
 ```
 
-This saves configuration, normally including pipeline variable files; use
-`--snapshot-only` on **both** review and save only when that was the reviewed
-intent. It does not deploy or commit/push. The supported SDK orchestration is
+**This saves configuration; it does not deploy or commit/push.** Normally it also
+writes pipeline variable files. If you want only a snapshot, review that choice
+and use `--snapshot-only` on **both** review and save.
+
+<details>
+<summary>More info</summary>
+
+The supported SDK helper is
 [`ConfigurationDraft.load/review/save`](../../../environment_setup/install_config_wizard/api-usage-examples/python/edit_configuration.py).
-Its underlying HTTP mapping is `/api/v1/projects/load`, `/validation`,
+Its HTTP calls are `/api/v1/projects/load`, `/validation`,
 `/export` without a path for review, then separately approved `/projects/save`.
 `/startup/load` is a hint, not exact project selection; preserve `_json_source`.
+
+</details>
 
 For a separate legacy runtime update/deployment:
 
@@ -1185,8 +1328,8 @@ $LegacyReceiptPath = Join-Path $ReviewRoot ('legacy-' + [guid]::NewGuid().ToStri
 if ($LASTEXITCODE -ne 0) { throw 'Legacy deployment preview blocked.' }
 ```
 
-**STOP — review deployment acknowledgement contract 2**, the exact saved draft,
-project, source/target, patch choice and source version/ref. Only then:
+**STOP — review the deployment preview (contract 2)**, including the saved draft,
+project, source/target, patch choice and version. Only after approval:
 
 ```powershell
 & $Python -m azurefactory legacy start --receipt $LegacyReceiptPath --yes
@@ -1197,6 +1340,14 @@ $LegacyJobId = Read-Host 'Exact job ID returned by this start'
 if ($LASTEXITCODE -ne 0) { throw 'Inspect the result; timeout does not cancel the job.' }
 ```
 
+**`submitted` means the local launcher finished, not that Azure deployment
+succeeded.** Check `execution_result` for recorded results and limitations.
+`--wait` does not change that meaning. This is also not the captured-success
+promotion requested in D.
+
+<details>
+<summary>More info</summary>
+
 | Legacy stage | SDK | REST |
 |---|---|---|
 | Plan | `project_deployment_plan(body)` | `POST /api/v1/operations/project-deployments/plan` |
@@ -1204,28 +1355,30 @@ if ($LASTEXITCODE -ne 0) { throw 'Inspect the result; timeout does not cancel th
 | Start | `project_deployment_start(folder, confirmation_id)` | `POST /api/v1/operations/project-deployments/start` |
 | Observe | `project_deployment_terminal(folder, job_id, cursor)` | `GET /api/v1/operations/project-deployments/terminal` |
 
-**`submitted` means local launcher completion, not verified provider deployment.**
-Use `execution_result` and its reported evidence/limitations; `--wait` does not
-upgrade this to Azure success. Legacy environment deployment is also not the
-captured-success promotion contract requested in D.
+</details>
 
 ### Older launcher-based Full bootstrap
 
-`bootstrap prepare/start/status` maps to `/api/v1/creation/bootstrap/*`;
-SDK methods are `bootstrap_prepare`, `bootstrap_start`, `bootstrap_job`.
-It is distinct from registered `creation_workflow_*`. Select only a genuinely
-supported legacy launcher/version from capabilities, never as a blocked registered
-workflow fallback. Legacy 124 is not a registered version fallback.
+Use this older flow only when you deliberately need a supported legacy launcher.
+**Do not use it to bypass a blocked registered workflow.** Check capabilities for
+the supported launcher/version; legacy 124 is not a registered-version fallback.
+It can create resources, commit/push and start pipelines.
 
-For an intentionally selected launcher flow, obtain an **operator-reviewed full
-BootstrapPrepare JSON file** with `launcher`, `orchestrator` and complete `config`
-matching `BootstrapConfig` and the capabilities. Its API-host `repo_root` must
-satisfy the new/empty destination constraints:
+<details>
+<summary>More info</summary>
+
+`bootstrap prepare/start/status` uses `/api/v1/creation/bootstrap/*`;
+SDK methods are `bootstrap_prepare`, `bootstrap_start`, `bootstrap_job`.
+These are separate from registered `creation_workflow_*`.
+
+Get an **operator-reviewed full BootstrapPrepare JSON file** with `launcher`,
+`orchestrator` and complete `config` matching `BootstrapConfig` and capabilities.
+Its API-host `repo_root` must be a permitted new/empty destination.
 
 If you first need account/team defaults from an existing wizard state, the
-following is an optional **mapping operation**, not a launcher request or
-deployment. Supply an actual approved state JSON file; do not treat the output
-as a complete reviewed bootstrap configuration:
+following optional step copies those defaults only; it does not deploy anything.
+Supply a real approved state JSON file. Its output is not a complete bootstrap
+configuration:
 
 ```powershell
 $WizardStatePath = Read-Host 'Existing local JSON object containing approved wizard state'
@@ -1260,16 +1413,16 @@ $LauncherJobId = Read-Host 'Exact returned bootstrap job ID'
 if ($LASTEXITCODE -ne 0) { throw 'Inspect outcome; timeout is not cancellation.' }
 ```
 
+</details>
+
 ## F. APIM, Kong, AI Gateway SKU and Application Gateway
 
-Do not translate a conceptual gateway box into invented deployment commands.
-There is **no first-class APIM-versus-Kong choice**, gateway endpoint, corresponding
-SDK deployment method, or complete hub/gateway route implied by these examples.
-Existing APIM-related resource configuration must be discovered in the selected
-published schema and reviewed through E; it is not a Kong switch.
+**Not implemented:** one command or API option to choose APIM versus Kong.
+These examples do not provide a gateway deployment method or a complete
+hub/gateway setup. For existing APIM settings, check the selected version's
+available parameters and follow E; that is not a Kong switch.
 
-Published accelerator change `81ec23d6` originally added these exact flags as
-configuration-only, with disabled defaults:
+These gateway settings default to disabled:
 
 | JSON/YAML name | GHA environment name |
 |---|---|
@@ -1277,50 +1430,64 @@ configuration-only, with disabled defaults:
 | `enableAIGatewaySKU` | `ENABLE_AI_GATEWAY_SKU` |
 | `addAIFactoryMCP2AIGatewaySKU` | `ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU` |
 
-**Publication-time update:** later main commit `cf8437af` adds dedicated legacy
-`config review` / `config save` options and opt-in ADO/GHA project-pipeline steps.
-That source can host the read-only Factory MCP, create/adopt an AI Gateway and
-register the MCP tool server for **project001 Dev**, subject to explicit images,
-identity, private networking and other prerequisites. See the
+**Conditional/blocked:** newer source adds legacy `config review` / `config save`
+options and optional ADO/GHA pipeline steps for **project001 Dev**. With the
+required images, identity and private networking, these can host the read-only
+Factory MCP, create/adopt an AI Gateway and register its MCP tool server.
+**Saving the flags only changes configuration. Starting the approved pipeline is
+separate. Setting a flag to false skips the new step; it does not delete resources.**
+
+This still does not add an APIM-versus-Kong choice. If the live `field_keys` or
+parameter schema does not list a flag, it is **not supported there**. Do not force
+unknown settings or invent CLI options.
+
+<details>
+<summary>More info</summary>
+
+The original `81ec23d6` change added configuration-only flags. The later
+`cf8437af` commit added the component pipeline support described above. See the
 [component contract at that source revision](https://github.com/jostrm/azure-enterprise-scale-ml/blob/cf8437af/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md)
 and [CLI options](https://github.com/jostrm/azure-enterprise-scale-ml/blob/cf8437af/environment_setup/azurefactory-cli/readme.md#mcp--ai-gateway-options-project001-dev).
-This is **conditional/blocked** component execution, not a unified APIM-versus-Kong
-selection API, installed-host certification or permission to upgrade a pin.
-Setting these flags still only changes configuration; running the corresponding
-approved pipeline is separate. False skips the new component step, not deletion.
 The earlier claim that these flags have no pipeline bindings applies only to the
-older `81ec23d6` baseline, not to current main after `cf8437af`.
+older `81ec23d6` version, not to main after `cf8437af`.
 
-Neither the flags nor this newer pipeline implementation certify full REST/SDK
-field parity or implement a Kong selection. If the live settings
-`field_keys` or selected parameter schema does not expose a flag, it is **not
-supported there**; do not force an unknown setting or add a made-up CLI flag.
+This does not prove your installed API supports every REST/SDK field, implement
+Kong selection or give permission to change a source pin.
+
+</details>
 
 **Azure Application Gateway is different from APIM/Kong/AI Gateway.**
 The creation input `enable_application_gateway` exists, but the registered
-workflow prerequisite stage rejects an enabled Application Gateway because that
-resource is outside its supported registered prerequisites. Configuration
-acceptance must not be described as an executable Application Gateway route.
+workflow blocks it: that workflow does not implement its deployment.
+Accepting the setting does not mean Application Gateway can be deployed this way.
 
-For removal of settings versus deployed resources, retained hub/VPN/bootstrap
-dependencies, mixed-retention blockers and recovery, continue with
-[20](20-cli-and-api-and-usage.md). No setting change here bypasses those controls.
+For deleting resources, keeping shared hub/VPN resources and recovering from
+uncertain results, continue with [20](20-cli-and-api-and-usage.md).
+Changing a setting does not bypass deletion safety checks.
 
-## Evidence, version boundaries and validation
+<a id="evidence-version-boundaries-and-validation"></a>
 
-Implementation authority is current source/tests plus the actual host's OpenAPI
-and capability responses, not the graph, a slide, a saved catalog or this guide.
-This documentation was checked against original API/accelerator sources and the
+## Sources, versions and checks
+
+**Check your installed version before using an example.** The actual API's
+capabilities and supported request fields matter. Documentation checks do not
+prove that your permissions, networking or deployment will work.
+
+<details>
+<summary>More info</summary>
+
+Current source/tests and the actual host's OpenAPI and capabilities define
+supported behavior. A graph, slide or saved catalog cannot prove deployment.
+This guide was checked against original API/accelerator sources and the
 explicitly approved publication copies at API `d52463f` and accelerator
 `eb077742` (including the earlier `81ec23d6` gateway configuration change).
-The gateway section additionally records the later published `cf8437af` delta
-found during documentation publication; other examples retain their stated
-parity baseline and live capability checks.
+The gateway section also covers the later published `cf8437af` changes.
+Other examples keep their stated version checks.
 The separate offline consumer harness is at `56a324b`. The frozen external accelerator
 source pin was **not changed**. Installed packages and selected immutable runtime
 releases can lag or differ; no live provisioning/installation was performed.
 
-Key local evidence:
+Source and test references:
 
 - [CLI parser and dispatch](../../../environment_setup/azurefactory-cli/src/azurefactory/cli.py),
   [supported client methods](../../../environment_setup/azurefactory-cli/src/azurefactory/client.py),
@@ -1337,22 +1504,24 @@ Key local evidence:
   `src\creation_workflows.py`, `src\creation_workflow_authorization.py`,
   and `src\project_deployments.py`. These repository-relative paths are not
   assumed to exist beneath the accelerator.
-- API regression evidence: `tests\test_catalog_auto_placement.py`,
+- API tests: `tests\test_catalog_auto_placement.py`,
   `tests\test_catalog_parameters.py`, `tests\test_creation_workflows.py`,
   `tests\test_creation_workflow_authorization.py`,
   `tests\test_project_deployments.py`; architecture notes
   `docs\architecture\patterns\Review-and-authorization.md` and
   `docs\architecture\contracts\API-and-external-clients.md`.
-- Published gateway evidence:
+- Published gateway references:
   `environment_setup\unit-tests\test-bicep\unit\test_mcp_ai_gateway_flags.py`,
   template variables and `documentation\gh-io\docs\parameters\advanced.md`
   in the approved published accelerator source. Older local checkouts may not
   contain that published delta.
 
-Bounded graph navigation reported original API fingerprint `de669aa8…` (566 files)
+The limited graph lookup reported original API fingerprint `de669aa8…` (566 files)
 and ESML snapshot `ae9853f9…` (1,653 files, 23 partial-syntax files), current/fresh
-at retrieval. Static/resolved edges are navigation, not runtime verification;
-unresolved/boundary/inferred edges and architecture review staleness remain gaps.
+at retrieval. Graph links help find source files; they do not verify running
+deployments. Some links and older architecture notes remain incomplete or uncertain.
 No full graph/vault or cloud connector was loaded. Source/model/parser checks
 validate documentation shape only; they do not validate real customer values,
 permissions, networking, installed versions or deployment outcomes.
+
+</details>
