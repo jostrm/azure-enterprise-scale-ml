@@ -217,6 +217,17 @@ def test_exact_environment_subscription(environment, subscription):
     assert values.get("enableAISearch") == (None if environment == "dev" else "true")
 
 
+@pytest.mark.parametrize("enabled", [False, True])
+def test_ml_data_shortcut_flags_reach_dashboard_only_template(enabled):
+    flags = ("enableAzureMachineLearning", "addAzureMachineLearning", "enableDatabricks", "enableDatafactory")
+    document = payload()
+    document["dev"].update({flag: enabled for flag in flags})
+    values, cfg, _ = runner.configuration(document, "dev", "001")
+    azure = fake_azure(document, "dev", {})
+    params = runner.project_parameters(values, cfg, azure.resources, azure.resources[1]["id"], azure.workspace)
+    assert {flag: params[flag] for flag in flags} == {flag: enabled for flag in flags}
+
+
 @pytest.mark.parametrize("key", ["test_sub_id", "tenantId"])
 def test_no_dev_fallback_for_stage_identity(key):
     document = payload()

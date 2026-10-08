@@ -68,8 +68,8 @@ def test_phase_outputs_and_optional_navigation_do_not_enable_collection(phase):
     assert template["parameters"]["agentMonitoringWorkbookResourceId"]["defaultValue"] == ""
     text = (BICEP / "modules" / "projectDash01.bicep").read_text(encoding="utf-8")
     assert "empty(agentMonitoringWorkbookResourceId) ? []" in text
-    assert "], myProjectEntryParts), agentMonitoringEntryParts)" in text
-    assert "position: { x: 0, y: 25" in text
+    assert "myProjectEntryParts, agentMonitoringEntryParts)" in text
+    assert "position: { x: 0, y: 19 + foundryMetricsHeight, colSpan: 12, rowSpan: 2 }" in text
 
 
 def test_canonical_kql_has_six_families_complete_sums_and_separate_value_tiers(phase):
