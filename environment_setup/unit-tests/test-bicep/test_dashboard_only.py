@@ -189,6 +189,8 @@ class Azure:
             self.parameters = json.loads(Path(args[args.index("--parameters") + 1][1:]).read_text())
             return response({}, "AuthorizationFailed" if self.fail_deployment else "")
         if args[:1] == ("rest",):
+            if runner.shared.usage.is_read_command(args):
+                return response(None, "AuthorizationFailed")
             method = args[args.index("--method") + 1]
             assert args[args.index("--url") + 1].startswith(f"https://management.azure.com{self.cfg.dashboard_id}?")
             if method == "get":
@@ -668,6 +670,29 @@ def test_azure_boundary_rejects_general_mutation_and_sanitizes_errors():
             azure(*command)
     result = azure("account", "show", "--output", "json", "--only-show-errors")
     assert "SECRET" not in result.stderr and result.stdout == ""
+
+
+def test_usage_reads_pass_existing_boundary_and_keep_failures_unavailable():
+    cloud = fake_azure(payload(), "dev", {})
+    azure = runner.DashboardAzure(cloud.cfg, "plan", cloud)
+    group_id = runner.shared.arm_id(DEV, cloud.cfg.current_project_resource_group)
+    snapshot = azure.usage_collector.collect(group_id)
+    reads = [args for args in cloud.commands if args[:1] == ("rest",)]
+    assert reads
+    assert all(runner.shared.usage.is_read_command(args) for args in reads)
+    assert snapshot["metrics"]["activity"]["status"] == "unavailable"
+    assert snapshot["metrics"]["activity"]["value"] is None
+    before = len(cloud.commands)
+    assert azure.usage_collector.collect(group_id) == snapshot
+    assert len(cloud.commands) == before
+    command = list(reads[0])
+    command[command.index("--subscription") + 1] = PROD
+    with pytest.raises(RuntimeError, match="prohibited"):
+        azure(*command)
+    command = list(reads[0])
+    command[command.index("--method") + 1] = "post"
+    with pytest.raises(RuntimeError, match="prohibited"):
+        azure(*command)
 
 
 def test_workflows_are_manual_plan_default_safe_oidc_and_shared_runner():

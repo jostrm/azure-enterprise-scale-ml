@@ -106,12 +106,20 @@ def test_native_model_tokens_are_independent_of_application_telemetry(items):
     assert profile["value"] == "foundry"
     assert {option["value"] for option in json.loads(profile["jsonData"])} == {"foundry", "openai"}
     groups = items["generic-native-tokens"]["content"]["items"]
+    detail_items = items["generic-native-details"]["content"]["items"]
     assert len(groups) == 2
     for group in groups:
         assert group["conditionalVisibility"]["parameterName"] == "GenericMetricProfile"
         family = group["conditionalVisibility"]["value"]
-        metrics = [child["content"] for child in group["content"]["items"]]
-        assert {content["chartType"] for content in metrics} == {0, 2}
+        metrics = [
+            child["content"] for child in flatten(group["content"]["items"])
+            if child["type"] == 10
+        ]
+        metrics.append(next(
+            item["content"] for item in detail_items
+            if item["conditionalVisibility"]["value"] == family
+        ))
+        assert {content["chartType"] for content in metrics} == {0, 3}
         for content in metrics:
             assert content["version"] == "MetricsItem/2.0"
             assert content["resourceIds"] == ["{GenericMetricAccount}"]
@@ -187,7 +195,7 @@ def test_account_revalidation_keeps_untrusted_selection_inside_one_literal(items
 
 def test_inventory_is_exact_rg_scoped_and_projects_only_public_metadata(items):
     inventory = [
-        item["content"] for item in items.values()
+        item["content"] for item in flatten(items.values())
         if item["content"].get("queryType") == 1
     ]
     assert len(inventory) >= 3
@@ -199,9 +207,69 @@ def test_inventory_is_exact_rg_scoped_and_projects_only_public_metadata(items):
         assert f"| where tolower(id) startswith '{RG.lower()}/providers/'" in query
         assert "properties" not in query
         assert "tags" not in query
-    grid = items["generic-inventory"]["content"]
+    nested = {item["name"]: item for item in flatten(items.values())}
+    grid = nested["generic-inventory"]["content"]
     assert "| project Resource=name, Type=type, Kind=kind, Location=location, id" in grid["query"]
-    assert {"barchart", "piechart"}.issubset({content["visualization"] for content in inventory})
+    assert {"categoricalbar", "piechart"}.issubset({content["visualization"] for content in inventory})
+
+
+def test_kpis_and_paired_charts_precede_all_optional_details(items):
+    names = list(items)
+    chart_names = [
+        "generic-native-tokens", "generic-inventory-map",
+        "generic-inventory-types", "generic-inventory-locations",
+    ]
+    assert names.index("generic-inventory-summary") < names.index(chart_names[0])
+    assert names[names.index(chart_names[0]):names.index(chart_names[-1]) + 1] == chart_names
+    heading = items["generic-usage-heading"]["content"]["json"]
+    assert len(heading.splitlines()) == 2
+    assert len(heading.splitlines()[1]) < 150
+    summary = items["generic-inventory-summary"]["content"]
+    assert summary["visualization"] == "tiles"
+    assert summary["size"] == 4
+    assert summary["tileSettings"]["leftContent"]["formatter"] == 12
+    assert summary["tileSettings"]["titleContent"]["columnMatch"] == "Label"
+    assert summary["tileSettings"]["leftContent"]["columnMatch"] == "Value"
+    for label in ("Resources", "Service types", "Locations", "Foundry / OpenAI accounts"):
+        assert label in summary["query"]
+    for name in chart_names:
+        assert items[name]["customWidth"] == "50"
+    assert items["generic-inventory-map"]["content"]["visualization"] == "map"
+    assert "generic-inventory" not in items, "Large inventory is not a primary-viewport item"
+    details = items["generic-inventory-details"]["content"]
+    assert details["loadType"] == "explicit"
+    assert details["items"][0]["name"] == "generic-inventory"
+    for name in ("generic-native-details", "generic-inventory-details", "generic-http-optional"):
+        assert names.index(name) > names.index(chart_names[-1])
+        assert items[name]["content"]["loadType"] == "explicit"
+    for group in items["generic-native-tokens"]["content"]["items"]:
+        visible_metrics = [item for item in group["content"]["items"] if item["type"] == 10]
+        assert len(visible_metrics) == 1
+        assert visible_metrics[0]["content"]["chartType"] == 3
+        assert len(group["content"]["items"]) == 1
+    assert all(item["content"]["chartType"] == 0 for item in items["generic-native-details"]["content"]["items"])
+
+
+def test_native_region_and_composition_visuals_keep_all_locations(items):
+    nested = {item["name"]: item["content"] for item in flatten(items.values())}
+    region_map = nested["generic-inventory-map"]
+    settings = region_map["mapSettings"]
+    assert settings["locInfo"] == "AzureLoc"
+    assert settings["locInfoColumn"] == "Location"
+    assert settings["sizeSettings"] == settings["legendMetric"] == "Resources"
+    assert settings["sizeAggregation"] == settings["legendAggregation"] == "Sum"
+    assert "where isnotempty(location) and location !~ 'global'" in region_map["query"]
+    assert "excludes global" in region_map["title"]
+    types = nested["generic-inventory-types"]
+    assert "by Provider, Location=location" in types["query"]
+    assert "split(type, '/')[0]" in types["query"]
+    assert types["visualization"] == "categoricalbar"
+    assert types["chartSettings"]["group"] == "Location"
+    for name in ("generic-inventory-types", "generic-inventory-locations"):
+        assert nested[name]["size"] == 1
+        assert nested[name]["chartSettings"]["createOtherGroup"] == 0
+        assert "where location" not in nested[name]["query"].lower()
+    assert "global / unmapped" in nested["generic-inventory-locations"]["title"]
 
 
 def test_billing_is_native_actual_cost_at_exact_rg_scope(items):
@@ -209,7 +277,10 @@ def test_billing_is_native_actual_cost_at_exact_rg_scope(items):
         name: item["content"] for name, item in items.items()
         if item["content"].get("queryType") == 12
     }
-    assert {"generic-cost-total", "generic-cost-daily", "generic-cost-services"} <= billing.keys()
+    assert {
+        "generic-cost-total", "generic-cost-daily", "generic-cost-services",
+        "generic-cost-daily-services",
+    } <= billing.keys()
     for content in billing.values():
         assert content["version"] == "KqlItem/1.0"
         assert "unavailable" in content["noDataMessage"].lower()
@@ -234,6 +305,9 @@ def test_billing_is_native_actual_cost_at_exact_rg_scope(items):
     assert daily["dataset"]["granularity"] == "Daily"
     services = json.loads(json.loads(billing["generic-cost-services"]["query"])["data"])
     assert services["dataset"]["grouping"] == [{"type": "Dimension", "name": "ServiceName"}]
+    daily_services = json.loads(json.loads(billing["generic-cost-daily-services"]["query"])["data"])
+    assert daily_services["dataset"]["granularity"] == "Daily"
+    assert daily_services["dataset"]["grouping"] == [{"type": "Dimension", "name": "ServiceName"}]
 
 
 @pytest.mark.parametrize(
@@ -268,11 +342,31 @@ def test_billing_is_native_actual_cost_at_exact_rg_scope(items):
                 {"Cost": 20.5, "ServiceName": "Azure OpenAI", "Currency": "USD"},
             ],
         ),
+        (
+            "generic-cost-daily-services",
+            [
+                [30.25, 20261001, "Azure OpenAI", "EUR"],
+                [-2.5, 20261001, "Virtual Machines", "EUR"],
+                [20.5, 20261002, "Azure OpenAI", "USD"],
+                [None, 20261003, "Azure OpenAI", "USD"],
+            ],
+            [
+                {"Cost": 30.25, "UsageDate": "2026-10-01", "ServiceName": "Azure OpenAI", "Currency": "EUR"},
+                {"Cost": -2.5, "UsageDate": "2026-10-01", "ServiceName": "Virtual Machines", "Currency": "EUR"},
+                {"Cost": 20.5, "UsageDate": "2026-10-02", "ServiceName": "Azure OpenAI", "Currency": "USD"},
+                {"Cost": None, "UsageDate": "2026-10-03", "ServiceName": "Azure OpenAI", "Currency": "USD"},
+            ],
+        ),
     ],
 )
 def test_billing_column_contract_preserves_source_values(items, name, rows, expected):
     settings = json.loads(items[name]["content"]["query"])["transformers"][0]["settings"]
-    assert settings["tablePath"] == "$.properties.rows"
+    assert settings["tablePath"] == (
+        '$.properties.rows[?(@[2] == "{GenericCostCurrency:escapejson}")]'
+        if name == "generic-cost-services" else
+        '$.properties.rows[?(@[3] == "{GenericCostCurrency:escapejson}")]'
+        if name == "generic-cost-daily-services" else "$.properties.rows"
+    )
     columns = settings["columns"]
     results = []
     for row in rows:
@@ -298,15 +392,68 @@ def test_billing_column_contract_preserves_source_values(items, name, rows, expe
 def test_currencies_stay_separate_and_fallback_is_display_only(items):
     total = items["generic-cost-total"]["content"]
     assert total["tileSettings"]["titleContent"]["columnMatch"] == "Currency"
-    assert total["tileSettings"]["leftContent"]["columnMatch"] == "Cost"
-    for name in ("generic-cost-daily", "generic-cost-services"):
+    assert total["tileSettings"]["leftContent"] == {
+        "columnMatch": "Cost",
+        "formatter": 12,
+        "numberFormat": {
+            "unit": 0,
+            "options": {
+                "style": "decimal",
+                "useGrouping": True,
+                "minimumFractionDigits": 2,
+                "maximumFractionDigits": 2,
+            },
+        },
+    }
+    for name in ("generic-cost-daily", "generic-cost-services", "generic-cost-daily-services"):
         content = items[name]["content"]
-        assert content["chartSettings"]["group"] == "Currency"
+        assert content["chartSettings"].get("group") == (
+            "Currency" if name == "generic-cost-daily" else
+            "ServiceName" if name == "generic-cost-daily-services" else None
+        )
         assert content["chartSettings"]["yAxis"] == ["Cost"]
         assert content["chartSettings"]["showMetrics"] is False
         assert "USD" not in content["query"], "Returned currency must not be replaced"
     assert "USD display fallback when no currency is emitted" in items["generic-cost-heading"]["content"]["json"]
     assert "missing amounts remain unavailable" in items["generic-cost-heading"]["content"]["json"]
+
+
+def test_cost_visuals_select_one_returned_currency_and_retain_unfiltered_details(items):
+    currency = items["generic-cost-currency"]["content"]["parameters"][0]
+    assert currency["name"] == "GenericCostCurrency"
+    assert currency["type"] == 2
+    assert currency["multiSelect"] is False
+    assert "value" not in currency, "An explicit empty selection overrides the native default"
+    assert currency["defaultValue"] == "value::1"
+    assert currency["typeSettings"]["additionalResourceOptions"] == ["value::1"]
+    assert "value::all" not in json.dumps(currency)
+    assert "USD" not in json.dumps(currency), "The default must come from returned billing rows"
+    endpoint = json.loads(currency["query"])
+    assert endpoint["path"] == RG + "/providers/Microsoft.CostManagement/query"
+    assert json.loads(endpoint["data"])["dataset"]["granularity"] == "None"
+    assert endpoint["transformers"][0]["settings"]["columns"] == [
+        {"path": "$[1]", "columnid": "value"}, {"path": "$[1]", "columnid": "label"},
+    ]
+    for name in ("generic-cost-services", "generic-cost-daily-services"):
+        content = items[name]["content"]
+        assert "{GenericCostCurrency}" in content["title"]
+        path = json.loads(content["query"])["transformers"][0]["settings"]["tablePath"]
+        assert "{GenericCostCurrency:escapejson}" in path
+        assert "@[0]" not in path, "Credits, null amounts, and zeros must not be filtered out"
+        assert content["chartSettings"]["createOtherGroup"] == 0
+        assert content["visualization"] != "piechart", "Signed cost is not a pie share"
+    assert items["generic-cost-daily-services"]["content"]["visualization"] == "areachart"
+    assert items["generic-cost-total"]["customWidth"] == "30"
+    assert items["generic-cost-services"]["customWidth"] == "70"
+    assert items["generic-cost-daily"]["customWidth"] == "50"
+    assert items["generic-cost-daily-services"]["customWidth"] == "50"
+    details = items["generic-cost-details"]["content"]
+    assert details["loadType"] == "explicit"
+    assert len(details["items"]) == 2
+    for item in details["items"]:
+        assert item["content"]["visualization"] == "table"
+        path = json.loads(item["content"]["query"])["transformers"][0]["settings"]["tablePath"]
+        assert path == "$.properties.rows", "All billing currencies and credits remain inspectable"
 
 
 def test_response_schema_and_pagination_are_inspectable_without_default_extra_calls(items):
@@ -317,8 +464,9 @@ def test_response_schema_and_pagination_are_inspectable_without_default_extra_ca
         "total": "Cost:Number, Currency:String",
         "daily": "Cost:Number, UsageDate:Number, Currency:String",
         "services": "Cost:Number, ServiceName:String, Currency:String",
+        "daily-services": "Cost:Number, UsageDate:Number, ServiceName:String, Currency:String",
     }
-    assert len(inspector["items"]) == 3
+    assert len(inspector["items"]) == 4
     for item in inspector["items"]:
         key = item["name"].removeprefix("generic-cost-schema-")
         content = item["content"]

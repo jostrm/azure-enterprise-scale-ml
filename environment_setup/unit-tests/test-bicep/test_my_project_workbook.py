@@ -607,7 +607,7 @@ def test_workbook_schema_shapes_and_real_query_items(workbook):
         assert "timeContext" not in content
         if item["name"].startswith("tokens-"):
             assert content["timeContextFromParameter"] == "TokenTimeRange"
-        assert content["visualization"] in ("table", "tiles", "timechart")
+        assert content["visualization"] in ("table", "tiles", "timechart", "barchart", "scatterchart")
         assert content["query"]
         if content["visualization"] == "timechart":
             assert content["chartSettings"]["xAxis"] == "Day"
@@ -715,6 +715,62 @@ def test_generic_project_hides_scenario_controls_and_reports(workbook):
     for forbidden in ("{Factory", "{ScaleSet", "{Store", "QuestionsComplete", "aifactory.chat"):
         assert forbidden not in generic_content
     assert "tokens-account-and-time" not in business_items
+
+
+def test_compact_header_and_token_details_are_optional(workbook):
+    all_items = items(workbook)
+    assert len(all_items["my-project-heading"]["content"]["json"]) < 450
+    for name, child in (
+        ("workbook-source-help", "native-rg-cost-navigation"),
+        ("tokens-methodology", "tokens-notice"),
+        ("tokens-bindings-detail", "tokens-source-coverage"),
+        ("tokens-request-details", "tokens-log-model-totals"),
+    ):
+        group = all_items[name]["content"]
+        assert group["loadType"] == "explicit"
+        assert child in items(group)
+    for kind in ("foundry", "openai"):
+        assert all_items[f"tokens-native-{kind}-trend"]["customWidth"] == "60"
+        assert all_items[f"tokens-native-{kind}-table"]["customWidth"] == "40"
+
+
+def test_token_overview_kpis_preserve_missing_and_cached_subset_semantics(workbook):
+    overview = items(workbook)["tokens-log-kpis"]["content"]
+    assert overview["visualization"] == "tiles"
+    assert overview["size"] == 4
+    assert overview["timeContextFromParameter"] == "TokenTimeRange"
+    query = overview["query"].split("let Overview =", 1)[1]
+    assert "TokenTotals" in query
+    assert "MissingInputGroups=countif(isnull(InputTokens))" in query
+    assert "MissingOutputGroups=countif(isnull(OutputTokens))" in query
+    assert "MissingCachedGroups=countif(isnull(CachedTokens))" in query
+    assert query.count("pack('Metric'") == 5
+    assert "'Cached input subset'" in query
+    assert "InputTokens + CachedTokens" not in query
+    assert "Records > 0" in query and "'Unavailable'" in query
+    assert "Observed request logs only" in query
+
+
+def test_token_columns_and_scatter_use_comparable_observed_fields_only(workbook):
+    all_items = items(workbook)
+    columns = all_items["tokens-log-columns"]
+    scatter = all_items["tokens-log-scatter"]
+    assert columns["customWidth"] == "60" and scatter["customWidth"] == "40"
+    assert columns["content"]["visualization"] == "barchart"
+    assert scatter["content"]["visualization"] == "scatterchart"
+    assert scatter["content"]["chartSettings"]["xAxis"] == "InputTokens"
+    assert scatter["content"]["chartSettings"]["yAxis"] == ["OutputTokens"]
+    assert scatter["content"]["chartSettings"]["xSettings"]["numberFormatSettings"] == {
+        "unit": 0, "options": {"style": "decimal", "useGrouping": True},
+    }
+    for item in (columns, scatter):
+        assert item["content"]["timeContextFromParameter"] == "TokenTimeRange"
+        assert item["content"]["chartSettings"]["createOtherGroup"] == 0
+    columns_projection = columns["content"]["query"].split(";", -1)[-1]
+    assert "Tokens=InputTokens" in columns_projection and "Tokens=OutputTokens" in columns_projection
+    assert "CachedTokens" not in columns_projection
+    assert "isnotnull(InputTokens) and isnotnull(OutputTokens)" in scatter["content"]["query"]
+    assert workbook["styleSettings"] == {"spacingStyle": "none"}
 
 
 def test_token_logs_bind_real_time_range_not_zero_second_transport(workbook):
@@ -829,7 +885,7 @@ def test_native_token_metrics_are_real_scoped_controls_and_not_alias_sums(workbo
         assert "resourceParameter" not in content  # Bind the validated scalar, not another resource picker.
         assert content["resourceLimit"] == 1
         assert content["timeContextFromParameter"] == "TokenTimeRange"
-        assert content["chartType"] in (0, 2)
+        assert content["chartType"] in (0, 3)
         assert item["conditionalVisibility"]["parameterName"] == "TokenMetricView"
         for metric in content["metrics"]:
             assert metric["aggregation"] == 1  # Total, not Count/Average

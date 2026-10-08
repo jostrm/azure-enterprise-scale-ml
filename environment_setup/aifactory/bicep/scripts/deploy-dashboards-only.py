@@ -294,6 +294,7 @@ class DashboardAzure:
         self.az = az or shared.az_cli
         self.previous_inventory = {}
         self.deployment_command = None
+        self.usage_collector = shared.usage.Collector(self)
 
     @property
     def dashboard_url(self):
@@ -306,6 +307,7 @@ class DashboardAzure:
             ("group", "list"), ("resource", "list"), ("resource", "show"),
         }
         compile_only = args == compile_command()
+        usage_read = shared.usage.is_read_command(args)
         factory_read = args == factory_command(self, "get")
         factory_write = (
             args[:1] == ("rest",) and "--method" in args
@@ -315,7 +317,8 @@ class DashboardAzure:
             and any(a.startswith(("If-Match=", "If-None-Match=")) for a in args)
         )
         deployment = self.deployment_command is not None and args == self.deployment_command
-        if not (read or compile_only or factory_read or (self.mode == "deploy" and (factory_write or deployment))):
+        if not (read or compile_only or factory_read or usage_read
+                or (self.mode == "deploy" and (factory_write or deployment))):
             raise RuntimeError("Non-dashboard Azure command prohibited.")
         if not compile_only:
             if "--subscription" in args:
@@ -566,7 +569,7 @@ def validate_template(template: dict, parameters: dict) -> None:
 
 def reconcile(azure: DashboardAzure):
     azure.previous_inventory = {}
-    inventory, tenant, etag = shared.reconcile(azure.config, azure)
+    inventory, tenant, etag = shared.reconcile(azure.config, azure, include_usage=False)
     # RG list can be permission-filtered without an error. A dashboard-only
     # refresh never treats absence from that result as proof of project deletion.
     previous = shared.previous_environments(azure.previous_inventory)
@@ -601,6 +604,7 @@ def reconcile(azure: DashboardAzure):
                 "not-deployed" if shared.error_code(result) in {"ResourceGroupNotFound", "ResourceNotFound"} else
                 "unverified"
             )
+    shared.collect_usage(inventory, azure.usage_collector, set(azure.config.subscriptions.values()))
     return inventory, tenant, etag
 
 
@@ -611,13 +615,13 @@ def factory_resource(cfg, inventory: dict, tenant: str) -> dict:
         if environment["commonResourceGroup"].get("deploymentStatus") != "not-deployed":
             continue
         # Retain ARM IDs and project history in inventory; replace only the two
-        # broken common RG/cost tiles, not the valid project tiles below them.
-        x = index * 10
+        # broken common RG/cost/usage tiles, not the valid project tiles below them.
+        x = index * shared.ENVIRONMENT_WIDTH
         parts[:] = [part for part in parts if not (
-            part["position"]["y"] == 7 and part["position"]["x"] in {x, x + 4}
+            part["position"]["y"] == 7 and part["position"]["x"] in {x, x + 4, x + 10}
         )]
         parts.append(shared.markdown_part(
-            x, 7, 10, 4,
+            x, 7, shared.ENVIRONMENT_WIDTH, 4,
             f"## {environment['displayName']} common resources not deployed\n\n"
             "The configured common resource group does not exist. "
             "Dashboard-only refresh does not create it. Existing project history is preserved below.",
@@ -681,6 +685,10 @@ def run(args, az=None) -> dict:
         "writes": ["Microsoft.Portal/dashboards (factory + project)", "Microsoft.Insights/workbooks (My Project)",
                    "Microsoft.Resources/deployments (Incremental deployment records)"],
         "coverage": "all false",
+        "usageSnapshots": [
+            {"resourceGroupId": group["id"], **group["usageSnapshot"]}
+            for group in shared.inventory_groups(inventory) if "usageSnapshot" in group
+        ],
     }
     if args.mode == "plan":
         print(json.dumps(summary, indent=2))

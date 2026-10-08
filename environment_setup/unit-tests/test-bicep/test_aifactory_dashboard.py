@@ -157,6 +157,21 @@ class TestDashboardCliLauncher(unittest.TestCase):
         ):
             self.assertIs(result, module.az_cli("rest"))
 
+    def test_usage_read_timeout_is_bounded_and_sanitized(self) -> None:
+        with (
+            patch.object(module.shutil, "which", return_value="az.exe"),
+            patch.object(module.sys, "platform", "win32"),
+            patch.object(module.usage, "is_read_command", return_value=True),
+            patch.object(module.subprocess, "run",
+                         side_effect=subprocess.TimeoutExpired("SECRET", 90)) as run,
+        ):
+            result = module.az_cli("rest", "--method", "get")
+        self.assertEqual(90, run.call_args.kwargs["timeout"])
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual("", result.stdout)
+        self.assertEqual("UsageReadTimeout", json.loads(result.stderr)["error"]["code"])
+        self.assertNotIn("SECRET", result.stderr)
+
     def test_main_reports_launch_failure_and_keeps_nonzero_exit(self) -> None:
         with (
             patch.dict(os.environ, environment(), clear=True),
@@ -258,6 +273,8 @@ class FakeAz:
             self.host_exists = True
             return response()
         if args[0] == "rest":
+            if module.usage.is_read_command(args):
+                return response(error='{"error":{"code":"AuthorizationFailed"}}')
             if "--method" in args and args[args.index("--method") + 1] == "put":
                 body_arg = args[args.index("--body") + 1]
                 self.rest_body = json.loads(
@@ -491,6 +508,94 @@ class TestAifactoryDashboard(unittest.TestCase):
             == project_rg["position"]["y"] + project_rg["position"]["rowSpan"]
             for part in shortcut_parts
         ))
+
+    def test_every_cost_has_an_adjacent_usage_snapshot_without_overlap(self) -> None:
+        config = self.config()
+        inventory, tenant, _ = module.reconcile(config, FakeAz(config))
+        inventory["hubResourceGroups"] = [{
+            "name": "hub", "id": module.arm_id(DEV_SUB, "hub"),
+        }]
+        parts = module.dashboard_parts(inventory, tenant)
+        costs = [p for p in parts if p["metadata"]["type"].endswith("CostAnalysisPinPart")]
+        for cost in costs:
+            position = cost["position"]
+            adjacent = [p for p in parts
+                        if p["position"]["x"] == position["x"] + position["colSpan"]
+                        and p["position"]["y"] == position["y"]]
+            self.assertEqual(1, len(adjacent))
+            card = adjacent[0]
+            self.assertEqual("Extension/HubsExtension/PartType/MarkdownPart", card["metadata"]["type"])
+            text = card["metadata"]["settings"]["content"]["settings"]["content"]
+            self.assertIn("Activity & solution assets", text)
+            self.assertIn("Unavailable", text)
+            self.assertIn("Snapshot", text)
+        for index, left in enumerate(parts):
+            a = left["position"]
+            for right in parts[index + 1:]:
+                b = right["position"]
+                self.assertTrue(
+                    a["x"] + a["colSpan"] <= b["x"] or b["x"] + b["colSpan"] <= a["x"]
+                    or a["y"] + a["rowSpan"] <= b["y"] or b["y"] + b["rowSpan"] <= a["y"]
+                )
+
+    def test_usage_tile_distinguishes_observed_zero_inventory_and_unavailable(self) -> None:
+        resource = {
+            "name": "project", "id": module.arm_id(DEV_SUB, "project"),
+            "usageSnapshot": {
+                "observedAt": "2026-10-08T20:00:00Z",
+                "windowStart": "2026-09-08T20:00:00Z", "windowEnd": "2026-10-08T20:00:00Z",
+                "metrics": {
+                    "activity": {"status": "ok", "value": 1234, "detail": "private@example.com"},
+                    "agents": {"status": "ok", "value": 3, "detail": "New agents: 2; classic: 1"},
+                    "models": {"status": "ok", "value": 0, "detail": "Registered model names"},
+                    "storage": {"status": "ok", "value": 1073741824, "detail": "Latest sample"},
+                    "adf": {"status": "unavailable", "value": None, "detail": "No observations"},
+                    "search": {"status": "not-deployed", "value": None, "detail": "Not deployed"},
+                },
+            },
+        }
+        card = module.usage_part(10, 12, resource, TENANT)
+        content = card["metadata"]["settings"]["content"]["settings"]["content"]
+        self.assertIn("1,234", content)
+        self.assertIn("1.00 GiB", content)
+        self.assertIn("**0**", content)
+        self.assertIn("Unavailable", content)
+        self.assertIn("Not deployed", content)
+        self.assertIn("2026-10-08 20:00 UTC", content)
+        self.assertIn("30d", content)
+        self.assertIn("not runtime usage", content)
+        self.assertIn("dashboard-only run", content)
+        self.assertIn("activitylog", content)
+        self.assertNotIn("private@example.com", content)
+
+    def test_usage_collection_covers_all_retained_rg_records_once_in_scope(self) -> None:
+        class Collector:
+            def __init__(self):
+                self.ids = []
+
+            def collect(self, resource_id):
+                self.ids.append(resource_id)
+                return {"observedAt": "2026-10-08T20:00:00Z", "metrics": {}}
+
+        current = {"id": module.arm_id(DEV_SUB, "project")}
+        duplicate = {"id": current["id"].upper()}
+        retained = {"id": module.arm_id(DEV_SUB, "retained")}
+        foreign = {"id": module.arm_id(PROD_SUB, "foreign"), "usageSnapshot": {"stale": True}}
+        absent = {"id": module.arm_id(DEV_SUB, "absent"), "deploymentStatus": "not-deployed"}
+        inventory = {
+            "hubResourceGroups": [current, foreign],
+            "environments": [
+                {"commonResourceGroup": duplicate, "projects": [retained]},
+                {"commonResourceGroup": absent, "projects": []},
+            ],
+        }
+        collector = Collector()
+        module.collect_usage(inventory, collector, {DEV_SUB})
+        self.assertEqual([current["id"], retained["id"]], collector.ids)
+        self.assertEqual(current["usageSnapshot"], duplicate["usageSnapshot"])
+        self.assertIn("usageSnapshot", retained)
+        self.assertNotIn("usageSnapshot", foreign)
+        self.assertNotIn("usageSnapshot", absent)
 
     def test_eight_discovered_resource_shortcuts_are_kept_in_two_rows(self) -> None:
         config = self.config()
