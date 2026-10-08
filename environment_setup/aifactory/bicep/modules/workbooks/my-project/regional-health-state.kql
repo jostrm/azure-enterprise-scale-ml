@@ -1,0 +1,24 @@
+ServiceHealthResources
+| where type =~ 'microsoft.resourcehealth/events'
+| where subscriptionId =~ '__SUBSCRIPTION__'
+| where tostring(properties.Status) =~ 'Active'
+| where tostring(properties.EventType) in~ ('ServiceIssue', 'HealthAdvisory', 'SecurityAdvisory', 'PlannedMaintenance')
+| extend ImpactStart=todatetime(properties.ImpactStartTime)
+| where isnull(ImpactStart) or ImpactStart <= now()
+| extend Impacts=properties.Impact, Incomplete=isnull(properties.Impact) or array_length(properties.Impact) == 0 or array_length(properties.Impact) > 2000
+| extend Impacts=iff(isnull(Impacts) or array_length(Impacts) == 0, pack_array(dynamic({})), Impacts)
+| mv-expand ServiceImpact=Impacts limit 2000
+| extend Regions=ServiceImpact.ImpactedRegions,
+    Incomplete=Incomplete or isnull(ServiceImpact.ImpactedRegions) or array_length(ServiceImpact.ImpactedRegions) == 0 or array_length(ServiceImpact.ImpactedRegions) > 2000
+| extend Regions=iff(isnull(Regions) or array_length(Regions) == 0, pack_array(dynamic({})), Regions)
+| mv-expand RegionImpact=Regions limit 2000
+| extend Location=tolower(replace_string(tostring(RegionImpact.ImpactedRegion), ' ', '')),
+    AffectedService=tostring(ServiceImpact.ImpactedService),
+    ActiveRegion=tostring(RegionImpact.Status) =~ 'Active',
+    Incomplete=Incomplete or isempty(tostring(RegionImpact.Status)) or isempty(tostring(RegionImpact.ImpactedRegion))
+| summarize EventIds=make_set_if(id, ActiveRegion, 10000), Services=make_set_if(AffectedService, ActiveRegion, 10000),
+    SourceRows=count(), Incomplete=max(toint(Incomplete)) by Location
+| extend Evidence=pack('events', array_length(EventIds), 'services', Services)
+| summarize RegionCount=count(), Regions=make_bag(pack(Location, Evidence), 1000),
+    Incomplete=max(Incomplete), LargestRegionRows=max(SourceRows)
+| project value=tostring(pack('complete', RegionCount <= 1000 and coalesce(Incomplete, 0) == 0 and coalesce(LargestRegionRows, 0) <= 10000, 'regions', Regions))

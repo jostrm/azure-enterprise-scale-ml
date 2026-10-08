@@ -238,7 +238,7 @@ def test_kpis_and_paired_charts_precede_all_optional_details(items):
     assert "generic-inventory" not in items, "Large inventory is not a primary-viewport item"
     details = items["generic-inventory-details"]["content"]
     assert details["loadType"] == "explicit"
-    assert details["items"][0]["name"] == "generic-inventory"
+    assert {item["name"] for item in details["items"]} == {"generic-inventory", "generic-health-details"}
     for name in ("generic-native-details", "generic-inventory-details", "generic-http-optional"):
         assert names.index(name) > names.index(chart_names[-1])
         assert items[name]["content"]["loadType"] == "explicit"
@@ -259,7 +259,7 @@ def test_native_region_and_composition_visuals_keep_all_locations(items):
     assert settings["sizeSettings"] == settings["legendMetric"] == "Resources"
     assert settings["sizeAggregation"] == settings["legendAggregation"] == "Sum"
     assert "where isnotempty(location) and location !~ 'global'" in region_map["query"]
-    assert "excludes global" in region_map["title"]
+    assert "health" in region_map["title"]
     types = nested["generic-inventory-types"]
     assert "by Provider, Location=location" in types["query"]
     assert "split(type, '/')[0]" in types["query"]
@@ -270,6 +270,37 @@ def test_native_region_and_composition_visuals_keep_all_locations(items):
         assert nested[name]["chartSettings"]["createOtherGroup"] == 0
         assert "where location" not in nested[name]["query"].lower()
     assert "global / unmapped" in nested["generic-inventory-locations"]["title"]
+
+
+def test_health_map_separates_health_sources_and_never_assumes_empty_is_healthy(items):
+    parameters = items["generic-health-sources"]["content"]["parameters"]
+    assert {parameter["name"] for parameter in parameters} == {"GenericResourceHealth", "GenericRegionalHealth"}
+    for parameter in parameters:
+        assert parameter["isRequired"] and parameter["isHiddenWhenLocked"]
+        assert parameter["value"] == ""
+        assert parameter["queryType"] == 1
+        assert parameter["crossComponentResources"] == [RG.split("/resourceGroups/")[0]]
+    assert "HealthResources" in parameters[0]["query"]
+    assert "ServiceHealthResources" not in parameters[0]["query"]
+    assert "ServiceHealthResources" in parameters[1]["query"]
+    assert "properties.Status" in parameters[1]["query"]
+    assert "ImpactedRegions" in parameters[1]["query"]
+    query = items["generic-inventory-map"]["content"]["query"]
+    assert 'parse_json("{GenericResourceHealth:escapejson}")' in query
+    assert 'parse_json("{GenericRegionalHealth:escapejson}")' in query
+    assert "ResourceIssues > 0 or RegionalEvents > 0, 2" in query
+    assert "SourcesComplete and AvailableResources == Resources and UnknownResources == 0, 0, 1" in query
+    assert "complete reported resource coverage" in query
+    assert "green does not guarantee SKU capacity" in items["generic-health-legend"]["content"]["json"]
+    colors = items["generic-inventory-map"]["content"]["mapSettings"]["itemColorSettings"]
+    assert colors == {
+        "type": "thresholds", "nodeColorField": "HealthCode", "colorAggregation": "Max",
+        "thresholdsGrid": [
+            {"operator": "==", "thresholdValue": "2", "representation": "redBright"},
+            {"operator": "==", "thresholdValue": "0", "representation": "green"},
+            {"operator": "Default", "thresholdValue": None, "representation": "gray"},
+        ],
+    }
 
 
 def test_billing_is_native_actual_cost_at_exact_rg_scope(items):

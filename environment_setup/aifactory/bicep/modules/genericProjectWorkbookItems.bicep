@@ -13,6 +13,10 @@ Resources
 | where tolower(id) startswith '__PROJECT_PREFIX__'
 '''
 var scopedInventory = replace(inventoryQuery, '__PROJECT_PREFIX__', toLower('${projectResourceGroupId}/providers/'))
+var subscriptionId = split(projectResourceGroupId, '/')[2]
+var resourceHealthQuery = replace(loadTextContent('./workbooks/my-project/resource-health-state.kql'), '__PROJECT_PREFIX__', toLower('${projectResourceGroupId}/providers/'))
+var regionalHealthQuery = replace(loadTextContent('./workbooks/my-project/regional-health-state.kql'), '__SUBSCRIPTION__', subscriptionId)
+var regionHealthMapQuery = replace(loadTextContent('./workbooks/my-project/resource-health-map.kql'), '__PROJECT_PREFIX__', toLower('${projectResourceGroupId}/providers/'))
 var inventorySettings = {
   version: 'KqlItem/1.0'
   queryType: 1
@@ -166,6 +170,41 @@ var usageItems = [
     }
   }
   {
+    type: 9
+    name: 'generic-health-sources'
+    conditionalVisibility: usageVisibility
+    content: {
+      version: 'KqlParameterItem/1.0'
+      style: 'above'
+      parameters: [
+        {
+          id: 'generic-resource-health'
+          name: 'GenericResourceHealth'
+          type: 1
+          value: ''
+          isRequired: true
+          isHiddenWhenLocked: true
+          queryType: 1
+          resourceType: 'microsoft.resourcegraph/resources'
+          crossComponentResources: ['/subscriptions/${subscriptionId}']
+          query: resourceHealthQuery
+        }
+        {
+          id: 'generic-regional-health'
+          name: 'GenericRegionalHealth'
+          type: 1
+          value: ''
+          isRequired: true
+          isHiddenWhenLocked: true
+          queryType: 1
+          resourceType: 'microsoft.resourcegraph/resources'
+          crossComponentResources: ['/subscriptions/${subscriptionId}']
+          query: regionalHealthQuery
+        }
+      ]
+    }
+  }
+  {
     type: 3
     name: 'generic-inventory-summary'
     conditionalVisibility: usageVisibility
@@ -203,9 +242,9 @@ var usageItems = [
     customWidth: '50'
     conditionalVisibility: usageVisibility
     content: union(inventorySettings, {
-      title: 'Azure regions · excludes global / unmapped'
+      title: 'Azure region health - resource signals and regional advisories'
       size: 1
-      query: '${scopedInventory}| where isnotempty(location) and location !~ \'global\'\n| summarize Resources=count() by Location=location | order by Resources desc'
+      query: regionHealthMapQuery
       visualization: 'map'
       // Native Azure-location lookup; global/unmapped locations remain in the breakdown and details.
       // Microsoft Application-Insights-Workbooks: CosmosDbOverview.workbook, mapSettings.
@@ -217,10 +256,14 @@ var usageItems = [
         legendMetric: 'Resources'
         legendAggregation: 'Sum'
         itemColorSettings: {
-          type: 'heatmap'
-          nodeColorField: 'Resources'
-          colorAggregation: 'Sum'
-          heatmapPalette: 'greenRed'
+          type: 'thresholds'
+          nodeColorField: 'HealthCode'
+          colorAggregation: 'Max'
+          thresholdsGrid: [
+            { operator: '==', thresholdValue: '2', representation: 'redBright' }
+            { operator: '==', thresholdValue: '0', representation: 'green' }
+            { operator: 'Default', thresholdValue: null, representation: 'gray' }
+          ]
         }
       }
     })
@@ -252,6 +295,14 @@ var usageItems = [
     })
   }
   {
+    type: 1
+    name: 'generic-health-legend'
+    conditionalVisibility: usageVisibility
+    content: {
+      json: '**Map:** red = reported resource issue or active subscription regional advisory (not proof this project is affected); green = all mapped resources report Available and no visible regional event; gray = incomplete/unknown coverage. Capacity is flagged only when Azure reports a related health event; green does not guarantee SKU capacity or quota. Global/unmapped resources remain in inventory.'
+    }
+  }
+  {
     type: 12
     name: 'generic-native-details'
     conditionalVisibility: usageVisibility
@@ -273,6 +324,15 @@ var usageItems = [
       loadType: 'explicit'
       loadButtonText: 'Show current resource inventory'
       items: [
+        {
+          type: 3
+          name: 'generic-health-details'
+          content: union(inventorySettings, {
+            title: 'Regional health evidence and coverage - current visible signals'
+            query: regionHealthMapQuery
+            visualization: 'table'
+          })
+        }
         {
           type: 3
           name: 'generic-inventory'

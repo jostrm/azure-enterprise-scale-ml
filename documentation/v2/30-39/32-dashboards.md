@@ -565,6 +565,24 @@ or application traffic. Global/non-geographic resources remain inventory, not
 invented map points. Native Portal styling applies; this is not a custom HTML
 dashboard or a pixel-identical rendering of the desktop charts.
 
+Map circles use **health, not resource count, for color**; count controls size.
+Red means a Resource Health `Unavailable`/`Degraded` signal or an active
+subscription-level regional service issue/advisory/maintenance event whose
+impact has begun. A regional advisory is context, not proof the project or all
+its services are affected. Green requires every mapped resource to have a
+reported `Available` state, both source queries to complete, and no visible
+regional event. Unknown, unsupported or incomplete coverage is gray, not green.
+The optional inventory details expose available/unknown resource counts and
+regional-event counts/services. Query/permission errors remain visible.
+
+Resource Health and Service Health are queried independently: Azure Resource
+Graph does not support joining both health tables in one cross-table query.
+Their scoped, bounded results feed the resource-location map through escaped
+query-backed parameters. Service events are subscription-scoped; only locations
+containing this project's resources are displayed. Capacity issues appear only
+when Azure reports a related health event: there is no real-time regional/SKU
+capacity forecast, quota guarantee, or inferred application-health promise.
+
 Do not infer a separate `stackedarea` or doughnut configuration from an Azure
 Data Explorer screenshot: workbook types are `areachart`, `barchart`,
 `categoricalbar`, `scatterchart`, `piechart` and `map`. Microsoft publishes
