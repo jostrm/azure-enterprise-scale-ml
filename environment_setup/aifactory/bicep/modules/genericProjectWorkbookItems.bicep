@@ -53,23 +53,25 @@ var nativeMetricGroups = [for profile in nativeMetricProfiles: {
         content: union(nativeMetricSettings, {
           chartId: 'generic-native-${profile.key}-trend'
           title: '${profile.label} · input / output tokens · last 30 days'
-          chartType: 2
-          metrics: profile.metrics
-        })
-      }
-      {
-        type: 10
-        name: 'generic-native-${profile.key}-table'
-        content: union(nativeMetricSettings, {
-          chartId: 'generic-native-${profile.key}-table'
-          title: '${profile.label} · token usage by deployment / model version'
-          chartType: 0
-          gridFormatType: 2
+          size: 1
+          chartType: 3
           metrics: profile.metrics
         })
       }
     ]
   }
+}]
+var nativeMetricDetails = [for profile in nativeMetricProfiles: {
+  type: 10
+  name: 'generic-native-${profile.key}-table'
+  conditionalVisibility: { parameterName: 'GenericMetricProfile', comparison: 'isEqualTo', value: profile.key }
+  content: union(nativeMetricSettings, {
+    chartId: 'generic-native-${profile.key}-table'
+    title: '${profile.label} · token usage by deployment / model version'
+    chartType: 0
+    gridFormatType: 2
+    metrics: profile.metrics
+  })
 }]
 
 // Native categories and Count aggregation:
@@ -106,7 +108,7 @@ var usageItems = [
     name: 'generic-usage-heading'
     conditionalVisibility: usageVisibility
     content: {
-      json: '## Project ${projectNumber}${environmentLabel} · Usage\nNative model tokens and HTTP request counts over the **last 30 days**, plus current project inventory. Select the metric family supported by your account. Tokens are observed usage, not billed cost; up to 100 model/deployment series per metric. Missing series are unavailable, not measured zero.'
+      json: '## Project ${projectNumber}${environmentLabel} · Usage\n30-day observed tokens (up to 100 series per metric, not billed cost) and current resources; missing means unavailable, not zero.'
     }
   }
   {
@@ -164,13 +166,129 @@ var usageItems = [
     }
   }
   {
+    type: 3
+    name: 'generic-inventory-summary'
+    conditionalVisibility: usageVisibility
+    content: union(inventorySettings, {
+      title: 'Current project footprint · visible resources'
+      size: 4
+      query: '${scopedInventory}| summarize ResourceCount=count(), Types=make_set(type), Locations=make_set(location), Accounts=countif(type =~ \'microsoft.cognitiveservices/accounts\' and [\'kind\'] in~ (\'AIServices\', \'OpenAI\'))\n| extend Counters=pack_array(pack(\'Label\', \'Resources\', \'Value\', ResourceCount), pack(\'Label\', \'Service types\', \'Value\', array_length(Types)), pack(\'Label\', \'Locations\', \'Value\', array_length(Locations)), pack(\'Label\', \'Foundry / OpenAI accounts\', \'Value\', Accounts))\n| mv-expand Counter=Counters\n| project Label=tostring(Counter.Label), Value=toint(Counter.Value)'
+      visualization: 'tiles'
+      tileSettings: {
+        titleContent: { columnMatch: 'Label', formatter: 1 }
+        leftContent: {
+          columnMatch: 'Value'
+          formatter: 12
+          numberFormat: { unit: 0, options: { style: 'decimal', useGrouping: true, maximumFractionDigits: 0 } }
+        }
+        showBorder: true
+        size: 'auto'
+      }
+    })
+  }
+  {
     type: 12
     name: 'generic-native-tokens'
+    customWidth: '50'
     conditionalVisibility: usageVisibility
     content: {
       version: 'NotebookGroup/1.0'
       groupType: 'editable'
       items: nativeMetricGroups
+    }
+  }
+  {
+    type: 3
+    name: 'generic-inventory-map'
+    customWidth: '50'
+    conditionalVisibility: usageVisibility
+    content: union(inventorySettings, {
+      title: 'Azure regions · excludes global / unmapped'
+      size: 1
+      query: '${scopedInventory}| where isnotempty(location) and location !~ \'global\'\n| summarize Resources=count() by Location=location | order by Resources desc'
+      visualization: 'map'
+      // Native Azure-location lookup; global/unmapped locations remain in the breakdown and details.
+      // Microsoft Application-Insights-Workbooks: CosmosDbOverview.workbook, mapSettings.
+      mapSettings: {
+        locInfo: 'AzureLoc'
+        locInfoColumn: 'Location'
+        sizeSettings: 'Resources'
+        sizeAggregation: 'Sum'
+        legendMetric: 'Resources'
+        legendAggregation: 'Sum'
+        itemColorSettings: {
+          type: 'heatmap'
+          nodeColorField: 'Resources'
+          colorAggregation: 'Sum'
+          heatmapPalette: 'greenRed'
+        }
+      }
+    })
+  }
+  {
+    type: 3
+    name: 'generic-inventory-types'
+    customWidth: '50'
+    conditionalVisibility: usageVisibility
+    content: union(inventorySettings, {
+      title: 'Resources by service provider / location'
+      size: 1
+      query: '${scopedInventory}| extend Provider=replace_string(tostring(split(type, \'/\')[0]), \'microsoft.\', \'\')\n| summarize Resources=count() by Provider, Location=location | order by Resources desc'
+      visualization: 'categoricalbar'
+      chartSettings: { xAxis: 'Provider', yAxis: ['Resources'], group: 'Location', createOtherGroup: 0, showLegend: true, showMetrics: false }
+    })
+  }
+  {
+    type: 3
+    name: 'generic-inventory-locations'
+    customWidth: '50'
+    conditionalVisibility: usageVisibility
+    content: union(inventorySettings, {
+      title: 'Location share · includes global / unmapped'
+      size: 1
+      query: '${scopedInventory}| summarize Resources=count() by Location=location | order by Resources desc'
+      visualization: 'piechart'
+      chartSettings: { xAxis: 'Location', yAxis: ['Resources'], createOtherGroup: 0, showLegend: true, showMetrics: false }
+    })
+  }
+  {
+    type: 12
+    name: 'generic-native-details'
+    conditionalVisibility: usageVisibility
+    content: {
+      version: 'NotebookGroup/1.0'
+      groupType: 'editable'
+      loadType: 'explicit'
+      loadButtonText: 'Show token totals by deployment / model version'
+      items: nativeMetricDetails
+    }
+  }
+  {
+    type: 12
+    name: 'generic-inventory-details'
+    conditionalVisibility: usageVisibility
+    content: {
+      version: 'NotebookGroup/1.0'
+      groupType: 'editable'
+      loadType: 'explicit'
+      loadButtonText: 'Show current resource inventory'
+      items: [
+        {
+          type: 3
+          name: 'generic-inventory'
+          content: union(inventorySettings, {
+            title: 'Current project resource inventory'
+            query: '${scopedInventory}| project Resource=name, Type=type, Kind=kind, Location=location, id | order by Type asc, Resource asc'
+            visualization: 'table'
+            gridSettings: {
+              formatters: [
+                { columnMatch: 'Resource', formatter: 7, formatOptions: { linkColumn: 'id', linkTarget: 'Resource' } }
+                { columnMatch: 'id', formatter: 5 }
+              ]
+            }
+          })
+        }
+      ]
     }
   }
   {
@@ -193,6 +311,7 @@ var usageItems = [
         {
           type: 10
           name: 'generic-http-trend'
+          customWidth: '50'
           content: union(httpMetricSettings, {
             chartId: 'generic-http-trend'
             title: 'HTTP requests · last 30 days'
@@ -202,6 +321,7 @@ var usageItems = [
         {
           type: 10
           name: 'generic-http-totals'
+          customWidth: '50'
           content: union(httpMetricSettings, {
             chartId: 'generic-http-totals'
             title: 'HTTP requests · 30-day totals'
@@ -212,51 +332,11 @@ var usageItems = [
       ]
     }
   }
-  {
-    type: 3
-    name: 'generic-inventory-types'
-    customWidth: '60'
-    conditionalVisibility: usageVisibility
-    content: union(inventorySettings, {
-      title: 'Project resources by service type'
-      query: '${scopedInventory}| summarize Resources=count() by Type=type | order by Resources desc'
-      visualization: 'barchart'
-      chartSettings: { xAxis: 'Type', yAxis: ['Resources'], showLegend: false }
-    })
-  }
-  {
-    type: 3
-    name: 'generic-inventory-locations'
-    customWidth: '40'
-    conditionalVisibility: usageVisibility
-    content: union(inventorySettings, {
-      title: 'Project resources by location'
-      query: '${scopedInventory}| summarize Resources=count() by Location=location | order by Resources desc'
-      visualization: 'piechart'
-      chartSettings: { xAxis: 'Location', yAxis: ['Resources'], showLegend: true }
-    })
-  }
-  {
-    type: 3
-    name: 'generic-inventory'
-    conditionalVisibility: usageVisibility
-    content: union(inventorySettings, {
-      title: 'Current project resource inventory'
-      query: '${scopedInventory}| project Resource=name, Type=type, Kind=kind, Location=location, id | order by Type asc, Resource asc'
-      visualization: 'table'
-      gridSettings: {
-        formatters: [
-          { columnMatch: 'Resource', formatter: 7, formatOptions: { linkColumn: 'id', linkTarget: 'Resource' } }
-          { columnMatch: 'id', formatter: 5 }
-        ]
-      }
-    })
-  }
 ]
 
 // ARMEndpoint/1.0 is a Workbook read/query data source; this module deploys no resources.
 // https://learn.microsoft.com/azure/azure-monitor/visualize/workbooks-data-sources#azure-resource-manager
-// Fixed response contracts (including column order) verified against this API on 2026-10-08.
+// Positional contracts must match returned columns; the optional inspector exposes schema/pagination.
 // https://learn.microsoft.com/rest/api/cost-management/query/usage?view=rest-cost-management-2025-03-01
 var costEndpoint = {
   version: 'ARMEndpoint/1.0'
@@ -274,6 +354,7 @@ var servicesDataset = {
   aggregation: costAggregation
   grouping: [{ type: 'Dimension', name: 'ServiceName' }]
 }
+var dailyServicesDataset = union(servicesDataset, { granularity: 'Daily' })
 var totalColumns = [
   { path: '$[0]', columnid: 'Cost' }
   { path: '$[1]', columnid: 'Currency' }
@@ -295,6 +376,13 @@ var servicesColumns = [
   { path: '$[1]', columnid: 'ServiceName' }
   { path: '$[2]', columnid: 'Currency' }
 ]
+var dailyServicesColumns = [
+  // Daily ServiceName column order verified against the API on 2026-10-08.
+  { path: '$[0]', columnid: 'Cost' }
+  dailyColumns[1]
+  { path: '$[2]', columnid: 'ServiceName' }
+  { path: '$[3]', columnid: 'Currency' }
+]
 var costProfiles = [
   {
     key: 'total'
@@ -302,6 +390,7 @@ var costProfiles = [
     dataset: totalDataset
     columns: totalColumns
     schema: 'Cost:Number, Currency:String'
+    currencyColumn: 1
   }
   {
     key: 'daily'
@@ -309,6 +398,7 @@ var costProfiles = [
     dataset: dailyDataset
     columns: dailyColumns
     schema: 'Cost:Number, UsageDate:Number, Currency:String'
+    currencyColumn: 2
   }
   {
     key: 'services'
@@ -316,6 +406,15 @@ var costProfiles = [
     dataset: servicesDataset
     columns: servicesColumns
     schema: 'Cost:Number, ServiceName:String, Currency:String'
+    currencyColumn: 2
+  }
+  {
+    key: 'daily-services'
+    title: 'Daily actual cost by service · month to date'
+    dataset: dailyServicesDataset
+    columns: dailyServicesColumns
+    schema: 'Cost:Number, UsageDate:Number, ServiceName:String, Currency:String'
+    currencyColumn: 3
   }
 ]
 var costQueries = [for profile in costProfiles: string(union(costEndpoint, {
@@ -324,6 +423,19 @@ var costQueries = [for profile in costProfiles: string(union(costEndpoint, {
     {
       type: 'jsonpath'
       settings: { tablePath: '$.properties.rows', columns: profile.columns }
+    }
+  ]
+}))]
+// Service compositions use one returned currency; unfiltered totals/details retain every currency and credit.
+var selectedCostQueries = [for profile in costProfiles: string(union(costEndpoint, {
+  data: string({ type: 'ActualCost', timeframe: 'MonthToDate', dataset: profile.dataset })
+  transformers: [
+    {
+      type: 'jsonpath'
+      settings: {
+        tablePath: '$.properties.rows[?(@[${profile.currencyColumn}] == "{GenericCostCurrency:escapejson}")]'
+        columns: profile.columns
+      }
     }
   ]
 }))]
@@ -362,12 +474,52 @@ var costItems = [
     name: 'generic-cost-heading'
     conditionalVisibility: costVisibility
     content: {
-      json: '## Project ${projectNumber}${environmentLabel} · Cost\n**ActualCost · month to date** from this project RG. Currency comes from billing; missing amounts remain unavailable. **USD display fallback when no currency is emitted.**'
+      json: '## Project ${projectNumber}${environmentLabel} · Cost\n**ActualCost · month to date** from this project RG. Currency comes from billing; missing amounts remain unavailable. **USD display fallback when no currency is emitted.** Totals and daily trends retain every returned currency; service visuals use the selected currency. Negative credits remain signed amounts, never pie shares. No budget source is configured.'
+    }
+  }
+  {
+    type: 9
+    name: 'generic-cost-currency'
+    conditionalVisibility: costVisibility
+    content: {
+      version: 'KqlParameterItem/1.0'
+      style: 'above'
+      parameters: [
+        {
+          id: 'generic-cost-currency'
+          name: 'GenericCostCurrency'
+          label: 'Billing currency · service visuals only'
+          type: 2
+          isRequired: true
+          multiSelect: false
+          // Native "Any one" resolves one returned value, never a hardcoded currency or All.
+          // https://learn.microsoft.com/azure/azure-monitor/visualize/workbooks-dropdowns#dropdown-special-selections
+          defaultValue: 'value::1'
+          queryType: 12
+          typeSettings: { additionalResourceOptions: ['value::1'], showDefault: false }
+          query: string(union(costEndpoint, {
+            data: string({ type: 'ActualCost', timeframe: 'MonthToDate', dataset: totalDataset })
+            transformers: [
+              {
+                type: 'jsonpath'
+                settings: {
+                  tablePath: '$.properties.rows'
+                  columns: [
+                    { path: '$[1]', columnid: 'value' }
+                    { path: '$[1]', columnid: 'label' }
+                  ]
+                }
+              }
+            ]
+          }))
+        }
+      ]
     }
   }
   {
     type: 3
     name: 'generic-cost-total'
+    customWidth: '30'
     conditionalVisibility: costVisibility
     content: union(costSettings, {
       title: costProfiles[0].title
@@ -375,7 +527,14 @@ var costItems = [
       visualization: 'tiles'
       tileSettings: {
         titleContent: { columnMatch: 'Currency', formatter: 1 }
-        leftContent: { columnMatch: 'Cost', formatter: 1 }
+        leftContent: {
+          columnMatch: 'Cost'
+          formatter: 12
+          numberFormat: {
+            unit: 0
+            options: { style: 'decimal', useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }
+          }
+        }
         showBorder: true
         size: 'auto'
       }
@@ -383,26 +542,42 @@ var costItems = [
   }
   {
     type: 3
-    name: 'generic-cost-daily'
-    customWidth: '60'
+    name: 'generic-cost-services'
+    customWidth: '70'
     conditionalVisibility: costVisibility
     content: union(costSettings, {
-      title: costProfiles[1].title
-      query: costQueries[1]
-      visualization: 'timechart'
-      chartSettings: { xAxis: 'UsageDate', yAxis: ['Cost'], group: 'Currency', showLegend: true, showMetrics: false }
+      title: '${costProfiles[2].title} · {GenericCostCurrency}'
+      query: selectedCostQueries[2]
+      visualization: 'barchart'
+      noDataMessage: 'Select a returned billing currency. No matching service cost is unavailable, not zero; all currencies remain in billing details.'
+      chartSettings: { xAxis: 'ServiceName', yAxis: ['Cost'], createOtherGroup: 0, showLegend: false, showMetrics: false }
     })
   }
   {
     type: 3
-    name: 'generic-cost-services'
-    customWidth: '40'
+    name: 'generic-cost-daily'
+    customWidth: '50'
     conditionalVisibility: costVisibility
     content: union(costSettings, {
-      title: costProfiles[2].title
-      query: costQueries[2]
-      visualization: 'barchart'
-      chartSettings: { xAxis: 'ServiceName', yAxis: ['Cost'], group: 'Currency', showLegend: true, showMetrics: false }
+      title: '${costProfiles[1].title} · separate currency series'
+      query: costQueries[1]
+      size: 1
+      visualization: 'timechart'
+      chartSettings: { xAxis: 'UsageDate', yAxis: ['Cost'], group: 'Currency', createOtherGroup: 0, showLegend: true, showMetrics: false }
+    })
+  }
+  {
+    type: 3
+    name: 'generic-cost-daily-services'
+    customWidth: '50'
+    conditionalVisibility: costVisibility
+    content: union(costSettings, {
+      title: '${costProfiles[3].title} · {GenericCostCurrency}'
+      query: selectedCostQueries[3]
+      size: 1
+      visualization: 'areachart'
+      noDataMessage: 'Select a returned billing currency. No matching daily service cost is unavailable, not zero; all currencies remain in billing details.'
+      chartSettings: { xAxis: 'UsageDate', yAxis: ['Cost'], group: 'ServiceName', createOtherGroup: 0, showLegend: true, showMetrics: false }
     })
   }
   {
@@ -411,6 +586,37 @@ var costItems = [
     conditionalVisibility: costVisibility
     content: {
       json: 'Returned rows only. Inspect responses if values look wrong: unexpected order/type is unsupported; a nonempty **NextPage** means a partial response. No currency conversion.'
+    }
+  }
+  {
+    type: 12
+    name: 'generic-cost-details'
+    conditionalVisibility: costVisibility
+    content: {
+      version: 'NotebookGroup/1.0'
+      groupType: 'editable'
+      loadType: 'explicit'
+      loadButtonText: 'Show billing rows · all currencies and credits'
+      items: [
+        {
+          type: 3
+          name: 'generic-cost-services-details'
+          content: union(costSettings, {
+            title: '${costProfiles[2].title} · all currencies'
+            query: costQueries[2]
+            visualization: 'table'
+          })
+        }
+        {
+          type: 3
+          name: 'generic-cost-daily-services-details'
+          content: union(costSettings, {
+            title: '${costProfiles[3].title} · all currencies'
+            query: costQueries[3]
+            visualization: 'table'
+          })
+        }
+      ]
     }
   }
   {

@@ -2,7 +2,9 @@
 """Reconcile and deploy the shared AI Factory Azure Portal dashboard."""
 from __future__ import annotations
 
+import importlib.util
 import json
+import math
 import os
 import re
 import shutil
@@ -10,9 +12,17 @@ import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
+
+_usage_spec = importlib.util.spec_from_file_location(
+    "aifactory_dashboard_usage", Path(__file__).with_name("dashboard_usage.py")
+)
+usage = importlib.util.module_from_spec(_usage_spec)
+sys.modules[_usage_spec.name] = usage
+_usage_spec.loader.exec_module(usage)
 
 GUID = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", re.I)
 PROJECT_NUMBER = re.compile(r"\d{3}")
@@ -25,6 +35,15 @@ ENVIRONMENTS = (
     ("prod", "PROD", "DASHBOARD_PROD_SUBSCRIPTION_ID"),
 )
 API_VERSION = "2020-09-01-preview"
+ENVIRONMENT_WIDTH = 16
+USAGE_LABELS = (
+    ("activity", "Email-caller Activity Log - 30d"),
+    ("agents", "Foundry agents - inventory"),
+    ("models", "Azure ML model names - inventory"),
+    ("storage", "Storage used - latest"),
+    ("adf", "ADF completed pipeline runs - 30d"),
+    ("search", "AI Search indexes - inventory"),
+)
 ML_DATA_SHORTCUTS = (
     ("Azure Machine Learning", "microsoft.machinelearningservices/workspaces"),
     ("Azure Databricks", "microsoft.databricks/workspaces"),
@@ -63,6 +82,11 @@ def az_cli(*args: str) -> subprocess.CompletedProcess[str]:
             text=True,
             encoding="utf-8",
             errors="replace",
+            timeout=90 if usage.is_read_command(args) else None,
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(
+            command, 1, "", '{"error":{"code":"UsageReadTimeout"}}'
         )
     except OSError as error:
         raise RuntimeError(f"Unable to launch Azure CLI for dashboard reconciliation: {error}") from error
@@ -706,12 +730,71 @@ def cost_part(x: int, y: int, resource: dict, tenant_id: str) -> dict:
     }
 
 
+def usage_part(x: int, y: int, resource: dict, tenant_id: str) -> dict:
+    snapshot = resource.get("usageSnapshot", {})
+    snapshot = snapshot if isinstance(snapshot, dict) else {}
+    metrics = snapshot.get("metrics", {})
+    metrics = metrics if isinstance(metrics, dict) else {}
+    observed = "not collected"
+    try:
+        timestamp = datetime.fromisoformat(str(snapshot.get("observedAt", "")).replace("Z", "+00:00"))
+        if timestamp.utcoffset() is not None and timestamp.utcoffset().total_seconds() == 0:
+            observed = timestamp.strftime("%Y-%m-%d %H:%M UTC")
+    except ValueError:
+        pass  # Old inventories have no usage snapshot; the card explicitly says so.
+    rows = []
+    for key, label in USAGE_LABELS:
+        metric = metrics.get(key, {})
+        metric = metric if isinstance(metric, dict) else {}
+        value = metric.get("value")
+        if metric.get("status") == "not-deployed":
+            display = "Not deployed"
+        elif (metric.get("status") == "ok" and isinstance(value, (int, float))
+              and not isinstance(value, bool) and math.isfinite(value) and value >= 0):
+            display = f"**{value / (1024 ** 3):,.2f} GiB**" if key == "storage" else f"**{value:,.0f}**"
+        else:
+            display = "**Unavailable**"
+        rows.append(f"| {label} | {display} |")
+    activity_url = f"https://portal.azure.com/#@{tenant_id}/resource{resource['id']}/activitylog"
+    return markdown_part(
+        x, y, 6, 4,
+        "### Activity & solution assets\n\n"
+        "| Evidence | Value |\n|---|---:|\n" + "\n".join(rows)
+        + f"\n\nSnapshot: {observed}. Refresh via dashboard-only run, not browser.\n\n"
+        + f"[Activity log]({activity_url}) - Email callers; no app/managed identities. "
+        "Inventory is not runtime usage.",
+    )
+
+
+def inventory_groups(inventory: dict) -> list[dict]:
+    groups = list(inventory.get("hubResourceGroups", []))
+    for environment in inventory.get("environments", []):
+        groups.extend([environment["commonResourceGroup"], *environment["projects"]])
+    return groups
+
+
+def collect_usage(inventory: dict, collector, subscriptions: set[str]) -> None:
+    allowed = {subscription.lower() for subscription in subscriptions if subscription}
+    snapshots = {}
+    for group in inventory_groups(inventory):
+        resource_id = group.get("id", "")
+        match = re.fullmatch(r"/subscriptions/([^/]+)/resourcegroups/([^/]+)", resource_id, re.I)
+        if (not match or match[1].lower() not in allowed
+                or group.get("deploymentStatus") == "not-deployed"):
+            group.pop("usageSnapshot", None)
+            continue
+        key = resource_id.lower()
+        if key not in snapshots:
+            snapshots[key] = collector.collect(resource_id)
+        group["usageSnapshot"] = snapshots[key]
+
+
 def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
     parts = [
         markdown_part(
             0,
             0,
-            30,
+            3 * ENVIRONMENT_WIDTH,
             2,
             "# AI Factory\n\nCross-environment landing zone inventory. "
             "Hub and shared services are shown first, followed by DEV, STAGE, and PROD. "
@@ -721,14 +804,15 @@ def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
     hubs = inventory["hubResourceGroups"]
     if hubs:
         for index, hub in enumerate(hubs[:3]):
-            x = index * 10
-            parts.extend((resource_part(x, 2, 4, 4, hub), cost_part(x + 4, 2, hub, tenant_id)))
+            x = index * ENVIRONMENT_WIDTH
+            parts.extend((resource_part(x, 2, 4, 4, hub), cost_part(x + 4, 2, hub, tenant_id),
+                          usage_part(x + 10, 2, hub, tenant_id)))
     else:
         parts.append(
             markdown_part(
                 0,
                 2,
-                30,
+                3 * ENVIRONMENT_WIDTH,
                 4,
                 "## Hub / Shared Services\n\nNo separate hub resource group is configured. "
                 "Environment common resource groups are shown below.",
@@ -736,9 +820,9 @@ def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
         )
 
     for environment_index, environment in enumerate(inventory["environments"]):
-        x = environment_index * 10
+        x = environment_index * ENVIRONMENT_WIDTH
         parts.append(
-            markdown_part(x, 6, 10, 1, f"# {environment['displayName']}")
+            markdown_part(x, 6, ENVIRONMENT_WIDTH, 1, f"# {environment['displayName']}")
         )
         common = environment["commonResourceGroup"]
         if not common.get("id"):
@@ -746,7 +830,7 @@ def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
                 markdown_part(
                     x,
                     7,
-                    10,
+                    ENVIRONMENT_WIDTH,
                     4,
                     f"## {environment['displayName']} is not configured\n\n"
                     "Set the environment subscription ID and rerun a project pipeline.",
@@ -757,6 +841,7 @@ def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
             (
                 resource_part(x, 7, 4, 4, common),
                 cost_part(x + 4, 7, common, tenant_id),
+                usage_part(x + 10, 7, common, tenant_id),
             )
         )
         for project_index, project in enumerate(environment["projects"]):
@@ -765,7 +850,7 @@ def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
                 markdown_part(
                     x,
                     y,
-                    10,
+                    ENVIRONMENT_WIDTH,
                     1,
                     f"## Project {project['projectNumber']}\n\n"
                     f"[Open project dashboard]({project['dashboardUrl']})",
@@ -775,6 +860,7 @@ def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
                 (
                     resource_part(x, y + 1, 4, 4, project),
                     cost_part(x + 4, y + 1, project, tenant_id),
+                    usage_part(x + 10, y + 1, project, tenant_id),
                 )
             )
             ml_data_types = {kind for _, kind in ML_DATA_SHORTCUTS}
@@ -788,7 +874,7 @@ def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
     return parts
 
 
-def reconcile(config: Config, az: Az = az_cli) -> tuple[dict, str, str | None]:
+def reconcile(config: Config, az: Az = az_cli, *, include_usage: bool = True) -> tuple[dict, str, str | None]:
     ensure_dashboard_resource_group(config, az)
     inventory, etag = existing_inventory(config, az)
     previous = previous_environments(inventory)
@@ -822,6 +908,8 @@ def reconcile(config: Config, az: Az = az_cli) -> tuple[dict, str, str | None]:
     )
     if tenant_result.returncode or not GUID.fullmatch(tenant_result.stdout.strip()):
         raise RuntimeError("Unable to resolve the dashboard host tenant.")
+    if include_usage:
+        collect_usage(reconciled, usage.Collector(az), set(config.subscriptions.values()))
     return reconciled, tenant_result.stdout.strip(), etag
 
 

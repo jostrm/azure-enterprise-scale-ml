@@ -496,6 +496,52 @@ These are local source changes; existing Azure dashboards require a separately
 authorized dashboard deployment to update. Portal rendering and live billing
 data still require review after that deployment.
 
+#### Activity and solution assets beside accumulated cost
+
+The shared AI Factory dashboard adds an **Activity & solution assets** card
+immediately to the right of each hub, common and project accumulated-cost tile.
+Environment bands include the additional card without overlapping neighboring
+environments or the existing project shortcuts.
+
+These are **UTC-timestamped snapshots collected by a dashboard-only run**.
+Refreshing the browser does not collect new values; rerun the dashboard-only
+pipeline or its CLI runner to refresh them. The 30-day window ends at the snapshot time, not the
+time someone later opens the dashboard. Snapshot windows use UTC minute
+boundaries to match native metric bucket precision. Native cost tiles retain their own
+live date controls. Each usage card is scoped to its exact resource group and
+includes all discovered resources of the relevant type, not only the first
+resource selected for a shortcut.
+
+| Evidence | Definition and interpretation |
+|---|---|
+| Email-caller Activity Log, 30 days | Count of distinct Activity Log event records with an email-shaped caller and positive user/delegated-scope claims, excluding application and managed identities. An email-caller record without sufficient identity evidence makes the total unavailable; classified/unclassified counts remain in snapshot metadata. These are management-plane events, not application traffic or distinct operations: Started/Succeeded records can describe the same operation. Delegated automation using a user's credentials cannot be distinguished from manual activity. No caller addresses are stored in the dashboard. |
+| Foundry agents | Current new agent definitions plus classic assistants, not their versions or executions. Both populations must be readable for a complete combined count. |
+| Azure ML model names | Distinct registered model containers, including archived containers, not model versions, deployments, scoring calls or public catalog models. |
+| Storage used | Sum of the latest available `UsedCapacity` hourly Average byte sample across the RG's storage accounts, displayed as GiB. Never sum capacity over time or add blob capacity to the already-inclusive account capacity. Stored data is not evidence of recent reads/writes. |
+| ADF completed pipeline runs, 30 days | Sum of `PipelineSucceededRuns`, `PipelineFailedRuns` and `PipelineCancelledRuns` totals. This demonstrates execution, not merely configured pipelines; queued/in-progress runs are not included. |
+| AI Search indexes | Current index inventory from each service's metadata API, not index versions, indexed documents or search-query traffic. |
+
+Inventory indicates configured solution assets, **not proof of runtime usage**.
+There is deliberately no automatic "unused" judgment based on a zero count.
+Missing observations, incomplete pagination, unsupported response shapes and
+denied/unreachable sources display **Unavailable**, not zero. **Not deployed**
+means successful RG discovery found no applicable service; a measured zero is
+shown only when the relevant read completed successfully.
+
+The collector uses existing Azure Monitor/management reads and existing Entra
+data-plane access. Foundry and Search inventory can require private-network
+reachability and data-plane authorization even when ARM reads succeed. The
+pipeline does not retrieve keys, grant roles, enable diagnostics, open firewalls
+or create a collector service to fill a missing value. Only aggregate values,
+timestamps and source-status metadata are persisted.
+
+Source contracts: [Activity Log events](https://learn.microsoft.com/en-us/rest/api/monitor/activity-logs/list),
+[Foundry agents](https://ai.azure.com/api-reference/agents/list-agents/),
+[AML model containers](https://learn.microsoft.com/en-us/rest/api/azureml/model-containers/list?view=rest-azureml-2025-06-01),
+[storage metrics](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-metrics/microsoft-storage-storageaccounts-metrics),
+[Data Factory metrics](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-metrics/microsoft-datafactory-factories-metrics)
+and [Search index metadata](https://learn.microsoft.com/en-us/rest/api/searchservice/indexes/list?view=rest-searchservice-2025-09-01).
+
 ### Native My Project generated with the project dashboard
 
 `modules\projectDash01.bicep` now deploys a companion
@@ -504,6 +550,27 @@ cards below the consumption charts, ahead of service configuration. The existing
 links and native Cost Management link remain in place.
 
 #### Generic project view and source availability
+
+The native workbook uses compact spacing, paired chart widths and KPI strips,
+with methodology, binding diagnostics and full request/inventory tables behind
+explicit detail controls. These controls change presentation only: source
+limitations, exact scope and missing-value behavior are unchanged.
+
+Native area, bar/column, scatter, pie and Azure-region map visualizations are
+used where their data shapes are appropriate. Categorical bars can segment by
+region; numeric token scatter compares observed daily input and output for each
+deployment/model. Cached tokens are a subset and are never stacked on top of
+inclusive input. The map describes Azure resource placement, not user locations
+or application traffic. Global/non-geographic resources remain inventory, not
+invented map points. Native Portal styling applies; this is not a custom HTML
+dashboard or a pixel-identical rendering of the desktop charts.
+
+Do not infer a separate `stackedarea` or doughnut configuration from an Azure
+Data Explorer screenshot: workbook types are `areachart`, `barchart`,
+`categoricalbar`, `scatterchart`, `piechart` and `map`. Microsoft publishes
+categorical stacking through the series/group mapping; unsupported custom
+chart flags are not added. See [native charts](https://learn.microsoft.com/en-us/azure/azure-monitor/visualize/workbooks-chart-visualizations)
+and [Azure-location maps](https://learn.microsoft.com/en-us/azure/azure-monitor/visualize/workbooks-map-visualizations).
 
 **Template = None - Generic project** is the default. The same workbook keeps
 **Usage / Cost / Model tokens** navigation without requiring a canonical
