@@ -2481,11 +2481,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">357</td>
+<td style="text-align: right;">360</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">357</td>
+<td style="text-align: right;">360</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2501,15 +2501,15 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">361</td>
+<td style="text-align: right;">364</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 135, 380; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 136, 381; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 382, 406; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 135, 384; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 136, 385; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 386, 410; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -2566,6 +2566,13 @@ reported, not silently represented as multiple settings.</p>
 <td>M</td>
 <td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
 <td>ACR dedicated (Premium tier) mandatory: ACR dedicated (Premium tier) ensure: must be true when using private endpoints or CMK.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:addAIFactoryMCP2AIGatewaySKU --><!-- parameter json.dev:addAIFactoryMCP2AIGatewaySKU --><code>addAIFactoryMCP2AIGatewaySKU</code></td>
+<td>No verified binding</td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Register the AI Factory MCP as a tool server on the AI Gateway SKU keep-as-is: Requires enableAIFactoryMCP:'true' and enableAIGatewaySKU:'true'.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:addAIFoundry --><!-- parameter json.dev:addAIFoundry --><code>addAIFoundry</code></td>
@@ -2799,6 +2806,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Own AI Factory Hub intent</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:enableAIFactoryMCP --><!-- parameter json.dev:enableAIFactoryMCP --><code>enableAIFactoryMCP</code></td>
+<td>No verified binding</td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Host the governed AI Factory MCP in project001 Dev keep-as-is: Requires enableContainerApps:'true'. false never deletes an existing MCP.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:enableAIFoundry --><!-- parameter json.dev:enableAIFoundry --><code>enableAIFoundry</code></td>
 <td><code>ENABLE_AI_FOUNDRY</code></td>
 <td>C</td>
@@ -2811,6 +2825,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
 <td>DEPRECATED. AI Foundry Hub (V1) service. Do not enable. Use enableAIFoundry instead. keep-as-is: DEPRECATED. AI Foundry Hub (V1) service. Do not enable. Use enableAIFoundry instead.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:enableAIGatewaySKU --><!-- parameter json.dev:enableAIGatewaySKU --><code>enableAIGatewaySKU</code></td>
+<td>No verified binding</td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Initialize the new Azure AI Gateway SKU (ai.gateway.azure.com) with the project001 Dev Foundry keep-as-is: Requires enableAIFoundry:'true'. false never deletes an existing gateway.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableAISearch --><!-- parameter json.dev:enableAISearch --><code>enableAISearch</code></td>
@@ -5713,6 +5734,13 @@ reported, not silently represented as multiple settings.</p>
 <td>ACR SKU keep-as-is: Premium required for private endpoints or CMK.</td>
 </tr>
 <tr>
+<td><!-- parameter env:ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU --><code>ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU</code></td>
+<td>No verified counterpart</td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>addAIFactoryMCP2AIGatewaySKU: register the AI Factory MCP as a tool server on the AI Gateway SKU keep-as-is: Requires ENABLE_AI_FACTORY_MCP:'true' and ENABLE_AI_GATEWAY_SKU:'true'.</td>
+</tr>
+<tr>
 <td><!-- parameter env:ADD_AI_FOUNDRY --><code>ADD_AI_FOUNDRY</code></td>
 <td><code>addAIFoundry</code></td>
 <td>O</td>
@@ -5944,6 +5972,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Own AI Factory Hub intent</td>
 </tr>
 <tr>
+<td><!-- parameter env:ENABLE_AI_FACTORY_MCP --><code>ENABLE_AI_FACTORY_MCP</code></td>
+<td>No verified counterpart</td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>enableAIFactoryMCP: host the governed AI Factory MCP in project001 Dev keep-as-is: Requires ENABLE_CONTAINER_APPS:'true'. false never deletes an existing MCP.</td>
+</tr>
+<tr>
 <td><!-- parameter env:ENABLE_AI_FOUNDRY --><code>ENABLE_AI_FOUNDRY</code></td>
 <td><code>enableAIFoundry</code></td>
 <td>C</td>
@@ -5956,6 +5991,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"false"</code></td>
 <td>DEPRECATED: Legacy AI Foundry Hub v1 keep-as-is: Legacy Hub (v1). Use ENABLE_AI_FOUNDRY instead.</td>
+</tr>
+<tr>
+<td><!-- parameter env:ENABLE_AI_GATEWAY_SKU --><code>ENABLE_AI_GATEWAY_SKU</code></td>
+<td>No verified counterpart</td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>enableAIGatewaySKU: initialize the new Azure AI Gateway SKU (ai.gateway.azure.com) with the project001 Dev Foundry keep-as-is: Requires ENABLE_AI_FOUNDRY:'true'. false never deletes an existing gateway.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_AI_SEARCH --><code>ENABLE_AI_SEARCH</code></td>
