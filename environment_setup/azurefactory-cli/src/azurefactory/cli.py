@@ -292,15 +292,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     project = sub.add_parser("project", help="Project catalog changes.")
     project_sub = project.add_subparsers(dest="project_command", required=True)
+    placement_help = ("Use dev=latest-successful for server selection, or environment=scale_set_uuid. "
+                      "Environments: dev, stage, prod; repeat for each placement. "
+                      "Review the resolved UUID and recorded success before confirming.")
     project_add = add_prepare_common(project_sub, "add", cmd_project_add)
     project_add.add_argument("--factory-id", required=True)
     project_add.add_argument("--number", required=True)
     project_add.add_argument("--display-name", default="")
-    project_add.add_argument("--placement", action="append", required=True, help="environment=scale_set_uuid; repeat for each placement.")
+    project_add.add_argument("--placement", action="append", required=True, help=placement_help)
     project_place = add_prepare_common(project_sub, "add-placements", cmd_project_add_placements)
     project_place.add_argument("--factory-id", required=True)
     project_place.add_argument("--project-id", required=True)
-    project_place.add_argument("--placement", action="append", required=True)
+    project_place.add_argument("--placement", action="append", required=True, help=placement_help)
 
     params = sub.add_parser("parameters", help="Typed ARM parameter introspection and editing.")
     params_sub = params.add_subparsers(dest="parameters_command", required=True)
@@ -409,13 +412,15 @@ def build_parser() -> argparse.ArgumentParser:
     legacy_prepare.add_argument("--aifactory-version")
     legacy_start = add_simple(legacy_sub, "start", cmd_legacy_start)
     add_receipt_and_yes(legacy_start)
-    legacy_start.add_argument("--wait", action="store_true")
+    legacy_start.add_argument("--wait", action="store_true",
+                              help="Wait for the local script to finish, not verified Azure deployment.")
     add_poll_args(legacy_start)
     legacy_status = add_simple(legacy_sub, "status", cmd_legacy_status)
     legacy_status.add_argument("--folder", required=True)
     legacy_status.add_argument("--job-id", required=True)
     legacy_status.add_argument("--cursor", type=int, default=0)
-    legacy_status.add_argument("--wait", action="store_true")
+    legacy_status.add_argument("--wait", action="store_true",
+                               help="Wait for the local script to finish, not verified Azure deployment.")
     add_poll_args(legacy_status)
 
     request = add_simple(sub, "request", cmd_request)
@@ -547,6 +552,7 @@ def _deletion_review(preview, folder):
                                   "Stages": describe_deletion_plan(plan)},
         "Exact resource manifest (delete / retain)": preview["deletion_targets"],
         "Retained Azure resources": preview["retained_resources"],
+        "Hub and reusable infrastructure retention policy": preview["deletion_retention_policy"],
         "Entra security groups preserved": preview["preserve_entra_groups"],
         "Saved configuration after successful deletion": (
             "Retained, as reported by the backend" if preview["retain_saved_configuration"]
@@ -1258,6 +1264,9 @@ def catalog_prepare_emit(args, body: dict[str, Any], operation: str) -> int:
     body = {k: v for k, v in body.items() if v is not None or
             (body.get("action") == "create-factory" and k == "initial_project")}
     result = client(args).catalog_prepare(body)
+    if result.get("can_execute") is True:
+        from .review import validate_project_selection
+        validate_project_selection(body, result)
     maybe_save_receipt(args, result, body, "catalog-confirm", operation=operation)
     return preview_emit(result)
 

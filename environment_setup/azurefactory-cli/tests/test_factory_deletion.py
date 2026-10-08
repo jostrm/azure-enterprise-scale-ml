@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import io
 import json
 import subprocess
@@ -39,6 +40,16 @@ ORDER = ["foundry-capability-hosts", "target-project-search-shared-private-links
          "service-managed-lifecycle", "project-resources", "project-network"]
 
 
+def retention_policy():
+    return {
+        "mode": "preserve-reusable-infrastructure",
+        "required_execution_contract": "ordered-project-pipelines-v1",
+        "execution_scope": "whole-resource-groups",
+        "selective_retention_supported": False,
+        "limitations": ["Protected resources inside a deletable group block preparation."],
+    }
+
+
 def deletion_plan():
     identity = {"factory_id": FACTORY, "scale_set_id": SCALE, "environment": "dev",
                 "subscription_id": SUBSCRIPTION, "tenant_id": TENANT, "run_id": JOB}
@@ -53,14 +64,15 @@ def deletion_plan():
               "resource_group_id": GROUP, "delete": [GROUP, RESOURCE], "depends_on": [project["id"]]}
     plan = {"contract": "ordered-project-pipelines-v1", "factory_id": FACTORY,
             "source_commit": "b" * 40, "policy": "all-projects-before-common",
+            "retention_policy": retention_policy(),
             "stages": [project, common], "protected_resources": [HUB], "retained_resources": []}
-    plan["plan_hash"] = canonical_json_hash(plan)
-    return plan
+    return rehash(plan)
 
 
 def rehash(plan):
-    plan.pop("plan_hash", None)
-    plan["plan_hash"] = canonical_json_hash(plan)
+    unsigned = {key: value for key, value in plan.items() if key != "plan_hash"}
+    encoded = (json.dumps(unsigned, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n").encode("utf-8")
+    plan["plan_hash"] = hashlib.sha256(encoded).hexdigest()
     return plan
 
 
@@ -98,6 +110,7 @@ def preview():
         "preserve_entra_groups": True, "retain_saved_configuration": False,
         "retained_resources": [HUB], "preview_hash": "c" * 64, "confirmation_phrase": PHRASE,
         "deletion_plan": plan,
+        "deletion_retention_policy": retention_policy(),
     }
 
 
@@ -205,8 +218,36 @@ def test_unsafe_or_legacy_deletion_plan_is_rejected_before_confirmation(tmp_path
             project["scale_set_id"] = "88888888-8888-4888-8888-888888888888"
         elif defect == "lifecycle":
             project["lifecycle_order"] = ORDER[::-1]
-        plan.pop("plan_hash")
-        plan["plan_hash"] = canonical_json_hash(plan)
+        rehash(plan)
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+    assert len(transport.records) == 1
+
+
+@pytest.mark.parametrize("encoding", ["api", "compact", "missing-newline", "ascii", "four-spaces"])
+def test_deletion_plan_hash_uses_only_api_catalog_storage_format(tmp_path, transport, encoding):
+    p = transport.preview
+    p["deletion_retention_policy"]["limitations"].append("Préserver l’infrastructure réutilisable.")
+    plan = p["deletion_plan"]
+    plan["retention_policy"] = copy.deepcopy(p["deletion_retention_policy"])
+    rehash(plan)
+    unsigned = {key: value for key, value in plan.items() if key != "plan_hash"}
+    if encoding == "compact":
+        plan["plan_hash"] = canonical_json_hash(unsigned)
+    elif encoding != "api":
+        encoded = json.dumps(unsigned, ensure_ascii=encoding == "ascii", sort_keys=True,
+                             indent=4 if encoding == "four-spaces" else 2, allow_nan=False)
+        if encoding != "missing-newline":
+            encoded += "\n"
+        plan["plan_hash"] = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    assert prepare(tmp_path) == (0 if encoding == "api" else 2)
+    assert (tmp_path / "receipt.json").exists() is (encoding == "api")
+    assert len(transport.records) == 1
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
+def test_deletion_plan_hash_rejects_nonfinite_json_numbers(tmp_path, transport, value):
+    transport.preview["deletion_plan"]["future_number"] = value
     assert prepare(tmp_path) == 2
     assert not (tmp_path / "receipt.json").exists()
     assert len(transport.records) == 1
@@ -350,15 +391,89 @@ def test_incomplete_or_broadened_manifest_fails_closed(tmp_path, transport, chan
     assert not (tmp_path / "receipt.json").exists()
 
 
-def test_retained_group_with_deleted_child_is_rendered_and_bound(tmp_path, transport, capsys):
+def test_retained_group_with_deleted_child_is_blocked_without_selective_runtime(tmp_path, transport):
     p = transport.preview
     p["deletion_targets"][0].update(delete=[RESOURCE], retain=[GROUP])
     p["retained_resources"] = [GROUP, HUB]
     p["inventory"] = [item for item in p["inventory"] if item["resource_id"] != GROUP]
     p["deletion_plan"]["stages"][1]["delete"] = [RESOURCE]
     rehash(p["deletion_plan"])
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+
+
+@pytest.mark.parametrize("change", [
+    "absent", "null", "mode", "contract", "scope", "selective", "boolean",
+    "limitations", "missing-plan", "mismatched-plan", "mismatched-contract",
+    "plan-boolean",
+])
+def test_unproven_retention_policy_never_becomes_an_approval(tmp_path, transport, change):
+    p = transport.preview
+    policy = p["deletion_retention_policy"]
+    if change == "absent":
+        del p["deletion_retention_policy"]
+    elif change == "null":
+        p["deletion_retention_policy"] = None
+    elif change == "mode":
+        policy["mode"] = "delete-hub"
+    elif change == "contract":
+        policy["required_execution_contract"] = "unknown"
+    elif change == "scope":
+        policy["execution_scope"] = "individual-resources"
+    elif change == "selective":
+        policy["selective_retention_supported"] = True
+    elif change == "boolean":
+        policy["selective_retention_supported"] = 0
+    elif change == "limitations":
+        policy["limitations"] = []
+    elif change == "missing-plan":
+        del p["deletion_plan"]
+    elif change == "mismatched-plan":
+        p["deletion_plan"]["retention_policy"]["mode"] = "delete-hub"
+    elif change == "plan-boolean":
+        p["deletion_plan"]["retention_policy"]["selective_retention_supported"] = 0
+        rehash(p["deletion_plan"])
+    else:
+        p["deletion_plan"]["contract"] = "unknown"
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+    assert len(transport.records) == 1
+
+
+def test_retention_limitations_are_rendered_and_receipt_bound(tmp_path, transport, capsys):
     assert prepare(tmp_path) == 0
-    assert '"retain": [' in capsys.readouterr().err
+    output = capsys.readouterr()
+    assert "whole-resource-groups" in output.err
+    assert "Protected resources inside" in output.err
+    receipt = json.loads((tmp_path / "receipt.json").read_text())
+    assert receipt["preview"]["deletion_retention_policy"] == retention_policy()
+
+
+def test_external_hub_retention_comes_from_frozen_plan(tmp_path, transport, capsys):
+    hub = f"/subscriptions/{SUBSCRIPTION}/resourceGroups/shared-hub"
+    transport.preview["deletion_plan"]["protected_resources"] = [hub]
+    transport.preview["retained_resources"] = [hub]
+    rehash(transport.preview["deletion_plan"])
+    assert prepare(tmp_path) == 0
+    assert hub in capsys.readouterr().err
+
+
+def test_external_retained_resource_is_bound_with_protected_resources(tmp_path, transport, capsys):
+    retained = f"/subscriptions/{SUBSCRIPTION}/resourceGroups/reusable-platform"
+    transport.preview["deletion_plan"]["retained_resources"] = [retained]
+    transport.preview["retained_resources"].append(retained)
+    rehash(transport.preview["deletion_plan"])
+    assert prepare(tmp_path) == 0
+    assert retained in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("field", ["protected_resources", "retained_resources"])
+def test_plan_retention_cannot_hide_under_a_deleted_group(tmp_path, transport, field):
+    transport.preview["deletion_plan"][field] = [RESOURCE]
+    transport.preview["retained_resources"] = [RESOURCE] if field == "protected_resources" else [HUB, RESOURCE]
+    rehash(transport.preview["deletion_plan"])
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
 
 
 def test_saved_configuration_handling_is_backend_sourced(tmp_path, transport, capsys):

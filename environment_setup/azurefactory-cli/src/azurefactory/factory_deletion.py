@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from typing import Any
 from uuid import UUID
@@ -27,16 +29,22 @@ def _contains(parent: str, child: str) -> bool:
 def validate_deletion_plan(plan: Any, factory_id: str, scales: dict[str, Any], factory: dict[str, Any],
                            targets: list[dict[str, Any]]) -> dict[str, Any]:
     """Client-side recheck of the server's hashed ordered pipeline plan; never a local deletion plan."""
-    from .client import canonical_json_hash
-
     def invalid(reason):
         raise ConfigError("Unsafe or incompatible factory deletion plan: " + reason
                           + ". Project teardown must use the reviewed GHA/ADO pipelines; no local fallback is allowed.")
 
-    if (not isinstance(plan, dict) or plan.get("contract") != PLAN_CONTRACT
+    if not isinstance(plan, dict):
+        invalid("missing ordered-project-pipelines-v1 plan")
+    try:
+        # The API's catalog_storage.digest uses indented UTF-8 JSON plus a newline, not receipt hashing.
+        encoded = (json.dumps({key: value for key, value in plan.items() if key != "plan_hash"},
+                              ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n").encode("utf-8")
+    except (TypeError, ValueError, UnicodeError):
+        invalid("the ordered pipeline plan is not strict UTF-8 JSON")
+    if (plan.get("contract") != PLAN_CONTRACT
             or plan.get("factory_id") != factory_id or plan.get("policy") != "all-projects-before-common"
             or not _hash(plan.get("plan_hash"))
-            or canonical_json_hash({key: value for key, value in plan.items() if key != "plan_hash"}) != plan["plan_hash"]
+            or hashlib.sha256(encoded).hexdigest() != plan["plan_hash"]
             or not isinstance(plan.get("source_commit"), str) or not re.fullmatch(r"[0-9a-f]{40}", plan["source_commit"])):
         invalid("missing, legacy or modified ordered-project-pipelines-v1 plan")
     protected = plan.get("protected_resources")
@@ -134,6 +142,7 @@ def validate_request(request: Any) -> None:
 
 
 def validate_deletion_preview(request: dict[str, Any], preview: Any) -> None:
+    from .client import canonical_json_hash
     from .review import validate_preview
 
     def invalid(reason):
@@ -159,6 +168,18 @@ def validate_deletion_preview(request: dict[str, Any], preview: Any) -> None:
             or preview.get("preserve_entra_groups") is not True
             or preview.get("retain_saved_configuration") is not False):
         invalid("the backend did not prove whole-factory scope, Entra preservation and saved configuration handling")
+    policy = preview.get("deletion_retention_policy")
+    if (not isinstance(policy, dict) or policy.get("mode") != "preserve-reusable-infrastructure"
+            or policy.get("required_execution_contract") != PLAN_CONTRACT
+            or policy.get("execution_scope") != "whole-resource-groups"
+            or policy.get("selective_retention_supported") is not False
+            or not isinstance(policy.get("limitations"), list) or not policy["limitations"]
+            or any(not _text(item) for item in policy["limitations"])):
+        invalid("the API must explicitly acknowledge its whole-group retention policy and limitations")
+    plan = preview.get("deletion_plan")
+    if (not isinstance(plan, dict) or plan.get("contract") != PLAN_CONTRACT
+            or canonical_json_hash(plan.get("retention_policy")) != canonical_json_hash(policy)):
+        invalid("retention policy differs from the server execution plan")
     factory = preview.get("target")
     if (not isinstance(factory, dict) or factory.get("id") != request["factory_id"]
             or not _text(factory.get("key")) or not isinstance(factory.get("scale_sets"), list)
@@ -221,16 +242,35 @@ def validate_deletion_preview(request: dict[str, Any], preview: Any) -> None:
         if (members["delete"] & members["retain"]
                 or (group.lower() in members["delete"] and members["retain"])):
             invalid("deleted and retained resources contradict each other")
+        if group.lower() not in members["delete"] or members["retain"]:
+            invalid("the acknowledged whole-group runtime cannot execute selective retention")
         deleted.update(members["delete"])
         retained.update(members["retain"])
     if covered != set(scales):
         invalid("the manifest does not cover every scale set of the whole factory")
     plan = validate_deletion_plan(preview.get("deletion_plan"), request["factory_id"], scales, factory, targets)
+    for field in ("protected_resources", "retained_resources"):
+        entries = plan.get(field)
+        if not isinstance(entries, list):
+            invalid("missing frozen plan retention manifest")
+        seen = set()
+        for entry in entries:
+            if (not _text(entry) or not re.fullmatch(
+                    r"/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[^/?#\\\x00-\x20]+"
+                    r"(?:/providers/[^?#\\\x00-\x20]+)?", entry)
+                    or any(part in (".", "..", "") for part in entry.split("/")[1:])
+                    or entry.lower() in seen):
+                invalid("invalid or duplicate frozen retained resource")
+            seen.add(entry.lower())
+        if retained & seen:
+            invalid("duplicate protected and retained resource entries")
+        retained.update(seen)
+    if any(keep == group or keep.startswith(group + "/") for group in groups for keep in retained):
+        invalid("retained infrastructure overlaps a group selected for cascading deletion")
     listed_retained = preview["retained_resources"]
-    protected = {item.lower() for item in plan["protected_resources"]}
     if (len({item.lower() for item in listed_retained}) != len(listed_retained)
-            or {item.lower() for item in listed_retained} != retained | protected):
-        invalid("retained resources differ from the exact target manifests and protected plan resources")
+            or {item.lower() for item in listed_retained} != retained):
+        invalid("retained resources differ from the exact target manifests and frozen plan resources")
     inventory = preview.get("inventory")
     if not isinstance(inventory, list) or any(
             not isinstance(item, dict) or not _text(item.get("resource_id")) for item in inventory):

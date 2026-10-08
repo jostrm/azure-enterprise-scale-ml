@@ -239,6 +239,34 @@ def test_cli_subprocess_help_and_json_health(server):
     assert json.loads(result.stdout)["status"] == "ok"
 
 
+@pytest.mark.parametrize("command", ["add", "add-placements"])
+def test_project_help_explains_server_owned_scale_selection(command, capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["project", command, "--help"])
+    assert exc.value.code == 0
+    output = capsys.readouterr().out
+    assert "latest-successful" in output
+    assert "server" in output.lower()
+
+
+@pytest.mark.parametrize("command", ["add", "add-placements"])
+def test_project_cli_rejects_unacknowledged_selection_without_confirming(server, command, capsys):
+    args = ["--api-url", server, "--api-key", "k", "project", command,
+            "--folder", "C:\\consumer\\azurefactory", "--factory-id", WORKFLOW_ID,
+            "--placement", "dev=latest-successful",
+            "--placement", f"stage={DRAFT_ID}"]
+    args += ["--number", "002"] if command == "add" else ["--project-id", CONFIRMATION_ID]
+    assert main(args) == 2
+    assert "Automatic placement" in capsys.readouterr().err
+    assert len(Handler.records) == 1
+    record = Handler.records[0]
+    assert record["route"] == "/api/v1/factory-catalog/prepare"
+    body = record["body"]
+    placements = body["project"]["placements"] if command == "add" else body["placements"]
+    assert placements == [{"environment": "dev", "scale_set_id": "latest-successful"},
+                          {"environment": "stage", "scale_set_id": DRAFT_ID}]
+
+
 @pytest.mark.parametrize("encoding,errors", [
     (None, None), ("utf-8", "strict"), ("cp1252", "strict"),
     ("ascii", "strict"), ("cp1252", "replace"), ("cp1252", "backslashreplace"),
@@ -536,7 +564,29 @@ def test_poll_submitted_is_terminal_not_deployed_success(server, capsys):
     code = main(["--api-url", server, "--api-key", "k", "legacy", "status", "--folder", "C:\\factory",
                  "--job-id", "job", "--wait", "--poll-timeout", "2", "--poll-interval", "0.01"])
     assert code == 0
-    assert json.loads(capsys.readouterr().out)["status"] == "submitted"
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "submitted"
+    assert result["execution_result"] == {
+        "contract_version": 1, "completion_scope": "local-script",
+        "local_terminal": True, "deployment_verified": False,
+    }
+    assert all(record["method"] == "GET" for record in Handler.records)
+
+
+def test_no_wait_running_is_not_deployment_success(server, capsys):
+    Handler.status_sequence = ["running"]
+    assert main(["--api-url", server, "--api-key", "k", "legacy", "status",
+                 "--folder", "C:\\factory", "--job-id", "job"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["execution_result"]["local_terminal"] is False
+    assert result["execution_result"]["deployment_verified"] is False
+
+
+def test_legacy_wait_help_names_the_completion_boundary(capsys):
+    with pytest.raises(SystemExit) as exited:
+        main(["legacy", "status", "--help"])
+    assert exited.value.code == 0
+    assert "local script" in capsys.readouterr().out
 
 
 def test_poll_failure_exit(server, capsys):

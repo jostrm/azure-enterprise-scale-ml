@@ -17,6 +17,7 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 
 from .errors import APIError, AuthError, ConfigError, FailureError, RedirectError, RequestTimeout
 from .monitoring_saved import SavedMonitoringClient
+from .operation_results import legacy_execution_result
 from .workflow_events import WorkflowRunEvent
 
 DEFAULT_API_URL = "http://127.0.0.1:8765"
@@ -432,6 +433,12 @@ class AzureFactoryClient(SavedMonitoringClient):
         ), "catalog parameters")
 
     def catalog_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Prepare once; the server owns defaults and project placement selection.
+
+        Project placements may explicitly request scale_set_id='latest-successful'
+        on supporting APIs. Review the resolved UUIDs before catalog_confirm.
+        No client-side selection, confirmation, fallback or retry is performed.
+        """
         if body.get("action") == "create-factory":
             schema = self.openapi()
             issues = registered_creation_issues(schema)
@@ -545,34 +552,43 @@ class AzureFactoryClient(SavedMonitoringClient):
                                         query={"folder": folder}), "workflow status")
 
     def project_deployments(self, folder: str) -> dict[str, Any]:
-        return self._object(self.request("GET", "/api/v1/operations/project-deployments", query={"folder": folder}), "project deployments")
+        result = self._object(self.request("GET", "/api/v1/operations/project-deployments", query={"folder": folder}), "project deployments")
+        if not isinstance(result.get("drafts"), list):
+            raise FailureError("Malformed legacy execution draft list.")
+        return {**result, "drafts": [self._legacy_object(item) for item in result["drafts"]]}
 
     def project_deployment_plan(self, body: dict[str, Any]) -> dict[str, Any]:
-        return self._object(self.request("POST", "/api/v1/operations/project-deployments/plan", body=body), "project deployment plan")
+        return self._legacy_object(self.request("POST", "/api/v1/operations/project-deployments/plan", body=body))
 
     def project_deployment_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
         return self._object(self.request("POST", "/api/v1/operations/project-deployments/prepare", body=body), "project deployment prepare")
 
     def project_deployment_start(self, folder: str, confirmation_id: str) -> dict[str, Any]:
-        return self._object(self.request(
+        """Submit once; the returned local job never proves provider deployment."""
+        return self._legacy_object(self.request(
             "POST",
             "/api/v1/operations/project-deployments/start",
             body={"folder": folder, "confirmation_id": confirmation_id},
-        ), "project deployment start")
+        ))
 
     def project_deployment_terminal(self, folder: str, job_id: str, cursor: int = 0) -> dict[str, Any]:
-        return self._object(self.request(
+        return self._legacy_object(self.request(
             "GET",
             "/api/v1/operations/project-deployments/terminal",
             query={"folder": folder, "job_id": job_id, "cursor": cursor},
-        ), "project deployment terminal")
+        ))
+
+    def _legacy_object(self, value: Any) -> dict[str, Any]:
+        result = legacy_execution_result(value)
+        return {**value, "execution_result": result}
 
     def review_catalog_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
         """Prepare only; caller must obtain explicit approval before confirm."""
         preview = self.catalog_prepare(body)
-        from .review import validate_preview
+        from .review import validate_preview, validate_project_selection
 
         validate_preview(preview)
+        validate_project_selection(body, preview)
         return preview
 
     def _object(self, value: Any, context: str) -> dict[str, Any]:

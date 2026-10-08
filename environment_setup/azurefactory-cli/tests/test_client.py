@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from azurefactory import APIError, AuthError, AzureFactoryClient, ConfigError, RedirectError
+from azurefactory import APIError, AuthError, AzureFactoryClient, ConfigError, FailureError, RedirectError
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -165,6 +165,40 @@ def test_factory_create_sdk_blocks_stale_api_without_preparing(server):
     assert [record["path"] for record in Handler.records] == ["/openapi.json"]
 
 
+@pytest.mark.parametrize("action", ["add-project", "add-project-placements"])
+def test_project_selection_is_forwarded_once_without_client_side_resolution(server, action):
+    placement = {"environment": "dev", "scale_set_id": "latest-successful"}
+    body = {"contract_version": 1, "folder": "C:\\consumer\\azurefactory",
+            "factory_id": "11111111-1111-4111-8111-111111111111", "action": action}
+    if action == "add-project":
+        body["project"] = {"number": "002", "placements": [placement]}
+    else:
+        body.update(project_id="22222222-2222-4222-8222-222222222222", placements=[placement])
+    expected = json.loads(json.dumps(body))
+    response = {"can_execute": False, "blockers": ["No eligible recorded success."]}
+    Handler.responses[("POST", "/api/v1/factory-catalog/prepare")] = (200, response, {})
+    assert AzureFactoryClient(server, "test-key").catalog_prepare(body) == response
+    assert body == expected
+    assert Handler.records == [{
+        "method": "POST", "path": "/api/v1/factory-catalog/prepare",
+        "key": "test-key", "body": expected,
+    }]
+
+
+def test_project_selection_unsupported_api_does_not_fallback_or_retry(server):
+    Handler.responses[("POST", "/api/v1/factory-catalog/prepare")] = (
+        422, {"detail": "scale_set_id must be a UUID"}, {},
+    )
+    body = {"contract_version": 1, "folder": "C:\\consumer\\azurefactory",
+            "factory_id": "11111111-1111-4111-8111-111111111111", "action": "add-project",
+            "project": {"number": "002", "placements": [
+                {"environment": "dev", "scale_set_id": "latest-successful"}]}}
+    with pytest.raises(APIError) as exc:
+        AzureFactoryClient(server, "test-key").catalog_prepare(body)
+    assert exc.value.status == 422
+    assert len(Handler.records) == 1 and Handler.records[0]["body"] == body
+
+
 @pytest.mark.parametrize("supported", [True, False])
 def test_factory_create_sdk_region_short_name_is_explicit_and_capability_checked(server, supported):
     properties = {"initial_project": {}}
@@ -235,3 +269,34 @@ def test_monitoring_csv_is_accepted_only_at_exact_export_route(server):
     Handler.responses[("POST", "/api/v1/monitoring/export")] = (200, {"wrong": "json"}, {})
     with pytest.raises(APIError, match="text/csv"):
         AzureFactoryClient(server, "k").monitoring_export(body)
+
+
+@pytest.mark.parametrize("method,endpoint,invoke,response", [
+    ("GET", "/api/v1/operations/project-deployments?folder=demo",
+     lambda client: client.project_deployments("demo"), {"drafts": [{"status": "draft"}]}),
+    ("POST", "/api/v1/operations/project-deployments/plan",
+     lambda client: client.project_deployment_plan({"folder": "demo"}), {"status": "draft"}),
+    ("POST", "/api/v1/operations/project-deployments/start",
+     lambda client: client.project_deployment_start("demo", "confirmation"), {"status": "queued"}),
+    ("GET", "/api/v1/operations/project-deployments/terminal?folder=demo&job_id=job&cursor=0",
+     lambda client: client.project_deployment_terminal("demo", "job"), {"status": "submitted"}),
+])
+def test_legacy_sdk_exposes_conservative_result_for_older_api(server, method, endpoint, invoke, response):
+    Handler.responses[(method, endpoint)] = (200, response, {})
+    result = invoke(AzureFactoryClient(server, "k"))
+    item = result["drafts"][0] if "drafts" in result else result
+    assert item["execution_result"]["deployment_verified"] is False
+    assert item["execution_result"]["completion_scope"] == "local-script"
+    assert len(Handler.records) == 1
+
+
+def test_legacy_start_invalid_result_does_not_retry_submission(server):
+    Handler.responses[("POST", "/api/v1/operations/project-deployments/start")] = (200, {
+        "status": "submitted", "execution_result": {
+            "contract_version": 1, "completion_scope": "local-script",
+            "local_terminal": True, "deployment_verified": True,
+        },
+    }, {})
+    with pytest.raises(FailureError, match="legacy execution"):
+        AzureFactoryClient(server, "k").project_deployment_start("demo", "confirmation")
+    assert len(Handler.records) == 1
