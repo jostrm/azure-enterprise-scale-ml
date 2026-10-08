@@ -2481,11 +2481,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">360</td>
+<td style="text-align: right;">366</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">360</td>
+<td style="text-align: right;">366</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2501,15 +2501,15 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">364</td>
+<td style="text-align: right;">370</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 135, 384; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 136, 385; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 386, 410; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 135, 390; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 136, 391; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 392, 416; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -2569,10 +2569,10 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter yaml:addAIFactoryMCP2AIGatewaySKU --><!-- parameter json.dev:addAIFactoryMCP2AIGatewaySKU --><code>addAIFactoryMCP2AIGatewaySKU</code></td>
-<td>No verified binding</td>
+<td><code>ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU</code></td>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Register the AI Factory MCP as a tool server on the AI Gateway SKU keep-as-is: Requires enableAIFactoryMCP:'true' and enableAIGatewaySKU:'true'.</td>
+<td>Register the AI Factory MCP as a tool server on the AI Gateway SKU keep-as-is: Requires enableAIFactoryMCP:'true', enableAIGatewaySKU:'true' and aiGatewaySkuOutboundSubnetId (or an adopted gateway with outbound VNet integration).</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:addAIFoundry --><!-- parameter json.dev:addAIFoundry --><code>addAIFoundry</code></td>
@@ -2807,10 +2807,10 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableAIFactoryMCP --><!-- parameter json.dev:enableAIFactoryMCP --><code>enableAIFactoryMCP</code></td>
-<td>No verified binding</td>
+<td><code>ENABLE_AI_FACTORY_MCP</code></td>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Host the governed AI Factory MCP in project001 Dev keep-as-is: Requires enableContainerApps:'true'. false never deletes an existing MCP.</td>
+<td>Host the governed AI Factory MCP in project001 Dev keep-as-is: Requires enableContainerApps:'true' and enableAIFoundry:'true' plus aifactoryMcpImage, aifactoryMcpApiImage and aifactoryMcpEntraAppId. false never deletes an existing MCP.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableAIFoundry --><!-- parameter json.dev:enableAIFoundry --><code>enableAIFoundry</code></td>
@@ -2828,7 +2828,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableAIGatewaySKU --><!-- parameter json.dev:enableAIGatewaySKU --><code>enableAIGatewaySKU</code></td>
-<td>No verified binding</td>
+<td><code>ENABLE_AI_GATEWAY_SKU</code></td>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
 <td>Initialize the new Azure AI Gateway SKU (ai.gateway.azure.com) with the project001 Dev Foundry keep-as-is: Requires enableAIFoundry:'true'. false never deletes an existing gateway.</td>
@@ -3289,6 +3289,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Semantic search tier mandatory: Semantic search tier</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:aiGatewaySkuResourceId --><!-- parameter json.dev:aiGatewaySkuResourceId --><code>aiGatewaySkuResourceId</code></td>
+<td><code>AI_GATEWAY_SKU_RESOURCE_ID</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Resource ID of an existing AI Gateway SKU to adopt (never modified) keep-as-is: Empty creates an owned gateway in the project resource group.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:aiSearchLocation --><!-- parameter json.dev:aiSearchLocation --><code>aiSearchLocation</code></td>
 <td><code>AI_SEARCH_LOCATION</code></td>
 <td>O</td>
@@ -3301,6 +3308,34 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>""</code><br>J.dev: <code>""</code></td>
 <td>Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aifactoryMcpApiImage --><!-- parameter json.dev:aifactoryMcpApiImage --><code>aifactoryMcpApiImage</code></td>
+<td><code>AIFACTORY_MCP_API_IMAGE</code></td>
+<td>C</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Digest-pinned Factory API sidecar image mandatory: if enableAIFactoryMCP:'true'. Same format as aifactoryMcpImage.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aifactoryMcpContainerAppsEnvironment --><!-- parameter json.dev:aifactoryMcpContainerAppsEnvironment --><code>aifactoryMcpContainerAppsEnvironment</code></td>
+<td><code>AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Name of the internal project Container Apps environment hosting the MCP keep-as-is: Empty selects the single environment in the project resource group.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aifactoryMcpEntraAppId --><!-- parameter json.dev:aifactoryMcpEntraAppId --><code>aifactoryMcpEntraAppId</code></td>
+<td><code>AIFACTORY_MCP_ENTRA_APP_ID</code></td>
+<td>C</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Client ID (GUID) of the MCP API app registration exposing app role AiFactory.Mcp.Read mandatory: if enableAIFactoryMCP:'true'. Created once by an Entra admin; pipelines never write Microsoft Graph.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aifactoryMcpImage --><!-- parameter json.dev:aifactoryMcpImage --><code>aifactoryMcpImage</code></td>
+<td><code>AIFACTORY_MCP_IMAGE</code></td>
+<td>C</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Digest-pinned AI Factory MCP image mandatory: if enableAIFactoryMCP:'true'. Format</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:aifactory_branch_chosen --><!-- parameter json.dev:aifactory_branch_chosen --><code>aifactory_branch_chosen</code></td>
@@ -3686,6 +3721,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>""</code><br>J.dev: <code>""</code></td>
 <td>ACR IP allowlist otherwise: provide comma-separated IPv4 addresses if ACR network restrictions are needed.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aiGatewaySkuOutboundSubnetId --><!-- parameter json.dev:aiGatewaySkuOutboundSubnetId --><code>aiGatewaySkuOutboundSubnetId</code></td>
+<td><code>AI_GATEWAY_SKU_OUTBOUND_SUBNET_ID</code></td>
+<td>C</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Subnet ID for AI Gateway outbound VNet integration mandatory: if addAIFactoryMCP2AIGatewaySKU:'true' with a new gateway. Delegated to Microsoft.Web/serverFarms, /27 or larger.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:allowPublicAccessWhenBehindVnet --><!-- parameter json.dev:allowPublicAccessWhenBehindVnet --><code>allowPublicAccessWhenBehindVnet</code></td>
@@ -5286,6 +5328,34 @@ reported, not silently represented as multiple settings.</p>
 <td>Region short name mandatory: Region short name</td>
 </tr>
 <tr>
+<td><!-- parameter env:AIFACTORY_MCP_API_IMAGE --><code>AIFACTORY_MCP_API_IMAGE</code></td>
+<td><code>aifactoryMcpApiImage</code></td>
+<td>C</td>
+<td><code>""</code></td>
+<td>Digest-pinned Factory API sidecar image mandatory: if ENABLE_AI_FACTORY_MCP:'true'.</td>
+</tr>
+<tr>
+<td><!-- parameter env:AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT --><code>AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT</code></td>
+<td><code>aifactoryMcpContainerAppsEnvironment</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>Name of the internal project Container Apps environment hosting the MCP keep-as-is: Empty selects the single environment in the project resource group.</td>
+</tr>
+<tr>
+<td><!-- parameter env:AIFACTORY_MCP_ENTRA_APP_ID --><code>AIFACTORY_MCP_ENTRA_APP_ID</code></td>
+<td><code>aifactoryMcpEntraAppId</code></td>
+<td>C</td>
+<td><code>""</code></td>
+<td>Client ID (GUID) of the MCP API app registration exposing app role AiFactory.Mcp.Read mandatory: if ENABLE_AI_FACTORY_MCP:'true'. Created once by an Entra admin; pipelines never write Microsoft Graph.</td>
+</tr>
+<tr>
+<td><!-- parameter env:AIFACTORY_MCP_IMAGE --><code>AIFACTORY_MCP_IMAGE</code></td>
+<td><code>aifactoryMcpImage</code></td>
+<td>C</td>
+<td><code>""</code></td>
+<td>Digest-pinned AI Factory MCP image mandatory: if ENABLE_AI_FACTORY_MCP:'true'. Format</td>
+</tr>
+<tr>
 <td><!-- parameter env:AIFACTORY_PREFIX --><code>AIFACTORY_PREFIX</code></td>
 <td><code>admin_aifactoryPrefixRG</code></td>
 <td>O</td>
@@ -5361,6 +5431,13 @@ reported, not silently represented as multiple settings.</p>
 <td>M</td>
 <td><code>"free"</code></td>
 <td>Semantic search tier mandatory: Semantic search tier</td>
+</tr>
+<tr>
+<td><!-- parameter env:AI_GATEWAY_SKU_RESOURCE_ID --><code>AI_GATEWAY_SKU_RESOURCE_ID</code></td>
+<td><code>aiGatewaySkuResourceId</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>Resource ID of an existing AI Gateway SKU to adopt (never modified) keep-as-is: Empty creates an owned gateway in the project resource group.</td>
 </tr>
 <tr>
 <td><!-- parameter env:AI_SEARCH_LOCATION --><code>AI_SEARCH_LOCATION</code></td>
@@ -5735,10 +5812,10 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter env:ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU --><code>ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU</code></td>
-<td>No verified counterpart</td>
+<td><code>addAIFactoryMCP2AIGatewaySKU</code></td>
 <td>O</td>
 <td><code>"false"</code></td>
-<td>addAIFactoryMCP2AIGatewaySKU: register the AI Factory MCP as a tool server on the AI Gateway SKU keep-as-is: Requires ENABLE_AI_FACTORY_MCP:'true' and ENABLE_AI_GATEWAY_SKU:'true'.</td>
+<td>addAIFactoryMCP2AIGatewaySKU: register the AI Factory MCP as a tool server on the AI Gateway SKU keep-as-is: Requires ENABLE_AI_FACTORY_MCP:'true', ENABLE_AI_GATEWAY_SKU:'true' and AI_GATEWAY_SKU_OUTBOUND_SUBNET_ID (or an adopted gateway with outbound VNet integration).</td>
 </tr>
 <tr>
 <td><!-- parameter env:ADD_AI_FOUNDRY --><code>ADD_AI_FOUNDRY</code></td>
@@ -5973,10 +6050,10 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_AI_FACTORY_MCP --><code>ENABLE_AI_FACTORY_MCP</code></td>
-<td>No verified counterpart</td>
+<td><code>enableAIFactoryMCP</code></td>
 <td>O</td>
 <td><code>"false"</code></td>
-<td>enableAIFactoryMCP: host the governed AI Factory MCP in project001 Dev keep-as-is: Requires ENABLE_CONTAINER_APPS:'true'. false never deletes an existing MCP.</td>
+<td>enableAIFactoryMCP: host the governed AI Factory MCP in project001 Dev keep-as-is: Requires ENABLE_CONTAINER_APPS:'true' and ENABLE_AI_FOUNDRY:'true' plus AIFACTORY_MCP_IMAGE, AIFACTORY_MCP_API_IMAGE and AIFACTORY_MCP_ENTRA_APP_ID. false never deletes an existing MCP.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_AI_FOUNDRY --><code>ENABLE_AI_FOUNDRY</code></td>
@@ -5994,7 +6071,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_AI_GATEWAY_SKU --><code>ENABLE_AI_GATEWAY_SKU</code></td>
-<td>No verified counterpart</td>
+<td><code>enableAIGatewaySKU</code></td>
 <td>O</td>
 <td><code>"false"</code></td>
 <td>enableAIGatewaySKU: initialize the new Azure AI Gateway SKU (ai.gateway.azure.com) with the project001 Dev Foundry keep-as-is: Requires ENABLE_AI_FOUNDRY:'true'. false never deletes an existing gateway.</td>
@@ -6334,6 +6411,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>""</code></td>
 <td>ACR IP allowlist for selected networks keep-as-is: comma-separated approved IPv4 addresses/ranges for ACR.</td>
+</tr>
+<tr>
+<td><!-- parameter env:AI_GATEWAY_SKU_OUTBOUND_SUBNET_ID --><code>AI_GATEWAY_SKU_OUTBOUND_SUBNET_ID</code></td>
+<td><code>aiGatewaySkuOutboundSubnetId</code></td>
+<td>C</td>
+<td><code>""</code></td>
+<td>Subnet ID for AI Gateway outbound VNet integration mandatory: if ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU:'true' with a new gateway. Delegated to Microsoft.Web/serverFarms, /27 or larger.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET --><code>ALLOW_PUBLIC_ACCESS_WHEN_BEHINDVNET</code></td>
