@@ -206,6 +206,32 @@ DESCRIPTIONS = {
     "SCALING_MODE": "Address-planning preset: own-subscriptions or shared-subscriptions; no subscription provisioning, network resizing, or peering.",
 }
 
+for names, text in (
+    (("enableAIFoundry", "ENABLE_AI_FOUNDRY"),
+     "Enable the current Foundry account/project path for the selected architecture. Check private-agent dependencies, model availability and the installed runtime; this setting is not a blanket GA or deployment-readiness claim."),
+    (("enableAFoundryCaphost", "ENABLE_FOUNDRY_CAPHOST"),
+     "Enable the capability host for the selected standard private-agent architecture with its required Storage, Search and Cosmos DB dependencies. Other Foundry paths can have different requirements."),
+    (("enableAIFactoryMCP", "ENABLE_AI_FACTORY_MCP"),
+     "Opt-in project001 Dev Factory MCP hosting through the matching project pipeline. Requires Foundry, Container Apps, approved image digests and an Entra application. False skips the step; it does not delete existing resources."),
+    (("enableAIGatewaySKU", "ENABLE_AI_GATEWAY_SKU"),
+     "Opt-in project001 Dev dedicated AI Gateway create/adopt integration. Requires Foundry and the component prerequisites. Not the regular APIM/Kong route. False skips the step; it does not delete existing resources."),
+    (("addAIFactoryMCP2AIGatewaySKU", "ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU"),
+     "Opt-in project001 Dev registration of the Factory MCP tool server on the AI Gateway. Requires both components, private outbound reachability and administrator-granted access. False skips registration; it does not delete existing resources."),
+    (("enableDeleteForDisabledResources", "ENABLE_DELETE_FOR_DISABLED_RESOURCES"),
+     "Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval."),
+    (("deleteAllServicesForProject", "DELETE_ALL_SERVICES_FOR_PROJECT"),
+     "Destructive project-service selection for a supported deletion run; review exact resources, dependencies and retention before execution."),
+    (("deleteKeyvaultAlso", "DELETE_KEYVAULT_ALSO"),
+     "Include Key Vault only in the applicable reviewed deletion path. Not purge permission; Azure retention and other resource-group controls still apply."),
+    (("deleteAllForProject", "DELETE_ALL_FOR_PROJECT"),
+     "Destructive whole-project selection for the supported pipeline path. Review scope and shared dependencies; not a general bypass for blocked registered deletion."),
+    (("apimGatewaySku", "APIM_GATEWAY_SKU"),
+     "SKU for the regular APIM pool/policy route, distinct from the dedicated AIGateway component. Check current Azure SKU, network and circuit-breaker support before deployment; this route does not support Consumption circuit breakers."),
+    (("apimGatewaySkuCapacity", "APIM_GATEWAY_SKU_CAPACITY"),
+     "Requested capacity for the selected regular APIM SKU. Validate current SKU limits and measured needs; the template value is not a capacity reservation."),
+):
+    DESCRIPTIONS.update(dict.fromkeys(names, text))
+
 
 def description(key, entry):
     comment = entry.get("comment", "")

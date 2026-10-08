@@ -1,82 +1,66 @@
-# IaC — BICEP
+# Bicep infrastructure
 
-All AI Factory infrastructure is defined in **Azure Bicep** — Microsoft's domain-specific language for declaring Azure resources. Bicep compiles to ARM JSON and is fully supported by Azure CLI.
+Bicep describes the Azure resources that the infrastructure pipelines deploy.
+AI Factory combines shared Bicep modules with configuration, planning, approval
+and operation tracking.
 
----
+## Recommended workflow
 
-## Why Bicep?
+1. Choose your registered factory, scale set and project.
+2. Review the supported [Parameters](../parameters/index.md).
+3. Save approved configuration.
+4. Prepare and separately approve deployment.
+5. Follow the exact run and its resulting Azure resources.
 
-- **Declarative Azure infrastructure** — compiled and deployed through Azure CLI and the selected pipeline.
-- **Modular** — each Azure service is a separate Bicep module, reused across project types.
-- **Auditable** — all deployments are logged in Azure Deployment history.
-- **Incremental** — Bicep deployments are idempotent; re-runs only update changed resources.
+Use the [CLI, Python SDK or REST walkthrough](../factory-tools/19-cli-and-api-and-usage.md).
+You do not need to edit shared Bicep for every configuration change.
 
----
+## Source organization
 
-## Repository Structure
+| Location under `environment_setup\aifactory\bicep` | Purpose |
+| --- | --- |
+| `esml-common` | Common infrastructure |
+| `esml-project` | Machine-learning project infrastructure |
+| `esml-genai-1` | Phased generative-AI project infrastructure |
+| `modules` | Reusable resource and access-control modules |
+| `copy_to_local_settings` | Provider templates copied into consumer repositories |
+| `scripts` | Validation, configuration translation and supporting operations |
 
-```
-environment_setup/aifactory/bicep/
-├── copy_to_local_settings/
-│   ├── azure-devops/
-│   │   └── esml-yaml-pipelines/variables/variables.yaml   # ADO parameters
-│   └── github-actions/
-│       └── .env.template                                  # GHA parameters
-└── modules/                                               # Bicep modules
-```
+The shared `variables.json` template currently has a `dev` section. A
+backend-generated registered project has `dev` and `stage_prod`; these are
+different formats. See [the parameter reference](../parameters/advanced.md#scope-and-authoritative-sources).
 
-The complete project JSON template is `environment_setup/aifactory/variables.json`.
-Its `dev` and `stage_prod` sections retain shared and environment-specific values.
-See [Configuration and API](../parameters/index.md) for input formats, validation,
-and the distinction between a preview and execution.
+## Existing resources and incremental updates
 
----
+A Bicep deployment can update existing resources, but "incremental" does not mean
+"nothing else can change." Inspect the plan, naming, dependencies and existing
+state. Some properties cannot be changed in place.
 
-## Key Modules
+!!! warning "Deletion is separate"
+    Disabling a flag is not a general deletion approval. Use the
+    [reviewed removal workflow](../factory-tools/20-cli-and-api-and-usage.md).
 
-| Module | Description |
-|---|---|
-| `aiFoundry.bicep` | AI Foundry Hub + project, private endpoints, RBAC |
-| `aiSearch.bicep` | AI Search with optional shared private link |
-| `networking.bicep` | VNet, subnets, NSGs, private DNS zones |
-| `keyvault.bicep` | Key Vault with soft-delete, RBAC, private endpoint |
-| `acr.bicep` | Azure Container Registry (Premium, private) |
-| `storage.bicep` | Storage accounts with ACLs and private endpoints |
-| `aks.bicep` | Private AKS cluster with Arc registration |
-| `containerApps.bicep` | Azure Container Apps environment |
-| `cosmosdb.bicep` | Cosmos DB with private endpoint |
+## Encryption and private networking
 
----
+Customer-managed encryption keys, private endpoints, DNS and role assignments
+are service-specific. Provide the supported key references and permissions and
+check compatibility for each enabled service. Do not assume a single switch
+enables every security feature everywhere.
 
-## Deployment Flow
+<details markdown="1">
+<summary>More info</summary>
 
-```
-Pipeline triggers
-      │
-      ▼
-Step 05: Build ACR image (if Container Apps)
-      │
-      ▼
-Steps 61–100: Bicep module deployments (parallel where possible)
-      │
-      ▼
-      Done ✓
-```
+Actual source modules include `aiSearch.bicep`, `keyVault.bicep`,
+`storageAccount.bicep` and `aksCluster.bicep`. Use the
+[module directory](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/modules)
+for the current names rather than guessed filenames.
 
-See [IaC Templates](../concepts/templates/iac.md) for the full list of pipeline steps.
+Published change `940b1b48` passes an existing AKS load-balancer subnet when
+attaching that cluster to Azure ML. It does not turn every AKS cluster into
+a supported/private inference target without its other prerequisites.
 
----
+Bootstrap also has reviewed supporting operations outside Bicep. Neither a
+successful compilation nor an accepted deployment request proves that all
+resources, permissions and private connectivity are working.
 
-## CMK Support
-
-Customer-Managed Keys (CMK) are supported for:
-
-- Key Vault (stores the CMK key)
-- Storage accounts
-- Azure Machine Learning workspaces
-- AI Foundry
-
-Enable via: `cmk=true`, `cmkKeyName=<your-key-name>`.
-
-!!! warning
-    CMK requires `acr_dedicated=true` and `acr_SKU=Premium`. Ensure the ACR container registry has been set up before enabling CMK.
+</details>

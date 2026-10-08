@@ -1,62 +1,66 @@
-# Enterprise Grade & Scale
+# Enterprise design and scale
 
-The AI Factory is designed for production enterprise workloads from day one — not retrofitted.
+AI Factory helps teams reuse common infrastructure while keeping project and
+environment choices explicit. The resulting design still needs your
+organization's security, network, reliability and cost review.
 
----
+## Scale by projects and scale sets
 
-## WAF Alignment
+An AI Factory scale set groups an environment, subscription and network setup.
+It is **not Azure VM Scale Sets**. A project selects where it runs through its
+Dev/Stage/Prod placements.
 
-Every architectural decision follows [Microsoft's Well-Architected Framework (WAF)](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas):
+There is no universal "200-300 projects per scale set" guarantee. Capacity
+depends on configured project limits, address ranges, existing subnets and
+service quotas. Add another scale set when the reviewed design requires it.
 
-| WAF Pillar | AI Factory Implementation |
-|---|---|
-| **Reliability** | Multi-environment isolation (Dev / Stage / Prod), retry settings, diagnostics |
-| **Security** | Private endpoints on all services, CMK support, Entra ID RBAC, Defender for AI |
-| **Cost Optimization** | Feature flags reduce cost in lower environments; shared ACR option |
-| **Operational Excellence** | Full IaC (Bicep), pipeline orchestration (ADO/GHA), diagnostic setting levels |
-| **Performance Efficiency** | AKS auto-scaling, AML cluster scaling, configurable SKUs per environment |
+## Environments and subscriptions
 
----
+| Choice | Meaning |
+| --- | --- |
+| Shared subscriptions | Environments can share subscriptions while retaining explicit identity and network targets. |
+| Own subscriptions | Use the selected subscriptions for the intended isolated targets. |
+| Existing enterprise network | Reuse approved hub, DNS and subnet arrangements through supported inputs. |
 
-## Scale Sets
+Register only the environments you need. Stage and Prod are not created simply
+because Dev exists, and a subscription reference does not create a subscription.
 
-The AI Factory uses a **scale set** concept to support organisations with many teams:
+## Review each design concern
 
-- Each scale set suffix (e.g. `-001`) represents one deployment of the common infrastructure.
-- Within a scale set, up to **200–300 AI Factory projects** can be created, each isolated by project number (`project_number_000`).
-- Multiple scale sets can be deployed for larger organisations.
+| Concern | What to check |
+| --- | --- |
+| Security | Identity, least privilege, data access, private connectivity and supported encryption options. |
+| Reliability | Dependencies, backup/recovery, regional service support and failure handling. |
+| Cost | Selected services, environment SKUs, model capacity and usage/cost reporting. |
+| Operations | Reviewed changes, exact run tracking, diagnostic settings and ownership. |
+| Performance | Workload needs, compute/service sizing, scaling limits and available capacity. |
 
----
+These align with [Well-Architected guidance](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas);
+they are not a blanket production or compliance certification.
 
-## Multi-environment Architecture
+## Plan network space before deployment
 
-Environments are deployed to separate Azure subscriptions (recommended) and share no network by default:
+Use aligned, non-overlapping ranges for selected environments, existing networks
+and VPN client pools. Address planning does not resize an existing VNet, move
+subnets or establish connectivity.
 
-```
-┌─────────────────────────────────────────────────────┐
-│  Subscription: DEV                                  │
-│  ┌─────────────────────────────────────────────┐   │
-│  │  AI Factory Common (vNet, shared services)  │   │
-│  │  ┌──────────────┐  ┌──────────────┐         │   │
-│  │  │  Project 001 │  │  Project 002 │  ...     │   │
-│  │  └──────────────┘  └──────────────┘         │   │
-│  └─────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────┐
-│  Subscription: STAGE                                │
-└─────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────┐
-│  Subscription: PROD                                 │
-└─────────────────────────────────────────────────────┘
-```
+The [Parameters checklist](../parameters/standard.md) and
+[platform automation guide](intelligence.md) explain the supported planning
+inputs. Private endpoints alone do not prove that a runner or user can reach a service.
 
----
+<details markdown="1">
+<summary>More info</summary>
 
-## Landing Zone Options
+The shared `/18` planning templates use environment selectors `0`, `64`, `128`;
+the own-subscription `/20` pattern uses `0`, `16`, `32`. Existing allocations,
+additional prefixes and provider requirements must still be checked.
+Do not copy older non-aligned examples as a deployment plan.
 
-| Mode | When to use |
-|---|---|
-| **Traditional Hub/Spoke** | Standard enterprise networking with a central hub VNet |
-| **VWAN Hub** | Azure Virtual WAN for global connectivity |
-| **Standalone** | Fully self-contained with its own VNet — ideal for PoC |
-| **Hybrid (public + private)** | Public access via VPN / IP whitelist / Bastion alongside private endpoints |
+Service/API availability varies across Azure regions, Government and Sovereign
+clouds. Validate the exact route and service set for the chosen cloud rather than
+assuming Azure Public Cloud examples apply unchanged.
+
+[Registered operations](../factory-tools/19-cli-and-api-and-usage.md) |
+[Shared template parameters](../parameters/advanced.md)
+
+</details>

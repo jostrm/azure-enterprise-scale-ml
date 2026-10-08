@@ -1,69 +1,62 @@
-# Automated Architectures
+# Choose an architecture
 
-The AI Factory currently provides two automated template architectures — **ESML** and **GenAI-1** — that are deployed as AI Factory projects inside your AI landing zones.
+AI Factory provides two main infrastructure families. Choose the workload first,
+then review the services, networking and environment you need.
 
----
+![AI Factory architectures](assets/images/10-two-architectures-v2.png)
 
-## Architecture Overview
+| Family | Choose it for | Typical building blocks |
+| --- | --- | --- |
+| **ESML** | Machine-learning training, batch scoring and online serving | Azure Machine Learning, data storage, Key Vault, monitoring and selected compute; optional Databricks, Data Factory or AKS. |
+| **GenAI-1** | Foundry agents, RAG and generative applications | Foundry, storage, Key Vault, monitoring and the selected private-agent dependencies, such as Search and Cosmos DB. |
 
-![AI Factory Architectures](assets/images/10-two-architectures-v2.png)
+Service switches and dependencies vary by route. Do not assume every possible
+GenAI project requires the same model or that all optional services are deployed.
+The older Foundry Hub flags are not the recommended current Foundry path.
 
-Each team in the AI Factory gets their own **floor**: an isolated project with either Architecture 1 (ESML) or Architecture 2 (GenAI-1), or both. Services can be turned ON/OFF at any time via feature flags without disrupting other projects.
+## Build on a shared foundation
 
----
+A factory can share common network and platform services while projects have
+their own resources and settings. A project can have explicit placements in Dev,
+Stage and Prod; configuration does not automatically provision all three.
 
-## Architecture 1 — ESML (Enterprise Scale Machine Learning)
+See [factory, scale-set and project concepts](concepts/index.md),
+[environment planning](concepts/enterprise-scale.md), and the
+[Parameters checklist](parameters/standard.md).
 
-Designed for **discriminative AI** workloads: model training, batch inference, and online scoring.
+!!! important "Plan changes before applying them"
+    Feature flags are inputs to reviewed deployment. They are not a guarantee
+    that existing resources remain untouched, or that disabled services are
+    deleted automatically.
 
-**Baseline services:**
-- Azure Machine Learning (private workspace)
-- Azure Container Registry (Premium, private)
-- Azure Storage (Data Lake)
-- Key Vault, Application Insights
-- Private networking (VNet, subnets, private endpoints)
+## Connect to your enterprise environment
 
-**Optional services:**
-- AKS (private cluster, Arc-enabled) for online scoring
-- Azure Data Factory for pipeline orchestration
-- Azure Databricks for large-scale feature engineering
-- Microsoft Fabric / OneLake integration
+Existing hub/spoke, central DNS and BYO network designs require the correct
+resource references, permissions, routes and private connectivity. A topology
+diagram is not a substitute for checking that setup.
 
----
+![Enterprise landing-zone context](assets/images/14-eslz-full-1.png)
 
-## Architecture 2 — GenAI-1 (Enterprise Scale GenAI)
+## Continue with your workload
 
-Designed for **generative AI** workloads: RAG, agentic pipelines, LLM-based applications.
+- [Agent and GenAIOps templates](concepts/templates/genaiops.md)
+- [ML Model Factory and MLOps](concepts/templates/mlops.md)
+- [DataOps and storage choices](concepts/templates/dataops.md)
+- [Create or update through CLI, SDK or REST](factory-tools/19-cli-and-api-and-usage.md)
 
-**Baseline services:**
-- AI Foundry Hub + default project (private)
-- AI Search (private, with shared private link support)
-- Azure OpenAI (via AI Foundry)
-- 2× Storage accounts, Key Vault, Application Insights, Monitoring dashboards
-- Private networking
+<details markdown="1">
+<summary>More info</summary>
 
-**Optional services (feature flags):**
-- Cosmos DB (required for AI Foundry Capacity Host)
-- Container Apps, Web App, Function App, AKS
-- Logic Apps, Event Hubs, APIM AI Gateway
-- Bing Grounding, Azure Vision, Speech, Content Safety, Document Intelligence
-- PostgreSQL, Redis Cache, Azure SQL
+Fabric/OneLake and other existing services can be integration targets, not
+automatic additions to every factory. Check the selected workload's documented
+storage and authentication contract.
 
----
+![ESML and Fabric integration concept](assets/images/11-services-highlevel-esml_fabric.png)
 
-## Enterprise Landing Zone Context
+Source families are
+[`esml-project`](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/esml-project)
+and [`esml-genai-1`](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/esml-genai-1),
+with shared common infrastructure. Template availability is not proof of
+capacity, regional service availability or a successful deployment.
 
-The AI Factory projects live inside **3 AI landing zones** (Dev, Stage, Prod), which can be connected to an existing enterprise network using:
-
-| Topology | Description |
-|---|---|
-| **Hub/Spoke** | Traditional hub VNet with peered spoke VNets per environment |
-| **VWAN Hub** | Azure Virtual WAN for global, managed connectivity |
-
-![ESLZ Full Diagram](assets/images/14-eslz-full-1.png)
-
----
-
-## ESML With Fabric Flavour
-
-![ESML Fabric flavour](assets/images/11-services-highlevel-esml_fabric.png)
+</details>

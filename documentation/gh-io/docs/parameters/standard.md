@@ -1,4 +1,4 @@
-# Parameters — Standard checklist
+# Parameters - required inputs
 
 Start with the inputs needed for your **selected route and environment**.
 This is a concise mandatory/conditional checklist, not the complete inventory
@@ -9,6 +9,22 @@ template key, bootstrap inputs and CLI/API options.
 **M** = mandatory in context; **C** = required only when its condition applies.
 Defaults can satisfy mandatory settings. Replace placeholders and verify
 permissions, service availability, quota, DNS and private network reachability.
+
+For the default registered approach, use the
+[CLI, Python SDK or REST tutorial](../factory-tools/18-cli-and-api-and-usage.md)
+to select the factory, scale set and project. Do not manually populate a generated
+register. The table below describes the underlying pipeline inputs; API field
+names can differ and must come from the selected host's schema.
+
+## Before editing
+
+| Decide first | Why it matters |
+| --- | --- |
+| New registered factory or an existing legacy consumer | The save and deployment routes differ. |
+| Dev, Stage or Prod | Only selected environments need their subscription, networking and provider setup. |
+| GitHub Actions or Azure DevOps | GitHub identity/environment variables and ADO service connections are not interchangeable. |
+| Which services and shared dependencies | Optional features can require other resources, permissions and extra cost. |
+| Settings change or actual deployment | Confirming settings does not start a deployment. |
 
 ## Scope, naming and project
 
@@ -70,13 +86,36 @@ own-hub intent unless central DNS is enabled, which takes precedence.
 Flags do not establish peering. Public-access flags do not govern GitHub
 repository visibility or guarantee private-only monitoring.
 
+## Optional Factory MCP and AI Gateway
+
+These inputs apply only when you intentionally enable the corresponding
+**project001 Dev** integration. They do not replace the general service inputs.
+
+| Input | Required when |
+| --- | --- |
+| `enableAIFactoryMCP` plus Foundry and Container Apps | Hosting the read-only Factory MCP. |
+| `aifactoryMcpImage`, `aifactoryMcpApiImage` | MCP hosting; supply approved digest-pinned images from the expected registry. |
+| `aifactoryMcpEntraAppId` | MCP hosting; an administrator prepares the app registration and required role. |
+| `enableAIGatewaySKU` plus Foundry | Creating/adopting the dedicated AI Gateway integration. |
+| `aiGatewaySkuResourceId` | Adopting an existing gateway rather than creating one. |
+| `addAIFactoryMCP2AIGatewaySKU` plus both components | Registering MCP on the gateway. |
+| `aiGatewaySkuOutboundSubnetId` | Registration with a new gateway; an adopted gateway must already have suitable outbound networking. |
+
+All three switches default to false. False skips the component action; it does
+not delete existing resources. See [full prerequisites and mappings](advanced.md#mcp-and-ai-gateway-parameters).
+Regular APIM, optional Kong and Application Gateway are different routes.
+
+<details markdown="1">
+<summary>Alternative and Legacy ways</summary>
+
 ## If using the create bootstrap instead
 
 Supply the route's public `AIF_*`, `GITHUB_REPOSITORY` or `ADO_*` inputs rather
 than assuming the generated `.env` is the input schema. The general create
 prompt currently defaults to `swedencentral` and accepts private networking
 only; this differs from the shared templates. Simple mode fixes additional
-settings and requires three private HTTPS gateway inputs.
+settings. The hostname/backend/certificate inputs are required only when its
+Application Gateway deployment is enabled.
 
 Follow the [bootstrap contract and full input tables](advanced.md#bash-create-and-update-contract).
 Before dispatch, review the exact factory/project/environment, resolved
@@ -87,3 +126,9 @@ For backend-generated Azure Factory v2 projects, the project's single
 retaining full configuration and separate subscription/SKU values. This differs
 from the raw shared consumer template's current `dev`-only shape; see
 [the two JSON contracts](advanced.md#scope-and-authoritative-sources).
+
+Legacy create defaults to `124`; update normally inherits its saved version.
+Choose `main` explicitly when adopting current development source. This does
+not migrate a legacy directory into a registered factory.
+
+</details>

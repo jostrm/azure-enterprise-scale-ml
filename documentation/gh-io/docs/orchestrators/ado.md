@@ -1,86 +1,83 @@
 # Azure DevOps
 
-Use the Azure DevOps consumer repository for this route; it is separate from a
-GitHub repository. Maintain one complete project `variables.json` with `dev` and
-`stage_prod`, or use ADO `variables.yaml`. See
-[configuration and API](../parameters/index.md) and [all variables](../parameters/advanced.md).
+Choose Azure DevOps when your team uses its repositories, pipelines and service
+connections. It is a provider choice, not a different Factory configuration model.
 
-## Create a new factory scale set
+## Start with a registered factory
 
-```bash
-bash ./ADO-create-new-aifactory-scaleset.sh --repo-root "C:/work/my-ado-factory"
-```
+Use the [CLI, Python SDK or REST guide](../factory-tools/19-cli-and-api-and-usage.md)
+to save configuration with the explicit `ado` orchestrator, review its binding and
+separately approve deployment or supported Full bootstrap.
 
-The source launcher is under `bootstrap/`; installed consumer copies may be at
-the repository root. Normal full bootstrap prepares Azure identity, configuration,
-repository/pipeline automation, common infrastructure and an initial project.
-It can create billable resources and publish repository changes.
+Selecting `ado` does not itself create a pipeline, authorize a service connection
+or deploy resources. A blocked registered operation is not permission to use a
+legacy launcher instead.
 
-Use `--help` for the selected version. `--aifactory-version main` is explicit;
-these create wrappers currently default to `main`. `--dry-run` collects and
-validates answers without running the normal bootstrap mutations.
-`--prepare-only` **does change Azure/identity/configuration**; it is not a preview.
-For unattended operation, provide the documented inputs and established
-authentication before using `--non-interactive --yes`.
+## Collect the right inputs
 
-## Update or run an existing project
+| Input | What to confirm |
+| --- | --- |
+| Azure tenant/subscription | The selected environment and deployment identity's permissions. |
+| ADO organization/project/repository | The actual source and pipeline location. |
+| ADO tenant | `azureDevOpsTenantId` can differ from Azure `tenantId`; do not change IDs merely to make them match. |
+| Service connections | Exact authorized names and permissions for each environment being deployed. |
+| Runner/pool | Supported OS, private connectivity and approved pool/image for the selected route. |
+| Version | Matching launcher, helpers, templates and API/runtime contracts. |
 
-From the selected ADO consumer repository:
+Scoped registered workers use the supported Linux execution contract. Other
+legacy paths can have different runner assumptions. Do not infer Azure login
+from an agent being online.
 
-```bash
-# Refresh AI Factory/templates, then run the selected project pipeline.
-bash ./ADO-update-aifactory-and-run-project.sh --aifactory-version main
+### Service-connection parameters
 
-# Preserve installed templates and run the project pipeline only.
-bash ./ADO-update-aifactory-and-run-project.sh --project-only
-```
-
-Normal update defaults to `main`; project-only uses the installed source.
-Scripts may prompt for configuration, commit/push or authentication. For API
-automation, use the project plan/prepare/start contract, which binds the selected
-project, environment, configuration and source version before execution.
-Default waiting tracks the submitted run; a submitted pipeline is not yet a
-verified deployed environment.
-
-## Tenant and service-connection setup
-
-`azureDevOpsTenantId` identifies the ADO organization tenant; `tenantId` identifies
-the Azure deployment tenant. Do not change either ID merely to make them equal.
-Cross-tenant reviewed execution needs the compatible organization-tenant
-authentication helper and access in both contexts. A standard username-prefixed
-ADO clone URL is not a reason to retarget the repository; never embed passwords
-or tokens in its URL.
-
-Configure service connections for each environment you actually deploy:
-
-| YAML/JSON variable | Purpose |
-|---|---|
+| JSON/YAML key | Purpose |
+| --- | --- |
 | `dev_service_connection` | Dev deployment |
-| `dev_seeding_kv_service_connection` | Dev seeding Key Vault access |
-| `test_service_connection` | Stage deployment |
-| `test_seeding_kv_service_connection` | Stage seeding Key Vault access |
-| `prod_service_connection` | Prod deployment |
-| `prod_seeding_kv_service_connection` | Prod seeding Key Vault access |
+| `dev_seeding_kv_service_connection` | Dev seeding-vault access |
+| `test_service_connection` / `test_seeding_kv_service_connection` | Stage, when selected |
+| `prod_service_connection` / `prod_seeding_kv_service_connection` | Prod, when selected |
 
-Connections must match the pipeline's authentication mode, subscription and
-permissions. The same authorized connection may cover compatible duties; six
-names do not necessarily require six distinct principals.
-Local execution also needs Git Bash, Azure CLI with the required ADO extension,
-and host Python.
+These names do not necessarily require separate principals for every duty, but
+every referenced connection must be authorized for its intended use.
+Secret-name references are not credential values.
 
-The source
-[`variables.yaml`](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/variables/variables.yaml)
-is copied to the consumer's
+## Follow the exact run
+
+Preserve the confirmation/job ID and the provider run details. Check the actual
+deployment result rather than treating HTTP acceptance or a local script exit
+as success. The CLI's `workflow status/watch` feature is GitHub-specific;
+use catalog job status and ADO's own run results for this provider.
+
+[Parameters](../parameters/index.md) |
+[Deployment/status tutorials](../factory-tools/19-cli-and-api-and-usage.md) |
+[Deletion and recovery](../factory-tools/20-cli-and-api-and-usage.md)
+
+<details markdown="1">
+<summary>Alternative and Legacy ways</summary>
+
+Existing legacy consumer repositories use the matching scripts installed at the
+consumer root:
+
+- `ADO-create-new-aifactory-scaleset.sh`: full creation flow, including potentially
+  billable Azure/identity/repository changes.
+- `ADO-update-aifactory-and-run-project.sh`: reviewed update/project execution.
+- `--project-only`: excludes the template/library update portion; not a version
+  upgrade or a blanket safety guarantee.
+- `--aifactory-env dev|stage|prod`: selects the project environment.
+
+Legacy create defaults to `124`; update normally inherits the saved version.
+Use an explicit supported version, including `main` for development, when
+intended. A version selection does not migrate layouts.
+`--prepare-only` can change Azure and configuration; it is not a read-only
+preview. Use the selected source's help and
+[complete input contract](../parameters/advanced.md#bash-create-and-update-contract).
+
+The source YAML is copied into
 `aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml`.
-Project JSON overrides must use the matching pipeline adapter; do not rename
-JSON keys to GitHub environment names.
+Project JSON overrides require the matching adapter; GitHub uppercase names
+are not a replacement for ADO keys.
 
-For registered exact-scope operations,
-`bootstrap/ADO-azurefactory.sh` consumes a trusted, protected reviewed manifest.
-It does not initialize the register or bypass provider publication, service
-connections, target-lock enrollment or approval.
+[Current ADO templates](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops) |
+[Setup overview](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/20-29/24-end-2-end-setup.md)
 
-!!! warning "Before execution"
-    Keep launchers, helpers and YAML templates on a compatible published version.
-    Protect populated project configuration and credentials. Run-specific secret
-    transport is not permission to commit them to the repository.
+</details>
