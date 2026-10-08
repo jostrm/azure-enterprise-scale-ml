@@ -184,6 +184,8 @@ class Arm:
             return args[0].format(*args[1:])
         if name == "replace":
             return args[0].replace(args[1], args[2])
+        if name == "split":
+            return args[0].split(args[1])
         if name == "substring":
             return args[0][args[1]:] if len(args) == 2 else args[0][args[1]:args[1] + args[2]]
         if name == "base64":
