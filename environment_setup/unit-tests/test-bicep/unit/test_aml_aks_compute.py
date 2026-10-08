@@ -81,6 +81,27 @@ class TestAmlAksCompute(unittest.TestCase):
             "AKS compute condition is hard-gated to dev; test/prod would be excluded",
         )
 
+    def test_existing_cluster_attach_sets_load_balancer_subnet(self) -> None:
+        """Attaching an existing AKS (aksExists) must still name the internal LB subnet.
+
+        Without loadBalancerSubnet Azure ML defaults to 'aks-subnet' and the
+        azureml-fe internal load balancer fails after ~50 minutes with
+        "failed to get subnet: <vnet>/aks-subnet" (GetAssignedIPFromK8sFailed).
+        """
+        aks_computes = [
+            d for d in iac.resource_declarations(_AML_AKS_TEMPLATE, _COMPUTE_TYPE)
+            if "'AKS'" in d["body"]
+        ]
+        self.assertEqual(1, len(aks_computes), "precondition: one AKS compute")
+        body = aks_computes[0]["body"]
+        always_applied = body.split("!aksExists ?", 1)[0]
+        self.assertIn("loadBalancerType: 'InternalLoadBalancer'", always_applied)
+        self.assertIn(
+            "loadBalancerSubnet: aksSubnetName", always_applied,
+            "loadBalancerSubnet is only set for new clusters; attaching an existing "
+            "cluster falls back to the non-existent 'aks-subnet'",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
