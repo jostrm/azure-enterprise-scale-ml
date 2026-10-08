@@ -325,6 +325,11 @@ for the identity boundary, pinned image, MCP-only pipeline and approval behavior
 Use `44-azure-mcp/deploy.py plan` before identity preparation or deployment;
 `configure-azure-mcp` must verify live private infrastructure before agent rollout.
 
+The separate, opt-in [45-aifactory-mcp-gateway](45-aifactory-mcp-gateway/readme.md) step
+hosts the governed AI Factory MCP and the new Azure AI Gateway SKU for project001 Dev
+(`enableAIFactoryMCP`, `enableAIGatewaySKU`, `addAIFactoryMCP2AIGatewaySKU`). Use its
+`deploy.py plan` for a GET-only preview; `false` never deletes resources.
+
 No infrastructure SKU, model deployment, service-enable flag, shared VM identity,
 or role assignment is changed implicitly. If infrastructure is missing, update
 the consumer's reviewed `enable...` values and use its

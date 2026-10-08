@@ -1,0 +1,46 @@
+# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
+# Opt-in AI Factory MCP + new AI Gateway SKU for project001 Dev. Disabled flags skip this step;
+# Stage/Prod and non-001 runs are rejected or skipped by the launcher; it never deletes resources.
+parameters:
+  - name: serviceConnection
+    type: string
+  - name: phase
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    displayName: '71-aifactory-mcp-ai-gateway'
+    condition: and(succeeded(), eq('${{ parameters.phase }}', 'foundry'), or(eq(variables['enableAIFactoryMCP'], 'true'), eq(variables['enableAIGatewaySKU'], 'true'), eq(variables['addAIFactoryMCP2AIGatewaySKU'], 'true')), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['deleteAllForProject'], 'true'))
+    inputs:
+      azureSubscription: ${{ parameters.serviceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
+        python "$MCP_GATEWAY_REPOSITORY/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py" apply --apply
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+    env:
+      MCP_GATEWAY_REPOSITORY: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml'
+      enableAIFactoryMCP: '$(enableAIFactoryMCP)'
+      enableAIGatewaySKU: '$(enableAIGatewaySKU)'
+      addAIFactoryMCP2AIGatewaySKU: '$(addAIFactoryMCP2AIGatewaySKU)'
+      enableContainerApps: '$(enableContainerApps)'
+      enableAIFoundry: '$(enableAIFoundry)'
+      deleteAllServicesForProject: '$(deleteAllServicesForProject)'
+      deleteAllForProject: '$(deleteAllForProject)'
+      dev_test_prod_sub_id: '$(dev_test_prod_sub_id)'
+      tenantId: '$(tenantId)'
+      dev_test_prod: '$(dev_test_prod)'
+      project_number_000: '$(project_number_000)'
+      admin_location: '$(admin_location)'
+      admin_aifactoryPrefixRG: '$(admin_aifactoryPrefixRG)'
+      projectPrefix: '$(projectPrefix)'
+      admin_locationSuffix: '$(admin_locationSuffix)'
+      admin_aifactorySuffixRG: '$(admin_aifactorySuffixRG)'
+      projectSuffix: '$(projectSuffix)'
+      aifactoryMcpImage: '$(aifactoryMcpImage)'
+      aifactoryMcpApiImage: '$(aifactoryMcpApiImage)'
+      aifactoryMcpEntraAppId: '$(aifactoryMcpEntraAppId)'
+      aifactoryMcpContainerAppsEnvironment: '$(aifactoryMcpContainerAppsEnvironment)'
+      aiGatewaySkuResourceId: '$(aiGatewaySkuResourceId)'
+      aiGatewaySkuOutboundSubnetId: '$(aiGatewaySkuOutboundSubnetId)'

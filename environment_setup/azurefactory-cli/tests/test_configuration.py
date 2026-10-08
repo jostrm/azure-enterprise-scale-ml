@@ -267,3 +267,51 @@ def test_configuration_roundtrip_against_canonical_api_preserves_unknown_json(mo
         source.write_text(json.dumps({**original, "changed": True}), encoding="utf-8")
         with pytest.raises(APIError, match="changed"):
             draft.save(review["review_id"])
+
+
+MCP_SCOPE = ["--folder", r"C:\aifactory", "--project-number", "001"]
+MCP_IMAGE = "acrcommon.azurecr.io/aifactory-mcp@sha256:" + "a" * 64
+
+
+@pytest.mark.parametrize("command", ["review", "save"])
+def test_dedicated_mcp_gateway_options_map_to_exact_variable_names(command):
+    extra = ["--expected-review", "a" * 64] if command == "save" else []
+    args = cli.build_parser().parse_args([
+        "config", command, *MCP_SCOPE, *extra,
+        "--enable-aifactory-mcp", "true", "--enable-ai-gateway-sku", "false",
+        "--add-aifactory-mcp-to-ai-gateway-sku", "true", "--aifactory-mcp-image", MCP_IMAGE,
+        "--aifactory-mcp-api-image", MCP_IMAGE, "--aifactory-mcp-entra-app-id", "33333333-3333-4333-8333-333333333333",
+        "--aifactory-mcp-container-apps-environment", "aca-env-prj001",
+        "--ai-gateway-sku-resource-id", "", "--ai-gateway-sku-outbound-subnet-id", "/subscriptions/x/subnets/y",
+    ])
+    assert cli.configuration_changes(args) == {
+        "enableAIFactoryMCP": "true", "enableAIGatewaySKU": "false", "addAIFactoryMCP2AIGatewaySKU": "true",
+        "aifactoryMcpImage": MCP_IMAGE, "aifactoryMcpApiImage": MCP_IMAGE,
+        "aifactoryMcpEntraAppId": "33333333-3333-4333-8333-333333333333",
+        "aifactoryMcpContainerAppsEnvironment": "aca-env-prj001", "aiGatewaySkuResourceId": "",
+        "aiGatewaySkuOutboundSubnetId": "/subscriptions/x/subnets/y",
+    }
+    assert cli.configuration_changes(cli.build_parser().parse_args(["config", command, *MCP_SCOPE, *extra])) == {}
+
+
+def test_mcp_gateway_options_reject_non_boolean_and_conflicting_changes(tmp_path, capsys):
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["config", "review", *MCP_SCOPE, "--enable-aifactory-mcp", "yes"])
+    patch = tmp_path / "changes.json"
+    patch.write_text('{"enableAIFactoryMCP": "false", "enableAIGatewaySKU": true}', encoding="utf-8")
+    agreeing = cli.build_parser().parse_args(["config", "review", *MCP_SCOPE, "--changes-json", str(patch),
+                                              "--enable-ai-gateway-sku", "true"])
+    assert cli.configuration_changes(agreeing) == {"enableAIFactoryMCP": "false", "enableAIGatewaySKU": "true"}
+    conflicting = cli.build_parser().parse_args(["config", "review", *MCP_SCOPE, "--changes-json", str(patch),
+                                                 "--enable-aifactory-mcp", "true"])
+    with pytest.raises(ConfigError, match="--enable-aifactory-mcp conflicts with enableAIFactoryMCP"):
+        cli.configuration_changes(conflicting)
+
+
+def test_cli_review_sends_dedicated_mcp_gateway_options(monkeypatch, capsys):
+    client = FakeAPI()
+    client.responses["/api/v1/projects/load"]["state"]["enableAIFactoryMCP"] = "false"
+    monkeypatch.setattr(cli, "client", lambda args: client)
+    assert cli.main(["config", "review", *MCP_SCOPE, "--snapshot-only", "--enable-aifactory-mcp", "true"]) == 0
+    validated = [call[2] for call in client.calls if call[1] == "/api/v1/validation"]
+    assert validated and all(body["state"]["enableAIFactoryMCP"] == "true" for body in validated)

@@ -73,6 +73,28 @@ REQUIRED_SCHEMAS = {
     "BootstrapPrepare",
 }
 
+BOOLEAN = ("true", "false")
+# Dedicated config options: (option, exact variable name, choices, help).
+MCP_GATEWAY_OPTIONS = (
+    ("--enable-aifactory-mcp", "enableAIFactoryMCP", BOOLEAN,
+     "Host the governed, read-only AI Factory MCP in project001 Dev (requires enableContainerApps and enableAIFoundry)."),
+    ("--enable-ai-gateway-sku", "enableAIGatewaySKU", BOOLEAN,
+     "Create or adopt the new Azure AI Gateway SKU wired to the project001 Dev Foundry (requires enableAIFoundry)."),
+    ("--add-aifactory-mcp-to-ai-gateway-sku", "addAIFactoryMCP2AIGatewaySKU", BOOLEAN,
+     "Register the AI Factory MCP as a read-only AI Gateway tool server (requires both options above)."),
+    ("--aifactory-mcp-image", "aifactoryMcpImage", None,
+     "Digest-pinned MCP image <registry>.azurecr.io/<repository>@sha256:<digest>."),
+    ("--aifactory-mcp-api-image", "aifactoryMcpApiImage", None, "Digest-pinned Factory API sidecar image."),
+    ("--aifactory-mcp-entra-app-id", "aifactoryMcpEntraAppId", None,
+     "Client ID (GUID) of the MCP API app registration exposing AiFactory.Mcp.Read."),
+    ("--aifactory-mcp-container-apps-environment", "aifactoryMcpContainerAppsEnvironment", None,
+     "Internal project Container Apps environment name; empty selects the single one."),
+    ("--ai-gateway-sku-resource-id", "aiGatewaySkuResourceId", None,
+     "Existing AI Gateway SKU resource ID to adopt (never modified); empty creates an owned gateway."),
+    ("--ai-gateway-sku-outbound-subnet-id", "aiGatewaySkuOutboundSubnetId", None,
+     "Subnet ID for AI Gateway outbound VNet integration (needed to register the private MCP)."),
+)
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
@@ -225,6 +247,11 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--project-number", required=True)
         command.add_argument("--changes-json", help="Local JSON object with only intentional field replacements.")
         command.add_argument("--snapshot-only", action="store_true", help="Do not write pipeline variable files.")
+        mcp_gateway = command.add_argument_group(
+            "MCP & AI Gateway (project001 Dev)",
+            "Dedicated replacements for the late foundry-phase pipeline step; saving never deploys.")
+        for option, key, choices, help_text in MCP_GATEWAY_OPTIONS:
+            mcp_gateway.add_argument(option, dest=f"mcp_gateway_{key}", choices=choices, help=f"{help_text} Sets {key}.")
         if name == "save":
             command.add_argument("--expected-review", required=True, help="review_id from the separately approved review.")
             command.add_argument("--yes", action="store_true")
@@ -804,9 +831,23 @@ def cmd_schema(args):
     return emit(c.openapi() if args.openapi else c.schema())
 
 
-def configuration_draft(args):
+def configuration_changes(args) -> dict:
+    """Merge --changes-json with the dedicated MCP & AI Gateway options; disagreement is an error."""
     changes = read_json_file(args.changes_json) if args.changes_json else {}
-    return ConfigurationDraft.load(client(args), args.folder, args.project_number, changes=changes)
+    if not isinstance(changes, dict):
+        raise ConfigError("--changes-json must contain a JSON object.")
+    for option, key, _, _ in MCP_GATEWAY_OPTIONS:
+        value = getattr(args, f"mcp_gateway_{key}", None)
+        if value is None:
+            continue
+        if key in changes and str(changes[key]).lower() != value.lower():
+            raise ConfigError(f"{option} conflicts with {key} in --changes-json.")
+        changes[key] = value
+    return changes
+
+
+def configuration_draft(args):
+    return ConfigurationDraft.load(client(args), args.folder, args.project_number, changes=configuration_changes(args))
 
 
 def cmd_config_review(args):

@@ -406,6 +406,35 @@ For runnable SDK code using `ConfigurationDraft.load()`, `review()` and
 `save()`, see [edit_configuration.py](../install_config_wizard/api-usage-examples/python/edit_configuration.py)
 and its [two-phase usage](../install_config_wizard/api-usage-examples/readme.md#edit-a-legacy-json-configuration-with-the-python-sdk).
 
+### MCP & AI Gateway options (project001 Dev)
+
+`config review` and `config save` accept dedicated options for the opt-in AI
+Factory MCP and the new Azure AI Gateway SKU. Each sets exactly one variable,
+is merged with `--changes-json`, and a disagreeing value in that file is a
+`ConfigError` instead of a silent override:
+
+| Option | Variable | Values |
+|---|---|---|
+| `--enable-aifactory-mcp` | `enableAIFactoryMCP` | `true` / `false` |
+| `--enable-ai-gateway-sku` | `enableAIGatewaySKU` | `true` / `false` |
+| `--add-aifactory-mcp-to-ai-gateway-sku` | `addAIFactoryMCP2AIGatewaySKU` | `true` / `false` |
+| `--aifactory-mcp-image` | `aifactoryMcpImage` | `<registry>.azurecr.io/<repository>@sha256:<digest>` |
+| `--aifactory-mcp-api-image` | `aifactoryMcpApiImage` | same format |
+| `--aifactory-mcp-entra-app-id` | `aifactoryMcpEntraAppId` | MCP API app registration client ID |
+| `--aifactory-mcp-container-apps-environment` | `aifactoryMcpContainerAppsEnvironment` | internal project environment name, or empty |
+| `--ai-gateway-sku-resource-id` | `aiGatewaySkuResourceId` | existing gateway to adopt, or empty to create one |
+| `--ai-gateway-sku-outbound-subnet-id` | `aiGatewaySkuOutboundSubnetId` | outbound integration subnet ID |
+
+```powershell
+azurefactory config review --folder C:\legacy\aifactory --project-number 001 `
+  --enable-aifactory-mcp true --enable-ai-gateway-sku true --add-aifactory-mcp-to-ai-gateway-sku true
+```
+
+The fields must exist in the selected draft/schema (wizard API v0.47.21 or later
+for the three flags). Saving never deploys: the project pipeline's late
+foundry-phase step `71-aifactory-mcp-ai-gateway` acts on them for project001
+Dev only. See [45-aifactory-mcp-gateway](../../usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md).
+
 ## Preview then confirm
 
 Confirm/start and generic writes require separate review and `--yes`. Preparation can persist a local draft/preview but never starts a deployment. Read the complete preview before approving. Save the preview receipt and consume it before expiry; expired or blocked previews are never re-prepared silently. All folder paths below are on the API host. New registers normally use a root named `azurefactory`.
