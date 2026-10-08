@@ -1985,3 +1985,7 @@ or push is part of preparing this documentation.
 
 For removing resources, preserving shared hub/VPN resources or recovering from
 uncertainty, continue with [20 — removal and recovery](20-cli-and-api-and-usage.md).
+
+---
+
+[Next - 20. Remove, observe and recover](20-cli-and-api-and-usage.md)

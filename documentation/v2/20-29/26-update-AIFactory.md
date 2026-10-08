@@ -1,4 +1,8 @@
 # Update existing AI Factory
+
+For reviewed updates through terminal commands, Python or direct HTTP requests,
+start with [17. Azure Factory CLI, Config Wizard API, and usage](../10-19/17-cli-and-api-and-usage.md).
+
 There are two types of updates you can do: `Library-UPDATE` or `Feature-UPDATE`.
 
 For a `Feature-UPDATE`, you can use a **Quick Feature-update & run** script or follow the manual instructions in [2) Feature-UPDATE: NEW feature, such as "BYOVNet"](#2-feature-update-new-feature-such-as-byovnet).

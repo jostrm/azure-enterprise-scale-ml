@@ -1,5 +1,8 @@
 # End-to-end setup: Azure Factory and AI projects
 
+For terminal commands, Python or direct HTTP requests, start with
+[17. Azure Factory CLI, Config Wizard API, and usage](../10-19/17-cli-and-api-and-usage.md).
+
 > For an introduction to the app interface and read-only API/CLI operations, see
 > the [AI Factory tutorial (version 1.25+)](28-tutorial-walkthrough.md).
 >

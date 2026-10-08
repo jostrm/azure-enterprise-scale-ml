@@ -1,5 +1,10 @@
 # Azure Factory CLI, Config Wizard API, and usage
 
+**Continue with the tool-specific guides:**
+[18. Get started with Factory tools](18-cli-and-api-and-usage.md) |
+[19. Add and update an AI factory](19-cli-and-api-and-usage.md) |
+[20. Remove, observe and recover](20-cli-and-api-and-usage.md)
+
 Central cloud teams can use the **Azure Factory CLI**, its importable **Python
 SDK**, or direct **HTTP requests** to integrate AI Factory configuration into
 their own UX. These are clients of the Config Wizard API, not separate
@@ -255,3 +260,7 @@ local waiting, not the server job. Record job IDs and re-read state before
 retrying a write. Legacy `submitted` means pipeline submission, not verified
 Azure deployment success. Never log API keys, sensitive parameter values or
 raw terminal output by default.
+
+---
+
+[Next - 18. Get started with Factory tools](18-cli-and-api-and-usage.md)

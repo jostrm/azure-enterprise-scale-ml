@@ -434,3 +434,7 @@ The pipeline JSON reader applies `dev`, then `stage_prod` for non-Dev, then exac
 </details>
 
 </details>
+
+---
+
+[Next - 19. Add and update an AI factory](19-cli-and-api-and-usage.md)
