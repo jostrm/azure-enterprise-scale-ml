@@ -492,7 +492,7 @@ class TestAifactoryDashboard(unittest.TestCase):
             for part in shortcut_parts
         ))
 
-    def test_five_discovered_resource_shortcuts_are_kept_in_project_layout(self) -> None:
+    def test_eight_discovered_resource_shortcuts_are_kept_in_two_rows(self) -> None:
         config = self.config()
         fake = FakeAz(config)
         inventory, tenant, _ = module.reconcile(config, fake)
@@ -503,6 +503,9 @@ class TestAifactoryDashboard(unittest.TestCase):
             ("Key Vault", "Microsoft.KeyVault/vaults", "vault"),
             ("AI Search", "Microsoft.Search/searchServices", "search"),
             ("Application Insights", "Microsoft.Insights/components", "insights"),
+            ("Azure Machine Learning", "Microsoft.MachineLearningServices/workspaces", "aml"),
+            ("Azure Databricks", "Microsoft.Databricks/workspaces", "dbx"),
+            ("Azure Data Factory", "Microsoft.DataFactory/factories", "adf"),
         ]
         discovered = [
             {"id": f"{project['id']}/providers/{kind}/{name}", "type": kind, "name": name}
@@ -519,10 +522,12 @@ class TestAifactoryDashboard(unittest.TestCase):
             part for part in parts
             if part["metadata"].get("asset", {}).get("type") in {kind for _, kind, _ in expected}
         ]
-        self.assertEqual(5, len(shortcuts))
+        self.assertEqual(8, len(shortcuts))
         for index, (part, resource) in enumerate(zip(shortcuts, discovered)):
             self.assertEqual(resource["id"], part["metadata"]["inputs"][0]["value"])
-            self.assertEqual({"x": index, "y": 16, "colSpan": 1, "rowSpan": 1}, part["position"])
+            self.assertEqual(
+                {"x": index if index < 5 else index - 5, "y": 16 if index < 5 else 17,
+                 "colSpan": 1, "rowSpan": 1}, part["position"])
 
     def test_deploy_passes_reconciled_inventory_and_parts_to_bicep(self) -> None:
         config = self.config()
@@ -536,6 +541,62 @@ class TestAifactoryDashboard(unittest.TestCase):
         deployment_call = fake.calls[-1]
         self.assertIn(str(TEMPLATE), deployment_call)
         self.assertIn(config.dashboard_resource_group, deployment_call)
+
+    def test_optional_ml_data_shortcuts_use_second_row_even_without_base_services(self) -> None:
+        config = self.config()
+        inventory, tenant, _ = module.reconcile(config, FakeAz(config))
+        project = inventory["environments"][0]["projects"][0]
+        kinds = [
+            ("Azure Machine Learning", "Microsoft.MachineLearningServices/workspaces", "aml", "Default"),
+            ("Azure Databricks", "Microsoft.Databricks/workspaces", "dbx", ""),
+            ("Azure Data Factory", "Microsoft.DataFactory/factories", "adf", ""),
+        ]
+        for enabled in itertools.product((False, True), repeat=3):
+            with self.subTest(enabled=enabled):
+                discovered = [
+                    {"id": f"{project['id']}/providers/{kind}/{name}", "type": kind,
+                     "name": name, "kind": workspace_kind}
+                    for active, (_, kind, name, workspace_kind) in zip(enabled, kinds) if active
+                ]
+                # Foundry hubs/projects share the AML resource provider, but are not AML workspaces.
+                discovered += [
+                    {"id": f"{project['id']}/providers/{kinds[0][1]}/{kind}",
+                     "type": kinds[0][1], "name": f"aaa-{kind}", "kind": kind}
+                    for kind in ("Hub", "Project")
+                ]
+                with patch.object(module, "az_cli", return_value=response(discovered)) as az:
+                    project["shortcuts"] = module.resource_shortcuts(DEV_SUB, project["name"], [], az)
+                expected = [item for active, item in zip(enabled, kinds) if active]
+                self.assertEqual([item[0] for item in expected], [s["label"] for s in project["shortcuts"]])
+                # Include a following project to catch overlap with its heading.
+                inventory["environments"][0]["projects"] = [
+                    project, {**project, "projectNumber": "018", "shortcuts": []},
+                ]
+                parts = module.dashboard_parts(inventory, tenant)
+                shortcuts = [p for p in parts if p["metadata"].get("asset", {}).get("type")
+                             in {item[1] for item in kinds}]
+                self.assertEqual(len(expected), len(shortcuts))
+                for index, part in enumerate(shortcuts):
+                    self.assertEqual({"x": index, "y": 17, "colSpan": 1, "rowSpan": 1}, part["position"])
+                for index, left in enumerate(parts):
+                    a = left["position"]
+                    for right in parts[index + 1:]:
+                        b = right["position"]
+                        self.assertTrue(
+                            a["x"] + a["colSpan"] <= b["x"] or b["x"] + b["colSpan"] <= a["x"]
+                            or a["y"] + a["rowSpan"] <= b["y"] or b["y"] + b["rowSpan"] <= a["y"]
+                        )
+
+    def test_ml_discovery_keeps_legacy_kind_and_preserves_shortcuts_on_read_failure(self) -> None:
+        workspace = {"id": "/workspace", "type": "Microsoft.MachineLearningServices/workspaces",
+                     "name": "legacy-aml"}
+        with patch.object(module, "az_cli", return_value=response([workspace])) as az:
+            previous = module.resource_shortcuts(DEV_SUB, "project", [], az)
+        self.assertEqual(["Azure Machine Learning"], [s["label"] for s in previous])
+        with patch.object(module, "az_cli", return_value=response(error="AuthorizationFailed")) as az:
+            self.assertEqual(previous, module.resource_shortcuts(DEV_SUB, "project", previous, az))
+        with patch.object(module, "az_cli", return_value=response([])) as az:
+            self.assertEqual([], module.resource_shortcuts(DEV_SUB, "project", previous, az))
 
     def test_existing_dashboard_update_uses_etag_and_rest_put(self) -> None:
         config = self.config()

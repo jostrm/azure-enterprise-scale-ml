@@ -424,28 +424,78 @@ The value model below makes that additional evidence explicit.
 
 ### Project resource groups, shortcuts and Cost analysis
 
-The project Portal dashboard retains the **resource-group resource list on the
-left** and **native Cost analysis on the right**, both scoped to the selected
-project resource group. Direct shortcuts below open **AI Foundry, Storage,
-Key Vault, AI Search and Application Insights**. Application Insights uses the
-same explicit resource-ID override as the companion workbook, when supplied.
-The Cost analysis tile shows this month's **ActualCost** and Azure's forecast;
-the direct Cost analysis link, Budgets and Cost Alerts remain available.
+The project Portal dashboard places the **resource group on the left** and
+**native accumulated Cost analysis on the right**, both scoped to the selected
+project resource group. Both tiles are four grid rows high (previously eight).
+The first shortcut row opens **AI Foundry, Storage, Key Vault, AI Search and
+Application Insights**. The second adds **Azure Machine Learning, Databricks
+and Data Factory** when their flags are enabled, plus the existing common
+**Log Analytics** workspace and links to application logs, metrics and cost
+alerts. Application Insights and Log Analytics honor the workbook's resource-ID
+overrides.
+
+Azure ML uses `enableAzureMachineLearning || addAzureMachineLearning`, including
+the added workspace's naming mode. Databricks uses `enableDatabricks`; Data
+Factory uses `enableDatafactory`. These shortcuts use the same project-scoped
+names as phase 07; they do not deploy services or prove their existence.
+
+Two native **daily consumption cost** column charts sit below the shortcuts:
+daily total and daily total split by service. Both use this month's project-RG
+**ActualCost**, not token-price estimates or live usage counters. The top chart
+retains Azure's forecast (a prediction, not a charge). These are different views
+of the same cost, not additive totals. Missing billing access/data is left to
+Azure's native unavailable/error display; no sample figures are inserted.
+Compact **Usage & outcomes** and **Model consumption** report cards follow,
+with service configuration below the charts and cards. Token metrics remain in
+the linked workbook and are not represented as billed costs.
+
+When `enableAIFoundry` or `addAIFoundry` is enabled, six native Azure Monitor
+tiles appear ahead of the report cards. Each contains **one or two metrics**
+(never more than five), using **Sum** and a **30-day** chart context. The project
+dashboard's shared time range also defaults to the past 30 days; viewers can
+change it in Azure Portal. Account and child-project scopes are kept separate.
+
+| Tile | Native metrics | Scope |
+|---|---|---|
+| Requests & calls | `AzureOpenAIRequests`, `TotalCalls` | Foundry account |
+| Generated images | `GeneratedImages` | Foundry account |
+| Content safety | `RAIHarmfulRequests`, `RAIRejectedRequests` | Foundry account |
+| Quota / limits | `BlockedCalls`, `Ratelimit` | Foundry account |
+| Agent activity | `AgentToolCalls`, `AgentResponses` | Foundry child project |
+| Agent model estimated USD | `AgentModelEstimatedCost` | Foundry child project |
+
+`TotalCalls`, `BlockedCalls` and `Ratelimit` are **non-OpenAI** Cognitive Services
+metrics. `BlockedCalls` means rate/quota blocking, not content safety blocking.
+`Ratelimit` sums published limit values as requested; it is **not a count of
+throttled requests**. Harmful volume includes annotate-only detections; it is
+not equivalent to blocked volume. Do not add overlapping series together.
+Agent estimated cost is an **estimate in USD**, never an invoice or part of the
+ActualCost total. An account can include multiple Foundry projects.
+
+These tiles use platform metrics directly and do not enable diagnostics,
+ingestion, paid advanced metrics, roles or model calls. Unsupported, unpublished
+or inaccessible metrics remain subject to the Portal's native no-data/error
+display, not an invented zero. The output-only `foundryMetricTiles.bicep` module
+isolates the native chart definitions from deployment-time naming.
+Metric names, scopes and Sum support follow the Microsoft references for
+[accounts](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-metrics/microsoft-cognitiveservices-accounts-metrics)
+and [projects](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-metrics/microsoft-cognitiveservices-accounts-projects-metrics).
 
 The factory landing dashboard keeps its common/project resource groups and
-their separate Cost analysis tiles. Each project now supports the same five
-shortcut types, showing only resources returned by existing inventory discovery
-(fewer shortcuts when a type is absent). The Bicep project shortcuts retain
-their configured naming bindings; they do not themselves provision the target
-services. Workbook and business-value reports supplement this resource/cost
-layout rather than replacing it. These are local source changes; existing Azure
-dashboards require a separately authorized dashboard deployment to update.
+their separate Cost analysis tiles. Each project supports the five original
+shortcut types plus a second row for **Azure ML, Databricks and Data Factory**,
+showing only resources returned by discovery. Foundry Hub/Project resources
+are excluded from Azure ML workspace selection. A failed discovery preserves
+the previous inventory; a successful empty result removes stale shortcuts.
+These are local source changes; existing Azure dashboards require a separately
+authorized dashboard deployment to update. Portal rendering and live billing
+data still require review after that deployment.
 
 ### Native My Project generated with the project dashboard
 
 `modules\projectDash01.bicep` now deploys a companion
-**My Project - Usage and Cost** Azure Monitor workbook and adds an entry tile
-below the existing project resource/service inventory. The existing resource
+**My Project - Usage and Cost** Azure Monitor workbook and adds compact entry
+cards below the consumption charts, ahead of service configuration. The existing resource
 links and native Cost Management link remain in place.
 
 The workbook provides **Usage & outcomes / Cost** navigation and

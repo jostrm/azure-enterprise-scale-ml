@@ -25,6 +25,11 @@ ENVIRONMENTS = (
     ("prod", "PROD", "DASHBOARD_PROD_SUBSCRIPTION_ID"),
 )
 API_VERSION = "2020-09-01-preview"
+ML_DATA_SHORTCUTS = (
+    ("Azure Machine Learning", "microsoft.machinelearningservices/workspaces"),
+    ("Azure Databricks", "microsoft.databricks/workspaces"),
+    ("Azure Data Factory", "microsoft.datafactory/factories"),
+)
 
 
 class ConcurrentUpdate(RuntimeError):
@@ -388,7 +393,7 @@ def resource_shortcuts(
         ("Key Vault", "microsoft.keyvault/vaults"),
         ("AI Search", "microsoft.search/searchservices"),
         ("Application Insights", "microsoft.insights/components"),
-    )
+    ) + ML_DATA_SHORTCUTS
     shortcuts: list[dict] = []
     for label, resource_type in wanted:
         matches = sorted(
@@ -398,6 +403,10 @@ def resource_shortcuts(
                 if isinstance(resource, dict)
                 and str(resource.get("type", "")).lower() == resource_type
                 and isinstance(resource.get("id"), str)
+                and (
+                    label != "Azure Machine Learning"
+                    or str(resource.get("kind") or "").lower() in {"", "default"}
+                )
             ),
             key=lambda item: (
                 0
@@ -768,10 +777,14 @@ def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
                     cost_part(x + 4, y + 1, project, tenant_id),
                 )
             )
-            for shortcut_index, shortcut in enumerate(project["shortcuts"][:5]):
-                parts.append(
-                    resource_part(x + shortcut_index, y + 5, 1, 1, shortcut)
-                )
+            ml_data_types = {kind for _, kind in ML_DATA_SHORTCUTS}
+            rows: tuple[list[dict], list[dict]] = ([], [])
+            for shortcut in project["shortcuts"]:
+                row = int(str(shortcut.get("type", "")).lower() in ml_data_types)
+                rows[row].append(shortcut)
+            for row, shortcuts in enumerate(rows):
+                for shortcut_index, shortcut in enumerate(shortcuts[:3 if row else 5]):
+                    parts.append(resource_part(x + shortcut_index, y + 5 + row, 1, 1, shortcut))
     return parts
 
 
