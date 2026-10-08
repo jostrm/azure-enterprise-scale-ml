@@ -20,18 +20,16 @@ version and factory still need to pass their own checks.
 |---|---|---|
 | Remove a custom parameter value | `parameters prepare --unset`; `ParameterPatch.unset` | **implemented**, settings only; confirm separately. Uses defaults or inherited values where available. No Azure deletion. |
 | Reset a saved parameter profile | `parameters prepare --reset-profile`; `reset_profile` | **implemented**, settings only; review replacement settings against the current version. Not “reset Azure”. |
-| Remove never-deployed local configuration | Catalog actions `delete-draft-project`, `delete-draft-scale-set`, `delete-draft-factory` | **generic-access only**, checked local removal with an archive; no Azure deletion or pipeline start. |
-| Delete one project's resources in selected environments | Catalog action `delete-project` and explicit `deletion_options` | **generic-access only; conditional/blocked** until the layout, installed features, resource ownership, permissions and deployment setup pass checks. |
-| Delete a selected scale set's Azure resources | Catalog action `delete-scale-set` | **generic-access only; conditional/blocked**. Review the exact list of resources to delete or keep; not every resource group is necessarily deleted. |
-| Delete an entire factory's reviewed Azure resources | `delete-aifactory prepare/confirm/status/reconcile` and named API/SDK methods | **implemented** interface; **conditional/blocked** execution. Requires compatible software; all project deletion pipelines finish before shared resources are removed. |
+| Remove never-deployed local configuration | `draft remove`; `draft_remove_prepare` | **implemented**, checked local removal with an archive; no Azure deletion or pipeline start. |
 | Finish local cleanup after a confirmed whole-factory deletion | Named `delete-aifactory reconcile` | **implemented**, uses saved, verified completion records. Does not restart pipelines or retry Azure deletion. |
+| Delete one project's resources in selected environments | `project delete`; `project_delete_prepare`; action `delete-project` | **implemented** preparation; **conditional/blocked** execution until the layout, installed features, resource ownership, permissions and deployment setup pass checks. |
+| Delete a selected scale set's Azure resources | `scaleset delete`; `scaleset_delete_prepare`; action `delete-scale-set` | **implemented** preparation; **conditional/blocked** execution. Review the exact list of resources to delete or keep; not every resource group is necessarily deleted. |
+| Delete an entire factory's reviewed Azure resources | `delete-aifactory prepare/confirm/status/reconcile` and named API/SDK methods | **implemented** interface; **conditional/blocked** execution. Requires compatible software; all project deletion pipelines finish before shared resources are removed. |
 
-**generic-access only** means using the shared request commands shown below,
-rather than a dedicated deletion command.
+The named project, scale-set and draft commands **prepare only**. A separate
+confirmation needs approval. General request commands remain an alternative.
 
-**not implemented:** friendly `project delete` or `scaleset delete` CLI commands,
-dedicated `AzureFactoryClient` project/scale-set/draft deletion methods, automatic
-“disable flag = delete” behavior, keeping selected resources inside groups being
+**not implemented:** automatic “disable flag = delete” behavior, keeping selected resources inside groups being
 deleted by the whole-factory command, or a generic force/retry/cancel-on-timeout
 workflow. Never switch to legacy deployment or direct Azure deletion to bypass
 a blocker.
@@ -55,9 +53,9 @@ approved host.
 
 #### Reviewed software versions and compatibility checks
 
-This chapter checks the published API source at `d52463f` and accelerator CLI/SDK
-source at `eb077742`, including its deletion-plan validator and reconcile
-method. A different local checkout or packaged sidecar may lack these methods.
+This chapter uses the published API baseline at `d52463f`, the earlier accelerator
+deletion-plan validator/reconcile methods, and named CLI/SDK preparation wrappers
+at `0da0d85b`. A different local checkout or packaged sidecar may lack these methods.
 The API's frozen accelerator pin
 `3e9102ee07c959d91e5ac508432bd1545d258a15` is **not changed by this guide** and
 does not supply the named ordered-pipeline execution contract. A publication of
@@ -175,8 +173,8 @@ $ResultPath = Join-Path $ReviewDir 'confirmation-result.json'
 
 ## 3. Build ONE removal request
 
-Choose **one** subsection below, then use the shared prepare/review/confirm
-walkthrough in section 4. For another operation, start again with a new workspace
+Choose **one** subsection below, then use section 4's named preparation for B–D
+or its generic alternative for A–D. For another operation, start again with a new workspace
 and a fresh factory list. Do not reuse an old review after saving a change.
 
 ### A. Remove a custom parameter value, or reset saved settings — no Azure deletion
@@ -427,6 +425,133 @@ Write-NewJson $RequestPath $Body
 
 ## 4. For A–D: prepare, STOP, then confirm once
 
+For **B–D**, the named CLI/SDK helpers below prepare the request built in section
+3 and save a typed receipt. Choose **one** preparation, not both. For **A**, or
+direct REST requests, use the generic alternative under **More info** below.
+Do not mix its plain preview files with these typed receipts.
+
+```powershell
+$ReceiptPath = Join-Path $ReviewDir ('removal-receipt-' + [guid]::NewGuid().ToString('N') + '.json')
+```
+
+### Named CLI preparation — B, C or D
+
+This uses the exact IDs, environments, revision and independent deletion choices
+you already selected. The project command repeats `--environment` for each choice
+and requires both retention flags as `yes` or `no`.
+
+```powershell
+switch ($Body.action) {
+    'delete-project' {
+        $EnvironmentArgs = @()
+        foreach ($Environment in $Body.deletion_options.environments) {
+            $EnvironmentArgs += @('--environment', $Environment)
+        }
+        $SubnetFlag = if ($Body.deletion_options.include_project_subnets) { 'yes' } else { 'no' }
+        $GroupFlag = if ($Body.deletion_options.include_keyvault_and_resource_group) { 'yes' } else { 'no' }
+        & $Python -m azurefactory project delete --folder $Folder `
+            --factory-id $FactoryId --project-id $Body.project_id @EnvironmentArgs `
+            --include-project-subnets $SubnetFlag --include-keyvault-and-resource-group $GroupFlag `
+            --expected-revision $Revision --save-receipt $ReceiptPath
+    }
+    'delete-scale-set' {
+        & $Python -m azurefactory scaleset delete --folder $Folder `
+            --factory-id $FactoryId --scale-set-id $Body.scale_set_id `
+            --expected-revision $Revision --save-receipt $ReceiptPath
+    }
+    { $_ -in @('delete-draft-factory','delete-draft-scale-set','delete-draft-project') } {
+        $DraftKind = $Body.action.Substring('delete-draft-'.Length)
+        $TargetArgs = @()
+        if ($Body.scale_set_id) { $TargetArgs += @('--scale-set-id', $Body.scale_set_id) }
+        if ($Body.project_id) { $TargetArgs += @('--project-id', $Body.project_id) }
+        & $Python -m azurefactory draft remove --folder $Folder `
+            --factory-id $FactoryId --kind $DraftKind @TargetArgs `
+            --expected-revision $Revision --save-receipt $ReceiptPath
+    }
+    default { throw 'Use a B, C or D request, or choose the generic alternative.' }
+}
+if ($LASTEXITCODE -ne 0) { throw 'Preparation blocked or failed; do not confirm.' }
+```
+
+### Named SDK preparation — same B, C or D request
+
+```powershell
+@'
+import json, sys
+from azurefactory import AzureFactoryClient
+from azurefactory.client import redact_secrets
+from azurefactory.review import validate_preview, write_receipt
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    body = json.load(stream)
+client = AzureFactoryClient()
+scope = dict(folder=body["folder"], factory_id=body["factory_id"],
+             expected_revision=body["expected_revision"])
+action = body["action"]
+if action == "delete-project":
+    preview = client.project_delete_prepare(
+        **scope, project_id=body["project_id"], **body["deletion_options"])
+    operation = "project-delete"
+elif action == "delete-scale-set":
+    preview = client.scaleset_delete_prepare(**scope, scale_set_id=body["scale_set_id"])
+    operation = "scaleset-delete"
+elif action in {"delete-draft-factory", "delete-draft-scale-set", "delete-draft-project"}:
+    kind = action.removeprefix("delete-draft-")
+    preview = client.draft_remove_prepare(
+        **scope, kind=kind, scale_set_id=body.get("scale_set_id"),
+        project_id=body.get("project_id"))
+    operation = "draft-remove-" + kind
+else:
+    raise SystemExit("Use a B, C or D request, or choose the generic alternative.")
+print(json.dumps(redact_secrets(preview, client.api_key), indent=2))
+validate_preview(preview)
+write_receipt(sys.argv[2], client=client, purpose="catalog-confirm",
+              operation=operation, request_body=body, preview=preview)
+'@ | & $Python - $RequestPath $ReceiptPath
+if ($LASTEXITCODE -ne 0) { throw 'Preparation blocked or failed; do not confirm.' }
+```
+
+### STOP — review, then separately confirm the typed receipt
+
+For either named preparation, review the full preview: exact factory and project
+or scale set, environments, tenants/subscriptions, settings or resource IDs,
+delete/retain lists, both project deletion choices, warnings, blockers and expiry.
+**An available helper does not unblock Azure deletion.** The mode, ownership,
+retention and installed-runtime checks in section 3 still apply.
+
+After approval, choose **only the matching command**. For **B (local draft
+removal)**, this archives/removes local configuration without deleting Azure resources:
+
+```powershell
+& $Python -m azurefactory catalog confirm --receipt $ReceiptPath --yes
+if ($LASTEXITCODE -ne 0) { throw 'Inspect saved state; do not retry confirmation.' }
+```
+
+For **C or D (Azure project/scale-set deletion)**, confirmation can start deletion;
+keep the returned `job.id` and observe it in section 6:
+
+```powershell
+& $Python -m azurefactory runtime confirm --receipt $ReceiptPath --yes
+if ($LASTEXITCODE -ne 0) { throw 'Outcome uncertain; inspect the job, do not retry.' }
+```
+
+<details>
+<summary>More info</summary>
+
+Both named paths use receipt purpose `catalog-confirm`, not `runtime-confirm`.
+The action/operation pairing and mode are checked strictly: `project-delete` and
+`scaleset-delete` require `runtime`; `draft-remove-factory`,
+`draft-remove-scale-set` and `draft-remove-project` require `configuration`.
+Draft `kind` is exactly `factory`, `scale-set` or `project`.
+`catalog confirm` rejects runtime receipts; `runtime confirm` rejects
+configuration receipts. Neither accepts a raw preview. Both use the shared
+catalog confirmation API after validation.
+
+### Generic alternative — CLI, REST or SDK for A–D
+
+Use this **instead of** the named preparation/confirmation above. It keeps the
+existing plain-preview flow; there is no typed receipt in this alternative.
+
 The request above is complete. **Choose ONE interface** for preparation and use
 its matching confirmation later. The generic CLI requires `--write --yes` for
 all POST requests, including **prepare** and POSTs that only read information.
@@ -573,6 +698,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Confirmation failed or outcome uncertain. Obse
 
 A settings-only result can contain `catalog` with no `job`. An Azure operation
 returns `job.id`; keep that ID and check its progress below.
+
+</details>
 
 ## 5. Delete a whole factory — separate compatibility checks and approval
 

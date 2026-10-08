@@ -249,6 +249,10 @@ The original parity walkthrough used API source
 `d52463fa6e1fd4371e38fdb9d0b4f9028f0cc17b` and accelerator source
 `eb077742e230e1b5338767f2e3c942b2ed792e85`, or compatible later code.
 These are source references, not instructions to change a deployment pin.
+The named settings, clone/add and removal helpers below were added in accelerator
+`0da0d85b`. Environment-only placement is implemented in newer API source but is
+not yet in the published API baseline above. It requires that updated API on the
+selected host; an older API can return HTTP 422. A newer client alone is not enough.
 Do not pull, reset or change a submodule in a checkout containing other work
 merely to run this tutorial. Use a reviewed compatible copy.
 
@@ -271,16 +275,17 @@ not deploy a factory. A branch name alone does not identify the exact code used.
 | --- | --- | --- | --- | --- |
 | Health, schema, capabilities and selected-account checks | implemented | implemented | implemented | `doctor` is an extra CLI helper. |
 | Create factory configuration | implemented | implemented: `factory_create_prepare` | implemented: `factory create` | Saves settings only. |
-| Clone/add scale set/project/placement | implemented | generic-access only: `catalog_prepare` | implemented: named commands | Does not copy deployed resources or data. |
-| Explicit `latest-successful` placement | implemented | implemented through catalog request/review | implemented | Requires successful recorded common deployment; not the default. |
+| Clone/add scale set/project/placement | implemented | implemented: `factory_clone_prepare`, `scaleset_add_prepare`, `project_add_prepare`, `project_add_placements_prepare` | implemented: named commands | Does not copy deployed resources or data. |
+| Latest successful placement within an explicit environment | implemented in newer API source | implemented: project prepare helpers | implemented: `--environment` or `--placement` | Requires successful recorded common deployment. Omitting the scale-set ID requires the updated API; never guesses Dev/Stage/Prod. |
 | Read settings | implemented | implemented | implemented | Reading does not change anything. |
-| Replace registered settings | implemented | generic-access only | generic-access only | Review and save separately from deployment. |
+| Replace registered settings | implemented | implemented: `catalog_settings_prepare` | implemented: `catalog configure-settings` | Only supplied values change; review and save separately from deployment. |
 | Parameter get/prepare/confirm and override removal | implemented | implemented | implemented | Removing an override is not deleting a resource. |
+| Remove never-deployed local drafts | implemented | implemented: `draft_remove_prepare` | implemented: `draft remove` | Checked local archive/removal only; no Azure deletion. |
 | GitHub workflow status/watch | implemented | implemented | implemented | No equivalent ADO watcher is claimed. |
 | Sample reports, saved results and costs | implemented | implemented | implemented | Saved results are not a new collection; real costs require Azure reads. |
 | Deployment and registered bootstrap | conditional/blocked | conditional/blocked | conditional/blocked | The selected workflow and Azure setup must support the request. |
 | Whole-factory deletion/status/recovery | conditional/blocked | conditional/blocked | conditional/blocked | Project teardown finishes before common infrastructure teardown. |
-| Project/scale-set deletion and draft removal | conditional/blocked | generic-access only | generic-access only | Different deletion choices; see guide 20. |
+| Project/scale-set Azure deletion | conditional/blocked execution | implemented: `project_delete_prepare`, `scaleset_delete_prepare` | implemented: `project delete`, `scaleset delete` | Prepare only; runtime confirmation stays conditional on mode, ownership, retention and permissions. See guide 20. |
 | Captured Dev-to-Stage-to-Prod promotion | not implemented | not implemented | not implemented | Adding a placement and deploying it is different. |
 
 ### The eight scenarios
@@ -289,12 +294,12 @@ not deploy a factory. A branch name alone does not identify the exact code used.
 | --- | --- | --- |
 | A. New factory, hub/VPN, project001 and selected environments | **implemented** configuration; **conditional/blocked** deployment. Explicitly select environments and complete the network setup. | 19 |
 | B. Add an AI Factory scale set | **implemented** configuration; **conditional/blocked** deployment. This is not an Azure VM Scale Set. | 19 |
-| C. Choose latest successful eligible scale set | **implemented** when explicitly requested; default automatic selection is **not implemented**. | 19 |
-| D. Promote a captured successful configuration/version through environments | **not implemented** as a complete operation. | 19 |
+| C. Choose latest successful eligible scale set | **implemented** within an explicit environment; omitting the scale-set ID requires newer API source installed on the host. No implicit environment. | 19 |
 | E. Add/update/remove settings and resources | Settings changes are **implemented**; resource changes are **conditional/blocked**. A normal settings update does not provide general resource removal. | 19/20 |
-| F. Choose APIM versus Kong | Unified three-tool selection is **not implemented**. Component setup has **conditional/blocked** support; Application Gateway is different. | 19 |
-| G. Delete a project | **generic-access only** in SDK/CLI; **conditional/blocked** execution. Selected environments and retention choices matter. | 20 |
+| G. Delete a project | Named SDK/CLI preparation is **implemented**; Azure execution remains **conditional/blocked**. Selected environments and retention choices matter. | 20 |
 | H. Delete factory/projects while keeping hub/VPN/dependencies | **conditional/blocked**. Resources that must remain inside a group selected for deletion block that operation. | 20 |
+| D. Promote a captured successful configuration/version through environments | **not implemented** as a complete operation. | 19 |
+| F. Choose APIM versus Kong | Unified three-tool selection is **not implemented**. Component setup has **conditional/blocked** support; Application Gateway is different. | 19 |
 
 ### Optional developer regression tests
 
@@ -330,16 +335,18 @@ These are command names, not complete examples. Guides 19/20 provide the inputs.
 | Connect/check | `health`, `doctor`, `api instructions`, `schema`, `bootstrap capabilities`, `auth status` | 18/19 |
 | Read settings | `catalog list`, `catalog settings`, `parameters get` | 19 |
 | Create/register | `factory create/clone`, `scaleset add`, `project add/add-placements`, `catalog confirm` | 19 |
-| Edit/deploy | `parameters prepare/confirm`, `runtime deploy/confirm` | 19 |
+| Edit/deploy | `catalog configure-settings/confirm`, `parameters prepare/confirm`, `runtime deploy/confirm` | 19 |
 | Registered bootstrap | `bootstrap workflow prepare/start/status/next/continue`, `preflight` | 19 |
 | Follow progress | `catalog jobs/job/logs/poll`, `runtime status/logs/poll`, `workflow status/watch` | 20 |
-| Delete/recover | `delete-aifactory prepare/confirm/status/reconcile`, general catalog deletion requests | 20 |
+| Delete/recover | `draft remove`, `project delete`, `scaleset delete`, `delete-aifactory prepare/confirm/status/reconcile` | 20 |
 | Monitor | `monitoring catalog/summary/report/export`, `monitoring saved read/summary/report`, `monitoring resource-group-costs` | 20 |
 
-There is no dedicated CLI `catalog prepare`, `project promote`, `project delete`,
-`scaleset delete` or general `resource delete` command in this baseline.
-There are no `AzureFactoryClient.scaleset_add()` or `project_promote()` methods.
-General request methods do not make an unsupported operation available.
+The named helpers prepare only. Use `catalog confirm` for settings and draft
+removal, or `runtime confirm` for project/scale-set Azure deletion, only after
+review and approval. Typed receipts enforce the action and mode; a raw API preview
+is not a CLI receipt. There is still no dedicated CLI `catalog prepare`,
+`project promote` or general `resource delete`, nor a `project_promote()` SDK
+method. General requests do not make an unsupported operation available.
 
 ### Implementation references
 

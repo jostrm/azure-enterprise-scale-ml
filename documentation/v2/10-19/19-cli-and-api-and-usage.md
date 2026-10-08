@@ -24,10 +24,10 @@ differ.** Run guide 18's compatibility checks; do not bypass a blocked operation
 | Scenario / intent | Support and boundary |
 |---|---|
 | **A. New AI factory, own hub/VPN, project001, selected Dev/Stage/Prod** | **implemented**: save selected scale sets and an initial project. **conditional/blocked**: deploying the hub/VPN and resources needs complete network settings and separate approval. The short example saves only part of that configuration. |
-| **B. Add an AI Factory scale set** | **implemented**: `scaleset add` saves configuration. Adding a project and deploying are separate steps. An AI Factory scale set groups an environment, network and subscription; it is **not Azure Virtual Machine Scale Sets (VMSS)**. |
-| **C. Put a project on the latest successful scale set** | **implemented**, opt-in: request `environment=latest-successful`. **not implemented**: choosing it automatically when placement is omitted. |
+| **B. Add an AI Factory scale set** | **implemented**: `scaleset add` prepares configuration; separate confirmation saves it. Adding a project and deploying are separate steps. An AI Factory scale set groups an environment, network and subscription; it is **not Azure Virtual Machine Scale Sets (VMSS)**. |
+| **C. Put a project on the latest successful scale set** | **implemented** within an explicit environment. Omitting the scale-set ID requires the newer API source installed on the host; no environment is guessed. |
+| **E. Add/update settings or typed parameters; unset an override** | **implemented**: named CLI/SDK settings and parameter preparation, followed by separate confirmation. None of these deletes Azure resources. |
 | **D. Promote captured successful Dev configuration/version to Stage, then Prod** | **not implemented**. You can choose a target, edit its settings and deploy separately. This does not copy a successful Dev deployment or require each environment to succeed before the next. |
-| **E. Add/update settings or typed parameters; unset an override** | **implemented**: review and save parameters or legacy configuration. Catalog settings writes are **generic-access only**: use a general API request rather than a dedicated command. None of these deletes Azure resources. |
 | **F. Choose APIM versus Kong for an AI gateway** | **not implemented** as one deployment choice. Newer source has **conditional/blocked** MCP/AI Gateway pipeline support. Application Gateway is a different product; its registered deployment workflow is blocked. |
 
 Choose **CLI** for terminal commands, the **`AzureFactoryClient` SDK** for Python
@@ -38,8 +38,9 @@ same API and follow the same approval rules; see [18](18-cli-and-api-and-usage.m
 <details>
 <summary>More info</summary>
 
-Use a trusted backend or automation worker for API calls. There are no SDK
-methods named `scaleset_add`, `project_promote` or `gateway_deploy`.
+Use a trusted backend or automation worker for API calls. Named SDK methods such
+as `scaleset_add_prepare` prepare only; they do not approve a change. There are
+still no SDK methods named `project_promote` or `gateway_deploy`.
 
 </details>
 
@@ -173,7 +174,7 @@ not sequential steps. Read the catalog again after every saved change.
 
 This step saves the selected request as JSON. Supported operations are `factory-create`, `factory-clone`,
 `scaleset-add`, `project-add`, `project-add-placements`, `parameters` and
-`runtime-deploy`. Generic settings writes and bootstrap have separate sections.
+`runtime-deploy`. Settings writes and bootstrap have separate sections.
 
 ```powershell
 $RequestPath = Write-ReviewJson $Request 'request'
@@ -231,6 +232,22 @@ if op == "factory-create":
         expected_revision=b["expected_revision"])
 elif op == "parameters":
     p = c.parameter_prepare(b)
+elif op == "factory-clone":
+    p = c.factory_clone_prepare(
+        b["folder"], b["factory_id"], prefix=b["target_prefix"], region=b["target_region"],
+        include_projects=b["include_projects"], expected_revision=b["expected_revision"])
+elif op == "scaleset-add":
+    p = c.scaleset_add_prepare(
+        b["folder"], b["factory_id"], b["scale_sets"], expected_revision=b["expected_revision"])
+elif op == "project-add":
+    p = c.project_add_prepare(
+        b["folder"], b["factory_id"], number=b["project"]["number"],
+        display_name=b["project"]["display_name"], placements=b["project"]["placements"],
+        expected_revision=b["expected_revision"])
+elif op == "project-add-placements":
+    p = c.project_add_placements_prepare(
+        b["folder"], b["factory_id"], b["project_id"], placements=b["placements"],
+        expected_revision=b["expected_revision"])
 else:
     p = c.review_catalog_prepare(b)
 print(json.dumps(redact_secrets(p, c.api_key), indent=2))
@@ -461,8 +478,8 @@ requests configuration without an initial project.
 
 ### Clone configuration to a new factory identity or region
 
-**implemented** CLI/REST; SDK **generic-access only** through the shared catalog
-method. This copies configuration, not deployed resources, data, credentials or
+**implemented** CLI/REST and SDK `factory_clone_prepare`.
+This copies configuration, not deployed resources, data, credentials or
 models. The helper displays an existing scale as context; this example clones
 the whole factory configuration, not only that scale.
 
@@ -533,8 +550,8 @@ select the new scale UUID before another operation.
 <details>
 <summary>More info</summary>
 
-The SDK uses `review_catalog_prepare` with `action: "create-scale-set"`.
-There is no dedicated `scaleset_add` SDK method.
+The SDK example uses `scaleset_add_prepare`. Generic
+`review_catalog_prepare` with `action: "create-scale-set"` remains valid.
 
 </details>
 
@@ -579,15 +596,21 @@ project home. Do not add a different factory-wide uniqueness rule.
 
 </details>
 
-## C. Explicit latest-successful placement
+<a id="c-explicit-latest-successful-placement"></a>
 
-**Implemented opt-in; not default behavior.** Build the new-project request in B.
-Then, **before 2.1 or any prepare**, change its placement choice:
+## C. Latest-successful placement within an explicit environment
+
+**Implemented in newer API source:** choose an environment and let the service
+select its latest successful eligible scale set. The selected host must run that
+updated API; this default is not yet in the published API baseline. Older APIs
+can return HTTP 422. The client never guesses Dev, Stage or Prod.
+
+Build the new-project inputs in B, but do not prepare them there. Then,
+**before 2.1 or any prepare**, change the placement choice:
 
 ```powershell
 $Environment = $Scope.scale.environment
-$Request.project.placements = @(@{ environment=$Environment; scale_set_id='latest-successful' })
-$Placement = $Environment + '=latest-successful'
+$Request.project.placements = @(@{ environment=$Environment })
 ```
 
 Run **2.1**, then choose this complete CLI command or the shared **2.2 SDK /
@@ -595,7 +618,7 @@ Run **2.1**, then choose this complete CLI command or the shared **2.2 SDK /
 
 ```powershell
 & $Python -m azurefactory project add --folder $FactoryFolder --factory-id $FactoryId `
-    --number $Number --display-name $DisplayName --placement $Placement `
+    --number $Number --display-name $DisplayName --environment $Environment `
     --expected-revision $Scope.catalog.revision --save-receipt $ReceiptPath
 if ($LASTEXITCODE -ne 0) { throw 'Automatic placement is blocked; review the reported deployment checks.' }
 ```
@@ -616,13 +639,40 @@ Review `latest-successful-placement-v1` and `resolved_placements`, including the
 exact UUID, source commit, completed job and `evidence_hash`. The CLI, receipt
 checks and `review_catalog_prepare` reject missing or conflicting selection details.
 
+The SDK example in **2.2** sends the same environment-only placement through
+`project_add_prepare`. Its `environments=[...]` argument is another way to build
+that request; supply either `environments` or `placements`, never both.
+REST sends `placements: [{"environment": "dev"}]` inside `project` for
+`add-project`, or at the top level for `add-project-placements`.
+Both CLI commands similarly accept repeated `--environment` flags **or**
+`--placement`, never both. Omitting both is an error, not an implicit Dev target.
+
+For an API supporting explicit selection but not the new default, deliberately
+choose the explicit selector instead, **before 2.1**:
+
+```powershell
+$Environment = $Scope.scale.environment
+$Request.project.placements = @(@{ environment=$Environment; scale_set_id='latest-successful' })
+$Placement = $Environment + '=latest-successful'
+```
+
+Run **2.1**, then choose this complete CLI alternative or **2.2/2.3**:
+
+```powershell
+& $Python -m azurefactory project add --folder $FactoryFolder --factory-id $FactoryId `
+    --number $Number --display-name $DisplayName --placement $Placement `
+    --expected-revision $Scope.catalog.revision --save-receipt $ReceiptPath
+if ($LASTEXITCODE -ne 0) { throw 'Explicit latest-successful placement is blocked.' }
+```
+
+This is a separately chosen input, not an automatic retry after a failed request.
+
 </details>
 
 **STOP**, then approve the chosen target through **2.4**. Confirmation does not
 silently switch to a newer scale. If no scale qualifies, stop; that is not
-permission to create one or guess an ID. Omitting `--placement` fails; it does
-not mean latest-successful. The same explicit selector is supported on
-`project add-placements` by replacing D's placement value, but is not promotion.
+permission to create one or guess an ID. The same selection choices are supported
+on `project add-placements`, but adding a placement is not promotion.
 
 ## D. Explicit Stage/Prod placement is not captured promotion
 
@@ -740,12 +790,13 @@ installation or hand-built JSON string is required.
 
 </details>
 
-### Catalog settings — generic-access only
+<a id="catalog-settings--generic-access-only"></a>
 
-`catalog settings` / `catalog_settings` only **reads** settings. There is no
-`settings set` command; use a general API request with
-`action: "configure-settings"`. This flow saves a plain preview, **not a receipt
-you can pass to CLI `catalog confirm`**.
+### Catalog settings — named CLI and SDK preparation
+
+`catalog settings` / `catalog_settings` **reads** settings.
+`catalog configure-settings` / `catalog_settings_prepare` prepares replacements
+for review. A separate `catalog confirm` saves them; it does not deploy or delete.
 
 Choose the target, read `field_keys` and `revision`, and send only the values you
 want to replace. Do not include secrets. This example changes scale-level
@@ -756,8 +807,8 @@ settings; factory identity, network addresses and version use separate operation
 
 Settings accept individual scalar values, not arbitrary nested objects. For
 project settings, add a checked `project_id`; for factory settings, omit
-`scale_set_id`. The specialized catalog receipt helper has no settings operation
-label, so do not invent one.
+`scale_set_id`. The typed receipt uses purpose `catalog-confirm`, operation
+`catalog-settings` and mode `configuration`. A plain API preview is not that receipt.
 
 </details>
 
@@ -779,6 +830,70 @@ $SettingsRequest = @{
     expected_revision=$CurrentSettings.revision; settings=$Changes
 }
 $SettingsRequestPath = Write-ReviewJson $SettingsRequest 'settings-request'
+$SettingsValuesPath = Write-ReviewJson $Changes 'settings-values'
+$SettingsReceiptPath = Join-Path $ReviewRoot ('settings-receipt-' + [guid]::NewGuid().ToString('N') + '.json')
+```
+
+Choose **one** preparation below. Both use exactly the settings, scope and revision
+selected above and save a typed receipt; neither confirms the change.
+
+**CLI:**
+
+```powershell
+& $Python -m azurefactory catalog configure-settings --folder $FactoryFolder `
+    --factory-id $Scope.factory.id --scale-set-id $Scope.scale.id `
+    --settings-json $SettingsValuesPath --expected-revision $CurrentSettings.revision `
+    --save-receipt $SettingsReceiptPath
+if ($LASTEXITCODE -ne 0) { throw 'Settings preview blocked; do not confirm.' }
+```
+
+**SDK alternative:**
+
+```powershell
+@'
+import json, sys
+from azurefactory import AzureFactoryClient
+from azurefactory.client import redact_secrets
+from azurefactory.review import validate_preview, write_receipt
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    body = json.load(stream)
+client = AzureFactoryClient()
+preview = client.catalog_settings_prepare(
+    body["folder"], body["factory_id"], body["settings"],
+    scale_set_id=body["scale_set_id"], expected_revision=body["expected_revision"])
+print(json.dumps(redact_secrets(preview, client.api_key), indent=2))
+validate_preview(preview)
+write_receipt(sys.argv[2], client=client, purpose="catalog-confirm",
+              operation="catalog-settings", request_body=body, preview=preview)
+'@ | & $Python - $SettingsRequestPath $SettingsReceiptPath
+if ($LASTEXITCODE -ne 0) { throw 'Settings preview blocked; do not confirm.' }
+```
+
+**STOP — review the settings, target, revision and expiry, then obtain approval.**
+For either named preparation above, only after approval, run this separate command:
+
+```powershell
+& $Python -m azurefactory catalog confirm --receipt $SettingsReceiptPath --yes
+if ($LASTEXITCODE -ne 0) { throw 'Inspect saved state; do not resend.' }
+```
+
+Read settings again to check the saved value. Omitted fields stay unchanged.
+**`null` is not a general settings unset operation.** Use typed parameter `unset`
+where supported; a settings patch does not delete an Azure resource.
+
+<details>
+<summary>More info</summary>
+
+#### Generic SDK/REST/CLI alternative — plain previews, not typed receipts
+
+Use this **instead of** the named prepare/confirm path above. It reuses
+`$SettingsRequestPath` from the input block and saves a plain preview.
+SDK preparation is `client.catalog_prepare(parsed_request)` followed by
+`validate_preview(preview)`; REST sends the same JSON to
+`POST /api/v1/factory-catalog/prepare`. The complete generic CLI equivalent:
+
+```powershell
 $Text = & $Python -m azurefactory request POST /api/v1/factory-catalog/prepare `
     --body-json $SettingsRequestPath --write --yes
 if ($LASTEXITCODE -ne 0) { throw 'Settings preview blocked.' }
@@ -791,9 +906,8 @@ $SettingsPreview | ConvertTo-Json -Depth 100
 ```
 
 The generic CLI `--write --yes` above acknowledges **only preparing** this request;
-it is not confirmation. SDK equivalent is
-`client.catalog_prepare(parsed_request)` followed by `validate_preview(preview)`;
-REST is the same JSON to `POST /api/v1/factory-catalog/prepare`.
+it is not confirmation. Do not pass `$SettingsPreviewPath` to `catalog confirm
+--receipt`; the raw and typed file formats are different.
 
 **STOP — review the settings, target, revision and expiry, then obtain approval.**
 The server checks that the saved preview still applies. Do not edit or silently
@@ -814,9 +928,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Inspect saved state; do not resend.' }
 
 SDK confirmation is `catalog_confirm(folder, confirmation_id)`; REST confirmation
 uses that same JSON and endpoint. Read settings again and check the exact value.
-Settings currently merge scalar replacements: **`null` is not a general settings
-unset operation**. Use typed parameter `unset` where supported; do not assume a
-settings patch deletes a key or resource.
+
+</details>
 
 ### Other existing catalog configuration actions
 
@@ -969,6 +1082,13 @@ First save the factory configuration through A or the registered creation API.
 The registered creation API is **generic-access only** in CLI/SDK:
 `POST /api/v1/creation/prepare`, then separately approved `/creation/confirm`.
 It is not `bootstrap_prepare`, which calls the legacy launcher API.
+
+Backend source `3c5694c` adds a limited DeveloperBastion handoff backed by normal
+deployment receipts and verified runner associations. **It does not unblock Full
+bootstrap.** The native prerequisite handoff supplies `verified_observations_hash`,
+not concrete post-success resource bodies. Unproven DNS, gateway, service
+association links (SAL) and additional Bastion fields remain blocked. This source
+increment does not change the API's frozen accelerator pin or certify an installed host.
 
 </details>
 
@@ -1482,7 +1602,11 @@ This guide was checked against original API/accelerator sources and the
 explicitly approved publication copies at API `d52463f` and accelerator
 `eb077742` (including the earlier `81ec23d6` gateway configuration change).
 The gateway section also covers the later published `cf8437af` changes.
-Other examples keep their stated version checks.
+The named settings, clone/add and removal wrappers are checked against accelerator
+`0da0d85b`. Environment-only placement is implemented in newer API source, not
+yet the published API baseline; it needs the updated API installed on the chosen
+host. An older API may reject the omitted scale-set ID with HTTP 422. Other
+examples keep their stated version checks; captured promotion remains unavailable.
 The separate offline consumer harness is at `56a324b`. The frozen external accelerator
 source pin was **not changed**. Installed packages and selected immutable runtime
 releases can lag or differ; no live provisioning/installation was performed.
