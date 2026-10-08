@@ -326,18 +326,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 357 |
-| `env` | 357 |
+| `yaml` | 360 |
+| `env` | 360 |
 | `bootstrap` | 90 |
 | `helper` | 17 |
 | `state` | 46 |
-| `json.dev` | 361 |
+| `json.dev` | 364 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 135, 380; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 136, 381; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 382, 406; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 135, 384; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 136, 385; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 386, 410; one reference row.
 
 ## YAML and variables.json reference
 
@@ -353,6 +353,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:acr_SKU --><!-- parameter json.dev:acr_SKU -->`acr_SKU` | `ACR_SKU` | M | Y: `"Premium"`<br>J.dev: `"Premium"` | ACR SKU mandatory: ACR SKU ensure: Premium required for private endpoints and CMK support. |
 | <!-- parameter yaml:acr_adminUserEnabled --><!-- parameter json.dev:acr_adminUserEnabled -->`acr_adminUserEnabled` | `ACR_ADMIN_USER_ENABLED` | O | Y: `"false"`<br>J.dev: `"false"` | ACR admin user enabled recommended: false, disable admin user for security. otherwise: true, enable for simpler dev access. |
 | <!-- parameter yaml:acr_dedicated --><!-- parameter json.dev:acr_dedicated -->`acr_dedicated` | `ACR_DEDICATED` | M | Y: `"true"`<br>J.dev: `"true"` | ACR dedicated (Premium tier) mandatory: ACR dedicated (Premium tier) ensure: must be true when using private endpoints or CMK. |
+| <!-- parameter yaml:addAIFactoryMCP2AIGatewaySKU --><!-- parameter json.dev:addAIFactoryMCP2AIGatewaySKU -->`addAIFactoryMCP2AIGatewaySKU` | No verified binding | O | Y: `"false"`<br>J.dev: `"false"` | Register the AI Factory MCP as a tool server on the AI Gateway SKU keep-as-is: Requires enableAIFactoryMCP:'true' and enableAIGatewaySKU:'true'. |
 | <!-- parameter yaml:addAIFoundry --><!-- parameter json.dev:addAIFoundry -->`addAIFoundry` | `ADD_AI_FOUNDRY` | O | Y: `"false"`<br>J.dev: `"false"` | Add new AI Foundry instance with new name otherwise: true, provisions a new AI Foundry with a new random name (for debugging or re-run) to get a fresh start. Still you should delete the old instance. |
 | <!-- parameter yaml:addAIFoundryHub --><!-- parameter json.dev:addAIFoundryHub -->`addAIFoundryHub` | `ADD_AI_FOUNDRY_HUB` | O | Y: `"false"`<br>J.dev: `"false"` | DEPRECATED. Do not enable. keep-as-is: DEPRECATED. Do not enable. |
 | <!-- parameter yaml:addAISearch --><!-- parameter json.dev:addAISearch -->`addAISearch` | `ADD_AI_SEARCH` | O | Y: `"false"`<br>J.dev: `"false"` | Add new AI Search instance otherwise: false, CreateIfNotExists logic. |
@@ -386,8 +387,10 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:enableAIDocIntelligence --><!-- parameter json.dev:enableAIDocIntelligence -->`enableAIDocIntelligence` | `ENABLE_AI_DOC_INTELLIGENCE` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure AI Document Intelligence |
 | <!-- parameter yaml:enableAIFactoryCreatedDefaultProjectForAIFv2 --><!-- parameter json.dev:enableAIFactoryCreatedDefaultProjectForAIFv2 -->`enableAIFactoryCreatedDefaultProjectForAIFv2` | `ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2` | O | Y: `"true"`<br>J.dev: `"true"` | AI Factory default project for AIFv2 otherwise: false, Azure creates a default project with additional CosmosDB, Storage, AI Search, and connections. |
 | <!-- parameter yaml:enableAIFactoryHub --><!-- parameter json.dev:enableAIFactoryHub -->`enableAIFactoryHub` | `ENABLE_AI_FACTORY_HUB` | O | Y: `"false"`<br>J.dev: `false` | Own AI Factory Hub intent |
+| <!-- parameter yaml:enableAIFactoryMCP --><!-- parameter json.dev:enableAIFactoryMCP -->`enableAIFactoryMCP` | No verified binding | O | Y: `"false"`<br>J.dev: `"false"` | Host the governed AI Factory MCP in project001 Dev keep-as-is: Requires enableContainerApps:'true'. false never deletes an existing MCP. |
 | <!-- parameter yaml:enableAIFoundry --><!-- parameter json.dev:enableAIFoundry -->`enableAIFoundry` | `ENABLE_AI_FOUNDRY` | C | Y: `"true"`<br>J.dev: `"true"` | Enable AI Foundry mandatory: Enable AI Foundry recommended: AI Foundry with default project; enterprise-grade private networking, BYOvNet, existing infra. GA. Required together for the standard private-agent capability-host architecture; not universal across all deployment paths. |
 | <!-- parameter yaml:enableAIFoundryHub --><!-- parameter json.dev:enableAIFoundryHub -->`enableAIFoundryHub` | `ENABLE_AI_FOUNDRY_HUB` | O | Y: `"false"`<br>J.dev: `"false"` | DEPRECATED. AI Foundry Hub (V1) service. Do not enable. Use enableAIFoundry instead. keep-as-is: DEPRECATED. AI Foundry Hub (V1) service. Do not enable. Use enableAIFoundry instead. |
+| <!-- parameter yaml:enableAIGatewaySKU --><!-- parameter json.dev:enableAIGatewaySKU -->`enableAIGatewaySKU` | No verified binding | O | Y: `"false"`<br>J.dev: `"false"` | Initialize the new Azure AI Gateway SKU (ai.gateway.azure.com) with the project001 Dev Foundry keep-as-is: Requires enableAIFoundry:'true'. false never deletes an existing gateway. |
 | <!-- parameter yaml:enableAISearch --><!-- parameter json.dev:enableAISearch -->`enableAISearch` | `ENABLE_AI_SEARCH` | C | Y: `"true"`<br>J.dev: `"true"` | Required capability-host vector store for private Foundry standard agents. mandatory: Required capability-host vector store for private Foundry standard agents. Required together for the standard private-agent capability-host architecture; not universal across all deployment paths. |
 | <!-- parameter yaml:enableAISearchSharedPrivateLink --><!-- parameter json.dev:enableAISearchSharedPrivateLink -->`enableAISearchSharedPrivateLink` | `ENABLE_AI_SEARCH_SHARED_PRIVATE_LINK` | O | Y: `"true"`<br>J.dev: `"true"` | AI Search shared private link otherwise: false, creates a private endpoint in the project vNet. |
 | <!-- parameter yaml:enableAIServices --><!-- parameter json.dev:enableAIServices -->`enableAIServices` | `ENABLE_AI_SERVICES` | O | Y: `"false"`<br>J.dev: `"false"` | DEPRECATED. Standalone AI Services account with Azure OpenAI endpoint. Do not enable. Use enableAIFoundry instead. keep-as-is: DEPRECATED. Standalone AI Services account with Azure OpenAI endpoint. Do not enable. Use enableAIFoundry instead. |
@@ -830,6 +833,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ACR_ADMIN_USER_ENABLED -->`ACR_ADMIN_USER_ENABLED` | `acr_adminUserEnabled` | O | `"false"` | Enable ACR admin user otherwise: true enables admin user; false is more secure. |
 | <!-- parameter env:ACR_DEDICATED -->`ACR_DEDICATED` | `acr_dedicated` | O | `"true"` | Dedicated ACR (Premium only) |
 | <!-- parameter env:ACR_SKU -->`ACR_SKU` | `acr_SKU` | O | `"Premium"` | ACR SKU keep-as-is: Premium required for private endpoints or CMK. |
+| <!-- parameter env:ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU -->`ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU` | No verified counterpart | O | `"false"` | addAIFactoryMCP2AIGatewaySKU: register the AI Factory MCP as a tool server on the AI Gateway SKU keep-as-is: Requires ENABLE_AI_FACTORY_MCP:'true' and ENABLE_AI_GATEWAY_SKU:'true'. |
 | <!-- parameter env:ADD_AI_FOUNDRY -->`ADD_AI_FOUNDRY` | `addAIFoundry` | O | `"false"` | Add new AI Foundry instance otherwise: true, add new Foundry even if one already exists. |
 | <!-- parameter env:ADD_AI_FOUNDRY_HUB -->`ADD_AI_FOUNDRY_HUB` | `addAIFoundryHub` | O | `"false"` | DEPRECATED: Add new legacy Hub v1 keep-as-is: Add new Hub even if one exists. Use ADD_AI_FOUNDRY instead. |
 | <!-- parameter env:ADD_AI_SEARCH -->`ADD_AI_SEARCH` | `addAISearch` | O | `"false"` | Add new AI Search instance otherwise: true, add new instance even if one exists. |
@@ -863,8 +867,10 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2 -->`ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2` | `enableAIFactoryCreatedDefaultProjectForAIFv2` | O | `"true"` | AI Factory default project for AIFv2 |
 | <!-- parameter env:ENABLE_AI_DOC_INTELLIGENCE -->`ENABLE_AI_DOC_INTELLIGENCE` | `enableAIDocIntelligence` | O | `"false"` | Enable Azure AI Document Intelligence |
 | <!-- parameter env:ENABLE_AI_FACTORY_HUB -->`ENABLE_AI_FACTORY_HUB` | `enableAIFactoryHub` | O | `"false"` | Own AI Factory Hub intent |
+| <!-- parameter env:ENABLE_AI_FACTORY_MCP -->`ENABLE_AI_FACTORY_MCP` | No verified counterpart | O | `"false"` | enableAIFactoryMCP: host the governed AI Factory MCP in project001 Dev keep-as-is: Requires ENABLE_CONTAINER_APPS:'true'. false never deletes an existing MCP. |
 | <!-- parameter env:ENABLE_AI_FOUNDRY -->`ENABLE_AI_FOUNDRY` | `enableAIFoundry` | C | `"true"` | Enable AI Foundry mandatory: Enable AI Foundry recommended: enterprise-grade private networking, BYOvNet. Required together for the standard private-agent capability-host architecture; not universal across all deployment paths. |
 | <!-- parameter env:ENABLE_AI_FOUNDRY_HUB -->`ENABLE_AI_FOUNDRY_HUB` | `enableAIFoundryHub` | O | `"false"` | DEPRECATED: Legacy AI Foundry Hub v1 keep-as-is: Legacy Hub (v1). Use ENABLE_AI_FOUNDRY instead. |
+| <!-- parameter env:ENABLE_AI_GATEWAY_SKU -->`ENABLE_AI_GATEWAY_SKU` | No verified counterpart | O | `"false"` | enableAIGatewaySKU: initialize the new Azure AI Gateway SKU (ai.gateway.azure.com) with the project001 Dev Foundry keep-as-is: Requires ENABLE_AI_FOUNDRY:'true'. false never deletes an existing gateway. |
 | <!-- parameter env:ENABLE_AI_SEARCH -->`ENABLE_AI_SEARCH` | `enableAISearch` | C | `"true"` | Required capability-host vector store for private Foundry standard agents. mandatory: Required capability-host vector store for private Foundry standard agents. Required together for the standard private-agent capability-host architecture; not universal across all deployment paths. |
 | <!-- parameter env:ENABLE_AI_SEARCH_SHARED_PRIVATE_LINK -->`ENABLE_AI_SEARCH_SHARED_PRIVATE_LINK` | `enableAISearchSharedPrivateLink` | O | `"true"` | Enable AI Search shared private link |
 | <!-- parameter env:ENABLE_AI_SERVICES -->`ENABLE_AI_SERVICES` | `enableAIServices` | O | `"false"` | DEPRECATED: Standalone AI Services account keep-as-is: Replaced by ENABLE_AI_FOUNDRY. Requires ENABLE_AI_SERVICES:'true' for legacy Hub v1. |

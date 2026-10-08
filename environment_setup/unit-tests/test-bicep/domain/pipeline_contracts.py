@@ -68,6 +68,8 @@ ENABLE_FUNCTION enableFunction
 ENABLE_WEBAPP enableWebApp
 ENABLE_CONTAINER_APPS enableContainerApps
 ENABLE_AZURE_MCP_SERVER enableAzureMcpServer
+ENABLE_AI_FACTORY_MCP enableAIFactoryMCP
+ENABLE_AI_GATEWAY_SKU enableAIGatewaySKU
 ENABLE_APPINSIGHTS_DASHBOARD enableAppInsightsDashboard
 ENABLE_APPLICATION_INSIGHTS enableApplicationInsights
 ENABLE_LOGIC_APPS enableLogicApps
@@ -84,6 +86,16 @@ CONFIG_ONLY_EXCEPTIONS = {
     "ENABLE_AI_FACTORY_HUB": "Explicit configuration-only Hub intent; the templates promise no deployment.",
     "ENABLE_AMPLS": "Legacy Hub switch has no GHA common/project binding; known wiring gap, not covered as a deployable flag.",
     "ENABLE_RETRIES": "Legacy retry setting is not forwarded by GHA; task/script retry policy is outside service provisioning.",
+    "ENABLE_AI_FACTORY_MCP": "AI Factory MCP hosting intent for project001 Dev only; no ADO/GHA stage consumes it yet, and false never deletes an existing MCP.",
+    "ENABLE_AI_GATEWAY_SKU": "New AI Gateway SKU intent for project001 Dev Foundry only; no ADO/GHA stage consumes it yet, and false never deletes an existing gateway.",
+}
+# Reviewed public switches outside the enable* inventory: public -> (runtime, reason).
+CONFIG_ONLY_SETTINGS = {
+    "ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU": (
+        "addAIFactoryMCP2AIGatewaySKU",
+        "AI Factory MCP registration intent on the AI Gateway SKU for project001 Dev only; requires both enable flags, "
+        "no ADO/GHA stage consumes it yet, and false never removes an existing registration.",
+    ),
 }
 DEFAULT_EXCEPTIONS = {
     "ENABLE_AKS_FOR_AZURE_ML": (
