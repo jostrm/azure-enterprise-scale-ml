@@ -70,6 +70,58 @@ def test_missing_blockers_is_not_approval():
         validate_preview(preview)
 
 
+def settings_review():
+    request = {"contract_version": 1, "action": "configure-settings", "folder": r"C:\factory",
+               "factory_id": "factory", "scale_set_id": "scale", "project_id": "project",
+               "expected_revision": "a" * 64, "settings": {"enableRedisCache": "false"}}
+    preview = {"contract_version": 1, "confirmation_id": "review", "can_execute": True,
+               "expires_at": future(), "blockers": [], "operation_mode": "configuration",
+               "source_revision": "a" * 64, "factory_id": "factory", "scale_set_id": "scale",
+               "project_id": "project", "target": {"id": "factory"}}
+    return request, preview
+
+
+def test_settings_receipt_roundtrip_and_tamper_detection(tmp_path):
+    request, preview = settings_review()
+    client = AzureFactoryClient()
+    path = tmp_path / "settings.json"
+    write_receipt(str(path), client=client, purpose="catalog-confirm", operation="catalog-settings",
+                  request_body=request, preview=preview)
+    receipt = load_receipt(str(path), client=client, purpose="catalog-confirm", operation_mode="configuration")
+    assert receipt["request"] == request
+    receipt["request"]["settings"]["enableRedisCache"] = "true"
+    path.write_text(json.dumps(receipt), encoding="utf-8")
+    with pytest.raises(ConfigError, match="request hash"):
+        load_receipt(str(path), client=client, purpose="catalog-confirm")
+
+
+@pytest.mark.parametrize("field,value", [
+    ("contract_version", True), ("operation_mode", "runtime"), ("source_revision", "b" * 64),
+    ("source_revision", None), ("factory_id", "other"), ("scale_set_id", None),
+    ("project_id", "other"), ("target", {"id": "other"}), ("target", None),
+])
+def test_settings_receipt_rejects_changed_or_unsupported_acknowledgement(tmp_path, field, value):
+    request, preview = settings_review()
+    preview[field] = value
+    with pytest.raises(ConfigError):
+        write_receipt(str(tmp_path / "settings.json"), client=AzureFactoryClient(),
+                      purpose="catalog-confirm", operation="catalog-settings", request_body=request, preview=preview)
+    assert not (tmp_path / "settings.json").exists()
+
+
+def test_settings_sdk_rejects_missing_acknowledgement_without_retry(monkeypatch):
+    calls = []
+
+    def prepare(self, body):
+        calls.append(body)
+        return {"can_execute": True}
+
+    monkeypatch.setattr(AzureFactoryClient, "catalog_prepare", prepare)
+    with pytest.raises(ConfigError, match="supporting API"):
+        AzureFactoryClient().catalog_settings_prepare(r"C:\factory", "factory", {"enableRedisCache": "false"})
+    assert len(calls) == 1
+
+
 def automatic_project_review(action="add-project"):
     factory_id = "11111111-1111-4111-8111-111111111111"
     scale_id = "22222222-2222-4222-8222-222222222222"

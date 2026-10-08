@@ -279,6 +279,43 @@ azurefactory catalog settings --folder C:\factory --factory-id <uuid> --scale-se
 azurefactory parameters get --folder C:\factory --factory-id <uuid> --scale-set-id <uuid>
 ```
 
+### Review scoped settings without deployment
+
+`AzureFactoryClient.catalog_settings_prepare()` and
+`azurefactory catalog configure-settings` wrap the existing REST
+`POST /api/v1/factory-catalog/prepare` action `configure-settings`.
+There is no new endpoint. Installed clients/APIs may lag the source.
+
+Supply only intentional replacements: omitted keys remain unchanged. The API
+owns editable fields, defaults, identity checks and persistence. Discover supported
+keys with `catalog settings`. Factory scope omits both selectors; scale scope adds
+`--scale-set-id`; project scope adds `--project-id`. With both selectors, the scale
+must be a project placement. **Project settings remain shared project configuration,
+not an environment-only patch.** Disabling a flag never authorizes resource removal.
+
+```powershell
+# settings.json contains only intentional, nonsecret replacements, for example:
+# {"enableRedisCache":"false"}
+azurefactory catalog configure-settings --folder C:\consumer\azurefactory `
+  --factory-id <factory-uuid> --settings-json .\settings.json `
+  --expected-revision <catalog-revision> --save-receipt .\settings-review.json
+```
+
+Inspect the exact request, scope, effects, blockers, revision and expiry. Only
+after separate human approval:
+
+```powershell
+azurefactory catalog confirm --receipt .\settings-review.json --yes
+```
+
+The SDK equivalent is
+`client.catalog_settings_prepare(folder, factory_id, settings, scale_set_id=None,
+project_id=None, expected_revision=revision)`. Save a receipt with
+`operation="catalog-settings"`, `purpose="catalog-confirm"` and the exact request.
+The response must acknowledge the selected scope/revision and configuration-only
+mode; older or contradictory acknowledgements fail closed. Unknown fields are
+rejected by the API, without translation, fallback or automatic retry.
+
 ### Read-only deployment preflight
 
 `preflight` **complements**, rather than replaces, `health` (API availability) and
@@ -496,11 +533,14 @@ UUID. Project numbers are unique across the factory; the two writes are not atom
 
 ### Latest-successful placement selection
 
-For an existing registered factory, explicitly opt in to server-side selection:
+For an existing registered factory, supply explicit environments for server-side
+selection, or retain the explicit selector/UUID placement form:
 
 ```powershell
 azurefactory project add --folder C:\consumer\azurefactory --factory-id <factory-uuid> --number 002 --placement dev=latest-successful --save-receipt .\project.receipt.json
 azurefactory project add-placements --folder C:\consumer\azurefactory --factory-id <factory-uuid> --project-id <project-uuid> --placement stage=latest-successful --save-receipt .\placement.receipt.json
+# Alternative to --placement; repeat --environment for each intended environment.
+azurefactory project add --folder C:\consumer\azurefactory --factory-id <factory-uuid> --number 002 --environment dev --save-receipt .\environment-review.json
 ```
 
 These are independent prepare-only examples. Read the resolved scale-set UUID
@@ -529,7 +569,12 @@ preview = client.review_catalog_prepare({
 
 REST uses this identical JSON with `POST /api/v1/factory-catalog/prepare`.
 For `add-project-placements`, supply `project_id` and top-level `placements`
-instead of `project`. Omission is not an implicit auto-selection request.
+instead of `project`. Omitting `scale_set_id` within an explicitly named environment
+requests the server's `latest-successful` default. `--environment` sends exactly
+`{"environment":"dev"}` for DEV, without a scale ID. Neither selection form may be
+omitted, and `--environment` and `--placement` cannot be combined. There is no
+implicit DEV or client-side catalog sorting. An older API that silently ignores
+the default is rejected unless it supplies consistent capability/resolution evidence.
 Supporting API source is required; older APIs reject the selector, with no
 client fallback, upgrade or retry. A saved draft, highest suffix, local script
 completion or inventory alone is not eligible success. Selection uses recorded
@@ -545,6 +590,78 @@ and `review_catalog_prepare` reject missing or contradictory resolution data,
 including a mismatch with the preview project's UUID placements. Raw
 `catalog_prepare` remains transport-oriented. These checks validate the review
 contract, not the authenticity of provider receipts or current Azure health.
+
+### Thin SDK conveniences and reviewed removal
+
+These supported methods return a prepare preview only:
+
+| SDK method | Existing catalog action |
+| --- | --- |
+| `factory_create_prepare(folder, *, prefix, region, scale_sets, ...)` | `create-factory` |
+| `factory_clone_prepare(folder, factory_id, *, prefix=None, region=None, ...)` | `clone` |
+| `scaleset_add_prepare(folder, factory_id, scale_sets, *, expected_revision=None)` | `create-scale-set` |
+| `project_add_prepare(folder, factory_id, *, number, placements=None, environments=None, ...)` | `add-project` |
+| `project_add_placements_prepare(folder, factory_id, project_id, *, placements=None, environments=None, expected_revision=None)` | `add-project-placements` |
+| `project_delete_prepare(folder, factory_id, project_id, *, environments, include_project_subnets, include_keyvault_and_resource_group, expected_revision, scale_set_id=None, version_ref=None)` | `delete-project` |
+| `scaleset_delete_prepare(folder, factory_id, scale_set_id, *, expected_revision, version_ref=None)` | `delete-scale-set` |
+| `draft_remove_prepare(folder, factory_id, *, kind, expected_revision, scale_set_id=None, project_id=None)` | `delete-draft-factory`, `delete-draft-scale-set`, `delete-draft-project` |
+
+CLI and SDK use shared request builders. Project helpers require nonempty
+`placements` **or** `environments`, never both; omitted scale IDs stay omitted on
+the wire. `project_add_prepare` also accepts `display_name` and nonsecret `settings`
+(`project add --settings-json` in the CLI). Clone accepts `factory_key`,
+`scale_set_id`, `include_projects`, `aifactory_version` and `region_short_name`.
+Configuration helpers accept an optional `expected_revision`; removal helpers
+require it. Server validation and UUID selection remain authoritative.
+
+```python
+preview = client.project_add_prepare(
+    folder, factory_id, number="002", environments=["dev"],
+    expected_revision=catalog_revision,
+)
+# Inspect resolved_placements and obtain approval before catalog_confirm.
+```
+
+**Azure resource deletion is not draft removal.** These CLI commands prepare only
+and do not accept an auto-approval flag:
+
+```powershell
+azurefactory project delete --folder C:\consumer\azurefactory `
+  --factory-id <factory-uuid> --project-id <project-uuid> `
+  --environment dev --environment stage --include-project-subnets no `
+  --include-keyvault-and-resource-group no --expected-revision <catalog-revision> `
+  --save-receipt .\project-delete-review.json
+azurefactory scaleset delete --folder C:\consumer\azurefactory `
+  --factory-id <factory-uuid> --scale-set-id <scale-uuid> `
+  --expected-revision <catalog-revision> --save-receipt .\scale-delete-review.json
+```
+
+Both project deletion choices are independent and required `yes`/`no` values,
+preserved as exact JSON booleans in `deletion_options` alongside explicit
+`environments`. Review the complete deletion/retention scope and blockers.
+Only after human approval, use **`azurefactory runtime confirm --receipt
+.\project-delete-review.json --yes`** (or the scale receipt).
+
+```powershell
+azurefactory draft remove --kind project --folder C:\consumer\azurefactory `
+  --factory-id <factory-uuid> --project-id <project-uuid> `
+  --expected-revision <catalog-revision> --save-receipt .\draft-review.json
+```
+
+Draft `--kind` is `factory`, `scale-set` (requires its exact `--scale-set-id`),
+or `project` (requires `--project-id`). The server must prove safe local draft
+lifecycle. It archives/removes local registration/configuration only; it never
+deletes Azure resources. After separate approval use **`azurefactory catalog
+confirm --receipt .\draft-review.json --yes`**.
+
+Removal receipts bind exact scope, revision, options and configuration-versus-runtime
+mode. Receipt operations are `project-delete`, `scaleset-delete`, and
+`draft-remove-<kind>`; purpose remains `catalog-confirm`. A receipt is not human
+approval. No wrapper retries or switches execution routes.
+Whole-factory Azure deletion continues to use the existing **named
+`delete-aifactory` route**, with its stronger retention/phrase/hash policy; never
+substitute `draft remove --kind factory` or a generic catalog request.
+Captured promotion helpers are not part of these wrappers.
 
 Catalog placements register where a logical project may live (`project add-placements`).
 They do not run update/promote. Catalog runtime deployment is `runtime deploy`

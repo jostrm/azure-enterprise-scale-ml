@@ -159,7 +159,7 @@ def validate_project_selection(request: dict[str, Any], preview: dict[str, Any])
     definition = request.get("project") if action == "add-project" else request
     submitted = definition.get("placements", []) if isinstance(definition, dict) else []
     automatic = [item for item in submitted if isinstance(item, dict)
-                 and item.get("scale_set_id") == "latest-successful"]
+                 and item.get("scale_set_id", "latest-successful") == "latest-successful"]
     if not automatic:
         return
 
@@ -221,12 +221,77 @@ def validate_project_selection(request: dict[str, Any], preview: dict[str, Any])
                                             ("environment", "tenant_id", "subscription_id", "orchestrator")))
             resolved[selected["environment"]] = selected["scale_set_id"]
         for placement in submitted:
-            expected = (resolved[placement["environment"]] if placement["scale_set_id"] == "latest-successful"
+            expected = (resolved[placement["environment"]] if placement.get("scale_set_id", "latest-successful") == "latest-successful"
                         else placement["scale_set_id"])
             matches = [item for item in project["placements"] if item["environment"] == placement["environment"]]
             require(len(matches) == 1 and matches[0]["scale_set_id"] == expected)
     except (KeyError, TypeError, ValueError, AttributeError):
         raise ConfigError("Automatic placement preview contains missing or malformed resolution evidence.") from None
+
+
+def validate_settings_selection(request: dict[str, Any], preview: dict[str, Any]) -> None:
+    """Require the server to acknowledge the selected scope and configuration mode."""
+    if request.get("action") != "configure-settings":
+        return
+    if (type(preview.get("contract_version")) is not int or preview["contract_version"] != 1
+            or preview.get("operation_mode") != "configuration"
+            or not isinstance(preview.get("target"), dict)
+            or preview["target"].get("id") != request.get("factory_id")
+            or not request.get("factory_id")
+            or any(key not in preview or preview[key] != request.get(key)
+                   for key in ("factory_id", "scale_set_id", "project_id"))
+            or not isinstance(preview.get("source_revision"), str)
+            or not re.fullmatch(r"[a-f0-9]{64}", preview["source_revision"])
+            or request.get("expected_revision") is not None
+            and preview["source_revision"] != request["expected_revision"]):
+        raise ConfigError("Settings preview must acknowledge the exact scope, revision and configuration-only mode; use a supporting API.")
+
+
+def validate_removal_selection(request: dict[str, Any], preview: dict[str, Any]) -> None:
+    """Bind removal receipts to exact selected scope/options and the intended mode."""
+    action = request.get("action")
+    draft = action in {"delete-draft-factory", "delete-draft-scale-set", "delete-draft-project"}
+    if not draft and action not in {"delete-project", "delete-scale-set"}:
+        return
+    mode = "configuration" if draft else "runtime"
+    try:
+        for key in ("factory_id", "scale_set_id", "project_id"):
+            value = request.get(key)
+            if value is not None and (not UUID(value).int or str(UUID(value)) != value):
+                raise ValueError()
+        if (not request.get("factory_id")
+                or not isinstance(request.get("expected_revision"), str)
+                or not re.fullmatch(r"[a-f0-9]{64}", request["expected_revision"])
+                or preview.get("source_revision") != request["expected_revision"]
+                or type(preview.get("contract_version")) is not int or preview["contract_version"] != 1
+                or preview.get("operation_mode") != mode
+                or not isinstance(preview.get("target"), dict)
+                or preview["target"].get("id") != request["factory_id"]
+                or any(key not in preview or preview[key] != request.get(key)
+                       for key in ("factory_id", "scale_set_id", "project_id"))
+                or canonical_json_hash(preview.get("deletion_options")) != canonical_json_hash(request.get("deletion_options"))
+                or not isinstance(preview.get("effects"), list) or not preview["effects"]):
+            raise ValueError()
+        if draft:
+            if (not isinstance(preview.get("capabilities"), list)
+                    or "draft-lifecycle-v1" not in preview["capabilities"]
+                    or preview.get("deletion_targets") or preview.get("deletion_plan")):
+                raise ValueError()
+        elif not isinstance(preview.get("deletion_targets"), list):
+            raise ValueError()
+        if action == "delete-project":
+            options = request["deletion_options"]
+            if (not request.get("project_id") or not isinstance(options, dict)
+                    or not isinstance(options.get("environments"), list) or not options["environments"]
+                    or any(type(options.get(key)) is not bool for key in
+                           ("include_project_subnets", "include_keyvault_and_resource_group"))):
+                raise ValueError()
+        if action in {"delete-scale-set", "delete-draft-scale-set"} and not request.get("scale_set_id"):
+            raise ValueError()
+        if action == "delete-draft-project" and not request.get("project_id"):
+            raise ValueError()
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise ConfigError("Removal preview must preserve the exact scope, revision, options and operation mode; use a supporting API.") from None
 
 
 def validate_bindings(request: dict[str, Any], preview: dict[str, Any], purpose: str, operation: str) -> None:
@@ -235,7 +300,7 @@ def validate_bindings(request: dict[str, Any], preview: dict[str, Any], purpose:
             raise ConfigError("Reviewed catalog request must use contract version 1.")
         if type(preview.get("contract_version")) is not int or preview["contract_version"] != 1:
             raise ConfigError("Preview did not acknowledge catalog contract version 1.")
-        expected_mode = "runtime" if operation == "runtime-deploy" else "configuration"
+        expected_mode = "runtime" if operation in {"runtime-deploy", "project-delete", "scaleset-delete"} else "configuration"
         if preview.get("operation_mode") != expected_mode:
             raise ConfigError("Preview operation mode does not match the requested action.")
         if purpose == "catalog-confirm":
@@ -244,10 +309,17 @@ def validate_bindings(request: dict[str, Any], preview: dict[str, Any], purpose:
                 "scaleset-add": "create-scale-set", "project-add": "add-project",
                 "project-add-placements": "add-project-placements", "runtime-deploy": "deploy",
                 "enrollment-binding": "configure-binding",
+                "catalog-settings": "configure-settings",
+                "project-delete": "delete-project", "scaleset-delete": "delete-scale-set",
+                "draft-remove-factory": "delete-draft-factory",
+                "draft-remove-scale-set": "delete-draft-scale-set",
+                "draft-remove-project": "delete-draft-project",
             }
             if operation not in actions or request.get("action") != actions[operation]:
                 raise ConfigError("Receipt operation does not match the reviewed catalog action.")
             validate_project_selection(request, preview)
+            validate_settings_selection(request, preview)
+            validate_removal_selection(request, preview)
             if operation == "enrollment-binding":
                 if (not isinstance(request.get("binding"), dict) or preview.get("binding") != request["binding"]
                         or not isinstance(preview.get("target"), dict)

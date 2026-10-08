@@ -13,7 +13,8 @@ from typing import Any
 
 from .client import API_KEY_ENV, API_URL_ENV, AzureFactoryClient, canonical_json_hash, factory_create_request, redact_secrets, registered_creation_issues
 from .configuration import ConfigurationDraft
-from . import enrollment
+from .client import catalog_settings_request
+from . import catalog_requests, enrollment
 from .errors import APIError, BlockedError, ConfigError, FailureError, RequestTimeout
 from .monitoring_saved import register_saved_commands
 from .review import load_receipt as review_load_receipt
@@ -270,6 +271,13 @@ def build_parser() -> argparse.ArgumentParser:
     catalog_settings.add_argument("--factory-id", required=True)
     catalog_settings.add_argument("--scale-set-id")
     catalog_settings.add_argument("--project-id")
+    settings_prepare = add_prepare_common(catalog_sub, "configure-settings", cmd_catalog_settings_prepare)
+    settings_prepare.description = "Prepare scoped setting replacements only; review and use catalog confirm separately. No deployment or resource deletion."
+    settings_prepare.add_argument("--factory-id", required=True)
+    settings_prepare.add_argument("--scale-set-id")
+    settings_prepare.add_argument("--project-id")
+    settings_prepare.add_argument("--settings-json", required=True,
+                                  help="Nonsecret JSON object with only intentional replacements; omitted keys stay unchanged.")
     catalog_confirm = add_simple(catalog_sub, "confirm", cmd_catalog_confirm)
     add_receipt_and_yes(catalog_confirm)
     catalog_jobs = add_simple(catalog_sub, "jobs", cmd_catalog_jobs)
@@ -308,6 +316,7 @@ def build_parser() -> argparse.ArgumentParser:
     factory_clone.add_argument("--scale-set-id")
     factory_clone.add_argument("--prefix")
     factory_clone.add_argument("--region")
+    factory_clone.add_argument("--region-short-name")
     factory_clone.add_argument("--include-projects", choices=["none", "all"], default="none")
     factory_clone.add_argument("--aifactory-version")
 
@@ -316,6 +325,13 @@ def build_parser() -> argparse.ArgumentParser:
     scaleset_add = add_prepare_common(scaleset_sub, "add", cmd_scaleset_add)
     scaleset_add.add_argument("--factory-id", required=True)
     add_scaleset_flags(scaleset_add)
+    scaleset_delete = add_prepare_common(scaleset_sub, "delete", cmd_scaleset_delete, revision_required=True)
+    scaleset_delete.description = (
+        "Prepare guarded Azure scale-set resource deletion, not local draft removal. No deletion occurs now. "
+        "Review --save-receipt PATH, then separately approve: azurefactory runtime confirm --receipt PATH --yes.")
+    scaleset_delete.add_argument("--factory-id", required=True)
+    scaleset_delete.add_argument("--scale-set-id", required=True)
+    scaleset_delete.add_argument("--version-ref")
 
     project = sub.add_parser("project", help="Project catalog changes.")
     project_sub = project.add_subparsers(dest="project_command", required=True)
@@ -326,11 +342,37 @@ def build_parser() -> argparse.ArgumentParser:
     project_add.add_argument("--factory-id", required=True)
     project_add.add_argument("--number", required=True)
     project_add.add_argument("--display-name", default="")
-    project_add.add_argument("--placement", action="append", required=True, help=placement_help)
+    project_add.add_argument("--settings-json", help="Nonsecret project setting replacements.")
+    add_project_selection(project_add, placement_help)
     project_place = add_prepare_common(project_sub, "add-placements", cmd_project_add_placements)
     project_place.add_argument("--factory-id", required=True)
     project_place.add_argument("--project-id", required=True)
-    project_place.add_argument("--placement", action="append", required=True, help=placement_help)
+    add_project_selection(project_place, placement_help)
+    project_delete = add_prepare_common(project_sub, "delete", cmd_project_delete, revision_required=True)
+    project_delete.description = (
+        "Prepare guarded Azure project resource deletion for explicit environments. Both retention choices are required. "
+        "No deletion occurs now. Review --save-receipt PATH, then separately approve: "
+        "azurefactory runtime confirm --receipt PATH --yes.")
+    project_delete.add_argument("--factory-id", required=True)
+    project_delete.add_argument("--project-id", required=True)
+    project_delete.add_argument("--scale-set-id", help="Optional exact registered source scale-set scope.")
+    project_delete.add_argument("--environment", action="append", choices=["dev", "stage", "prod"], required=True)
+    project_delete.add_argument("--include-project-subnets", choices=["yes", "no"], required=True,
+                                help="Independently choose whether project subnets may be deleted.")
+    project_delete.add_argument("--include-keyvault-and-resource-group", choices=["yes", "no"], required=True,
+                                help="Independently choose whether the project Key Vault and resource group may be deleted.")
+    project_delete.add_argument("--version-ref")
+
+    draft = sub.add_parser("draft", help="Local catalog draft lifecycle; never Azure resource deletion.")
+    draft_sub = draft.add_subparsers(dest="draft_command", required=True)
+    draft_remove = add_prepare_common(draft_sub, "remove", cmd_draft_remove, revision_required=True)
+    draft_remove.description = (
+        "Prepare removal of a proven-safe local factory, scale-set or project draft. No Azure resource deletion. "
+        "Review --save-receipt PATH, then separately approve: azurefactory catalog confirm --receipt PATH --yes.")
+    draft_remove.add_argument("--kind", choices=["factory", "scale-set", "project"], required=True)
+    draft_remove.add_argument("--factory-id", required=True)
+    draft_remove.add_argument("--scale-set-id")
+    draft_remove.add_argument("--project-id")
 
     params = sub.add_parser("parameters", help="Typed ARM parameter introspection and editing.")
     params_sub = params.add_subparsers(dest="parameters_command", required=True)
@@ -467,12 +509,20 @@ def add_simple(sub, name: str, func, **kwargs):
     return parser
 
 
-def add_prepare_common(sub, name: str, func):
+def add_prepare_common(sub, name: str, func, *, revision_required: bool = False):
     parser = add_simple(sub, name, func)
     parser.add_argument("--folder", required=True)
-    parser.add_argument("--expected-revision")
+    parser.add_argument("--expected-revision", required=revision_required)
     parser.add_argument("--save-receipt", help="Write preview receipt JSON for later confirm/start.")
     return parser
+
+
+def add_project_selection(parser, placement_help):
+    selection = parser.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--placement", action="append", help=placement_help)
+    selection.add_argument("--environment", action="append", choices=["dev", "stage", "prod"],
+                           help="Explicit environment; repeat as needed. API selects the latest verified successful "
+                                "common placement. Review resolved UUID/evidence; no implicit dev or client selection.")
 
 
 def add_auth_scope(parser):
@@ -920,6 +970,15 @@ def cmd_catalog_settings(args):
     return emit(client(args).catalog_settings(args.folder, args.factory_id, args.scale_set_id, args.project_id))
 
 
+def cmd_catalog_settings_prepare(args):
+    body = catalog_settings_request(
+        args.folder, args.factory_id, read_json_file(args.settings_json),
+        scale_set_id=args.scale_set_id, project_id=args.project_id,
+        expected_revision=args.expected_revision,
+    )
+    return catalog_prepare_emit(args, body, "catalog-settings")
+
+
 def cmd_catalog_confirm(args):
     require_yes(args)
     receipt = load_receipt(args.receipt, client(args), "catalog-confirm", operation_mode="configuration")
@@ -979,30 +1038,58 @@ def cmd_factory_create(args):
 
 
 def cmd_factory_clone(args):
-    body = prepare_base(args, "clone")
-    body.update(factory_id=args.factory_id, factory_key=args.factory_key, scale_set_id=args.scale_set_id,
-                target_prefix=args.prefix, target_region=args.region, include_projects=args.include_projects,
-                aifactory_version=args.aifactory_version)
+    body = catalog_requests.factory_clone_request(
+        args.folder, args.factory_id, factory_key=args.factory_key, scale_set_id=args.scale_set_id,
+        prefix=args.prefix, region=args.region, include_projects=args.include_projects,
+        aifactory_version=args.aifactory_version, region_short_name=args.region_short_name,
+        expected_revision=args.expected_revision)
     return catalog_prepare_emit(args, body, "factory-clone")
 
 
 def cmd_scaleset_add(args):
-    body = prepare_base(args, "create-scale-set")
-    body.update(factory_id=args.factory_id, scale_sets=build_scale_sets(args))
+    body = catalog_requests.scaleset_add_request(
+        args.folder, args.factory_id, build_scale_sets(args), expected_revision=args.expected_revision)
     return catalog_prepare_emit(args, body, "scaleset-add")
 
 
 def cmd_project_add(args):
-    body = prepare_base(args, "add-project")
-    body.update(factory_id=args.factory_id, project={"number": args.number, "display_name": args.display_name,
-                "placements": parse_placements(args.placement)})
+    body = catalog_requests.project_add_request(
+        args.folder, args.factory_id, number=args.number, display_name=args.display_name,
+        placements=parse_placements(args.placement) if args.placement is not None else None,
+        environments=args.environment, expected_revision=args.expected_revision,
+        settings=read_json_file(args.settings_json) if args.settings_json else None)
     return catalog_prepare_emit(args, body, "project-add")
 
 
 def cmd_project_add_placements(args):
-    body = prepare_base(args, "add-project-placements")
-    body.update(factory_id=args.factory_id, project_id=args.project_id, placements=parse_placements(args.placement))
+    body = catalog_requests.project_add_placements_request(
+        args.folder, args.factory_id, args.project_id,
+        placements=parse_placements(args.placement) if args.placement is not None else None,
+        environments=args.environment, expected_revision=args.expected_revision)
     return catalog_prepare_emit(args, body, "project-add-placements")
+
+
+def cmd_project_delete(args):
+    body = catalog_requests.project_delete_request(
+        args.folder, args.factory_id, args.project_id, environments=args.environment,
+        include_project_subnets=args.include_project_subnets == "yes",
+        include_keyvault_and_resource_group=args.include_keyvault_and_resource_group == "yes",
+        expected_revision=args.expected_revision, scale_set_id=args.scale_set_id, version_ref=args.version_ref)
+    return catalog_prepare_emit(args, body, "project-delete")
+
+
+def cmd_scaleset_delete(args):
+    body = catalog_requests.scaleset_delete_request(
+        args.folder, args.factory_id, args.scale_set_id, expected_revision=args.expected_revision,
+        version_ref=args.version_ref)
+    return catalog_prepare_emit(args, body, "scaleset-delete")
+
+
+def cmd_draft_remove(args):
+    body = catalog_requests.draft_remove_request(
+        args.folder, args.factory_id, kind=args.kind, expected_revision=args.expected_revision,
+        scale_set_id=args.scale_set_id, project_id=args.project_id)
+    return catalog_prepare_emit(args, body, "draft-remove-" + args.kind)
 
 
 def cmd_parameters_get(args):
@@ -1306,8 +1393,10 @@ def catalog_prepare_emit(args, body: dict[str, Any], operation: str) -> int:
             (body.get("action") == "create-factory" and k == "initial_project")}
     result = client(args).catalog_prepare(body)
     if result.get("can_execute") is True:
-        from .review import validate_project_selection
+        from .review import validate_project_selection, validate_settings_selection, validate_removal_selection
         validate_project_selection(body, result)
+        validate_settings_selection(body, result)
+        validate_removal_selection(body, result)
     maybe_save_receipt(args, result, body, "catalog-confirm", operation=operation)
     return preview_emit(result)
 

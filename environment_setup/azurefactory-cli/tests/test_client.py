@@ -113,6 +113,42 @@ def test_bootstrap_common_details_is_explicit_and_strict_remains_default(server)
     assert len(Handler.records) == 2
 
 
+@pytest.mark.parametrize("scope", [{}, {"scale_set_id": "scale"}, {"project_id": "project"},
+                                  {"scale_set_id": "scale", "project_id": "project"}])
+def test_catalog_settings_sdk_prepares_once_without_mutating_input(server, scope):
+    settings = {"enableAIGatewaySKU": False, "addAIFactoryMCP2AIGatewaySKU": True,
+                "enableAIFactoryMCP": False}
+    preview = {"can_execute": False, "blockers": ["Scope unavailable."]}
+    Handler.responses[("POST", "/api/v1/factory-catalog/prepare")] = (200, preview, {})
+    result = AzureFactoryClient(server, "test-key").catalog_settings_prepare(
+        r"C:\factory", "factory", settings, expected_revision="a" * 64, **scope)
+    assert result == preview
+    assert Handler.records == [{
+        "method": "POST", "path": "/api/v1/factory-catalog/prepare", "key": "test-key",
+        "body": {"folder": r"C:\factory", "contract_version": 1, "action": "configure-settings",
+                 "factory_id": "factory", "settings": settings, "expected_revision": "a" * 64, **scope},
+    }]
+    assert settings == {"enableAIGatewaySKU": False, "addAIFactoryMCP2AIGatewaySKU": True,
+                        "enableAIFactoryMCP": False}
+
+
+@pytest.mark.parametrize("settings", [None, [], "settings", 1])
+def test_catalog_settings_sdk_rejects_nonobject_before_request(server, settings):
+    with pytest.raises(ConfigError, match="settings must be a JSON object"):
+        AzureFactoryClient(server, "test-key").catalog_settings_prepare(r"C:\factory", "factory", settings)
+    assert Handler.records == []
+
+
+@pytest.mark.parametrize("status", [401, 404, 405, 409, 422, 503])
+def test_catalog_settings_sdk_surfaces_errors_without_fallback_or_retry(server, status):
+    Handler.responses[("POST", "/api/v1/factory-catalog/prepare")] = (status, {"detail": "Rejected"}, {})
+    with pytest.raises(APIError) as error:
+        AzureFactoryClient(server, "test-key").catalog_settings_prepare(
+            r"C:\factory", "factory", {"enableRedisCache": "false"})
+    assert error.value.status == status
+    assert len(Handler.records) == 1
+
+
 def test_factory_create_sdk_defers_defaults_and_prepares_only(server):
     client = AzureFactoryClient(server, "test-key")
     scales = [{"environment": "dev", "suffix": "001"}]

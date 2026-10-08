@@ -392,6 +392,38 @@ def factory_create_args(server):
     ]
 
 
+@pytest.mark.parametrize("content", ["null", "[]", '"settings"'])
+def test_settings_cli_rejects_nonobject_input_before_network(server, tmp_path, capsys, content):
+    path = tmp_path / "settings.json"
+    path.write_text(content, encoding="utf-8")
+    assert main(["--api-url", server, "--api-key", "test-key", "catalog", "configure-settings",
+                 "--folder", r"C:\factory", "--factory-id", "factory", "--settings-json", str(path)]) == 2
+    assert "settings must be a JSON object" in capsys.readouterr().err
+    assert Handler.records == []
+
+
+def test_settings_cli_does_not_overwrite_existing_review_or_prepare(server, tmp_path, capsys):
+    settings = tmp_path / "settings.json"
+    settings.write_text('{"enableRedisCache":"false"}', encoding="utf-8")
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text("existing review", encoding="utf-8")
+    assert main(["--api-url", server, "--api-key", "test-key", "catalog", "configure-settings",
+                 "--folder", r"C:\factory", "--factory-id", "factory", "--settings-json", str(settings),
+                 "--save-receipt", str(receipt)]) == 2
+    assert "Refusing to overwrite" in capsys.readouterr().err
+    assert receipt.read_text(encoding="utf-8") == "existing review"
+    assert Handler.records == []
+
+
+def test_settings_cli_rejects_unsupported_scope_acknowledgement_without_receipt(server, tmp_path, capsys):
+    settings = tmp_path / "settings.json"
+    settings.write_text('{"enableRedisCache":"false"}', encoding="utf-8")
+    assert main(["--api-url", server, "--api-key", "test-key", "catalog", "configure-settings",
+                 "--folder", r"C:\factory", "--factory-id", "factory", "--settings-json", str(settings)]) == 2
+    assert "supporting API" in capsys.readouterr().err
+    assert [record["route"] for record in Handler.records] == ["/api/v1/factory-catalog/prepare"]
+
+
 def test_factory_create_delegates_default_project_and_version_to_api(server, capsys):
     assert main(factory_create_args(server)) == 0
     assert [record["route"] for record in Handler.records] == ["/openapi.json", "/api/v1/factory-catalog/prepare"]
