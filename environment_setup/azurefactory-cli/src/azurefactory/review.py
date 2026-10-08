@@ -247,6 +247,21 @@ def validate_settings_selection(request: dict[str, Any], preview: dict[str, Any]
         raise ConfigError("Settings preview must acknowledge the exact scope, revision and configuration-only mode; use a supporting API.")
 
 
+def _normalized_project_deletion_options(options: Any) -> dict[str, Any]:
+    flags = ("include_project_subnets", "include_keyvault_and_resource_group")
+    if (not isinstance(options, dict) or set(options) != {"environments", *flags}
+            or any(type(options[key]) is not bool for key in flags)):
+        raise ValueError()
+    environments = options["environments"]
+    allowed = ("dev", "stage", "prod")
+    if (not isinstance(environments, list) or not environments
+            or any(not isinstance(environment, str) or environment not in allowed for environment in environments)
+            or len(set(environments)) != len(environments)):
+        raise ValueError()
+    # The API canonicalizes environment order; retain the original reviewed request.
+    return {**options, "environments": [environment for environment in allowed if environment in environments]}
+
+
 def validate_removal_selection(request: dict[str, Any], preview: dict[str, Any]) -> None:
     """Bind removal receipts to exact selected scope/options and the intended mode."""
     action = request.get("action")
@@ -269,7 +284,6 @@ def validate_removal_selection(request: dict[str, Any], preview: dict[str, Any])
                 or preview["target"].get("id") != request["factory_id"]
                 or any(key not in preview or preview[key] != request.get(key)
                        for key in ("factory_id", "scale_set_id", "project_id"))
-                or canonical_json_hash(preview.get("deletion_options")) != canonical_json_hash(request.get("deletion_options"))
                 or not isinstance(preview.get("effects"), list) or not preview["effects"]):
             raise ValueError()
         if draft:
@@ -280,12 +294,12 @@ def validate_removal_selection(request: dict[str, Any], preview: dict[str, Any])
         elif not isinstance(preview.get("deletion_targets"), list):
             raise ValueError()
         if action == "delete-project":
-            options = request["deletion_options"]
-            if (not request.get("project_id") or not isinstance(options, dict)
-                    or not isinstance(options.get("environments"), list) or not options["environments"]
-                    or any(type(options.get(key)) is not bool for key in
-                           ("include_project_subnets", "include_keyvault_and_resource_group"))):
+            if (not request.get("project_id")
+                    or _normalized_project_deletion_options(request.get("deletion_options"))
+                    != _normalized_project_deletion_options(preview.get("deletion_options"))):
                 raise ValueError()
+        elif canonical_json_hash(preview.get("deletion_options")) != canonical_json_hash(request.get("deletion_options")):
+            raise ValueError()
         if action in {"delete-scale-set", "delete-draft-scale-set"} and not request.get("scale_set_id"):
             raise ValueError()
         if action == "delete-draft-project" and not request.get("project_id"):

@@ -4,7 +4,7 @@ import pytest
 
 from azurefactory import AzureFactoryClient, ConfigError
 from azurefactory.cli import main
-from azurefactory.review import write_receipt
+from azurefactory.review import load_receipt, write_receipt
 from test_reviews import automatic_project_review, future
 
 
@@ -140,6 +140,68 @@ def test_project_delete_cli_requires_independent_choices(captured, capsys):
     capsys.readouterr()
     assert captured[0][2]["deletion_options"] == {"environments": ["dev"],
         "include_project_subnets": False, "include_keyvault_and_resource_group": True}
+
+
+def test_project_delete_accepts_reordered_environments_without_mutation(monkeypatch, tmp_path, capsys):
+    request, preview = destructive_review()
+    request["deletion_options"] = {**request["deletion_options"], "environments": ["prod", "dev"]}
+    preview["deletion_options"] = {**request["deletion_options"], "environments": ["dev", "prod"]}
+    original_request, original_preview = copy.deepcopy(request), copy.deepcopy(preview)
+    calls = []
+
+    def prepare(self, body):
+        calls.append(copy.deepcopy(body))
+        return preview
+
+    monkeypatch.setattr(AzureFactoryClient, "catalog_prepare", prepare)
+    client = AzureFactoryClient()
+    assert client.project_delete_prepare("folder", FACTORY, PROJECT, expected_revision=REVISION,
+                                         **request["deletion_options"]) == preview
+    assert calls == [request]
+    receipt_path = tmp_path / "sdk-review.json"
+    write_receipt(str(receipt_path), client=client, purpose="catalog-confirm", operation="project-delete",
+                  request_body=request, preview=preview)
+    assert load_receipt(str(receipt_path), client=client, purpose="catalog-confirm",
+                        operation_mode="runtime")["request"] == request
+    cli_path = tmp_path / "cli-review.json"
+    assert main(["project", "delete", "--folder", "folder", "--factory-id", FACTORY,
+                 "--project-id", PROJECT, "--expected-revision", REVISION,
+                 "--environment", "prod", "--environment", "dev",
+                 "--include-project-subnets", "no", "--include-keyvault-and-resource-group", "no",
+                 "--save-receipt", str(cli_path)]) == 0
+    capsys.readouterr()
+    assert calls == [request, request]
+    assert load_receipt(str(cli_path), client=client, purpose="catalog-confirm",
+                        operation_mode="runtime")["request"] == request
+    assert request == original_request and preview == original_preview
+
+
+@pytest.mark.parametrize("side", ["request", "preview", "both"])
+@pytest.mark.parametrize("changes", [
+    {"environments": ["dev", "dev"]}, {"environments": ["dev", "invalid"]},
+    {"environments": []}, {"environments": "dev"}, {"environments": ["DEV"]},
+    {"environments": [None]}, {"environments": [["dev"]]}, {"environments": [True]},
+    {"include_project_subnets": 0}, {"include_keyvault_and_resource_group": "false"},
+    {"unknown_option": False},
+])
+def test_project_delete_rejects_malformed_options_even_when_equal(tmp_path, side, changes):
+    request, preview = destructive_review()
+    request["deletion_options"] = copy.deepcopy(request["deletion_options"])
+    preview["deletion_options"] = copy.deepcopy(preview["deletion_options"])
+    for value in ([request, preview] if side == "both" else [request if side == "request" else preview]):
+        value["deletion_options"].update(changes)
+    with pytest.raises(ConfigError):
+        write_receipt(str(tmp_path / "review.json"), client=AzureFactoryClient(), purpose="catalog-confirm",
+                      operation="project-delete", request_body=request, preview=preview)
+
+
+@pytest.mark.parametrize("field", ["environments", "include_project_subnets", "include_keyvault_and_resource_group"])
+def test_project_delete_rejects_changed_valid_options(tmp_path, field):
+    request, preview = destructive_review()
+    preview["deletion_options"] = {**request["deletion_options"], field: ["prod"] if field == "environments" else True}
+    with pytest.raises(ConfigError):
+        write_receipt(str(tmp_path / "review.json"), client=AzureFactoryClient(), purpose="catalog-confirm",
+                      operation="project-delete", request_body=request, preview=preview)
 
 
 def test_deletion_receipt_uses_runtime_confirmation_only(monkeypatch, tmp_path, capsys):
