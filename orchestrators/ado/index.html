@@ -397,7 +397,7 @@
   
     
   
-  AI Factory Intelligence
+  Monitor and operate
 
       </a>
     </li>
@@ -749,7 +749,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -859,7 +859,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Platform automation
   
 
     
@@ -1372,10 +1372,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#create-a-new-factory-scale-set" class="md-nav__link">
+  <a href="#start-with-a-registered-factory" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Create a new factory scale set
+        Start with a registered factory
       
     </span>
   </a>
@@ -1383,21 +1383,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#update-or-run-an-existing-project" class="md-nav__link">
+  <a href="#collect-the-right-inputs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Update or run an existing project
+        Collect the right inputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Collect the right inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#service-connection-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service-connection parameters
       
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#tenant-and-service-connection-setup" class="md-nav__link">
+  <a href="#follow-the-exact-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tenant and service-connection setup
+        Follow the exact run
       
     </span>
   </a>
@@ -1489,7 +1506,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1529,10 +1546,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#create-a-new-factory-scale-set" class="md-nav__link">
+  <a href="#start-with-a-registered-factory" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Create a new factory scale set
+        Start with a registered factory
       
     </span>
   </a>
@@ -1540,21 +1557,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#update-or-run-an-existing-project" class="md-nav__link">
+  <a href="#collect-the-right-inputs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Update or run an existing project
+        Collect the right inputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Collect the right inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#service-connection-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service-connection parameters
       
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#tenant-and-service-connection-setup" class="md-nav__link">
+  <a href="#follow-the-exact-run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tenant and service-connection setup
+        Follow the exact run
       
     </span>
   </a>
@@ -1582,49 +1616,58 @@
 
 
 <h1 id="azure-devops">Azure DevOps<a class="headerlink" href="#azure-devops" title="Permanent link">&para;</a></h1>
-<p>Use the Azure DevOps consumer repository for this route; it is separate from a
-GitHub repository. Maintain one complete project <code>variables.json</code> with <code>dev</code> and
-<code>stage_prod</code>, or use ADO <code>variables.yaml</code>. See
-<a href="../../parameters/">configuration and API</a> and <a href="../../parameters/advanced/">all variables</a>.</p>
-<h2 id="create-a-new-factory-scale-set">Create a new factory scale set<a class="headerlink" href="#create-a-new-factory-scale-set" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>bash<span class="w"> </span>./ADO-create-new-aifactory-scaleset.sh<span class="w"> </span>--repo-root<span class="w"> </span><span class="s2">"C:/work/my-ado-factory"</span>
-</code></pre></div>
-<p>The source launcher is under <code>bootstrap/</code>; installed consumer copies may be at
-the repository root. Normal full bootstrap prepares Azure identity, configuration,
-repository/pipeline automation, common infrastructure and an initial project.
-It can create billable resources and publish repository changes.</p>
-<p>Use <code>--help</code> for the selected version. <code>--aifactory-version main</code> is explicit;
-these create wrappers currently default to <code>main</code>. <code>--dry-run</code> collects and
-validates answers without running the normal bootstrap mutations.
-<code>--prepare-only</code> <strong>does change Azure/identity/configuration</strong>; it is not a preview.
-For unattended operation, provide the documented inputs and established
-authentication before using <code>--non-interactive --yes</code>.</p>
-<h2 id="update-or-run-an-existing-project">Update or run an existing project<a class="headerlink" href="#update-or-run-an-existing-project" title="Permanent link">&para;</a></h2>
-<p>From the selected ADO consumer repository:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Refresh AI Factory/templates, then run the selected project pipeline.</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>bash<span class="w"> </span>./ADO-update-aifactory-and-run-project.sh<span class="w"> </span>--aifactory-version<span class="w"> </span>main
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Preserve installed templates and run the project pipeline only.</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>bash<span class="w"> </span>./ADO-update-aifactory-and-run-project.sh<span class="w"> </span>--project-only
-</code></pre></div>
-<p>Normal update defaults to <code>main</code>; project-only uses the installed source.
-Scripts may prompt for configuration, commit/push or authentication. For API
-automation, use the project plan/prepare/start contract, which binds the selected
-project, environment, configuration and source version before execution.
-Default waiting tracks the submitted run; a submitted pipeline is not yet a
-verified deployed environment.</p>
-<h2 id="tenant-and-service-connection-setup">Tenant and service-connection setup<a class="headerlink" href="#tenant-and-service-connection-setup" title="Permanent link">&para;</a></h2>
-<p><code>azureDevOpsTenantId</code> identifies the ADO organization tenant; <code>tenantId</code> identifies
-the Azure deployment tenant. Do not change either ID merely to make them equal.
-Cross-tenant reviewed execution needs the compatible organization-tenant
-authentication helper and access in both contexts. A standard username-prefixed
-ADO clone URL is not a reason to retarget the repository; never embed passwords
-or tokens in its URL.</p>
-<p>Configure service connections for each environment you actually deploy:</p>
+<p>Choose Azure DevOps when your team uses its repositories, pipelines and service
+connections. It is a provider choice, not a different Factory configuration model.</p>
+<h2 id="start-with-a-registered-factory">Start with a registered factory<a class="headerlink" href="#start-with-a-registered-factory" title="Permanent link">&para;</a></h2>
+<p>Use the <a href="../../factory-tools/19-cli-and-api-and-usage/">CLI, Python SDK or REST guide</a>
+to save configuration with the explicit <code>ado</code> orchestrator, review its binding and
+separately approve deployment or supported Full bootstrap.</p>
+<p>Selecting <code>ado</code> does not itself create a pipeline, authorize a service connection
+or deploy resources. A blocked registered operation is not permission to use a
+legacy launcher instead.</p>
+<h2 id="collect-the-right-inputs">Collect the right inputs<a class="headerlink" href="#collect-the-right-inputs" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>YAML/JSON variable</th>
+<th>Input</th>
+<th>What to confirm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Azure tenant/subscription</td>
+<td>The selected environment and deployment identity's permissions.</td>
+</tr>
+<tr>
+<td>ADO organization/project/repository</td>
+<td>The actual source and pipeline location.</td>
+</tr>
+<tr>
+<td>ADO tenant</td>
+<td><code>azureDevOpsTenantId</code> can differ from Azure <code>tenantId</code>; do not change IDs merely to make them match.</td>
+</tr>
+<tr>
+<td>Service connections</td>
+<td>Exact authorized names and permissions for each environment being deployed.</td>
+</tr>
+<tr>
+<td>Runner/pool</td>
+<td>Supported OS, private connectivity and approved pool/image for the selected route.</td>
+</tr>
+<tr>
+<td>Version</td>
+<td>Matching launcher, helpers, templates and API/runtime contracts.</td>
+</tr>
+</tbody>
+</table>
+<p>Scoped registered workers use the supported Linux execution contract. Other
+legacy paths can have different runner assumptions. Do not infer Azure login
+from an agent being online.</p>
+<h3 id="service-connection-parameters">Service-connection parameters<a class="headerlink" href="#service-connection-parameters" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>JSON/YAML key</th>
 <th>Purpose</th>
 </tr>
 </thead>
@@ -1635,47 +1678,54 @@ or tokens in its URL.</p>
 </tr>
 <tr>
 <td><code>dev_seeding_kv_service_connection</code></td>
-<td>Dev seeding Key Vault access</td>
+<td>Dev seeding-vault access</td>
 </tr>
 <tr>
-<td><code>test_service_connection</code></td>
-<td>Stage deployment</td>
+<td><code>test_service_connection</code> / <code>test_seeding_kv_service_connection</code></td>
+<td>Stage, when selected</td>
 </tr>
 <tr>
-<td><code>test_seeding_kv_service_connection</code></td>
-<td>Stage seeding Key Vault access</td>
-</tr>
-<tr>
-<td><code>prod_service_connection</code></td>
-<td>Prod deployment</td>
-</tr>
-<tr>
-<td><code>prod_seeding_kv_service_connection</code></td>
-<td>Prod seeding Key Vault access</td>
+<td><code>prod_service_connection</code> / <code>prod_seeding_kv_service_connection</code></td>
+<td>Prod, when selected</td>
 </tr>
 </tbody>
 </table>
-<p>Connections must match the pipeline's authentication mode, subscription and
-permissions. The same authorized connection may cover compatible duties; six
-names do not necessarily require six distinct principals.
-Local execution also needs Git Bash, Azure CLI with the required ADO extension,
-and host Python.</p>
-<p>The source
-<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/variables/variables.yaml"><code>variables.yaml</code></a>
-is copied to the consumer's
+<p>These names do not necessarily require separate principals for every duty, but
+every referenced connection must be authorized for its intended use.
+Secret-name references are not credential values.</p>
+<h2 id="follow-the-exact-run">Follow the exact run<a class="headerlink" href="#follow-the-exact-run" title="Permanent link">&para;</a></h2>
+<p>Preserve the confirmation/job ID and the provider run details. Check the actual
+deployment result rather than treating HTTP acceptance or a local script exit
+as success. The CLI's <code>workflow status/watch</code> feature is GitHub-specific;
+use catalog job status and ADO's own run results for this provider.</p>
+<p><a href="../../parameters/">Parameters</a> |
+<a href="../../factory-tools/19-cli-and-api-and-usage/">Deployment/status tutorials</a> |
+<a href="../../factory-tools/20-cli-and-api-and-usage/">Deletion and recovery</a></p>
+<details>
+<summary>Alternative and Legacy ways</summary>
+<p>Existing legacy consumer repositories use the matching scripts installed at the
+consumer root:</p>
+<ul>
+<li><code>ADO-create-new-aifactory-scaleset.sh</code>: full creation flow, including potentially
+  billable Azure/identity/repository changes.</li>
+<li><code>ADO-update-aifactory-and-run-project.sh</code>: reviewed update/project execution.</li>
+<li><code>--project-only</code>: excludes the template/library update portion; not a version
+  upgrade or a blanket safety guarantee.</li>
+<li><code>--aifactory-env dev|stage|prod</code>: selects the project environment.</li>
+</ul>
+<p>Legacy create defaults to <code>124</code>; update normally inherits the saved version.
+Use an explicit supported version, including <code>main</code> for development, when
+intended. A version selection does not migrate layouts.
+<code>--prepare-only</code> can change Azure and configuration; it is not a read-only
+preview. Use the selected source's help and
+<a href="../../parameters/advanced/#bash-create-and-update-contract">complete input contract</a>.</p>
+<p>The source YAML is copied into
 <code>aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml</code>.
-Project JSON overrides must use the matching pipeline adapter; do not rename
-JSON keys to GitHub environment names.</p>
-<p>For registered exact-scope operations,
-<code>bootstrap/ADO-azurefactory.sh</code> consumes a trusted, protected reviewed manifest.
-It does not initialize the register or bypass provider publication, service
-connections, target-lock enrollment or approval.</p>
-<div class="admonition warning">
-<p class="admonition-title">Before execution</p>
-<p>Keep launchers, helpers and YAML templates on a compatible published version.
-Protect populated project configuration and credentials. Run-specific secret
-transport is not permission to commit them to the repository.</p>
-</div>
+Project JSON overrides require the matching adapter; GitHub uppercase names
+are not a replacement for ADO keys.</p>
+<p><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops">Current ADO templates</a> |
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/20-29/24-end-2-end-setup.md">Setup overview</a></p>
+</details>
 
 
 

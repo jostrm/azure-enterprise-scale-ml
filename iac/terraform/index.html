@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#iac-byo-terraform" class="md-skip">
+        <a href="#bring-your-own-infrastructure" class="md-skip">
           Skip to content
         </a>
       
@@ -397,7 +397,7 @@
   
     
   
-  AI Factory Intelligence
+  Monitor and operate
 
       </a>
     </li>
@@ -749,7 +749,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -859,7 +859,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Platform automation
   
 
     
@@ -1277,10 +1277,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#byo-terraform-philosophy" class="md-nav__link">
+  <a href="#a-practical-split" class="md-nav__link">
     <span class="md-ellipsis">
       
-        BYO Terraform Philosophy
+        A practical split
       
     </span>
   </a>
@@ -1288,21 +1288,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#integration-points" class="md-nav__link">
+  <a href="#before-integrating" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Integration Points
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#terraform-references" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Terraform References
+        Before integrating
       
     </span>
   </a>
@@ -1489,7 +1478,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1529,10 +1518,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#byo-terraform-philosophy" class="md-nav__link">
+  <a href="#a-practical-split" class="md-nav__link">
     <span class="md-ellipsis">
       
-        BYO Terraform Philosophy
+        A practical split
       
     </span>
   </a>
@@ -1540,21 +1529,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#integration-points" class="md-nav__link">
+  <a href="#before-integrating" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Integration Points
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#terraform-references" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Terraform References
+        Before integrating
       
     </span>
   </a>
@@ -1581,95 +1559,76 @@
   
 
 
-<h1 id="iac-byo-terraform">IaC — BYO Terraform<a class="headerlink" href="#iac-byo-terraform" title="Permanent link">&para;</a></h1>
-<p>The AI Factory natively uses <strong>Azure Bicep</strong> for IaC. However, if your organisation already has Terraform-based infrastructure, the AI Factory supports a <strong>Bring Your Own Terraform (BYO Terraform)</strong> mode.</p>
-<hr />
-<h2 id="byo-terraform-philosophy">BYO Terraform Philosophy<a class="headerlink" href="#byo-terraform-philosophy" title="Permanent link">&para;</a></h2>
-<p>BYO Terraform means: <strong>use your existing Terraform for shared/common infrastructure, and let the AI Factory Bicep handle the AI Factory-specific project resources</strong>.</p>
-<p>Typical split:</p>
+<h1 id="bring-your-own-infrastructure">Bring your own infrastructure<a class="headerlink" href="#bring-your-own-infrastructure" title="Permanent link">&para;</a></h1>
+<p>Already managing shared Azure resources with Terraform? You can use supported
+AI Factory <strong>existing-resource inputs</strong> to integrate with that estate.
+Keep ownership clear: Terraform and AI Factory must not independently manage
+the same resource without an explicit plan.</p>
+<div class="admonition note">
+<p class="admonition-title">Not a second complete deployment engine</p>
+<p>The repository's <code>environment_setup/aifactory/terraform/readme.md</code> remains
+a TODO for Bicep-equivalent behavior. Do not assume complete Terraform
+templates or registered-runtime parity are implemented.</p>
+</div>
+<h2 id="a-practical-split">A practical split<a class="headerlink" href="#a-practical-split" title="Permanent link">&para;</a></h2>
+<p>Your platform team may provide subscriptions, hub networking, DNS, storage or
+other common services. The AI Factory's supported Bicep/project route then uses
+approved references where the chosen template supports them.</p>
 <table>
 <thead>
 <tr>
-<th>Managed by Terraform</th>
-<th>Managed by AI Factory Bicep</th>
+<th>Input</th>
+<th>What it identifies</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Hub VNet, firewall, DNS zones</td>
-<td>Project VNets, subnets (or BYO subnets)</td>
-</tr>
-<tr>
-<td>Shared Key Vaults (seeding KV)</td>
-<td>Project Key Vaults</td>
-</tr>
-<tr>
-<td>Shared ACR</td>
-<td>Project ACR (or shared, configurable)</td>
-</tr>
-<tr>
-<td>Existing subscriptions, resource groups</td>
-<td>AI Factory Common RG + Project RGs</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="integration-points">Integration Points<a class="headerlink" href="#integration-points" title="Permanent link">&para;</a></h2>
-<p>Configure the following variables to point the AI Factory at your existing Terraform-managed resources:</p>
-<table>
-<thead>
-<tr>
-<th>Variable</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>vnetNameFull_param</code></td>
-<td>Full name of your existing VNet</td>
-</tr>
-<tr>
-<td><code>vnetResourceGroup_param</code></td>
-<td>Resource group of your existing VNet</td>
+<td><code>vnetNameFull_param</code>, <code>vnetResourceGroup_param</code></td>
+<td>Existing VNet and its resource group</td>
 </tr>
 <tr>
 <td><code>commonResourceGroup_param</code></td>
-<td>Existing common resource group name</td>
+<td>Common resource-group reference</td>
 </tr>
 <tr>
 <td><code>datalakeName_param</code></td>
-<td>Existing data lake storage account name</td>
+<td>Existing data-lake account</td>
 </tr>
 <tr>
 <td><code>kvNameFromCOMMON_param</code></td>
-<td>Existing common Key Vault name</td>
+<td>Existing common Key Vault</td>
 </tr>
 <tr>
-<td><code>BYO_subnets=true</code></td>
-<td>Use your pre-existing subnets</td>
+<td><code>BYO_subnets</code> and service subnet names</td>
+<td>Use the reviewed existing subnet layout</td>
 </tr>
 <tr>
-<td><code>centralDnsZoneByPolicyInHub=true</code></td>
-<td>Use your existing centralised private DNS zones</td>
-</tr>
-<tr>
-<td><code>privDnsSubscription_param</code></td>
-<td>Subscription containing your DNS zones</td>
-</tr>
-<tr>
-<td><code>privDnsResourceGroup_param</code></td>
-<td>Resource group containing your DNS zones</td>
+<td><code>centralDnsZoneByPolicyInHub</code> and <code>privDns*</code> settings</td>
+<td>Central private-DNS design and location</td>
 </tr>
 </tbody>
 </table>
-<hr />
-<h2 id="terraform-references">Terraform References<a class="headerlink" href="#terraform-references" title="Permanent link">&para;</a></h2>
-<p>The <code>environment_setup/aifactory/terraform/</code> directory contains Terraform reference configurations that can be used as a starting point for managing shared infrastructure outside the AI Factory Bicep pipeline.</p>
-<hr />
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>For most new deployments, the <strong>full Bicep</strong> approach (no BYO Terraform) is recommended — it is simpler, faster, and fully supported. Use BYO Terraform only when integrating into an existing Terraform-managed estate.</p>
-</div>
+<p>See <a href="../../parameters/advanced/">all parameters</a> for exact names and conditions.
+Supplying a reference does not grant access, create a peering, or transfer
+resource ownership.</p>
+<h2 id="before-integrating">Before integrating<a class="headerlink" href="#before-integrating" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Agree which tool owns each resource and its state.</li>
+<li>Confirm exact IDs, subscriptions, address ranges, DNS and private routes.</li>
+<li>Give the deployment identity only the required permissions.</li>
+<li>Review AI Factory's deployment and deletion plans with those boundaries.</li>
+</ol>
+<p>Never allow whole-group deletion to remove resources still owned by another
+project or tool. An unsupported combination should remain blocked.</p>
+<details>
+<summary>More info</summary>
+<p><a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/terraform/readme.md">Terraform status in source</a> |
+<a href="../bicep/">Bicep route</a> |
+<a href="../../factory-tools/19-cli-and-api-and-usage/">Factory operations</a></p>
+<p>BYO integration is not an automatic translation of Terraform state into the
+registered catalog. Importing configuration and proving deployment ownership
+are separate tasks.</p>
+</details>
 
 
 

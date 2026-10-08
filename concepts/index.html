@@ -29,7 +29,7 @@
     
     
       
-        <title>AI Factory Concepts - Enterprise Scale AI Factory</title>
+        <title>AI Factory concepts - Enterprise Scale AI Factory</title>
       
     
     
@@ -115,7 +115,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              AI Factory Concepts
+              AI Factory concepts
             
           </span>
         </div>
@@ -397,7 +397,7 @@
   
     
   
-  AI Factory Intelligence
+  Monitor and operate
 
       </a>
     </li>
@@ -749,7 +749,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -862,7 +862,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Platform automation
   
 
     
@@ -1412,7 +1412,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1452,10 +1452,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-four-pillars" class="md-nav__link">
+  <a href="#factory-scale-set-and-project" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The Four Pillars
+        Factory, scale set and project
       
     </span>
   </a>
@@ -1463,10 +1463,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#design-philosophy" class="md-nav__link">
+  <a href="#choose-the-layer-you-need" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Design Philosophy
+        Choose the layer you need
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-rules-to-keep-in-mind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three rules to keep in mind
       
     </span>
   </a>
@@ -1493,44 +1504,106 @@
   
 
 
-<h1 id="ai-factory-concepts">AI Factory Concepts<a class="headerlink" href="#ai-factory-concepts" title="Permanent link">&para;</a></h1>
-<p>The Enterprise Scale AI Factory is built around four foundational concepts that together deliver an enterprise-grade, scalable, and secure AI platform.</p>
-<hr />
-<h2 id="the-four-pillars">The Four Pillars<a class="headerlink" href="#the-four-pillars" title="Permanent link">&para;</a></h2>
+<h1 id="ai-factory-concepts">AI Factory concepts<a class="headerlink" href="#ai-factory-concepts" title="Permanent link">&para;</a></h1>
+<p>An AI Factory separates reusable platform services from the projects that use
+them. You choose what to configure, where to deploy it and who may operate it.</p>
+<h2 id="factory-scale-set-and-project">Factory, scale set and project<a class="headerlink" href="#factory-scale-set-and-project" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Concept</th>
-<th>Description</th>
+<th>Term</th>
+<th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a href="intelligence/">AI Factory Intelligence</a></td>
-<td>Built-in automation, dynamic networking, RBAC, and persona-based access control</td>
+<td><strong>Factory</strong></td>
+<td>The registered identity and settings for a governed AI platform, including its region and naming.</td>
 </tr>
 <tr>
-<td><a href="enterprise-scale/">Enterprise Grade &amp; Scale</a></td>
-<td>WAF-aligned, private networking, multi-environment (Dev/Stage/Prod), scale sets for 200–300 projects</td>
+<td><strong>Scale set</strong></td>
+<td>An environment/subscription/networking grouping inside a factory. <strong>Not Azure Virtual Machine Scale Sets (VMSS).</strong></td>
 </tr>
 <tr>
-<td><a href="templates/iac/">Templates — IaC</a></td>
-<td>Bicep-based Infrastructure-as-Code for repeatable, auditable deployments</td>
+<td><strong>Project</strong></td>
+<td>A logical workload/team with its own number, settings and explicitly selected deployment locations.</td>
 </tr>
 <tr>
-<td><a href="templates/dataops/">Templates — DataOps / MLOps / GenAIOps</a></td>
-<td>Project templates for data, ML, and GenAI workloads</td>
+<td><strong>Placement</strong></td>
+<td>The scale set used by that project in Dev, Stage or Prod. Adding a placement saves a target; it does not deploy it.</td>
+</tr>
+<tr>
+<td><strong>Common services</strong></td>
+<td>Shared resources such as networking or storage that projects may depend on.</td>
 </tr>
 </tbody>
 </table>
-<hr />
-<h2 id="design-philosophy">Design Philosophy<a class="headerlink" href="#design-philosophy" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Project-based isolation</strong>: Each team/use-case gets its own floor with isolated networking, RBAC, and data access.</li>
-<li><strong>Feature flags</strong>: Services are toggled on/off — deploy a minimal baseline first, add services incrementally as your project evolves.</li>
-<li><strong>Bring Your Own</strong>: Supports BYO vNet, BYO subnets, BYO Terraform, and BYO existing services.</li>
-<li><strong>Dual orchestrator</strong>: Works identically with <strong>GitHub Actions</strong> or <strong>Azure DevOps Pipelines</strong>.</li>
-</ul>
+<p>The registered format uses stable UUIDs for these objects. Human-readable names
+and three-digit numbers help navigation but are not interchangeable with UUIDs.
+See <a href="enterprise-scale/">scale and environment choices</a>.</p>
+<h2 id="choose-the-layer-you-need">Choose the layer you need<a class="headerlink" href="#choose-the-layer-you-need" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Guidance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Configure or operate the factory</td>
+<td><a href="../factory-tools/18-cli-and-api-and-usage/">Factory tools</a></td>
+</tr>
+<tr>
+<td>Understand planning and dependency checks</td>
+<td><a href="intelligence/">Platform automation</a></td>
+</tr>
+<tr>
+<td>Build infrastructure</td>
+<td><a href="templates/iac/">IaC templates</a></td>
+</tr>
+<tr>
+<td>Prepare and move data</td>
+<td><a href="templates/dataops/">DataOps</a></td>
+</tr>
+<tr>
+<td>Train and evaluate models</td>
+<td><a href="templates/mlops/">MLOps</a></td>
+</tr>
+<tr>
+<td>Build agents and RAG applications</td>
+<td><a href="templates/genaiops/">GenAIOps</a></td>
+</tr>
+<tr>
+<td>Follow usage, cost and health</td>
+<td><a href="../intelligence/">Monitor and operate</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="three-rules-to-keep-in-mind">Three rules to keep in mind<a class="headerlink" href="#three-rules-to-keep-in-mind" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Configuration is not deployment.</strong> Save reviewed settings, then separately
+   approve the operation that applies them.</li>
+<li><strong>A flag is not a cleanup plan.</strong> Removing settings and deleting resources are
+   different tasks with different safeguards.</li>
+<li><strong>Shared source is not live state.</strong> A template, graph or screenshot does not
+   prove a resource was deployed successfully in your environment.</li>
+</ol>
+<p>Both GitHub Actions and Azure DevOps are supported provider choices, with
+different authentication and execution setup. Their availability does not imply
+that every operation behaves identically through every version.</p>
+<details>
+<summary>More info</summary>
+<p>The default registered layout is <code>azurefactory/register.json</code> with
+API-written project settings. Older <code>aifactory</code> JSON/YAML/<code>.env</code> workflows remain
+separate routes. A source-version change does not migrate one layout into another.</p>
+<p>The CLI and Python SDK use the shared Factory API for supported operations.
+Advanced enrollment is a separate local CLI implementation. A desktop host,
+Agent Chat or MCP adapter does not create a second independent deployment engine
+or bypass approval.</p>
+<p>Conceptual labels such as foundation, automation and guided experience describe
+levels of assistance, not Azure product SKUs.</p>
+</details>
 
 
 

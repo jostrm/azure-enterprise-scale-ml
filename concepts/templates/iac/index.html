@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#iac-templates" class="md-skip">
+        <a href="#infrastructure-templates" class="md-skip">
           Skip to content
         </a>
       
@@ -397,7 +397,7 @@
   
     
   
-  AI Factory Intelligence
+  Monitor and operate
 
       </a>
     </li>
@@ -749,7 +749,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -862,7 +862,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Platform automation
   
 
     
@@ -1038,10 +1038,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#bicep-architecture" class="md-nav__link">
+  <a href="#common-and-project-infrastructure" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bicep Architecture
+        Common and project infrastructure
       
     </span>
   </a>
@@ -1049,10 +1049,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#deployment-stages-pipeline-steps" class="md-nav__link">
+  <a href="#use-settings-before-customizing-shared-code" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Deployment Stages (Pipeline Steps)
+        Use settings before customizing shared code
       
     </span>
   </a>
@@ -1060,10 +1060,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#bring-your-own-byo-options" class="md-nav__link">
+  <a href="#reuse-existing-infrastructure-deliberately" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bring Your Own (BYO) Options
+        Reuse existing infrastructure deliberately
       
     </span>
   </a>
@@ -1492,7 +1492,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1532,10 +1532,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#bicep-architecture" class="md-nav__link">
+  <a href="#common-and-project-infrastructure" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bicep Architecture
+        Common and project infrastructure
       
     </span>
   </a>
@@ -1543,10 +1543,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#deployment-stages-pipeline-steps" class="md-nav__link">
+  <a href="#use-settings-before-customizing-shared-code" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Deployment Stages (Pipeline Steps)
+        Use settings before customizing shared code
       
     </span>
   </a>
@@ -1554,10 +1554,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#bring-your-own-byo-options" class="md-nav__link">
+  <a href="#reuse-existing-infrastructure-deliberately" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bring Your Own (BYO) Options
+        Reuse existing infrastructure deliberately
       
     </span>
   </a>
@@ -1584,120 +1584,67 @@
   
 
 
-<h1 id="iac-templates">IaC Templates<a class="headerlink" href="#iac-templates" title="Permanent link">&para;</a></h1>
-<p>Infrastructure as Code (IaC) is the backbone of the AI Factory. All resources are defined in <strong>Azure Bicep</strong>, ensuring repeatable, auditable, and version-controlled deployments.</p>
-<hr />
-<h2 id="bicep-architecture">Bicep Architecture<a class="headerlink" href="#bicep-architecture" title="Permanent link">&para;</a></h2>
-<p>The Bicep templates are structured as modular, composable units:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>environment_setup/aifactory/bicep/
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── modules/               # Reusable resource modules
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│   ├── aiFoundry.bicep
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   ├── aiSearch.bicep
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│   ├── networking.bicep
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│   ├── keyvault.bicep
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│   └── ...
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>├── esml-common/           # AI Factory common infrastructure
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>└── esml-project/          # Per-project infrastructure
-</code></pre></div>
-<hr />
-<h2 id="deployment-stages-pipeline-steps">Deployment Stages (Pipeline Steps)<a class="headerlink" href="#deployment-stages-pipeline-steps" title="Permanent link">&para;</a></h2>
+<h1 id="infrastructure-templates">Infrastructure templates<a class="headerlink" href="#infrastructure-templates" title="Permanent link">&para;</a></h1>
+<p>Infrastructure as Code (IaC) describes resources as versioned files. AI Factory
+uses Bicep modules and supporting scripts within reviewed workflows; the
+templates alone are not the complete operational process.</p>
+<h2 id="common-and-project-infrastructure">Common and project infrastructure<a class="headerlink" href="#common-and-project-infrastructure" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Step</th>
-<th>Description</th>
+<th>Source area</th>
+<th>Role</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>61</td>
-<td>Foundation — Resource Groups, Managed Identities, VMs</td>
+<td><code>esml-common</code></td>
+<td>Shared foundation and common services</td>
 </tr>
 <tr>
-<td>62</td>
-<td>Core Infrastructure — Application Insights, Key Vault, Storage, ACR</td>
+<td><code>esml-project</code></td>
+<td>Machine-learning project resources</td>
 </tr>
 <tr>
-<td>63</td>
-<td>Cognitive Services — AI Search, OpenAI, Vision, Speech, etc.</td>
+<td><code>esml-genai-1</code></td>
+<td>Generative-AI project phases</td>
 </tr>
 <tr>
-<td>64</td>
-<td>Databases — Cosmos DB, SQL, PostgreSQL, Redis</td>
+<td><code>modules</code></td>
+<td>Reusable Azure resource/access modules</td>
 </tr>
 <tr>
-<td>65</td>
-<td>Compute Services — Container Apps, Web App, Function App</td>
-</tr>
-<tr>
-<td>66</td>
-<td>AI Platform (V1) — AI Foundry Hub with default project and connections</td>
-</tr>
-<tr>
-<td>67</td>
-<td>ML Platform — Azure Machine Learning, Data Factory, Databricks</td>
-</tr>
-<tr>
-<td>68</td>
-<td>Integration — Logic Apps, Event Hubs</td>
-</tr>
-<tr>
-<td>69</td>
-<td>AI Foundry V2 (2025) — AI Foundry V2 with RBAC and default project</td>
-</tr>
-<tr>
-<td>100</td>
-<td>RBAC &amp; Security — Role assignments across all services (steps 61–99)</td>
+<td>Provider templates</td>
+<td>Azure DevOps and GitHub Actions orchestration</td>
 </tr>
 </tbody>
 </table>
-<p>Each step can be individually skipped via <code>debug_disable_XX</code> flags for faster re-runs during development.</p>
-<hr />
-<h2 id="bring-your-own-byo-options">Bring Your Own (BYO) Options<a class="headerlink" href="#bring-your-own-byo-options" title="Permanent link">&para;</a></h2>
-<p>The IaC supports several BYO overrides to integrate with existing infrastructure:</p>
-<table>
-<thead>
-<tr>
-<th>BYO Option</th>
-<th>Variable</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Existing vNet</td>
-<td><code>vnetNameFull_param</code> + <code>vnetResourceGroup_param</code></td>
-</tr>
-<tr>
-<td>Existing subnets</td>
-<td><code>BYO_subnets=true</code> + subnet name variables</td>
-</tr>
-<tr>
-<td>Existing Common Resource Group</td>
-<td><code>commonResourceGroup_param</code></td>
-</tr>
-<tr>
-<td>Existing Data Lake</td>
-<td><code>datalakeName_param</code></td>
-</tr>
-<tr>
-<td>Existing Key Vault</td>
-<td><code>kvNameFromCOMMON_param</code></td>
-</tr>
-<tr>
-<td>Existing ASEv3</td>
-<td><code>byoASEv3=true</code> + <code>byoAseFullResourceId</code></td>
-</tr>
-<tr>
-<td>BYO Terraform</td>
-<td>See <a href="../../../iac/terraform/">BYO Terraform</a></td>
-</tr>
-</tbody>
-</table>
-<hr />
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>See <a href="../../../iac/bicep/">IaC — BICEP</a> for detailed Bicep usage and best practices.</p>
-</div>
+<p>The GenAI source is split into foundation, core infrastructure, cognitive
+services, databases, compute, AI/ML platform, access/security, Foundry, dashboards
+and integration. Provider step names/numbers can differ; use the selected
+pipeline's current definitions.</p>
+<h2 id="use-settings-before-customizing-shared-code">Use settings before customizing shared code<a class="headerlink" href="#use-settings-before-customizing-shared-code" title="Permanent link">&para;</a></h2>
+<p>For ordinary changes, start with <a href="../../../parameters/">Parameters</a> and
+<a href="../../../factory-tools/19-cli-and-api-and-usage/">Factory tools</a>.
+Keep customer settings outside generated template copies. Replacing templates
+can overwrite local customizations if they are stored in the wrong location.</p>
+<p>Debug switches are for deliberate diagnosis. Skipping a task does not prove its
+dependencies were deployed, nor turn a partial run into a successful factory.</p>
+<h2 id="reuse-existing-infrastructure-deliberately">Reuse existing infrastructure deliberately<a class="headerlink" href="#reuse-existing-infrastructure-deliberately" title="Permanent link">&para;</a></h2>
+<p>Supported inputs cover existing VNet/subnets, common groups, data lake, Key Vault
+and selected service integrations. Validate resource identity, permissions and
+ownership; do not give two independent tools conflicting control.</p>
+<p><a href="../../../iac/bicep/">Bicep details</a> |
+<a href="../../../iac/terraform/">Bring your own infrastructure</a></p>
+<details>
+<summary>More info</summary>
+<p><a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep">Current Bicep source</a> |
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml">GHA project phases</a> |
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs">ADO project jobs</a></p>
+<p>Ordinary deployment, selective project-resource deletion and ordered whole-factory
+teardown use different reviewed contracts. Do not infer deletion order from an
+infrastructure module list.</p>
+</details>
 
 
 

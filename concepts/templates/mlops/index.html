@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#mlops-templates" class="md-skip">
+        <a href="#ml-model-factory-and-mlops" class="md-skip">
           Skip to content
         </a>
       
@@ -397,7 +397,7 @@
   
     
   
-  AI Factory Intelligence
+  Monitor and operate
 
       </a>
     </li>
@@ -749,7 +749,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -862,7 +862,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Platform automation
   
 
     
@@ -1094,10 +1094,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#esml-architecture" class="md-nav__link">
+  <a href="#choose-your-use-case" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ESML Architecture
+        Choose your use case
       
     </span>
   </a>
@@ -1105,10 +1105,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#esml-with-fabric-flavour" class="md-nav__link">
+  <a href="#where-to-make-your-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ESML With Fabric Flavour
+        Where to make your changes
       
     </span>
   </a>
@@ -1116,10 +1116,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mlops-pipeline-templates" class="md-nav__link">
+  <a href="#train-compare-and-deploy-separately" class="md-nav__link">
     <span class="md-ellipsis">
       
-        MLOps Pipeline Templates
+        Train, compare and deploy separately
       
     </span>
   </a>
@@ -1127,10 +1127,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compute-defaults-overridable" class="md-nav__link">
+  <a href="#version-and-engine-limits" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compute Defaults (Overridable)
+        Version and engine limits
       
     </span>
   </a>
@@ -1503,7 +1503,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1543,10 +1543,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#esml-architecture" class="md-nav__link">
+  <a href="#choose-your-use-case" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ESML Architecture
+        Choose your use case
       
     </span>
   </a>
@@ -1554,10 +1554,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#esml-with-fabric-flavour" class="md-nav__link">
+  <a href="#where-to-make-your-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ESML With Fabric Flavour
+        Where to make your changes
       
     </span>
   </a>
@@ -1565,10 +1565,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mlops-pipeline-templates" class="md-nav__link">
+  <a href="#train-compare-and-deploy-separately" class="md-nav__link">
     <span class="md-ellipsis">
       
-        MLOps Pipeline Templates
+        Train, compare and deploy separately
       
     </span>
   </a>
@@ -1576,10 +1576,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compute-defaults-overridable" class="md-nav__link">
+  <a href="#version-and-engine-limits" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compute Defaults (Overridable)
+        Version and engine limits
       
     </span>
   </a>
@@ -1606,105 +1606,94 @@
   
 
 
-<h1 id="mlops-templates">MLOps Templates<a class="headerlink" href="#mlops-templates" title="Permanent link">&para;</a></h1>
-<p>The AI Factory provides MLOps templates for the <strong>ESML</strong> (Enterprise Scale Machine Learning) project type, enabling a full ML lifecycle within a secure, private Azure environment.</p>
-<hr />
-<h2 id="esml-architecture">ESML Architecture<a class="headerlink" href="#esml-architecture" title="Permanent link">&para;</a></h2>
-<p>The ESML project type includes:</p>
-<ul>
-<li><strong>Azure Machine Learning</strong> workspace — private, with private endpoints on all dependent services.</li>
-<li><strong>AML Compute Clusters</strong> — auto-scaling, configurable SKU and node count per environment.</li>
-<li><strong>AML Compute Instances</strong> — for interactive development.</li>
-<li><strong>Private AKS Cluster</strong> — for model serving at scale (Azure Arc-enabled).</li>
-<li><strong>Azure Container Registry (ACR)</strong> — private, Premium SKU for model image storage.</li>
-<li><strong>Azure Data Factory</strong> — for orchestrating training and batch-inference pipelines.</li>
-<li><strong>Databricks</strong> (optional) — for large-scale feature engineering.</li>
-</ul>
-<hr />
-<h2 id="esml-with-fabric-flavour">ESML With Fabric Flavour<a class="headerlink" href="#esml-with-fabric-flavour" title="Permanent link">&para;</a></h2>
-<p>The ESML project type optionally integrates with <strong>Microsoft Fabric</strong>:</p>
-<ul>
-<li>Data scientists can work from Azure Databricks, Microsoft Fabric, or Azure Machine Learning — with the same MLOps template.</li>
-<li>Fabric provides a unified analytics platform with OneLake as the data foundation.</li>
-</ul>
-<hr />
-<h2 id="mlops-pipeline-templates">MLOps Pipeline Templates<a class="headerlink" href="#mlops-pipeline-templates" title="Permanent link">&para;</a></h2>
-<p>Templates are provided for:</p>
+<h1 id="ml-model-factory-and-mlops">ML Model Factory and MLOps<a class="headerlink" href="#ml-model-factory-and-mlops" title="Permanent link">&para;</a></h1>
+<p>Use reusable examples and shared engines to prepare data, train and compare
+models, then deliberately deploy the selected result.</p>
+<h2 id="choose-your-use-case">Choose your use case<a class="headerlink" href="#choose-your-use-case" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Template</th>
-<th>Description</th>
+<th>Pattern</th>
+<th>Typical use</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Training pipeline</td>
-<td>AML pipeline for model training with logging and experiment tracking</td>
+<td>Batch</td>
+<td>Score a dataset on demand or on a schedule.</td>
 </tr>
 <tr>
-<td>Batch inference pipeline</td>
-<td>Scheduled or event-driven batch scoring</td>
+<td>Online</td>
+<td>Answer individual inference requests.</td>
 </tr>
 <tr>
-<td>Online inference</td>
-<td>AKS-hosted REST endpoint with private networking</td>
-</tr>
-<tr>
-<td>Model registration &amp; promotion</td>
-<td>Automated model registration and promotion across Dev → Stage → Prod</td>
+<td>Streaming</td>
+<td>Process continuous or micro-batch events with checkpoints.</td>
 </tr>
 </tbody>
 </table>
-<hr />
-<h2 id="compute-defaults-overridable">Compute Defaults (Overridable)<a class="headerlink" href="#compute-defaults-overridable" title="Permanent link">&para;</a></h2>
+<p>The current Model Factory organizes examples by pattern, task and technology:
+classification, regression, forecasting and supported vision routes using
+custom Python, AutoML, Azure ML pipelines and Databricks.</p>
+<p>Start at the <a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/50-ml-model-factory/usecase-type">current use-case tree</a>
+and read that leaf's prerequisites. A notebook's presence is not proof that all
+engine/task combinations are supported or deployed.</p>
+<h2 id="where-to-make-your-changes">Where to make your changes<a class="headerlink" href="#where-to-make-your-changes" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Setting</th>
-<th>DEV default</th>
-<th>TEST/PROD default</th>
+<th>Folder in <code>50-ml-model-factory</code></th>
+<th>Ownership</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>AKS node SKU</td>
-<td><code>Standard_B4ms</code></td>
-<td><code>Standard_DS13-2_v2</code></td>
+<td><code>user-config</code></td>
+<td>Your scenario, model policy, storage and Databricks choices.</td>
 </tr>
 <tr>
-<td>AKS node count</td>
-<td>1</td>
-<td>3</td>
+<td>Project copies of <code>usecase-type</code> examples</td>
+<td>Thin examples you can adapt for the workload.</td>
 </tr>
 <tr>
-<td>AKS Kubernetes version</td>
-<td><code>1.33.2</code></td>
-<td><code>1.33.2</code></td>
+<td><code>accelerator</code></td>
+<td>Shared maintainer-owned engines; avoid copying their internals.</td>
 </tr>
 <tr>
-<td>AML cluster max nodes</td>
-<td>3</td>
-<td>5</td>
-</tr>
-<tr>
-<td>AML cluster SKU</td>
-<td><code>Standard_DS3_v2</code></td>
-<td><code>Standard_D13_v2</code></td>
-</tr>
-<tr>
-<td>AML compute instance SKU</td>
-<td><code>Standard_DS11_v2</code></td>
-<td><code>Standard_ND96amsr_A100_v4</code></td>
+<td><code>data/out</code> and <code>ml-environment</code></td>
+<td>Generated datasets, models, reports and run artifacts.</td>
 </tr>
 </tbody>
 </table>
-<p>All compute settings are overridable via <code>admin_aks_*</code> and <code>admin_aml_*</code> variables.</p>
-<hr />
-<div class="admonition info">
-<p class="admonition-title">Info</p>
-<p>MLOps templates are located under <code>copy_my_subfolders_to_my_grandparent/mlops/</code>.</p>
-</div>
+<h2 id="train-compare-and-deploy-separately">Train, compare and deploy separately<a class="headerlink" href="#train-compare-and-deploy-separately" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Validate the chosen scenario, input data, budget and compute references.</li>
+<li>Render or inspect the job before submitting cloud work.</li>
+<li>Evaluate candidates against compatible held-out data and the configured policy.</li>
+<li>Review registration and deployment as separate actions.</li>
+<li>Monitor inputs, performance and freshness after deployment.</li>
+</ol>
+<p>A winning model is not production approval. Missing labels or insufficient
+observations are unknown, not a successful health result.</p>
+<h2 id="version-and-engine-limits">Version and engine limits<a class="headerlink" href="#version-and-engine-limits" title="Permanent link">&para;</a></h2>
+<p><code>azure-esml-sdk</code> / <code>azure_esml</code> is a newer API, <strong>not a drop-in ESML v1 replacement</strong>.
+Older pipelines remain separate compatibility paths.
+AutoML forecasting is not offered for streaming where the prediction method
+requires observed history with each request; use the supported alternative
+described in the model-factory guide.</p>
+<p>Compute SKU/version defaults change and have regional constraints. Read the
+<a href="../../../parameters/advanced/">current Parameters reference</a> instead of copying
+an old hard-coded compute table.</p>
+<details>
+<summary>More info</summary>
+<p><a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/50-ml-model-factory/readme.md">Model Factory quickstart and limitations</a> |
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/copy_my_subfolders_to_my_grandparent/mlops">Shared pipeline templates</a> |
+<a href="../dataops/">DataOps</a></p>
+<p>Storage selection does not provision or migrate data. Dataset licences, vision
+dependencies, existing compute/cluster references and authenticated cloud access
+remain explicit requirements. Framework examples are not a universal model CRUD
+API across every runtime.</p>
+</details>
 
 
 

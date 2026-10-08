@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#enterprise-grade-scale" class="md-skip">
+        <a href="#enterprise-design-and-scale" class="md-skip">
           Skip to content
         </a>
       
@@ -397,7 +397,7 @@
   
     
   
-  AI Factory Intelligence
+  Monitor and operate
 
       </a>
     </li>
@@ -749,7 +749,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -862,7 +862,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Platform automation
   
 
     
@@ -943,10 +943,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#waf-alignment" class="md-nav__link">
+  <a href="#scale-by-projects-and-scale-sets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        WAF Alignment
+        Scale by projects and scale sets
       
     </span>
   </a>
@@ -954,10 +954,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#scale-sets" class="md-nav__link">
+  <a href="#environments-and-subscriptions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Scale Sets
+        Environments and subscriptions
       
     </span>
   </a>
@@ -965,10 +965,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#multi-environment-architecture" class="md-nav__link">
+  <a href="#review-each-design-concern" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Multi-environment Architecture
+        Review each design concern
       
     </span>
   </a>
@@ -976,10 +976,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#landing-zone-options" class="md-nav__link">
+  <a href="#plan-network-space-before-deployment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Landing Zone Options
+        Plan network space before deployment
       
     </span>
   </a>
@@ -1503,7 +1503,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1543,10 +1543,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#waf-alignment" class="md-nav__link">
+  <a href="#scale-by-projects-and-scale-sets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        WAF Alignment
+        Scale by projects and scale sets
       
     </span>
   </a>
@@ -1554,10 +1554,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#scale-sets" class="md-nav__link">
+  <a href="#environments-and-subscriptions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Scale Sets
+        Environments and subscriptions
       
     </span>
   </a>
@@ -1565,10 +1565,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#multi-environment-architecture" class="md-nav__link">
+  <a href="#review-each-design-concern" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Multi-environment Architecture
+        Review each design concern
       
     </span>
   </a>
@@ -1576,10 +1576,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#landing-zone-options" class="md-nav__link">
+  <a href="#plan-network-space-before-deployment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Landing Zone Options
+        Plan network space before deployment
       
     </span>
   </a>
@@ -1606,96 +1606,94 @@
   
 
 
-<h1 id="enterprise-grade-scale">Enterprise Grade &amp; Scale<a class="headerlink" href="#enterprise-grade-scale" title="Permanent link">&para;</a></h1>
-<p>The AI Factory is designed for production enterprise workloads from day one — not retrofitted.</p>
-<hr />
-<h2 id="waf-alignment">WAF Alignment<a class="headerlink" href="#waf-alignment" title="Permanent link">&para;</a></h2>
-<p>Every architectural decision follows <a href="https://learn.microsoft.com/en-us/azure/well-architected/ai/personas">Microsoft's Well-Architected Framework (WAF)</a>:</p>
+<h1 id="enterprise-design-and-scale">Enterprise design and scale<a class="headerlink" href="#enterprise-design-and-scale" title="Permanent link">&para;</a></h1>
+<p>AI Factory helps teams reuse common infrastructure while keeping project and
+environment choices explicit. The resulting design still needs your
+organization's security, network, reliability and cost review.</p>
+<h2 id="scale-by-projects-and-scale-sets">Scale by projects and scale sets<a class="headerlink" href="#scale-by-projects-and-scale-sets" title="Permanent link">&para;</a></h2>
+<p>An AI Factory scale set groups an environment, subscription and network setup.
+It is <strong>not Azure VM Scale Sets</strong>. A project selects where it runs through its
+Dev/Stage/Prod placements.</p>
+<p>There is no universal "200-300 projects per scale set" guarantee. Capacity
+depends on configured project limits, address ranges, existing subnets and
+service quotas. Add another scale set when the reviewed design requires it.</p>
+<h2 id="environments-and-subscriptions">Environments and subscriptions<a class="headerlink" href="#environments-and-subscriptions" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>WAF Pillar</th>
-<th>AI Factory Implementation</th>
+<th>Choice</th>
+<th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Reliability</strong></td>
-<td>Multi-environment isolation (Dev / Stage / Prod), retry settings, diagnostics</td>
+<td>Shared subscriptions</td>
+<td>Environments can share subscriptions while retaining explicit identity and network targets.</td>
 </tr>
 <tr>
-<td><strong>Security</strong></td>
-<td>Private endpoints on all services, CMK support, Entra ID RBAC, Defender for AI</td>
+<td>Own subscriptions</td>
+<td>Use the selected subscriptions for the intended isolated targets.</td>
 </tr>
 <tr>
-<td><strong>Cost Optimization</strong></td>
-<td>Feature flags reduce cost in lower environments; shared ACR option</td>
-</tr>
-<tr>
-<td><strong>Operational Excellence</strong></td>
-<td>Full IaC (Bicep), pipeline orchestration (ADO/GHA), diagnostic setting levels</td>
-</tr>
-<tr>
-<td><strong>Performance Efficiency</strong></td>
-<td>AKS auto-scaling, AML cluster scaling, configurable SKUs per environment</td>
+<td>Existing enterprise network</td>
+<td>Reuse approved hub, DNS and subnet arrangements through supported inputs.</td>
 </tr>
 </tbody>
 </table>
-<hr />
-<h2 id="scale-sets">Scale Sets<a class="headerlink" href="#scale-sets" title="Permanent link">&para;</a></h2>
-<p>The AI Factory uses a <strong>scale set</strong> concept to support organisations with many teams:</p>
-<ul>
-<li>Each scale set suffix (e.g. <code>-001</code>) represents one deployment of the common infrastructure.</li>
-<li>Within a scale set, up to <strong>200–300 AI Factory projects</strong> can be created, each isolated by project number (<code>project_number_000</code>).</li>
-<li>Multiple scale sets can be deployed for larger organisations.</li>
-</ul>
-<hr />
-<h2 id="multi-environment-architecture">Multi-environment Architecture<a class="headerlink" href="#multi-environment-architecture" title="Permanent link">&para;</a></h2>
-<p>Environments are deployed to separate Azure subscriptions (recommended) and share no network by default:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌─────────────────────────────────────────────────────┐
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│  Subscription: DEV                                  │
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│  ┌─────────────────────────────────────────────┐   │
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│  │  AI Factory Common (vNet, shared services)  │   │
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│  │  ┌──────────────┐  ┌──────────────┐         │   │
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│  │  │  Project 001 │  │  Project 002 │  ...     │   │
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│  │  └──────────────┘  └──────────────┘         │   │
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│  └─────────────────────────────────────────────┘   │
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>└─────────────────────────────────────────────────────┘
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>┌─────────────────────────────────────────────────────┐
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│  Subscription: STAGE                                │
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>└─────────────────────────────────────────────────────┘
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>┌─────────────────────────────────────────────────────┐
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│  Subscription: PROD                                 │
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>└─────────────────────────────────────────────────────┘
-</code></pre></div>
-<hr />
-<h2 id="landing-zone-options">Landing Zone Options<a class="headerlink" href="#landing-zone-options" title="Permanent link">&para;</a></h2>
+<p>Register only the environments you need. Stage and Prod are not created simply
+because Dev exists, and a subscription reference does not create a subscription.</p>
+<h2 id="review-each-design-concern">Review each design concern<a class="headerlink" href="#review-each-design-concern" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Mode</th>
-<th>When to use</th>
+<th>Concern</th>
+<th>What to check</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Traditional Hub/Spoke</strong></td>
-<td>Standard enterprise networking with a central hub VNet</td>
+<td>Security</td>
+<td>Identity, least privilege, data access, private connectivity and supported encryption options.</td>
 </tr>
 <tr>
-<td><strong>VWAN Hub</strong></td>
-<td>Azure Virtual WAN for global connectivity</td>
+<td>Reliability</td>
+<td>Dependencies, backup/recovery, regional service support and failure handling.</td>
 </tr>
 <tr>
-<td><strong>Standalone</strong></td>
-<td>Fully self-contained with its own VNet — ideal for PoC</td>
+<td>Cost</td>
+<td>Selected services, environment SKUs, model capacity and usage/cost reporting.</td>
 </tr>
 <tr>
-<td><strong>Hybrid (public + private)</strong></td>
-<td>Public access via VPN / IP whitelist / Bastion alongside private endpoints</td>
+<td>Operations</td>
+<td>Reviewed changes, exact run tracking, diagnostic settings and ownership.</td>
+</tr>
+<tr>
+<td>Performance</td>
+<td>Workload needs, compute/service sizing, scaling limits and available capacity.</td>
 </tr>
 </tbody>
 </table>
+<p>These align with <a href="https://learn.microsoft.com/en-us/azure/well-architected/ai/personas">Well-Architected guidance</a>;
+they are not a blanket production or compliance certification.</p>
+<h2 id="plan-network-space-before-deployment">Plan network space before deployment<a class="headerlink" href="#plan-network-space-before-deployment" title="Permanent link">&para;</a></h2>
+<p>Use aligned, non-overlapping ranges for selected environments, existing networks
+and VPN client pools. Address planning does not resize an existing VNet, move
+subnets or establish connectivity.</p>
+<p>The <a href="../../parameters/standard/">Parameters checklist</a> and
+<a href="../intelligence/">platform automation guide</a> explain the supported planning
+inputs. Private endpoints alone do not prove that a runner or user can reach a service.</p>
+<details>
+<summary>More info</summary>
+<p>The shared <code>/18</code> planning templates use environment selectors <code>0</code>, <code>64</code>, <code>128</code>;
+the own-subscription <code>/20</code> pattern uses <code>0</code>, <code>16</code>, <code>32</code>. Existing allocations,
+additional prefixes and provider requirements must still be checked.
+Do not copy older non-aligned examples as a deployment plan.</p>
+<p>Service/API availability varies across Azure regions, Government and Sovereign
+clouds. Validate the exact route and service set for the chosen cloud rather than
+assuming Azure Public Cloud examples apply unchanged.</p>
+<p><a href="../../factory-tools/19-cli-and-api-and-usage/">Registered operations</a> |
+<a href="../../parameters/advanced/">Shared template parameters</a></p>
+</details>
 
 
 

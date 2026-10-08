@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#genaiops-templates" class="md-skip">
+        <a href="#agent-factory-and-genaiops" class="md-skip">
           Skip to content
         </a>
       
@@ -397,7 +397,7 @@
   
     
   
-  AI Factory Intelligence
+  Monitor and operate
 
       </a>
     </li>
@@ -749,7 +749,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -862,7 +862,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Platform automation
   
 
     
@@ -1122,10 +1122,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#genai-1-baseline-architecture" class="md-nav__link">
+  <a href="#choose-a-starting-point" class="md-nav__link">
     <span class="md-ellipsis">
       
-        GenAI-1 Baseline Architecture
+        Choose a starting point
       
     </span>
   </a>
@@ -1133,10 +1133,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#agentic-scenarios" class="md-nav__link">
+  <a href="#configure-infrastructure-and-workload-separately" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Agentic Scenarios
+        Configure infrastructure and workload separately
       
     </span>
   </a>
@@ -1144,10 +1144,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#default-model-deployment" class="md-nav__link">
+  <a href="#rag-and-shared-data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Default Model Deployment
+        RAG and shared data
       
     </span>
   </a>
@@ -1155,10 +1155,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#genai-project-team-personas" class="md-nav__link">
+  <a href="#gateways-and-management-interfaces" class="md-nav__link">
     <span class="md-ellipsis">
       
-        GenAI Project Team Personas
+        Gateways and management interfaces
       
     </span>
   </a>
@@ -1503,7 +1503,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1543,10 +1543,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#genai-1-baseline-architecture" class="md-nav__link">
+  <a href="#choose-a-starting-point" class="md-nav__link">
     <span class="md-ellipsis">
       
-        GenAI-1 Baseline Architecture
+        Choose a starting point
       
     </span>
   </a>
@@ -1554,10 +1554,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#agentic-scenarios" class="md-nav__link">
+  <a href="#configure-infrastructure-and-workload-separately" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Agentic Scenarios
+        Configure infrastructure and workload separately
       
     </span>
   </a>
@@ -1565,10 +1565,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#default-model-deployment" class="md-nav__link">
+  <a href="#rag-and-shared-data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Default Model Deployment
+        RAG and shared data
       
     </span>
   </a>
@@ -1576,10 +1576,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#genai-project-team-personas" class="md-nav__link">
+  <a href="#gateways-and-management-interfaces" class="md-nav__link">
     <span class="md-ellipsis">
       
-        GenAI Project Team Personas
+        Gateways and management interfaces
       
     </span>
   </a>
@@ -1606,140 +1606,78 @@
   
 
 
-<h1 id="genaiops-templates">GenAIOps Templates<a class="headerlink" href="#genaiops-templates" title="Permanent link">&para;</a></h1>
-<p>The AI Factory provides GenAIOps templates for the <strong>GenAI-1</strong> project type, enabling a full agentic AI lifecycle within a secure, private Azure environment.</p>
-<hr />
-<h2 id="genai-1-baseline-architecture">GenAI-1 Baseline Architecture<a class="headerlink" href="#genai-1-baseline-architecture" title="Permanent link">&para;</a></h2>
-<p>Every GenAI-1 project deploys a <strong>secured baseline</strong> automatically:</p>
+<h1 id="agent-factory-and-genaiops">Agent Factory and GenAIOps<a class="headerlink" href="#agent-factory-and-genaiops" title="Permanent link">&para;</a></h1>
+<p>Agent Factory supplies reusable workload examples for persistent prompt agents,
+hosted agents, multi-agent patterns, ingestion and RAG. It is not a promise that
+one setup command deploys every agent framework or application.</p>
+<h2 id="choose-a-starting-point">Choose a starting point<a class="headerlink" href="#choose-a-starting-point" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Service</th>
-<th>Purpose</th>
+<th>Example area</th>
+<th>Use</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>AI Foundry (Hub + Project)</strong></td>
-<td>Central AI development environment</td>
+<td><code>41-single-agent</code></td>
+<td>Foundry prompt-agent and supported hosted-framework examples.</td>
 </tr>
 <tr>
-<td><strong>AI Search</strong></td>
-<td>Vector search for RAG scenarios</td>
+<td><code>42-multi-agent</code></td>
+<td>A hosted team calling separately persisted knowledge/reviewer agents.</td>
 </tr>
 <tr>
-<td><strong>AI Services / Azure OpenAI</strong></td>
-<td>LLM and embedding model hosting</td>
+<td><code>43-data</code></td>
+<td>Ingestion and retrieval preparation for the selected target.</td>
 </tr>
 <tr>
-<td><strong>Storage (×2)</strong></td>
-<td>Data lake + AI Foundry default storage</td>
+<td><code>44-azure-mcp</code></td>
+<td>A narrow, private read-only Azure tool example.</td>
 </tr>
 <tr>
-<td><strong>Key Vault</strong></td>
-<td>Secrets, keys, CMK support</td>
-</tr>
-<tr>
-<td><strong>Application Insights</strong></td>
-<td>Monitoring and observability</td>
-</tr>
-<tr>
-<td><strong>Private Networking</strong></td>
-<td>All services connected via private endpoints</td>
+<td><code>45-rag-agent</code></td>
+<td>Explicit source-bound RAG with separate Search and Foundry IQ paths.</td>
 </tr>
 </tbody>
 </table>
-<p>Optional services are added via feature flags — see <a href="../../../parameters/standard/">Parameters</a>.</p>
-<hr />
-<h2 id="agentic-scenarios">Agentic Scenarios<a class="headerlink" href="#agentic-scenarios" title="Permanent link">&para;</a></h2>
-<p>The GenAI-1 template supports:</p>
-<ul>
-<li><strong>RAG (Retrieval Augmented Generation)</strong>: AI Search + AI Foundry + GPT-4o</li>
-<li><strong>Agentic Workflows</strong>: AI Foundry Agents with network injection, Capacity Host (<code>enableAFoundryCaphost=true</code>)</li>
-<li><strong>AI Gateway</strong>: APIM integration via <code>foundryApiManagementResourceId</code></li>
-<li><strong>Content Safety</strong>: Azure Content Safety service (<code>enableContentSafety=true</code>)</li>
-</ul>
-<hr />
-<h2 id="default-model-deployment">Default Model Deployment<a class="headerlink" href="#default-model-deployment" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Model</th>
-<th>Default enabled</th>
-<th>Default version</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>gpt-4o</code></td>
-<td>✅ yes</td>
-<td><code>2024-11-20</code></td>
-</tr>
-<tr>
-<td><code>text-embedding-3-large</code></td>
-<td>✅ yes (recommended for production RAG)</td>
-<td>latest</td>
-</tr>
-<tr>
-<td><code>gpt-4o-mini</code></td>
-<td>❌ no</td>
-<td><code>2024-07-18</code></td>
-</tr>
-<tr>
-<td><code>text-embedding-ada-002</code></td>
-<td>❌ no</td>
-<td>—</td>
-</tr>
-<tr>
-<td><code>text-embedding-3-small</code></td>
-<td>❌ no</td>
-<td>—</td>
-</tr>
-<tr>
-<td>Custom GPT-X</td>
-<td>❌ no</td>
-<td>configurable</td>
-</tr>
-</tbody>
-</table>
-<p>All model deployments are configurable — see <a href="../../../parameters/advanced/">Parameters — Advanced Mode</a>.</p>
-<hr />
-<h2 id="genai-project-team-personas">GenAI Project Team Personas<a class="headerlink" href="#genai-project-team-personas" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Persona</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>p011_genai_team_lead</code></td>
-<td>Project lead, architect</td>
-</tr>
-<tr>
-<td><code>p012_genai_team_member_aifoundry</code></td>
-<td>AI Foundry specialist</td>
-</tr>
-<tr>
-<td><code>p013_genai_team_member_agentic</code></td>
-<td>Agentic workflow developer</td>
-</tr>
-<tr>
-<td><code>p014_genai_team_member_dataops</code></td>
-<td>Data pipeline engineer</td>
-</tr>
-<tr>
-<td><code>p015_genai_team_member_frontend</code></td>
-<td>Front-end / app developer</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<div class="admonition info">
-<p class="admonition-title">Info</p>
-<p>GenAIOps templates are located under <code>copy_my_subfolders_to_my_grandparent/genaiops/</code>.</p>
-</div>
+<p><a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/readme.md">Open the Agent Factory quickstart</a>.
+Keep project configuration outside generated use-case copies, and select an
+exact existing target rather than guessing a resource from its name.</p>
+<h2 id="configure-infrastructure-and-workload-separately">Configure infrastructure and workload separately<a class="headerlink" href="#configure-infrastructure-and-workload-separately" title="Permanent link">&para;</a></h2>
+<p>The GenAI infrastructure route can provide Foundry, storage, Key Vault, Search,
+Cosmos DB, monitoring and hosting components according to the selected design.
+For standard private agents, review capability-host dependencies together.
+Creating infrastructure does not automatically ingest data or deploy an agent.</p>
+<p>Current model names, versions, SKU and capacity are in
+<a href="../../../parameters/advanced/">Parameters</a>. Do not assume the old GPT-4o table
+still describes the selected template. Simple presets can also differ from raw
+shared-template defaults.</p>
+<h2 id="rag-and-shared-data">RAG and shared data<a class="headerlink" href="#rag-and-shared-data" title="Permanent link">&para;</a></h2>
+<p>Select the intended source, version and audience, then configure ingestion and
+grounding. The RAG example preserves source bindings and isolated retrieval
+copies. It does not imply arbitrary binary extraction or automatic per-user
+document permissions.</p>
+<p>Changing <code>use_common_datalake_storage</code> does not move data or repoint deployed
+agents automatically. Reconfigure and verify the affected workload.</p>
+<h2 id="gateways-and-management-interfaces">Gateways and management interfaces<a class="headerlink" href="#gateways-and-management-interfaces" title="Permanent link">&para;</a></h2>
+<p>Regular APIM pools, optional Kong edge, dedicated AI Gateway integration and
+network Application Gateway have different jobs and prerequisites.
+See <a href="../../../parameters/advanced/#mcp-and-ai-gateway-parameters">gateway parameters</a>.</p>
+<p>Factory Agent Chat and Factory MCP are management interfaces, not the same as
+your workload agent or the narrow private Azure MCP example. Their allowed
+actions depend on configured identity, scope and approval.</p>
+<details>
+<summary>More info</summary>
+<p><a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/45-rag-agent/readme.md">Private RAG example</a> |
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/44-azure-mcp/readme.md">Private Azure MCP</a> |
+<a href="../../../intelligence/">Monitor and operate</a></p>
+<p>The private Azure MCP example initially permits a narrow resource-read tool
+surface, not arbitrary shell commands or mutations. Framework/model support,
+private network reachability and tool permissions must be checked for the chosen
+deployment. Cloud inference and ingestion are explicit operations with their own
+costs and permissions.</p>
+</details>
 
 
 

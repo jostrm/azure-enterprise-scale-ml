@@ -29,7 +29,7 @@
     
     
       
-        <title>All variables - Enterprise Scale AI Factory</title>
+        <title>All parameters - Enterprise Scale AI Factory</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#parameters-advanced-reference" class="md-skip">
+        <a href="#parameters-complete-reference" class="md-skip">
           Skip to content
         </a>
       
@@ -115,7 +115,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              All variables
+              All parameters
             
           </span>
         </div>
@@ -397,7 +397,7 @@
   
     
   
-  AI Factory Intelligence
+  Monitor and operate
 
       </a>
     </li>
@@ -761,7 +761,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -779,7 +779,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -803,6 +803,28 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#mcp-and-ai-gateway-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCP and AI Gateway parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safe-editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safe editing
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#scope-and-authoritative-sources" class="md-nav__link">
@@ -1274,7 +1296,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Platform automation
   
 
     
@@ -1821,7 +1843,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1859,6 +1881,28 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#mcp-and-ai-gateway-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCP and AI Gateway parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safe-editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safe editing
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#scope-and-authoritative-sources" class="md-nav__link">
@@ -2245,10 +2289,63 @@
   
 
 
-<h1 id="parameters-advanced-reference">Parameters — Advanced reference<a class="headerlink" href="#parameters-advanced-reference" title="Permanent link">&para;</a></h1>
+<h1 id="parameters-complete-reference">Parameters - complete reference<a class="headerlink" href="#parameters-complete-reference" title="Permanent link">&para;</a></h1>
 <p>Use <a href="../standard/">Standard parameters</a> for the initial checklist. This reference
 covers the <strong>public configuration surface</strong>, not every Bash local or internal
 Bicep/ARM module parameter.</p>
+<p>This page follows the shared templates on <strong>published development <code>main</code></strong>.
+It calls the settings "Parameters"; their exact JSON/YAML/environment names stay
+unchanged. Start with the <a href="../../factory-tools/18-cli-and-api-and-usage/">tool-specific guide</a>
+for a registered factory, rather than manually editing generated files.</p>
+<p>Jump to <a href="#mcp-and-ai-gateway-parameters">current feature choices</a>,
+<a href="#yaml-and-variablesjson-reference">all JSON/YAML parameters</a>, or
+<a href="#github-actions-env-reference">GitHub environment parameters</a>.</p>
+<h2 id="mcp-and-ai-gateway-parameters">MCP and AI Gateway parameters<a class="headerlink" href="#mcp-and-ai-gateway-parameters" title="Permanent link">&para;</a></h2>
+<p>These are opt-in <strong>project001 Dev</strong> features in matching ADO/GHA project
+pipelines, not a universal gateway selection switch.</p>
+<table>
+<thead>
+<tr>
+<th>JSON/YAML</th>
+<th>GitHub name</th>
+<th>Effect / requirements</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enableAIFactoryMCP</code></td>
+<td><code>ENABLE_AI_FACTORY_MCP</code></td>
+<td>Host read-only Factory MCP; needs Foundry, Container Apps, approved image digests and the Entra app.</td>
+</tr>
+<tr>
+<td><code>enableAIGatewaySKU</code></td>
+<td><code>ENABLE_AI_GATEWAY_SKU</code></td>
+<td>Create or adopt the dedicated AI Gateway with the selected Foundry account.</td>
+</tr>
+<tr>
+<td><code>addAIFactoryMCP2AIGatewaySKU</code></td>
+<td><code>ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU</code></td>
+<td>Register the MCP tool server; both components and suitable private outbound networking are required.</td>
+</tr>
+</tbody>
+</table>
+<p>All three default to false. <strong>False skips the step; it does not delete resources.</strong>
+<code>aifactoryMcpImage</code>, <code>aifactoryMcpApiImage</code> and <code>aifactoryMcpEntraAppId</code> are required
+for MCP hosting. <code>aiGatewaySkuResourceId</code> selects an existing gateway to adopt;
+<code>aiGatewaySkuOutboundSubnetId</code> provides the new gateway's outbound subnet when
+registration needs it. The exact environment names and defaults are in the
+generated tables below.</p>
+<p>Regular APIM pools (<code>ENABLE_APIM</code>), the optional Kong edge (<code>ENABLE_KONG</code>) and
+network Application Gateway are <strong>different routes</strong>. A configuration field
+does not make every route available in an installed API.
+See <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md">component prerequisites</a>.</p>
+<h2 id="safe-editing">Safe editing<a class="headerlink" href="#safe-editing" title="Permanent link">&para;</a></h2>
+<p>Use <a href="../">registered settings/parameter preparation</a> for API-managed
+configuration. Inspect defaults and dependencies; change only intended values.
+Deleting an override is not resource deletion. Secret-name references are not
+places to store secret values.</p>
+<details>
+<summary>More info</summary>
 <h2 id="scope-and-authoritative-sources">Scope and authoritative sources<a class="headerlink" href="#scope-and-authoritative-sources" title="Permanent link">&para;</a></h2>
 <p>The generated tables include every unique key in these <strong>shared templates</strong>:</p>
 <ul>
@@ -2430,6 +2527,9 @@ them out of committed files, logs and command history.</p>
 Their presence is not a recommendation to enable them. Review the exact target,
 backups, policy/RBAC permissions, network reachability and the deployment plan.
 A complete configuration reference is not a guarantee of deployment success.</p>
+</details>
+<details>
+<summary>Alternative and Legacy ways</summary>
 <h2 id="bash-create-and-update-contract">Bash create and update contract<a class="headerlink" href="#bash-create-and-update-contract" title="Permanent link">&para;</a></h2>
 <p>Run these entrypoints from the generated consumer checkout, using Bash/Git Bash.
 They use the existing deployment engine and route configuration.</p>
@@ -2504,8 +2604,9 @@ They use the existing deployment engine and route configuration.</p>
 </tr>
 </tbody>
 </table>
-<p>Create and update default to <code>main</code> unless an explicit version selector is
-provided; project-only is not an upgrade operation. Current create validation
+<p>Legacy create defaults to <code>124</code>. Update inherits the saved version unless an
+explicit version selector is provided. Choose <code>main</code> explicitly for development;
+project-only is not an upgrade operation. Current create validation
 accepts <strong><code>AIF_NETWORK_MODE=priv</code> only</strong>, despite legacy help also mentioning
 <code>h</code>/<code>pub</code>. Its general region prompt defaults to <strong><code>swedencentral</code></strong>, whereas
 the shared configuration templates default to <strong><code>eastus2</code></strong>.
@@ -2643,6 +2744,7 @@ reported, not silently represented as multiple settings.</p>
 <p>Targeted regression tests:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>environment_setup/unit-tests/test-bicep/unit<span class="w"> </span>-p<span class="w"> </span>test_parameter_documentation.py<span class="w"> </span>-v
 </code></pre></div>
+</details>
 <!-- BEGIN GENERATED PARAMETERS -->
 
 <h2 id="source-coverage">Source coverage<a class="headerlink" href="#source-coverage" title="Permanent link">&para;</a></h2>
@@ -2747,7 +2849,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU</code></td>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Register the AI Factory MCP as a tool server on the AI Gateway SKU keep-as-is: Requires enableAIFactoryMCP:'true', enableAIGatewaySKU:'true' and aiGatewaySkuOutboundSubnetId (or an adopted gateway with outbound VNet integration).</td>
+<td>Opt-in project001 Dev registration of the Factory MCP tool server on the AI Gateway. Requires both components, private outbound reachability and administrator-granted access. False skips registration; it does not delete existing resources.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:addAIFoundry --><!-- parameter json.dev:addAIFoundry --><code>addAIFoundry</code></td>
@@ -2859,14 +2961,14 @@ reported, not silently represented as multiple settings.</p>
 <td><code>APIM_GATEWAY_SKU</code></td>
 <td>O</td>
 <td>Y: <code>"StandardV2"</code><br>J.dev: <code>"StandardV2"</code></td>
-<td>AI gateway SKU: BasicV2=dev/test; StandardV2=production default with VNet integration; PremiumV2=private inbound/outbound, zones, and high scale. Classic Developer/Basic/Standard/Premium are supported but cannot be migrated to v2 in place. Consumption is unsupported because APIM backend circuit breakers are unavailable.</td>
+<td>SKU for the regular APIM pool/policy route, distinct from the dedicated AIGateway component. Check current Azure SKU, network and circuit-breaker support before deployment; this route does not support Consumption circuit breakers.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:apimGatewaySkuCapacity --><!-- parameter json.dev:apimGatewaySkuCapacity --><code>apimGatewaySkuCapacity</code></td>
 <td><code>APIM_GATEWAY_SKU_CAPACITY</code></td>
 <td>O</td>
 <td>Y: <code>1</code><br>J.dev: <code>1</code></td>
-<td>BasicV2/StandardV2 scale to 10 units; PremiumV2 scales to 30 units. Set capacity based on APIM gateway CPU/memory metrics.</td>
+<td>Requested capacity for the selected regular APIM SKU. Validate current SKU limits and measured needs; the template value is not a capacity reservation.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:apimGatewaySubscriptionId --><!-- parameter json.dev:apimGatewaySubscriptionId --><code>apimGatewaySubscriptionId</code></td>
@@ -2957,7 +3059,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>ENABLE_FOUNDRY_CAPHOST</code></td>
 <td>C</td>
 <td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
-<td>Required for this private Foundry standard-agent architecture. Cannot be disabled; binds Cosmos DB thread storage, AI Search vector storage, and project Storage. mandatory: Required for this private Foundry standard-agent architecture. Cannot be disabled; binds Cosmos DB thread storage, AI Search vector storage, and project Storage. Required together for the standard private-agent capability-host architecture; not universal across all deployment paths.</td>
+<td>Enable the capability host for the selected standard private-agent architecture with its required Storage, Search and Cosmos DB dependencies. Other Foundry paths can have different requirements.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableAIDocIntelligence --><!-- parameter json.dev:enableAIDocIntelligence --><code>enableAIDocIntelligence</code></td>
@@ -2985,14 +3087,14 @@ reported, not silently represented as multiple settings.</p>
 <td><code>ENABLE_AI_FACTORY_MCP</code></td>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Host the governed AI Factory MCP in project001 Dev keep-as-is: Requires enableContainerApps:'true' and enableAIFoundry:'true' plus aifactoryMcpImage, aifactoryMcpApiImage and aifactoryMcpEntraAppId. false never deletes an existing MCP.</td>
+<td>Opt-in project001 Dev Factory MCP hosting through the matching project pipeline. Requires Foundry, Container Apps, approved image digests and an Entra application. False skips the step; it does not delete existing resources.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableAIFoundry --><!-- parameter json.dev:enableAIFoundry --><code>enableAIFoundry</code></td>
 <td><code>ENABLE_AI_FOUNDRY</code></td>
 <td>C</td>
 <td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
-<td>Enable AI Foundry mandatory: Enable AI Foundry recommended: AI Foundry with default project; enterprise-grade private networking, BYOvNet, existing infra. GA. Required together for the standard private-agent capability-host architecture; not universal across all deployment paths.</td>
+<td>Enable the current Foundry account/project path for the selected architecture. Check private-agent dependencies, model availability and the installed runtime; this setting is not a blanket GA or deployment-readiness claim.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableAIFoundryHub --><!-- parameter json.dev:enableAIFoundryHub --><code>enableAIFoundryHub</code></td>
@@ -3006,7 +3108,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>ENABLE_AI_GATEWAY_SKU</code></td>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Initialize the new Azure AI Gateway SKU (ai.gateway.azure.com) with the project001 Dev Foundry keep-as-is: Requires enableAIFoundry:'true'. false never deletes an existing gateway.</td>
+<td>Opt-in project001 Dev dedicated AI Gateway create/adopt integration. Requires Foundry and the component prerequisites. Not the regular APIM/Kong route. False skips the step; it does not delete existing resources.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableAISearch --><!-- parameter json.dev:enableAISearch --><code>enableAISearch</code></td>
@@ -3188,7 +3290,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>ENABLE_DELETE_FOR_DISABLED_RESOURCES</code></td>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Delete disabled services otherwise: false, keeps all existing resources regardless of ENABLE_* flags.</td>
+<td>Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableElasticsearch --><!-- parameter json.dev:enableElasticsearch --><code>enableElasticsearch</code></td>
@@ -4357,21 +4459,21 @@ reported, not silently represented as multiple settings.</p>
 <td><code>DELETE_ALL_FOR_PROJECT</code></td>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>ULTRA DELETE MODE - Delete ALL resources in project RG and networking resources (subnets, NSGs) in common RG. Use with extreme caution!</td>
+<td>Destructive whole-project selection for the supported pipeline path. Review scope and shared dependencies; not a general bypass for blocked registered deletion.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:deleteAllServicesForProject --><!-- parameter json.dev:deleteAllServicesForProject --><code>deleteAllServicesForProject</code></td>
 <td><code>DELETE_ALL_SERVICES_FOR_PROJECT</code></td>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Delete all project services otherwise: true, deletes all services in project RG in step 04 then quits pipeline (Key Vault retained by default; set deleteKeyvaultAlso:'true' to also delete it).</td>
+<td>Destructive project-service selection for a supported deletion run; review exact resources, dependencies and retention before execution.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:deleteKeyvaultAlso --><!-- parameter json.dev:deleteKeyvaultAlso --><code>deleteKeyvaultAlso</code></td>
 <td><code>DELETE_KEYVAULT_ALSO</code></td>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
-<td>Also delete Key Vault when deleteAllServicesForProject:'true' recommended: false, retains Key Vault as a safety net (secrets, CMK keys, RBAC). otherwise: true, also deletes the project Key Vault.</td>
+<td>Include Key Vault only in the applicable reviewed deletion path. Not purge permission; Azure retention and other resource-group controls still apply.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:diagnosticSettingLevel --><!-- parameter json.dev:diagnosticSettingLevel --><code>diagnosticSettingLevel</code></td>
@@ -5990,7 +6092,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>addAIFactoryMCP2AIGatewaySKU</code></td>
 <td>O</td>
 <td><code>"false"</code></td>
-<td>addAIFactoryMCP2AIGatewaySKU: register the AI Factory MCP as a tool server on the AI Gateway SKU keep-as-is: Requires ENABLE_AI_FACTORY_MCP:'true', ENABLE_AI_GATEWAY_SKU:'true' and AI_GATEWAY_SKU_OUTBOUND_SUBNET_ID (or an adopted gateway with outbound VNet integration).</td>
+<td>Opt-in project001 Dev registration of the Factory MCP tool server on the AI Gateway. Requires both components, private outbound reachability and administrator-granted access. False skips registration; it does not delete existing resources.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ADD_AI_FOUNDRY --><code>ADD_AI_FOUNDRY</code></td>
@@ -6102,14 +6204,14 @@ reported, not silently represented as multiple settings.</p>
 <td><code>apimGatewaySku</code></td>
 <td>O</td>
 <td><code>"StandardV2"</code></td>
-<td>BasicV2=dev/test; StandardV2=production default + VNet integration; PremiumV2=full private network isolation, zones, and high scale. Classic Developer/Basic/Standard/Premium cannot migrate to v2 in place. Consumption cannot use backend circuit breakers.</td>
+<td>SKU for the regular APIM pool/policy route, distinct from the dedicated AIGateway component. Check current Azure SKU, network and circuit-breaker support before deployment; this route does not support Consumption circuit breakers.</td>
 </tr>
 <tr>
 <td><!-- parameter env:APIM_GATEWAY_SKU_CAPACITY --><code>APIM_GATEWAY_SKU_CAPACITY</code></td>
 <td><code>apimGatewaySkuCapacity</code></td>
 <td>O</td>
 <td><code>"1"</code></td>
-<td>BasicV2/StandardV2 support up to 10 units; PremiumV2 supports up to 30.</td>
+<td>Requested capacity for the selected regular APIM SKU. Validate current SKU limits and measured needs; the template value is not a capacity reservation.</td>
 </tr>
 <tr>
 <td><!-- parameter env:APIM_GATEWAY_SUBSCRIPTION_ID --><code>APIM_GATEWAY_SUBSCRIPTION_ID</code></td>
@@ -6228,14 +6330,14 @@ reported, not silently represented as multiple settings.</p>
 <td><code>enableAIFactoryMCP</code></td>
 <td>O</td>
 <td><code>"false"</code></td>
-<td>enableAIFactoryMCP: host the governed AI Factory MCP in project001 Dev keep-as-is: Requires ENABLE_CONTAINER_APPS:'true' and ENABLE_AI_FOUNDRY:'true' plus AIFACTORY_MCP_IMAGE, AIFACTORY_MCP_API_IMAGE and AIFACTORY_MCP_ENTRA_APP_ID. false never deletes an existing MCP.</td>
+<td>Opt-in project001 Dev Factory MCP hosting through the matching project pipeline. Requires Foundry, Container Apps, approved image digests and an Entra application. False skips the step; it does not delete existing resources.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_AI_FOUNDRY --><code>ENABLE_AI_FOUNDRY</code></td>
 <td><code>enableAIFoundry</code></td>
 <td>C</td>
 <td><code>"true"</code></td>
-<td>Enable AI Foundry mandatory: Enable AI Foundry recommended: enterprise-grade private networking, BYOvNet. Required together for the standard private-agent capability-host architecture; not universal across all deployment paths.</td>
+<td>Enable the current Foundry account/project path for the selected architecture. Check private-agent dependencies, model availability and the installed runtime; this setting is not a blanket GA or deployment-readiness claim.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_AI_FOUNDRY_HUB --><code>ENABLE_AI_FOUNDRY_HUB</code></td>
@@ -6249,7 +6351,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>enableAIGatewaySKU</code></td>
 <td>O</td>
 <td><code>"false"</code></td>
-<td>enableAIGatewaySKU: initialize the new Azure AI Gateway SKU (ai.gateway.azure.com) with the project001 Dev Foundry keep-as-is: Requires ENABLE_AI_FOUNDRY:'true'. false never deletes an existing gateway.</td>
+<td>Opt-in project001 Dev dedicated AI Gateway create/adopt integration. Requires Foundry and the component prerequisites. Not the regular APIM/Kong route. False skips the step; it does not delete existing resources.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_AI_SEARCH --><code>ENABLE_AI_SEARCH</code></td>
@@ -6424,7 +6526,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>enableDeleteForDisabledResources</code></td>
 <td>O</td>
 <td><code>"false"</code></td>
-<td>Delete disabled services keep-as-is: true, delete resources that exist but are disabled (ENABLE_* flag = false). otherwise: false, keep all existing resources.</td>
+<td>Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_ELASTICSEARCH --><code>ENABLE_ELASTICSEARCH</code></td>
@@ -6445,7 +6547,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>enableAFoundryCaphost</code></td>
 <td>C</td>
 <td><code>"true"</code></td>
-<td>Required for this private Foundry standard-agent architecture. Cannot be disabled; binds Cosmos DB, AI Search, and project Storage. mandatory: Required for this private Foundry standard-agent architecture. Cannot be disabled; binds Cosmos DB, AI Search, and project Storage. Required together for the standard private-agent capability-host architecture; not universal across all deployment paths.</td>
+<td>Enable the capability host for the selected standard private-agent architecture with its required Storage, Search and Cosmos DB dependencies. Other Foundry paths can have different requirements.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_FUNCTION --><code>ENABLE_FUNCTION</code></td>
@@ -7873,21 +7975,21 @@ reported, not silently represented as multiple settings.</p>
 <td><code>deleteAllForProject</code></td>
 <td>O</td>
 <td><code>"false"</code></td>
-<td>Delete EVERYTHING for project otherwise: true, deletes ALL resources in project RG including KV, Storage, AppInsights, and networking resources (subnets, NSGs) in common RG. Use with extreme caution!</td>
+<td>Destructive whole-project selection for the supported pipeline path. Review scope and shared dependencies; not a general bypass for blocked registered deletion.</td>
 </tr>
 <tr>
 <td><!-- parameter env:DELETE_ALL_SERVICES_FOR_PROJECT --><code>DELETE_ALL_SERVICES_FOR_PROJECT</code></td>
 <td><code>deleteAllServicesForProject</code></td>
 <td>O</td>
 <td><code>"false"</code></td>
-<td>Delete all project services otherwise: true, delete ALL services in the project RG (except KV, Storage, AppInsights) before redeploy.</td>
+<td>Destructive project-service selection for a supported deletion run; review exact resources, dependencies and retention before execution.</td>
 </tr>
 <tr>
 <td><!-- parameter env:DELETE_KEYVAULT_ALSO --><code>DELETE_KEYVAULT_ALSO</code></td>
 <td><code>deleteKeyvaultAlso</code></td>
 <td>O</td>
 <td><code>"false"</code></td>
-<td>Also delete Key Vault when DELETE_ALL_SERVICES_FOR_PROJECT:'true' recommended: false, retains Key Vault as a safety net (secrets, CMK keys, RBAC). otherwise: true, also deletes the project Key Vault.</td>
+<td>Include Key Vault only in the applicable reviewed deletion path. Not purge permission; Azure retention and other resource-group controls still apply.</td>
 </tr>
 <tr>
 <td><!-- parameter env:DIAGNOSTIC_SETTING_LEVEL --><code>DIAGNOSTIC_SETTING_LEVEL</code></td>

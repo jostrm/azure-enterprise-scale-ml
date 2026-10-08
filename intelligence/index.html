@@ -27,7 +27,7 @@
     
     
       
-        <title>AI Factory Intelligence - Enterprise Scale AI Factory</title>
+        <title>Monitor and operate - Enterprise Scale AI Factory</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#ai-factory-intelligence" class="md-skip">
+        <a href="#monitor-and-operate" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              AI Factory Intelligence
+              Monitor and operate
             
           </span>
         </div>
@@ -395,7 +395,7 @@
   
     
   
-  AI Factory Intelligence
+  Monitor and operate
 
       </a>
     </li>
@@ -747,7 +747,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -857,7 +857,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Platform automation
   
 
     
@@ -1413,7 +1413,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1431,7 +1431,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1457,10 +1457,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#capability-summary" class="md-nav__link">
+  <a href="#metrics-reports-and-dashboards" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Capability Summary
+        Metrics, reports and dashboards
       
     </span>
   </a>
@@ -1468,10 +1468,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#dynamic-ip-calculator" class="md-nav__link">
+  <a href="#optional-health-models" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dynamic IP Calculator
+        Optional health models
       
     </span>
   </a>
@@ -1479,21 +1479,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#dynamic-rbac-engine" class="md-nav__link">
+  <a href="#agent-chat-and-mcp" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dynamic RBAC Engine
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#feature-flag-orchestrator" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Feature Flag Orchestrator
+        Agent Chat and MCP
       
     </span>
   </a>
@@ -1535,10 +1524,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#capability-summary" class="md-nav__link">
+  <a href="#metrics-reports-and-dashboards" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Capability Summary
+        Metrics, reports and dashboards
       
     </span>
   </a>
@@ -1546,10 +1535,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#dynamic-ip-calculator" class="md-nav__link">
+  <a href="#optional-health-models" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dynamic IP Calculator
+        Optional health models
       
     </span>
   </a>
@@ -1557,21 +1546,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#dynamic-rbac-engine" class="md-nav__link">
+  <a href="#agent-chat-and-mcp" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Dynamic RBAC Engine
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#feature-flag-orchestrator" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Feature Flag Orchestrator
+        Agent Chat and MCP
       
     </span>
   </a>
@@ -1598,111 +1576,116 @@
   
 
 
-<h1 id="ai-factory-intelligence">AI Factory Intelligence<a class="headerlink" href="#ai-factory-intelligence" title="Permanent link">&para;</a></h1>
-<p>AI Factory Intelligence is the top-level capability that transforms the AI Factory from a set of Bicep templates into a <strong>self-aware, context-driven provisioning platform</strong>.</p>
-<hr />
-<h2 id="capability-summary">Capability Summary<a class="headerlink" href="#capability-summary" title="Permanent link">&para;</a></h2>
+<h1 id="monitor-and-operate">Monitor and operate<a class="headerlink" href="#monitor-and-operate" title="Permanent link">&para;</a></h1>
+<p>Choose the question you want to answer. Factory inventory, deployment progress,
+usage, billing and workload health are different views.</p>
 <table>
 <thead>
 <tr>
-<th>Capability</th>
-<th>Description</th>
+<th>Your question</th>
+<th>Use</th>
+<th>Important limit</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Dynamic IP/Subnet Calculator</strong></td>
-<td>One integer per environment → all subnet CIDRs auto-calculated</td>
+<td>Is the Factory API running?</td>
+<td><code>health</code></td>
+<td>Process health, not Azure resource health.</td>
 </tr>
 <tr>
-<td><strong>Dynamic RBAC Engine</strong></td>
-<td>Service principal + managed identity roles assigned automatically across all services</td>
+<td>What is registered or deployed?</td>
+<td>Catalog/inventory and the selected run's results</td>
+<td>Refreshing a list is not telemetry collection.</td>
 </tr>
 <tr>
-<td><strong>Persona Mapping</strong></td>
-<td>Entra ID groups → predefined personas → fine-grained RBAC</td>
+<td>Did this deployment finish?</td>
+<td>Exact job status, logs and provider/worker completion records</td>
+<td>Submission or local script exit does not prove deployment success.</td>
 </tr>
 <tr>
-<td><strong>Feature Flag Orchestrator</strong></td>
-<td>Pipeline reads flags → invokes only the required Bicep modules</td>
+<td>How much was used or billed?</td>
+<td>Usage workbooks/reports and explicit Cost Management reads</td>
+<td>Billing can be delayed; modelled cost is not billed cost.</td>
 </tr>
 <tr>
-<td><strong>Incremental / Idempotent Deployments</strong></td>
-<td>Re-run safely at any time to add services or apply updates</td>
-</tr>
-<tr>
-<td><strong>Salt-based Resource Naming</strong></td>
-<td>Deterministic unique 5-char salt prevents resource name collisions</td>
-</tr>
-<tr>
-<td><strong>Debug Mode</strong></td>
-<td>Individual pipeline steps can be skipped (<code>debug_disable_XX=true</code>)</td>
+<td>Are services healthy together?</td>
+<td>Optional Azure Monitor health-model component</td>
+<td>Preview service and separate setup; missing signals remain unknown.</td>
 </tr>
 </tbody>
 </table>
-<hr />
-<h2 id="dynamic-ip-calculator">Dynamic IP Calculator<a class="headerlink" href="#dynamic-ip-calculator" title="Permanent link">&para;</a></h2>
-<p>Given only:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">dev_cidr_range</span><span class="p">:</span><span class="w"> </span><span class="s">"61"</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">test_cidr_range</span><span class="p">:</span><span class="w"> </span><span class="s">"62"</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">prod_cidr_range</span><span class="p">:</span><span class="w"> </span><span class="s">"63"</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nt">common_vnet_cidr</span><span class="p">:</span><span class="w"> </span><span class="s">"172.16.0.0/16"</span>
-</code></pre></div>
-<p>The pipeline automatically calculates all subnets:</p>
+<p><a href="../factory-tools/20-cli-and-api-and-usage/">CLI, SDK and REST observation examples</a>
+include job status, logs, GitHub workflow watch, saved reports and resource-group
+cost reads. A GitHub watcher is not an ADO watcher.</p>
+<h2 id="metrics-reports-and-dashboards">Metrics, reports and dashboards<a class="headerlink" href="#metrics-reports-and-dashboards" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Sample reports</strong> use demonstration data, not customer usage.</li>
+<li><strong>Saved reports</strong> read existing results. They do not silently collect new
+  telemetry or provision monitoring.</li>
+<li><strong>Live reads</strong> require the correct identity and scope. A request may read
+  Azure even when it does not change resources.</li>
+<li><strong>Dashboard-only refresh</strong> is a separate plan/apply operation for dashboard
+  resources, not a side effect of reading a report.</li>
+</ul>
+<p>Missing, stale or incomplete observations are not zero cost or good health.
+Business-outcome reporting needs application instrumentation and agreed measures.
+Creating a report does not mean its attachments were emailed.</p>
+<h2 id="optional-health-models">Optional health models<a class="headerlink" href="#optional-health-models" title="Permanent link">&para;</a></h2>
+<p>The published <code>healthmodel</code> package provides an optional Azure Monitor health
+tree, signal configuration, alerts and separate ADO/GHA deployment entry points.
+It uses the preview <code>Microsoft.CloudHealth</code> API. Check supported regions,
+permissions and signal sources for your environment.</p>
+<p>This is not the same as API <code>health</code>, an MCP dependency check, or a universally
+integrated <code>azurefactory healthmodel</code> command. The package's recorded test results
+are not a guarantee of current availability in another subscription.</p>
+<p><a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/healthmodel/readme.md">Health-model component guide</a></p>
+<h2 id="agent-chat-and-mcp">Agent Chat and MCP<a class="headerlink" href="#agent-chat-and-mcp" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Subnet</th>
-<th>DEV CIDR</th>
+<th>Component</th>
+<th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Common subnet</td>
-<td><code>172.16.61.0/26</code></td>
+<td>Factory Agent Chat</td>
+<td>A scoped, source-grounded management assistant using configured Search/Foundry and Factory operation adapters.</td>
 </tr>
 <tr>
-<td>Scoring subnet</td>
-<td><code>172.16.61.64/26</code></td>
+<td>Factory MCP</td>
+<td>MCP clients/servers and host adapters for available Factory capabilities.</td>
 </tr>
 <tr>
-<td>Power BI GW subnet</td>
-<td><code>172.16.61.128/26</code></td>
+<td>Private Azure MCP example</td>
+<td>A distinct narrow, read-only Azure resource-tool example for workloads.</td>
 </tr>
 <tr>
-<td>Bastion subnet</td>
-<td><code>172.16.61.192/26</code></td>
-</tr>
-<tr>
-<td>Project GenAI subnet</td>
-<td><code>172.16.61.X/26</code></td>
-</tr>
-<tr>
-<td>Project AKS subnet</td>
-<td><code>172.16.61.X/26</code></td>
+<td>Project001 Dev MCP/AI Gateway integration</td>
+<td>An opt-in pipeline component with explicit image, identity and network prerequisites.</td>
 </tr>
 </tbody>
 </table>
-<hr />
-<h2 id="dynamic-rbac-engine">Dynamic RBAC Engine<a class="headerlink" href="#dynamic-rbac-engine" title="Permanent link">&para;</a></h2>
-<p>At deployment time, the pipeline:</p>
-<ol>
-<li>Reads the project service principal OID and managed identity from the seeding Key Vault.</li>
-<li>Assigns the correct Azure RBAC roles to each service (Storage, Key Vault, AI Foundry, AI Search, ACR, etc.).</li>
-<li>Sets up ACL permissions on the Data Lake for the project team.</li>
-<li>Applies Entra ID group assignments based on configured personas.</li>
-</ol>
-<hr />
-<h2 id="feature-flag-orchestrator">Feature Flag Orchestrator<a class="headerlink" href="#feature-flag-orchestrator" title="Permanent link">&para;</a></h2>
-<p>Feature flags in <code>variables.yaml</code> / <code>.env</code> control which services are deployed:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">enableAIFoundry</span><span class="p">:</span><span class="w"> </span><span class="s">"true"</span><span class="w">      </span><span class="c1"># deploy AI Foundry</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">enableAISearch</span><span class="p">:</span><span class="w"> </span><span class="s">"true"</span><span class="w">       </span><span class="c1"># deploy AI Search</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">enableCosmosDB</span><span class="p">:</span><span class="w"> </span><span class="s">"false"</span><span class="w">      </span><span class="c1"># skip Cosmos DB</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">enableContainerApps</span><span class="p">:</span><span class="w"> </span><span class="s">"false"</span><span class="w"> </span><span class="c1"># skip Container Apps (add later)</span>
-</code></pre></div>
-<p>On re-run with <code>enableContainerApps: "true"</code>, only the Container Apps step runs — existing services are untouched.</p>
-<hr />
-<p>For the full persona reference, see <a href="../concepts/intelligence/">AI Factory Intelligence — Concepts</a>.</p>
+<p>These components do not bypass caller permissions or human approval. Enabling
+a conversational interface does not grant access to every factory or turn
+missing actions into successful operations.</p>
+<details>
+<summary>More info</summary>
+<p>Published references:
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/30-39/32-dashboards.md">dashboards</a>,
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/40-aifactory-agent/readme.md">Factory Agent Chat</a>,
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/mcp/readme.md">Factory MCP</a>,
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/44-azure-mcp/readme.md">private Azure MCP example</a>,
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md">gateway integration</a>.</p>
+<p>The local dual graph combines code relationships and architecture notes. It is
+a navigation aid, not current Azure state. Unpublished graph/authentication or
+multi-model health enhancements described in local release addenda are not
+automatically present in published <code>main</code> or an installed application.</p>
+<p>Cloud inference, monitoring queries and actual operations have their own
+permissions and potential costs. A successful source build is not a live
+deployment or compliance certification.</p>
+</details>
 
 
 

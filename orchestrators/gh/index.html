@@ -397,7 +397,7 @@
   
     
   
-  AI Factory Intelligence
+  Monitor and operate
 
       </a>
     </li>
@@ -749,7 +749,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -859,7 +859,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Platform automation
   
 
     
@@ -1400,10 +1400,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#create-a-new-factory-scale-set" class="md-nav__link">
+  <a href="#start-with-a-registered-factory" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Create a new factory scale set
+        Start with a registered factory
       
     </span>
   </a>
@@ -1411,10 +1411,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#update-or-run-an-existing-project" class="md-nav__link">
+  <a href="#repository-identity-and-environments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Update or run an existing project
+        Repository, identity and environments
       
     </span>
   </a>
@@ -1422,10 +1422,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#authentication-and-configuration" class="md-nav__link">
+  <a href="#configuration-and-private-access" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Authentication and configuration
+        Configuration and private access
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observe-rather-than-retry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observe rather than retry
       
     </span>
   </a>
@@ -1489,7 +1500,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1529,10 +1540,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#create-a-new-factory-scale-set" class="md-nav__link">
+  <a href="#start-with-a-registered-factory" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Create a new factory scale set
+        Start with a registered factory
       
     </span>
   </a>
@@ -1540,10 +1551,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#update-or-run-an-existing-project" class="md-nav__link">
+  <a href="#repository-identity-and-environments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Update or run an existing project
+        Repository, identity and environments
       
     </span>
   </a>
@@ -1551,10 +1562,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#authentication-and-configuration" class="md-nav__link">
+  <a href="#configuration-and-private-access" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Authentication and configuration
+        Configuration and private access
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observe-rather-than-retry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observe rather than retry
       
     </span>
   </a>
@@ -1582,152 +1604,99 @@
 
 
 <h1 id="github-actions">GitHub Actions<a class="headerlink" href="#github-actions" title="Permanent link">&para;</a></h1>
-<p>Use the GitHub consumer repository for this route; it is separate from an Azure
-DevOps repository. Maintain one complete project <code>variables.json</code> with <code>dev</code> and
-<code>stage_prod</code>, or use the route's <code>.env</code> settings. See
-<a href="../../parameters/">configuration and API</a> and <a href="../../parameters/advanced/">all variables</a>.</p>
-<h2 id="create-a-new-factory-scale-set">Create a new factory scale set<a class="headerlink" href="#create-a-new-factory-scale-set" title="Permanent link">&para;</a></h2>
-<p>Run the current published create launcher, supplying a separate destination:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>bash<span class="w"> </span>./GHA-create-new-aifactory-scaleset.sh<span class="w"> </span>--repo-root<span class="w"> </span><span class="s2">"C:/work/my-gha-factory"</span>
-</code></pre></div>
-<p>The source copy is under <code>bootstrap/</code>; installed consumer copies may be at the
-repository root. The normal bootstrap prepares the repository, identity,
-configuration, common infrastructure and initial project. It can create billable
-resources and publish repository changes. Read its summary before accepting.</p>
+<p>Choose GitHub Actions when your team uses GitHub repositories, environments and
+workflows. It uses the same reviewed Factory configuration concepts as the other
+clients, with GitHub-specific identity and execution setup.</p>
+<h2 id="start-with-a-registered-factory">Start with a registered factory<a class="headerlink" href="#start-with-a-registered-factory" title="Permanent link">&para;</a></h2>
+<p>Use <a href="../../factory-tools/19-cli-and-api-and-usage/">CLI, Python SDK or REST</a> to
+select <code>gha</code>, save configuration and review the exact target. Then separately
+approve the supported deployment or registered Full-bootstrap workflow.</p>
+<p>Selecting <code>gha</code> or creating a project record does not dispatch a workflow.
+Registered execution requires compatible source, a reviewed binding, identity,
+coordination and runner/private-network setup.</p>
+<h2 id="repository-identity-and-environments">Repository, identity and environments<a class="headerlink" href="#repository-identity-and-environments" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Option</th>
-<th>Meaning</th>
+<th>Area</th>
+<th>What to check</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>--aifactory-version main</code></td>
-<td>Explicit template selection; these create wrappers currently default to <code>main</code></td>
+<td>Repository</td>
+<td>Exact owner/name, approved visibility and source revision.</td>
 </tr>
 <tr>
-<td><code>--dry-run</code></td>
-<td>Collect/validate answers without executing the normal full-bootstrap mutations</td>
+<td>Azure identity</td>
+<td>Configured OIDC/federated identity or the supported service-principal route; API keys are separate.</td>
 </tr>
 <tr>
-<td><code>--non-interactive --yes</code></td>
-<td>Use documented <code>AIF_*</code> inputs and accept execution; authentication must already be available</td>
+<td>GitHub environment</td>
+<td>Exact case-sensitive name, required secrets/variables and protection rules.</td>
 </tr>
 <tr>
-<td><code>--prepare-only</code></td>
-<td>Prepares Azure/identity/configuration/automation; <strong>not</strong> a read-only preview</td>
+<td>Runner</td>
+<td>Supported labels/image, registration and network reachability. Registration is not an Azure deployment login.</td>
 </tr>
 <tr>
-<td><code>--no-wait</code></td>
-<td>Dispatch without waiting; does not prove deployment success</td>
+<td>Azure target</td>
+<td>Existing tenant/subscription, region, selected environment and required permissions.</td>
 </tr>
 </tbody>
 </table>
-<p>The specialized <code>AIF_SIMPLE_MODE=true</code> contract has its own fixed inputs and
-preview restrictions; see <a href="../../parameters/advanced/">the full reference</a>.</p>
-<h2 id="update-or-run-an-existing-project">Update or run an existing project<a class="headerlink" href="#update-or-run-an-existing-project" title="Permanent link">&para;</a></h2>
-<p>From the selected consumer repository:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Refresh AI Factory/templates, then run the project workflow.</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>bash<span class="w"> </span>./GH-update-aifactory-and-run-project.sh<span class="w"> </span>--aifactory-version<span class="w"> </span>main
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Run the existing project pipeline without refreshing templates.</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>bash<span class="w"> </span>./GH-update-aifactory-and-run-project.sh<span class="w"> </span>--project-only
-</code></pre></div>
-<p><code>GHA-update-aifactory-and-run-project.sh</code> is the equivalent alias. Default update
-uses <code>main</code>; <code>--project-only</code> preserves the installed source. Scripts can prompt
-for configuration, commit/push or authentication; they are not automatically
-unattended merely because they are invoked from another program.</p>
-<p>API-reviewed runs bind <code>AIFACTORY_TARGET_ENVIRONMENT</code>, <code>AIFACTORY_PROJECT_NUMBER</code>
-and <code>AIFACTORY_PROJECT_CONFIG</code> to the selected target. Use the API prepare/start
-flow for those runs; do not reuse an old confirmation for another project.
-The configuration is transported through protected per-run configuration, not
-committed as a public JSON file.</p>
-<h2 id="authentication-and-configuration">Authentication and configuration<a class="headerlink" href="#authentication-and-configuration" title="Permanent link">&para;</a></h2>
-<p>Local execution needs Git Bash, Azure CLI, GitHub CLI, host Python and access to
-the intended repository and Azure subscriptions. Pipeline authentication uses
-the configured OIDC/federated identity or the supported service-principal route.
-Keep credentials in the required secret stores, never in <code>.env.template</code> or docs.</p>
-<p>GitHub runner <strong>registration</strong> uses a short-lived token minted by authenticated
-<code>gh</code>; Azure managed identity/OIDC is the separate <strong>deployment</strong> login. A GitHub
-runner's name or online status cannot establish whether the historical <code>gh</code>
-session used an OAuth login, PAT or installation token. Newly provisioned Linux
-runner VMs have no managed identity attached. Existing Windows admin-VM identity
-settings are preserved.</p>
-<p>New full bootstrap creates GitHub environments <strong>Dev</strong>, <strong>Stage</strong>, <strong>Prod</strong>.
-The numeric <code>/settings/environments/&lt;id&gt;</code> URL is an environment ID, not its name.
-The repository variable <code>AIFACTORY_GITHUB_ENVIRONMENTS</code> maps the unchanged logical
-selectors <code>dev</code>, <code>stage</code>, <code>prod</code> to exact GitHub names; Azure still uses
-<code>dev</code>, <code>test</code>, <code>prod</code>. Existing lowercase environments keep their names and
-case-sensitive OIDC subjects. Updated workflows without the mapping retain
-their legacy lowercase behavior. No remote environment is renamed, deleted or
-stripped of protection rules. Other named environments are left untouched and do
-not require enrollment to run full bootstrap. To deliberately use a custom
-environment, supply a reviewed complete <code>AIFACTORY_GITHUB_ENVIRONMENTS</code> mapping,
-for example <code>{"dev":"aifactory-existing","stage":"Stage","prod":"Prod"}</code>. Bootstrap refuses
-to overwrite a saved mapping or a conflicting federated credential; changing
-either requires a separately reviewed migration.</p>
-<p>Full bootstrap can create/ensure its bootstrap resource group, deployment
-identity (<code>AIF_IDENTITY_MODE=c</code>), common infrastructure and missing Linux runner.
-<code>mi</code> and <code>sp</code> instead select existing identities. The runner-only preparation
-command intentionally requires the selected common resource group and subnet to
-exist; it is not full bootstrap.
-Advanced Mode reuses existing resource groups and deployment identities rather
-than recreating them. Simple Mode deliberately requires a fresh bootstrap/common
-scope; use Advanced Mode to resume an existing scope.
-All subscription IDs must already exist; bootstrap does not create subscriptions.
-The existing MAUI/API full-bootstrap route remains independent of optional
-registered exact-scope enrollment.</p>
-<p>The initial team group is created/ensured unless <code>AIF_TEAM_GROUP_ID</code> supplies an
-existing group. Technical administrators default to that team for compatibility.
-Choose <code>AIF_ADMIN_GROUP_MODE=separate</code> to supply <code>AIF_ADMIN_GROUP_ID</code>, or
-create/ensure <code>AIF_ADMIN_GROUP_NAME</code> with <code>AIF_ADMIN_MEMBER_EMAIL</code>.
-Supplied group IDs skip membership changes; creation/membership and role
-assignments still require the caller's normal Entra/Azure permissions.</p>
-<div class="admonition note">
-<p class="admonition-title">Integrated VPN and project allocation</p>
-<p><strong>Advanced Mode with integrated VPN</strong> keeps <code>GatewaySubnet</code> at the end of
-the common VNet. <code>subnetCalc_v2.ps1</code> now allocates aligned free IPv4 gaps
-across all VNet prefixes, largest subnet first with stable logical-name ties.
-Existing managed <code>snt-prj&lt;projectNumber&gt;-...</code> subnets retain their exact CIDRs, even when defaults
-change; other subnets are reserved, never renumbered. Exhaustion, fragmentation,
-malformed inventory, and unsupported multi-prefix project subnets fail before
-parameter output. Multiple IPv4 prefixes on unrelated subnets are reserved;
-IPv6 allocation is not supported. Serialize writers sharing the same VNet.
-<strong>Simple Mode</strong> instead reserves <code>172.16.1.0/27</code> for the gateway and
-<code>172.16.1.32/28</code> for DNS, and checks room for a full project in its fixed
-<code>172.16.0.0/20</code>, using the same gap policy rather than a tail cursor.
-The offline <code>10.113.0.0/18</code> regression retains gateway <code>10.113.63.224/27</code>
-and supports three full project allocations and repeat updates; client pool
-<code>172.31.240.0/24</code> is separate, not a VNet subnet. This is not Azure deployment proof.
-Do not change an integrated selection to an external hub to bypass allocation.</p>
-<p>Canonical GitHub Actions and ADO project templates pass the project number to
-the allocator in the accelerator submodule. Existing consumers must adopt the
-reviewed published accelerator revision and refreshed templates together.
-Registered Full bootstrap's API frozen project projection already uses free-gap
-allocation with exact project ownership checks, reading subnet sizes from the
-pinned PowerShell source rather than invoking its old append path. API creation
-sources snapshot <code>bootstrap</code> and <code>environment_setup/aifactory</code>; after publishing,
-synchronize the exact reviewed source and rebuild packaged clients where needed.
-Editing the canonical working tree does not update existing pinned snapshots.</p>
-</div>
-<p>The route template is
-<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/.env.template"><code>github-actions/.env.template</code></a>.
-It uses uppercase names; JSON/YAML often use different names. Do not mechanically
-uppercase JSON keys. Workflow files run under <code>.github/workflows</code>; use the
-documented entrypoint and verify the exact workflow/run, rather than assuming
-every push deploys.</p>
-<p>For a registered exact-scope lifecycle operation, the additional
-<code>bootstrap/GHA-azurefactory.sh</code> wrapper consumes a trusted, protected reviewed
-manifest. It does not replace full bootstrap or initialize a register. It requires
-a published compatible provider, authentication and target-lock enrollment.</p>
-<div class="admonition note">
-<p class="admonition-title">Source versions</p>
-<p>Use a matching published release of scripts, helpers and pipeline templates.
-<code>125</code> means <code>release/v1.25</code>; <code>main</code> is an explicit moving branch whose reviewed
-commit is pinned for execution. Local unpublished changes are not available
-to a remote workflow until separately published.</p>
-</div>
+<p>GitHub full-bootstrap paths can create environment names <code>Dev</code>, <code>Stage</code>, <code>Prod</code>
+and store the logical-to-actual mapping in <code>AIFACTORY_GITHUB_ENVIRONMENTS</code>.
+That does not mean Stage/Prod Azure infrastructure has been deployed.
+Existing environments and OIDC subjects must not be silently renamed.</p>
+<h2 id="configuration-and-private-access">Configuration and private access<a class="headerlink" href="#configuration-and-private-access" title="Permanent link">&para;</a></h2>
+<p>GitHub <code>.env</code> template names are often uppercase; JSON/YAML names can differ.
+Use <a href="../../parameters/advanced/">Parameters</a> instead of mechanical case conversion.
+Editing a local <code>.env</code> does not publish its values to GitHub automatically.</p>
+<p>Private endpoints require working DNS, routes and runner access. Hosted runners
+are not automatically able to reach private services. Full bootstrap and
+runner-only setup have different prerequisites; runner-only setup expects the
+selected existing network resources.</p>
+<h2 id="observe-rather-than-retry">Observe rather than retry<a class="headerlink" href="#observe-rather-than-retry" title="Permanent link">&para;</a></h2>
+<p>Read the catalog job and the exact GitHub run. <code>workflow status/watch</code> is
+read-only; reconnecting the watch does not rerun the workflow.
+A timeout stops local waiting, not the Azure operation.</p>
+<p><a href="../../factory-tools/20-cli-and-api-and-usage/">Status and recovery examples</a></p>
+<details>
+<summary>More info</summary>
+<p>Shared-VNet project allocation uses the selected planner and existing subnet
+inventory. Available aligned gaps, fragmentation, reserved gateway/DNS ranges
+and exact project ownership matter. Existing subnets are not renamed or moved
+just to make a new allocation fit. Serialize writers of a shared network.</p>
+<p>Simple-mode and advanced/full-bootstrap paths have different address and
+resource-selection contracts. New optional Application Gateway choices do not
+automatically adopt a customer's existing gateway. Read the
+<a href="../../parameters/advanced/#simple-mode-technical-contract">specific parameter contract</a>.</p>
+<p>The project001 Dev MCP/AI Gateway integration is a later opt-in pipeline step,
+with explicit image, identity and network prerequisites. False skips that step,
+not resource deletion. <a href="../../parameters/advanced/#mcp-and-ai-gateway-parameters">Component details</a>.</p>
+</details>
+<details>
+<summary>Alternative and Legacy ways</summary>
+<p>Existing legacy consumers use matching root launchers:</p>
+<ul>
+<li><code>GHA-create-new-aifactory-scaleset.sh</code> for its full creation path.</li>
+<li><code>GH-update-aifactory-and-run-project.sh</code> for project/template updates;
+  <code>GHA-update-aifactory-and-run-project.sh</code> forwards to it.</li>
+<li><code>--project-only</code> skips the library/template update part.</li>
+<li><code>--aifactory-env dev|stage|prod</code> chooses the project environment.</li>
+</ul>
+<p>Legacy create defaults to <code>124</code>; update normally inherits the saved version.
+Select <code>--aifactory-version main</code> explicitly when adopting development source.
+The actual run is tied to the reviewed commit even as <code>main</code> advances.</p>
+<p>Normal launcher runs can commit/push, configure identities, create billable
+resources and dispatch workflows. <code>--prepare-only</code> is not a read-only preview;
+<code>--no-wait</code> does not prove completion. Neither route is a fallback for a blocked
+registered operation.</p>
+<p><a href="../../parameters/advanced/#bash-create-and-update-contract">Complete launcher inputs</a> |
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions">Current GHA templates</a> |
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/20-29/24-end-2-end-setup.md">Setup guide</a></p>
+</details>
 
 
 

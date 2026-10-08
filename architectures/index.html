@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#automated-architectures" class="md-skip">
+        <a href="#choose-an-architecture" class="md-skip">
           Skip to content
         </a>
       
@@ -397,7 +397,7 @@
   
     
   
-  AI Factory Intelligence
+  Monitor and operate
 
       </a>
     </li>
@@ -749,7 +749,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -859,7 +859,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Platform automation
   
 
     
@@ -1159,10 +1159,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#architecture-overview" class="md-nav__link">
+  <a href="#build-on-a-shared-foundation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Architecture Overview
+        Build on a shared foundation
       
     </span>
   </a>
@@ -1170,10 +1170,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#architecture-1-esml-enterprise-scale-machine-learning" class="md-nav__link">
+  <a href="#connect-to-your-enterprise-environment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Architecture 1 — ESML (Enterprise Scale Machine Learning)
+        Connect to your enterprise environment
       
     </span>
   </a>
@@ -1181,32 +1181,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#architecture-2-genai-1-enterprise-scale-genai" class="md-nav__link">
+  <a href="#continue-with-your-workload" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Architecture 2 — GenAI-1 (Enterprise Scale GenAI)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#enterprise-landing-zone-context" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Enterprise Landing Zone Context
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#esml-with-fabric-flavour" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ESML With Fabric Flavour
+        Continue with your workload
       
     </span>
   </a>
@@ -1508,7 +1486,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1548,10 +1526,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#architecture-overview" class="md-nav__link">
+  <a href="#build-on-a-shared-foundation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Architecture Overview
+        Build on a shared foundation
       
     </span>
   </a>
@@ -1559,10 +1537,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#architecture-1-esml-enterprise-scale-machine-learning" class="md-nav__link">
+  <a href="#connect-to-your-enterprise-environment" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Architecture 1 — ESML (Enterprise Scale Machine Learning)
+        Connect to your enterprise environment
       
     </span>
   </a>
@@ -1570,32 +1548,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#architecture-2-genai-1-enterprise-scale-genai" class="md-nav__link">
+  <a href="#continue-with-your-workload" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Architecture 2 — GenAI-1 (Enterprise Scale GenAI)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#enterprise-landing-zone-context" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Enterprise Landing Zone Context
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#esml-with-fabric-flavour" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ESML With Fabric Flavour
+        Continue with your workload
       
     </span>
   </a>
@@ -1622,66 +1578,71 @@
   
 
 
-<h1 id="automated-architectures">Automated Architectures<a class="headerlink" href="#automated-architectures" title="Permanent link">&para;</a></h1>
-<p>The AI Factory currently provides two automated template architectures — <strong>ESML</strong> and <strong>GenAI-1</strong> — that are deployed as AI Factory projects inside your AI landing zones.</p>
-<hr />
-<h2 id="architecture-overview">Architecture Overview<a class="headerlink" href="#architecture-overview" title="Permanent link">&para;</a></h2>
-<p><img alt="AI Factory Architectures" src="../assets/images/10-two-architectures-v2.png" /></p>
-<p>Each team in the AI Factory gets their own <strong>floor</strong>: an isolated project with either Architecture 1 (ESML) or Architecture 2 (GenAI-1), or both. Services can be turned ON/OFF at any time via feature flags without disrupting other projects.</p>
-<hr />
-<h2 id="architecture-1-esml-enterprise-scale-machine-learning">Architecture 1 — ESML (Enterprise Scale Machine Learning)<a class="headerlink" href="#architecture-1-esml-enterprise-scale-machine-learning" title="Permanent link">&para;</a></h2>
-<p>Designed for <strong>discriminative AI</strong> workloads: model training, batch inference, and online scoring.</p>
-<p><strong>Baseline services:</strong>
-- Azure Machine Learning (private workspace)
-- Azure Container Registry (Premium, private)
-- Azure Storage (Data Lake)
-- Key Vault, Application Insights
-- Private networking (VNet, subnets, private endpoints)</p>
-<p><strong>Optional services:</strong>
-- AKS (private cluster, Arc-enabled) for online scoring
-- Azure Data Factory for pipeline orchestration
-- Azure Databricks for large-scale feature engineering
-- Microsoft Fabric / OneLake integration</p>
-<hr />
-<h2 id="architecture-2-genai-1-enterprise-scale-genai">Architecture 2 — GenAI-1 (Enterprise Scale GenAI)<a class="headerlink" href="#architecture-2-genai-1-enterprise-scale-genai" title="Permanent link">&para;</a></h2>
-<p>Designed for <strong>generative AI</strong> workloads: RAG, agentic pipelines, LLM-based applications.</p>
-<p><strong>Baseline services:</strong>
-- AI Foundry Hub + default project (private)
-- AI Search (private, with shared private link support)
-- Azure OpenAI (via AI Foundry)
-- 2× Storage accounts, Key Vault, Application Insights, Monitoring dashboards
-- Private networking</p>
-<p><strong>Optional services (feature flags):</strong>
-- Cosmos DB (required for AI Foundry Capacity Host)
-- Container Apps, Web App, Function App, AKS
-- Logic Apps, Event Hubs, APIM AI Gateway
-- Bing Grounding, Azure Vision, Speech, Content Safety, Document Intelligence
-- PostgreSQL, Redis Cache, Azure SQL</p>
-<hr />
-<h2 id="enterprise-landing-zone-context">Enterprise Landing Zone Context<a class="headerlink" href="#enterprise-landing-zone-context" title="Permanent link">&para;</a></h2>
-<p>The AI Factory projects live inside <strong>3 AI landing zones</strong> (Dev, Stage, Prod), which can be connected to an existing enterprise network using:</p>
+<h1 id="choose-an-architecture">Choose an architecture<a class="headerlink" href="#choose-an-architecture" title="Permanent link">&para;</a></h1>
+<p>AI Factory provides two main infrastructure families. Choose the workload first,
+then review the services, networking and environment you need.</p>
+<p><img alt="AI Factory architectures" src="../assets/images/10-two-architectures-v2.png" /></p>
 <table>
 <thead>
 <tr>
-<th>Topology</th>
-<th>Description</th>
+<th>Family</th>
+<th>Choose it for</th>
+<th>Typical building blocks</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Hub/Spoke</strong></td>
-<td>Traditional hub VNet with peered spoke VNets per environment</td>
+<td><strong>ESML</strong></td>
+<td>Machine-learning training, batch scoring and online serving</td>
+<td>Azure Machine Learning, data storage, Key Vault, monitoring and selected compute; optional Databricks, Data Factory or AKS.</td>
 </tr>
 <tr>
-<td><strong>VWAN Hub</strong></td>
-<td>Azure Virtual WAN for global, managed connectivity</td>
+<td><strong>GenAI-1</strong></td>
+<td>Foundry agents, RAG and generative applications</td>
+<td>Foundry, storage, Key Vault, monitoring and the selected private-agent dependencies, such as Search and Cosmos DB.</td>
 </tr>
 </tbody>
 </table>
-<p><img alt="ESLZ Full Diagram" src="../assets/images/14-eslz-full-1.png" /></p>
-<hr />
-<h2 id="esml-with-fabric-flavour">ESML With Fabric Flavour<a class="headerlink" href="#esml-with-fabric-flavour" title="Permanent link">&para;</a></h2>
-<p><img alt="ESML Fabric flavour" src="../assets/images/11-services-highlevel-esml_fabric.png" /></p>
+<p>Service switches and dependencies vary by route. Do not assume every possible
+GenAI project requires the same model or that all optional services are deployed.
+The older Foundry Hub flags are not the recommended current Foundry path.</p>
+<h2 id="build-on-a-shared-foundation">Build on a shared foundation<a class="headerlink" href="#build-on-a-shared-foundation" title="Permanent link">&para;</a></h2>
+<p>A factory can share common network and platform services while projects have
+their own resources and settings. A project can have explicit placements in Dev,
+Stage and Prod; configuration does not automatically provision all three.</p>
+<p>See <a href="../concepts/">factory, scale-set and project concepts</a>,
+<a href="../concepts/enterprise-scale/">environment planning</a>, and the
+<a href="../parameters/standard/">Parameters checklist</a>.</p>
+<div class="admonition important">
+<p class="admonition-title">Plan changes before applying them</p>
+<p>Feature flags are inputs to reviewed deployment. They are not a guarantee
+that existing resources remain untouched, or that disabled services are
+deleted automatically.</p>
+</div>
+<h2 id="connect-to-your-enterprise-environment">Connect to your enterprise environment<a class="headerlink" href="#connect-to-your-enterprise-environment" title="Permanent link">&para;</a></h2>
+<p>Existing hub/spoke, central DNS and BYO network designs require the correct
+resource references, permissions, routes and private connectivity. A topology
+diagram is not a substitute for checking that setup.</p>
+<p><img alt="Enterprise landing-zone context" src="../assets/images/14-eslz-full-1.png" /></p>
+<h2 id="continue-with-your-workload">Continue with your workload<a class="headerlink" href="#continue-with-your-workload" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../concepts/templates/genaiops/">Agent and GenAIOps templates</a></li>
+<li><a href="../concepts/templates/mlops/">ML Model Factory and MLOps</a></li>
+<li><a href="../concepts/templates/dataops/">DataOps and storage choices</a></li>
+<li><a href="../factory-tools/19-cli-and-api-and-usage/">Create or update through CLI, SDK or REST</a></li>
+</ul>
+<details>
+<summary>More info</summary>
+<p>Fabric/OneLake and other existing services can be integration targets, not
+automatic additions to every factory. Check the selected workload's documented
+storage and authentication contract.</p>
+<p><img alt="ESML and Fabric integration concept" src="../assets/images/11-services-highlevel-esml_fabric.png" /></p>
+<p>Source families are
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/esml-project"><code>esml-project</code></a>
+and <a href="https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/esml-genai-1"><code>esml-genai-1</code></a>,
+with shared common infrastructure. Template availability is not proof of
+capacity, regional service availability or a successful deployment.</p>
+</details>
 
 
 

@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#parameters-standard-checklist" class="md-skip">
+        <a href="#parameters-required-inputs" class="md-skip">
           Skip to content
         </a>
       
@@ -397,7 +397,7 @@
   
     
   
-  AI Factory Intelligence
+  Monitor and operate
 
       </a>
     </li>
@@ -777,6 +777,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#before-editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before editing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scope-naming-and-project" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -803,6 +814,17 @@
     <span class="md-ellipsis">
       
         Network and service dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optional-factory-mcp-and-ai-gateway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional Factory MCP and AI Gateway
       
     </span>
   </a>
@@ -843,7 +865,7 @@
   <span class="md-ellipsis">
     
   
-    All variables
+    All parameters
   
 
     
@@ -953,7 +975,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Platform automation
   
 
     
@@ -1500,7 +1522,7 @@
   <span class="md-ellipsis">
     
   
-    AI Factory Intelligence
+    Monitor and operate
   
 
     
@@ -1540,6 +1562,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#before-editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before editing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#scope-naming-and-project" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1566,6 +1599,17 @@
     <span class="md-ellipsis">
       
         Network and service dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optional-factory-mcp-and-ai-gateway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional Factory MCP and AI Gateway
       
     </span>
   </a>
@@ -1603,7 +1647,7 @@
   
 
 
-<h1 id="parameters-standard-checklist">Parameters — Standard checklist<a class="headerlink" href="#parameters-standard-checklist" title="Permanent link">&para;</a></h1>
+<h1 id="parameters-required-inputs">Parameters - required inputs<a class="headerlink" href="#parameters-required-inputs" title="Permanent link">&para;</a></h1>
 <p>Start with the inputs needed for your <strong>selected route and environment</strong>.
 This is a concise mandatory/conditional checklist, not the complete inventory
 or a guarantee that a subscription is ready to deploy.
@@ -1612,6 +1656,42 @@ template key, bootstrap inputs and CLI/API options.</p>
 <p><strong>M</strong> = mandatory in context; <strong>C</strong> = required only when its condition applies.
 Defaults can satisfy mandatory settings. Replace placeholders and verify
 permissions, service availability, quota, DNS and private network reachability.</p>
+<p>For the default registered approach, use the
+<a href="../../factory-tools/18-cli-and-api-and-usage/">CLI, Python SDK or REST tutorial</a>
+to select the factory, scale set and project. Do not manually populate a generated
+register. The table below describes the underlying pipeline inputs; API field
+names can differ and must come from the selected host's schema.</p>
+<h2 id="before-editing">Before editing<a class="headerlink" href="#before-editing" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Decide first</th>
+<th>Why it matters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>New registered factory or an existing legacy consumer</td>
+<td>The save and deployment routes differ.</td>
+</tr>
+<tr>
+<td>Dev, Stage or Prod</td>
+<td>Only selected environments need their subscription, networking and provider setup.</td>
+</tr>
+<tr>
+<td>GitHub Actions or Azure DevOps</td>
+<td>GitHub identity/environment variables and ADO service connections are not interchangeable.</td>
+</tr>
+<tr>
+<td>Which services and shared dependencies</td>
+<td>Optional features can require other resources, permissions and extra cost.</td>
+</tr>
+<tr>
+<td>Settings change or actual deployment</td>
+<td>Confirming settings does not start a deployment.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="scope-naming-and-project">Scope, naming and project<a class="headerlink" href="#scope-naming-and-project" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1790,12 +1870,59 @@ and the simple-mode preset are not interchangeable.</p>
 own-hub intent unless central DNS is enabled, which takes precedence.
 Flags do not establish peering. Public-access flags do not govern GitHub
 repository visibility or guarantee private-only monitoring.</p>
+<h2 id="optional-factory-mcp-and-ai-gateway">Optional Factory MCP and AI Gateway<a class="headerlink" href="#optional-factory-mcp-and-ai-gateway" title="Permanent link">&para;</a></h2>
+<p>These inputs apply only when you intentionally enable the corresponding
+<strong>project001 Dev</strong> integration. They do not replace the general service inputs.</p>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Required when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enableAIFactoryMCP</code> plus Foundry and Container Apps</td>
+<td>Hosting the read-only Factory MCP.</td>
+</tr>
+<tr>
+<td><code>aifactoryMcpImage</code>, <code>aifactoryMcpApiImage</code></td>
+<td>MCP hosting; supply approved digest-pinned images from the expected registry.</td>
+</tr>
+<tr>
+<td><code>aifactoryMcpEntraAppId</code></td>
+<td>MCP hosting; an administrator prepares the app registration and required role.</td>
+</tr>
+<tr>
+<td><code>enableAIGatewaySKU</code> plus Foundry</td>
+<td>Creating/adopting the dedicated AI Gateway integration.</td>
+</tr>
+<tr>
+<td><code>aiGatewaySkuResourceId</code></td>
+<td>Adopting an existing gateway rather than creating one.</td>
+</tr>
+<tr>
+<td><code>addAIFactoryMCP2AIGatewaySKU</code> plus both components</td>
+<td>Registering MCP on the gateway.</td>
+</tr>
+<tr>
+<td><code>aiGatewaySkuOutboundSubnetId</code></td>
+<td>Registration with a new gateway; an adopted gateway must already have suitable outbound networking.</td>
+</tr>
+</tbody>
+</table>
+<p>All three switches default to false. False skips the component action; it does
+not delete existing resources. See <a href="../advanced/#mcp-and-ai-gateway-parameters">full prerequisites and mappings</a>.
+Regular APIM, optional Kong and Application Gateway are different routes.</p>
+<details>
+<summary>Alternative and Legacy ways</summary>
 <h2 id="if-using-the-create-bootstrap-instead">If using the create bootstrap instead<a class="headerlink" href="#if-using-the-create-bootstrap-instead" title="Permanent link">&para;</a></h2>
 <p>Supply the route's public <code>AIF_*</code>, <code>GITHUB_REPOSITORY</code> or <code>ADO_*</code> inputs rather
 than assuming the generated <code>.env</code> is the input schema. The general create
 prompt currently defaults to <code>swedencentral</code> and accepts private networking
 only; this differs from the shared templates. Simple mode fixes additional
-settings and requires three private HTTPS gateway inputs.</p>
+settings. The hostname/backend/certificate inputs are required only when its
+Application Gateway deployment is enabled.</p>
 <p>Follow the <a href="../advanced/#bash-create-and-update-contract">bootstrap contract and full input tables</a>.
 Before dispatch, review the exact factory/project/environment, resolved
 configuration, networking dependencies, authentication and destructive flags.</p>
@@ -1804,6 +1931,10 @@ configuration, networking dependencies, authentication and destructive flags.</p
 retaining full configuration and separate subscription/SKU values. This differs
 from the raw shared consumer template's current <code>dev</code>-only shape; see
 <a href="../advanced/#scope-and-authoritative-sources">the two JSON contracts</a>.</p>
+<p>Legacy create defaults to <code>124</code>; update normally inherits its saved version.
+Choose <code>main</code> explicitly when adopting current development source. This does
+not migrate a legacy directory into a registered factory.</p>
+</details>
 
 
 
