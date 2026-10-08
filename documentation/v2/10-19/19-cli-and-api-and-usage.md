@@ -1,91 +1,102 @@
-# 19. Add and update: choose the intent, then the interface
+# 19. Add and update an AI factory
 
-Start with [18 — connection, smoke checks and routing](18-cli-and-api-and-usage.md).
-For removal and uncertain outcomes, use
-[20 — removal and recovery](20-cli-and-api-and-usage.md).
-Decide first between
-[file-first variables.json editing and wrapper-first operations](18-cli-and-api-and-usage.md#choose-how-to-author-configuration-file-first-or-wrapper-first).
-This chapter uses commands and API calls to save changes. You can supply JSON
-request files, but do not edit the generated catalog files directly.
-[17 — earlier overview](17-cli-and-api-and-usage.md) remains historical context;
-use this chapter's limits on promotion and deployment success.
+Choose **one tool tab for this whole tutorial**. Each tab connects independently,
+selects real targets, prepares changes and stops for review before confirmation.
+Start with [18 — connection and compatibility checks](18-cli-and-api-and-usage.md);
+use [20 — removal and recovery](20-cli-and-api-and-usage.md) for deletion or an
+uncertain result. [17](17-cli-and-api-and-usage.md) remains historical context.
+On GitHub, expand the matching tool section. The documentation website uses
+one linked tab selector for the same content.
 
-**Saved configuration is not deployed infrastructure.** A successful configuration
-confirmation saves settings only (`job: null`). Deployment needs a separate
-review and approval. Its confirmation can start pipelines, create billable
-resources and publish Git changes. An accepted request or finished local command
-does not by itself mean Azure deployment succeeded.
+## Before you start
 
-## Choose the intent
+- Obtain the **owning API's URL and key** from your operator. A demo address/key
+  is not for real resources. These administrative endpoints currently require
+  local-host access. Keep the key out of browser code, source control and output.
+- `folder`, `repo_root` and import paths refer to the **API host**. Request files
+  and reviews below are **client-local**. A needs an operator-created, empty
+  `azurefactory` folder; B–E need the real registered catalog, not a smoke-test root.
+- **No deployment yet:** confirming configuration saves settings (`job: null`).
+  Runtime confirmation is separate and can create billable resources, publish Git
+  changes and start pipelines. `can_execute: true` is not approval or proof of success.
+- **STOP and review** the exact folder, IDs, environment, tenant/subscription,
+  version, changes, ownership, warnings and expiry. Keep reviews in private,
+  persistent storage outside Git and temporary cleanup folders; verify its access
+  permissions. Checksums detect file changes; they are not signatures or approval.
+- **Never retry an uncertain write**, or switch tools to repeat it. Inspect saved
+  state first. A timeout stops waiting, not the deployment.
+- Settings saves and typed `unset` do not delete Azure resources. `null` is not a
+  general unset. Changes to shared **`stage_prod`** settings can affect both Stage
+  and Prod: replacing shared values can lose settings the other environment uses.
+  Review both; do not assume Stage-only isolation. A parameter profile reset discards **all old protected parameter
+  settings in that scale set**, even when one project is selected; do not use it
+  to bypass an error.
 
-These labels describe the checked source version. **Your installed tools may
-differ.** Run guide 18's compatibility checks; do not bypass a blocked operation.
-
-| Scenario / intent | Support and boundary |
-|---|---|
-| **A. New AI factory, own hub/VPN, project001, selected Dev/Stage/Prod** | **implemented**: save selected scale sets and an initial project. **conditional/blocked**: deploying the hub/VPN and resources needs complete network settings and separate approval. The short example saves only part of that configuration. |
-| **B. Add an AI Factory scale set** | **implemented**: `scaleset add` prepares configuration; separate confirmation saves it. Adding a project and deploying are separate steps. An AI Factory scale set groups an environment, network and subscription; it is **not Azure Virtual Machine Scale Sets (VMSS)**. |
-| **C. Put a project on the latest successful scale set** | **implemented** within an explicit environment. Omitting the scale-set ID requires the newer API source installed on the host; no environment is guessed. |
-| **E. Add/update settings or typed parameters; unset an override** | **implemented**: named CLI/SDK settings and parameter preparation, followed by separate confirmation. None of these deletes Azure resources. |
-| **D. Promote captured successful Dev configuration/version to Stage, then Prod** | **not implemented**. You can choose a target, edit its settings and deploy separately. This does not copy a successful Dev deployment or require each environment to succeed before the next. |
-| **F. Choose APIM versus Kong for an AI gateway** | **not implemented** as one deployment choice. Newer source has **conditional/blocked** MCP/AI Gateway pipeline support. Application Gateway is a different product; its registered deployment workflow is blocked. |
-
-Choose **CLI** for terminal commands, the **`AzureFactoryClient` SDK** for Python
-helpers, or **REST** for direct HTTP requests from your application. All call the
-same API and follow the same approval rules; see [18](18-cli-and-api-and-usage.md).
-**Keep the API key out of browser code.**
-
-<details>
+<details markdown="1">
 <summary>More info</summary>
 
-Use a trusted backend or automation worker for API calls. Named SDK methods such
-as `scaleset_add_prepare` prepare only; they do not approve a change. There are
-still no SDK methods named `project_promote` or `gateway_deploy`.
+| Intent | Support and limit |
+|---|---|
+| **A. New factory, selected Dev/Stage/Prod, project001, own hub intent; clone** | **implemented** configuration preparation and confirmation. The short request does not configure or deploy a complete VPN/hub. |
+| **B. Add a scale set and/or project** | **implemented**; separate configuration changes. An AI Factory scale set is an environment/network/subscription grouping, **not Azure VMSS**. |
+| **C. Latest successful scale in an explicit environment** | **implemented** in newer API source. Environment-only placement is **not yet in the published API baseline**; install-compatible host required, no implicit Dev. |
+| **D. Stage/Prod placement versus captured promotion** | Placement is **implemented**. Executing a captured successful Dev configuration/version through Stage and Prod is **not implemented**. Backend capture/review work is in progress, not a published executable promotion route. |
+| **E. Typed parameters and scoped settings** | **implemented**, including named CLI/SDK preparation and typed review receipts. |
+| Runtime and registered Full bootstrap | **conditional/blocked** by host/runtime versions, permissions, bindings, ownership, identity, runners and network readiness. |
+| Migration, draft identity correction, direct binding configuration, registered creation API | **generic-access only** where supported; no invented dedicated helpers. |
+| Unified APIM-versus-Kong deployment choice | **not implemented**. Newer MCP/AI Gateway component pipelines have **conditional/blocked** support; Application Gateway is a different product and its registered workflow is blocked. |
+
+Read the chosen API's capabilities and OpenAPI before using a request. A newer
+client cannot supply a missing server/runtime feature. `DEV/001`, `STAGE/001`
+and `PROD/001` are different targets; `001` is not a UUID. API environments are
+`dev`, `stage`, `prod` (some Azure naming uses `test` for Stage).
 
 </details>
 
-## 1. Connection and exact target selection
+## Choose your tool
 
-Use Windows PowerShell **5.1+ or 7**. Run **guide 18's Window B setup in this same
-shell** to set up the client tools. Before real-factory operations,
-replace its demonstration URL/key through your approved secret mechanism with
-the **actual owning API host and key**. Do not operate a real factory through the
-public demonstration key or assume port 8876 is its real API address.
-That setup defines `$ApiRoot`, `$AcceleratorRoot`,
-`$Python = Join-Path $ApiRoot '.venv\Scripts\python.exe'`,
-`PYTHONPATH` pointing to `environment_setup\azurefactory-cli\src`, and
-`AIFACTORY_API_URL` / `AIFACTORY_API_KEY`. No console-script installation is assumed.
+<details markdown="1" data-factory-tool="CLI (PowerShell)">
+<summary>CLI (PowerShell)</summary>
 
-**Do not carry guide 18's empty-demo target into real work accidentally.** Choose
-the actual existing catalog for B–F, or a separately approved new target for A.
-All `folder`, `repo_root` and configuration import paths sent to the API refer to
-the **API host**. Request files and receipts in this tutorial are **client-local**.
-The API still restricts these administrative calls to local-host access.
-For A, the chosen new `azurefactory` directory must already exist and be empty;
-have the API-host operator create that directory first. For B-F select an
-existing registered root, not the empty smoke-test directory.
+## Connect and define the local helpers
 
-Run these helper definitions once. They are PowerShell functions for this guide,
-not extra SDK methods. Store reviews under private local application data,
-outside Git checkouts, replaceable templates and temporary cleanup areas.
-Saved reviews and responses may contain sensitive settings. Check that only
-authorized people can read the folder.
+Use Windows PowerShell 5.1+ or PowerShell 7, an existing API Python environment
+and the approved accelerator checkout. No console-script installation or
+variables from another tab are required. These snippets run in **one shell**.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-if (!(Test-Path -LiteralPath $Python -PathType Leaf)) { throw 'Run guide 18 Window B setup.' }
-if (!$env:AIFACTORY_API_URL -or !$env:AIFACTORY_API_KEY) { throw 'Connection/key missing.' }
-$FactoryFolder = Read-Host 'Exact approved azurefactory folder on the API host'
+$ApiRoot = Read-Host 'Absolute path to your existing API checkout'
+$AcceleratorRoot = Read-Host 'Absolute path to your approved accelerator checkout'
+$Python = Join-Path $ApiRoot '.venv\Scripts\python.exe'
+$SdkSource = Join-Path $AcceleratorRoot 'environment_setup\azurefactory-cli\src'
+if (!(Test-Path -LiteralPath $Python -PathType Leaf) -or
+    !(Test-Path -LiteralPath $SdkSource -PathType Container)) { throw 'Check existing tool paths.' }
+$env:PYTHONPATH = $SdkSource
+$env:AIFACTORY_API_URL = Read-Host 'Operator-provided owning API URL, without trailing slash'
+if (!$env:AIFACTORY_API_URL) { throw 'Do not use an implicit demo URL.' }
+if (!$env:AIFACTORY_API_KEY) {
+    $Secret = Read-Host 'Operator-provided API key' -AsSecureString
+    $Pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Secret)
+    try { $env:AIFACTORY_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($Pointer) }
+    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Pointer) }
+}
+if (!$env:AIFACTORY_API_KEY) { throw 'Missing API key.' }
+& $Python -m azurefactory health
+if ($LASTEXITCODE -ne 0) { throw 'API unavailable.' }
+& $Python -m azurefactory doctor
+if ($LASTEXITCODE -ne 0) { throw 'Incompatible host; stop.' }
+$FactoryFolder = Read-Host 'Exact absolute azurefactory folder ON THE API HOST'
 if (![IO.Path]::IsPathRooted($FactoryFolder)) { throw 'Use an absolute API-host path.' }
-$ReviewBase = Join-Path $env:LOCALAPPDATA 'AzureFactory\reviews'
-New-Item -ItemType Directory -Path $ReviewBase -Force | Out-Null
-$ReviewRoot = Join-Path $ReviewBase ('add-update-' + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $ReviewRoot -ErrorAction Stop | Out-Null
+$ReviewRoot = Join-Path $env:LOCALAPPDATA ('AzureFactory\reviews\' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $ReviewRoot -Force | Out-Null
 
+function New-ReviewPath([string]$Label) {
+    return (Join-Path $ReviewRoot ($Label + '-' + [guid]::NewGuid().ToString('N') + '.json'))
+}
 function Write-ReviewJson($Value, [string]$Label) {
-    $Path = Join-Path $ReviewRoot ($Label + '-' + [guid]::NewGuid().ToString('N') + '.json')
-    if (Test-Path -LiteralPath $Path) { throw 'Refusing to overwrite a review artifact.' }
-    [IO.File]::WriteAllText($Path, ($Value | ConvertTo-Json -Depth 100),
+    $Path = New-ReviewPath $Label
+    [IO.File]::WriteAllText($Path, (ConvertTo-Json -InputObject $Value -Depth 100),
         [Text.UTF8Encoding]::new($false))
     return $Path
 }
@@ -93,1559 +104,1884 @@ function Read-Catalog {
     $Text = & $Python -m azurefactory catalog list --folder $FactoryFolder
     if ($LASTEXITCODE -ne 0) { throw 'Catalog read failed.' }
     $Value = ($Text -join "`n") | ConvertFrom-Json
-    if ($Value.contract_version -ne 1 -or $Value.mode -ne 'catalog') {
-        throw 'Select a registered catalog, not a legacy root.'
-    }
+    if ($Value.contract_version -ne 1 -or $Value.mode -ne 'catalog') { throw 'Not a registered catalog.' }
     return $Value
 }
-function Read-Target([switch]$Project, [switch]$RequirePlacement) {
+function Read-Target([switch]$Scale, [switch]$Project, [switch]$Placed) {
     $Catalog = Read-Catalog
     $Catalog.factories | Select-Object id,key,region,version_ref | Format-Table | Out-Host
-    $FactoryId = Read-Host 'Exact factory UUID from this catalog'
-    $Factories = @($Catalog.factories | Where-Object { $_.id -eq $FactoryId })
-    if ($Factories.Count -ne 1) { throw 'Factory selection is not exact.' }
-    $Factory = $Factories[0]
-    $Factory.scale_sets | Select-Object id,environment,suffix,tenant_id,subscription_id |
-        Format-Table | Out-Host
-    $ScaleId = Read-Host 'Exact target scale-set UUID from this factory'
-    $Scales = @($Factory.scale_sets | Where-Object { $_.id -eq $ScaleId })
-    if ($Scales.Count -ne 1) { throw 'Scale-set selection is not exact.' }
-    $SelectedProject = $null
+    $Id = Read-Host 'Exact factory UUID'
+    $Found = @($Catalog.factories | Where-Object { $_.id -eq $Id })
+    if ($Found.Count -ne 1) { throw 'Select exactly one listed factory.' }
+    $Factory = $Found[0]; $SelectedScale = $null; $SelectedProject = $null
+    if ($Scale) {
+        $Factory.scale_sets | Select-Object id,environment,suffix,tenant_id,subscription_id | Format-Table | Out-Host
+        $Id = Read-Host 'Exact scale-set UUID'
+        $Found = @($Factory.scale_sets | Where-Object { $_.id -eq $Id })
+        if ($Found.Count -ne 1) { throw 'Select exactly one listed scale.' }
+        $SelectedScale = $Found[0]
+    }
     if ($Project) {
         $Factory.projects | Select-Object id,number,display_name,placements | Format-List | Out-Host
-        $ProjectId = Read-Host 'Exact project UUID from this factory'
-        $Projects = @($Factory.projects | Where-Object { $_.id -eq $ProjectId })
-        if ($Projects.Count -ne 1) { throw 'Project selection is not exact.' }
-        $SelectedProject = $Projects[0]
-        if ($RequirePlacement -and !@($SelectedProject.placements | Where-Object {
-            $_.scale_set_id -eq $ScaleId -and $_.environment -eq $Scales[0].environment
-        }).Count) { throw 'Project is not placed in this target scale set.' }
+        $Id = Read-Host 'Exact project UUID'
+        $Found = @($Factory.projects | Where-Object { $_.id -eq $Id })
+        if ($Found.Count -ne 1) { throw 'Select exactly one listed project.' }
+        $SelectedProject = $Found[0]
+        if ($Placed -and !@($SelectedProject.placements | Where-Object {
+            $_.scale_set_id -eq $SelectedScale.id -and $_.environment -eq $SelectedScale.environment
+        }).Count) { throw 'Project is not placed in this scale.' }
     }
-    return @{ catalog=$Catalog; factory=$Factory; scale=$Scales[0]; project=$SelectedProject }
+    return @{ catalog=$Catalog; factory=$Factory; scale=$SelectedScale; project=$SelectedProject }
 }
 function Read-NewScale {
     $Environment = (Read-Host 'Environment: dev, stage or prod').Trim().ToLowerInvariant()
     if ($Environment -notin @('dev','stage','prod')) { throw 'Invalid environment.' }
-    $Suffix = Read-Host 'Three-digit scale-set suffix, for example 001 or 002'
-    if ($Suffix -notmatch '^(?!000)[0-9]{3}$') { throw 'Suffix must be 001 through 999.' }
+    $Suffix = Read-Host 'Unused three-digit suffix, 001 through 999'
+    if ($Suffix -notmatch '^(?!000)[0-9]{3}$') { throw 'Invalid suffix.' }
     $Tenant = [guid](Read-Host 'Approved existing tenant UUID')
     $Subscription = [guid](Read-Host 'Approved existing subscription UUID')
     if ($Tenant -eq [guid]::Empty -or $Subscription -eq [guid]::Empty) { throw 'Nonzero UUIDs required.' }
     $Route = (Read-Host 'Orchestrator: ado or gha').Trim().ToLowerInvariant()
-    if ($Route -notin @('ado','gha')) { throw 'Invalid orchestrator.' }
-    $Cidr = Read-Host 'Approved non-overlapping VNet CIDR for this environment'
+    if ($Route -notin @('ado','gha')) { throw 'Invalid route.' }
+    $Cidr = Read-Host 'Approved non-overlapping VNet CIDR'
     $Capacity = [int](Read-Host 'Approved project capacity, 1 through 8')
     if ($Capacity -lt 1 -or $Capacity -gt 8) { throw 'Invalid capacity.' }
-    return @{
-        environment=$Environment; suffix=$Suffix; tenant_id=$Tenant.ToString()
+    return @{ environment=$Environment; suffix=$Suffix; tenant_id=$Tenant.ToString()
         subscription_id=$Subscription.ToString(); orchestrator=$Route
-        network=@{ vnet_cidr=$Cidr; max_projects=$Capacity }
-    }
+        network=@{ vnet_cidr=$Cidr; max_projects=$Capacity } }
 }
 ```
 
-Choose the exact IDs displayed by the API, not the first item in a list.
-`DEV/001`, `STAGE/001` and `PROD/001` are different scale sets.
+## A. Save a new factory and project001
 
-<details>
-<summary>More info</summary>
-
-The helper uses `[0]` only after matching the requested ID and checking there is
-exactly one result. UUIDs identify objects; `001` is a project number or scale-set
-suffix. API environment values are `dev`, `stage`, `prod`; some Azure names use
-`test` for Stage.
-
-</details>
-
-## 2. Shared three-interface prepare → review → confirm
-
-For each scenario below:
-
-1. Run its input example to set `$Request` and `$Operation`.
-2. Run **2.1** to create new local request and review files.
-3. Choose **one** prepare alternative: that scenario's friendly CLI command,
-   **2.2 SDK**, or **2.3 REST**.
-4. **STOP** and review. Only after approval choose **one** confirmation in **2.4**.
-
-Do not run all alternatives against the same target. They are equivalent choices,
-not sequential steps. Read the catalog again after every saved change.
-
-### 2.1 Serialize the selected scenario
-
-This step saves the selected request as JSON. Supported operations are `factory-create`, `factory-clone`,
-`scaleset-add`, `project-add`, `project-add-placements`, `parameters` and
-`runtime-deploy`. Settings writes and bootstrap have separate sections.
-
-```powershell
-$RequestPath = Write-ReviewJson $Request 'request'
-$ReceiptPath = Join-Path $ReviewRoot ('receipt-' + [guid]::NewGuid().ToString('N') + '.json')
-$PreviewPath = Join-Path $ReviewRoot ('preview-' + [guid]::NewGuid().ToString('N') + '.json')
-$Purpose = 'catalog-confirm'
-$Mode = 'configuration'
-$PrepareEndpoint = '/api/v1/factory-catalog/prepare'
-$ConfirmEndpoint = '/api/v1/factory-catalog/confirm'
-if ($Operation -eq 'parameters') {
-    $Purpose = 'parameters-confirm'
-    $PrepareEndpoint = '/api/v1/factory-catalog/parameters/prepare'
-    $ConfirmEndpoint = '/api/v1/factory-catalog/parameters/confirm'
-}
-if ($Operation -eq 'runtime-deploy') { $Mode = 'runtime' }
-$env:AIF_GUIDE_REQUEST = $RequestPath
-$env:AIF_GUIDE_RECEIPT = $ReceiptPath
-$env:AIF_GUIDE_PREVIEW = $PreviewPath
-$env:AIF_GUIDE_OPERATION = $Operation
-$env:AIF_GUIDE_PURPOSE = $Purpose
-$env:AIF_GUIDE_MODE = $Mode
-```
-
-### 2.2 SDK alternative — executable for A, B, C, D, E and runtime
-
-The example prepares a change, checks the preview and saves a review file.
-It does **not** approve or start the change.
-
-<details>
-<summary>More info</summary>
-
-`factory_create_prepare` and `parameter_prepare` return previews that still need
-checking. `validate_preview` and the receipt helper perform those checks.
-`review_catalog_prepare` also checks the selected target for automatic placement.
-
-</details>
-
-```powershell
-@'
-import json, os
-from pathlib import Path
-from azurefactory import AzureFactoryClient
-from azurefactory.client import redact_secrets
-from azurefactory.review import validate_preview, write_receipt
-
-c = AzureFactoryClient()
-b = json.loads(Path(os.environ["AIF_GUIDE_REQUEST"]).read_text(encoding="utf-8"))
-op = os.environ["AIF_GUIDE_OPERATION"]
-if op == "factory-create":
-    p = c.factory_create_prepare(
-        b["folder"], prefix=b["target_prefix"], region=b["target_region"],
-        scale_sets=b["scale_sets"], factory_key=b["factory_key"],
-        kind=b["factory_kind"], aifactory_version=b["aifactory_version"],
-        initial_project=b["initial_project"], settings=b["settings"],
-        expected_revision=b["expected_revision"])
-elif op == "parameters":
-    p = c.parameter_prepare(b)
-elif op == "factory-clone":
-    p = c.factory_clone_prepare(
-        b["folder"], b["factory_id"], prefix=b["target_prefix"], region=b["target_region"],
-        include_projects=b["include_projects"], expected_revision=b["expected_revision"])
-elif op == "scaleset-add":
-    p = c.scaleset_add_prepare(
-        b["folder"], b["factory_id"], b["scale_sets"], expected_revision=b["expected_revision"])
-elif op == "project-add":
-    p = c.project_add_prepare(
-        b["folder"], b["factory_id"], number=b["project"]["number"],
-        display_name=b["project"]["display_name"], placements=b["project"]["placements"],
-        expected_revision=b["expected_revision"])
-elif op == "project-add-placements":
-    p = c.project_add_placements_prepare(
-        b["folder"], b["factory_id"], b["project_id"], placements=b["placements"],
-        expected_revision=b["expected_revision"])
-else:
-    p = c.review_catalog_prepare(b)
-print(json.dumps(redact_secrets(p, c.api_key), indent=2))
-validate_preview(p)
-write_receipt(os.environ["AIF_GUIDE_RECEIPT"], client=c,
-              purpose=os.environ["AIF_GUIDE_PURPOSE"], operation=op,
-              request_body=b, preview=p)
-'@ | & $Python -
-if ($LASTEXITCODE -ne 0) { throw 'Prepare/validation failed; do not confirm.' }
-```
-
-### 2.3 REST alternative — same JSON, no SDK dependency
-
-Use `curl.exe`, not PowerShell's `curl` alias. These commands require a curl
-version supporting `--fail-with-body`. There are no retries or redirects.
-Do not publish raw error bodies or secret-bearing requests.
-
-```powershell
-if (Test-Path -LiteralPath $PreviewPath) { throw 'Preview path already exists.' }
-curl.exe --fail-with-body --silent --show-error --noproxy "*" `
-    --request POST "$env:AIFACTORY_API_URL$PrepareEndpoint" `
-    --header "X-API-Key: $env:AIFACTORY_API_KEY" --header "Content-Type: application/json" `
-    --data-binary "@$RequestPath" --output "$PreviewPath"
-if ($LASTEXITCODE -ne 0) { throw 'REST prepare failed; inspect private response, do not confirm.' }
-$Preview = Get-Content -LiteralPath $PreviewPath -Raw | ConvertFrom-Json
-$Preview | ConvertTo-Json -Depth 100
-if ($Preview.contract_version -ne 1 -or $Preview.can_execute -ne $true -or
-    @($Preview.blockers).Count -ne 0 -or $Preview.operation_mode -ne $Mode -or
-    $Preview.source_revision -ne $Request.expected_revision -or
-    [DateTimeOffset]::Parse($Preview.expires_at) -le [DateTimeOffset]::UtcNow) {
-    throw 'Blocked, incompatible or expired REST preview; do not confirm.'
-}
-```
-
-This saves a **plain API preview**, not a CLI receipt. Use the REST confirmation
-below, not `catalog confirm --receipt` on this file. Check the target and recorded
-results yourself; the script's checks do not replace your review or the API's checks.
-
-<details>
-<summary>More info</summary>
-
-A REST-only application must keep its saved review tied to the exact request and
-API host. It does not need the Python SDK to send HTTP requests.
-
-</details>
-
-**STOP — review and approve this exact preview.** Check the target folder, IDs,
-environment, tenant/subscription, version, changes, network ownership, warnings
-and expiry. For automatic placement, check the chosen scale and its successful
-deployment records. **`can_execute: true` is not approval.** Keep review files private.
-
-<details>
-<summary>More info</summary>
-
-Also check contract 1, configuration versus runtime mode and the resolved source
-commit. Receipts expire and apply only to the reviewed target. Their checksums
-detect changes to the file; they are not signatures or user approval.
-
-</details>
-
-### 2.4 Confirm only after approval — choose one
-
-**CLI:**
-
-```powershell
-if ($Operation -eq 'parameters') {
-    & $Python -m azurefactory parameters confirm --receipt $ReceiptPath --yes
-} elseif ($Operation -eq 'runtime-deploy') {
-    & $Python -m azurefactory runtime confirm --receipt $ReceiptPath --yes
-} else {
-    & $Python -m azurefactory catalog confirm --receipt $ReceiptPath --yes
-}
-if ($LASTEXITCODE -ne 0) { throw 'Inspect server state; do not repeat confirmation.' }
-```
-
-**SDK, instead of CLI:**
-
-```powershell
-@'
-import json, os
-from azurefactory import AzureFactoryClient
-from azurefactory.review import load_receipt
-
-c = AzureFactoryClient()
-r = load_receipt(os.environ["AIF_GUIDE_RECEIPT"], client=c,
-                 purpose=os.environ["AIF_GUIDE_PURPOSE"],
-                 operation_mode=os.environ["AIF_GUIDE_MODE"])
-result = (c.parameter_confirm(r["folder"], r["confirmation_id"])
-          if r["purpose"] == "parameters-confirm"
-          else c.catalog_confirm(r["folder"], r["confirmation_id"]))
-print(json.dumps(result, indent=2))
-if result.get("contract_version") != 1:
-    raise RuntimeError("Unknown confirmation contract; inspect state, do not retry.")
-if r["operation_mode"] == "configuration":
-    if not isinstance(result.get("catalog"), dict) or result.get("job") is not None:
-        raise RuntimeError("Not a catalog-only result; inspect state.")
-elif not isinstance(result.get("job"), dict):
-    raise RuntimeError("Missing runtime job; inspect state, do not retry.")
-'@ | & $Python -
-if ($LASTEXITCODE -ne 0) { throw 'Inspect the outcome; never automatically retry a write.' }
-```
-
-**REST, following REST preparation:** review the original request and its saved
-API preview. Only after approval, type the exact confirmation ID you reviewed.
-The server rechecks who prepared the change, whether anything changed, the expiry
-and the saved plan. Approval can be used only once. No CLI receipt or Python
-helper is needed.
-
-```powershell
-$ReviewedRequest = Get-Content -LiteralPath $RequestPath -Raw | ConvertFrom-Json
-$Preview = Get-Content -LiteralPath $PreviewPath -Raw | ConvertFrom-Json
-if ($Preview.contract_version -ne 1 -or $Preview.can_execute -ne $true -or
-    @($Preview.blockers).Count -ne 0 -or $Preview.operation_mode -ne $Mode -or
-    $Preview.source_revision -ne $ReviewedRequest.expected_revision -or
-    [DateTimeOffset]::Parse($Preview.expires_at) -le [DateTimeOffset]::UtcNow) {
-    throw 'Blocked, incompatible or expired REST review.'
-}
-$ApprovedId = Read-Host 'After reviewing and obtaining approval, paste this preview confirmation_id'
-if ($ApprovedId -cne $Preview.confirmation_id) { throw 'Approval does not match this preview.' }
-$ConfirmPath = Write-ReviewJson @{
-    contract_version=1; folder=$ReviewedRequest.folder; confirmation_id=$ApprovedId
-} 'confirm'
-$ResultPath = Join-Path $ReviewRoot ('result-' + [guid]::NewGuid().ToString('N') + '.json')
-curl.exe --fail-with-body --silent --show-error --noproxy "*" `
-    --request POST "$env:AIFACTORY_API_URL$ConfirmEndpoint" `
-    --header "X-API-Key: $env:AIFACTORY_API_KEY" --header "Content-Type: application/json" `
-    --data-binary "@$ConfirmPath" --output "$ResultPath"
-if ($LASTEXITCODE -ne 0) { throw 'Unknown/failed confirmation outcome; inspect state, do not resend.' }
-$Result = Get-Content -LiteralPath $ResultPath -Raw | ConvertFrom-Json
-if ($Result.contract_version -ne 1) { throw 'Unknown result contract.' }
-if ($Mode -eq 'configuration' -and (!$Result.catalog -or $null -ne $Result.job)) {
-    throw 'Not a catalog-only confirmation; inspect state.'
-}
-if ($Mode -eq 'runtime' -and !$Result.job) { throw 'Missing runtime job; inspect state.' }
-$Result | ConvertTo-Json -Depth 100
-```
-
-After saving configuration, read the catalog again and check the **exact IDs and
-changes**. **If a write fails, times out or loses its response, inspect the saved
-state before doing anything else. Do not repeat it or switch tools to retry it.**
-
-<details>
-<summary>More info</summary>
-
-Catalog responses use `revision`; parameter responses and previews use
-`source_revision`. Use the matching field, not a guessed or old value.
-
-</details>
-
-## A. New factory + selected environments + project001
-
-Choose one or more of **Dev, Stage and Prod**, with one scale set per environment.
-This saves one initial project001 and its selected locations. Use a new factory
-key/prefix/region combination. If a draft already exists, inspect it; creation
-does not update or reopen it.
-
-The own-hub setting below saves your choice only. It does **not** supply all
-VPN, network, identity, repository or runner settings. Review
-those separately under [registered Full bootstrap](#registered-full-bootstrap).
-No tenant or subscription is created by these inputs.
+Select the environments explicitly. The owned-hub flags save intent only:
+this is **not a complete VPN run**. Use a fresh identity; creation does not
+reopen an existing draft. No tenant or subscription is created.
 
 ```powershell
 $Before = Read-Catalog
+if (@($Before.factories).Count) { throw 'This example requires the approved empty new-factory root.' }
 $FactoryKey = Read-Host 'New unique factory key'
-$Prefix = Read-Host 'Approved new factory prefix'
-$Region = Read-Host 'Approved Azure region from the API capabilities'
+$Prefix = Read-Host 'Approved new prefix'
+$Region = Read-Host 'Approved region supported by capabilities'
 $Version = Read-Host 'Approved registered source version: main or supported 125+'
-$SelectedEnvironments = @((Read-Host 'Selected environments, comma-separated: dev,stage,prod').
-    Split(',') | ForEach-Object { $_.Trim().ToLowerInvariant() })
-if (!$SelectedEnvironments.Count -or @($SelectedEnvironments | Where-Object {
-    $_ -notin @('dev','stage','prod')
-}).Count -or @($SelectedEnvironments | Select-Object -Unique).Count -ne $SelectedEnvironments.Count) {
-    throw 'Select each intended environment exactly once.'
-}
+$Environments = @((Read-Host 'Selected environments, comma-separated: dev,stage,prod').Split(',') |
+    ForEach-Object { $_.Trim().ToLowerInvariant() })
+if (!$Environments.Count -or @($Environments | Where-Object { $_ -notin @('dev','stage','prod') }).Count -or
+    @($Environments | Select-Object -Unique).Count -ne $Environments.Count) { throw 'Select each environment once.' }
 $Scales = @()
-foreach ($Environment in $SelectedEnvironments) {
-    Write-Host "Enter the approved scale for $Environment."
+foreach ($Environment in $Environments) {
+    Write-Host "Enter the new scale for $Environment."
     $Scale = Read-NewScale
-    if ($Scale.environment -ne $Environment) { throw 'Environment differs from the selection.' }
+    if ($Scale.environment -ne $Environment) { throw 'Environment differs from selection.' }
     $Scales += $Scale
 }
-$InitialProject = @{
-    number='001'; display_name=(Read-Host 'Initial project display name')
-    placements=@($Scales | ForEach-Object { @{ environment=$_.environment; suffix=$_.suffix } })
-}
-$Settings = @{ enableAIFactoryHub='true'; centralDnsZoneByPolicyInHub='false' }
-$Request = @{
-    contract_version=1; folder=$FactoryFolder; action='create-factory'
-    expected_revision=$Before.revision; factory_kind='ai'; factory_key=$FactoryKey
-    target_prefix=$Prefix; target_region=$Region; aifactory_version=$Version
-    scale_sets=$Scales; initial_project=$InitialProject; settings=$Settings
-}
-$Operation = 'factory-create'
+$InitialProject = @{ number='001'; display_name=(Read-Host 'Project001 display name')
+    placements=@($Scales | ForEach-Object { @{ environment=$_.environment; suffix=$_.suffix } }) }
 $ScalePath = Write-ReviewJson $Scales 'scales'
-$InitialProjectPath = Write-ReviewJson $InitialProject 'initial-project'
-$SettingsPath = Write-ReviewJson $Settings 'settings'
-```
-
-Run **2.1**, then choose this **CLI prepare**, **2.2 SDK** or **2.3 REST**.
-
-```powershell
+$ProjectPath = Write-ReviewJson $InitialProject 'project001'
+$SettingsPath = Write-ReviewJson @{ enableAIFactoryHub=$true; centralDnsZoneByPolicyInHub=$false } 'settings'
+$ReceiptPath = New-ReviewPath 'factory-create'
 & $Python -m azurefactory factory create --folder $FactoryFolder --factory-key $FactoryKey `
     --kind ai --prefix $Prefix --region $Region --aifactory-version $Version `
     --expected-revision $Before.revision --scale-set-json $ScalePath `
-    --initial-project-json $InitialProjectPath --settings-json $SettingsPath `
-    --save-receipt $ReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Review creation blockers; do not confirm.' }
+    --initial-project-json $ProjectPath --settings-json $SettingsPath --save-receipt $ReceiptPath
+if ($LASTEXITCODE -ne 0) { throw 'Creation preview blocked.' }
 ```
 
-**STOP.** Approve configuration only, then use one **2.4** confirmation. Re-read
-the catalog and verify project001 and all selected environment/suffix placements.
-Do not run `project add --number 001` afterward.
+**STOP.** Use the separate confirmation block below only after configuration
+approval. Re-read and verify project001's selected placements; **do not add
+project001 again**. Stage/Prod configuration and similarly named GitHub
+environments do not deploy Stage/Prod. Registered bootstrap starts with its
+selected initial Dev target.
 
-Creating Stage/Prod **configuration**, or GitHub environments named `Dev`, `Stage`,
-`Prod`, does not deploy those environments. The registered bootstrap workflow
-deploys its selected initial Dev target. This short request does not deploy three
-complete environments at once.
+### Clone configuration instead
 
-<details>
-<summary>More info</summary>
-
-The SDK example uses `factory_create_prepare`; REST sends a `CatalogPrepare`
-request. On supported APIs, omitting the initial-project object also defaults to
-project001. This example chooses its locations explicitly. `--common-only` instead
-requests configuration without an initial project.
-
-</details>
-
-### Clone configuration to a new factory identity or region
-
-**implemented** CLI/REST and SDK `factory_clone_prepare`.
-This copies configuration, not deployed resources, data, credentials or
-models. The helper displays an existing scale as context; this example clones
-the whole factory configuration, not only that scale.
+This copies configuration, not resources, data, models or credentials.
 
 ```powershell
 $Scope = Read-Target
-$FactoryId = $Scope.factory.id
-$ClonePrefix = Read-Host 'Approved new factory prefix'
-$CloneRegion = Read-Host 'Approved target Azure region'
-$IncludeProjects = Read-Host 'Copy project configuration? Type none or all'
-if ($IncludeProjects -notin @('none','all')) { throw 'Choose none or all.' }
-if ($ClonePrefix -eq $Scope.factory.prefix -and $CloneRegion -eq $Scope.factory.region) {
-    throw 'Clone requires a changed prefix or region, not the same physical identity.'
-}
-$Request = @{
-    contract_version=1; folder=$FactoryFolder; action='clone'
-    factory_id=$FactoryId; expected_revision=$Scope.catalog.revision
-    target_prefix=$ClonePrefix; target_region=$CloneRegion; include_projects=$IncludeProjects
-}
-$Operation = 'factory-clone'
-```
-
-Run **2.1**, then choose the following CLI command, **2.2 SDK**, or **2.3 REST**:
-
-```powershell
-& $Python -m azurefactory factory clone --folder $FactoryFolder --factory-id $FactoryId `
-    --prefix $ClonePrefix --region $CloneRegion --include-projects $IncludeProjects `
+$Prefix = Read-Host 'Approved new prefix'
+$Region = Read-Host 'Approved target region'
+$Include = Read-Host 'Copy project configuration: none or all'
+if ($Include -notin @('none','all')) { throw 'Choose none or all.' }
+if ($Prefix -eq $Scope.factory.prefix -and $Region -eq $Scope.factory.region) { throw 'Choose a new identity.' }
+$ReceiptPath = New-ReviewPath 'factory-clone'
+& $Python -m azurefactory factory clone --folder $FactoryFolder --factory-id $Scope.factory.id `
+    --prefix $Prefix --region $Region --include-projects $Include `
     --expected-revision $Scope.catalog.revision --save-receipt $ReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Clone configuration review is blocked.' }
+if ($LASTEXITCODE -ne 0) { throw 'Clone preview blocked.' }
 ```
 
-**STOP**, obtain approval and use the corresponding **2.4** confirmation.
-Check the new IDs, network addresses, copied settings and pipeline connection
-before a separate deployment review. A saved clone is not a deployed factory.
+**STOP** for separate confirmation. Review new IDs, network addresses, copied
+settings and pipeline bindings before considering deployment.
 
-## B. Add a scale set, then optionally a project
-
-Choose an existing factory and inspect its current scales. The helper also asks
-for an existing scale to make the context explicit; the **new** scale comes from
-the separate inputs below and must not already exist in that environment/suffix.
+## B. Add a scale set, then optionally a new project
 
 ```powershell
 $Scope = Read-Target
-$FactoryId = $Scope.factory.id
 $Scale = Read-NewScale
 if (@($Scope.factory.scale_sets | Where-Object {
     $_.environment -eq $Scale.environment -and $_.suffix -eq $Scale.suffix
-}).Count) { throw 'This environment/suffix already exists.' }
-$Request = @{
-    contract_version=1; folder=$FactoryFolder; action='create-scale-set'
-    factory_id=$FactoryId; expected_revision=$Scope.catalog.revision; scale_sets=@($Scale)
-}
-$Operation = 'scaleset-add'
-$ScalePath = Write-ReviewJson @($Scale) 'new-scale'
+}).Count) { throw 'Environment/suffix already exists.' }
+$ScalePath = Write-ReviewJson @($Scale) 'scale'
+$ReceiptPath = New-ReviewPath 'scaleset-add'
+& $Python -m azurefactory scaleset add --folder $FactoryFolder --factory-id $Scope.factory.id `
+    --scale-set-json $ScalePath --expected-revision $Scope.catalog.revision --save-receipt $ReceiptPath
+if ($LASTEXITCODE -ne 0) { throw 'Scale preview blocked.' }
 ```
 
-Run **2.1**, then this CLI alternative or the shared SDK/REST alternative:
+**STOP**, approve and confirm that configuration first. The following is an
+independent change, not an all-or-nothing extension of the scale-set save.
+Select the newly saved scale UUID if that is the intended placement.
 
 ```powershell
-& $Python -m azurefactory scaleset add --folder $FactoryFolder --factory-id $FactoryId `
-    --expected-revision $Scope.catalog.revision --scale-set-json $ScalePath --save-receipt $ReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Scale-set preview blocked.' }
-```
-
-**STOP**, then approve and confirm using **2.4**. This saves settings only; it does
-not deploy VMSS, shared infrastructure or a project. Read the catalog again and
-select the new scale UUID before another operation.
-
-<details>
-<summary>More info</summary>
-
-The SDK example uses `scaleset_add_prepare`. Generic
-`review_catalog_prepare` with `action: "create-scale-set"` remains valid.
-
-</details>
-
-### Add a different project to an existing or newly saved scale
-
-This is an independent configuration write. Do not reuse project001 from A.
-
-```powershell
-$Scope = Read-Target
-$FactoryId = $Scope.factory.id
-$Number = Read-Host 'Unused three-digit project number, 001 through 999'
-if ($Number -notmatch '^(?!000)[0-9]{3}$') { throw 'Project number must be 001 through 999.' }
-$DisplayName = Read-Host 'Project display name'
+$Scope = Read-Target -Scale
+$Number = Read-Host 'Unused project number, 001 through 999 (not project001 already created by A)'
+if ($Number -notmatch '^(?!000)[0-9]{3}$') { throw 'Invalid number.' }
+$Name = Read-Host 'Project display name'
 $Placement = $Scope.scale.environment + '=' + $Scope.scale.id
-$Request = @{
-    contract_version=1; folder=$FactoryFolder; action='add-project'
-    factory_id=$FactoryId; expected_revision=$Scope.catalog.revision
-    project=@{ number=$Number; display_name=$DisplayName
-        placements=@(@{ environment=$Scope.scale.environment; scale_set_id=$Scope.scale.id }) }
-}
-$Operation = 'project-add'
-```
-
-Run **2.1**, then one prepare alternative:
-
-```powershell
-& $Python -m azurefactory project add --folder $FactoryFolder --factory-id $FactoryId `
-    --number $Number --display-name $DisplayName --placement $Placement `
+$ReceiptPath = New-ReviewPath 'project-add'
+& $Python -m azurefactory project add --folder $FactoryFolder --factory-id $Scope.factory.id `
+    --number $Number --display-name $Name --placement $Placement `
     --expected-revision $Scope.catalog.revision --save-receipt $ReceiptPath
 if ($LASTEXITCODE -ne 0) { throw 'Project preview blocked.' }
 ```
 
-**STOP**, then **2.4** after approval. For SDK/REST, send the same request through
-**2.2/2.3**. Saving the scale and saving the project are separate changes, not one
-all-or-nothing step. Deployment comes later.
+**STOP** and confirm separately. Server checks cover number conflicts in the
+selected locations and the layout-2 project home, not an invented global rule.
 
-<details>
+## C. Let the API choose a successful scale in one environment
+
+**Requires newer API source, not yet the published baseline.** This is an
+alternative to B's project creation, not a second add of the same project.
+No environment is inferred.
+
+```powershell
+$Scope = Read-Target
+$Environment = (Read-Host 'Explicit environment: dev, stage or prod').Trim().ToLowerInvariant()
+if ($Environment -notin @('dev','stage','prod')) { throw 'Choose an environment.' }
+$Number = Read-Host 'Unused three-digit project number'
+if ($Number -notmatch '^(?!000)[0-9]{3}$') { throw 'Invalid number.' }
+$Name = Read-Host 'Project display name'
+$ReceiptPath = New-ReviewPath 'project-auto-placement'
+& $Python -m azurefactory project add --folder $FactoryFolder --factory-id $Scope.factory.id `
+    --number $Number --display-name $Name --environment $Environment `
+    --expected-revision $Scope.catalog.revision --save-receipt $ReceiptPath
+if ($LASTEXITCODE -ne 0) { throw 'Automatic placement blocked; do not guess a scale.' }
+```
+
+**STOP** and review the resolved scale UUID and completed common deployment.
+The service checks recorded success for the factory/environment/version and
+capacity; it does not just choose the highest suffix. Confirmation does not
+switch to a newer scale silently.
+
+<details markdown="1">
 <summary>More info</summary>
 
-The server checks project-number conflicts in the selected locations and layout-2
-project home. Do not add a different factory-wide uniqueness rule.
+Inspect `latest-successful-placement-v1`, `resolved_placements`, source commit,
+completed job and `evidence_hash`. An older API may reject environment-only
+placement with HTTP 422. If the operator deliberately chooses the older explicit
+selector **before preparation**, replace `--environment $Environment` with
+`--placement ($Environment + '=latest-successful')`. Never use both.
+`project add-placements` supports these selectors too; neither means promotion.
 
 </details>
 
-<a id="c-explicit-latest-successful-placement"></a>
+## D. Add a Stage or Prod placement — not captured promotion
 
-## C. Latest-successful placement within an explicit environment
-
-**Implemented in newer API source:** choose an environment and let the service
-select its latest successful eligible scale set. The selected host must run that
-updated API; this default is not yet in the published API baseline. Older APIs
-can return HTTP 422. The client never guesses Dev, Stage or Prod.
-
-Build the new-project inputs in B, but do not prepare them there. Then,
-**before 2.1 or any prepare**, change the placement choice:
+Executing captured successful Dev settings/version in Stage then Prod is
+**not implemented**. Instead, prepare a target placement, review its parameters,
+then prepare deployment separately. `--version-ref` selects code; it does not
+copy settings, data, models or deployment success.
 
 ```powershell
+$Scope = Read-Target -Scale -Project
 $Environment = $Scope.scale.environment
-$Request.project.placements = @(@{ environment=$Environment })
-```
-
-Run **2.1**, then choose this complete CLI command or the shared **2.2 SDK /
-2.3 REST** alternatives:
-
-```powershell
-& $Python -m azurefactory project add --folder $FactoryFolder --factory-id $FactoryId `
-    --number $Number --display-name $DisplayName --environment $Environment `
-    --expected-revision $Scope.catalog.revision --save-receipt $ReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Automatic placement is blocked; review the reported deployment checks.' }
-```
-
-The chosen existing scale in the input helper identifies
-the requested environment, **not** the final automatic target.
-
-The API chooses a scale with recorded successful **common** deployment results
-for the requested factory, environment and version, with room for the project.
-It does not simply choose the highest suffix. Saved drafts, a list of resources,
-a finished local command or `submitted` do not count as deployment success.
-
-<details>
-<summary>More info</summary>
-
-Selection uses recorded deployments, not a fresh scan of all Azure resources.
-Review `latest-successful-placement-v1` and `resolved_placements`, including the
-exact UUID, source commit, completed job and `evidence_hash`. The CLI, receipt
-checks and `review_catalog_prepare` reject missing or conflicting selection details.
-
-The SDK example in **2.2** sends the same environment-only placement through
-`project_add_prepare`. Its `environments=[...]` argument is another way to build
-that request; supply either `environments` or `placements`, never both.
-REST sends `placements: [{"environment": "dev"}]` inside `project` for
-`add-project`, or at the top level for `add-project-placements`.
-Both CLI commands similarly accept repeated `--environment` flags **or**
-`--placement`, never both. Omitting both is an error, not an implicit Dev target.
-
-For an API supporting explicit selection but not the new default, deliberately
-choose the explicit selector instead, **before 2.1**:
-
-```powershell
-$Environment = $Scope.scale.environment
-$Request.project.placements = @(@{ environment=$Environment; scale_set_id='latest-successful' })
-$Placement = $Environment + '=latest-successful'
-```
-
-Run **2.1**, then choose this complete CLI alternative or **2.2/2.3**:
-
-```powershell
-& $Python -m azurefactory project add --folder $FactoryFolder --factory-id $FactoryId `
-    --number $Number --display-name $DisplayName --placement $Placement `
-    --expected-revision $Scope.catalog.revision --save-receipt $ReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Explicit latest-successful placement is blocked.' }
-```
-
-This is a separately chosen input, not an automatic retry after a failed request.
-
-</details>
-
-**STOP**, then approve the chosen target through **2.4**. Confirmation does not
-silently switch to a newer scale. If no scale qualifies, stop; that is not
-permission to create one or guess an ID. The same selection choices are supported
-on `project add-placements`, but adding a placement is not promotion.
-
-## D. Explicit Stage/Prod placement is not captured promotion
-
-**Not implemented:** copying a saved snapshot of a successful Dev deployment,
-including its settings and version, through Stage and Prod. There is no
-`project promote` command or `project_promote` SDK method. `--version-ref` chooses
-code; it does not copy settings, data, models or a previous deployment's success.
-
-Instead, create the target scale with B if needed, add the project's target
-location below, edit **target** parameters with E, then deploy separately.
-Each step needs its own review.
-
-```powershell
-$Scope = Read-Target -Project
-$FactoryId = $Scope.factory.id
-$ProjectId = $Scope.project.id
-$ScaleId = $Scope.scale.id
-$Environment = $Scope.scale.environment
-if ($Environment -notin @('stage','prod')) { throw 'Choose the intended Stage or Prod target.' }
+if ($Environment -notin @('stage','prod')) { throw 'Choose Stage or Prod.' }
 if (@($Scope.project.placements | Where-Object { $_.environment -eq $Environment }).Count) {
-    throw 'This project already has a placement in that environment; inspect it, do not move it implicitly.'
+    throw 'Placement already exists; inspect it rather than moving it implicitly.'
 }
-$Placement = $Environment + '=' + $ScaleId
-$Request = @{
-    contract_version=1; folder=$FactoryFolder; action='add-project-placements'
-    factory_id=$FactoryId; project_id=$ProjectId; expected_revision=$Scope.catalog.revision
-    placements=@(@{ environment=$Environment; scale_set_id=$ScaleId })
-}
-$Operation = 'project-add-placements'
-```
-
-Run **2.1**, then choose this CLI, **2.2 SDK** or **2.3 REST**:
-
-```powershell
+$ReceiptPath = New-ReviewPath 'project-placement'
+$Placement = $Environment + '=' + $Scope.scale.id
 & $Python -m azurefactory project add-placements --folder $FactoryFolder `
-    --factory-id $FactoryId --project-id $ProjectId --placement $Placement `
+    --factory-id $Scope.factory.id --project-id $Scope.project.id --placement $Placement `
     --expected-revision $Scope.catalog.revision --save-receipt $ReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Target placement preview blocked.' }
+if ($LASTEXITCODE -ne 0) { throw 'Placement preview blocked.' }
 ```
 
-**STOP**, then **2.4** after approval. For Prod, choose and review the target again.
-This does not automatically require Stage to have succeeded.
-Do not use legacy deployment to bypass a blocked catalog operation.
+**STOP** for confirmation. Prod requires a new target review; this operation
+does not automatically require Stage to have succeeded.
 
-## E. Add/update a parameter, unset an override, or edit settings
+## E. Change typed parameters or scoped settings
 
-### Typed resource parameters — all three interfaces
-
-Read the available parameters for the actual target and version. Do not guess
-names from a slide or old template. For common-only
-parameters omit project selection and `--project-id`; this example targets a
-project that is already placed in the selected scale.
+First read the target's published parameter schema. This example changes one
+placed project's parameter. For common-only parameters, select only a scale
+and omit `project_id`/`--project-id` from the read and request.
 
 ```powershell
-$Scope = Read-Target -Project -RequirePlacement
-$FactoryId = $Scope.factory.id
-$ScaleId = $Scope.scale.id
-$ProjectId = $Scope.project.id
+$Scope = Read-Target -Scale -Project -Placed
 $Text = & $Python -m azurefactory parameters get --folder $FactoryFolder `
-    --factory-id $FactoryId --scale-set-id $ScaleId --project-id $ProjectId
-if ($LASTEXITCODE -ne 0) { throw 'Cannot read the parameter schema.' }
+    --factory-id $Scope.factory.id --scale-set-id $Scope.scale.id --project-id $Scope.project.id
+if ($LASTEXITCODE -ne 0) { throw 'Cannot read parameter schema.' }
 $Parameters = ($Text -join "`n") | ConvertFrom-Json
 $Parameters | ConvertTo-Json -Depth 100
-if ($Parameters.requires_profile_reset) { throw 'Profile reset needs a separate explicit review; stop.' }
-$TemplateName = Read-Host 'Exact template name from this response'
-$Templates = @($Parameters.templates | Where-Object { $_.template -eq $TemplateName })
-if ($Templates.Count -ne 1) { throw 'Select one published template.' }
-$Field = Read-Host 'Exact editable parameter field name from this template'
-if (!@($Templates[0].fields | Where-Object { $_.name -eq $Field }).Count) {
-    throw 'Unknown field; do not fabricate a parameter.'
-}
-$Edit = (Read-Host 'Choose set or unset').Trim().ToLowerInvariant()
-$Patch = @{ template=$TemplateName; parameters=@{}; unset=@() }
+if ($Parameters.requires_profile_reset) { throw 'Profile reset requires a separate wider review.' }
+$Template = Read-Host 'Exact template name from the response'
+$Found = @($Parameters.templates | Where-Object { $_.template -eq $Template })
+if ($Found.Count -ne 1) { throw 'Select one listed template.' }
+$Field = Read-Host 'Exact editable field name'
+$Fields = @($Found[0].fields | Where-Object { $_.name -eq $Field -and !$_.sensitive })
+if ($Fields.Count -ne 1) { throw 'This example requires a listed non-secret field.' }
+$Edit = Read-Host 'set or unset'
+$Patch = @{ template=$Template; parameters=@{}; unset=@() }
 if ($Edit -eq 'set') {
-    $Patch.parameters[$Field] = ConvertFrom-Json -InputObject (
-        Read-Host 'Approved JSON value (string in quotes, boolean, number, object or array; no secrets)')
-} elseif ($Edit -eq 'unset') {
-    $Patch.unset = @($Field)
-} else { throw 'Choose set or unset.' }
-$Request = @{
-    contract_version=1; folder=$FactoryFolder; factory_id=$FactoryId
-    scale_set_id=$ScaleId; project_id=$ProjectId
+    $Patch.parameters[$Field] = ConvertFrom-Json -InputObject (Read-Host 'Approved JSON value; no secrets')
+} elseif ($Edit -eq 'unset') { $Patch.unset = @($Field) }
+else { throw 'Choose set or unset.' }
+$RequestPath = Write-ReviewJson @{
+    contract_version=1; folder=$FactoryFolder; factory_id=$Scope.factory.id
+    scale_set_id=$Scope.scale.id; project_id=$Scope.project.id
     expected_revision=$Parameters.source_revision; schema_revision=$Parameters.schema_revision
     templates=@($Patch)
-}
-$Operation = 'parameters'
-```
-
-Run **2.1**, then this CLI or **2.2 SDK / 2.3 REST**. The latter use
-`parameter_prepare` and `/factory-catalog/parameters/prepare`, respectively.
-
-```powershell
+} 'parameters'
+$ReceiptPath = New-ReviewPath 'parameters-receipt'
 & $Python -m azurefactory parameters prepare --request-json $RequestPath --save-receipt $ReceiptPath
 if ($LASTEXITCODE -ne 0) { throw 'Parameter preview blocked.' }
 ```
 
-**STOP**, then use the parameter confirmation in **2.4** after approval.
-Only the chosen values change. `unset` removes a saved override, so an inherited
-or default value may apply instead. It is not the same as `null`.
-**Neither `unset` nor a disabled resource flag promises to delete an Azure
-resource.** Use a separate deployment review, or guide 20 for removal.
+**STOP** for parameter confirmation. `unset` removes an override, allowing an
+inherited/default value to apply; it is not `null` or resource deletion.
 
-**Do not use `--reset-profile` just to get past an error.** `reset_profile`
-discards **all old protected parameter settings in that scale set**, even when
-`project_id` selects one project. Review that wider loss of settings separately.
-
-<details>
-<summary>More info</summary>
-
-SDK read equivalent: `client.catalog_parameters(folder, factory_id, scale_set_id,
-project_id)`. REST read equivalent: `GET /api/v1/factory-catalog/parameters` with
-those exact query names. Guide 18 shows read-request mechanics. The complete
-prepare/confirm alternatives above share the parsed schema revisions; no helper
-installation or hand-built JSON string is required.
-
-</details>
-
-<a id="catalog-settings--generic-access-only"></a>
-
-### Catalog settings — named CLI and SDK preparation
-
-`catalog settings` / `catalog_settings` **reads** settings.
-`catalog configure-settings` / `catalog_settings_prepare` prepares replacements
-for review. A separate `catalog confirm` saves them; it does not deploy or delete.
-
-Choose the target, read `field_keys` and `revision`, and send only the values you
-want to replace. Do not include secrets. This example changes scale-level
-settings; factory identity, network addresses and version use separate operations.
-
-<details>
-<summary>More info</summary>
-
-Settings accept individual scalar values, not arbitrary nested objects. For
-project settings, add a checked `project_id`; for factory settings, omit
-`scale_set_id`. The typed receipt uses purpose `catalog-confirm`, operation
-`catalog-settings` and mode `configuration`. A plain API preview is not that receipt.
-
-</details>
+For a settings replacement, use this **separate** scenario. It reads
+`field_keys`, changes one scalar and leaves omitted keys unchanged.
 
 ```powershell
-$Scope = Read-Target
+$Scope = Read-Target -Scale
 $Text = & $Python -m azurefactory catalog settings --folder $FactoryFolder `
     --factory-id $Scope.factory.id --scale-set-id $Scope.scale.id
-if ($LASTEXITCODE -ne 0) { throw 'Settings read failed.' }
-$CurrentSettings = ($Text -join "`n") | ConvertFrom-Json
-$CurrentSettings | ConvertTo-Json -Depth 100
-$SettingName = Read-Host 'Exact editable field_key'
-if ($SettingName -notin $CurrentSettings.field_keys) { throw 'Setting is not editable here.' }
-$SettingValue = ConvertFrom-Json -InputObject (Read-Host 'Approved scalar JSON replacement, not a secret')
-$Changes = @{}
-$Changes[$SettingName] = $SettingValue
-$SettingsRequest = @{
-    contract_version=1; folder=$FactoryFolder; action='configure-settings'
-    factory_id=$Scope.factory.id; scale_set_id=$Scope.scale.id
-    expected_revision=$CurrentSettings.revision; settings=$Changes
-}
-$SettingsRequestPath = Write-ReviewJson $SettingsRequest 'settings-request'
-$SettingsValuesPath = Write-ReviewJson $Changes 'settings-values'
-$SettingsReceiptPath = Join-Path $ReviewRoot ('settings-receipt-' + [guid]::NewGuid().ToString('N') + '.json')
-```
-
-Choose **one** preparation below. Both use exactly the settings, scope and revision
-selected above and save a typed receipt; neither confirms the change.
-
-**CLI:**
-
-```powershell
+if ($LASTEXITCODE -ne 0) { throw 'Cannot read settings.' }
+$Settings = ($Text -join "`n") | ConvertFrom-Json
+$Settings | ConvertTo-Json -Depth 100
+$Field = Read-Host 'Exact editable field_key'
+if ($Field -notin $Settings.field_keys) { throw 'Unlisted field.' }
+$Value = ConvertFrom-Json -InputObject (Read-Host 'Approved non-null scalar JSON replacement; no secrets')
+if ($null -eq $Value -or $Value -is [array] -or $Value -is [pscustomobject]) { throw 'Use a non-null scalar.' }
+$Changes = @{}; $Changes[$Field] = $Value
+$ChangesPath = Write-ReviewJson $Changes 'settings'
+$ReceiptPath = New-ReviewPath 'settings-receipt'
 & $Python -m azurefactory catalog configure-settings --folder $FactoryFolder `
-    --factory-id $Scope.factory.id --scale-set-id $Scope.scale.id `
-    --settings-json $SettingsValuesPath --expected-revision $CurrentSettings.revision `
-    --save-receipt $SettingsReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Settings preview blocked; do not confirm.' }
-```
-
-**SDK alternative:**
-
-```powershell
-@'
-import json, sys
-from azurefactory import AzureFactoryClient
-from azurefactory.client import redact_secrets
-from azurefactory.review import validate_preview, write_receipt
-
-with open(sys.argv[1], encoding="utf-8") as stream:
-    body = json.load(stream)
-client = AzureFactoryClient()
-preview = client.catalog_settings_prepare(
-    body["folder"], body["factory_id"], body["settings"],
-    scale_set_id=body["scale_set_id"], expected_revision=body["expected_revision"])
-print(json.dumps(redact_secrets(preview, client.api_key), indent=2))
-validate_preview(preview)
-write_receipt(sys.argv[2], client=client, purpose="catalog-confirm",
-              operation="catalog-settings", request_body=body, preview=preview)
-'@ | & $Python - $SettingsRequestPath $SettingsReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Settings preview blocked; do not confirm.' }
-```
-
-**STOP — review the settings, target, revision and expiry, then obtain approval.**
-For either named preparation above, only after approval, run this separate command:
-
-```powershell
-& $Python -m azurefactory catalog confirm --receipt $SettingsReceiptPath --yes
-if ($LASTEXITCODE -ne 0) { throw 'Inspect saved state; do not resend.' }
-```
-
-Read settings again to check the saved value. Omitted fields stay unchanged.
-**`null` is not a general settings unset operation.** Use typed parameter `unset`
-where supported; a settings patch does not delete an Azure resource.
-
-<details>
-<summary>More info</summary>
-
-#### Generic SDK/REST/CLI alternative — plain previews, not typed receipts
-
-Use this **instead of** the named prepare/confirm path above. It reuses
-`$SettingsRequestPath` from the input block and saves a plain preview.
-SDK preparation is `client.catalog_prepare(parsed_request)` followed by
-`validate_preview(preview)`; REST sends the same JSON to
-`POST /api/v1/factory-catalog/prepare`. The complete generic CLI equivalent:
-
-```powershell
-$Text = & $Python -m azurefactory request POST /api/v1/factory-catalog/prepare `
-    --body-json $SettingsRequestPath --write --yes
+    --factory-id $Scope.factory.id --scale-set-id $Scope.scale.id --settings-json $ChangesPath `
+    --expected-revision $Settings.revision --save-receipt $ReceiptPath
 if ($LASTEXITCODE -ne 0) { throw 'Settings preview blocked.' }
-$SettingsPreview = ($Text -join "`n") | ConvertFrom-Json
-if (!$SettingsPreview.can_execute -or @($SettingsPreview.blockers).Count -or
-    $SettingsPreview.operation_mode -ne 'configuration' -or
-    $SettingsPreview.source_revision -ne $CurrentSettings.revision) { throw 'Invalid settings preview.' }
-$SettingsPreviewPath = Write-ReviewJson $SettingsPreview 'settings-preview'
-$SettingsPreview | ConvertTo-Json -Depth 100
 ```
 
-The generic CLI `--write --yes` above acknowledges **only preparing** this request;
-it is not confirmation. Do not pass `$SettingsPreviewPath` to `catalog confirm
---receipt`; the raw and typed file formats are different.
+**STOP** before catalog confirmation. To change factory-level settings, omit
+the scale selector from both read and prepare; for project settings select a
+checked placed project and include its ID in both. Identity, network addresses
+and code version are not arbitrary settings fields.
 
-**STOP — review the settings, target, revision and expiry, then obtain approval.**
-The server checks that the saved preview still applies. Do not edit or silently
-replace that preview. Only after approval:
+## Confirm the one configuration or runtime review you approved
+
+Run this block only after reviewing the receipt from **one** scenario.
+In a new shell, repeat connection setup and enter its saved receipt path.
+Do not prepare the change again just to obtain a new variable.
 
 ```powershell
-$SettingsPreview = Get-Content -LiteralPath $SettingsPreviewPath -Raw | ConvertFrom-Json
-if ([DateTimeOffset]::Parse($SettingsPreview.expires_at) -le [DateTimeOffset]::UtcNow) {
-    throw 'Settings preview expired; another review is required.'
-}
-$SettingsConfirmPath = Write-ReviewJson @{
-    contract_version=1; folder=$FactoryFolder; confirmation_id=$SettingsPreview.confirmation_id
-} 'settings-confirm'
-& $Python -m azurefactory request POST /api/v1/factory-catalog/confirm `
-    --body-json $SettingsConfirmPath --write --yes
-if ($LASTEXITCODE -ne 0) { throw 'Inspect saved state; do not resend.' }
+$ReceiptPath = Read-Host 'Absolute path to the exact reviewed receipt'
+$Receipt = Get-Content -LiteralPath $ReceiptPath -Raw | ConvertFrom-Json
+$Receipt.preview | ConvertTo-Json -Depth 100
+$Approved = Read-Host 'After approval, paste this review confirmation_id'
+if ($Approved -cne $Receipt.confirmation_id) { throw 'Approval does not match.' }
+if ($Receipt.purpose -eq 'parameters-confirm' -and $Receipt.operation_mode -eq 'configuration') {
+    & $Python -m azurefactory parameters confirm --receipt $ReceiptPath --yes
+} elseif ($Receipt.purpose -eq 'catalog-confirm' -and $Receipt.operation_mode -eq 'runtime') {
+    & $Python -m azurefactory runtime confirm --receipt $ReceiptPath --yes
+} elseif ($Receipt.purpose -eq 'catalog-confirm' -and $Receipt.operation_mode -eq 'configuration') {
+    & $Python -m azurefactory catalog confirm --receipt $ReceiptPath --yes
+} else { throw 'Wrong receipt type for this block.' }
+if ($LASTEXITCODE -ne 0) { throw 'Inspect state; do not repeat confirmation.' }
+& $Python -m azurefactory catalog list --folder $Receipt.folder
+if ($LASTEXITCODE -ne 0) { throw 'Readback failed; do not repeat the write.' }
 ```
 
-SDK confirmation is `catalog_confirm(folder, confirmation_id)`; REST confirmation
-uses that same JSON and endpoint. Read settings again and check the exact value.
+The CLI checks receipt host, hashes, purpose, mode, expiry and server bindings.
+For configuration, expect a returned catalog and `job: null`; verify the exact
+saved changes and read parameters/settings again when those changed.
 
-</details>
+## Separate runtime deployment
 
-### Other existing catalog configuration actions
-
-These advanced actions are **generic-access only**: use general API requests,
-not dedicated CLI commands. They need the same separate review and confirmation
-as settings changes.
-
-<details>
-<summary>More info</summary>
-
-Use `POST /api/v1/factory-catalog/prepare` with a `CatalogPrepare` request,
-then separately approve `/confirm`. Save plain API previews, as above; do not
-invent a specialized `write_receipt` operation. Check the selected host's OpenAPI
-for required fields and allowed combinations.
-
-| Action | When to choose it | Scope / boundary |
-| --- | --- | --- |
-| `migrate` | Register legacy configuration, or copy it into a separate empty modern folder | Same-folder registration uses `folder`; copying uses destination `folder` plus `source_folder`. Preserve UUIDs/source files. Never let both copies independently change the same Azure targets. This does not prove ownership of deployed resources. |
-| `correct-draft-scale-identity` | Fix a tenant/subscription on an eligible empty draft | Supply `factory_id`, `scale_set_id`, `expected_revision` and `draft_identity` with tenant/subscription UUIDs. Targets with bindings, ownership, project placements or previous execution are blocked. This does not move deployed resources. |
-| `configure-binding` | Save a reviewed pipeline connection | Supply the exact factory and a `RuntimeBinding`. Use the enrollment steps below rather than guessing repository, runner, identity or coordination settings. |
-
-The SDK uses `catalog_prepare(parsed_body)` and `catalog_confirm(folder,
-confirmation_id)`. The generic CLI uses `request POST` with `--body-json`,
-`--write --yes`; these flags acknowledge that single HTTP request, not approval
-for a later deployment. General API requests still follow the server's safety checks.
-
-</details>
-
-## Separate runtime deployment — after configuration approval
-
-Use this to deploy the selected target after B/D/E. **It is not captured
-promotion.** The API checks the pipeline connection, permissions, ownership,
-version, runner and networking. A saved configuration does not mean those checks
-will pass.
-
-<details>
-<summary>More info</summary>
-
-Runtime preparation uses `action: "deploy"`. Common-only, GHA and shared-remote
-deployment need compatible runtime support, including coordination and exact
-deployment identity checks. Do not switch routes to bypass a blocker.
-
-</details>
+This prepares only. Use the preceding confirmation block **only after separate
+deployment approval**; it chooses `runtime confirm`, not a configuration save.
 
 ```powershell
-$Scope = Read-Target -Project -RequirePlacement
-$FactoryId = $Scope.factory.id
-$ScaleId = $Scope.scale.id
-$ProjectId = $Scope.project.id
-$VersionRef = Read-Host 'Explicit approved runtime code version/reference'
-if (!$VersionRef) { throw 'Choose a version explicitly for this example.' }
-$Request = @{
-    contract_version=1; folder=$FactoryFolder; action='deploy'
-    factory_id=$FactoryId; scale_set_id=$ScaleId; project_id=$ProjectId
-    expected_revision=$Scope.catalog.revision; version_ref=$VersionRef
-}
-$Operation = 'runtime-deploy'
+$Kind = Read-Host 'Deploy project or common only? Type project or common'
+if ($Kind -eq 'project') { $Scope = Read-Target -Scale -Project -Placed }
+elseif ($Kind -eq 'common') { $Scope = Read-Target -Scale }
+else { throw 'Choose project or common.' }
+$Version = Read-Host 'Explicit approved runtime code version/reference'
+if (!$Version) { throw 'Choose a version.' }
+$ReceiptPath = New-ReviewPath 'runtime'
+$Arguments = @('-m','azurefactory','runtime','deploy','--folder',$FactoryFolder,
+    '--factory-id',$Scope.factory.id,'--scale-set-id',$Scope.scale.id,
+    '--version-ref',$Version,'--expected-revision',$Scope.catalog.revision,'--save-receipt',$ReceiptPath)
+if ($Kind -eq 'project') { $Arguments += @('--project-id',$Scope.project.id) }
+& $Python @Arguments
+if ($LASTEXITCODE -ne 0) { throw 'Runtime blocked; do not switch to legacy/bootstrap.' }
 ```
 
-Run **2.1**, then choose this CLI, **2.2 SDK** (`review_catalog_prepare`) or
-**2.3 REST** (`POST /api/v1/factory-catalog/prepare`):
+Omitting the project deliberately means **common-only**, not every project.
+Common-only, GHA and shared-remote execution require compatible runtime support.
+After the approved confirmation, observe the returned job:
 
 ```powershell
-& $Python -m azurefactory runtime deploy --folder $FactoryFolder --factory-id $FactoryId `
-    --scale-set-id $ScaleId --project-id $ProjectId --version-ref $VersionRef `
-    --expected-revision $Scope.catalog.revision --save-receipt $ReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Runtime blocked; no legacy/bootstrap fallback.' }
+$Receipt = Get-Content -LiteralPath $ReceiptPath -Raw | ConvertFrom-Json
+& $Python -m azurefactory catalog jobs --folder $Receipt.folder
+if ($LASTEXITCODE -ne 0) { throw 'Cannot read jobs.' }
+$JobId = Read-Host 'Exact job UUID returned by your runtime confirmation; verify its scope above'
+& $Python -m azurefactory runtime status --folder $Receipt.folder --job-id $JobId
+if ($LASTEXITCODE -ne 0) { throw 'Inspect the reported state.' }
+& $Python -m azurefactory runtime poll --folder $Receipt.folder --job-id $JobId --poll-timeout 300 --poll-interval 2
+if ($LASTEXITCODE -ne 0) { throw 'Inspect timeout/failure/uncertainty; do not redispatch.' }
 ```
 
-For B's **common-only** scale-set deployment, use these inputs **instead of**
-the project inputs above, then run **2.1** and the following CLI command
-(or the same **2.2 SDK / 2.3 REST** alternatives). This is still conditional on
-the reviewed runtime's common-only support:
-
-```powershell
-$Scope = Read-Target
-$FactoryId = $Scope.factory.id
-$ScaleId = $Scope.scale.id
-$ProjectId = $null
-$VersionRef = Read-Host 'Explicit approved runtime code version/reference'
-if (!$VersionRef) { throw 'Choose a version explicitly.' }
-$Request = @{
-    contract_version=1; folder=$FactoryFolder; action='deploy'
-    factory_id=$FactoryId; scale_set_id=$ScaleId
-    expected_revision=$Scope.catalog.revision; version_ref=$VersionRef
-}
-$Operation = 'runtime-deploy'
-```
-
-After **2.1**, the common-only CLI prepare is:
-
-```powershell
-& $Python -m azurefactory runtime deploy --folder $FactoryFolder --factory-id $FactoryId `
-    --scale-set-id $ScaleId --version-ref $VersionRef `
-    --expected-revision $Scope.catalog.revision --save-receipt $ReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Common runtime blocked; do not switch routes to bypass it.' }
-```
-
-**STOP — this approval starts deployment, not just a configuration save.**
-Only after approval use **2.4**, whose CLI branch is `runtime confirm`. Omitting
-`project_id` deliberately selects common-only deployment, not every project; use
-that only with a separately reviewed supported common route.
-
-Check the returned job, then follow its exact ID:
-
-```powershell
-$JobsText = & $Python -m azurefactory catalog jobs --folder $FactoryFolder
-if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect jobs.' }
-$Jobs = ($JobsText -join "`n") | ConvertFrom-Json
-$Jobs | ConvertTo-Json -Depth 100
-$JobId = Read-Host 'Exact runtime job UUID returned by this confirmation'
-if (!@($Jobs.jobs | Where-Object {
-    $_.id -eq $JobId -and $_.factory_id -eq $FactoryId -and
-    $_.scale_set_id -eq $ScaleId -and $_.project_id -eq $ProjectId
-}).Count) { throw 'Job is not the selected scope; inspect the confirmation.' }
-& $Python -m azurefactory runtime status --folder $FactoryFolder --job-id $JobId
-if ($LASTEXITCODE -ne 0) { throw 'Inspect the reported job state, not a retry instruction.' }
-& $Python -m azurefactory runtime poll --folder $FactoryFolder --job-id $JobId `
-    --poll-timeout 300 --poll-interval 2
-if ($LASTEXITCODE -ne 0) { throw 'Deadline/failure/uncertainty: inspect state; do not redispatch.' }
-```
-
-**A timeout stops waiting; it does not cancel deployment.** Check the pipeline's
-deployment results, exact version/target and catalog status before claiming success.
-
-<details>
-<summary>More info</summary>
-
-SDK status calls are `catalog_job(folder, job_id)` / `catalog_terminal(folder,
-job_id, cursor)`; REST is `GET /api/v1/factory-catalog/jobs/{job_id}?folder=...`
-and `/api/v1/factory-catalog/terminal` with `folder`, `job_id`, `cursor`.
-
-</details>
+Check actual pipeline results, target and version before claiming success.
 
 ## Registered Full bootstrap
 
-**Conditional/blocked**: provide complete settings reviewed by the operator.
-Use `bootstrap workflow ...`, not the older `bootstrap ...` launcher commands.
-This workflow can set up its own prerequisites; advanced manual enrollment is
-not always needed. **It can create billable resources, identities, groups,
-networks and runners, create repositories, commit/push and start pipelines.**
-Do not use another route to bypass a blocker.
-
-First save the factory configuration through A or the registered creation API.
-**Do not recreate an existing factory to switch routes.**
-
-<details>
-<summary>More info</summary>
-
-The registered creation API is **generic-access only** in CLI/SDK:
-`POST /api/v1/creation/prepare`, then separately approved `/creation/confirm`.
-It is not `bootstrap_prepare`, which calls the legacy launcher API.
-
-Backend source `3c5694c` adds a limited DeveloperBastion handoff backed by normal
-deployment receipts and verified runner associations. **It does not unblock Full
-bootstrap.** The native prerequisite handoff supplies `verified_observations_hash`,
-not concrete post-success resource bodies. Unproven DNS, gateway, service
-association links (SAL) and additional Bastion fields remain blocked. This source
-increment does not change the API's frozen accelerator pin or certify an installed host.
-
-</details>
-
-### Discover and provide the complete bootstrap configuration
+**Conditional/blocked.** Read the [shared bootstrap requirements](#registered-full-bootstrap)
+first. It can create billable resources, identities, groups, networks, runners
+and repositories, commit/push and start pipelines. Do not recreate an existing
+factory to change routes or substitute a legacy launcher to bypass a blocker.
 
 ```powershell
 & $Python -m azurefactory bootstrap capabilities
-if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect bootstrap capabilities.' }
+if ($LASTEXITCODE -ne 0) { throw 'Cannot read capabilities.' }
 & $Python -m azurefactory schema --openapi
-if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect bootstrap schema.' }
-```
-
-Use the commands above to check required fields, defaults and supported regions.
-Provide a real, complete JSON configuration file reviewed by the operator—not a
-sample with placeholder accounts or network addresses.
-
-<details>
-<summary>More info</summary>
-
-Read `bootstrap_fields` (including `required`) in capabilities and
-`BootstrapConfig` / `WorkflowBootstrapConfig` / `CreationWorkflowPrepare` in the
-live OpenAPI. The API reference is `$ApiRoot\docs\API.md`. Required keys include
-`subscription_id`, `tenant_id`, `scale_set_number`, `repo_root`,
-`team_member_email`, `team_group_name`; route validation adds the GHA repository
-or ADO organization/project/repository/service connection and ADO connected tenant.
-A supplied existing team-group ID does not remove the current API's required
-team name/member-email fields.
-
-</details>
-
-For A's **owned** hub/VPN, explicitly review `setup_hub_access: true`,
-`access_hub_mode: "integrated"`, Dev VNet CIDR and `vpn_client_cidr`, DNS/network
-ownership, region, subscription, project001, repository, identity and runner.
-Integrated mode does not need an invented second hub VNet. External hub mode is
-different. **This does not install a VPN client or check your workstation's
-connection.** Hosted runners need suitable private-network access.
-
-Choose `coordination_mode` deliberately. `single-writer` requires a private
-repository and an approved setup where only one writer changes the factory;
-`blob` has separate coordination/network requirements. **Do not change an existing
-binding's mode just to unblock deployment.** The file below is supplied by your
-operator after review; it is not included with this guide.
-
-```powershell
-$Scope = Read-Target -Project -RequirePlacement
-if ($Scope.scale.environment -ne 'dev') { throw 'Choose the reviewed initial Dev bootstrap scope.' }
-$BootstrapConfigPath = Read-Host 'Existing absolute CLIENT-local JSON file containing the reviewed complete bootstrap_config object'
-if (!(Test-Path -LiteralPath $BootstrapConfigPath -PathType Leaf)) { throw 'Supply the real reviewed file.' }
-$BootstrapConfig = Get-Content -LiteralPath $BootstrapConfigPath -Raw | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw 'Cannot read schema.' }
+$Scope = Read-Target -Scale -Project -Placed
+if ($Scope.scale.environment -ne 'dev') { throw 'Select the initial Dev target.' }
+$ConfigPath = Read-Host 'Existing client-local JSON file containing the complete reviewed bootstrap_config object'
+$Config = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
 foreach ($Key in @('subscription_id','tenant_id','scale_set_number','repo_root','team_member_email','team_group_name')) {
-    if (!$BootstrapConfig.$Key) { throw "Missing mandatory bootstrap field: $Key" }
+    if (!$Config.$Key) { throw "Missing bootstrap field: $Key" }
 }
-if ($BootstrapConfig.subscription_id -ne $Scope.scale.subscription_id -or
-    $BootstrapConfig.tenant_id -ne $Scope.scale.tenant_id -or
-    $BootstrapConfig.scale_set_number -ne $Scope.scale.suffix -or
-    $BootstrapConfig.project_number -ne $Scope.project.number) {
-    throw 'Bootstrap configuration must match the saved target exactly.'
+if ($Config.subscription_id -ne $Scope.scale.subscription_id -or $Config.tenant_id -ne $Scope.scale.tenant_id -or
+    $Config.scale_set_number -ne $Scope.scale.suffix -or $Config.project_number -ne $Scope.project.number) {
+    throw 'Bootstrap configuration differs from the saved target.'
 }
+$ApprovalMode = Read-Host 'Choose per-stage or whole-workflow'
+if ($ApprovalMode -notin @('per-stage','whole-workflow')) { throw 'Choose an approval mode.' }
 $WorkflowRequest = @{
     contract_version=1; operation='create-factory'; execution_mode='privileged-bootstrap'
-    creation_mode='full-bootstrap'; approval_mode='per-stage'
-    scope=@{ folder=$FactoryFolder; factory_id=$Scope.factory.id
-        scale_set_id=$Scope.scale.id; project_id=$Scope.project.id }
-    expected_revision=$Scope.catalog.revision; bootstrap_config=$BootstrapConfig
+    creation_mode='full-bootstrap'; approval_mode=$ApprovalMode; expected_revision=$Scope.catalog.revision
+    scope=@{ folder=$FactoryFolder; factory_id=$Scope.factory.id; scale_set_id=$Scope.scale.id; project_id=$Scope.project.id }
+    bootstrap_config=$Config
 }
-$WorkflowRequestPath = Write-ReviewJson $WorkflowRequest 'workflow-request'
-$PreflightRequestPath = Write-ReviewJson @{
-    contract_version=1; orchestrator=$Scope.scale.orchestrator
-    bootstrap_config=$BootstrapConfig; scope=$WorkflowRequest.scope
-    expected_revision=$Scope.catalog.revision
+$WorkflowPath = Write-ReviewJson $WorkflowRequest 'workflow-request'
+$PreflightPath = Write-ReviewJson @{
+    contract_version=1; orchestrator=$Scope.scale.orchestrator; bootstrap_config=$Config
+    scope=$WorkflowRequest.scope; expected_revision=$Scope.catalog.revision
 } 'preflight-request'
-$PreflightReportPath = Join-Path $ReviewRoot ('preflight-' + [guid]::NewGuid().ToString('N') + '.json')
-& $Python -m azurefactory preflight --request-json $PreflightRequestPath --save-report $PreflightReportPath
-if ($LASTEXITCODE -ne 0) { throw 'Preflight blocked/incomplete; inspect it before preparing.' }
-```
-
-The script's local checks are not a full Azure check. Server preflight reads
-Azure/provider state but **does not approve or start deployment**. Its cost
-estimate may be incomplete; it is not a spending limit.
-
-<details>
-<summary>More info</summary>
-
-An equivalent CLI entry point accepts the workflow request itself; choose this
-instead of the preceding `preflight` call, not as another approval step:
-
-```powershell
-$AlternateReportPath = Join-Path $ReviewRoot ('preflight-' + [guid]::NewGuid().ToString('N') + '.json')
-& $Python -m azurefactory bootstrap workflow prepare --preflight `
-    --request-json $WorkflowRequestPath --save-report $AlternateReportPath
-if ($LASTEXITCODE -ne 0) { throw 'Readiness is blocked or incomplete; this created no workflow approval.' }
-```
-
-</details>
-
-### Per-stage workflow: prepare, approve, observe, next
-
-```powershell
-$WorkflowReceiptPath = Join-Path $ReviewRoot ('stage-' + [guid]::NewGuid().ToString('N') + '.json')
-& $Python -m azurefactory bootstrap workflow prepare --request-json $WorkflowRequestPath `
-    --save-receipt $WorkflowReceiptPath
+$ReportPath = New-ReviewPath 'preflight'
+& $Python -m azurefactory preflight --request-json $PreflightPath --save-report $ReportPath
+if ($LASTEXITCODE -ne 0) { throw 'Preflight blocked/incomplete; no deployment approval.' }
+$WorkflowReceiptPath = New-ReviewPath 'workflow-review'
+& $Python -m azurefactory bootstrap workflow prepare --request-json $WorkflowPath --save-receipt $WorkflowReceiptPath
 if ($LASTEXITCODE -ne 0) { throw 'Workflow preparation blocked.' }
 ```
 
-**STOP — review and approve this stage's target, version, commands, changes and expiry.**
-Only then:
+**STOP**. For per-stage mode review this stage. For optional bounded
+whole-workflow mode review **all listed stages**, targets, expiry, fingerprints,
+`authorization_hash` and estimated cost (not a spending limit). Do not blindly
+approve stages in a loop.
 
 ```powershell
+$WorkflowReceipt = Get-Content -LiteralPath $WorkflowReceiptPath -Raw | ConvertFrom-Json
+$Approved = Read-Host 'After approval, paste the exact workflow confirmation_id'
+if ($Approved -cne $WorkflowReceipt.confirmation_id) { throw 'Approval does not match.' }
 & $Python -m azurefactory bootstrap workflow start --receipt $WorkflowReceiptPath --yes
 if ($LASTEXITCODE -ne 0) { throw 'Inspect workflow state; do not repeat start.' }
-$WorkflowReceipt = Get-Content -LiteralPath $WorkflowReceiptPath -Raw | ConvertFrom-Json
 $WorkflowId = $WorkflowReceipt.preview.workflow_id
 & $Python -m azurefactory bootstrap workflow status --folder $FactoryFolder --workflow-id $WorkflowId
-if ($LASTEXITCODE -ne 0) { throw 'Inspect the reported workflow boundary.' }
+if ($LASTEXITCODE -ne 0) { throw 'Inspect the reported boundary.' }
 ```
 
-Check status until the server reports `requires_review: true`. A finished local
-command does not mean the next stage is ready. Then prepare a new review:
+For per-stage mode, **only when status reports `requires_review: true`**:
 
 ```powershell
-$WorkflowReceiptPath = Join-Path $ReviewRoot ('stage-' + [guid]::NewGuid().ToString('N') + '.json')
+$WorkflowReceiptPath = New-ReviewPath 'next-stage'
 & $Python -m azurefactory bootstrap workflow next --folder $FactoryFolder `
     --workflow-id $WorkflowId --save-receipt $WorkflowReceiptPath
 if ($LASTEXITCODE -ne 0) { throw 'No confirmable next stage.' }
 ```
 
-**STOP again.** Review this new stage before separately using the earlier `start`
-command with this new receipt. Never automate a loop that approves every stage.
-One completed stage or queued job does not mean the entire factory is deployed.
-
-### Optional bounded whole-workflow approval
-
-Optionally approve the listed workflow stages together, instead of one at a time.
-This is a separate choice—not an extra step after per-stage preparation:
+**STOP again**, then use the start block with this new receipt after its own
+approval. For whole-workflow mode, use the following only when the server
+reports safe continuation of the **existing** approval, never as a retry of
+a running, failed or uncertain stage:
 
 ```powershell
-$WorkflowReceiptPath = Join-Path $ReviewRoot ('whole-workflow-' + [guid]::NewGuid().ToString('N') + '.json')
-& $Python -m azurefactory bootstrap workflow prepare --whole-workflow `
-    --request-json $WorkflowRequestPath --save-receipt $WorkflowReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Bounded approval unsupported/blocked; no silent fallback.' }
-```
-
-**STOP.** Review all listed stages, targets, changes, expiry and the cost estimate.
-Only after approval run `bootstrap workflow start` above. The server then manages
-the approved stages; do not build a script that blindly approves later steps.
-**Changed inputs, expired approval, failure or an uncertain result mean stop and
-review the state.**
-
-<details>
-<summary>More info</summary>
-
-Check `review.workflow_authorization`, contract `bounded-full-bootstrap-v1`,
-the source/program/template fingerprints, expiry and hash.
-`review.cost_preview` is an estimate, not a spending limit.
-
-</details>
-
-Use the following command **only when the server says the workflow can safely
-continue**. It resumes the existing approval; it is not a retry for a failed or
-running stage:
-
-```powershell
-$WorkflowReceipt = Get-Content -LiteralPath $WorkflowReceiptPath -Raw | ConvertFrom-Json
-$WorkflowId = $WorkflowReceipt.preview.workflow_id
-$AuthorizationHash = $WorkflowReceipt.preview.review.workflow_authorization.authorization_hash
-if (!$AuthorizationHash) { throw 'This is not a whole-workflow receipt.' }
-& $Python -m azurefactory bootstrap workflow continue --folder $FactoryFolder `
-    --workflow-id $WorkflowId --authorization-hash $AuthorizationHash
+$OriginalReceiptPath = Read-Host 'Original approved whole-workflow receipt path'
+$Original = Get-Content -LiteralPath $OriginalReceiptPath -Raw | ConvertFrom-Json
+$Hash = $Original.preview.review.workflow_authorization.authorization_hash
+if (!$Hash) { throw 'Not a whole-workflow receipt.' }
+if ((Read-Host 'After checking server state, type CONTINUE') -cne 'CONTINUE') { throw 'Stopped.' }
+& $Python -m azurefactory bootstrap workflow continue --folder $Original.folder `
+    --workflow-id $Original.preview.workflow_id --authorization-hash $Hash
 if ($LASTEXITCODE -ne 0) { throw 'Inspect state; never loop continue on failure.' }
 ```
 
-### Registered workflow SDK/REST mapping
+<details markdown="1">
+<summary>Alternative and Legacy ways</summary>
 
-For an application using SDK or REST, the equivalent calls are below.
+Advanced enrollment is a **local-core** workflow, not an SDK/REST equivalent
+or mandatory prerequisite for API-managed Full bootstrap. `enrollment plan`
+reads provider state; `ensure` can create billable resources and grant roles.
+Independently approve its plan, then review `prepare-binding` and approve
+`publish`. `plan-and-publish` is an alternative combining enrollment and binding
+publication, not an extra step. Its governance flag acknowledges administrator-
+arranged exclusive writers; it does not arrange them. Do not change an existing
+binding's coordination mode to unblock it. Follow the
+[complete enrollment reference](../../../environment_setup/azurefactory-cli/readme.md#enroll-a-registered-factory--scale-set).
 
-<details>
-<summary>More info</summary>
-
-Use the same reviewed JSON. For SDK receipt handling, use `write_receipt` /
-`load_receipt` with purpose `creation-workflow-start`, operation
-`creation-workflow` before approval/start. This also checks whole-workflow
-approval hashes; `validate_preview` alone does not perform that check.
-
-| Step | Supported SDK | HTTP contract |
-|---|---|---|
-| Capabilities | `creation_capabilities()` | `GET /api/v1/creation/capabilities` |
-| Read-only preflight | `preflight(parsed_preflight_request)` | `POST /api/v1/creation/preflight` |
-| Prepare | `creation_workflow_prepare(parsed_workflow_request)` | `POST /api/v1/creation/workflows/prepare` |
-| Start | `creation_workflow_start(folder, workflow_id, confirmation_id, authorization_hash=reviewed_hash)`; omit hash for per-stage | `POST /api/v1/creation/workflows/start`: `folder`, `workflow_id`, `confirmation_id`, optional `authorization_hash` |
-| Status | `creation_workflow_status(folder, workflow_id)` | `GET /api/v1/creation/workflows/{id}` with `folder` query |
-| Next review | `creation_workflow_next(folder, workflow_id)` | `POST /api/v1/creation/workflows/{id}/prepare-next`: `{"folder": ...}` |
-| Safe continuation only | `creation_workflow_continue(folder, workflow_id, authorization_hash)` | `POST /api/v1/creation/workflows/{id}/continue`: `folder`, original `authorization_hash` |
-
-</details>
-
-## Advanced enrollment is a separate local-core workflow
-
-These optional commands set up a pipeline connection using local Azure/provider
-tools. **They are not a replacement for Full bootstrap or workload deployment,
-and there is no matching REST/`AzureFactoryClient` enrollment flow.**
-`plan` reads cloud state; **`ensure` can create billable resources and grant roles**.
-An administrator must first arrange that writers do not make conflicting changes.
-
-<details>
-<summary>More info</summary>
-
-Use `enrollment plan`, `ensure` and `plan-and-publish` only with explicitly
-authenticated tools, a schema-2 consumer repository and the exact registered
-target. They do not create every runner/network resource. Read the options schema and
-[canonical enrollment reference](../../../environment_setup/azurefactory-cli/readme.md#enroll-a-registered-factory--scale-set)
-for required repository/ref, writable/dependency RG IDs, roles, runner, ADO tenant,
-identity and coordination options. Do not put credentials in options JSON.
-
-```powershell
-$Scope = Read-Target
-$EnrollmentConsumerRoot = Read-Host 'Absolute schema-2 consumer root accessible to local CLI AND API host'
-$OptionsPath = Read-Host 'Existing absolute local reviewed enrollment-options JSON file'
-if (!(Test-Path -LiteralPath $OptionsPath -PathType Leaf)) { throw 'Provide reviewed options.' }
-$PlanPath = Join-Path $ReviewRoot ('enrollment-plan-' + [guid]::NewGuid().ToString('N') + '.json')
-$EnrollmentResultPath = Join-Path $ReviewRoot ('enrollment-result-' + [guid]::NewGuid().ToString('N') + '.json')
-& $Python -m azurefactory enrollment plan --consumer-root $EnrollmentConsumerRoot `
-    --factory-id $Scope.factory.id --scale-set-id $Scope.scale.id --environment $Scope.scale.environment `
-    --options $OptionsPath --expected-orchestrator $Scope.scale.orchestrator `
-    --acknowledge-exclusive-writer-governance --save-plan $PlanPath
-if ($LASTEXITCODE -ne 0) { throw 'Enrollment plan blocked.' }
-```
-
-The governance flag confirms that an administrator has already arranged safe,
-nonconflicting writes. It does not set that up. Do not use it if that is untrue.
-
-**STOP — independently approve the plan, role scopes, resource creation, hashes
-and limitations.** Only then:
-
-```powershell
-& $Python -m azurefactory enrollment ensure --plan $PlanPath --yes `
-    --acknowledge-exclusive-writer-governance --save-result $EnrollmentResultPath
-if ($LASTEXITCODE -ne 0) { throw 'Inspect enrollment outcome; do not re-plan/retry automatically.' }
-```
-
-Ensure returns a proposed pipeline connection (**binding candidate**), not a
-deployment. Review saving that connection separately:
-
-```powershell
-$Catalog = Read-Catalog
-$BindingReceiptPath = Join-Path $ReviewRoot ('binding-' + [guid]::NewGuid().ToString('N') + '.json')
-& $Python -m azurefactory enrollment prepare-binding --result $EnrollmentResultPath `
-    --expected-revision $Catalog.revision --save-receipt $BindingReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Binding publication preview blocked.' }
-```
-
-**STOP — review the exact candidate, API target, derived consumer folder and
-revision, then approve publication separately:**
-
-```powershell
-& $Python -m azurefactory enrollment publish --receipt $BindingReceiptPath --yes
-if ($LASTEXITCODE -ne 0) { throw 'Inspect binding state; do not republish automatically.' }
-```
-
-This final binding portion is catalog `action: "configure-binding"` plus catalog
-confirm; `catalog confirm` is an alternative to `enrollment publish`, not another
-step. It does not imply SDK parity for provisioning.
-
-`plan-and-publish` combines enrollment and saving the connection. It is an
-alternative, **not an extra step after the sequence above**. With the same inputs
-and safe-writer setup, first review its read-only plan (exit 3 means approval required):
-
-```powershell
-$CombinedReviewDir = Join-Path $ReviewRoot ('combined-review-' + [guid]::NewGuid().ToString('N'))
-& $Python -m azurefactory enrollment plan-and-publish --consumer-root $EnrollmentConsumerRoot `
-    --factory-id $Scope.factory.id --scale-set-id $Scope.scale.id --environment $Scope.scale.environment `
-    --options $OptionsPath --artifact-dir $CombinedReviewDir --expected-orchestrator $Scope.scale.orchestrator `
-    --acknowledge-exclusive-writer-governance
-if ($LASTEXITCODE -ne 3) { throw 'Inspect result; expected an approval-required review, not execution.' }
-```
-
-**STOP.** Approve enrollment **and binding publication**, not Full bootstrap or
-workload deployment. Use a different, nonexistent artifact directory:
-
-```powershell
-$CombinedRunDir = Join-Path $ReviewRoot ('combined-run-' + [guid]::NewGuid().ToString('N'))
-& $Python -m azurefactory enrollment plan-and-publish --consumer-root $EnrollmentConsumerRoot `
-    --factory-id $Scope.factory.id --scale-set-id $Scope.scale.id --environment $Scope.scale.environment `
-    --options $OptionsPath --artifact-dir $CombinedRunDir --expected-orchestrator $Scope.scale.orchestrator `
-    --acknowledge-exclusive-writer-governance --yes
-if ($LASTEXITCODE -ne 0) { throw 'Inspect saved artifacts and server state; no automatic retry.' }
-```
-
-The convenience flow's new-binding/no-Blob-options default can be single-writer;
-original plan/ensure defaults differ. Saved factory mode must already agree.
-It must not change an existing binding's mode, rewrite the register to fit, guess
-the subscription from the current account, or bypass shared-hub safety rules.
+Legacy `aifactory` roots use `legacy list`, `config review`, then separately
+approved `config save --expected-review … --yes`. Preserve `_json_source`;
+choose an exact saved project, not a startup hint. Saving writes configuration
+and normally pipeline variables, not deployment or Git publication.
+`--snapshot-only` must be used on **both** review and save when chosen.
+Separate `legacy plan` → `legacy prepare` → approved `legacy start` →
+`legacy status` uses deployment contract 2. `submitted` means the local launcher
+finished, **not** Azure success; inspect `execution_result`.
+Older `bootstrap prepare/start/status` uses the legacy launcher API, not
+`bootstrap workflow`. Legacy 124 is not a registered-version fallback.
+See the [canonical CLI reference](../../../environment_setup/azurefactory-cli/readme.md).
 
 </details>
 
-## Legacy configuration and legacy deployment are separate contracts
+</details>
+<!-- /factory-tool -->
 
-Use this only for a real legacy `aifactory` root, not an `azurefactory` catalog.
-Choose the exact saved JSON project. Let the tools preserve its `_json_source`
-metadata; do not edit that metadata, identity fields or private fields yourself.
+<details markdown="1" data-factory-tool="Python SDK">
+<summary>Python SDK</summary>
 
-```powershell
-$LegacyFolder = Read-Host 'Exact legacy aifactory folder on the API host'
-$LegacyProject = Read-Host 'Exact three-digit legacy project number'
-if ($LegacyProject -notmatch '^(?!000)[0-9]{3}$') { throw 'Choose an exact project number.' }
-& $Python -m azurefactory legacy list --folder $LegacyFolder
-if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect existing legacy deployment drafts.' }
-& $Python -m azurefactory schema
-if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect editable wizard fields.' }
-$ChangesSourcePath = Read-Host 'Existing local JSON object containing only reviewed editable field replacements'
-if (!(Test-Path -LiteralPath $ChangesSourcePath -PathType Leaf)) { throw 'Provide the real changes file.' }
-$LegacyChangesPath = Write-ReviewJson (Get-Content -LiteralPath $ChangesSourcePath -Raw | ConvertFrom-Json) 'legacy-changes'
-& $Python -m azurefactory config review --folder $LegacyFolder `
-    --project-number $LegacyProject --changes-json $LegacyChangesPath
-if ($LASTEXITCODE -ne 0) { throw 'Legacy configuration review failed.' }
+## Connect and save the reusable Python helpers
+
+These are **normal Python programs**, not PowerShell scripts. Use Python 3.10+
+and your existing approved accelerator checkout. The helper prompts for that
+checkout's root and adds its SDK source directory to Python's import path
+**before importing the client**. Neither this tab nor guide 18 requires an SDK
+installation. No CLI call is needed to discover IDs or prepare a change.
+
+Save the following as **`aif_review.py`** in your private working folder.
+Each scenario below is a separate file in the same folder. `connect()` prompts
+for the API-host catalog path; it never assumes guide 18's demo target.
+
+```python
+import getpass
+import ipaddress
+import json
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+import re
+import sys
+from uuid import UUID, uuid4
+
+accelerator = Path(input("Absolute path to your approved accelerator checkout: ").strip()).expanduser()
+source = accelerator / "environment_setup" / "azurefactory-cli" / "src"
+if not accelerator.is_absolute() or not (source / "azurefactory" / "client.py").is_file():
+    raise RuntimeError("Check the existing approved accelerator checkout path.")
+sys.path.insert(0, str(source))
+
+from azurefactory import AzureFactoryClient
+from azurefactory.client import (
+    canonical_json_hash, catalog_settings_request, factory_create_request, redact_secrets,
+)
+from azurefactory.catalog_requests import (
+    factory_clone_request, scaleset_add_request,
+    project_add_request, project_add_placements_request,
+)
+from azurefactory.review import load_receipt, parse_expires_at, validate_preview, write_receipt
+
+def require(condition, message):
+    if not condition:
+        raise RuntimeError(message)
+
+def choice(prompt, allowed):
+    value = input(prompt).strip()
+    require(value in allowed, "Choose exactly one listed value.")
+    return value
+
+def connect():
+    url = os.getenv("AIFACTORY_API_URL") or input("Operator-provided owning API URL: ").strip()
+    key = os.getenv("AIFACTORY_API_KEY") or getpass.getpass("API key: ")
+    require(bool(url and key), "Explicit URL and key required; no demo default.")
+    c = AzureFactoryClient(base_url=url, api_key=key)
+    c.health()
+    folder = input("Exact absolute azurefactory folder ON THE API HOST: ").strip()
+    require(bool(folder), "Select the approved host folder.")
+    return c, folder
+
+def show(c, value):
+    print(json.dumps(redact_secrets(value, c.api_key), indent=2, ensure_ascii=False))
+
+def read_json(prompt):
+    return json.loads(Path(input(prompt).strip()).expanduser().read_text(encoding="utf-8-sig"))
+
+def private_directory():
+    if os.name == "nt":
+        base = Path(os.getenv("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+    else:
+        os.umask(0o077)
+        base = Path(os.getenv("XDG_STATE_HOME") or Path.home() / ".local" / "state")
+    root = base / "AzureFactory" / "reviews"
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return root
+
+def save_json(c, value, label):
+    path = private_directory() / f"{label}-{uuid4().hex}.json"
+    with path.open("x", encoding="utf-8") as stream:
+        json.dump(redact_secrets(value, c.api_key), stream, indent=2, ensure_ascii=False)
+    print("Saved private file:", path)
+    return path
+
+def catalog(c, folder):
+    result = c.catalog_list(folder)
+    require(result.get("contract_version") == 1 and result.get("mode") == "catalog",
+            "Choose a registered catalog, not a legacy root.")
+    return result
+
+def exact(c, rows, label):
+    show(c, rows)
+    identifier = input(f"Exact {label} UUID from this list: ").strip()
+    matches = [row for row in rows if row["id"] == identifier]
+    require(len(matches) == 1, "Selection is not exact.")
+    return matches[0]
+
+def select(c, folder, *, scale=False, project=False, placed=False):
+    current = catalog(c, folder)
+    f = exact(c, current["factories"], "factory")
+    s = exact(c, f["scale_sets"], "scale-set") if scale else None
+    p = exact(c, f["projects"], "project") if project else None
+    if placed:
+        require(s is not None and p is not None and any(
+            item["scale_set_id"] == s["id"] and item["environment"] == s["environment"]
+            for item in p["placements"]), "Project is not placed in that scale.")
+    return current, f, s, p
+
+def number(prompt):
+    value = input(prompt).strip()
+    require(re.fullmatch(r"(?!000)[0-9]{3}", value), "Use 001 through 999.")
+    return value
+
+def new_scale(environment=None):
+    env = environment or choice("Environment (dev/stage/prod): ", ("dev", "stage", "prod"))
+    suffix = number(f"Unused {env} scale suffix: ")
+    tenant = UUID(input("Approved existing tenant UUID: ").strip())
+    subscription = UUID(input("Approved existing subscription UUID: ").strip())
+    require(tenant.int and subscription.int, "Nonzero UUIDs required.")
+    route = choice("Orchestrator (ado/gha): ", ("ado", "gha"))
+    cidr = str(ipaddress.ip_network(input("Approved non-overlapping VNet CIDR: ").strip()))
+    capacity = int(input("Approved project capacity (1 through 8): "))
+    require(1 <= capacity <= 8, "Invalid capacity.")
+    return {"environment": env, "suffix": suffix, "tenant_id": str(tenant),
+            "subscription_id": str(subscription), "orchestrator": route,
+            "network": {"vnet_cidr": cidr, "max_projects": capacity}}
+
+def save_review(c, body, preview, operation):
+    show(c, body)
+    show(c, preview)
+    validate_preview(preview)
+    if body.get("expected_revision"):
+        require(preview.get("source_revision") == body["expected_revision"], "Revision changed.")
+    save_json(c, body, f"{operation}-request")
+    purpose = ("parameters-confirm" if operation == "parameters" else
+               "creation-workflow-start" if operation == "creation-workflow" else "catalog-confirm")
+    path = private_directory() / f"{operation}-{uuid4().hex}.receipt.json"
+    write_receipt(str(path), client=c, purpose=purpose, operation=operation,
+                  request_body=body, preview=preview)
+    print("STOP. Review and obtain approval before confirming:", path)
+    return path
 ```
 
-**STOP — check the changed values, `review_id`, `can_save`, warnings and what will
-be saved.** Only after approval:
+Run a saved scenario with your configured Python interpreter, for example:
 
-```powershell
-$ReviewId = Read-Host 'Exact approved review_id from config review'
-& $Python -m azurefactory config save --folder $LegacyFolder --project-number $LegacyProject `
-    --changes-json $LegacyChangesPath --expected-review $ReviewId --yes
-if ($LASTEXITCODE -ne 0) { throw 'Inspect persistent state; never blindly repeat save.' }
+```bash
+python prepare_factory.py
 ```
 
-**This saves configuration; it does not deploy or commit/push.** Normally it also
-writes pipeline variable files. If you want only a snapshot, review that choice
-and use `--snapshot-only` on **both** review and save.
+The helper only prepares/saves reviews; it never confirms. Do not concatenate
+preparation and confirmation programs into an unattended script.
+Keep the separately saved request JSON with its receipt. Parameter receipts
+intentionally omit parameter values; review those values in the private request
+file as well as the server preview. Do not edit either after review.
 
-<details>
+## A. New factory, selected environments and project001
+
+Save as **`prepare_factory.py`**. This records own-hub intent, not a complete
+VPN/network setup, and does not create a tenant or subscription.
+
+```python
+from aif_review import *
+
+c, folder = connect()
+before = catalog(c, folder)
+require(not before["factories"], "This example needs the approved empty new-factory root.")
+environments = [part.strip() for part in input("Selected environments, comma-separated: ").split(",")]
+require(environments and len(set(environments)) == len(environments)
+        and all(env in ("dev", "stage", "prod") for env in environments), "Select each environment once.")
+scales = [new_scale(env) for env in environments]
+options = {
+    "prefix": input("Approved new prefix: ").strip(),
+    "region": input("Approved supported region: ").strip(),
+    "factory_key": input("New unique factory key: ").strip(),
+    "kind": "ai",
+    "aifactory_version": input("Approved registered version, main or supported 125+: ").strip(),
+    "scale_sets": scales,
+    "initial_project": {
+        "number": "001", "display_name": input("Project001 display name: "),
+        "placements": [{"environment": s["environment"], "suffix": s["suffix"]} for s in scales],
+    },
+    "settings": {"enableAIFactoryHub": True, "centralDnsZoneByPolicyInHub": False},
+    "expected_revision": before["revision"],
+}
+body = factory_create_request(folder, **options)
+preview = c.factory_create_prepare(folder, **options)
+save_review(c, body, preview, "factory-create")
+```
+
+**STOP** for separate configuration confirmation. Verify project001's selected
+placements afterward; **do not add it again**. Stage/Prod configuration does not
+deploy Stage/Prod; Full bootstrap selects an initial Dev target.
+
+### Clone configuration instead
+
+Save as **`prepare_clone.py`**. The new factory has configuration, not deployed
+resources/data/models/credentials. Review its network and bindings separately.
+
+```python
+from aif_review import *
+
+c, folder = connect()
+current, f, _, _ = select(c, folder)
+options = {
+    "prefix": input("Approved new prefix: ").strip(),
+    "region": input("Approved target region: ").strip(),
+    "include_projects": choice("Copy project configuration (none/all): ", ("none", "all")),
+    "expected_revision": current["revision"],
+}
+require((options["prefix"], options["region"]) != (f["prefix"], f["region"]), "Choose a new identity.")
+body = factory_clone_request(folder, f["id"], **options)
+save_review(c, body, c.factory_clone_prepare(folder, f["id"], **options), "factory-clone")
+```
+
+## B. Add a scale set, then optionally a project
+
+Save as **`prepare_scale.py`**. This does not deploy VMSS or common resources.
+
+```python
+from aif_review import *
+
+c, folder = connect()
+current, f, _, _ = select(c, folder)
+scale = new_scale()
+require(not any((s["environment"], s["suffix"]) == (scale["environment"], scale["suffix"])
+                for s in f["scale_sets"]), "Environment/suffix already exists.")
+options = {"expected_revision": current["revision"]}
+body = scaleset_add_request(folder, f["id"], [scale], **options)
+save_review(c, body, c.scaleset_add_prepare(folder, f["id"], [scale], **options), "scaleset-add")
+```
+
+**STOP**, approve and confirm the scale configuration first. Then, if needed,
+save **`prepare_project.py`** for an independent project change. It reads fresh
+IDs itself; no CLI output or previous program variables are needed.
+
+```python
+from aif_review import *
+
+c, folder = connect()
+current, f, s, _ = select(c, folder, scale=True)
+options = {
+    "number": number("Unused project number (not project001 already created by A): "),
+    "display_name": input("Project display name: "),
+    "placements": [{"environment": s["environment"], "scale_set_id": s["id"]}],
+    "expected_revision": current["revision"],
+}
+body = project_add_request(folder, f["id"], **options)
+save_review(c, body, c.project_add_prepare(folder, f["id"], **options), "project-add")
+```
+
+**STOP** for its own review/confirmation. The server checks project-number
+conflicts in selected locations and the layout-2 project home.
+
+## C. Latest successful scale in an explicit environment
+
+Save as **`prepare_auto_project.py`**, **instead of** B's project program for
+that project. This requires newer API source; environment-only placement is
+not yet in the published baseline. There is no implicit Dev.
+
+```python
+from aif_review import *
+
+c, folder = connect()
+current, f, _, _ = select(c, folder)
+environment = choice("Explicit environment (dev/stage/prod): ", ("dev", "stage", "prod"))
+options = {
+    "number": number("Unused project number: "),
+    "display_name": input("Project display name: "),
+    "environments": [environment],
+    "expected_revision": current["revision"],
+}
+body = project_add_request(folder, f["id"], **options)
+save_review(c, body, c.project_add_prepare(folder, f["id"], **options), "project-add")
+```
+
+**STOP** and review `resolved_placements`, exact scale UUID, completed common
+job, version/source commit and `evidence_hash`. The SDK/receipt helpers check
+these bindings. Selection requires recorded successful common deployment and
+capacity, not the highest suffix or a finished local command.
+
+<details markdown="1">
 <summary>More info</summary>
 
-The supported SDK helper is
-[`ConfigurationDraft.load/review/save`](../../../environment_setup/install_config_wizard/api-usage-examples/python/edit_configuration.py).
-Its HTTP calls are `/api/v1/projects/load`, `/validation`,
-`/export` without a path for review, then separately approved `/projects/save`.
-`/startup/load` is a hint, not exact project selection; preserve `_json_source`.
+On an API supporting only the explicit selector, deliberately replace
+`environments=[environment]` with
+`placements=[{"environment": environment, "scale_set_id": "latest-successful"}]`
+before preparation. Supply **one**, never both. An older API may return 422;
+no automatic fallback is safe. The same options exist on
+`project_add_placements_prepare`. Confirmation does not silently change the
+resolved scale; no eligible scale means stop, not invent one.
 
 </details>
 
-For a separate legacy runtime update/deployment:
+## D. Add a Stage/Prod placement, not captured promotion
 
-```powershell
-$LegacySourceEnv = (Read-Host 'Source environment: dev, stage or prod').ToLowerInvariant()
-$LegacyTargetEnv = (Read-Host 'Target environment: dev, stage or prod').ToLowerInvariant()
-if ($LegacySourceEnv -notin @('dev','stage','prod') -or
-    $LegacyTargetEnv -notin @('dev','stage','prod')) { throw 'Invalid environment.' }
-$LegacyOperation = if ($LegacySourceEnv -eq $LegacyTargetEnv) { 'update' } else { 'deploy' }
-& $Python -m azurefactory legacy plan --folder $LegacyFolder --project-number $LegacyProject `
-    --operation $LegacyOperation --source-env $LegacySourceEnv --target-env $LegacyTargetEnv
-if ($LASTEXITCODE -ne 0) { throw 'Legacy deployment plan failed.' }
-$DraftId = Read-Host 'Exact draft ID returned by this plan'
-$LegacyReceiptPath = Join-Path $ReviewRoot ('legacy-' + [guid]::NewGuid().ToString('N') + '.json')
-& $Python -m azurefactory legacy prepare --folder $LegacyFolder --draft-id $DraftId `
-    --save-receipt $LegacyReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Legacy deployment preview blocked.' }
+Save as **`prepare_placement.py`**. Executing captured successful Dev
+configuration/version through Stage then Prod is **not implemented**. This
+saves a target placement only; target parameters and deployment remain separate.
+
+```python
+from aif_review import *
+
+c, folder = connect()
+current, f, s, p = select(c, folder, scale=True, project=True)
+require(s["environment"] in ("stage", "prod"), "Choose the Stage or Prod target.")
+require(not any(item["environment"] == s["environment"] for item in p["placements"]),
+        "Already placed there; do not move the project implicitly.")
+options = {
+    "placements": [{"environment": s["environment"], "scale_set_id": s["id"]}],
+    "expected_revision": current["revision"],
+}
+body = project_add_placements_request(folder, f["id"], p["id"], **options)
+preview = c.project_add_placements_prepare(folder, f["id"], p["id"], **options)
+save_review(c, body, preview, "project-add-placements")
 ```
 
-**STOP — review the deployment preview (contract 2)**, including the saved draft,
-project, source/target, patch choice and version. Only after approval:
+**STOP** before confirmation. This does not require Stage success before Prod.
+There is no `project_promote` method; a runtime `version_ref` selects code,
+not the previous deployment's settings, data, models or success.
 
-```powershell
-& $Python -m azurefactory legacy start --receipt $LegacyReceiptPath --yes
-if ($LASTEXITCODE -ne 0) { throw 'Inspect the legacy execution result; do not repeat start.' }
-$LegacyJobId = Read-Host 'Exact job ID returned by this start'
-& $Python -m azurefactory legacy status --folder $LegacyFolder --job-id $LegacyJobId `
-    --wait --poll-timeout 300 --poll-interval 2
-if ($LASTEXITCODE -ne 0) { throw 'Inspect the result; timeout does not cancel the job.' }
+## E. Typed parameters and scoped settings
+
+Save as **`prepare_parameters.py`**. Choose a non-secret field from the target's
+schema; boolean JSON input becomes Python `True`/`False`, not a string.
+
+```python
+from aif_review import *
+
+c, folder = connect()
+kind = choice("Parameter scope (common/project): ", ("common", "project"))
+current, f, s, p = select(c, folder, scale=True, project=kind == "project", placed=kind == "project")
+project_id = p["id"] if p else None
+schema = c.catalog_parameters(folder, f["id"], s["id"], project_id)
+show(c, schema)
+require(not schema["requires_profile_reset"], "A profile reset needs a separate wider review.")
+template_name = input("Exact template name from this response: ").strip()
+matches = [t for t in schema["templates"] if t["template"] == template_name]
+require(len(matches) == 1, "Unknown template.")
+field = input("Exact editable field name: ").strip()
+require(any(item["name"] == field and not item["sensitive"] for item in matches[0]["fields"]),
+        "Choose a listed non-secret field.")
+edit = choice("Edit (set/unset): ", ("set", "unset"))
+patch = {"template": template_name, "parameters": {}, "unset": []}
+if edit == "set":
+    patch["parameters"][field] = json.loads(input("Approved JSON value; no secrets: "))
+else:
+    patch["unset"] = [field]
+body = {"contract_version": 1, "folder": folder, "factory_id": f["id"], "scale_set_id": s["id"],
+        "expected_revision": schema["source_revision"], "schema_revision": schema["schema_revision"],
+        "templates": [patch]}
+if project_id:
+    body["project_id"] = project_id
+save_review(c, body, c.parameter_prepare(body), "parameters")
 ```
 
-**`submitted` means the local launcher finished, not that Azure deployment
-succeeded.** Check `execution_result` for recorded results and limitations.
-`--wait` does not change that meaning. This is also not the captured-success
-promotion requested in D.
+**STOP** for parameter confirmation. `unset` removes an override, not resources;
+inherited/default values may apply. A profile reset loses all old protected
+parameter settings in that scale, not only those of the selected project.
 
-<details>
-<summary>More info</summary>
+Save the following **separate scenario** as **`prepare_settings.py`**. It uses
+named `catalog_settings_prepare`, not a generic-only placeholder.
 
-| Legacy stage | SDK | REST |
-|---|---|---|
-| Plan | `project_deployment_plan(body)` | `POST /api/v1/operations/project-deployments/plan` |
-| Prepare | `project_deployment_prepare(body)` | `POST /api/v1/operations/project-deployments/prepare` |
-| Start | `project_deployment_start(folder, confirmation_id)` | `POST /api/v1/operations/project-deployments/start` |
-| Observe | `project_deployment_terminal(folder, job_id, cursor)` | `GET /api/v1/operations/project-deployments/terminal` |
+```python
+from aif_review import *
+
+c, folder = connect()
+kind = choice("Settings scope (factory/scale/project): ", ("factory", "scale", "project"))
+current, f, s, p = select(c, folder, scale=kind != "factory",
+                        project=kind == "project", placed=kind == "project")
+scope = {}
+if s:
+    scope["scale_set_id"] = s["id"]
+if p:
+    scope["project_id"] = p["id"]
+settings = c.catalog_settings(folder, f["id"], **scope)
+show(c, settings)
+field = input("Exact editable field_key: ").strip()
+require(field in settings["field_keys"], "Unknown or locked field.")
+value = json.loads(input("Approved non-null scalar JSON replacement; no secrets: "))
+require(type(value) in (str, bool, int, float), "Use a non-null scalar, not an object or array.")
+changes = {field: value}
+options = {**scope, "expected_revision": settings["revision"]}
+body = catalog_settings_request(folder, f["id"], changes, **options)
+preview = c.catalog_settings_prepare(folder, f["id"], changes, **options)
+save_review(c, body, preview, "catalog-settings")
+```
+
+**STOP** for catalog confirmation. Omitted fields are unchanged; `null` is not
+a general unset. Shared `stage_prod` settings affect both environments.
+Neither a settings save nor disabling a flag deletes Azure resources.
+
+## Confirm exactly one approved configuration or runtime receipt
+
+Save as **`confirm_review.py`**, and run separately **after approval**. Choose
+the intended operation explicitly. The API key is never printed or persisted.
+
+```python
+from aif_review import *
+
+c, folder = connect()
+kind = choice("Approved operation (configuration/parameters/runtime): ",
+              ("configuration", "parameters", "runtime"))
+purpose = "parameters-confirm" if kind == "parameters" else "catalog-confirm"
+mode = "runtime" if kind == "runtime" else "configuration"
+path = input("Absolute path to the exact reviewed receipt: ").strip()
+receipt = load_receipt(path, client=c, purpose=purpose, operation_mode=mode)
+require(receipt["folder"] == folder, "Receipt targets another folder.")
+show(c, receipt["preview"])
+require(input("After approval, paste this confirmation_id: ").strip() == receipt["confirmation_id"],
+        "Approval does not match the review.")
+if kind == "parameters":
+    result = c.parameter_confirm(folder, receipt["confirmation_id"])
+else:
+    result = c.catalog_confirm(folder, receipt["confirmation_id"])
+save_json(c, result, "confirmation-result")
+show(c, result)
+require(result.get("contract_version") == 1, "Unknown response; inspect state, never resend.")
+if mode == "configuration":
+    require(isinstance(result.get("catalog"), dict) and result.get("job") is None,
+            "Not a configuration-only result; inspect state.")
+    show(c, catalog(c, folder))
+else:
+    job = result.get("job")
+    require(isinstance(job, dict), "Missing runtime job; inspect state, never resend.")
+    require(all(job.get(key) == receipt["request"].get(key)
+                for key in ("factory_id", "scale_set_id", "project_id")), "Unexpected runtime target.")
+    print("Observe this job, do not redispatch:", job["id"])
+```
+
+Check the readback's exact IDs and changes. Read settings/parameters again
+when changed. A transport error may occur after a write took effect; do not
+catch it by automatically running this program again.
+
+## Separate runtime deployment and observation
+
+Save as **`prepare_runtime.py`**. Project deployment requires an existing
+placement. Common-only deliberately omits `project_id`; it does not mean all
+projects. Both require compatible runtime support and a valid pipeline binding.
+
+```python
+from aif_review import *
+
+c, folder = connect()
+kind = choice("Deployment target (common/project): ", ("common", "project"))
+current, f, s, p = select(c, folder, scale=True, project=kind == "project", placed=kind == "project")
+version = input("Explicit approved runtime code version/reference: ").strip()
+require(bool(version), "Select a version.")
+body = {"contract_version": 1, "folder": folder, "action": "deploy", "factory_id": f["id"],
+        "scale_set_id": s["id"], "expected_revision": current["revision"], "version_ref": version}
+if p:
+    body["project_id"] = p["id"]
+save_review(c, body, c.review_catalog_prepare(body), "runtime-deploy")
+```
+
+**STOP**. Deployment approval is distinct from configuration approval. Only
+afterward run `confirm_review.py` with `runtime`. Do not bypass blockers with
+legacy/bootstrap calls.
+
+Save **`observe_runtime.py`** to inspect the returned job. This bounded loop
+only reads; it does not retry deployment.
+
+```python
+import time
+from aif_review import *
+
+c, folder = connect()
+jobs = c.catalog_jobs(folder)
+job = exact(c, jobs["jobs"], "job returned by your confirmation; verify its target")
+deadline = time.monotonic() + 300
+while True:
+    status = c.catalog_job(folder, job["id"])
+    require(status.get("id") == job["id"] and all(status.get(k) == job.get(k)
+            for k in ("factory_id", "scale_set_id", "project_id")), "Unexpected job scope.")
+    show(c, status)
+    if status.get("status") not in ("queued", "running"):
+        break
+    if time.monotonic() >= deadline:
+        print("Observation deadline reached; deployment is NOT cancelled.")
+        break
+    time.sleep(2)
+show(c, c.catalog_terminal(folder, job["id"], cursor=0))
+```
+
+Check pipeline deployment results, exact target and version before claiming
+success. A queued job or completed local process alone is insufficient.
+
+## Registered Full bootstrap
+
+**Conditional/blocked.** Read the [shared bootstrap requirements](#registered-full-bootstrap).
+This workflow can create resources/identities/repositories, commit/push and
+dispatch pipelines. Save as **`prepare_bootstrap.py`**. Supply a real,
+operator-reviewed JSON object matching the live `WorkflowBootstrapConfig`,
+not a placeholder or the short settings object from A.
+
+```python
+from aif_review import *
+
+c, folder = connect()
+show(c, c.creation_capabilities())
+save_json(c, c.openapi(), "openapi")
+current, f, s, p = select(c, folder, scale=True, project=True, placed=True)
+require(s["environment"] == "dev", "Choose the initial Dev bootstrap scope.")
+config = read_json("Client-local file containing complete reviewed bootstrap_config: ")
+require(all(config.get(k) for k in ("subscription_id", "tenant_id", "scale_set_number",
+                                  "repo_root", "team_member_email", "team_group_name")),
+        "Missing mandatory bootstrap settings.")
+require(all(config.get(k) == value for k, value in {
+    "subscription_id": s["subscription_id"], "tenant_id": s["tenant_id"],
+    "scale_set_number": s["suffix"], "project_number": p["number"],
+}.items()), "Bootstrap settings differ from the saved target.")
+scope = {"folder": folder, "factory_id": f["id"], "scale_set_id": s["id"], "project_id": p["id"]}
+report = c.preflight({"contract_version": 1, "orchestrator": s["orchestrator"],
+                     "scope": scope, "expected_revision": current["revision"], "bootstrap_config": config})
+save_json(c, report, "preflight")
+show(c, report)
+require(report["ready"] is True, "Preflight blocked/incomplete; stop.")
+mode = choice("Approval mode (per-stage/whole-workflow): ", ("per-stage", "whole-workflow"))
+body = {"contract_version": 1, "operation": "create-factory", "execution_mode": "privileged-bootstrap",
+        "creation_mode": "full-bootstrap", "approval_mode": mode, "scope": scope,
+        "expected_revision": current["revision"], "bootstrap_config": config}
+save_review(c, body, c.creation_workflow_prepare(body), "creation-workflow")
+```
+
+**STOP**. Preflight reads provider state but approves nothing; its estimated
+cost is not a spending limit. Per-stage mode approves one reviewed stage.
+Optional whole-workflow mode needs review of all listed stages, expiry, target,
+fingerprints and `authorization_hash`; the receipt helpers validate its
+`bounded-full-bootstrap-v1` binding.
+
+Save **`start_bootstrap.py`**, used only after approval:
+
+```python
+from aif_review import *
+
+c, folder = connect()
+receipt = load_receipt(input("Exact approved workflow receipt path: ").strip(),
+                       client=c, purpose="creation-workflow-start")
+require(receipt["folder"] == folder, "Different target folder.")
+preview = receipt["preview"]
+show(c, preview)
+require(input("After approval, paste confirmation_id: ").strip() == receipt["confirmation_id"],
+        "Approval does not match.")
+authorization = preview["review"].get("workflow_authorization")
+options = {"authorization_hash": authorization["authorization_hash"]} if authorization else {}
+result = c.creation_workflow_start(folder, preview["workflow_id"], receipt["confirmation_id"], **options)
+save_json(c, result, "workflow-start")
+require(result.get("scope") == preview["scope"] and result.get("workflow_id") == preview["workflow_id"],
+        "Unexpected workflow result; inspect state, never resend.")
+show(c, c.creation_workflow_status(folder, preview["workflow_id"]))
+```
+
+Save **`next_bootstrap.py`** for a per-stage workflow. It reads status before
+preparing the next review; it never approves it.
+
+```python
+from aif_review import *
+
+c, folder = connect()
+workflow_id = input("Exact existing workflow UUID: ").strip()
+status = c.creation_workflow_status(folder, workflow_id)
+show(c, status)
+require(status.get("requires_review") is True, "Server has not requested another review.")
+body = {"folder": folder, "workflow_id": workflow_id}
+save_review(c, body, c.creation_workflow_next(folder, workflow_id), "creation-workflow")
+```
+
+**STOP again** before using `start_bootstrap.py` with the new stage's receipt.
+Never write an automatic approval loop.
+
+For bounded whole-workflow approval, save **`continue_bootstrap.py`** and run
+it **only when server status says continuation of the existing approval is
+safe**. It is not a retry of a running, failed or uncertain stage.
+
+```python
+from aif_review import *
+
+c, folder = connect()
+receipt = read_json("Original approved whole-workflow receipt: ")
+require(receipt.get("format") == "azurefactory-review-receipt-v1"
+        and receipt.get("purpose") == "creation-workflow-start"
+        and receipt.get("base_url") == c.canonical_base_url and receipt.get("folder") == folder,
+        "Different receipt purpose, host or folder.")
+require(receipt["request_hash"] == canonical_json_hash(receipt["request"])
+        and receipt["preview_hash"] == canonical_json_hash(receipt["preview"]), "Archived review changed.")
+preview = receipt["preview"]
+authorization = preview["review"].get("workflow_authorization")
+require(receipt["request"].get("approval_mode") == "whole-workflow"
+        and isinstance(authorization, dict) and authorization["contract"] == "bounded-full-bootstrap-v1"
+        and authorization["scope"] == preview["scope"] and preview["scope"]["folder"] == folder
+        and authorization["workflow_id"] == preview["workflow_id"], "Not the approved bounded workflow.")
+require(authorization["authorization_hash"] == canonical_json_hash(
+    {k: v for k, v in authorization.items() if k != "authorization_hash"}), "Approval hash changed.")
+require(parse_expires_at(authorization["expires_at"]) > datetime.now(timezone.utc), "Workflow approval expired.")
+show(c, c.creation_workflow_status(folder, preview["workflow_id"]))
+require(input("After checking safe continuation, type CONTINUE: ") == "CONTINUE", "Stopped.")
+result = c.creation_workflow_continue(folder, preview["workflow_id"], authorization["authorization_hash"])
+save_json(c, result, "workflow-continue")
+show(c, result)
+```
+
+Continuation checks the existing **whole-workflow approval's expiry**, not
+whether the earlier one-time stage-start preview could still be started.
+The server also checks the original approval and current workflow state.
+
+<details markdown="1">
+<summary>Alternative and Legacy ways</summary>
+
+There is no `AzureFactoryClient` equivalent for local enrollment provisioning.
+Generic `catalog_prepare` can review an operator-produced
+`action: "configure-binding"` request; separately approved `catalog_confirm`
+saves it, not infrastructure.
+
+For legacy `aifactory` configuration, use
+[`ConfigurationDraft.load/review/save`](../../../environment_setup/install_config_wizard/api-usage-examples/python/edit_configuration.py),
+preserving `_json_source` and exact saved project identity. Review/save is not
+deployment; snapshot-only must be chosen consistently for both.
+Legacy runtime methods are `project_deployment_plan`,
+`project_deployment_prepare`, separately approved `project_deployment_start`,
+and `project_deployment_terminal`. Review deployment contract 2 and
+`execution_result`; `submitted` is not Azure success.
+Legacy `bootstrap_prepare`, `bootstrap_start`, `bootstrap_job` are different
+from registered `creation_workflow_*`, and must not bypass a blocker.
+See the [published SDK/API examples](../../../environment_setup/install_config_wizard/api-usage-examples/readme.md).
 
 </details>
 
-### Older launcher-based Full bootstrap
+</details>
+<!-- /factory-tool -->
 
-Use this older flow only when you deliberately need a supported legacy launcher.
-**Do not use it to bypass a blocked registered workflow.** Check capabilities for
-the supported launcher/version; legacy 124 is not a registered-version fallback.
-It can create resources, commit/push and start pipelines.
+<details markdown="1" data-factory-tool="REST (curl)">
+<summary>REST (curl)</summary>
 
-<details>
+## Connect with Bash / Git Bash
+
+Prerequisites: **Bash, curl 7.76+** (`--fail-with-body`), **jq 1.6+** and
+**sha256sum**. This tab needs no CLI or Python SDK. Use one Bash session; in
+Git Bash enter client-local paths in Bash notation, but API-host paths exactly
+as the host expects. `read -r` preserves Windows backslashes in those values.
+
+Save the setup/helper block as **`review_helpers.sh`** in your private working
+folder and source it. It defines only read/prepare helpers, not confirmation.
+There are no redirects or automatic HTTP retries.
+
+```bash
+set -euo pipefail
+set +x
+umask 077
+for tool in curl jq sha256sum; do command -v "$tool" >/dev/null; done
+read -r -p 'Operator-provided owning API URL: ' API_URL
+API_URL=${API_URL%/}
+case "$API_URL" in
+  http://127.0.0.1:*|http://localhost:*|http://\[::1\]:*|https://*) ;;
+  *) printf '%s\n' 'Use the approved loopback HTTP or HTTPS API URL.' >&2; exit 1 ;;
+esac
+[[ "$API_URL" != *'@'* && "$API_URL" != *'?'* && "$API_URL" != *'#'* ]]
+API_KEY=${AIFACTORY_API_KEY:-}
+if [[ -z "$API_KEY" ]]; then read -r -s -p 'API key: ' API_KEY; printf '\n'; fi
+[[ -n "$API_KEY" ]]
+read -r -p 'Exact absolute azurefactory folder ON THE API HOST: ' FOLDER
+[[ -n "$FOLDER" ]]
+BASE="${LOCALAPPDATA:-${XDG_STATE_HOME:-$HOME/.local/state}}/AzureFactory/reviews"
+mkdir -p -- "$BASE"
+
+die() { printf '%s\n' "$*" >&2; return 1; }
+digest() { sha256sum -- "$1" | cut -d ' ' -f 1; }
+show() {
+  jq --arg key "$API_KEY" '
+    walk(if type == "object" then
+      with_entries(if (.key | test("password|credential|access_token|api_key|client_secret"; "i"))
+                   then .value = "[redacted]" else . end)
+    elif type == "string" then split($key) | join("[redacted]") else . end)' "$1"
+}
+get() {
+  local endpoint=$1 output=$2 code; shift 2
+  [[ ! -e "$output" ]] || { die 'Choose a new response filename.'; return 1; }
+  code=$(curl --fail-with-body --silent --show-error --noproxy "*" \
+    --get "$API_URL$endpoint" --header "X-API-Key: $API_KEY" \
+    "$@" --output "$output" --write-out '%{http_code}') || {
+      die "Read failed; inspect private response: $output"; return 1;
+    }
+  [[ "$code" == 2?? ]] || { die 'Unexpected HTTP status; no redirect followed.'; return 1; }
+}
+post_prepare() {
+  local endpoint=$1 request=$2 output=$3 code
+  case "$endpoint" in
+    /api/v1/factory-catalog/prepare|/api/v1/factory-catalog/parameters/prepare|\
+    /api/v1/creation/preflight|/api/v1/creation/workflows/prepare|\
+    /api/v1/creation/workflows/*/prepare-next) ;;
+    *) die 'Helper permits read/preparation only.'; return 1 ;;
+  esac
+  [[ ! -e "$output" ]] || { die 'Refusing to overwrite a response.'; return 1; }
+  code=$(curl --fail-with-body --silent --show-error --noproxy "*" \
+    --request POST "$API_URL$endpoint" --header "X-API-Key: $API_KEY" \
+    --header 'Content-Type: application/json' --data-binary "@$request" \
+    --output "$output" --write-out '%{http_code}') || {
+      die "Preparation failed; inspect private response: $output"; return 1;
+    }
+  [[ "$code" == 2?? ]] || { die 'Unexpected status; stop.'; return 1; }
+}
+new_review() {
+  KIND=$1 MODE=$2
+  case "$KIND:$MODE" in catalog:configuration|catalog:runtime|parameters:configuration|workflow:workflow) ;;
+    *) die 'Unknown review type.'; return 1 ;; esac
+  DIR="$BASE/$(date -u +%Y%m%dT%H%M%S)-$$-$RANDOM"
+  mkdir -- "$DIR"
+  REQUEST="$DIR/request.json"; PREVIEW="$DIR/preview.json"
+  printf 'Private review directory: %s\n' "$DIR"
+}
+read_catalog() {
+  get /api/v1/factory-catalog "$DIR/catalog.json" --data-urlencode "folder=$FOLDER"
+  jq -e '.contract_version == 1 and .mode == "catalog"' "$DIR/catalog.json" >/dev/null
+  REVISION=$(jq -er '.revision' "$DIR/catalog.json")
+}
+select_factory() {
+  read_catalog
+  jq '.factories | map({id,key,region,version_ref})' "$DIR/catalog.json"
+  read -r -p 'Exact factory UUID: ' FACTORY
+  jq -e --arg id "$FACTORY" '.factories | map(select(.id == $id)) |
+    if length == 1 then .[0] else error("Select exactly one listed factory") end' \
+    "$DIR/catalog.json" > "$DIR/factory.json"
+}
+select_scale() {
+  jq '.scale_sets | map({id,environment,suffix,tenant_id,subscription_id})' "$DIR/factory.json"
+  read -r -p 'Exact scale-set UUID: ' SCALE
+  jq -e --arg id "$SCALE" '.scale_sets | map(select(.id == $id)) |
+    if length == 1 then .[0] else error("Select exactly one listed scale") end' \
+    "$DIR/factory.json" > "$DIR/scale.json"
+  ENVIRONMENT=$(jq -er '.environment' "$DIR/scale.json")
+}
+select_project() {
+  jq '.projects | map({id,number,display_name,placements})' "$DIR/factory.json"
+  read -r -p 'Exact project UUID: ' PROJECT
+  jq -e --arg id "$PROJECT" '.projects | map(select(.id == $id)) |
+    if length == 1 then .[0] else error("Select exactly one listed project") end' \
+    "$DIR/factory.json" > "$DIR/project.json"
+}
+require_placement() {
+  jq -e --arg scale "$SCALE" --arg env "$ENVIRONMENT" \
+    'any(.placements[]; .scale_set_id == $scale and .environment == $env)' "$DIR/project.json" >/dev/null
+}
+new_scale() {
+  local output=$1 env=$2 suffix tenant subscription route cidr capacity
+  [[ "$env" =~ ^(dev|stage|prod)$ ]]
+  read -r -p "Unused $env suffix, 001 through 999: " suffix
+  [[ "$suffix" =~ ^[0-9]{3}$ && "$suffix" != 000 ]]
+  read -r -p 'Approved existing tenant UUID: ' tenant
+  read -r -p 'Approved existing subscription UUID: ' subscription
+  read -r -p 'Orchestrator (ado/gha): ' route
+  [[ "$route" =~ ^(ado|gha)$ ]]
+  read -r -p 'Approved non-overlapping VNet CIDR: ' cidr
+  read -r -p 'Approved project capacity (1 through 8): ' capacity
+  [[ "$capacity" =~ ^[1-8]$ ]]
+  jq -n --arg environment "$env" --arg suffix "$suffix" --arg tenant_id "$tenant" \
+    --arg subscription_id "$subscription" --arg orchestrator "$route" \
+    --arg cidr "$cidr" --argjson capacity "$capacity" \
+    '{$environment,$suffix,$tenant_id,$subscription_id,$orchestrator,
+      network:{vnet_cidr:$cidr,max_projects:$capacity}}' > "$output"
+}
+base_request() {
+  jq -n --arg folder "$FOLDER" --arg factory_id "$FACTORY" --arg action "$1" \
+    --arg expected_revision "$REVISION" \
+    '{contract_version:1,$folder,$factory_id,$action,$expected_revision}'
+}
+seal_review() {
+  jq -n --arg base_url "$API_URL" --arg kind "$KIND" --arg mode "$MODE" \
+    --arg request_sha256 "$(digest "$REQUEST")" --arg preview_sha256 "$(digest "$PREVIEW")" \
+    '{$base_url,$kind,$mode,$request_sha256,$preview_sha256}' > "$DIR/metadata.json"
+}
+check_review() {
+  [[ "$(jq -er '.base_url' "$DIR/metadata.json")" == "$API_URL" ]]
+  [[ "$(jq -er '.request_sha256' "$DIR/metadata.json")" == "$(digest "$REQUEST")" ]]
+  [[ "$(jq -er '.preview_sha256' "$DIR/metadata.json")" == "$(digest "$PREVIEW")" ]]
+  jq -e --arg phase "${1:-preview}" --slurpfile r "$REQUEST" --slurpfile m "$DIR/metadata.json" '
+    def future: sub("\\+00:00$";"Z") | sub("\\.[0-9]+Z$";"Z") | fromdateiso8601 > now;
+    . as $p | $r[0] as $b |
+    .contract_version == 1 and .can_execute == true and .blockers == [] and
+    (.confirmation_id | type == "string" and length > 0) and
+    (if $phase == "continue" then $m[0].kind == "workflow" and $b.approval_mode == "whole-workflow"
+     else (.expires_at | future) end) and
+    (if $m[0].kind == "workflow" then
+      (.workflow_id | type == "string" and length > 0) and
+      (.source_revision | test("^[a-f0-9]{64}$")) and (.input_hash | test("^[a-f0-9]{64}$")) and
+      (if $b.scope then .scope == $b.scope and .source_revision == $b.expected_revision
+       else .scope.folder == $b.folder and .workflow_id == $b.workflow_id end) and
+      (if $b.approval_mode == "whole-workflow" then
+        .review.workflow_authorization as $a |
+        $a.contract == "bounded-full-bootstrap-v1" and $a.workflow_id == .workflow_id and
+        $a.scope == .scope and $a.source_revision == .source_revision and
+        ($a.stages | length > 0) and ($a.expires_at | future) and
+        ($a.authorization_hash | test("^[a-f0-9]{64}$")) and
+        ($a.program_fingerprint | length > 0) and ($a.template_fingerprint | length > 0)
+       else .review.workflow_authorization == null end)
+    else
+      .operation_mode == $m[0].mode and .source_revision == $b.expected_revision and
+      (if $b.factory_id then .target.id == $b.factory_id else true end) and
+      (if $b.action == "configure-settings" or $b.action == "deploy" then
+        .factory_id == $b.factory_id and .scale_set_id == $b.scale_set_id and .project_id == $b.project_id
+       else true end) and
+      (if $b.action == "add-project" or $b.action == "add-project-placements" then
+        (if $b.action == "add-project" then $b.project.placements else $b.placements end) as $placements |
+        [$placements[] | select((.scale_set_id // "latest-successful") == "latest-successful")] as $auto |
+        if ($auto | length) == 0 then true else
+          (.capabilities | index("latest-successful-placement-v1") != null) and
+          (.resolved_placements | length) == ($auto | length) and
+          all($auto[]; .environment as $env |
+            [$p.resolved_placements[] | select(.environment == $env and .factory_id == $b.factory_id and
+              .selector == "latest-successful" and .evidence_kind == "recorded-verified-common-deployment" and
+              .version_ref == $p.target.version_ref and (.source_commit | test("^[a-f0-9]{40}$")) and
+              (.evidence_hash | test("^[a-f0-9]{64}$")))] | length == 1)
+        end
+       else true end)
+    end)' "$PREVIEW" >/dev/null
+}
+prepare() {
+  local endpoint
+  case "$KIND" in
+    catalog) endpoint=/api/v1/factory-catalog/prepare ;;
+    parameters) endpoint=/api/v1/factory-catalog/parameters/prepare ;;
+    workflow) endpoint=/api/v1/creation/workflows/prepare ;;
+  esac
+  post_prepare "$endpoint" "$REQUEST" "$PREVIEW"
+  show "$PREVIEW"
+  seal_review
+  check_review
+  printf 'STOP. Review and obtain approval. Keep this directory: %s\n' "$DIR"
+}
+```
+
+In your Bash shell:
+
+```bash
+source ./review_helpers.sh
+```
+
+Requests are created with `jq -n`/`--arg`/`--argjson`, never interpolated JSON
+strings. These local SHA-256 checks tie unchanged request and preview files to
+the host; they are **not** the server's canonical `input_hash` or a signature.
+Keep server hashes untouched. The server revalidates its saved request, owner,
+revision, expiry, target and one-time confirmation.
+
+## A. New factory, selected environments and project001
+
+Run one scenario at a time. This saves selected scale sets and owned-hub
+intent; it does not supply the complete VPN/network/bootstrap configuration.
+
+```bash
+new_review catalog configuration
+read_catalog
+jq -e '.factories | length == 0' "$DIR/catalog.json" >/dev/null
+read -r -p 'New unique factory key: ' FACTORY_KEY
+read -r -p 'Approved new prefix: ' PREFIX
+read -r -p 'Approved supported region: ' REGION
+read -r -p 'Approved registered version, main or supported 125+: ' VERSION
+read -r -p 'Selected environments separated by spaces, e.g. dev stage: ' ENVIRONMENTS
+read -r -a ENV_LIST <<< "$ENVIRONMENTS"
+[[ ${#ENV_LIST[@]} -gt 0 ]]
+for env in "${ENV_LIST[@]}"; do
+  [[ "$env" =~ ^(dev|stage|prod)$ ]]
+  [[ ! -e "$DIR/scale-$env.json" ]] || { die 'Select each environment once.'; exit 1; }
+  new_scale "$DIR/scale-$env.json" "$env"
+done
+jq -s '.' "$DIR"/scale-*.json > "$DIR/scales.json"
+read -r -p 'Project001 display name: ' NAME
+jq -n --arg folder "$FOLDER" --arg expected_revision "$REVISION" --arg factory_key "$FACTORY_KEY" \
+  --arg target_prefix "$PREFIX" --arg target_region "$REGION" --arg aifactory_version "$VERSION" \
+  --arg name "$NAME" --slurpfile scales "$DIR/scales.json" \
+  '{contract_version:1,$folder,action:"create-factory",$expected_revision,factory_kind:"ai",
+    $factory_key,$target_prefix,$target_region,$aifactory_version,scale_sets:$scales[0],
+    initial_project:{number:"001",display_name:$name,
+      placements:[$scales[0][] | {environment,suffix}]},
+    settings:{enableAIFactoryHub:true,centralDnsZoneByPolicyInHub:false}}' > "$REQUEST"
+prepare
+```
+
+**STOP** and use the separate confirmation block after configuration approval.
+Verify project001 and each selected placement; **do not add project001 again**.
+Saving Stage/Prod configuration or named GitHub environments does not deploy
+Stage/Prod. No tenant/subscription is created here.
+
+### Clone configuration instead
+
+```bash
+new_review catalog configuration
+select_factory
+read -r -p 'Approved new prefix: ' PREFIX
+read -r -p 'Approved target region: ' REGION
+read -r -p 'Copy project configuration (none/all): ' INCLUDE
+[[ "$INCLUDE" =~ ^(none|all)$ ]]
+jq -e --arg prefix "$PREFIX" --arg region "$REGION" \
+  '.prefix != $prefix or .region != $region' "$DIR/factory.json" >/dev/null
+base_request clone | jq --arg target_prefix "$PREFIX" --arg target_region "$REGION" \
+  --arg include_projects "$INCLUDE" '. + {$target_prefix,$target_region,$include_projects}' > "$REQUEST"
+prepare
+```
+
+**STOP** for separate confirmation. Cloning copies configuration, not deployed
+resources, data, models or credentials. Review new IDs, networking and bindings.
+
+## B. Add a scale set and optionally a project
+
+```bash
+new_review catalog configuration
+select_factory
+read -r -p 'New scale environment (dev/stage/prod): ' ENVIRONMENT
+new_scale "$DIR/new-scale.json" "$ENVIRONMENT"
+jq -e --slurpfile s "$DIR/new-scale.json" \
+  'all(.scale_sets[]; .environment != $s[0].environment or .suffix != $s[0].suffix)' \
+  "$DIR/factory.json" >/dev/null
+base_request create-scale-set | jq --slurpfile s "$DIR/new-scale.json" '. + {scale_sets:$s}' > "$REQUEST"
+prepare
+```
+
+**STOP**, approve and confirm the scale configuration first. It does not
+deploy VMSS or common resources. Then independently add a different project:
+
+```bash
+new_review catalog configuration
+select_factory
+select_scale
+read -r -p 'Unused project number (not project001 already created by A): ' NUMBER
+[[ "$NUMBER" =~ ^[0-9]{3}$ && "$NUMBER" != 000 ]]
+read -r -p 'Project display name: ' NAME
+base_request add-project | jq --arg number "$NUMBER" --arg display_name "$NAME" \
+  --arg environment "$ENVIRONMENT" --arg scale_set_id "$SCALE" \
+  '. + {project:{$number,$display_name,placements:[{$environment,$scale_set_id}]}}' > "$REQUEST"
+prepare
+```
+
+**STOP** for its own confirmation. The API validates number conflicts at the
+chosen placements and layout-2 project home.
+
+## C. Latest successful scale in an explicit environment
+
+This replaces B's project request; do not add the same project twice.
+Environment-only placement needs **newer API source, not yet the published
+baseline**. No environment is guessed.
+
+```bash
+new_review catalog configuration
+select_factory
+read -r -p 'Explicit environment (dev/stage/prod): ' ENVIRONMENT
+[[ "$ENVIRONMENT" =~ ^(dev|stage|prod)$ ]]
+read -r -p 'Unused project number: ' NUMBER
+[[ "$NUMBER" =~ ^[0-9]{3}$ && "$NUMBER" != 000 ]]
+read -r -p 'Project display name: ' NAME
+base_request add-project | jq --arg number "$NUMBER" --arg display_name "$NAME" \
+  --arg environment "$ENVIRONMENT" \
+  '. + {project:{$number,$display_name,placements:[{$environment}]}}' > "$REQUEST"
+prepare
+```
+
+**STOP**. Inspect the resolved UUID, tenant/subscription, source commit,
+completed job and `evidence_hash`, and check the project placement in `target`.
+The service selects from recorded successful **common** deployments for this
+factory/environment/version with capacity, not by highest suffix.
+
+<details markdown="1">
 <summary>More info</summary>
 
-`bootstrap prepare/start/status` uses `/api/v1/creation/bootstrap/*`;
-SDK methods are `bootstrap_prepare`, `bootstrap_start`, `bootstrap_job`.
-These are separate from registered `creation_workflow_*`.
-
-Get an **operator-reviewed full BootstrapPrepare JSON file** with `launcher`,
-`orchestrator` and complete `config` matching `BootstrapConfig` and capabilities.
-Its API-host `repo_root` must be a permitted new/empty destination.
-
-If you first need account/team defaults from an existing wizard state, the
-following optional step copies those defaults only; it does not deploy anything.
-Supply a real approved state JSON file. Its output is not a complete bootstrap
-configuration:
-
-```powershell
-$WizardStatePath = Read-Host 'Existing local JSON object containing approved wizard state'
-if (!(Test-Path -LiteralPath $WizardStatePath -PathType Leaf)) { throw 'Provide the actual state file.' }
-& $Python -m azurefactory bootstrap config --state-json $WizardStatePath --mapping-mode common-details
-if ($LASTEXITCODE -ne 0) { throw 'Configuration mapping failed.' }
-```
-
-Its SDK equivalent is `bootstrap_config(state, mapping_mode="common-details")`;
-REST uses `POST /api/v1/creation/bootstrap/config`. Merge only reviewed account
-defaults into the independent new-factory request.
-
-Then prepare the complete, separately reviewed launcher request:
-
-```powershell
-$LauncherRequestPath = Read-Host 'Existing local reviewed legacy BootstrapPrepare JSON path'
-if (!(Test-Path -LiteralPath $LauncherRequestPath -PathType Leaf)) { throw 'Provide the real request.' }
-$LauncherReceiptPath = Join-Path $ReviewRoot ('launcher-' + [guid]::NewGuid().ToString('N') + '.json')
-& $Python -m azurefactory bootstrap prepare --request-json $LauncherRequestPath `
-    --save-receipt $LauncherReceiptPath
-if ($LASTEXITCODE -ne 0) { throw 'Legacy bootstrap preview blocked.' }
-```
-
-**STOP — this can provision common infrastructure and the initial project, create
-identities/repositories, commit/push and dispatch pipelines.** Only after approval:
-
-```powershell
-& $Python -m azurefactory bootstrap start --receipt $LauncherReceiptPath --yes
-if ($LASTEXITCODE -ne 0) { throw 'Inspect bootstrap outcome; do not repeat start.' }
-$LauncherJobId = Read-Host 'Exact returned bootstrap job ID'
-& $Python -m azurefactory bootstrap status --job-id $LauncherJobId --wait --poll-timeout 300
-if ($LASTEXITCODE -ne 0) { throw 'Inspect outcome; timeout is not cancellation.' }
-```
+For an API supporting only the explicit selector, deliberately construct
+`placements:[{$environment,scale_set_id:"latest-successful"}]` instead, before
+preparing. An older host can return HTTP 422; do not switch selectors as an
+automatic retry. The same placement objects are top-level for
+`add-project-placements`, nested in `project` for `add-project`. No eligible
+scale means stop; confirmation never silently substitutes another scale.
 
 </details>
 
-## F. APIM, Kong, AI Gateway SKU and Application Gateway
+## D. Stage/Prod placement, not captured promotion
 
-**Not implemented:** one command or API option to choose APIM versus Kong.
-These examples do not provide a gateway deployment method or a complete
-hub/gateway setup. For existing APIM settings, check the selected version's
-available parameters and follow E; that is not a Kong switch.
+Executing a captured successful Dev configuration/version through Stage and
+Prod is **not implemented**. Save an explicit target placement, then review
+target parameters and deployment separately.
 
-These gateway settings default to disabled:
+```bash
+new_review catalog configuration
+select_factory
+select_scale
+select_project
+[[ "$ENVIRONMENT" =~ ^(stage|prod)$ ]]
+jq -e --arg env "$ENVIRONMENT" 'all(.placements[]; .environment != $env)' "$DIR/project.json" >/dev/null
+base_request add-project-placements | jq --arg project_id "$PROJECT" \
+  --arg environment "$ENVIRONMENT" --arg scale_set_id "$SCALE" \
+  '. + {$project_id,placements:[{$environment,$scale_set_id}]}' > "$REQUEST"
+prepare
+```
 
-| JSON/YAML name | GHA environment name |
+**STOP** for confirmation. Prod needs a separate target review; this does not
+require Stage success. `version_ref` chooses code, not captured settings,
+data, models or success.
+
+## E. Typed parameters and scoped settings
+
+This parameter example targets a placed project; for common-only parameters,
+omit project selection and `project_id` from the read/request.
+
+```bash
+new_review parameters configuration
+select_factory
+select_scale
+select_project
+require_placement
+get /api/v1/factory-catalog/parameters "$DIR/parameters.json" \
+  --data-urlencode "folder=$FOLDER" --data-urlencode "factory_id=$FACTORY" \
+  --data-urlencode "scale_set_id=$SCALE" --data-urlencode "project_id=$PROJECT"
+show "$DIR/parameters.json"
+jq -e '.requires_profile_reset == false' "$DIR/parameters.json" >/dev/null
+read -r -p 'Exact template name from the response: ' TEMPLATE
+read -r -p 'Exact non-secret field name: ' FIELD
+jq -e --arg t "$TEMPLATE" --arg f "$FIELD" \
+  '[.templates[] | select(.template == $t) | .fields[] | select(.name == $f and .sensitive == false)] |
+   length == 1' "$DIR/parameters.json" >/dev/null
+read -r -p 'Edit (set/unset): ' EDIT
+[[ "$EDIT" =~ ^(set|unset)$ ]]
+VALUE=null
+if [[ "$EDIT" == set ]]; then read -r -p 'Approved JSON value; no secrets: ' VALUE; fi
+jq -n --arg folder "$FOLDER" --arg factory_id "$FACTORY" --arg scale_set_id "$SCALE" \
+  --arg project_id "$PROJECT" --slurpfile schema "$DIR/parameters.json" \
+  --arg template "$TEMPLATE" --arg field "$FIELD" --arg edit "$EDIT" --argjson value "$VALUE" \
+  '{contract_version:1,$folder,$factory_id,$scale_set_id,$project_id,
+    expected_revision:$schema[0].source_revision,schema_revision:$schema[0].schema_revision,
+    templates:[{template:$template,
+      parameters:(if $edit == "set" then {($field):$value} else {} end),
+      unset:(if $edit == "unset" then [$field] else [] end)}]}' > "$REQUEST"
+prepare
+```
+
+**STOP** for parameter confirmation. `unset` removes an override, not a
+resource; inherited/default values may apply. Do not reset the entire
+scale-set parameter profile just to bypass an error.
+
+For a scale-level settings replacement, use this separate scenario:
+
+```bash
+new_review catalog configuration
+select_factory
+select_scale
+get /api/v1/factory-catalog/settings "$DIR/settings.json" \
+  --data-urlencode "folder=$FOLDER" --data-urlencode "factory_id=$FACTORY" --data-urlencode "scale_set_id=$SCALE"
+show "$DIR/settings.json"
+read -r -p 'Exact editable field_key: ' FIELD
+jq -e --arg f "$FIELD" '.field_keys | index($f) != null' "$DIR/settings.json" >/dev/null
+read -r -p 'Approved non-null scalar JSON replacement; no secrets: ' VALUE
+jq -en --argjson value "$VALUE" '$value | type | . == "string" or . == "number" or . == "boolean"' >/dev/null
+REVISION=$(jq -er '.revision' "$DIR/settings.json")
+base_request configure-settings | jq --arg scale_set_id "$SCALE" --arg field "$FIELD" --argjson value "$VALUE" \
+  '. + {$scale_set_id,settings:{($field):$value}}' > "$REQUEST"
+prepare
+```
+
+**STOP** before catalog confirmation. For factory scope omit `scale_set_id`
+from both read and request; for project scope select a placed project and add
+its `project_id` to both. Omitted settings stay unchanged; `null` is not a
+general unset. Shared `stage_prod` settings affect both Stage and Prod.
+Disabling a flag does not delete resources.
+
+## Confirm one approved review — never automatically
+
+This block supports the catalog/parameters scenarios and registered workflow
+reviews below. It requires the saved directory, unchanged files and explicit
+matching approval. **Plain REST previews are not CLI/SDK receipt files.**
+In a new shell, source the setup again, using the **same owning API and key**.
+
+```bash
+read -r -p 'Private directory containing the exact reviewed request, preview and metadata: ' DIR
+REQUEST="$DIR/request.json"; PREVIEW="$DIR/preview.json"
+KIND=$(jq -er '.kind' "$DIR/metadata.json")
+MODE=$(jq -er '.mode' "$DIR/metadata.json")
+check_review
+show "$REQUEST"
+show "$PREVIEW"
+read -r -p 'After reviewing and obtaining approval, paste this confirmation_id: ' APPROVED
+[[ "$APPROVED" == "$(jq -er '.confirmation_id' "$PREVIEW")" ]]
+[[ ! -e "$DIR/confirmation-attempted" ]] || { die 'A write was already attempted. Inspect state; do not resend.'; exit 1; }
+case "$KIND:$MODE" in
+  catalog:configuration|catalog:runtime|parameters:configuration)
+    ENDPOINT=/api/v1/factory-catalog/confirm
+    [[ "$KIND" != parameters ]] || ENDPOINT=/api/v1/factory-catalog/parameters/confirm
+    jq -n --slurpfile r "$REQUEST" --arg confirmation_id "$APPROVED" \
+      '{contract_version:1,folder:$r[0].folder,$confirmation_id}' > "$DIR/confirm.json"
+    ;;
+  workflow:workflow)
+    ENDPOINT=/api/v1/creation/workflows/start
+    jq -n --slurpfile p "$PREVIEW" --arg confirmation_id "$APPROVED" \
+      '{folder:$p[0].scope.folder,workflow_id:$p[0].workflow_id,$confirmation_id} +
+       (if $p[0].review.workflow_authorization then
+         {authorization_hash:$p[0].review.workflow_authorization.authorization_hash} else {} end)' > "$DIR/confirm.json"
+    ;;
+  *) die 'Wrong review kind/mode.'; exit 1 ;;
+esac
+(set -o noclobber; printf '%s\n' 'Inspect server state before any further write.' > "$DIR/confirmation-attempted")
+CODE=$(curl --fail-with-body --silent --show-error --noproxy "*" \
+  --request POST "$API_URL$ENDPOINT" --header "X-API-Key: $API_KEY" \
+  --header 'Content-Type: application/json' --data-binary "@$DIR/confirm.json" \
+  --output "$DIR/result.json" --write-out '%{http_code}') || {
+    die 'Failed/uncertain confirmation. Inspect server state, do not resend.'; exit 1;
+  }
+[[ "$CODE" == 2?? ]] || { die 'Unexpected response. Inspect state, do not resend.'; exit 1; }
+show "$DIR/result.json"
+if [[ "$KIND" == workflow ]]; then
+  jq -e --slurpfile p "$PREVIEW" '.contract_version == 1 and
+    .workflow_id == $p[0].workflow_id and .scope == $p[0].scope' "$DIR/result.json" >/dev/null
+elif [[ "$MODE" == configuration ]]; then
+  jq -e '.contract_version == 1 and (.catalog | type == "object") and .job == null' "$DIR/result.json" >/dev/null
+  FOLDER=$(jq -er '.folder' "$REQUEST")
+  get /api/v1/factory-catalog "$DIR/readback.json" --data-urlencode "folder=$FOLDER"
+  show "$DIR/readback.json"
+else
+  jq -e --slurpfile r "$REQUEST" '.contract_version == 1 and (.job | type == "object") and
+    .job.factory_id == $r[0].factory_id and .job.scale_set_id == $r[0].scale_set_id and
+    .job.project_id == $r[0].project_id' "$DIR/result.json" >/dev/null
+fi
+```
+
+Verify saved IDs and changes in readback, and re-read settings/parameters when
+changed. Any unexpected response means inspect state, **not repeat the write**.
+
+## Separate runtime deployment
+
+Choose common-only or a placed project. Omitting a project does **not** deploy
+every project. Common-only/GHA/shared-remote routes need compatible runtime
+support; do not change routes to bypass a blocker.
+
+```bash
+new_review catalog runtime
+select_factory
+select_scale
+read -r -p 'Deployment target (common/project): ' TARGET
+[[ "$TARGET" =~ ^(common|project)$ ]]
+PROJECT=''
+if [[ "$TARGET" == project ]]; then select_project; require_placement; fi
+read -r -p 'Explicit approved runtime code version/reference: ' VERSION
+[[ -n "$VERSION" ]]
+base_request deploy | jq --arg scale_set_id "$SCALE" --arg project "$PROJECT" --arg version_ref "$VERSION" \
+  '. + {$scale_set_id,$version_ref} + (if $project != "" then {project_id:$project} else {} end)' > "$REQUEST"
+prepare
+```
+
+**STOP** for distinct deployment approval before using the confirmation block.
+After confirmation, with `DIR` still pointing to that runtime review:
+
+```bash
+FOLDER=$(jq -er '.folder' "$REQUEST")
+JOB=$(jq -er '.job.id' "$DIR/result.json")
+[[ "$JOB" =~ ^[a-f0-9-]{36}$ ]]
+STATUS="$DIR/job-$(date -u +%Y%m%dT%H%M%S)-$RANDOM.json"
+get "/api/v1/factory-catalog/jobs/$JOB" "$STATUS" --data-urlencode "folder=$FOLDER"
+show "$STATUS"
+jq -e --slurpfile r "$REQUEST" --arg id "$JOB" '.id == $id and
+  .factory_id == $r[0].factory_id and .scale_set_id == $r[0].scale_set_id and
+  .project_id == $r[0].project_id' "$STATUS" >/dev/null
+TERMINAL="$DIR/terminal-$(date -u +%Y%m%dT%H%M%S)-$RANDOM.json"
+get /api/v1/factory-catalog/terminal "$TERMINAL" --data-urlencode "folder=$FOLDER" \
+  --data-urlencode "job_id=$JOB" --data-urlencode 'cursor=0'
+show "$TERMINAL"
+```
+
+Repeat only these **GETs** as needed, using the returned terminal cursor for
+later output. Check pipeline results, exact version and target, not merely a
+queued job or completed local command. A timeout is not cancellation.
+
+## Registered Full bootstrap
+
+**Conditional/blocked**: first read the [shared requirements](#registered-full-bootstrap).
+This can provision resources, identities, networks, runners and repositories,
+publish Git changes and start pipelines. Supply complete reviewed configuration,
+not A's short settings object.
+
+```bash
+new_review workflow workflow
+get /api/v1/creation/capabilities "$DIR/capabilities.json"
+get /openapi.json "$DIR/openapi.json"
+show "$DIR/capabilities.json"
+select_factory
+select_scale
+select_project
+require_placement
+[[ "$ENVIRONMENT" == dev ]]
+read -r -p 'Existing client-local JSON file containing complete reviewed bootstrap_config: ' CONFIG
+jq -e --slurpfile s "$DIR/scale.json" --slurpfile p "$DIR/project.json" '
+  .subscription_id == $s[0].subscription_id and .tenant_id == $s[0].tenant_id and
+  .scale_set_number == $s[0].suffix and .project_number == $p[0].number and
+  ([.repo_root,.team_member_email,.team_group_name] | all(.[]; type == "string" and length > 0))' "$CONFIG" >/dev/null
+read -r -p 'Approval mode (per-stage/whole-workflow): ' APPROVAL_MODE
+[[ "$APPROVAL_MODE" =~ ^(per-stage|whole-workflow)$ ]]
+jq -n --arg folder "$FOLDER" --arg factory_id "$FACTORY" --arg scale_set_id "$SCALE" \
+  --arg project_id "$PROJECT" --arg expected_revision "$REVISION" --arg approval_mode "$APPROVAL_MODE" \
+  --slurpfile config "$CONFIG" \
+  '{contract_version:1,operation:"create-factory",execution_mode:"privileged-bootstrap",
+    creation_mode:"full-bootstrap",$approval_mode,$expected_revision,
+    scope:{$folder,$factory_id,$scale_set_id,$project_id},bootstrap_config:$config[0]}' > "$REQUEST"
+jq --slurpfile s "$DIR/scale.json" \
+  '{contract_version,scope,expected_revision,bootstrap_config,orchestrator:$s[0].orchestrator}' \
+  "$REQUEST" > "$DIR/preflight-request.json"
+post_prepare /api/v1/creation/preflight "$DIR/preflight-request.json" "$DIR/preflight.json"
+show "$DIR/preflight.json"
+jq -e '.contract_version == 1 and .kind == "deployment-preflight" and .read_only == true and
+  .authorization == false and .ready == true and .status == "ready"' "$DIR/preflight.json" >/dev/null
+prepare
+```
+
+**STOP**. Preflight reads provider state; it approves no deployment. Cost
+estimates are not spending limits. In per-stage mode review the current stage.
+In optional whole-workflow mode review all listed stages, scope, fingerprints,
+expiry and `authorization_hash`. Then use the separate confirmation block,
+which sends the strict workflow-start body **without** catalog-only fields.
+
+Read workflow status after start, or later from its saved review directory:
+
+```bash
+WORKFLOW=$(jq -er '.workflow_id' "$PREVIEW")
+FOLDER=$(jq -er '.scope.folder' "$PREVIEW")
+[[ "$WORKFLOW" =~ ^[a-f0-9-]{36}$ ]]
+STATUS="$DIR/workflow-status-$(date -u +%Y%m%dT%H%M%S)-$RANDOM.json"
+get "/api/v1/creation/workflows/$WORKFLOW" "$STATUS" --data-urlencode "folder=$FOLDER"
+show "$STATUS"
+jq -e --slurpfile p "$PREVIEW" '.workflow_id == $p[0].workflow_id and .scope == $p[0].scope' "$STATUS" >/dev/null
+```
+
+For per-stage mode **only when status reports `requires_review: true`**,
+prepare another review:
+
+```bash
+jq -e '.requires_review == true' "$STATUS" >/dev/null
+new_review workflow workflow
+jq -n --arg folder "$FOLDER" --arg workflow_id "$WORKFLOW" '{$folder,$workflow_id}' > "$REQUEST"
+jq '{folder}' "$REQUEST" > "$DIR/next-body.json"
+post_prepare "/api/v1/creation/workflows/$WORKFLOW/prepare-next" "$DIR/next-body.json" "$PREVIEW"
+seal_review
+check_review
+show "$PREVIEW"
+printf 'STOP. Review the new stage before confirmation: %s\n' "$DIR"
+```
+
+**STOP again** before using the confirmation block. The local request records
+the workflow ID for review; the strict `/prepare-next` body sends only `folder`.
+Do not automate stage approvals.
+
+For bounded whole-workflow mode, resume **only if the server reports safe
+continuation of the existing approval**. Use the original review directory;
+this is not a retry of a running, failed or uncertain stage.
+
+```bash
+read -r -p 'Original approved whole-workflow review directory: ' DIR
+REQUEST="$DIR/request.json"; PREVIEW="$DIR/preview.json"
+check_review continue
+jq -e '.approval_mode == "whole-workflow"' "$REQUEST" >/dev/null
+WORKFLOW=$(jq -er '.workflow_id' "$PREVIEW")
+FOLDER=$(jq -er '.scope.folder' "$PREVIEW")
+STATUS="$DIR/before-continue-$(date -u +%Y%m%dT%H%M%S)-$RANDOM.json"
+get "/api/v1/creation/workflows/$WORKFLOW" "$STATUS" --data-urlencode "folder=$FOLDER"
+show "$STATUS"
+read -r -p 'After checking safe continuation, type CONTINUE: ' ANSWER
+[[ "$ANSWER" == CONTINUE ]]
+[[ ! -e "$DIR/continue-attempted" ]] || { die 'Inspect the earlier continuation outcome; do not resend.'; exit 1; }
+jq '{folder:.scope.folder,authorization_hash:.review.workflow_authorization.authorization_hash}' \
+  "$PREVIEW" > "$DIR/continue.json"
+(set -o noclobber; printf '%s\n' 'Inspect server state before another write.' > "$DIR/continue-attempted")
+CODE=$(curl --fail-with-body --silent --show-error --noproxy "*" \
+  --request POST "$API_URL/api/v1/creation/workflows/$WORKFLOW/continue" \
+  --header "X-API-Key: $API_KEY" --header 'Content-Type: application/json' \
+  --data-binary "@$DIR/continue.json" --output "$DIR/continue-result.json" --write-out '%{http_code}') || {
+    die 'Failed/uncertain continuation; inspect state, do not repeat.'; exit 1;
+  }
+[[ "$CODE" == 2?? ]]
+show "$DIR/continue-result.json"
+```
+
+<details markdown="1">
+<summary>Alternative and Legacy ways</summary>
+
+There is no REST equivalent for local enrollment provisioning. An approved
+binding candidate can use generic catalog `action: "configure-binding"`,
+then its own catalog review/confirmation; that only saves the connection.
+
+Legacy configuration uses `/api/v1/projects/load` with exact folder/project,
+`/api/v1/validation`, then `/api/v1/export` without a destination for review.
+Separately approved `/api/v1/projects/save` saves configuration, not deployment.
+Preserve `_json_source`; `/startup/load` is only a hint.
+Legacy deployment uses `/api/v1/operations/project-deployments/plan`,
+`/prepare`, separately approved `/start`, then `/terminal`. It requires
+deployment contract 2; `submitted` is local launcher completion, not Azure
+success. Older launcher bootstrap uses `/api/v1/creation/bootstrap/*`,
+not `/api/v1/creation/workflows/*`. Neither route bypasses registered blockers.
+See the [published API examples and contracts](../../../environment_setup/install_config_wizard/api-usage-examples/readme.md).
+
+</details>
+
+</details>
+<!-- /factory-tool -->
+
+<a id="registered-full-bootstrap"></a>
+
+## Full bootstrap requirements
+
+Registered Full bootstrap deploys its selected initial **Dev** target. Saving
+Stage/Prod configurations is not a three-environment deployment. Start from the
+already saved factory; do not recreate it. Local checks and preflight cannot
+guarantee Azure permissions, networking or eventual success.
+
+For an **owned integrated hub/VPN**, review `setup_hub_access: true`,
+`access_hub_mode: "integrated"`, Dev VNet CIDR, `vpn_client_cidr`, network/DNS
+ownership, region/subscription, project001, repository, identity and runner.
+Integrated mode does not need an invented second hub VNet; external hub is
+different. **This does not install a VPN client or verify workstation access.**
+Hosted runners still need suitable private-network connectivity.
+
+<details markdown="1">
+<summary>More info</summary>
+
+Read `bootstrap_fields` and `BootstrapConfig` / `WorkflowBootstrapConfig` /
+`CreationWorkflowPrepare` in the **live** capabilities/OpenAPI. Required settings
+include `subscription_id`, `tenant_id`, `scale_set_number`, `repo_root`,
+`team_member_email`, `team_group_name`. An existing group ID does not remove
+required team name/email fields. GHA needs its repository details; ADO needs its
+organization/project/repository/service connection and connected tenant.
+
+Choose `coordination_mode` deliberately. `single-writer` needs a private
+repository and an administrator-approved exclusive-writer arrangement; `blob`
+has additional coordination/network requirements. Do not change an existing
+binding's mode to bypass a blocker. `review.workflow_authorization` uses
+`bounded-full-bootstrap-v1`; changed inputs, expiry, failure or uncertainty
+require stopping to inspect the state. No automatic approval/retry loops.
+
+The limited DeveloperBastion handoff in API source `3c5694c` uses deployment
+receipts and verified runner associations. It **does not unblock Full bootstrap**.
+The native prerequisite handoff supplies `verified_observations_hash`, not concrete
+post-success resource bodies. Unproven DNS, gateway, service association links
+(SAL) and additional Bastion fields remain blocked. This does not change a frozen
+runtime source pin or certify an installed host.
+
+</details>
+
+<a id="c-explicit-latest-successful-placement"></a>
+<a id="catalog-settings--generic-access-only"></a>
+
+<details markdown="1">
+<summary>More info</summary>
+
+The historical settings anchor above is retained for links; scoped settings now
+have named CLI/SDK preparation and typed receipts. Other advanced actions remain
+**generic-access only**, with separately reviewed prepare/confirm:
+
+| Action / endpoint | Boundary |
+|---|---|
+| `migrate` | Register a legacy root or copy it to a separate empty modern `folder` using `source_folder`. Preserve UUIDs/source files. Never allow both copies to independently modify the same Azure targets. Registration does not prove ownership of existing resources. |
+| `correct-draft-scale-identity` | Exact factory/scale IDs, revision and `draft_identity` tenant/subscription UUIDs. Eligible empty drafts only; bindings, ownership, placements or previous execution block it. This does not move resources. |
+| `configure-binding` | Exact factory and typed `RuntimeBinding`; review repository, runner, identity, roles and coordination settings. Saving a connection is not deployment. |
+| `/api/v1/creation/prepare` and separately `/confirm` | Registered creation API, not the legacy bootstrap launcher. Use live schemas rather than inventing a friendly wrapper or receipt operation. |
+
+Generic catalog actions use `/api/v1/factory-catalog/prepare` then separately
+approved `/confirm`. Follow the [published factory scope contract](https://github.com/jostrm/azure-aifactory-config/blob/d52463f/docs/API.md)
+and installed OpenAPI. Never pass a plain preview as a typed SDK/CLI receipt.
+Catalog reads use `revision`; parameter reads/previews use `source_revision`.
+
+</details>
+
+## APIM, Kong, MCP/AI Gateway and Application Gateway
+
+**Not implemented:** a unified deployment choice between APIM and Kong.
+For existing APIM settings, use only the chosen version's published parameter
+schema. There is no `gateway_deploy` SDK method or invented gateway CLI option.
+
+**Conditional/blocked:** newer source has optional ADO/GHA component pipeline
+support for **project001 Dev**: host the read-only Factory MCP, create/adopt an
+AI Gateway and register its MCP tool server, given required images, identity and
+private networking. Saving flags changes configuration only. An approved pipeline
+run is separate; setting a flag to false skips a step, **not resource deletion**.
+
+<details markdown="1">
+<summary>More info</summary>
+
+| JSON/YAML setting (default disabled) | GHA environment name |
 |---|---|
 | `enableAIFactoryMCP` | `ENABLE_AI_FACTORY_MCP` |
 | `enableAIGatewaySKU` | `ENABLE_AI_GATEWAY_SKU` |
 | `addAIFactoryMCP2AIGatewaySKU` | `ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU` |
 
-**Conditional/blocked:** newer source adds legacy `config review` / `config save`
-options and optional ADO/GHA pipeline steps for **project001 Dev**. With the
-required images, identity and private networking, these can host the read-only
-Factory MCP, create/adopt an AI Gateway and register its MCP tool server.
-**Saving the flags only changes configuration. Starting the approved pipeline is
-separate. Setting a flag to false skips the new step; it does not delete resources.**
+Accelerator `81ec23d6` added configuration-only flags; `cf8437af` added the component
+pipeline support. API `08b17ce` adds corresponding partial support, not universal
+host/runtime parity or Kong selection. The old "no pipeline bindings" statement
+does not apply to main after `cf8437af`. See the
+[component contract](https://github.com/jostrm/azure-enterprise-scale-ml/blob/cf8437af/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md)
+and [options reference](https://github.com/jostrm/azure-enterprise-scale-ml/blob/cf8437af/environment_setup/azurefactory-cli/readme.md#mcp--ai-gateway-options-project001-dev).
+If a flag is missing from the live `field_keys`/parameter schema, do not force it.
 
-This still does not add an APIM-versus-Kong choice. If the live `field_keys` or
-parameter schema does not list a flag, it is **not supported there**. Do not force
-unknown settings or invent CLI options.
-
-<details>
-<summary>More info</summary>
-
-The original `81ec23d6` change added configuration-only flags. The later
-`cf8437af` commit added the component pipeline support described above. See the
-[component contract at that source revision](https://github.com/jostrm/azure-enterprise-scale-ml/blob/cf8437af/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md)
-and [CLI options](https://github.com/jostrm/azure-enterprise-scale-ml/blob/cf8437af/environment_setup/azurefactory-cli/readme.md#mcp--ai-gateway-options-project001-dev).
-The earlier claim that these flags have no pipeline bindings applies only to the
-older `81ec23d6` version, not to main after `cf8437af`.
-
-This does not prove your installed API supports every REST/SDK field, implement
-Kong selection or give permission to change a source pin.
+**Azure Application Gateway is different.** Creation input
+`enable_application_gateway` exists, but its registered workflow deployment is
+blocked/unimplemented. Accepting an input does not implement its deployment.
 
 </details>
-
-**Azure Application Gateway is different from APIM/Kong/AI Gateway.**
-The creation input `enable_application_gateway` exists, but the registered
-workflow blocks it: that workflow does not implement its deployment.
-Accepting the setting does not mean Application Gateway can be deployed this way.
-
-For deleting resources, keeping shared hub/VPN resources and recovering from
-uncertain results, continue with [20](20-cli-and-api-and-usage.md).
-Changing a setting does not bypass deletion safety checks.
 
 <a id="evidence-version-boundaries-and-validation"></a>
 
-## Sources, versions and checks
-
-**Check your installed version before using an example.** The actual API's
-capabilities and supported request fields matter. Documentation checks do not
-prove that your permissions, networking or deployment will work.
-
-<details>
+<details markdown="1">
 <summary>More info</summary>
 
-Current source/tests and the actual host's OpenAPI and capabilities define
-supported behavior. A graph, slide or saved catalog cannot prove deployment.
-This guide was checked against original API/accelerator sources and the
-explicitly approved publication copies at API `d52463f` and accelerator
-`eb077742` (including the earlier `81ec23d6` gateway configuration change).
-The gateway section also covers the later published `cf8437af` changes.
-The named settings, clone/add and removal wrappers are checked against accelerator
-`0da0d85b`. Environment-only placement is implemented in newer API source, not
-yet the published API baseline; it needs the updated API installed on the chosen
-host. An older API may reject the omitted scale-set ID with HTTP 422. Other
-examples keep their stated version checks; captured promotion remains unavailable.
-The separate offline consumer harness is at `56a324b`. The frozen external accelerator
-source pin was **not changed**. Installed packages and selected immutable runtime
-releases can lag or differ; no live provisioning/installation was performed.
+The named helpers and receipts here were checked against accelerator main-based
+source `300234cd`, including the earlier `0da0d85b` helper changes. Environment-only
+placement requires newer API source and is not yet the published API default;
+older APIs may return 422. Captured-project backend capture/review is in progress,
+not published executable promotion. Selected immutable runtimes, API builds and
+installed SDK packages can differ; check the actual host before proceeding.
 
-Source and test references:
+References:
 
-- [CLI parser and dispatch](../../../environment_setup/azurefactory-cli/src/azurefactory/cli.py),
-  [supported client methods](../../../environment_setup/azurefactory-cli/src/azurefactory/client.py),
-  [receipt/placement validation](../../../environment_setup/azurefactory-cli/src/azurefactory/review.py),
-  [CLI tests](../../../environment_setup/azurefactory-cli/tests) and
-  [canonical reference](../../../environment_setup/azurefactory-cli/readme.md).
-- [API request examples and contracts](../../../environment_setup/install_config_wizard/api-usage-examples/readme.md),
-  [scenario JSON](../../../environment_setup/install_config_wizard/api-usage-examples/scenarios.json)
-  and [canonical factory scope contract](https://github.com/jostrm/azure-aifactory-config/blob/d52463f/docs/API.md).
-- In the separate API checkout (`$ApiRoot`): `docs\API.md`, `docs\openapi.json`,
-  `src\factory_catalog_models.py` (`CatalogPrepare`, `CatalogSummary`),
-  `src\catalog_parameter_models.py`, `src\catalog_settings.py`,
-  `src\creation.py`, `src\creation_workflow_models.py`,
-  `src\creation_workflows.py`, `src\creation_workflow_authorization.py`,
-  and `src\project_deployments.py`. These repository-relative paths are not
-  assumed to exist beneath the accelerator.
-- API tests: `tests\test_catalog_auto_placement.py`,
-  `tests\test_catalog_parameters.py`, `tests\test_creation_workflows.py`,
-  `tests\test_creation_workflow_authorization.py`,
-  `tests\test_project_deployments.py`; architecture notes
-  `docs\architecture\patterns\Review-and-authorization.md` and
-  `docs\architecture\contracts\API-and-external-clients.md`.
-- Published gateway references:
-  `environment_setup\unit-tests\test-bicep\unit\test_mcp_ai_gateway_flags.py`,
-  template variables and `documentation\gh-io\docs\parameters\advanced.md`
-  in the approved published accelerator source. Older local checkouts may not
-  contain that published delta.
+- [Canonical CLI/SDK reference](../../../environment_setup/azurefactory-cli/readme.md),
+  [client](../../../environment_setup/azurefactory-cli/src/azurefactory/client.py),
+  [request builders](../../../environment_setup/azurefactory-cli/src/azurefactory/catalog_requests.py),
+  [receipt validation](../../../environment_setup/azurefactory-cli/src/azurefactory/review.py),
+  [CLI tests](../../../environment_setup/azurefactory-cli/tests).
+- [Published API examples](../../../environment_setup/install_config_wizard/api-usage-examples/readme.md)
+  and [API baseline contract](https://github.com/jostrm/azure-aifactory-config/blob/d52463f/docs/API.md).
 
-The limited graph lookup reported original API fingerprint `de669aa8…` (566 files)
-and ESML snapshot `ae9853f9…` (1,653 files, 23 partial-syntax files), current/fresh
-at retrieval. Graph links help find source files; they do not verify running
-deployments. Some links and older architecture notes remain incomplete or uncertain.
-No full graph/vault or cloud connector was loaded. Source/model/parser checks
-validate documentation shape only; they do not validate real customer values,
-permissions, networking, installed versions or deployment outcomes.
+Offline syntax/model checks validate the examples' shape, not real customer
+values, installed features, permissions, networks or deployment outcomes.
+No installation, Azure operation, pipeline dispatch, source-pin change, commit
+or push is part of preparing this documentation.
 
 </details>
+
+For removing resources, preserving shared hub/VPN resources or recovering from
+uncertainty, continue with [20 — removal and recovery](20-cli-and-api-and-usage.md).

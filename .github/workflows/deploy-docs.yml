@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - 'documentation/gh-io/**'
+      - 'documentation/v2/10-19/18-cli-and-api-and-usage.md'
+      - 'documentation/v2/10-19/19-cli-and-api-and-usage.md'
+      - 'documentation/v2/10-19/20-cli-and-api-and-usage.md'
       - 'bootstrap/**'
       - 'environment_setup/aifactory/variables.json'
       - 'environment_setup/aifactory/bicep/copy_to_local_settings/**'

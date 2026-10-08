@@ -56,8 +56,15 @@ markdown_extensions:
 plugins:
   - search
 
+hooks:
+  - tools/factory_guides.py
+
 nav:
   - Overview: index.md
+  - Factory tools:
+      - Get started: factory-tools/18-cli-and-api-and-usage.md
+      - Add and update: factory-tools/19-cli-and-api-and-usage.md
+      - Remove and recover: factory-tools/20-cli-and-api-and-usage.md
   - Parameters:
       - Configuration and API: parameters/index.md
       - Required inputs: parameters/standard.md

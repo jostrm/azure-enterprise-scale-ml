@@ -1,471 +1,435 @@
-# 18. Get started with the Factory CLI, Python SDK or REST API
+# 18. Get started with Factory tools
 
 [19: Add and update](19-cli-and-api-and-usage.md) |
 [20: Remove and recover](20-cli-and-api-and-usage.md)
 
-This guide starts with the **new registered Azure Factory** approach. Try the
-connection examples below before creating or changing a factory.
+Choose one tool below. The whole tutorial changes with your choice on the
+[documentation site](https://jostrm.github.io/azure-enterprise-scale-ml/factory-tools/18-cli-and-api-and-usage/).
+GitHub's Markdown viewer provides expandable tool sections instead of interactive tabs.
 
-## Choose the tool that suits you
+**This quick connection check does not create Azure resources, deploy or delete.**
+It uses the new registered Azure Factory approach and an empty local folder.
+You need the prepared API and accelerator source folders from your platform team.
 
-All three tools use the same Factory service. You do not need to learn all three.
+## Choose your tool
 
-| If you want to... | Choose | What it means |
-| --- | --- | --- |
-| Type commands in a terminal | **CLI** | Ready-made commands, such as `azurefactory factory create`. Start here if you are unsure. |
-| Write a Python script | **Python SDK** | Python helpers that send your requests to the Factory service. |
-| Connect another application or language | **REST API** | Send requests directly to the Factory service using HTTP. The example uses `curl.exe`. |
+<details markdown="1" data-factory-tool="CLI (PowerShell)">
+<summary>CLI (PowerShell)</summary>
 
-## Common docs - What is needed for all
+The **CLI** gives you ready-made commands to type in PowerShell. Start here
+if you do not want to write a program.
 
-- An existing Factory API setup and matching CLI/SDK files. Ask your platform
-  team for the folders if you have not installed them.
-- Two PowerShell windows for this local tutorial.
-- Approval before changing a real factory. **Saving settings and deploying
-  resources are separate actions.**
+### 1. Start the local demo service in Window A
 
-### The five steps
-
-| Step | Meaning | Remember |
-| --- | --- | --- |
-| Check / preflight | Validates your configuration and environment. | Resolve any reported problems first. |
-| Prepare | Shows the changes for you to review. | No deployment yet. |
-| Review and approve | Check the selected factory, environment and changes. | Approve only what you intend to do. |
-| Confirm / start | For deployment, sends the approved configuration to the configured Azure DevOps (ADO) or GitHub Actions (GHA) pipeline and starts it. | A settings-only confirmation saves settings; it does not deploy. Starting a run does not mean it has finished. |
-| Follow progress | Reads status and output from the current deployment run. | If a response is missing, check the run before trying again. |
-
-## Tutorial: the same safe smoke test through all three approaches
-
-A **smoke test** is a quick check that the tools can connect. This tutorial uses
-an empty temporary folder. **It does not create Azure resources, deploy or delete.**
-
-Open **two PowerShell windows**. Copy each setup block into the named window.
-**Variables are not shared between windows**: complete the Window B setup even
-if you already completed Window A.
-
-### Window A: start the Factory service
-
-Enter the full path to your prepared API folder when asked. It must already
-contain `src\api.py` and its `.venv` Python environment.
+Open PowerShell. Enter your prepared API folder when asked.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-$ApiRoot = Read-Host 'Absolute path to the reviewed API source checkout'
+$ApiRoot = Read-Host 'Full path to the prepared API folder'
 $Python = Join-Path $ApiRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $Python -PathType Leaf)) {
-    throw 'The selected API checkout needs its existing .venv. Follow API setup first.'
-}
-if (-not (Test-Path -LiteralPath (Join-Path $ApiRoot 'src\api.py'))) {
-    throw 'This is not the API source checkout.'
+    throw 'Ask your platform team to complete API setup first.'
 }
 Set-Location -LiteralPath $ApiRoot
 $env:AIFACTORY_API_KEY = 'local-parity-smoke-only'
 & $Python -m uvicorn src.api:app --host 127.0.0.1 --port 8876
 ```
 
-Leave this window running. The example key is **only for this local demo**.
-Do not use it for a real factory. If port 8876 is already in use, ask the operator
-for a free port and use it in both windows; do not stop someone else's service.
+Leave Window A running. The example key is **only for this local demo**.
+Do not use it for a real factory.
 
-<details>
-<summary>More info</summary>
+### 2. Set up Window B
 
-The API is the local service that receives requests. This example deliberately
-uses `http://127.0.0.1:8876`; `127.0.0.1` means your own computer. The usual
-source API default is 8765, and a desktop application's port may be different.
-
-A typical developer API folder is
-`C:\code\code_py_25\008_aifactory_admin_ux_tkinter`. Use the actual prepared
-folder provided by your operator, not a guessed path. The tutorial installs
-nothing. See [setup instructions](17-cli-and-api-and-usage.md#install-and-connect-the-cli)
-if the required environment is missing.
-
-</details>
-
-### Window B: set up the tools
-
-Enter the **same API folder** as Window A, then the accelerator folder containing
-the CLI and Python helpers. This block also creates the empty demo folder.
+Open a **second PowerShell window** and paste this entire block.
+Variables are not shared between windows.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-$ApiRoot = Read-Host 'Absolute path to the API checkout used in Window A'
-$AcceleratorRoot = Read-Host 'Absolute path to the reviewed accelerator checkout'
+$ApiRoot = Read-Host 'API folder used in Window A'
+$AcceleratorRoot = Read-Host 'Accelerator source folder'
 $Python = Join-Path $ApiRoot '.venv\Scripts\python.exe'
 $SdkSource = Join-Path $AcceleratorRoot 'environment_setup\azurefactory-cli\src'
-if (-not (Test-Path -LiteralPath $Python -PathType Leaf)) {
-    throw 'API Python environment not found.'
-}
-if (-not (Test-Path -LiteralPath (Join-Path $SdkSource 'azurefactory\client.py'))) {
-    throw 'SDK source not found in the selected accelerator checkout.'
+if (-not (Test-Path -LiteralPath $Python -PathType Leaf) -or
+    -not (Test-Path -LiteralPath (Join-Path $SdkSource 'azurefactory\client.py'))) {
+    throw 'Check the API and accelerator folders.'
 }
 $env:PYTHONPATH = $SdkSource
 $env:AIFACTORY_API_URL = 'http://127.0.0.1:8876'
 $env:AIFACTORY_API_KEY = 'local-parity-smoke-only'
-$DemoRoot = Join-Path $env:TEMP ('factory-parity-smoke-' + [guid]::NewGuid())
+$DemoRoot = Join-Path $env:TEMP ('factory-smoke-' + [guid]::NewGuid())
 $env:FACTORY_FOLDER = Join-Path $DemoRoot 'azurefactory'
 New-Item -ItemType Directory -Path $env:FACTORY_FOLDER | Out-Null
-Set-Location -LiteralPath $DemoRoot
-Write-Host "Empty demo folder: $env:FACTORY_FOLDER"
 ```
 
-Keep using **this Window B** for the following examples. You can choose one
-approach or try all three: these examples only read information.
-
-<details>
-<summary>More info</summary>
-
-A typical accelerator folder is
-`C:\code\code_py_25\003_aifactory_sub\azure-enterprise-scale-ml`.
-`PYTHONPATH` selects its CLI/SDK source without another installation. Using
-`& $Python -m azurefactory` means the `azurefactory` command does not need to be
-installed separately on your command search path.
-
-Both windows must use the same URL and key. The scripts work in PowerShell 5.1
-or 7. REST examples need a `curl.exe` version supporting `--fail-with-body`.
-The CLI/SDK requires Python 3.10+; the API uses its own prepared environment.
-
-</details>
-
-### Approach 1: terminal commands - CLI
-
-Run in Window B:
+### 3. Check the connection
 
 ```powershell
 & $Python -m azurefactory health
-if ($LASTEXITCODE -ne 0) { throw 'CLI could not reach the API.' }
+if ($LASTEXITCODE -ne 0) { throw 'The service is not reachable.' }
 & $Python -m azurefactory catalog list --folder $env:FACTORY_FOLDER
-if ($LASTEXITCODE -ne 0) { throw 'Catalog read failed.' }
+if ($LASTEXITCODE -ne 0) { throw 'The factory list could not be read.' }
 ```
 
-Expect a healthy service and an empty factory list. This is correct: you have
-not created a factory yet.
+Expect a healthy service and an empty factory list. You have not created a
+factory yet. **You are finished; no developer tests are required.**
+Stop the idle demo service with **Ctrl+C in Window A**.
 
-### Approach 2: Python helpers - SDK
-
-Paste the complete block into Window B:
-
-```powershell
-@'
-import json
-import os
-from azurefactory import AzureFactoryClient
-
-client = AzureFactoryClient()
-print(json.dumps(client.health(), indent=2))
-catalog = client.catalog_list(os.environ["FACTORY_FOLDER"])
-print(json.dumps(catalog, indent=2))
-'@ | & $Python -
-if ($LASTEXITCODE -ne 0) { throw 'SDK smoke test failed.' }
-```
-
-This sends the same two requests using Python. You do not need to create a
-separate Python file.
-
-### Approach 3: direct requests - REST API
-
-Run in Window B. Use `curl.exe` exactly as written:
-
-```powershell
-curl.exe --silent --show-error --fail-with-body `
-    "$env:AIFACTORY_API_URL/health"
-if ($LASTEXITCODE -ne 0) { throw 'REST health request failed.' }
-
-curl.exe --silent --show-error --fail-with-body --get `
-    "$env:AIFACTORY_API_URL/api/v1/factory-catalog" `
-    --header "X-API-Key: $env:AIFACTORY_API_KEY" `
-    --data-urlencode "folder=$env:FACTORY_FOLDER"
-if ($LASTEXITCODE -ne 0) { throw 'REST catalog request failed.' }
-```
-
-All three approaches should show the same empty factory list.
-
-### Finished
-
-**No extra test step is required.** Stop the idle demo service with **Ctrl+C in
-Window A** when you finish.
-
-Next, use [guide 19 to add or update](19-cli-and-api-and-usage.md), or
-[guide 20 to remove resources](20-cli-and-api-and-usage.md). For real work, use
-the real factory's service address and private key, not the demo key or folder.
-Do not stop a real running deployment's service as a way to cancel Azure work.
-
-## First identify which variables.json you mean
-
-For the default registered Azure Factory approach, use the supported commands
-or requests to change settings. Let the service maintain these files:
-
-| File / location | Ownership and editing rule |
-| --- | --- |
-| Registered `azurefactory\factories\<key>\scalesets\<suffix>\projects\projectNNN\variables.json` | A project settings file written by the service. Manual edits are not automatically loaded and can be overwritten. Change settings through the supported commands or requests. |
-| Registered `azurefactory\register.json`, bindings, receipts and encrypted profiles | Files maintained by the service. Do not edit them to change factory identity, approve work or bypass an error. |
-
-## If something goes wrong
-
-| Message or symptom | What to do |
-| --- | --- |
-| `Set-Location` says the path is null | Run the complete setup block in that window. Variables do not carry over from another window. |
-| `No module named azurefactory` | Check the accelerator folder entered in Window B, then rerun its setup. |
-| Connection refused | Keep Window A running and check both windows use the same address and port. |
-| 401 / wrong key | Use the key belonging to that service. |
-| Blocked request or missing response | Read the message and check the run's status. Do not repeat a deployment or deletion blindly. |
-
-## Optional reference
-
-<details>
+<details markdown="1">
 <summary>More info</summary>
 
-### Compatibility and common requirements
+If port 8876 is busy, use a free port in **both** windows; do not stop an
+unrelated service. `127.0.0.1` means your own computer. The normal API source
+default is 8765; a desktop app can use a different port.
 
-An installed desktop/API can be older than the published code. An API key gives
-access to that service; it does not replace Azure permissions or your approval
-process. For a real operation, select the exact factory, project and environment.
-
-Paths sent as `folder`, `aifactory_folder` or `repo_root` refer to the computer
-running the API. Request JSON and client review files are local to the client.
-Keep keys, requests, review files and output private and outside Git.
-
-A settings-only confirmation normally returns `job:null`; it saved configuration,
-not a deployment. A deployment confirmation returns a job to follow.
-Requests from other computers may be restricted: do not expose the desktop API
-publicly or put its key in browser JavaScript to work around that restriction.
-
-Optional compatibility checks in the initialized Window B:
+Optional compatibility information, while Window A is running:
 
 ```powershell
-& $Python -m azurefactory api instructions
 & $Python -m azurefactory doctor
 & $Python -m azurefactory schema --openapi
 & $Python -m azurefactory bootstrap capabilities
 ```
 
-`doctor` checks supported interfaces, not whether Azure deployment will succeed.
-Interactive API help is at `http://127.0.0.1:8876/docs`; the machine-readable
-description is at `http://127.0.0.1:8876/openapi.json`.
+These checks do not guarantee that an Azure deployment will succeed.
+Python is used here to launch the existing CLI package without requiring a
+separate `azurefactory.exe` installation.
 
-### Source versions
+</details>
 
-The original parity walkthrough used API source
-`d52463fa6e1fd4371e38fdb9d0b4f9028f0cc17b` and accelerator source
-`eb077742e230e1b5338767f2e3c942b2ed792e85`, or compatible later code.
-These are source references, not instructions to change a deployment pin.
-The named settings, clone/add and removal helpers below were added in accelerator
-`0da0d85b`. Environment-only placement is implemented in newer API source but is
-not yet in the published API baseline above. It requires that updated API on the
-selected host; an older API can return HTTP 422. A newer client alone is not enough.
-Do not pull, reset or change a submodule in a checkout containing other work
-merely to run this tutorial. Use a reviewed compatible copy.
+</details>
+<!-- /factory-tool -->
 
-The accelerator provides shared source/templates. Registered configuration is
-managed by the API; copying templates, changing a branch or saving a file does
-not deploy a factory. A branch name alone does not identify the exact code used.
+<details markdown="1" data-factory-tool="Python SDK">
+<summary>Python SDK</summary>
+
+The **SDK** provides Python helpers for your scripts or applications.
+These are ordinary Python examples: save them as `.py` files or run them
+in your Python editor. No PowerShell strings are involved.
+
+### 1. Start the local demo service
+
+If your platform team already started the demo service, go to step 2.
+Otherwise save this as `start_factory_demo.py`. In your editor, select the
+prepared API folder's `.venv` Python interpreter, then run this file.
+
+```python
+import os
+from pathlib import Path
+import sys
+import uvicorn
+
+api_root = Path(input("Prepared API source folder: ").strip()).resolve()
+if not (api_root / "src" / "api.py").is_file():
+    raise SystemExit("Select the prepared API source folder.")
+
+os.chdir(api_root)
+sys.path.insert(0, str(api_root))
+os.environ["AIFACTORY_API_KEY"] = "local-parity-smoke-only"
+uvicorn.run("src.api:app", host="127.0.0.1", port=8876)
+```
+
+Leave it running. The key above is **for this empty local demo only**.
+
+### 2. Run a real Python example
+
+Open another editor terminal or Python process. Save this as
+`factory_smoke.py` and run it with Python 3.10 or later.
+Enter the accelerator source folder and the demo key when asked.
+You can also use the [ready-to-run Python file](../../../environment_setup/install_config_wizard/api-usage-examples/python/factory_smoke.py).
+
+```python
+import getpass
+import json
+from pathlib import Path
+import sys
+import tempfile
+
+accelerator = Path(input("Accelerator source folder: ").strip()).resolve()
+sdk_source = accelerator / "environment_setup" / "azurefactory-cli" / "src"
+if not (sdk_source / "azurefactory" / "client.py").is_file():
+    raise SystemExit("The selected folder does not contain the Factory SDK.")
+sys.path.insert(0, str(sdk_source))
+
+from azurefactory import AzureFactoryClient
+
+url = input("Demo API URL [http://127.0.0.1:8876]: ").strip() or "http://127.0.0.1:8876"
+key = getpass.getpass("Demo API key: ")
+if not key:
+    raise SystemExit("Enter the local demo key.")
+client = AzureFactoryClient(base_url=url, api_key=key)
+
+print(json.dumps(client.health(), indent=2))
+folder = Path(tempfile.mkdtemp(prefix="factory-smoke-")) / "azurefactory"
+folder.mkdir()
+print(f"Empty local demo folder: {folder}")
+print(json.dumps(client.catalog_list(str(folder)), indent=2))
+```
+
+Expect a healthy service and an empty factory list. **No extra test step is
+required.** Stop your idle demo service when finished.
+
+<details markdown="1">
+<summary>More info</summary>
+
+The SDK sends HTTP requests to the API service; it does not replace that
+service. This example imports the reviewed SDK source without installing
+packages. The SDK itself uses Python's standard library.
+
+If the package is already installed in your selected interpreter, omit the
+source-folder prompt and `sys.path` setup and start with:
+
+```python
+from azurefactory import AzureFactoryClient
+
+client = AzureFactoryClient()  # Uses AIFACTORY_API_URL and AIFACTORY_API_KEY.
+print(client.health())
+```
+
+Set those environment variables through your approved secret mechanism.
+Do not put a real API key in a Python file or notebook you share.
+The local temporary folder works because the API runs on the same computer.
+
+</details>
+
+</details>
+<!-- /factory-tool -->
+
+<details markdown="1" data-factory-tool="REST (curl)">
+<summary>REST (curl)</summary>
+
+**REST** lets you send requests directly, without the Factory CLI or Python
+SDK. This example uses **Bash and curl**. On Windows, use Git Bash, not
+PowerShell, for the commands in this tab.
+
+### 1. Connect to the prepared demo service
+
+Ask your platform team to start the local demo API, or use the optional
+startup instructions below. Keep the service running while trying step 2.
+
+<details markdown="1">
+<summary>More info</summary>
+
+To start the prepared API yourself from **Git Bash on Windows**, enter its
+Windows folder path. `cygpath` converts the path for Git Bash:
+
+```bash
+read -r -p "Prepared API folder (Windows path): " api_windows
+api_root="$(cygpath -u "$api_windows")"
+cd "$api_root" || exit 1
+AIFACTORY_API_KEY='local-parity-smoke-only' \
+  .venv/Scripts/python.exe -m uvicorn src.api:app --host 127.0.0.1 --port 8876
+```
+
+Leave this terminal running and use another Git Bash terminal for step 2.
+On Linux/macOS, start the service from its prepared environment instead;
+the following curl requests are unchanged.
+
+</details>
+
+### 2. Set the address, key and empty local folder
+
+Use the address/key of the **local demo**, not a production factory.
+`curl` must support `--fail-with-body`.
+
+```bash
+read -r -p "Demo API URL [http://127.0.0.1:8876]: " API_URL
+API_URL="${API_URL:-http://127.0.0.1:8876}"
+API_URL="${API_URL%/}"
+read -r -s -p "Demo API key: " API_KEY
+printf '\n'
+test -n "$API_KEY" || { printf 'An API key is required.\n' >&2; exit 1; }
+
+demo_root="$(mktemp -d)"
+mkdir "$demo_root/azurefactory"
+if command -v cygpath >/dev/null 2>&1; then
+  FACTORY_FOLDER="$(cygpath -w "$demo_root/azurefactory")"
+else
+  FACTORY_FOLDER="$demo_root/azurefactory"
+fi
+```
+
+This folder is on the same computer as the demo API. A real operation uses
+the actual folder on the computer running the API.
+
+### 3. Read health and the factory list
+
+```bash
+curl --silent --show-error --fail-with-body --noproxy '*' \
+  "$API_URL/health" || exit 1
+printf '\n'
+
+curl --silent --show-error --fail-with-body --noproxy '*' --get \
+  "$API_URL/api/v1/factory-catalog" \
+  --header "X-API-Key: $API_KEY" \
+  --data-urlencode "folder=$FACTORY_FOLDER" || exit 1
+printf '\n'
+```
+
+Expect a healthy service and an empty factory list. **You are finished.**
+Stop the idle demo server with Ctrl+C in its terminal when done.
+
+<details markdown="1">
+<summary>More info</summary>
+
+Interactive API help: `http://127.0.0.1:8876/docs`.
+The exact HTTP definitions are at `/openapi.json`.
+Curl sends HTTP requests; it is not the `azurefactory` CLI.
+Do not send privileged requests from browser JavaScript with an API key.
+
+</details>
+
+</details>
+<!-- /factory-tool -->
+
+## Next: a real registered factory
+
+Use [guide 19](19-cli-and-api-and-usage.md) or [guide 20](20-cli-and-api-and-usage.md)
+with your real service address and private key. **Do not reuse the public demo
+key or its empty folder.** The documentation site remembers the selected tool.
+
+### The five steps
+
+| Step | Meaning | Remember |
+| --- | --- | --- |
+| Check / preflight | Validates your configuration and environment. | Resolve any reported problems first. |
+| Prepare | Shows changes for review. | No deployment yet. |
+| Review and approve | Check the factory, environment and changes. | Approve only what you intend. |
+| Confirm / start | For deployment, sends the approved configuration to the configured ADO/GHA pipeline and starts it. | A settings-only confirmation saves settings; it does not deploy. |
+| Follow progress | Reads status and output from the current deployment run. | Check a missing response before trying again. |
+
+### First identify which variables.json you mean
+
+| File / location | Ownership and editing rule |
+| --- | --- |
+| Registered `azurefactory\factories\<key>\scalesets\<suffix>\projects\projectNNN\variables.json` | Written by the service. Use supported settings requests; manual changes are not automatically loaded and can be overwritten. |
+| Registered `azurefactory\register.json`, bindings, receipts and encrypted profiles | Maintained by the service. Do not edit them to change factory identity, approve work or bypass errors. |
+
+## If something goes wrong
+
+| Problem | What to do |
+| --- | --- |
+| A variable or path is missing | Run the setup for your chosen tab in the same terminal/process as its requests. |
+| Connection refused | Start the service and check the address/port. |
+| Wrong key / 401 | Use the key belonging to that service. |
+| Python cannot import the SDK | Check the source folder or selected Python environment. |
+| Blocked operation / missing response | Read the message and check the existing run. Do not repeat a deployment or deletion blindly. |
+
+<details markdown="1">
+<summary>More info</summary>
+
+### Setup and versions
+
+Use compatible API and client versions. A published source update is not an
+installed upgrade. The original parity baseline was API `d52463f` and accelerator
+`eb077742`; named convenience helpers were added in `0da0d85b`. Environment-only
+placement needs the newer API implementation; an older API may return 422.
+Do not reset another person's checkout or change a deployment pin just to follow
+a tutorial.
+
+The API key does not grant Azure permissions. Settings saves, deployments and
+deletions have separate approval steps. Keep keys and review files private.
+API paths refer to the computer running the service.
 
 ### Support labels
 
 | Label | Meaning |
 | --- | --- |
-| **implemented** | Available in the reviewed code; check that your installed version supports it. |
-| **generic-access only** | Available through a general request, without a dedicated shortcut command or method. |
-| **conditional/blocked** | Needs supported versions, permissions, settings and successful checks before it can run. |
-| **not implemented** | The complete requested behavior is not available. |
+| **implemented** | Available in the reviewed code; check the installed version. |
+| **generic-access only** | Use a general request rather than a named shortcut. |
+| **conditional/blocked** | Software, permissions, settings and deployment checks must pass. |
+| **not implemented** | The complete behavior is not available. |
 
 ### Three-interface coverage
 
 | Capability | REST | Python SDK | CLI | Important limit |
 | --- | --- | --- | --- | --- |
-| Health, schema, capabilities and selected-account checks | implemented | implemented | implemented | `doctor` is an extra CLI helper. |
-| Create factory configuration | implemented | implemented: `factory_create_prepare` | implemented: `factory create` | Saves settings only. |
-| Clone/add scale set/project/placement | implemented | implemented: `factory_clone_prepare`, `scaleset_add_prepare`, `project_add_prepare`, `project_add_placements_prepare` | implemented: named commands | Does not copy deployed resources or data. |
-| Latest successful placement within an explicit environment | implemented in newer API source | implemented: project prepare helpers | implemented: `--environment` or `--placement` | Requires successful recorded common deployment. Omitting the scale-set ID requires the updated API; never guesses Dev/Stage/Prod. |
-| Read settings | implemented | implemented | implemented | Reading does not change anything. |
-| Replace registered settings | implemented | implemented: `catalog_settings_prepare` | implemented: `catalog configure-settings` | Only supplied values change; review and save separately from deployment. |
-| Parameter get/prepare/confirm and override removal | implemented | implemented | implemented | Removing an override is not deleting a resource. |
-| Remove never-deployed local drafts | implemented | implemented: `draft_remove_prepare` | implemented: `draft remove` | Checked local archive/removal only; no Azure deletion. |
-| GitHub workflow status/watch | implemented | implemented | implemented | No equivalent ADO watcher is claimed. |
-| Sample reports, saved results and costs | implemented | implemented | implemented | Saved results are not a new collection; real costs require Azure reads. |
-| Deployment and registered bootstrap | conditional/blocked | conditional/blocked | conditional/blocked | The selected workflow and Azure setup must support the request. |
-| Whole-factory deletion/status/recovery | conditional/blocked | conditional/blocked | conditional/blocked | Project teardown finishes before common infrastructure teardown. |
-| Project/scale-set Azure deletion | conditional/blocked execution | implemented: `project_delete_prepare`, `scaleset_delete_prepare` | implemented: `project delete`, `scaleset delete` | Prepare only; runtime confirmation stays conditional on mode, ownership, retention and permissions. See guide 20. |
-| Captured Dev-to-Stage-to-Prod promotion | not implemented | not implemented | not implemented | Adding a placement and deploying it is different. |
+| Health, schema, capabilities and account checks | implemented | implemented | implemented | `doctor` is an extra CLI helper. |
+| Create factory configuration | implemented | implemented | implemented | Saves settings only. |
+| Clone/add scale set/project/placement | implemented | implemented | implemented | Does not copy deployed resources or data. |
+| Latest successful placement in a selected environment | implemented in newer API source | implemented | implemented | Successful recorded common deployment required; no implicit environment. |
+| Read/replace registered settings | implemented | implemented | implemented | Review and save separately from deployment. |
+| Parameter editing and override removal | implemented | implemented | implemented | Removing an override is not deleting a resource. |
+| Remove never-deployed local drafts | implemented | implemented | implemented | Checked local removal only. |
+| GitHub workflow status/watch | implemented | implemented | implemented | Not an ADO watcher. |
+| Sample reports, saved results and costs | implemented | implemented | implemented | Actual billing requires Azure reads. |
+| Deployment and registered bootstrap | conditional/blocked | conditional/blocked | conditional/blocked | Requires compatible setup and runtime. |
+| Whole-factory deletion/status/recovery | conditional/blocked | conditional/blocked | conditional/blocked | Projects finish before common teardown. |
+| Project/scale-set Azure deletion | conditional/blocked | implemented preparation | implemented preparation | Actual deletion still needs all ownership/retention checks. |
+| Captured Dev-to-Stage-to-Prod promotion | not implemented as execution | not implemented as execution | not implemented as execution | Capturing/reviewing inputs is not target deployment. |
 
 ### The eight scenarios
 
 | Scenario | Support and limit | Guide |
 | --- | --- | --- |
-| A. New factory, hub/VPN, project001 and selected environments | **implemented** configuration; **conditional/blocked** deployment. Explicitly select environments and complete the network setup. | 19 |
-| B. Add an AI Factory scale set | **implemented** configuration; **conditional/blocked** deployment. This is not an Azure VM Scale Set. | 19 |
-| C. Choose latest successful eligible scale set | **implemented** within an explicit environment; omitting the scale-set ID requires newer API source installed on the host. No implicit environment. | 19 |
-| E. Add/update/remove settings and resources | Settings changes are **implemented**; resource changes are **conditional/blocked**. A normal settings update does not provide general resource removal. | 19/20 |
-| G. Delete a project | Named SDK/CLI preparation is **implemented**; Azure execution remains **conditional/blocked**. Selected environments and retention choices matter. | 20 |
-| H. Delete factory/projects while keeping hub/VPN/dependencies | **conditional/blocked**. Resources that must remain inside a group selected for deletion block that operation. | 20 |
-| D. Promote a captured successful configuration/version through environments | **not implemented** as a complete operation. | 19 |
-| F. Choose APIM versus Kong | Unified three-tool selection is **not implemented**. Component setup has **conditional/blocked** support; Application Gateway is different. | 19 |
+| A. New factory, hub/VPN, project001 and environments | **implemented** configuration; **conditional/blocked** deployment. | 19 |
+| B. Add an AI Factory scale set | **implemented** configuration; **conditional/blocked** deployment. Not VMSS. | 19 |
+| C. Choose latest successful eligible scale set | **implemented** in an explicit environment on a compatible API. | 19 |
+| E. Add/update/remove settings and resources | Settings are **implemented**; Azure changes are **conditional/blocked**. | 19/20 |
+| G. Delete a project | Named preparation is **implemented**; execution is **conditional/blocked**. | 20 |
+| H. Keep hub/VPN/dependencies during factory deletion | **conditional/blocked**; resources that must stay can block group deletion. | 20 |
+| D. Promote captured configuration/version across environments | **not implemented** as a complete deployment operation. | 19 |
+| F. Choose APIM versus Kong | Unified selection is **not implemented**; component support is **conditional/blocked**. | 19 |
 
 ### Optional developer regression tests
 
-These are **not required to use the tools**. They check the three interfaces
-together using simulated provider results and temporary data. They do not
-contact Azure, deploy anything or require Window A's server.
+These are not needed to use any of the three tools. The offline consumer 114
+harness checks the interfaces with simulated provider results; it makes no Azure
+changes and does not need a running demo server. Its README contains the runner.
+The earlier `25 passed, 1 warning` result was successful; the `httpx` deprecation
+warning was not an instruction to install another dependency.
 
-In the initialized Window B, select the consumer 114 folder containing the test
-script. Both source folders must contain the compatible code and existing test
-dependencies. The script installs nothing:
+[Offline test instructions](https://github.com/jostrm/azure-enterprise-scale-byor-114).
+Consumer 114 is not an Azure sandbox; consumer 113 is not used here.
 
-```powershell
-$ConsumerRoot = Read-Host 'Absolute path to the consumer 114 offline harness checkout'
-$ParityRunner = Join-Path $ConsumerRoot 'test-parity.ps1'
-if (-not (Test-Path -LiteralPath $ParityRunner -PathType Leaf)) {
-    throw 'This checkout does not contain the offline parity harness.'
-}
-& $ParityRunner -ApiRoot $ApiRoot -AcceleratorRoot $AcceleratorRoot
-if ($LASTEXITCODE -ne 0) { throw 'Offline parity tests failed; inspect the reported failures.' }
-```
+### References
 
-The original walkthrough reported `25 passed, 1 warning`. The
-`StarletteDeprecationWarning` about `httpx` was not a test failure; no package
-change is needed just to follow this guide. Counts can change as tests are added.
-Consumer 114 is a test repository, not an Azure sandbox; 113 is not used.
-
-### Command index
-
-These are command names, not complete examples. Guides 19/20 provide the inputs.
-
-| Intent | Commands | Guide |
-| --- | --- | --- |
-| Connect/check | `health`, `doctor`, `api instructions`, `schema`, `bootstrap capabilities`, `auth status` | 18/19 |
-| Read settings | `catalog list`, `catalog settings`, `parameters get` | 19 |
-| Create/register | `factory create/clone`, `scaleset add`, `project add/add-placements`, `catalog confirm` | 19 |
-| Edit/deploy | `catalog configure-settings/confirm`, `parameters prepare/confirm`, `runtime deploy/confirm` | 19 |
-| Registered bootstrap | `bootstrap workflow prepare/start/status/next/continue`, `preflight` | 19 |
-| Follow progress | `catalog jobs/job/logs/poll`, `runtime status/logs/poll`, `workflow status/watch` | 20 |
-| Delete/recover | `draft remove`, `project delete`, `scaleset delete`, `delete-aifactory prepare/confirm/status/reconcile` | 20 |
-| Monitor | `monitoring catalog/summary/report/export`, `monitoring saved read/summary/report`, `monitoring resource-group-costs` | 20 |
-
-The named helpers prepare only. Use `catalog confirm` for settings and draft
-removal, or `runtime confirm` for project/scale-set Azure deletion, only after
-review and approval. Typed receipts enforce the action and mode; a raw API preview
-is not a CLI receipt. There is still no dedicated CLI `catalog prepare`,
-`project promote` or general `resource delete`, nor a `project_promote()` SDK
-method. General requests do not make an unsupported operation available.
-
-### Implementation references
-
-Use the selected service's OpenAPI and current source for exact field names:
 [CLI/SDK reference](../../../environment_setup/azurefactory-cli/readme.md),
 [API examples](../../../environment_setup/install_config_wizard/api-usage-examples/readme.md),
-[client methods](../../../environment_setup/azurefactory-cli/src/azurefactory/client.py),
-[review helpers](../../../environment_setup/azurefactory-cli/src/azurefactory/review.py),
-[canonical API guide](https://github.com/jostrm/azure-aifactory-config/blob/main/docs/API.md)
-and [offline tests](https://github.com/jostrm/azure-enterprise-scale-byor-114).
-
-Source descriptions and architecture graphs are not live Azure results. The
-four support labels describe reviewed code, not a guarantee that an installed
-host supports every operation. Never bypass blocked checks or retry uncertain
-writes automatically.
+[canonical API guide](https://github.com/jostrm/azure-aifactory-config/blob/main/docs/API.md).
 
 </details>
 
-<details>
+<details markdown="1">
 <summary>Alternative and Legacy ways</summary>
 
 ## Choose how to author configuration: file-first or wrapper-first
 
-The default for a registered factory is **wrapper-first**: use the supported
-commands or Python helpers and let the service save the settings. A wrapper is
-simply a helper that builds a request for you.
+The default registered-factory route uses commands/helpers (**wrapper-first**)
+to save settings. You may write request JSON, but do not hand-edit registered
+catalog files.
 
-Choose **file-first** only when you deliberately maintain a consumer-owned
-configuration file used by a supported pipeline or older factory setup.
-Both styles need a separate deployment review.
+**File-first** applies to an exact consumer-owned `variables.json` used by a
+supported older pipeline. Check the file, project and environment; keep a private
+backup, edit only intended values, validate them, and separately review deployment.
+Saving JSON does not publish provider variables, run pipelines or delete resources.
 
-| Your preference | Route |
+| File / location | Editing rule |
 | --- | --- |
-| Edit my `variables.json` and review the file changes myself | File-first for the exact supported consumer file; do not edit registered generated files as a substitute. |
-| Let the tools handle settings | Wrapper-first through guide 19's commands, SDK helpers or REST requests. |
-| Write JSON but keep a registered factory managed | Write a request or small patch JSON file and send it through prepare/confirm. |
-| Use an existing desktop application | Use its supported setup and actual URL/key; this tutorial's demo address is not that application's address. |
+| Accelerator `environment_setup\aifactory\variables.json` | Shared defaults, not a customer-settings shortcut. |
+| Legacy consumer `aifactory\variables.json` or selected project JSON | Manual editing may apply; confirm which file the pipeline actually reads. |
+| `.env`, ADO `variables.yaml`, GitHub Environment variables | Separate inputs with explicit save/publish steps; no automatic synchronization. |
 
-### Files outside the default registered approach
+Legacy `config review/save` and `ConfigurationDraft` preserve persistent JSON.
+Reload after manual changes; an old review is no longer valid. Migration to a
+registered factory is a separate operation. Legacy `submitted` means the local
+script exited zero, not that Azure succeeded.
 
-| File / location | Ownership and editing rule |
-| --- | --- |
-| Accelerator `environment_setup\aifactory\variables.json` | Shared template/defaults, not the place for a consumer-specific change. Do not change pinned shared source to customize a project. |
-| Legacy consumer `aifactory\variables.json`, or its selected persistent project JSON | File-first editing can apply. Confirm the exact file used by the loader/pipeline; a root default is not always the project input. |
-| `.env`, ADO `variables.yaml` and GitHub Environment variables | Separate inputs with their own save/publish steps. Editing one does not automatically update the others. |
+Advanced CLI enrollment is a separate local implementation, not equivalent
+REST/SDK provisioning. It can create resources and grant roles. See guide 19's
+tool-specific alternatives and the canonical reference.
 
-### File-first steps
-
-1. Identify the exact project, environment and file used by the intended run.
-2. Keep a private backup and review the changes. Preserve other settings, types
-   and environment sections. Never put secrets into source-controlled JSON.
-3. Check the JSON and the selected version's supported settings. Valid JSON alone
-   does not prove a deployment is ready.
-4. Follow the approved procedure to get the file to the intended pipeline.
-   Saving locally does not publish GitHub variables, commit/push or run a pipeline.
-5. Review and separately approve deployment, then follow its recorded results.
-
-Do not replace an approved run's settings by editing another file. If settings
-change after review, reload and review again. If a run has already started and
-its outcome is unclear, inspect it before trying again.
-
-### Legacy configuration and deployment
-
-For an exact legacy JSON project, `config review` / `config save` and the SDK
-`ConfigurationDraft` can help preserve the file's existing content. They are
-not commands for registered catalog roots.
-
-Older `legacy plan/prepare/start/list/status` and launcher
-`bootstrap config/prepare/start/status` flows are described in guide 19. Do not
-use them to bypass a blocked registered operation. Legacy `submitted` means the
-local script finished with exit zero, not that Azure deployment succeeded.
-
-### Advanced enrollment
-
-`enrollment plan/ensure/prepare-binding/publish/plan-and-publish` is an advanced,
-separate CLI flow. It is **implemented** with **conditional/blocked** execution:
-`ensure` can create resources and grant roles. Equivalent REST enrollment and
-`AzureFactoryClient.enrollment_ensure()` are **not implemented**.
-Binding publication uses the API, but that does not make all enrollment actions
-available through all three interfaces.
-
-### Switching approaches
-
-- After manually editing legacy JSON, reload the exact project before using
-  wrappers; an older review is no longer valid.
-- For a registered factory, send a supported settings/parameter request rather
-  than hand-editing `register.json` or its project files.
-- Importing a JSON file is not registering or deploying a factory. Migration is
-  a separate reviewed action.
-- Saving a snapshot does not necessarily update pipeline files or remote settings.
-
-<details>
+<details markdown="1">
 <summary>More info</summary>
 
-There is no automatic two-way sync between arbitrary JSON edits and the registered
-catalog. The API reads the register and writes the registered project files.
-Manual edits to those files may be overwritten and do not change the catalog's
-deployment input.
+There is no two-way sync from arbitrary JSON edits into the register. Registered
+project exports can be overwritten. Never reconstruct `_json_source` or change
+review hashes to replay a stale save.
 
-The legacy source-preserving path retains an opaque `_json_source` reference.
-Do not edit or reconstruct it. Source changes after loading/reviewing require a
-fresh load/review; do not repair hashes to replay an old save.
+The pipeline JSON reader applies `dev`, then `stage_prod` for non-Dev, then exact
+`test`/`prod` overrides when present. Registered snapshots use `dev` and
+`stage_prod` with placement checks; these formats are not interchangeable.
 
-The pipeline reader `apply-json-config-overrides.py` starts from `dev`, overlays
-`stage_prod` for a non-Dev target when present, then exact `test` for Stage or
-`prod` for Prod when supplied. That rule is specific to that reader. Registered
-project snapshots use `dev` and `stage_prod` with explicit placement checks;
-do not copy a legacy environment layout into them.
-
-General configuration actions include `migrate`, `configure-settings`,
-`configure-binding` and `correct-draft-scale-identity`. Their requirements are
-described in guide 19. A general CLI POST's `--write --yes` acknowledges that
-request, not permission to perform a later deployment.
-
-References:
-[legacy JSON editing](../../../environment_setup/azurefactory-cli/readme.md#edit-a-legacy-json-projects-configuration-without-deployment),
-[pipeline JSON reader](../../../environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py),
-[catalog storage](https://github.com/jostrm/azure-aifactory-config/blob/d52463f/src/factory_catalog.py),
-[registered project settings](https://github.com/jostrm/azure-aifactory-config/blob/d52463f/src/catalog_project_configuration.py).
+[Legacy JSON editing](../../../environment_setup/azurefactory-cli/readme.md#edit-a-legacy-json-projects-configuration-without-deployment) |
+[Pipeline reader](../../../environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py)
 
 </details>
 
