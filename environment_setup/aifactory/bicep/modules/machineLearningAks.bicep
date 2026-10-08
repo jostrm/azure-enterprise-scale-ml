@@ -219,6 +219,8 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
     properties: union({
       clusterPurpose: env == 'dev' ? 'DevTest' : 'FastProd'
       loadBalancerType: 'InternalLoadBalancer'
+      // Also required when attaching an existing cluster; otherwise Azure ML defaults to 'aks-subnet'.
+      loadBalancerSubnet: aksSubnetName
     }, !aksExists ? {
       agentCount: env == 'dev' ? aksNodes_dev : aksNodes_testProd
       agentVmSize: env == 'dev' ? aksVmSku_dev : aksVmSku_testProd
@@ -228,7 +230,6 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
         dockerBridgeCidr: aksDockerBridgeCidr
         serviceCidr: aksServiceCidr
       }
-      loadBalancerSubnet: aksSubnetName
     } : {})
   }
   dependsOn: [
