@@ -700,6 +700,43 @@ It does not create missing resource groups, grant roles, create identities,
 enable diagnostics or rerun networking/Foundry/compute deployment. Read-only
 `existing` resource references used by naming are not resource creation.
 
+#### Refresh the AI Factory dashboard and Project001 without redeploying services
+
+One run of **infra-project-dashboards** refreshes both the shared AI Factory
+dashboard and the selected project's standalone dashboard. It also refreshes
+that project's **My Project workbook**; this is not a two-resource-only update.
+Other projects' standalone dashboards are not redeployed. Their navigation
+tiles remain in the shared factory inventory.
+
+Use these manual pipeline inputs for an existing Dev Project001:
+
+| Setting | Azure DevOps parameter | GitHub Actions input | Value |
+|---|---|---|---|
+| Environment | `environment` | `environment` | `dev` |
+| Project assertion | `projectNumber` | `project_number` | `001` |
+| Configuration | `configFile` | `config_file` | Consumer-relative path to Project001's existing persistent `variables.json` |
+| Operation | `mode` | `mode` | `plan` first; after reviewing its targets, rerun with `deploy` |
+| Runner | `runnerSelection` | `runner_selection` | `from-config`, or an explicitly selected available hosted runner |
+
+Select the configuration for the intended factory and scale set, not another
+project's file or a stale legacy copy. The project assertion must match
+`project_number_000`; existing project/common resource groups, Application
+Insights and Log Analytics must be readable. The deploy identity also needs
+the existing dashboard/workbook deployment permissions described above.
+
+**Source version matters:** the pipeline runs the accelerator revision pinned
+by the consumer checkout, not whichever `main` branch happens to be newer.
+Publish the reviewed dashboard source, update the consumer submodule pin to a
+revision containing it, and select that consumer branch when running the
+pipeline. The compact layout, ML/data shortcuts and Foundry metric tiles were
+introduced in accelerator commit `3f4bbd26` (or a later revision containing the
+same changes). A local commit alone cannot update a remote pipeline.
+
+After a successful deploy, open the shared AI Factory dashboard and the
+selected Project001 dashboard in Azure Portal and refresh the page. Native
+metric availability, access and data freshness are separate from deployment
+success. No general `infra-project` deployment is needed for this refresh.
+
 Use the existing environment service connection/OIDC identity. Runner selection
 can explicitly choose a hosted runner when self-hosted agents are offline;
 it does not start or provision a build VM. The new ADO pipeline needs
