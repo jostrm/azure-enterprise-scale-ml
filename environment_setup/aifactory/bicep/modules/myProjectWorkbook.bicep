@@ -21,7 +21,7 @@ param tags object = {}
 
 var workbookName = guid(resourceGroup().id, 'aifactory.my-project.v1', projectNumber, env)
 var workbookId = resourceId('Microsoft.Insights/workbooks', workbookName)
-var workbookUrl = 'https://portal.azure.com/#@${tenant().tenantId}/resource${workbookId}'
+var workbookUrl = 'https://portal.azure.com/#@${tenant().tenantId}/resource${workbookId}/workbook'
 var tokenLinkParameters = { Navigation: 'tokens' }
 var tokensUrl = 'https://portal.azure.com/#@${tenant().tenantId}/blade/AppInsightsExtension/WorkbookViewerBlade/ComponentId/${uriComponent(applicationInsightsResourceId)}/ConfigurationId/${uriComponent(workbookId)}/Type/workbook/NotebookParams/${uriComponent(string(tokenLinkParameters))}'
 var insightsUrl = 'https://portal.azure.com/#@${tenant().tenantId}/resource${applicationInsightsResourceId}/logs'
@@ -72,8 +72,7 @@ var querySettings = {
   queryType: 0
   resourceType: 'microsoft.operationalinsights/workspaces'
   crossComponentResources: [logAnalyticsResourceId]
-  // No workbook timespan binding: the KQL owns inclusive local dates and baseline history.
-  timeContext: { durationMs: 0 }
+  // Set in query: KQL owns inclusive dates/history. Zero emits PT0S, not an unbounded range.
   size: 0
   visualization: 'table'
   noDataMessage: 'No matching observations. Missing scope, instrumentation or coverage is unavailable, not a known zero.'
@@ -85,12 +84,20 @@ var dropdownQuerySettings = {
   queryType: 0
   resourceType: 'microsoft.operationalinsights/workspaces'
   crossComponentResources: [logAnalyticsResourceId]
-  timeContext: { durationMs: 0 }
+  timeContext: { durationMs: 7776000000 }
   typeSettings: {
     additionalResourceOptions: []
     showDefault: false
   }
 }
+var tokenLogQuerySettings = union(querySettings, {
+  timeContextFromParameter: 'TokenTimeRange'
+  noDataMessage: 'No matching request-usage records for this account, model and time range. Check request-log coverage below; native Metrics is independent.'
+})
+var tokenDropdownQuerySettings = union(dropdownQuerySettings, {
+  timeContextFromParameter: 'TokenTimeRange'
+  timeContext: { durationMs: 604800000 }
+})
 var coverageDefaults = union({
   questions: false
   devices: false
@@ -243,6 +250,16 @@ union
  (print Source='Existing shared Log Analytics workspace — queries enforce exact component and dimensions', Url=base64_decode_tostring('__WORKSPACE_URL__')),
  (print Source='Native Azure Cost Management — project RG (independent native date/basis/currency controls)', Url=base64_decode_tostring('__COST_URL__'))
 '''
+module genericProjectView './genericProjectWorkbookItems.bicep' = {
+  name: 'my-project-generic-view'
+  params: {
+    projectResourceGroupId: projectResourceGroupId
+    applicationInsightsResourceId: applicationInsightsResourceId
+    projectNumber: projectNumber
+    env: env
+  }
+}
+
 var workbook = {
   version: 'Notebook/1.0'
   '$schema': 'https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json'
@@ -252,7 +269,7 @@ var workbook = {
       type: 1
       name: 'my-project-heading'
       content: {
-        json: '# My Project ${projectNumber} · ${toUpper(env)}\n\n**Fixed telemetry project:** `${projectNumber}` · **environment:** `${telemetryEnvironment}`. This saved Azure-native workbook uses existing telemetry; it creates no workspace, collector, ingestion pipeline, diagnostic setting or role assignment. Native model calls are not user questions; no model metrics are substituted for business events.\n\n**Usage & Cost:** select the canonical factory and scale set, not an RG-derived label. Selectors discover this component/project/environment in the last 90 days; no missing selection broadens to All. **Store All** is allowed only within this exact project scope.\n\n**Model tokens:** independent native Foundry / Azure OpenAI account metrics and request-usage logs, scoped to this exact project RG. Factory, scale set, store, business dates and coverage declarations do not gate tokens. Select View = Model tokens below.'
+        json: '# My Project ${projectNumber} · ${toUpper(env)}\n\n**None — Generic project** shows native resource inventory, application usage and Azure billing for this project RG. No business template or application-specific events are required. Select **Cost** for native ActualCost, or **Model tokens** for Foundry / OpenAI metrics and request-log detail.\n\nRetail, Booking and Support are optional business views requiring instrumented events and reviewed coverage. Model calls and HTTP requests are not user questions. This workbook creates no workspace, collector, ingestion pipeline, diagnostic setting or role assignment.'
       }
     }
     {
@@ -277,15 +294,15 @@ var workbook = {
             isRequired: true
             isGlobal: true
             value: 'usage'
-            jsonData: string([{ value: 'usage', label: 'Usage & outcomes' }, { value: 'cost', label: 'Cost' }, { value: 'tokens', label: 'Model tokens' }])
+            jsonData: string([{ value: 'usage', label: 'Usage' }, { value: 'cost', label: 'Cost' }, { value: 'tokens', label: 'Model tokens' }])
           }
           {
             id: 'template'
             name: 'Template'
             type: 2
             isRequired: true
-            value: 'retail-chat'
-            jsonData: string([{ value: 'retail-chat', label: 'Retail' }, { value: 'booking-chat', label: 'Booking' }, { value: 'support-chat', label: 'Support' }])
+            value: 'none'
+            jsonData: string([{ value: 'none', label: 'None — Generic project' }, { value: 'retail-chat', label: 'Retail' }, { value: 'booking-chat', label: 'Booking' }, { value: 'support-chat', label: 'Support' }])
           }
           union(dropdownQuerySettings, {
             id: 'time-zone'
@@ -294,225 +311,265 @@ var workbook = {
             value: timeZone
             query: 'print Zones=datetime_list_timezones() | mv-expand Zones | project value=tostring(Zones), label=tostring(Zones) | order by label asc'
           })
-          {
-            id: 'date-preset'
-            name: 'DatePreset'
-            label: 'Inclusive local dates'
-            type: 2
-            isRequired: true
-            value: '7'
-            jsonData: string([{ value: '1', label: 'Today (1 day)' }, { value: '7', label: 'Last 7 days' }, { value: '30', label: 'Last 30 days' }, { value: 'custom', label: 'Custom (maximum 30 dates)' }])
-          }
-          {
-            id: 'from-date'
-            name: 'FromDate'
-            label: 'Custom from (YYYY-MM-DD, inclusive)'
-            description: 'Used only for Custom. Local calendar date in the selected IANA time zone.'
-            type: 1
-            value: ''
-          }
-          {
-            id: 'to-date'
-            name: 'ToDate'
-            label: 'Custom to (YYYY-MM-DD, inclusive)'
-            description: 'Used only for Custom. At most 30 inclusive dates; invalid/reversed ranges produce no metrics.'
-            type: 1
-            value: ''
-          }
-          union(dropdownQuerySettings, {
-            id: 'factory'
-            name: 'Factory'
-            label: 'Canonical factory (required)'
-            value: factoryId
-            query: '${discovery}\n| distinct factory\n| project value=factory, label=factory, selected=(factory == base64_decode_tostring(\'${base64(factoryId)}\'))\n| union (print value=base64_decode_tostring(\'${base64(factoryId)}\') | where isnotempty(value) | project value, label=value, selected=true)\n| union (print value=\'\', label=\'Select canonical factory (required)\', selected=isempty(base64_decode_tostring(\'${base64(factoryId)}\')))\n| distinct value, label, selected'
-          })
-          union(dropdownQuerySettings, {
-            id: 'scale-set'
-            name: 'ScaleSet'
-            label: 'Canonical scale set (required)'
-            value: scaleSetId
-            query: '${discovery}\n| where factory == base64_decode_tostring(\'{Factory:base64}\')\n| distinct scaleset\n| project value=scaleset, label=scaleset, selected=(scaleset == base64_decode_tostring(\'${base64(scaleSetId)}\'))\n| union (print value=base64_decode_tostring(\'${base64(scaleSetId)}\') | where isnotempty(value) | project value, label=value, selected=true)\n| union (print value=\'\', label=\'Select canonical scale set (required)\', selected=isempty(base64_decode_tostring(\'${base64(scaleSetId)}\')))\n| distinct value, label, selected'
-          })
-          union(dropdownQuerySettings, {
-            id: 'store'
-            name: 'Store'
-            value: 'All'
-            query: '${discovery}\n| where factory == base64_decode_tostring(\'{Factory:base64}\') and scaleset == base64_decode_tostring(\'{ScaleSet:base64}\')\n| where isnotempty(store) and tolower(store) !in (\'all\', \'unknown\', \'unavailable\', \'n/a\', \'none\', \'null\', \'*\')\n| distinct store\n| project value=store, label=store\n| union (print value=\'All\', label=\'All stores in this exact scope\')'
-          })
         ]
       }
     }
     {
-      type: 1
-      name: 'coverage-explanation'
+      type: 12
+      name: 'generic-project'
+      conditionalVisibility: { parameterName: 'Template', comparison: 'isEqualTo', value: 'none' }
       content: {
-        json: '### Coverage is an explicit declaration, not data health\n\nAll channels default to **false / unavailable**. Change them only after reviewing instrumentation completeness for this **exact scope, store and date range**; re-review after changing filters. Absence of telemetry never establishes completeness. Sampled events, invalid evidence and conflicting duplicate identities invalidate results. Query/service failures remain errors, not zero. No prompts, chat text, device values, phone values or raw IP fields are projected to results.\n\n**State history:** at most ${stateHistoryDays} local dates before selected end. Bookings/cases require both the channel declaration and a reviewed full baseline in this bound; entities created earlier must have a baseline snapshot in this window. Otherwise status totals are unavailable.'
+        version: 'NotebookGroup/1.0'
+        groupType: 'editable'
+        exportParameters: true
+        items: genericProjectView.outputs.items
       }
     }
     {
-      type: 9
-      name: 'reviewed-coverage'
+      type: 12
+      name: 'business-scenario'
+      conditionalVisibility: { parameterName: 'Template', comparison: 'isNotEqualTo', value: 'none' }
       content: {
-        version: 'KqlParameterItem/1.0'
-        style: 'above'
-        parameters: coverageParameters
+        version: 'NotebookGroup/1.0'
+        groupType: 'editable'
+        exportParameters: true
+        items: concat([
+          {
+            type: 1
+            name: 'business-source-notice'
+            content: {
+              json: '## Optional business outcomes\n\nThese views require `aifactory.chat` / `aifactory.chat.meter` events for project **${projectNumber}**, environment **${telemetryEnvironment}** and the selected canonical factory, scale set and store. No matching events means **not instrumented or unavailable**, not zero business activity. Use **None — Generic project** for native usage and billing without these events.'
+            }
+          }
+          {
+            type: 9
+            name: 'business-filters'
+            content: {
+              version: 'KqlParameterItem/1.0'
+              style: 'above'
+              parameters: [
+                {
+                  id: 'date-preset'
+                  name: 'DatePreset'
+                  label: 'Inclusive local dates'
+                  type: 2
+                  isRequired: true
+                  value: '7'
+                  jsonData: string([{ value: '1', label: 'Today (1 day)' }, { value: '7', label: 'Last 7 days' }, { value: '30', label: 'Last 30 days' }, { value: 'custom', label: 'Custom (maximum 30 dates)' }])
+                }
+                {
+                  id: 'from-date'
+                  name: 'FromDate'
+                  label: 'Custom from (YYYY-MM-DD, inclusive)'
+                  description: 'Used only for Custom. Local calendar date in the selected IANA time zone.'
+                  type: 1
+                  value: ''
+                }
+                {
+                  id: 'to-date'
+                  name: 'ToDate'
+                  label: 'Custom to (YYYY-MM-DD, inclusive)'
+                  description: 'Used only for Custom. At most 30 inclusive dates; invalid/reversed ranges produce no metrics.'
+                  type: 1
+                  value: ''
+                }
+                union(dropdownQuerySettings, {
+                  id: 'factory'
+                  name: 'Factory'
+                  label: 'Canonical factory (required)'
+                  value: factoryId
+                  query: '${discovery}\n| distinct factory\n| project value=factory, label=factory, selected=(factory == base64_decode_tostring(\'${base64(factoryId)}\'))\n| union (print value=base64_decode_tostring(\'${base64(factoryId)}\') | where isnotempty(value) | project value, label=value, selected=true)\n| union (print value=\'\', label=\'Select canonical factory (required)\', selected=isempty(base64_decode_tostring(\'${base64(factoryId)}\')))\n| distinct value, label, selected'
+                })
+                union(dropdownQuerySettings, {
+                  id: 'scale-set'
+                  name: 'ScaleSet'
+                  label: 'Canonical scale set (required)'
+                  value: scaleSetId
+                  query: '${discovery}\n| where factory == base64_decode_tostring(\'{Factory:base64}\')\n| distinct scaleset\n| project value=scaleset, label=scaleset, selected=(scaleset == base64_decode_tostring(\'${base64(scaleSetId)}\'))\n| union (print value=base64_decode_tostring(\'${base64(scaleSetId)}\') | where isnotempty(value) | project value, label=value, selected=true)\n| union (print value=\'\', label=\'Select canonical scale set (required)\', selected=isempty(base64_decode_tostring(\'${base64(scaleSetId)}\')))\n| distinct value, label, selected'
+                })
+                union(dropdownQuerySettings, {
+                  id: 'store'
+                  name: 'Store'
+                  value: 'All'
+                  query: '${discovery}\n| where factory == base64_decode_tostring(\'{Factory:base64}\') and scaleset == base64_decode_tostring(\'{ScaleSet:base64}\')\n| where isnotempty(store) and tolower(store) !in (\'all\', \'unknown\', \'unavailable\', \'n/a\', \'none\', \'null\', \'*\')\n| distinct store\n| project value=store, label=store\n| union (print value=\'All\', label=\'All stores in this exact scope\')'
+                })
+              ]
+            }
+          }
+          {
+            type: 1
+            name: 'coverage-explanation'
+            content: {
+              json: '### Coverage is an explicit declaration, not data health\n\nAll channels default to **false / unavailable**. Change them only after reviewing instrumentation completeness for this **exact scope, store and date range**; re-review after changing filters. Absence of telemetry never establishes completeness. Sampled events, invalid evidence and conflicting duplicate identities invalidate results. Query/service failures remain errors, not zero. No prompts, chat text, device values, phone values or raw IP fields are projected to results.\n\n**State history:** at most ${stateHistoryDays} local dates before selected end. Bookings/cases require both the channel declaration and a reviewed full baseline in this bound; entities created earlier must have a baseline snapshot in this window. Otherwise status totals are unavailable.'
+            }
+          }
+          {
+            type: 9
+            name: 'reviewed-coverage'
+            content: {
+              version: 'KqlParameterItem/1.0'
+              style: 'above'
+              parameters: coverageParameters
+            }
+          }
+          {
+            type: 3
+            name: 'source-links'
+            content: union(querySettings, {
+              title: 'Data sources — exact native ARM scopes'
+              query: replace(replace(replace(sourceQuery, '__INSIGHTS_URL__', base64(insightsUrl)), '__WORKSPACE_URL__', base64(workspaceUrl)), '__COST_URL__', base64(costUrl))
+              gridSettings: {
+                formatters: [{
+                  columnMatch: 'Source'
+                  formatter: 1
+                  formatOptions: { linkColumn: 'Url', linkTarget: 'Url' }
+                }]
+              }
+            })
+          }
+          {
+            type: 3
+            name: 'usage-validation'
+            conditionalVisibility: usageVisibility
+            content: union(querySettings, {
+              title: 'Usage source / validation (not a health indicator)'
+              query: '${usageQuery}print ScopeSelected=ScopeReady, ValidLocalDates=WindowValid, FromLocal=FirstLocalDate, ThroughLocal=LastLocalDate, TimeZone=Zone, ExclusiveEndUtc=EndUtc, BaselineFromUtc=HistoryStartUtc, ConflictingEventIdentities=EventConflicts, ConflictingQuestions=QuestionConflicts, ConflictingVotes=VoteConflicts, ConflictingStates=StateConflicts, InvalidOrSampledEvents=InvalidEvents, ResultsValid=UsageValid, ObservedQuestions=iff(UsageValid, QuestionCount, long(null)), ObservedQuestionsWithDeviceId=iff(UsageValid, QuestionsWithDevice, long(null)), ObservedDeviceIdCoveragePercent=iff(UsageValid, 100.0 * Ratio(toreal(QuestionsWithDevice), toreal(QuestionCount)), real(null))'
+            })
+          }
+          {
+            type: 3
+            name: 'common-cards'
+            conditionalVisibility: usageVisibility
+            content: union(querySettings, {
+              title: 'Usage & answer quality — identical across all templates'
+              query: '${usageQuery}Metrics | where Section == \'common\' | extend DisplayValue=iff(isnull(Value), \'Unavailable / undefined\', tostring(round(Value, 2)))'
+              visualization: 'tiles'
+              tileSettings: tileSettings
+            })
+          }
+          {
+            type: 3
+            name: 'domain-cards'
+            conditionalVisibility: usageVisibility
+            content: union(querySettings, {
+              title: '{Template:label} outcomes'
+              query: '${usageQuery}Metrics | where Section == base64_decode_tostring(\'{Template:base64}\') | extend DisplayValue=iff(isnull(Value), \'Unavailable / undefined\', tostring(round(Value, 2)))'
+              visualization: 'tiles'
+              tileSettings: tileSettings
+            })
+          }
+          {
+            type: 9
+            name: 'usage-daily-availability'
+            content: {
+              version: 'KqlParameterItem/1.0'
+              style: 'above'
+              parameters: chartAvailabilityParameters
+            }
+          }
+        ], chartItems, chartUnavailableItems, [
+          {
+            type: 3
+            name: 'metric-formulas'
+            conditionalVisibility: usageVisibility
+            content: union(querySettings, {
+              title: 'Visible definitions, formulas and availability'
+              query: '${usageQuery}Metrics | where Section == \'common\' or Section == base64_decode_tostring(\'{Template:base64}\') | project Metric, Value, Unit, Availability, Formula, Source'
+            })
+          }
+          {
+            type: 1
+            name: 'cost-notice'
+            conditionalVisibility: costVisibility
+            content: {
+              json: '## Cost — observed meter evidence, not a real-time invoice\n\nOnly **AppEvents `aifactory.chat.meter`** is read. No automatic Azure billing collector is installed. Actual/allocated amounts are imported or ingested reviewed evidence, not live invoice data. For native billed project cost, use **Azure Cost Management** above (its own dates/basis/currency controls; not a store/session view).\n\n**Never add actual + allocated + estimated**, or different currencies. Estimated = quantity × supplied unit_price ÷ price_unit_quantity; no prices are hardcoded. Actual/allocated = supplied evidenced amount. Allocated requires allocation_method and billing_reference. Session/IP attribution for either requires attribution_reference. Fixed/PTU/reservation costs are separate other-service charges, never token estimates. Tables preserve rate and evidence references; they do not execute links in evidence.\n\nMissing session/network keys stay **Unattributed**. IP groups are upstream pseudonymous `ipkey_` hashes, **not people** (NAT/shared networks/VPNs/rotation). Only validated `session_` and `ipkey_` keys are shown. Cost per observed session uses attributed cost / exact known (store, session_key) identities, not all chat conversations. Charges lacking store cannot match a selected store and prevent a completeness claim. Observed incomplete costs are labeled partial; absent days are null unless reviewed complete. No currency is invented for empty results.'
+            }
+          }
+          {
+            type: 3
+            name: 'cost-validation'
+            conditionalVisibility: costVisibility
+            content: union(querySettings, {
+              title: 'Meter evidence validation and coverage'
+              query: '${costQuery}Bases | project Basis=basis, Complete, ScopeSelected=ScopeReady, ValidLocalDates=WindowValid, ConflictingEventIdentities=CostConflicts, InvalidOrSampledOrUnsafeCharges=InvalidCosts, ResultsValid=CostValid, MissingStorePreventsCompleteness=(Store != \'All\' and not(Complete)), Source=\'AppEvents / aifactory.chat.meter\''
+            })
+          }
+          {
+            type: 3
+            name: 'cost-summary'
+            conditionalVisibility: costVisibility
+            content: union(querySettings, {
+              title: 'Separate actual / allocated / estimated amounts, by currency'
+              query: '${costQuery}CostSummary'
+            })
+          }
+          {
+            type: 9
+            name: 'chart-currency'
+            conditionalVisibility: costVisibility
+            content: {
+              version: 'KqlParameterItem/1.0'
+              style: 'above'
+              parameters: [union(dropdownQuerySettings, {
+                id: 'chart-currency'
+                name: 'ChartCurrency'
+                label: 'Chart currency (required; tables retain separate currencies)'
+                value: ''
+                query: '${costQuery}Pairs | distinct currency | project value=currency, label=currency | union (print value=\'\', label=\'Select one observed currency\', selected=true)'
+              })]
+            }
+          }
+          {
+            type: 3
+            name: 'cost-daily'
+            conditionalVisibility: costVisibility
+            content: union(querySettings, {
+              title: 'Cost per local day — {ChartCurrency:label}, bases never combined'
+              query: '${costQuery}DailyCosts | where Currency == base64_decode_tostring(\'{ChartCurrency:base64}\') | project Day, Series=Basis, Cost'
+              visualization: 'timechart'
+              chartSettings: { xAxis: 'Day', yAxis: ['Cost'], group: 'Series', showLegend: true }
+            })
+          }
+          {
+            type: 3
+            name: 'cost-service-daily'
+            conditionalVisibility: costVisibility
+            content: union(querySettings, {
+              title: 'Cost per local day by service — {ChartCurrency:label}'
+              query: '${costQuery}DailyServiceCosts | where Currency == base64_decode_tostring(\'{ChartCurrency:base64}\') | project Day, Series=strcat(Basis, \' / \', Service), Cost'
+              visualization: 'timechart'
+              chartSettings: { xAxis: 'Day', yAxis: ['Cost'], group: 'Series', showLegend: true }
+            })
+          }
+          {
+            type: 3
+            name: 'session-daily'
+            conditionalVisibility: costVisibility
+            content: union(querySettings, {
+              title: 'Cost per day per chat session — missing attribution retained'
+              query: '${costQuery}CostRows | summarize Cost=sum(cost) by Day, Store=StoreLabel, Session, Basis=basis, Currency=currency | order by Day asc, Basis asc, Currency asc'
+            })
+          }
+          {
+            type: 3
+            name: 'network-daily'
+            conditionalVisibility: costVisibility
+            content: union(querySettings, {
+              title: 'Cost per day per pseudonymous IP group — not people'
+              query: '${costQuery}CostRows | summarize Cost=sum(cost) by Day, Store=StoreLabel, IPGroup, Basis=basis, Currency=currency | order by Day asc, Basis asc, Currency asc'
+            })
+          }
+          {
+            type: 3
+            name: 'meter-details'
+            conditionalVisibility: costVisibility
+            content: union(querySettings, {
+              title: 'Meter breakdown — distinct units, rate and evidence references'
+              query: '${costQuery}CostRows | summarize Quantity=sum(quantity), Cost=sum(cost), Observations=count() by Day, Store=StoreLabel, Session, IPGroup, service, meter, unit, basis, currency, charge_type, unit_price, price_unit_quantity, rate_reference, evidence_reference, allocation_method, billing_reference, attribution_reference | order by Day asc, basis asc, currency asc'
+            })
+          }
+              ])
       }
-    }
-    {
-      type: 3
-      name: 'source-links'
-      content: union(querySettings, {
-        title: 'Data sources — exact native ARM scopes'
-        query: replace(replace(replace(sourceQuery, '__INSIGHTS_URL__', base64(insightsUrl)), '__WORKSPACE_URL__', base64(workspaceUrl)), '__COST_URL__', base64(costUrl))
-        gridSettings: {
-          formatters: [{
-            columnMatch: 'Source'
-            formatter: 1
-            formatOptions: { linkColumn: 'Url', linkTarget: 'Url' }
-          }]
-        }
-      })
-    }
-    {
-      type: 3
-      name: 'usage-validation'
-      conditionalVisibility: usageVisibility
-      content: union(querySettings, {
-        title: 'Usage source / validation (not a health indicator)'
-        query: '${usageQuery}print ScopeSelected=ScopeReady, ValidLocalDates=WindowValid, FromLocal=FirstLocalDate, ThroughLocal=LastLocalDate, TimeZone=Zone, ExclusiveEndUtc=EndUtc, BaselineFromUtc=HistoryStartUtc, ConflictingEventIdentities=EventConflicts, ConflictingQuestions=QuestionConflicts, ConflictingVotes=VoteConflicts, ConflictingStates=StateConflicts, InvalidOrSampledEvents=InvalidEvents, ResultsValid=UsageValid, ObservedQuestions=iff(UsageValid, QuestionCount, long(null)), ObservedQuestionsWithDeviceId=iff(UsageValid, QuestionsWithDevice, long(null)), ObservedDeviceIdCoveragePercent=iff(UsageValid, 100.0 * Ratio(toreal(QuestionsWithDevice), toreal(QuestionCount)), real(null))'
-      })
-    }
-    {
-      type: 3
-      name: 'common-cards'
-      conditionalVisibility: usageVisibility
-      content: union(querySettings, {
-        title: 'Usage & answer quality — identical across all templates'
-        query: '${usageQuery}Metrics | where Section == \'common\' | extend DisplayValue=iff(isnull(Value), \'Unavailable / undefined\', tostring(round(Value, 2)))'
-        visualization: 'tiles'
-        tileSettings: tileSettings
-      })
-    }
-    {
-      type: 3
-      name: 'domain-cards'
-      conditionalVisibility: usageVisibility
-      content: union(querySettings, {
-        title: '{Template:label} outcomes'
-        query: '${usageQuery}Metrics | where Section == base64_decode_tostring(\'{Template:base64}\') | extend DisplayValue=iff(isnull(Value), \'Unavailable / undefined\', tostring(round(Value, 2)))'
-        visualization: 'tiles'
-        tileSettings: tileSettings
-      })
-    }
-    {
-      type: 9
-      name: 'usage-daily-availability'
-      content: {
-        version: 'KqlParameterItem/1.0'
-        style: 'above'
-        parameters: chartAvailabilityParameters
-      }
-    }
-  ], chartItems, chartUnavailableItems, [
-    {
-      type: 3
-      name: 'metric-formulas'
-      conditionalVisibility: usageVisibility
-      content: union(querySettings, {
-        title: 'Visible definitions, formulas and availability'
-        query: '${usageQuery}Metrics | where Section == \'common\' or Section == base64_decode_tostring(\'{Template:base64}\') | project Metric, Value, Unit, Availability, Formula, Source'
-      })
-    }
-    {
-      type: 1
-      name: 'cost-notice'
-      conditionalVisibility: costVisibility
-      content: {
-        json: '## Cost — observed meter evidence, not a real-time invoice\n\nOnly **AppEvents `aifactory.chat.meter`** is read. No automatic Azure billing collector is installed. Actual/allocated amounts are imported or ingested reviewed evidence, not live invoice data. For native billed project cost, use **Azure Cost Management** above (its own dates/basis/currency controls; not a store/session view).\n\n**Never add actual + allocated + estimated**, or different currencies. Estimated = quantity × supplied unit_price ÷ price_unit_quantity; no prices are hardcoded. Actual/allocated = supplied evidenced amount. Allocated requires allocation_method and billing_reference. Session/IP attribution for either requires attribution_reference. Fixed/PTU/reservation costs are separate other-service charges, never token estimates. Tables preserve rate and evidence references; they do not execute links in evidence.\n\nMissing session/network keys stay **Unattributed**. IP groups are upstream pseudonymous `ipkey_` hashes, **not people** (NAT/shared networks/VPNs/rotation). Only validated `session_` and `ipkey_` keys are shown. Cost per observed session uses attributed cost / exact known (store, session_key) identities, not all chat conversations. Charges lacking store cannot match a selected store and prevent a completeness claim. Observed incomplete costs are labeled partial; absent days are null unless reviewed complete. No currency is invented for empty results.'
-      }
-    }
-    {
-      type: 3
-      name: 'cost-validation'
-      conditionalVisibility: costVisibility
-      content: union(querySettings, {
-        title: 'Meter evidence validation and coverage'
-        query: '${costQuery}Bases | project Basis=basis, Complete, ScopeSelected=ScopeReady, ValidLocalDates=WindowValid, ConflictingEventIdentities=CostConflicts, InvalidOrSampledOrUnsafeCharges=InvalidCosts, ResultsValid=CostValid, MissingStorePreventsCompleteness=(Store != \'All\' and not(Complete)), Source=\'AppEvents / aifactory.chat.meter\''
-      })
-    }
-    {
-      type: 3
-      name: 'cost-summary'
-      conditionalVisibility: costVisibility
-      content: union(querySettings, {
-        title: 'Separate actual / allocated / estimated amounts, by currency'
-        query: '${costQuery}CostSummary'
-      })
-    }
-    {
-      type: 9
-      name: 'chart-currency'
-      conditionalVisibility: costVisibility
-      content: {
-        version: 'KqlParameterItem/1.0'
-        style: 'above'
-        parameters: [union(dropdownQuerySettings, {
-          id: 'chart-currency'
-          name: 'ChartCurrency'
-          label: 'Chart currency (required; tables retain separate currencies)'
-          value: ''
-          query: '${costQuery}Pairs | distinct currency | project value=currency, label=currency | union (print value=\'\', label=\'Select one observed currency\', selected=true)'
-        })]
-      }
-    }
-    {
-      type: 3
-      name: 'cost-daily'
-      conditionalVisibility: costVisibility
-      content: union(querySettings, {
-        title: 'Cost per local day — {ChartCurrency:label}, bases never combined'
-        query: '${costQuery}DailyCosts | where Currency == base64_decode_tostring(\'{ChartCurrency:base64}\') | project Day, Series=Basis, Cost'
-        visualization: 'timechart'
-        chartSettings: { xAxis: 'Day', yAxis: ['Cost'], group: 'Series', showLegend: true }
-      })
-    }
-    {
-      type: 3
-      name: 'cost-service-daily'
-      conditionalVisibility: costVisibility
-      content: union(querySettings, {
-        title: 'Cost per local day by service — {ChartCurrency:label}'
-        query: '${costQuery}DailyServiceCosts | where Currency == base64_decode_tostring(\'{ChartCurrency:base64}\') | project Day, Series=strcat(Basis, \' / \', Service), Cost'
-        visualization: 'timechart'
-        chartSettings: { xAxis: 'Day', yAxis: ['Cost'], group: 'Series', showLegend: true }
-      })
-    }
-    {
-      type: 3
-      name: 'session-daily'
-      conditionalVisibility: costVisibility
-      content: union(querySettings, {
-        title: 'Cost per day per chat session — missing attribution retained'
-        query: '${costQuery}CostRows | summarize Cost=sum(cost) by Day, Store=StoreLabel, Session, Basis=basis, Currency=currency | order by Day asc, Basis asc, Currency asc'
-      })
-    }
-    {
-      type: 3
-      name: 'network-daily'
-      conditionalVisibility: costVisibility
-      content: union(querySettings, {
-        title: 'Cost per day per pseudonymous IP group — not people'
-        query: '${costQuery}CostRows | summarize Cost=sum(cost) by Day, Store=StoreLabel, IPGroup, Basis=basis, Currency=currency | order by Day asc, Basis asc, Currency asc'
-      })
-    }
-    {
-      type: 3
-      name: 'meter-details'
-      conditionalVisibility: costVisibility
-      content: union(querySettings, {
-        title: 'Meter breakdown — distinct units, rate and evidence references'
-        query: '${costQuery}CostRows | summarize Quantity=sum(quantity), Cost=sum(cost), Observations=count() by Day, Store=StoreLabel, Session, IPGroup, service, meter, unit, basis, currency, charge_type, unit_price, price_unit_quantity, rate_reference, evidence_reference, allocation_method, billing_reference, attribution_reference | order by Day asc, basis asc, currency asc'
-      })
     }
     {
       type: 1
@@ -571,7 +628,7 @@ var workbook = {
             value: 'foundry'
             jsonData: string([{ value: 'foundry', label: 'Foundry / Models — InputTokens, OutputTokens' }, { value: 'openai', label: 'Standard Azure OpenAI — ProcessedPromptTokens, GeneratedTokens' }])
           }
-          union(dropdownQuerySettings, {
+          union(tokenDropdownQuerySettings, {
             id: 'token-metric-account'
             name: 'TokenMetricAccount'
             type: 1
@@ -580,7 +637,7 @@ var workbook = {
             isHiddenWhenLocked: true
             query: '${tokenContext}\nprint value=iff(AccountSelected and WindowValid, SelectedAccount, \'\')'
           })
-          union(dropdownQuerySettings, {
+          union(tokenDropdownQuerySettings, {
             id: 'token-metric-view'
             name: 'TokenMetricView'
             type: 1
@@ -594,7 +651,7 @@ var workbook = {
       type: 3
       name: 'tokens-source-coverage'
       conditionalVisibility: tokenVisibility
-      content: union(querySettings, {
+      content: union(tokenLogQuerySettings, {
         title: 'Token source inputs, scope and availability'
         query: '${tokenContext}\nprint AccountSelected, InventoryShape=gettype(InventorySelection), ScopedAccounts=toscalar(Inventory | count), AccountSelectionShape=gettype(AccountSelection), MetricAccountMatchesSelection=(AccountSelected and base64_decode_tostring(\'{TokenMetricAccount:base64}\') == SelectedAccount), ValidTimeRange=WindowValid, FromUtc=StartUtc, ExclusiveEndUtc=EndUtc, DailyTimeZone=Zone, ProjectResourceGroup, AccountId=iff(AccountSelected, SelectedAccount, \'\'), MetricSchema=base64_decode_tostring(\'{TokenMetricProfile:base64}\'), NativeSource=\'Azure Monitor Metrics / Microsoft.CognitiveServices/accounts / Total\', NativeCoverage=\'Observed series only; max 100 series per metric; absent series is unavailable\', RequestLogSource=TokenSource, Workspace=base64_decode_tostring(\'${base64(logAnalyticsResourceId)}\'), Status=case(not(AccountSelected), \'Unavailable — select a discovered account in this exact RG\', not(WindowValid), \'Unavailable — invalid time zone or time range (maximum 31 days)\', \'Read sources separately below; no cache series/field is NOT zero\'), AccountUrl=iff(AccountSelected, strcat(\'https://portal.azure.com/#resource\', SelectedAccount), \'\'), MetricsUrl=iff(AccountSelected, strcat(\'https://portal.azure.com/#resource\', SelectedAccount, \'/metrics\'), \'\')'
         gridSettings: {
@@ -607,16 +664,34 @@ var workbook = {
     }
   ], tokenMetricTables, tokenMetricTrends, [
     {
-      type: 10
-      name: 'tokens-native-cached-table'
+      type: 12
+      name: 'tokens-native-cache-optional'
       conditionalVisibility: { parameterName: 'TokenMetricView', comparison: 'isEqualTo', value: 'foundry' }
-      content: union(tokenMetricSettings, {
-        chartId: 'tokens-native-cached-table'
-        title: 'Native cached input by deployment / model / version — absent series = UNAVAILABLE, not zero'
-        chartType: 0
-        gridFormatType: 2
-        metrics: [tokenCachedMetric]
-      })
+      content: {
+        version: 'NotebookGroup/1.0'
+        groupType: 'editable'
+        loadType: 'explicit'
+        loadButtonText: 'Show optional native cache metric (model-dependent)'
+        items: [
+          {
+            type: 1
+            name: 'tokens-native-cache-explanation'
+            content: { json: '**Native cache metric is optional.** `cacheReadInputTokens` is documented for Anthropic model deployments. OpenAI deployments may emit no series. Use observed cached-input fields in request logs below when available; never infer a missing metric as zero or add cache to inclusive input.' }
+          }
+          {
+            type: 10
+            name: 'tokens-native-cached-table'
+            conditionalVisibility: { parameterName: 'TokenMetricView', comparison: 'isEqualTo', value: 'foundry' }
+            content: union(tokenMetricSettings, {
+              chartId: 'tokens-native-cached-table'
+              title: 'Native cached input by deployment / model / version — absent series = UNAVAILABLE, not zero'
+              chartType: 0
+              gridFormatType: 2
+              metrics: [tokenCachedMetric]
+            })
+          }
+        ]
+      }
     }
     {
       type: 1
@@ -632,14 +707,14 @@ var workbook = {
         version: 'KqlParameterItem/1.0'
         style: 'above'
         parameters: [
-          union(dropdownQuerySettings, {
+          union(tokenDropdownQuerySettings, {
             id: 'token-deployment'
             name: 'TokenDeployment'
             label: 'Deployment (request logs only)'
             value: '*'
             query: '${tokenQuery}TokenRecords | distinct Deployment | project value=Deployment, label=Deployment | union (print value=\'*\', label=\'All observed deployments in selected account\')'
           })
-          union(dropdownQuerySettings, {
+          union(tokenDropdownQuerySettings, {
             id: 'token-model'
             name: 'TokenModel'
             label: 'Model / version (request logs only)'
@@ -661,7 +736,7 @@ var workbook = {
       type: 3
       name: 'tokens-log-validation'
       conditionalVisibility: tokenVisibility
-      content: union(querySettings, {
+      content: union(tokenLogQuerySettings, {
         title: 'Request-log coverage (not native Metrics coverage)'
         query: '${tokenReportQuery}SelectedTokenRecords | summarize ObservedRows=count(), MissingRequestIdentity=countif(not(HasRequestId)), MissingInputField=countif(isnull(InputTokens)), MissingOutputField=countif(isnull(OutputTokens)), MissingCachedField=countif(isnull(CachedTokens)), InvalidValues=countif(InvalidValues), ConflictingRows=countif(Conflict), FirstObservedUtc=min(FirstObservedUtc), LastObservedUtc=max(LastObservedUtc) | extend Source=TokenSource, LastObservationAge=now() - LastObservedUtc, GapToWindowEnd=EndUtc - LastObservedUtc, Status=case(not(AccountSelected), \'Unavailable — no valid scoped account\', not(WindowValid), \'Unavailable — invalid time range / zone\', ObservedRows == 0, \'Unavailable — no matching request-usage logs; native Metrics above is independent\', \'Observed request logs only; missing fields/series are not measured zero\')'
       })
@@ -670,7 +745,7 @@ var workbook = {
       type: 3
       name: 'tokens-log-model-totals'
       conditionalVisibility: tokenVisibility
-      content: union(querySettings, {
+      content: union(tokenLogQuerySettings, {
         title: 'Request logs — input / output / cached by deployment AND model / version'
         noDataMessage: 'Unavailable — no matching AzureOpenAIRequestUsage rows. Native Metrics above is independent.'
         query: '${tokenReportQuery}TokenTotals | order by Account asc, Deployment asc, ModelName asc, ModelVersion asc'
@@ -686,7 +761,7 @@ var workbook = {
       type: 3
       name: 'tokens-log-daily'
       conditionalVisibility: tokenVisibility
-      content: union(querySettings, {
+      content: union(tokenLogQuerySettings, {
         title: 'Request logs — token totals per local day (cached is a subset)'
         query: '${tokenReportQuery}union (TokenDaily | project Day, Series=strcat(Deployment, \' / \', ModelName, \' / \', ModelVersion, \' / input\'), Tokens=InputTokens), (TokenDaily | project Day, Series=strcat(Deployment, \' / \', ModelName, \' / \', ModelVersion, \' / output\'), Tokens=OutputTokens), (TokenDaily | project Day, Series=strcat(Deployment, \' / \', ModelName, \' / \', ModelVersion, \' / cached subset\'), Tokens=CachedTokens) | order by Day asc'
         visualization: 'timechart'
@@ -697,7 +772,7 @@ var workbook = {
       type: 3
       name: 'tokens-log-daily-details'
       conditionalVisibility: tokenVisibility
-      content: union(querySettings, {
+      content: union(tokenLogQuerySettings, {
         title: 'Request logs — daily token and emitted-field coverage detail'
         query: '${tokenReportQuery}TokenDaily | extend Source=TokenSource | order by Day asc, Deployment asc, ModelName asc, ModelVersion asc'
       })

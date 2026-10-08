@@ -479,7 +479,7 @@ var myProjectEntryParts = enableMyProjectDashboard ? [
       settings: {
         content: {
           settings: {
-            content: '## Usage & outcomes\n\n[Open My Project ${projectNumber}](${myProjectWorkbook!.outputs.url} "Usage, feedback, business outcomes and attributed costs")\n\nConversations, feedback and Retail / Booking / Support outcomes. Select factory, scale set, dates and store. Coverage required; missing data is unavailable, not zero. Allocated / estimated costs are separate from billing.'
+            content: '## Project usage & cost\n\n[Open My Project ${projectNumber}](${myProjectWorkbook!.outputs.url} "Native resource usage, tokens and project cost")\n\nStart with None — Generic project for native usage and Azure billing. Retail / Booking / Support outcomes remain optional and require business events. Missing telemetry is unavailable, not zero.'
             title: ''
             subtitle: ''
             markdownSource: 1

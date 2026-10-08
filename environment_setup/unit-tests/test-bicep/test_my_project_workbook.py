@@ -204,6 +204,18 @@ class Arm:
             if len(args) == 4:
                 return f"/subscriptions/{args[0]}/resourceGroups/{args[1]}/providers/{args[2]}/{args[3]}"
             return RG + "/providers/" + args[0] + "/" + args[1]
+        if name == "reference":
+            deployment = next(r for r in self.template["resources"]
+                              if r["type"] == "Microsoft.Resources/deployments"
+                              and args[0].endswith("/" + r["name"]))
+            child = Arm(deployment["properties"]["template"], {
+                key: self.value(binding["value"])
+                for key, binding in deployment["properties"]["parameters"].items()
+            })
+            return {"outputs": {
+                key: {"value": child.value(output["value"])}
+                for key, output in child.template["outputs"].items()
+            }}
         if name == "guid":
             # ARM's documented namespace and separator.
             return str(uuid.uuid5(uuid.UUID("11fb06fb-712d-4ddd-98c7-e71bbd588830"), "-".join(args)))
@@ -254,7 +266,8 @@ def materialize(template, **overrides):
         "telemetryEnvironment": "stage", "applicationInsightsResourceId": COMPONENT,
         "logAnalyticsResourceId": WORKSPACE, "projectResourceGroupId": RG, **overrides,
     })
-    return arm, json.loads(arm.value(template["resources"][0]["properties"]["serializedData"]))
+    resource = next(r for r in template["resources"] if r["type"] == "Microsoft.Insights/workbooks")
+    return arm, json.loads(arm.value(resource["properties"]["serializedData"]))
 
 
 @pytest.fixture(scope="module")
@@ -263,18 +276,30 @@ def workbook(workbook_template):
 
 
 def items(workbook):
-    return {item["name"]: item for item in workbook["items"]}
+    result = {}
+    for item in workbook["items"]:
+        assert item["name"] not in result
+        result[item["name"]] = item
+        if item["type"] == 12:
+            children = items(item["content"])
+            assert not result.keys() & children.keys()
+            result.update(children)
+    return result
 
 
 def parameters(workbook):
     return {
-        p["name"]: p for item in workbook["items"] if item["type"] == 9
+        p["name"]: p for item in items(workbook).values() if item["type"] == 9
         for p in item["content"]["parameters"]
     }
 
 
 def test_only_saved_workbook_and_deterministic_name(workbook_template):
-    assert [r["type"] for r in workbook_template["resources"]] == ["Microsoft.Insights/workbooks"]
+    saved = [r for r in workbook_template["resources"] if r["type"] == "Microsoft.Insights/workbooks"]
+    assert len(saved) == 1
+    helpers = [r for r in workbook_template["resources"] if r not in saved]
+    assert all(r["type"] == "Microsoft.Resources/deployments"
+               and not r["properties"]["template"].get("resources") for r in helpers)
     arm, _ = materialize(workbook_template)
     expected = arm.variable("workbookName")
     assert expected == materialize(workbook_template)[0].variable("workbookName")
@@ -282,7 +307,7 @@ def test_only_saved_workbook_and_deterministic_name(workbook_template):
     assert expected != materialize(workbook_template, env="prod")[0].variable("workbookName")
     assert expected == materialize(workbook_template, telemetryEnvironment="custom")[0].variable("workbookName")
     assert "guid(resourceGroup().id, 'aifactory.my-project.v1'" in workbook_template["variables"]["workbookName"]
-    assert arm.value(workbook_template["resources"][0]["properties"]["sourceId"]) == COMPONENT
+    assert arm.value(saved[0]["properties"]["sourceId"]) == COMPONENT
 
 
 def test_enable_disable_and_stage_outputs(compiled, project_template):
@@ -566,10 +591,12 @@ def test_workbook_schema_shapes_and_real_query_items(workbook):
     assert workbook["version"] == "Notebook/1.0"
     assert workbook["fallbackResourceIds"] == [WORKSPACE]
     all_items = items(workbook)
-    assert len(all_items) == len(workbook["items"])
+    assert len(all_items) >= len(workbook["items"])
     assert len(all_items) >= 20
     for item in all_items.values():
-        assert item["type"] in (1, 3, 9, 10)
+        assert item["type"] in (1, 3, 9, 10, 12)
+        if item["name"].startswith("generic-"):
+            continue
         if item["type"] != 3:
             continue
         content = item["content"]
@@ -577,7 +604,9 @@ def test_workbook_schema_shapes_and_real_query_items(workbook):
         assert content["queryType"] == 0
         assert content["crossComponentResources"] == [WORKSPACE]
         assert content["resourceType"] == "microsoft.operationalinsights/workspaces"
-        assert content["timeContext"] == {"durationMs": 0}
+        assert "timeContext" not in content
+        if item["name"].startswith("tokens-"):
+            assert content["timeContextFromParameter"] == "TokenTimeRange"
         assert content["visualization"] in ("table", "tiles", "timechart")
         assert content["query"]
         if content["visualization"] == "timechart":
@@ -594,9 +623,9 @@ def test_workbook_schema_shapes_and_real_query_items(workbook):
 
 def test_templates_scope_selection_and_coverage_defaults(workbook):
     params = parameters(workbook)
-    assert params["Template"]["value"] == "retail-chat"
-    assert {v["value"] for v in json.loads(params["Template"]["jsonData"])} == {"retail-chat", "booking-chat", "support-chat"}
-    assert {v["label"] for v in json.loads(params["Navigation"]["jsonData"])} == {"Usage & outcomes", "Cost", "Model tokens"}
+    assert params["Template"]["value"] == "none"
+    assert {v["value"] for v in json.loads(params["Template"]["jsonData"])} == {"none", "retail-chat", "booking-chat", "support-chat"}
+    assert {v["label"] for v in json.loads(params["Navigation"]["jsonData"])} == {"Usage", "Cost", "Model tokens"}
     assert params["Store"]["value"] == "All"
     for name in ("Factory", "ScaleSet"):
         assert params[name]["isRequired"]
@@ -637,7 +666,9 @@ def test_opaque_identifiers_and_query_substitution(workbook_template):
     assert params["ScaleSet"]["value"] == scale_set
     assert base64.b64encode(factory.encode()).decode() in params["Factory"]["query"]
     assert factory not in params["Factory"]["query"]
-    for item in workbook["items"]:
+    for item in items(workbook).values():
+        if item["name"].startswith("generic-"):
+            continue
         for query in ([item["content"]["query"]] if item["type"] == 3 else []):
             tokens = re.findall(r"\{([A-Za-z]+)(?::([^}]+))?\}", query)
             assert all(name in params and (formatting == "base64" or
@@ -666,6 +697,39 @@ def test_shared_metric_queries_are_template_independent(workbook):
     assert "Q and F" in query
     assert "Questions >= 3" in query
     assert "LatestStates" in query and "StateBaselineComplete" in query
+
+
+def test_generic_project_hides_scenario_controls_and_reports(workbook):
+    all_items = items(workbook)
+    generic = all_items["generic-project"]
+    business = all_items["business-scenario"]
+    assert generic["type"] == business["type"] == 12
+    assert generic["conditionalVisibility"] == {
+        "parameterName": "Template", "comparison": "isEqualTo", "value": "none"}
+    assert business["conditionalVisibility"] == {
+        "parameterName": "Template", "comparison": "isNotEqualTo", "value": "none"}
+    business_items = items(business["content"])
+    for name in ("domain-cards", "common-cards", "reviewed-coverage", "cost-summary", "business-filters"):
+        assert name in business_items
+    generic_content = json.dumps(generic)
+    for forbidden in ("{Factory", "{ScaleSet", "{Store", "QuestionsComplete", "aifactory.chat"):
+        assert forbidden not in generic_content
+    assert "tokens-account-and-time" not in business_items
+
+
+def test_token_logs_bind_real_time_range_not_zero_second_transport(workbook):
+    for name in ("tokens-source-coverage", "tokens-log-validation", "tokens-log-model-totals",
+                 "tokens-log-daily", "tokens-log-daily-details"):
+        content = items(workbook)[name]["content"]
+        assert content["timeContextFromParameter"] == "TokenTimeRange"
+        assert "timeContext" not in content
+    for name in ("TokenMetricAccount", "TokenMetricView", "TokenDeployment", "TokenModel"):
+        content = parameters(workbook)[name]
+        assert content["timeContextFromParameter"] == "TokenTimeRange"
+        assert content["timeContext"]["durationMs"] > 0
+    cache_group = items(workbook)["tokens-native-cache-optional"]
+    assert cache_group["content"]["loadType"] == "explicit"
+    assert "tokens-native-cached-table" in items(cache_group["content"])
 
 
 def test_filters_precede_aggregation_and_conflicts_reject(workbook):
@@ -754,7 +818,8 @@ def test_sql_structural_parity_exact_cohorts_and_duplicate_conflicts(workbook):
 
 def test_native_token_metrics_are_real_scoped_controls_and_not_alias_sums(workbook):
     params = parameters(workbook)
-    native = [item for item in workbook["items"] if item["type"] == 10]
+    native = [item for item in items(workbook).values()
+              if item["type"] == 10 and item["name"].startswith("tokens-")]
     assert len(native) == 5
     for item in native:
         content = item["content"]

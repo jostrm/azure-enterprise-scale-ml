@@ -72,7 +72,12 @@ number / Environment**. There is no All-project choice in this view. The
 compound identity prevents Project `001` in one factory from including another
 factory's Project `001`.
 
-Select the business template in a dropdown. **Retail chat** is the default.
+The Azure-native workbook defaults to **None - Generic project**. This view
+needs no Retail/Booking/Support events: it reads native model usage, current
+resource inventory and Azure Cost Management for the project RG. Select a
+business template explicitly for instrumented outcomes. The separate
+application/API report examples below still use their explicit `retail-chat`
+template; native service activity is not relabeled as business activity.
 
 | Shared across every template | Retail chat | Booking chat | Support chat |
 |---|---|---|---|
@@ -498,7 +503,48 @@ data still require review after that deployment.
 cards below the consumption charts, ahead of service configuration. The existing resource
 links and native Cost Management link remain in place.
 
-The workbook provides **Usage & outcomes / Cost** navigation and
+#### Generic project view and source availability
+
+**Template = None - Generic project** is the default. The same workbook keeps
+**Usage / Cost / Model tokens** navigation without requiring a canonical
+factory, scale set, store, scenario or business-event coverage declaration for
+the generic view. Retail, Booking and Support remain optional and show their
+own controls and reports only when selected.
+
+Generic **Usage** prioritizes native input/output token charts for a discovered
+Foundry or OpenAI account in this exact RG. A unique account is auto-selected;
+multiple accounts require an explicit selection, and the label identifies the
+account rather than claiming an all-account total. Application HTTP request
+metrics are a separate optional section, followed by project resource inventory.
+Model calls, tokens and HTTP requests are not conversations, user questions or
+business outcomes.
+
+Generic **Cost** reads native RG `ActualCost` month-to-date through Azure
+Resource Manager / Cost Management. It does not depend on `aifactory.chat.meter`
+events. Returned currencies remain attached to their amounts; USD is only a
+labeled display fallback when no currency is available, never a conversion or
+an invented cost. Store/session attribution and imported/estimated meter costs
+remain separate business views, not substitutes for Azure billing. Native
+permission, throttling and API failures remain visible.
+
+The request-log token report binds its transport window to **TokenTimeRange**.
+Business KQL owns its explicit local-date and baseline-history bounds; discovery
+uses the last 90 days. Do not use `timeContext: { durationMs: 0 }` to mean
+"Set in query": the Portal emits `timespan=PT0S`, which can discard all matching
+observations even when the KQL date range is valid.
+
+Native `cacheReadInputTokens` is optional and model-dependent; its table is
+behind an explicit **Show optional native cache metric** control. Missing
+native cache series is not zero. Request-usage logs can still contain observed
+cached tokens independently. Business views require real `aifactory.chat` and
+`aifactory.chat.meter` events; no template can reconstruct cart/booking/support
+outcomes from service metrics.
+
+These workbook improvements are source changes until a separately approved
+dashboard-only deployment includes them. They add no telemetry collection,
+diagnostic settings, service resources or role assignments.
+
+The optional business view provides **Usage / Cost** navigation and
 **Retail / Booking / Support** templates. Shared usage, customer-feedback and
 three daily charts do not depend on the business template. The Cart section
 is replaced by booking or case state cards. Cost includes separate
