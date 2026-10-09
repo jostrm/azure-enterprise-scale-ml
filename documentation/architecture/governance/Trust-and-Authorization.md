@@ -5,6 +5,7 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_routes.py
   - mcp/src/aifactory_mcp/auth.py
   - mcp/src/aifactory_mcp/server.py
   - mcp/src/aifactory_mcp/access.py
@@ -13,11 +14,12 @@ tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_security.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_conversation.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_operations.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_routes.py
   - mcp/tests/test_auth.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py::function:authorize
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py::function:principal_from_token
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
+reviewed_source: '3e9102ee + working tree; observed 2026-10-07; live voice observed 2026-10-09 at 29642909'
 ---
 # Trust and authorization
 
@@ -26,6 +28,8 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 Authentication identifies a caller; current exact-scope grants authorize a permission; human review authorizes a specific mutation; cloud/provider identities and rights determine whether it can execute. No layer replaces another.
 
 Agent delegated-token validation checks signature, issuer, audience, lifetime, tenant, object identity, delegated scope and approved client. `authorize` deliberately avoids unioning permissions across different scopes. MCP application principals have separately explicit read-only identity/scope/tool bindings.
+
+The optional live voice relay reuses these checks: the Entra token sent in the first WebSocket frame is validated by `principal_from_token`, the exact-scope `knowledge.read` grant by `authorize`, and the session ends no later than token expiry. Speech, transcripts and spoken text are not authorization, and the Voice Live roles held by the application identity are service-level rights that never authorize a user.
 
 Model-facing tools intersect canonical safe definitions with backend availability. Closed schemas cannot carry arbitrary endpoints, filesystem paths, scopes or shell commands. Approval and execution remain outside the ordinary model answer loop.
 

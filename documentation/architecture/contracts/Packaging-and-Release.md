@@ -8,13 +8,15 @@ sources:
   - esml-v2/esml_build.py
   - usecase_code/40-agent-factory/40-aifactory-agent/deploy.py
   - usecase_code/40-agent-factory/40-aifactory-agent/readme.md
+  - usecase_code/40-agent-factory/40-aifactory-agent/infra/voice-roles.bicep
 tests:
   - environment_setup/azurefactory-cli/tests/test_enrollment_packaging.py
   - esml-v2/tests/test_esml_packaging.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_skill_packaging.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_packaging.py
 graph_symbols:
   - esml-v2/esml_build.py::function:_source
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
+reviewed_source: '3e9102ee + working tree; observed 2026-10-07; live voice observed 2026-10-09 at 29642909'
 ---
 # Packaging and release
 
@@ -31,6 +33,8 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 | Graph snapshot | Locally implemented immutable source/architecture evidence for offline queries; not full runtime/cloud discovery or publication proof. |
 
 The agent's cloud source snapshot is immutable. Refreshing retrieval against it does not fetch new local edits; first package/deploy an approved updated snapshot, then separately authorize ingestion. Ingestion may embed documents and mutate owned retrieval resources; inference is another operation.
+
+Live voice adds the pinned `websockets` wheel to the locked, offline-installable application dependencies, and an opt-in `infra/voice-roles.bicep` template that `deploy.py` applies only when `voice.enabled` is true (Cognitive Services User and Foundry User on the project Foundry account; never removed by turning voice off). `identity.bicep` keeps the project-scoped runtime role only. A pipeline-created app carries the tag `aifactory-integration: live-voice`; an app deployed by hand does not and is never replaced by the pipeline step.
 
 The SDK, Agent Factory operator and grounded application have different dependency/runtime requirements. Do not share environments based on similar directory names. Installed packages should be tested through their declared public surfaces, not accidental source-path imports.
 

@@ -1954,6 +1954,33 @@ blocked/unimplemented. Accepting an input does not implement its deployment.
 
 </details>
 
+## Agent Factory chat and live voice
+
+**Conditional/blocked:** two optional project-pipeline steps run in the foundry phase. `enableFactoryChatAgent`
+creates or updates the owned Foundry prompt agent. With `enableAIFactoryAgentLiveVoice` **also** set, a second step
+deploys the private chat web application with Azure Voice Live for **project001 Dev**, given an Entra registration,
+reader object IDs, an internal Container Apps environment and a succeeded model deployment. Saving flags changes
+configuration only. An approved pipeline run is separate; `false` skips a step, **not resource deletion**.
+
+<details markdown="1">
+<summary>More info</summary>
+
+| JSON/YAML setting (default disabled) | GHA environment name |
+|---|---|
+| `enableFactoryChatAgent` | `ENABLE_FACTORY_CHAT_AGENT` |
+| `enableAIFactoryAgentLiveVoice` | `ENABLE_AI_FACTORY_AGENT_LIVE_VOICE` |
+
+Inputs (default empty): `aifactoryAgentEntraAppId`, `aifactoryAgentReaderObjectIds`,
+`aifactoryAgentContainerAppsEnvironment`, `aifactoryAgentVoiceName`, `aifactoryAgentVoiceLanguages`
+(GHA `AIFACTORY_AGENT_ENTRA_APP_ID`, `AIFACTORY_AGENT_READER_OBJECT_IDS`,
+`AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT`, `AIFACTORY_AGENT_VOICE_NAME`, `AIFACTORY_AGENT_VOICE_LANGUAGES`).
+Voice without the chat flag fails loudly. The step never replaces an app deployed by hand; use the operator flow
+for that. See [chapter 21 — Agent Factory chat and live voice](21-agent-factory-chat.md) and the
+[options reference](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/azurefactory-cli/readme.md#ai-factory-agent-live-voice-options-project001-dev).
+If a flag is missing from the live `field_keys`/parameter schema, do not force it.
+
+</details>
+
 <a id="evidence-version-boundaries-and-validation"></a>
 
 <details markdown="1">

@@ -9,6 +9,11 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/web.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/browser_auth.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/graph_service.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_routes.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_settings.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/speech.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/voice.js
 tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_conversation.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_knowledge.py
@@ -16,11 +21,16 @@ tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_web.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_graph_integration.py
   - usecase_code/40-agent-factory/tests/test_factory_chat_agent.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_routes.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_session.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_speech.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_frontend.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::class:Conversation
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::function:Conversation.answer
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/graph_service.py::class:GraphQueryService
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice.py::class:VoiceSession
+reviewed_source: '3e9102ee + working tree; observed 2026-10-07; live voice observed 2026-10-09 at 29642909'
 ---
 # Chat and grounding
 
@@ -42,6 +52,14 @@ The app and opt-in project pipeline reuse the canonical prompt definition in
 citations and freshness limitations. The app appends `graph_query` only when
 dual-graph configuration is present, before hashing the deployment definition;
 the shared pipeline definition does not enable graph access by itself.
+
+## Optional live voice (speech shell)
+
+When `voice.enabled` is set, the application registers `GET /api/voice/status` and `WS /api/voice/ws`; otherwise neither route exists. Azure Voice Live is used only for speech to text, turn detection, noise suppression, echo cancellation and text to speech. The session is configured server side with `create_response` off, so the speech service never writes an answer. Each final transcript is answered by the same `Conversation.answer` call as a typed question (same exact-scope `knowledge.read` grant, readiness checks, retrieval, tools and citations). The answer is shown on the page and a shortened rendition from `speech.spoken_text` (no citation markers, links, code or long tables) is spoken.
+
+The browser never receives Foundry credentials: it connects to the application's relay, which holds the managed-identity connection to Voice Live. The Entra access token travels in the first WebSocket frame (never a URL), is validated by `principal_from_token` and `authorize`, and bounds the session so it ends no later than token expiry. Origin, pre-authentication, concurrency, audio-rate, idle and maximum-duration limits are enforced by the relay; the browser cannot choose the model, voice, instructions or tools. A transcript or spoken text is user input or evidence, never authorization. Audio is not stored; tokens and transcripts are not logged.
+
+Live voice needs Cognitive Services User and Foundry User on the project Foundry account (assigned from `infra/voice-roles.bicep` only when voice is enabled) and private reachability of the account's `services.ai.azure.com` endpoint from the application. Offline tests with fake backends, mutation checks of the relay's safety properties and real-browser runs cover the relay and UI. A live Voice Live session in a tenant is a separate observation (region, DNS, roles); passing tests do not establish it.
 
 ## Separation of operations
 

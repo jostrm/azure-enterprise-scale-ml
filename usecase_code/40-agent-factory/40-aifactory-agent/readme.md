@@ -376,7 +376,11 @@ working when voice is disabled, unavailable or blocked.
 Enable it with `"voice": {"enabled": true}` in the configuration. The project
 pipeline sets this when `enableAIFactoryAgentLiveVoice` is `true` next to
 `enableFactoryChatAgent`, which creates the Foundry Agent (see
-[47-aifactory-agent-live-voice](../47-aifactory-agent-live-voice/readme.md)).
+[47-aifactory-agent-live-voice](../47-aifactory-agent-live-voice/readme.md)). That step
+only creates apps it created itself (a read-only baseline configuration); for an app you
+deployed by hand, add the `voice` block to your own `config.local.json` and run `deploy.py`
+(the operator flow). The user guide is
+[chapter 21](../../../documentation/v2/10-19/21-agent-factory-chat.md).
 
 **How it works**
 

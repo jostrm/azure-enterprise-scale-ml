@@ -50,6 +50,7 @@ are not a guarantee of current availability in another subscription.
 | Factory MCP | MCP clients/servers and host adapters for available Factory capabilities. |
 | Private Azure MCP example | A distinct narrow, read-only Azure resource-tool example for workloads. |
 | Project001 Dev MCP/AI Gateway integration | An opt-in pipeline component with explicit image, identity and network prerequisites. |
+| Factory Agent Chat live voice | An opt-in speech layer (Azure Voice Live) on the same governed chat: talk to the agent and watch the voice orb listen, think and speak. Needs the chat agent flag, an Entra registration and private connectivity to Foundry. |
 
 These components do not bypass caller permissions or human approval. Enabling
 a conversational interface does not grant access to every factory or turn
@@ -63,7 +64,8 @@ Published references:
 [Factory Agent Chat](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/40-aifactory-agent/readme.md),
 [Factory MCP](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/mcp/readme.md),
 [private Azure MCP example](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/44-azure-mcp/readme.md),
-[gateway integration](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md).
+[gateway integration](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md),
+[Agent Factory chat and live voice](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/10-19/21-agent-factory-chat.md).
 
 The local dual graph combines code relationships and architecture notes. It is
 a navigation aid, not current Azure state. Unpublished graph/authentication or

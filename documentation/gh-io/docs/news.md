@@ -11,6 +11,7 @@ feature needs a particular API or runtime version.
 | CLI, Python SDK and REST tutorials | One whole-page tool selector, real Python examples and matching add/update/remove walkthroughs. | [Get started](factory-tools/18-cli-and-api-and-usage.md) |
 | Reviewed client shortcuts | Named configuration, settings, project/scale-set deletion preparation and local draft-removal helpers. Confirmation remains separate. | [Add and update](factory-tools/19-cli-and-api-and-usage.md), [remove and recover](factory-tools/20-cli-and-api-and-usage.md) |
 | MCP and AI Gateway integration | Opt-in project001 Dev component pipeline steps, with image, identity and network prerequisites. This is not a universal APIM-versus-Kong switch. | [Parameters](parameters/advanced.md#mcp-and-ai-gateway-parameters) |
+| Factory Agent Chat live voice | Optional Azure Voice Live speech for the chat: a pulsing voice orb, the same governed answers, `enableAIFactoryAgentLiveVoice` next to `enableFactoryChatAgent`. Opt-in, project001 Dev, off by default. | [Chapter 21](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/10-19/21-agent-factory-chat.md) |
 | AKS attached to Azure ML | The published template supplies the existing cluster's load-balancer subnet. | [IaC](iac/bicep.md) |
 | Usage, cost and monitoring | Native workbooks, sample/saved report interfaces and explicit Azure billing reads; missing data is not zero cost. | [Monitor and operate](intelligence.md) |
 

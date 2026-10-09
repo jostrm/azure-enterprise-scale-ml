@@ -20,6 +20,7 @@ Quick Setup
 * [25) Personas: Connecting people & agents to processes (DataOps, MLOps, GenAIOps) & tools(architectures and services)](#25-personas-connecting-people--agents-to-processes-dataops-mlops-genaiops--toolsarchitectures-and-services)
 * [26) UPDATE AIFactory: Update with new features](../v2/20-29/26-update-AIFactory.md)
 * [26) EXTEND AIFactory project type: With new Services, Your BICEP](../v2/20-29/27-extend-AIF-pipelines.md)
+* [21) Agent Factory chat & live voice: talk to your AI Factory (10-19 series, CoreTeam + ProjectTeam)](./10-19/21-agent-factory-chat.md)
 
 
 **Consumer related** - relevant for developers, data scientists, data engineers (ProjectTeam: 30-39)

@@ -9,15 +9,20 @@ sources:
   - usecase_code/40-agent-factory/agent_factory/prompt.py
   - usecase_code/40-agent-factory/agent_factory/hosted.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/services.py
+  - usecase_code/40-agent-factory/agent_factory/factory_chat_agent.py
+  - usecase_code/40-agent-factory/agent_factory/agent_live_voice.py
+  - usecase_code/40-agent-factory/47-aifactory-agent-live-voice/deploy.py
 tests:
   - usecase_code/40-agent-factory/tests/test_prompt.py
   - usecase_code/40-agent-factory/tests/test_hosted.py
   - usecase_code/40-agent-factory/tests/test_cli.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_services.py
+  - usecase_code/40-agent-factory/tests/test_factory_chat_agent.py
+  - usecase_code/40-agent-factory/tests/test_agent_live_voice.py
 graph_symbols:
   - usecase_code/40-agent-factory/agent_factory/cli.py::function:run
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/services.py::class:AgentServiceFactory
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
+reviewed_source: '3e9102ee + working tree; observed 2026-10-07; live voice observed 2026-10-09 at 29642909'
 ---
 # Agent Factory
 
@@ -31,6 +36,8 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 | Multi-agent examples | Knowledge/reviewer collaboration pattern; role names alone do not grant additional tools or permissions. |
 | `40-aifactory-agent` application | Grounded Factory Chat, exact-scope authorization, existing API adapters and durable human-approved operations. |
 | Backend functions | Execute client-side tool implementations. Creating a Foundry definition alone does not host those functions. |
+| Factory Chat Agent step (`46-factory-chat-agent`, `enableFactoryChatAgent`) | Opt-in late project-pipeline step that creates or versions the owned Foundry prompt agent from the canonical definition; idempotent by definition hash, never deletes, refuses a foreign owner. |
+| Live voice step (`47-aifactory-agent-live-voice`, `enableAIFactoryAgentLiveVoice`) | Opt-in late project-pipeline step for project001 Dev: verifies that owned agent (never creates it), builds the knowledge index and deploys the private chat application with Azure Voice Live using the application's own ownership-checked commands. Voice without the chat flag fails; an app deployed by hand is never replaced; false never deletes. |
 
 The shared operator and Factory Chat application have separate Python/dependency/configuration boundaries. Parent operator `--apply` conventions are not portable to Chat's immediate `ingest`/`deploy-agent` commands. Offline plans/help do not imply live connectivity; invocation and ingestion can incur model/service charges.
 
