@@ -115,6 +115,42 @@ def test_invalid_group_pattern_policy_fails_closed(patterns):
     assert not cloud.deleted
 
 
+def test_session_group_pattern_rejects_plan_before_source_or_provider_execution(workspace, monkeypatch):
+    document, cloud, _ = factory_prepared()
+    document["protected_resource_group_patterns"] = ["*REVIEWED*"]
+    seal(document)
+    source = workspace / "source"
+    source.mkdir()
+    verify = Mock(side_effect=AssertionError("Source/provider execution forbidden"))
+    monkeypatch.setattr(fl, "verify_source", verify)
+    cloud.verify_identity = verify
+    with pytest.raises(fl.Blocked, match="protected-resource-group"):
+        run = workspace / "execution"
+        fl.execute_factory_deletion_cohort([document], source, run, run / "receipt.json",
+                                          cloud_factory=lambda _: cloud)
+    verify.assert_not_called()
+    assert not cloud.deleted
+
+
+def test_preexecution_exact_closure_rejects_new_protected_managed_cascade(workspace, monkeypatch):
+    document, cloud, _ = factory_prepared()
+    document["protected_resource_group_patterns"] = ["*SPIDER*"]
+    seal(document)
+    cloud.bodies[RESOURCE.lower()]["properties"]["managedResourceGroupId"] = (
+        GROUP.rsplit("/", 1)[0] + "/managed-SpIdEr")
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    dispatch = Mock(side_effect=AssertionError("Provider dispatch forbidden"))
+    monkeypatch.setattr(fl, "ado_scoped", dispatch)
+    run = workspace / "execution"
+    result = fl.execute_factory_deletion_cohort([document], source, run, run / "receipt.json",
+                                              cloud_factory=lambda _: cloud)
+    assert result["status"] == "blocked", result
+    dispatch.assert_not_called()
+    assert not cloud.deleted
+
+
 def test_successful_provider_run_requires_bound_worker_deletion_evidence():
     module = runtime()
     document = manifest()
@@ -180,6 +216,27 @@ def test_prepare_freezes_project_flags_and_retains_shared_network():
     assert rows[SUBNET.lower()]["delete"] is True
     assert all(rows[value.lower()]["delete"] is False for value in (COMMON, VNET, SHARED_SUBNET))
     assert document["deletion"]["flags"] == dict.fromkeys(runtime().DELETE_FLAGS, True)
+    assert not cloud.deleted
+
+
+def test_bastion_is_retained_even_with_factory_ownership_tags():
+    document, cloud, projects = factory_prepared()
+    bastion = COMMON + "/providers/Microsoft.Network/bastionHosts/bastion"
+    owner = {key: value for key, value in OWNER.items() if key != "project_id"}
+    cloud.bodies[bastion.lower()] = tagged(bastion, "Microsoft.Network/bastionHosts", owner)
+    old_schema = cloud.provider_schema
+
+    def schema(namespace):
+        result = copy.deepcopy(old_schema(namespace))
+        if namespace.lower() == "microsoft.network":
+            result["resourceTypes"].append({"resourceType": "bastionHosts", "apiVersions": ["2024-05-01"]})
+        return result
+
+    cloud.provider_schema = schema
+    frozen = fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
+    row = next(entry for entry in frozen["resources"] if entry["id"].lower() == bastion.lower())
+    assert row["delete"] is False
+    assert row["retention_reason"] == "protected-infrastructure"
     assert not cloud.deleted
 
 

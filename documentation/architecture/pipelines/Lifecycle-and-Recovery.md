@@ -75,6 +75,12 @@ exact duplicate-free worker receipt and freshly observed ARM absence precede any
 common teardown. Final success and completed resume freshly verify every selected
 resource/group remains absent, rather than trusting recorded deletion IDs.
 
+VPN gateways and Bastion hosts are protected by resource type even when tagged
+with the factory's ownership. Their ancestor groups are retained. The named
+API/CLI's whole-group retention policy therefore blocks a group containing
+reusable connectivity; empty project inventories do not authorize common-group
+cascades or override those protections.
+
 `protected_resource_group_patterns` is an optional hash-bound manifest policy of
 case-insensitive RG-name globs. The guard blocks direct/nested deletions and
 managed-group cascades. A backend requiring it must freeze its policy on every
@@ -84,6 +90,12 @@ The CLI can add a local JSON-array policy via
 `AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS` and rechecks saved confirmation
 receipts against it. It does not send that local policy to the API or prove the
 server/worker enforces it.
+
+An operator session deny policy can be frozen in this manifest field without
+changing customer variables or inferring ownership from names. Apply it to every
+environment before hashing/review. Frozen matching groups/cascades are rejected
+before source/provider execution, and a newly changed managed cascade fails the
+fresh exact closure check before provider dispatch.
 
 Consumer lifecycle definitions are generated copies of
 `bootstrap/templates/factory-lifecycle-gha.yml` and `factory-lifecycle-ado.yml`,
