@@ -176,7 +176,17 @@ in `deletion_plan.retention_policy`: preserve reusable infrastructure, require
 limitations; an executable preview missing or contradicting this policy is
 rejected, including from an older server. No `--preserve-hub` shortcut invents
 runtime support. Protected/retained IDs come from the frozen plan and must
-match the preview. Hub/VPN/bootstrap/platform infrastructure inside an owned
+match the preview. Shared connectivity resource groups must be excluded from
+deletion targets/stages and retained in full, not just their VPN/Bastion resources.
+The CLI rejects any deletion inside a group whose name contains `connectivity`
+(case-insensitive). A plan may additionally declare exact
+`connectivity_resource_group_ids` for differently named groups; these must be
+unique RG ARM IDs explicitly included in its protected/retained inventory.
+The backend must freeze configured connectivity dependencies per environment and
+require runtime capability
+`factory_deletion_connectivity_retention=whole-connectivity-resource-groups-v1`.
+Older API/worker versions may still block preparation rather than exclude these
+groups. Other protected hub/bootstrap/platform infrastructure inside a selected
 group blocks preparation, rather than allowing a cascading group delete.
 Outside-group retained inventory is not proof of post-execution preservation.
 The selected immutable runtime must independently support the required contract.

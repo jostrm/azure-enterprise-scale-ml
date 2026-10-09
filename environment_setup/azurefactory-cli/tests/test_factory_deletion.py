@@ -235,6 +235,51 @@ def test_protected_group_pattern_blocks_prepare(tmp_path, transport, monkeypatch
     assert not (tmp_path / "receipt.json").exists()
 
 
+@pytest.mark.parametrize("group", [GROUP.upper(), HUB + "-undeclared"])
+def test_connectivity_group_must_be_retained_in_full(tmp_path, transport, group):
+    plan = transport.preview["deletion_plan"]
+    plan["connectivity_resource_group_ids"] = [group]
+    rehash(plan)
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+    assert len(transport.records) == 1
+
+
+def test_named_connectivity_group_is_never_a_deletion_target(tmp_path, transport):
+    named_group = GROUP.rsplit("/", 1)[0] + "/shared-CoNnEcTiViTy"
+    transport.preview = json.loads(json.dumps(transport.preview).replace(GROUP, named_group)
+                                   .replace("rg-factory-dev", "shared-CoNnEcTiViTy"))
+    rehash(transport.preview["deletion_plan"])
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+
+
+def test_whole_connectivity_group_retention_is_accepted(tmp_path, transport):
+    plan = transport.preview["deletion_plan"]
+    plan["connectivity_resource_group_ids"] = [HUB.upper()]
+    rehash(plan)
+    assert prepare(tmp_path) == 0
+
+
+def test_listing_connectivity_as_retained_cannot_authorize_its_deletion(tmp_path, transport):
+    plan = transport.preview["deletion_plan"]
+    plan["connectivity_resource_group_ids"] = [GROUP]
+    plan["retained_resources"] = [GROUP]
+    transport.preview["retained_resources"].append(GROUP)
+    rehash(plan)
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+
+
+@pytest.mark.parametrize("groups", ["hub", [RESOURCE], [None], [HUB, HUB.upper()]])
+def test_invalid_connectivity_groups_in_plan_fail_closed(tmp_path, transport, groups):
+    plan = transport.preview["deletion_plan"]
+    plan["connectivity_resource_group_ids"] = groups
+    rehash(plan)
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+
+
 def test_new_local_group_protection_blocks_existing_confirmation_receipt(tmp_path, transport, capsys, monkeypatch):
     make_receipt(tmp_path, transport, capsys)
     monkeypatch.setenv("AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS", '["*PROJECT*"]')

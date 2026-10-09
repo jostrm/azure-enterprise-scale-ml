@@ -23,9 +23,10 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_project_deletion_pipelines.py
 graph_symbols:
   - bootstrap/lib/factory_lifecycle.py::function:execute
+  - bootstrap/lib/factory_deletion_pipeline.py::function:connectivity_groups
   - bootstrap/lib/factory_lifecycle.py::class:BlobLocks
   - bootstrap/lib/factory_lifecycle.py::class:RepositoryCoordination
-reviewed_source: '1c1057c0 + isolated deletion-hardening working tree; observed 2026-10-09'
+reviewed_source: 'e53fcdc8 + isolated connectivity-retention working tree; observed 2026-10-09'
 ---
 # Lifecycle and recovery
 
@@ -57,11 +58,25 @@ exact duplicate-free worker receipt and freshly observed ARM absence precede any
 common teardown. Final success and completed resume freshly verify every selected
 resource/group remains absent, rather than trusting recorded deletion IDs.
 
-VPN gateways and Bastion hosts are protected by resource type even when tagged
-with the factory's ownership. Their ancestor groups are retained. The named
-API/CLI's whole-group retention policy therefore blocks a group containing
-reusable connectivity; empty project inventories do not authorize common-group
-cascades or override those protections.
+Connectivity RGs are retained in full, including all their network, DNS and
+supporting resources, even when tagged with the factory's ownership. Exact
+`connectivity_resource_group_ids` from resolved configuration/catalog must be
+frozen per environment within the locked scope/dependency union. Names containing
+`connectivity` (case-insensitive) and groups hosting VPN gateways/sites/connections,
+local network gateways or Bastion hosts also conservatively identify retention,
+never ownership. Effective group IDs are frozen in the deletion inventory and
+rederived on validation. Direct, nested and managed-cascade deletion into these
+groups is rejected.
+
+The named API must omit connectivity groups from deletable targets/stages, expose
+their exact RG IDs as retained/protected, and require runtime capability
+`factory_deletion_connectivity_retention=whole-connectivity-resource-groups-v1`.
+The CLI rejects connectivity-named deletion targets and contradictory declared
+connectivity retention. An older API may still block preparation instead of
+excluding a mixed common/connectivity group; these accelerator/CLI source changes
+are not proof of API/MAUI integration or an installed runtime update. Other
+protected infrastructure inside a selected whole-group target still blocks
+cascading deletion; empty inventories never override protection.
 
 `protected_resource_group_patterns` is an optional hash-bound manifest policy of
 case-insensitive RG-name globs. The guard blocks direct/nested deletions and

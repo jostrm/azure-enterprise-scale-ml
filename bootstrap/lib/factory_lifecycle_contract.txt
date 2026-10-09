@@ -44,6 +44,28 @@ Protected/shared/bootstrap/platform/VPN/Bastion resources and reusable hubs are 
 an explicitly protected selected ID, ambiguous ownership, unmanaged dependency,
 or overlapping mutable snapshots blocks rather than broadening deletion.
 
+Connectivity is shared infrastructure, not disposable factory ownership. The
+entire connectivity RG and EVERY inventoried resource inside it are retained,
+even with this factory's ownership tags. Optional manifest
+connectivity_resource_group_ids lists exact dependency RG ARM IDs from resolved
+configuration/catalog; arbitrary names require this explicit declaration. IDs
+must be unique (case-insensitively) and included in the locked scope/dependency
+union. Groups with "connectivity" in their name (case-insensitive), or containing
+VPN gateways/sites/connections, local network gateways or Bastion hosts, are
+also conservatively retained in full. This recognition only denies deletion:
+it is never ownership/adoption proof and does not authorize discovering new scopes.
+The sorted effective group IDs are frozen in deletion.connectivity_resource_group_ids
+and rederived during validation; direct, nested and managed-cascade deletion
+into those groups is forbidden. Their retained dependencies remain protected.
+The backend must freeze every configured connectivity dependency per environment,
+omit those groups from deletion targets/stages, and include the exact RG IDs
+in the whole-factory review's protected_resources or retained_resources.
+Require factory_deletion_connectivity_retention =
+whole-connectivity-resource-groups-v1 on the selected immutable runtime; an old
+source that only preserves VPN/Bastion resources does not meet this contract.
+The CLI rejects connectivity-named targets and contradictory declared connectivity
+RG retention; it cannot establish that an older API/worker implements this policy.
+
 Receipts and infinite Blob leases survive uncertain dispatch, provider failure,
 permission denial and incomplete teardown. Calling the same cohort with the same
 execution directory observes persisted run IDs instead of redispatching. Local

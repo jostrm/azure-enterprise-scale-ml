@@ -14,6 +14,9 @@ from urllib.parse import quote, unquote, urlsplit
 CONTRACT = "ordered-project-pipelines-v1"
 DELETE_FLAGS = ("enableDeleteForDisabledResources", "deleteAllServicesForProject",
                 "deleteKeyvaultAlso", "deleteAllForProject")
+CONNECTIVITY_TYPES = {"microsoft.network/virtualnetworkgateways", "microsoft.network/localnetworkgateways",
+                      "microsoft.network/vpngateways", "microsoft.network/vpnsites", "microsoft.network/connections",
+                      "microsoft.network/bastionhosts"}
 fl = None
 
 
@@ -58,9 +61,29 @@ def protected(body, explicit):
             or fl.project_resource_shared(body)
             or any(tags.get("aifactory." + name) == "true" for name in ("bootstrap", "platform", "protected", "reusable"))
             or (kind == "microsoft.machinelearningservices/workspaces" and str(body.get("kind", "")).lower() == "hub")
-            or kind in {"microsoft.network/virtualnetworkgateways", "microsoft.network/localnetworkgateways",
-                        "microsoft.network/vpngateways", "microsoft.network/vpnsites", "microsoft.network/connections",
-                        "microsoft.network/bastionhosts"})
+            or kind in CONNECTIVITY_TYPES)
+
+
+def connectivity_groups(document, bodies):
+    declared = document.get("connectivity_resource_group_ids", [])
+    fl.require(isinstance(declared, list)
+               and all(isinstance(value, str) and fl.RG_ID.fullmatch(value) for value in declared),
+               "factory-delete-connectivity-scopes-invalid")
+    groups = {value.lower() for value in declared}
+    scopes = {value.lower() for value in document["locks"]["scopes"] + document["locks"]["common_dependencies"]}
+    fl.require(len(groups) == len(declared) and groups <= scopes, "factory-delete-connectivity-scopes-invalid")
+    # Names and network types only deny deletion; they never establish ownership.
+    groups.update(fl.arm_scope(key) for key, body in bodies.items()
+                  if (fl.RG_ID.fullmatch(key) and "connectivity" in key.rsplit("/", 1)[-1].lower())
+                  or str(body.get("type", "")).lower() in CONNECTIVITY_TYPES)
+    return sorted(groups)
+
+
+def assert_connectivity_group_allowed(document, identifier, body):
+    groups = {fl.arm_scope(identifier)}
+    groups.update(fl.managed_group_cascades(body, document["target"]["subscription_id"]))
+    fl.require(not groups.intersection(document["deletion"]["connectivity_resource_group_ids"]),
+               "factory-delete-connectivity-group-deletion-forbidden")
 
 
 def validate_route(document):
@@ -112,12 +135,14 @@ def normalize_projects(document, projects):
 def freeze(cloud, document, ownership_records, registered_projects):
     validate_route(document)
     fl.protected_resource_group_patterns(document)
+    connectivity_groups(document, {})
     projects = normalize_projects(document, registered_projects)
     cloud.verify_identity()
     fl.BlobLocks(cloud, document).verify_enrollment()
     scopes = sorted(set(document["locks"]["scopes"] + document["locks"]["common_dependencies"]), key=str.lower)
     writable = {scope.lower() for scope in document["locks"]["scopes"]}
     closure, bodies = fl.collect_resource_closure(cloud, scopes)
+    connectivity = set(connectivity_groups(document, bodies))
     fl.verify_deletion_identity(document, bodies)
     worker = copy.deepcopy(document)
     worker["identity"]["object_id"] = document["identity"]["deployment_object_id"]
@@ -155,7 +180,7 @@ def freeze(cloud, document, ownership_records, registered_projects):
             fl.require(any(key == value or key.startswith(value + "/") for value in registered),
                        "factory-delete-project-resource-unregistered")
         metadata = closure["groups"].get(key, closure["resources"].get(key))
-        keep = protected(body, explicit)
+        keep = protected(body, explicit) or fl.arm_scope(key) in connectivity
         if key in explicit:
             fl.require(not selected, "factory-delete-protected-resource-selected")
         entries[key] = {"id": body["id"], **metadata, **proof,
@@ -167,7 +192,8 @@ def freeze(cloud, document, ownership_records, registered_projects):
         if entries[key]["delete"]:
             fl.assert_deletion_group_allowed(document, key, body)
         if not entries[key]["delete"]:
-            entries[key]["retention_reason"] = ("protected-infrastructure" if keep else
+            entries[key]["retention_reason"] = ("shared-connectivity-resource-group" if fl.arm_scope(key) in connectivity else
+                "protected-infrastructure" if keep else
                 "outside-registered-ownership" if not selected else "read-only-dependency")
         if selected and key in closure["resources"] and entries[key]["delete"]:
             fl.require(not str(metadata["type"]).lower() in
@@ -215,6 +241,7 @@ def freeze(cloud, document, ownership_records, registered_projects):
             "flags": dict.fromkeys(DELETE_FLAGS, True), "projects": projects, "resource_groups": groups,
             "resources": resources, "inventory_hash": fl.digest(resources), "closure": closure,
             "closure_hash": fl.digest(closure), "bodies": bodies, "protected_resource_ids": sorted(explicit),
+            "connectivity_resource_group_ids": sorted(connectivity),
             "configuration_hash": fl.digest(document["config"]),
             "route_hash": fl.digest(document["route"]), "source_hash": fl.digest(document["source"])}
     validate({**document, "deletion": data})
@@ -246,6 +273,8 @@ def validate(document):
     entries = {row["id"].lower(): row for row in groups + resources}
     fl.require(len(entries) == len(groups + resources) and set(entries) == set(data["bodies"]),
                "factory-delete-complete-inventory-required")
+    fl.require(data.get("connectivity_resource_group_ids") == connectivity_groups(document, data["bodies"]),
+               "factory-delete-connectivity-scopes-changed")
     fl.protect_coordination_storage(document)
     for key, row in entries.items():
         fl.require(type(row.get("delete")) is bool and row.get("body_hash") == fl.digest(data["bodies"][key]),
@@ -257,6 +286,7 @@ def validate(document):
         fl.require(row.get("project_number") == expected_number, "factory-delete-project-stage-mismatch")
         if not row["delete"]:
             continue
+        assert_connectivity_group_allowed(document, key, data["bodies"][key])
         fl.assert_deletion_group_allowed(document, key, data["bodies"][key])
         fl.require(fl.arm_scope(key) in {scope.lower() for scope in document["locks"]["scopes"]}
                    and all(row.get("owner", {}).get(field) == document["target"][field]
@@ -385,6 +415,7 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
                     receipt["deleted_resources"].append(child["id"])
             persist()
             continue
+        assert_connectivity_group_allowed(document, row["id"], body)
         fl.assert_deletion_group_allowed(document, row["id"], body)
         fl.verify_project_inventory(cloud, document, removed)
         if fl.RG_ID.fullmatch(key):
