@@ -66,6 +66,11 @@
     "repository_root": "..\\..\\..",
     "profiles": {}
   },
+  "voice": {
+    "enabled": false,
+    "voice_name": "en-US-Ava:DragonHDLatestNeural",
+    "input_languages": ["en-US"]
+  },
   "auth": {
     "client_id": null,
     "audience": null,

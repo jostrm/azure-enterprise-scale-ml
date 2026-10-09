@@ -30,6 +30,9 @@ are distinct operations.
 - A dedicated Entra registration or an approved existing one is needed for web
   sign-in. Unconfigured sign-in fails closed. Operator CLI questions use the
   actual signed-in user's object ID and the same configured authorization.
+- Live voice (Azure Voice Live) is optional and off by default. It adds speech in
+  and out only: authorization, scope, retrieval, tools and citations still come
+  from the same governed backend (see [Live voice](#live-voice-optional)).
 
 ## Prerequisites
 
@@ -361,6 +364,86 @@ The bootstrap needs Blob-role propagation and private DNS. The startup probe
 allows bounded initialization time. `/health/live` means process alive;
 `/health/ready` includes prerequisites and must not be interpreted as operational
 readiness while sign-in or knowledge is blocked.
+
+## Live voice (optional)
+
+Talk to the agent like a voice assistant. The page shows a voice card with a
+pulsing circular orb that reflects what the agent is doing: *connecting*,
+*listening*, *thinking*, *speaking* or *error*. With reduced-motion preferences
+the orb stays still and the state is still announced as text. Typing keeps
+working when voice is disabled, unavailable or blocked.
+
+Enable it with `"voice": {"enabled": true}` in the configuration. The project
+pipeline sets this when `enableAIFactoryAgentLiveVoice` is `true` next to
+`enableFactoryChatAgent`, which creates the Foundry Agent (see
+[47-aifactory-agent-live-voice](../47-aifactory-agent-live-voice/readme.md)).
+
+**How it works**
+
+- Azure **Voice Live** (`api-version` `2026-04-10`) is a *speech shell*: speech to
+  text, turn detection, noise suppression, echo cancellation and text to speech.
+  It never writes the answer (`create_response` is off).
+- Every final transcript is answered by the same governed `Conversation.answer()`
+  as a typed question: same sign-in, exact scope grant, readiness checks,
+  retrieval, tools, citations and audit. The full answer and its citations appear
+  in the normal answer card; a short spoken rendition (no citation markers,
+  markdown, URLs or code, long tables summarised as "...is on screen") is spoken.
+- The browser never receives Foundry credentials. It opens
+  `WS /api/voice/ws` on the application; the backend connects to
+  `wss://<foundry-account>.services.ai.azure.com/voice-live/realtime` with its
+  managed identity (token scope `https://ai.azure.com/.default`).
+- The first frame carries the caller's Entra access token, scope and audience
+  (never a URL or cookie). The server validates the token and the exact-scope
+  `knowledge.read` grant, checks the `Origin`, caps pre-authentication sockets,
+  rate-limits audio, ends idle or over-long sessions (never later than the expiry of
+  the token that opened them) and replaces a user's older session with the newer one. The browser cannot choose the model, voice,
+  instructions or tools.
+- Speaking while the agent answers (barge-in) cancels the pending answer and the
+  speech. Tokens and transcripts are never logged; errors shown to the browser
+  carry no internal detail.
+- The `Permissions-Policy` header allows the microphone only for the application
+  itself when voice is enabled and denies it otherwise. The routes
+  `/api/voice/status` and `/api/voice/ws` do not exist when voice is disabled.
+
+**Configuration** (`voice` block; all optional except `enabled`)
+
+| Field | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Registers the voice routes and shows the voice card. |
+| `endpoint` | derived | `https://<foundry-account>.services.ai.azure.com` from `azure.foundry_account`; only Foundry/Cognitive Services hosts are accepted. |
+| `model` | `gpt-4.1-nano` | Voice Live billing tier (the model does not answer). Pick a tier available in your region. |
+| `voice_name` | `en-US-Ava:DragonHDLatestNeural` | Fixed for the whole session. |
+| `input_languages` | `["en-US"]` | Explicit BCP-47 speech languages (1-10). |
+| `turn_detection` | `azure_semantic_vad` | Also `azure_semantic_vad_multilingual`, `server_vad`; `silence_duration_ms` 500. |
+| `max_session_seconds` / `idle_timeout_seconds` | `900` / `120` | Session bounds. |
+| `max_concurrent_sessions` | `4` | Per application replica. |
+| `max_spoken_characters` / `answer_timeout_seconds` | `1200` / `120` | Spoken length and backend answer deadline. |
+| `greeting` | "Factory Agent online. How can I help?" | `null` for silence. |
+| `allowed_origins` | `[]` | Extra browser origins; same-origin is always allowed. |
+
+**Identity and network.** With voice enabled, `deploy.py` adds two roles to the
+application identity on the project Foundry account: *Cognitive Services User* and
+*Azure AI User* (never removed when voice is turned off). *Cognitive Services User*
+can also list keys while local authentication is enabled on the account; prefer keeping
+local authentication disabled. Whether *Azure AI User* alone is enough for the Voice Live
+data plane is not verified here: check it in a test environment, then drop the
+broader role in `infra/identity.bicep`. The application must resolve and reach the
+Foundry `services.ai.azure.com` private endpoint. The ingress transport (`http`, HTTP/1.1)
+already supports WebSockets.
+
+**Languages.** Swedish is not in the automatic multilingual language list: set
+`input_languages` to, for example, `["sv-SE", "en-US"]` and a Swedish voice such as
+`sv-SE-SofieNeural`. Voice quality and language coverage differ per region and voice.
+
+**Cost.** Voice Live is billed per use by the tier of the configured `model`, even
+though that model writes no answer here, in addition to the grounded answer's model
+and Search usage. HD voices are regional. Sessions are bounded by
+`max_session_seconds`. Verify current rates for your agreement; none are invented here.
+
+**Limits.** Each utterance is a standalone question (the same as typed chat); the
+agent does not speak filler while it thinks; session caps are per replica; and the
+live handshake through the private endpoint was not exercised against Azure in this
+repository's tests, which use fakes and a real browser.
 
 ## Authentication, tools and approvals
 
@@ -696,6 +779,9 @@ Model/embedding usage, storage, monitoring, requests and existing environment
 charges are additional. GPT 6.1 prices were not present in the queried retail
 records; the public pricing page exposed placeholders. No total model price is
 invented. Use your verified agreement/calculator rates and actual usage.
+
+Optional live voice adds Azure Voice Live usage (see [Live voice](#live-voice-optional)),
+billed by speech tier and audio duration; it is off by default.
 
 ## Automated tests and evaluations
 

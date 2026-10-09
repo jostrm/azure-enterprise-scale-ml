@@ -191,7 +191,9 @@ def create_app(settings: Settings, *, services: AgentServices | None = None) -> 
         "form-action 'none'"
     )
     headers = {"Content-Security-Policy": csp, "X-Content-Type-Options": "nosniff",
-               "Referrer-Policy": "no-referrer", "Cache-Control": "no-store"}
+               "Referrer-Policy": "no-referrer", "Cache-Control": "no-store",
+               "Permissions-Policy": ("microphone=(self), camera=(), geolocation=()" if settings.voice.enabled
+                                      else "microphone=(), camera=(), geolocation=()")}
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -556,6 +558,10 @@ def create_app(settings: Settings, *, services: AgentServices | None = None) -> 
                 "message": "Continuation could not be confirmed. Inspect the saved operation; do not retry.",
             }}, status_code=503)
         return record
+
+    if settings.voice.enabled:
+        from .voice_routes import register_voice
+        register_voice(app)
 
     @app.get("/")
     def frontend():

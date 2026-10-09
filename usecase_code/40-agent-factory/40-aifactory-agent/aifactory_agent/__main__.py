@@ -67,7 +67,8 @@ def main(argv=None, *, services: AgentServices | None = None, principal_provider
         from .telemetry import configure
         from .web import create_app
         configure(settings)
-        uvicorn.run(create_app(settings, services=services), host="0.0.0.0", port=args.port, proxy_headers=False)
+        uvicorn.run(create_app(settings, services=services), host="0.0.0.0", port=args.port, proxy_headers=False,
+                    ws_max_size=1 << 20)
         return
     print(json.dumps(result, indent=2, ensure_ascii=True, default=str))
 

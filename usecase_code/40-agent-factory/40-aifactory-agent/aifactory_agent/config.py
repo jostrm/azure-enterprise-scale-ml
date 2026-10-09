@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .actions import ActionSettings
 from .costs import CostSettings
+from .voice_settings import VoiceSettings
 from .workloads import WorkloadSettings
 
 
@@ -148,6 +149,7 @@ class Settings(ClosedModel):
     actions: ActionSettings = Field(default_factory=ActionSettings)
     costs: CostSettings = Field(default_factory=CostSettings)
     workloads: WorkloadSettings = Field(default_factory=WorkloadSettings)
+    voice: VoiceSettings = Field(default_factory=VoiceSettings)
     agent_name: str = Field(default="enterprise-scale-ai-factory", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9-]{1,62}$")
     agent_version: str | None = None
     agent_invocation: Literal["project_reference", "agent_endpoint"] = "project_reference"

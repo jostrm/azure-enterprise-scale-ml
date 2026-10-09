@@ -37,6 +37,7 @@
     hostRenewal: null,
     hostNextRenewalAt: 0,
   };
+  const moduleListeners = new Set();
   const HOST_PROTOCOL = "esaif.agentChat";
   const HOST_RENEWAL_MARGIN_MS = 4 * 60 * 1000;
   const statusLabels = {
@@ -409,6 +410,9 @@
     ui("view-help").textContent = state.audience === "platform"
       ? "Platform guidance emphasizes shared architecture, governance and team responsibilities."
       : "Project guidance emphasizes use-case onboarding and self-service.";
+    for (const listener of moduleListeners) {
+      try { listener(); } catch { /* an optional module must never break the page */ }
+    }
   }
 
   function proposalBlocker() {
@@ -766,6 +770,25 @@
     if (!ui("citations").children.length) ui("citations").append(node("li", "No cited source was returned."));
   }
 
+  function showAnswer(result) {
+    answerRenderer.render(result.answer, ui("answer"), result.citations || []);
+    ui("answer-context").textContent = "Scope: " + result.scope_key + " · view: " + result.audience
+      + " · correlation: " + result.correlation_id;
+    renderSources(result.citations);
+    const activity = result.tool_activity || [];
+    ui("tool-activity").textContent = activity.length
+      ? "Backend tool calls: " + activity.map((item) => item.name).join(", ")
+        + ". Consult persisted plans below; a call is not proof of successful execution."
+      : "No backend tool calls reported for this answer.";
+    ui("request-status").textContent = "Answer received. Chat is read-only; existing persisted plans require separate approval and execution.";
+    if (result.graph_context && result.graph_context.status !== "not_requested") {
+      const graph = result.graph_context;
+      ui("request-status").textContent += " Graph context: " + (graph.status || "unknown")
+        + (graph.snapshot_id ? " (snapshot " + graph.snapshot_id + ")" : "")
+        + ". " + (graph.warnings || []).join("; ") + " Snapshot evidence is not live state.";
+    }
+  }
+
   async function ask(event) {
     event.preventDefault();
     if (state.busy || !permitted("knowledge.read")) return;
@@ -784,22 +807,7 @@
       const result = await api("/api/chat", {method: "POST", body: {
         question, audience: submittedView, scope_key: submittedScope,
       }});
-      answerRenderer.render(result.answer, ui("answer"), result.citations || []);
-      ui("answer-context").textContent = "Scope: " + result.scope_key + " · view: " + result.audience
-        + " · correlation: " + result.correlation_id;
-      renderSources(result.citations);
-      const activity = result.tool_activity || [];
-      ui("tool-activity").textContent = activity.length
-        ? "Backend tool calls: " + activity.map((item) => item.name).join(", ")
-          + ". Consult persisted plans below; a call is not proof of successful execution."
-        : "No backend tool calls reported for this answer.";
-      ui("request-status").textContent = "Answer received. Chat is read-only; existing persisted plans require separate approval and execution.";
-      if (result.graph_context && result.graph_context.status !== "not_requested") {
-        const graph = result.graph_context;
-        ui("request-status").textContent += " Graph context: " + (graph.status || "unknown")
-          + (graph.snapshot_id ? " (snapshot " + graph.snapshot_id + ")" : "")
-          + ". " + (graph.warnings || []).join("; ") + " Snapshot evidence is not live state.";
-      }
+      showAnswer(result);
       await refresh();
     } catch (error) {
       showError(error.message);
@@ -1308,5 +1316,21 @@
       void refresh().catch((error) => showError(error.message));
     }
   }, 10000);
+  // Narrow surface for optional page modules (live voice): the verified session snapshot, the shared answer
+  // rendering, and change notifications. Nothing here can perform an action the signed-in user could not.
+  Object.defineProperty(window, "AIFactoryAgent", {
+    value: Object.freeze({
+      voiceSession() {
+        if (!state.token || Date.now() >= state.expiresAt || !state.context || !permitted("knowledge.read")) return null;
+        return {token: state.token, expiresAt: state.expiresAt, scopeKey: state.scopeKey, audience: state.audience};
+      },
+      showAnswer,
+      subscribe(listener) {
+        moduleListeners.add(listener);
+        return () => moduleListeners.delete(listener);
+      },
+    }),
+    configurable: false, writable: false,
+  });
   void initialize();
 })();

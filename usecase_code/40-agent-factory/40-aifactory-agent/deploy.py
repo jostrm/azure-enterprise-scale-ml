@@ -44,6 +44,21 @@ def resource_names(settings):
     }
 
 
+def identity_permissions(settings) -> list[str]:
+    permissions = ["Search index data read", "Owned Blob container read/write", "OpenAI embeddings/inference",
+                   ("Invocation of the configured agent endpoint only" if settings.agent_invocation == "agent_endpoint"
+                    else "Foundry project Responses execution"),
+                   "Resource-group inventory read"]
+    if settings.voice.enabled:
+        permissions.append("Azure Voice Live on the Foundry account: Cognitive Services User and Foundry User (Azure AI User); "
+                           "live voice only, broader than the project-scoped runtime role, never removed by turning it off")
+    return permissions
+
+
+def voice_role_arguments(identity_name: str, names: dict) -> list[str]:
+    return [f"identityName={identity_name}", f"foundryAccount={names['foundryAccount']}"]
+
+
 def graph_bundle(settings) -> dict | None:
     config = settings.dual_graph
     if config is None:
@@ -179,11 +194,7 @@ def main():
             "additions": [args.identity_name, args.app_name, args.refresh_identity_name, args.refresh_job_name],
             "reuse": {"environment": args.environment, **names},
             "image": IMAGE, "network_changes": False,
-            "identity_permissions": ["Search index data read", "Owned Blob container read/write",
-                                    "OpenAI embeddings/inference",
-                                    ("Invocation of the configured agent endpoint only" if settings.agent_invocation == "agent_endpoint"
-                                     else "Foundry project Responses execution"),
-                                    "Resource-group inventory read"],
+            "identity_permissions": identity_permissions(settings),
             "refresh_job": {"schedule_utc": args.refresh_schedule, "source": "approved immutable repository snapshot",
                             "permissions": ["Search schema read/documents write", "Owned Blob state", "Embeddings"]},
             "entra_changes": False, "factory_api_host": False}
@@ -201,6 +212,10 @@ def main():
                   "--parameters", f"location={settings.location}", f"identityName={args.identity_name}",
                   *(f"{key}={value}" for key, value in names.items()))
     client_id = identity["properties"]["outputs"]["clientId"]["value"]
+    if settings.voice.enabled:
+        az("deployment", "group", "create", *common, "--name", "aifactory-agent-voice-roles",
+           "--template-file", str(BASE / "infra" / "voice-roles.bicep"),
+           "--parameters", *voice_role_arguments(args.identity_name, names))
     bundle = BASE / ".build" / "agent-bundle.tar.gz"
     result = package(settings, client_id, bundle)
     blob_name = f"deployments/{result['sha256']}/agent-bundle.tar.gz"

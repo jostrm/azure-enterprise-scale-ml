@@ -16,9 +16,12 @@
   <meta name="referrer" content="no-referrer">
   <title>Enterprise Scale AI Factory Agent</title>
   <link rel="stylesheet" href="/static/theme.css">
+  <link rel="stylesheet" href="/static/voice.css">
   <script src="/static/vendor/markdown-it.min.js" defer></script>
   <script src="/static/markdown.js" defer></script>
   <script src="/static/app.js" defer></script>
+  <script src="/static/voice-orb.js" defer></script>
+  <script src="/static/voice.js" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -62,6 +65,21 @@
         </section>
       </aside>
       <div class="content">
+        <section id="voice-card" class="card voice-card" aria-labelledby="voice-heading" hidden>
+          <h2 id="voice-heading">Talk to the Factory Agent</h2>
+          <p id="voice-help" class="muted">Live voice asks the same read-only, scope-bound agent as typed questions and reads the answer back. The full answer and its sources appear below. The microphone is used only while a session is running; this app does not store audio.</p>
+          <div class="voice-stage">
+            <canvas id="voice-orb" class="voice-orb" width="320" height="320" role="img" aria-label="Voice activity light"></canvas>
+            <p id="voice-state" class="voice-state" role="status" aria-live="polite">Voice is off</p>
+          </div>
+          <div class="voice-controls">
+            <button id="voice-toggle" type="button" aria-pressed="false" disabled>Start talking</button>
+            <button id="voice-mute" type="button" class="secondary" aria-pressed="false" disabled>Mute microphone</button>
+            <button id="voice-interrupt" type="button" class="secondary" disabled>Stop speaking</button>
+          </div>
+          <div id="voice-transcript" class="voice-transcript" aria-live="polite"></div>
+          <p id="voice-error" class="error" role="status" hidden></p>
+        </section>
         <section class="card" aria-labelledby="question-heading">
           <h2 id="question-heading">Ask the Factory expert</h2>
           <p class="muted" id="question-examples-help">Read-only examples for the active scope. Choose a question to edit it, then press Ask agent yourself. No example sends automatically.</p>
