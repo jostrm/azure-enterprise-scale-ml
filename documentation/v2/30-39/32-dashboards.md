@@ -498,6 +498,16 @@ data still require review after that deployment.
 
 #### Activity and solution assets beside accumulated cost
 
+The common AI Factory dashboard includes **Number of resources by region**,
+immediately right of the first connectivity/hub resource-group tile. Its native
+Workbook map pin queries Resource Graph live across the exact known hub, common
+and project RG IDs in the retained factory inventory, including configured
+environments. It never broadens to all resources in those subscriptions. Blue
+bubbles show resource counts only. Connectivity cost/activity tiles remain
+beside the map; additional hub rows do not overlap environment/project rows.
+The pin has no frozen health-parameter snapshot or misleading project-only
+workbook link. Inventory/read permission filtering still limits visible counts.
+
 The shared AI Factory dashboard adds an **Activity & solution assets** card
 immediately to the right of each hub, common and project accumulated-cost tile.
 Environment bands include the additional card without overlapping neighboring
@@ -565,19 +575,29 @@ or application traffic. Global/non-geographic resources remain inventory, not
 invented map points. Native Portal styling applies; this is not a custom HTML
 dashboard or a pixel-identical rendering of the desktop charts.
 
-Map circles use **health, not resource count, for color**; count controls size.
-Red means a Resource Health `Unavailable`/`Degraded` signal or an active
+Both resource maps are titled **Number of resources by region** and use
+**blue circles**. Their numbers and circle sizes represent visible resources,
+not incidents or healthy/unhealthy status. For example, `87` means 87 resources,
+not 87 health issues. In the project workbook, **Explore resources by region**
+opens a region selector and a resource table; clicking a resource name opens its
+Azure resource page. Select `northeurope` to identify any resources placed there.
+Global/unmapped locations remain in the selector/table, not invented map points.
+
+Health is separate under **Regional advisories and issue details**, with a
+coverage table, clickable advisory titles, reported-resource links, and direct
+Azure Service Health navigation. A reported issue means Resource Health
+`Unavailable`/`Degraded` or an active
 subscription-level regional service issue/advisory/maintenance event whose
 impact has begun. A regional advisory is context, not proof the project or all
 its services are affected. Green requires every mapped resource to have a
 reported `Available` state, both source queries to complete, and no visible
-regional event. Unknown, unsupported or incomplete coverage is gray, not green.
-The optional inventory details expose available/unknown resource counts and
+regional event. Unknown, unsupported or incomplete coverage stays unknown.
+The health details expose available/unknown resource counts separately from
 regional-event counts/services. Query/permission errors remain visible.
 
 Resource Health and Service Health are queried independently: Azure Resource
 Graph does not support joining both health tables in one cross-table query.
-Their scoped, bounded results feed the resource-location map through escaped
+Their scoped, bounded results feed the separate health details through escaped
 query-backed parameters. Service events are subscription-scoped; only locations
 containing this project's resources are displayed. Capacity issues appear only
 when Azure reports a related health event: there is no real-time regional/SKU

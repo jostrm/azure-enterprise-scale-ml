@@ -3,7 +3,8 @@ ServiceHealthResources
 | where subscriptionId =~ '__SUBSCRIPTION__'
 | where tostring(properties.Status) =~ 'Active'
 | where tostring(properties.EventType) in~ ('ServiceIssue', 'HealthAdvisory', 'SecurityAdvisory', 'PlannedMaintenance')
-| extend ImpactStart=todatetime(properties.ImpactStartTime)
+| extend ImpactStart=coalesce(todatetime(properties.ImpactStartTime),
+    unixtime_milliseconds_todatetime((tolong(properties.ImpactStartTime) - 621355968000000000) / 10000.0))
 | where isnull(ImpactStart) or ImpactStart <= now()
 | extend Impacts=properties.Impact, Incomplete=isnull(properties.Impact) or array_length(properties.Impact) == 0 or array_length(properties.Impact) > 2000
 | extend Impacts=iff(isnull(Impacts) or array_length(Impacts) == 0, pack_array(dynamic({})), Impacts)
@@ -16,9 +17,19 @@ ServiceHealthResources
     AffectedService=tostring(ServiceImpact.ImpactedService),
     ActiveRegion=tostring(RegionImpact.Status) =~ 'Active',
     Incomplete=Incomplete or isempty(tostring(RegionImpact.Status)) or isempty(tostring(RegionImpact.ImpactedRegion))
+| where set_has_element(parse_json("{GenericProjectRegions:escapejson}"), Location) or Location == 'global' or Incomplete
+| extend EventSummary=pack('trackingId', tostring(properties.TrackingId), 'scope', 'Subscription',
+    'impactedSubscriptions', pack_array(subscriptionId))
+| extend EventURL=strcat('https://portal.azure.com/#view/Microsoft_Azure_Health/DetailsPage.ReactView/fromDeeplink~/false/index~/0/selectedEventSummary~/',
+    url_encode_component(tostring(EventSummary)), '/trackingId/', url_encode_component(tostring(properties.TrackingId)),
+    '/impactedSubs~/', url_encode_component(tostring(pack_array(subscriptionId))), '/scope/Subscription')
 | summarize EventIds=make_set_if(id, ActiveRegion, 10000), Services=make_set_if(AffectedService, ActiveRegion, 10000),
+    EventDetails=make_set_if(pack('title', tostring(properties.Title), 'type', tostring(properties.EventType),
+        'status', tostring(properties.Status), 'trackingId', tostring(properties.TrackingId),
+        'service', AffectedService, 'region', tostring(RegionImpact.ImpactedRegion), 'start', tostring(ImpactStart),
+        'url', EventURL), ActiveRegion, 2000),
     SourceRows=count(), Incomplete=max(toint(Incomplete)) by Location
-| extend Evidence=pack('events', array_length(EventIds), 'services', Services)
+| extend Evidence=pack('events', array_length(EventIds), 'services', Services, 'details', EventDetails)
 | summarize RegionCount=count(), Regions=make_bag(pack(Location, Evidence), 1000),
     Incomplete=max(Incomplete), LargestRegionRows=max(SourceRows)
-| project value=tostring(pack('complete', RegionCount <= 1000 and coalesce(Incomplete, 0) == 0 and coalesce(LargestRegionRows, 0) <= 10000, 'regions', Regions))
+| project value=tostring(pack('complete', RegionCount <= 1000 and coalesce(Incomplete, 0) == 0 and coalesce(LargestRegionRows, 0) <= 2000, 'regions', Regions))

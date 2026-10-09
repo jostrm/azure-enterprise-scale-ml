@@ -220,7 +220,7 @@ def test_kpis_and_paired_charts_precede_all_optional_details(items):
         "generic-inventory-types", "generic-inventory-locations",
     ]
     assert names.index("generic-inventory-summary") < names.index(chart_names[0])
-    assert names[names.index(chart_names[0]):names.index(chart_names[-1]) + 1] == chart_names
+    assert [name for name in names if name in chart_names] == chart_names
     heading = items["generic-usage-heading"]["content"]["json"]
     assert len(heading.splitlines()) == 2
     assert len(heading.splitlines()[1]) < 150
@@ -238,7 +238,7 @@ def test_kpis_and_paired_charts_precede_all_optional_details(items):
     assert "generic-inventory" not in items, "Large inventory is not a primary-viewport item"
     details = items["generic-inventory-details"]["content"]
     assert details["loadType"] == "explicit"
-    assert {item["name"] for item in details["items"]} == {"generic-inventory", "generic-health-details"}
+    assert {item["name"] for item in details["items"]} == {"generic-inventory", "generic-resource-region-selector"}
     for name in ("generic-native-details", "generic-inventory-details", "generic-http-optional"):
         assert names.index(name) > names.index(chart_names[-1])
         assert items[name]["content"]["loadType"] == "explicit"
@@ -259,7 +259,7 @@ def test_native_region_and_composition_visuals_keep_all_locations(items):
     assert settings["sizeSettings"] == settings["legendMetric"] == "Resources"
     assert settings["sizeAggregation"] == settings["legendAggregation"] == "Sum"
     assert "where isnotempty(location) and location !~ 'global'" in region_map["query"]
-    assert "health" in region_map["title"]
+    assert region_map["title"] == "Number of resources by region"
     types = nested["generic-inventory-types"]
     assert "by Provider, Location=location" in types["query"]
     assert "split(type, '/')[0]" in types["query"]
@@ -274,6 +274,9 @@ def test_native_region_and_composition_visuals_keep_all_locations(items):
 
 def test_health_map_separates_health_sources_and_never_assumes_empty_is_healthy(items):
     parameters = items["generic-health-sources"]["content"]["parameters"]
+    assert parameters[0]["name"] == "GenericProjectRegions"
+    assert parameters[0]["crossComponentResources"] == [RG]
+    parameters = parameters[1:]
     assert {parameter["name"] for parameter in parameters} == {"GenericResourceHealth", "GenericRegionalHealth"}
     for parameter in parameters:
         assert parameter["isRequired"] and parameter["isHiddenWhenLocked"]
@@ -285,22 +288,133 @@ def test_health_map_separates_health_sources_and_never_assumes_empty_is_healthy(
     assert "ServiceHealthResources" in parameters[1]["query"]
     assert "properties.Status" in parameters[1]["query"]
     assert "ImpactedRegions" in parameters[1]["query"]
-    query = items["generic-inventory-map"]["content"]["query"]
+    nested = {item["name"]: item for item in flatten(items.values())}
+    query = nested["generic-health-summary"]["content"]["query"]
     assert 'parse_json("{GenericResourceHealth:escapejson}")' in query
     assert 'parse_json("{GenericRegionalHealth:escapejson}")' in query
     assert "ResourceIssues > 0 or RegionalEvents > 0, 2" in query
     assert "SourcesComplete and AvailableResources == Resources and UnknownResources == 0, 0, 1" in query
     assert "complete reported resource coverage" in query
-    assert "green does not guarantee SKU capacity" in items["generic-health-legend"]["content"]["json"]
+    assert "not a SKU capacity guarantee" in nested["generic-health-links"]["content"]["json"]
     colors = items["generic-inventory-map"]["content"]["mapSettings"]["itemColorSettings"]
     assert colors == {
-        "type": "thresholds", "nodeColorField": "HealthCode", "colorAggregation": "Max",
+        "type": "thresholds", "nodeColorField": "Resources", "colorAggregation": "Sum",
         "thresholdsGrid": [
-            {"operator": "==", "thresholdValue": "2", "representation": "redBright"},
-            {"operator": "==", "thresholdValue": "0", "representation": "green"},
-            {"operator": "Default", "thresholdValue": None, "representation": "gray"},
+            {"operator": "Default", "thresholdValue": None, "representation": "blue"},
         ],
     }
+
+
+def test_map_explains_resource_counts_next_to_visible_regional_health(items):
+    title = items["generic-inventory-map"]["content"]["title"]
+    assert title == "Number of resources by region"
+    legend = items["generic-health-legend"]["content"]["json"]
+    for text in ("resource counts, not health issues", "Blue represents inventory only", "Explore resources by region"):
+        assert text in legend
+    nested = {item["name"]: item["content"] for item in flatten(items.values())}
+    summary = nested["generic-health-summary"]
+    assert summary["visualization"] == "table" and summary["size"] == 1
+    assert items["generic-health-details"]["content"]["loadType"] == "explicit"
+    assert "GenericRegionalHealth" not in items["generic-inventory-map"]["content"]["query"]
+    selector = nested["generic-resource-region-selector"]["parameters"][0]
+    assert selector["name"] == "GenericResourceRegion" and selector["value"] == "*"
+    assert '{GenericResourceRegion:escapejson}' in nested["generic-inventory"]["query"]
+    assert "Resource" == nested["generic-inventory"]["gridSettings"]["formatters"][0]["formatOptions"]["linkTarget"]
+
+
+def test_regional_advisories_are_bounded_scoped_metadata_not_raw_json(items):
+    parameters = items["generic-health-sources"]["content"]["parameters"]
+    resource_query, regional_query = [parameter["query"] for parameter in parameters[1:]]
+    assert 'parse_json("{GenericProjectRegions:escapejson}")' in regional_query
+    assert "StateCount <= 10000" in resource_query
+    assert "RegionCount <= 1000" in regional_query
+    assert "LargestRegionRows, 0) <= 2000" in regional_query
+    assert "make_set_if(id, ActiveRegion, 10000)" in regional_query
+    assert "EventDetails=make_set_if(pack(" in regional_query
+    assert "ActiveRegion, 2000)" in regional_query
+    assert "array_length(properties.Impact) > 2000" in regional_query
+    assert "array_length(ServiceImpact.ImpactedRegions) > 2000" in regional_query
+    assert regional_query.count("mv-expand") == 2
+    assert regional_query.count("limit 2000") == 2
+    for field in ("Title", "EventType", "Status", "TrackingId", "ImpactStartTime"):
+        assert f"properties.{field}" in regional_query
+    for field in ("Description", "ImpactDescription", "UserPrincipalName", "Email"):
+        assert f"properties.{field}" not in regional_query
+    group = items["generic-health-details"]["content"]
+    assert group["loadType"] == "explicit"
+    assert group["loadButtonText"] == "Regional advisories and issue details"
+    nested = {item["name"]: item["content"] for item in group["items"]}
+    events = nested["generic-regional-advisories"]
+    assert events["visualization"] == "table"
+    query = events["query"]
+    assert f"startswith '{RG.lower()}/providers/'" in query
+    assert 'parse_json("{GenericRegionalHealth:escapejson}")' in query
+    assert "RegionalHealth.regions[Location]" in query
+    assert "RegionalHealth.regions['global']" in query
+    assert "mv-expand Notice=Events limit 2000" in query
+    for column in ("Region", "Title", "Type", "Status", "Service", "EventRegion", "Start", "TrackingId", "URL"):
+        assert re.search(rf"\b{column}=", query)
+    assert "Regional notice - not confirmed project impact" in query
+    assert "project value=" not in query
+    issues = nested["generic-resource-issues"]
+    assert 'parse_json("{GenericResourceHealth:escapejson}")' in issues["query"]
+    assert f"| where tolower(id) startswith '{RG.lower()}/providers/'" in issues["query"]
+    assert issues["gridSettings"]["formatters"][0]["formatOptions"] == {
+        "linkColumn": "id", "linkTarget": "Resource",
+    }
+
+
+@pytest.mark.parametrize("payload", [
+    {"complete": True, "regions": {"swedencentral": {"details": [{"title": 'Quoted "title"\\n with \\\\'}]}}},
+    {"complete": False, "regions": {}},
+    {"complete": True, "states": {RG.lower() + "/providers/example/type": "Unknown"}},
+])
+def test_health_dictionary_expansion_remains_inside_json_literal(items, payload):
+    nested = list(flatten(items.values()))
+    for name in ("GenericResourceHealth", "GenericRegionalHealth"):
+        placeholder = "{" + name + ":escapejson}"
+        for item in nested:
+            query = item["content"].get("query", "")
+            if placeholder not in query:
+                continue
+            replacement = json.dumps(json.dumps(payload))[1:-1]
+            expanded = query.replace(placeholder, replacement)
+            literal = re.search(r'parse_json\(("(?:\\.|[^"\\])*")\)', expanded)
+            # Select the parameter under test when both dictionaries occur.
+            for candidate in re.finditer(r'parse_json\(("(?:\\.|[^"\\])*")\)', expanded):
+                value = json.loads(candidate[1])
+                if value.startswith("{") and ":escapejson}" not in value:
+                    literal = candidate
+                    break
+            assert literal and json.loads(json.loads(literal[1])) == payload
+
+
+@pytest.mark.parametrize(
+    "resources,available,issues,unknown,events,complete,expected",
+    [
+        (87, 0, 0, 87, 3, True, 2),
+        (1, 0, 0, 1, 3, True, 2),
+        (87, 0, 0, 87, 0, True, 1),
+        (87, 87, 0, 0, 0, True, 0),
+        (87, 87, 0, 0, 0, False, 1),
+        (87, 86, 1, 0, 0, False, 2),
+        (87, 86, 0, 1, 0, True, 1),
+    ],
+)
+def test_compiled_health_evidence_truth_table(items, resources, available, issues, unknown, events, complete, expected):
+    nested = {item["name"]: item["content"] for item in flatten(items.values())}
+    query = nested["generic-health-summary"]["query"]
+    # Offline truth table for the exact emitted classifier, not a KQL execution.
+    assert """HealthCode=case(ResourceIssues > 0 or RegionalEvents > 0, 2,
+    SourcesComplete and AvailableResources == Resources and UnknownResources == 0, 0, 1)""" in query.replace("\r\n", "\n")
+    actual = 2 if issues > 0 or events > 0 else (
+        0 if complete and available == resources and unknown == 0 else 1
+    )
+    assert actual == expected
+    assert "| summarize Resources=count()" in query
+    assert "ResourceIssues=countif(ResourceState == 'Issue')" in query
+    assert "not confirmed project impact" in nested["generic-health-links"]["json"]
+    assert items["generic-inventory-map"]["content"]["mapSettings"]["sizeSettings"] == "Resources"
 
 
 def test_billing_is_native_actual_cost_at_exact_rg_scope(items):

@@ -614,14 +614,15 @@ def factory_resource(cfg, inventory: dict, tenant: str) -> dict:
     for index, environment in enumerate(inventory["environments"]):
         if environment["commonResourceGroup"].get("deploymentStatus") != "not-deployed":
             continue
-        # Retain ARM IDs and project history in inventory; replace only the two
+        # Retain ARM IDs and project history in inventory; replace only the
         # broken common RG/cost/usage tiles, not the valid project tiles below them.
         x = index * shared.ENVIRONMENT_WIDTH
+        y = shared.environment_row(inventory) + 1
         parts[:] = [part for part in parts if not (
-            part["position"]["y"] == 7 and part["position"]["x"] in {x, x + 4, x + 10}
+            part["position"]["y"] == y and part["position"]["x"] in {x, x + 4, x + 10}
         )]
         parts.append(shared.markdown_part(
-            x, 7, shared.ENVIRONMENT_WIDTH, 4,
+            x, y, shared.ENVIRONMENT_WIDTH, 4,
             f"## {environment['displayName']} common resources not deployed\n\n"
             "The configured common resource group does not exist. "
             "Dashboard-only refresh does not create it. Existing project history is preserved below.",
