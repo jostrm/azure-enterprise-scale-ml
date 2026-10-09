@@ -97,6 +97,22 @@ MCP_GATEWAY_OPTIONS = (
     ("--ai-gateway-sku-outbound-subnet-id", "aiGatewaySkuOutboundSubnetId", None,
      "Subnet ID for AI Gateway outbound VNet integration (needed to register the private MCP)."),
 )
+LIVE_VOICE_OPTIONS = (
+    ("--enable-aifactory-agent-live-voice", "enableAIFactoryAgentLiveVoice", BOOLEAN,
+     "Deploy the AI Factory Agent chat application with Azure Voice Live speech and the pulsing voice orb in project001 Dev "
+     "(requires enableFactoryChatAgent, enableContainerApps, enableAIFoundry and enableAISearch)."),
+    ("--aifactory-agent-entra-app-id", "aifactoryAgentEntraAppId", None,
+     "Client ID (GUID) of the agent's dedicated Entra single-page-app registration."),
+    ("--aifactory-agent-container-apps-environment", "aifactoryAgentContainerAppsEnvironment", None,
+     "Internal project Container Apps environment name; empty selects the single one."),
+    ("--aifactory-agent-reader-object-ids", "aifactoryAgentReaderObjectIds", None,
+     "Comma-separated Entra object IDs (GUIDs) granted read-only chat access."),
+    ("--aifactory-agent-voice-name", "aifactoryAgentVoiceName", None,
+     "Azure Speech voice for spoken answers; empty uses en-US-Ava:DragonHDLatestNeural."),
+    ("--aifactory-agent-voice-languages", "aifactoryAgentVoiceLanguages", None,
+     "Comma-separated BCP-47 speech input languages such as sv-SE,en-US; empty uses en-US."),
+)
+DEDICATED_OPTIONS = (("mcp_gateway", MCP_GATEWAY_OPTIONS), ("live_voice", LIVE_VOICE_OPTIONS))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -255,6 +271,11 @@ def build_parser() -> argparse.ArgumentParser:
             "Dedicated options for late Foundry-phase pipeline steps; saving never deploys.")
         for option, key, choices, help_text in MCP_GATEWAY_OPTIONS:
             mcp_gateway.add_argument(option, dest=f"mcp_gateway_{key}", choices=choices, help=f"{help_text} Sets {key}.")
+        live_voice = command.add_argument_group(
+            "AI Factory Agent live voice (project001 Dev)",
+            "Dedicated replacements for the late foundry-phase pipeline step; saving never deploys.")
+        for option, key, choices, help_text in LIVE_VOICE_OPTIONS:
+            live_voice.add_argument(option, dest=f"live_voice_{key}", choices=choices, help=f"{help_text} Sets {key}.")
         if name == "save":
             command.add_argument("--expected-review", required=True, help="review_id from the separately approved review.")
             command.add_argument("--yes", action="store_true")
@@ -884,17 +905,18 @@ def cmd_schema(args):
 
 
 def configuration_changes(args) -> dict:
-    """Merge --changes-json with the dedicated MCP & AI Gateway options; disagreement is an error."""
+    """Merge --changes-json with the dedicated MCP & AI Gateway and live voice options; disagreement is an error."""
     changes = read_json_file(args.changes_json) if args.changes_json else {}
     if not isinstance(changes, dict):
         raise ConfigError("--changes-json must contain a JSON object.")
-    for option, key, _, _ in MCP_GATEWAY_OPTIONS:
-        value = getattr(args, f"mcp_gateway_{key}", None)
-        if value is None:
-            continue
-        if key in changes and str(changes[key]).lower() != value.lower():
-            raise ConfigError(f"{option} conflicts with {key} in --changes-json.")
-        changes[key] = value
+    for prefix, options in DEDICATED_OPTIONS:
+        for option, key, _, _ in options:
+            value = getattr(args, f"{prefix}_{key}", None)
+            if value is None:
+                continue
+            if key in changes and str(changes[key]).lower() != value.lower():
+                raise ConfigError(f"{option} conflicts with {key} in --changes-json.")
+            changes[key] = value
     return changes
 
 

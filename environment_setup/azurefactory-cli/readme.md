@@ -541,6 +541,35 @@ remains project001 Dev only. See
 [40-aifactory-agent](../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md)
 and [45-aifactory-mcp-gateway](../../usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md).
 
+### AI Factory Agent live voice options (project001 Dev)
+
+`config review` and `config save` also accept dedicated options for the opt-in live
+voice of the AI Factory Agent chat (Azure Voice Live speech with the pulsing voice
+orb). They follow the same rules as the options above: each sets exactly one variable,
+is merged with `--changes-json`, and a disagreeing value in that file is a
+`ConfigError`. The chat Agent itself is switched with `--enable-factory-chat-agent`
+(`enableFactoryChatAgent`, listed above); live voice requires it.
+
+| Option | Variable | Values |
+|---|---|---|
+| `--enable-aifactory-agent-live-voice` | `enableAIFactoryAgentLiveVoice` | `true` / `false` (requires `enableFactoryChatAgent`) |
+| `--aifactory-agent-entra-app-id` | `aifactoryAgentEntraAppId` | client ID of the agent's Entra single-page-app registration |
+| `--aifactory-agent-container-apps-environment` | `aifactoryAgentContainerAppsEnvironment` | internal project environment name, or empty |
+| `--aifactory-agent-reader-object-ids` | `aifactoryAgentReaderObjectIds` | comma-separated Entra object IDs granted read-only chat access |
+| `--aifactory-agent-voice-name` | `aifactoryAgentVoiceName` | Azure Speech voice, or empty for the default |
+| `--aifactory-agent-voice-languages` | `aifactoryAgentVoiceLanguages` | comma-separated BCP-47 input languages such as `sv-SE,en-US`, or empty (`en-US`) |
+
+```powershell
+azurefactory config review --folder C:\legacy\aifactory --project-number 001 `
+  --enable-factory-chat-agent true --enable-aifactory-agent-live-voice true `
+  --aifactory-agent-entra-app-id <client-id> --aifactory-agent-reader-object-ids <object-id>
+```
+
+The fields must exist in the selected draft/schema (a wizard API version that
+includes the live voice settings). Saving never deploys: the project pipeline's late
+foundry-phase step `72-aifactory-agent-live-voice` acts on them for project001 Dev only. See
+[47-aifactory-agent-live-voice](../../usecase_code/40-agent-factory/47-aifactory-agent-live-voice/readme.md).
+
 ## Preview then confirm
 
 Confirm/start and generic writes require separate review and `--yes`. Preparation can persist a local draft/preview but never starts a deployment. Read the complete preview before approving. Save the preview receipt and consume it before expiry; expired or blocked previews are never re-prepared silently. All folder paths below are on the API host. New registers normally use a root named `azurefactory`.

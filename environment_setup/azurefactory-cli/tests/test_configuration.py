@@ -317,3 +317,57 @@ def test_cli_review_sends_dedicated_mcp_gateway_options(monkeypatch, capsys):
     assert cli.main(["config", "review", *MCP_SCOPE, "--snapshot-only", "--enable-aifactory-mcp", "true"]) == 0
     validated = [call[2] for call in client.calls if call[1] == "/api/v1/validation"]
     assert validated and all(body["state"]["enableAIFactoryMCP"] == "true" for body in validated)
+
+
+VOICE_APP = "33333333-3333-4333-8333-333333333333"
+VOICE_READERS = "44444444-4444-4444-8444-444444444444,55555555-5555-4555-8555-555555555555"
+
+
+@pytest.mark.parametrize("command", ["review", "save"])
+def test_dedicated_live_voice_options_map_to_exact_variable_names(command):
+    extra = ["--expected-review", "a" * 64] if command == "save" else []
+    args = cli.build_parser().parse_args([
+        "config", command, *MCP_SCOPE, *extra,
+        "--enable-aifactory-agent-live-voice", "true",
+        "--aifactory-agent-entra-app-id", VOICE_APP, "--aifactory-agent-container-apps-environment", "aca-env-prj001",
+        "--aifactory-agent-reader-object-ids", VOICE_READERS,
+        "--aifactory-agent-voice-name", "sv-SE-SofieNeural", "--aifactory-agent-voice-languages", "sv-SE,en-US",
+    ])
+    assert cli.configuration_changes(args) == {
+        "enableAIFactoryAgentLiveVoice": "true",
+        "aifactoryAgentEntraAppId": VOICE_APP, "aifactoryAgentContainerAppsEnvironment": "aca-env-prj001",
+        "aifactoryAgentReaderObjectIds": VOICE_READERS,
+        "aifactoryAgentVoiceName": "sv-SE-SofieNeural", "aifactoryAgentVoiceLanguages": "sv-SE,en-US",
+    }
+    assert cli.configuration_changes(cli.build_parser().parse_args(["config", command, *MCP_SCOPE, *extra])) == {}
+
+
+def test_live_voice_options_sit_next_to_the_chat_agent_option_and_share_no_destination():
+    args = cli.build_parser().parse_args([
+        "config", "review", *MCP_SCOPE, "--enable-factory-chat-agent", "true",
+        "--enable-aifactory-agent-live-voice", "true", "--aifactory-agent-voice-languages", ""])
+    assert cli.configuration_changes(args) == {
+        "enableFactoryChatAgent": "true", "enableAIFactoryAgentLiveVoice": "true", "aifactoryAgentVoiceLanguages": ""}
+
+
+def test_live_voice_options_reject_non_boolean_and_conflicting_changes(tmp_path):
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["config", "review", *MCP_SCOPE, "--enable-aifactory-agent-live-voice", "1"])
+    patch = tmp_path / "changes.json"
+    patch.write_text('{"enableAIFactoryAgentLiveVoice": "false", "aifactoryAgentVoiceName": "x"}', encoding="utf-8")
+    agreeing = cli.build_parser().parse_args(["config", "review", *MCP_SCOPE, "--changes-json", str(patch),
+                                              "--aifactory-agent-voice-name", "x"])
+    assert cli.configuration_changes(agreeing) == {"enableAIFactoryAgentLiveVoice": "false", "aifactoryAgentVoiceName": "x"}
+    conflicting = cli.build_parser().parse_args(["config", "review", *MCP_SCOPE, "--changes-json", str(patch),
+                                                 "--enable-aifactory-agent-live-voice", "true"])
+    with pytest.raises(ConfigError, match="--enable-aifactory-agent-live-voice conflicts with enableAIFactoryAgentLiveVoice"):
+        cli.configuration_changes(conflicting)
+
+
+def test_cli_review_sends_dedicated_live_voice_options(monkeypatch, capsys):
+    client = FakeAPI()
+    client.responses["/api/v1/projects/load"]["state"]["enableAIFactoryAgentLiveVoice"] = "false"
+    monkeypatch.setattr(cli, "client", lambda args: client)
+    assert cli.main(["config", "review", *MCP_SCOPE, "--snapshot-only", "--enable-aifactory-agent-live-voice", "true"]) == 0
+    validated = [call[2] for call in client.calls if call[1] == "/api/v1/validation"]
+    assert validated and all(body["state"]["enableAIFactoryAgentLiveVoice"] == "true" for body in validated)
