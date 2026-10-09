@@ -583,12 +583,17 @@ class TestAifactoryDashboard(unittest.TestCase):
         self.assertNotIn("invalid", content["query"])
         self.assertIn("GroupId in~ (", content["query"])
         self.assertEqual({}, inputs["ParameterValues"])
+        self.assertIn(inputs["ComponentId"].lower(), [
+            group["id"].lower() for group in module.inventory_groups(inventory)
+            if group.get("deploymentStatus") != "not-deployed"
+        ])
+        self.assertEqual("microsoft.resources/subscriptions/resourcegroups", inputs["GalleryResourceType"])
         self.assertNotIn("ConfigurationId", inputs)
         self.assertNotIn("Health", content["query"])
         self.assertEqual("blue", content["mapSettings"]["itemColorSettings"]["thresholdsGrid"][0]["representation"])
         empty = module.factory_map_part({"hubResourceGroups": [], "environments": []})
-        query = json.loads(next(i["value"] for i in empty["metadata"]["inputs"] if i["name"] == "StepSettings"))["query"]
-        self.assertIn('GroupId in~ ("")', query)
+        self.assertEqual("Extension/HubsExtension/PartType/MarkdownPart", empty["metadata"]["type"])
+        self.assertIn("No known factory resource groups", empty["metadata"]["settings"]["content"]["settings"]["content"])
 
     def test_usage_tile_distinguishes_observed_zero_inventory_and_unavailable(self) -> None:
         resource = {

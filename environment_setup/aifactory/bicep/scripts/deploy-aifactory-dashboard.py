@@ -796,6 +796,11 @@ def factory_map_part(inventory: dict) -> dict:
         and usage.RG_PATTERN.fullmatch(group["id"])
         and group.get("deploymentStatus") != "not-deployed"
     })
+    if not groups:
+        return markdown_part(
+            4, 2, 12, 4, "### Number of resources by region\n\n"
+            "No known factory resource groups are configured. Map inventory is unavailable.",
+        )
     subscriptions = sorted({"/subscriptions/" + group.split("/")[2] for group in groups})
     query = (
         "Resources\n"
@@ -824,6 +829,8 @@ def factory_map_part(inventory: dict) -> dict:
     }
     # Native Workbook pin serialization; no parameter snapshots or project-only workbook link.
     inputs = {
+        "ComponentId": groups[0],
+        "GalleryResourceType": "microsoft.resources/subscriptions/resourcegroups",
         "TimeContext": None, "ResourceIds": subscriptions, "Type": "workbook",
         "PinName": "AI Factory resource locations", "StepSettings": json.dumps(content),
         "ParameterValues": {},
