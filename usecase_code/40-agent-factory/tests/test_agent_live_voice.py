@@ -28,6 +28,7 @@ GROUP_ID = f"/subscriptions/{SUB}/resourceGroups/{GROUP}"
 ACCOUNT_ID = f"{GROUP_ID}/providers/Microsoft.CognitiveServices/accounts/aifacct001"
 PROJECT_ID = f"{ACCOUNT_ID}/projects/aifproj001"
 ENV_ID = f"{GROUP_ID}/providers/Microsoft.App/managedEnvironments/aca-env-prj001"
+APP_ID = f"{GROUP_ID}/providers/Microsoft.App/containerApps/aifactory-agent-project001-dev"
 ENDPOINT = "https://aifacct001.services.ai.azure.com/api/projects/aifproj001"
 MODEL = "aifactory-agent-gpt-6-1-sol"
 VALUES = {
@@ -49,13 +50,16 @@ def values(**changes):
 class FakeArm:
     """Read-only Azure fake: records every call; refuses any write."""
 
-    def __init__(self, deployments=None, environments=None, agent="owned"):
+    def __init__(self, deployments=None, environments=None, agent="owned", app="missing"):
         self.calls, self.agent = [], agent
         self.resources = {
             PROJECT_ID.lower(): {"id": PROJECT_ID, "name": "aifacct001/aifproj001", "identity": {"principalId": READER_A},
                                  "properties": {"endpoints": {"AI Foundry API": ENDPOINT}}},
             ENV_ID.lower(): {"id": ENV_ID, "properties": {"vnetConfiguration": {"internal": True}, "defaultDomain": "internal.example"}},
         }
+        if app != "missing":
+            tags = {"managed-by": "enterprise-scale-ai-factory-agent", **({"aifactory-integration": "live-voice"} if app == "pipeline" else {})}
+            self.resources[APP_ID.lower()] = {"id": APP_ID, "name": "aifactory-agent-project001-dev", "tags": tags}
         self.lists = {
             f"{GROUP_ID}/resources": [
                 {"id": ACCOUNT_ID, "name": "aifacct001", "type": "Microsoft.CognitiveServices/accounts", "kind": "AIServices", "location": "swedencentral"},
@@ -253,6 +257,15 @@ def test_the_hosting_environment_must_be_internal_and_unambiguous():
         live.discover(public, request())
 
 
+def test_an_operator_deployed_app_is_never_replaced_by_the_generated_baseline():
+    arm = FakeArm(app="operator")
+    with pytest.raises(ValueError, match="already exists and was not created by this pipeline step.*operator flow"):
+        live.discover(arm, request())
+    assert all(call[0] in {"GET", "LIST"} for call in arm.calls)
+    assert live.discover(FakeArm(app="pipeline"), request()).environment_name == "aca-env-prj001"
+    assert live.discover(FakeArm(app="missing"), request()).environment_name == "aca-env-prj001"
+
+
 def test_the_foundry_agent_from_the_chat_step_must_exist_and_be_owned_by_the_factory():
     with pytest.raises(ValueError, match="does not exist yet.*enableFactoryChatAgent"):
         live.discover(FakeArm(agent="missing"), request())
@@ -283,7 +296,7 @@ def test_the_generated_configuration_is_valid_for_the_applications_own_schema_wi
 
 def test_grants_are_read_only_and_exactly_the_listed_users_and_no_secret_is_present():
     config = render()
-    assert config["auth"]["client_id"] == APP and config["auth"]["audience"] == "api://" + APP
+    assert config["auth"]["client_id"] == APP and config["auth"]["audience"] == APP, "v2 access tokens carry the client ID as aud"
     assert config["auth"]["grants"] == [
         {"object_id": READER_A, "scopes": ["project001-dev"], "permissions": ["knowledge.read", "factory.read"]},
         {"object_id": READER_B, "scopes": ["project001-dev"], "permissions": ["knowledge.read", "factory.read"]}]
@@ -336,6 +349,7 @@ def test_apply_runs_the_documented_operator_sequence_in_order_with_the_generated
     assert config_paths == {str(tmp_path / "config.json")} and not str(tmp_path).startswith(str(ROOT))
     last = runner.calls[-1]["args"]
     assert last[-1] == "--apply" and "--environment" in last and last[last.index("--environment") + 1] == "aca-env-prj001"
+    assert last[last.index("--integration") + 1] == "live-voice", "the app is marked as created by this step"
     assert report["mode"] == "apply" and report["mutations"] is True
     assert report["outputs"]["agent"] == {"name": AGENT_NAME, "version": "3"}
     assert report["outputs"]["knowledge"] == {"status": "ready", "indexed_document_count": 12}
@@ -357,7 +371,7 @@ def test_a_failed_step_stops_the_sequence_and_does_not_leak_command_output(tmp_p
     assert "deploy.py" not in runner.names() and runner.names()[-1] == "ingest"
 
 
-@pytest.mark.parametrize("arm", [FakeArm(deployments=[]), FakeArm(agent="missing"), FakeArm(agent="foreign")])
+@pytest.mark.parametrize("arm", [FakeArm(deployments=[]), FakeArm(agent="missing"), FakeArm(agent="foreign"), FakeArm(app="operator")])
 def test_missing_prerequisites_fail_before_any_command_runs(tmp_path, arm):
     engine, runner = integration(tmp_path, arm=arm)
     with pytest.raises(ValueError):

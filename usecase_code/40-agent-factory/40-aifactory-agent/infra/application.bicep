@@ -10,6 +10,8 @@ param storageContainer string
 param bundleBlob string
 param bundleSha256 string
 param bootstrapCommand string
+@description('Set by a pipeline integration that created the app; empty for operator deployments.')
+param integration string = ''
 param minReplicas int = 1
 param maxReplicas int = 2
 param cpu string = '0.5'
@@ -25,10 +27,12 @@ resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' 
 resource application 'Microsoft.App/containerApps@2025-01-01' = {
   name: appName
   location: location
-  tags: {
+  tags: union({
     'managed-by': 'enterprise-scale-ai-factory-agent'
     'bundle-sha256': bundleSha256
-  }
+  }, empty(integration) ? {} : {
+    'aifactory-integration': integration
+  })
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {

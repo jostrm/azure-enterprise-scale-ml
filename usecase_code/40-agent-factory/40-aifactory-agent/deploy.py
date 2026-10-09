@@ -174,6 +174,7 @@ def main():
     parser.add_argument("--refresh-job-name", default="aifactory-agent-refresh-dev")
     parser.add_argument("--refresh-identity-name", default="mi-aifactory-agent-refresh-dev")
     parser.add_argument("--refresh-schedule", default="0 3 * * *")
+    parser.add_argument("--integration", default="", help="Tag value set by a pipeline integration that creates the app.")
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     settings = load_settings(args.config)
@@ -236,7 +237,7 @@ def main():
         "environmentName": args.environment, "identityName": args.identity_name,
         "image": IMAGE, "storageAccount": names["storageName"],
         "storageContainer": names["storageContainer"], "bundleBlob": blob_name,
-        "bundleSha256": result["sha256"],
+        "bundleSha256": result["sha256"], "integration": args.integration,
         "bootstrapCommand": (BASE / "infra" / "bootstrap.sh").read_text(encoding="utf-8"),
     }
     parameter_file = BASE / ".build" / "app.parameters.json"

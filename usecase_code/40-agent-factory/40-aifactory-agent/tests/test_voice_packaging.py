@@ -43,6 +43,14 @@ def test_the_hardened_runtime_identity_template_has_no_voice_role_and_the_voice_
     assert "param identityName string" in voice and "param foundryAccount string" in voice
 
 
+def test_the_application_template_marks_apps_created_by_a_pipeline_integration_only_when_asked():
+    bicep = (ROOT / "infra" / "application.bicep").read_text("utf-8")
+    assert "param integration string = ''" in bicep and "'managed-by': 'enterprise-scale-ai-factory-agent'" in bicep
+    assert "empty(integration) ? {} : {" in bicep and "'aifactory-integration': integration" in bicep
+    source = (ROOT / "deploy.py").read_text("utf-8")
+    assert '"--integration"' in source and '"integration": args.integration' in source
+
+
 def test_the_deployment_plan_discloses_the_extra_foundry_roles_only_when_voice_is_enabled():
     off = deploy.identity_permissions(settings())
     on = deploy.identity_permissions(settings(enabled=True))

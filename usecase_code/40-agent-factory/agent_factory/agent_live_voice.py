@@ -32,6 +32,8 @@ CHAT_FLAG = "enableFactoryChatAgent"
 VOICE_FLAG = "enableAIFactoryAgentLiveVoice"
 PROJECT_NUMBER = "001"
 ENVIRONMENT = "dev"
+APP_NAME = "aifactory-agent-project001-dev"
+INTEGRATION = "live-voice"
 SCOPE_KEY = "project001-dev"
 DEFAULT_VOICE = "en-US-Ava:DragonHDLatestNeural"
 DEFAULT_LANGUAGE = "en-US"
@@ -39,6 +41,7 @@ READ_ONLY_PERMISSIONS = ["knowledge.read", "factory.read"]
 MAX_READERS = 20
 RESOURCES_API = "2021-04-01"
 COGNITIVE_API = "2025-06-01"
+APPS_API = "2025-01-01"
 VOICE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:._-]{1,99}$")
 LANGUAGE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$")
 
@@ -220,9 +223,24 @@ def verify_agent(session: ArmPort, project_endpoint: str) -> str:
     return str(latest.get("version") or latest.get("id") or "")
 
 
+def check_existing_app(session: ArmPort, group_id: str) -> None:
+    """Never replace an operator-deployed app (its richer configuration would be overwritten by the generated baseline)."""
+    try:
+        existing = session.arm("GET", f"{group_id}/providers/Microsoft.App/containerApps/{APP_NAME}", api_version=APPS_API)
+    except AzureError as error:
+        if error.status == 404:
+            return
+        raise
+    if (existing.get("tags") or {}).get("aifactory-integration") != INTEGRATION:
+        raise ValueError(f"The AI Factory Agent app '{APP_NAME}' already exists and was not created by this pipeline step, so "
+                         "it is left untouched. To enable live voice on it, set voice.enabled in your own agent configuration "
+                         "and run 40-aifactory-agent/deploy.py (the operator flow), or remove the app and let this step create it.")
+
+
 def discover(session: ArmPort, request: LiveVoiceRequest) -> Target:
     """Resolve the project's actual Foundry, data and Container Apps resources (GET only)."""
     group_id = f"/subscriptions/{request.subscription_id}/resourceGroups/{request.resource_group}"
+    check_existing_app(session, group_id)
     resources = session.pages(f"{ARM}{group_id}/resources?api-version={RESOURCES_API}")
 
     def of_type(kind: str) -> list[dict]:
@@ -311,7 +329,7 @@ def render_config(request: LiveVoiceRequest, target: Target, *, repository_root:
                     "allowed_write_environments": [ENVIRONMENT]},
         "actions": {"enabled_skills": []}, "costs": {},
         "workloads": {"enabled_skills": [], "repository_root": root, "profiles": {}},
-        "auth": {"client_id": request.entra_app_id, "audience": "api://" + request.entra_app_id,
+        "auth": {"client_id": request.entra_app_id, "audience": request.entra_app_id,
                  "grants": [{"object_id": object_id, "scopes": [SCOPE_KEY], "permissions": list(READ_ONLY_PERMISSIONS)}
                             for object_id in request.reader_object_ids]},
         "voice": {"enabled": True, "voice_name": request.voice_name or DEFAULT_VOICE,
@@ -379,7 +397,7 @@ class LiveVoiceIntegration:
                  "pip==25.3"]]),
             ("knowledge index", "ingest", [[python, "-m", "aifactory_agent", "--config", str(config), "ingest"]]),
             ("container app", "deploy.py", [[python, "deploy.py", "--config", str(config), "--environment",
-                                              target.environment_name, "--apply"]]),
+                                              target.environment_name, "--integration", INTEGRATION, "--apply"]]),
         ]
 
     def run(self, request: LiveVoiceRequest, *, apply: bool) -> dict:
@@ -398,9 +416,9 @@ class LiveVoiceIntegration:
                           "container_apps_environment": target.environment_name,
                           "agent": {"name": AGENT_NAME, "version": target.agent_version}}
         report.prerequisites = [
-            "An Entra admin created the agent's single-page-app registration (Application ID URI api://<client-id>, delegated "
-            "scope access_as_user) and registered the application's exact HTTPS root as its SPA redirect URI; pipelines never "
-            "write Microsoft Graph.",
+            "An Entra admin created the agent's dedicated registration with python -m aifactory_agent.browser_auth (single-page "
+            "app, delegated scope access_as_user, the application's exact HTTPS root as its redirect URI); the token audience is "
+            "the registration's client ID. Pipelines never write Microsoft Graph.",
             f"The Foundry Agent comes from {CHAT_FLAG} (step 70-factory-chat-agent) earlier in the same foundry phase; this step "
             "only verifies it and never creates or changes it.",
             "The listed reader object IDs are the only users granted read-only chat access; write, delete and cost "

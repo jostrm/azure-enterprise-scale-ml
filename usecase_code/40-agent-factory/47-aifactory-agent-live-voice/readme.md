@@ -32,6 +32,12 @@ with Azure Voice Live: a voice card with a pulsing orb that listens, thinks and 
   account and exactly one (or the named) **internal** Container Apps environment.
 - **This step never creates the Agent or a model deployment**, and it refuses an Agent that the
   Enterprise Scale AI Factory does not own.
+- **An operator-deployed app is never replaced.** The step generates a read-only baseline configuration
+  (the listed readers get `knowledge.read` and `factory.read` only), so it only creates or updates an app
+  that it created itself (tag `aifactory-integration: live-voice`). If the derived app
+  (`aifactory-agent-project001-dev`) already exists without that tag, the step stops with guidance: enable voice
+  there by setting `voice.enabled` in your own agent configuration and running `40-aifactory-agent/deploy.py`
+  (the operator flow), or remove the app and let this step create it.
 - **`false` never deletes.** Turning the flag off skips the step; the app, index, identity and roles
   stay. Delete-all runs skip this step, and the launcher rejects that combination if run directly.
 - **Read-only access.** Generated grants contain only `knowledge.read` and `factory.read` for the
@@ -46,8 +52,8 @@ with Azure Voice Live: a voice card with a pulsing orb that listens, thinks and 
 1. An isolated Python environment under `$RUNNER_TEMP` (or `AGENT_TEMPDIRECTORY`/the system temp
    folder, never the checkout) with `requirements.lock.txt`, then the Linux wheels for the offline bundle.
 2. `ingest` — creates/reconciles the owned Search index (**billed** embedding calls).
-3. `deploy.py --apply` — owned identity, Voice Live roles, the private Container App and the knowledge
-   refresh job. The generated configuration sets `voice.enabled`.
+3. `deploy.py --apply --integration live-voice` — owned identity, Voice Live roles, the private Container App (tagged
+   as created by this step) and the knowledge refresh job. The generated configuration sets `voice.enabled`.
 
 ## Voice Live roles
 
@@ -59,10 +65,10 @@ test environment whether a narrower scope is enough before using voice in produc
 
 ## Prerequisites (one-time, outside the pipeline)
 
-1. An Entra admin creates the agent's single-page-app registration (Application ID URI
-   `api://<client-id>`, delegated scope `access_as_user`) and registers the application's
-   exact HTTPS root (`https://<application FQDN>/`) as its SPA redirect URI. Sign-in fails closed
-   until this exists.
+1. An Entra admin creates the agent's dedicated registration with
+   `python -m aifactory_agent.browser_auth --config <config> --redirect-uri https://<application FQDN>/ --user-object-id <object id> --apply`
+   (single-page app, delegated scope `access_as_user`, redirect URI = the application's exact HTTPS root).
+   The token audience is the registration's client ID. Sign-in fails closed until this exists.
 2. Enable `enableFactoryChatAgent` so step 70 creates the Foundry Agent, and deploy a text-embedding model.
 3. The runner can reach the package feed, the project's private Foundry, Search and Storage endpoints.
 4. Voice Live must be available in the Foundry account's region, and the application must resolve and
