@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/azure/enterprise-scale-aifactory/healthmodel/model-definition.schema.json",
+  "title": "AI Factory health model definition",
+  "description": "Declares one kind of Azure Monitor health model. The planner validates every file strictly (python aif_healthmodel.py models --validate).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["key", "nameToken", "home", "rootDisplayName", "layers"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "key": {
+      "description": "Definition key used with --model and nestedModel selectors.",
+      "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$"
+    },
+    "kind": {
+      "description": "Definition kind registered in ModelDefinitionFactory. Built in: layered.",
+      "type": "string", "default": "layered"
+    },
+    "description": {"type": "string"},
+    "nameToken": {
+      "description": "Model name token: 2-8 lowercase letters/digits, optionally followed by {project}. Rendered into hm-<prefix>-<token>-<loc>-<env><suffix>.",
+      "type": "string", "pattern": "^[a-z][a-z0-9]{1,7}(\\{project\\})?$"
+    },
+    "home": {
+      "description": "Resource group the model is deployed to.",
+      "enum": ["project", "common"]
+    },
+    "rootDisplayName": {
+      "description": "Root entity display name. Placeholders: {project}, {env}.",
+      "type": "string", "maxLength": 200
+    },
+    "reportCoverage": {
+      "description": "Report enable* flag coverage, unmodelled and not-monitorable resources of the home resource group.",
+      "type": "boolean", "default": false
+    },
+    "layers": {
+      "description": "Layers in priority order: a resource joins the first layer whose selector matches it.",
+      "type": "array", "minItems": 1,
+      "items": {"oneOf": [{"$ref": "#/$defs/catalogLayers"}, {"$ref": "#/$defs/layer"}]}
+    },
+    "overrides": {
+      "description": "Signal and profile overrides (same format as --overrides; --overrides wins).",
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "profiles": {"type": "object", "additionalProperties": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "impact": {"enum": ["Standard", "Limited", "Suppressed"]},
+            "resourceHealth": {"enum": ["Enabled", "Disabled"]}
+          }}},
+        "signals": {"type": "object", "additionalProperties": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "degradedThreshold": {"type": ["integer", "null"]},
+            "unhealthyThreshold": {"type": "integer"},
+            "timeGrain": {"type": "string"},
+            "refreshInterval": {"enum": ["PT1M", "PT5M", "PT10M", "PT15M", "PT30M", "PT1H", "PT2H"]}
+          }}}
+      }
+    },
+    "alertPolicy": {
+      "description": "Default health-state alert severities; --alert-policy wins per key. Empty disables.",
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "rootUnhealthySeverity": {"$ref": "#/$defs/severity"},
+        "rootDegradedSeverity": {"$ref": "#/$defs/severity"},
+        "layerUnhealthySeverity": {"$ref": "#/$defs/severity"},
+        "layerDegradedSeverity": {"$ref": "#/$defs/severity"},
+        "resourceUnhealthySeverity": {"$ref": "#/$defs/severity"},
+        "resourceDegradedSeverity": {"$ref": "#/$defs/severity"}
+      }
+    },
+    "healthObjective": {"type": "integer", "minimum": 0, "maximum": 100}
+  },
+  "$defs": {
+    "severity": {"enum": ["", "Sev0", "Sev1", "Sev2", "Sev3", "Sev4"]},
+    "catalogLayers": {
+      "description": "Selected resources join the catalog layer of their profile.",
+      "type": "object", "additionalProperties": false, "required": ["fromCatalog", "select"],
+      "properties": {"fromCatalog": {"const": true}, "select": {"$ref": "#/$defs/selector"}}
+    },
+    "layer": {
+      "description": "A named layer. Catalog layer keys inherit display name and impact; custom keys need both.",
+      "type": "object", "additionalProperties": false, "required": ["key", "select"],
+      "properties": {
+        "key": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,39}[a-z0-9]$"},
+        "displayName": {"type": "string", "maxLength": 120},
+        "impact": {"enum": ["Standard", "Limited", "Suppressed"]},
+        "description": {"type": "string"},
+        "select": {"$ref": "#/$defs/selector"}
+      }
+    },
+    "names": {"oneOf": [{"type": "string", "minLength": 1},
+                        {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}]},
+    "selector": {
+      "description": "Several keys in one object must all match.",
+      "type": "object", "minProperties": 1, "additionalProperties": false,
+      "properties": {
+        "all": {"const": true},
+        "profile": {"$ref": "#/$defs/names"},
+        "origin": {"oneOf": [{"enum": ["project", "common", "model"]},
+                             {"type": "array", "minItems": 1, "items": {"enum": ["project", "common", "model"]}}]},
+        "type": {"$ref": "#/$defs/names"},
+        "layer": {"$ref": "#/$defs/names"},
+        "tag": {"type": "object", "minProperties": 1, "additionalProperties": {
+          "oneOf": [{"const": true}, {"$ref": "#/$defs/names"}]}},
+        "name": {"type": "string", "description": "Regular expression matched against the whole resource name."},
+        "nestedModel": {"$ref": "#/$defs/names"},
+        "allOf": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/selector"}},
+        "anyOf": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/selector"}},
+        "not": {"$ref": "#/$defs/selector"}
+      }
+    }
+  }
+}

@@ -442,8 +442,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     commonRGNamePrefix: commonRGNamePrefix
     commonResourceGroupName: commonResourceGroup
     subscriptionIdDevTestProd:subscriptionIdDevTestProd
-    technicalAdminsEmail:technicalAdminsEmail
-    technicalAdminsObjectID:technicalAdminsObjectID
+    technicalAdminsEmail: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? '' : technicalAdminsEmail
+    technicalAdminsObjectID: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? '' : technicalAdminsObjectID
     acaSubnetId: acaSubnetId
     aksSubnetId:aksSubnetId
     genaiSubnetId:genaiSubnetId

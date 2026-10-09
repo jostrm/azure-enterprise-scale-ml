@@ -1,7 +1,9 @@
 .venv/
+.venv-dualgraph-312/
 .state/
 .build/
 config.local.json
 *.log
 __pycache__/
 .pytest_cache/
+node_modules/

@@ -23,12 +23,15 @@ class Principal:
     object_id: str
     scopes: frozenset[str] = field(default_factory=frozenset)
     permissions: frozenset[str] = field(default_factory=frozenset)
+    client_id: str | None = None
 
     def __post_init__(self):
         object.__setattr__(self, "tenant_id", str(UUID(str(self.tenant_id))))
         object.__setattr__(self, "object_id", str(UUID(str(self.object_id))))
         object.__setattr__(self, "scopes", frozenset(self.scopes))
         object.__setattr__(self, "permissions", frozenset(self.permissions))
+        if self.client_id is not None:
+            object.__setattr__(self, "client_id", str(UUID(str(self.client_id))))
 
 
 def authorize(settings: Settings, principal: Principal, scope_key: str, permission: str) -> Scope:
@@ -106,13 +109,17 @@ def principal_from_token(settings: Settings, token: str, *, jwks_client=None) ->
     delegated = claims.get("scp")
     if not isinstance(delegated, str) or auth.required_scope not in delegated.split():
         raise AuthenticationError("The configured delegated access scope is required.")
-    # A single app registration is supported. Separate SPA registrations need an explicit config contract.
-    if "azp" in claims and claims["azp"] != client_id:
-        raise AuthenticationError("The token's authorized client differs from the configured registration.")
+    # The primary SPA registration plus explicitly reviewed public clients (for example Azure CLI for the
+    # MAUI-embedded Chat) share this audience, scope and grants. The authorized client must be present.
+    allowed_clients = {client_id, *(str(client) for client in auth.additional_client_ids)}
+    authorized_client = claims.get("azp")
+    if not isinstance(authorized_client, str) or authorized_client not in allowed_clients:
+        raise AuthenticationError("The token's authorized client differs from the configured registrations.")
     grants = [grant for grant in auth.grants if str(grant.object_id) == object_id]
     return Principal(
         tenant_id=token_tenant,
         object_id=object_id,
         scopes=frozenset(key for grant in grants for key in grant.scopes),
         permissions=frozenset(permission for grant in grants for permission in grant.permissions),
+        client_id=authorized_client,
     )

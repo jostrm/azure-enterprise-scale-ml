@@ -45,8 +45,9 @@ param inputKeyvaultResourcegroup string
 
 var technicalAdminsObjectID_array = array(split(technicalAdminsObjectID,','))
 var technicalAdminsEmail_array = array(split(technicalAdminsEmail,','))
-var technicalAdminsObjectID_array_safe = technicalAdminsObjectID == 'null'? []: technicalAdminsObjectID_array
-var technicalAdminsEmail_array_safe = technicalAdminsEmail == 'null'? []: technicalAdminsEmail_array
+var personaGroupsEnabled = contains(tags, 'AIF-Persona-Access') ? tags['AIF-Persona-Access'] == 'groups-v1' : false
+var technicalAdminsObjectID_array_safe = personaGroupsEnabled || empty(technicalAdminsObjectID) || technicalAdminsObjectID == 'null' ? [] : technicalAdminsObjectID_array
+var technicalAdminsEmail_array_safe = personaGroupsEnabled || empty(technicalAdminsEmail) || technicalAdminsEmail == 'null' ? [] : technicalAdminsEmail_array
 var subscriptionIdDevTestProd = subscription().subscriptionId
 
 var commonResourceGroupName = commonResourceGroup_param != '' ? commonResourceGroup_param : '${commonRGNamePrefix}${esmlCommonOverride}-${locationSuffix}-${env}${aifactorySuffixRG}' // aaa-bbb-{commonResourceName}-weu-dev-002 (31/90 chars)
@@ -72,7 +73,7 @@ module contributorPermissions '../../modules/contributorRbac.bicep' = {
   name: 'ContributorPermissionsOnRGCmn-depl${commonRGNamePrefix}${env}${aifactorySuffixRG}${locationSuffix}'
   params: {
     //userId: technicalContactId
-    userEmail: technicalContactEmail
+    userEmail: personaGroupsEnabled ? '' : technicalContactEmail
     additionalUserIds: technicalAdminsObjectID_array_safe
     additionalUserEmails: technicalAdminsEmail_array_safe
     useAdGroups: useAdGroups
@@ -86,7 +87,7 @@ module vmAdminLoginPermissions '../../modules/vmAdminLoginRbac.bicep' = if (enab
   name: 'VMAdminLoginPermissions-depl${commonRGNamePrefix}${env}${aifactorySuffixRG}${locationSuffix}'
   params: {
     //userId: technicalContactId
-    userEmail: technicalContactEmail
+    userEmail: personaGroupsEnabled ? '' : technicalContactEmail
     additionalUserIds: technicalAdminsObjectID_array_safe
     additionalUserEmails: technicalAdminsEmail_array_safe
     useAdGroups: useAdGroups

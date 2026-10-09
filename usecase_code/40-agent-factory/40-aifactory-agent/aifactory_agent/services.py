@@ -6,13 +6,18 @@ from threading import RLock
 from typing import Callable, Mapping
 
 from .config import Settings
-from .ports import ConversationPort, CostPort, FactoryToolPort, KnowledgePort, OperationStorePort, WorkloadPort
+from .ports import ConversationPort, CostPort, DualGraphPort, FactoryToolPort, KnowledgePort, OperationStorePort, WorkloadPort
 from .security import Principal, principal_from_token
 
 
 def _knowledge(settings: Settings) -> KnowledgePort:
     from .knowledge import Knowledge
     return Knowledge(settings)
+
+
+def _dual_graph(settings: Settings) -> DualGraphPort:
+    from .graph_service import GraphQueryService
+    return GraphQueryService(settings)
 
 
 def _store(settings: Settings) -> OperationStorePort:
@@ -32,9 +37,10 @@ def _workloads(settings: Settings, principal: Principal, scope_key: str,
 
 
 def _conversation(settings: Settings, knowledge: KnowledgePort,
-                  tools: Callable[[Principal, str], FactoryToolPort]) -> ConversationPort:
+                  tools: Callable[[Principal, str], FactoryToolPort],
+                  dual_graph: DualGraphPort | None = None) -> ConversationPort:
     from .foundry import Conversation
-    return Conversation(settings, knowledge, tool_factory=tools)
+    return Conversation(settings, knowledge, tool_factory=tools, dual_graph=dual_graph)
 
 
 @dataclass(frozen=True)
@@ -48,6 +54,10 @@ class AgentDependencies:
         [Settings, KnowledgePort, Callable[[Principal, str], FactoryToolPort]], ConversationPort
     ] = _conversation
     authenticate: Callable[[Settings, str], Principal] = principal_from_token
+    dual_graph_factory: Callable[[Settings], DualGraphPort] = _dual_graph
+    graph_conversation_factory: Callable[
+        [Settings, KnowledgePort, Callable[[Principal, str], FactoryToolPort], DualGraphPort], ConversationPort
+    ] | None = None
 
 
 class AgentServices:
@@ -57,6 +67,7 @@ class AgentServices:
         self.settings = Settings.model_validate(settings.model_dump(mode="python"))
         self.dependencies = dependencies if dependencies is not None else AgentDependencies()
         self._knowledge: KnowledgePort | None = None
+        self._dual_graph: DualGraphPort | None = None
         self._store: OperationStorePort | None = None
         self._lock = RLock()
 
@@ -71,6 +82,12 @@ class AgentServices:
             if self._store is None:
                 self._store = self.dependencies.operation_store_factory(self.settings)
             return self._store
+
+    def dual_graph(self) -> DualGraphPort:
+        with self._lock:
+            if self._dual_graph is None:
+                self._dual_graph = self.dependencies.dual_graph_factory(self.settings)
+            return self._dual_graph
 
     def tools(self, principal: Principal, scope_key: str, *,
               store: OperationStorePort | None = None) -> FactoryToolPort:
@@ -96,6 +113,11 @@ class AgentServices:
 
     def conversation(self, knowledge: KnowledgePort | None = None) -> ConversationPort:
         knowledge = knowledge if knowledge is not None else self.knowledge()
+        factory = self.dependencies.graph_conversation_factory
+        if factory is not None:
+            return factory(self.settings, knowledge, self.tools, self.dual_graph())
+        if self.dependencies.conversation_factory is _conversation:
+            return _conversation(self.settings, knowledge, self.tools, self.dual_graph())
         return self.dependencies.conversation_factory(self.settings, knowledge, self.tools)
 
     def authenticate(self, token: str) -> Principal:

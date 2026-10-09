@@ -1,61 +1,52 @@
-# IaC Templates
+# Infrastructure templates
 
-Infrastructure as Code (IaC) is the backbone of the AI Factory. All resources are defined in **Azure Bicep**, ensuring repeatable, auditable, and version-controlled deployments.
+Infrastructure as Code (IaC) describes resources as versioned files. AI Factory
+uses Bicep modules and supporting scripts within reviewed workflows; the
+templates alone are not the complete operational process.
 
----
+## Common and project infrastructure
 
-## Bicep Architecture
+| Source area | Role |
+| --- | --- |
+| `esml-common` | Shared foundation and common services |
+| `esml-project` | Machine-learning project resources |
+| `esml-genai-1` | Generative-AI project phases |
+| `modules` | Reusable Azure resource/access modules |
+| Provider templates | Azure DevOps and GitHub Actions orchestration |
 
-The Bicep templates are structured as modular, composable units:
+The GenAI source is split into foundation, core infrastructure, cognitive
+services, databases, compute, AI/ML platform, access/security, Foundry, dashboards
+and integration. Provider step names/numbers can differ; use the selected
+pipeline's current definitions.
 
-```
-environment_setup/aifactory/bicep/
-├── modules/               # Reusable resource modules
-│   ├── aiFoundry.bicep
-│   ├── aiSearch.bicep
-│   ├── networking.bicep
-│   ├── keyvault.bicep
-│   └── ...
-├── esml-common/           # AI Factory common infrastructure
-└── esml-project/          # Per-project infrastructure
-```
+## Use settings before customizing shared code
 
----
+For ordinary changes, start with [Parameters](../../parameters/index.md) and
+[Factory tools](../../factory-tools/19-cli-and-api-and-usage.md).
+Keep customer settings outside generated template copies. Replacing templates
+can overwrite local customizations if they are stored in the wrong location.
 
-## Deployment Stages (Pipeline Steps)
+Debug switches are for deliberate diagnosis. Skipping a task does not prove its
+dependencies were deployed, nor turn a partial run into a successful factory.
 
-| Step | Description |
-|---|---|
-| 61 | Foundation — Resource Groups, Managed Identities, VMs |
-| 62 | Core Infrastructure — Application Insights, Key Vault, Storage, ACR |
-| 63 | Cognitive Services — AI Search, OpenAI, Vision, Speech, etc. |
-| 64 | Databases — Cosmos DB, SQL, PostgreSQL, Redis |
-| 65 | Compute Services — Container Apps, Web App, Function App |
-| 66 | AI Platform (V1) — AI Foundry Hub with default project and connections |
-| 67 | ML Platform — Azure Machine Learning, Data Factory, Databricks |
-| 68 | Integration — Logic Apps, Event Hubs |
-| 69 | AI Foundry V2 (2025) — AI Foundry V2 with RBAC and default project |
-| 100 | RBAC & Security — Role assignments across all services (steps 61–99) |
+## Reuse existing infrastructure deliberately
 
-Each step can be individually skipped via `debug_disable_XX` flags for faster re-runs during development.
+Supported inputs cover existing VNet/subnets, common groups, data lake, Key Vault
+and selected service integrations. Validate resource identity, permissions and
+ownership; do not give two independent tools conflicting control.
 
----
+[Bicep details](../../iac/bicep.md) |
+[Bring your own infrastructure](../../iac/terraform.md)
 
-## Bring Your Own (BYO) Options
+<details markdown="1">
+<summary>More info</summary>
 
-The IaC supports several BYO overrides to integrate with existing infrastructure:
+[Current Bicep source](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep) |
+[GHA project phases](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml) |
+[ADO project jobs](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs)
 
-| BYO Option | Variable |
-|---|---|
-| Existing vNet | `vnetNameFull_param` + `vnetResourceGroup_param` |
-| Existing subnets | `BYO_subnets=true` + subnet name variables |
-| Existing Common Resource Group | `commonResourceGroup_param` |
-| Existing Data Lake | `datalakeName_param` |
-| Existing Key Vault | `kvNameFromCOMMON_param` |
-| Existing ASEv3 | `byoASEv3=true` + `byoAseFullResourceId` |
-| BYO Terraform | See [BYO Terraform](../../iac/terraform.md) |
+Ordinary deployment, selective project-resource deletion and ordered whole-factory
+teardown use different reviewed contracts. Do not infer deletion order from an
+infrastructure module list.
 
----
-
-!!! tip
-    See [IaC — BICEP](../../iac/bicep.md) for detailed Bicep usage and best practices.
+</details>

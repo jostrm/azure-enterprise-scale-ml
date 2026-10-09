@@ -110,7 +110,9 @@ def _matches(path: str, pattern: str) -> bool:
 def _excluded(path: str, settings: Settings) -> bool:
     parts = path.casefold().split("/")
     return (
-        any(p in _HARD_DIRS or "secret" in p or "credential" in p or "generated" in p
+        ("meta" in parts and "graphify" in parts)
+        or any(p in {"test", "tests", "testdata", "test_data", "fixtures", "__tests__"} for p in parts)
+        or any(p in _HARD_DIRS or "secret" in p or "credential" in p or "generated" in p
             or "eval" in p or p.startswith(".env") for p in parts)
         or parts[-1].startswith("test_")
         or any(_matches(path, p) for p in settings.knowledge.excludes)

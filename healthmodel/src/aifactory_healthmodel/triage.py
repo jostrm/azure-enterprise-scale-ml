@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from .azure import az_command
+from .infrastructure.azure_cli import az_command
 
 SYSTEM_PROMPT = (
     "You are an Azure site reliability engineer for an Enterprise Scale AI Factory. Using only the health model "

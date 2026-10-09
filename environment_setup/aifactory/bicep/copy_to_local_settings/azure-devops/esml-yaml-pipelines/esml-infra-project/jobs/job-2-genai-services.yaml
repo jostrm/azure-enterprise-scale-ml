@@ -33,6 +33,10 @@ steps:
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py'
     arguments: '--file "$(configOverrideFile)" --environment "$(dev_test_prod)" --format azure-devops'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
+- template: ../../variables/persona-access-steps.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    scope: project
 # ---------------------------------------------------------------------------
 # PREFLIGHT (early, fail-fast): validate AI Search/model quota, Elasticsearch
 # policy/RP blocks, resource-provider registration and region support for THIS
@@ -43,7 +47,7 @@ steps:
 # ---------------------------------------------------------------------------
 - task: AzureCLI@2
   displayName: '00_preflight_quota_policy_checks'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
+  condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -249,7 +253,7 @@ steps:
       echo "Variables set: vnetResourceGroup_resolved, vnetNameFull_resolved, network_env=$NETWORK_ENV"
 - task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'), ne(variables['deleteAllForProject'], 'true'))
+  condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'), ne(variables['deleteAllForProject'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -315,7 +319,7 @@ steps:
 
 - task: PowerShell@2
   displayName: '00_check_for_submodule'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
+  condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     targetType: 'inline'
     script: |
@@ -1045,7 +1049,7 @@ steps:
       Get-ChildItem -Path $tempDir -Filter "*.json" | ForEach-Object { Write-Host "  Found: $($_.FullName)" }
 - task: PowerShell@2
   displayName: '04_debug_check_files_and_paths'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
+  condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     targetType: 'inline'
     script: |
@@ -2859,7 +2863,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 - task: AzureCLI@2
   displayName: 'Check and Delete Current Project Orphan Role Assignments'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['persona_access_mode'], 'groups-v1'), ne(variables['deleteAllServicesForProject'], 'true'))
   env:
     ORPHAN_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
     ORPHAN_RG_PREFIX: $(admin_aifactoryPrefixRG)
@@ -3170,6 +3174,13 @@ steps:
      --parameters enableAzureSpeech="$(enableAzureSpeech)" \
      --parameters enableAIDocIntelligence="$(enableAIDocIntelligence)" \
      --parameters deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
+     --parameters skipDiagAISearch="$(skipDiagAISearch)" \
+     --parameters skipDiagAIServices="$(skipDiagAIServices)" \
+     --parameters skipDiagAOAI="$(skipDiagAOAI)" \
+     --parameters skipDiagContentSafety="$(skipDiagContentSafety)" \
+     --parameters skipDiagDocIntelligence="$(skipDiagDocIntelligence)" \
+     --parameters skipDiagSpeech="$(skipDiagSpeech)" \
+     --parameters skipDiagVision="$(skipDiagVision)" \
      --parameters deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
      --parameters deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
      --parameters deployModel_gpt_54_mini="$(deployModel_gpt_54_mini)" \
@@ -3325,6 +3336,7 @@ steps:
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-genai-1/05-compute-services.bicep" \
+     --parameters aksSkuTier="$(aksSkuTier)" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters skuWebAppDev="$(skuWebAppDev)" \
@@ -3516,6 +3528,7 @@ steps:
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-genai-1/07-ml-data-platform.bicep" \
+     --parameters aksSkuTier="$(aksSkuTier)" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters skuAzureMLDev="$(skuAzureMLDev)" \
@@ -3921,6 +3934,7 @@ steps:
     RBAC_LAKE_ACCOUNT: $(datalakeName_param)
     RBAC_LAKE_CONTAINER: $(lakeContainerName)
     RBAC_PROJECT_LAKE_ACCESS: $(enableProjectLakeAccess)
+    RBAC_PERSONA_ACCESS_MODE: $(persona_access_mode)
     RBAC_GATEWAY_ONLY: $(deployOnlyAIGatewayNetworking)
     RBAC_PROJECT_PREFIX: $(projectPrefix)
     RBAC_PROJECT_SUFFIX: $(projectSuffix)
@@ -3952,6 +3966,11 @@ steps:
      # Older customer variable files may not define these optional overrides.
      RBAC_BASTION_RG="${RBAC_BASTION_RG:-}"
      RBAC_BASTION_NAME="${RBAC_BASTION_NAME:-}"
+     RBAC_PERSONA_ACCESS_MODE="${RBAC_PERSONA_ACCESS_MODE:-legacy}"
+     case "$RBAC_PERSONA_ACCESS_MODE" in
+       legacy|groups-v1) ;;
+       *) echo "##vso[task.logissue type=error]Unsupported Common RG persona access mode"; exit 1 ;;
+     esac
      az account set --subscription "$RBAC_SUBSCRIPTION_ID"
 
      # Compute effective RBAC flags: only true if the feature is enabled AND the resource
@@ -3966,6 +3985,7 @@ steps:
      --subscription "$RBAC_SUBSCRIPTION_ID" \
      --location "$RBAC_LOCATION" \
      --template-file "esml-genai-1/08b-rbac-common-rg.bicep" \
+     --parameters personaAccessMode="$RBAC_PERSONA_ACCESS_MODE" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
      --parameters env="$RBAC_ENV" \
      --parameters projectNumber="$RBAC_PROJECT_NUMBER" \
@@ -4018,7 +4038,7 @@ steps:
   # Runs on the same private agent and approved service connection as task 101.
   # Opt out with enableProjectLakeAccess=false; legacy folders require an explicit
   # projectLakeAccessLegacyLayout=true. Neither option migrates existing data.
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_101_rbac_common_rg'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['persona_access_mode'], 'groups-v1'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_101_rbac_common_rg'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
   env:
     PROJECT_LAKE_CONTRACT_READY: $(projectLakeAccessContractReady)
     PROJECT_LAKE_ACCESS_ENABLED: $(enableProjectLakeAccess)
@@ -5650,7 +5670,7 @@ steps:
   # If task 62 / 63 / etc. failed BEFORE 69a, the started markers are never set
   # (69a/69b's own conditions require the Foundry phase and succeeded()),
   # so 110 stays skipped and any healthy caphost from a prior run is preserved.
-  condition: and(eq('${{ parameters.phase }}', 'foundry'), or(and(eq(variables['foundry_69a_started'], 'true'), ne(variables['foundry_69a_deployment_succeeded'], 'true')), and(eq(variables['foundry_69b_started'], 'true'), ne(variables['foundry_69b_succeeded'], 'true')), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
+  condition: and(eq(variables['persona_preflight_ready'], 'true'), eq('${{ parameters.phase }}', 'foundry'), or(and(eq(variables['foundry_69a_started'], 'true'), ne(variables['foundry_69a_deployment_succeeded'], 'true')), and(eq(variables['foundry_69b_started'], 'true'), ne(variables['foundry_69b_succeeded'], 'true')), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5660,7 +5680,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '111_If_Error_AIFoundryHubAndProject_DeleteIt'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(eq(variables['persona_preflight_ready'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5670,7 +5690,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '112_If_Error_AIServices_DeleteIt'
-  condition: and(ne(variables['deleteAllServicesForProject'], 'true'), eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '63-cognitive-services'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(eq(variables['persona_preflight_ready'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '63-cognitive-services'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5680,7 +5700,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '113_If_Error_AIFoundryProject_DeleteIt'
-  condition: and(eq('${{ parameters.phase }}', 'foundry'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '69-aifoundry-2025'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(eq(variables['persona_preflight_ready'], 'true'), eq('${{ parameters.phase }}', 'foundry'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '69-aifoundry-2025'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5854,6 +5874,18 @@ steps:
     DASHBOARD_VNET_RESOURCE_GROUP: $(vnetResourceGroup_resolved)
     DASHBOARD_CONFIG_FILE: $(configOverrideFile)
     DASHBOARD_TEMPLATE_FILE: $(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/aifactory-dash-01.bicep
+- ${{ if eq(parameters.phase, 'foundry') }}:
+  - template: ../../variables/persona-access-steps.yaml
+    parameters:
+      serviceConnection: ${{ parameters.serviceConnection }}
+      scope: common
+      phase: apply
+  - template: ../../variables/persona-access-steps.yaml
+    parameters:
+      serviceConnection: ${{ parameters.serviceConnection }}
+      scope: project
+      phase: apply
+
 - task: AzureCLI@2
   displayName: '07_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'), eq(variables['seeding_kv_ip_rule_added'], 'true'))
@@ -5904,7 +5936,7 @@ steps:
        --only-show-errors || echo "##[warning]Failed to remove Key Vault IP rule '$matching_rule'."
 - task: AzureCLI@2
   displayName: '08_az_remove_ips_from_ACR_FW_whitelist'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
+  condition: and(eq(variables['persona_preflight_ready'], 'true'), eq('${{ parameters.phase }}', 'infra'), always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash

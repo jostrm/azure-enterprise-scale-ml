@@ -7,3 +7,5 @@ build/
 dist/
 config.local.json
 *.log
+.copilot-azure/
+.build/

@@ -38,11 +38,20 @@ def substitute(script: str, values: dict[str, str]) -> str:
     )
 
 
+def bash_executable() -> str | None:
+    """Git Bash on Windows, like run_ci.py: WSL's bash.exe (often first on PATH) inherits neither
+    the Windows environment nor Windows paths, so GITHUB_ENV writes would fail."""
+    if os.name == "nt":
+        candidate = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin" / "bash.exe"
+        return str(candidate) if candidate.is_file() else None
+    return shutil.which("bash")
+
+
 class PipelineDnsOwnershipTests(unittest.TestCase):
     def run_shell(self, shell, script, env=None):
-        command = shutil.which(shell)
+        command = bash_executable() if shell == "bash" else shutil.which(shell)
         if not command:
-            self.skipTest(f"{shell} is required")
+            self.skipTest(f"{shell} is required" + (" (Git Bash on Windows)" if shell == "bash" else ""))
         args = (
             ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script]
             if shell == "pwsh" else ["--noprofile", "--norc", "-s"]

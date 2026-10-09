@@ -25,6 +25,8 @@ Published `main` is **30 commits ahead** of the requested release branch, with *
 > [!IMPORTANT]
 > **Already implemented is not the same as adopted.** The roadmap separates published source changes, installed/runtime adoption and proposals that still need owners and acceptance criteria. A published repair is not evidence that a workbook was refreshed or a deployment completed.
 
+> **8 October 2026 follow-up:** the [post-v1.25 source addendum](RELEASE_125.md#post-v125-addendum--8-october-2026) covers Factory Agent Chat, Factory MCP, CLI/API execution boundaries, the shared dual graph, Azure Monitor health models and opt-in personas. It labels committed versus working-tree implementation and remaining integration/adoption gaps separately. The dated snapshot, commit counts and published-main comparisons below remain the 30 September assessment; the addendum does not retroactively add these features to v1.25.
+
 ---
 
 ## 1. Cumulative main progress versus the v1.24 notes
@@ -44,6 +46,13 @@ Published `main` is **30 commits ahead** of the requested release branch, with *
 Detailed scope, representative commits and migration caveats are in [RELEASE_125.md](RELEASE_125.md). Existing persona groups, CMEK, MI-only setup, per-environment SKUs and baseline FinOps are not new announcements.
 
 ### What "personas" means in the v1.24.1 summary
+
+**Post-snapshot implementation:** the opt-in `groups-v1` nine-persona source model
+now has separate group bootstrap, bound seeding records, declarative permissions
+and common/project reconciliation. It is not a retroactive capability claim for
+v1.24.1/v1.25 snapshots or installed desktop/API packages. See the
+[current specification and adoption requirements](documentation/v2/20-29/25-personas-aifactory.md).
+Live tenant authorization remains an operator validation requirement.
 
 These are **team responsibilities and identity/access groupings**, not LLM personalities or system prompts. With `use_ad_groups: "true"`, configuration supplies Entra security-group ObjectIDs for project/core-team membership. Pipeline parameters pass this as `useAdGroups`; RBAC modules use `principalType: 'Group'` rather than `'User'`. The `personas_project_esml`, `personas_project_genai_1` and `personas_core_team` strings describe persona names; changing a label alone is not a new access policy.
 

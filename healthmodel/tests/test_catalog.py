@@ -273,11 +273,10 @@ def test_profile_lookup_rejects_unknown_key():
         cat.profile(CATALOG, "does-not-exist")
 
 
-def test_project_shared_profiles_and_common_flags_are_consistent():
-    keys = {p["key"] for p in PROFILES}
-    assert set(CATALOG["projectSharedProfiles"]) <= keys
+def test_common_flags_map_to_catalog_profiles():
     mapped = {flag for profile in PROFILES for flag in profile["enableFlags"]}
     assert set(CATALOG["commonResourceFlags"]) <= mapped
+    assert "projectSharedProfiles" not in CATALOG, "model contents belong to definitions/*.json"
 
 
 def test_classify_uses_kind_and_hierarchical_namespace():

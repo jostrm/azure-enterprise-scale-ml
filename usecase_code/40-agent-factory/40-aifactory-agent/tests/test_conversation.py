@@ -578,3 +578,54 @@ def test_workload_actions_are_panel_instructions_not_model_tools():
     names = {tool["name"] for tool in foundry.knowledge_tools() + foundry.factory_tools()}
     assert not any("prepare" in name or "approve" in name or "execute" in name for name in names)
     assert "Chat remains read-only" in foundry.INSTRUCTIONS
+
+
+def test_agent_endpoint_gateway_binds_only_configured_agent_and_omits_reference(settings):
+    settings = settings.model_copy(update={"agent_invocation": "agent_endpoint"})
+    calls, closed = [], []
+    expected = response()
+    model = SimpleNamespace(responses=FakeResponses([expected]))
+
+    @contextmanager
+    def openai_client(**kwargs):
+        calls.append(("openai", kwargs))
+        try:
+            yield model
+        finally:
+            closed.append("openai")
+
+    @contextmanager
+    def project_client(**kwargs):
+        calls.append(("project", kwargs))
+        try:
+            yield SimpleNamespace(get_openai_client=openai_client)
+        finally:
+            closed.append("project")
+
+    cred = object()
+    gateway = foundry.FoundryModelGateway(project_client_factory=project_client, credential_factory=lambda _: cred)
+    messages = [{"role": "user", "content": "Read-only question"}]
+    with gateway.open(settings) as session:
+        assert session.respond(messages, {"type": "agent_reference", "name": settings.agent_name}) is expected
+    assert calls == [
+        ("project", {"endpoint": settings.azure.project_endpoint, "credential": cred, "allow_preview": True}),
+        ("openai", {"agent_name": settings.agent_name, "timeout": 120, "max_retries": 0}),
+    ]
+    assert model.responses.requests == [{
+        "input": messages, "store": False, "include": ["reasoning.encrypted_content"],
+        "max_output_tokens": settings.max_output_tokens,
+    }]
+    assert closed == ["openai", "project"]
+
+
+@pytest.mark.parametrize("reference", [
+    {"type": "agent_reference", "name": "other-agent"},
+    {"type": "agent_reference", "name": "enterprise-scale-ai-factory", "version": "2"},
+])
+def test_agent_endpoint_session_rejects_target_or_version_override_before_request(settings, reference):
+    settings = settings.model_copy(update={"agent_invocation": "agent_endpoint"})
+    model = SimpleNamespace(responses=FakeResponses([response()]))
+    session = foundry.FoundryModelSession(model, settings)
+    with pytest.raises(ValueError):
+        session.respond([], reference)
+    assert model.responses.requests == []

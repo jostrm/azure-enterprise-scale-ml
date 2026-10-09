@@ -1,43 +1,52 @@
-# AI Factory Intelligence
+# Platform automation
 
-AI Factory Intelligence refers to the built-in automation layer that makes the AI Factory a truly "intelligent" provisioning platform — not just a collection of Bicep templates.
+AI Factory automation helps turn selected settings into a repeatable plan.
+It is not a self-aware system, and it does not replace your network, security
+or deployment approvals.
 
----
+## What the automation does
 
-## What Is AI Factory Intelligence?
+| Area | Help provided | Your responsibility |
+| --- | --- | --- |
+| Address planning | Calculates supported project subnet layouts from the selected ranges and existing allocations. | Supply enough non-overlapping address space and verify connectivity. |
+| Service dependencies | Checks the selected service bundle and related settings. | Choose a supported architecture and resolve blockers. |
+| Identity and access | Applies configured identities, role assignments and storage permissions through supported steps. | Approve least-privilege scope and supply required privileges. |
+| Configuration translation | Maps supported JSON/YAML/GitHub names for the chosen route. | Use the correct input and avoid conflicting manual copies. |
+| Naming | Uses configured naming and salts where required. | Preserve identity and handle existing-name/ownership conflicts. |
+| Updates | Reviews and applies supported changes to existing targets. | Inspect the plan; do not assume a re-run leaves every resource untouched. |
 
-AI Factory Intelligence is the set of automated capabilities that understands **context** and acts accordingly:
+## Groups and personas
 
-1. **Dynamic Subnet / IP Calculator** — automatically computes all CIDR ranges for every subnet in every environment (Dev, Stage, Prod) from a single `cidr_range` integer per environment. No manual IP planning required.
-2. **Dynamic RBAC** — automatically assigns the correct roles to the correct identities (Managed Identities, Service Principals, user groups) across all services in a project — including private endpoint connections, Key Vault access, and storage ACLs.
-3. **Persona-based Access Control** — maps Entra ID security groups to predefined personas (e.g. `p001_esml_team_lead`, `p012_genai_team_member_aifoundry`) so that access rights follow skills and responsibilities, not just roles.
-4. **Feature-flag orchestration** — the pipeline reads your `variables.yaml` / `.env` configuration and decides which Bicep modules to invoke, in which order, skipping disabled services entirely.
-5. **Incremental deployment** — re-run the pipeline at any time to add new services (e.g. set `enableContainerApps=true`) without touching previously deployed resources.
+The published templates support group principals and persona-labelled settings.
+Labels alone do not prove that a complete least-privilege permission policy has
+been applied.
 
----
+Newer nine-persona `groups-v1` work described in local addenda is separate from
+the older release snapshot. Check the published source and installed host
+before assuming that policy, seeding and migration are available together.
+Never grant roles merely because a document or assistant suggests them.
 
-## Personas
+## Choose the supported path
 
-The AI Factory uses a persona system aligned with [WAF AI personas](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas):
+Start with [Parameters](../parameters/index.md), then use the
+[reviewed tool workflow](../factory-tools/19-cli-and-api-and-usage.md).
+A service flag requests behavior; it does not itself prove deployment,
+connectivity or cleanup.
 
-| Persona ID | Role |
-|---|---|
-| `p001` | ESML Team Lead |
-| `p002` | ESML Data Scientist |
-| `p003` | ESML Front-end Developer |
-| `p011` | GenAI Team Lead |
-| `p012` | GenAI AI Foundry specialist |
-| `p013` | GenAI Agentic developer |
-| `p014` | GenAI DataOps engineer |
-| `p015` | GenAI Front-end developer |
-| `p080` | Core Team IT Admin |
-| `p081` | Core Team DataOps |
-| `p082` | Core Team Fabric DataOps |
+<details markdown="1">
+<summary>More info</summary>
 
----
+The shared `/18` planning pattern uses aligned Dev/Stage/Prod selectors
+`0`, `64`, `128`. Own-subscription `/20` plans use `0`, `16`, `32`.
+Planning does not move existing subnets or resize a VNet. Private DNS, routing,
+VPN client pools and the runner's access must also be checked.
 
-## Salt-based Uniqueness
+Names and salts reduce collisions but are not a universal uniqueness guarantee.
+Use recorded resource IDs for later operations rather than reconstructing a
+target from a prefix.
 
-Each AI Factory deployment gets a deterministic 5-character **salt** derived from the User-Assigned Managed Identity. This salt is used in all resource names to ensure uniqueness without collisions across scale sets.
+Scoped review records, compatible runtime contracts and exact operation
+versions protect execution. They are not permission to retry an uncertain write.
+See [removal and recovery](../factory-tools/20-cli-and-api-and-usage.md).
 
-Example: `adf-cmn-weu-dev-a4c2b-001` — the `a4c2b` is the salt.
+</details>

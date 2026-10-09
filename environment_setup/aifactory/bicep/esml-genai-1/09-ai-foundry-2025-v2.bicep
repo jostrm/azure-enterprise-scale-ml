@@ -222,8 +222,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
 		randomValue: randomValue
 		aifactorySuffixRG: aifactorySuffixRG
 		commonRGNamePrefix: commonRGNamePrefix
-		technicalAdminsObjectID: technicalAdminsObjectID
-		technicalAdminsEmail: technicalAdminsEmail
+		technicalAdminsObjectID: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? '' : technicalAdminsObjectID
+		technicalAdminsEmail: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? '' : technicalAdminsEmail
 		commonResourceGroupName: resolvedCommonResourceGroup
 		subscriptionIdDevTestProd: resolvedSubscriptionId
 		genaiSubnetId: genaiSubnetId

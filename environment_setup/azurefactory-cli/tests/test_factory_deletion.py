@@ -30,6 +30,16 @@ RESOURCE = GROUP + "/providers/Microsoft.Storage/storageAccounts/factorystore"
 PHRASE = "DELETE ai-demo"
 
 
+def retention_policy():
+    return {
+        "mode": "preserve-reusable-infrastructure",
+        "required_execution_contract": "ordered-project-pipelines-v1",
+        "execution_scope": "whole-resource-groups",
+        "selective_retention_supported": False,
+        "limitations": ["Protected resources inside a deletable group block preparation."],
+    }
+
+
 def preview():
     return {
         "contract_version": 1, "capabilities": ["delete-aifactory-v1"],
@@ -56,6 +66,9 @@ def preview():
         "deletion_options": None, "deletion_scope": "whole-factory",
         "preserve_entra_groups": True, "retain_saved_configuration": False,
         "retained_resources": [], "preview_hash": "c" * 64, "confirmation_phrase": PHRASE,
+        "deletion_retention_policy": retention_policy(),
+        "deletion_plan": {"contract": "ordered-project-pipelines-v1", "retention_policy": retention_policy(),
+                          "protected_resources": [], "retained_resources": []},
     }
 
 
@@ -264,13 +277,72 @@ def test_incomplete_or_broadened_manifest_fails_closed(tmp_path, transport, chan
     assert not (tmp_path / "receipt.json").exists()
 
 
-def test_retained_group_with_deleted_child_is_rendered_and_bound(tmp_path, transport, capsys):
+def test_retained_group_with_deleted_child_is_blocked_without_selective_runtime(tmp_path, transport):
     p = transport.preview
     p["deletion_targets"][0].update(delete=[RESOURCE], retain=[GROUP])
     p["retained_resources"] = [GROUP]
     p["inventory"] = [p["inventory"][1]]
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+
+
+@pytest.mark.parametrize("change", [
+    "absent", "null", "mode", "contract", "scope", "selective", "boolean",
+    "limitations", "missing-plan", "mismatched-plan", "mismatched-contract",
+])
+def test_unproven_retention_policy_never_becomes_an_approval(tmp_path, transport, change):
+    p = transport.preview
+    policy = p["deletion_retention_policy"]
+    if change == "absent":
+        del p["deletion_retention_policy"]
+    elif change == "null":
+        p["deletion_retention_policy"] = None
+    elif change == "mode":
+        policy["mode"] = "delete-hub"
+    elif change == "contract":
+        policy["required_execution_contract"] = "unknown"
+    elif change == "scope":
+        policy["execution_scope"] = "individual-resources"
+    elif change == "selective":
+        policy["selective_retention_supported"] = True
+    elif change == "boolean":
+        policy["selective_retention_supported"] = 0
+    elif change == "limitations":
+        policy["limitations"] = []
+    elif change == "missing-plan":
+        del p["deletion_plan"]
+    elif change == "mismatched-plan":
+        p["deletion_plan"]["retention_policy"]["mode"] = "delete-hub"
+    else:
+        p["deletion_plan"]["contract"] = "unknown"
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+    assert len(transport.records) == 1
+
+
+def test_retention_limitations_are_rendered_and_receipt_bound(tmp_path, transport, capsys):
     assert prepare(tmp_path) == 0
-    assert '"retain": [' in capsys.readouterr().err
+    output = capsys.readouterr()
+    assert "whole-resource-groups" in output.err
+    assert "Protected resources inside" in output.err
+    receipt = json.loads((tmp_path / "receipt.json").read_text())
+    assert receipt["preview"]["deletion_retention_policy"] == retention_policy()
+
+
+def test_external_hub_retention_comes_from_frozen_plan(tmp_path, transport, capsys):
+    hub = f"/subscriptions/{SUBSCRIPTION}/resourceGroups/shared-hub"
+    transport.preview["deletion_plan"]["protected_resources"] = [hub]
+    transport.preview["retained_resources"] = [hub]
+    assert prepare(tmp_path) == 0
+    assert hub in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("field", ["protected_resources", "retained_resources"])
+def test_plan_retention_cannot_hide_under_a_deleted_group(tmp_path, transport, field):
+    transport.preview["deletion_plan"][field] = [RESOURCE]
+    transport.preview["retained_resources"] = [RESOURCE]
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
 
 
 def test_saved_configuration_handling_is_backend_sourced(tmp_path, transport, capsys):

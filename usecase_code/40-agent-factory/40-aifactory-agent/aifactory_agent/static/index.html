@@ -5,15 +5,19 @@
   <script>
   (() => {
     const param = new URLSearchParams(window.location.search).get("scoutTheme");
-    const theme =
-      param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    document.documentElement.setAttribute("data-theme", theme);
+    const explicit = param === "light" || param === "dark";
+    const system = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => document.documentElement.setAttribute("data-theme", explicit ? param : system.matches ? "dark" : "light");
+    apply();
+    if (!explicit) system.addEventListener("change", apply);
   })();
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>Enterprise Scale AI Factory Agent</title>
   <link rel="stylesheet" href="/static/theme.css">
+  <script src="/static/vendor/markdown-it.min.js" defer></script>
+  <script src="/static/markdown.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
 <body>
@@ -60,6 +64,8 @@
       <div class="content">
         <section class="card" aria-labelledby="question-heading">
           <h2 id="question-heading">Ask the Factory expert</h2>
+          <p class="muted" id="question-examples-help">Read-only examples for the active scope. Choose a question to edit it, then press Ask agent yourself. No example sends automatically.</p>
+          <div id="question-examples" class="tile-grid" role="group" aria-label="Example questions" aria-describedby="question-examples-help"></div>
           <form id="question-form">
             <label for="question">Architecture, onboarding, operations or updates</label>
             <textarea id="question" rows="6" maxlength="8000" required disabled
@@ -83,6 +89,8 @@
         <section class="card" aria-labelledby="skills-heading">
           <h2 id="skills-heading">Factory actions and cost monitoring</h2>
           <p class="muted">Cost reports are read-only. Factory actions prepare a saved plan here; they never run from chat. Creation uses an approved private hub/VPN/default-project configuration. Deletion requires the exact resource list, plan hash and deletion phrase, and preserves Entra security groups.</p>
+          <p class="muted" id="action-tiles-help">Action shortcuts ask for confirmation before selecting the form only; no request is sent. Complete the form and confirm preparation separately. Approval and execution remain separate server-governed steps.</p>
+          <div id="action-tiles" class="tile-grid" role="group" aria-label="Factory skill shortcuts" aria-describedby="action-tiles-help"></div>
           <form id="skill-form">
             <label for="skill-selector">Skill</label>
             <select id="skill-selector" disabled>
@@ -120,6 +128,19 @@
       </div>
     </div>
   </main>
+  <dialog id="confirmation-dialog" class="confirmation-dialog" aria-labelledby="confirmation-heading"
+    aria-describedby="confirmation-action confirmation-description">
+    <h2 id="confirmation-heading">Are you sure?</h2>
+    <p id="confirmation-action" class="confirmation-action"></p>
+    <p id="confirmation-description"></p>
+    <h3>Review the exact action and active target</h3>
+    <pre id="confirmation-details" tabindex="0" aria-label="Action, scope and request details"></pre>
+    <p class="muted">Cancel or press Escape to make no request. This confirmation never replaces server permissions, exact plan-hash approval or the typed deletion phrase.</p>
+    <div class="confirmation-controls">
+      <button id="confirmation-cancel" type="button" class="secondary" autofocus>Cancel · do nothing</button>
+      <button id="confirmation-accept" type="button">Confirm action</button>
+    </div>
+  </dialog>
   <footer>Tenant-bound Entra sign-in · scoped evidence · server-enforced approvals · no tokens stored in the browser</footer>
 </body>
 </html>

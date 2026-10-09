@@ -26,6 +26,7 @@ class ToolAudit:
         event = {
             "event_id": str(uuid4()), "correlation_id": self.correlation_id,
             "tenant_id": self.principal.tenant_id, "object_id": self.principal.object_id,
+            "client_id": getattr(self.principal, "client_id", None),
             "agent_name": self.settings.agent_name,
             "scope_key": self.scope_key,
             "scope": self.settings.scopes[self.scope_key].model_dump(mode="json"),

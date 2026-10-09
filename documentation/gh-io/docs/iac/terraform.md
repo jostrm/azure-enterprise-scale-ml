@@ -1,47 +1,53 @@
-# IaC — BYO Terraform
+# Bring your own infrastructure
 
-The AI Factory natively uses **Azure Bicep** for IaC. However, if your organisation already has Terraform-based infrastructure, the AI Factory supports a **Bring Your Own Terraform (BYO Terraform)** mode.
+Already managing shared Azure resources with Terraform? You can use supported
+AI Factory **existing-resource inputs** to integrate with that estate.
+Keep ownership clear: Terraform and AI Factory must not independently manage
+the same resource without an explicit plan.
 
----
+!!! note "Not a second complete deployment engine"
+    The repository's `environment_setup/aifactory/terraform/readme.md` remains
+    a TODO for Bicep-equivalent behavior. Do not assume complete Terraform
+    templates or registered-runtime parity are implemented.
 
-## BYO Terraform Philosophy
+## A practical split
 
-BYO Terraform means: **use your existing Terraform for shared/common infrastructure, and let the AI Factory Bicep handle the AI Factory-specific project resources**.
+Your platform team may provide subscriptions, hub networking, DNS, storage or
+other common services. The AI Factory's supported Bicep/project route then uses
+approved references where the chosen template supports them.
 
-Typical split:
+| Input | What it identifies |
+| --- | --- |
+| `vnetNameFull_param`, `vnetResourceGroup_param` | Existing VNet and its resource group |
+| `commonResourceGroup_param` | Common resource-group reference |
+| `datalakeName_param` | Existing data-lake account |
+| `kvNameFromCOMMON_param` | Existing common Key Vault |
+| `BYO_subnets` and service subnet names | Use the reviewed existing subnet layout |
+| `centralDnsZoneByPolicyInHub` and `privDns*` settings | Central private-DNS design and location |
 
-| Managed by Terraform | Managed by AI Factory Bicep |
-|---|---|
-| Hub VNet, firewall, DNS zones | Project VNets, subnets (or BYO subnets) |
-| Shared Key Vaults (seeding KV) | Project Key Vaults |
-| Shared ACR | Project ACR (or shared, configurable) |
-| Existing subscriptions, resource groups | AI Factory Common RG + Project RGs |
+See [all parameters](../parameters/advanced.md) for exact names and conditions.
+Supplying a reference does not grant access, create a peering, or transfer
+resource ownership.
 
----
+## Before integrating
 
-## Integration Points
+1. Agree which tool owns each resource and its state.
+2. Confirm exact IDs, subscriptions, address ranges, DNS and private routes.
+3. Give the deployment identity only the required permissions.
+4. Review AI Factory's deployment and deletion plans with those boundaries.
 
-Configure the following variables to point the AI Factory at your existing Terraform-managed resources:
+Never allow whole-group deletion to remove resources still owned by another
+project or tool. An unsupported combination should remain blocked.
 
-| Variable | Description |
-|---|---|
-| `vnetNameFull_param` | Full name of your existing VNet |
-| `vnetResourceGroup_param` | Resource group of your existing VNet |
-| `commonResourceGroup_param` | Existing common resource group name |
-| `datalakeName_param` | Existing data lake storage account name |
-| `kvNameFromCOMMON_param` | Existing common Key Vault name |
-| `BYO_subnets=true` | Use your pre-existing subnets |
-| `centralDnsZoneByPolicyInHub=true` | Use your existing centralised private DNS zones |
-| `privDnsSubscription_param` | Subscription containing your DNS zones |
-| `privDnsResourceGroup_param` | Resource group containing your DNS zones |
+<details markdown="1">
+<summary>More info</summary>
 
----
+[Terraform status in source](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/terraform/readme.md) |
+[Bicep route](bicep.md) |
+[Factory operations](../factory-tools/19-cli-and-api-and-usage.md)
 
-## Terraform References
+BYO integration is not an automatic translation of Terraform state into the
+registered catalog. Importing configuration and proving deployment ownership
+are separate tasks.
 
-The `environment_setup/aifactory/terraform/` directory contains Terraform reference configurations that can be used as a starting point for managing shared infrastructure outside the AI Factory Bicep pipeline.
-
----
-
-!!! tip
-    For most new deployments, the **full Bicep** approach (no BYO Terraform) is recommended — it is simpler, faster, and fully supported. Use BYO Terraform only when integrating into an existing Terraform-managed estate.
+</details>

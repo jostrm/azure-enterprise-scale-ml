@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.R
 add_model_arguments(parser)
 parser.add_argument("--hours", type=float, default=24, help="History window for failing signals.")
 args = parser.parse_args()
-client = client_from(args)
+client = client_from(args, read_only=True)
 
 summary = client.summary()
 root = summary["root"]

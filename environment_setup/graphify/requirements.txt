@@ -1,0 +1,4 @@
+# Development-only extraction; never install in an MCP or agent runtime.
+graphifyy[mcp,terraform]==0.9.72
+PyYAML==6.0.3
+pytest>=8,<10

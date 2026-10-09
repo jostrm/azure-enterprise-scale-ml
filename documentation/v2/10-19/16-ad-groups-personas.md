@@ -1,12 +1,19 @@
 # Microsoft EntraID Security Groups & Personas
 Microsoft EntraID Security groups are mapped to Personas. 
 
+> [!IMPORTANT]
+> The positional `pNNN` configuration below is the **legacy model**, not an enforced
+> hierarchy of permissions. See [the current persona specification](../20-29/25-personas-aifactory.md)
+> for the opt-in `groups-v1` model, its explicit `personaNNN` identifiers, privileged
+> bootstrap, migration prerequisites and deployment limitations. Entra group
+> administration is separate from normal factory provisioning.
+
 # Rules & AI Factory configuration file (.yaml or .env)
 - The 3 arrays below contains "Group ObjectID" for Entra ID security groups in a commas separated list, without space. It should not contain the Group name. 
 - All groups needs to be created. Some can be empty of members.
 - Only the first group in each array is mandatory to add members to (`team_lead`, `core_team_admin`)
-- A member can belong to 1 core team group, and at the same time one project team.
-- A member cannot belong to multiple project team groups, instead move the member upwards in the elevation chaing, "team lead" being the one with highest permissions.
+- A member can belong to core-team and project groups.
+- Membership is additive: multiple project personas and multiple projects are supported. A read-only group never cancels a permission from another group. Persona ordering in an array does not create a deny or precedence rule.
 
 ## Microft EntraID group names
 
@@ -58,13 +65,12 @@ An Entra ID administrator can manually create the Microsoft EntraID groups, per 
     - **Group type**: Security
     - **Group name**: Prefferebly the as suggested naming convention containing at least project number(prj001) and persiona number (p001)
     - **Group description**: Prefferebly persona name
-    - **Microsoft Entra roles can be assigned to the group**: Yes
+    - **Microsoft Entra roles can be assigned to the group**: No. Ordinary security groups can receive Azure RBAC assignments; role-assignable Entra groups are not required and confer a different directory-administration boundary.
     - **Membership type**: Assigned
-    - **Owners, Members, Roles**: - (will be set by AI Factory)
+    - **Owners, Members, Roles**: Managed by the authorized Entra administrator; normal AI Factory deployment pipelines do not manage group membership.
 
 ![](./images/16-ad-groups-personas-create-group.png)
 
 Then the administrator needs to add the ObjectID per EntraID group, to the seeding keyvault, with the naming convention accordingly, `group-prjXXX-pXXX`, such as below: 
 
 ![](./images/16-ad-groups-seeding-keyvault.png)
-

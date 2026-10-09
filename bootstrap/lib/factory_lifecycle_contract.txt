@@ -52,9 +52,13 @@ not proof. Repository admins/code writers are trusted and can bypass/delete
 this state. This does not fence other repositories or arbitrary Azure writers.
 
 Supported: frozen common/create-factory/create-scaleset and exact project
-deployments via GHA and ADO Linux workers. Single-writer delete, physical-lease
-cohorts and legacy project pipelines are explicitly blocked before provisioning;
-they must not be presented as available. Capabilities advertises coordination_modes
+deployments via GHA and ADO Linux workers. Single-writer deletion supports
+whole-owned-group plans/cohorts only: every group and resource in the deletion
+manifest must be marked delete. Mixed delete/retain and selective project
+deletion are not supported by that path. It uses repository CAS, not physical
+leases; legacy project pipelines remain outside this coordination contract.
+Capabilities advertises single_writer_deletion="provider-repository-cas-cohort-v1",
+coordination_modes
 ["blob","single-writer"], single_writer="provider-repository-cas-v1" and the
 single_writer_operations list.
 

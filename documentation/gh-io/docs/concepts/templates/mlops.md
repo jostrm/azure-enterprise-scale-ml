@@ -1,59 +1,66 @@
-# MLOps Templates
+# ML Model Factory and MLOps
 
-The AI Factory provides MLOps templates for the **ESML** (Enterprise Scale Machine Learning) project type, enabling a full ML lifecycle within a secure, private Azure environment.
+Use reusable examples and shared engines to prepare data, train and compare
+models, then deliberately deploy the selected result.
 
----
+## Choose your use case
 
-## ESML Architecture
+| Pattern | Typical use |
+| --- | --- |
+| Batch | Score a dataset on demand or on a schedule. |
+| Online | Answer individual inference requests. |
+| Streaming | Process continuous or micro-batch events with checkpoints. |
 
-The ESML project type includes:
+The current Model Factory organizes examples by pattern, task and technology:
+classification, regression, forecasting and supported vision routes using
+custom Python, AutoML, Azure ML pipelines and Databricks.
 
-- **Azure Machine Learning** workspace — private, with private endpoints on all dependent services.
-- **AML Compute Clusters** — auto-scaling, configurable SKU and node count per environment.
-- **AML Compute Instances** — for interactive development.
-- **Private AKS Cluster** — for model serving at scale (Azure Arc-enabled).
-- **Azure Container Registry (ACR)** — private, Premium SKU for model image storage.
-- **Azure Data Factory** — for orchestrating training and batch-inference pipelines.
-- **Databricks** (optional) — for large-scale feature engineering.
+Start at the [current use-case tree](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/usecase_code/50-ml-model-factory/usecase-type)
+and read that leaf's prerequisites. A notebook's presence is not proof that all
+engine/task combinations are supported or deployed.
 
----
+## Where to make your changes
 
-## ESML With Fabric Flavour
+| Folder in `50-ml-model-factory` | Ownership |
+| --- | --- |
+| `user-config` | Your scenario, model policy, storage and Databricks choices. |
+| Project copies of `usecase-type` examples | Thin examples you can adapt for the workload. |
+| `accelerator` | Shared maintainer-owned engines; avoid copying their internals. |
+| `data/out` and `ml-environment` | Generated datasets, models, reports and run artifacts. |
 
-The ESML project type optionally integrates with **Microsoft Fabric**:
+## Train, compare and deploy separately
 
-- Data scientists can work from Azure Databricks, Microsoft Fabric, or Azure Machine Learning — with the same MLOps template.
-- Fabric provides a unified analytics platform with OneLake as the data foundation.
+1. Validate the chosen scenario, input data, budget and compute references.
+2. Render or inspect the job before submitting cloud work.
+3. Evaluate candidates against compatible held-out data and the configured policy.
+4. Review registration and deployment as separate actions.
+5. Monitor inputs, performance and freshness after deployment.
 
----
+A winning model is not production approval. Missing labels or insufficient
+observations are unknown, not a successful health result.
 
-## MLOps Pipeline Templates
+## Version and engine limits
 
-Templates are provided for:
+`azure-esml-sdk` / `azure_esml` is a newer API, **not a drop-in ESML v1 replacement**.
+Older pipelines remain separate compatibility paths.
+AutoML forecasting is not offered for streaming where the prediction method
+requires observed history with each request; use the supported alternative
+described in the model-factory guide.
 
-| Template | Description |
-|---|---|
-| Training pipeline | AML pipeline for model training with logging and experiment tracking |
-| Batch inference pipeline | Scheduled or event-driven batch scoring |
-| Online inference | AKS-hosted REST endpoint with private networking |
-| Model registration & promotion | Automated model registration and promotion across Dev → Stage → Prod |
+Compute SKU/version defaults change and have regional constraints. Read the
+[current Parameters reference](../../parameters/advanced.md) instead of copying
+an old hard-coded compute table.
 
----
+<details markdown="1">
+<summary>More info</summary>
 
-## Compute Defaults (Overridable)
+[Model Factory quickstart and limitations](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/50-ml-model-factory/readme.md) |
+[Shared pipeline templates](https://github.com/jostrm/azure-enterprise-scale-ml/tree/main/copy_my_subfolders_to_my_grandparent/mlops) |
+[DataOps](dataops.md)
 
-| Setting | DEV default | TEST/PROD default |
-|---|---|---|
-| AKS node SKU | `Standard_B4ms` | `Standard_DS13-2_v2` |
-| AKS node count | 1 | 3 |
-| AKS Kubernetes version | `1.33.2` | `1.33.2` |
-| AML cluster max nodes | 3 | 5 |
-| AML cluster SKU | `Standard_DS3_v2` | `Standard_D13_v2` |
-| AML compute instance SKU | `Standard_DS11_v2` | `Standard_ND96amsr_A100_v4` |
+Storage selection does not provision or migrate data. Dataset licences, vision
+dependencies, existing compute/cluster references and authenticated cloud access
+remain explicit requirements. Framework examples are not a universal model CRUD
+API across every runtime.
 
-All compute settings are overridable via `admin_aks_*` and `admin_aml_*` variables.
-
----
-
-!!! info
-    MLOps templates are located under `copy_my_subfolders_to_my_grandparent/mlops/`.
+</details>

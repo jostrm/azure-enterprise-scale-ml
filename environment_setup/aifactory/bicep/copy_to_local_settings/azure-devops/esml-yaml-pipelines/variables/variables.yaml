@@ -1,4 +1,19 @@
 variables:
+  enablePersonas: false # True selects groups-v1; false preserves configured legacy human/group grants.
+  persona_access_mode: "legacy" # Derived from enablePersonas; mode-only opt-in is supported when the flag is absent.
+  persona_access_manifest: "" # Repository-relative reviewed manifest for this environment/project.
+  persona_preflight_ready: "false"
+  aksSkuTier: "Standard"
+  enableProjectVM: false
+  updateRbac: false
+  # Match Bicep defaults: diagnostic deployment remains opt-in per service.
+  skipDiagAISearch: true
+  skipDiagAIServices: true
+  skipDiagAOAI: true
+  skipDiagContentSafety: true
+  skipDiagDocIntelligence: true
+  skipDiagSpeech: true
+  skipDiagVision: true
   aifactory-dash-01: "" # <optional>Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard.<default>""
   scaling-mode: "shared-subscriptions" # <optional>Wizard network preset: own-subscriptions or shared-subscriptions. Does not provision subscriptions or resize existing networks.<default>shared-subscriptions
   # ============================================================f================  

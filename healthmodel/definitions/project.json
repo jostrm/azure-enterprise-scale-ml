@@ -1,0 +1,19 @@
+{
+  "$schema": "./model-definition.schema.json",
+  "key": "project",
+  "description": "One AI Factory project: every workload in the project resource group, plus the common services it depends on (Log Analytics and the data lake).",
+  "nameToken": "prj{project}",
+  "home": "project",
+  "rootDisplayName": "AI Factory project {project} ({env})",
+  "reportCoverage": true,
+  "layers": [
+    {
+      "fromCatalog": true,
+      "select": {"origin": "project"}
+    },
+    {
+      "key": "shared",
+      "select": {"origin": "common", "profile": ["loganalytics", "adls-gen2"]}
+    }
+  ]
+}

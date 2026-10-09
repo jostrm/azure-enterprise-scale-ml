@@ -18,7 +18,7 @@ add_model_arguments(parser)
 parser.add_argument("--foundry-endpoint", required=True)
 parser.add_argument("--deployment", default="aifactory-agent-gpt-6-1-sol")
 args = parser.parse_args()
-client = client_from(args)
+client = client_from(args, read_only=True)
 
 summary = client.summary()
 alerts = client.alerts(hours=24)

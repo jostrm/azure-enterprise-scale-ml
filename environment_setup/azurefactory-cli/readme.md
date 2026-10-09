@@ -156,6 +156,18 @@ the current backend removes the local catalog registration/configuration only
 after verified whole-factory deletion succeeds, and retains it on failure.
 Entra security groups and Git history remain preserved.
 
+The review must also include the server's `deletion_retention_policy`, mirrored
+in `deletion_plan.retention_policy`: preserve reusable infrastructure, require
+`ordered-project-pipelines-v1`, execute whole resource groups, and report
+`selective_retention_supported:false`. The CLI displays and receipt-binds its
+limitations; an executable preview missing or contradicting this policy is
+rejected, including from an older server. No `--preserve-hub` shortcut invents
+runtime support. Protected/retained IDs come from the frozen plan and must
+match the preview. Hub/VPN/bootstrap/platform infrastructure inside an owned
+group blocks preparation, rather than allowing a cascading group delete.
+Outside-group retained inventory is not proof of post-execution preservation.
+The selected immutable runtime must independently support the required contract.
+
 After a human approves that exact review, run a separate command:
 
 ```powershell
@@ -244,6 +256,108 @@ azurefactory catalog list --folder C:\factory
 azurefactory catalog settings --folder C:\factory --factory-id <uuid> --scale-set-id <uuid> --project-id <uuid>
 azurefactory parameters get --folder C:\factory --factory-id <uuid> --scale-set-id <uuid>
 ```
+
+### Review scoped settings without deployment
+
+**Implemented in source:** `AzureFactoryClient.catalog_settings_prepare()` and
+`azurefactory catalog configure-settings` wrap the existing REST
+`POST /api/v1/factory-catalog/prepare` action `configure-settings`. Confirmation
+still uses `catalog_confirm()` / `catalog confirm` and the same REST `/confirm`.
+There is no new API route or deployment capability. Installed clients may lag.
+
+Supply only intentional replacements: omitted keys remain unchanged. The API
+owns `field_keys`, defaults, immutable identity checks, and persistence. Discover
+supported fields with `catalog settings`; do not infer gateway/MCP support from a
+newer document or source commit. Factory scope omits both selectors; scale scope
+adds `--scale-set-id`; project scope adds `--project-id`. With both selectors, the
+scale must be one of the project's placements. **Project settings are shared
+project configuration, not an environment-only patch**, even when a scale is
+selected. Registered project variable sections follow the canonical API rules.
+
+This advanced example needs an existing catalog; it is not an empty-catalog smoke
+test. It changes the saved Redis setting only. Disabling a flag does not authorize
+resource removal, deploy anything, or change a running job's frozen inputs.
+
+**Window A: inspect and prepare** (PowerShell 7; obtain URL/key from your API host):
+
+```powershell
+$env:AIFACTORY_API_URL = Read-Host 'Actual API host URL'
+$env:AIFACTORY_API_KEY = Read-Host 'API key' -MaskInput
+$folder = Read-Host 'Catalog folder on the API host'
+$factoryId = Read-Host 'Exact factory UUID'
+$receiptPath = Read-Host 'New local settings review receipt path'
+$current = azurefactory catalog settings --folder $folder --factory-id $factoryId | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw 'Settings inspection failed' }
+$current | ConvertTo-Json -Depth 30
+$changesPath = Join-Path $env:TEMP ("factory-settings-" + [guid]::NewGuid() + ".json")
+@{ enableRedisCache = 'false' } | ConvertTo-Json | Set-Content -LiteralPath $changesPath -Encoding utf8
+azurefactory catalog configure-settings --folder $folder --factory-id $factoryId `
+  --settings-json $changesPath --expected-revision $current.revision --save-receipt $receiptPath
+$prepareExit = $LASTEXITCODE
+Remove-Item -LiteralPath $changesPath
+if ($prepareExit -ne 0) { throw 'Preparation failed or was blocked; do not confirm' }
+Get-Content -LiteralPath $receiptPath
+```
+
+**Window B: review, approve, save, then observe.** Setup is repeated because
+PowerShell variables do not transfer between windows. Inspect both `request`
+(exact replacements) and `preview` (scope, effects, blockers, revision, expiry).
+
+```powershell
+$env:AIFACTORY_API_URL = Read-Host 'Same API host URL used for preparation'
+$env:AIFACTORY_API_KEY = Read-Host 'Same API key used for preparation' -MaskInput
+$receiptPath = Read-Host 'Local settings review receipt path from Window A'
+$review = Get-Content -Raw -LiteralPath $receiptPath | ConvertFrom-Json
+$review | ConvertTo-Json -Depth 40
+if ((Read-Host 'Type SAVE to approve this exact configuration-only review') -cne 'SAVE') { throw 'Not approved' }
+azurefactory catalog confirm --receipt $receiptPath --yes
+if ($LASTEXITCODE -ne 0) { throw 'Save not confirmed; inspect current settings before any new review. Do not retry automatically.' }
+azurefactory catalog settings --folder $review.folder --factory-id $review.request.factory_id
+if ($LASTEXITCODE -ne 0) { throw 'Post-save inspection failed' }
+```
+
+**Equivalent Python SDK flow** (one process, with a separate explicit approval
+prompt; stdlib plus the installed `azurefactory` package):
+
+```python
+import getpass
+import json
+from azurefactory import AzureFactoryClient, load_receipt, write_receipt
+
+client = AzureFactoryClient(input("Actual API host URL: "), getpass.getpass("API key: "))
+folder = input("Catalog folder on API host: ")
+factory_id = input("Exact factory UUID: ")
+receipt_path = input("New local settings review receipt path: ")
+current = client.catalog_settings(folder, factory_id)
+changes = {"enableRedisCache": "false"}
+request = {
+    "contract_version": 1, "action": "configure-settings", "folder": folder,
+    "factory_id": factory_id, "settings": changes, "expected_revision": current["revision"],
+}
+preview = client.catalog_settings_prepare(
+    folder, factory_id, changes, expected_revision=current["revision"],
+)
+print(json.dumps({"request": request, "preview": preview}, indent=2))
+write_receipt(receipt_path, client=client, purpose="catalog-confirm",
+              operation="catalog-settings", request_body=request, preview=preview)
+if preview.get("can_execute") is not True or preview.get("blockers"):
+    raise SystemExit("Blocked; do not confirm.")
+if input("Type SAVE to approve the exact review: ") != "SAVE":
+    raise SystemExit("Not approved.")
+review = load_receipt(receipt_path, client=client, purpose="catalog-confirm",
+                      operation_mode="configuration")
+result = client.catalog_confirm(review["folder"], review["confirmation_id"])
+print(json.dumps(result, indent=2))
+print(json.dumps(client.catalog_settings(folder, factory_id), indent=2))
+```
+
+The same `request` object is the complete REST prepare body; REST confirmation
+uses `folder`, `contract_version: 1`, and the returned `confirmation_id`. The
+server persists the frozen review and rejects changed revisions, expired/consumed
+reviews, or a different authenticated owner. Configuration confirmation returns
+`job: null`, not a deployment receipt. No client fallback or automatic retry is
+performed. After a timeout or lost acknowledgement, inspect saved settings before
+deciding whether a new review is needed; do not assume that the write failed.
 
 ### Read-only deployment preflight
 
@@ -430,6 +544,58 @@ to `project add --number 003 --placement dev=<new-scale-set-uuid>` when the earl
 existing-scale example already created 002. If running only the new-scale
 scenario, 002 is available instead. For existing DEV/001 use that scale set's
 UUID. Project numbers are unique across the factory; the two writes are not atomic.
+
+### Latest-successful placement selection
+
+For an existing registered factory, explicitly opt in to server-side selection:
+
+```powershell
+azurefactory project add --folder C:\consumer\azurefactory --factory-id <factory-uuid> --number 002 --placement dev=latest-successful --save-receipt .\project.receipt.json
+azurefactory project add-placements --folder C:\consumer\azurefactory --factory-id <factory-uuid> --project-id <project-uuid> --placement stage=latest-successful --save-receipt .\placement.receipt.json
+```
+
+These are independent prepare-only examples. Read the resolved scale-set UUID
+and recorded-success evidence in the preview, then separately approve the
+corresponding `catalog confirm`. Selection is performed by the shared API, not
+by sorting the catalog on the client. Explicit UUID placements remain supported.
+The selector does not create or deploy a scale set, move an existing placement,
+or copy a successful project's configuration between environments.
+
+The same request is available through the existing SDK:
+
+```python
+preview = client.review_catalog_prepare({
+    "contract_version": 1,
+    "folder": r"C:\consumer\azurefactory",
+    "action": "add-project",
+    "factory_id": factory_id,
+    "expected_revision": catalog_revision,
+    "project": {
+        "number": "002",
+        "placements": [{"environment": "dev", "scale_set_id": "latest-successful"}],
+    },
+})
+# Inspect the preview and obtain approval before a separate catalog_confirm call.
+```
+
+REST uses this identical JSON with `POST /api/v1/factory-catalog/prepare`.
+For `add-project-placements`, supply `project_id` and top-level `placements`
+instead of `project`. Omission is not an implicit auto-selection request.
+Supporting API source is required; older APIs reject the selector, with no
+client fallback, upgrade or retry. A saved draft, highest suffix, local script
+completion or inventory alone is not eligible success. Selection uses recorded
+verified runtime evidence and configured capacity, not a new live Azure probe.
+No eligible candidate or ambiguous scope is a blocker, not permission to guess.
+Confirmation saves only the exact reviewed placement; it never silently
+reselects a newer candidate.
+
+Executable automatic previews advertise `latest-successful-placement-v1` and
+include `resolved_placements`: exact target scope, source commit, verified common
+deployment job/completion, and evidence hash. CLI output, saved review receipts
+and `review_catalog_prepare` reject missing or contradictory resolution data,
+including a mismatch with the preview project's UUID placements. Raw
+`catalog_prepare` remains transport-oriented. These checks validate the review
+contract, not the authenticity of provider receipts or current Azure health.
 
 Catalog placements register where a logical project may live (`project add-placements`).
 They do not run update/promote. Catalog runtime deployment is `runtime deploy`
@@ -827,7 +993,28 @@ azurefactory legacy start --receipt .\legacy.receipt.json --yes --wait --poll-ti
 azurefactory legacy status --folder C:\legacy --job-id <job-guid> --wait --poll-timeout 900
 ```
 
-Legacy update/promote is separate from catalog placement/runtime. It targets only legacy aifactory roots; catalog roots or nested catalog factory paths must use catalog commands and must not be sent to `/api/v1/operations/project-deployments/*`. Legacy `update` requires same source/target environment; legacy `deploy` promotes to a later environment. Acknowledgements must be contract version 2. `legacy prepare` preserves the saved patch choice unless `--patch` or `--no-patch` is explicit. `submitted` means the local pipeline was submitted, not that Azure deployment completed.
+Legacy update/promote is separate from catalog placement/runtime. It targets only legacy aifactory roots; catalog roots or nested catalog factory paths must use catalog commands and must not be sent to `/api/v1/operations/project-deployments/*`. Legacy `update` requires same source/target environment; legacy `deploy` promotes to a later environment. Acknowledgements must be contract version 2. `legacy prepare` preserves the saved patch choice unless `--patch` or `--no-patch` is explicit. `submitted` means the local script exited zero, not that provider completion or Azure deployment was verified.
+
+Draft, start and terminal results include an additive `execution_result`:
+
+```json
+{"contract_version":1,"completion_scope":"local-script","local_terminal":true,"deployment_verified":false}
+```
+
+`local_terminal` is true for `submitted`, `failed` and `interrupted`, and false
+for `draft`, `queued` and `running`. It describes the recorded local job boundary,
+not proof that all child processes or remote work stopped. `legacy --wait` waits
+only for that local boundary. Without `--wait`, queued/running results remain
+nonterminal. Neither form nor exit code 0 proves deployed resources.
+
+The SDK's public `legacy_execution_result(response)` and legacy client methods
+conservatively interpret older status-only servers using the same fields; this
+is a client interpretation, not new server/provider evidence. Present but
+contradictory metadata, unknown states or legacy `succeeded` fail closed.
+The version-2 `deployment_contract` still binds the reviewed draft, patch and
+source version; a review receipt authorizes neither itself nor a retry and is
+not a signed approval or deployment-success receipt. Obtain separate exact
+provider run/effect evidence before reporting deployment success.
 
 ## Exit codes
 

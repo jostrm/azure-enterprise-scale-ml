@@ -5,7 +5,7 @@
 - Use case type: RAG with LLM
 - Data type: Tabular | Document (Markdown articles packaged in CSV/JSON; text-only runtime)
 - Number of source data sets: 1 shared helpdesk corpus across all framework examples
-- Data sources: No master-lake binding yet; `<project-data-storage>/agent-factory-adf/kaggle-rag-v1/knowledge/items.json` via the persisted knowledge agent and Foundry IQ. See [source paths](../../43-data/readme.md#data-sources-and-lake-layout).
+- Data sources: `<selected-storage>/<selected-container>/<ADF-prefix>/knowledge/items.json` via the persisted knowledge agent and Foundry IQ. See [source paths](../../43-data/readme.md#data-sources-and-lake-layout).
 - Inference type: Online
 - Technology used in full chain: Azure Data Factory | Azure Storage | Azure AI Search | Microsoft Foundry | Microsoft Entra ID | Selected Python agent framework
 
@@ -15,10 +15,99 @@ Azure inventory as well as Foundry IQ results. This is not a training pipeline:
 Azure Machine Learning and Azure Databricks are not used in the current chain.
 Serving a response over SSE does not imply a streaming-data ingestion workload.
 
+`<ADF-prefix>` comes from the ingestion result: explicit storage profiles use
+`kaggle-rag-v1/adf/<project-id-hash>`, while legacy omitted-flag ADF mode uses
+`kaggle-rag-v1`. Workers do not hardcode either storage path.
+
 Framework guides: [Agent Framework](agent-framework/readme.md) |
 [LangGraph](langgraph/readme.md) | [OpenAI Agents SDK](openai-agent-sdk/readme.md) |
 [Anthropic](anthropic-agents/readme.md) | [Copilot SDK](github-copilot-sdk/readme.md) |
 [Custom](custom/readme.md).
+
+## Prerequisites
+
+Reuse cached Azure CLI OAuth first; browser sign-in is needed only if that
+cached authentication is unavailable for the selected tenant.
+
+- Python 3.13, PowerShell, Azure CLI OAuth and the
+  [root prerequisites](../../readme.md#prerequisites). Use the consumer's
+  `aifactory\agent-factory\config.json` and its variables file, an existing Foundry
+  project and an API-compatible model deployment.
+- The operator must reach the private Foundry and Search endpoints; hosted
+  workers also need private routing, build/package access, hosted quota, and
+  dedicated runtime identity permissions for model inference and participant calls.
+  The deployer does not grant these permissions or create model deployments.
+- Complete [ingestion](../../43-data/readme.md) and
+  [Foundry IQ verification](../../readme.md#how-to-run-the-code) for this target
+  and storage selection. Preserve the verified `ingestion.json` (ADF mode) and
+  `knowledge.json` under the config directory's `.agent-factory\<account>\<project>`.
+  Deploy `aif-knowledge` as an active prompt agent before a single-agent worker.
+  The helpdesk team also needs an active `aif-reviewer`.
+- An `expanded-readonly` tool profile requires [verified private MCP](../../44-azure-mcp/readme.md).
+  Check the [framework-specific boundaries](#framework-prerequisites-and-boundaries):
+  Anthropic additionally requires an approved local Foundry Claude deployment,
+  and Copilot requires its supported native runtime.
+
+## How to set up the Python environment
+
+Run from the **factory root**, not a framework subfolder. For a copied consumer
+tree, use `C:\path\to\consumer\aifactory-usecase-code\40-agent-factory` instead of
+the first path below. Replace the config placeholder and target with real values.
+
+```powershell
+Set-Location "C:\code\code_py_25\003_aifactory_sub\azure-enterprise-scale-ml\usecase_code\40-agent-factory"
+py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r .\requirements.txt
+$Config = "C:\path\to\consumer\aifactory\agent-factory\config.json"
+$Target = "project001-dev"
+```
+
+No activation is needed. These root requirements are for the **operator**
+(`azure-ai-projects`, `azure-identity`, `openai`), not the hosted framework.
+Each ZIP contains its own framework's `requirements.txt`; Foundry installs it
+during remote build with Python 3.13. Do not install all runtime requirements
+into the operator environment. See [shared setup](../../readme.md#how-to-set-up-the-python-environment).
+
+## How to run the code
+
+This example selects `aif-custom`, the smallest hosted worker. Keep the same
+factory-root directory/session. All names use the default `agent_prefix`, `aif`;
+replace every name if customized. The framework guides provide exact selectors
+for the other workers; selecting one hosted `--agent` does not need `--include-hosted`.
+
+```powershell
+# Offline help and catalog/config plan; no Azure calls or deployment.
+.\.venv\Scripts\python.exe -m agent_factory --help
+.\.venv\Scripts\python.exe -m agent_factory plan --config $Config --target $Target --agent aif-knowledge --agent aif-custom
+
+# Online, read-only Azure/network preflight; not a runtime or grounding test.
+.\.venv\Scripts\python.exe -m agent_factory preflight --config $Config --target $Target
+
+# MUTATING: after verified ingestion/Foundry IQ, create/reuse the prompt participant.
+.\.venv\Scripts\python.exe -m agent_factory deploy --config $Config --target $Target --agent aif-knowledge --apply
+
+# MUTATING: after the participant is active, upload/build and route the hosted worker.
+.\.venv\Scripts\python.exe -m agent_factory deploy --config $Config --target $Target --agent aif-custom --apply
+
+# Online inference, potentially billable; select exactly one agent.
+.\.venv\Scripts\python.exe -m agent_factory invoke --config $Config --target $Target --agent aif-custom --input "How do I reset my password?"
+```
+
+Expect an offline plan with `mutations: false`, a hosted deployment record with
+service name/version/ID and `status: active`, then invocation JSON with `agent`,
+`response_id` and a grounded `text` answer retaining source links and uncertainty.
+The outer `tool_calls` list may be empty because the worker validates the
+knowledge participant's tool call internally. A greeting is not a grounding
+test. Actual model, network and identity readiness must be verified in your
+target; these instructions do not assert a successful live deployment.
+
+Do **not** run a framework's raw `main.py` from this checkout. The factory builds
+a ZIP with generated `agent_spec.json` and shared `hosted_common.py`, then Foundry
+starts its `python main.py` entry point in the managed host. The deployment sets
+`FOUNDRY_PROJECT_ENDPOINT`, `FOUNDRY_RESOURCE_ENDPOINT` and
+`AZURE_AI_MODEL_DEPLOYMENT_NAME`; the platform supplies managed/workload identity.
+The runtime excludes Azure CLI/browser/user credential fallbacks, so signing
+into Azure locally does not make the raw template runnable.
 
 ## Platform background versus these examples
 
@@ -119,7 +208,7 @@ contracts below determine what these examples implement.
 
 | `framework` | Runtime implementation |
 |---|---|
-| `agent-framework` | Microsoft Agent Framework `Agent` and `OpenAIChatClient` (Responses), using an explicit Foundry-authenticated client |
+| `agent-framework` | Microsoft Agent Framework `Agent` and `OpenAIChatClient`, using an explicit Foundry-authenticated client |
 | `langgraph` | A compiled LangGraph `StateGraph` with a Foundry model node |
 | `openai-agent-sdk` | OpenAI Agents `Agent`, `OpenAIResponsesModel`, and `Runner`, with public OpenAI tracing disabled |
 | `anthropic-agents` | Anthropic Python SDK `AsyncAnthropicFoundry` Messages client with Entra authentication; **not Claude Code or the Claude Agent SDK** |
@@ -153,22 +242,22 @@ warning; that requires a separately designed persistence/recovery configuration.
 Inspect the invocation's actual exception and request/session ID when diagnosing
 an HTTP 500.
 
-### Offline package and local run
+### Offline package inspection and hosted startup
 
-From `usecase_code\40-agent-factory`, with Python 3.13:
+Optional local packaging only, from the factory root after the Python setup
+above. This demonstration uses the default `aif` prefix and writes `artifacts`;
+it does not deploy the package, validate a model or create participants.
 
-```python
+```powershell
+@'
 from pathlib import Path
+from agent_factory.catalog import agent_catalog
 from agent_factory.hosted import build_package
 
-package = build_package({
-    "name": "factory-custom",
-    "framework": "custom",
-    "instructions": "Answer questions briefly and state uncertainty.",
-    "description": "Custom hosted example",
-    "metadata": {},
-}, Path("artifacts"))
+spec = next(item for item in agent_catalog() if item["name"] == "aif-custom")
+package = build_package(spec, Path("artifacts"))
 print(package)
+'@ | .\.venv\Scripts\python.exe -
 ```
 
 ZIP creation does not contact Azure. Its only entries are `main.py`,
@@ -177,12 +266,14 @@ ordering and permissions are fixed, so identical inputs produce identical bytes.
 Readmes, `.env`, caches, credentials, virtual environments and unrelated files
 are never discovered or copied into the ZIP.
 
-Extract the ZIP into a fresh directory, create a virtual environment there, and
-install **that ZIP's** `requirements.txt`. Set `FOUNDRY_PROJECT_ENDPOINT` to the
-canonical `https://ACCOUNT.services.ai.azure.com/api/projects/PROJECT` endpoint
-and `AZURE_AI_MODEL_DEPLOYMENT_NAME` to an existing deployment. Run `python main.py`.
-Use the Azure host's managed/workload identity; local user credential fallbacks
-are disabled. Do not put credentials into JSON, environment definitions or ZIPs.
+Inspect the ZIP to verify its contents; this is not a workstation inference
+recipe. The managed Foundry deployment installs **that ZIP's** requirements,
+sets the canonical `https://ACCOUNT.services.ai.azure.com/api/projects/PROJECT`
+endpoint and existing model deployment, and launches `python main.py` using
+the host's managed/workload identity. A separately engineered Azure-hosted test
+environment would need the same generated files, endpoint/model configuration,
+identity grants and participant access; ordinary local user credentials are
+disabled. Do not put credentials into JSON, environment definitions or ZIPs.
 The factory neither signs you in nor provisions models or identity role assignments.
 
 Keep each example's requirements isolated from the deployment environment and
@@ -289,8 +380,13 @@ does not claim that its consultation relationships automatically render as edges
 
 ### Validation and source contracts
 
-Run `python -m unittest discover -s tests -p test_hosted.py -v` from the factory
-directory. Tests cover package inclusion/exclusion, reproducibility, safe names,
+Optional offline validation after operator setup, from the factory root:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s .\tests -p test_hosted.py -v
+```
+
+Tests cover package inclusion/exclusion, reproducibility, safe names,
 ownership, idempotency, explicit failures, prerequisites, history and cancellation.
 
 Public contract references:

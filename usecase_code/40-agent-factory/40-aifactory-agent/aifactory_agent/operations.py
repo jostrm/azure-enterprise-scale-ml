@@ -257,10 +257,10 @@ class OperationStore:
             raise OperationError("plan_changed", "The reviewed plan or scope has changed; prepare again.")
         return record, etag
 
-    def _audit(self, record, event):
+    def _audit(self, record, event, client_id=None):
         self.backend.audit({
             "operation_id": record["id"], "correlation_id": record["correlation_id"],
-            "tenant_id": record["tenant_id"], "object_id": record["object_id"],
+            "tenant_id": record["tenant_id"], "object_id": record["object_id"], "client_id": client_id,
             "scope_key": record["scope_key"], "plan_hash": record["plan_hash"],
             "agent_namespace": record.get("agent_namespace"),
             "event": event, "status": record["status"], "timestamp": self._now().isoformat(),
@@ -273,6 +273,7 @@ class OperationStore:
         if status == "approved":
             updated["approval"] = {
                 "tenant_id": principal.tenant_id, "object_id": principal.object_id,
+                "client_id": getattr(principal, "client_id", None),
                 "plan_hash": updated["plan_hash"], "approved_at": updated["updated_at"],
             }
         if outcome is not None:
@@ -286,7 +287,7 @@ class OperationStore:
             raise OperationError("operation_conflict", "Another request already changed this operation.") from None
         except _Missing:
             raise OperationError("operation_not_found", "The operation was not found.", 404) from None
-        self._audit(updated, status)
+        self._audit(updated, status, getattr(principal, "client_id", None))
         return updated, version
 
     def _unexpired(self, principal, record, etag):
@@ -365,7 +366,7 @@ class OperationStore:
             self.backend.create(self._key(principal, record["id"]), record)
         except _Conflict:
             raise OperationError("operation_conflict", "The operation identifier already exists.") from None
-        self._audit(record, "proposed")
+        self._audit(record, "proposed", getattr(principal, "client_id", None))
         return self._public(record)
 
     def read(self, principal, operation_id) -> dict:

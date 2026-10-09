@@ -98,21 +98,34 @@ def ado_token_identity(token, tenant, now):
             "Authenticate that tenant explicitly outside this launcher; no login or account switch was performed.") from None
 
 
+def selected_values(document, target):
+    exact = "test" if target == "stage" else target
+    section = "dev" if target == "dev" else "stage_prod"
+    if not isinstance(document.get(section, document.get(exact)), dict):
+        raise ValueError(f"Selected project JSON has no {section}/{exact} object; Dev fallback is forbidden.")
+    result = {}
+    for name in ("dev", *(("stage_prod", exact) if target != "dev" else ())):
+        values = document.get(name, {})
+        if not isinstance(values, dict):
+            raise ValueError("Project configuration environment sections must be objects.")
+        result.update(values)
+    return result
+
+
 def validate_config(document, project, target):
     if not re.fullmatch(r"[0-9]{3}", project) or project == "000" or target not in ("dev", "stage", "prod"):
         raise ValueError("A three-digit project and exact dev/stage/prod target are required.")
     if not isinstance(document, dict):
         raise ValueError("Selected project JSON must be an object.")
     section = "dev" if target == "dev" else "stage_prod"
-    values = document.get(section)
-    if not isinstance(values, dict):
-        raise ValueError(f"Selected project JSON has no {section} object; Dev fallback is forbidden.")
-    for name in ("dev", section):
-        identity = document.get(name)
+    exact = "test" if target == "stage" else target
+    values = selected_values(document, target)
+    identity_values = {**document.get(section, {}), **document.get(exact, {})}
+    for identity in (document.get("dev"), identity_values):
         if not isinstance(identity, dict) or project_number(identity.get("project_number_000")) != project:
             raise ValueError("Selected configuration project identity does not match the reviewed project.")
-    subscription = str(values.get({"dev": "dev_sub_id", "stage": "test_sub_id", "prod": "prod_sub_id"}[target], ""))
-    tenant = str(values.get("tenantId", ""))
+    subscription = str(identity_values.get({"dev": "dev_sub_id", "stage": "test_sub_id", "prod": "prod_sub_id"}[target], ""))
+    tenant = str(identity_values.get("tenantId", ""))
     if not re.fullmatch(GUID, subscription) or not re.fullmatch(GUID, tenant):
         raise ValueError("Exact target subscription and tenant are required; no Dev fallback is permitted.")
     if any(str(values.get(key, "")).lower() in ("true", "1", "yes") for key in (
@@ -314,7 +327,7 @@ class Deployment:
         document = json.loads(self.config)
         return project_environment.require_prerequisite(
             self.selected["target"], self.selected["project"],
-            lambda env: document.get("dev" if env == "dev" else "stage_prod"), self.read_json,
+            lambda env: selected_values(document, env), self.read_json,
         )
 
     def ado(self, method, endpoint, data=None):

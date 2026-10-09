@@ -27,6 +27,9 @@ COMMON_FIELDS = {
     "AIF_ACCESS_HUB_VNET_CIDR": "access_hub_vnet_cidr",
     "AIF_VPN_CLIENT_CIDR": "vpn_client_cidr",
     "AIF_COORDINATION_MODE": "coordination_mode",
+    "AIF_PERSONA_ACCESS_MODE": "persona_access_mode",
+    "AIF_ENABLE_PERSONAS": "enablePersonas",
+    "AIF_PERSONA_ACCESS_MANIFEST": "persona_access_manifest",
 }
 FULL_FIELDS = {
     "GITHUB_REPOSITORY": "github_repository", "GITHUB_REPOSITORY_VISIBILITY": "github_visibility",
@@ -145,6 +148,7 @@ def boolean(value, name):
 
 
 def creation_input(args, root, version, environ):
+    import registered_personas
     simple = boolean(environ.get("AIF_SIMPLE_MODE", "false"), "AIF_SIMPLE_MODE")
     if simple and args.provider != "gha":
         raise ValueError("The Simple preset is GHA-only; select Full configuration for ADO.")
@@ -180,6 +184,18 @@ def creation_input(args, root, version, environ):
         raise ValueError("Unmapped modern bootstrap settings (never silently discarded): " + ", ".join(unsupported)
                          + ". Use explicit catalog configuration/enrollment for these choices.")
     config = {target: environ[name] for name, target in fields.items() if environ.get(name)}
+    if "AIF_PERSONA_ACCESS_MODE" in environ:
+        config["persona_access_mode"] = environ["AIF_PERSONA_ACCESS_MODE"]
+    for name in ("ENABLE_PERSONAS", "AIF_ENABLE_PERSONAS"):
+        if name in environ:
+            config["enablePersonas"] = environ[name]
+    persona_mode = registered_personas.mode(config)
+    config["enablePersonas"] = persona_mode == "groups-v1"
+    config["persona_access_mode"] = persona_mode
+    if persona_mode == "groups-v1":
+        config["persona_access_manifest"] = registered_personas.relative_manifest(config)
+        for key in ("team_group_id", "team_group_name", "team_member_email"):
+            config[key] = ""
     if config.get("coordination_mode", "blob") not in ("blob", "single-writer"):
         raise ValueError("AIF_COORDINATION_MODE must be blob or single-writer; automatic fallback is not supported.")
     config.update(repo_root=str(root), aifactory_version=version)
@@ -218,7 +234,7 @@ def creation_input(args, root, version, environ):
             raise ValueError("External hub requires explicit reviewed coordinates: " + ", ".join(missing_external))
     elif any(config.get(key) for key in external_fields):
         raise ValueError("External hub coordinates require AIF_ACCESS_HUB_MODE=external; they are never silently ignored.")
-    if not simple and not config.get("team_group_id") and not args.non_interactive and sys.stdin.isatty():
+    if persona_mode == "legacy" and not simple and not config.get("team_group_id") and not args.non_interactive and sys.stdin.isatty():
         group_id = input("Existing Entra team group object ID (blank: find/create the named group during bootstrap): ").strip()
         if group_id:
             try:
@@ -228,8 +244,9 @@ def creation_input(args, root, version, environ):
             if not parsed.int or str(parsed) != group_id:
                 raise ValueError("Supply a canonical nonzero Entra group object ID, not its name.")
             config["team_group_id"] = group_id
-    required = ["subscription_id", "tenant_id", "factory_prefix", "location",
-                "team_member_email", "team_group_name"]
+    required = ["subscription_id", "tenant_id", "factory_prefix", "location"]
+    if persona_mode == "legacy":
+        required += ["team_member_email", "team_group_name"]
     required += (["github_repository"] if args.provider == "gha" else
                  ["ado_organization", "ado_project", "ado_repository", "ado_service_connection"])
     defaults = {"factory_prefix": "aif-", "location": "swedencentral"}
@@ -249,6 +266,11 @@ def creation_input(args, root, version, environ):
             "orchestrator": args.provider, "config": config}
     if simple and environ.get("AIF_PROJECT_NUMBER"):
         body["initial_project"] = {"number": environ["AIF_PROJECT_NUMBER"]}
+    if persona_mode == "groups-v1":
+        manifest = registered_personas.local_manifest(config, root)
+        registered_personas.check_identity(
+            manifest, tenant=config["tenant_id"], environment="dev",
+            project=body.get("initial_project", {}).get("number", config.get("project_number", "001")))
     return body
 
 
@@ -272,6 +294,7 @@ def main(argv=None):
 
 
 def prepare(args, root, version):
+    import registered_personas
     request = creation_input(args, root, version, os.environ)
     if args.dry_run or os.environ.get("AIF_DRY_RUN") == "true":
         print(json.dumps({"status": "offline-input-only", "request": request,
@@ -286,12 +309,18 @@ def prepare(args, root, version):
         raise ValueError("Receipt must be a new file in an existing directory; existing receipts are never replaced.")
     if receipt_path.is_relative_to(root / "azurefactory"):
         raise ValueError("Keep the review receipt outside the generated azurefactory directory.")
+    persona = registered_personas.local_manifest(request["config"], root)
+    if persona:
+        registered_personas.seeds(persona)
     client_type, write_receipt = load_sdk()
     client = client_type()
     preview = client.request("POST", "/api/v1/creation/prepare", body=request)
     if not isinstance(preview, dict) or preview.get("operation_mode") != "configuration":
         raise ValueError("The API did not return configure-first review. Update the local API; no legacy fallback or bootstrap start is allowed.")
     capabilities = preview.get("capabilities")
+    if persona and (not isinstance(capabilities, list) or "persona-groups-v1" not in capabilities):
+        raise ValueError("The API must advertise persona-groups-v1 and preserve persona settings in registered "
+                         "factory/scaleset/project configuration. Upgrade the API; no legacy fallback is permitted.")
     if (not isinstance(capabilities, list) or any(not isinstance(value, str) for value in capabilities)
             or not {"initial-project-v1", "draft-scale-identity-v1"}.issubset(capabilities)):
         raise ValueError("The API lacks required initial-project-v1/draft-scale-identity-v1 capabilities; no approval receipt was saved.")

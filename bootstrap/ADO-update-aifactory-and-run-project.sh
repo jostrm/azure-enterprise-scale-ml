@@ -966,6 +966,13 @@ def read_assignments(path):
     return values, lines
 
 active, active_lines = read_assignments(active_path)
+if "enablePersonas" not in active and "persona_access_mode" in active:
+    sys.path[:0] = [str(Path("azure-enterprise-scale-ml/bootstrap/lib")), str(Path("bootstrap/lib"))]
+    from aifactory_scaleset_config import persona_mode
+    active["enablePersonas"] = str(persona_mode({
+        "persona_access_mode": active["persona_access_mode"].strip("'\"")
+    }) == "groups-v1").lower()
+    active_lines["enablePersonas"] = "  enablePersonas: " + active["enablePersonas"]
 template, _ = read_assignments(template_path)
 if not active:
     raise SystemExit(f"No variables found in active file: {active_path}")
@@ -1022,7 +1029,10 @@ def merge(template_value, active_value):
         return merged
     return active_value
 
-output_path.write_text(json.dumps(merge(template, active), indent=2) + "\n", encoding="utf-8")
+sys.path[:0] = [str(Path("azure-enterprise-scale-ml/bootstrap/lib")), str(Path("bootstrap/lib"))]
+from aifactory_scaleset_config import preserve_template_configuration
+merged = preserve_template_configuration(active, merge(template, active))
+output_path.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
 PY
 fi
 

@@ -56,15 +56,22 @@ markdown_extensions:
 plugins:
   - search
 
+hooks:
+  - tools/factory_guides.py
+
 nav:
   - Overview: index.md
+  - Factory tools:
+      - Get started: factory-tools/18-cli-and-api-and-usage.md
+      - Add and update: factory-tools/19-cli-and-api-and-usage.md
+      - Remove and recover: factory-tools/20-cli-and-api-and-usage.md
   - Parameters:
-      - Configuration and API: parameters/index.md
+      - Configure your factory: parameters/index.md
       - Required inputs: parameters/standard.md
-      - All variables: parameters/advanced.md
+      - All parameters: parameters/advanced.md
   - AI Factory Concepts:
       - concepts/index.md
-      - AI Factory Intelligence: concepts/intelligence.md
+      - Platform automation: concepts/intelligence.md
       - Enterprise Grade & Scale: concepts/enterprise-scale.md
       - Templates:
           - IaC: concepts/templates/iac.md
@@ -79,7 +86,7 @@ nav:
       - Azure DevOps: orchestrators/ado.md
       - GitHub Actions: orchestrators/gh.md
   - News: news.md
-  - AI Factory Intelligence: intelligence.md
+  - Monitor and operate: intelligence.md
 
 extra:
   social:

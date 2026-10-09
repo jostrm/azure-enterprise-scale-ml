@@ -56,7 +56,11 @@ if args.entity and (args.unhealthy or args.degraded):
     for key in ("unhealthy", "degraded"):
         value = getattr(args, key)
         if value:
-            changes[key] = None if value == "off" else {"severity": value, "actionGroupIds": args.action_group_id}
+            # Only the given fields change; existing action groups are kept unless replaced.
+            config = {"severity": value}
+            if args.action_group_id:
+                config["actionGroupIds"] = args.action_group_id
+            changes[key] = None if value == "off" else config
     if args.apply:
         client.set_entity_alerts(args.entity, **changes)
         print(f"Alerts on {args.entity}: {client.entity(args.entity)['properties'].get('alerts')}")

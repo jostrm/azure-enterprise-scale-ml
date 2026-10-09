@@ -38,6 +38,7 @@ import aifactory_private_dns
 import factory_enrollment as enrollment
 import hub_lock_foundation
 import release_version
+import registered_personas
 
 
 CONTRACT_VERSION = 1
@@ -78,6 +79,7 @@ SOURCE_FILES = (
     "bootstrap/lib/aifactory_private_dns.py",
     "bootstrap/lib/release_version.py",
     "bootstrap/lib/hub_lock_foundation.py",
+    "bootstrap/lib/registered_personas.py",
 )
 CONTEXT_KEYS = {
     "coordination", "seeding_keyvault_id", "owned_resource_group_ids", "reuse_deployment_identity",
@@ -93,6 +95,7 @@ CONFIG_KEYS = {
     "access_hub_vnet_cidr", "vpn_client_cidr", "dev_vnet_cidr",
     "first_party_apps", "resource_providers", "coordination_mode",
     "dns_policy_exemption_assignment_ids", "dns_policy_exemption_expires_on",
+    "enablePersonas", "persona_access_mode", "persona_access_manifest",
 }
 FIRST_PARTY_APPS = {"azure-machine-learning": "0736f41a-0425-4b46-bdb5-1563eff02385",
                     "databricks": "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d"}
@@ -127,6 +130,14 @@ def source_fingerprint(source_root):
         path = ordinary(root / relative)
         require(path.is_file(), "privileged-source-file-missing:" + relative)
         files[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+    persona_root = root / "environment_setup" / "aifactory" / "bicep" / "personas"
+    for path in sorted(persona_root.glob("*")):
+        if path.suffix in (".py", ".json"):
+            files[path.relative_to(root).as_posix()] = hashlib.sha256(ordinary(path).read_bytes()).hexdigest()
+    if persona_root.is_dir():
+        utility = ordinary(persona_root.parent / "esml-util" / "project_lake_access.py")
+        require(utility.is_file(), "persona-lake-utility-source-required")
+        files[utility.relative_to(root).as_posix()] = hashlib.sha256(utility.read_bytes()).hexdigest()
     return {"kind": "reviewed-local-payload", "root": str(root),
             "published_ref_verified": False, "verification": "exact-local-file-bytes-only",
             "files": files, "payload_sha256": digest(files)}
@@ -134,7 +145,7 @@ def source_fingerprint(source_root):
 
 def _verify_loaded_source(source):
     loaded = (__file__, enrollment.__file__, aifactory_private_dns.__file__, release_version.__file__,
-              hub_lock_foundation.__file__)
+              hub_lock_foundation.__file__, registered_personas.__file__)
     require(all(hashlib.sha256(ordinary(path).read_bytes()).hexdigest() == source["files"][relative]
                 for relative, path in zip(SOURCE_FILES, loaded)),
             "loaded-prerequisite-code-differs-from-reviewed-source")
@@ -1374,12 +1385,23 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                                     expected_payload_sha256=context.get("source_payload_sha256"))
     require(root != ordinary(source_root), "source-cannot-be-consumer")
     config = copy.deepcopy(bootstrap_config)
+    persona_mode = registered_personas.mode(config)
+    persona_manifest = registered_personas.local_manifest(config, root, source_root=source_root)
+    if persona_manifest:
+        registered_personas.check_identity(
+            persona_manifest, tenant=target["tenant_id"], environment="dev",
+            project=target.get("project_number"))
+        require(not config.get("first_party_apps"), "groups-v1-first-party-graph-bootstrap-forbidden")
+        for key in ("team_group_id", "team_group_name", "team_member_email"):
+            config[key] = ""
     for field, value in (("tenant_id", target["tenant_id"]), ("subscription_id", target["subscription_id"]),
                          ("location", target["location"]), ("factory_prefix", target["prefix"])):
         require(config.get(field, value) == value, "registered-config-mismatch:" + field)
     require(config.get("access_hub_mode") in ("integrated", "external"), "explicit-access-hub-mode-required")
     require(type(config.get("setup_hub_access")) is bool, "explicit-setup-hub-access-required")
-    if config.get("team_group_id"):
+    if persona_mode == "groups-v1":
+        pass
+    elif config.get("team_group_id"):
         _guid(config["team_group_id"])
     else:
         require(isinstance(config.get("team_group_name"), str) and 1 <= len(config["team_group_name"]) <= 128
@@ -1418,6 +1440,22 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
     require(vault.split("/providers/")[0] in owned, "seeding-vault-must-be-owned")
     runtime = runtime or Cloud(target, coordinates)
     runtime.read_only = True
+    persona_groups = None
+    if persona_manifest:
+        pipeline = registered_personas.pipeline_module(source_root)
+        values = {
+            **config, "tenantId": target["tenant_id"], "dev_sub_id": target["subscription_id"],
+            "admin_aifactoryPrefixRG": target["prefix"], "admin_aifactorySuffixRG": "-" + target["suffix"],
+            "admin_locationSuffix": context["location_short"],
+            "project_number_000": target.get("project_number", persona_manifest["project"].removeprefix("project")),
+        }
+        expected_scopes = pipeline.deployment_scopes(values, "dev")
+        require(all(persona_manifest[k + "_scope"].lower() == expected_scopes[k].lower()
+                    for k in ("common", "project")), "persona-manifest-registered-scope-mismatch")
+        persona_cli = getattr(runtime, "persona_cli", None)
+        persona_groups = registered_personas.preflight(
+            pipeline, persona_manifest, values, "dev", source_root=source_root, cli=persona_cli,
+            project="project_number" in target)
     builder = Builder(runtime)
     if mode == "provider":
         require(config.get("coordination_mode") == "single-writer"
@@ -1448,6 +1486,8 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
         require(project_group == expected_project, "canonical-project-resource-group-required")
     for rg in owned:
         tags = {"aifactory.factory_id": target["factory_id"], "aifactory.scaleset_id": target["scale_set_id"]}
+        if persona_manifest:
+            tags[registered_personas.MARKER] = "groups-v1"
         if rg == project_group:
             tags.update({"aifactory.project_id": target["project_number"], "aifactory.logical_project_id": target["project_id"]})
         existing = builder.read(rg, enrollment.RG_API)
@@ -1455,12 +1495,23 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
             builder.ensure(rg, enrollment.RG_API, {"location": target["location"], "tags": tags},
                 ownership="factory-owned", already_read=True)
         else:
-            require(_contains(existing.get("tags", {}), tags),
+            previous_tags = existing.get("tags", {})
+            require(not previous_tags.get(registered_personas.MARKER)
+                    or previous_tags[registered_personas.MARKER] == persona_mode,
+                    "persona-access-downgrade-forbidden")
+            require(_contains(previous_tags, {key: value for key, value in tags.items()
+                                             if key != registered_personas.MARKER}),
                     "existing-owned-resource-group-tags-mismatch:" + rg)
     minimum = context.get("bootstrap_phase") == "minimum-foundation"
     require(context.get("bootstrap_phase") in (None, "minimum-foundation"), "unknown-bootstrap-phase")
     exemptions = dns_policy_exemptions(builder, config, target, context, owned, create=minimum)
-    bindings = {"team_group_id": None if minimum else _group(builder, config, target), "seeding_keyvault_id": vault}
+    bindings = {"team_group_id": None if minimum or persona_manifest else _group(builder, config, target),
+                "seeding_keyvault_id": vault}
+    if persona_groups:
+        bindings["persona_groups"] = persona_groups
+        bindings["persona_manifest_sha256"] = digest(persona_manifest)
+        bindings.update({key: config[key] for key in registered_personas.FIELDS if key in config})
+        bindings.update(enablePersonas=True, persona_access_mode=persona_mode)
     if project_group:
         bindings["project_resource_group_id"] = project_group
     if not minimum and config.get("first_party_apps"):
@@ -1541,10 +1592,10 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                 effect["kind"] == "gateway-route-append" and effect["executable"]
                 for effect in builder.effects),
         })
-    group_scope = (_guid(config["team_group_id"]) if config.get("team_group_id")
+    group_scope = (None if persona_manifest else _guid(config["team_group_id"]) if config.get("team_group_id")
                    else digest(config["team_group_name"].casefold()))
     locks = sorted(set(owned + hub_scopes + provider_scopes +
-                       ["/tenants/" + target["tenant_id"] + "/groups/" + group_scope]))
+                       (["/tenants/" + target["tenant_id"] + "/groups/" + group_scope] if group_scope else [])))
     plan = {"contract_version": CONTRACT_VERSION, "stage": "privileged-prerequisites",
             "execution_mode": "privileged-bootstrap", "plan_id": str(uuid4()),
             "prepared_at": time.time(), "expires_at": time.time() + 900,
@@ -1564,6 +1615,10 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                          if mode == "factory-common" else [])}
     if exemptions:
         plan["dns_policy_exemptions"] = exemptions
+    if persona_manifest:
+        plan["warnings"].append(
+            "Persona Entra groups and shared-scope grants are retained on deletion. "
+            "Any retained common ACL cleanup requires explicit manual review.")
     if any("retained_response_extensions" in effect for effect in builder.effects):
         plan["warnings"].append(GATEWAY_RESPONSE_EXTENSION_WARNING)
     plan.update(
@@ -1573,10 +1628,10 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
              "ownership": ("factory-owned" if value in owned else "subscription-provider-registration"
                            if value in provider_scopes else "external-retained")}
             for value in sorted(set(owned + hub_scopes + provider_scopes))
-        ] + gateway_auth_scopes + [{"service": "graph", "tenant_id": target["tenant_id"],
+        ] + gateway_auth_scopes + ([] if persona_manifest else [{"service": "graph", "tenant_id": target["tenant_id"],
               "permissions": (["Group.Read.All"] if config.get("team_group_id")
                               else ["Group.ReadWrite.All", "User.Read.All"]) +
-                  (["Application.ReadWrite.All"] if config.get("first_party_apps") else [])},
+                  (["Application.ReadWrite.All"] if config.get("first_party_apps") else [])}]) + [
              *([{"service": "storage", "scope": container_id,
                  "purpose": "physical-leases-and-durable-stage-proofs-only"}] if account else
                [{"service": "provider", "purpose": "exclusive-initializer-ref",
@@ -1594,6 +1649,14 @@ def prepare(*, source_root, consumer_root, scope, bootstrap_config, expected_rev
                        "cold_start_supported": False},
         capabilities=capabilities(),
     )
+    if persona_manifest:
+        seed = persona_manifest["seeding"]
+        plan["auth_scopes"].append({
+            "service": "keyvault",
+            "scope": f"/subscriptions/{seed['subscription_id']}/resourceGroups/{seed['resource_group']}"
+                     f"/providers/Microsoft.KeyVault/vaults/{seed['vault_name']}",
+            "purpose": "read-existing-bound-persona-seeds-only",
+        })
     plan["plan_hash"] = digest(plan)
     return plan
 
@@ -1707,7 +1770,7 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
                 unchanged = fresh[key] == plan[key]
             require(unchanged, "prerequisite-live-state-or-plan-changed:" + key)
         require(time.time() < plan["expires_at"], "prerequisite-review-expired")
-    except (PrerequisiteError, enrollment.EnrollmentError, OSError) as exc:
+    except (ValueError, RuntimeError, OSError) as exc:
         code = getattr(exc, "code", "prerequisite-preflight-io-failed")
         if not isinstance(code, str) or not re.fullmatch(r"[A-Za-z0-9:/._-]{1,256}", code):
             code = "prerequisite-preflight-rejected"

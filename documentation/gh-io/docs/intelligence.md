@@ -1,71 +1,77 @@
-# AI Factory Intelligence
+# Monitor and operate
 
-AI Factory Intelligence is the top-level capability that transforms the AI Factory from a set of Bicep templates into a **self-aware, context-driven provisioning platform**.
+Choose the question you want to answer. Factory inventory, deployment progress,
+usage, billing and workload health are different views.
 
----
+| Your question | Use | Important limit |
+| --- | --- | --- |
+| Is the Factory API running? | `health` | Process health, not Azure resource health. |
+| What is registered or deployed? | Catalog/inventory and the selected run's results | Refreshing a list is not telemetry collection. |
+| Did this deployment finish? | Exact job status, logs and provider/worker completion records | Submission or local script exit does not prove deployment success. |
+| How much was used or billed? | Usage workbooks/reports and explicit Cost Management reads | Billing can be delayed; modelled cost is not billed cost. |
+| Are services healthy together? | Optional Azure Monitor health-model component | Preview service and separate setup; missing signals remain unknown. |
 
-## Capability Summary
+[CLI, SDK and REST observation examples](factory-tools/20-cli-and-api-and-usage.md)
+include job status, logs, GitHub workflow watch, saved reports and resource-group
+cost reads. A GitHub watcher is not an ADO watcher.
 
-| Capability | Description |
-|---|---|
-| **Dynamic IP/Subnet Calculator** | One integer per environment → all subnet CIDRs auto-calculated |
-| **Dynamic RBAC Engine** | Service principal + managed identity roles assigned automatically across all services |
-| **Persona Mapping** | Entra ID groups → predefined personas → fine-grained RBAC |
-| **Feature Flag Orchestrator** | Pipeline reads flags → invokes only the required Bicep modules |
-| **Incremental / Idempotent Deployments** | Re-run safely at any time to add services or apply updates |
-| **Salt-based Resource Naming** | Deterministic unique 5-char salt prevents resource name collisions |
-| **Debug Mode** | Individual pipeline steps can be skipped (`debug_disable_XX=true`) |
+## Metrics, reports and dashboards
 
----
+- **Sample reports** use demonstration data, not customer usage.
+- **Saved reports** read existing results. They do not silently collect new
+  telemetry or provision monitoring.
+- **Live reads** require the correct identity and scope. A request may read
+  Azure even when it does not change resources.
+- **Dashboard-only refresh** is a separate plan/apply operation for dashboard
+  resources, not a side effect of reading a report.
 
-## Dynamic IP Calculator
+Missing, stale or incomplete observations are not zero cost or good health.
+Business-outcome reporting needs application instrumentation and agreed measures.
+Creating a report does not mean its attachments were emailed.
 
-Given only:
+## Optional health models
 
-```yaml
-dev_cidr_range: "61"
-test_cidr_range: "62"
-prod_cidr_range: "63"
-common_vnet_cidr: "172.16.0.0/16"
-```
+The published `healthmodel` package provides an optional Azure Monitor health
+tree, signal configuration, alerts and separate ADO/GHA deployment entry points.
+It uses the preview `Microsoft.CloudHealth` API. Check supported regions,
+permissions and signal sources for your environment.
 
-The pipeline automatically calculates all subnets:
+This is not the same as API `health`, an MCP dependency check, or a universally
+integrated `azurefactory healthmodel` command. The package's recorded test results
+are not a guarantee of current availability in another subscription.
 
-| Subnet | DEV CIDR |
-|---|---|
-| Common subnet | `172.16.61.0/26` |
-| Scoring subnet | `172.16.61.64/26` |
-| Power BI GW subnet | `172.16.61.128/26` |
-| Bastion subnet | `172.16.61.192/26` |
-| Project GenAI subnet | `172.16.61.X/26` |
-| Project AKS subnet | `172.16.61.X/26` |
+[Health-model component guide](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/healthmodel/readme.md)
 
----
+## Agent Chat and MCP
 
-## Dynamic RBAC Engine
+| Component | Purpose |
+| --- | --- |
+| Factory Agent Chat | A scoped, source-grounded management assistant using configured Search/Foundry and Factory operation adapters. |
+| Factory MCP | MCP clients/servers and host adapters for available Factory capabilities. |
+| Private Azure MCP example | A distinct narrow, read-only Azure resource-tool example for workloads. |
+| Project001 Dev MCP/AI Gateway integration | An opt-in pipeline component with explicit image, identity and network prerequisites. |
 
-At deployment time, the pipeline:
+These components do not bypass caller permissions or human approval. Enabling
+a conversational interface does not grant access to every factory or turn
+missing actions into successful operations.
 
-1. Reads the project service principal OID and managed identity from the seeding Key Vault.
-2. Assigns the correct Azure RBAC roles to each service (Storage, Key Vault, AI Foundry, AI Search, ACR, etc.).
-3. Sets up ACL permissions on the Data Lake for the project team.
-4. Applies Entra ID group assignments based on configured personas.
+<details markdown="1">
+<summary>More info</summary>
 
----
+Published references:
+[dashboards](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/30-39/32-dashboards.md),
+[Factory Agent Chat](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/40-aifactory-agent/readme.md),
+[Factory MCP](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/mcp/readme.md),
+[private Azure MCP example](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/44-azure-mcp/readme.md),
+[gateway integration](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md).
 
-## Feature Flag Orchestrator
+The local dual graph combines code relationships and architecture notes. It is
+a navigation aid, not current Azure state. Unpublished graph/authentication or
+multi-model health enhancements described in local release addenda are not
+automatically present in published `main` or an installed application.
 
-Feature flags in `variables.yaml` / `.env` control which services are deployed:
+Cloud inference, monitoring queries and actual operations have their own
+permissions and potential costs. A successful source build is not a live
+deployment or compliance certification.
 
-```yaml
-enableAIFoundry: "true"      # deploy AI Foundry
-enableAISearch: "true"       # deploy AI Search
-enableCosmosDB: "false"      # skip Cosmos DB
-enableContainerApps: "false" # skip Container Apps (add later)
-```
-
-On re-run with `enableContainerApps: "true"`, only the Container Apps step runs — existing services are untouched.
-
----
-
-For the full persona reference, see [AI Factory Intelligence — Concepts](concepts/intelligence.md).
+</details>

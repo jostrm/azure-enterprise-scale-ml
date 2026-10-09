@@ -1,0 +1,58 @@
+{
+  "$schema": "./model-definition.schema.json",
+  "key": "agents",
+  "description": "User-flow model for generative AI agents in one project: model endpoints, agent runtime, knowledge (grounding), conversation state, channels and telemetry. Opt in with --model agents.",
+  "nameToken": "agt{project}",
+  "home": "project",
+  "rootDisplayName": "AI Factory agents, project {project} ({env})",
+  "reportCoverage": false,
+  "layers": [
+    {
+      "key": "models",
+      "displayName": "Model endpoints",
+      "impact": "Standard",
+      "description": "Foundry, Azure OpenAI and AI Services accounts that serve the models.",
+      "select": {"origin": "project", "profile": ["foundry", "openai", "ai-service"]}
+    },
+    {
+      "key": "agent-runtime",
+      "displayName": "Agent runtime",
+      "impact": "Standard",
+      "description": "Foundry projects that host the agents.",
+      "select": {"origin": "project", "profile": "foundry-project"}
+    },
+    {
+      "key": "knowledge",
+      "displayName": "Knowledge and grounding",
+      "impact": "Standard",
+      "description": "Vector and web grounding used by agent tools.",
+      "select": {"origin": "project", "profile": ["search", "bing"]}
+    },
+    {
+      "key": "state",
+      "displayName": "Conversation state and files",
+      "impact": "Standard",
+      "description": "Thread storage (Cosmos DB) and file storage used by the agent service.",
+      "select": {"origin": "project", "profile": ["cosmos", "storage"]}
+    },
+    {
+      "key": "channels",
+      "displayName": "Channels",
+      "impact": "Limited",
+      "description": "Bot channels that expose agents to users.",
+      "select": {"origin": "project", "profile": "bot"}
+    },
+    {
+      "key": "telemetry",
+      "displayName": "Telemetry",
+      "impact": "Limited",
+      "description": "Application Insights used for agent tracing.",
+      "select": {"origin": "project", "profile": "appinsights"}
+    }
+  ],
+  "alertPolicy": {
+    "rootUnhealthySeverity": "Sev1",
+    "rootDegradedSeverity": "Sev3",
+    "layerUnhealthySeverity": "Sev2"
+  }
+}

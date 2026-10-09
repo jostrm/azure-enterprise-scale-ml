@@ -10,6 +10,7 @@ from .errors import ConfigError, FailureError
 
 PURPOSE = "delete-aifactory-confirm"
 CAPABILITY = "delete-aifactory-v1"
+RETENTION_CONTRACT = "ordered-project-pipelines-v1"
 REQUEST_FIELDS = {"contract_version", "folder", "factory_id", "expected_revision", "version_ref"}
 
 
@@ -66,6 +67,18 @@ def validate_deletion_preview(request: dict[str, Any], preview: Any) -> None:
             or preview.get("preserve_entra_groups") is not True
             or preview.get("retain_saved_configuration") is not False):
         invalid("the backend did not prove whole-factory scope, Entra preservation and saved configuration handling")
+    policy = preview.get("deletion_retention_policy")
+    if (not isinstance(policy, dict) or policy.get("mode") != "preserve-reusable-infrastructure"
+            or policy.get("required_execution_contract") != RETENTION_CONTRACT
+            or policy.get("execution_scope") != "whole-resource-groups"
+            or policy.get("selective_retention_supported") is not False
+            or not isinstance(policy.get("limitations"), list) or not policy["limitations"]
+            or any(not _text(item) for item in policy["limitations"])):
+        invalid("the API must explicitly acknowledge its whole-group retention policy and limitations")
+    plan = preview.get("deletion_plan")
+    if (not isinstance(plan, dict) or plan.get("contract") != RETENTION_CONTRACT
+            or plan.get("retention_policy") != policy):
+        invalid("retention policy differs from the server execution plan")
     factory = preview.get("target")
     if (not isinstance(factory, dict) or factory.get("id") != request["factory_id"]
             or not _text(factory.get("key")) or not isinstance(factory.get("scale_sets"), list)
@@ -128,10 +141,30 @@ def validate_deletion_preview(request: dict[str, Any], preview: Any) -> None:
         if (members["delete"] & members["retain"]
                 or (group.lower() in members["delete"] and members["retain"])):
             invalid("deleted and retained resources contradict each other")
+        if group.lower() not in members["delete"] or members["retain"]:
+            invalid("the acknowledged whole-group runtime cannot execute selective retention")
         deleted.update(members["delete"])
         retained.update(members["retain"])
     if covered != set(scales):
         invalid("the manifest does not cover every scale set of the whole factory")
+    for field in ("protected_resources", "retained_resources"):
+        entries = plan.get(field)
+        if not isinstance(entries, list):
+            invalid("missing frozen plan retention manifest")
+        seen = set()
+        for entry in entries:
+            if (not _text(entry) or not re.fullmatch(
+                    r"/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[^/?#\\\x00-\x20]+"
+                    r"(?:/providers/[^?#\\\x00-\x20]+)?", entry)
+                    or any(part in (".", "..", "") for part in entry.split("/")[1:])
+                    or entry.lower() in seen):
+                invalid("invalid or duplicate frozen retained resource")
+            seen.add(entry.lower())
+        if retained & seen:
+            invalid("duplicate protected and retained resource entries")
+        retained.update(seen)
+    if any(keep == group or keep.startswith(group + "/") for group in groups for keep in retained):
+        invalid("retained infrastructure overlaps a group selected for cascading deletion")
     listed_retained = preview["retained_resources"]
     if (len({item.lower() for item in listed_retained}) != len(listed_retained)
             or {item.lower() for item in listed_retained} != retained):

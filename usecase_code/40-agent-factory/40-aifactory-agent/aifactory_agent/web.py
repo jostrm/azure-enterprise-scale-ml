@@ -31,7 +31,7 @@ from .skills import (
 )
 
 STATIC = Path(__file__).with_name("static")
-PERMISSIONS = ("knowledge.read", "factory.read", "config.write", "knowledge.refresh",
+PERMISSIONS = ("knowledge.read", "factory.read", "config.write", "knowledge.refresh", "graph.read",
                "factory.create", "factory.delete", "project.add", "cost.read", "agent.create", "model.create")
 
 
@@ -173,8 +173,8 @@ def create_app(settings: Settings, *, services: AgentServices | None = None) -> 
                              workload_factory=workload_factory),
             cost_factory=cost_factory,
             workload_factory=workload_factory,
-            conversation_factory=lambda current, knowledge, tools: Conversation(
-                current, knowledge, tool_factory=tools),
+            graph_conversation_factory=lambda current, knowledge, tools, graph: Conversation(
+                current, knowledge, tool_factory=tools, dual_graph=graph),
             authenticate=lambda current, token: security.principal_from_token(current, token),
         )
         services = AgentServices(settings, dependencies=dependencies)

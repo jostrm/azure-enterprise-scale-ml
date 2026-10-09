@@ -84,6 +84,14 @@ def test_real_signed_token_uses_backend_grants(settings, signing_key):
     assert authorize(settings, caller, SCOPE, "factory.read") == settings.scopes[SCOPE]
 
 
+def test_browser_registration_v2_token_uses_api_client_id_as_exact_audience(settings, signing_key):
+    settings = settings.model_copy(update={"auth": settings.auth.model_copy(update={"audience": CLIENT})})
+    caller = verify(settings, signing_key, claims(aud=CLIENT))
+    assert caller.object_id == CALLER
+    with pytest.raises(AuthenticationError):
+        verify(settings, signing_key, claims(aud="api://" + CLIENT))
+
+
 @pytest.mark.parametrize("missing", ["exp", "iat", "nbf", "tid", "oid", "aud", "iss"])
 def test_all_identity_and_lifetime_claims_required(settings, signing_key, missing):
     body = claims()
@@ -130,6 +138,41 @@ def test_default_verifier_uses_fixed_tenant_keys(settings, signing_key, monkeypa
     token = jwt.encode(claims(), signing_key, algorithm="RS256", headers={"jku": "https://attacker.test/keys"})
     principal_from_token(settings, token)
     assert urls == [f"https://login.microsoftonline.com/{TENANT}/discovery/v2.0/keys"]
+
+
+AZURE_CLI = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
+
+
+def with_additional_clients(settings, *clients):
+    return settings.model_copy(update={"auth": settings.auth.model_copy(update={"additional_client_ids": list(clients)})})
+
+
+def test_spa_principal_records_its_authorized_client(settings, signing_key):
+    assert verify(settings, signing_key, claims()).client_id == CLIENT
+
+
+def test_reviewed_additional_client_uses_same_audience_scope_and_grants(settings, signing_key):
+    from uuid import UUID
+    current = with_additional_clients(settings, UUID(AZURE_CLI))
+    caller = verify(current, signing_key, claims(azp=AZURE_CLI))
+    assert caller.client_id == AZURE_CLI
+    assert caller.object_id == CALLER and caller.permissions == {"factory.read", "config.write", "knowledge.read"}
+    for change in ({"scp": "user_impersonation"}, {"aud": "api://" + AZURE_CLI}, {"tid": CLIENT}, {"azp": CALLER}):
+        with pytest.raises(AuthenticationError):
+            verify(current, signing_key, claims(**{"azp": AZURE_CLI, **change}))
+
+
+@pytest.mark.parametrize("azp", [AZURE_CLI, ["unexpected"], AZURE_CLI.upper()])
+def test_unconfigured_or_malformed_additional_client_is_rejected(settings, signing_key, azp):
+    with pytest.raises(AuthenticationError):
+        verify(settings, signing_key, claims(azp=azp))
+
+
+def test_authorized_client_claim_is_required_for_allowlist_and_attribution(settings, signing_key):
+    body = claims()
+    del body["azp"]
+    with pytest.raises(AuthenticationError):
+        verify(settings, signing_key, body)
 
 
 def test_unknown_caller_and_cross_project_denied(settings, principal):

@@ -1,5 +1,444 @@
 
-# Introduction to Personas in AI
+# AI Factory human-access personas
+
+For a runnable walkthrough, start with the
+[persona tutorial and offline inspection](../../../environment_setup/aifactory/bicep/personas/readme.md).
+
+## Evidence-backed status of the legacy release
+
+Review baseline: `main` at `3e9102ee`, 5 October 2026. This is a source review,
+not an inventory of a deployed tenant. Existing assignments, nested memberships,
+management-group/subscription inheritance, credentials and workload identities
+can make effective access broader than any template alone.
+
+| Status | Executable evidence |
+|---|---|
+| Implemented and wired | `useAdGroups` changes assignment principal type to `Group`; `modules/resourceGroupRbacUsers.bicep` assigns the supplied human list project-RG roles; `modules/storageRbacUsers.bicep` grants account-level Blob/File/Queue data roles to that list. |
+| Implemented and wired | `modules/kvRbacAssignments.bicep` grants humans **Key Vault Secrets User** (GET/LIST); service principals and managed identities receive **Secrets Officer**. `esml-util/project_lake_access.py:apply` provisions common-lake project ACLs, called by `scripts/Invoke-ProjectLakeAccess.ps1` and ADO/GHA project pipelines. |
+| Partially implemented | `esml-util/32-create-azure-groups.sh:create_group` creates legacy groups and `store_group_id_in_keyvault` publishes `group-prjNNN-pNNN`. Its historical path does not safely discover duplicates or protect an existing ID from replacement. |
+| Partially implemented | `bootstrap/lib/create-new-aifactory-scaleset.sh:aif_ensure_team_group` supports team-group reuse, but `bootstrap/lib/aifactory_scaleset_config.py` repeats one team-group ID across five project and three core slots. That is not distinct persona authorization. |
+| Documented only | The old persona-labelled configuration arrays and service tables below do not implement nine independently mapped roles. `modules/common/CmnAIfactoryNaming.bicep:74-75` derives `p011_genai_team_lead_array` from `technicalAdminsObjectID`; `esml-genai-1/08-rbac-security.bicep` consumes that list. Renaming a persona does not change a permission. |
+| Missing from the baseline | Nine-persona lifecycle reconciliation; protected scope-bound seeded discovery; automatic distinct core-team coverage of every project; the exact four-operation secret baseline; and migration-enforced AI-developer-only lake authorization. |
+
+Paths in this table are relative to `environment_setup/aifactory/bicep` unless
+prefixed with `bootstrap`. See also
+[`resourceGroupRbacUsers.bicep`](../../../environment_setup/aifactory/bicep/modules/resourceGroupRbacUsers.bicep),
+[`storageRbacUsers.bicep`](../../../environment_setup/aifactory/bicep/modules/storageRbacUsers.bicep),
+[`kvRbacAssignments.bicep`](../../../environment_setup/aifactory/bicep/modules/kvRbacAssignments.bicep),
+and [`project_lake_access.py`](../../../environment_setup/aifactory/bicep/esml-util/project_lake_access.py).
+
+**Release verdict:** `RELEASE_125.md` lists "Entra group personas" as inherited
+functionality, not a new v1.25 feature. `ROADMAP_MAIN.md` explicitly says persona
+labels alone are not policies. The narrow claim of Entra-group RBAC support is
+accurate; interpreting it as a complete, distinct persona access model is not.
+The older tables below overstate executable persona-specific wiring.
+
+### What "default project access" actually meant
+
+There is no single tenant-independent default. In the phased GenAI route, the
+supplied `technicalAdminsObjectID` list normally receives project-RG Contributor,
+Azure AI User, Azure AI Project Manager, Cognitive Services User, AI Inference
+Deployment Operator, AzureML Data Scientist, workspace-connection secret reader
+and AcrPush. Unless disabled, it also receives conditional Role Based Access
+Control Administrator (`resourceGroupRbacUsers.bicep:171-205`). The condition
+excludes granting Owner, User Access Administrator and RBAC Administrator; it
+does **not** prevent granting other powerful roles or data access. Project
+storage receives account-level data roles, which cannot be restricted by ADLS
+ACLs when RBAC already authorizes the operation.
+
+Common-lake onboarding separately grants project ACLs, including ancestor
+traversal and defaults. The legacy modern-layout implementation traverses and
+grants the entire project root, not only one environment leaf. Older manual
+`addUserAsProjectMember*` routes additionally grant project/dashboard Contributor,
+VM Administrator Login and common-network/Bastion permissions at their configured
+scopes. These routes are not identical to phased GenAI RBAC.
+
+Key Vault also varies: modern project RBAC grants human secret GET/LIST; the
+manual `25-add-users-to-kv-get-list-access-policy.ps1:39-42` grants project humans
+GET/LIST and core-team humans GET/LIST/SET. Common infrastructure
+`esml-common/main/13-rgLevel.bicep:737-741` also uses a secret `all` policy at
+selected call sites. There is **no uniform four-operation human baseline**.
+`groups-v1` deliberately implements the requested GET/LIST/SET/DELETE contract:
+this is broader than existing read-only project-vault access, but narrower than
+secret `all`. The Secrets
+Officer role is **not** an exact GET/LIST/SET/DELETE substitute: its secret wildcard
+includes backup, restore, recover and purge. Comments suggesting otherwise do
+not narrow the Azure role definition. Access-policy vaults and RBAC vaults use
+different authorization modes; writing an inactive policy does not establish
+effective access.
+
+## Opt-in nine-persona model (`groups-v1`)
+
+This model is an **unreleased opt-in source feature**, not a claim of live-tenant
+certification. `enablePersonas` defaults to `false` in JSON/YAML (`ENABLE_PERSONAS=false`
+in deployment `.env`), preserving configured legacy human/group access. True derives
+`persona_access_mode=groups-v1`; false derives `legacy`. When the flag is absent,
+old explicit mode-only opt-ins remain supported. Adopting the new model
+requires a reviewed `persona_access_manifest` as well as updated provisioning
+scripts and pipelines. Never enable it by merely placing new groups into old
+`technical_admins_ad_object_id` or positional persona arrays.
+
+### Human permission matrix
+
+The executable policy catalogue and role definitions live in
+[`personas/`](../../../environment_setup/aifactory/bicep/personas).
+Custom roles intentionally replace broad built-ins where those include unwanted
+credential, access-management or secret operations. Resource visibility is not
+data authorization.
+
+| Stable ID | Persona | Management-plane boundary | Data-plane boundary |
+|---|---|---|---|
+| `persona200` | Super admin | Owner on explicitly registered common, connectivity and project RGs; can grant/revoke Azure permissions there. No Entra administration is implied. | Project-admin-equivalent secret operations; a privileged administrator who can grant additional data access, not an ordinary isolated project user. |
+| `persona201` | Core team | Contributor on registered common/project RGs; no connectivity grants or unrestricted Azure access administration. Every project also receives the project-admin baseline. | Same project secret baseline; common-resource administrators remain trusted for storage/workload administration. |
+| `persona210` | Project member | Broad project-resource management with explicit exclusions for Azure access administration, storage credentials/mutations, vault management and identity-assignment paths. | Exact project-vault secret GET/LIST/SET/DELETE and the safe project AI service-data bundle described below. No source-lake data rights. |
+| `persona211` | Project admin | Project member plus project resource-lock creation/removal. Member retains deployment and monitoring operations. Not Owner, User Access Administrator or RBAC Administrator. | Same secret baseline; no source-lake access merely by being an admin. |
+| `persona212` | Front-end developer | Project Web/Functions/App Service, Container Apps and API Management operations, not common/shared gateway administration. | Secret baseline and non-data foundational visibility; no source-lake access. |
+| `persona213` | AI developer | Project Container Apps, Search, Foundry/Cognitive Services (including Speech/Vision), APIM and Azure ML management. | Secret baseline and project/environment source-lake **read-only ACLs**. Service data operations are separately listed in the executable catalogue; no broad lake data role. |
+| `persona214` | Database developer | Project database-resource management for the supported SQL, PostgreSQL, Cosmos DB, Redis and Elastic providers. | Secret baseline. Database engine login/SQL grants/Cosmos data roles/Elastic privileges are separate; resource administration or credential-reset capability is not a claim of no indirect data access. |
+| `persona215` | Network & Security | Network Contributor only at reviewed project-relevant subnets/NSGs or a dedicated project-RG VNet. Whole common-RG VNets and connectivity RGs are excluded. | Key Vault Administrator at project vaults: elevated secrets, keys and certificates, subject to service protection policies. No source-lake grant. |
+| `persona216` | Project manager | Project visibility/cost and dashboard/Application Insights read access; required common Log Analytics workspace is explicitly scoped. | Log-query access only as listed by the catalogue. No secret values, secret writes, deployments or lake data. Workspace-scoped log access can expose other projects' logs; use a dedicated workspace if that is unacceptable. |
+
+Built-in role identifiers used by this design: Owner
+`8e3af657-a8ff-443c-a75c-2fe8c4bcb635`, Contributor
+`b24988ac-6180-42a0-ab88-20f7382dd24c`, Reader
+`acdd72a7-3385-48ef-bd42-f606fba81ae7`, Cost Management Reader
+`72fafb9e-0641-4937-9268-a91bfd8191a3`, Network Contributor
+`4d97b98b-1d4f-4787-a291-c67834d212e7`, and Key Vault Administrator
+`00482a5a-887f-4fb3-b363-3b7fe8e74483`. Custom role action lists, GUID construction
+and actual assignments are authoritative in `catalog.json`, `policy.py` and
+`custom-roles.bicep`; the provisioning preview exposes their exact definitions
+and scopes before execution.
+
+Custom role IDs are deterministic UUIDv5 values using namespace
+`cf916f48-aefd-5f72-929d-f9df85318fb4` and
+`role|<lowercase resource-group ARM ID>|<role key>`. Role keys include `member`,
+`admin`, `frontend`, `ai`, `database`, `vault-secrets`, `workspace-observer` and
+service-data roles in the catalogue. Each definition's assignable scope is its
+owned RG; role-assignment scope is still the narrower target where applicable.
+The preview returns concrete GUIDs rather than asking operators to invent them.
+
+Project admin's exact increment is `Microsoft.Authorization/locks/read`,
+`Microsoft.Authorization/locks/write` and `Microsoft.Authorization/locks/delete`
+at the project RG. It can protect/unprotect project resources against accidental
+changes, but cannot change role assignments, storage authorization or vault
+policies. Both core groups also receive the project-admin custom role on every
+project; Core team's Contributor alone would not include resource-lock writes.
+
+The shared `project-ai` service-data bundle preserves safe non-lake developer
+capabilities for core groups, Project member, Project admin and AI developer.
+It assigns Search Index Data Contributor
+(`8ebe5a00-799e-43f5-93ac-243d3dce84a7`) at exact project Search resources, plus
+custom `cognitive-inference` (33 explicitly enumerated operations) and
+`foundry-agent-author` (44 explicitly enumerated operations) at applicable project
+Cognitive/Foundry accounts. Agent authoring includes agents/assistants, threads,
+runs, files and vector stores; it excludes connection-secret extraction and
+identity-blueprint administration. The Search role includes elevated
+index-content security read: do not use this bundle as a per-document end-user
+security boundary. `report.service_data` lists concrete IDs, scopes and operations.
+
+Frontend/database personas do not inherit this AI data bundle. Ordinary storage
+Blob/File/Queue data roles are deliberately not preserved: isolate source data
+from artifacts, queues and application stores before granting separately reviewed
+workload access. The model never treats general storage visibility as permission
+to read source data.
+
+The secret baseline uses only
+`Microsoft.KeyVault/vaults/secrets/getSecret/action`,
+`Microsoft.KeyVault/vaults/secrets/readMetadata/action`,
+`Microsoft.KeyVault/vaults/secrets/setSecret/action`, and
+`Microsoft.KeyVault/vaults/secrets/delete`. It excludes recover, purge,
+backup/restore, keys and certificates. A deleted secret may therefore require
+Network & Security to recover it before its name can be reused.
+
+**Compatibility differences:** the new Project member does not retain legacy
+role-delegation, general storage management/data access, broad common networking,
+or credential access that would defeat isolation. Human project-secret SET/
+DELETE are explicitly added where the old path provided only GET/LIST. Broad
+legacy access must be removed; Azure `NotActions` is not a deny against another
+assignment.
+
+### Naming and lifecycle boundaries
+
+The old documented numeric ranges reserve 001-030, 080-090 and 100-110. The new
+model avoids semantic reinterpretation of those numbers: core personas are
+200-201 and project personas 210-216. Every new name ends in **`personaNNN`**,
+never ambiguous `pNNN`. `groups.py:group_specs` is the single naming authority.
+
+Core groups are factory/environment-wide and reused across scalesets. Project
+groups include factory, scaleset, project and environment, so `project001` in two
+scalesets does not share a group accidentally. Environment names are
+`dev`/`test`/`prod`; the pipeline UI's `stage` maps to `test`. Membership across
+environments must be deliberate. Stable group object IDs, not mutable names,
+are the authorization subjects.
+
+Examples: `aif--contoso--dev--persona200` and
+`aif--contoso--sdc001--dev--project001--persona213`; corresponding seeding keys
+are `group-aif--contoso--dev--persona200` and
+`group-aif--contoso--sdc001--dev--project001--persona213`. Double hyphens separate
+components and are forbidden inside factory/scaleset slugs, avoiding ambiguous
+concatenation. Seed values use schema `aifactory.persona-group/v1`, binding
+`tenant_id`, `factory`, `environment`, `persona`, `object_id`, `display_name`,
+and additionally `scaleset`/`project` for project groups.
+
+An Entra administrator creates or explicitly adopts ordinary assigned-membership
+security groups, then publishes scope-bound JSON records to the seeding vault.
+Discovery and creation are separate operations, preview is the default, duplicate
+names fail, and publication cannot silently replace a different object ID.
+Deployment identities read those records without Graph group-create privileges.
+Neither project nor factory deletion deletes these reusable directory groups.
+
+New common/scaleset provisioning binds the two core groups. Every project
+reconciliation, including initial `project001` and all subsequent projects,
+includes both core groups and all seven project groups. Assignments use stable
+scope/principal/role identity; matching pre-existing grants are not silently
+claimed as deployment-owned.
+
+Subscription/RG bootstrap is privileged: an RG-scoped role cannot create sibling
+RGs or confer subscription-wide rights. A separately authorized bootstrap/
+deployment identity creates the reviewed RGs and performs authorized role
+assignments. Core operators may trigger this governed process without becoming
+Entra administrators. Do not grant subscription Owner merely to resolve a
+pipeline authorization failure.
+
+### Additive membership and data trust boundary
+
+| Membership | Effective result |
+|---|---|
+| Core team plus any project persona | Union of core and project rights; no project group restricts the core administration grant. |
+| Front-end plus database developer | Both management permission sets and one effective secret baseline; still no source-lake grant. |
+| Project manager plus a developer | Developer permissions remain. Manager membership does not turn the user read-only. |
+| AI developer plus another project persona | Adds that project's authorized source-lake ACL access. |
+| AI developer in projects 001 and 002 | Access to both authorized subtrees, not every other project. |
+| Project member in 001 and AI developer in 002 | Management in 001; source-data access only in 002 unless another independently authorized membership grants more. |
+
+Modern lake authorization is limited to
+`mlops/v1/projects/projectNNN/environments/<environment>`. Only `--x` is added
+on ancestors, no default ACL is added above that leaf, and the AI group receives
+`r-x` on directories and `r--` on files, with defaults within the leaf.
+Legacy `projects/projectNNN` paths require a separately isolated per-environment
+lake. Existing ACLs/defaults, ownership and mask expansion are audited before
+writes; unrelated project paths are never automatically rewritten.
+
+Read-only source access is intentional: an ADLS writer can own new files and
+change their ACLs. Trusted ingestion identities own/write the source tree instead.
+Use a separately governed output/artifact store for development writes; do not
+silently make the protected source lake writable to solve a workload failure.
+Account/container Blob Data Reader/Contributor/Owner is not assigned to ordinary
+persona groups because an authorizing RBAC grant bypasses folder ACLs.
+
+Shared Key and public blob access must be explicitly disabled. Retire account/
+service SAS, rotate exposed credentials and revoke historical user-delegation
+keys as part of the separately reviewed migration. The reconciler does not
+silently rotate keys or grant itself a temporary data-owner role. It audits the
+filesystem with a bounded path limit (100,000 by default; reviewed
+`lake.max_audit_paths` up to 1,000,000); exceeding the limit stops before ACL
+writes rather than claiming a partial audit is sufficient.
+
+**The privileged boundary remains real.** Super admins, common-resource
+administrators, directory membership administrators and isolated ingestion
+operators can change access. Ordinary workload administrators can execute code
+as an already attached workload identity. A trusted lake identity attached to a
+project-controllable resource is therefore an adoption blocker. Review child
+compute identities, external connections, service credentials and deployment
+agents too; generic ARM inventory cannot prove the absence of every service's
+indirect credential path. No lake credentials may be stored in the project
+vault or application settings readable by non-AI personas. Derived data copied
+to Search, databases or applications needs its own authorization policy.
+
+Nested Entra memberships and existing user/management-group/subscription grants
+must be reviewed by the authorized operator. The normal pipeline deliberately
+does not require Graph membership administration. Use PIM/time-bound privileged
+membership, approval-protected infrastructure pipelines, Conditional Access,
+Key Vault/storage diagnostics and periodic access reviews. Changes to membership
+and cached tokens require propagation before effective-access testing.
+
+### Adoption, migration and rollback
+
+Keep `enablePersonas: false` until a deliberate adoption is approved. Turning it
+off does not migrate a marked persona RG back to legacy: the downgrade guard
+remains fail-closed. For a Dev-only trial explicitly keep `stage_prod.enablePersonas`
+false; see the [configuration and migration guide](../../../environment_setup/aifactory/bicep/personas/readme.md).
+Create one manifest per project/environment and select it explicitly through
+`persona_access_manifest`; a dev manifest cannot authorize a test/prod run.
+Existing factory consumers need the updated Purple scripts and copied ADO/GHA
+pipeline templates together. A Python API/desktop installer or another
+repository pinned to the old Purple snapshot is **not updated by local edits**.
+Pink API and MAUI packaging/version propagation are external dependencies.
+
+Supported local paths include the copied Azure DevOps/GitHub common and phased
+project workflows (including AML through those workflows), legacy-layout
+bootstrap, and the registered configuration/prerequisite/scoped-worker adapters.
+Registered workers freeze the persona manifest from the **reviewed consumer
+commit**, sanitize legacy human parameters before plan hashing, reconcile after
+successful ARM provisioning, and retain the report in the worker receipt.
+Only one project manifest is accepted per registered operation; split multi-project
+runs. Connectivity grants require their own exact registered scope locks or a
+separately reviewed common-access operation.
+
+The separate creation API must advertise **`persona-groups-v1`**. Its server
+implementation is outside Purple and was not changed here; unsupported API
+versions fail closed. The direct old `esml-project/22-main.bicep` route is also
+blocked for `groups-v1`: use the phased project route, not an attempt to mix new
+groups with legacy broad assignments. Explicit dashboard/network resources in
+an existing-deployment manifest must exist before its security preflight; add
+new resources and their permission scope through an approved staged deployment.
+
+1. Inventory every old human group/user assignment, eligible/PIM/transitive
+   membership, vault policy, lake ACL/default/owner, shared credential, SAS and
+   developer-controllable workload identity. Include assignments inherited from
+   subscriptions and management groups. Prefer fresh persona groups rather than
+   reusing a broad legacy principal.
+2. An authorized directory administrator creates/resolves all nine groups and
+   publishes the bound IDs to an existing, reachable seeding vault. Runtime
+   consumes the vault records without Graph. Serialize bootstrap runs: Entra
+   names are not unique and Key Vault secret publication is not an atomic
+   compare-and-swap across independent administrators.
+3. Preview the new common/project model. Disable Shared Key/public blobs on the
+   source lake through a separately reviewed infrastructure update, isolate
+   ingestion identities, migrate project vaults to RBAC deliberately, and remove
+   conflicting common-vault policies. Do not flip a vault authorization mode
+   without separately preparing legitimate workload access.
+4. Record legacy identities in `adoption.legacy_principal_ids`. Exact
+   `approved_role_assignment_ids` and `adoption.execute_migration: true` authorize
+   only the supported, validated owned-project assignment removals. Inherited/
+   shared/common access remains a manual, separately scoped operator action.
+   Approved named legacy ACL entries can be removed only inside the target
+   environment leaf using `approved_acl_principal_ids`; parent/sibling ACLs,
+   `other`, owning-group permissions and file ownership need explicit remediation.
+5. Complete the three `security_review` checks:
+   `workload_identities_and_secrets_reviewed`,
+   `transitive_membership_reviewed`, and `legacy_credentials_reviewed`.
+   These are operator attestations, not claims that offline templates can inspect
+   the directory or all credential paths. Keep all false until actually reviewed.
+6. Run reviewed common and project provisioning, inspect the report, then perform
+   real positive/negative authorization probes with distinct test users. Refresh
+   tokens after propagation. Expand to other projects/scalesets only after the
+   first project behaves as intended.
+
+The runtime rejects bare legacy `group-prjNNN-pNNN` values and positional arrays
+as new persona metadata. An explicit bootstrap `groups` mapping adopts a group
+only under its canonical new name; an administrator must separately review and
+rename a historical group before adoption. Never put a new seeded persona group
+in the legacy-removal list. No automatic group renaming, membership edits or
+object-ID replacement is performed.
+
+**Rollback is fail-closed:** retain the new groups, bound seeding metadata and
+restricted grants while reverting workload changes. Do not automatically restore
+legacy Contributor, RBAC Administrator, storage keys or broad lake roles. The
+`AIF-Persona-Access` RG marker guards against accidental return to legacy
+provisioning through the supported bridge. Restrict access to that marker and
+configuration: privileged operators can alter it. Delete only assignments
+positively identified as deployment-owned, not matching grants adopted from
+another owner. Resource deletion removes resource-scoped Azure assignments;
+reusable Entra groups are preserved.
+
+There is no automated receipt-bound deprovision command in this implementation.
+Deleting a project RG is **not complete human offboarding**: grants and ACLs on
+surviving common resources can remain. Review the stored assignment/ACL report,
+remove only approved project-owned entries, and retain shared/adopted access.
+Disable/remove group memberships through the authorized Entra process when access
+must be withdrawn immediately; do not delete the reusable groups.
+
+### Configuration and operator commands
+
+Start from [`manifest.example.json`](../../../environment_setup/aifactory/bicep/personas/manifest.example.json).
+Its GUIDs, names and scopes are **fictional**. Replace every tenant/resource value,
+identify trusted ingestion/provisioning principals explicitly, and keep review
+flags false until the review is complete. Store a reviewed copy in the consumer
+repository, for example `access/dev-project001.json`. Manifest paths are literal
+repository-relative paths, not templates with expanded placeholders.
+
+Merge these selectors into the full deployment `variables.json`:
+
+```json
+{
+  "dev": {
+    "persona_access_mode": "groups-v1",
+    "enablePersonas": true,
+    "persona_access_manifest": "access/dev-project001.json",
+    "project_number_000": "001"
+  },
+  "test": {
+    "persona_access_manifest": "access/test-project001.json"
+  },
+  "prod": {
+    "persona_access_manifest": "access/prod-project001.json"
+  }
+}
+```
+
+The selection order is `dev` baseline, then `stage_prod` for non-dev, then the
+exact `test`/`prod` section. Change the manifest together with the project number
+when provisioning a subsequent project. Scope/environment mismatches stop before
+deployment; the bridge never infers which similarly named group to use.
+
+From the consumer repository, these commands are **read-only previews** but
+require the caller's existing Azure authentication and network reachability:
+
+```powershell
+$personas = ".\azure-enterprise-scale-ml\environment_setup\aifactory\bicep\personas"
+python "$personas\groups.py" --manifest .\access\dev-project001.json --operation discover
+python "$personas\groups.py" --manifest .\access\dev-project001.json --operation create
+python "$personas\pipeline.py" --config .\aifactory\variables.json --environment dev --scope project --phase preflight --format json
+```
+
+Only an explicitly authorized Entra administrator should append `--execute` to
+the reviewed `groups.py` operation: `discover --execute` publishes existing
+groups, whereas `create --execute` can create missing groups before publication.
+The compatibility shell entrypoint accepts `--persona-manifest` for this new
+path. Its no-argument legacy path remains legacy behavior, not the idempotent
+new-model contract. Do not run it accidentally during persona adoption.
+
+`pipeline.py --phase apply` is an Azure permission-changing operation, normally
+invoked by the reviewed provider pipeline after infrastructure provisioning.
+It is **not a preview**. Do not run it until its exact scopes, migration removals
+and required deployment permissions have been approved. Seeding-vault GET and
+normal Azure access-assignment authorization do not imply Graph permissions.
+
+### Authorization validation and operating limits
+
+Offline pytest coverage includes policy/scopes, additive memberships, naming
+collisions, seeded-ID discovery, duplicate groups, immutable publication,
+idempotence, CLI failures, initial/subsequent project wiring, migration guards,
+PM exclusions and AI-only ACLs. Mocked HTTP/CLI tests assert no writes on blocked
+preflight. Bicep compilation checks syntax, **not** valid Azure role operation
+names, current tenant policy or effective human access.
+
+Live probes are deliberately separate:
+`environment_setup/unit-tests/test-bicep/integration/test_persona_authorization.py`.
+They run only with `LIVE_AZURE=1` and `PERSONA_AUTHORIZATION_CASES` pointing to a
+local JSON case inventory. Each case specifies `name`, an already authenticated
+`azure_config_dir`, `principal_id`, `tenant_id`, `subscription_id`, exact `url`,
+token `resource`, `expected_status` (200 or 403) and `expected_error_code` for
+denials. Tokens and returned secret/file content are not logged. Test requests
+are read-only, reject redirects and require authorization-specific denial codes:
+a firewall failure is not evidence of persona isolation.
+
+Use separate accounts for member, admin, frontend, AI, database, network/security
+and PM; add combinations of PM+developer, multiple developers, core+project and
+two projects. Probe known existing source files in both own and other project/
+environment folders, own secret access and PM secret denial, project dashboard/
+cost/log access, and unrelated resource management denial. Independently test
+SET/DELETE and prohibited purge/key/certificate operations with disposable
+canary secrets in an explicitly authorized tenant exercise; the supplied GET
+probe intentionally does not perform destructive operations.
+
+**Live execution is still required before a production designation.** No local
+unit test proves tenant-wide absence of nested membership, historical credentials,
+privileged self-elevation, third-party service permissions, or future drift.
+Database engine grants, private-endpoint reachability, billing-scope cost access,
+PIM activation and service-specific AI APIs require tenant validation. Any
+failure must be investigated at its actual scope, never resolved by silently
+granting Owner or a storage data role.
+
+## Historical conceptual catalogue
+
+The following material is retained for architectural context and legacy
+configuration migration. It is **not the permission contract for `groups-v1`**
+and does not establish mutually exclusive memberships, privilege precedence,
+or verified deployment support.
+
+### Introduction to personas in AI
 Please see section [Personas](./25-personas.md) for generic information about Personas - what it is, how to use it where the concept is explained, and its benefits such as access control, education & skilling.You can also read about personas in the Microsoft Well-architected Framework for AI, at [aka.ms/wafai](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas) where the Enterprise Scale AI Factory is referenced. 
 
 The Enterprise Scale AI Factory are using personas both to connect personas to: 

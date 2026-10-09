@@ -8,7 +8,7 @@ import pytest
 
 import deploy
 from aifactory_agent.config import load_settings
-from aifactory_agent.costs import DEFAULT_VARIABLES_RELATIVE_PATH, DEFAULT_VARIABLES_SHA256
+from aifactory_agent.costs import DEFAULT_VARIABLES_RELATIVE_PATH
 
 
 @pytest.fixture
@@ -32,6 +32,9 @@ def package_inputs(tmp_path, monkeypatch):
     settings = original.model_copy(update={
         "knowledge": original.knowledge.model_copy(update={"repository_root": root, "includes": []}),
         "azure": original.azure.model_copy(update={"application_insights_name": None}),
+        "costs": original.costs.model_copy(update={
+            "default_variables_sha256": hashlib.sha256(template.read_bytes()).hexdigest(),
+        }),
     })
     return settings, tmp_path / "bundle.tar.gz", template
 
@@ -42,8 +45,8 @@ def test_pinned_default_cost_template_is_in_cloud_bundle(package_inputs):
     with tarfile.open(destination) as archive:
         raw = archive.extractfile("repository/" + DEFAULT_VARIABLES_RELATIVE_PATH.as_posix()).read()
         config = json.load(archive.extractfile("config.json"))
-    assert hashlib.sha256(raw).hexdigest() == DEFAULT_VARIABLES_SHA256
-    assert config["costs"]["default_variables_sha256"] == DEFAULT_VARIABLES_SHA256
+    assert hashlib.sha256(raw).hexdigest() == settings.costs.default_variables_sha256
+    assert config["costs"]["default_variables_sha256"] == settings.costs.default_variables_sha256
     assert config["costs"]["default_variables_path"] == DEFAULT_VARIABLES_RELATIVE_PATH.as_posix()
     assert config["azure"]["credential"] == "managed_identity"
     assert config["workloads"]["repository_root"] == "/tmp/agent-app/workload_sources"
@@ -86,3 +89,31 @@ def test_bootstrap_prefers_approved_workload_provider_sources_to_shared_fallback
     assert "workload_sources/usecase_code/40-agent-factory" in pythonpath
     assert "workload_sources/usecase_code/50-ml-model-factory/accelerator/src" in pythonpath
     assert pythonpath.index("workload_sources/usecase_code/40-agent-factory") < pythonpath.index("/tmp/agent-app/shared")
+
+
+def test_deployment_selects_exact_foundry_project_for_runtime_access():
+    settings = load_settings(Path(deploy.__file__).parent / "config.example.json")
+    assert deploy.resource_names(settings)["foundryProject"] == settings.azure.foundry_project
+
+
+def test_runtime_identity_has_project_scoped_responses_role_not_foundry_management():
+    source = (Path(deploy.__file__).parent / "infra" / "identity.bicep").read_text("utf-8")
+    assert "resource project 'Microsoft.CognitiveServices/accounts/projects@" in source
+    runtime = source.split("resource projectRuntime ", 1)[1].split("resource ", 1)[0]
+    assert "scope: project" in runtime
+    assert "'142bfaed-a13f-4c2d-bed2-6db62c4a1009'" in runtime
+    assert "'53ca6127-db72-4b80-b1b0-d745d6d5456d'" not in source
+
+
+def test_endpoint_deployment_selects_named_agent_and_consumption_only_role():
+    settings = load_settings(Path(deploy.__file__).parent / "config.example.json")
+    settings = settings.model_copy(update={"agent_invocation": "agent_endpoint"})
+    assert deploy.resource_names(settings)["agentName"] == settings.agent_name
+    assert deploy.resource_names(settings)["agentInvocation"] == "agent_endpoint"
+    source = (Path(deploy.__file__).parent / "infra" / "identity.bicep").read_text("utf-8")
+    consumer = source.split("resource agentConsumer ", 1)[1].split("resource ", 1)[0]
+    assert "if (agentInvocation == 'agent_endpoint')" in consumer
+    assert "scope: agent" in consumer
+    assert "'eed3b665-ab3a-47b6-8f48-c9382fb1dad6'" in consumer
+    project_runtime = source.split("resource projectRuntime ", 1)[1].split("resource ", 1)[0]
+    assert "if (agentInvocation == 'project_reference')" in project_runtime

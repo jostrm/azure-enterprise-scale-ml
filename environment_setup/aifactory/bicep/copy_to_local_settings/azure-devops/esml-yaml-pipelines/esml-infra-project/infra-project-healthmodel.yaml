@@ -53,6 +53,10 @@ parameters:
     displayName: Comma-separated e-mails for a health-alert action group (empty = alerts without notifications)
     type: string
     default: ''
+  - name: extraModels
+    displayName: Comma-separated extra model definitions, for example agents (definitions/*.json or aifactory/healthmodels/*.json)
+    type: string
+    default: ''
   - name: runnerSelection
     type: string
     default: microsoft-hosted
@@ -113,11 +117,22 @@ jobs:
             foreach ($email in ($env:HM_ALERT_EMAILS -split ',')) {
               if ($email.Trim()) { $extra += @('--alert-email', $email.Trim()) }
             }
-            & $python.Source $tool $env:HM_MODE --consumer-root $env:CONSUMER_ROOT --variables-json $env:CONFIG_FILE --environment $env:TARGET_ENVIRONMENT --project $env:PROJECT_NUMBER --scope $env:HM_SCOPE @extra
+            foreach ($model in ($env:HM_EXTRA_MODELS -split ',')) {
+              $name = $model.Trim()
+              if (-not $name) { continue }
+              if ($name -cnotmatch '^[a-z][a-z0-9-]{1,30}$') { throw "Extra model '$name' must be a model definition key." }
+              $extra += @('--model', $name)
+            }
+            # Consumer model definitions live beside the configuration: <config folder>/healthmodels/*.json
+            $configFolder = Join-Path $env:CONSUMER_ROOT ([string](Split-Path -Parent $env:CONFIG_FILE))
+            $definitions = Join-Path $configFolder 'healthmodels'
+            $definitionArgs = @()
+            if (Test-Path -LiteralPath $definitions -PathType Container) { $definitionArgs = @('--definitions-dir', $definitions) }
+            & $python.Source $tool $env:HM_MODE --consumer-root $env:CONSUMER_ROOT --variables-json $env:CONFIG_FILE --environment $env:TARGET_ENVIRONMENT --project $env:PROJECT_NUMBER --scope $env:HM_SCOPE @extra @definitionArgs
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             if ($env:HM_MODE -eq 'deploy' -and $env:HM_SCOPE -ne 'common') {
               # Informational: new role assignments can take minutes before every signal reports data.
-              & $python.Source $tool status --consumer-root $env:CONSUMER_ROOT --variables-json $env:CONFIG_FILE --environment $env:TARGET_ENVIRONMENT --project $env:PROJECT_NUMBER --scope project
+              & $python.Source $tool status --consumer-root $env:CONSUMER_ROOT --variables-json $env:CONFIG_FILE --environment $env:TARGET_ENVIRONMENT --project $env:PROJECT_NUMBER --scope project @definitionArgs
             }
             exit 0
         env:
@@ -130,3 +145,4 @@ jobs:
           HM_REGISTER_PROVIDER: ${{ parameters.registerProvider }}
           HM_PRUNE: ${{ parameters.prune }}
           HM_ALERT_EMAILS: ${{ parameters.alertEmails }}
+          HM_EXTRA_MODELS: ${{ parameters.extraModels }}

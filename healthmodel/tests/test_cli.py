@@ -149,6 +149,14 @@ def test_set_alert_requires_a_change(capsys):
     assert "--unhealthy" in capsys.readouterr().err
 
 
+def test_set_alert_changes_only_given_fields_and_clears_groups_explicitly():
+    assert run("set-alert", "--model-id", MODEL_ID, "--entity", "layer-genai", "--unhealthy", "Sev1") == 0
+    assert last_calls()[0][2] == {"unhealthy": {"severity": "Sev1"}}
+    assert run("set-alert", "--model-id", MODEL_ID, "--entity", "layer-genai", "--unhealthy", "Sev1",
+               "--clear-action-groups") == 0
+    assert last_calls()[0][2] == {"unhealthy": {"severity": "Sev1", "actionGroupIds": []}}
+
+
 def test_alert_state_change():
     alert_id = f"/subscriptions/{SUB}/providers/Microsoft.AlertsManagement/alerts/1"
     assert run("alert-state", "--model-id", MODEL_ID, "--alert-id", alert_id, "--state", "Acknowledged",
@@ -177,6 +185,30 @@ def test_tool_definitions_are_read_only_and_schema_shaped():
         assert len(tool["description"]) > 40
 
 
+def test_tool_schemas_use_portable_json_schema_regex():
+    """MCP hosts validate schemas with ECMA-262 regex; Python-only syntax would break registration."""
+    def patterns(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "pattern":
+                    yield value
+                else:
+                    yield from patterns(value)
+        elif isinstance(node, list):
+            for item in node:
+                yield from patterns(item)
+    for tool in tools.TOOLS:
+        for pattern in patterns(tool["inputSchema"]):
+            for python_only in ("(?P<", "(?i", "\\A", "\\Z", "(?#"):
+                assert python_only not in pattern, (tool["name"], pattern)
+
+
+def test_call_tool_accepts_lowercase_model_ids_like_alert_payloads_use():
+    factory = lambda model_id: FakeClient(model_id)
+    summary = tools.call_tool(factory, "healthmodel_summary", {"modelId": MODEL_ID.lower()})
+    assert summary["root"]["state"] == "Degraded"
+
+
 def test_call_tool_dispatches_with_validation():
     factory = lambda model_id: FakeClient(model_id)
     result = tools.call_tool(factory, "healthmodel_alerts", {"modelId": MODEL_ID, "hours": 168})
@@ -191,3 +223,71 @@ def test_call_tool_dispatches_with_validation():
         tools.call_tool(factory, "healthmodel_alerts", {"modelId": MODEL_ID, "hours": 5})
     with pytest.raises(KeyError):
         tools.call_tool(factory, "healthmodel_delete", {"modelId": MODEL_ID})
+
+
+def test_read_only_client_factory_blocks_writes():
+    from aifactory_healthmodel.infrastructure.proxies import ReadOnlyTransport, ReadOnlyViolation
+
+    client = tools.read_only_client_factory("cli")(MODEL_ID)
+    assert isinstance(client.transport, ReadOnlyTransport)
+    with pytest.raises(ReadOnlyViolation):
+        client.ingest_health_report("root", "probe", "Healthy")
+
+
+# ---------------------------------------------------------------- consumer model definitions at runtime
+def factory_config(tmp_path):
+    document = {"dev": {"tenantId": "11111111-1111-1111-1111-111111111111", "dev_sub_id": SUB,
+                        "admin_location": "swedencentral", "admin_locationSuffix": "sdc",
+                        "admin_aifactoryPrefixRG": "spider-", "admin_aifactorySuffixRG": "-001",
+                        "projectPrefix": "esml-", "projectSuffix": "-rg", "vnetResourceGroupBase": "esml-common",
+                        "project_number_000": "001"}, "stage_prod": {}}
+    folder = tmp_path / "aifactory"
+    (folder / "healthmodels").mkdir(parents=True)
+    (folder / "variables.json").write_text(json.dumps(document), encoding="utf-8")
+    return folder
+
+
+def write_definition(folder, key, token, home):
+    folder.mkdir(exist_ok=True)
+    (folder / f"{key}.json").write_text(json.dumps({
+        "key": key, "nameToken": token, "home": home, "rootDisplayName": key,
+        "layers": [{"fromCatalog": True, "select": {"all": True}}]}), encoding="utf-8")
+
+
+def test_runtime_scope_resolves_consumer_definitions(tmp_path):
+    folder = factory_config(tmp_path)
+    write_definition(folder / "healthmodels", "data-platform", "dat{project}", "project")
+    write_definition(tmp_path / "more", "vault", "kv", "common")
+    config = ["--consumer-root", str(tmp_path), "--variables-json", "aifactory/variables.json",
+              "--environment", "dev", "--project", "001"]
+    assert run("status", *config, "--scope", "data-platform") == 0, "<config folder>/healthmodels is loaded"
+    assert FakeClient.instances[-1].model_id == (
+        f"/subscriptions/{SUB}/resourceGroups/{RG}/providers/Microsoft.CloudHealth/healthmodels/hm-spider-dat001-sdc-dev-001")
+    assert run("alerts", *config, "--scope", "vault", "--definitions-dir", str(tmp_path / "more")) == 0
+    assert FakeClient.instances[-1].model_id == (
+        f"/subscriptions/{SUB}/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.CloudHealth/"
+        "healthmodels/hm-spider-kv-sdc-dev-001")
+
+
+def test_consumer_definitions_can_redefine_a_built_in_key(tmp_path, capsys):
+    folder = factory_config(tmp_path)
+    write_definition(folder / "healthmodels", "agents", "bot{project}", "project")
+    config = ["--consumer-root", str(tmp_path), "--variables-json", "aifactory/variables.json",
+              "--environment", "dev", "--project", "001"]
+    assert run("status", *config, "--scope", "agents") == 0
+    assert FakeClient.instances[-1].model_id.endswith("/healthmodels/hm-spider-bot001-sdc-dev-001")
+    assert run("status", *config, "--scope", "nope") == 1
+    assert "Unknown model definition 'nope'" in capsys.readouterr().err
+
+
+def test_later_definition_folders_win_even_when_the_convention_folder_is_repeated(tmp_path):
+    folder = factory_config(tmp_path)
+    write_definition(folder / "healthmodels", "data-platform", "dat{project}", "project")
+    write_definition(tmp_path / "shared", "data-platform", "shr{project}", "project")
+    config = ["--consumer-root", str(tmp_path), "--variables-json", "aifactory/variables.json",
+              "--environment", "dev", "--project", "001", "--scope", "data-platform"]
+    assert run("status", *config, "--definitions-dir", str(tmp_path / "shared")) == 0
+    assert FakeClient.instances[-1].model_id.endswith("/hm-spider-shr001-sdc-dev-001"), "explicit folder after convention"
+    assert run("status", *config, "--definitions-dir", str(tmp_path / "shared"),
+               "--definitions-dir", str(folder / "healthmodels")) == 0
+    assert FakeClient.instances[-1].model_id.endswith("/hm-spider-dat001-sdc-dev-001"), "the folder given last wins"

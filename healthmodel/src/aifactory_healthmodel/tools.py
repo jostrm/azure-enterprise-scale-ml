@@ -13,8 +13,10 @@ import re
 
 from .client import ALERT_STATES, MODEL_ID, TIME_RANGES
 
-MODEL_ID_SCHEMA = {"type": "string", "pattern": f"^{MODEL_ID.pattern}$",
-                   "description": "Resource ID of the Microsoft.CloudHealth/healthmodels resource."}
+MODEL_ID_SCHEMA = {"type": "string", "minLength": 80, "maxLength": 400,
+                   "description": "Resource ID of the Microsoft.CloudHealth/healthmodels resource: "
+                                  "/subscriptions/{id}/resourceGroups/{rg}/providers/Microsoft.CloudHealth/healthmodels/{name}. "
+                                  "Validated server-side (case-insensitive)."}
 ENTITY_SCHEMA = {"type": "string", "pattern": r"^(root|[a-zA-Z0-9][a-zA-Z0-9-]{1,258}[a-zA-Z0-9])$",
                  "description": "Entity name, or 'root' for the whole workload."}
 HOURS_SCHEMA = {"type": "number", "minimum": 1, "maximum": 720, "description": "Look-back window in hours."}
@@ -90,9 +92,20 @@ def validate(arguments: dict, schema: dict) -> dict:
             raise ValueError(f"{name} must be one of {rule['enum']}.")
         if "pattern" in rule and not re.fullmatch(rule["pattern"].strip("^$"), value, re.I):
             raise ValueError(f"{name} has an invalid format.")
+        if name == "modelId" and not MODEL_ID.fullmatch(value):
+            raise ValueError("modelId must be a Microsoft.CloudHealth/healthmodels resource ID.")
         if "minimum" in rule and value < rule["minimum"] or "maximum" in rule and value > rule["maximum"]:
             raise ValueError(f"{name} is out of range.")
     return arguments
+
+
+def read_only_client_factory(auth: str = "cli"):
+    """Default factory for MCP hosts: clients share one resilient transport that refuses every write."""
+    from .bootstrap import runtime_transport
+    from .client import HealthModelClient
+
+    transport = runtime_transport(auth, read_only=True)
+    return lambda model_id: HealthModelClient(model_id, transport)
 
 
 def call_tool(client_factory, name: str, arguments: dict) -> dict:

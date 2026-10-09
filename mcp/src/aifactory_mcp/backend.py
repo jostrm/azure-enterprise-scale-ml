@@ -12,6 +12,8 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from .health import AgentHealthProbe, HealthModel, HealthRegistry
+from . import graph
+from .policy import GRAPH_APPLICATION_TOOLS
 
 
 _LOG = logging.getLogger(__name__)
@@ -178,6 +180,8 @@ class AgentBackend:
                 if name not in _HEALTH_NAMES:
                     definitions.append(self._descriptor(name, item["description"], item["parameters"]))
             definitions.extend(self._health.descriptors())
+            if graph.authorized(self.runtime, self.principal, self.scope_key):
+                definitions.extend(graph.descriptors())
             for name, skill in zip(_PREPARES, self.runtime.skills.ACTION_SKILLS):
                 definitions.append(self._descriptor(
                     name, f"Prepare and persist a reviewed plan: {self.runtime.skills.SKILL_LABELS[skill]}. "
@@ -283,6 +287,10 @@ class AgentBackend:
             self._authorize()
             if not isinstance(name, str) or name not in {item["name"] for item in self.list_tools()}:
                 raise _error("unsupported_tool", 400)
+            if name in GRAPH_APPLICATION_TOOLS:
+                if not isinstance(arguments, dict):
+                    raise _error("invalid_arguments", 400)
+                return self._sanitize(graph.call(self.runtime, self.principal, self.scope_key, name, arguments))
             if name in self._health:
                 return self._read_result(self._health.evaluate(name, arguments))
             args = self._arguments(name, arguments)

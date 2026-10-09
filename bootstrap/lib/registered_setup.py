@@ -68,6 +68,16 @@ def install(source, root, provider="both", refresh_only=False):
         if not starter.ordinary(cli / name).is_file():
             raise ValueError(f"Incomplete CLI source: {name}")
     merge.tree(cli, package)
+    persona_source = source / "environment_setup" / "aifactory" / "bicep"
+    persona_package = Path(".azurefactory-tools") / "persona-engine"
+    for name in ("pipeline.py", "groups.py", "policy.py", "access.py", "cli.py", "lake.py", "catalog.json"):
+        if not starter.ordinary(persona_source / "personas" / name).is_file():
+            raise ValueError(f"Incomplete registered persona helper source: {name}")
+    for path in (persona_source / "personas").iterdir():
+        if path.suffix in (".py", ".json"):
+            merge.file(path, persona_package / "personas" / path.name)
+    merge.file(persona_source / "esml-util" / "project_lake_access.py",
+               persona_package / "esml-util" / "project_lake_access.py")
     merge.file(bootstrap / "lib" / "factory_enrollment.py", package / "_vendor" / "factory_enrollment.py")
     merge.file(bootstrap / "lib" / "provider_repository_state.py", package / "_vendor" / "provider_repository_state.py")
     merge.file(bootstrap / ".gitignore.template", ".gitignore", preserve=True)

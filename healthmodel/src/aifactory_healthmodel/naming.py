@@ -42,6 +42,9 @@ REGION_FALLBACK = {
 }
 ENVIRONMENTS = {"dev": "dev", "test": "test", "stage": "test", "prod": "prod"}
 SUBSCRIPTION_KEYS = {"dev": "dev_sub_id", "test": "test_sub_id", "prod": "prod_sub_id"}
+# Model definitions name their models with a short token, e.g. "prj{project}" -> prj001, "cmn".
+TOKEN_TEMPLATE = re.compile(r"([a-z][a-z0-9]{1,7})(\{project\})?")
+SCOPE_TOKENS = {"project": "prj{project}", "common": "cmn"}
 
 
 @dataclass(frozen=True)
@@ -60,22 +63,43 @@ class FactoryScope:
 
     def model_name(self, scope: str) -> str:
         """Deterministic, valid health model name for the project or common model."""
-        if scope == "project":
-            token = f"prj{self.project_number}"
-        elif scope == "common":
-            token = "cmn"
-        else:
+        if scope not in SCOPE_TOKENS:
             raise ValueError("Model scope must be 'project' or 'common'.")
+        return self.model_name_for(self.render_token(SCOPE_TOKENS[scope]))
+
+    def render_token(self, template: str) -> str:
+        match = TOKEN_TEMPLATE.fullmatch(template or "")
+        if not match:
+            raise ValueError(f"Invalid model name token {template!r}: use 2-8 lowercase letters or digits, "
+                             "optionally followed by {project}.")
+        return match.group(1) + (self.project_number if match.group(2) else "")
+
+    def model_name_for(self, token: str) -> str:
+        """Deterministic, valid health model name for a rendered definition token."""
         head = _sanitize(f"hm-{self.resource_group_prefix}")
         tail = _sanitize(f"{token}-{self.location_suffix}-{self.environment}{self.resource_group_suffix}")[:30].strip("-")
         name = f"{head}-{tail}" if head else tail
         if len(name) > MODEL_NAME_MAX:
-            digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:6]
+            # The digest excludes the model token, so sibling project models of one factory
+            # differ only in prjNNN and the common model can find them by name.
+            factory = f"{head}|{self.location_suffix}|{self.environment}|{self.resource_group_suffix}"
+            digest = hashlib.sha1(factory.encode("utf-8")).hexdigest()[:6]
             head = head[: MODEL_NAME_MAX - len(tail) - len(digest) - 2].rstrip("-")
             name = f"{head}-{digest}-{tail}"
         if not MODEL_NAME_PATTERN.fullmatch(name):
             raise ValueError(f"Cannot derive a valid health model name from the configuration: {name!r}")
         return name
+
+    def sibling_model_pattern(self, template: str) -> re.Pattern:
+        """Names of the models a definition creates for every project of this factory and environment."""
+        token = self.render_token(template)
+        escaped, escaped_token = re.escape(self.model_name_for(token)), re.escape(token)
+        if not TOKEN_TEMPLATE.fullmatch(template).group(2):
+            return re.compile(escaped)
+        head, found, tail = escaped.rpartition(escaped_token)
+        if not found:
+            raise ValueError(f"Model name for token {template!r} does not contain the token.")
+        return re.compile(f"{head}{re.escape(token[:-3])}\\d{{3}}{tail}")
 
     @property
     def resource_groups(self) -> tuple[str, str]:

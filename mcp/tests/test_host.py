@@ -139,6 +139,17 @@ def test_discovery_filters_missing_false_annotations_and_all_action_tools(runtim
     assert invocations == []
 
 
+def test_graph_host_uses_only_discovered_reads_and_keeps_snapshot_semantics(runtime, invocations):
+    model = Model(response(call("graph_status")), response(text="Static graph evidence only."))
+    result = run(runtime, model, Session([tool("graph_status")]))
+    assert result["status"] == "completed"
+    assert invocations == [("graph_status", {})]
+    assert "static snapshot evidence" in model.requests[0]["instructions"]
+    assert model.requests[0]["model"] == runtime.settings.azure.model_deployment
+    denied = run(runtime, Model(response(call("graph_query"))), Session([tool("graph_status")]))
+    assert denied["error_code"] == "tool_not_allowed"
+
+
 @pytest.mark.parametrize("name", [
     "unknown_health", "factory_prepare", "factory_approve", "factory_approval",
     "factory_execute", "factory_cancel", "factory_cli_health",

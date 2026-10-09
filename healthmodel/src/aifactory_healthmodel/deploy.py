@@ -1,46 +1,30 @@
-"""Plan, what-if and deploy AI Factory health models (project and/or common scope).
+"""Plan, what-if and deploy AI Factory health models from model definitions.
 
-plan    read-only: account check, provider check, Resource Graph discovery, rendered summary
-deploy  Incremental Bicep deployment per model (+ optional provider registration and pruning)
+plan    read-only: account check, provider check, one Resource Graph discovery and a rendered
+        summary per model (--inventory plans offline from a saved Resource Graph export)
+deploy  incremental Bicep deployment per model, nested models first (+ optional provider
+        registration and pruning)
+models  list and validate model definitions (built in, --definitions-dir, --model FILE)
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
-import shutil
 import sys
 import time
 from pathlib import Path
-from uuid import uuid4
 
-from . import __version__
-from . import catalog as cat
-from . import naming, planner
-from .azure import AzureBoundary, default_runner
-from .client import HealthModelClient, HealthModelError
+from . import __version__, naming
+from .application.service import HealthModelService, RunRequest
+from .bootstrap import Settings, build_registry, create_services
+from .domain.definitions import DefinitionRegistry
+from .domain.policy import validate_alert_policy
+from .infrastructure.azure_cli import AzureCliInfrastructure, default_runner
+from .infrastructure.offline import OfflineInfrastructure
 
-TEMPLATE = cat.HEALTHMODEL_ROOT / "bicep" / "main.bicep"
-POLICY_KEYS = frozenset({
-    "rootUnhealthySeverity", "rootDegradedSeverity", "layerUnhealthySeverity", "layerDegradedSeverity",
-    "resourceUnhealthySeverity", "resourceDegradedSeverity",
-})
-DEFAULT_ALERT_POLICY = {
-    "rootUnhealthySeverity": "Sev1", "rootDegradedSeverity": "Sev3", "layerUnhealthySeverity": "Sev2",
-    "layerDegradedSeverity": "", "resourceUnhealthySeverity": "", "resourceDegradedSeverity": "",
-}
-
-
-def _workspace(args, resources) -> str | None:
-    if args.log_analytics_workspace_id:
-        return args.log_analytics_workspace_id
-    if not args.log_signals:
-        return None
-    workspaces = sorted({r.id for r in resources if r.type == "microsoft.operationalinsights/workspaces"})
-    if len(workspaces) != 1:
-        raise ValueError(f"--log-signals found {len(workspaces)} Log Analytics workspaces in the factory resource "
-                         "groups; pass --log-analytics-workspace-id explicitly.")
-    return workspaces[0]
+SCOPES = {"project": ["project"], "common": ["common"], "all": ["project", "common"]}
+CONSUMER_DEFINITIONS = "healthmodels"
 
 
 def _default_az():
@@ -90,13 +74,7 @@ def bicep_options(args) -> dict:
     options = {}
     policy = _read_json_file(args.alert_policy, "alert policy")
     if policy:
-        unknown = set(policy) - POLICY_KEYS
-        if unknown:
-            raise ValueError(f"Unknown alert policy keys: {sorted(unknown)}")
-        for key, value in policy.items():
-            if value not in ("", *cat.SEVERITIES):
-                raise ValueError(f"{key}: severity must be empty or one of {cat.SEVERITIES}.")
-        options["alertPolicy"] = policy
+        options["alertPolicy"] = validate_alert_policy(policy)
     if args.health_objective is not None:
         if not 0 <= args.health_objective <= 100:
             raise ValueError("--health-objective must be between 0 and 100.")
@@ -113,98 +91,84 @@ def bicep_options(args) -> dict:
     return options
 
 
-def _scopes(value: str) -> list[str]:
-    return ["project", "common"] if value == "all" else [value]
+def definition_dirs(args) -> tuple[Path, ...]:
+    """Consumer definition folders: ``<folder of --variables-json>/healthmodels`` when it exists, then every
+    ``--definitions-dir`` in order (later folders override earlier keys). Used by every command, so plan,
+    deploy and the runtime commands resolve the same definitions."""
+    folders: list[Path] = []
+    if getattr(args, "variables_json", None):
+        root = Path(getattr(args, "consumer_root", None) or os.getcwd())
+        convention = _bounded(root, args.variables_json).parent / CONSUMER_DEFINITIONS
+        if convention.is_dir():
+            folders.append(convention)
+    folders.extend(Path(value) for value in getattr(args, "definitions_dir", None) or ())
+    # Keep the last occurrence of a repeated folder so the folder given last still wins.
+    unique: list[Path] = []
+    for folder in reversed(folders):
+        if all(folder.resolve() != seen.resolve() for seen in unique):
+            unique.append(folder)
+    return tuple(reversed(unique))
 
 
-def run(args, az=None, sleep=time.sleep) -> dict:
+def _is_definition_file(value: str) -> bool:
+    """Definition keys never contain path separators or a .json suffix; anything else is a key."""
+    return value.lower().endswith(".json") or "/" in value or "\\" in value
+
+
+def _resolve_model(registry: DefinitionRegistry, item: str) -> str:
+    return registry.load_file(item).key if _is_definition_file(item) else registry.get(item).key
+
+
+def selected_models(args, registry: DefinitionRegistry) -> list[str]:
+    """--scope picks the built-in project/common models; every --model adds a definition key or file."""
+    keys = [] if args.scope is None and args.model else list(SCOPES[args.scope or "project"])
+    for item in args.model:
+        key = _resolve_model(registry, item)
+        if key not in keys:
+            keys.append(key)
+    return keys
+
+
+def run(args, az=None, sleep=time.sleep, configure=None) -> dict:
+    if args.command == "models":
+        return list_models(args)
     scope = resolve_scope(args)
-    catalog = cat.load_catalog()
     overrides = _read_json_file(args.overrides, "overrides")
     options = bicep_options(args)
-    azure = AzureBoundary(scope.subscription_id, runner=az or _default_az(), sleep=sleep)
-    azure.verify_account(scope.tenant_id)
-    provider = azure.provider()
-    region, region_reason = naming.health_model_location(
-        scope.location, args.health_model_location, supported=provider["regions"] or None)
-    registered = provider["registrationState"] == "Registered"
-    if args.command == "deploy" and not registered:
-        if not args.register_provider:
-            raise RuntimeError(f"{scope.subscription_id}: Microsoft.CloudHealth is {provider['registrationState']}. "
-                               "Rerun with --register-provider (needs */register/action) or register it once.")
-        azure.register_provider()
-        registered = True
-
-    results, deployed_models = [], []
-    work = Path(args.consumer_root or os.getcwd()) / f".healthmodel-{uuid4().hex[:12]}"
-    try:
-        for model_scope in _scopes(args.scope):
-            if model_scope == "common" and not scope.common_resource_group:
-                raise ValueError("The common model needs a common resource group.")
-            groups = [scope.project_resource_group, scope.common_resource_group]
-            rows = azure.discover(groups, include_health_models=model_scope == "common")
-            resources = planner.parse_resources(rows)
-            known = {r.id.lower() for r in resources}
-            resources += [r for r in deployed_models if r.id.lower() not in known]
-            workspace = _workspace(args, resources)
-            plan = planner.build_plan(catalog, scope, resources, model_scope=model_scope, overrides=overrides,
-                                      log_analytics_workspace_id=workspace)
-            document = planner.bicep_parameters(plan, location=region, options=options)
-            summary = {**plan.summary(), "location": region, "locationReason": region_reason,
-                       "providerRegistration": "Registered" if registered else provider["registrationState"],
-                       "apiVersion": catalog["apiVersion"], "logAnalyticsWorkspace": workspace,
-                       "alertPolicy": {**DEFAULT_ALERT_POLICY, **options.get("alertPolicy", {})},
-                       "azureWritesPerformed": False}
-            work.mkdir(exist_ok=True)
-            parameters = work / f"{plan.model_name}.parameters.json"
-            parameters.write_text(json.dumps(document), encoding="utf-8")
-            if args.command == "plan":
-                if args.what_if:
-                    summary["whatIf"] = (azure.what_if(plan.home_resource_group, TEMPLATE, parameters) if registered
-                                         else "skipped: Microsoft.CloudHealth is not registered")
-            else:
-                name = f"aifactory-{plan.model_name}"[:64]
-                azure.deploy(name, plan.home_resource_group, TEMPLATE, parameters)
-                model_id = (f"/subscriptions/{scope.subscription_id}/resourceGroups/{plan.home_resource_group}"
-                            f"/providers/Microsoft.CloudHealth/healthmodels/{plan.model_name}")
-                summary.update(azureWritesPerformed=True, deploymentName=name, healthModelId=model_id)
-                client = HealthModelClient(model_id, azure.transport)
-                if args.prune:
-                    summary["pruned"] = prune(client, plan)
-                if not args.no_annotate:
-                    annotate(client, plan)
-                deployed_models += planner.parse_resources([{
-                    "id": model_id, "name": plan.model_name, "type": "microsoft.cloudhealth/healthmodels",
-                    "resourceGroup": plan.home_resource_group, "kind": "", "tags": {}}])
-            results.append(summary)
-    finally:
-        shutil.rmtree(work, ignore_errors=True)
-    report = {"mode": args.command, "models": results}
+    if args.inventory:
+        if args.command != "plan":
+            raise ValueError("--inventory plans offline; deploy needs Azure access.")
+        infrastructure = OfflineInfrastructure.from_file(args.inventory, subscription_id=scope.subscription_id,
+                                                         tenant_id=scope.tenant_id)
+    else:
+        infrastructure = AzureCliInfrastructure(scope.subscription_id, runner=az or _default_az(), sleep=sleep)
+    settings = Settings(subscription_id=scope.subscription_id, tenant_id=scope.tenant_id,
+                        read_only=args.command == "plan", definitions_dirs=definition_dirs(args), sleep=sleep)
+    services = create_services(settings, infrastructure=infrastructure, configure=configure)
+    models = selected_models(args, services.get(DefinitionRegistry))
+    request = RunRequest(
+        mode=args.command, scope=scope, models=tuple(models), overrides=overrides, options=options,
+        health_model_location=args.health_model_location, what_if=args.what_if,
+        register_provider=args.register_provider, prune=args.prune, annotate=not args.no_annotate,
+        log_signals=args.log_signals, workspace_id=args.log_analytics_workspace_id,
+        work_root=Path(args.consumer_root or os.getcwd()),
+        run_id=os.environ.get("BUILD_BUILDID") or os.environ.get("GITHUB_RUN_ID") or "local")
+    report = services.get(HealthModelService).run(request)
     print(json.dumps(report, indent=2, default=sorted))
     if args.command == "plan":
-        print("PLAN ONLY: no Azure writes. 'deploy' creates/updates the health model, its entities, "
+        print("PLAN ONLY: no Azure writes. 'deploy' creates/updates the health model(s), their entities, "
               "relationships, alert settings and Monitoring Reader role assignments.")
     return report
 
 
-def prune(client, plan) -> dict:
-    stale = client.stale_managed({e.name for e in plan.entities}, {r["name"] for r in plan.relationships})
-    for name in stale["relationships"]:
-        client.delete_relationship(name)
-    for name in stale["entities"]:
-        client.delete_entity(name)
-    return stale
-
-
-def annotate(client, plan) -> None:
-    run_id = os.environ.get("BUILD_BUILDID") or os.environ.get("GITHUB_RUN_ID") or "local"
-    try:
-        client.add_annotation("root", {"event": "aifactory-healthmodel-deployment", "tool": f"aifactory-healthmodel {__version__}",
-                                       "resources": str(len([e for e in plan.entities if e.role == "resource"])),
-                                       "run": run_id[:256]},
-                              f"AI Factory health model {plan.model_name} deployed or refreshed.")
-    except HealthModelError as error:
-        print(f"WARNING: deployment annotation skipped ({error.code}).", file=sys.stderr)
+def list_models(args) -> dict:
+    registry = build_registry(definition_dirs(args))
+    for item in args.model:
+        _resolve_model(registry, item)
+    report = {"tool": f"aifactory-healthmodel {__version__}",
+              "definitions": [definition.describe() for definition in registry.definitions()]}
+    print(json.dumps(report, indent=2))
+    return report
 
 
 def add_scope_arguments(parser: argparse.ArgumentParser) -> None:
@@ -218,10 +182,20 @@ def add_scope_arguments(parser: argparse.ArgumentParser) -> None:
         explicit.add_argument(f"--{name}", default=None)
 
 
+def add_definition_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--model", action="append", default=[], metavar="KEY_OR_FILE",
+                        help="Model definition key (for example agents) or definition JSON file; repeat for more.")
+    parser.add_argument("--definitions-dir", action="append", default=[], metavar="DIR",
+                        help="Folder with more model definitions (*.json); later folders override earlier keys. "
+                             "<folder of --variables-json>/healthmodels is loaded automatically when it exists.")
+
+
 def add_deploy_arguments(parser: argparse.ArgumentParser) -> None:
     add_scope_arguments(parser)
-    parser.add_argument("--scope", choices=("project", "common", "all"), default="project",
-                        help="project RG model, common RG model, or both (common nests the project model).")
+    add_definition_arguments(parser)
+    parser.add_argument("--scope", choices=tuple(SCOPES), default=None,
+                        help="Built-in models: project RG, common RG or both (common nests the project models). "
+                             "Default: project, or none when --model is given.")
     parser.add_argument("--health-model-location", default=None, help="Override the health model region.")
     parser.add_argument("--overrides", default=None, help="JSON file with signal/profile overrides.")
     parser.add_argument("--alert-policy", default=None, help="JSON file with alert severities (empty disables).")
@@ -241,13 +215,18 @@ def parse_args(argv=None):
     plan = commands.add_parser("plan", help="Read-only discovery and rendered model summary.")
     add_deploy_arguments(plan)
     plan.add_argument("--what-if", action="store_true", help="Also run an ARM what-if (read-only).")
+    plan.add_argument("--inventory", default=None,
+                      help="Plan offline from a saved Resource Graph inventory (JSON rows) instead of Azure.")
     deploy = commands.add_parser("deploy", help="Deploy or refresh the health model(s).")
     add_deploy_arguments(deploy)
     deploy.add_argument("--register-provider", action="store_true", help="Register Microsoft.CloudHealth if needed.")
     deploy.add_argument("--prune", action="store_true", help="Delete stale entities/relationships created by this tool.")
     deploy.add_argument("--no-annotate", action="store_true", help="Skip the deployment annotation on the root entity.")
+    models = commands.add_parser("models", help="List and validate the model definitions.")
+    add_definition_arguments(models)
     args = parser.parse_args(argv)
-    for name, default in (("what_if", False), ("register_provider", False), ("prune", False), ("no_annotate", False)):
+    for name, default in (("what_if", False), ("register_provider", False), ("prune", False), ("no_annotate", False),
+                          ("inventory", None)):
         if not hasattr(args, name):
             setattr(args, name, default)
     return args

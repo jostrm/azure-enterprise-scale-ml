@@ -120,6 +120,34 @@ def test_summary_lists_parents_that_fail_through_their_own_signals(model_routes)
     assert summary["problems"][0]["signals"][0]["name"] == "pipeline-smoke-test"
 
 
+def test_summary_explains_a_root_failing_through_its_own_external_report(model_routes):
+    routes, entities = model_routes
+    root = entity(NAME, "Unhealthy", display="AI Factory project 001 (dev)")
+    root["properties"]["signalGroups"]["external"] = {"signals": [signal("synthetic-probe", "Unhealthy", 0)]}
+    healthy = [entity(e["name"], "Healthy", display=e["properties"]["displayName"]) for e in entities[1:]]
+    routes[("GET", f"{MODEL_ID}/entities")] = {"value": [root, *healthy]}
+    summary = client_with(routes).summary()
+    assert [p["name"] for p in summary["problems"]] == [NAME]
+    assert summary["problems"][0]["signals"][0]["name"] == "synthetic-probe"
+    assert summary["problems"][0]["path"] == ["AI Factory project 001 (dev)"]
+
+
+def test_set_entity_alerts_keeps_existing_action_groups_and_description(model_routes):
+    _, entities = model_routes
+    group = f"/subscriptions/{SUB}/resourceGroups/{RG}/providers/microsoft.insights/actionGroups/ag-deployed"
+    current = json.loads(json.dumps(entities[1]))
+    current["properties"]["alerts"] = {"unhealthy": {"severity": "Sev2", "description": "Deployed text.",
+                                                     "actionGroupIds": [group]}}
+    routes = {("GET", f"{MODEL_ID}/entities/layer-genai"): current,
+              ("PUT", f"{MODEL_ID}/entities/layer-genai"): lambda body, query: body}
+    client = client_with(routes)
+    client.set_entity_alerts("layer-genai", unhealthy={"severity": "Sev1"})
+    assert client.transport.calls[-1][3]["properties"]["alerts"]["unhealthy"] == {
+        "severity": "Sev1", "description": "Deployed text.", "actionGroupIds": [group]}
+    client.set_entity_alerts("layer-genai", unhealthy={"severity": "Sev1", "actionGroupIds": []})
+    assert "actionGroupIds" not in client.transport.calls[-1][3]["properties"]["alerts"]["unhealthy"]
+
+
 def test_summary_surfaces_signal_errors_such_as_missing_rbac(model_routes):
     routes, entities = model_routes
     broken = signal("model-availability", "Unknown")

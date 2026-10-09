@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -150,6 +151,101 @@ def request_folder(request: dict[str, Any], purpose: str) -> str | None:
     return request.get("folder")
 
 
+def validate_project_selection(request: dict[str, Any], preview: dict[str, Any]) -> None:
+    """Bind automatic requests to concrete reviewed targets, not local selection."""
+    action = request.get("action")
+    if action not in {"add-project", "add-project-placements"}:
+        return
+    definition = request.get("project") if action == "add-project" else request
+    submitted = definition.get("placements", []) if isinstance(definition, dict) else []
+    automatic = [item for item in submitted if isinstance(item, dict)
+                 and item.get("scale_set_id") == "latest-successful"]
+    if not automatic:
+        return
+
+    def require(condition):
+        if not condition:
+            raise ConfigError("Automatic placement preview lacks consistent resolved target/evidence; prepare again on a supporting API.")
+
+    def identifier(value):
+        require(isinstance(value, str))
+        parsed = UUID(value)
+        require(parsed.int != 0 and str(parsed) == value)
+        return value
+
+    try:
+        require(type(preview.get("contract_version")) is int and preview["contract_version"] == 1
+                and preview.get("operation_mode") == "configuration"
+                and "latest-successful-placement-v1" in preview.get("capabilities", []))
+        require(not request.get("expected_revision") or preview.get("source_revision") == request["expected_revision"])
+        target = preview["target"]
+        require(identifier(target["id"]) == request["factory_id"] == preview["factory_id"])
+        project_id = identifier(preview["project_id"])
+        if action == "add-project-placements":
+            require(project_id == request["project_id"])
+        projects = [item for item in target["projects"] if item["id"] == project_id]
+        require(len(projects) == 1)
+        project = projects[0]
+        if action == "add-project":
+            require(project["number"] == request["project"]["number"])
+        selections = preview["resolved_placements"]
+        require(isinstance(selections, list) and len(selections) == len(automatic))
+        environments = [item["environment"] for item in automatic]
+        require(len(set(environments)) == len(environments))
+        require(sorted(item["environment"] for item in selections) == sorted(environments))
+        resolved = {}
+        for selected in selections:
+            require(selected["selector"] == "latest-successful"
+                    and selected["evidence_kind"] == "recorded-verified-common-deployment"
+                    and selected["factory_id"] == target["id"]
+                    and selected["environment"] in {"dev", "stage", "prod"}
+                    and selected["version_ref"] == target["version_ref"])
+            for key in ("scale_set_id", "tenant_id", "subscription_id", "job_id"):
+                identifier(selected[key])
+            if selected.get("deployment_object_id") is not None:
+                identifier(selected["deployment_object_id"])
+            require(re.fullmatch(r"[a-f0-9]{40}", selected["source_commit"])
+                    and re.fullmatch(r"[a-f0-9]{64}", selected["evidence_hash"]))
+            completed = datetime.fromisoformat(selected["completed_at"].replace("Z", "+00:00"))
+            require(completed.tzinfo is not None)
+            for key in ("writer_id", "auth_namespace"):
+                require(re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", selected[key]))
+            require(selected["orchestrator"] in {"gha", "ado"})
+            repository_pattern = (r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+                                  if selected["orchestrator"] == "gha" else
+                                  r"https://dev\.azure\.com/[A-Za-z0-9_.%-]+/[A-Za-z0-9_.%-]+/_git/[A-Za-z0-9_.%-]+")
+            require(re.fullmatch(repository_pattern, selected["repository"]))
+            scales = [item for item in target["scale_sets"] if item["id"] == selected["scale_set_id"]]
+            require(len(scales) == 1 and all(scales[0][key] == selected[key] for key in
+                                            ("environment", "tenant_id", "subscription_id", "orchestrator")))
+            resolved[selected["environment"]] = selected["scale_set_id"]
+        for placement in submitted:
+            expected = (resolved[placement["environment"]] if placement["scale_set_id"] == "latest-successful"
+                        else placement["scale_set_id"])
+            matches = [item for item in project["placements"] if item["environment"] == placement["environment"]]
+            require(len(matches) == 1 and matches[0]["scale_set_id"] == expected)
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise ConfigError("Automatic placement preview contains missing or malformed resolution evidence.") from None
+
+
+def validate_settings_selection(request: dict[str, Any], preview: dict[str, Any]) -> None:
+    """Require the server to acknowledge the selected scope and configuration mode."""
+    if request.get("action") != "configure-settings":
+        return
+    if (type(preview.get("contract_version")) is not int or preview["contract_version"] != 1
+            or preview.get("operation_mode") != "configuration"
+            or not isinstance(preview.get("target"), dict)
+            or preview["target"].get("id") != request.get("factory_id")
+            or not request.get("factory_id")
+            or any(key not in preview or preview[key] != request.get(key)
+                   for key in ("factory_id", "scale_set_id", "project_id"))
+            or not isinstance(preview.get("source_revision"), str)
+            or not re.fullmatch(r"[a-f0-9]{64}", preview["source_revision"])
+            or request.get("expected_revision") is not None
+            and preview["source_revision"] != request["expected_revision"]):
+        raise ConfigError("Settings preview must acknowledge the exact scope, revision and configuration-only mode; use a supporting API.")
+
+
 def validate_bindings(request: dict[str, Any], preview: dict[str, Any], purpose: str, operation: str) -> None:
     if purpose in {"catalog-confirm", "parameters-confirm"}:
         if type(request.get("contract_version")) is not int or request["contract_version"] != 1:
@@ -165,9 +261,12 @@ def validate_bindings(request: dict[str, Any], preview: dict[str, Any], purpose:
                 "scaleset-add": "create-scale-set", "project-add": "add-project",
                 "project-add-placements": "add-project-placements", "runtime-deploy": "deploy",
                 "enrollment-binding": "configure-binding",
+                "catalog-settings": "configure-settings",
             }
             if operation not in actions or request.get("action") != actions[operation]:
                 raise ConfigError("Receipt operation does not match the reviewed catalog action.")
+            validate_project_selection(request, preview)
+            validate_settings_selection(request, preview)
             if operation == "enrollment-binding":
                 if (not isinstance(request.get("binding"), dict) or preview.get("binding") != request["binding"]
                         or not isinstance(preview.get("target"), dict)

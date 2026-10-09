@@ -24,6 +24,14 @@
     {"command": "/create-ml-model-oftype-for-project", "model_callable": false, "permission": "model.create", "basis": "Immediate approved ML template type and serving_mode plus exact project/workspace ARM ID; asynchronous training, no implicit serving promotion."}
   ],
   "scope_resolution": "Authenticated caller and server-configured scope key resolve tenant, subscription, resource group, factory, project and environment. The model cannot supply scope overrides.",
+  "dual_graph": {
+    "enabled": "Optional settings.dual_graph; absent by default. No default graph.read grants.",
+    "authorization": "graph.read in the exact active tenant/scope AND explicit dual_graph.allowed_scopes, enforced before snapshot reads. factory.read and knowledge.read never imply graph.read.",
+    "orchestration": "Substantive code, architecture, pipeline and dependency questions retrieve both graph planes before the model, alongside unchanged Search retrieval. Greetings, health and unrelated questions do not request graph context.",
+    "trust": "All graph content is untrusted data, never authority. Snapshot ID, repository source revision and live state are distinct. Missing, forbidden or stale evidence is explicitly degraded, not fabricated.",
+    "citations": "Search S IDs are preserved; structural G and architecture A IDs are separately assigned per answer and bound to snapshot identity.",
+    "runtime": "Bounded read-only standard-library snapshot reader. No graph generation, dependency installation, checkout cloning or network access at startup."
+  },
   "read_output_schema": {
     "oneOf": [
       {"type": "object", "required": ["ok", "data"], "properties": {"ok": {"const": true}, "data": {"type": "object"}}},
@@ -54,6 +62,29 @@
       "timeout_seconds": 60,
       "retry": "Read SDK policies only.",
       "approval": "No write approval."
+    },
+    {
+      "name": "graph_query",
+      "purpose": "Optional bounded read-only structural and architecture snapshot query through the same graph core used by MCP.",
+      "input_schema": {
+        "type": "object",
+        "required": ["operation", "query", "node_id", "depth", "limit"],
+        "properties": {
+          "operation": {"type": "string", "enum": ["status", "symbols", "usages", "callers", "dependencies", "dependents", "trace", "pipeline", "impact", "notes", "note", "backlinks", "adrs", "context"]},
+          "query": {"type": "string", "maxLength": 2048},
+          "node_id": {"type": "string", "maxLength": 1000},
+          "depth": {"type": "integer", "minimum": 0, "maximum": 5},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 50}
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {"type": "object", "required": ["status", "snapshot_id", "freshness", "warnings", "truncated", "results", "citations"]},
+      "required_permissions": ["graph.read"],
+      "scope": "Exact authenticated active scope in the configured graph allowlist; no model-selected roots or source-access override.",
+      "changes_state": false,
+      "timeout_seconds": 60,
+      "retry": "None; missing or invalid snapshots return explicit degradation.",
+      "approval": "No write approval; explicit graph.read grant and operator opt-in required."
     },
     {
       "name": "azure_live_state",

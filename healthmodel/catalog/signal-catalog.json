@@ -1,11 +1,7 @@
 {
   "schemaVersion": 1,
   "apiVersion": "2026-09-01-preview",
-  "description": "AI Factory health signal catalog. Each profile classifies one Azure resource type (optionally by kind or hierarchical namespace) and lists curated Azure Monitor platform-metric signals. Thresholds are defaults; override them per deployment with signal overrides.",
-  "projectSharedProfiles": [
-    "loganalytics",
-    "adls-gen2"
-  ],
+  "description": "AI Factory health signal catalog. Each profile classifies one Azure resource type (optionally by kind or hierarchical namespace) and lists curated Azure Monitor platform-metric signals. Thresholds are defaults; override them per deployment with signal overrides. Which resources a model contains is declared by the model definitions in ../definitions.",
   "commonResourceFlags": [
     "enableAdminVM",
     "enableDatafactoryCommon"

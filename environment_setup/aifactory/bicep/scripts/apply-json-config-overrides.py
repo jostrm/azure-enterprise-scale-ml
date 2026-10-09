@@ -18,6 +18,16 @@ VARIABLE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 VARIABLE_ALIASES = {
     "aifactory-dash-01": "AIFACTORY_DASHBOARD_URL",
     "scaling-mode": "SCALING_MODE",
+    "ENABLE_PERSONAS": "enablePersonas",
+    "ENABLEPERSONAS": "enablePersonas",
+}
+CONFIGURATION_ALIASES = {
+    "acrIpWhitelist": "acr_IP_whitelist",
+    "admin_username": "adminUsername",
+    "ENABLEPERSONAS": "enablePersonas",
+    "ENABLE_PERSONAS": "enablePersonas",
+    "PERSONA_ACCESS_MODE": "persona_access_mode",
+    "PERSONA_ACCESS_MANIFEST": "persona_access_manifest",
 }
 GITHUB_IDENTITY_OUTPUTS = {
     "AZURE_CLIENT_ID": "azure_client_id",
@@ -93,11 +103,11 @@ def serialize(value: Any, variable_name: str) -> str:
 
 
 def selected_values(config: dict[str, Any], environment: str) -> tuple[dict[str, str], str]:
-    supported_keys = {"dev", "stage_prod", "_wizard"}
+    supported_keys = {"dev", "stage_prod", "test", "prod", "_wizard"}
     unknown_keys = set(config).difference(supported_keys)
     if unknown_keys:
         fail(
-            "The root object supports only 'dev', 'stage_prod' and '_wizard'; found "
+            "The root object supports only 'dev', 'stage_prod', 'test', 'prod' and '_wizard'; found "
             + ", ".join(sorted(unknown_keys))
             + "."
         )
@@ -106,10 +116,22 @@ def selected_values(config: dict[str, Any], environment: str) -> tuple[dict[str,
     # baseline for all environments. Stage/Prod applies its explicit overrides
     # on top of that baseline, so shared OIDC identity selectors and settings
     # are never accidentally omitted from the later environment deployments.
-    dev_values = read_object(config.get("dev", {}), "dev")
+    def canonical_values(section_name: str) -> dict[str, Any]:
+        result = dict(read_object(config.get(section_name, {}), section_name))
+        # Established canonical values win over obsolete duplicate wizard aliases.
+        for alias, canonical in CONFIGURATION_ALIASES.items():
+            if alias in result:
+                result.setdefault(canonical, result.pop(alias))
+        return result
+
+    dev_values = canonical_values("dev")
     section = "stage_prod" if environment != "dev" and "stage_prod" in config else "dev"
-    section_values = read_object(config.get(section, {}), section)
+    section_values = canonical_values(section)
     values = {**dev_values, **section_values} if section == "stage_prod" else dev_values
+    exact_environment = "test" if environment == "stage" else environment
+    if exact_environment != "dev" and exact_environment in config:
+        values = {**values, **canonical_values(exact_environment)}
+        section = exact_environment
     serialized: dict[str, str] = {}
     for name, value in values.items():
         if name in METADATA_KEYS:
@@ -186,7 +208,7 @@ def github_runtime_names(workflow_file: str | None) -> dict[str, set[str]]:
 
     mappings: dict[str, set[str]] = {}
     for line in path.read_text(encoding="utf-8").splitlines():
-        target = re.match(r"^\s{6}([A-Za-z_][A-Za-z0-9_]*):\s+\$\{\{", line)
+        target = re.match(r"""^\s{6}([A-Za-z_][A-Za-z0-9_]*):\s+["']?\$\{\{""", line)
         if not target:
             continue
         for source in re.findall(r"vars\.([A-Z][A-Z0-9_]*)", line):
@@ -232,6 +254,31 @@ def main() -> None:
 
     environment = args.environment
     values, section = selected_values(read_object(config, "root"), environment)
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from personas.pipeline import access_mode, configuration, mode_variables, safe_variables
+    try:
+        mode = access_mode(values)
+    except ValueError as error:
+        fail(str(error))
+    if mode == "groups-v1":
+        effective_environment = "test" if environment == "stage" else environment
+        values["dev_test_prod"] = effective_environment
+        for destination, source in (
+            ("dev_test_prod_sub_id", f"{effective_environment}_sub_id"),
+            ("admin_bicep_input_keyvault_subscription", f"{effective_environment}_admin_bicep_input_keyvault_subscription"),
+            ("admin_bicep_kv_fw_rg", f"{effective_environment}_admin_bicep_kv_fw_rg"),
+            ("admin_bicep_kv_fw", f"{effective_environment}_admin_bicep_kv_fw"),
+        ):
+            if source in values:
+                values[destination] = values[source]
+    try:
+        mode, manifest = configuration(values, environment, Path.cwd())
+        if any(key in values for key in ("enablePersonas", "persona_access_mode", "PERSONA_ACCESS_MODE")):
+            values.update(mode_variables(mode))
+        if manifest is not None:
+            values.update(safe_variables(values))
+    except (ValueError, OSError, KeyError) as error:
+        fail(str(error))
     network_environment_key = {
         "dev": "network_env_dev",
         "stage": "network_env_stage",

@@ -1,134 +1,115 @@
-# Configuration and API
+# Parameters: configure your factory
 
-Keep each project's complete configuration together. The current JSON format has
-two sections: **`dev`** and **`stage_prod`**. It includes shared settings,
-environment-specific choices, all three subscription IDs, and factory/project
-naming. GitHub Actions `.env` and Azure DevOps `variables.yaml` remain supported;
-their names are not always identical.
+**Parameters** are the settings called variables in `variables.json`, ADO
+`variables.yaml` and GitHub `.env` files. Use this section to find the correct
+name, value and dependency for the route you are using.
 
-| Reference | Use |
-|---|---|
-| [Standard parameters](standard.md) | Required and conditional setup inputs |
-| [All variables](advanced.md) | Current configuration keys, route-specific names, defaults and guidance |
-| [GitHub Actions](../orchestrators/gh.md) | Create/update scripts and workflow configuration |
-| [Azure DevOps](../orchestrators/ado.md) | Create/update scripts and service connections |
+| What you need | Open |
+| --- | --- |
+| Start configuring a registered factory | [CLI, Python SDK or REST tutorial](../factory-tools/18-cli-and-api-and-usage.md) |
+| Know which inputs to collect | [Required inputs](standard.md) |
+| Look up an exact key, default or format mapping | [All parameters](advanced.md) |
+| Change settings and deploy separately | [Add and update](../factory-tools/19-cli-and-api-and-usage.md) |
+| Remove an override, draft or Azure resource | [Remove and recover](../factory-tools/20-cli-and-api-and-usage.md) |
 
-## One project, all environments
+!!! important "A saved setting is not a deployment"
+    Review and save your configuration first. Deployment needs a separate
+    approved operation. Turning a flag off or removing a parameter override
+    is not a general resource-deletion instruction.
 
-```text
-project006\
-  project_state.json
-  variables.json
-```
+## Recommended: let the registered-factory tools save settings
 
-`project_state.json` is the configuration API's saved editor state.
-`variables.json` is the pipeline configuration. Do not pass editor-only state keys
-directly to a pipeline. The following is a **structural excerpt**, not a complete
-deployable configuration:
+For a registered factory, read the available settings and choose the exact
+factory/project/environment before editing. Use the named CLI or SDK helpers,
+or the matching REST request.
 
-```json
-{
-  "dev": {
-    "project_number_000": "006",
-    "admin_aifactoryPrefixRG": "team-",
-    "admin_aifactorySuffixRG": "-001",
-    "dev_sub_id": "<dev-subscription-id>",
-    "test_sub_id": "<stage-subscription-id>",
-    "prod_sub_id": "<prod-subscription-id>"
-  },
-  "stage_prod": {
-    "project_number_000": "006",
-    "admin_aifactoryPrefixRG": "team-",
-    "admin_aifactorySuffixRG": "-001",
-    "dev_sub_id": "<dev-subscription-id>",
-    "test_sub_id": "<stage-subscription-id>",
-    "prod_sub_id": "<prod-subscription-id>"
-  }
-}
-```
+| Task | CLI | Python SDK | REST |
+| --- | --- | --- | --- |
+| Read editable settings | `catalog settings` | `catalog_settings(...)` | `GET /api/v1/factory-catalog/settings` |
+| Prepare setting replacements | `catalog configure-settings` | `catalog_settings_prepare(...)` | `POST /api/v1/factory-catalog/prepare`, action `configure-settings` |
+| Save reviewed replacements | `catalog confirm` | `catalog_confirm(...)` | `POST /api/v1/factory-catalog/confirm` |
+| Read deployed-template parameter choices | `parameters get` | `catalog_parameters(...)` | `GET /api/v1/factory-catalog/parameters` |
+| Prepare typed parameter changes | `parameters prepare` | `parameter_prepare(...)` | `POST /api/v1/factory-catalog/parameters/prepare` |
+| Save reviewed parameter changes | `parameters confirm` | `parameter_confirm(...)` | `POST /api/v1/factory-catalog/parameters/confirm` |
 
-Dev execution selects `dev`; Stage and Prod select `stage_prod` and their
-respective subscription. The shared Stage/Prod section must represent both
-environments consistently. Changing a subscription reference does not create or
-move a subscription. Changing networking in a file does not migrate a deployed VNet.
+These are command/method names, not complete examples. The
+[tool-specific tutorial](../factory-tools/19-cli-and-api-and-usage.md) provides
+full examples with required inputs and separate confirmation.
 
-Use the full [JSON template](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/variables.json)
-as the field reference and preserve its property names and value types. That
-raw source template currently contains only `dev`; generated project configuration
-has both sections. See [the exact format distinction](advanced.md#scope-and-authoritative-sources).
-Route adapters translate JSON
-into the pipeline's expected variables. Updating `.env`, YAML and JSON separately
-can leave conflicting settings: choose the intended input explicitly for each run.
-Never commit populated credentials, protected artifacts or private configuration.
+The API writes the registered project files. Do not hand-edit `register.json`,
+review files or generated project exports to bypass validation. Changing a
+factory default does not necessarily change an existing project's saved settings.
 
-### Optional project organizational ownership
+## Dev, Stage and Prod
 
-`org-department-name` and `org-department-id` are optional project metadata, both
-defaulting to `""`. Keep the same values in `dev` and `stage_prod` within that
-project's full `variables.json`; conflicting values require explicit correction.
-Older configurations without either key remain supported. Neither field inherits
-from the factory or another project, and neither changes cost center, identity,
-authentication or authorization. The name accepts Unicode plain text (up to 200
-characters); the ID is a string (up to 128 characters), not necessarily a GUID.
-Control characters are not allowed.
+A generated registered project's `variables.json` has `dev` and `stage_prod`
+sections. Stage and Prod use their own selected subscriptions but share the
+Stage/Prod settings section. Review both environments before changing shared
+values. A placement selects a real registered scale set; it does not create a
+subscription or move deployed resources.
 
-JSON and YAML retain these exact hyphenated keys. Shell `.env` uses
-`ORG_DEPARTMENT_NAME` and `ORG_DEPARTMENT_ID`; quote values as shell literals.
-These fields are configuration metadata only, not automatically written to Azure
-resource tags. Existing cost-center tags and department tag aliases remain separate.
+The checked-in [shared JSON template](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/aifactory/variables.json)
+currently contains **`dev` only**, including paired Dev/StageProd fields.
+It is a template reference, not the full registered project's storage format.
 
-## API layer
+## Feature choices to review together
 
-An API-enabled installation exposes configuration, validation and reviewed
-operations independently of the calling application. The default local endpoint
-is `http://127.0.0.1:8765`; deployed host ports may differ.
+| Area | Parameters and guidance |
+| --- | --- |
+| Private Foundry agents | Review `enableAIFoundry`, `enableAFoundryCaphost`, Search, Cosmos DB and Storage dependencies together. A simple preset and raw template defaults are not interchangeable. |
+| Network and DNS | Select your address plan and whether DNS/network services are standalone, factory-owned or provided centrally. Flags alone do not establish private access. |
+| Models and compute | Choose the version, SKU and capacity supported in the selected region/subscription. A default is not reserved capacity. |
+| MCP and gateways | Factory MCP, dedicated AI Gateway, regular APIM/Kong and Application Gateway are distinct choices. See [the current parameter guide](advanced.md#mcp-and-ai-gateway-parameters). |
+| Access | Existing group/object IDs, managed identities, role assignments and secret-name references have different meanings. Do not put credential values in these files. |
+| Deletion | Use the separate reviewed removal flow; ordinary settings replacements cannot request arbitrary destructive actions. |
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /health` | Public process health; not Azure deployment status |
-| `GET /docs` and `/openapi.json` | Running API's interactive reference and exact request schemas |
-| `GET /api/v1/schema` | Configuration keys, defaults and choices; not the OpenAPI document |
-| `POST /api/v1/import` | Import JSON, YAML or `.env` into configuration state |
-| `POST /api/v1/validation` | Validate supplied current-project state without saving or deploying |
-| `POST /api/v1/export` | Render JSON, YAML or `.env`; a requested output path writes a file |
-| `POST /api/v1/projects/save` | Save project configuration; pipeline-variable writes are explicit |
-| `GET /api/v1/creation/capabilities` | Supported create launchers and typed bootstrap fields |
-| `POST /api/v1/creation/bootstrap/prepare` | Review common-infrastructure plus initial-project creation |
-| `POST /api/v1/creation/bootstrap/start` | Execute the reviewed bootstrap confirmation |
-| `/api/v1/operations/project-deployments/plan`, `/prepare`, `/start` | Save a deployment draft, review it, then explicitly execute |
+## Optional project ownership labels
 
-All `/api/v1/*` requests require `X-API-Key`, configured on the host through
-`AIFACTORY_API_KEY`. Execution additionally requires the appropriate host identity,
-permissions, tools and current published scripts. Use the live OpenAPI schemas:
-configuration `state`, a bootstrap `config`, and a pipeline `variables.json` are
-different request formats, not interchangeable objects.
+`org-department-name` and `org-department-id` describe who owns a project. Both
+default to an empty string. Keep them consistent across that project's
+environments. They do not grant permissions, change identity or automatically
+write Azure resource tags.
 
-Preparation is not execution. Keep the returned confirmation tied to its exact
-factory, project, environment and version; changed or expired inputs need a fresh
-review. Poll the returned job ID rather than blindly retrying a start request.
-Address-planning findings are advisory; authentication, identity, schema and
-execution prerequisites remain separate.
+<details markdown="1">
+<summary>More info</summary>
 
-## Two common workflows
+The name supports plain Unicode text up to 200 characters; the ID is a string
+up to 128 characters, not necessarily a GUID. Control characters are rejected.
+JSON/YAML use the hyphenated names; `.env` uses `ORG_DEPARTMENT_NAME` and
+`ORG_DEPARTMENT_ID`. Read/edit them at project scope, not as an inherited factory
+label.
 
-- **ITSM-integrated:** ServiceNow, Jira Service Management or an internal portal
-  can call the API through a trusted automation runner: import/configure,
-  validate, prepare, apply the organization's approval policy, execute and track
-  the job. Unattended execution requires pre-established authentication and all
-  required inputs; an incoming ticket alone is not deployment authorization.
-- **Core-team managed:** The core team maintains the project configuration and
-  runs the appropriate [GHA](../orchestrators/gh.md) or
-  [ADO](../orchestrators/ado.md) create/update Bash launcher on the team's behalf.
+The [generated reference](advanced.md#source-coverage) reads shared repository
+templates, not a customer's files. It lists actual assigned values and explicit
+format mappings. A template-only field may still be rejected by an older API.
+The selected host's `/api/v1/schema` describes editor fields; `/openapi.json`
+describes HTTP requests; `parameters get` describes the selected published
+deployment templates. These are different schemas.
 
-!!! warning "API access"
-    The local API is loopback-scoped, not a public ITSM endpoint. Do not expose
-    its port or put API keys in URLs. Use an authenticated integration on the
-    intended execution host, with protected secret storage and least privilege.
+</details>
 
-## Template guidance
+<details markdown="1">
+<summary>Alternative and Legacy ways</summary>
 
-Source comments use `<mandatory>`, `<optional>`, `<default>`, `<ensure>`,
-`<recommended>`, `<keep-as-is>` and `<otherwise>` tags. Requirements can be
-conditional on a selected feature; template defaults are not proof of deployment
-readiness. Consult the generated [complete reference](advanced.md) for the exact
-source values and differences between formats.
+For a consumer-owned legacy JSON file, you may edit the exact input used by its
+pipeline. Preserve other keys, value types and environments, and review the
+effective result. Updating `.env`, YAML and JSON independently can create
+conflicting inputs; remote GitHub variables have their own publication step.
+
+Legacy `config review/save` and `ConfigurationDraft` preserve a persistent JSON
+project's source information. They are not registered catalog save commands.
+The legacy HTTP routes include `/api/v1/projects/load`, `/api/v1/import`,
+`/api/v1/validation`, `/api/v1/export` and `/api/v1/projects/save`.
+Export can write a host-local file when a path is supplied; it does not deploy.
+
+The pipeline JSON reader can overlay `dev`, `stage_prod`, then exact `test` or
+`prod` sections. That entry-point-specific behavior does not permit adding those
+sections to a registered project snapshot. See the
+[file-first versus wrapper-first guidance](../factory-tools/18-cli-and-api-and-usage.md#choose-how-to-author-configuration-file-first-or-wrapper-first).
+
+The API is an administrative service with local-host restrictions, not a public
+ticket-system endpoint. Keep keys on an approved backend/worker, not in browser
+JavaScript. Authentication, Azure/provider permissions and operation approval
+remain separate.
+
+</details>
