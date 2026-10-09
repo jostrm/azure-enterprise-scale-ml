@@ -40,7 +40,7 @@ Receipt IDs alone are not absence observations; even completed resume rechecks
 absence, and resources recorded removed are reobserved before further deletion.
 The API must submit the complete factory cohort frozen by its catalog review;
 individual lifecycle manifests do not enumerate other registered environments.
-Protected/shared/bootstrap/platform/VPN resources and reusable hubs are retained;
+Protected/shared/bootstrap/platform/VPN/Bastion resources and reusable hubs are retained;
 an explicitly protected selected ID, ambiguous ownership, unmanaged dependency,
 or overlapping mutable snapshots blocks rather than broadening deletion.
 

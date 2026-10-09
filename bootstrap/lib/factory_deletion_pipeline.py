@@ -59,7 +59,8 @@ def protected(body, explicit):
             or any(tags.get("aifactory." + name) == "true" for name in ("bootstrap", "platform", "protected", "reusable"))
             or (kind == "microsoft.machinelearningservices/workspaces" and str(body.get("kind", "")).lower() == "hub")
             or kind in {"microsoft.network/virtualnetworkgateways", "microsoft.network/localnetworkgateways",
-                        "microsoft.network/vpngateways", "microsoft.network/vpnsites", "microsoft.network/connections"})
+                        "microsoft.network/vpngateways", "microsoft.network/vpnsites", "microsoft.network/connections",
+                        "microsoft.network/bastionhosts"})
 
 
 def validate_route(document):
