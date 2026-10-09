@@ -2924,7 +2924,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
-<td style="text-align: right;">90</td>
+<td style="text-align: right;">92</td>
 </tr>
 <tr>
 <td><code>helper</code></td>
@@ -8994,6 +8994,18 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"false"</code></td>
 <td>Aif no wait override; see create launcher.</td>
+</tr>
+<tr>
+<td><!-- parameter bootstrap:AIF_PERSONA_ACCESS_MANIFEST --><code>AIF_PERSONA_ACCESS_MANIFEST</code></td>
+<td>C</td>
+<td><code>""</code></td>
+<td>Repository-relative reviewed manifest for groups-v1; omission inherits saved configuration. Required for groups-v1 together with bootstrapped seeding records.</td>
+</tr>
+<tr>
+<td><!-- parameter bootstrap:AIF_PERSONA_ACCESS_MODE --><code>AIF_PERSONA_ACCESS_MODE</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>Explicit legacy or groups-v1 override; omission inherits saved persona settings, otherwise legacy.</td>
 </tr>
 <tr>
 <td><!-- parameter bootstrap:AIF_PREFIX --><code>AIF_PREFIX</code></td>
