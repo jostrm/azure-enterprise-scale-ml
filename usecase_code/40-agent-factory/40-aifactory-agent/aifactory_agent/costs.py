@@ -19,7 +19,7 @@ RETAIL = "https://prices.azure.com/api/retail/prices"
 API_VERSION = "2025-03-01"
 HOURS = Decimal(730)
 DEFAULT_VARIABLES_RELATIVE_PATH = Path("environment_setup") / "aifactory" / "variables.json"
-DEFAULT_VARIABLES_SHA256 = "7902bc9c6f1685b45dfdd0094e4441c76e13802507867addae1f64e01897f836"
+DEFAULT_VARIABLES_SHA256 = "c753b65634f80e9dc4f55323fb917448e3f57c11311e73bad6f09b748e4f3ec6"
 COST_SKILLS = (
     "/get-default-project-estimated-azure-idle-running-cost",
     "/get-aifactory-common-estimated-azure-idle-running-cost",

@@ -219,6 +219,8 @@ for names, text in (
      "Opt-in project001 Dev dedicated AI Gateway create/adopt integration. Requires Foundry and the component prerequisites. Not the regular APIM/Kong route. False skips the step; it does not delete existing resources."),
     (("addAIFactoryMCP2AIGatewaySKU", "ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU"),
      "Opt-in project001 Dev registration of the Factory MCP tool server on the AI Gateway. Requires both components, private outbound reachability and administrator-granted access. False skips registration; it does not delete existing resources."),
+    (("enableAIFactoryAgentLiveVoice", "ENABLE_AI_FACTORY_AGENT_LIVE_VOICE"),
+     "Opt-in project001 Dev live voice for the AI Factory Agent chat: deploys the private chat application with Azure Voice Live on the project Foundry account and a pulsing voice orb. Requires enableFactoryChatAgent (voice alone fails the step), Container Apps, Foundry and AI Search, an Entra single-page-app registration and read-only reader object IDs. False skips the step; it does not delete resources or remove roles."),
     (("enableDeleteForDisabledResources", "ENABLE_DELETE_FOR_DISABLED_RESOURCES"),
      "Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval."),
     (("deleteAllServicesForProject", "DELETE_ALL_SERVICES_FOR_PROJECT"),

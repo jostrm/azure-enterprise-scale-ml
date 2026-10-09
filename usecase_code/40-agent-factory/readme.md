@@ -519,6 +519,12 @@ hosts the governed AI Factory MCP and the new Azure AI Gateway SKU for project00
 (`enableAIFactoryMCP`, `enableAIGatewaySKU`, `addAIFactoryMCP2AIGatewaySKU`). Use its
 `deploy.py plan` for a GET-only preview; `false` never deletes resources.
 
+The separate, opt-in [47-aifactory-agent-live-voice](47-aifactory-agent-live-voice/readme.md) step
+deploys the private chat application with live voice (the pulsing voice orb) for project001 Dev
+when `enableAIFactoryAgentLiveVoice` is `true` next to `enableFactoryChatAgent`, which creates the
+Foundry Agent ([46-factory-chat-agent](46-factory-chat-agent/deploy.py)). Use its `deploy.py plan`
+for a GET-only preview; `false` never deletes resources.
+
 No infrastructure SKU, model deployment, service-enable flag, shared VM identity,
 or role assignment is changed implicitly. If infrastructure is missing, update
 the consumer's reviewed `enable...` values and use its

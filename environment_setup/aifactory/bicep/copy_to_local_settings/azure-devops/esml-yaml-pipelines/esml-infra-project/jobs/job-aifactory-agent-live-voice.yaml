@@ -1,0 +1,47 @@
+# AIFACTORY_PROJECT_DEPLOYMENT_CONTRACT=1
+# Opt-in live voice for the AI Factory Agent chat (project001 Dev): deploys the private chat application with Azure Voice
+# Live on top of the Foundry Agent created by 70-factory-chat-agent. A false flag skips this step; Stage/Prod and
+# non-001 runs are rejected or skipped by the launcher; it never deletes resources.
+parameters:
+  - name: serviceConnection
+    type: string
+  - name: phase
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    displayName: '72-aifactory-agent-live-voice'
+    condition: and(succeeded(), eq('${{ parameters.phase }}', 'foundry'), eq(variables['enableAIFactoryAgentLiveVoice'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['deleteAllForProject'], 'true'))
+    inputs:
+      azureSubscription: ${{ parameters.serviceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
+        python "$AIFACTORY_AGENT_REPOSITORY/usecase_code/40-agent-factory/47-aifactory-agent-live-voice/deploy.py" apply --apply
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+    env:
+      AIFACTORY_AGENT_REPOSITORY: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml'
+      enableFactoryChatAgent: '$(enableFactoryChatAgent)'
+      enableAIFactoryAgentLiveVoice: '$(enableAIFactoryAgentLiveVoice)'
+      enableContainerApps: '$(enableContainerApps)'
+      enableAIFoundry: '$(enableAIFoundry)'
+      enableAISearch: '$(enableAISearch)'
+      deleteAllServicesForProject: '$(deleteAllServicesForProject)'
+      deleteAllForProject: '$(deleteAllForProject)'
+      dev_test_prod_sub_id: '$(dev_test_prod_sub_id)'
+      tenantId: '$(tenantId)'
+      dev_test_prod: '$(dev_test_prod)'
+      project_number_000: '$(project_number_000)'
+      admin_location: '$(admin_location)'
+      admin_aifactoryPrefixRG: '$(admin_aifactoryPrefixRG)'
+      projectPrefix: '$(projectPrefix)'
+      admin_locationSuffix: '$(admin_locationSuffix)'
+      admin_aifactorySuffixRG: '$(admin_aifactorySuffixRG)'
+      projectSuffix: '$(projectSuffix)'
+      modelGPTXName: '$(modelGPTXName)'
+      aifactoryAgentEntraAppId: '$(aifactoryAgentEntraAppId)'
+      aifactoryAgentContainerAppsEnvironment: '$(aifactoryAgentContainerAppsEnvironment)'
+      aifactoryAgentReaderObjectIds: '$(aifactoryAgentReaderObjectIds)'
+      aifactoryAgentVoiceName: '$(aifactoryAgentVoiceName)'
+      aifactoryAgentVoiceLanguages: '$(aifactoryAgentVoiceLanguages)'

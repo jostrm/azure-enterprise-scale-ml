@@ -317,6 +317,7 @@ jobs:
       enableAzureMcpServer: ${{ vars.ENABLE_AZURE_MCP_SERVER || 'false' }}
       enableAIFactoryMCP: ${{ vars.ENABLE_AI_FACTORY_MCP || 'false' }}
       enableFactoryChatAgent: ${{ vars.ENABLE_FACTORY_CHAT_AGENT || 'false' }}
+      enableAIFactoryAgentLiveVoice: ${{ vars.ENABLE_AI_FACTORY_AGENT_LIVE_VOICE || 'false' }}
       enableAIGatewaySKU: ${{ vars.ENABLE_AI_GATEWAY_SKU || 'false' }}
       addAIFactoryMCP2AIGatewaySKU: ${{ vars.ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU || 'false' }}
       aifactoryMcpImage: ${{ vars.AIFACTORY_MCP_IMAGE || '' }}
@@ -325,6 +326,11 @@ jobs:
       aifactoryMcpContainerAppsEnvironment: ${{ vars.AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT || '' }}
       aiGatewaySkuResourceId: ${{ vars.AI_GATEWAY_SKU_RESOURCE_ID || '' }}
       aiGatewaySkuOutboundSubnetId: ${{ vars.AI_GATEWAY_SKU_OUTBOUND_SUBNET_ID || '' }}
+      aifactoryAgentEntraAppId: ${{ vars.AIFACTORY_AGENT_ENTRA_APP_ID || '' }}
+      aifactoryAgentContainerAppsEnvironment: ${{ vars.AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT || '' }}
+      aifactoryAgentReaderObjectIds: ${{ vars.AIFACTORY_AGENT_READER_OBJECT_IDS || '' }}
+      aifactoryAgentVoiceName: ${{ vars.AIFACTORY_AGENT_VOICE_NAME || '' }}
+      aifactoryAgentVoiceLanguages: ${{ vars.AIFACTORY_AGENT_VOICE_LANGUAGES || '' }}
       enableAppInsightsDashboard: ${{ vars.ENABLE_APPINSIGHTS_DASHBOARD || 'false' }}
       enableApplicationInsights: ${{ vars.ENABLE_APPLICATION_INSIGHTS || 'true' }}
       enableFunction: ${{ vars.ENABLE_FUNCTION || 'false' }}
@@ -4394,6 +4400,15 @@ jobs:
         run: |
           set -euo pipefail
           python3 "$MCP_GATEWAY_REPOSITORY/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py" apply --apply
+
+      - name: Deploy AI Factory Agent live voice (project001 Dev)
+        if: success() && inputs.phase == 'foundry' && env.enableAIFactoryAgentLiveVoice == 'true' && env.deleteAllServicesForProject != 'true' && env.deleteAllForProject != 'true'
+        shell: bash
+        env:
+          AIFACTORY_AGENT_REPOSITORY: ${{ github.workspace }}/azure-enterprise-scale-ml
+        run: |
+          set -euo pipefail
+          python3 "$AIFACTORY_AGENT_REPOSITORY/usecase_code/40-agent-factory/47-aifactory-agent-live-voice/deploy.py" apply --apply
 
       - name: Report final pipeline job result (offline)
         if: always()

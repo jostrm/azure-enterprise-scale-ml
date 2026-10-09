@@ -376,18 +376,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 381 |
-| `env` | 380 |
+| `yaml` | 387 |
+| `env` | 386 |
 | `bootstrap` | 90 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 384 |
+| `json.dev` | 390 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 149, 405; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 150, 406; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 407, 431; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 149, 412; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 150, 413; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 414, 438; one reference row.
 
 ## YAML and variables.json reference
 
@@ -435,6 +435,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:elasticType --><!-- parameter json.dev:elasticType -->`elasticType` | `ELASTIC_TYPE` | O | Y: `"ElasticCloud"`<br>J.dev: `"ElasticCloud"` | Elasticsearch deployment type otherwise: "SelfManagedOnAKS" (future support). |
 | <!-- parameter yaml:enableAFoundryCaphost --><!-- parameter json.dev:enableAFoundryCaphost -->`enableAFoundryCaphost` | `ENABLE_FOUNDRY_CAPHOST` | C | Y: `"true"`<br>J.dev: `"true"` | Enable the capability host for the selected standard private-agent architecture with its required Storage, Search and Cosmos DB dependencies. Other Foundry paths can have different requirements. |
 | <!-- parameter yaml:enableAIDocIntelligence --><!-- parameter json.dev:enableAIDocIntelligence -->`enableAIDocIntelligence` | `ENABLE_AI_DOC_INTELLIGENCE` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure AI Document Intelligence |
+| <!-- parameter yaml:enableAIFactoryAgentLiveVoice --><!-- parameter json.dev:enableAIFactoryAgentLiveVoice -->`enableAIFactoryAgentLiveVoice` | `ENABLE_AI_FACTORY_AGENT_LIVE_VOICE` | O | Y: `"false"`<br>J.dev: `"false"` | Opt-in project001 Dev live voice for the AI Factory Agent chat: deploys the private chat application with Azure Voice Live on the project Foundry account and a pulsing voice orb. Requires enableFactoryChatAgent (voice alone fails the step), Container Apps, Foundry and AI Search, an Entra single-page-app registration and read-only reader object IDs. False skips the step; it does not delete resources or remove roles. |
 | <!-- parameter yaml:enableAIFactoryCreatedDefaultProjectForAIFv2 --><!-- parameter json.dev:enableAIFactoryCreatedDefaultProjectForAIFv2 -->`enableAIFactoryCreatedDefaultProjectForAIFv2` | `ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2` | O | Y: `"true"`<br>J.dev: `"true"` | AI Factory default project for AIFv2 otherwise: false, Azure creates a default project with additional CosmosDB, Storage, AI Search, and connections. |
 | <!-- parameter yaml:enableAIFactoryHub --><!-- parameter json.dev:enableAIFactoryHub -->`enableAIFactoryHub` | `ENABLE_AI_FACTORY_HUB` | O | Y: `"false"`<br>J.dev: `false` | Own AI Factory Hub intent |
 | <!-- parameter yaml:enableAIFactoryMCP --><!-- parameter json.dev:enableAIFactoryMCP -->`enableAIFactoryMCP` | `ENABLE_AI_FACTORY_MCP` | O | Y: `"false"`<br>J.dev: `"false"` | Opt-in project001 Dev Factory MCP hosting through the matching project pipeline. Requires Foundry, Container Apps, approved image digests and an Entra application. False skips the step; it does not delete existing resources. |
@@ -515,6 +516,11 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:aiGatewaySkuResourceId --><!-- parameter json.dev:aiGatewaySkuResourceId -->`aiGatewaySkuResourceId` | `AI_GATEWAY_SKU_RESOURCE_ID` | O | Y: `""`<br>J.dev: `""` | Resource ID of an existing AI Gateway SKU to adopt (never modified) keep-as-is: Empty creates an owned gateway in the project resource group. |
 | <!-- parameter yaml:aiSearchLocation --><!-- parameter json.dev:aiSearchLocation -->`aiSearchLocation` | `AI_SEARCH_LOCATION` | O | Y: `""`<br>J.dev: `""` | AI Search region override. Empty keeps the project region; use another supported region only when regional Search capacity is unavailable. |
 | <!-- parameter yaml:aifactory-dash-01 --><!-- parameter json.dev:aifactory-dash-01 -->`aifactory-dash-01` | `AIFACTORY_DASHBOARD_URL` | O | Y: `""`<br>J.dev: `""` | Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard. |
+| <!-- parameter yaml:aifactoryAgentContainerAppsEnvironment --><!-- parameter json.dev:aifactoryAgentContainerAppsEnvironment -->`aifactoryAgentContainerAppsEnvironment` | `AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT` | O | Y: `""`<br>J.dev: `""` | Name of the internal project Container Apps environment hosting the agent chat keep-as-is: Empty selects the single environment in the project resource group. |
+| <!-- parameter yaml:aifactoryAgentEntraAppId --><!-- parameter json.dev:aifactoryAgentEntraAppId -->`aifactoryAgentEntraAppId` | `AIFACTORY_AGENT_ENTRA_APP_ID` | C | Y: `""`<br>J.dev: `""` | Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if enableAIFactoryAgentLiveVoice:'true'. Created once by an Entra admin: SPA redirect URI = the application's HTTPS root, Application ID URI api:// |
+| <!-- parameter yaml:aifactoryAgentReaderObjectIds --><!-- parameter json.dev:aifactoryAgentReaderObjectIds -->`aifactoryAgentReaderObjectIds` | `AIFACTORY_AGENT_READER_OBJECT_IDS` | C | Y: `""`<br>J.dev: `""` | Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in project001 Dev mandatory: if enableAIFactoryAgentLiveVoice:'true'. Write, delete and cost permissions are never granted by the pipeline. |
+| <!-- parameter yaml:aifactoryAgentVoiceLanguages --><!-- parameter json.dev:aifactoryAgentVoiceLanguages -->`aifactoryAgentVoiceLanguages` | `AIFACTORY_AGENT_VOICE_LANGUAGES` | O | Y: `""`<br>J.dev: `""` | Comma-separated speech input languages (BCP-47) for live voice keep-as-is: Empty uses en-US. Swedish needs an explicit entry such as sv-SE,en-US. Only read when enableAIFactoryAgentLiveVoice:'true'. |
+| <!-- parameter yaml:aifactoryAgentVoiceName --><!-- parameter json.dev:aifactoryAgentVoiceName -->`aifactoryAgentVoiceName` | `AIFACTORY_AGENT_VOICE_NAME` | O | Y: `""`<br>J.dev: `""` | Azure Speech voice used for spoken answers keep-as-is: Empty uses en-US-Ava:DragonHDLatestNeural. Only read when enableAIFactoryAgentLiveVoice:'true'. |
 | <!-- parameter yaml:aifactoryMcpApiImage --><!-- parameter json.dev:aifactoryMcpApiImage -->`aifactoryMcpApiImage` | `AIFACTORY_MCP_API_IMAGE` | C | Y: `""`<br>J.dev: `""` | Digest-pinned Factory API sidecar image mandatory: if enableAIFactoryMCP:'true'. Same format as aifactoryMcpImage. |
 | <!-- parameter yaml:aifactoryMcpContainerAppsEnvironment --><!-- parameter json.dev:aifactoryMcpContainerAppsEnvironment -->`aifactoryMcpContainerAppsEnvironment` | `AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT` | O | Y: `""`<br>J.dev: `""` | Name of the internal project Container Apps environment hosting the MCP keep-as-is: Empty selects the single environment in the project resource group. |
 | <!-- parameter yaml:aifactoryMcpEntraAppId --><!-- parameter json.dev:aifactoryMcpEntraAppId -->`aifactoryMcpEntraAppId` | `AIFACTORY_MCP_ENTRA_APP_ID` | C | Y: `""`<br>J.dev: `""` | Client ID (GUID) of the MCP API app registration exposing app role AiFactory.Mcp.Read mandatory: if enableAIFactoryMCP:'true'. Created once by an Entra admin; pipelines never write Microsoft Graph. |
@@ -833,6 +839,11 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ADMIN_PROJECT_TYPE -->`ADMIN_PROJECT_TYPE` | `admin_projectType` | O | `"all"` | Project service selection; matches JSON/YAML defaults. |
 | <!-- parameter env:ADMIN_SEMANTIC_SEARCH_TIER -->`ADMIN_SEMANTIC_SEARCH_TIER` | `admin_semanticSearchTier` | M | `"free"` | Semantic search tier mandatory: Semantic search tier |
 | <!-- parameter env:ADMIN_USERNAME -->`ADMIN_USERNAME` | `adminUsername` | O | `"esmladmin"` | VM admin username |
+| <!-- parameter env:AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT -->`AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT` | `aifactoryAgentContainerAppsEnvironment` | O | `""` | Name of the internal project Container Apps environment hosting the agent chat keep-as-is: Empty selects the single environment in the project resource group. |
+| <!-- parameter env:AIFACTORY_AGENT_ENTRA_APP_ID -->`AIFACTORY_AGENT_ENTRA_APP_ID` | `aifactoryAgentEntraAppId` | C | `""` | Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. Created once by an Entra admin: SPA redirect URI = the application's HTTPS root, Application ID URI api:// |
+| <!-- parameter env:AIFACTORY_AGENT_READER_OBJECT_IDS -->`AIFACTORY_AGENT_READER_OBJECT_IDS` | `aifactoryAgentReaderObjectIds` | C | `""` | Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in project001 Dev mandatory: if ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. Write, delete and cost permissions are never granted by the pipeline. |
+| <!-- parameter env:AIFACTORY_AGENT_VOICE_LANGUAGES -->`AIFACTORY_AGENT_VOICE_LANGUAGES` | `aifactoryAgentVoiceLanguages` | O | `""` | Comma-separated speech input languages (BCP-47) for live voice keep-as-is: Empty uses en-US. Swedish needs an explicit entry such as sv-SE,en-US. Only read when ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. |
+| <!-- parameter env:AIFACTORY_AGENT_VOICE_NAME -->`AIFACTORY_AGENT_VOICE_NAME` | `aifactoryAgentVoiceName` | O | `""` | Azure Speech voice used for spoken answers keep-as-is: Empty uses en-US-Ava:DragonHDLatestNeural. Only read when ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. |
 | <!-- parameter env:AIFACTORY_BRANCH_CHOSEN -->`AIFACTORY_BRANCH_CHOSEN` | `aifactory_branch_chosen` | O | `"release/v1.24"` | Submodule release branch |
 | <!-- parameter env:AIFACTORY_COMMON_ONLY_DEV_ENVIRONMENT -->`AIFACTORY_COMMON_ONLY_DEV_ENVIRONMENT` | No verified counterpart | O | `"true"` | Create common-DEV environment only otherwise: false, creates Dev, Stage, Prod environments in Azure. |
 | <!-- parameter env:AIFACTORY_DASHBOARD_URL -->`AIFACTORY_DASHBOARD_URL` | `aifactory-dash-01` | O | `""` | Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard. |
@@ -952,6 +963,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ENABLE_ADMIN_VM -->`ENABLE_ADMIN_VM` | `enableAdminVM` | O | `"false"` | Enable Admin VM in common RG |
 | <!-- parameter env:ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2 -->`ENABLE_AIFACTORY_CREATED_DEFAULT_PROJECT_FOR_AIFV2` | `enableAIFactoryCreatedDefaultProjectForAIFv2` | O | `"true"` | AI Factory default project for AIFv2 |
 | <!-- parameter env:ENABLE_AI_DOC_INTELLIGENCE -->`ENABLE_AI_DOC_INTELLIGENCE` | `enableAIDocIntelligence` | O | `"false"` | Enable Azure AI Document Intelligence |
+| <!-- parameter env:ENABLE_AI_FACTORY_AGENT_LIVE_VOICE -->`ENABLE_AI_FACTORY_AGENT_LIVE_VOICE` | `enableAIFactoryAgentLiveVoice` | O | `"false"` | Opt-in project001 Dev live voice for the AI Factory Agent chat: deploys the private chat application with Azure Voice Live on the project Foundry account and a pulsing voice orb. Requires enableFactoryChatAgent (voice alone fails the step), Container Apps, Foundry and AI Search, an Entra single-page-app registration and read-only reader object IDs. False skips the step; it does not delete resources or remove roles. |
 | <!-- parameter env:ENABLE_AI_FACTORY_HUB -->`ENABLE_AI_FACTORY_HUB` | `enableAIFactoryHub` | O | `"false"` | Own AI Factory Hub intent |
 | <!-- parameter env:ENABLE_AI_FACTORY_MCP -->`ENABLE_AI_FACTORY_MCP` | `enableAIFactoryMCP` | O | `"false"` | Opt-in project001 Dev Factory MCP hosting through the matching project pipeline. Requires Foundry, Container Apps, approved image digests and an Entra application. False skips the step; it does not delete existing resources. |
 | <!-- parameter env:ENABLE_AI_FOUNDRY -->`ENABLE_AI_FOUNDRY` | `enableAIFoundry` | C | `"true"` | Enable the current Foundry account/project path for the selected architecture. Check private-agent dependencies, model availability and the installed runtime; this setting is not a blanket GA or deployment-readiness claim. |
