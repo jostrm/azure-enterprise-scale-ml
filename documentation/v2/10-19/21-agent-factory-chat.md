@@ -42,6 +42,46 @@ flowchart LR
   D --> U[Your browser on the private network]
 ```
 
+## Connected to the Factory MCP
+
+The chat and the **AI Factory MCP** are two front doors to the same governed core, not two separate systems.
+
+| | Factory Agent chat | AI Factory MCP |
+|---|---|---|
+| Used by | People, in a browser (text or voice) | Agents and MCP clients, for example through the AI Gateway |
+| Sign-in | Entra user sign-in with exact-scope grants | Entra app role `AiFactory.Mcp.Read`, verified on every request |
+| Switched on by | `enableFactoryChatAgent` (voice: `enableAIFactoryAgentLiveVoice`) | `enableAIFactoryMCP` (gateway: `enableAIGatewaySKU`, `addAIFactoryMCP2AIGatewaySKU`) |
+
+- **Shared core.** Both run the same factory tools, skills and operation store, and the same dual knowledge graph
+  query core (next section), so a typed question, a spoken question and an MCP tool call see the same facts and obey
+  the same rules.
+- **Prepare, never approve.** A state-changing tool only prepares a bounded plan. Approving and executing it happen
+  outside the model, in chat and in the MCP alike.
+- **No network hop between them.** The chat does not call the MCP; it runs the same governed tools inside its own
+  app with its own sign-in. Deploy the MCP when other agents or tools (for example a Foundry agent behind the AI
+  Gateway) should reach the same tools. The chat works without it.
+
+## Connected to the dual knowledge graphs
+
+Before the model answers a substantive question about code, architecture, pipelines or dependencies, the chat can
+look it up in two local, read-only evidence sources:
+
+- a **structural graph** of the repository (what calls, configures and deploys what), extracted locally with Graphify;
+- an **architecture vault** of reviewed notes, contracts and decisions.
+
+That is how the agent can explain the **Factory IaC (Bicep), AI Factories, usecase code, the CLI, SDK and API, and
+ESML** with sources instead of from memory.
+
+- **Separate citations.** Search documents keep `[S1]` ids, structural graph results use `[G1]` and architecture
+  notes `[A1]`. The page shows which snapshot they came from and warns when context is missing, stale or unverified.
+- **Opt in and pinned.** Off by default. Add a `dual_graph` block with the reviewed snapshot id to the app
+  configuration and grant `graph.read` to the people who may use it (`knowledge.read` and `factory.read` do not imply
+  it). The pipeline step does not configure it; use the [operator flow](#b-operator-flow-existing-or-customized-app).
+- **One snapshot per app.** The app answers from the snapshot it was packaged with. UX apps such as the Config
+  Wizards live in their own repositories with their own graphs; they are not part of this repository's snapshot.
+- **Evidence, not proof.** Graph results help you navigate and explain intent; what is actually deployed comes from
+  live, authenticated factory calls. A spoken question gets the same graph context as a typed one.
+
 ## What you need first
 
 - An **AI Factory project001 Dev** with Foundry (`enableAIFoundry`), AI Search (`enableAISearch`) and an
@@ -87,6 +127,16 @@ azurefactory config review --folder C:\factory --project-number 001 `
   --enable-factory-chat-agent true --enable-aifactory-agent-live-voice true `
   --aifactory-agent-entra-app-id <client-id> --aifactory-agent-reader-object-ids <object-id>
 ```
+
+Where the settings live in the wizards (Simple Mode and the exported `variables.json`, `variables.yaml` and `.env`
+carry the same seven settings side by side):
+
+- **ESAIF ConfigWizard (MAUI app):** step 6, **AI Factory Agent chat & live voice**, right after *MCP & AI Gateway*,
+  and the same section in the Simple Mode card. A flag without its prerequisites stops the review with a plain reason;
+  a malformed voice input stops it only while voice is on.
+- **AIFactory Config Wizard (Tkinter, v0.47.24):** the section **AI Factory Agent chat & live voice** on the
+  *ON/OFF: App & Integration* page, above *MCP & AI Gateway*. Dependency and project001-scope problems block the
+  draft; input problems show as warnings because the project pipeline checks them again before any Azure call.
 
 !!! warning "The step never replaces an app you deployed by hand"
 
@@ -188,6 +238,7 @@ The deployment adds one **revision** of the same app. With voice enabled it also
 | "Live voice was started in another tab or window." | A newer session replaced this one. |
 | "The voice session reached its time limit." | Start again; sessions never outlive the sign-in token. |
 | The step stops with "already exists and was not created by this pipeline step" | An app deployed by hand exists. Use the operator flow, or remove the app and let the pipeline create it. |
+| `AuthorizationFailure` when the deployment uploads the bundle (operator flow) | Your machine cannot reach the project's private storage account. Deploy from inside the factory network (VPN or a machine in it). Do not leave public access open afterwards. |
 
 ## Evidence and limits
 
