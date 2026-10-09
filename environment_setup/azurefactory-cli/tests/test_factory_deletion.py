@@ -224,6 +224,55 @@ def test_unsafe_or_legacy_deletion_plan_is_rejected_before_confirmation(tmp_path
     assert len(transport.records) == 1
 
 
+@pytest.mark.parametrize("policy", ["local", "server"])
+def test_protected_group_pattern_blocks_prepare(tmp_path, transport, monkeypatch, policy):
+    if policy == "local":
+        monkeypatch.setenv("AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS", '["*FACTORY*"]')
+    else:
+        transport.preview["deletion_plan"]["protected_resource_group_patterns"] = ["*FACTORY*"]
+        rehash(transport.preview["deletion_plan"])
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+
+
+def test_new_local_group_protection_blocks_existing_confirmation_receipt(tmp_path, transport, capsys, monkeypatch):
+    make_receipt(tmp_path, transport, capsys)
+    monkeypatch.setenv("AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS", '["*PROJECT*"]')
+    assert confirm(tmp_path, "--yes", "--confirmation-phrase", PHRASE) == 2
+    assert not transport.records
+
+
+@pytest.mark.parametrize("value", ["not-json", '"*"', '[""]', '[null]', '["bad/pattern"]'])
+def test_malformed_local_group_protection_fails_closed(tmp_path, transport, monkeypatch, value):
+    monkeypatch.setenv("AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS", value)
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+
+
+@pytest.mark.parametrize("defect", ["source", "group", "project-number", "run"])
+def test_plan_execution_identities_match_review(tmp_path, transport, defect):
+    plan = transport.preview["deletion_plan"]
+    project = plan["stages"][0]
+    if defect == "source":
+        plan["source_commit"] = "e" * 40
+    elif defect == "group":
+        project["resource_group_id"] = HUB
+    elif defect == "project-number":
+        project["project_number"] = "999"
+    else:
+        project["run_id"] = "not-a-run-id"
+    rehash(plan)
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+
+
+def test_stage_group_binding_respects_case_insensitive_arm_identity(tmp_path, transport):
+    plan = transport.preview["deletion_plan"]
+    plan["stages"][0]["resource_group_id"] = PROJECT_GROUP.upper()
+    rehash(plan)
+    assert prepare(tmp_path) == 0
+
+
 @pytest.mark.parametrize("encoding", ["api", "compact", "missing-newline", "ascii", "four-spaces"])
 def test_deletion_plan_hash_uses_only_api_catalog_storage_format(tmp_path, transport, encoding):
     p = transport.preview

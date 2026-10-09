@@ -133,6 +133,11 @@ PY
 }
 trap 'aif_delete_exit $?' EXIT
 
+if [ "${AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS+x}" = "x" ]; then
+  guard_common_group="${commonResourceGroup_param:-${commonRGNamePrefix}${vnetResourceGroupBase:-esml-common}-${locationSuffix}-${envName}${aifactorySuffixRG}}"
+  aif_delete guard --additional-resource-group "$guard_common_group"
+fi
+
 if [ "$deleteAllServicesForProject" = "true" ]; then
   if [ "$preserve_foundation" = "true" ]; then
     echo "Services-only cleanup: preserving foundation resources and common networking."
