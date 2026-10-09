@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import itertools
 import json
@@ -132,6 +133,72 @@ class TestPrivateFoundryCapabilityHost(unittest.TestCase):
         self.assertIn("threadStorageConnections", capability_host)
         self.assertIn("vectorStoreConnections", capability_host)
         self.assertIn("storageConnections", capability_host)
+
+    def test_v4_reconciles_capability_hosts_for_existing_projects(self) -> None:
+        content = FOUNDRY_TEMPLATES[3].read_text(encoding="utf-8")
+        project_line = next(
+            line for line in content.splitlines()
+            if line.startswith("module addProjectCapabilityHost ")
+        )
+        account_line = next(
+            line for line in content.splitlines()
+            if line.startswith("module addAccountCapabilityHost ")
+        )
+        self.assertNotIn("aiFoundryV2ProjectExists", project_line)
+        self.assertNotIn("aiFoundryV2Exists", project_line)
+        self.assertNotIn("aiFoundryV2ProjectExists", account_line)
+
+    def test_v4_host_guards_cover_fresh_accounts_reruns_and_explicit_opt_outs(self) -> None:
+        content = FOUNDRY_TEMPLATES[3].read_text(encoding="utf-8")
+
+        def enabled(symbol, values):
+            line = next(line for line in content.splitlines()
+                        if line.startswith(f"module {symbol} "))
+            condition = re.search(r"= if\((.*)\) \{", line).group(1)
+            condition = condition.replace("&&", " and ").replace("||", " or ").replace("!", " not ").strip()
+
+            def evaluate(node):
+                if isinstance(node, ast.Expression):
+                    return evaluate(node.body)
+                if isinstance(node, ast.Name):
+                    return values[node.id]
+                if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+                    return not evaluate(node.operand)
+                if isinstance(node, ast.BoolOp) and isinstance(node.op, ast.And):
+                    return all(evaluate(item) for item in node.values)
+                if isinstance(node, ast.BoolOp) and isinstance(node.op, ast.Or):
+                    return any(evaluate(item) for item in node.values)
+                self.fail(f"Unexpected capability-host condition: {ast.dump(node)}")
+
+            return evaluate(ast.parse(condition, mode="eval"))
+
+        defaults = {
+            "effectiveEnableCaphost": True,
+            "enableAIFactoryCreatedDefaultProjectForAIFv2": True,
+            "needsAISearch": True,
+            "effectiveEnableCosmosDB": True,
+            "enableAIFoundry": True,
+            "foundryV22AccountOnly": False,
+        }
+        for account_exists, project_exists, injection_disabled in itertools.product((False, True), repeat=3):
+            values = {
+                **defaults, "aiFoundryV2Exists": account_exists,
+                "aiFoundryV2ProjectExists": project_exists,
+                "disableAgentNetworkInjection": injection_disabled,
+            }
+            with self.subTest(**values):
+                self.assertTrue(enabled("addProjectCapabilityHost", values))
+                self.assertEqual(enabled("addAccountCapabilityHost", values), injection_disabled)
+        for key in defaults:
+            values = {
+                **defaults, key: key == "foundryV22AccountOnly",
+                "aiFoundryV2Exists": True, "aiFoundryV2ProjectExists": True,
+                "disableAgentNetworkInjection": True,
+            }
+            with self.subTest(disabled_prerequisite=key):
+                self.assertFalse(enabled("addProjectCapabilityHost", values))
+                if key in {"effectiveEnableCaphost", "enableAIFoundry", "foundryV22AccountOnly"}:
+                    self.assertFalse(enabled("addAccountCapabilityHost", values))
 
     def test_preflight_resolves_only_requested_capability_host_dependencies(self) -> None:
         git_bash = Path(r"C:\Program Files\Git\bin\bash.exe")
