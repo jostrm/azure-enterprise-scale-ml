@@ -426,6 +426,9 @@ deployed by hand, add the `voice` block to your own `config.local.json` and run 
   optionally copies the last utterance without submitting, and releases voice.
   **Check voice again** rechecks capabilities; **Start talking** retries a failed
   voice session. Language changes close/reopen voice only, with the same Chat sign-in.
+  Native service rejection or a failed native response ends voice and directs the
+  user to typing; it never silently switches to the shell, another model, or
+  ungrounded generation, and never asks for service secrets or new consent.
 - The `Permissions-Policy` header allows the microphone only for the application
   itself when voice is enabled and denies it otherwise. The routes
   `/api/voice/status` and `/api/voice/ws` do not exist when voice is disabled.

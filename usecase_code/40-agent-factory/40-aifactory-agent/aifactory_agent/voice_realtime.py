@@ -147,6 +147,8 @@ class RealtimeVoiceSession(VoiceSession):
             if (event.get("error") or {}).get("code") not in BENIGN_UPSTREAM_ERRORS:
                 self._cancel_pending_answer()
                 await self._fail_turn(self._turn, "voice_error", "The native speech service reported a problem.")
+                await self._fatal("voice_unavailable", "Native voice is unavailable. Typing still works.")
+                await self.end("voice_unavailable")
         else:
             await super()._handle_upstream(event)
 
@@ -177,6 +179,9 @@ class RealtimeVoiceSession(VoiceSession):
         self._assistant_item = None
         if response.get("status") != "completed":
             await self._fail_turn(turn, "voice_error", "The native voice response did not complete.")
+            if response.get("status") == "failed":
+                await self._fatal("voice_unavailable", "Native voice is unavailable. Typing still works.")
+                await self.end("voice_unavailable")
             return
         calls = [item for item in response.get("output", []) if item.get("type") == "function_call"]
         if calls:
@@ -240,6 +245,9 @@ class RealtimeVoiceSession(VoiceSession):
     async def _fail_turn(self, turn, code, message):
         if turn != self._turn:
             return
+        LOGGER.warning("voice_turn_failed session=%s turn=%d code=%s", self.session_id, turn, code)
+        from .telemetry import VOICE_FAILURES
+        VOICE_FAILURES.add(1, {"stage": code, "mode": "realtime"})
         if self._response_active:
             await self._cancel_response()
         if self._turn_timer is not None and self._turn_timer is not asyncio.current_task():

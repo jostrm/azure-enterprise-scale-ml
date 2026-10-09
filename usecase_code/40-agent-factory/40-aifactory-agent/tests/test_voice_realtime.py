@@ -190,3 +190,26 @@ def test_native_turn_deadline_reports_failure_without_poisoning_session():
         await harness.until(lambda: len(harness.prepared) == 2)
         await harness.finish()
     run(scenario)
+
+
+@pytest.mark.parametrize("code", ["model_not_supported", "invalid_value", "authentication_error"])
+@pytest.mark.parametrize("event", ["error", "response_failed"])
+def test_native_service_rejection_ends_only_voice_without_alternate_generation_or_auth_prompts(code, event):
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("First")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        if event == "error":
+            harness.upstream.push({"type": "error", "error": {"code": code, "message": "SECRET internal detail"}})
+        else:
+            harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+            harness.response(status="failed", status_details={"error": {"code": code, "message": "SECRET internal detail"}})
+        await harness.until(lambda: harness.task.done())
+        errors = harness.channel.of("error")
+        assert errors[-1]["fatal"] is True and "Typing still works" in errors[-1]["message"]
+        assert "SECRET" not in str(errors) and "Sign in" not in str(errors)
+        assert not harness.questions and not harness.channel.of("answer")
+        assert len(harness.upstream.of("response.create")) == 1
+        assert harness.upstream.closed
+        assert await harness.finish() == "voice_unavailable"
+    run(scenario)
