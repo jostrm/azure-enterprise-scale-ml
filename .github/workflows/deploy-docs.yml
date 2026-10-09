@@ -9,6 +9,10 @@ on:
       - 'documentation/v2/10-19/18-cli-and-api-and-usage.md'
       - 'documentation/v2/10-19/19-cli-and-api-and-usage.md'
       - 'documentation/v2/10-19/20-cli-and-api-and-usage.md'
+      - 'usecase_code/40-agent-factory/agent_factory/readme.md'
+      - 'usecase_code/50-ml-model-factory/user-config/readme.md'
+      - 'environment_setup/azurefactory-cli/tests/test_documentation_tabs.py'
+      - '.github/workflows/deploy-docs.yml'
       - 'bootstrap/**'
       - 'environment_setup/aifactory/variables.json'
       - 'environment_setup/aifactory/bicep/copy_to_local_settings/**'
@@ -32,9 +36,12 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install MkDocs and Material theme
+      - name: Install documentation and offline test dependencies
         run: |
-          pip install mkdocs-material
+          pip install mkdocs-material pytest ./environment_setup/azurefactory-cli
+
+      - name: Check shared tutorials and generated onboarding
+        run: python -m pytest environment_setup/azurefactory-cli/tests/test_documentation_tabs.py -q
 
       - name: Check complete parameter reference
         run: python documentation/gh-io/tools/generate_parameters.py --check
