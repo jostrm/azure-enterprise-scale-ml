@@ -219,6 +219,7 @@ The deployment adds one **revision** of the same app. With voice enabled it also
 | Topic | Details |
 |---|---|
 | Limits (defaults) | 15 minutes per session, idle end after 2 minutes, 4 concurrent sessions per app replica, one session per user (a newer one replaces the older). |
+| Spoken length | `voice.max_spoken_characters` defaults to `1200` (allowed range: `200` to `4000`). Long spoken replies are shortened; the full answer stays on screen. Adjust your operator configuration and redeploy if you need longer speech. |
 | Cost | Voice Live is billed per use by the tier of the configured speech `model` (default `gpt-4.1-nano`), in addition to the grounded answer's model and Search usage. HD voices are regional. Check your agreement's current rates. |
 | Languages | English by default. Swedish is not in the automatic multilingual list: set `sv-SE,en-US` and a Swedish voice such as `sv-SE-SofieNeural`. The voice is fixed per session. |
 | Knowledge | The index is rebuilt by a nightly refresh job and by `ingest`. Re-run `ingest` after large documentation changes. |
@@ -238,7 +239,7 @@ The deployment adds one **revision** of the same app. With voice enabled it also
 | "Live voice was started in another tab or window." | A newer session replaced this one. |
 | "The voice session reached its time limit." | Start again; sessions never outlive the sign-in token. |
 | The step stops with "already exists and was not created by this pipeline step" | An app deployed by hand exists. Use the operator flow, or remove the app and let the pipeline create it. |
-| `AuthorizationFailure` when the deployment uploads the bundle (operator flow) | Your machine cannot reach the project's private storage account. Deploy from inside the factory network (VPN or a machine in it). Do not leave public access open afterwards. |
+| `AuthorizationFailure` when the deployment uploads the bundle (operator flow) | With storage public access disabled, check private DNS, effective VPN routes and upload permissions. An overlapping VPN route such as `172.16.0.0/12` can divert private-endpoint traffic to the wrong network. Deploy from the approved factory network; keep public access disabled. |
 
 ## Evidence and limits
 
@@ -252,6 +253,20 @@ The deployment adds one **revision** of the same app. With voice enabled it also
   thinks. Session limits apply per app replica.
 - Saving configuration, running `plan`, or seeing a green pipeline step is not proof that the app is reachable or
   that speech works on your network. Open the page and run a short session.
+
+??? info "More info: verified deployment on 9 October 2026"
+
+    A project001 Dev app was updated through the operator flow. The pipeline switches
+    `enableFactoryChatAgent` and `enableAIFactoryAgentLiveVoice` still default to `false`.
+
+    - Deployment succeeded. Revision suffix `--0000008` was Healthy and Running with **100% traffic**;
+      `--0000007` was retained for rollback.
+    - The app identity held **Foundry User** and **Cognitive Services User** on the project Foundry account.
+    - Bundle upload succeeded after the private-storage network path was restored, with public access still disabled.
+    - An end-to-end browser voice session worked. A long spoken reply was shortened at
+      `max_spoken_characters = 1200`: a spoken-length setting to tune, not a failed voice session.
+
+    This is a dated result from one environment, not proof that voice works in every tenant or network.
 
 See also: [Agent Factory chat application guide](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/40-aifactory-agent/readme.md),
 [live voice pipeline step](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/47-aifactory-agent-live-voice/readme.md),
