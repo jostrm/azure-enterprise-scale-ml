@@ -51,6 +51,8 @@ coverage.xml
 .pytest_cache/
 /.test-state/
 /environment_setup/unit-tests/test-bicep/test-results/
+/environment_setup/unit-tests/test-bicep/.pytest-deletion-providers/
+/usecase_code/40-agent-factory/40-aifactory-agent/.workload-test-*/
 /.validation-work/
 /%SystemDrive%/
 
