@@ -266,6 +266,14 @@ def test_windows_arm_ids_are_safe_before_first_azure_command():
     assert 'cygpath -m "$deletion_script_dir"' in SCRIPT.read_text(encoding="utf-8")
 
 
+def test_configured_group_protection_preflights_before_legacy_mutations():
+    text = SCRIPT.read_text(encoding="utf-8")
+    marker = text.index("aif_delete guard --additional-resource-group")
+    assert marker < text.index("az network private-endpoint delete")
+    assert "AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS" in text[:marker]
+    assert '${commonResourceGroup_param:-' in text[:marker]
+
+
 @pytest.mark.parametrize("exit_code,status", [(0, "succeeded"), (7, "failed")])
 def test_script_outcome_distinguishes_whole_task_from_last_helper(tmp_path, exit_code, status):
     bash = (Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin" / "bash.exe"

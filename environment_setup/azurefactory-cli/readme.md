@@ -181,6 +181,19 @@ group blocks preparation, rather than allowing a cascading group delete.
 Outside-group retained inventory is not proof of post-execution preservation.
 The selected immutable runtime must independently support the required contract.
 
+Optional local protection uses
+`AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS`, a JSON array of case-insensitive
+RG-name globs (`*` and `?`; no bracket syntax). Preparation and confirmation
+recheck this policy as well as any hashed plan `protected_resource_group_patterns`;
+invalid policies block. For example, an operator can set
+`$env:AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS='["*-protected-*"]'`.
+This is additional client-side rejection, not a server policy update or evidence
+of protection on the worker. The API must separately freeze its policy in every
+protected lifecycle manifest and require source capability
+`factory_deletion_group_protection=case-insensitive-name-globs-v1` when required.
+The lifecycle guard checks direct/nested targets and managed-group cascades;
+an older source ignoring that field cannot be substituted.
+
 After a human approves that exact review, run a separate command:
 
 ```powershell

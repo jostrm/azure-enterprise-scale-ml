@@ -144,6 +144,50 @@ GROUP_ARGS = ["group", "--confirm-resource-group", RG]
 NETWORK_ARGS = ["verify-network", "--network-resource-group", "network", "--project-number", "002"]
 
 
+@pytest.mark.parametrize("args", [RESOURCE, GROUP_ARGS])
+def test_protected_group_pattern_blocks_mutations_without_commands(monkeypatch, args):
+    monkeypatch.setenv("AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS", '["*PROJECT*"]')
+    status, runner, _ = invoke([], args)
+    assert status != 0 and not runner.calls
+
+
+@pytest.mark.parametrize("property_name", ["managedResourceGroupId", "managedResourceGroupName", "nodeResourceGroup"])
+def test_protected_managed_group_cascade_blocks_service_delete(monkeypatch, property_name):
+    monkeypatch.setenv("AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS", '["*SPIDER*"]')
+    item = body()
+    name = "managed-SpIdEr"
+    item["properties"][property_name] = (
+        f"/subscriptions/{SUB}/resourceGroups/{name}" if property_name.endswith("Id") else name)
+    status, runner, _ = invoke([("GET", DBX_ID, item)], RESOURCE)
+    assert status != 0
+    assert [call[0] for call in runner.calls] == ["GET"]
+
+
+def test_protected_managed_group_in_inventory_blocks_rg_cascade(monkeypatch):
+    monkeypatch.setenv("AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS", '["*SPIDER*"]')
+    item = body()
+    item["properties"]["managedResourceGroupId"] = f"/subscriptions/{SUB}/resourceGroups/managed-SpIdEr"
+    status, runner, _ = invoke([("GET", GROUP, body(GROUP)), ("LIST", GROUP, [item])], GROUP_ARGS)
+    assert status != 0
+    assert all(call[0] not in ("DELETE", "DELETE-GROUP") for call in runner.calls)
+
+
+def test_guard_rejects_protected_external_network_group_before_commands(monkeypatch):
+    monkeypatch.setenv("AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS", '["*SPIDER*"]')
+    status, runner, _ = invoke([], ["guard", "--additional-resource-group", "network-SpIdEr"])
+    assert status != 0 and not runner.calls
+
+
+def test_guard_blocks_uninspectable_managed_cascades_without_deletion(monkeypatch):
+    monkeypatch.setenv("AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS", '["*SPIDER*"]')
+    unknown = GROUP + "/providers/Microsoft.NewProvider/services/resource"
+    status, runner, _ = invoke([
+        ("GET", GROUP, body(GROUP)), ("LIST", GROUP, [body(unknown)]),
+    ], ["guard"])
+    assert status != 0
+    assert all(call[0] not in ("DELETE", "DELETE-GROUP") for call in runner.calls)
+
+
 def test_names_authoritative_case_insensitive_prefixes_stdout_only(capsys):
     steps = [("LIST", GROUP, [
         body(DBX_ID), body(DBX_ID.replace("/dbx", "/Other")),

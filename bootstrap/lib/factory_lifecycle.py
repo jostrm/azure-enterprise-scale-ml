@@ -697,6 +697,7 @@ def capabilities():
         "delete_owned_resource_groups": "arm-provider-closure-v1",
         "factory_deletion_dependencies": "search-shared-private-links-first-v1",
         "factory_deletion_pipeline": "ordered-project-pipelines-v1",
+        "factory_deletion_group_protection": "case-insensitive-name-globs-v1",
         "factory_deletion_pipeline_coordination_modes": ["blob"],
         "factory_deletion_access_hub": "factory-owned-access-hub-v1",
         "factory_deletion_shared_hub_links": "shared-hub-spoke-links-v1",
@@ -1586,6 +1587,23 @@ def managed_group_cascades(body, subscription):
 
     visit(body)
     return groups
+
+
+def protected_resource_group_patterns(document):
+    patterns = document.get("protected_resource_group_patterns", [])
+    require(isinstance(patterns, list) and len(patterns) <= 100
+            and all(isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.()*?-]{1,90}", value)
+                    for value in patterns), "invalid-protected-resource-group-patterns")
+    return patterns
+
+
+def assert_deletion_group_allowed(document, identifier, body=None):
+    patterns = protected_resource_group_patterns(document)
+    groups = {arm_scope(identifier)}
+    if body is not None:
+        groups.update(managed_group_cascades(body, document["target"]["subscription_id"]))
+    require(not any(fnmatch.fnmatchcase(RG_ID.fullmatch(group).group(2).lower(), pattern.lower())
+                    for group in groups for pattern in patterns), "protected-resource-group-deletion-forbidden")
 
 
 def verify_group_ownership(body, owner, bodies):

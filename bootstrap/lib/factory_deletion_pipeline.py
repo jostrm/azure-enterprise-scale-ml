@@ -57,7 +57,8 @@ def phase(item):
         return 4
     if kind.endswith("/capabilityhosts"):
         return 0
-    if kind == "microsoft.search/services/sharedprivatelinkresources":
+    if kind in {"microsoft.search/searchservices/sharedprivatelinkresources",
+                "microsoft.search/services/sharedprivatelinkresources"}:
         return 1
     if kind.startswith("microsoft.network/"):
         return 3
@@ -353,6 +354,7 @@ def normalize_projects(document, projects):
 
 def freeze(cloud, document, ownership_records, registered_projects):
     validate_route(document)
+    fl.protected_resource_group_patterns(document)
     projects = normalize_projects(document, registered_projects)
     cloud.verify_identity()
     fl.BlobLocks(cloud, document).verify_enrollment()
@@ -413,6 +415,8 @@ def freeze(cloud, document, ownership_records, registered_projects):
                         "managed_group_ids": sorted(fl.managed_group_cascades(
                             body, document["target"]["subscription_id"])),
                         "depends_on": fl.project_resource_dependencies(body)}
+        if entries[key]["delete"]:
+            fl.assert_deletion_group_allowed(document, key, body)
         if not entries[key]["delete"]:
             entries[key]["retention_reason"] = ("protected-infrastructure" if keep else
                 "outside-registered-ownership" if not selected else "read-only-dependency")
@@ -485,6 +489,7 @@ def freeze(cloud, document, ownership_records, registered_projects):
 
 def validate(document):
     validate_route(document)
+    fl.protected_resource_group_patterns(document)
     data = document["deletion"]
     validate_flags(data.get("flags"))
     fl.require(data.get("inventory_mode") == CONTRACT and data.get("inventory_complete") is True
@@ -521,6 +526,7 @@ def validate(document):
         fl.require(row.get("project_number") == expected_number, "factory-delete-project-stage-mismatch")
         if not row["delete"]:
             continue
+        fl.assert_deletion_group_allowed(document, key, data["bodies"][key])
         fl.require(fl.arm_scope(key) in {scope.lower() for scope in document["locks"]["scopes"]}
                    and all(row.get("owner", {}).get(field) == document["target"][field]
                            for field in ("factory_id", "scaleset_id")),
@@ -579,6 +585,8 @@ def verify_worker_result(document, result):
                and all(value is True for value in result.get("flags", {}).values())
                and result.get("project_numbers") == document["target"]["project_ids"]
                and isinstance(result.get("deleted_resources"), list)
+               and all(isinstance(value, str) for value in result["deleted_resources"])
+               and len(result["deleted_resources"]) == len(expected)
                and {value.lower() for value in result["deleted_resources"]} == expected,
                "factory-delete-worker-incomplete")
     fl.require(result.get("projects") == completed_projects(document), "factory-delete-project-evidence-incomplete")
@@ -603,6 +611,14 @@ def observed_absent(cloud, document):
     return absent
 
 
+def verify_absent(cloud, rows):
+    for row in rows:
+        if row["delete"]:
+            api = fl.RG_API if fl.RG_ID.fullmatch(row["id"]) else row["api_version"]
+            status, _, _ = cloud.arm("GET", row["id"], api, allowed=(200, 404))
+            fl.require(status == 404, "factory-delete-resource-still-present")
+
+
 def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep, fresh=None):
     flags = document["deletion"]["flags"]
     validate_flags(flags)
@@ -611,6 +627,7 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
     for row in teardown_order(document, rows):
         key = row["id"].lower()
         if key in removed:
+            verify_absent(cloud, [row])
             if key not in {value.lower() for value in receipt.get("deleted_resources", [])}:
                 receipt.setdefault("deleted_resources", []).append(row["id"])
                 persist()
@@ -640,6 +657,7 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
                     receipt["deleted_resources"].append(child["id"])
             persist()
             continue
+        fl.assert_deletion_group_allowed(document, row["id"], body)
         if fresh:
             fresh(row, body)
         else:
@@ -715,6 +733,7 @@ def run_worker(envelope, source_root, expected_run, expected_hash, cloud=None, s
         receipt["observed_absent"] = observed_absent(cloud, document)
         fl.verify_project_inventory(cloud, document, receipt["observed_absent"])
         delete_rows(cloud, locks, document, receipt, persist, project_rows(document), sleep)
+        verify_absent(cloud, project_rows(document))
         fl.verify_project_inventory(cloud, document, receipt["deleted_resources"] + receipt["observed_absent"])
         receipt["projects"] = completed_projects(document)
         receipt["status"] = "succeeded"
@@ -892,6 +911,8 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
                 fl.require(not aggregate.get("lock_retained")
                            and all(row.get("status") == "succeeded" and not row.get("lock_retained")
                                    for row in aggregate["children"]), "factory-delete-success-receipt-incomplete")
+                for cloud, document in zip(clouds, documents):
+                    verify_absent(cloud, document["deletion"]["resources"] + document["deletion"]["resource_groups"])
                 return aggregate
             context = aggregate.get("lease_context")
             fl.require(isinstance(context, dict) and set(context) == set(union.owners)
@@ -947,6 +968,9 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
             persist()
         fl.require(all(row.get("projects_succeeded") is True for row in aggregate["children"]),
                    "factory-delete-project-pipeline-barrier-incomplete")
+        union.assert_held()
+        for cloud, document in zip(clouds, documents):
+            verify_absent(cloud, project_rows(document))
         for cloud, locks, document, receipt in zip(clouds, members, documents, aggregate["children"]):
             rows = [row for row in document["deletion"]["resources"] + document["deletion"]["resource_groups"]
                     if row["delete"] and row.get("project_number") is None]
@@ -958,6 +982,8 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
             if document["deletion"].get("hub_links"):
                 unlink_shared_hub(cloud, locks, document, receipt, persist)
         union.assert_held()
+        for cloud, document in zip(clouds, documents):
+            verify_absent(cloud, document["deletion"]["resources"] + document["deletion"]["resource_groups"])
         # Store completion while leases still exist; the final receipt is only
         # successful after every lease is durably observed released.
         persist()
@@ -967,7 +993,8 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         aggregate["status"] = "succeeded"
         persist()
     except BaseException as error:
-        aggregate["status"] = "reconciliation-required" if claim_attempted else "blocked"
+        aggregate["status"] = ("reconciliation-required" if claim_attempted
+                               or any(row.get("mutation_started") for row in aggregate["children"]) else "blocked")
         aggregate.update(fl.failure_fields(error, "unexpected-factory-delete-failure"))
         if not claim_attempted:
             try:

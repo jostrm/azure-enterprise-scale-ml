@@ -2,6 +2,7 @@
 """Confirm project deletion through bounded, extension-free ARM observations."""
 
 import argparse
+import fnmatch
 from http import HTTPStatus
 import json
 import math
@@ -192,6 +193,45 @@ def resource_group_id(subscription, group):
     return f"/subscriptions/{subscription}/resourceGroups/{group}"
 
 
+def protected_group_patterns():
+    try:
+        patterns = json_value(os.environ.get("AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS", "[]"))
+    except ValueError:
+        raise DeletionError("InvalidProtectionPolicy", "Protected group patterns must be a JSON array.") from None
+    if (not isinstance(patterns, list) or len(patterns) > 100
+            or any(not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_.()*?-]{1,90}", value)
+                   for value in patterns)):
+        raise DeletionError("InvalidProtectionPolicy", "Invalid protected resource-group name globs.")
+    return patterns
+
+
+def assert_group_allowed(subscription, resource_id, patterns, body=None):
+    groups = {resource_id.split("/")[4]}
+
+    def visit(value):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key.lower() in {"managedresourcegroupid", "managedresourcegroupname",
+                                   "managedresourcegroup", "noderesourcegroup"} and item:
+                    if not isinstance(item, str):
+                        raise DeletionError("UnverifiedManagedGroup", "Cannot establish a managed-group cascade.", resource_id)
+                    identifier = item if item.startswith("/") else resource_group_id(subscription, item)
+                    if not re.fullmatch(r"/subscriptions/[0-9a-f-]{36}/resourceGroups/[A-Za-z0-9_.()-]{1,90}",
+                                        identifier, re.I):
+                        raise DeletionError("UnverifiedManagedGroup", "Invalid managed-group identity.", resource_id)
+                    groups.add(identifier.split("/")[4])
+                else:
+                    visit(item)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item)
+
+    if patterns:
+        visit(body)
+    if any(fnmatch.fnmatchcase(group.lower(), pattern.lower()) for group in groups for pattern in patterns):
+        raise DeletionError("ProtectedResourceGroup", "Deletion would affect a protected resource group.", resource_id)
+
+
 def supported_type(value):
     if not isinstance(value, str) or value.lower() not in API_VERSIONS:
         raise DeletionError("UnsupportedResourceType", "Use a supported project resource type.")
@@ -215,6 +255,7 @@ class Deletion:
         self.runner = runner or subprocess.run
         self.deadline = self.clock() + args.timeout_seconds
         self.group_id = resource_group_id(args.subscription, args.resource_group)
+        self.protected_patterns = protected_group_patterns()
         self.active_id = self.group_id
         self.states = {}
         self.diagnostics = []
@@ -459,6 +500,7 @@ class Deletion:
         item = self.wait_ready(resource_id, version, self.get(resource_id, version))
         if item is None:
             return
+        assert_group_allowed(self.args.subscription, resource_id, self.protected_patterns, item)
         if self.state(item) == "deleting":
             self.wait_absent(resource_id, version, deleting=True)
             return
@@ -469,10 +511,12 @@ class Deletion:
             item = self.wait_ready(resource_id, version, self.get(resource_id, version))
             if item is None:
                 return
+            assert_group_allowed(self.args.subscription, resource_id, self.protected_patterns, item)
             if self.state(item) == "deleting":
                 self.wait_absent(resource_id, version, deleting=True)
                 return
         for attempt in range(MAX_DELETE_ATTEMPTS):
+            assert_group_allowed(self.args.subscription, resource_id, self.protected_patterns, item)
             try:
                 self.rest("delete", resource_id, version, read_json=False)
             except DeletionError as error:
@@ -559,19 +603,41 @@ class Deletion:
             self.diagnose_group()
             raise
 
+    def guard(self):
+        if not self.protected_patterns:
+            return
+        group = self.get(self.group_id, GROUP_API)
+        assert_group_allowed(self.args.subscription, self.group_id, self.protected_patterns, group)
+        if group is None:
+            return
+        for resource in self.inventory():
+            assert_group_allowed(self.args.subscription, resource["id"], self.protected_patterns, resource)
+            version = API_VERSIONS.get(resource["type"].lower())
+            if version is None:
+                raise DeletionError("UnverifiedManagedGroup",
+                                    "Cannot prove cascade safety for an unsupported resource type.", resource["id"])
+            current = self.get(resource["id"], version)
+            assert_group_allowed(self.args.subscription, resource["id"], self.protected_patterns, current)
+
     def group(self):
         item = self.get(self.group_id, GROUP_API)
         if item is None:
             return
+        assert_group_allowed(self.args.subscription, self.group_id, self.protected_patterns, item)
         if self.state(item) == "deleting":
             self.watch_group(deleting=True)
             return
         for resource in self.inventory():
+            assert_group_allowed(self.args.subscription, resource["id"], self.protected_patterns, resource)
             version = API_VERSIONS.get(resource["type"].lower())
             if version is None:
+                if self.protected_patterns:
+                    raise DeletionError("UnverifiedManagedGroup",
+                                        "Cannot prove cascade safety for an unsupported resource type.", resource["id"])
                 continue
             resource_id = resource["id"]
             current = self.wait_ready(resource_id, version, self.get(resource_id, version))
+            assert_group_allowed(self.args.subscription, resource_id, self.protected_patterns, current)
             if current is not None and self.state(current) == "deleting":
                 self.wait_absent(resource_id, version, deleting=True)
         item = self.wait_ready(self.group_id, GROUP_API, self.get(self.group_id, GROUP_API))
@@ -640,6 +706,8 @@ def arguments(argv):
     state.add_argument("--name", required=True)
     group = commands.add_parser("group", help="Delete only the explicitly confirmed project resource group.")
     group.add_argument("--confirm-resource-group", required=True)
+    guard = commands.add_parser("guard", help="Read-only protected-group and managed-cascade preflight.")
+    guard.add_argument("--additional-resource-group", action="append", default=[])
     network = commands.add_parser("verify-network", help="Read-only verification of project network cleanup.")
     network.add_argument("--network-resource-group", required=True)
     network.add_argument("--project-number", required=True)
@@ -650,6 +718,13 @@ def validate_arguments(args):
     if not re.fullmatch(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", args.subscription):
         raise DeletionError("InvalidArgument", "--subscription must be a subscription GUID.")
     valid_name(args.resource_group, "resource group", 90)
+    if args.action in {"resource", "group", "guard"}:
+        assert_group_allowed(args.subscription, resource_group_id(args.subscription, args.resource_group),
+                             protected_group_patterns())
+    if args.action == "guard":
+        for group in args.additional_resource_group:
+            valid_name(group, "additional resource group", 90)
+            assert_group_allowed(args.subscription, resource_group_id(args.subscription, group), protected_group_patterns())
     if args.action in {"resource", "state"}:
         supported_type(args.resource_type)
     if args.action == "names":

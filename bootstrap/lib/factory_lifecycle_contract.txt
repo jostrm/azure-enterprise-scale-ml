@@ -25,7 +25,8 @@ receipt_path, cloud_factory=Cloud, lock_factory=None) acquires and claims the
 entire physical scope union before dispatch. Each scale-set manifest is one
 configured provider pipeline run containing its ordered project resource stages.
 Worker evidence binds every project's exact deleted resource IDs and the four
-actual boolean flags. Capability hosts precede project-owned Search shared links,
+actual boolean flags, without duplicates. Capability hosts precede project-owned
+Search searchServices/sharedPrivateLinkResources links,
 then managed services, then network resources. Provider-managed children lacking
 an independent DELETE are verified absent after their explicitly reviewed service
 parent deletion, never through a blanket project RG cascade. Project RG deletion
@@ -33,6 +34,10 @@ requires the reviewed children to be absent and the group to be empty.
 
 No common-resource teardown begins until ALL project pipelines in the submitted
 cohort have verified successful provider completion and exact worker evidence.
+The coordinator freshly observes every project deletion as ARM 404 before crossing
+the common barrier, and every selected resource/group as absent before success.
+Receipt IDs alone are not absence observations; even completed resume rechecks
+absence, and resources recorded removed are reobserved before further deletion.
 The API must submit the complete factory cohort frozen by its catalog review;
 individual lifecycle manifests do not enumerate other registered environments.
 Protected/shared/bootstrap/platform/VPN resources and reusable hubs are retained;
@@ -119,6 +124,17 @@ An uncertain dispatch without a verified run ID requires reconciliation; it is
 never silently retried. Completed receipts are idempotent, and a resumed common
 stage re-verifies every provider run. Source publication, clean execution-source
 isolation and existing enrollment/identity authorization remain mandatory.
+
+Optional manifest protected_resource_group_patterns is a hash-bound list of up to
+100 case-insensitive resource-group NAME globs (1-90 ASCII name characters, "*" and
+"?" wildcards; bracket syntax is unsupported). Empty strings/invalid patterns fail closed.
+The guard covers direct groups, resources within those groups and every managed
+group cascade discovered in the frozen/current ARM body. It blocks the operation,
+not merely the group DELETE. The backend must freeze its operator policy into every
+manifest before review. Require capability factory_deletion_group_protection =
+case-insensitive-name-globs-v1 when this policy is required; older source that
+ignores the field is not an execution-compatible substitute. No personal group
+names or implicit ownership-by-name rules are built into the product.
 
 The aggregate receipt uses the generic cohort identity (cohort_hash over the
 sorted manifest hashes, source_commit, source_ref; each child also records

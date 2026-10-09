@@ -3,6 +3,7 @@ id: lifecycle-and-recovery
 status: observed
 sources:
   - bootstrap/lib/factory_lifecycle.py
+  - bootstrap/lib/factory_deletion_pipeline.py
   - bootstrap/lib/factory_lifecycle_contract.txt
   - bootstrap/lib/factory_deletion_pipeline.py
   - bootstrap/lib/factory_enrollment.py
@@ -13,6 +14,7 @@ sources:
   - environment_setup/aifactory/bicep/scripts/project-deletion.py
 tests:
   - environment_setup/unit-tests/test-bicep/unit/test_factory_lifecycle.py
+  - environment_setup/unit-tests/test-bicep/unit/test_factory_deletion_pipeline.py
   - environment_setup/unit-tests/test-bicep/unit/test_factory_lifecycle_bootstrap_handoff.py
   - environment_setup/unit-tests/test-bicep/unit/test_selective_project_deletion.py
   - environment_setup/unit-tests/test-bicep/unit/test_factory_deletion_pipeline.py
@@ -64,6 +66,34 @@ Default coordination uses Blob leases and durable claims/receipts. Explicit sing
 
 **Intended rule:** reconcile the observed job, receipt, ownership and inventory before deciding on another reviewed operation. Do not automatically retry uncertain writes, clear claims or perform destructive rollback.
 
+The separate Blob-only `ordered-project-pipelines-v1` factory cohort runs the
+reviewed scoped worker for every scale set. All four deletion flags must be actual
+boolean true. Capability hosts precede Search
+`searchServices/sharedPrivateLinkResources`, services and networking; project
+groups require empty reviewed children. Every environment's provider completion,
+exact duplicate-free worker receipt and freshly observed ARM absence precede any
+common teardown. Final success and completed resume freshly verify every selected
+resource/group remains absent, rather than trusting recorded deletion IDs.
+
+`protected_resource_group_patterns` is an optional hash-bound manifest policy of
+case-insensitive RG-name globs. The guard blocks direct/nested deletions and
+managed-group cascades. A backend requiring it must freeze its policy on every
+manifest and require `factory_deletion_group_protection` capability
+`case-insensitive-name-globs-v1`; an older source pin cannot satisfy that check.
+The CLI can add a local JSON-array policy via
+`AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS` and rechecks saved confirmation
+receipts against it. It does not send that local policy to the API or prove the
+server/worker enforces it.
+
+Consumer lifecycle definitions are generated copies of
+`bootstrap/templates/factory-lifecycle-gha.yml` and `factory-lifecycle-ado.yml`,
+not accelerator-root deployment workflows. Source capability, consumer workflow
+commit/submodule, enrollment, deployment identity, auth namespace and Linux runner
+must be independently compatible. Registration is not adoption authority:
+untagged older resources need verified durable deployment-ownership evidence,
+not inferred factory/project names. Shared DNS links and dependencies require
+their own closure/ownership evidence.
+
 ## Legacy project-pipeline deletion
 
 The shared ADO/GHA deletion script is separate from the enrolled lifecycle engine
@@ -81,6 +111,13 @@ retention boundary; explicit full-project deletion overrides it. ADO keeps its
 existing services-only policy. Confirmed-deletion markers preserve downstream
 purge eligibility without treating stale live-existence flags as deletion evidence.
 These are source changes, not proof of an updated consumer checkout or deployed run.
+
+When the optional `AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS` JSON-array policy
+is configured, the legacy shell entry point preflights project and external common
+group names plus project managed cascades before its direct service deletions.
+Unsupported resource types whose cascades cannot be inspected block this legacy
+preflight. This is defense in depth, not authorization to substitute the legacy
+shell for the named ordered-pipeline contract.
 
 See [[Reviewed-Operations]], [[State-Machines-and-DAGs]], [[Bootstrap-and-Layouts]], [[Orchestration-and-Updates]], [[IaC-and-Private-Networking]] and [[Index]].
 

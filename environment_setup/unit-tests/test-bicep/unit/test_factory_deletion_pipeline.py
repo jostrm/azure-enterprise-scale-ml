@@ -44,6 +44,7 @@ def row(name, kind, dependencies=()):
 
 def test_published_capability_names_the_pipeline_contract():
     assert fl.capabilities()["factory_deletion_pipeline"] == "ordered-project-pipelines-v1"
+    assert fl.capabilities()["factory_deletion_group_protection"] == "case-insensitive-name-globs-v1"
 
 
 @pytest.mark.parametrize("bad", [False, "true", "True", 1, None])
@@ -78,6 +79,42 @@ def test_dependency_conflicting_with_service_teardown_order_blocks():
         module.ordered_resources([host, network])
 
 
+def test_real_search_shared_private_link_precedes_project_services():
+    module = runtime()
+    link = row("link", "Microsoft.Search/searchServices/search/sharedPrivateLinkResources")
+    assert module.phase(link) == 1
+
+
+@pytest.mark.parametrize("identifier", [GROUP, RESOURCE])
+def test_configurable_group_patterns_block_direct_and_resource_deletion(identifier):
+    document, cloud, projects = factory_prepared()
+    document["protected_resource_group_patterns"] = ["*REVIEWED*"]
+    with pytest.raises(fl.Blocked, match="protected-resource-group"):
+        fl.assert_deletion_group_allowed(document, identifier)
+    with pytest.raises(fl.Blocked, match="protected-resource-group"):
+        fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
+    assert not cloud.deleted
+
+
+def test_configurable_group_patterns_block_managed_group_cascade():
+    document, cloud, projects = factory_prepared()
+    document["protected_resource_group_patterns"] = ["*SPIDER*"]
+    cloud.bodies[RESOURCE.lower()]["properties"]["managedResourceGroupId"] = (
+        GROUP.rsplit("/", 1)[0] + "/managed-SpIdEr")
+    with pytest.raises(fl.Blocked, match="protected-resource-group"):
+        fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
+    assert not cloud.deleted
+
+
+@pytest.mark.parametrize("patterns", ["*", [""], [None], ["bad/pattern"], [" x "], ["["]])
+def test_invalid_group_pattern_policy_fails_closed(patterns):
+    document, cloud, projects = factory_prepared()
+    document["protected_resource_group_patterns"] = patterns
+    with pytest.raises(fl.Blocked, match="protected-resource-group-pattern"):
+        fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
+    assert not cloud.deleted
+
+
 def test_successful_provider_run_requires_bound_worker_deletion_evidence():
     module = runtime()
     document = manifest()
@@ -92,7 +129,8 @@ def test_successful_provider_run_requires_bound_worker_deletion_evidence():
     result["projects"] = module.completed_projects(document)
     module.verify_worker_result(document, result)
     for field, value in (("status", "failed"), ("deleted_resources", []),
-                         ("flags", {}), ("project_numbers", [])):
+                         ("flags", {}), ("project_numbers", []),
+                         ("deleted_resources", [RESOURCE, RESOURCE])):
         with pytest.raises(fl.Blocked):
             module.verify_worker_result(document, {**result, field: value})
 
@@ -198,6 +236,38 @@ def test_worker_then_common_barrier_and_successful_resume(workspace, monkeypatch
     assert not cloud.leases
 
 
+@pytest.mark.parametrize("reappear", ["before-common", "completed-resume"])
+def test_project_group_absence_is_observed_not_inferred_from_worker_receipt(workspace, monkeypatch, reappear):
+    document, cloud, _ = factory_prepared()
+    group_body = copy.deepcopy(cloud.bodies[GROUP.lower()])
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    monkeypatch.setattr(fl, "_verify_source", lambda *args, **kwargs: source)
+
+    def dispatch(cloud, locks, document, source_root, receipt, persist):
+        result = fl.run_deployment_worker(json.loads(fl.protected_worker_envelope(document, locks)), source_root,
+            document["run_id"], document["manifest_hash"], cloud=cloud, sleep=lambda _: None)
+        assert result["status"] == "succeeded", result
+        receipt.update(remote_run={"kind": "ado", "pipeline_id": 8, "run_id": 44}, remote_terminal=True)
+        if reappear == "before-common":
+            cloud.bodies[GROUP.lower()] = group_body
+
+    monkeypatch.setattr(fl, "ado_scoped", dispatch)
+    run = workspace / "execution"
+    result = fl.execute_factory_deletion_cohort([document], source, run, run / "receipt.json",
+                                                cloud_factory=lambda _: cloud)
+    if reappear == "completed-resume":
+        assert result["status"] == "succeeded", result
+        cloud.bodies[GROUP.lower()] = group_body
+        result = fl.execute_factory_deletion_cohort([document], source, run, run / "receipt.json",
+                                                    cloud_factory=lambda _: cloud)
+    else:
+        assert not any(identifier.endswith("/common-ip") for identifier in cloud.deleted)
+    assert result["status"] != "succeeded", result
+    assert result["error_code"] == "factory-delete-resource-still-present"
+
+
 def test_failed_pipeline_retains_claim_and_never_deletes_common(workspace, monkeypatch):
     document, cloud, _ = factory_prepared()
     source = workspace / "source"
@@ -283,6 +353,16 @@ def test_already_absent_reviewed_project_resource_is_idempotent(workspace, monke
     result = fl.execute_factory_deletion_cohort([document], source, run, run / "receipt.json",
                                                 cloud_factory=lambda _: cloud)
     assert result["status"] == "succeeded", result
+
+
+def test_resumed_removed_row_is_reobserved_before_any_further_deletion():
+    document, cloud, _ = factory_prepared()
+    module = runtime()
+    rows = [entry for entry in module.project_rows(document) if entry["id"] == RESOURCE]
+    receipt = {"deleted_resources": [RESOURCE]}
+    with pytest.raises(fl.Blocked, match="factory-delete-resource-still-present"):
+        module.delete_rows(cloud, Mock(spec=fl.BlobLocks), document, receipt, Mock(), rows, lambda _: None)
+    assert not cloud.deleted
 
 
 def test_provider_managed_child_uses_reviewed_service_delete_not_rg_shortcut(workspace, monkeypatch):

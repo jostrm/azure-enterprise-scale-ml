@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
+import os
 import re
 from typing import Any
 from uuid import UUID
@@ -134,6 +136,21 @@ def describe_teardown_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
             for stage in plan["stages"]]
 
 
+def protected_group_patterns(plan: dict[str, Any]) -> list[str]:
+    policies = [plan.get("protected_resource_group_patterns", [])]
+    raw = os.environ.get("AIFACTORY_PROTECTED_RESOURCE_GROUP_PATTERNS")
+    if raw is not None:
+        try:
+            policies.append(json.loads(raw))
+        except (ValueError, TypeError):
+            raise ConfigError("Protected resource-group patterns must be a JSON array of name globs.") from None
+    if any(not isinstance(policy, list) or len(policy) > 100
+           or any(not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_.()*?-]{1,90}", value)
+                  for value in policy) for policy in policies):
+        raise ConfigError("Invalid protected resource-group patterns; deletion is blocked.")
+    return [value for policy in policies for value in policy]
+
+
 def validate_deletion_plan(plan: Any, factory_id: str, scales: dict[str, Any], factory: dict[str, Any],
                            targets: list[dict[str, Any]]) -> dict[str, Any]:
     """Client-side recheck of the server's hashed ordered pipeline plan; never a local deletion plan."""
@@ -160,9 +177,11 @@ def validate_deletion_plan(plan: Any, factory_id: str, scales: dict[str, Any], f
                                               for item in protected):
         invalid("missing protected-resource list")
     stages = plan.get("stages")
-    if not isinstance(stages, list) or not stages or len({stage.get("id") for stage in stages
-                                                          if isinstance(stage, dict)}) != len(stages):
+    if (not isinstance(stages, list) or not stages
+            or any(not isinstance(stage, dict) or not _text(stage.get("id")) for stage in stages)
+            or len({stage["id"] for stage in stages}) != len(stages)):
         invalid("missing or duplicate stages")
+    patterns = protected_group_patterns(plan)
     reviewed = {}
     for target in targets:
         for entry in target["delete"]:
@@ -171,24 +190,41 @@ def validate_deletion_plan(plan: Any, factory_id: str, scales: dict[str, Any], f
                 for project in factory.get("projects", []) if isinstance(project, dict)
                 for placement in project.get("placements", []) if isinstance(placement, dict)
                 if placement.get("scale_set_id") in scales}
+    project_numbers = {project["id"]: project.get("number") for project in factory.get("projects", [])
+                      if isinstance(project, dict) and _uuid(project.get("id"))}
     projects, covered, seen_common = [], set(), False
     for stage in stages:
         if not isinstance(stage, dict) or stage.get("kind") not in ("project", "common"):
             invalid("unknown stage")
+        if not _text(stage.get("scale_set_id")):
+            invalid("missing stage scale-set identity")
         scale = scales.get(stage.get("scale_set_id"))
         if (scale is None or stage.get("factory_id") != factory_id
                 or any(stage.get(field) != scale[field] for field in ("environment", "subscription_id", "tenant_id"))):
             invalid("a stage changed its factory, scale set, subscription or tenant")
+        group = stage.get("resource_group_id")
+        if (not _uuid(stage.get("run_id")) or not _text(group)
+                or not re.fullmatch(r"/subscriptions/" + re.escape(scale["subscription_id"])
+                                    + r"/resourceGroups/[\w().-]{1,90}", group, re.I)
+                or reviewed.get(group.lower()) != scale["id"]):
+            invalid("a stage changed its exact resource group or run identity")
         deleted = stage.get("delete")
         if not isinstance(deleted, list) or not deleted:
             invalid("a stage has no exact deletions")
+        if not any(isinstance(entry, str) and group.lower() == entry.lower() for entry in deleted):
+            invalid("the stage resource group differs from its exact deletions")
         for entry in deleted:
             if not _text(entry) or reviewed.get(entry.lower()) != scale["id"] or entry.lower() in covered:
                 invalid("stage deletions differ from the reviewed exact inventory")
+            name = entry.split("/")[4]
+            if any(fnmatch.fnmatchcase(name.lower(), pattern.lower()) for pattern in patterns):
+                invalid("deletion targets a protected resource-group name")
             covered.add(entry.lower())
         if stage["kind"] == "project":
             pipeline = stage.get("pipeline")
             if (seen_common or stage.get("depends_on") != [] or stage.get("inputs") != DELETE_FLAGS
+                    or not _uuid(stage.get("project_id"))
+                    or stage.get("project_number") != project_numbers.get(stage["project_id"])
                     or any(value is not True for value in stage["inputs"].values())
                     or stage.get("lifecycle_order") != PROJECT_ORDER or not isinstance(pipeline, dict)
                     or pipeline.get("provider") not in PIPELINE_DEFINITIONS
@@ -438,6 +474,8 @@ def validate_deletion_preview(request: dict[str, Any], preview: Any) -> None:
     plan = (validate_teardown_plan(preview.get("deletion_plan"), request["factory_id"], scales, targets)
             if contract == TEARDOWN_CONTRACT else
             validate_deletion_plan(preview.get("deletion_plan"), request["factory_id"], scales, factory, targets))
+    if re.fullmatch(r"[0-9a-f]{40}", version["resolved_ref"]) and plan["source_commit"] != version["resolved_ref"]:
+        invalid("the execution plan changed the reviewed source commit")
     for field in ("protected_resources", "retained_resources"):
         entries = plan.get(field)
         if not isinstance(entries, list):
