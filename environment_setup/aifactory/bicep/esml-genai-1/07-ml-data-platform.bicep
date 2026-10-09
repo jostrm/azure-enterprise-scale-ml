@@ -549,10 +549,11 @@ module amlv2Aks '../modules/machineLearningAks.bicep' = if(enableAzureMachineLea
     aksDnsServiceIP: aksDnsServiceIP
     aksServiceCidr: aksServiceCidr
     tags: tagsProject
-    aksVmSku_dev: aksExists ? '' : aks_dev_sku_param
-    aksVmSku_testProd: aksExists ? '' : aks_test_prod_sku_param
-    aksNodes_dev: aksExists ? 0 : aks_dev_nodes_param
-    aksNodes_testProd: aksExists ? 0 : aks_test_prod_nodes_param
+    // Preserve desired immutable AML attachment sizes even when AKS already exists.
+    aksVmSku_dev: aks_dev_sku_param
+    aksVmSku_testProd: aks_test_prod_sku_param
+    aksNodes_dev: aks_dev_nodes_param
+    aksNodes_testProd: aks_test_prod_nodes_param
     kubernetesVersionAndOrchestrator: aksExists ? '' : aks_version_param
     kvName: keyvaultName
   }

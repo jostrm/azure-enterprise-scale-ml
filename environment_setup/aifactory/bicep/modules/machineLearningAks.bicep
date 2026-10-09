@@ -221,9 +221,10 @@ resource machineLearningCompute 'Microsoft.MachineLearningServices/workspaces/co
       loadBalancerType: 'InternalLoadBalancer'
       // Also required when attaching an existing cluster; otherwise Azure ML defaults to 'aks-subnet'.
       loadBalancerSubnet: aksSubnetName
-    }, !aksExists ? {
+      // Immutable on an existing AML attachment; omission on a repeated PUT resets API defaults.
       agentCount: env == 'dev' ? aksNodes_dev : aksNodes_testProd
       agentVmSize: env == 'dev' ? aksVmSku_dev : aksVmSku_testProd
+    }, !aksExists ? {
       aksNetworkingConfiguration: {
         subnetId: aksSubnetId
         dnsServiceIP: aksDnsServiceIP

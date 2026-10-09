@@ -27,14 +27,16 @@ def test_aks_completion_does_not_require_recreating_workspace():
     assert "if(!amlExists && enableAzureMachineLearning)" in module_block(source, "amlv2").splitlines()[0]
 
 
-def test_existing_cluster_attachment_omits_creation_only_sizes():
+def test_existing_cluster_attachment_resubmits_sizes_without_cluster_creation():
     source = (BICEP / "modules" / "machineLearningAks.bicep").read_text()
     compute = source[source.index("resource machineLearningCompute "):]
     common, creation = compute.split("}, !aksExists ? {", 1)
-    assert "agentCount:" not in common
-    assert "agentVmSize:" not in common
-    assert "agentCount: env == 'dev' ? aksNodes_dev : aksNodes_testProd" in creation
-    assert "agentVmSize: env == 'dev' ? aksVmSku_dev : aksVmSku_testProd" in creation
+    assert "agentCount: env == 'dev' ? aksNodes_dev : aksNodes_testProd" in common
+    assert "agentVmSize: env == 'dev' ? aksVmSku_dev : aksVmSku_testProd" in common
+    assert "agentCount:" not in creation
+    assert "agentVmSize:" not in creation
+    assert "aksNetworkingConfiguration:" not in common
+    assert "aksNetworkingConfiguration:" in creation
     assert "resourceId: aksResourceId" in common
     assert "env == 'dev' && !aksExists" in source
     assert "(env == 'test' || env == 'prod') && !aksExists" in source

@@ -102,6 +102,37 @@ class TestAmlAksCompute(unittest.TestCase):
             "cluster falls back to the non-existent 'aks-subnet'",
         )
 
+    def test_repeated_attachment_resubmits_immutable_sizes(self) -> None:
+        """An omitted size defaults on PUT and fails an already-attached compute."""
+        aks_computes = [
+            d for d in iac.resource_declarations(_AML_AKS_TEMPLATE, _COMPUTE_TYPE)
+            if "'AKS'" in d["body"]
+        ]
+        self.assertEqual(1, len(aks_computes), "precondition: one AKS compute")
+        common, creation = aks_computes[0]["body"].split("}, !aksExists ? {", 1)
+        for binding in (
+            "agentCount: env == 'dev' ? aksNodes_dev : aksNodes_testProd",
+            "agentVmSize: env == 'dev' ? aksVmSku_dev : aksVmSku_testProd",
+        ):
+            with self.subTest(binding=binding):
+                self.assertIn(binding, common, "Existing attachments must resend their immutable sizes")
+                self.assertNotIn(binding, creation)
+        self.assertNotIn("aksNetworkingConfiguration:", common)
+        self.assertIn("aksNetworkingConfiguration:", creation)
+
+    def test_attachment_caller_preserves_configured_sizes(self) -> None:
+        """aksExists must not replace immutable attachment sizes with zero/empty."""
+        source = (config.GENAI_BICEP_DIR / "07-ml-data-platform.bicep").read_text()
+        caller = source.split("module amlv2Aks ", 1)[1].split("\nmodule ", 1)[0]
+        for binding in (
+            "aksVmSku_dev: aks_dev_sku_param",
+            "aksVmSku_testProd: aks_test_prod_sku_param",
+            "aksNodes_dev: aks_dev_nodes_param",
+            "aksNodes_testProd: aks_test_prod_nodes_param",
+        ):
+            with self.subTest(binding=binding):
+                self.assertIn(binding, caller, "Attachment caller must forward desired immutable sizes")
+
 
 if __name__ == "__main__":
     unittest.main()
