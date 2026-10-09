@@ -10,6 +10,7 @@ import json
 import math
 import re
 import subprocess
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 from urllib.parse import parse_qsl, urlencode, urlsplit
@@ -19,6 +20,8 @@ Az = Callable[..., subprocess.CompletedProcess[str]]
 MAX_PAGES = 100
 MAX_ROWS = 100_000
 MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+MAX_READ_ATTEMPTS = 3
+MAX_RETRY_AFTER_SECONDS = 30
 STORAGE_MAX_AGE = timedelta(days=2)
 ARM = "https://management.azure.com"
 RESOURCE_QUERY = "[].{id:id,type:type,kind:kind,name:name}"
@@ -54,10 +57,147 @@ UNAVAILABLE = "Read unavailable; access, connectivity, or API support could not 
 INCOMPLETE = "Incomplete response; no aggregate is reported."
 INVALID = "Invalid response; no aggregate is reported."
 METRIC_KEYS = ("activity", "agents", "models", "storage", "adf", "search")
+FAILURE_DETAILS = {
+    "UsageReadTimeout": "CLI read timed out; no aggregate is reported.",
+    "ReadTimeout": "Read timed out; no aggregate is reported.",
+    "Throttled": "Read throttled; no aggregate is reported.",
+    "ServiceUnavailable": "Service or transport unavailable; no aggregate is reported.",
+    "NetworkAccessDenied": "Network access denied; no aggregate is reported.",
+    "AuthenticationRequired": "Authentication is required; no aggregate is reported.",
+    "AccessDenied": "Read access denied; no aggregate is reported.",
+    "ReadFailed": UNAVAILABLE,
+    "ReadSchemaInvalid": INVALID,
+    "ReadIncomplete": INCOMPLETE,
+}
+HTTP_STATUS = re.compile(
+    r"\b(?:http(?:/\d(?:\.\d)?)?(?:\s*error)?|(?:response\s+)?status(?:[\s_-]*code)?)"
+    r"""["']?\s*[:=]?\s*["']?([1-5]\d{2})\b""", re.I,
+)
+CLI_STATUS = re.compile(
+    r"""(?:\bERROR:\s*\(?|\b(?:invalid\s+status|status)\s*['"])"""
+    r"(Forbidden|Unauthorized|ResourceNotFound|Too\s*Many\s*Requests|Service\s*Unavailable)\b", re.I,
+)
+NETWORK_HINT = re.compile(
+    r"\b(?:public[\s_-]*network|firewall|virtual[\s_-]*network|private[\s_-]*endpoint"
+    r"|network[\s_-]*(?:access[\s_-]*)?(?:denied|policy|blocked))", re.I,
+)
+TIMEOUT_HINT = re.compile(r"\b(?:timed?\s*out|readtimeout|connecttimeout|timeoutexpired)\b", re.I)
+RETRY_AFTER = re.compile(r"""\bretry-?after["']?\s*[:=]\s*["']?([^\s"',;}]*)""", re.I)
+DENIED_CODES = {"accessdenied", "forbidden", "authorizationfailed", "authorizationpermissionmismatch"}
+AUTH_CODES = {
+    "authenticationrequired", "unauthorized", "authenticationfailed", "invalidauthenticationtoken",
+    "expiredauthenticationtoken", "authenticationmissing", "invalidtoken", "unauthenticated",
+}
+TIMEOUT_CODES = {"readtimeout", "connecttimeout", "timeoutexpired", "timeout", "requesttimeout", "operationtimedout"}
+SERVICE_CODES = {"serviceunavailable", "internalservererror", "badgateway", "gatewaytimeout", "connectionerror"}
+THROTTLED_CODES = {"throttled", "toomanyrequests", "throttling", "throttlingexception"}
+TRANSIENT_HTTP_STATUS = {408, 429, 500, 502, 503, 504}
+
+
+class AzureCliUnavailable(RuntimeError):
+    """The required Azure CLI executable or its runtime could not be launched."""
 
 
 class ObservationError(Exception):
     """A deliberately payload-free failure safe to display on a shared dashboard."""
+
+    def __init__(self, detail=UNAVAILABLE, code=None):
+        if code is None:
+            code = {INVALID: "ReadSchemaInvalid", INCOMPLETE: "ReadIncomplete"}.get(detail, "ReadFailed")
+        self.code = code if code in FAILURE_DETAILS else "ReadFailed"
+        super().__init__(FAILURE_DETAILS[self.code])
+
+
+def azure_error_code(result: subprocess.CompletedProcess[str]) -> str | None:
+    """Extract Azure's first JSON error code; callers must sanitize before display."""
+    text = f"{result.stderr}\n{result.stdout}"
+    for offset, character in enumerate(text):
+        if character != "{":
+            continue
+        try:
+            payload, _ = json.JSONDecoder().raw_decode(text[offset:])
+        except (json.JSONDecodeError, RecursionError):
+            continue
+        error = payload.get("error") if isinstance(payload, dict) else None
+        code = error.get("code") if isinstance(error, dict) else None
+        if isinstance(code, str):
+            return code
+    return None
+
+
+def _failure_signals(result):
+    code = (azure_error_code(result) or "").lower()
+    text = f"{result.stderr}\n{result.stdout}"
+    match = HTTP_STATUS.search(text)
+    status = int(code) if re.fullmatch(r"[1-5]\d{2}", code) else int(match[1]) if match else None
+    if status is None:
+        reason = CLI_STATUS.search(text)
+        if reason:
+            status = {
+                "forbidden": 403, "unauthorized": 401, "resourcenotfound": 404,
+                "toomanyrequests": 429, "serviceunavailable": 503,
+            }[re.sub(r"\s", "", reason[1]).lower()]
+    return code, text, status
+
+
+def read_failure_code(result: subprocess.CompletedProcess[str]) -> str:
+    """Classify failed reads into fixed, payload-free dashboard codes."""
+    code, text, status = _failure_signals(result)
+    denied = status == 403 or code in DENIED_CODES or re.search(r"\bforbidden\b", text, re.I)
+    if code in {"networkaccessdenied", "networkdenied", "networkblocked", "networkpolicydenied"} or (
+        NETWORK_HINT.search(text) and (denied or re.search(r"\b(?:denied|disabled|blocked)\b", text, re.I))
+    ):
+        return "NetworkAccessDenied"
+    if status == 401 or code in AUTH_CODES or re.search(r"\bAADSTS\d+\b", text, re.I):
+        return "AuthenticationRequired"
+    if denied:
+        return "AccessDenied"
+    if code in {"resourcenotfound", "notfound"} or status == 404:
+        return "ReadFailed"
+    # Terminal HTTP failures must remain terminal after code-only sanitization.
+    if status is not None and status not in TRANSIENT_HTTP_STATUS:
+        return "ReadFailed"
+    if status == 429 or code in THROTTLED_CODES:
+        return "Throttled"
+    if status is not None and 500 <= status <= 599:
+        return "ServiceUnavailable"
+    if code == "usagereadtimeout":
+        return "UsageReadTimeout"
+    if status == 408 or code in TIMEOUT_CODES or TIMEOUT_HINT.search(text):
+        return "ReadTimeout"
+    if code in SERVICE_CODES or re.search(r"\bConnectionError\b", text):
+        return "ServiceUnavailable"
+    if code == "readschemainvalid":
+        return "ReadSchemaInvalid"
+    if code == "readincomplete":
+        return "ReadIncomplete"
+    return "ReadFailed"
+
+
+def is_transient_read_failure(result: subprocess.CompletedProcess[str]) -> bool:
+    """Retry only known throttling, selected HTTP failures and transport timeouts."""
+    if not result.returncode:
+        return False
+    failure = read_failure_code(result)
+    if failure not in {"UsageReadTimeout", "ReadTimeout", "Throttled", "ServiceUnavailable"}:
+        return False
+    _, _, status = _failure_signals(result)
+    return status in TRANSIENT_HTTP_STATUS if status is not None else True
+
+
+def _retry_delay(result, attempt):
+    # CLI does not normally expose headers. Honor explicit numeric hints only;
+    # unsupported or out-of-budget hints stop the read instead of hot-looping.
+    delays = []
+    for match in RETRY_AFTER.finditer(f"{result.stderr}\n{result.stdout}"):
+        try:
+            delay = float(match[1])
+        except ValueError:
+            return None
+        if not math.isfinite(delay) or not 0 < delay <= MAX_RETRY_AFTER_SECONDS:
+            return None
+        delays.append(delay)
+    return max(delays) if delays else attempt + 1
 
 
 def _iso(value: datetime) -> str:
@@ -85,6 +225,8 @@ def _number(value: object) -> bool:
 
 
 def _metric(value=None, status="unavailable", detail=UNAVAILABLE, **extra) -> dict:
+    if status == "unavailable":
+        extra.setdefault("errorCode", "ReadFailed")
     return {"value": value, "status": status, "detail": detail, **extra}
 
 
@@ -274,11 +416,12 @@ def is_read_command(args) -> bool:
 
 
 class Collector:
-    def __init__(self, az: Az, now: datetime | None = None):
+    def __init__(self, az: Az, now: datetime | None = None, *, sleeper: Callable[[float], None] = time.sleep):
         now = now if now is not None else datetime.now(timezone.utc)
         if now.tzinfo is None or now.utcoffset() is None:
             raise ValueError("Snapshot time must be timezone-aware.")
         self.az = az
+        self._sleep = sleeper
         # Monitor FULL buckets start at minute grain, even for second-precision requests.
         self.now = now.astimezone(timezone.utc).replace(second=0, microsecond=0)
         self.start = self.now - timedelta(days=30)
@@ -288,14 +431,27 @@ class Collector:
         command = (*args, "--subscription", subscription, "--output", "json", "--only-show-errors")
         if not is_read_command(command):
             raise ObservationError(INVALID)
-        try:
-            result = self.az(*command)
-        except (OSError, subprocess.TimeoutExpired, RuntimeError):
-            # The dashboard launcher reports missing CLI/runtime and launch failures
-            # as RuntimeError. Catch only at this transport boundary, never parsing.
-            raise ObservationError(UNAVAILABLE) from None
-        if result.returncode:
-            raise ObservationError(UNAVAILABLE)
+        for attempt in range(MAX_READ_ATTEMPTS):
+            try:
+                result = self.az(*command)
+            except subprocess.TimeoutExpired:
+                failure, transient, delay = "UsageReadTimeout", True, attempt + 1
+            except TimeoutError:
+                failure, transient, delay = "ReadTimeout", True, attempt + 1
+            except ConnectionError:
+                failure, transient, delay = "ServiceUnavailable", True, attempt + 1
+            except (OSError, AzureCliUnavailable):
+                # Launcher/runtime failures are sanitized only at this boundary.
+                raise ObservationError(code="ReadFailed") from None
+            else:
+                if not result.returncode:
+                    break
+                failure = read_failure_code(result)
+                transient = is_transient_read_failure(result)
+                delay = _retry_delay(result, attempt) if transient else None
+            if not transient or attempt + 1 == MAX_READ_ATTEMPTS or delay is None:
+                raise ObservationError(code=failure) from None
+            self._sleep(delay)
         if not isinstance(result.stdout, str):
             raise ObservationError(INVALID)
         if len(result.stdout.encode("utf-8")) > MAX_RESPONSE_BYTES:
@@ -385,17 +541,26 @@ class Collector:
         try:
             metrics["activity"] = self._activity(subscription, rg_name, resource_group_id)
         except ObservationError as error:
-            metrics["activity"] = _metric(detail=str(error))
+            metrics["activity"] = _metric(detail=str(error), errorCode=error.code)
         try:
             resources = self._resources(subscription, rg_name, resource_group_id)
         except ObservationError as error:
-            metrics.update({key: _metric(detail=str(error)) for key in METRIC_KEYS if key != "activity"})
+            metrics.update({
+                key: _metric(detail=str(error), errorCode=error.code)
+                for key in METRIC_KEYS if key != "activity"
+            })
         else:
             for key in METRIC_KEYS[1:]:
                 try:
                     metrics[key] = getattr(self, "_" + key)(subscription, resources)
                 except ObservationError as error:
-                    metrics[key] = _metric(detail=str(error))
+                    metrics[key] = _metric(detail=str(error), errorCode=error.code)
+        for key, metric in metrics.items():
+            if metric["status"] == "ok":
+                metric["observedAt"] = _iso(self.now)
+            elif metric["status"] == "unavailable":
+                codes = metric.get("errorCodes", [metric["errorCode"]])
+                print(f"WARNING: Dashboard usage {key} unavailable ({', '.join(codes)}).")
         result = {
             "observedAt": _iso(self.now), "windowStart": _iso(self.start),
             "windowEnd": _iso(self.now), "metrics": metrics,
@@ -467,6 +632,7 @@ class Collector:
             "Email-caller Activity Log events in the last 30 days with positive user/delegated-scope claims; app/managed identities excluded. Delegated automation may remain."
             + (" Unclassified identities prevent a complete count." if unknown else ""),
             classifiedEvents=count, unclassifiedEvents=unknown,
+            **({"errorCode": "ReadIncomplete"} if unknown else {}),
         )
 
     @staticmethod
@@ -514,21 +680,24 @@ class Collector:
                 str(item.get("kind", "")).lower() == "aiservices"
                 for item in self._matching(resources, FOUNDRY_ACCOUNT)
             ):
-                return _metric(detail="No supported Foundry project endpoint was discovered; agent inventory is unavailable.")
+                return _metric(
+                    detail="No supported Foundry project endpoint was discovered; agent inventory is unavailable.",
+                    errorCode="ReadIncomplete",
+                )
             return self._absent()
         endpoints = []
-        endpoint_failure = bool(legacy_projects)
+        endpoint_errors = {"ReadIncomplete"} if legacy_projects else set()
         for project in projects:
             try:
                 endpoints.append(self._project_endpoint(subscription, project))
-            except ObservationError:
-                endpoint_failure = True
-        counts, statuses = {}, {}
+            except ObservationError as error:
+                endpoint_errors.add(error.code)
+        counts, statuses, errors = {}, {}, {}
         for population, path, version in (
             ("new", "agents", NEW_AGENT_API), ("classic", "assistants", CLASSIC_AGENT_API),
         ):
             identities = set()
-            failed = endpoint_failure
+            failures = set(endpoint_errors)
             for endpoint in endpoints:
                 try:
                     url = endpoint + "/" + path + "?" + urlencode({
@@ -540,18 +709,25 @@ class Collector:
                             if not isinstance(identifier, str) or not CURSOR.fullmatch(identifier):
                                 raise ObservationError(INVALID)
                             identities.add((endpoint, identifier))
-                except ObservationError:
-                    failed = True
-            counts[population] = None if failed else len(identities)
-            statuses[population] = "unavailable" if failed else "ok"
+                except ObservationError as error:
+                    failures.add(error.code)
+            counts[population] = None if failures else len(identities)
+            statuses[population] = "unavailable" if failures else "ok"
+            errors[population] = sorted(failures)
         complete = all(value is not None for value in counts.values())
+        failure_codes = sorted(set(errors["new"]) | set(errors["classic"]))
         return _metric(
             sum(counts.values()) if complete else None, "ok" if complete else "unavailable",
             "Foundry inventory: new agents (v1) and classic assistants (2025-05-01) are separate populations, not versions or runtime traffic."
-            + ("" if complete else " One or more populations could not be completely read."),
+            + ("" if complete else " One or more populations could not be completely read. Failure codes: "
+               + ", ".join(failure_codes) + "."),
             newCount=counts["new"], classicCount=counts["classic"],
             newStatus=statuses["new"], classicStatus=statuses["classic"],
             resourceCount=len(projects) + len(legacy_projects),
+            **({
+                "errorCode": failure_codes[0], "errorCodes": failure_codes,
+                "newErrorCodes": errors["new"], "classicErrorCodes": errors["classic"],
+            } if not complete else {}),
         )
 
     def _project_endpoint(self, subscription, project):

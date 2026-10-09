@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import copy
 import json
 import math
 import os
@@ -65,14 +66,14 @@ def env_value(name: str, default: str = "") -> str:
 def az_cli(*args: str) -> subprocess.CompletedProcess[str]:
     executable = shutil.which("az")
     if not executable:
-        raise RuntimeError("Azure CLI is required for dashboard reconciliation; 'az' was not found on PATH.")
+        raise usage.AzureCliUnavailable("Azure CLI is required for dashboard reconciliation; 'az' was not found on PATH.")
     command = [executable]
     if sys.platform == "win32" and Path(executable).suffix.lower() in (".cmd", ".bat"):
         # Use the CLI's own runtime, as in cleanup-project-orphan-roles.py, not cmd.exe:
         # dashboard URLs, ETags, and JSON-file arguments must stay literal.
         cli_python = Path(executable).parent.parent / "python.exe"
         if not cli_python.is_file():
-            raise RuntimeError(f"Cannot locate the Windows Azure CLI Python runtime: {cli_python}")
+            raise usage.AzureCliUnavailable(f"Cannot locate the Windows Azure CLI Python runtime: {cli_python}")
         command = [str(cli_python), "-X", "utf8", "-IBm", "azure.cli"]
     try:
         return subprocess.run(
@@ -89,23 +90,11 @@ def az_cli(*args: str) -> subprocess.CompletedProcess[str]:
             command, 1, "", '{"error":{"code":"UsageReadTimeout"}}'
         )
     except OSError as error:
-        raise RuntimeError(f"Unable to launch Azure CLI for dashboard reconciliation: {error}") from error
+        raise usage.AzureCliUnavailable(f"Unable to launch Azure CLI for dashboard reconciliation: {error}") from error
 
 
 def error_code(result: subprocess.CompletedProcess[str]) -> str | None:
-    text = f"{result.stderr}\n{result.stdout}"
-    for offset, character in enumerate(text):
-        if character != "{":
-            continue
-        try:
-            payload, _ = json.JSONDecoder().raw_decode(text[offset:])
-        except json.JSONDecodeError:
-            continue
-        error = payload.get("error") if isinstance(payload, dict) else None
-        code = error.get("code") if isinstance(error, dict) else None
-        if isinstance(code, str):
-            return code
-    return None
+    return usage.azure_error_code(result)
 
 
 def json_result(result: subprocess.CompletedProcess[str], purpose: str) -> object | None:
@@ -730,18 +719,62 @@ def cost_part(x: int, y: int, resource: dict, tenant_id: str) -> dict:
     }
 
 
+def snapshot_time(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    offset = timestamp.utcoffset()
+    return timestamp if offset is not None and offset.total_seconds() == 0 else None
+
+
+def measured_value(value: object) -> bool:
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and 0 <= value <= 2 ** 63 - 1 and math.isfinite(value))
+
+
+def merge_usage_snapshot(fresh: dict, previous: object) -> dict:
+    result = copy.deepcopy(fresh)
+    if not isinstance(previous, dict):
+        return result
+    attempted = snapshot_time(fresh.get("observedAt"))
+    old_metrics = previous.get("metrics", {})
+    if attempted is None or not isinstance(old_metrics, dict):
+        return result
+    for key, metric in result.get("metrics", {}).items():
+        old = old_metrics.get(key)
+        if not isinstance(metric, dict) or metric.get("status") != "unavailable" or not isinstance(old, dict):
+            continue
+        observed = snapshot_time(old.get("observedAt", previous.get("observedAt")))
+        if (old.get("status") not in {"ok", "stale"} or not measured_value(old.get("value"))
+                or (key != "storage" and int(old["value"]) != old["value"])
+                or observed is None or observed > attempted):
+            continue
+        retained = copy.deepcopy(old)
+        retained.update({
+            "status": "stale",
+            "observedAt": observed.isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "refreshAttemptedAt": fresh["observedAt"],
+            "refreshErrorCode": metric.get("errorCode", "ReadFailed"),
+        })
+        for field in ("windowStart", "windowEnd"):
+            if field not in retained and field in previous:
+                retained[field] = previous[field]
+        result["metrics"][key] = retained
+    return result
+
+
 def usage_part(x: int, y: int, resource: dict, tenant_id: str) -> dict:
     snapshot = resource.get("usageSnapshot", {})
     snapshot = snapshot if isinstance(snapshot, dict) else {}
     metrics = snapshot.get("metrics", {})
     metrics = metrics if isinstance(metrics, dict) else {}
     observed = "not collected"
-    try:
-        timestamp = datetime.fromisoformat(str(snapshot.get("observedAt", "")).replace("Z", "+00:00"))
-        if timestamp.utcoffset() is not None and timestamp.utcoffset().total_seconds() == 0:
-            observed = timestamp.strftime("%Y-%m-%d %H:%M UTC")
-    except ValueError:
-        pass  # Old inventories have no usage snapshot; the card explicitly says so.
+    timestamp = snapshot_time(snapshot.get("observedAt"))
+    if timestamp is not None:
+        observed = timestamp.strftime("%Y-%m-%d %H:%M UTC")
     rows = []
     for key, label in USAGE_LABELS:
         metric = metrics.get(key, {})
@@ -749,11 +782,17 @@ def usage_part(x: int, y: int, resource: dict, tenant_id: str) -> dict:
         value = metric.get("value")
         if metric.get("status") == "not-deployed":
             display = "Not deployed"
-        elif (metric.get("status") == "ok" and isinstance(value, (int, float))
-              and not isinstance(value, bool) and math.isfinite(value) and value >= 0):
+        elif metric.get("status") in {"ok", "stale"} and measured_value(value):
             display = f"**{value / (1024 ** 3):,.2f} GiB**" if key == "storage" else f"**{value:,.0f}**"
+            if metric["status"] == "stale":
+                last_time = snapshot_time(metric.get("observedAt"))
+                last_label = last_time.strftime("%Y-%m-%d %H:%M UTC") if last_time else "unknown time"
+                display += f" (last known {last_label})"
         else:
             display = "**Unavailable**"
+        code = metric.get("refreshErrorCode") if metric.get("status") == "stale" else metric.get("errorCode")
+        if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9]{1,64}", code):
+            display += f" - {code}"
         rows.append(f"| {label} | {display} |")
     activity_url = f"https://portal.azure.com/#@{tenant_id}/resource{resource['id']}/activitylog"
     return markdown_part(
@@ -761,6 +800,7 @@ def usage_part(x: int, y: int, resource: dict, tenant_id: str) -> dict:
         "### Activity & solution assets\n\n"
         "| Evidence | Value |\n|---|---:|\n" + "\n".join(rows)
         + f"\n\nSnapshot: {observed}. Refresh via dashboard-only run, not browser.\n\n"
+        + "Last known values are not current; their original collection time is retained.\n\n"
         + f"[Activity log]({activity_url}) - Email callers; no app/managed identities. "
         "Inventory is not runtime usage.",
     )
@@ -773,8 +813,13 @@ def inventory_groups(inventory: dict) -> list[dict]:
     return groups
 
 
-def collect_usage(inventory: dict, collector, subscriptions: set[str]) -> None:
+def collect_usage(inventory: dict, collector, subscriptions: set[str], *, previous_inventory: dict | None = None) -> None:
     allowed = {subscription.lower() for subscription in subscriptions if subscription}
+    previous = {
+        group["id"].lower(): group.get("usageSnapshot")
+        for group in inventory_groups(previous_inventory or {"hubResourceGroups": [], "environments": []})
+        if isinstance(group.get("id"), str)
+    }
     snapshots = {}
     for group in inventory_groups(inventory):
         resource_id = group.get("id", "")
@@ -785,7 +830,9 @@ def collect_usage(inventory: dict, collector, subscriptions: set[str]) -> None:
             continue
         key = resource_id.lower()
         if key not in snapshots:
-            snapshots[key] = collector.collect(resource_id)
+            snapshots[key] = merge_usage_snapshot(
+                collector.collect(resource_id), previous.get(key, group.get("usageSnapshot")),
+            )
         group["usageSnapshot"] = snapshots[key]
 
 
@@ -971,7 +1018,7 @@ def reconcile(config: Config, az: Az = az_cli, *, include_usage: bool = True) ->
     if tenant_result.returncode or not GUID.fullmatch(tenant_result.stdout.strip()):
         raise RuntimeError("Unable to resolve the dashboard host tenant.")
     if include_usage:
-        collect_usage(reconciled, usage.Collector(az), set(config.subscriptions.values()))
+        collect_usage(reconciled, usage.Collector(az), set(config.subscriptions.values()), previous_inventory=inventory)
     return reconciled, tenant_result.stdout.strip(), etag
 
 

@@ -538,6 +538,22 @@ denied/unreachable sources display **Unavailable**, not zero. **Not deployed**
 means successful RG discovery found no applicable service; a measured zero is
 shown only when the relevant read completed successfully.
 
+A failed refresh does not erase an earlier successful value for the same exact
+RG. It retains that value as **last known**, with its original UTC collection
+time and a safe refresh-failure code; it is **not current**. Successful new reads
+replace it, including measured zero. Confirmed absence replaces it with
+**Not deployed**. Last-known Activity Log / pipeline totals retain their
+original observation window, not a newly shifted 30-day period.
+
+Only known transient transport, throttling and service failures are retried,
+with bounded attempts and backoff. Authorization/network-policy denials are
+not retried as if the service had no assets. Failure codes distinguish these
+conditions without exposing raw API errors, identities or credentials.
+Foundry agent and Search index counts require a caller/network path that can
+reach their existing private endpoints when public access is disabled; an
+ARM-readable service or a working model-metrics chart does not establish that
+data-plane access. This command does not open access or fall back to keys.
+
 The collector uses existing Azure Monitor/management reads and existing Entra
 data-plane access. Foundry and Search inventory can require private-network
 reachability and data-plane authorization even when ARM reads succeed. The
