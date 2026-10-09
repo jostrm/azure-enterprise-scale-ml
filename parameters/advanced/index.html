@@ -2916,11 +2916,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">381</td>
+<td style="text-align: right;">387</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">380</td>
+<td style="text-align: right;">386</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2936,15 +2936,15 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">384</td>
+<td style="text-align: right;">390</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 149, 405; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 150, 406; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 407, 431; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 149, 412; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 150, 413; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 414, 438; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -3225,6 +3225,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
 <td>Deploy Azure AI Document Intelligence</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:enableAIFactoryAgentLiveVoice --><!-- parameter json.dev:enableAIFactoryAgentLiveVoice --><code>enableAIFactoryAgentLiveVoice</code></td>
+<td><code>ENABLE_AI_FACTORY_AGENT_LIVE_VOICE</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Opt-in project001 Dev live voice for the AI Factory Agent chat: deploys the private chat application with Azure Voice Live on the project Foundry account and a pulsing voice orb. Requires enableFactoryChatAgent (voice alone fails the step), Container Apps, Foundry and AI Search, an Entra single-page-app registration and read-only reader object IDs. False skips the step; it does not delete resources or remove roles.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableAIFactoryCreatedDefaultProjectForAIFv2 --><!-- parameter json.dev:enableAIFactoryCreatedDefaultProjectForAIFv2 --><code>enableAIFactoryCreatedDefaultProjectForAIFv2</code></td>
@@ -3764,6 +3771,41 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>""</code><br>J.dev: <code>""</code></td>
 <td>Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aifactoryAgentContainerAppsEnvironment --><!-- parameter json.dev:aifactoryAgentContainerAppsEnvironment --><code>aifactoryAgentContainerAppsEnvironment</code></td>
+<td><code>AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Name of the internal project Container Apps environment hosting the agent chat keep-as-is: Empty selects the single environment in the project resource group.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aifactoryAgentEntraAppId --><!-- parameter json.dev:aifactoryAgentEntraAppId --><code>aifactoryAgentEntraAppId</code></td>
+<td><code>AIFACTORY_AGENT_ENTRA_APP_ID</code></td>
+<td>C</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if enableAIFactoryAgentLiveVoice:'true'. Created once by an Entra admin: SPA redirect URI = the application's HTTPS root, Application ID URI api://</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aifactoryAgentReaderObjectIds --><!-- parameter json.dev:aifactoryAgentReaderObjectIds --><code>aifactoryAgentReaderObjectIds</code></td>
+<td><code>AIFACTORY_AGENT_READER_OBJECT_IDS</code></td>
+<td>C</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in project001 Dev mandatory: if enableAIFactoryAgentLiveVoice:'true'. Write, delete and cost permissions are never granted by the pipeline.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aifactoryAgentVoiceLanguages --><!-- parameter json.dev:aifactoryAgentVoiceLanguages --><code>aifactoryAgentVoiceLanguages</code></td>
+<td><code>AIFACTORY_AGENT_VOICE_LANGUAGES</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Comma-separated speech input languages (BCP-47) for live voice keep-as-is: Empty uses en-US. Swedish needs an explicit entry such as sv-SE,en-US. Only read when enableAIFactoryAgentLiveVoice:'true'.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aifactoryAgentVoiceName --><!-- parameter json.dev:aifactoryAgentVoiceName --><code>aifactoryAgentVoiceName</code></td>
+<td><code>AIFACTORY_AGENT_VOICE_NAME</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Azure Speech voice used for spoken answers keep-as-is: Empty uses en-US-Ava:DragonHDLatestNeural. Only read when enableAIFactoryAgentLiveVoice:'true'.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:aifactoryMcpApiImage --><!-- parameter json.dev:aifactoryMcpApiImage --><code>aifactoryMcpApiImage</code></td>
@@ -5840,6 +5882,41 @@ reported, not silently represented as multiple settings.</p>
 <td>VM admin username</td>
 </tr>
 <tr>
+<td><!-- parameter env:AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT --><code>AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT</code></td>
+<td><code>aifactoryAgentContainerAppsEnvironment</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>Name of the internal project Container Apps environment hosting the agent chat keep-as-is: Empty selects the single environment in the project resource group.</td>
+</tr>
+<tr>
+<td><!-- parameter env:AIFACTORY_AGENT_ENTRA_APP_ID --><code>AIFACTORY_AGENT_ENTRA_APP_ID</code></td>
+<td><code>aifactoryAgentEntraAppId</code></td>
+<td>C</td>
+<td><code>""</code></td>
+<td>Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. Created once by an Entra admin: SPA redirect URI = the application's HTTPS root, Application ID URI api://</td>
+</tr>
+<tr>
+<td><!-- parameter env:AIFACTORY_AGENT_READER_OBJECT_IDS --><code>AIFACTORY_AGENT_READER_OBJECT_IDS</code></td>
+<td><code>aifactoryAgentReaderObjectIds</code></td>
+<td>C</td>
+<td><code>""</code></td>
+<td>Comma-separated Entra object IDs (GUIDs) granted read-only chat access (knowledge.read, factory.read) in project001 Dev mandatory: if ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. Write, delete and cost permissions are never granted by the pipeline.</td>
+</tr>
+<tr>
+<td><!-- parameter env:AIFACTORY_AGENT_VOICE_LANGUAGES --><code>AIFACTORY_AGENT_VOICE_LANGUAGES</code></td>
+<td><code>aifactoryAgentVoiceLanguages</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>Comma-separated speech input languages (BCP-47) for live voice keep-as-is: Empty uses en-US. Swedish needs an explicit entry such as sv-SE,en-US. Only read when ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'.</td>
+</tr>
+<tr>
+<td><!-- parameter env:AIFACTORY_AGENT_VOICE_NAME --><code>AIFACTORY_AGENT_VOICE_NAME</code></td>
+<td><code>aifactoryAgentVoiceName</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>Azure Speech voice used for spoken answers keep-as-is: Empty uses en-US-Ava:DragonHDLatestNeural. Only read when ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'.</td>
+</tr>
+<tr>
 <td><!-- parameter env:AIFACTORY_BRANCH_CHOSEN --><code>AIFACTORY_BRANCH_CHOSEN</code></td>
 <td><code>aifactory_branch_chosen</code></td>
 <td>O</td>
@@ -6650,6 +6727,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"false"</code></td>
 <td>Enable Azure AI Document Intelligence</td>
+</tr>
+<tr>
+<td><!-- parameter env:ENABLE_AI_FACTORY_AGENT_LIVE_VOICE --><code>ENABLE_AI_FACTORY_AGENT_LIVE_VOICE</code></td>
+<td><code>enableAIFactoryAgentLiveVoice</code></td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>Opt-in project001 Dev live voice for the AI Factory Agent chat: deploys the private chat application with Azure Voice Live on the project Foundry account and a pulsing voice orb. Requires enableFactoryChatAgent (voice alone fails the step), Container Apps, Foundry and AI Search, an Entra single-page-app registration and read-only reader object IDs. False skips the step; it does not delete resources or remove roles.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_AI_FACTORY_HUB --><code>ENABLE_AI_FACTORY_HUB</code></td>
