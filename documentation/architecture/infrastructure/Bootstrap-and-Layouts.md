@@ -6,6 +6,7 @@ sources:
   - 01-start-v125-and-above.sh
   - bootstrap/01-aif-copy-aifactory-templates.sh
   - bootstrap/lib/layout_router.sh
+  - bootstrap/.gitignore.template
   - bootstrap/lib/bootstrap_no_delete.py
   - bootstrap/lib/registered_setup.py
   - bootstrap/lib/registered_creation.py
@@ -14,6 +15,7 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_registered_creation.py
   - environment_setup/unit-tests/test-bicep/unit/test_registered_prerequisites.py
   - environment_setup/unit-tests/test-bicep/unit/test_runner_bootstrap.py
+  - environment_setup/unit-tests/test-bicep/unit/test_bootstrap_scoped_creation_guard.py
 graph_symbols:
   - bootstrap/lib/registered_creation.py::function:prepare
 reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
@@ -23,6 +25,11 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 ## Observed entry points
 
 `00-start.sh` is intended to install a control bundle into the parent consumer repository. It routes by layout and has an explicit `--no-delete` bundle-refresh path that avoids legacy cleanup, prompts and dispatch. Ordinary invocation is not equivalent to that safer path.
+
+The bundle includes `registered_personas.py`. Runtime Git ignore exceptions are
+derived from the same library inventory used for copying, while the checked-in
+ignore template is covered by the round-trip contract. Unlisted local library
+files and credentials remain ignored.
 
 `01-start-v125-and-above.sh` delegates to `registered_setup.py`: registered-layout onboarding, not a download, source-version change or cloud deployment. `registered_creation.py` maps Simple/Full launcher inputs into the API-owned prepare/review/confirm workflow and does not write factory records or execute cloud bootstrap itself.
 

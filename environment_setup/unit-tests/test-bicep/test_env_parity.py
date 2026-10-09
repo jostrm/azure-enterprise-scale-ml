@@ -166,6 +166,8 @@ KNOWN_MISSING = {
     "test_seeding_kv_service_connection",
     "prod_seeding_kv_service_connection",
     # CI-only or ADO-only variables not mirrored in GH .env template
+    # Set by successful persona preflight, never supplied by the operator.
+    "persona_preflight_ready",
     "admin_ip_fw",
     "aifactory_branch_chosen",
     "tag_costceter_common",
@@ -402,6 +404,11 @@ def _env_key(key: str, aliases: dict[str, str], env_vars: dict[str, str]) -> str
 
 
 class TestADOToGitHubEnvParity(unittest.TestCase):
+    def test_persona_readiness_is_runtime_state_not_a_public_input(self) -> None:
+        self.assertIn("persona_preflight_ready", KNOWN_MISSING)
+        self.assertEqual("false", _parse_yaml_vars(YAML_PATH)["persona_preflight_ready"])
+        self.assertNotIn("PERSONA_PREFLIGHT_READY", _parse_env_template(ENV_TEMPLATE_PATH))
+
     def test_camel_case_aliases_require_unique_matches(self) -> None:
         self.assertEqual(
             "APIM_GATEWAY_SKU", _env_key("apimGatewaySku", {}, {"APIM_GATEWAY_SKU": ""}),

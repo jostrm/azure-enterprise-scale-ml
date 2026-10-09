@@ -8,10 +8,13 @@ sources:
   - environment_setup/aifactory/bicep/modules/storageRbacUsers.bicep
   - environment_setup/aifactory/bicep/modules/kvRbacAssignments.bicep
   - bootstrap/lib/registered_personas.py
+  - bootstrap/lib/factory_enrollment.py
+  - environment_setup/aifactory/bicep/modules/dataLake.bicep
 tests:
   - environment_setup/unit-tests/test-bicep/unit/test_persona_policy.py
   - environment_setup/unit-tests/test-bicep/unit/test_persona_lake.py
   - environment_setup/unit-tests/test-bicep/unit/test_registered_personas.py
+  - environment_setup/unit-tests/test-bicep/unit/test_factory_enrollment.py
   - environment_setup/unit-tests/test-bicep/integration/test_persona_authorization.py
 graph_symbols:
   - bootstrap/lib/registered_personas.py
@@ -26,6 +29,11 @@ Legacy group-principal support is not a complete nine-persona permission model. 
 The authoritative [persona specification](../../v2/20-29/25-personas-aifactory.md) maps stable personas, executable custom roles, scoped discovery, privileged seeding and adoption/migration gates. Link to that matrix rather than keeping a second permission table here.
 
 Management visibility, resource administration and data access are different. Common-lake ACLs cannot restrict access already granted by broad storage RBAC. Project administrator labels do not authorize unrestricted common/hub access. The new exact project-vault secret GET/LIST/SET/DELETE baseline is neither the older read-only baseline nor the broader Secrets Officer wildcard.
+
+The canonical common-storage enrollment projection preserves the datalake's
+tag-driven shared-key policy: `AIF-Persona-Access=groups-v1` disables shared keys;
+legacy or absent persona tags retain the legacy policy. Enrollment does not
+re-enable keys to make coordination work.
 
 Deployment identities, runtime managed identities, human principals and provider service connections serve different purposes. Application runtime inference/search grants do not imply permission to deploy agents, mutate infrastructure or retrieve arbitrary secrets.
 

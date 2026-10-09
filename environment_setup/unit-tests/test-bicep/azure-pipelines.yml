@@ -17,21 +17,25 @@ pool:
 jobs:
   - job: OfflineInfrastructure
     displayName: Credential-free infrastructure tests
-    timeoutInMinutes: 30
+    timeoutInMinutes: $(jobTimeoutMinutes)
     strategy:
       matrix:
         UnitLinux:
           testPhase: unit
           imageName: ubuntu-22.04
+          jobTimeoutMinutes: 30
         UnitWindows:
           testPhase: unit
           imageName: windows-2022
+          jobTimeoutMinutes: 50
         Syntax:
           testPhase: syntax
           imageName: ubuntu-22.04
+          jobTimeoutMinutes: 30
         Bicep:
           testPhase: bicep
           imageName: ubuntu-22.04
+          jobTimeoutMinutes: 30
     steps:
       - checkout: self
         persistCredentials: false

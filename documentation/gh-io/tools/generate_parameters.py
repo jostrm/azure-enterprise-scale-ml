@@ -348,6 +348,8 @@ def bootstrap_inventory():
         "AIF_APP_GATEWAY_HOSTNAME": ("", "Simple-mode custom frontend FQDN covered by certificate DNS SAN."),
         "AIF_APP_GATEWAY_BACKEND_FQDN": ("", "Simple-mode distinct private HTTPS backend; trusted TLS and unauthenticated GET / returning 200-399."),
         "AIF_APP_GATEWAY_CERT_SECRET_ID": ("", "Simple-mode versionless Key Vault PFX certificate-secret URI, not a secret value."),
+        "AIF_PERSONA_ACCESS_MODE": ("", "Explicit legacy or groups-v1 override; omission inherits saved persona settings, otherwise legacy."),
+        "AIF_PERSONA_ACCESS_MANIFEST": ("", "Repository-relative reviewed manifest for groups-v1; omission inherits saved configuration. Required for groups-v1 together with bootstrapped seeding records."),
         "AIF_SIMPLE_PROJECT_RESOURCES_JSON": (
             re.search(r"AIF_SIMPLE_PROJECT_RESOURCES_JSON='([^']+)'", source)[1],
             "Simple-mode JSON resource-ID selection. Required project dependencies cannot be removed; [] removes only optional selections."),
@@ -398,7 +400,8 @@ def bootstrap_requirement(key):
         return "M"
     if (key.startswith(("ADO_", "AIF_HUB_", "AIF_ACCESS_HUB_", "AIF_APP_GATEWAY_"))
             or key in {"GITHUB_REPOSITORY", "AZURE_DEVOPS_EXT_PAT", "AIF_MI_RESOURCE_ID", "AIF_SP_CLIENT_ID", "AIF_SP_CLIENT_SECRET", "AIF_SUBMODULE_REF", "AIF_SEEDING_RESOURCE_GROUP", "AIF_SEEDING_KEYVAULT_NAME",
-                       "AIFACTORY_PROJECT_CONFIG", "AIFACTORY_PROJECT_NUMBER", "AIFACTORY_TARGET_ENVIRONMENT"}):
+                       "AIFACTORY_PROJECT_CONFIG", "AIFACTORY_PROJECT_NUMBER", "AIFACTORY_TARGET_ENVIRONMENT",
+                       "AIF_PERSONA_ACCESS_MANIFEST"}):
         return "C"
     return "O"
 

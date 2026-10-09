@@ -378,7 +378,7 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 |---|---:|
 | `yaml` | 387 |
 | `env` | 386 |
-| `bootstrap` | 90 |
+| `bootstrap` | 92 |
 | `helper` | 17 |
 | `state` | 47 |
 | `json.dev` | 390 |
@@ -1323,6 +1323,8 @@ Inputs are read by the create launchers, with version selectors also used by upd
 | <!-- parameter bootstrap:AIF_NETWORK_MODE -->`AIF_NETWORK_MODE` | O | `"priv"` | Networking: private-only (priv; enforced by policy); allowed: priv |
 | <!-- parameter bootstrap:AIF_NON_INTERACTIVE -->`AIF_NON_INTERACTIVE` | O | `"false"` | Aif non interactive override; see create launcher. |
 | <!-- parameter bootstrap:AIF_NO_WAIT -->`AIF_NO_WAIT` | O | `"false"` | Aif no wait override; see create launcher. |
+| <!-- parameter bootstrap:AIF_PERSONA_ACCESS_MANIFEST -->`AIF_PERSONA_ACCESS_MANIFEST` | C | `""` | Repository-relative reviewed manifest for groups-v1; omission inherits saved configuration. Required for groups-v1 together with bootstrapped seeding records. |
+| <!-- parameter bootstrap:AIF_PERSONA_ACCESS_MODE -->`AIF_PERSONA_ACCESS_MODE` | O | `""` | Explicit legacy or groups-v1 override; omission inherits saved persona settings, otherwise legacy. |
 | <!-- parameter bootstrap:AIF_PREFIX -->`AIF_PREFIX` | O | `"aif-"` | AI Factory naming prefix |
 | <!-- parameter bootstrap:AIF_PREPARE_ONLY -->`AIF_PREPARE_ONLY` | O | `"false"` | Aif prepare only override; see create launcher. |
 | <!-- parameter bootstrap:AIF_PROD_SUBSCRIPTION_ID -->`AIF_PROD_SUBSCRIPTION_ID` | O | `"$AIF_DEV_SUBSCRIPTION_ID"` | Aif prod subscription id override; see create launcher. |

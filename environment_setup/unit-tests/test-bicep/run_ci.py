@@ -128,7 +128,8 @@ def main(argv: list[str] | None = None) -> int:
                     code = subprocess.run(
                         [sys.executable, "-m", "pytest", *offline_test_paths(), "-q", "--tb=short",
                          f"--junitxml={results / 'unit-tests.xml'}"],
-                        cwd=SUITE, env=environment, timeout=1200, check=False,
+                        cwd=SUITE, env=environment,
+                        timeout=2400 if sys.platform == "win32" else 1200, check=False,
                     ).returncode
                 from domain.pipeline_contracts import CONFIG_ONLY_EXCEPTIONS, DEFAULT_EXCEPTIONS, FEATURES
                 coverage = {

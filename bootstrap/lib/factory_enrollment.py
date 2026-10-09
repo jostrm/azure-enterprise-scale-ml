@@ -347,7 +347,8 @@ def resolve_factory_common_storage(common_resource_group_id, parameters, *, tena
         "sku": {"name": parameters.get("skuNameStorage", "Standard_ZRS")},
         "tags": copy.deepcopy(parameters["tags"]), "identity": {"type": "None"},
         "properties": {
-            "isHnsEnabled": True, "allowBlobPublicAccess": False, "allowSharedKeyAccess": True,
+            "isHnsEnabled": True, "allowBlobPublicAccess": False,
+            "allowSharedKeyAccess": parameters["tags"].get("AIF-Persona-Access") != "groups-v1",
             "publicNetworkAccess": "Disabled", "accessTier": "Hot", "minimumTlsVersion": "TLS1_2",
             "supportsHttpsTrafficOnly": True, "largeFileSharesState": "Disabled",
             "keyPolicy": {"keyExpirationPeriodInDays": 14},

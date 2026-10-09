@@ -78,7 +78,8 @@ def test_crlf_bash_is_rejected_before_text_mode_can_hide_linux_failure(tmp_path)
     assert "LF line endings" in report["failures"][0]["error"]
 
 
-def test_failed_unit_suite_propagates_nonzero_and_forces_offline(tmp_path, monkeypatch):
+@pytest.mark.parametrize("platform,timeout", [("linux", 1200), ("win32", 2400)])
+def test_failed_unit_suite_propagates_nonzero_and_forces_offline(tmp_path, monkeypatch, platform, timeout):
     calls = []
 
     def failed(command, **kwargs):
@@ -86,10 +87,12 @@ def test_failed_unit_suite_propagates_nonzero_and_forces_offline(tmp_path, monke
         return subprocess.CompletedProcess(command, 1)
 
     monkeypatch.setattr(run_ci.subprocess, "run", failed)
+    monkeypatch.setattr(run_ci.sys, "platform", platform)
     assert run_ci.main(["--phase", "unit", "--results-dir", str(tmp_path)]) == 1
     command, options = calls[0]
     assert "pytest" in command
     assert options["env"]["LIVE_AZURE"] == "0"
+    assert options["timeout"] == timeout
     assert not any(Path(argument).name == "integration" for argument in command)
     assert (tmp_path / "unit-summary.json").is_file()
 
@@ -114,6 +117,9 @@ def test_github_runs_all_checks_on_push_and_pull_requests_without_azure_permissi
         ("unit", "ubuntu-22.04"), ("unit", "windows-2022"),
         ("syntax", "ubuntu-22.04"), ("bicep", "ubuntu-22.04"),
     }
+    assert job["timeout-minutes"] == "${{ matrix.timeout_minutes }}"
+    for row in matrix:
+        assert row["timeout_minutes"] == (50 if row["os"] == "windows-2022" else 30)
     assert job["defaults"]["run"]["shell"] == "bash"
     assert job["env"]["LIVE_AZURE"] == "0"
     assert "environment" not in job
@@ -136,6 +142,9 @@ def test_ado_runs_same_phases_without_service_connections_and_publishes_results(
     assert {value["testPhase"] for value in job["strategy"]["matrix"].values()} == {"unit", "syntax", "bicep"}
     assert {value["imageName"] for value in job["strategy"]["matrix"].values()
             if value["testPhase"] == "unit"} == {"ubuntu-22.04", "windows-2022"}
+    assert job["timeoutInMinutes"] == "$(jobTimeoutMinutes)"
+    for row in job["strategy"]["matrix"].values():
+        assert row["jobTimeoutMinutes"] == (50 if row["imageName"] == "windows-2022" else 30)
     steps = job["steps"]
     assert steps[0]["persistCredentials"] is False
     tasks = {step["task"] for step in steps if "task" in step}

@@ -494,6 +494,26 @@ def test_common_resolver_custom_frozen_parameters_and_name_length():
             group, params, tenant_id=TENANT, naming_identity=identity, naming_identity_id=identity["id"])
 
 
+@pytest.mark.parametrize("mode,shared_keys", [(None, True), ("legacy", True), ("groups-v1", False)])
+def test_common_resolver_preserves_canonical_persona_shared_key_policy(workspace, mode, shared_keys):
+    group = f"/subscriptions/{SUB}/resourcegroups/common"
+    params = canonical_common_parameters()
+    if mode is not None:
+        params["tags"]["AIF-Persona-Access"] = mode
+    before = copy.deepcopy(params)
+    account = group + "/providers/microsoft.storage/storageaccounts/mrvelx46jfesml001test"
+    resolved = en.resolve_factory_common_storage(
+        group, params, tenant_id=TENANT, evaluated_account_id=account)
+    body = resolved["coordination_account_creation"]
+    assert body["properties"]["allowSharedKeyAccess"] is shared_keys
+    assert body["tags"] == before["tags"]
+    assert params == before
+    req = request(workspace, **resolved)
+    fake = Fake(req, provisioned=False)
+    assert enroll(req, fake)["enrollment_complete"]
+    assert fake.resources[account]["properties"]["allowSharedKeyAccess"] is shared_keys
+
+
 def test_common_resolver_matches_canonical_bicep_not_unused_override():
     bicep = ROOT / "environment_setup" / "aifactory" / "bicep"
     common = (bicep / "esml-common" / "main" / "13-rgLevel.bicep").read_text()
@@ -505,7 +525,8 @@ def test_common_resolver_matches_canonical_bicep_not_unused_override():
     assert "param commonResourceAbbreviation string = 'esml'" in common
     assert "var miPrjName = 'mi-${projectName}-${locationSuffix}-${env}-${uniqueInAIFenv}${randomSalt}${miSuffix}'" in naming
     for clause in ("param keyExpirationPeriodInDays int = 14", "publicNetworkAccess:'Disabled'",
-                   "isHnsEnabled: true", "allowSharedKeyAccess: true"):
+                   "isHnsEnabled: true",
+                   "allowSharedKeyAccess: !(contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1')"):
         assert clause in lake
 
 

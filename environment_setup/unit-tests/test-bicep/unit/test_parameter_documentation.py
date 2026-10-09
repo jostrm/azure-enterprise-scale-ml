@@ -123,6 +123,14 @@ class ParameterDocumentationTests(unittest.TestCase):
         for option in options:
             self.assertIn(option, page)
 
+    def test_bootstrap_persona_manifest_is_conditional_and_inherits_saved_configuration(self):
+        inventory = generator.bootstrap_inventory()
+        for key in ("AIF_PERSONA_ACCESS_MODE", "AIF_PERSONA_ACCESS_MANIFEST"):
+            self.assertEqual("", inventory[key]["value"])
+        self.assertEqual("O", generator.bootstrap_requirement("AIF_PERSONA_ACCESS_MODE"))
+        self.assertEqual("C", generator.bootstrap_requirement("AIF_PERSONA_ACCESS_MANIFEST"))
+        self.assertIn("Required for groups-v1", inventory["AIF_PERSONA_ACCESS_MANIFEST"]["comment"])
+
     def test_no_desktop_promotion_or_consumer_dependency(self):
         for name in ("advanced.md", "standard.md"):
             page = (generator.PAGE.parent / name).read_text(encoding="utf-8")

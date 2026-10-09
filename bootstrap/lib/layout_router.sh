@@ -284,26 +284,11 @@ aif_ensure_control_bundle_gitignore() {
   rules+=(
     "!/lib/"
     "/lib/*"
-    "!/lib/aifactory_private_dns.py"
-    "!/lib/aifactory_scaleset_config.py"
-    "!/lib/aifactory_vpn_profile.py"
-    "!/lib/create-new-aifactory-scaleset.sh"
-    "!/lib/factory_enrollment.py"
-    "!/lib/factory_enrollment_entry.py"
-    "!/lib/factory_lifecycle.py"
-    "!/lib/github_environments.py"
-    "!/lib/layout_router.sh"
-    "!/lib/project_deployment.py"
-    "!/lib/project_environment.py"
-    "!/lib/registered_creation.py"
-    "!/lib/release_version.py"
-    "!/lib/release_version.sh"
-    "!/lib/runner-prerequisites.ps1"
-    "!/lib/runner-prerequisites.sh"
-    "!/lib/runner_bootstrap.py"
-    "!/lib/runner-only-registration.sh"
-    "!/lib/runner-registration.ps1"
-    "!/lib/runner-registration.sh"
+  )
+  for name in "${AIF_DUAL_LAYOUT_LIBRARIES[@]}"; do
+    rules+=("!/lib/$name")
+  done
+  rules+=(
     "!/ui/"
     "/ui/*"
     "!/ui/terminal.sh"

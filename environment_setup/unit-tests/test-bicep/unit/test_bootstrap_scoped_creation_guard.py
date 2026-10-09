@@ -22,7 +22,7 @@ CONTROL_LIBRARIES = (
     "factory_enrollment.py", "factory_enrollment_entry.py", "factory_lifecycle.py",
     "github_environments.py",
     "layout_router.sh", "project_deployment.py", "project_environment.py",
-    "registered_creation.py",
+    "registered_creation.py", "registered_personas.py",
     "release_version.py", "release_version.sh",
     "runner-prerequisites.ps1", "runner-prerequisites.sh",
     "runner-registration.ps1", "runner-registration.sh",
