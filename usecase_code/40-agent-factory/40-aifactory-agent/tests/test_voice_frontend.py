@@ -668,6 +668,27 @@ def test_interrupt_sends_a_control_message_and_flushes_local_playback():
 """, STATIC / "voice.js")
 
 
+def test_language_switch_restarts_only_voice_with_same_authenticated_text_session():
+    node(CLIENT_HARNESS + r"""
+(async () => {
+  const rig = await started({language: "en-US"});
+  rig.socket.json({type: "ready"});
+  assert.equal(JSON.parse(rig.socket.sent[0]).language, "en-US");
+  await rig.client.setLanguage("sv-SE");
+  assert.equal(rig.socket.closed, 1000);
+  assert.ok(rig.context.closed && rig.env.tracks[0].stopped);
+  const next = FakeSocket.instances.at(-1);
+  next.open();
+  assert.equal(JSON.parse(next.sent[0]).language, "sv-SE");
+  assert.equal(JSON.parse(next.sent[0]).token, session.token);
+  rig.socket.audio(new Int16Array(480).fill(4));
+  assert.equal(rig.playback.port.posts.length, 0, "old language session cannot resume audio");
+  assert.equal(session.token, "TOKEN-ABC-123", "text session was not cleared");
+  await rig.client.stop();
+})().catch((error) => { console.error(error); process.exit(1); });
+""", STATIC / "voice.js")
+
+
 def test_levels_follow_the_microphone_while_listening_and_the_speakers_while_speaking():
     node(CLIENT_HARNESS + r"""
 (async () => {

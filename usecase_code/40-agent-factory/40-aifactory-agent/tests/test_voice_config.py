@@ -109,3 +109,39 @@ def test_voice_block_does_not_change_other_settings_equality():
     enabled = Settings.model_validate(example(enabled=True))
     assert base != enabled
     assert enabled.model_copy(update={"voice": VoiceSettings()}) == base
+
+
+def test_native_mode_requires_native_model_and_uses_server_language_profiles():
+    with pytest.raises(ValidationError):
+        VoiceSettings(mode="realtime")
+    voice = VoiceSettings(mode="realtime", model="gpt-realtime-mini", language_profiles={
+        "en-US": {"voice_name": "en-US-Ava:DragonHDLatestNeural"},
+        "sv-SE": {"voice_name": "sv-SE-SofieNeural", "greeting": "Hej! Hur kan jag hjälpa dig?"},
+    })
+    selected = voice.for_language("sv-SE")
+    assert selected.voice_name == "sv-SE-SofieNeural"
+    assert selected.input_languages == ["sv-SE"] and selected.turn_detection == "server_vad"
+    assert selected.greeting.startswith("Hej")
+    with pytest.raises(ValueError):
+        voice.for_language("fr-FR")
+    with pytest.raises(ValidationError):
+        VoiceSettings(mode="realtime", model="gpt-realtime-mini",
+                      language_profiles={"sv-SE": {"voice_name": "sv-SE-SofieNeural"}},
+                      default_language="en-US")
+
+
+@pytest.mark.parametrize("voice", [
+    {"mode": "realtime", "model": "gpt-realtime-mini", "voice_type": "openai", "voice_name": "attacker"},
+    {"voice_type": "openai", "voice_name": "coral"},
+    {"mode": "realtime", "model": "gpt-realtime-mini", "input_languages": ["fr-FR"]},
+    {"mode": "realtime", "model": "gpt-realtime-mini", "input_languages": ["en-US", "sv-SE"]},
+    {"language_profiles": {"en-US": {"voice_name": "voice", "instructions": "client policy"}}},
+])
+def test_invalid_native_profile_configuration_fails_closed(voice):
+    with pytest.raises(ValidationError):
+        VoiceSettings(**voice)
+
+
+def test_native_swedish_single_profile_never_uses_english_semantic_vad():
+    voice = VoiceSettings(mode="realtime", model="gpt-realtime-mini", input_languages=["sv-SE"])
+    assert voice.for_language("sv-SE").turn_detection == "server_vad"

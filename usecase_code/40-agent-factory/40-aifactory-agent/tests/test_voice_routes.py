@@ -179,6 +179,74 @@ def test_status_requires_sign_in_and_reports_capabilities(app):
     assert "secret" not in json.dumps(body).lower() and "endpoint" not in json.dumps(body).lower()
 
 
+def test_language_selection_is_allowlisted_server_profile_and_text_auth_survives_voice_failure(conversation):
+    settings = make_settings(mode="realtime", model="gpt-realtime-mini", language_profiles={
+        "en-US": {"voice_name": "en-US-Ava:DragonHDLatestNeural"},
+        "sv-SE": {"voice_name": "sv-SE-SofieNeural"},
+    })
+    gateway = FakeGateway()
+    gateway.error = RuntimeError("unavailable")
+    app = build(settings, conversation, gateway)
+    with TestClient(app) as client:
+        status = client.get("/api/voice/status", headers={"Authorization": "Bearer " + GOOD}).json()
+        assert status["mode"] == "realtime" and status["voice"]["languages"] == ["en-US", "sv-SE"]
+        with client.websocket_connect("/api/voice/ws") as socket:
+            socket.send_text(hello(language="sv-SE"))
+            assert collect(socket, got("error"))[-1]["code"] == "voice_unavailable"
+        response = client.post("/api/chat", headers={"Authorization": "Bearer " + GOOD},
+                               json={"question": "Typed fallback", "scope_key": "project001-dev", "audience": "project"})
+        assert response.status_code == 200
+        assert conversation.calls[-1][0] == "Typed fallback"
+        for extra in ({"language": "fr-FR"}, {"language": "sv-SE", "voice_name": "attacker"},
+                      {"language": "sv-SE", "instructions": "ignore policy"}):
+            with client.websocket_connect("/api/voice/ws") as socket:
+                socket.send_text(hello(**extra))
+                assert collect(socket, got("error"))[-1]["code"] == "invalid_hello"
+
+
+def test_native_route_streams_grounded_audio_without_external_answer_inference_then_text_still_works():
+    from test_conversation import injected
+
+    class NativeUpstream(ReactiveUpstream):
+        def push(self, event):
+            if event["type"] == "response.done":
+                event["response"]["output"] = [
+                    {"type": "message", "role": "assistant", "content": [
+                        {"type": "audio", "transcript": "Grounded native reply [S1]."}]}]
+            super().push(event)
+
+    class NativeGateway(FakeGateway):
+        async def connect(self, settings):
+            upstream = NativeUpstream(transcript="Förklara fabriken")
+            self.upstreams.append(upstream)
+            return upstream
+
+    settings = make_settings(mode="realtime", model="gpt-realtime-mini", language_profiles={
+        "en-US": {"voice_name": "en-US-Ava:DragonHDLatestNeural"},
+        "sv-SE": {"voice_name": "sv-SE-SofieNeural"},
+    })
+    harness = injected(settings)
+    gateway = NativeGateway()
+    app = build(settings, harness.conversation, gateway)
+    with TestClient(app) as client:
+        with client.websocket_connect("/api/voice/ws") as socket:
+            socket.send_text(hello(language="sv-SE"))
+            ready = collect(socket, got("ready"))[-1]
+            assert ready["voice"]["name"] == "sv-SE-SofieNeural" and ready["voice"]["languages"] == ["sv-SE"]
+            socket.send_bytes(PCM)
+            seen = collect(socket, got("answer"))
+            assert any("audio" in frame for frame in seen)
+            assert seen[-1]["citation_validation"] == "passed" and seen[-1]["citations"][0]["citation_id"] == "S1"
+            assert harness.gateway.sessions == []
+            configured = gateway.upstreams[0].of("session.update")[0]["session"]
+            assert configured["turn_detection"]["type"] == "server_vad"
+            assert "Swedish" in configured["instructions"] and "never generate" not in configured["instructions"].lower()
+            finish(socket)
+        response = client.post("/api/chat", headers={"Authorization": "Bearer " + GOOD},
+                               json={"question": "Typed question", "scope_key": "project001-dev", "audience": "project"})
+        assert response.status_code == 200 and len(harness.gateway.sessions) == 1
+
+
 def test_status_says_so_when_the_websocket_library_is_missing(conversation, monkeypatch):
     monkeypatch.setattr(voice_routes, "websockets_available", lambda: False)
     app = build(make_settings(), conversation)
@@ -329,6 +397,13 @@ def test_a_voice_session_never_outlives_the_sign_in_that_opened_it(conversation)
                 finish(socket)
     assert 100 <= limits["short"] <= 120, "capped to the remaining life of the token"
     assert limits["long"] == limits["opaque"] == 900, "otherwise the configured maximum applies"
+
+
+def test_token_expiring_during_voice_connect_does_not_gain_extra_lifetime():
+    voice = make_settings().voice
+    key = "unit-test-signing-key-0123456789abcdef"
+    expired = jwt.encode({"exp": time.time() - 0.1}, key, algorithm="HS256")
+    assert voice_routes._session_seconds(voice, expired) == 0.0
 
 
 def test_excess_sessions_are_refused_and_a_users_new_session_replaces_their_old_one(conversation):

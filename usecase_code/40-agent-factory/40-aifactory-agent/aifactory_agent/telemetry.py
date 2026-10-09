@@ -12,6 +12,7 @@ VOICE_SESSIONS = METER.create_counter("aifactory.voice.sessions")
 VOICE_SESSION_SECONDS = METER.create_histogram("aifactory.voice.session.duration", unit="s")
 VOICE_TURNS = METER.create_counter("aifactory.voice.turns")
 VOICE_FAILURES = METER.create_counter("aifactory.voice.failures")
+VOICE_FIRST_AUDIO = METER.create_histogram("aifactory.voice.first_audio.duration", unit="s")
 
 
 def configure(settings):

@@ -57,6 +57,7 @@
     };
     const run = {phase: "off", muted: false, generation: 0};
     let resources = null;
+    let language = options.language || null;
 
     function release() {
       const current = resources;
@@ -135,7 +136,8 @@
           show(message.state);
           break;
         case "transcript":
-          emit("onTranscript", message.role, String(message.text || ""), Boolean(message.final));
+          if (message.provisional) emit("onTranscript", message.role, String(message.text || ""), Boolean(message.final), true);
+          else emit("onTranscript", message.role, String(message.text || ""), Boolean(message.final));
           break;
         case "answer":
           emit("onAnswer", message);
@@ -235,8 +237,9 @@
         socket.binaryType = "arraybuffer";
         current.socket = socket;
         socket.onopen = () => {
+          if (generation !== run.generation) { socket.close(1000); return; }
           socket.send(JSON.stringify({type: "hello", token: session.token, scope_key: session.scopeKey,
-            audience: session.audience}));
+            audience: session.audience, ...(language ? {language} : {})}));
         };
         socket.onmessage = (event) => handleMessage(current, generation, event);
         socket.onclose = () => {
@@ -283,8 +286,16 @@
       }
     }
 
+    async function setLanguage(value) {
+      if (value === language) return;
+      const restart = run.phase === "active" || run.phase === "connecting";
+      await stop();
+      language = value || null;
+      if (restart) await start();
+    }
+
     return {
-      start, stop, interrupt, setMuted,
+      start, stop, interrupt, setMuted, setLanguage,
       get phase() { return run.phase; },
       get muted() { return run.muted; },
     };
@@ -309,15 +320,18 @@
     const transcript = element("voice-transcript");
     const problem = element("voice-error");
     const help = element("voice-help");
+    const language = element("voice-language");
+    const fallback = element("voice-use-text");
     const orb = orbApi && element("voice-orb") ? orbApi.createOrb(element("voice-orb"), {environment: env}) : null;
     if (orb) orb.start();
-    const lines = {user: "", agent: ""};
+    const lines = {user: "", agent: "", provisional: false};
     let enabled = false;
     let probedFor = null;
+    let probeGeneration = 0;
 
     const render = () => {
       transcript.replaceChildren();
-      for (const [label, text] of [["You", lines.user], ["Agent", lines.agent]]) {
+      for (const [label, text] of [["You", lines.user], [lines.provisional ? "Agent (provisional)" : "Agent", lines.agent]]) {
         if (!text) continue;
         const paragraph = doc.createElement("p");
         const name = doc.createElement("strong");
@@ -327,7 +341,7 @@
       }
     };
     const message = (text, fatal) => {
-      problem.textContent = text || "";
+      problem.textContent = text ? text + " Typed chat remains available below." : "";
       problem.hidden = !text;
       if (fatal) problem.setAttribute("role", "alert");
     };
@@ -348,13 +362,14 @@
         controls(state);
       },
       onLevel: (level) => { if (orb) orb.setLevel(level); },
-      onTranscript: (role, text, final) => {
+      onTranscript: (role, text, final, provisional) => {
         if (role === "user") lines.user = text;
-        else lines.agent = text;
+        else { lines.agent = text; lines.provisional = Boolean(provisional); }
         if (role === "user" && final) lines.agent = "";
         render();
       },
       onAnswer: (answer) => {
+        lines.provisional = false;
         lines.agent = String(answer.spoken || "");
         render();
         host.showAnswer(answer);
@@ -373,30 +388,69 @@
       stateLabel.textContent = statusText(client.phase === "active" ? "listening" : "off", client.muted);
     });
     interrupt.addEventListener("click", () => client.interrupt());
+    if (language) language.addEventListener("change", () => {
+      void client.setLanguage(language.value);
+    });
+    if (fallback) fallback.addEventListener("click", () => {
+      void client.stop();
+      if (host.focusTypedChat) host.focusTypedChat(lines.user);
+    });
 
     async function probe() {
       const session = host.voiceSession();
       if (!session) {
+        probeGeneration += 1;
         enabled = false;
         probedFor = null;
         card.hidden = true;
         await client.stop();
         return;
       }
-      if (probedFor === session.token) return;
-      probedFor = session.token;
+      const identity = `${session.token}:${session.scopeKey}:${session.audience}`;
+      if (probedFor === identity) return;
+      await client.stop();
+      probedFor = identity;
+      const generation = ++probeGeneration;
       try {
         const response = await env.fetch("/api/voice/status", {
           credentials: "omit", cache: "no-store", redirect: "error", headers: {Authorization: "Bearer " + session.token}});
-        if (!response.ok) { card.hidden = true; enabled = false; return; }
+        if (generation !== probeGeneration) return;
+        if (!response.ok) {
+          card.hidden = response.status === 404;
+          enabled = false;
+          probedFor = null;
+          toggle.disabled = true;
+          message("Live voice is unavailable. Your Chat sign-in has not been changed.", false);
+          return;
+        }
         const status = await response.json();
+        if (generation !== probeGeneration) return;
         enabled = Boolean(status.enabled);
         card.hidden = !enabled;
         toggle.disabled = !status.ready;
+        if (language) {
+          const profiles = status.voice && status.voice.profiles;
+          language.hidden = !profiles;
+          language.replaceChildren();
+          for (const code of Object.keys(profiles || {})) {
+            const option = doc.createElement("option");
+            option.value = code;
+            option.textContent = code === "sv-SE" ? "Svenska" : "English";
+            language.append(option);
+          }
+          language.value = status.voice.default_language || "en-US";
+          await client.setLanguage(profiles ? language.value : null);
+        }
+        if (status.mode === "realtime" && help) help.textContent =
+          "Native voice streams a reply. Live audio and transcript are provisional until the final sources are checked. Typing remains available.";
         if (!status.ready && help) help.textContent = "Live voice is enabled but not ready on this deployment; ask the operator to check the voice dependencies.";
       } catch {
-        card.hidden = true;
+        if (generation !== probeGeneration) return;
+        card.hidden = false;
         enabled = false;
+        probedFor = null;
+        toggle.disabled = true;
+        message("Live voice status could not be checked. Your Chat sign-in has not been changed.", false);
       }
     }
 
@@ -404,6 +458,8 @@
     stateLabel.textContent = statusText("off", false);
     host.subscribe(probe);
     probe();
+    const retry = element("voice-retry");
+    if (retry) retry.addEventListener("click", () => { probedFor = null; void probe(); });
     return {client, probe, get enabled() { return enabled; }};
   }
 

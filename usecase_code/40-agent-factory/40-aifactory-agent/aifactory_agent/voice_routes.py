@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import time
 import uuid
 from typing import Annotated, Literal
@@ -32,6 +33,7 @@ from .voice import (
     PROTOCOL_VERSION, SAMPLE_RATE, ClientGone, SessionRegistry, VoiceAnswerError, VoiceLiveGateway,
     VoiceProtocolError, VoiceSession, websockets_available,
 )
+from .voice_realtime import RealtimeVoiceSession
 
 LOGGER = logging.getLogger(__name__)
 
@@ -61,6 +63,7 @@ class HelloMessage(BaseModel):
     token: str = Field(min_length=20, max_length=8192)
     scope_key: str = Field(pattern=r"^[A-Za-z0-9_-]{1,80}$")
     audience: Literal["platform", "project"]
+    language: Literal["en-US", "sv-SE"] | None = None
 
 
 class StarletteChannel:
@@ -142,6 +145,44 @@ def _answerer(app: FastAPI, principal: Principal, scope_key: str, audience: str)
     return answer
 
 
+async def _native_work(work, *arguments):
+    try:
+        return await asyncio.to_thread(work, *arguments)
+    except PermissionError:
+        raise VoiceAnswerError("forbidden", MESSAGES["forbidden"])
+    except (IndexingError, OwnershipError):
+        raise VoiceAnswerError("knowledge_unavailable", "Knowledge is unavailable; ask an approved operator.")
+    except (AzureError, OpenAIError):
+        raise VoiceAnswerError("dependency_unavailable", "An Azure dependency is unavailable.")
+    except (ToolError, ValueError):
+        raise VoiceAnswerError("operation_blocked", "The approved operation is blocked or invalid.")
+
+
+def _native_handlers(app: FastAPI, principal: Principal, scope_key: str, audience: str):
+    def prepare_work(text):
+        services = _services(app)
+        return services.conversation(services.knowledge()).prepare(text, audience, principal, scope_key)
+
+    async def prepare(text):
+        return await _native_work(prepare_work, text)
+
+    def execute_work(context, name, identifier, arguments):
+        # A live configuration change must not leave a formerly granted call authorized.
+        current = _services(app).settings
+        authorize(current, principal, scope_key, "knowledge.read")
+        permission = ("graph.read" if name == "graph_query" else
+                      "knowledge.read" if isinstance(name, str) and name.startswith("knowledge_") else "factory.read")
+        authorize(current, principal, scope_key, permission)
+        if isinstance(name, str) and name.startswith("cost_"):
+            authorize(current, principal, scope_key, "cost.read")
+        return context.execute(name, identifier, arguments)
+
+    async def execute(context, name, identifier, arguments):
+        return await _native_work(execute_work, context, name, identifier, arguments)
+
+    return prepare, execute
+
+
 async def _refuse(websocket: WebSocket, channel: StarletteChannel, code: str, close: int | None = None) -> None:
     try:
         await channel.send_json({"type": "error", "code": code, "fatal": True, "message": MESSAGES[code]})
@@ -166,8 +207,8 @@ def _session_seconds(voice, token: str) -> float:
         expires = jwt.decode(token, options={"verify_signature": False, "verify_exp": False}).get("exp")
     except jwt.PyJWTError:
         return limit
-    if isinstance(expires, int) and not isinstance(expires, bool):
-        return max(1.0, min(limit, expires - time.time()))
+    if type(expires) in (int, float) and math.isfinite(expires):
+        return max(0.0, min(limit, expires - time.time()))
     return limit
 
 
@@ -220,7 +261,7 @@ def register_voice(app: FastAPI) -> None:
         gateway = request.app.state.voice_gateway
         needs_library = getattr(gateway, "requires_websockets", False)
         ready = not needs_library or websockets_available()
-        return {
+        result = {
             "enabled": True, "ready": ready, "unavailable_reason": None if ready else "websockets_missing",
             "protocol": PROTOCOL_VERSION,
             "audio": {"encoding": "pcm16", "sample_rate": SAMPLE_RATE, "channels": 1},
@@ -228,6 +269,13 @@ def register_voice(app: FastAPI) -> None:
             "limits": {"max_session_seconds": current.voice.max_session_seconds,
                        "idle_timeout_seconds": current.voice.idle_timeout_seconds},
         }
+        result["mode"] = current.voice.mode
+        if current.voice.language_profiles:
+            result["voice"].update({
+                "languages": list(current.voice.language_profiles), "default_language": current.voice.default_language,
+                "profiles": {language: {"name": profile.voice_name} for language, profile in current.voice.language_profiles.items()},
+            })
+        return result
 
     @app.websocket("/api/voice/ws")
     async def voice_socket(websocket: WebSocket):
@@ -267,6 +315,11 @@ def register_voice(app: FastAPI) -> None:
             except PermissionError:
                 await _refuse(websocket, channel, "forbidden")
                 return
+            try:
+                selected_voice = current.voice.for_language(hello.language)
+            except ValueError:
+                await _refuse(websocket, channel, "invalid_hello")
+                return
             reservation = state.voice_registry.reserve(principal.object_id)
             if reservation is None:
                 await _refuse(websocket, channel, "voice_busy")
@@ -284,9 +337,14 @@ def register_voice(app: FastAPI) -> None:
                 VOICE_FAILURES.add(1, {"stage": "connect"})
                 await _refuse(websocket, channel, "voice_unavailable")
                 return
-            session = VoiceSession(current.voice, upstream, channel,
-                                   _answerer(websocket.app, principal, hello.scope_key, hello.audience),
-                                   session_id=uuid.uuid4().hex, max_duration=_session_seconds(current.voice, hello.token))
+            options = {"session_id": uuid.uuid4().hex, "max_duration": _session_seconds(current.voice, hello.token)}
+            if selected_voice.mode == "realtime":
+                prepare, execute = _native_handlers(websocket.app, principal, hello.scope_key, hello.audience)
+                session = RealtimeVoiceSession(selected_voice, upstream, channel, prepare, execute,
+                                               max_tool_rounds=current.max_tool_rounds, **options)
+            else:
+                session = VoiceSession(selected_voice, upstream, channel,
+                                       _answerer(websocket.app, principal, hello.scope_key, hello.audience), **options)
             entry.session = session
             if entry.replaced:
                 await session.end("replaced")

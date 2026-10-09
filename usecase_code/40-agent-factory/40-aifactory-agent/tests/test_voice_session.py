@@ -146,6 +146,16 @@ def test_handshake_failure_is_reported_as_a_fatal_voice_error():
     run(scenario)
 
 
+def test_token_bound_counts_handshake_time_not_just_ready_session_time():
+    async def scenario():
+        harness = Harness(handshake_timeout=2.0, max_duration=0.04)
+        started = asyncio.get_running_loop().time()
+        assert await harness.session.run() == "handshake_failed"
+        assert asyncio.get_running_loop().time() - started < 0.3
+        assert harness.upstream.closed
+    run(scenario)
+
+
 def test_client_audio_is_forwarded_as_base64_pcm_and_bad_frames_are_rejected():
     async def scenario():
         harness = await Harness().start()

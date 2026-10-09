@@ -206,6 +206,32 @@ def test_fully_injected_answer_needs_no_cloud_constructors_or_monkeypatch(settin
     assert [item["call_id"] for item in outputs] == [call.call_id for call in calls]
 
 
+def test_prepared_turn_reuses_grounding_tools_and_citations_without_external_inference(settings):
+    harness = injected(settings)
+    prepared = harness.conversation.prepare("Explain setup", "project", caller(settings), SCOPE)
+    assert harness.gateway.sessions == []
+    assert prepared.messages[1]["role"] == "user"
+    assert "Evidence for source-1" in prepared.messages[1]["content"][0]["text"]
+    assert prepared.execute("factory_health", "call-1", "{}") == {"ok": True}
+    result = prepared.finish("Grounded [S1].", "native-response")
+    assert result["citations"][0]["citation_id"] == "S1"
+    assert result["tool_activity"] == [{"name": "factory_health", "call_id": "call-1"}]
+    with pytest.raises(RuntimeError, match="unsupported source citation"):
+        prepared.finish("Invented [S9].", "native-response")
+    with pytest.raises(RuntimeError, match="omitted available"):
+        prepared.finish("No citations.", "native-response")
+    with pytest.raises(PermissionError):
+        prepared.execute("operation_execute", "call-2", "{}")
+
+
+@pytest.mark.parametrize("arguments", ['{"query": 1}', '{"query": true}', '{"query": "x", "scope": "other"}'])
+def test_prepared_turn_rejects_invalid_native_tool_arguments(settings, arguments):
+    harness = injected(settings)
+    prepared = harness.conversation.prepare("Explain setup", "project", caller(settings), SCOPE)
+    with pytest.raises(ValueError):
+        prepared.execute("knowledge_search", "call-1", arguments)
+
+
 def test_two_agents_keep_settings_and_versioned_model_references_independent(settings):
     first = settings.model_copy(update={"agent_name": "first-agent", "agent_version": "7"})
     second = settings.model_copy(update={

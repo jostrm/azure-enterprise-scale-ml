@@ -68,6 +68,7 @@
   },
   "voice": {
     "enabled": false,
+    "mode": "speech_shell",
     "voice_name": "en-US-Ava:DragonHDLatestNeural",
     "input_languages": ["en-US"]
   },

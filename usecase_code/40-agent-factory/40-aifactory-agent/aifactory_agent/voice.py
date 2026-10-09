@@ -163,14 +163,16 @@ class VoiceSession:
         self._end_reason = "ended"
         self._last_activity = time.monotonic()
         self.turns = 0
+        self._started = time.monotonic()
 
     async def run(self) -> str:
         reason, started = "error", time.monotonic()
+        self._started = started
         tasks: list[asyncio.Task] = []
         try:
             iterator = self.upstream.__aiter__()
             try:
-                await self._handshake(iterator)
+                await asyncio.wait_for(self._handshake(iterator), self._max_duration)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -229,7 +231,7 @@ class VoiceSession:
         first = await asyncio.wait_for(iterator.__anext__(), self._handshake_timeout)
         if first.get("type") != "session.created":
             raise VoiceUnavailable("The speech service did not open a session.")
-        await self.upstream.send(session_update_event(self.voice, self.session_id))
+        await self.upstream.send(self._session_event())
         while True:
             event = await asyncio.wait_for(iterator.__anext__(), self._handshake_timeout)
             if event.get("type") == "session.updated":
@@ -245,10 +247,16 @@ class VoiceSession:
             "voice": {"name": self.voice.voice_name, "languages": list(self.voice.input_languages)},
         })
         await self._set_state("listening")
+        await self._greet()
+
+    async def _greet(self) -> None:
         if self.voice.greeting:
             await self.channel.send_json({"type": "transcript", "role": "assistant",
                                           "text": self.voice.greeting, "final": True})
             await self._speak(self.voice.greeting)
+
+    def _session_event(self) -> dict:
+        return session_update_event(self.voice, self.session_id)
 
     async def _pump(self, iterator) -> None:
         async for event in iterator:
@@ -262,7 +270,7 @@ class VoiceSession:
                 LOGGER.warning("voice_event_failed session=%s error=%s", self.session_id, type(exc).__name__)
 
     async def _watchdog(self) -> str:
-        started = time.monotonic()
+        started = self._started
         while True:
             now = time.monotonic()
             if now - started >= self._max_duration:
@@ -450,6 +458,8 @@ class VoiceSession:
 
     async def _shutdown(self, reason: str, seconds: float) -> None:
         self._cancel_pending_answer()
+        if self._answer_task is not None:
+            await asyncio.gather(self._answer_task, return_exceptions=True)
         with contextlib.suppress(Exception):
             await self.upstream.close()
         with contextlib.suppress(Exception):

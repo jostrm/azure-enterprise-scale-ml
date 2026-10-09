@@ -22,7 +22,7 @@ tests:
 graph_symbols:
   - usecase_code/40-agent-factory/agent_factory/cli.py::function:run
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/services.py::class:AgentServiceFactory
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07; live voice observed 2026-10-09 at 29642909'
+reviewed_source: 'd7dc78dc + native voice working tree; observed 2026-10-10; no live deployment asserted'
 ---
 # Agent Factory
 
@@ -46,6 +46,8 @@ Storage selection is explicit common/project data storage. Changing it does not 
 ## Authority boundary
 
 The model can propose or explain; backend authorization determines scope. Platform/Project audience changes explanation, not permissions. A source/knowledge agent and a reviewer cannot approve an infrastructure change merely by agreeing with each other.
+
+The application has a compatibility speech shell and an opt-in native Voice Live realtime engine. Both reuse the common prepared-turn grounding/read-tool policy; native streaming is not another privileged agent or an external full-text answer chain. Language profiles and voice mode are operator-owned configuration, not deployment intent from a spoken request. Voice-only failure must not invalidate authenticated text chat. Native streamed speech is provisional until final citation checks (see [[Chat-and-Grounding]]); local tests do not establish the installed live revision.
 
 Private Azure MCP in `44-azure-mcp` is a separate narrow Azure resource-read integration from this repository's `mcp` Factory API adapter. Neither name implies arbitrary shell access or unrestricted Azure writes.
 
