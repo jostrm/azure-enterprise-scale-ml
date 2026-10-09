@@ -329,11 +329,15 @@ class DashboardAzure:
                 raise RuntimeError("Azure commands require an explicit configured subscription.")
         result = self.az(*args)
         if result.returncode:
-            code = shared.error_code(result)
+            code = shared.usage.read_failure_code(result) if usage_read else shared.error_code(result)
             if not code or not re.fullmatch(r"[A-Za-z0-9]+", code):
                 code = "AzureCommandFailed"
             # Never replay raw CLI errors: they can include parameter/configuration values.
-            return subprocess.CompletedProcess(args, result.returncode, "", json.dumps({"error": {"code": code}}))
+            safe_error = {"error": {"code": code}}
+            if usage_read and shared.usage.RETRY_AFTER.search(f"{result.stderr}\n{result.stdout}"):
+                delay = shared.usage._retry_delay(result, 0)
+                safe_error["retry-after"] = delay if delay is not None else 0
+            return subprocess.CompletedProcess(args, result.returncode, "", json.dumps(safe_error))
         if factory_read:
             payload = json_response(result, "Reading factory dashboard")
             self.previous_inventory = payload.get("properties", {}).get("metadata", {}).get("aifactoryInventory", {})
@@ -604,7 +608,10 @@ def reconcile(azure: DashboardAzure):
                 "not-deployed" if shared.error_code(result) in {"ResourceGroupNotFound", "ResourceNotFound"} else
                 "unverified"
             )
-    shared.collect_usage(inventory, azure.usage_collector, set(azure.config.subscriptions.values()))
+    shared.collect_usage(
+        inventory, azure.usage_collector, set(azure.config.subscriptions.values()),
+        previous_inventory=azure.previous_inventory,
+    )
     return inventory, tenant, etag
 
 

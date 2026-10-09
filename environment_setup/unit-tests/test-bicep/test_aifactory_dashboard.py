@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import copy
 import io
 import itertools
 import json
@@ -653,6 +654,98 @@ class TestAifactoryDashboard(unittest.TestCase):
         self.assertIn("usageSnapshot", retained)
         self.assertNotIn("usageSnapshot", foreign)
         self.assertNotIn("usageSnapshot", absent)
+
+    def test_failed_refresh_retains_only_same_scope_last_success_with_original_time(self) -> None:
+        previous = {
+            "observedAt": "2026-10-08T22:32:00Z", "windowStart": "2026-09-08T22:32:00Z",
+            "windowEnd": "2026-10-08T22:32:00Z",
+            "metrics": {
+                "agents": {"status": "ok", "value": 12},
+                "models": {"status": "ok", "value": 63},
+                "search": {"status": "ok", "value": 0},
+                "adf": {"status": "unavailable", "value": None},
+            },
+        }
+        fresh = {
+            "observedAt": "2026-10-09T01:30:00Z", "windowStart": "2026-09-09T01:30:00Z",
+            "windowEnd": "2026-10-09T01:30:00Z",
+            "metrics": {
+                "agents": {"status": "unavailable", "value": None, "errorCode": "NetworkAccessDenied"},
+                "models": {"status": "ok", "value": 64},
+                "search": {"status": "unavailable", "value": None, "errorCode": "AccessDenied"},
+                "adf": {"status": "unavailable", "value": None},
+            },
+        }
+        original = copy.deepcopy(previous)
+        merged = module.merge_usage_snapshot(fresh, previous)
+        self.assertEqual(original, previous)
+        self.assertEqual("stale", merged["metrics"]["agents"]["status"])
+        self.assertEqual(12, merged["metrics"]["agents"]["value"])
+        self.assertEqual("2026-10-08T22:32:00Z", merged["metrics"]["agents"]["observedAt"])
+        self.assertEqual("NetworkAccessDenied", merged["metrics"]["agents"]["refreshErrorCode"])
+        self.assertEqual("2026-10-09T01:30:00Z", merged["metrics"]["agents"]["refreshAttemptedAt"])
+        self.assertEqual("ok", merged["metrics"]["models"]["status"])
+        self.assertEqual(64, merged["metrics"]["models"]["value"])
+        self.assertEqual(0, merged["metrics"]["search"]["value"])
+        self.assertEqual("unavailable", merged["metrics"]["adf"]["status"])
+        failed_again = copy.deepcopy(fresh)
+        failed_again["observedAt"] = "2026-10-09T02:00:00Z"
+        repeated = module.merge_usage_snapshot(failed_again, merged)
+        self.assertEqual("2026-10-08T22:32:00Z", repeated["metrics"]["agents"]["observedAt"])
+        gone = copy.deepcopy(fresh)
+        gone["metrics"]["agents"] = {"status": "not-deployed", "value": None}
+        self.assertEqual("not-deployed", module.merge_usage_snapshot(gone, previous)["metrics"]["agents"]["status"])
+
+    def test_failed_refresh_ignores_invalid_or_future_success_values(self) -> None:
+        fresh = {"observedAt": "2026-10-09T01:30:00Z", "metrics": {"models": {"status": "unavailable", "value": None}}}
+        for value in (None, True, -1, float("nan"), float("inf"), 63.25, 2 ** 10000):
+            previous = {"observedAt": "2026-10-08T22:32:00Z", "metrics": {"models": {"status": "ok", "value": value}}}
+            self.assertIsNone(module.merge_usage_snapshot(fresh, previous)["metrics"]["models"]["value"])
+        for timestamp in ("", "not-a-time", "2026-10-10T01:00:00Z", "2026-10-08T22:32:00"):
+            previous = {"observedAt": timestamp, "metrics": {"models": {"status": "ok", "value": 63}}}
+            self.assertIsNone(module.merge_usage_snapshot(fresh, previous)["metrics"]["models"]["value"])
+
+    def test_usage_refresh_history_is_exact_rg_scoped_and_never_shared_between_projects(self) -> None:
+        one = {"id": module.arm_id(DEV_SUB, "one")}
+        two = {"id": module.arm_id(DEV_SUB, "two")}
+        fresh = {"observedAt": "2026-10-09T01:30:00Z", "metrics": {"models": {"status": "unavailable", "value": None}}}
+        history = {
+            "hubResourceGroups": [],
+            "environments": [{
+                "commonResourceGroup": {"id": ""},
+                "projects": [{"id": one["id"], "usageSnapshot": {
+                    "observedAt": "2026-10-08T22:32:00Z", "metrics": {"models": {"status": "ok", "value": 63}},
+                }}],
+            }],
+        }
+        collector = unittest.mock.Mock()
+        collector.collect.return_value = fresh
+        inventory = {"hubResourceGroups": [], "environments": [{"commonResourceGroup": {"id": ""}, "projects": [one, two]}]}
+        module.collect_usage(inventory, collector, {DEV_SUB}, previous_inventory=history)
+        self.assertEqual(63, one["usageSnapshot"]["metrics"]["models"]["value"])
+        self.assertIsNone(two["usageSnapshot"]["metrics"]["models"]["value"])
+
+    def test_usage_tile_explicitly_labels_last_known_values_and_read_failure(self) -> None:
+        card = module.usage_part(10, 12, {
+            "id": module.arm_id(DEV_SUB, "one"),
+            "usageSnapshot": {
+                "observedAt": "2026-10-09T01:30:00Z",
+                "metrics": {
+                    "agents": {"status": "stale", "value": 12, "observedAt": "2026-10-08T22:32:00Z",
+                               "refreshErrorCode": "NetworkAccessDenied"},
+                    "models": {"status": "ok", "value": 63},
+                    "search": {"status": "unavailable", "value": None, "errorCode": "AccessDenied"},
+                },
+            },
+        }, TENANT)
+        text = card["metadata"]["settings"]["content"]["settings"]["content"]
+        self.assertIn("**12**", text)
+        self.assertIn("last known", text)
+        self.assertIn("2026-10-08 22:32 UTC", text)
+        self.assertIn("NetworkAccessDenied", text)
+        self.assertIn("AccessDenied", text)
+        self.assertIn("**63**", text)
+        self.assertIn("not current", text)
 
     def test_eight_discovered_resource_shortcuts_are_kept_in_two_rows(self) -> None:
         config = self.config()

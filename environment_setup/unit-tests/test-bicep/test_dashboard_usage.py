@@ -342,13 +342,19 @@ def test_boundary_rejects_subscription_mismatch_extra_flags_and_writes():
     assert not usage.is_read_command(changed)
 
 
-def test_timeout_is_sanitized_without_retry_and_cached(capsys):
+def test_timeout_is_sanitized_with_bounded_retries_and_cached(capsys):
+    calls, sleeps = [], []
     def az(*args):
+        calls.append(args)
         raise subprocess.TimeoutExpired(["secret-command"], 90, output="private-payload")
-    collector = usage.Collector(az, NOW)
+    collector = usage.Collector(az, NOW, sleeper=sleeps.append)
     result = collector.collect(RG)
     assert all(metric["status"] == "unavailable" for metric in result["metrics"].values())
+    assert all(metric["errorCode"] == "UsageReadTimeout" for metric in result["metrics"].values())
+    assert len(calls) == 6
+    assert sleeps == [1, 2, 1, 2]
     assert collector.collect(RG) == result
+    assert len(calls) == 6 and sleeps == [1, 2, 1, 2]
     assert "secret" not in json.dumps(result) + str(capsys.readouterr())
     assert "private-payload" not in json.dumps(result)
 
@@ -785,6 +791,10 @@ def test_result_and_logs_never_expose_resource_payloads_names_or_callers(capsys)
         return agents_handler(args)
     result = usage.Collector(Azure([PROJECT, storage, search, model], handler), NOW).collect(RG)
     assert all(result["metrics"][key]["status"] == "ok" for key in ("activity", "agents", "models", "storage", "search"))
+    assert all(
+        metric["observedAt"] == "2026-10-08T20:00:00Z"
+        for metric in result["metrics"].values() if metric["status"] == "ok"
+    )
     output = json.dumps(result) + str(capsys.readouterr())
     for sensitive in ("private-", "secret-", RG, SUB, ".azure.com", ".search.windows.net", "event-1"):
         assert sensitive not in output
@@ -792,7 +802,7 @@ def test_result_and_logs_never_expose_resource_payloads_names_or_callers(capsys)
 
 def test_launcher_runtime_failures_are_sanitized_without_masking_parser_errors():
     def az(*args):
-        raise RuntimeError("private-path secret-token")
+        raise usage.AzureCliUnavailable("private-path secret-token")
     result = usage.Collector(az, NOW).collect(RG)
     assert all(metric["status"] == "unavailable" for metric in result["metrics"].values())
     assert "private-path" not in json.dumps(result)
@@ -974,3 +984,335 @@ def test_activity_boundary_rejects_unbounded_or_changed_continuation_query(query
         "--subscription", SUB, "--output", "json", "--only-show-errors",
     )
     assert not usage.is_read_command(args)
+
+
+def failed_response(code=None, message="", *, stdout=""):
+    error = {"message": message}
+    if code is not None:
+        error["code"] = code
+    return subprocess.CompletedProcess([], 1, stdout, json.dumps({"error": error}))
+
+
+@pytest.mark.parametrize("stderr,stdout,expected", [
+    ('prefix {"error":{"code":"ResourceNotFound"}} trailing', "", "ResourceNotFound"),
+    ('{"error":{"code":"First"}} {"error":{"code":"Second"}}', "", "First"),
+    ("not json", '{"error":{"code":"FromStdout"}}', "FromStdout"),
+    ('{"error":{"code":403}}', "", None),
+    ('{"unrelated":true}', "", None),
+    ('{"error":{"code":"private-person@example.com"}}', "", "private-person@example.com"),
+])
+def test_azure_error_code_preserves_general_json_extraction_contract(stderr, stdout, expected):
+    result = subprocess.CompletedProcess([], 1, stdout, stderr)
+    assert usage.azure_error_code(result) == expected
+
+
+@pytest.mark.parametrize("code,message,expected,transient", [
+    ("UsageReadTimeout", "", "UsageReadTimeout", True),
+    ("ReadTimeout", "", "ReadTimeout", True),
+    ("ConnectionError", "", "ServiceUnavailable", True),
+    ("TooManyRequests", "", "Throttled", True),
+    ("ServiceUnavailable", "", "ServiceUnavailable", True),
+    ("Forbidden", "", "AccessDenied", False),
+    ("403", "Denied by Virtual Network/Firewall rules.", "NetworkAccessDenied", False),
+    ("403", "NetworkDenied: request rejected by network policy.", "NetworkAccessDenied", False),
+    ("403", "", "AccessDenied", False),
+    ("401", "", "AuthenticationRequired", False),
+    ("429", "", "Throttled", True),
+    ("503", "", "ServiceUnavailable", True),
+    ("501", "", "ReadFailed", False),
+    ("Forbidden", "Access denied due to Virtual Network/Firewall rules.", "NetworkAccessDenied", False),
+    ("Forbidden", "PublicNetworkAccess is disabled; use a private endpoint.", "NetworkAccessDenied", False),
+    ("NetworkAccessDenied", "", "NetworkAccessDenied", False),
+    ("AuthorizationFailed", "", "AccessDenied", False),
+    ("Unauthorized", "", "AuthenticationRequired", False),
+    (None, "AADSTS700082: private-person@example.com", "AuthenticationRequired", False),
+    (None, "HTTP 401 Unauthorized", "AuthenticationRequired", False),
+    (None, "HTTP 403 Forbidden", "AccessDenied", False),
+    (None, "ERROR: Forbidden", "AccessDenied", False),
+    ("", "forbidden", "AccessDenied", False),
+    (None, "ERROR: Operation returned an invalid status 'Forbidden'", "AccessDenied", False),
+    (None, "ERROR: Unauthorized", "AuthenticationRequired", False),
+    (None, "ERROR: (TooManyRequests) secret-token", "Throttled", True),
+    (None, "ERROR: (ResourceNotFound) previous request timed out", "ReadFailed", False),
+    (None, "HTTP 408 Request Timeout", "ReadTimeout", True),
+    (None, "HTTP 429 Too Many Requests", "Throttled", True),
+    (None, "HTTP 500 Internal Server Error", "ServiceUnavailable", True),
+    (None, "HTTP 502 Bad Gateway", "ServiceUnavailable", True),
+    (None, "HTTP 503 Service Unavailable", "ServiceUnavailable", True),
+    (None, "HTTP 504 Gateway Timeout", "ServiceUnavailable", True),
+    (None, "HTTP 501 Not Implemented", "ReadFailed", False),
+    (None, "Response status code: 503", "ServiceUnavailable", True),
+    (None, "HTTP/1.1 503 Service Unavailable", "ServiceUnavailable", True),
+    (None, "Read timed out. private-endpoint-name.example.com", "ReadTimeout", True),
+    ("ResourceNotFound", "", "ReadFailed", False),
+    ("private-person@example.com", "secret-token", "ReadFailed", False),
+    ("UsageReadTimeout", "HTTP 403 Forbidden", "AccessDenied", False),
+])
+def test_read_failures_use_only_safe_codes_and_retry_known_transients(code, message, expected, transient):
+    result = failed_response(code, message)
+    assert usage.read_failure_code(result) == expected
+    assert usage.is_transient_read_failure(result) is transient
+
+
+@pytest.mark.parametrize("failure", [
+    failed_response("TooManyRequests"),
+    failed_response("UsageReadTimeout"),
+    failed_response("ServiceUnavailable"),
+    failed_response(message="HTTP 503 Service Unavailable"),
+    subprocess.TimeoutExpired(["secret-command"], 90, output="private-payload"),
+    TimeoutError("secret transport timeout"),
+    ConnectionError("secret transport failure"),
+])
+def test_transient_activity_reads_recover_once_without_false_unavailable_or_warnings(failure, capsys):
+    attempts, sleeps = [], []
+    def handler(args):
+        if "eventtypes/management/values" not in url_of(args):
+            return None
+        attempts.append(args)
+        if len(attempts) == 1:
+            if isinstance(failure, Exception):
+                raise failure
+            return failure
+        return response({"value": [event()]})
+    metric = usage.Collector(Azure(handler=handler), NOW, sleeper=sleeps.append).collect(RG)["metrics"]["activity"]
+    assert metric["status"] == "ok" and metric["value"] == 1
+    assert metric["observedAt"] == "2026-10-08T20:00:00Z"
+    assert "errorCode" not in metric
+    assert len(attempts) == 2 and sleeps == [1]
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("code,message", [
+    ("TooManyRequests", ""), ("UsageReadTimeout", ""), ("ServiceUnavailable", ""),
+])
+def test_retry_exhaustion_is_unknown_warns_once_and_cache_never_replays_attempts(code, message, capsys):
+    sleeps = []
+    az = Azure(handler=lambda args: failed_response(code, message))
+    collector = usage.Collector(az, NOW, sleeper=sleeps.append)
+    result = collector.collect(RG)
+    metric = result["metrics"]["activity"]
+    assert metric["status"] == "unavailable" and metric["value"] is None
+    assert metric["errorCode"] == usage.read_failure_code(failed_response(code, message))
+    assert "observedAt" not in metric
+    assert len(az.calls) == 4 and sleeps == [1, 2]
+    output = capsys.readouterr().out
+    assert output.count("WARNING:") == 1
+    assert "activity" in output and metric["errorCode"] in output
+    assert collector.collect(RG.upper()) == result
+    assert len(az.calls) == 4 and capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("failure,expected", [
+    (failed_response("Forbidden"), "AccessDenied"),
+    (failed_response("Forbidden", "Public network access is disabled."), "NetworkAccessDenied"),
+    (failed_response("Unauthorized"), "AuthenticationRequired"),
+    (failed_response(message="AADSTS700082: authentication expired"), "AuthenticationRequired"),
+    (failed_response("ResourceNotFound"), "ReadFailed"),
+    (failed_response(message="HTTP 501 Not Implemented"), "ReadFailed"),
+    (subprocess.CompletedProcess([], 0, '{"value":', ""), "ReadSchemaInvalid"),
+    (response({"value": None}), "ReadSchemaInvalid"),
+])
+def test_permanent_and_schema_failures_do_not_retry(failure, expected):
+    sleeps = []
+    az = Azure(handler=lambda args: failure)
+    metric = usage.Collector(az, NOW, sleeper=sleeps.append).collect(RG)["metrics"]["activity"]
+    assert metric["status"] == "unavailable" and metric["value"] is None
+    assert metric["errorCode"] == expected
+    assert len(az.calls) == 2 and sleeps == []
+
+
+@pytest.mark.parametrize("retry_after,expected_sleep", [
+    ("Retry-After: 5", [5]),
+    ('"retryAfter": 30', [30]),
+    ('"Retry-After": "1.5"', [1.5]),
+    ("Retry-After: 31", []),
+    ("Retry-After: 0", []),
+    ("Retry-After: -1", []),
+    ("Retry-After: not-a-delay", []),
+    ("Retry-After:", []),
+    ('"retryAfter": ""', []),
+])
+def test_explicit_retry_after_is_honored_only_within_bounded_positive_delay(retry_after, expected_sleep):
+    attempts, sleeps = [], []
+    def handler(args):
+        attempts.append(args)
+        if len(attempts) == 1:
+            return subprocess.CompletedProcess([], 1, "", "HTTP 429 Too Many Requests\n" + retry_after)
+        return response({"value": []})
+    metric = usage.Collector(Azure(handler=handler), NOW, sleeper=sleeps.append).collect(RG)["metrics"]["activity"]
+    assert metric["status"] == ("ok" if expected_sleep else "unavailable")
+    assert len(attempts) == (2 if expected_sleep else 1)
+    assert sleeps == expected_sleep
+
+
+def test_later_model_page_transient_exhaustion_discards_partial_aggregate_and_keeps_other_metric(capsys):
+    workspace = resource("Microsoft.MachineLearningServices/workspaces", "one")
+    sleeps = []
+    def handler(args):
+        url = url_of(args)
+        if "/models?" not in url:
+            return None
+        if "$skipToken=" in url:
+            return failed_response("ServiceUnavailable", "secret-token " + RG)
+        return response({"value": [model_row(workspace, "secret-model")], "nextLink": url + "&$skipToken=next"})
+    az = Azure([workspace], handler)
+    metrics = usage.Collector(az, NOW, sleeper=sleeps.append).collect(RG)["metrics"]
+    assert metrics["models"]["value"] is None
+    assert metrics["models"]["errorCode"] == "ServiceUnavailable"
+    assert "observedAt" not in metrics["models"]
+    assert metrics["activity"]["observedAt"] == "2026-10-08T20:00:00Z"
+    assert len([args for args in az.calls if "/models?" in url_of(args)]) == 4
+    assert sleeps == [1, 2]
+    output = json.dumps(metrics) + capsys.readouterr().out
+    assert "secret-" not in output and RG not in output
+
+
+def test_unsafe_continuation_is_incomplete_and_never_retried():
+    sleeps = []
+    az = Azure(handler=lambda args: response({
+        "value": [event()], "nextLink": "https://attacker.example?secret-token",
+    }))
+    metric = usage.Collector(az, NOW, sleeper=sleeps.append).collect(RG)["metrics"]["activity"]
+    assert metric["errorCode"] == "ReadIncomplete"
+    assert len(az.calls) == 2 and sleeps == []
+
+
+def test_successful_metrics_have_individual_end_bound_timestamps_only():
+    workspace = resource("Microsoft.MachineLearningServices/workspaces")
+    search = resource("Microsoft.Search/searchServices", "search-one")
+    def handler(args):
+        if "/models?" in url_of(args):
+            return response({"value": []})
+        if ".search.windows.net/" in url_of(args):
+            return failed_response("Forbidden")
+    metrics = usage.Collector(Azure([workspace, search], handler), NOW.replace(second=35)).collect(RG)["metrics"]
+    for metric in metrics.values():
+        if metric["status"] == "ok":
+            assert metric["observedAt"] == "2026-10-08T20:00:00Z"
+            assert "errorCode" not in metric
+        else:
+            assert "observedAt" not in metric
+
+
+def test_agents_preserve_successful_population_and_all_safe_failure_codes(capsys):
+    def handler(args):
+        if "/assistants?" in url_of(args):
+            return failed_response("Forbidden", "Public network access is disabled. secret-token " + ENDPOINT)
+        return agents_handler(args)
+    az = Azure([PROJECT], handler)
+    metric = usage.Collector(az, NOW, sleeper=lambda _: pytest.fail("must not retry a denied read")).collect(RG)["metrics"]["agents"]
+    assert metric["value"] is None and metric["status"] == "unavailable"
+    assert metric["newCount"] == 2 and metric["classicCount"] is None
+    assert metric["newStatus"] == "ok" and metric["classicStatus"] == "unavailable"
+    assert metric["errorCode"] == "NetworkAccessDenied"
+    assert metric["errorCodes"] == metric["classicErrorCodes"] == ["NetworkAccessDenied"]
+    assert metric["newErrorCodes"] == []
+    assert "observedAt" not in metric
+    output = json.dumps(metric) + capsys.readouterr().out
+    for sensitive in ("secret-", ENDPOINT, RG, "private-person", "private-project"):
+        assert sensitive not in output
+    assert output.count("WARNING:") == 1
+
+
+def test_agents_different_population_failures_keep_codes_without_raw_payloads(capsys):
+    def handler(args):
+        if args[:2] == ("resource", "show"):
+            return project_response()
+        if "/agents?" in url_of(args):
+            return failed_response("Unauthorized", "private-person@example.com secret-token")
+        if "/assistants?" in url_of(args):
+            return response({"data": [], "has_more": "secret-invalid"})
+    metric = usage.Collector(Azure([PROJECT], handler), NOW).collect(RG)["metrics"]["agents"]
+    assert metric["newCount"] is None and metric["classicCount"] is None
+    assert metric["errorCodes"] == ["AuthenticationRequired", "ReadIncomplete"]
+    assert metric["newErrorCodes"] == ["AuthenticationRequired"]
+    assert metric["classicErrorCodes"] == ["ReadIncomplete"]
+    output = json.dumps(metric) + capsys.readouterr().out
+    assert "secret-" not in output and "private-person" not in output
+    assert output.count("WARNING:") == 1
+
+
+def test_agent_endpoint_discovery_failure_keeps_safe_reason_for_both_populations():
+    metric = usage.Collector(Azure([PROJECT], lambda args: (
+        failed_response("AuthorizationFailed") if args[:2] == ("resource", "show") else None
+    )), NOW).collect(RG)["metrics"]["agents"]
+    assert metric["errorCodes"] == ["AccessDenied"]
+    assert metric["newErrorCodes"] == metric["classicErrorCodes"] == ["AccessDenied"]
+
+
+def test_observation_error_constructor_remains_compatible_and_codes_are_payload_free():
+    assert usage.ObservationError(usage.INVALID).code == "ReadSchemaInvalid"
+    assert usage.ObservationError(usage.INCOMPLETE).code == "ReadIncomplete"
+    error = usage.ObservationError("secret-token private-person@example.com", code="secret-code")
+    assert error.code == "ReadFailed"
+    assert "secret" not in str(error) and "private-person" not in str(error)
+
+
+def test_transients_can_recover_on_final_allowed_attempt_and_preserve_page_identity(capsys):
+    workspace = resource("Microsoft.MachineLearningServices/workspaces", "one")
+    calls, sleeps = [], []
+    def handler(args):
+        url = url_of(args)
+        if "/models?" not in url:
+            return None
+        calls.append(args)
+        if "$skipToken=" not in url:
+            return response({"value": [model_row(workspace, "first")], "nextLink": url + "&$skipToken=next"})
+        if len(calls) < 4:
+            return failed_response("TooManyRequests")
+        return response({"value": [model_row(workspace, "second")]})
+    metric = usage.Collector(Azure([workspace], handler), NOW, sleeper=sleeps.append).collect(RG)["metrics"]["models"]
+    assert metric["status"] == "ok" and metric["value"] == 2
+    assert len(calls) == 4 and calls[1] == calls[2] == calls[3]
+    assert sleeps == [1, 2] and capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("failure", [
+    OSError("secret-path missing CLI"),
+    usage.AzureCliUnavailable("secret-path missing runtime"),
+])
+def test_non_transient_launcher_failures_never_retry_or_print_raw_messages(failure, capsys):
+    attempts, sleeps = [], []
+    def az(*args):
+        attempts.append(args)
+        raise failure
+    metrics = usage.Collector(az, NOW, sleeper=sleeps.append).collect(RG)["metrics"]
+    assert len(attempts) == 2 and sleeps == []
+    assert all(metric["errorCode"] == "ReadFailed" for metric in metrics.values())
+    output = json.dumps(metrics) + capsys.readouterr().out
+    assert "secret-" not in output and output.count("WARNING:") == 6
+
+
+def test_runtime_scope_or_programming_errors_are_not_converted_to_unavailable():
+    def az(*args):
+        raise RuntimeError("Explicit command-scope failure")
+    with pytest.raises(RuntimeError, match="command-scope"):
+        usage.Collector(az, NOW).collect(RG)
+
+
+def test_success_responses_are_never_transient_even_when_payload_contains_error_like_strings():
+    result = response({"error": {"code": "UsageReadTimeout"}})
+    assert not usage.is_transient_read_failure(result)
+
+
+def test_activity_unclassified_identities_expose_incomplete_code_without_success_timestamp():
+    metric = usage.Collector(Azure(handler=lambda args: response({
+        "value": [event(claims={})],
+    })), NOW).collect(RG)["metrics"]["activity"]
+    assert metric["value"] is None and metric["errorCode"] == "ReadIncomplete"
+    assert "observedAt" not in metric
+
+
+@pytest.mark.parametrize("original", [
+    failed_response("403", "Access denied due to Virtual Network/Firewall rules."),
+    subprocess.CompletedProcess([], 1, "", "forbidden"),
+    failed_response("Unauthorized"),
+    failed_response(message="HTTP 501 Not Implemented"),
+    failed_response("UsageReadTimeout"),
+    failed_response("ServiceUnavailable"),
+    failed_response("429"),
+])
+def test_payload_free_boundary_roundtrip_preserves_classification_and_retry_eligibility(original):
+    sanitized = failed_response(usage.read_failure_code(original))
+    assert usage.read_failure_code(sanitized) == usage.read_failure_code(original)
+    assert usage.is_transient_read_failure(sanitized) == usage.is_transient_read_failure(original)

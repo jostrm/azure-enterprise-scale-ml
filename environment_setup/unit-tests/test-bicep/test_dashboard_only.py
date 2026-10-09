@@ -695,6 +695,64 @@ def test_usage_reads_pass_existing_boundary_and_keep_failures_unavailable():
         azure(*command)
 
 
+def test_dashboard_only_retains_previous_same_project_measurements_on_failed_refresh():
+    cloud = fake_azure(payload(), "dev", {})
+    previous = cloud.project("001", "dev", DEV)
+    previous["usageSnapshot"] = {
+        "observedAt": "2026-10-08T22:32:00Z",
+        "metrics": {
+            "agents": {"status": "ok", "value": 12},
+            "models": {"status": "ok", "value": 63},
+        },
+    }
+    cloud.inventory["environments"][0]["projects"].append(previous)
+    azure = runner.DashboardAzure(cloud.cfg, "plan", cloud)
+
+    class FailedRefresh:
+        def collect(self, group):
+            return {"observedAt": "2026-10-09T01:30:00Z", "metrics": {
+                "agents": {"status": "unavailable", "value": None, "errorCode": "AccessDenied"},
+                "models": {"status": "ok", "value": 64},
+            }}
+
+    azure.usage_collector = FailedRefresh()
+    inventory, _, _ = runner.reconcile(azure)
+    project = next(p for p in inventory["environments"][0]["projects"] if p["projectNumber"] == "001")
+    metrics = project["usageSnapshot"]["metrics"]
+    assert metrics["agents"]["status"] == "stale" and metrics["agents"]["value"] == 12
+    assert metrics["agents"]["observedAt"] == "2026-10-08T22:32:00Z"
+    assert metrics["models"]["status"] == "ok" and metrics["models"]["value"] == 64
+    assert all("put" not in command for command in cloud.commands)
+
+
+@pytest.mark.parametrize("stderr,code,transient,delay", [
+    ('ERROR: {"error":{"code":"403","message":"Public network access is disabled. SECRET"}}', "NetworkAccessDenied", False, None),
+    ("ERROR: Forbidden SECRET", "AccessDenied", False, None),
+    ('{"error":{"code":"429"}} Retry-After: 12 SECRET', "Throttled", True, 12),
+    ('{"error":{"code":"501"}} SECRET', "ReadFailed", False, None),
+    ('{"error":{"code":"503"}} Retry-After: 99 SECRET', "ServiceUnavailable", True, 0),
+])
+def test_usage_boundary_preserves_safe_failure_class_and_retry_budget(stderr, code, transient, delay):
+    cloud = fake_azure(payload(), "dev", {})
+    captured = []
+
+    def denied(*args):
+        captured.append(args)
+        return subprocess.CompletedProcess(args, 1, "", stderr)
+
+    azure = runner.DashboardAzure(cloud.cfg, "plan", denied)
+    collector = runner.shared.usage.Collector(azure, sleeper=lambda seconds: None)
+    snapshot = collector.collect(runner.shared.arm_id(DEV, cloud.cfg.current_project_resource_group))
+    command = next(args for args in captured if args[:1] == ("rest",))
+    result = azure(*command)
+    assert runner.shared.usage.read_failure_code(result) == code
+    assert runner.shared.usage.is_transient_read_failure(result) is transient
+    assert "SECRET" not in result.stderr
+    assert "SECRET" not in json.dumps(snapshot)
+    safe = json.loads(result.stderr)
+    assert safe.get("retry-after") == delay
+
+
 def test_workflows_are_manual_plan_default_safe_oidc_and_shared_runner():
     ado = yaml.load(ADO.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
     gha = yaml.load(GHA.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
