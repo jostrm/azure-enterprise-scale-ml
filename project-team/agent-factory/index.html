@@ -12,31 +12,31 @@
         <meta name="author" content="Microsoft">
       
       
-        <link rel="canonical" href="https://jostrm.github.io/azure-enterprise-scale-ml/concepts/templates/dataops/">
+        <link rel="canonical" href="https://jostrm.github.io/azure-enterprise-scale-ml/project-team/agent-factory/">
       
       
-        <link rel="prev" href="../iac/">
+        <link rel="prev" href="../">
       
       
-        <link rel="next" href="../mlops/">
+        <link rel="next" href="../ml-model-factory/">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/logo.svg">
+      <link rel="icon" href="../../assets/logo.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>DataOps - Enterprise Scale AI Factory</title>
+        <title>Agent Factory SDK - Enterprise Scale AI Factory</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -55,7 +55,7 @@
       
     
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#dataops-templates" class="md-skip">
+        <a href="#agent-factory-sdk" class="md-skip">
           Skip to content
         </a>
       
@@ -96,9 +96,9 @@
 
 <header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="Enterprise Scale AI Factory" class="md-header__button md-logo" aria-label="Enterprise Scale AI Factory" data-md-component="logo">
+    <a href="../.." title="Enterprise Scale AI Factory" class="md-header__button md-logo" aria-label="Enterprise Scale AI Factory" data-md-component="logo">
       
-  <img src="../../../assets/logo.svg" alt="logo">
+  <img src="../../assets/logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -115,7 +115,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              DataOps
+              Agent Factory SDK
             
           </span>
         </div>
@@ -222,7 +222,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../.." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -243,7 +243,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../factory-tools/18-cli-and-api-and-usage/" class="md-tabs__link">
+        <a href="../../factory-tools/18-cli-and-api-and-usage/" class="md-tabs__link">
           
   
   
@@ -261,11 +261,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../../project-team/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
           
   
   
@@ -287,7 +289,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../parameters/" class="md-tabs__link">
+        <a href="../../parameters/" class="md-tabs__link">
           
   
   
@@ -305,13 +307,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../concepts/" class="md-tabs__link">
           
   
   
@@ -331,7 +331,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../architectures/" class="md-tabs__link">
+      <a href="../../architectures/" class="md-tabs__link">
         
   
   
@@ -352,7 +352,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../iac/bicep/" class="md-tabs__link">
+        <a href="../../iac/bicep/" class="md-tabs__link">
           
   
   
@@ -374,7 +374,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../orchestrators/ado/" class="md-tabs__link">
+        <a href="../../orchestrators/ado/" class="md-tabs__link">
           
   
   
@@ -394,7 +394,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../news/" class="md-tabs__link">
+      <a href="../../news/" class="md-tabs__link">
         
   
   
@@ -413,7 +413,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../intelligence/" class="md-tabs__link">
+      <a href="../../intelligence/" class="md-tabs__link">
         
   
   
@@ -454,9 +454,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="Enterprise Scale AI Factory" class="md-nav__button md-logo" aria-label="Enterprise Scale AI Factory" data-md-component="logo">
+    <a href="../.." title="Enterprise Scale AI Factory" class="md-nav__button md-logo" aria-label="Enterprise Scale AI Factory" data-md-component="logo">
       
-  <img src="../../../assets/logo.svg" alt="logo">
+  <img src="../../assets/logo.svg" alt="logo">
 
     </a>
     Enterprise Scale AI Factory
@@ -483,7 +483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -572,7 +572,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../factory-tools/18-cli-and-api-and-usage/" class="md-nav__link">
+      <a href="../../factory-tools/18-cli-and-api-and-usage/" class="md-nav__link">
         
   
   
@@ -600,7 +600,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../factory-tools/19-cli-and-api-and-usage/" class="md-nav__link">
+      <a href="../../factory-tools/19-cli-and-api-and-usage/" class="md-nav__link">
         
   
   
@@ -628,7 +628,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../factory-tools/20-cli-and-api-and-usage/" class="md-nav__link">
+      <a href="../../factory-tools/20-cli-and-api-and-usage/" class="md-nav__link">
         
   
   
@@ -660,6 +660,8 @@
       
   
   
+    
+  
   
   
     
@@ -677,22 +679,23 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../project-team/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -710,13 +713,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -733,10 +736,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../../project-team/agent-factory/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Factory SDK
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -752,6 +782,87 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#project-team-quickstart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project-team quickstart
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Project-team quickstart">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-prepare-your-project-copy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Prepare your project copy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-inspect-agent-definitions-offline-with-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Inspect agent definitions offline with Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-make-an-offline-single-target-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Make an offline single-target plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-optional-live-work-review-before-applying" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Optional live work: review before applying
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -764,7 +875,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../project-team/ml-model-factory/" class="md-nav__link">
+      <a href="../ml-model-factory/" class="md-nav__link">
         
   
   
@@ -828,7 +939,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../parameters/" class="md-nav__link ">
+            <a href="../../parameters/" class="md-nav__link ">
               
   
   
@@ -872,7 +983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../parameters/standard/" class="md-nav__link">
+      <a href="../../parameters/standard/" class="md-nav__link">
         
   
   
@@ -900,7 +1011,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../parameters/advanced/" class="md-nav__link">
+      <a href="../../parameters/advanced/" class="md-nav__link">
         
   
   
@@ -932,8 +1043,6 @@
       
   
   
-    
-  
   
   
     
@@ -953,23 +1062,22 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../" class="md-nav__link ">
+            <a href="../../concepts/" class="md-nav__link ">
               
   
   
@@ -987,13 +1095,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1013,7 +1121,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../intelligence/" class="md-nav__link">
+      <a href="../../concepts/intelligence/" class="md-nav__link">
         
   
   
@@ -1041,7 +1149,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../enterprise-scale/" class="md-nav__link">
+      <a href="../../concepts/enterprise-scale/" class="md-nav__link">
         
   
   
@@ -1066,10 +1174,8 @@
                 
   
   
-    
   
   
-  
     
     
       
@@ -1086,21 +1192,20 @@
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
         
           
-          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
             
   
   
@@ -1118,7 +1223,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1136,7 +1241,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../iac/" class="md-nav__link">
+      <a href="../../concepts/templates/iac/" class="md-nav__link">
         
   
   
@@ -1161,37 +1266,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    DataOps
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../concepts/templates/dataops/" class="md-nav__link">
         
   
   
@@ -1207,70 +1285,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#a-reusable-data-path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A reusable data path
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#choose-the-tools-for-the-workload" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Choose the tools for the workload
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-or-project-storage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common or project storage
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#continue" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Continue
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1283,7 +1297,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../mlops/" class="md-nav__link">
+      <a href="../../concepts/templates/mlops/" class="md-nav__link">
         
   
   
@@ -1311,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../genaiops/" class="md-nav__link">
+      <a href="../../concepts/templates/genaiops/" class="md-nav__link">
         
   
   
@@ -1354,7 +1368,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architectures/" class="md-nav__link">
+      <a href="../../architectures/" class="md-nav__link">
         
   
   
@@ -1441,7 +1455,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../iac/bicep/" class="md-nav__link">
+      <a href="../../iac/bicep/" class="md-nav__link">
         
   
   
@@ -1469,7 +1483,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../iac/terraform/" class="md-nav__link">
+      <a href="../../iac/terraform/" class="md-nav__link">
         
   
   
@@ -1564,7 +1578,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../orchestrators/ado/" class="md-nav__link">
+      <a href="../../orchestrators/ado/" class="md-nav__link">
         
   
   
@@ -1592,7 +1606,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../orchestrators/gh/" class="md-nav__link">
+      <a href="../../orchestrators/gh/" class="md-nav__link">
         
   
   
@@ -1627,7 +1641,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../news/" class="md-nav__link">
+      <a href="../../news/" class="md-nav__link">
         
   
   
@@ -1654,7 +1668,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../intelligence/" class="md-nav__link">
+      <a href="../../intelligence/" class="md-nav__link">
         
   
   
@@ -1701,46 +1715,63 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#a-reusable-data-path" class="md-nav__link">
+  <a href="#project-team-quickstart" class="md-nav__link">
     <span class="md-ellipsis">
       
-        A reusable data path
+        Project-team quickstart
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Project-team quickstart">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-prepare-your-project-copy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Prepare your project copy
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#choose-the-tools-for-the-workload" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#2-inspect-agent-definitions-offline-with-python" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Choose the tools for the workload
+        2. Inspect agent definitions offline with Python
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#common-or-project-storage" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#3-make-an-offline-single-target-plan" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Common or project storage
+        3. Make an offline single-target plan
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#continue" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#4-optional-live-work-review-before-applying" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Continue
+        4. Optional live work: review before applying
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1760,81 +1791,95 @@
                   
 
 
-  
-  
 
-
-<h1 id="dataops-templates">DataOps templates<a class="headerlink" href="#dataops-templates" title="Permanent link">&para;</a></h1>
-<p>DataOps prepares data for your models and agents. Choose a data source, storage
-target, transformation and versioning approach before running a workload.</p>
-<h2 id="a-reusable-data-path">A reusable data path<a class="headerlink" href="#a-reusable-data-path" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Stage</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Landing / original inputs</td>
-<td>Keep the source version and its origin clear.</td>
-</tr>
-<tr>
-<td>Bronze</td>
-<td>Preserve the supported original input representation.</td>
-</tr>
-<tr>
-<td>Silver</td>
-<td>Clean and transform data using the selected engine and format.</td>
-</tr>
-<tr>
-<td>Gold</td>
-<td>Create the model/application-ready view and reproducible splits.</td>
-</tr>
-<tr>
-<td>Inference and feedback</td>
-<td>Track scoring inputs, outputs, checkpoints and feedback separately.</td>
-</tr>
-</tbody>
-</table>
-<p>Current model-factory examples support versioned lake configuration, Delta-based
-flows and explicit compatibility paths. Select the documented scenario rather
-than treating every folder as an interchangeable input.</p>
-<h2 id="choose-the-tools-for-the-workload">Choose the tools for the workload<a class="headerlink" href="#choose-the-tools-for-the-workload" title="Permanent link">&para;</a></h2>
-<p>Data Factory can orchestrate ingestion, Databricks can transform/process data,
-and Event Hubs can provide event streams when configured. These resource options
-do not automatically create a complete data pipeline for every source.
-Fabric/OneLake integration needs its own documented connections and permissions.</p>
-<h2 id="common-or-project-storage">Common or project storage<a class="headerlink" href="#common-or-project-storage" title="Permanent link">&para;</a></h2>
-<p><code>use_common_datalake_storage</code> chooses the existing common or project data account
-in supported workload examples. New example configurations use project storage;
-omitting the setting in an older configuration retains its documented behavior.</p>
-<div class="admonition important">
-<p class="admonition-title">Selection does not move data</p>
-<p>Changing this setting does not copy data, provision an account, grant access
-or repoint an already-deployed agent automatically. Reconfigure and verify
-the affected workload deliberately.</p>
-</div>
-<p>Keep team access and producer/consumer ownership explicit. Sharing Silver data
-through a reference or an approved copy is not permission to overwrite another
-project's data.</p>
-<h2 id="continue">Continue<a class="headerlink" href="#continue" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/50-ml-model-factory/readme.md">ML Model Factory configuration and data</a></li>
-<li><a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/readme.md">Agent Factory storage and ingestion</a></li>
-<li><a href="../mlops/">MLOps</a> and <a href="../genaiops/">GenAIOps</a></li>
-</ul>
-<details>
-<summary>More info</summary>
-<p>Keep user configuration and project-specific example copies separate from
-maintainer-owned shared engines and generated outputs. Dataset licensing,
-private connectivity, storage format, hierarchical namespace and checkpoint
-requirements vary by scenario.</p>
-<p>Provisioning storage and assigning an ACL are different from validating the
-end user's effective access. Never infer access from the existence of a folder
-or a successful deployment script.</p>
-</details>
+<h1 id="agent-factory-sdk">Agent Factory SDK<a class="headerlink" href="#agent-factory-sdk" title="Permanent link">&para;</a></h1>
+<p><a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/agent_factory/readme.md#project-team-quickstart">Maintained source guide</a></p>
+<h2 id="project-team-quickstart">Project-team quickstart<a class="headerlink" href="#project-team-quickstart" title="Permanent link">&para;</a></h2>
+<p>Use the existing <code>agent_factory</code> Python modules for agent definitions and
+single-target operator commands. This is different from the core team's
+<code>azurefactory</code> administration client. There is no separate published
+<code>AgentFactoryClient</code> to install.</p>
+<h3 id="1-prepare-your-project-copy">1. Prepare your project copy<a class="headerlink" href="#1-prepare-your-project-copy" title="Permanent link">&para;</a></h3>
+<p>From the repository root, or use the equivalent copied directory
+<code>aifactory-usecase-code\40-agent-factory</code> in your orange project:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">Set-Location</span> <span class="p">.\</span><span class="n">usecase_code</span><span class="p">\</span><span class="n">40-agent-factory</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">python</span> <span class="n">-m</span> <span class="n">venv</span> <span class="p">.</span><span class="n">venv</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">.\.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">python</span><span class="p">.</span><span class="n">exe</span> <span class="n">-m</span> <span class="n">pip</span> <span class="n">install</span> <span class="n">-r</span> <span class="n">requirements</span><span class="p">.</span><span class="n">txt</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">.\.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">python</span><span class="p">.</span><span class="n">exe</span> <span class="n">-m</span> <span class="n">agent_factory</span> <span class="p">-</span><span class="n">-help</span>
+</code></pre></div>
+<p>Keep your project configuration outside generated use-case code:
+copy <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/config.example.json">config.example.json</a> to
+<code>aifactory\agent-factory\config.json</code>, then have the operator resolve the
+target key, environment, variables-file path and selected storage profile.
+Do not run the unresolved example against Azure. See
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/readme.md#separation-and-template-copying">configuration ownership</a> and
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/readme.md#one-storage-selection-for-every-example">storage selection</a>.</p>
+<h3 id="2-inspect-agent-definitions-offline-with-python">2. Inspect agent definitions offline with Python<a class="headerlink" href="#2-inspect-agent-definitions-offline-with-python" title="Permanent link">&para;</a></h3>
+<p>Save this as <code>inspect_agents.py</code> in the Agent Factory root and run
+<code>.\.venv\Scripts\python.exe .\inspect_agents.py</code>.
+It reads the maintained catalog without credentials, network access, model
+calls, deployment or local writes.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agent_factory.catalog</span><span class="w"> </span><span class="kn">import</span> <span class="n">agent_catalog</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">agents</span> <span class="o">=</span> <span class="n">agent_catalog</span><span class="p">()</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">([</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="n">agent</span><span class="p">[</span><span class="s2">"name"</span><span class="p">],</span> <span class="s2">"kind"</span><span class="p">:</span> <span class="n">agent</span><span class="p">[</span><span class="s2">"kind"</span><span class="p">],</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>     <span class="s2">"framework"</span><span class="p">:</span> <span class="n">agent</span><span class="p">[</span><span class="s2">"framework"</span><span class="p">],</span> <span class="s2">"role"</span><span class="p">:</span> <span class="n">agent</span><span class="p">[</span><span class="s2">"metadata"</span><span class="p">][</span><span class="s2">"aifactory.role"</span><span class="p">]}</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="n">agents</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">],</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+</code></pre></div>
+<p>The default catalog contains knowledge/reviewer/documentation prompt agents,
+hosted framework examples and a multi-agent helpdesk team. An entry is a
+definition, not proof that its framework, model or knowledge source is deployed.
+Read the real <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/agent_factory/catalog.py">catalog</a>,
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/41-single-agent/prompt-agent/readme.md">prompt agents</a>,
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/41-single-agent/hosted-agent/readme.md">hosted examples</a> and
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/42-multi-agent/readme.md">multi-agent examples</a>.</p>
+<h3 id="3-make-an-offline-single-target-plan">3. Make an offline single-target plan<a class="headerlink" href="#3-make-an-offline-single-target-plan" title="Permanent link">&para;</a></h3>
+<p>Save this separate program as <code>plan_agents.py</code> in the same directory. Supply
+the absolute path to your reviewed project configuration and its exact target
+key when prompted. <code>plan</code> validates local configuration; it does not
+authenticate, discover Azure resources or prove connectivity.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">agent_factory.cli</span><span class="w"> </span><span class="kn">import</span> <span class="n">parser</span><span class="p">,</span> <span class="n">run</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">config_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">input</span><span class="p">(</span><span class="s2">"Reviewed configuration path: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span><span class="o">.</span><span class="n">resolve</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">target_key</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">"Exact target key from that configuration: "</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">target_key</span><span class="p">:</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Select one target explicitly."</span><span class="p">)</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">arguments</span> <span class="o">=</span> <span class="n">parser</span><span class="p">()</span><span class="o">.</span><span class="n">parse_args</span><span class="p">([</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="s2">"plan"</span><span class="p">,</span> <span class="s2">"--config"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">config_path</span><span class="p">),</span> <span class="s2">"--target"</span><span class="p">,</span> <span class="n">target_key</span><span class="p">,</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="p">])</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">plan</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span><span class="n">arguments</span><span class="p">)</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="k">assert</span> <span class="n">plan</span><span class="p">[</span><span class="s2">"mutations"</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">False</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">"mutations"</span><span class="p">:</span> <span class="n">plan</span><span class="p">[</span><span class="s2">"mutations"</span><span class="p">],</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>                  <span class="s2">"agents"</span><span class="p">:</span> <span class="p">[</span><span class="n">agent</span><span class="p">[</span><span class="s2">"name"</span><span class="p">]</span> <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="n">plan</span><span class="p">[</span><span class="s2">"agents"</span><span class="p">]]},</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+</code></pre></div>
+<p>The equivalent CLI plan is also offline:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">$config</span> <span class="p">=</span> <span class="nb">Read-Host</span> <span class="s2">"Absolute reviewed configuration path"</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nv">$target</span> <span class="p">=</span> <span class="nb">Read-Host</span> <span class="s2">"Exact target key"</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="p">.\.</span><span class="n">venv</span><span class="p">\</span><span class="n">Scripts</span><span class="p">\</span><span class="n">python</span><span class="p">.</span><span class="n">exe</span> <span class="n">-m</span> <span class="n">agent_factory</span> <span class="n">plan</span> <span class="p">-</span><span class="n">-config</span> <span class="nv">$config</span> <span class="p">-</span><span class="n">-target</span> <span class="nv">$target</span>
+</code></pre></div>
+<h3 id="4-optional-live-work-review-before-applying">4. Optional live work: review before applying<a class="headerlink" href="#4-optional-live-work-review-before-applying" title="Permanent link">&para;</a></h3>
+<p>Stop after the plan unless the operator has reviewed the target, existing
+Foundry/model resources, selected data account, dataset terms, private DNS,
+identity permissions and cost budget. <code>discover</code> and <code>preflight</code> read Azure;
+they are not offline tests. Ingestion, knowledge configuration and deployment
+are distinct mutations requiring <code>--apply</code>; invocation can incur model costs.</p>
+<p>Follow the maintained <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/readme.md#operator-commands-powershell">operator commands</a>
+and <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/readme.md#data-and-foundry-iq">ingestion/knowledge/deployment sequence</a>
+for <strong>one explicit <code>--target</code></strong>. Do not silently enable public access, approve
+private links, lift a policy gate or guess a resource name.
+Python integrations use the actual <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/agent_factory/cli.py">selection and command entry points</a>,
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/agent_factory/prompt.py">OAuth-backed <code>project_client</code> and prompt lifecycle</a> and
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/agent_factory/hosted.py">hosted deployment implementation</a>; the operator CLI preserves the
+same ownership, storage and grounding checks.</p>
+<p>For source-bound RAG use <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/45-rag-agent/readme.md">45-rag-agent</a>, not an
+unbounded storage scan. Continue with the
+<a href="../ml-model-factory/#project-team-quickstart">ML Model Factory SDK</a>
+when your project also trains models.</p>
 
 
 
@@ -1919,10 +1964,10 @@ or a successful deployment script.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.indexes", "search.highlight", "search.suggest", "content.code.copy", "content.tabs.link", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
