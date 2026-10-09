@@ -2916,11 +2916,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">367</td>
+<td style="text-align: right;">381</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">367</td>
+<td style="text-align: right;">380</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2932,19 +2932,19 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>state</code></td>
-<td style="text-align: right;">46</td>
+<td style="text-align: right;">47</td>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">371</td>
+<td style="text-align: right;">384</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 135, 391; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 136, 392; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 393, 417; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 149, 405; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 150, 406; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 407, 431; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -3486,11 +3486,25 @@ reported, not silently represented as multiple settings.</p>
 <td>Deploy Azure Logic Apps</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:enablePersonas --><!-- parameter json.dev:enablePersonas --><code>enablePersonas</code></td>
+<td>No verified binding</td>
+<td>O</td>
+<td>Y: <code>false</code><br>J.dev: <code>false</code></td>
+<td>True selects groups-v1; false preserves configured legacy human/group grants.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:enablePostgreSQL --><!-- parameter json.dev:enablePostgreSQL --><code>enablePostgreSQL</code></td>
 <td><code>ENABLE_POSTGRESQL</code></td>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
 <td>Deploy Azure PostgreSQL</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:enableProjectVM --><!-- parameter json.dev:enableProjectVM --><code>enableProjectVM</code></td>
+<td><code>ENABLE_PROJECT_VM</code></td>
+<td>O</td>
+<td>Y: <code>false</code><br>J.dev: <code>false</code></td>
+<td>Enable project vm.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:enableRedisCache --><!-- parameter json.dev:enableRedisCache --><code>enableRedisCache</code></td>
@@ -3718,7 +3732,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter yaml:admin_projectType --><!-- parameter json.dev:admin_projectType --><code>admin_projectType</code></td>
-<td><code>PROJECT_TYPE</code></td>
+<td><code>ADMIN_PROJECT_TYPE</code>, <code>PROJECT_TYPE</code></td>
 <td>M</td>
 <td>Y: <code>"all"</code><br>J.dev: <code>"all"</code></td>
 <td></td>
@@ -3969,6 +3983,27 @@ reported, not silently represented as multiple settings.</p>
 <td>Project organizational department name keep-as-is: Unicode text, max 200 characters; identical across environments, independent of cost center. No factory inheritance or Azure tag writes.</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:persona_access_manifest --><!-- parameter json.dev:persona_access_manifest --><code>persona_access_manifest</code></td>
+<td><code>PERSONA_ACCESS_MANIFEST</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Repository-relative reviewed manifest for this environment/project.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:persona_access_mode --><!-- parameter json.dev:persona_access_mode --><code>persona_access_mode</code></td>
+<td><code>PERSONA_ACCESS_MODE</code></td>
+<td>O</td>
+<td>Y: <code>"legacy"</code><br>J.dev: <code>"legacy"</code></td>
+<td>Derived from enablePersonas; mode-only opt-in is supported when the flag is absent.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:persona_preflight_ready --><code>persona_preflight_ready</code></td>
+<td>No verified binding</td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: absent</td>
+<td>Persona preflight ready.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:postGresAdminEmails --><!-- parameter json.dev:postGresAdminEmails --><code>postGresAdminEmails</code></td>
 <td><code>POSTGRES_ADMIN_EMAILS</code></td>
 <td>C</td>
@@ -4030,6 +4065,55 @@ reported, not silently represented as multiple settings.</p>
 <td>M</td>
 <td>Y: <code>"001"</code><br>J.dev: <code>"001"</code></td>
 <td>Project number mandatory: Project number keep-as-is: For 1st project. otherwise: increment to '002', '003', etc.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skipDiagAISearch --><!-- parameter json.dev:skipDiagAISearch --><code>skipDiagAISearch</code></td>
+<td><code>SKIP_DIAG_AI_SEARCH</code></td>
+<td>O</td>
+<td>Y: <code>true</code><br>J.dev: <code>true</code></td>
+<td>Skip diag aisearch.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skipDiagAIServices --><!-- parameter json.dev:skipDiagAIServices --><code>skipDiagAIServices</code></td>
+<td><code>SKIP_DIAG_AI_SERVICES</code></td>
+<td>O</td>
+<td>Y: <code>true</code><br>J.dev: <code>true</code></td>
+<td>Skip diag aiservices.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skipDiagAOAI --><!-- parameter json.dev:skipDiagAOAI --><code>skipDiagAOAI</code></td>
+<td><code>SKIP_DIAG_AOAI</code></td>
+<td>O</td>
+<td>Y: <code>true</code><br>J.dev: <code>true</code></td>
+<td>Skip diag aoai.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skipDiagContentSafety --><!-- parameter json.dev:skipDiagContentSafety --><code>skipDiagContentSafety</code></td>
+<td><code>SKIP_DIAG_CONTENT_SAFETY</code></td>
+<td>O</td>
+<td>Y: <code>true</code><br>J.dev: <code>true</code></td>
+<td>Skip diag content safety.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skipDiagDocIntelligence --><!-- parameter json.dev:skipDiagDocIntelligence --><code>skipDiagDocIntelligence</code></td>
+<td><code>SKIP_DIAG_DOC_INTELLIGENCE</code></td>
+<td>O</td>
+<td>Y: <code>true</code><br>J.dev: <code>true</code></td>
+<td>Skip diag doc intelligence.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skipDiagSpeech --><!-- parameter json.dev:skipDiagSpeech --><code>skipDiagSpeech</code></td>
+<td><code>SKIP_DIAG_SPEECH</code></td>
+<td>O</td>
+<td>Y: <code>true</code><br>J.dev: <code>true</code></td>
+<td>Skip diag speech.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:skipDiagVision --><!-- parameter json.dev:skipDiagVision --><code>skipDiagVision</code></td>
+<td><code>SKIP_DIAG_VISION</code></td>
+<td>O</td>
+<td>Y: <code>true</code><br>J.dev: <code>true</code></td>
+<td>Skip diag vision.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:tag_costcenter --><!-- parameter json.dev:tag_costcenter --><code>tag_costcenter</code></td>
@@ -4830,6 +4914,13 @@ reported, not silently represented as multiple settings.</p>
 <td>AKS SKU name otherwise: "Standard" for production workloads.</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:aksSkuTier --><!-- parameter json.dev:aksSkuTier --><code>aksSkuTier</code></td>
+<td><code>AKS_SKU_TIER</code></td>
+<td>O</td>
+<td>Y: <code>"Standard"</code><br>J.dev: <code>"Standard"</code></td>
+<td>Aks sku tier.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:skuAISearchDev --><!-- parameter json.dev:skuAISearchDev --><code>skuAISearchDev</code></td>
 <td><code>ADMIN_AISEARCH_TIER</code>, <code>SKU_AISEARCH_DEV</code></td>
 <td>O</td>
@@ -5530,6 +5621,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Update Key Vault RBAC otherwise: true, re-run to update RBAC properties.</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:updateRbac --><!-- parameter json.dev:updateRbac --><code>updateRbac</code></td>
+<td><code>UPDATE_RBAC</code></td>
+<td>O</td>
+<td>Y: <code>false</code><br>J.dev: <code>false</code></td>
+<td>Update rbac.</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:use_ad_groups --><!-- parameter json.dev:use_ad_groups --><code>use_ad_groups</code></td>
 <td><code>USE_AD_GROUPS</code></td>
 <td>O</td>
@@ -5719,6 +5817,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"-001"</code></td>
 <td>Project resources suffix otherwise: change to reprovision new services in the same project RG while keeping old ones.</td>
+</tr>
+<tr>
+<td><!-- parameter env:ADMIN_PROJECT_TYPE --><code>ADMIN_PROJECT_TYPE</code></td>
+<td><code>admin_projectType</code></td>
+<td>O</td>
+<td><code>"all"</code></td>
+<td>Project service selection; matches JSON/YAML defaults.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ADMIN_SEMANTIC_SEARCH_TIER --><code>ADMIN_SEMANTIC_SEARCH_TIER</code></td>
@@ -6085,6 +6190,20 @@ reported, not silently represented as multiple settings.</p>
 <td>Project organizational department name keep-as-is: Unicode text, max 200 characters; identical across environments, independent of cost center. No factory inheritance or Azure tag writes.</td>
 </tr>
 <tr>
+<td><!-- parameter env:PERSONA_ACCESS_MANIFEST --><code>PERSONA_ACCESS_MANIFEST</code></td>
+<td><code>persona_access_manifest</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>Persona access manifest.</td>
+</tr>
+<tr>
+<td><!-- parameter env:PERSONA_ACCESS_MODE --><code>PERSONA_ACCESS_MODE</code></td>
+<td><code>persona_access_mode</code></td>
+<td>O</td>
+<td><code>"legacy"</code></td>
+<td>Persona access mode.</td>
+</tr>
+<tr>
 <td><!-- parameter env:POSTGRESQL_RETRY_CAPACITY_ARRAY --><code>POSTGRESQL_RETRY_CAPACITY_ARRAY</code></td>
 <td><code>postgreSQLRetryCapacityArray</code></td>
 <td>O</td>
@@ -6132,6 +6251,55 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"all"</code></td>
 <td>Project type keep-as-is: Not used anymore. Leave as is.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKIP_DIAG_AI_SEARCH --><code>SKIP_DIAG_AI_SEARCH</code></td>
+<td><code>skipDiagAISearch</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Skip diag ai search.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKIP_DIAG_AI_SERVICES --><code>SKIP_DIAG_AI_SERVICES</code></td>
+<td><code>skipDiagAIServices</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Skip diag ai services.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKIP_DIAG_AOAI --><code>SKIP_DIAG_AOAI</code></td>
+<td><code>skipDiagAOAI</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Skip diag aoai.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKIP_DIAG_CONTENT_SAFETY --><code>SKIP_DIAG_CONTENT_SAFETY</code></td>
+<td><code>skipDiagContentSafety</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Skip diag content safety.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKIP_DIAG_DOC_INTELLIGENCE --><code>SKIP_DIAG_DOC_INTELLIGENCE</code></td>
+<td><code>skipDiagDocIntelligence</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Skip diag doc intelligence.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKIP_DIAG_SPEECH --><code>SKIP_DIAG_SPEECH</code></td>
+<td><code>skipDiagSpeech</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Skip diag speech.</td>
+</tr>
+<tr>
+<td><!-- parameter env:SKIP_DIAG_VISION --><code>SKIP_DIAG_VISION</code></td>
+<td><code>skipDiagVision</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Skip diag vision.</td>
 </tr>
 <tr>
 <td><!-- parameter env:STAGE_SUBSCRIPTION_ID --><code>STAGE_SUBSCRIPTION_ID</code></td>
@@ -6743,11 +6911,25 @@ reported, not silently represented as multiple settings.</p>
 <td>Enable Azure Logic Apps</td>
 </tr>
 <tr>
+<td><!-- parameter env:ENABLE_PERSONAS --><code>ENABLE_PERSONAS</code></td>
+<td>No verified counterpart</td>
+<td>O</td>
+<td><code>false</code></td>
+<td>Enable personas.</td>
+</tr>
+<tr>
 <td><!-- parameter env:ENABLE_POSTGRESQL --><code>ENABLE_POSTGRESQL</code></td>
 <td><code>enablePostgreSQL</code></td>
 <td>O</td>
 <td><code>"false"</code></td>
 <td>Enable Azure PostgreSQL Flexible Server</td>
+</tr>
+<tr>
+<td><!-- parameter env:ENABLE_PROJECT_VM --><code>ENABLE_PROJECT_VM</code></td>
+<td><code>enableProjectVM</code></td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>Enable project vm.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ENABLE_REDIS_CACHE --><code>ENABLE_REDIS_CACHE</code></td>
@@ -7346,7 +7528,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter env:AKS_SKU_TIER --><code>AKS_SKU_TIER</code></td>
-<td>No verified counterpart</td>
+<td><code>aksSkuTier</code></td>
 <td>O</td>
 <td><code>"Standard"</code></td>
 <td>AKS SKU tier otherwise: Free or Premium.</td>
@@ -8029,6 +8211,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"false"</code></td>
 <td>Update Key Vault RBAC otherwise: true enables updating KV RBAC by rerunning the pipeline.</td>
+</tr>
+<tr>
+<td><!-- parameter env:UPDATE_RBAC --><code>UPDATE_RBAC</code></td>
+<td><code>updateRbac</code></td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>Update rbac.</td>
 </tr>
 <tr>
 <td><!-- parameter env:USE_AD_GROUPS --><code>USE_AD_GROUPS</code></td>
@@ -9199,6 +9388,12 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>""</code></td>
 <td><code>apply_gha</code>; Oidc client id</td>
+</tr>
+<tr>
+<td><!-- parameter state:persona_access_manifest --><code>persona_access_manifest</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td><code>common_values</code>; Persona access manifest</td>
 </tr>
 <tr>
 <td><!-- parameter state:prefix --><code>prefix</code></td>
