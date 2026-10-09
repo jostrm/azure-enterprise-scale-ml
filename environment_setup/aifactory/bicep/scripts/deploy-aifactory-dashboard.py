@@ -776,6 +776,7 @@ def usage_part(x: int, y: int, resource: dict, tenant_id: str) -> dict:
     if timestamp is not None:
         observed = timestamp.strftime("%Y-%m-%d %H:%M UTC")
     rows = []
+    last_known = {}
     for key, label in USAGE_LABELS:
         metric = metrics.get(key, {})
         metric = metric if isinstance(metric, dict) else {}
@@ -787,20 +788,30 @@ def usage_part(x: int, y: int, resource: dict, tenant_id: str) -> dict:
             if metric["status"] == "stale":
                 last_time = snapshot_time(metric.get("observedAt"))
                 last_label = last_time.strftime("%Y-%m-%d %H:%M UTC") if last_time else "unknown time"
-                display += f" (last known {last_label})"
+                code = metric.get("refreshErrorCode")
+                safe_code = code if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9]{1,64}", code) else "ReadFailed"
+                last_known.setdefault((last_label, safe_code), []).append(key)
+                display += " (last known)"
         else:
             display = "**Unavailable**"
-        code = metric.get("refreshErrorCode") if metric.get("status") == "stale" else metric.get("errorCode")
+        code = metric.get("errorCode") if metric.get("status") != "stale" else None
         if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9]{1,64}", code):
             display += f" - {code}"
         rows.append(f"| {label} | {display} |")
     activity_url = f"https://portal.azure.com/#@{tenant_id}/resource{resource['id']}/activitylog"
+    history = ""
+    if last_known:
+        entries = [
+            f"{'/'.join(keys)}: {time_label} - {code}"
+            for (time_label, code), keys in last_known.items()
+        ]
+        history = "\n\nLast known (not current): " + "; ".join(entries) + "."
     return markdown_part(
         x, y, 6, 4,
         "### Activity & solution assets\n\n"
         "| Evidence | Value |\n|---|---:|\n" + "\n".join(rows)
-        + f"\n\nSnapshot: {observed}. Refresh via dashboard-only run, not browser.\n\n"
-        + "Last known values are not current; their original collection time is retained.\n\n"
+        + f"\n\nSnapshot: {observed}. Refresh via dashboard-only run, not browser."
+        + history + "\n\n"
         + f"[Activity log]({activity_url}) - Email callers; no app/managed identities. "
         "Inventory is not runtime usage.",
     )
