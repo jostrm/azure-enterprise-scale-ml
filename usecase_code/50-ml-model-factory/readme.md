@@ -2,7 +2,7 @@
 
 **Purpose:** configure and run reusable machine-learning examples without editing shared accelerator code.
 **Ownership:** `user-config` and project copies of examples are user-editable; `accelerator` is maintainer-owned; `data/out` and `ml-environment` contain generated artifacts.
-**Status:** executable notebook templates exist for 124 of 126 use-case leaves (batch, online and streaming x seven tasks x six technologies) over shared engines for training, scoring, online serving, streaming, the ESML pipeline factory and Databricks. Dataset, licensing, compute and task-specific prerequisites still apply; cloud steps are explicit and a folder or template is not proof of a deployed model.
+**Status:** 8/105 implementations are **Tested and works** and 97/105 are **Impl TBA** in the Azure matrix recorded on 2026-10-08 to 2026-10-09. Templates exist for 124 of 126 catalog leaves, but a template is not proof of a working deployment. **Impl TBA** includes failed implementations and routes not run because of dataset, quota or private-connectivity prerequisites; see [Azure test status](#azure-test-status).
 
 ## Folder layout
 
@@ -49,7 +49,70 @@
 
 `pyproject.toml`, `setup.cfg`, this guide and ignore rules stay at the project root. Install from that root; the Python import remains `ml_model_factory`. `setup.cfg` directs generated package metadata into `ml-environment`; packaging tooling owns those files.
 
-Each serving category contains `classification`, `regression`, `timeseries-forecasting`, and the four `computer-vision` subtypes: `multi-class`, `multi-label`, `object-detection`, and `instance-segmentation`. Technology branches offer custom notebooks, AutoML notebooks/pipelines, Azure ML pipelines (the ESML pipeline factory for tabular tasks), Databricks notebooks and Azure ML pipelines with Databricks steps. Every leaf README states its route, prerequisites and limitations; see [use-case examples](#use-case-examples-and-shared-inference-engines).
+An implementation is `usecase-type\<usecase_type>\<problem_type>\<tech_stack>`. The three dimensions are:
+
+- Use-case type: `batch`, `online`, `streaming`.
+- Problem type: `classification`, `computer-vision`, `regression`, `timeseries-forecasting`. Computer vision expands into `multi-class`, `multi-label`, `object-detection`, and `instance-segmentation`.
+- Tech stack: `azure-automl`, `azureml-pipeline`, `databricks-azureml-pipeline-step`, `databricks-notebook`, `notebook`. Azure ML pipeline leaves use the ESML pipeline factory for tabular tasks.
+
+The `azure-automl` stack has two variants: `notebook` and `azureml-pipeline-with-automl-step`. They are separate catalog leaves, not additional tech stacks. An AutoML implementation is **Tested and works** only when **both variants** pass.
+
+The catalog contains **12 use cases** (3 x 4), **60 combinations** (3 x 4 x 5), **105 implementations** (3 x 7 expanded problem rows x 5), **126 catalog leaves** (AutoML variants split), and **192 notebooks**. Both streaming forecasting AutoML leaves are unsupported and have no runnable notebooks. From this root, list the source-of-truth catalog with `.\.venv\Scripts\python.exe -m ml_model_factory usecases`.
+
+Example implementation paths:
+
+```text
+usecase-type\batch\classification\azure-automl
+usecase-type\batch\classification\databricks-azureml-pipeline-step
+usecase-type\online\classification\azureml-pipeline
+usecase-type\streaming\regression\databricks-notebook
+```
+
+Every leaf README states its route, prerequisites and limitations; see [use-case examples](#use-case-examples-and-shared-inference-engines).
+
+## Azure test status
+
+Test dates: **2026-10-08 to 2026-10-09**. Tested factory source: **`81ec23d6588923fe43e0d28935c92602e5397fe1`**; infrastructure prerequisite correction: **`940b1b48`**. This table is generated from the consumer's `matrix-results.json`: **8 Tested and works**, **97 Impl TBA**, no pending classifications. Customer resource identifiers, requests and result receipts remain in the consumer repository.
+
+**Tested and works** means a registered, quality-gated model produced the required lake predictions; any endpoint route must also have a completed invocation. Online additionally requires a successful private endpoint invocation with matching contract-test predictions (or ready, invoked Unity Catalog Model Serving for Databricks). Streaming additionally requires in-network Event Hubs production, the stack's consumer, verified outputs/checkpoints and an idempotent rerun.
+
+Runs used reviewed runtime settings and pinned environments. These results do not certify production quality or every default dependency image. Diagnostic successes do not turn a failed example into a passing implementation. **Impl TBA** is a disposition, not a claim that every affected route has a code defect; footnotes distinguish failures from prerequisites that prevented a run.
+
+| Use-case type | Problem type | azure-automl | azureml-pipeline | databricks-azureml-pipeline-step | databricks-notebook | notebook |
+|---|---|---|---|---|---|---|
+| batch | classification | Impl TBA[^automl-evaluation] | Tested and works | Impl TBA[^private-connectivity] | Impl TBA[^databricks-package] | Impl TBA[^batch-compute] |
+| batch | computer-vision/multi-class | Impl TBA[^dataset-license] | Impl TBA[^dataset-license] | Impl TBA[^dataset-license] | Impl TBA[^dataset-license] | Impl TBA[^dataset-license] |
+| batch | computer-vision/multi-label | Impl TBA[^gpu-quota] | Tested and works | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Tested and works |
+| batch | computer-vision/object-detection | Impl TBA[^gpu-quota] | Tested and works | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Tested and works |
+| batch | computer-vision/instance-segmentation | Impl TBA[^gpu-quota] | Impl TBA[^instance-segmentation-evaluation] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^instance-segmentation-evaluation] |
+| batch | regression | Impl TBA[^automl-evaluation] | Tested and works | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^batch-compute] |
+| batch | timeseries-forecasting | Impl TBA[^automl-forecast-timezone][^automl-evaluation] | Tested and works | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Tested and works |
+| online | classification | Impl TBA[^private-connectivity][^automl-evaluation] | Impl TBA[^private-online] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-online] |
+| online | computer-vision/multi-class | Impl TBA[^dataset-license] | Impl TBA[^dataset-license] | Impl TBA[^dataset-license] | Impl TBA[^dataset-license] | Impl TBA[^dataset-license] |
+| online | computer-vision/multi-label | Impl TBA[^gpu-quota] | Impl TBA[^private-online] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-online] |
+| online | computer-vision/object-detection | Impl TBA[^gpu-quota] | Impl TBA[^private-online] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-online] |
+| online | computer-vision/instance-segmentation | Impl TBA[^gpu-quota] | Impl TBA[^instance-segmentation-evaluation] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^instance-segmentation-evaluation] |
+| online | regression | Impl TBA[^private-connectivity][^automl-evaluation] | Impl TBA[^private-online] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-online] |
+| online | timeseries-forecasting | Impl TBA[^automl-forecast-timezone][^automl-evaluation] | Impl TBA[^private-online-storage] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-online-storage] |
+| streaming | classification | Impl TBA[^private-connectivity][^automl-evaluation] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] |
+| streaming | computer-vision/multi-class | Impl TBA[^dataset-license] | Impl TBA[^dataset-license] | Impl TBA[^dataset-license] | Impl TBA[^dataset-license] | Impl TBA[^dataset-license] |
+| streaming | computer-vision/multi-label | Impl TBA[^gpu-quota] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] |
+| streaming | computer-vision/object-detection | Impl TBA[^gpu-quota] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] |
+| streaming | computer-vision/instance-segmentation | Impl TBA[^gpu-quota] | Impl TBA[^instance-segmentation-evaluation] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^instance-segmentation-evaluation] |
+| streaming | regression | Impl TBA[^private-connectivity][^automl-evaluation] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] |
+| streaming | timeseries-forecasting | Impl TBA[^unsupported-stream-automl] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] | Impl TBA[^private-connectivity] |
+
+[^dataset-license]: Not run: the multi-class dataset is still in license review and no other approved multi-class scenario was available. Other gated datasets were not substituted or automatically approved.
+[^gpu-quota]: Not run: image AutoML requires GPU compute, but all applicable GPU families had zero quota in the test region.
+[^unsupported-stream-automl]: Not implemented: both streaming AutoML forecasting variants are unsupported because forecasting requires observed history with each request.
+[^automl-evaluation]: Training failed: AutoML notebook evaluation could not load the model (`azureml._common` missing in the shipped environment; `pkg_resources` missing in the curated environment). The tabular AutoML pipeline-step variant passed batch scoring where available, but an AutoML cell requires both variants to pass.
+[^automl-forecast-timezone]: Training failed: the ESML AutoML forecasting evaluation raised a tz-naive versus tz-aware timestamp error.
+[^instance-segmentation-evaluation]: Training failed: instance-segmentation evaluation raised `KeyError: 'map_per_class'`, reproduced in Azure and locally, before quality-gated registration.
+[^batch-compute]: Batch deployment failed: the no-code MLflow route embedded `azureml:<compute>` in the compute ARM ID, so no endpoint invocation was possible.
+[^private-online]: Online deployment failed: automatic scoring selected no-code MLflow, which the private-network endpoint rejected. A separately recorded custom-scoring diagnostic with a workspace-storage model copy returned HTTP 200 and matching contract-test predictions; the example remains Impl TBA.
+[^private-online-storage]: Online deployment failed with an internal-server error for the lake-stored model. A separate custom-scoring diagnostic with a workspace-storage model copy returned HTTP 200 and matching predictions; the example remains Impl TBA.
+[^databricks-package]: Training failed: installation of the factory wheel tried to resolve a dependency from a public package repository that the private workspace could not reach. The selected runtime's PyYAML version was below the declared minimum. Later retries were blocked by private client connectivity; no successful training or serving result is claimed.
+[^private-connectivity]: Not run to completion: the test client's private-network connection was disconnected. Private DNS resolved correctly inside Azure, but private storage uploads and service calls from the client were blocked. This is a platform prerequisite, not an established defect in each affected implementation.
 
 ## Start here
 
