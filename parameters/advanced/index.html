@@ -3784,7 +3784,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>AIFACTORY_AGENT_ENTRA_APP_ID</code></td>
 <td>C</td>
 <td>Y: <code>""</code><br>J.dev: <code>""</code></td>
-<td>Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if enableAIFactoryAgentLiveVoice:'true'. Created once by an Entra admin: SPA redirect URI = the application's HTTPS root, Application ID URI api://</td>
+<td>Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if enableAIFactoryAgentLiveVoice:'true'. Created once by an Entra admin with python -m aifactory_agent.browser_auth (SPA redirect URI = the application's HTTPS root, delegated scope access_as_user). Pipelines never write Microsoft Graph.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:aifactoryAgentReaderObjectIds --><!-- parameter json.dev:aifactoryAgentReaderObjectIds --><code>aifactoryAgentReaderObjectIds</code></td>
@@ -5893,7 +5893,7 @@ reported, not silently represented as multiple settings.</p>
 <td><code>aifactoryAgentEntraAppId</code></td>
 <td>C</td>
 <td><code>""</code></td>
-<td>Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. Created once by an Entra admin: SPA redirect URI = the application's HTTPS root, Application ID URI api://</td>
+<td>Client ID (GUID) of the dedicated Entra single-page-app registration used for sign-in to the agent chat mandatory: if ENABLE_AI_FACTORY_AGENT_LIVE_VOICE:'true'. Created once by an Entra admin with python -m aifactory_agent.browser_auth (SPA redirect URI = the application's HTTPS root, delegated scope access_as_user). Pipelines never write Microsoft Graph.</td>
 </tr>
 <tr>
 <td><!-- parameter env:AIFACTORY_AGENT_READER_OBJECT_IDS --><code>AIFACTORY_AGENT_READER_OBJECT_IDS</code></td>

@@ -1056,6 +1056,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#agent-factory-chat-and-live-voice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Factory chat and live voice
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2435,6 +2446,17 @@
     <span class="md-ellipsis">
       
         APIM, Kong, MCP/AI Gateway and Application Gateway
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#agent-factory-chat-and-live-voice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Factory chat and live voice
       
     </span>
   </a>
@@ -4212,6 +4234,41 @@ If a flag is missing from the live <code>field_keys</code>/parameter schema, do 
 <p><strong>Azure Application Gateway is different.</strong> Creation input
 <code>enable_application_gateway</code> exists, but its registered workflow deployment is
 blocked/unimplemented. Accepting an input does not implement its deployment.</p>
+</details>
+<h2 id="agent-factory-chat-and-live-voice">Agent Factory chat and live voice<a class="headerlink" href="#agent-factory-chat-and-live-voice" title="Permanent link">&para;</a></h2>
+<p><strong>Conditional/blocked:</strong> two optional project-pipeline steps run in the foundry phase. <code>enableFactoryChatAgent</code>
+creates or updates the owned Foundry prompt agent. With <code>enableAIFactoryAgentLiveVoice</code> <strong>also</strong> set, a second step
+deploys the private chat web application with Azure Voice Live for <strong>project001 Dev</strong>, given an Entra registration,
+reader object IDs, an internal Container Apps environment and a succeeded model deployment. Saving flags changes
+configuration only. An approved pipeline run is separate; <code>false</code> skips a step, <strong>not resource deletion</strong>.</p>
+<details>
+<summary>More info</summary>
+<table>
+<thead>
+<tr>
+<th>JSON/YAML setting (default disabled)</th>
+<th>GHA environment name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enableFactoryChatAgent</code></td>
+<td><code>ENABLE_FACTORY_CHAT_AGENT</code></td>
+</tr>
+<tr>
+<td><code>enableAIFactoryAgentLiveVoice</code></td>
+<td><code>ENABLE_AI_FACTORY_AGENT_LIVE_VOICE</code></td>
+</tr>
+</tbody>
+</table>
+<p>Inputs (default empty): <code>aifactoryAgentEntraAppId</code>, <code>aifactoryAgentReaderObjectIds</code>,
+<code>aifactoryAgentContainerAppsEnvironment</code>, <code>aifactoryAgentVoiceName</code>, <code>aifactoryAgentVoiceLanguages</code>
+(GHA <code>AIFACTORY_AGENT_ENTRA_APP_ID</code>, <code>AIFACTORY_AGENT_READER_OBJECT_IDS</code>,
+<code>AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT</code>, <code>AIFACTORY_AGENT_VOICE_NAME</code>, <code>AIFACTORY_AGENT_VOICE_LANGUAGES</code>).
+Voice without the chat flag fails loudly. The step never replaces an app deployed by hand; use the operator flow
+for that. See <a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/10-19/21-agent-factory-chat.md">chapter 21 — Agent Factory chat and live voice</a> and the
+<a href="https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/environment_setup/azurefactory-cli/readme.md#ai-factory-agent-live-voice-options-project001-dev">options reference</a>.
+If a flag is missing from the live <code>field_keys</code>/parameter schema, do not force it.</p>
 </details>
 <p><a id="evidence-version-boundaries-and-validation"></a></p>
 <details>
