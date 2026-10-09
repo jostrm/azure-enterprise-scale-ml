@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -81,13 +83,17 @@ def test_crlf_bash_is_rejected_before_text_mode_can_hide_linux_failure(tmp_path)
 @pytest.mark.parametrize("platform,timeout", [("linux", 1200), ("win32", 2400)])
 def test_failed_unit_suite_propagates_nonzero_and_forces_offline(tmp_path, monkeypatch, platform, timeout):
     calls = []
+    host_platform = sys.platform
 
     def failed(command, **kwargs):
+        assert sys.platform == host_platform
         calls.append((command, kwargs))
         return subprocess.CompletedProcess(command, 1)
 
     monkeypatch.setattr(run_ci.subprocess, "run", failed)
-    monkeypatch.setattr(run_ci.sys, "platform", platform)
+    monkeypatch.setattr(run_ci, "sys", SimpleNamespace(
+        platform=platform, executable=sys.executable, stderr=sys.stderr,
+    ))
     assert run_ci.main(["--phase", "unit", "--results-dir", str(tmp_path)]) == 1
     command, options = calls[0]
     assert "pytest" in command
