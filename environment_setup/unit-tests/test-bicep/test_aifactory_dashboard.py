@@ -538,6 +538,58 @@ class TestAifactoryDashboard(unittest.TestCase):
                     or a["y"] + a["rowSpan"] <= b["y"] or b["y"] + b["rowSpan"] <= a["y"]
                 )
 
+    def test_factory_map_is_immediately_right_of_connectivity_and_preserves_hub_cost(self) -> None:
+        config = self.config()
+        inventory, tenant, _ = module.reconcile(config, FakeAz(config))
+        inventory["hubResourceGroups"] = [
+            {"name": f"hub-{i}", "id": module.arm_id(DEV_SUB, f"hub-{i}")} for i in range(3)
+        ]
+        parts = module.dashboard_parts(inventory, tenant)
+        maps = [p for p in parts if p["metadata"]["type"].endswith("/PinnedNotebookQueryPart")]
+        self.assertEqual(1, len(maps))
+        self.assertEqual({"x": 4, "y": 2, "colSpan": 12, "rowSpan": 4}, maps[0]["position"])
+        for hub in inventory["hubResourceGroups"]:
+            self.assertTrue(any(p["metadata"].get("asset", {}).get("type") == "ResourceGroup"
+                                and p["metadata"]["inputs"][0]["value"] == hub["id"] for p in parts))
+            self.assertTrue(any(p["metadata"]["type"].endswith("CostAnalysisPinPart")
+                                and p["metadata"]["inputs"][0]["value"] == hub["id"] for p in parts))
+        for index, left in enumerate(parts):
+            a = left["position"]
+            for right in parts[index + 1:]:
+                b = right["position"]
+                self.assertTrue(
+                    a["x"] + a["colSpan"] <= b["x"] or b["x"] + b["colSpan"] <= a["x"]
+                    or a["y"] + a["rowSpan"] <= b["y"] or b["y"] + b["rowSpan"] <= a["y"]
+                )
+
+    def test_factory_map_is_live_blue_inventory_across_exact_known_group_ids(self) -> None:
+        config = self.config()
+        inventory, _, _ = module.reconcile(config, FakeAz(config))
+        hub = module.arm_id(PROD_SUB, "connectivity")
+        inventory["hubResourceGroups"] = [
+            {"id": hub}, {"id": hub.upper()},
+            {"id": module.arm_id(DEV_SUB, "deleted"), "deploymentStatus": "not-deployed"},
+            {"id": "/subscriptions/invalid/resourceGroups/foreign"},
+        ]
+        part = module.factory_map_part(inventory)
+        inputs = {item["name"]: item["value"] for item in part["metadata"]["inputs"]}
+        content = json.loads(inputs["StepSettings"])
+        self.assertEqual("Number of resources by region", content["title"])
+        self.assertEqual("map", content["visualization"])
+        self.assertEqual(1, content["queryType"])
+        self.assertIn(json.dumps(hub.lower()), content["query"])
+        self.assertEqual(1, content["query"].count(hub.lower()))
+        self.assertNotIn("deleted", content["query"])
+        self.assertNotIn("invalid", content["query"])
+        self.assertIn("GroupId in~ (", content["query"])
+        self.assertEqual({}, inputs["ParameterValues"])
+        self.assertNotIn("ConfigurationId", inputs)
+        self.assertNotIn("Health", content["query"])
+        self.assertEqual("blue", content["mapSettings"]["itemColorSettings"]["thresholdsGrid"][0]["representation"])
+        empty = module.factory_map_part({"hubResourceGroups": [], "environments": []})
+        query = json.loads(next(i["value"] for i in empty["metadata"]["inputs"] if i["name"] == "StepSettings"))["query"]
+        self.assertIn('GroupId in~ ("")', query)
+
     def test_usage_tile_distinguishes_observed_zero_inventory_and_unavailable(self) -> None:
         resource = {
             "name": "project", "id": module.arm_id(DEV_SUB, "project"),

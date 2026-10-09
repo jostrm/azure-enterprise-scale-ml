@@ -789,6 +789,58 @@ def collect_usage(inventory: dict, collector, subscriptions: set[str]) -> None:
         group["usageSnapshot"] = snapshots[key]
 
 
+def factory_map_part(inventory: dict) -> dict:
+    groups = sorted({
+        group["id"].lower() for group in inventory_groups(inventory)
+        if isinstance(group.get("id"), str)
+        and usage.RG_PATTERN.fullmatch(group["id"])
+        and group.get("deploymentStatus") != "not-deployed"
+    })
+    subscriptions = sorted({"/subscriptions/" + group.split("/")[2] for group in groups})
+    query = (
+        "Resources\n"
+        "| extend GroupId=tolower(strcat('/subscriptions/', subscriptionId, '/resourceGroups/', resourceGroup))\n"
+        f"| where GroupId in~ ({', '.join(json.dumps(group) for group in groups) or '\"\"'})\n"
+        "| where isnotempty(location) and location !~ 'global'\n"
+        "| summarize Resources=count() by Location=location\n"
+        "| order by Resources desc"
+    )
+    content = {
+        "version": "KqlItem/1.0", "query": query, "size": 1,
+        "title": "Number of resources by region",
+        "queryType": 1, "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": subscriptions,
+        "visualization": "map",
+        "noDataMessage": "No visible regional resources in the factory's known resource groups.",
+        "mapSettings": {
+            "locInfo": "AzureLoc", "locInfoColumn": "Location",
+            "sizeSettings": "Resources", "sizeAggregation": "Sum",
+            "legendMetric": "Resources", "legendAggregation": "Sum",
+            "itemColorSettings": {
+                "type": "thresholds", "nodeColorField": "Resources", "colorAggregation": "Sum",
+                "thresholdsGrid": [{"operator": "Default", "thresholdValue": None, "representation": "blue"}],
+            },
+        },
+    }
+    # Native Workbook pin serialization; no parameter snapshots or project-only workbook link.
+    inputs = {
+        "TimeContext": None, "ResourceIds": subscriptions, "Type": "workbook",
+        "PinName": "AI Factory resource locations", "StepSettings": json.dumps(content),
+        "ParameterValues": {},
+    }
+    return {
+        "position": {"x": 4, "y": 2, "colSpan": 12, "rowSpan": 4},
+        "metadata": {
+            "type": "Extension/AppInsightsExtension/PartType/PinnedNotebookQueryPart",
+            "inputs": [{"name": name, "value": value, "isOptional": True} for name, value in inputs.items()],
+        },
+    }
+
+
+def environment_row(inventory: dict) -> int:
+    return 6 + max(0, min(len(inventory["hubResourceGroups"]), 3) - 1) * 4
+
+
 def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
     parts = [
         markdown_part(
@@ -802,34 +854,37 @@ def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
         )
     ]
     hubs = inventory["hubResourceGroups"]
+    parts.append(factory_map_part(inventory))
     if hubs:
         for index, hub in enumerate(hubs[:3]):
-            x = index * ENVIRONMENT_WIDTH
-            parts.extend((resource_part(x, 2, 4, 4, hub), cost_part(x + 4, 2, hub, tenant_id),
-                          usage_part(x + 10, 2, hub, tenant_id)))
+            y = 2 + index * 4
+            cost_x = 16 if index == 0 else 4
+            parts.extend((resource_part(0, y, 4, 4, hub), cost_part(cost_x, y, hub, tenant_id),
+                          usage_part(cost_x + 6, y, hub, tenant_id)))
     else:
         parts.append(
             markdown_part(
                 0,
                 2,
-                3 * ENVIRONMENT_WIDTH,
+                4,
                 4,
                 "## Hub / Shared Services\n\nNo separate hub resource group is configured. "
                 "Environment common resource groups are shown below.",
             )
         )
 
+    header_y = environment_row(inventory)
     for environment_index, environment in enumerate(inventory["environments"]):
         x = environment_index * ENVIRONMENT_WIDTH
         parts.append(
-            markdown_part(x, 6, ENVIRONMENT_WIDTH, 1, f"# {environment['displayName']}")
+            markdown_part(x, header_y, ENVIRONMENT_WIDTH, 1, f"# {environment['displayName']}")
         )
         common = environment["commonResourceGroup"]
         if not common.get("id"):
             parts.append(
                 markdown_part(
                     x,
-                    7,
+                    header_y + 1,
                     ENVIRONMENT_WIDTH,
                     4,
                     f"## {environment['displayName']} is not configured\n\n"
@@ -839,13 +894,13 @@ def dashboard_parts(inventory: dict, tenant_id: str) -> list[dict]:
             continue
         parts.extend(
             (
-                resource_part(x, 7, 4, 4, common),
-                cost_part(x + 4, 7, common, tenant_id),
-                usage_part(x + 10, 7, common, tenant_id),
+                resource_part(x, header_y + 1, 4, 4, common),
+                cost_part(x + 4, header_y + 1, common, tenant_id),
+                usage_part(x + 10, header_y + 1, common, tenant_id),
             )
         )
         for project_index, project in enumerate(environment["projects"]):
-            y = 11 + project_index * 7
+            y = header_y + 5 + project_index * 7
             parts.append(
                 markdown_part(
                     x,

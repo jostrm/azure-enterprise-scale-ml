@@ -178,6 +178,18 @@ var usageItems = [
       style: 'above'
       parameters: [
         {
+          id: 'generic-project-regions'
+          name: 'GenericProjectRegions'
+          type: 1
+          value: ''
+          isRequired: true
+          isHiddenWhenLocked: true
+          queryType: 1
+          resourceType: 'microsoft.resourcegraph/resources'
+          crossComponentResources: [projectResourceGroupId]
+          query: '${scopedInventory}| summarize Regions=make_set(tolower(location), 1000) | project value=tostring(Regions)'
+        }
+        {
           id: 'generic-resource-health'
           name: 'GenericResourceHealth'
           type: 1
@@ -242,9 +254,9 @@ var usageItems = [
     customWidth: '50'
     conditionalVisibility: usageVisibility
     content: union(inventorySettings, {
-      title: 'Azure region health - resource signals and regional advisories'
+      title: 'Number of resources by region'
       size: 1
-      query: regionHealthMapQuery
+      query: '${scopedInventory}| where isnotempty(location) and location !~ \'global\'\n| summarize Resources=count() by Location=location | order by Resources desc'
       visualization: 'map'
       // Native Azure-location lookup; global/unmapped locations remain in the breakdown and details.
       // Microsoft Application-Insights-Workbooks: CosmosDbOverview.workbook, mapSettings.
@@ -257,12 +269,10 @@ var usageItems = [
         legendAggregation: 'Sum'
         itemColorSettings: {
           type: 'thresholds'
-          nodeColorField: 'HealthCode'
-          colorAggregation: 'Max'
+          nodeColorField: 'Resources'
+          colorAggregation: 'Sum'
           thresholdsGrid: [
-            { operator: '==', thresholdValue: '2', representation: 'redBright' }
-            { operator: '==', thresholdValue: '0', representation: 'green' }
-            { operator: 'Default', thresholdValue: null, representation: 'gray' }
+            { operator: 'Default', thresholdValue: null, representation: 'blue' }
           ]
         }
       }
@@ -299,7 +309,7 @@ var usageItems = [
     name: 'generic-health-legend'
     conditionalVisibility: usageVisibility
     content: {
-      json: '**Map:** red = reported resource issue or active subscription regional advisory (not proof this project is affected); green = all mapped resources report Available and no visible regional event; gray = incomplete/unknown coverage. Capacity is flagged only when Azure reports a related health event; green does not guarantee SKU capacity or quota. Global/unmapped resources remain in inventory.'
+      json: '**Map numbers and circle size are resource counts, not health issues.** Blue represents inventory only. Open **Explore resources by region** below, select a region, then click a resource name to open it in Azure. Global/unmapped resources remain in the resource list. Health notices are separate under **Regional advisories and issue details**.'
     }
   }
   {
@@ -322,23 +332,36 @@ var usageItems = [
       version: 'NotebookGroup/1.0'
       groupType: 'editable'
       loadType: 'explicit'
-      loadButtonText: 'Show current resource inventory'
+      loadButtonText: 'Explore resources by region'
       items: [
         {
-          type: 3
-          name: 'generic-health-details'
-          content: union(inventorySettings, {
-            title: 'Regional health evidence and coverage - current visible signals'
-            query: regionHealthMapQuery
-            visualization: 'table'
-          })
+          type: 9
+          name: 'generic-resource-region-selector'
+          content: {
+            version: 'KqlParameterItem/1.0'
+            style: 'above'
+            parameters: [{
+              id: 'generic-resource-region'
+              name: 'GenericResourceRegion'
+              label: 'Resource region'
+              type: 2
+              value: '*'
+              isRequired: true
+              multiSelect: false
+              queryType: 1
+              resourceType: 'microsoft.resourcegraph/resources'
+              crossComponentResources: [projectResourceGroupId]
+              query: '${scopedInventory}| summarize Regions=make_set(location)\n| extend Regions=array_concat(pack_array(\'*\'), Regions)\n| mv-expand Region=Regions\n| project value=tostring(Region), label=iff(tostring(Region) == \'*\', \'All project regions\', tostring(Region)), selected=tostring(Region) == \'*\''
+              typeSettings: { additionalResourceOptions: [], showDefault: false }
+            }]
+          }
         }
         {
           type: 3
           name: 'generic-inventory'
           content: union(inventorySettings, {
-            title: 'Current project resource inventory'
-            query: '${scopedInventory}| project Resource=name, Type=type, Kind=kind, Location=location, id | order by Type asc, Resource asc'
+            title: 'Resources in {GenericResourceRegion:label} - click a resource name'
+            query: '${scopedInventory}| where "{GenericResourceRegion:escapejson}" == \'*\' or location =~ "{GenericResourceRegion:escapejson}"\n| project Resource=name, Type=type, Kind=kind, Location=location, id | order by Type asc, Resource asc'
             visualization: 'table'
             gridSettings: {
               formatters: [
@@ -346,6 +369,63 @@ var usageItems = [
                 { columnMatch: 'id', formatter: 5 }
               ]
             }
+          })
+        }
+      ]
+    }
+  }
+  {
+    type: 12
+    name: 'generic-health-details'
+    conditionalVisibility: usageVisibility
+    content: {
+      version: 'NotebookGroup/1.0'
+      groupType: 'editable'
+      loadType: 'explicit'
+      loadButtonText: 'Regional advisories and issue details'
+      items: [
+        {
+          type: 1
+          name: 'generic-health-links'
+          content: {
+            json: '### Health evidence - separate from resource counts\nRegional advisories are **not confirmed project impact or a regional outage**. Resource Health coverage can be incomplete; unavailable data is not healthy. Capacity appears only when Azure reports a related notice, not a SKU capacity guarantee. [Open Azure Service Health](https://portal.azure.com/#view/Microsoft_Azure_Health/AzureHealthBrowseBlade/~/serviceIssues) · [Open health advisories](https://portal.azure.com/#view/Microsoft_Azure_Health/AzureHealthBrowseBlade/~/otherAnnouncements)'
+          }
+        }
+        {
+          type: 3
+          name: 'generic-health-summary'
+          content: union(inventorySettings, {
+            title: 'Health coverage and regional notice counts - not resource counts'
+            query: regionHealthMapQuery
+            visualization: 'table'
+            size: 1
+          })
+        }
+        {
+          type: 3
+          name: 'generic-regional-advisories'
+          content: union(inventorySettings, {
+            title: 'Regional advisories - click the title for Azure details'
+            query: replace(loadTextContent('./workbooks/my-project/regional-health-events.kql'), '__PROJECT_PREFIX__', toLower('${projectResourceGroupId}/providers/'))
+            visualization: 'table'
+            noDataMessage: 'No matching advisory rows from the loaded source. This is not confirmation of project health.'
+            gridSettings: {
+              formatters: [
+                { columnMatch: 'Title', formatter: 7, formatOptions: { linkColumn: 'URL', linkTarget: 'Url' } }
+                { columnMatch: 'URL', formatter: 5 }
+              ]
+            }
+          })
+        }
+        {
+          type: 3
+          name: 'generic-resource-issues'
+          content: union(inventorySettings, {
+            title: 'Reported resource issues - click the resource for details'
+            query: '${scopedInventory}| extend ResourceHealth=parse_json("{GenericResourceHealth:escapejson}")\n| where tostring(ResourceHealth.states[tolower(id)]) == \'Issue\'\n| project Resource=name, Type=type, Location=location, id'
+            visualization: 'table'
+            noDataMessage: 'No reported resource issues in the visible source. Unsupported or missing health coverage is unknown.'
+            gridSettings: { formatters: [{ columnMatch: 'Resource', formatter: 7, formatOptions: { linkColumn: 'id', linkTarget: 'Resource' } }] }
           })
         }
       ]
