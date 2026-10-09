@@ -124,11 +124,13 @@ configuration recording's happy-path.
 `az`/`gh`, legacy scripts or a catalog fallback. An older API without
 `delete-aifactory-v1` is blocked. This is **Azure resource deletion**, not removal
 of a saved factory entry.
-Repository-only single-writer deletion availability depends on published backend
-support and the exact preview's `can_execute` result; the named API capability
-alone does not establish readiness. A blocked preview remains blocked; do not
-change coordination settings, run separate deletions or use another route to
-bypass it.
+Generic repository-only single-writer deletion supports whole-owned-group
+plans/cohorts, not the named route's required `ordered-project-pipelines-v1`
+contract. The API's currently pinned runtime does not support named deletion
+under single-writer coordination; the named API capability alone does not
+establish readiness. A supporting immutable runtime pin and an executable exact
+preview are both required. A blocked preview remains blocked; do not change
+coordination settings, run separate deletions or use another route to bypass it.
 
 The factory's existing enrollment must also explicitly permit deletion
 (`allow_delete=true`). A confirmation prompt does not grant that permission.
@@ -151,6 +153,17 @@ security-group preservation and saved-configuration handling. Repositories,
 subscription-level configuration and outside-group dependencies are not claimed
 deleted; the backend's retained-resource warnings describe the limitations.
 Empty, narrowed, inconsistent or broadened manifests cannot be confirmed.
+The review also shows the server's hashed `ordered-project-pipelines-v1`
+**deletion plan**, which the CLI rechecks before saving a receipt: one stage per
+registered project placement in every environment, run by the configured GHA/ADO
+lifecycle pipeline with `enableDeleteForDisabledResources`,
+`deleteAllServicesForProject`, `deleteKeyvaultAlso` and `deleteAllForProject`
+all boolean `true`; Foundry capability hosts, that project's Search shared private
+links, service-managed lifecycle, project resources and project network in that
+order; common stages waiting for every project stage; every reviewed deletion
+covered exactly once; and no overlap with protected hub, VPN, bootstrap or shared
+resources. A missing, legacy or modified plan is rejected; there is no local
+deletion fallback.
 The review reports the backend's saved-configuration handling explicitly:
 the current backend removes the local catalog registration/configuration only
 after verified whole-factory deletion succeeds, and retains it on failure.
@@ -192,8 +205,17 @@ azurefactory delete-aifactory status --folder $env:FACTORY_FOLDER --job-id $env:
 
 A timeout is an **unknown outcome**, not cancellation or permission to retry.
 Inspect server state before further action; confirmation is never retried
-automatically. Tests use mocked transport only and do not establish Azure
-deletion success.
+automatically. Status includes exact provider run IDs/links in `pipeline_runs`.
+If the API host stopped after the pipelines finished, finish the local catalog
+update from the existing verified receipts without dispatching anything:
+
+```powershell
+azurefactory delete-aifactory reconcile --folder $env:FACTORY_FOLDER --job-id $env:DELETE_JOB_ID
+```
+
+`reconcile` never dispatches a pipeline, retries an Azure delete or treats a
+denied/timed-out check as absence; partial or unknown runs stay blocked. Tests
+use mocked transport only and do not establish Azure deletion success.
 
 ### Shell-first registered onboarding
 
@@ -486,6 +508,39 @@ For runnable SDK code using `ConfigurationDraft.load()`, `review()` and
 `save()`, see [edit_configuration.py](../install_config_wizard/api-usage-examples/python/edit_configuration.py)
 and its [two-phase usage](../install_config_wizard/api-usage-examples/readme.md#edit-a-legacy-json-configuration-with-the-python-sdk).
 
+### Factory Chat Agent, MCP & AI Gateway options
+
+`config review` and `config save` accept dedicated options for the opt-in AI
+Factory Chat Agent, Factory MCP and the new Azure AI Gateway SKU. Each sets
+exactly one variable, is merged with `--changes-json`, and a disagreeing value
+in that file is a `ConfigError` instead of a silent override:
+
+| Option | Variable | Values |
+|---|---|---|
+| `--enable-aifactory-mcp` | `enableAIFactoryMCP` | `true` / `false` |
+| `--enable-factory-chat-agent` | `enableFactoryChatAgent` | `true` / `false` |
+| `--enable-ai-gateway-sku` | `enableAIGatewaySKU` | `true` / `false` |
+| `--add-aifactory-mcp-to-ai-gateway-sku` | `addAIFactoryMCP2AIGatewaySKU` | `true` / `false` |
+| `--aifactory-mcp-image` | `aifactoryMcpImage` | `<registry>.azurecr.io/<repository>@sha256:<digest>` |
+| `--aifactory-mcp-api-image` | `aifactoryMcpApiImage` | same format |
+| `--aifactory-mcp-entra-app-id` | `aifactoryMcpEntraAppId` | MCP API app registration client ID |
+| `--aifactory-mcp-container-apps-environment` | `aifactoryMcpContainerAppsEnvironment` | internal project environment name, or empty |
+| `--ai-gateway-sku-resource-id` | `aiGatewaySkuResourceId` | existing gateway to adopt, or empty to create one |
+| `--ai-gateway-sku-outbound-subnet-id` | `aiGatewaySkuOutboundSubnetId` | outbound integration subnet ID |
+
+```powershell
+azurefactory config review --folder C:\legacy\aifactory --project-number 001 `
+  --enable-factory-chat-agent true --enable-aifactory-mcp true `
+  --enable-ai-gateway-sku true --add-aifactory-mcp-to-ai-gateway-sku true
+```
+
+The fields must exist in the selected draft/schema. Saving never deploys. The
+project pipeline's late Foundry phase creates or versions the Chat Agent in the
+selected project when `enableFactoryChatAgent` is true; the MCP/Gateway step
+remains project001 Dev only. See
+[40-aifactory-agent](../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md)
+and [45-aifactory-mcp-gateway](../../usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md).
+
 ## Preview then confirm
 
 Confirm/start and generic writes require separate review and `--yes`. Preparation can persist a local draft/preview but never starts a deployment. Read the complete preview before approving. Save the preview receipt and consume it before expiry; expired or blocked previews are never re-prepared silently. All folder paths below are on the API host. New registers normally use a root named `azurefactory`.
@@ -547,11 +602,14 @@ UUID. Project numbers are unique across the factory; the two writes are not atom
 
 ### Latest-successful placement selection
 
-For an existing registered factory, explicitly opt in to server-side selection:
+For an existing registered factory, supply explicit environments for server-side
+selection, or retain the explicit selector/UUID placement form:
 
 ```powershell
 azurefactory project add --folder C:\consumer\azurefactory --factory-id <factory-uuid> --number 002 --placement dev=latest-successful --save-receipt .\project.receipt.json
 azurefactory project add-placements --folder C:\consumer\azurefactory --factory-id <factory-uuid> --project-id <project-uuid> --placement stage=latest-successful --save-receipt .\placement.receipt.json
+# Alternative to --placement; repeat --environment for each intended environment.
+azurefactory project add --folder C:\consumer\azurefactory --factory-id <factory-uuid> --number 002 --environment dev --save-receipt .\environment-review.json
 ```
 
 These are independent prepare-only examples. Read the resolved scale-set UUID
@@ -580,7 +638,12 @@ preview = client.review_catalog_prepare({
 
 REST uses this identical JSON with `POST /api/v1/factory-catalog/prepare`.
 For `add-project-placements`, supply `project_id` and top-level `placements`
-instead of `project`. Omission is not an implicit auto-selection request.
+instead of `project`. Omitting `scale_set_id` within an explicitly named environment
+requests the server's `latest-successful` default. `--environment` sends exactly
+`{"environment":"dev"}` for DEV, without a scale ID. Neither selection form may be
+omitted, and `--environment` and `--placement` cannot be combined. There is no
+implicit DEV or client-side catalog sorting. An older API that silently ignores
+the default is rejected unless it supplies consistent capability/resolution evidence.
 Supporting API source is required; older APIs reject the selector, with no
 client fallback, upgrade or retry. A saved draft, highest suffix, local script
 completion or inventory alone is not eligible success. Selection uses recorded
@@ -596,6 +659,78 @@ and `review_catalog_prepare` reject missing or contradictory resolution data,
 including a mismatch with the preview project's UUID placements. Raw
 `catalog_prepare` remains transport-oriented. These checks validate the review
 contract, not the authenticity of provider receipts or current Azure health.
+
+### Thin SDK conveniences and reviewed removal
+
+These supported methods return a prepare preview only:
+
+| SDK method | Existing catalog action |
+| --- | --- |
+| `factory_create_prepare(folder, *, prefix, region, scale_sets, ...)` | `create-factory` |
+| `factory_clone_prepare(folder, factory_id, *, prefix=None, region=None, ...)` | `clone` |
+| `scaleset_add_prepare(folder, factory_id, scale_sets, *, expected_revision=None)` | `create-scale-set` |
+| `project_add_prepare(folder, factory_id, *, number, placements=None, environments=None, ...)` | `add-project` |
+| `project_add_placements_prepare(folder, factory_id, project_id, *, placements=None, environments=None, expected_revision=None)` | `add-project-placements` |
+| `project_delete_prepare(folder, factory_id, project_id, *, environments, include_project_subnets, include_keyvault_and_resource_group, expected_revision, scale_set_id=None, version_ref=None)` | `delete-project` |
+| `scaleset_delete_prepare(folder, factory_id, scale_set_id, *, expected_revision, version_ref=None)` | `delete-scale-set` |
+| `draft_remove_prepare(folder, factory_id, *, kind, expected_revision, scale_set_id=None, project_id=None)` | `delete-draft-factory`, `delete-draft-scale-set`, `delete-draft-project` |
+
+CLI and SDK use shared request builders. Project helpers require nonempty
+`placements` **or** `environments`, never both; omitted scale IDs stay omitted on
+the wire. `project_add_prepare` also accepts `display_name` and nonsecret `settings`
+(`project add --settings-json` in the CLI). Clone accepts `factory_key`,
+`scale_set_id`, `include_projects`, `aifactory_version` and `region_short_name`.
+Configuration helpers accept an optional `expected_revision`; removal helpers
+require it. Server validation and UUID selection remain authoritative.
+
+```python
+preview = client.project_add_prepare(
+    folder, factory_id, number="002", environments=["dev"],
+    expected_revision=catalog_revision,
+)
+# Inspect resolved_placements and obtain approval before catalog_confirm.
+```
+
+**Azure resource deletion is not draft removal.** These CLI commands prepare only
+and do not accept an auto-approval flag:
+
+```powershell
+azurefactory project delete --folder C:\consumer\azurefactory `
+  --factory-id <factory-uuid> --project-id <project-uuid> `
+  --environment dev --environment stage --include-project-subnets no `
+  --include-keyvault-and-resource-group no --expected-revision <catalog-revision> `
+  --save-receipt .\project-delete-review.json
+azurefactory scaleset delete --folder C:\consumer\azurefactory `
+  --factory-id <factory-uuid> --scale-set-id <scale-uuid> `
+  --expected-revision <catalog-revision> --save-receipt .\scale-delete-review.json
+```
+
+Both project deletion choices are independent and required `yes`/`no` values,
+preserved as exact JSON booleans in `deletion_options` alongside explicit
+`environments`. Review the complete deletion/retention scope and blockers.
+Only after human approval, use **`azurefactory runtime confirm --receipt
+.\project-delete-review.json --yes`** (or the scale receipt).
+
+```powershell
+azurefactory draft remove --kind project --folder C:\consumer\azurefactory `
+  --factory-id <factory-uuid> --project-id <project-uuid> `
+  --expected-revision <catalog-revision> --save-receipt .\draft-review.json
+```
+
+Draft `--kind` is `factory`, `scale-set` (requires its exact `--scale-set-id`),
+or `project` (requires `--project-id`). The server must prove safe local draft
+lifecycle. It archives/removes local registration/configuration only; it never
+deletes Azure resources. After separate approval use **`azurefactory catalog
+confirm --receipt .\draft-review.json --yes`**.
+
+Removal receipts bind exact scope, revision, options and configuration-versus-runtime
+mode. Receipt operations are `project-delete`, `scaleset-delete`, and
+`draft-remove-<kind>`; purpose remains `catalog-confirm`. A receipt is not human
+approval. No wrapper retries or switches execution routes.
+Whole-factory Azure deletion continues to use the existing **named
+`delete-aifactory` route**, with its stronger retention/phrase/hash policy; never
+substitute `draft remove --kind factory` or a generic catalog request.
+Captured promotion helpers are not part of these wrappers.
 
 Catalog placements register where a logical project may live (`project add-placements`).
 They do not run update/promote. Catalog runtime deployment is `runtime deploy`
@@ -1107,6 +1242,51 @@ Tkinter/MAUI releases. Use `python -m azurefactory` if the console script is not
 on PATH.
 
 Use `client.request("GET", "/api/v1/...")` for future read resources. Generic CLI writes require `request POST ... --write --yes`.
+
+### Monitoring: Azure resource-group costs
+
+The API, MAUI Monitor, Tkinter Monitor and CLI use the same Azure Cost Management
+report. Select subscriptions explicitly; no command expands the scope to the
+tenant or uses the current Azure subscription as an implicit default.
+
+```powershell
+azurefactory monitoring resource-group-costs --subscription $env:SUBSCRIPTION_ID
+azurefactory monitoring resource-group-costs --subscription $env:DEV_SUBSCRIPTION_ID `
+  --subscription $env:PROD_SUBSCRIPTION_ID --month 2026-10 `
+  --folder $env:FACTORY_FOLDER --refresh
+```
+
+`--month` defaults to the API's current UTC calendar month. `--folder` supplies
+registered factory configuration as attribution evidence, not a deletion grant.
+The SDK equivalent is `client.resource_group_costs({"subscription_ids": [...]})`,
+using `POST /api/v1/monitoring/resource-group-costs`. The API host needs Azure
+resource read access and Cost Management Reader (or equivalent) at each selected
+scope; billing-account charge visibility policies can impose additional limits.
+Sharing a dashboard never grants underlying billing permissions.
+
+Actual is month-to-date **ActualCost**, with the reported data-through date.
+Forecast is the projected **full-month total**, including actuals, from Azure's
+Forecast API; never add actual to it again. Daily forecast responses are summed
+once, not guessed from usage or list prices. Azure forecast grouping is not
+supported: the service uses exact resource-group filters and marks unsupported,
+empty or inaccessible forecasts unavailable, never proportionally allocates them.
+Currency buckets remain separate. Data freshness includes retrieval time and
+Azure reporting delays; recent charges can arrive late or change.
+
+Inventory is reconciled with billed groups, including deleted groups with charges.
+Managed groups attributed through service ownership contribute once to their
+project/factory, not again to standalone Managed RGs. All AI Factories excludes
+separately classified hubs, bootstrap and unattributed managed groups. The overall
+selected-scope total includes all categories. Partial, stale or unavailable reports
+retain their status in JSON and return exit code **3**, rather than implying a
+complete successful report. The CLI does not recalculate or convert any totals.
+
+The report's `charts` array carries the same server-built chart data the desktop
+clients draw, one currency per chart: `factory-cost-<CUR>`, `project-cost-<CUR>`
+and `category-cost-<CUR>` (month-to-date actual, largest first, smaller slices
+combined into one labelled remainder) and `daily-cost-<CUR>` (daily actual cost
+for the trailing 30 days, or the whole selected past month; days Azure has not
+reported yet are `null`, not zero).
 
 ### Monitoring: canonical reports, not collector jobs
 

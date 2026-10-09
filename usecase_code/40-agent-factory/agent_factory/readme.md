@@ -100,3 +100,114 @@ configured project data storage. Only omission retains legacy `2001` discovery
 and route-specific containers. All examples, including
 [45-rag-agent](../45-rag-agent/readme.md), inherit explicit selection without
 moving Foundry/Search/project identities or renaming physical lake paths.
+
+<!-- project-team:start -->
+## Project-team quickstart
+
+Use the existing `agent_factory` Python modules for agent definitions and
+single-target operator commands. This is different from the core team's
+`azurefactory` administration client. There is no separate published
+`AgentFactoryClient` to install.
+
+### 1. Prepare your project copy
+
+From the repository root, or use the equivalent copied directory
+`aifactory-usecase-code\40-agent-factory` in your orange project:
+
+```powershell
+Set-Location .\usecase_code\40-agent-factory
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m agent_factory --help
+```
+
+Keep your project configuration outside generated use-case code:
+copy [config.example.json](../config.example.json) to
+`aifactory\agent-factory\config.json`, then have the operator resolve the
+target key, environment, variables-file path and selected storage profile.
+Do not run the unresolved example against Azure. See
+[configuration ownership](../readme.md#separation-and-template-copying) and
+[storage selection](../readme.md#one-storage-selection-for-every-example).
+
+### 2. Inspect agent definitions offline with Python
+
+Save this as `inspect_agents.py` in the Agent Factory root and run
+`.\.venv\Scripts\python.exe .\inspect_agents.py`.
+It reads the maintained catalog without credentials, network access, model
+calls, deployment or local writes.
+
+```python
+import json
+from agent_factory.catalog import agent_catalog
+
+agents = agent_catalog()
+print(json.dumps([
+    {"name": agent["name"], "kind": agent["kind"],
+     "framework": agent["framework"], "role": agent["metadata"]["aifactory.role"]}
+    for agent in agents
+], indent=2))
+```
+
+The default catalog contains knowledge/reviewer/documentation prompt agents,
+hosted framework examples and a multi-agent helpdesk team. An entry is a
+definition, not proof that its framework, model or knowledge source is deployed.
+Read the real [catalog](catalog.py),
+[prompt agents](../41-single-agent/prompt-agent/readme.md),
+[hosted examples](../41-single-agent/hosted-agent/readme.md) and
+[multi-agent examples](../42-multi-agent/readme.md).
+
+### 3. Make an offline single-target plan
+
+Save this separate program as `plan_agents.py` in the same directory. Supply
+the absolute path to your reviewed project configuration and its exact target
+key when prompted. `plan` validates local configuration; it does not
+authenticate, discover Azure resources or prove connectivity.
+
+```python
+import json
+from pathlib import Path
+from agent_factory.cli import parser, run
+
+config_path = Path(input("Reviewed configuration path: ").strip()).resolve(strict=True)
+target_key = input("Exact target key from that configuration: ").strip()
+if not target_key:
+    raise ValueError("Select one target explicitly.")
+arguments = parser().parse_args([
+    "plan", "--config", str(config_path), "--target", target_key,
+])
+plan = run(arguments)
+assert plan["mutations"] is False
+print(json.dumps({"mutations": plan["mutations"],
+                  "agents": [agent["name"] for agent in plan["agents"]]}, indent=2))
+```
+
+The equivalent CLI plan is also offline:
+
+```powershell
+$config = Read-Host "Absolute reviewed configuration path"
+$target = Read-Host "Exact target key"
+.\.venv\Scripts\python.exe -m agent_factory plan --config $config --target $target
+```
+
+### 4. Optional live work: review before applying
+
+Stop after the plan unless the operator has reviewed the target, existing
+Foundry/model resources, selected data account, dataset terms, private DNS,
+identity permissions and cost budget. `discover` and `preflight` read Azure;
+they are not offline tests. Ingestion, knowledge configuration and deployment
+are distinct mutations requiring `--apply`; invocation can incur model costs.
+
+Follow the maintained [operator commands](../readme.md#operator-commands-powershell)
+and [ingestion/knowledge/deployment sequence](../readme.md#data-and-foundry-iq)
+for **one explicit `--target`**. Do not silently enable public access, approve
+private links, lift a policy gate or guess a resource name.
+Python integrations use the actual [selection and command entry points](cli.py),
+[OAuth-backed `project_client` and prompt lifecycle](prompt.py) and
+[hosted deployment implementation](hosted.py); the operator CLI preserves the
+same ownership, storage and grounding checks.
+
+For source-bound RAG use [45-rag-agent](../45-rag-agent/readme.md), not an
+unbounded storage scan. Continue with the
+[ML Model Factory SDK](../../50-ml-model-factory/user-config/readme.md#project-team-quickstart)
+when your project also trains models.
+<!-- project-team:end -->

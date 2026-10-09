@@ -61,10 +61,14 @@ hooks:
 
 nav:
   - Overview: index.md
-  - Factory tools:
+  - "Get started - CLI, SDK, API: Core team":
       - Get started: factory-tools/18-cli-and-api-and-usage.md
       - Add and update: factory-tools/19-cli-and-api-and-usage.md
       - Remove and recover: factory-tools/20-cli-and-api-and-usage.md
+  - "Get started - Agent & ML Factory SDK: Project team":
+      - Choose your workload: project-team/index.md
+      - Agent Factory SDK: project-team/agent-factory.md
+      - ML Model Factory SDK: project-team/ml-model-factory.md
   - Parameters:
       - Configure your factory: parameters/index.md
       - Required inputs: parameters/standard.md

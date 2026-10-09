@@ -6001,4 +6001,14 @@ steps:
     serviceConnection: ${{ parameters.serviceConnection }}
     phase: ${{ parameters.phase }}
 
+- template: job-factory-chat-agent.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    phase: ${{ parameters.phase }}
+
+- template: job-aifactory-mcp-ai-gateway.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    phase: ${{ parameters.phase }}
+
 - template: ../../esml-infra-common/jobs/region-report-steps.yaml

@@ -329,6 +329,23 @@ def test_real_snapshot_combines_both_planes_before_model(settings, tmp_path):
     assert any(record.get("record_type") == "note" for record in records)
 
 
+def test_deploy_preserves_configured_graph_tools(settings, tmp_path, monkeypatch):
+    from unittest.mock import MagicMock
+    from aifactory_agent import foundry
+
+    settings = configured(settings, tmp_path)
+    project = Mock()
+    project.agents.get.return_value = None
+    project.agents.create_version.return_value = Mock(version="1", id="agent-version")
+    project_client = MagicMock()
+    project_client.return_value.__enter__.return_value = project
+    monkeypatch.setattr(foundry, "AIProjectClient", project_client)
+    monkeypatch.setattr(foundry, "credential", lambda _: None)
+    foundry.deploy(settings)
+    definition = project.agents.create_version.call_args.kwargs["definition"]
+    assert "graph_query" in [tool.name for tool in definition.tools]
+
+
 def test_graph_tool_contract_matches_runtime_descriptor():
     from aifactory_agent.foundry import graph_tools
     contracts = json.loads((EXAMPLE.parent / "tool-contracts.json").read_text("utf-8"))

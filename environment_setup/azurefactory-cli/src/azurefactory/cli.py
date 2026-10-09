@@ -13,7 +13,8 @@ from typing import Any
 
 from .client import API_KEY_ENV, API_URL_ENV, AzureFactoryClient, canonical_json_hash, catalog_settings_request, factory_create_request, redact_secrets, registered_creation_issues
 from .configuration import ConfigurationDraft
-from . import enrollment
+from .client import catalog_settings_request
+from . import catalog_requests, enrollment
 from .errors import APIError, BlockedError, ConfigError, FailureError, RequestTimeout
 from .monitoring_saved import register_saved_commands
 from .review import load_receipt as review_load_receipt
@@ -73,6 +74,30 @@ REQUIRED_SCHEMAS = {
     "BootstrapPrepare",
 }
 
+BOOLEAN = ("true", "false")
+# Dedicated config options: (option, exact variable name, choices, help).
+MCP_GATEWAY_OPTIONS = (
+    ("--enable-aifactory-mcp", "enableAIFactoryMCP", BOOLEAN,
+     "Host the governed, read-only AI Factory MCP in project001 Dev (requires enableContainerApps and enableAIFoundry)."),
+    ("--enable-factory-chat-agent", "enableFactoryChatAgent", BOOLEAN,
+     "Create or update the owned Factory Chat Agent in the selected project Foundry (requires enableAIFoundry)."),
+    ("--enable-ai-gateway-sku", "enableAIGatewaySKU", BOOLEAN,
+     "Create or adopt the new Azure AI Gateway SKU wired to the project001 Dev Foundry (requires enableAIFoundry)."),
+    ("--add-aifactory-mcp-to-ai-gateway-sku", "addAIFactoryMCP2AIGatewaySKU", BOOLEAN,
+     "Register the AI Factory MCP as a read-only AI Gateway tool server (requires both options above)."),
+    ("--aifactory-mcp-image", "aifactoryMcpImage", None,
+     "Digest-pinned MCP image <registry>.azurecr.io/<repository>@sha256:<digest>."),
+    ("--aifactory-mcp-api-image", "aifactoryMcpApiImage", None, "Digest-pinned Factory API sidecar image."),
+    ("--aifactory-mcp-entra-app-id", "aifactoryMcpEntraAppId", None,
+     "Client ID (GUID) of the MCP API app registration exposing AiFactory.Mcp.Read."),
+    ("--aifactory-mcp-container-apps-environment", "aifactoryMcpContainerAppsEnvironment", None,
+     "Internal project Container Apps environment name; empty selects the single one."),
+    ("--ai-gateway-sku-resource-id", "aiGatewaySkuResourceId", None,
+     "Existing AI Gateway SKU resource ID to adopt (never modified); empty creates an owned gateway."),
+    ("--ai-gateway-sku-outbound-subnet-id", "aiGatewaySkuOutboundSubnetId", None,
+     "Subnet ID for AI Gateway outbound VNet integration (needed to register the private MCP)."),
+)
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
@@ -123,6 +148,12 @@ def build_parser() -> argparse.ArgumentParser:
                                  help="Read deletion progress without starting or retrying deletion.")
     deletion_status.add_argument("--folder", required=True)
     deletion_status.add_argument("--job-id", required=True)
+    deletion_reconcile = add_simple(
+        deletion_sub, "reconcile", cmd_delete_aifactory_reconcile,
+        help="Resume local completion of an existing job from its verified pipeline receipts; never dispatch, "
+             "retry pipelines or call Azure.")
+    deletion_reconcile.add_argument("--folder", required=True)
+    deletion_reconcile.add_argument("--job-id", required=True)
     workflow = sub.add_parser("workflow", help="Read-only GitHub Actions status and events; never dispatch or rerun.")
     workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
     for name, handler in (("status", cmd_workflow_status), ("watch", cmd_workflow_watch)):
@@ -142,9 +173,17 @@ def build_parser() -> argparse.ArgumentParser:
     api_sub = api.add_subparsers(dest="api_command", required=True)
     add_simple(api_sub, "instructions", cmd_api_instructions,
                help="Print offline startup instructions and the selected URL; never print or persist credentials.")
-    monitoring = sub.add_parser("monitoring", help="Canonical evidence reports; no collectors, deployments or cloud jobs.")
+    monitoring = sub.add_parser("monitoring", help="Canonical evidence and read-only Azure cost reports; no deployments.")
     monitoring_sub = monitoring.add_subparsers(dest="monitoring_command", required=True)
     add_simple(monitoring_sub, "catalog", cmd_monitoring_catalog)
+    costs = add_simple(
+        monitoring_sub, "resource-group-costs", cmd_resource_group_costs,
+        help="Azure Cost Management actual and full-month forecast; explicitly selected subscriptions only.")
+    costs.add_argument("--subscription", dest="subscription_ids", action="append", required=True,
+                       help="Selected subscription UUID; repeat for multiple subscriptions.")
+    costs.add_argument("--month", help="Calendar month YYYY-MM; omitted uses the current UTC month on the API.")
+    costs.add_argument("--folder", help="Optional registered factory catalog folder on the API host.")
+    costs.add_argument("--refresh", action="store_true", help="Bypass the API's scoped read cache.")
     register_saved_commands(monitoring_sub)
     for action in ("summary", "report", "export"):
         command = add_simple(monitoring_sub, action, cmd_monitoring)
@@ -211,6 +250,11 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--project-number", required=True)
         command.add_argument("--changes-json", help="Local JSON object with only intentional field replacements.")
         command.add_argument("--snapshot-only", action="store_true", help="Do not write pipeline variable files.")
+        mcp_gateway = command.add_argument_group(
+            "Factory Chat Agent, MCP & AI Gateway",
+            "Dedicated options for late Foundry-phase pipeline steps; saving never deploys.")
+        for option, key, choices, help_text in MCP_GATEWAY_OPTIONS:
+            mcp_gateway.add_argument(option, dest=f"mcp_gateway_{key}", choices=choices, help=f"{help_text} Sets {key}.")
         if name == "save":
             command.add_argument("--expected-review", required=True, help="review_id from the separately approved review.")
             command.add_argument("--yes", action="store_true")
@@ -274,6 +318,7 @@ def build_parser() -> argparse.ArgumentParser:
     factory_clone.add_argument("--scale-set-id")
     factory_clone.add_argument("--prefix")
     factory_clone.add_argument("--region")
+    factory_clone.add_argument("--region-short-name")
     factory_clone.add_argument("--include-projects", choices=["none", "all"], default="none")
     factory_clone.add_argument("--aifactory-version")
 
@@ -282,6 +327,13 @@ def build_parser() -> argparse.ArgumentParser:
     scaleset_add = add_prepare_common(scaleset_sub, "add", cmd_scaleset_add)
     scaleset_add.add_argument("--factory-id", required=True)
     add_scaleset_flags(scaleset_add)
+    scaleset_delete = add_prepare_common(scaleset_sub, "delete", cmd_scaleset_delete, revision_required=True)
+    scaleset_delete.description = (
+        "Prepare guarded Azure scale-set resource deletion, not local draft removal. No deletion occurs now. "
+        "Review --save-receipt PATH, then separately approve: azurefactory runtime confirm --receipt PATH --yes.")
+    scaleset_delete.add_argument("--factory-id", required=True)
+    scaleset_delete.add_argument("--scale-set-id", required=True)
+    scaleset_delete.add_argument("--version-ref")
 
     project = sub.add_parser("project", help="Project catalog changes.")
     project_sub = project.add_subparsers(dest="project_command", required=True)
@@ -292,11 +344,37 @@ def build_parser() -> argparse.ArgumentParser:
     project_add.add_argument("--factory-id", required=True)
     project_add.add_argument("--number", required=True)
     project_add.add_argument("--display-name", default="")
-    project_add.add_argument("--placement", action="append", required=True, help=placement_help)
+    project_add.add_argument("--settings-json", help="Nonsecret project setting replacements.")
+    add_project_selection(project_add, placement_help)
     project_place = add_prepare_common(project_sub, "add-placements", cmd_project_add_placements)
     project_place.add_argument("--factory-id", required=True)
     project_place.add_argument("--project-id", required=True)
-    project_place.add_argument("--placement", action="append", required=True, help=placement_help)
+    add_project_selection(project_place, placement_help)
+    project_delete = add_prepare_common(project_sub, "delete", cmd_project_delete, revision_required=True)
+    project_delete.description = (
+        "Prepare guarded Azure project resource deletion for explicit environments. Both retention choices are required. "
+        "No deletion occurs now. Review --save-receipt PATH, then separately approve: "
+        "azurefactory runtime confirm --receipt PATH --yes.")
+    project_delete.add_argument("--factory-id", required=True)
+    project_delete.add_argument("--project-id", required=True)
+    project_delete.add_argument("--scale-set-id", help="Optional exact registered source scale-set scope.")
+    project_delete.add_argument("--environment", action="append", choices=["dev", "stage", "prod"], required=True)
+    project_delete.add_argument("--include-project-subnets", choices=["yes", "no"], required=True,
+                                help="Independently choose whether project subnets may be deleted.")
+    project_delete.add_argument("--include-keyvault-and-resource-group", choices=["yes", "no"], required=True,
+                                help="Independently choose whether the project Key Vault and resource group may be deleted.")
+    project_delete.add_argument("--version-ref")
+
+    draft = sub.add_parser("draft", help="Local catalog draft lifecycle; never Azure resource deletion.")
+    draft_sub = draft.add_subparsers(dest="draft_command", required=True)
+    draft_remove = add_prepare_common(draft_sub, "remove", cmd_draft_remove, revision_required=True)
+    draft_remove.description = (
+        "Prepare removal of a proven-safe local factory, scale-set or project draft. No Azure resource deletion. "
+        "Review --save-receipt PATH, then separately approve: azurefactory catalog confirm --receipt PATH --yes.")
+    draft_remove.add_argument("--kind", choices=["factory", "scale-set", "project"], required=True)
+    draft_remove.add_argument("--factory-id", required=True)
+    draft_remove.add_argument("--scale-set-id")
+    draft_remove.add_argument("--project-id")
 
     params = sub.add_parser("parameters", help="Typed ARM parameter introspection and editing.")
     params_sub = params.add_subparsers(dest="parameters_command", required=True)
@@ -433,12 +511,20 @@ def add_simple(sub, name: str, func, **kwargs):
     return parser
 
 
-def add_prepare_common(sub, name: str, func):
+def add_prepare_common(sub, name: str, func, *, revision_required: bool = False):
     parser = add_simple(sub, name, func)
     parser.add_argument("--folder", required=True)
-    parser.add_argument("--expected-revision")
+    parser.add_argument("--expected-revision", required=revision_required)
     parser.add_argument("--save-receipt", help="Write preview receipt JSON for later confirm/start.")
     return parser
+
+
+def add_project_selection(parser, placement_help):
+    selection = parser.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--placement", action="append", help=placement_help)
+    selection.add_argument("--environment", action="append", choices=["dev", "stage", "prod"],
+                           help="Explicit environment; repeat as needed. API selects the latest verified successful "
+                                "common placement. Review resolved UUID/evidence; no implicit dev or client selection.")
 
 
 def add_auth_scope(parser):
@@ -528,14 +614,21 @@ def cmd_preflight(args):
 
 
 def _deletion_review(preview, folder):
+    from .factory_deletion import describe_deletion_plan
+
     print("Are you sure you want to delete this factory's Azure resources?", file=sys.stderr)
     print("Review the exact deleted and retained resources below. Nothing has been deleted by this command.",
           file=sys.stderr)
+    plan = preview["deletion_plan"]
     _print_json({
         "Factory": preview["target"]["key"], "Factory ID": preview["factory_id"],
         "Saved folder": folder, "Scope": "Whole factory, all scale sets",
         "Source version": preview["source_version"], "Saved revision": preview["source_revision"],
         "Expires": preview["expires_at"], "Server review fingerprint": preview["preview_hash"],
+        "Ordered pipeline plan": {"Contract": plan["contract"], "Policy": plan["policy"],
+                                  "Plan fingerprint": plan["plan_hash"], "Pinned source": plan["source_commit"],
+                                  "Protected (never deleted)": plan["protected_resources"],
+                                  "Stages": describe_deletion_plan(plan)},
         "Exact resource manifest (delete / retain)": preview["deletion_targets"],
         "Retained Azure resources": preview["retained_resources"],
         "Hub and reusable infrastructure retention policy": preview["deletion_retention_policy"],
@@ -628,6 +721,15 @@ def cmd_delete_aifactory_status(args):
     return emit(result, status_exit(result["status"]))
 
 
+def cmd_delete_aifactory_reconcile(args):
+    from .factory_deletion import validate_job
+
+    api = client(args)
+    result = redact_secrets(api.delete_aifactory_reconcile(args.folder, args.job_id), api.api_key)
+    validate_job(result, job_id=args.job_id)
+    return emit(result, status_exit(result["status"]))
+
+
 def _workflow_output(args, event):
     from .workflow_events import monitoring_unavailable
 
@@ -684,6 +786,20 @@ def cmd_workflow_watch(args):
 
 def cmd_monitoring_catalog(args):
     return emit(client(args).monitoring_catalog())
+
+
+def cmd_resource_group_costs(args):
+    body = {"subscription_ids": args.subscription_ids}
+    for field in ("month",):
+        if getattr(args, field) is not None:
+            body[field] = getattr(args, field)
+    if args.folder is not None:
+        body["aifactory_folder"] = args.folder
+    if args.refresh:
+        body["refresh"] = True
+    api = client(args, default_timeout=300.0)
+    result = redact_secrets(api.resource_group_costs(body), api.api_key)
+    return emit(result, EXIT_OK if result.get("status") in {"available", "empty"} else EXIT_BLOCKED)
 
 
 def cmd_monitoring(args):
@@ -767,9 +883,23 @@ def cmd_schema(args):
     return emit(c.openapi() if args.openapi else c.schema())
 
 
-def configuration_draft(args):
+def configuration_changes(args) -> dict:
+    """Merge --changes-json with the dedicated MCP & AI Gateway options; disagreement is an error."""
     changes = read_json_file(args.changes_json) if args.changes_json else {}
-    return ConfigurationDraft.load(client(args), args.folder, args.project_number, changes=changes)
+    if not isinstance(changes, dict):
+        raise ConfigError("--changes-json must contain a JSON object.")
+    for option, key, _, _ in MCP_GATEWAY_OPTIONS:
+        value = getattr(args, f"mcp_gateway_{key}", None)
+        if value is None:
+            continue
+        if key in changes and str(changes[key]).lower() != value.lower():
+            raise ConfigError(f"{option} conflicts with {key} in --changes-json.")
+        changes[key] = value
+    return changes
+
+
+def configuration_draft(args):
+    return ConfigurationDraft.load(client(args), args.folder, args.project_number, changes=configuration_changes(args))
 
 
 def cmd_config_review(args):
@@ -910,30 +1040,58 @@ def cmd_factory_create(args):
 
 
 def cmd_factory_clone(args):
-    body = prepare_base(args, "clone")
-    body.update(factory_id=args.factory_id, factory_key=args.factory_key, scale_set_id=args.scale_set_id,
-                target_prefix=args.prefix, target_region=args.region, include_projects=args.include_projects,
-                aifactory_version=args.aifactory_version)
+    body = catalog_requests.factory_clone_request(
+        args.folder, args.factory_id, factory_key=args.factory_key, scale_set_id=args.scale_set_id,
+        prefix=args.prefix, region=args.region, include_projects=args.include_projects,
+        aifactory_version=args.aifactory_version, region_short_name=args.region_short_name,
+        expected_revision=args.expected_revision)
     return catalog_prepare_emit(args, body, "factory-clone")
 
 
 def cmd_scaleset_add(args):
-    body = prepare_base(args, "create-scale-set")
-    body.update(factory_id=args.factory_id, scale_sets=build_scale_sets(args))
+    body = catalog_requests.scaleset_add_request(
+        args.folder, args.factory_id, build_scale_sets(args), expected_revision=args.expected_revision)
     return catalog_prepare_emit(args, body, "scaleset-add")
 
 
 def cmd_project_add(args):
-    body = prepare_base(args, "add-project")
-    body.update(factory_id=args.factory_id, project={"number": args.number, "display_name": args.display_name,
-                "placements": parse_placements(args.placement)})
+    body = catalog_requests.project_add_request(
+        args.folder, args.factory_id, number=args.number, display_name=args.display_name,
+        placements=parse_placements(args.placement) if args.placement is not None else None,
+        environments=args.environment, expected_revision=args.expected_revision,
+        settings=read_json_file(args.settings_json) if args.settings_json else None)
     return catalog_prepare_emit(args, body, "project-add")
 
 
 def cmd_project_add_placements(args):
-    body = prepare_base(args, "add-project-placements")
-    body.update(factory_id=args.factory_id, project_id=args.project_id, placements=parse_placements(args.placement))
+    body = catalog_requests.project_add_placements_request(
+        args.folder, args.factory_id, args.project_id,
+        placements=parse_placements(args.placement) if args.placement is not None else None,
+        environments=args.environment, expected_revision=args.expected_revision)
     return catalog_prepare_emit(args, body, "project-add-placements")
+
+
+def cmd_project_delete(args):
+    body = catalog_requests.project_delete_request(
+        args.folder, args.factory_id, args.project_id, environments=args.environment,
+        include_project_subnets=args.include_project_subnets == "yes",
+        include_keyvault_and_resource_group=args.include_keyvault_and_resource_group == "yes",
+        expected_revision=args.expected_revision, scale_set_id=args.scale_set_id, version_ref=args.version_ref)
+    return catalog_prepare_emit(args, body, "project-delete")
+
+
+def cmd_scaleset_delete(args):
+    body = catalog_requests.scaleset_delete_request(
+        args.folder, args.factory_id, args.scale_set_id, expected_revision=args.expected_revision,
+        version_ref=args.version_ref)
+    return catalog_prepare_emit(args, body, "scaleset-delete")
+
+
+def cmd_draft_remove(args):
+    body = catalog_requests.draft_remove_request(
+        args.folder, args.factory_id, kind=args.kind, expected_revision=args.expected_revision,
+        scale_set_id=args.scale_set_id, project_id=args.project_id)
+    return catalog_prepare_emit(args, body, "draft-remove-" + args.kind)
 
 
 def cmd_parameters_get(args):
@@ -1237,9 +1395,10 @@ def catalog_prepare_emit(args, body: dict[str, Any], operation: str) -> int:
             (body.get("action") == "create-factory" and k == "initial_project")}
     result = client(args).catalog_prepare(body)
     if result.get("can_execute") is True:
-        from .review import validate_project_selection, validate_settings_selection
+        from .review import validate_project_selection, validate_settings_selection, validate_removal_selection
         validate_project_selection(body, result)
         validate_settings_selection(body, result)
+        validate_removal_selection(body, result)
     maybe_save_receipt(args, result, body, "catalog-confirm", operation=operation)
     return preview_emit(result)
 

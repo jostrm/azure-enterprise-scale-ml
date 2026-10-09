@@ -137,6 +137,46 @@ class ParameterDocumentationTests(unittest.TestCase):
         self.assertIn("direct top-level `dev` and `stage_prod` sections", page)
         self.assertIn("factories/<key>/scalesets/<immutable storage_suffix>/projects/projectNNN/variables.json", page)
 
+    def test_site_distinguishes_current_development_from_deployment_defaults(self):
+        page = generator.PAGE.read_text(encoding="utf-8").split(generator.START, 1)[0]
+        self.assertNotIn("Create and update default to `main`", page)
+        self.assertIn("Legacy create defaults to `124`", page)
+        self.assertIn("Update inherits the saved version", page)
+        self.assertIn("main", (generator.PAGE.parent.parent / "news.md").read_text(encoding="utf-8"))
+
+    def test_new_component_flags_are_not_unconditional_deployment_or_deletion(self):
+        for key in ("enableAIFactoryMCP", "enableAIGatewaySKU", "addAIFactoryMCP2AIGatewaySKU"):
+            line = next(line for line in self.generated.splitlines()
+                        if f"<!-- parameter yaml:{key} -->" in line)
+            self.assertIn("project001 Dev", line)
+            self.assertIn("does not delete", line)
+        for key in ("deleteAllForProject", "deleteKeyvaultAlso", "enableDeleteForDisabledResources"):
+            line = next(line for line in self.generated.splitlines()
+                        if f"<!-- parameter yaml:{key} -->" in line)
+            self.assertIn("review", line.lower())
+
+    def test_parameters_landing_routes_registered_users_to_catalog_not_legacy_save(self):
+        page = (generator.PAGE.parent / "index.md").read_text(encoding="utf-8")
+        self.assertIn("/api/v1/factory-catalog/parameters/prepare", page)
+        self.assertIn("configure-settings", page)
+        self.assertIn("Legacy", page)
+        self.assertIn("factory-tools/18-cli-and-api-and-usage.md", page)
+
+    def test_guide_navigation_has_no_next_self_link(self):
+        guides = ROOT / "documentation" / "v2" / "10-19"
+        for current, following, title in (
+            (17, 18, "Get started with Factory tools"),
+            (18, 19, "Add and update an AI factory"),
+            (19, 20, "Remove, observe and recover"),
+        ):
+            name = f"{current}-cli-and-api-and-usage.md"
+            text = (guides / name).read_text(encoding="utf-8")
+            self.assertIn(f"[Next - {following}. {title}]({following}-cli-and-api-and-usage.md)", text)
+            self.assertNotRegex(text, r"\[Next[^]]*\]\(" + re.escape(name) + r"\)")
+        for name in ("24-end-2-end-setup.md", "26-update-AIFactory.md"):
+            text = (ROOT / "documentation" / "v2" / "20-29" / name).read_text(encoding="utf-8")
+            self.assertIn("../10-19/17-cli-and-api-and-usage.md", text)
+
 
 if __name__ == "__main__":
     unittest.main()

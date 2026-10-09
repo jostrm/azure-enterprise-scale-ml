@@ -42,6 +42,44 @@ def test_generated_notebooks_and_readmes_match_the_catalog():
     assert result["notebooks"] == len(NOTEBOOKS) == 192
 
 
+def test_root_readme_explains_implementation_dimensions_and_counts():
+    text = (ROOT / "readme.md").read_text(encoding="utf-8")
+    for count in ("12 use cases", "60 combinations", "105 implementations", "126 catalog leaves", "192 notebooks"):
+        assert count in text
+    for path in (
+        r"usecase-type\batch\classification\azure-automl",
+        r"usecase-type\batch\classification\databricks-azureml-pipeline-step",
+        r"usecase-type\online\classification\azureml-pipeline",
+        r"usecase-type\streaming\regression\databricks-notebook",
+    ):
+        assert path in text
+    assert "both variants" in text
+
+
+def test_root_readme_cloud_status_covers_all_implementations_without_private_scope():
+    text = (ROOT / "readme.md").read_text(encoding="utf-8")
+    section = text.split("## Azure test status\n", 1)[1].split("\n## Start here", 1)[0]
+    rows = [line for line in section.splitlines() if re.match(r"^\| (batch|online|streaming) \|", line)]
+    assert len(rows) == 21
+    expected = {(leaf.pattern, leaf.task_folder) for leaf in catalog()}
+    actual, passed = set(), 0
+    for line in rows:
+        fields = [field.strip() for field in line.strip("|").split("|")]
+        assert len(fields) == 7
+        actual.add(tuple(fields[:2]))
+        for value in fields[2:]:
+            assert re.fullmatch(r"(Tested and works|Impl TBA)(\[\^[a-z0-9-]+\])*", value)
+            passed += value == "Tested and works"
+            if value.startswith("Impl TBA"):
+                assert "[^" in value
+    assert actual == expected
+    assert f"{passed}/105" in text.split("**Status:**", 1)[1].splitlines()[0]
+    references = set(re.findall(r"\[\^([a-z0-9-]+)\](?!:)", section))
+    definitions = set(re.findall(r"^\[\^([a-z0-9-]+)\]:", section, re.M))
+    assert references == definitions
+    assert not re.search(r"spider|/subscriptions/|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}", section, re.I)
+
+
 def _parsers():
     root = cli.parser()
 

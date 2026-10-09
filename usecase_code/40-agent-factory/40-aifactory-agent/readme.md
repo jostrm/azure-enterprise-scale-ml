@@ -169,6 +169,16 @@ Do not replace an unavailable requested model without approval.
 .\.venv\Scripts\python.exe -m aifactory_agent --config config.local.json deploy-agent
 ```
 
+For a normal project pipeline, set `enableFactoryChatAgent: "true"` in ADO
+`variables.yaml` or `ENABLE_FACTORY_CHAT_AGENT="true"` in the GHA environment
+template. The late Foundry phase discovers the selected project's existing
+AIServices account, project endpoint and succeeded `modelGPTXName` deployment,
+then creates or versions the owned `enterprise-scale-ai-factory` prompt Agent.
+The flag defaults to false, never deletes an Agent, and refuses to overwrite an
+Agent with the same name that is not owned by this implementation. This step
+creates the Foundry Agent resource; hosting the private browser/MAUI chat backend
+and its knowledge refresh remains a separate application deployment.
+
 The name is ownership-checked. A changed definition creates a new agent version;
 an identical definition reuses the existing version. Set `agent_version` to pin
 invocations or roll back. Foundry instructions and function definitions are in

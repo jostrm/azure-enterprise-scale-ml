@@ -44,6 +44,8 @@ import registered_personas
 CONTRACT_VERSION = 1
 NETWORK_API = "2024-05-01"
 DNS_API = "2022-07-01"
+# First private DNS link API with resolutionPolicy (NXDOMAIN fallback to public DNS).
+PRIVATE_DNS_LINK_API = "2024-06-01"
 POLICY_API = "2022-06-01"
 POLICY_DEFINITION_API = "2023-04-01"
 EXEMPTION_API = "2022-07-01-preview"
@@ -683,11 +685,13 @@ def _private_dns(builder, vnet, rg, context, target, ownership):
             body = {"location": "global", "properties": {"registrationEnabled": False,
                     "virtualNetwork": {"id": target_vnet}}}
             if matches:
+                # Links created before NXDOMAIN fallback stay compatible; only new links get it.
                 if not _contains(matches[0], body):
                     builder.blockers.append("existing-private-dns-link-incompatible:" + matches[0]["id"])
             else:
+                body["properties"]["resolutionPolicy"] = "NxDomainRedirect"
                 builder.ensure(zone_id + "/virtualNetworkLinks/aif-" + digest(target_vnet)[:12],
-                               "2020-06-01", body, ownership=ownership)
+                               PRIVATE_DNS_LINK_API, body, ownership=ownership)
 
 
 def _providers(builder, target, config, context):

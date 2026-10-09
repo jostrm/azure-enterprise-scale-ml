@@ -3,6 +3,7 @@ id: chat-and-grounding
 status: observed
 sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py
+  - usecase_code/40-agent-factory/agent_factory/factory_chat_agent.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/knowledge.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/web.py
@@ -14,6 +15,7 @@ tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_browser_auth.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_web.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_graph_integration.py
+  - usecase_code/40-agent-factory/tests/test_factory_chat_agent.py
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::class:Conversation
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::function:Conversation.answer
@@ -34,6 +36,12 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 Citation validation prevents invented identifiers; it is not a proof that every sentence is entailed by a cited passage. Responses still need evidence-aware interpretation, especially for dated release notes and incomplete coverage.
 
 The injected model gateway supports existing project-reference and dedicated agent-endpoint modes. Endpoint invocation uses a narrower consumption permission; model inference permission alone does not establish agent-endpoint invocation rights. Version routing is a separately configured operation, not changed by asking a question.
+
+The app and opt-in project pipeline reuse the canonical prompt definition in
+`agent_factory.factory_chat_agent`. Its instructions preserve graph-evidence
+citations and freshness limitations. The app appends `graph_query` only when
+dual-graph configuration is present, before hashing the deployment definition;
+the shared pipeline definition does not enable graph access by itself.
 
 ## Separation of operations
 

@@ -315,6 +315,16 @@ jobs:
       aksAzureFirewallPrivateIp: ${{ vars.AKS_AZURE_FIREWALL_PRIVATE_IP || '' }}
       enableContainerApps: ${{ vars.ENABLE_CONTAINER_APPS || 'false' }}
       enableAzureMcpServer: ${{ vars.ENABLE_AZURE_MCP_SERVER || 'false' }}
+      enableAIFactoryMCP: ${{ vars.ENABLE_AI_FACTORY_MCP || 'false' }}
+      enableFactoryChatAgent: ${{ vars.ENABLE_FACTORY_CHAT_AGENT || 'false' }}
+      enableAIGatewaySKU: ${{ vars.ENABLE_AI_GATEWAY_SKU || 'false' }}
+      addAIFactoryMCP2AIGatewaySKU: ${{ vars.ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU || 'false' }}
+      aifactoryMcpImage: ${{ vars.AIFACTORY_MCP_IMAGE || '' }}
+      aifactoryMcpApiImage: ${{ vars.AIFACTORY_MCP_API_IMAGE || '' }}
+      aifactoryMcpEntraAppId: ${{ vars.AIFACTORY_MCP_ENTRA_APP_ID || '' }}
+      aifactoryMcpContainerAppsEnvironment: ${{ vars.AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT || '' }}
+      aiGatewaySkuResourceId: ${{ vars.AI_GATEWAY_SKU_RESOURCE_ID || '' }}
+      aiGatewaySkuOutboundSubnetId: ${{ vars.AI_GATEWAY_SKU_OUTBOUND_SUBNET_ID || '' }}
       enableAppInsightsDashboard: ${{ vars.ENABLE_APPINSIGHTS_DASHBOARD || 'false' }}
       enableApplicationInsights: ${{ vars.ENABLE_APPLICATION_INSIGHTS || 'true' }}
       enableFunction: ${{ vars.ENABLE_FUNCTION || 'false' }}
@@ -4366,6 +4376,24 @@ jobs:
             --config "$MCP_CONFIG" --repository-root "$MCP_REPOSITORY" \
             --expected-subscription "$MCP_SUBSCRIPTION" --expected-project "$MCP_PROJECT" \
             --expected-environment "$MCP_ENVIRONMENT" --variables-file "$MCP_VARIABLES" --apply
+
+      - name: Deploy Factory Chat Agent in Foundry
+        if: success() && inputs.phase == 'foundry' && env.enableFactoryChatAgent == 'true' && env.deleteAllServicesForProject != 'true' && env.deleteAllForProject != 'true'
+        shell: bash
+        env:
+          FACTORY_CHAT_AGENT_REPOSITORY: ${{ github.workspace }}/azure-enterprise-scale-ml
+        run: |
+          set -euo pipefail
+          python3 "$FACTORY_CHAT_AGENT_REPOSITORY/usecase_code/40-agent-factory/46-factory-chat-agent/deploy.py" apply --apply
+
+      - name: Deploy AI Factory MCP and AI Gateway SKU (project001 Dev)
+        if: success() && inputs.phase == 'foundry' && (env.enableAIFactoryMCP == 'true' || env.enableAIGatewaySKU == 'true' || env.addAIFactoryMCP2AIGatewaySKU == 'true') && env.deleteAllServicesForProject != 'true' && env.deleteAllForProject != 'true'
+        shell: bash
+        env:
+          MCP_GATEWAY_REPOSITORY: ${{ github.workspace }}/azure-enterprise-scale-ml
+        run: |
+          set -euo pipefail
+          python3 "$MCP_GATEWAY_REPOSITORY/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py" apply --apply
 
       - name: Report final pipeline job result (offline)
         if: always()

@@ -1,6 +1,60 @@
 AIFACTORY_LIFECYCLE_CONTRACT=1
 ============================
 
+Factory teardown pipelines (ordered-project-pipelines-v1)
+---------------------------------------------------------
+factory_deletion_pipeline advertises this separate, Blob-only contract.
+Package factory_deletion_pipeline.py beside factory_lifecycle.py in every pinned
+runtime bundle. Existing scoped GHA/ADO workflow templates and authentication
+bindings are reused; legacy delete-services shell scripts are not authorized by
+this contract because their broad fallback/error handling is not a reviewed plan.
+
+freeze_factory_deletion_pipeline(cloud, manifest, ownership_records, registered_projects)
+is read-only and returns the deletion inventory. ownership_records are the explicit
+catalog receipts (same shape as freeze_deletion_inventory/freeze_project_deletion);
+manifest-embedded ownership copies are never read. Each registered project supplies project_id
+(logical UUID), project_number (three-digit string), and registered_resource_ids
+(exact ARM group and external project subnet/network IDs). Source, route and
+configuration hashes, ownership, closure, preserved resources and the four boolean
+true delete flags are frozen in that inventory. The scoped provider runner,
+auth_namespace and deployment_object_id must match enrolled writer authority.
+All selected project identities must be present, not inferred from RG names.
+
+execute_factory_deletion_cohort(manifests, source_root, execution_root,
+receipt_path, cloud_factory=Cloud, lock_factory=None) acquires and claims the
+entire physical scope union before dispatch. Each scale-set manifest is one
+configured provider pipeline run containing its ordered project resource stages.
+Worker evidence binds every project's exact deleted resource IDs and the four
+actual boolean flags. Capability hosts precede project-owned Search shared links,
+then managed services, then network resources. Provider-managed children lacking
+an independent DELETE are verified absent after their explicitly reviewed service
+parent deletion, never through a blanket project RG cascade. Project RG deletion
+requires the reviewed children to be absent and the group to be empty.
+
+No common-resource teardown begins until ALL project pipelines in the submitted
+cohort have verified successful provider completion and exact worker evidence.
+The API must submit the complete factory cohort frozen by its catalog review;
+individual lifecycle manifests do not enumerate other registered environments.
+Protected/shared/bootstrap/platform/VPN resources and reusable hubs are retained;
+an explicitly protected selected ID, ambiguous ownership, unmanaged dependency,
+or overlapping mutable snapshots blocks rather than broadening deletion.
+
+Receipts and infinite Blob leases survive uncertain dispatch, provider failure,
+permission denial and incomplete teardown. Calling the same cohort with the same
+execution directory observes persisted run IDs instead of redispatching. Local
+receipt evidence must exactly match durable Blob receipts and accepted claims.
+An uncertain dispatch without a verified run ID requires reconciliation; it is
+never silently retried. Completed receipts are idempotent, and a resumed common
+stage re-verifies every provider run. Source publication, clean execution-source
+isolation and existing enrollment/identity authorization remain mandatory.
+
+The aggregate receipt uses the generic cohort identity (cohort_hash over the
+sorted manifest hashes, source_commit, source_ref; each child also records
+manifest_revision and source_ref) plus contract, per-child remote_run {kind,
+run_id}, worker_receipt, projects_succeeded and deletion_complete. The catalog
+removes a factory only from a succeeded aggregate whose children carry exactly
+the reviewed deletions and successful worker evidence for every project.
+
 Opt-in single-writer coordination (provider-repository-cas-v1)
 -----------------------------------------------------------
 Blob coordination remains the default. Enrollment options may explicitly select
@@ -57,6 +111,10 @@ whole-owned-group plans/cohorts only: every group and resource in the deletion
 manifest must be marked delete. Mixed delete/retain and selective project
 deletion are not supported by that path. It uses repository CAS, not physical
 leases; legacy project pipelines remain outside this coordination contract.
+This generic whole-owned-group support does not satisfy the named API's separate
+ordered-project-pipelines-v1 requirement. Named deletion remains unsupported
+under single-writer coordination on the API's current immutable runtime pin.
+The named capability alone cannot unblock a preview or authorize a fallback.
 Capabilities advertises single_writer_deletion="provider-repository-cas-cohort-v1",
 coordination_modes
 ["blob","single-writer"], single_writer="provider-repository-cas-v1" and the

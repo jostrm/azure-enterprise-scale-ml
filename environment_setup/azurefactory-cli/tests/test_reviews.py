@@ -173,6 +173,7 @@ def test_automatic_project_receipt_binds_selector_and_resolved_target(tmp_path, 
     "missing", "duplicate", "capability", "factory", "project", "placement", "scale",
     "tenant", "environment", "version", "job", "time", "commit", "hash", "kind", "selector",
     "revision", "repository", "explicit-placement", "principal",
+    "capability-string", "capability-object",
 ])
 def test_automatic_project_review_rejects_unbound_resolution(tmp_path, change):
     request, preview = automatic_project_review()
@@ -183,6 +184,10 @@ def test_automatic_project_review_rejects_unbound_resolution(tmp_path, change):
         preview["resolved_placements"].append(copy.deepcopy(selected))
     elif change == "capability":
         preview["capabilities"] = []
+    elif change == "capability-string":
+        preview["capabilities"] = "latest-successful-placement-v1"
+    elif change == "capability-object":
+        preview["capabilities"] = {"latest-successful-placement-v1": True}
     elif change in ("factory", "project"):
         preview[change + "_id"] = "77777777-7777-4777-8777-777777777777"
     elif change == "placement":

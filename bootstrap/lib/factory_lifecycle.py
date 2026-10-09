@@ -236,6 +236,25 @@ def repository_state_module():
     return module
 
 
+def factory_deletion_module():
+    spec = importlib.util.spec_from_file_location(
+        "factory_deletion_pipeline", Path(__file__).with_name("factory_deletion_pipeline.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.fl = types.SimpleNamespace(**globals())
+    return module
+
+
+def freeze_factory_deletion_pipeline(cloud, document, ownership_records, registered_projects):
+    return factory_deletion_module().freeze(cloud, document, ownership_records, registered_projects)
+
+
+def execute_factory_deletion_cohort(documents, source_root, execution_root, receipt_path,
+                                    cloud_factory=None, lock_factory=None):
+    return factory_deletion_module().execute_cohort(
+        documents, source_root, execution_root, receipt_path, cloud_factory or Cloud, lock_factory)
+
+
 def scoped_template(document):
     return SCOPED_SOURCE + ("single-writer-" if single_writer(document) else "") + document["route"]["kind"] + ".yml"
 
@@ -528,6 +547,8 @@ def protect_coordination_storage(document):
 
 
 def validate_deletion(document):
+    if document.get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1":
+        return factory_deletion_module().validate(document)
     if "deletion_scope" in document:
         return validate_project_deletion(document)
     data = document.get("deletion")
@@ -638,6 +659,8 @@ def capabilities():
         "delete_leaf_types": sorted(LEAF_TYPES), "delete_empty_owned_resource_groups": True,
         "delete_owned_resource_groups": "arm-provider-closure-v1",
         "factory_deletion_dependencies": "search-shared-private-links-first-v1",
+        "factory_deletion_pipeline": "ordered-project-pipelines-v1",
+        "factory_deletion_pipeline_coordination_modes": ["blob"],
         "factory_deletion_coordination_modes": ["blob", "single-writer"],
         "selective_project_deletion": SELECTIVE_PROJECT_DELETE,
         "factory_cohort": "physical-lease-cohort-v1",
@@ -2012,7 +2035,8 @@ class BlobLocks:
         writer = writers[route["writer_id"]]
         require(all(writer.get(key) == route[key] for key in ("kind", "repository", "shared_remote")),
                 "writer-binding-changed")
-        if "deployment" in self.document:
+        if ("deployment" in self.document or
+                self.document.get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1"):
             require(writer.get("auth_namespace") == route["auth_namespace"]
                     and writer.get("deployment_object_id") == self.document["identity"]["deployment_object_id"]
                     and writer.get("runner") == route["runner"],
@@ -3194,6 +3218,9 @@ def persona_worker(document, source_root, *, execute=False):
 def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cloud=None, sleep=time.sleep):
     require(isinstance(envelope, dict), "invalid-worker-envelope")
     envelope = json.loads(canonical(envelope))
+    if envelope.get("manifest", {}).get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1":
+        return factory_deletion_module().run_worker(
+            envelope, source_root, expected_run, expected_hash, cloud, sleep)
     document = _validate_manifest(envelope.get("manifest"))
     require(document["run_id"] == expected_run and document["manifest_hash"] == expected_hash
             and "deployment" in document, "worker-run-binding-mismatch")
@@ -3381,6 +3408,8 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
 
 def verify_worker_receipt(locks, document):
     _, _, result = locks.request("GET", "runs/" + document["run_id"] + ".worker.json")
+    if document.get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1":
+        return factory_deletion_module().verify_worker_result(document, result)
     require(isinstance(result, dict) and result.get("schema") == 1 and result.get("status") == "succeeded"
             and result.get("run_id") == document["run_id"] and result.get("manifest_hash") == document["manifest_hash"]
             and result.get("source_commit") == document["source"]["commit"] and result.get("target") == document["target"],
@@ -3440,6 +3469,8 @@ def protected_worker_envelope(document, locks):
 
 def failed_worker_diagnostic(locks, document):
     """Read bound failure metadata without granting success or cleanup authority."""
+    if document.get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1":
+        return None
     try:
         status, _, result = locks.request("GET", "runs/" + document["run_id"] + ".worker.json")
     except (Blocked, OSError, KeyError, TypeError, ValueError):
@@ -3527,6 +3558,10 @@ def github_scoped(cloud, locks, document, source_root, receipt, persist, sleep=t
         locks.assert_held()
         result = github("GET", "/actions/runs/" + str(run_id))
         require(result.get("head_sha") == route["commit"], "scoped-github-run-commit-mismatch")
+        if document.get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1":
+            require(result.get("id") == run_id and run_id > 0
+                    and result.get("display_title") == "factory-lifecycle [" + document["run_id"] + "]",
+                    "factory-delete-run-identity-unverified")
         if result.get("status") == "completed":
             receipt["remote_terminal"] = True
             break
@@ -3606,6 +3641,9 @@ def ado_scoped(cloud, locks, document, source_root, receipt, persist, sleep=time
     for _ in range(1440):
         locks.assert_held()
         result = request("GET", f"/pipelines/{pipeline}/runs/{run['id']}?api-version=7.1")
+        if document.get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1":
+            require(result.get("id") == run["id"] and result.get("pipeline", {}).get("id") == pipeline,
+                    "factory-delete-run-identity-unverified")
         require(result.get("resources", {}).get("repositories", {}).get("self", {}).get("version") == route["commit"],
                 "scoped-ado-run-commit-mismatch")
         if result.get("state") == "completed":
@@ -3949,6 +3987,10 @@ def _cohort_order(documents):
 
 def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_factory=Cloud, lock_factory=None):
     """Accept all factory children under the full physical union before deleting."""
+    if isinstance(documents, list) and documents and any(
+            document.get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1" for document in documents):
+        return execute_factory_deletion_cohort(
+            documents, source_root, execution_root, receipt_path, cloud_factory, lock_factory)
     require(isinstance(documents, list) and documents, "nonempty-delete-cohort-required")
     documents = json.loads(canonical(documents))
     selective = all(document.get("deletion_scope", {}).get("contract") == SELECTIVE_PROJECT_DELETE for document in documents)
@@ -4116,6 +4158,10 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
 
 
 def execute(document, source_root, execution_root, receipt_path, cloud=None, lock_factory=None):
+    if document.get("deletion", {}).get("inventory_mode") == "ordered-project-pipelines-v1":
+        return execute_factory_deletion_cohort(
+            [document], source_root, execution_root, receipt_path,
+            cloud_factory=(lambda _: cloud) if cloud is not None else Cloud, lock_factory=lock_factory)
     document = json.loads(canonical(document))
     validate_manifest(document)
     if single_writer(document) and document["operation"] == "delete":

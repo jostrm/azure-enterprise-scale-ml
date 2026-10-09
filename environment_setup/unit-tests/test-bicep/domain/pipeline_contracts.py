@@ -69,6 +69,9 @@ ENABLE_FUNCTION enableFunction
 ENABLE_WEBAPP enableWebApp
 ENABLE_CONTAINER_APPS enableContainerApps
 ENABLE_AZURE_MCP_SERVER enableAzureMcpServer
+ENABLE_AI_FACTORY_MCP enableAIFactoryMCP
+ENABLE_FACTORY_CHAT_AGENT enableFactoryChatAgent
+ENABLE_AI_GATEWAY_SKU enableAIGatewaySKU
 ENABLE_APPINSIGHTS_DASHBOARD enableAppInsightsDashboard
 ENABLE_APPLICATION_INSIGHTS enableApplicationInsights
 ENABLE_LOGIC_APPS enableLogicApps
@@ -90,6 +93,8 @@ CONFIG_ONLY_EXCEPTIONS = {
     "ENABLE_AMPLS": "Legacy Hub switch has no GHA common/project binding; known wiring gap, not covered as a deployable flag.",
     "ENABLE_RETRIES": "Legacy retry setting is not forwarded by GHA; task/script retry policy is outside service provisioning.",
 }
+# Reviewed public switches outside the enable* inventory that pipelines bind: public -> runtime.
+EXTRA_FEATURES = {"ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU": "addAIFactoryMCP2AIGatewaySKU"}
 DEFAULT_EXCEPTIONS = {
     "ENABLE_AKS_FOR_AZURE_ML": (
         "true", "false",

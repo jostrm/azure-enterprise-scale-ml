@@ -16,6 +16,7 @@ from uuid import UUID
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from .errors import APIError, AuthError, ConfigError, FailureError, RedirectError, RequestTimeout
+from . import catalog_requests
 from .monitoring_saved import SavedMonitoringClient
 from .operation_results import legacy_execution_result
 from .workflow_events import WorkflowRunEvent
@@ -242,6 +243,11 @@ class AzureFactoryClient(SavedMonitoringClient):
     def delete_aifactory_status(self, folder: str, job_id: str) -> dict[str, Any]:
         return self._factory_deletion_request("status", query={"folder": folder, "job_id": job_id})
 
+    def delete_aifactory_reconcile(self, folder: str, job_id: str) -> dict[str, Any]:
+        """Server-side local completion from existing verified receipts; never redispatches pipelines."""
+        return self._factory_deletion_request("reconcile", body={
+            "contract_version": 1, "folder": folder, "job_id": job_id})
+
     def schema(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/api/v1/schema"), "schema")
 
@@ -281,6 +287,43 @@ class AzureFactoryClient(SavedMonitoringClient):
     def monitoring_catalog(self) -> dict[str, Any]:
         """Read canonical report/source capabilities; never start a collector."""
         return self._object(self.request("GET", "/api/v1/monitoring/catalog"), "monitoring catalog")
+
+    def resource_group_costs(self, request: dict[str, Any]) -> dict[str, Any]:
+        """Read Azure billing for explicitly selected subscriptions; never allocate locally."""
+        if (not isinstance(request, dict)
+                or set(request) - {"subscription_ids", "month", "aifactory_folder", "refresh"}):
+            raise ConfigError("Resource-group costs require an explicit subscription_ids scope.")
+        subscriptions = request.get("subscription_ids")
+        if not isinstance(subscriptions, list) or not subscriptions:
+            raise ConfigError("Select at least one subscription_id; tenant-wide discovery is not supported.")
+        identities = set()
+        for value in subscriptions:
+            try:
+                identifier = UUID(value)
+                if not identifier.int or str(identifier) != value.lower():
+                    raise ValueError()
+            except (ValueError, TypeError, AttributeError):
+                raise ConfigError("Every selected subscription_id must be an Azure subscription UUID.") from None
+            if identifier in identities:
+                raise ConfigError("Select each subscription_id only once.")
+            identities.add(identifier)
+        if "month" in request:
+            value = request["month"]
+            try:
+                parsed = date.fromisoformat(value + "-01")
+            except (ValueError, TypeError):
+                raise ConfigError("Cost month must be YYYY-MM.") from None
+            if parsed.strftime("%Y-%m") != value:
+                raise ConfigError("Cost month must be YYYY-MM.")
+        if "refresh" in request and type(request["refresh"]) is not bool:
+            raise ConfigError("Cost refresh must be a boolean.")
+        if "aifactory_folder" in request and (
+                not isinstance(request["aifactory_folder"], str) or not request["aifactory_folder"].strip()
+                or _has_control(request["aifactory_folder"])):
+            raise ConfigError("Cost catalog folder must be a nonempty API-host path.")
+        return self._object(self.request(
+            "POST", "/api/v1/monitoring/resource-group-costs", body=request,
+        ), "resource-group cost report")
 
     def monitoring_report(self, request: dict[str, Any]) -> dict[str, Any]:
         """Calculate a report from explicit sample or supplied observation evidence."""
@@ -446,6 +489,88 @@ class AzureFactoryClient(SavedMonitoringClient):
         )
         return self.catalog_prepare(body)
 
+    def factory_clone_prepare(
+        self, folder: str, factory_id: str, *, prefix: str | None = None, region: str | None = None,
+        factory_key: str | None = None, scale_set_id: str | None = None, include_projects: str = "none",
+        aifactory_version: str | None = None, expected_revision: str | None = None,
+        region_short_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Prepare a configuration clone, never a deployment."""
+        return self._catalog_wrapper_prepare(catalog_requests.factory_clone_request(
+            folder, factory_id, prefix=prefix, region=region, factory_key=factory_key,
+            scale_set_id=scale_set_id, include_projects=include_projects, aifactory_version=aifactory_version,
+            expected_revision=expected_revision, region_short_name=region_short_name), "factory-clone")
+
+    def scaleset_add_prepare(
+        self, folder: str, factory_id: str, scale_sets: list[dict[str, Any]], *,
+        expected_revision: str | None = None,
+    ) -> dict[str, Any]:
+        """Prepare explicit scale-set configuration; server validates network and scope."""
+        return self._catalog_wrapper_prepare(catalog_requests.scaleset_add_request(
+            folder, factory_id, scale_sets, expected_revision=expected_revision), "scaleset-add")
+
+    def project_add_prepare(
+        self, folder: str, factory_id: str, *, number: str, display_name: str = "",
+        placements: list[dict[str, str]] | None = None, environments: list[str] | None = None,
+        settings: dict[str, Any] | None = None, expected_revision: str | None = None,
+    ) -> dict[str, Any]:
+        """Prepare a project using explicit placements OR server-resolved environments."""
+        return self._catalog_wrapper_prepare(catalog_requests.project_add_request(
+            folder, factory_id, number=number, display_name=display_name, placements=placements,
+            environments=environments, settings=settings, expected_revision=expected_revision), "project-add")
+
+    def project_add_placements_prepare(
+        self, folder: str, factory_id: str, project_id: str, *,
+        placements: list[dict[str, str]] | None = None, environments: list[str] | None = None,
+        expected_revision: str | None = None,
+    ) -> dict[str, Any]:
+        """Prepare placements on the same saved project; never creates resources."""
+        return self._catalog_wrapper_prepare(catalog_requests.project_add_placements_request(
+            folder, factory_id, project_id, placements=placements, environments=environments,
+            expected_revision=expected_revision), "project-add-placements")
+
+    def project_delete_prepare(
+        self, folder: str, factory_id: str, project_id: str, *, environments: list[str],
+        include_project_subnets: bool, include_keyvault_and_resource_group: bool,
+        expected_revision: str, scale_set_id: str | None = None, version_ref: str | None = None,
+    ) -> dict[str, Any]:
+        """Review guarded Azure project deletion; confirmation is separate approval."""
+        return self._catalog_wrapper_prepare(catalog_requests.project_delete_request(
+            folder, factory_id, project_id, environments=environments,
+            include_project_subnets=include_project_subnets,
+            include_keyvault_and_resource_group=include_keyvault_and_resource_group,
+            expected_revision=expected_revision, scale_set_id=scale_set_id,
+            version_ref=version_ref), "project-delete")
+
+    def scaleset_delete_prepare(
+        self, folder: str, factory_id: str, scale_set_id: str, *, expected_revision: str,
+        version_ref: str | None = None,
+    ) -> dict[str, Any]:
+        """Review guarded Azure scale-set deletion; never confirms or retries."""
+        return self._catalog_wrapper_prepare(catalog_requests.scaleset_delete_request(
+            folder, factory_id, scale_set_id, expected_revision=expected_revision,
+            version_ref=version_ref), "scaleset-delete")
+
+    def draft_remove_prepare(
+        self, folder: str, factory_id: str, *, kind: str, expected_revision: str,
+        scale_set_id: str | None = None, project_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Review local draft removal only; the API must prove safe draft lifecycle."""
+        return self._catalog_wrapper_prepare(catalog_requests.draft_remove_request(
+            folder, factory_id, kind=kind, expected_revision=expected_revision,
+            scale_set_id=scale_set_id, project_id=project_id), "draft-remove-" + kind)
+
+    def _catalog_wrapper_prepare(self, body: dict[str, Any], operation: str) -> dict[str, Any]:
+        from .review import validate_bindings, validate_preview
+
+        preview = self.catalog_prepare(body)
+        if type(preview.get("can_execute")) is not bool:
+            raise FailureError("Malformed preview: missing boolean can_execute.")
+        if preview["can_execute"]:
+            validate_preview(preview)
+            validate_bindings(body, preview, "catalog-confirm", operation)
+        return preview
+
     def catalog_confirm(self, folder: str, confirmation_id: str) -> dict[str, Any]:
         return self._object(self.request(
             "POST",
@@ -563,10 +688,12 @@ class AzureFactoryClient(SavedMonitoringClient):
     def review_catalog_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
         """Prepare only; caller must obtain explicit approval before confirm."""
         preview = self.catalog_prepare(body)
-        from .review import validate_preview, validate_project_selection
+        from .review import validate_preview, validate_project_selection, validate_settings_selection, validate_removal_selection
 
         validate_preview(preview)
         validate_project_selection(body, preview)
+        validate_settings_selection(body, preview)
+        validate_removal_selection(body, preview)
         return preview
 
     def _object(self, value: Any, context: str) -> dict[str, Any]:

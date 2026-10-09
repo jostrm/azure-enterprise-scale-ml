@@ -406,6 +406,17 @@ variables:
   # === Container Apps ===
   enableContainerApps: "false" # <optional>Deploy Azure Container Apps<default>false<keep-as-is>
   enableAzureMcpServer: "false" # Private, read-only MCP deployment; requires prepared project-scoped configuration.
+  # === Factory Chat Agent, AI Factory MCP & new AI Gateway SKU (late Foundry-phase steps) ===
+  enableAIFactoryMCP: "false" # <optional>Host the governed AI Factory MCP in project001 Dev<default>false<keep-as-is> Requires enableContainerApps:'true' and enableAIFoundry:'true' plus aifactoryMcpImage, aifactoryMcpApiImage and aifactoryMcpEntraAppId. false never deletes an existing MCP.
+  enableFactoryChatAgent: "false" # <optional>Create or update the owned Enterprise Scale AI Factory prompt Agent in the selected project Foundry<default>false<keep-as-is> Requires enableAIFoundry:'true' and a succeeded modelGPTXName deployment. false never deletes an existing Agent.
+  enableAIGatewaySKU: "false" # <optional>Initialize the new Azure AI Gateway SKU (ai.gateway.azure.com) with the project001 Dev Foundry<default>false<keep-as-is> Requires enableAIFoundry:'true'. false never deletes an existing gateway.
+  addAIFactoryMCP2AIGatewaySKU: "false" # <optional>Register the AI Factory MCP as a tool server on the AI Gateway SKU<default>false<keep-as-is> Requires enableAIFactoryMCP:'true', enableAIGatewaySKU:'true' and aiGatewaySkuOutboundSubnetId (or an adopted gateway with outbound VNet integration).
+  aifactoryMcpImage: "" # <optional>Digest-pinned AI Factory MCP image<default>""<keep-as-is> <mandatory> if enableAIFactoryMCP:'true'. Format <registry>.azurecr.io/<repository>@sha256:<digest>; the registry must be in the project subscription.
+  aifactoryMcpApiImage: "" # <optional>Digest-pinned Factory API sidecar image<default>""<keep-as-is> <mandatory> if enableAIFactoryMCP:'true'. Same format as aifactoryMcpImage.
+  aifactoryMcpEntraAppId: "" # <optional>Client ID (GUID) of the MCP API app registration exposing app role AiFactory.Mcp.Read<default>""<keep-as-is> <mandatory> if enableAIFactoryMCP:'true'. Created once by an Entra admin; pipelines never write Microsoft Graph.
+  aifactoryMcpContainerAppsEnvironment: "" # <optional>Name of the internal project Container Apps environment hosting the MCP<default>""<keep-as-is> Empty selects the single environment in the project resource group.
+  aiGatewaySkuResourceId: "" # <optional>Resource ID of an existing AI Gateway SKU to adopt (never modified)<default>""<keep-as-is> Empty creates an owned gateway in the project resource group.
+  aiGatewaySkuOutboundSubnetId: "" # <optional>Subnet ID for AI Gateway outbound VNet integration<default>""<keep-as-is> <mandatory> if addAIFactoryMCP2AIGatewaySKU:'true' with a new gateway. Delegated to Microsoft.Web/serverFarms, /27 or larger.
   enableAppInsightsDashboard: "false" # <optional>Deploy Application Insights dashboard<default>false<keep-as-is>
   enableApplicationInsights: "true" # <optional>Deploy project Application Insights<default>true<keep-as-is>
   # aca_a_registry_image: "containerapps-default:latest"

@@ -10,11 +10,12 @@ need, and add projects without rebuilding every part of the platform.
 
 | Your task | Start here |
 | --- | --- |
-| Try the tools safely | [CLI, Python SDK or REST quickstart](factory-tools/18-cli-and-api-and-usage.md) — choose one tab for the whole tutorial |
+| Core team: configure and administer | [Get started - CLI, SDK, API: Core team](factory-tools/18-cli-and-api-and-usage.md) — choose one linked tab for the whole tutorial |
+| Project team: build workload code | [Get started - Agent & ML Factory SDK: Project team](project-team/index.md) — native Python and CLI examples, offline first |
 | Configure a new factory or add a project | [Add and update](factory-tools/19-cli-and-api-and-usage.md) |
 | Find a setting or default | [Parameters](parameters/index.md), [required inputs](parameters/standard.md), [complete reference](parameters/advanced.md) |
 | Understand factories, scale sets and projects | [Core concepts](concepts/index.md) |
-| Build an agent, model or data workflow | [GenAIOps](concepts/templates/genaiops.md), [MLOps](concepts/templates/mlops.md), [DataOps](concepts/templates/dataops.md) |
+| Build an agent, model or data workflow | [Agent SDK](project-team/agent-factory.md), [ML SDK](project-team/ml-model-factory.md), [DataOps](concepts/templates/dataops.md) |
 | Monitor usage, cost and health | [Monitor and operate](intelligence.md) |
 | Remove a draft or Azure resources | [Remove and recover](factory-tools/20-cli-and-api-and-usage.md) |
 | Choose a version or see recent changes | [News and releases](news.md) |
@@ -82,6 +83,8 @@ The site is built from this repository's existing `documentation/gh-io` director
 Factory tutorials are maintained in `documentation/v2/10-19`; the build displays
 those same Markdown sources with linked tool tabs rather than maintaining a
 second set of instructions.
+Project-team SDK pages likewise reuse the marked onboarding sections from
+`usecase_code/40-agent-factory` and `usecase_code/50-ml-model-factory`.
 
 The project aligns with the [Cloud Adoption Framework](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/ai-machine-learning-mlops#ai-factory)
 and [Well-Architected AI guidance](https://learn.microsoft.com/en-us/azure/well-architected/ai/personas).
