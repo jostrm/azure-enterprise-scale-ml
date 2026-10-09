@@ -52,4 +52,4 @@ jobs:
 
       - name: Deploy documentation to GitHub Pages
         working-directory: documentation/gh-io
-        run: mkdocs gh-deploy --force
+        run: mkdocs gh-deploy

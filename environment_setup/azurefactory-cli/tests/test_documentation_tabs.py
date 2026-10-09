@@ -1,6 +1,7 @@
 """Offline checks for the shared documentation source and native tool views."""
 
 import ast
+import fnmatch
 import importlib.util
 import json
 from pathlib import Path
@@ -141,6 +142,25 @@ def test_project_guide_relative_links_reference_current_sources():
             location = match[2].partition("#")[0]
             if location and not location.startswith(("https://", "http://", "/")):
                 assert (source.parent / location).exists(), (source, location)
+
+
+def test_pages_workflow_preserves_history_and_rebuilds_canonical_guides():
+    hook = load_hook()
+    import yaml
+
+    path = ROOT / ".github" / "workflows" / "deploy-docs.yml"
+    workflow = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    paths = workflow["on"]["push"]["paths"]
+    for source in [*(hook.SOURCE / name for name in hook.GUIDES), *hook.PROJECT_GUIDES.values()]:
+        relative = source.relative_to(ROOT).as_posix()
+        assert any(fnmatch.fnmatchcase(relative, pattern) for pattern in paths), relative
+    steps = workflow["jobs"]["deploy"]["steps"]
+    commands = [step.get("run", "") for step in steps]
+    publication = next(command for command in commands if "mkdocs gh-deploy" in command)
+    assert publication == "mkdocs gh-deploy"
+    assert commands.index(publication) > commands.index("mkdocs build --strict")
+    assert any("test_documentation_tabs.py" in command for command in commands)
+    assert any("generate_parameters.py --check" in command for command in commands)
 
 
 def test_project_catalog_python_examples_run_offline(monkeypatch, capsys):
