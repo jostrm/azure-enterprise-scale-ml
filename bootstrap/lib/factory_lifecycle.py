@@ -698,6 +698,7 @@ def capabilities():
         "factory_deletion_dependencies": "search-shared-private-links-first-v1",
         "factory_deletion_pipeline": "ordered-project-pipelines-v1",
         "factory_deletion_group_protection": "case-insensitive-name-globs-v1",
+        "factory_deletion_connectivity_retention": "whole-connectivity-resource-groups-v1",
         "factory_deletion_pipeline_coordination_modes": ["blob"],
         "factory_deletion_access_hub": "factory-owned-access-hub-v1",
         "factory_deletion_shared_hub_links": "shared-hub-spoke-links-v1",

@@ -306,6 +306,38 @@ def teardown_order(document, rows):
             + ordered_resources([row for row in rows if row["id"].lower() in late]))
 
 
+def connectivity_groups(document, bodies):
+    """Shared connectivity resource groups that factory deletion retains whole.
+
+    Declared groups come from the hashed plan, and a group whose name contains
+    'connectivity' counts as shared connectivity too. Names only deny deletion; they never
+    establish ownership. Resource types do not mark a group: unproven gateways and Bastion
+    hosts are already protected resources, and a factory's own bootstrap-proven access hub
+    stays deletable under its hub proof, so its groups are never shared connectivity.
+    """
+    declared = document.get("connectivity_resource_group_ids", [])
+    fl.require(isinstance(declared, list)
+               and all(isinstance(value, str) and fl.RG_ID.fullmatch(value) for value in declared),
+               "factory-delete-connectivity-scopes-invalid")
+    groups = {value.lower() for value in declared}
+    scopes = {value.lower() for value in document["locks"]["scopes"] + document["locks"]["common_dependencies"]}
+    fl.require(len(groups) == len(declared) and groups <= scopes, "factory-delete-connectivity-scopes-invalid")
+    hub = access_hub(document)
+    hub_groups = set(hub["resource_group_ids"]) if hub else set()
+    fl.require(not groups & hub_groups, "factory-delete-connectivity-scopes-invalid")
+    groups.update(fl.arm_scope(key) for key in bodies
+                  if fl.RG_ID.fullmatch(key) and "connectivity" in key.rsplit("/", 1)[-1].lower()
+                  and fl.arm_scope(key) not in hub_groups)
+    return sorted(groups)
+
+
+def assert_connectivity_group_allowed(document, identifier, body):
+    groups = {fl.arm_scope(identifier)}
+    groups.update(fl.managed_group_cascades(body, document["target"]["subscription_id"]))
+    fl.require(not groups.intersection(document["deletion"]["connectivity_resource_group_ids"]),
+               "factory-delete-connectivity-group-deletion-forbidden")
+
+
 def validate_route(document):
     route = document["route"]
     fl.require(not fl.single_writer(document), "factory-delete-blob-coordination-required")
@@ -355,6 +387,7 @@ def normalize_projects(document, projects):
 def freeze(cloud, document, ownership_records, registered_projects):
     validate_route(document)
     fl.protected_resource_group_patterns(document)
+    connectivity_groups(document, {})
     projects = normalize_projects(document, registered_projects)
     cloud.verify_identity()
     fl.BlobLocks(cloud, document).verify_enrollment()
@@ -362,6 +395,7 @@ def freeze(cloud, document, ownership_records, registered_projects):
     writable = {scope.lower() for scope in document["locks"]["scopes"]}
     hub, links = access_hub(document), shared_hub_links(document)
     closure, bodies = fl.collect_resource_closure(cloud, scopes)
+    connectivity = set(connectivity_groups(document, bodies))
     # The operator executes common teardown; it must never sit on anything in scope.
     fl.verify_deletion_identity(document, bodies)
     verify_access_hub_network(hub, bodies, links)
@@ -406,7 +440,7 @@ def freeze(cloud, document, ownership_records, registered_projects):
             fl.require(any(key == value or key.startswith(value + "/") for value in registered),
                        "factory-delete-project-resource-unregistered")
         metadata = closure["groups"].get(key, closure["resources"].get(key))
-        keep = protected(body, explicit, hub)
+        keep = protected(body, explicit, hub) or fl.arm_scope(key) in connectivity
         if key in explicit:
             fl.require(not selected, "factory-delete-protected-resource-selected")
         entries[key] = {"id": body["id"], **metadata, **proof,
@@ -418,7 +452,8 @@ def freeze(cloud, document, ownership_records, registered_projects):
         if entries[key]["delete"]:
             fl.assert_deletion_group_allowed(document, key, body)
         if not entries[key]["delete"]:
-            entries[key]["retention_reason"] = ("protected-infrastructure" if keep else
+            entries[key]["retention_reason"] = ("shared-connectivity-resource-group" if fl.arm_scope(key) in connectivity else
+                "protected-infrastructure" if keep else
                 "outside-registered-ownership" if not selected else "read-only-dependency")
         if selected and key in closure["resources"] and entries[key]["delete"]:
             fl.require(not str(metadata["type"]).lower() in
@@ -472,6 +507,7 @@ def freeze(cloud, document, ownership_records, registered_projects):
             "flags": dict.fromkeys(DELETE_FLAGS, True), "projects": projects, "resource_groups": groups,
             "resources": resources, "inventory_hash": fl.digest(resources), "closure": closure,
             "closure_hash": fl.digest(closure), "bodies": bodies, "protected_resource_ids": sorted(explicit),
+            "connectivity_resource_group_ids": sorted(connectivity),
             "configuration_hash": fl.digest(document["config"]),
             "route_hash": fl.digest(document["route"]), "source_hash": fl.digest(document["source"])}
     if hub:
@@ -513,6 +549,8 @@ def validate(document):
     entries = {row["id"].lower(): row for row in groups + resources}
     fl.require(len(entries) == len(groups + resources) and set(entries) == set(data["bodies"]),
                "factory-delete-complete-inventory-required")
+    fl.require(data.get("connectivity_resource_group_ids") == connectivity_groups(document, data["bodies"]),
+               "factory-delete-connectivity-scopes-changed")
     fl.protect_coordination_storage(document)
     verify_access_hub_network(hub, data["bodies"], links)
     validate_shared_hub_links(data, links, entries)
@@ -526,6 +564,7 @@ def validate(document):
         fl.require(row.get("project_number") == expected_number, "factory-delete-project-stage-mismatch")
         if not row["delete"]:
             continue
+        assert_connectivity_group_allowed(document, key, data["bodies"][key])
         fl.assert_deletion_group_allowed(document, key, data["bodies"][key])
         fl.require(fl.arm_scope(key) in {scope.lower() for scope in document["locks"]["scopes"]}
                    and all(row.get("owner", {}).get(field) == document["target"][field]
@@ -657,6 +696,7 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
                     receipt["deleted_resources"].append(child["id"])
             persist()
             continue
+        assert_connectivity_group_allowed(document, row["id"], body)
         fl.assert_deletion_group_allowed(document, row["id"], body)
         if fresh:
             fresh(row, body)

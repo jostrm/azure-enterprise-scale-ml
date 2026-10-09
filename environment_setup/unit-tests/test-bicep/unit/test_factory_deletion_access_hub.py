@@ -353,3 +353,38 @@ def test_operator_tears_down_hub_and_runner_last_after_every_project_pipeline(wo
     assert common.index(GATEWAY.lower()) < common.index(GATEWAY_IP.lower())
     assert common[-1] == COMMON.lower()
     assert not cloud.bodies and not cloud.leases
+
+
+def test_a_factory_owned_hub_is_never_shared_connectivity():
+    # The VPN gateway and Bastion in the factory's own common group never mark it as shared
+    # connectivity; the bootstrap proof keeps the whole hub deletable.
+    document, cloud = hub_document()
+    entries = rows(freeze(document, cloud))
+    assert document["deletion"]["connectivity_resource_group_ids"] == []
+    for identifier in (COMMON, GATEWAY, BASTION):
+        assert entries[identifier.lower()]["delete"] is True, identifier
+    assert not cloud.deleted
+
+
+def test_a_declared_connectivity_group_cannot_be_a_factory_owned_hub_group():
+    document, cloud = hub_document()
+    document["connectivity_resource_group_ids"] = [COMMON]
+    with pytest.raises(fl.Blocked, match="factory-delete-connectivity-scopes-invalid"):
+        fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects())
+    assert not cloud.deleted
+
+
+def test_a_factory_owned_hub_group_named_connectivity_stays_deletable():
+    document, cloud = hub_document()
+    hub_group = COMMON.rsplit("/", 1)[0] + "/esml-connectivity-sdc-dev-001-rg"
+
+    def renamed(value):
+        return json.loads(json.dumps(value).replace(COMMON, hub_group).replace(COMMON.lower(), hub_group.lower()))
+
+    document, cloud.bodies, cloud.enrollment = map(renamed, (document, cloud.bodies, cloud.enrollment))
+    document["locks"]["coordination_hash"] = fl.digest(cloud.enrollment)
+    frozen = fl.freeze_factory_deletion_pipeline(cloud, document, {}, renamed(projects()))
+    assert frozen["connectivity_resource_group_ids"] == []
+    group = next(row for row in frozen["resource_groups"] if row["id"].lower() == hub_group.lower())
+    assert group["delete"] is True
+    assert not cloud.deleted

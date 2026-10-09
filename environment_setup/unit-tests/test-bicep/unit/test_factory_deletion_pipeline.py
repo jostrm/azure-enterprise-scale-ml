@@ -45,6 +45,7 @@ def row(name, kind, dependencies=()):
 def test_published_capability_names_the_pipeline_contract():
     assert fl.capabilities()["factory_deletion_pipeline"] == "ordered-project-pipelines-v1"
     assert fl.capabilities()["factory_deletion_group_protection"] == "case-insensitive-name-globs-v1"
+    assert fl.capabilities()["factory_deletion_connectivity_retention"] == "whole-connectivity-resource-groups-v1"
 
 
 @pytest.mark.parametrize("bad", [False, "true", "True", 1, None])
@@ -236,8 +237,139 @@ def test_bastion_is_retained_even_with_factory_ownership_tags():
     frozen = fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
     row = next(entry for entry in frozen["resources"] if entry["id"].lower() == bastion.lower())
     assert row["delete"] is False
+    # A Bastion is protected infrastructure; on its own it never marks its group as shared connectivity.
     assert row["retention_reason"] == "protected-infrastructure"
+    assert frozen["connectivity_resource_group_ids"] == []
     assert not cloud.deleted
+
+
+def test_declared_connectivity_group_and_all_contents_are_retained():
+    document, cloud, projects = factory_prepared()
+    document["connectivity_resource_group_ids"] = [COMMON.upper()]
+    frozen = fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
+    assert frozen["connectivity_resource_group_ids"] == [COMMON.lower()]
+    kept = [row for row in frozen["resource_groups"] + frozen["resources"]
+            if fl.arm_scope(row["id"]) == COMMON.lower()]
+    assert kept and all(row["delete"] is False for row in kept)
+    assert next(row for row in frozen["resources"] if row["id"].lower() == RESOURCE.lower())["delete"] is True
+    assert not cloud.deleted
+
+
+@pytest.mark.parametrize("kind", ["Microsoft.Network/bastionHosts", "Microsoft.Network/virtualNetworkGateways",
+                                  "Microsoft.Network/localNetworkGateways", "Microsoft.Network/vpnGateways",
+                                  "Microsoft.Network/vpnSites", "Microsoft.Network/connections"])
+def test_connectivity_types_stay_protected_without_marking_their_group(kind):
+    # Main's rule: an unproven gateway, site, connection or Bastion is protected infrastructure and keeps
+    # its group, but its type alone does not make the group shared connectivity (a bootstrap-proven
+    # factory-owned hub in the same kind of group must stay deletable).
+    document, cloud, projects = factory_prepared()
+    identifier = COMMON + "/providers/" + kind + "/shared-access"
+    owner = {key: value for key, value in OWNER.items() if key != "project_id"}
+    cloud.bodies[identifier.lower()] = tagged(identifier, kind, owner)
+    old_schema = cloud.provider_schema
+
+    def schema(namespace):
+        result = copy.deepcopy(old_schema(namespace))
+        if namespace.lower() == "microsoft.network":
+            result["resourceTypes"].append({"resourceType": kind.split("/", 1)[1], "apiVersions": ["2024-05-01"]})
+        return result
+
+    cloud.provider_schema = schema
+    frozen = fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
+    assert frozen["connectivity_resource_group_ids"] == []
+    rows = {row["id"].lower(): row for row in frozen["resource_groups"] + frozen["resources"]}
+    assert rows[identifier.lower()]["delete"] is False
+    assert rows[identifier.lower()]["retention_reason"] == "protected-infrastructure"
+    assert rows[COMMON.lower()]["delete"] is False
+    assert rows[RESOURCE.lower()]["delete"] is True
+    assert not cloud.deleted
+
+
+def test_named_connectivity_group_is_retained_without_vpn_or_bastion():
+    document, cloud, projects = factory_prepared()
+    connectivity = GROUP.rsplit("/", 1)[0] + "/shared-CoNnEcTiViTy"
+    def renamed(value):
+        return json.loads(json.dumps(value).replace(COMMON, connectivity).replace(COMMON.lower(), connectivity.lower()))
+
+    document, cloud.bodies, cloud.enrollment, projects = map(renamed, (document, cloud.bodies, cloud.enrollment, projects))
+    document["locks"]["coordination_hash"] = fl.digest(cloud.enrollment)
+    frozen = fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
+    group = next(row for row in frozen["resource_groups"] if row["id"].lower() == connectivity.lower())
+    assert group["delete"] is False
+    assert connectivity.lower() in frozen["connectivity_resource_group_ids"]
+
+
+def test_empty_owned_connectivity_group_is_retained():
+    document, cloud, projects = factory_prepared()
+    connectivity = GROUP.rsplit("/", 1)[0] + "/empty-connectivity"
+    document["locks"]["scopes"].append(connectivity)
+    cloud.enrollment["scopes"][connectivity.lower()] = copy.deepcopy(cloud.enrollment["scopes"][GROUP.lower()])
+    document["locks"]["coordination_hash"] = fl.digest(cloud.enrollment)
+    owner = {key: value for key, value in OWNER.items() if key != "project_id"}
+    cloud.bodies[connectivity.lower()] = tagged(connectivity, "Microsoft.Resources/resourceGroups", owner)
+    frozen = fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
+    group = next(row for row in frozen["resource_groups"] if row["id"].lower() == connectivity.lower())
+    assert group["delete"] is False
+    assert group["retention_reason"] == "shared-connectivity-resource-group"
+
+
+@pytest.mark.parametrize("value", ["common", [RESOURCE], [None], [COMMON, COMMON.upper()],
+                                  [GROUP.rsplit("/", 1)[0] + "/not-in-inventory"]])
+def test_invalid_connectivity_group_scopes_fail_closed(value):
+    document, cloud, projects = factory_prepared()
+    document["connectivity_resource_group_ids"] = value
+    with pytest.raises(fl.Blocked, match="connectivity"):
+        fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
+    assert not cloud.deleted
+
+
+@pytest.mark.parametrize("tamper", ["drop-scope", "delete-content", "managed-cascade"])
+def test_frozen_connectivity_retention_cannot_be_bypassed(tamper):
+    document, cloud, projects = factory_prepared()
+    document["connectivity_resource_group_ids"] = [COMMON]
+    document["deletion"] = fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
+    data = document["deletion"]
+    if tamper == "drop-scope":
+        data["connectivity_resource_group_ids"] = []
+    elif tamper == "delete-content":
+        next(row for row in data["resources"] if row["id"].lower().endswith("/common-ip"))["delete"] = True
+    else:
+        body = data["bodies"][RESOURCE.lower()]
+        body["properties"]["managedResourceGroupId"] = COMMON
+        row = next(row for row in data["resources"] if row["id"].lower() == RESOURCE.lower())
+        row["managed_group_ids"] = [COMMON.lower()]
+        row["body_hash"] = fl.digest(body)
+    data["inventory_hash"] = fl.digest(data["resources"])
+    with pytest.raises(fl.Blocked, match="connectivity"):
+        runtime().validate(document)
+    assert not cloud.deleted
+
+
+def test_worker_and_common_teardown_leave_connectivity_group_untouched(workspace, monkeypatch):
+    document, cloud, projects = factory_prepared()
+    document["connectivity_resource_group_ids"] = [COMMON]
+    document["deletion"] = fl.freeze_factory_deletion_pipeline(cloud, document, {}, projects)
+    seal(document)
+    source = workspace / "source"
+    source.mkdir()
+    monkeypatch.setattr(fl, "verify_source", lambda *args: source)
+    monkeypatch.setattr(fl, "_verify_source", lambda *args, **kwargs: source)
+
+    def dispatch(cloud, locks, document, source_root, receipt, persist):
+        result = fl.run_deployment_worker(json.loads(fl.protected_worker_envelope(document, locks)), source_root,
+            document["run_id"], document["manifest_hash"], cloud=cloud, sleep=lambda _: None)
+        assert result["status"] == "succeeded", result
+        receipt.update(remote_run={"kind": "ado", "pipeline_id": 8, "run_id": 44}, remote_terminal=True)
+
+    monkeypatch.setattr(fl, "ado_scoped", dispatch)
+    run = workspace / "execution"
+    result = fl.execute_factory_deletion_cohort([document], source, run, run / "receipt.json",
+                                                cloud_factory=lambda _: cloud)
+    assert result["status"] == "succeeded", result
+    assert GROUP.lower() not in cloud.bodies
+    assert all(fl.arm_scope(identifier) != COMMON.lower() for identifier in cloud.deleted)
+    assert COMMON.lower() in cloud.bodies
+    assert (COMMON + "/providers/Microsoft.Network/publicIPAddresses/common-ip").lower() in cloud.bodies
 
 
 @pytest.mark.parametrize("change", ["logical", "unregistered", "protected", "permission", "principal"])

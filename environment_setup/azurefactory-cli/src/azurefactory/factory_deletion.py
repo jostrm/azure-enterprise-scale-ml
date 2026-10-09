@@ -176,6 +176,18 @@ def validate_deletion_plan(plan: Any, factory_id: str, scales: dict[str, Any], f
     if not isinstance(protected, list) or any(not _text(item) or not item.lower().startswith("/subscriptions/")
                                               for item in protected):
         invalid("missing protected-resource list")
+    connectivity = plan.get("connectivity_resource_group_ids", [])
+    if (not isinstance(connectivity, list) or any(not _text(item) or not re.fullmatch(
+            r"/subscriptions/[a-fA-F0-9-]{36}/resourceGroups/[\w().-]{1,90}", item, re.I) for item in connectivity)
+            or len({item.lower() for item in connectivity}) != len(connectivity)):
+        invalid("invalid connectivity resource-group identities")
+    retained = plan.get("retained_resources")
+    if not isinstance(retained, list):
+        invalid("missing frozen plan retention manifest")
+    retained_groups = {item.lower() for item in protected + retained
+                       if isinstance(item, str)}
+    if any(item.lower() not in retained_groups for item in connectivity):
+        invalid("every connectivity resource group must be explicitly retained in full")
     stages = plan.get("stages")
     if (not isinstance(stages, list) or not stages
             or any(not isinstance(stage, dict) or not _text(stage.get("id")) for stage in stages)
@@ -217,6 +229,9 @@ def validate_deletion_plan(plan: Any, factory_id: str, scales: dict[str, Any], f
             if not _text(entry) or reviewed.get(entry.lower()) != scale["id"] or entry.lower() in covered:
                 invalid("stage deletions differ from the reviewed exact inventory")
             name = entry.split("/")[4]
+            if ("connectivity" in name.lower()
+                    or any(_contains(identifier, entry) for identifier in connectivity)):
+                invalid("shared connectivity resource groups and their contents must be retained")
             if any(fnmatch.fnmatchcase(name.lower(), pattern.lower()) for pattern in patterns):
                 invalid("deletion targets a protected resource-group name")
             covered.add(entry.lower())

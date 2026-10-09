@@ -40,9 +40,36 @@ Receipt IDs alone are not absence observations; even completed resume rechecks
 absence, and resources recorded removed are reobserved before further deletion.
 The API must submit the complete factory cohort frozen by its catalog review;
 individual lifecycle manifests do not enumerate other registered environments.
-Protected/shared/bootstrap/platform/VPN/Bastion resources and reusable hubs are retained;
+Protected/shared/bootstrap/platform/VPN/Bastion resources and reusable hubs are retained
+(a covered factory-owned access hub below is the one exception);
 an explicitly protected selected ID, ambiguous ownership, unmanaged dependency,
 or overlapping mutable snapshots blocks rather than broadening deletion.
+
+Shared connectivity resource groups (whole-connectivity-resource-groups-v1)
+---------------------------------------------------------------------------
+Connectivity is shared infrastructure, not disposable factory ownership. The
+entire connectivity RG and every inventoried resource inside it are retained,
+even with this factory's ownership tags. Optional manifest
+connectivity_resource_group_ids lists exact dependency RG ARM IDs from resolved
+configuration/catalog; arbitrary names require this explicit declaration. IDs
+must be unique (case-insensitively), included in the locked scope/dependency
+union and outside the resource_group_ids of a factory-owned-access-hub-v1 proof.
+Groups with "connectivity" in their name (case-insensitive) are also retained in
+full, except a group that such a proof covers. Resource types never mark a group:
+unproven VPN gateways, sites, connections and Bastion hosts stay protected
+resources, and a covered factory-owned hub stays deletable. This recognition only
+denies deletion: it is never ownership/adoption proof and does not authorize
+discovering new scopes. The sorted effective group IDs are frozen in
+deletion.connectivity_resource_group_ids and rederived during validation;
+direct, nested and managed-cascade deletion into those groups is forbidden.
+Their retained dependencies remain protected. The backend must freeze every
+configured connectivity dependency per environment, omit those groups from
+deletion targets/stages, and include the exact RG IDs in the whole-factory
+review's protected_resources or retained_resources. Require
+factory_deletion_connectivity_retention = whole-connectivity-resource-groups-v1
+on the selected immutable runtime. The CLI also rejects every deletion target in a
+group whose name contains "connectivity" and contradictory declared connectivity
+RG retention; it cannot establish that an older API/worker implements this policy.
 
 Factory-owned access hub (factory-owned-access-hub-v1)
 ------------------------------------------------------
