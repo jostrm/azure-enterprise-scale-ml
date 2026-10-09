@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.R
 add_model_arguments(parser)
 parser.add_argument("--tool", default="healthmodel_summary", choices=[t["name"] for t in TOOLS])
 args = parser.parse_args()
-model = client_from(args)
+model = client_from(args, read_only=True)
 
 print("tools/list ->", json.dumps([{"name": t["name"], "title": t["title"]} for t in TOOLS], indent=1))
 

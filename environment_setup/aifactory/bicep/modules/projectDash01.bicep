@@ -5,14 +5,17 @@
 //   - Full-width H1 banner (project number, environment, region)
 //   - Resource Group resources list tile      (left half)
 //   - Cost Analysis tile                       (right half — to the right of the RG)
-//   - 5 small 1x1 quick-access shortcut tiles  (Foundry account, Storage, Key Vault, AI Search, Application Insights)
+//   - Two rows of resource shortcuts, with optional ML/data services
+//   - Native daily consumption cost charts and compact report navigation
 //
 // Layout (12-column grid):
 //   Row 0-1:  [ Banner H1 — Project {N} · {ENV} · {REGION} ]                    (colSpan 12, rowSpan 2)
-//   Row 2-9:  [ Resources (RG) ][ Cost Analysis ]                                (6 + 6)
-//   Row 10:   [Foundry][Storage][KeyVault][AISearch][AppInsights][Cost links]    (5 + 7)
-//   Row 19-21: Optional My Project Usage & Cost workbook entry (existing rows preserved)
-//   Row 22-24: Optional native model-token report entry
+//   Row 2-5:  [ Resources (RG) ][ Accumulated Cost Analysis ]                    (6 + 6)
+//   Row 6:    [Foundry][Storage][KeyVault][AISearch][AppInsights][Cost links]    (5 + 7)
+//   Row 7:    [Azure ML][Databricks][Data Factory][Logs][Monitoring links]
+//   Row 8-11: [ Daily consumption cost ][ Daily cost by service ]               (6 + 6)
+//   Row 12-19: Optional Foundry metrics (30-day Sum), then compact report cards,
+//              service configuration and optional agent monitoring.
 
 // ============================================================================
 // PARAMETERS
@@ -208,6 +211,7 @@ module namingConvention './common/CmnAIfactoryNaming.bicep' = {
     acaSubnetId: acaSubnetId
     aksSubnetId: aksSubnetId
     genaiSubnetId: genaiSubnetId
+    addAzureMachineLearning: addAzureMachineLearning
   }
 }
 
@@ -228,9 +232,15 @@ var rgResourceId           = '/subscriptions/${subscriptionIdDevTestProd}/resour
 var aifV2AccountName       = addAIFoundry ? namingOutputs.aifV2NameAdd : namingOutputs.aifV2Name
 var aifV2ProjectName       = addAIFoundry ? namingOutputs.aifV2PrjNameAdd : namingOutputs.aifV2PrjName
 var foundryAccountResId    = '${rgResourceId}/providers/Microsoft.CognitiveServices/accounts/${aifV2AccountName}'
+var foundryProjectResId    = '${foundryAccountResId}/projects/${aifV2ProjectName}'
 var keyvaultResId          = '${rgResourceId}/providers/Microsoft.KeyVault/vaults/${namingOutputs.keyvaultName}'
 var storage2001ResId       = '${rgResourceId}/providers/Microsoft.Storage/storageAccounts/${namingOutputs.storageAccount2001Name}'
 var aiSearchResId          = '${rgResourceId}/providers/Microsoft.Search/searchServices/${namingOutputs.safeNameAISearch}'
+var amlResId               = '${rgResourceId}/providers/Microsoft.MachineLearningServices/workspaces/${namingOutputs.amlName}'
+// Keep the phase-07 Databricks name; it does not include the random AML salt.
+var databricksName         = 'dbx-${projectNumber}-${locationSuffix}-${env}-${namingOutputs.uniqueInAIFenv}${resourceSuffix}'
+var databricksResId        = '${rgResourceId}/providers/Microsoft.Databricks/workspaces/${databricksName}'
+var dataFactoryResId       = '${rgResourceId}/providers/Microsoft.DataFactory/factories/${namingOutputs.dataFactoryName}'
 var isDev = env == 'dev'
 var privateNetworking = !(allowPublicAccessWhenBehindVnet && enablePublicGenAIAccess && enablePublicAccessWithPerimeter)
 var foundryWithPrivateCaphost = (enableAIFoundry || addAIFoundry) && enableAFoundryCaphost && privateNetworking
@@ -297,7 +307,7 @@ var rgPortalUrl            = 'https://portal.azure.com/#@${tenant().tenantId}/re
 
 // Same native pin schema as deploy-aifactory-dashboard.py::cost_part.
 var nativeCostAnalysisPart = {
-  position: { x: 6, y: 2, colSpan: 6, rowSpan: 8 }
+  position: { x: 6, y: 2, colSpan: 6, rowSpan: 4 }
   metadata: {
     deepLink: '#@${tenant().tenantId}/resource${rgResourceId}/costanalysis'
     inputs: [
@@ -347,6 +357,94 @@ var nativeCostAnalysisPart = {
   }
 }
 
+var consumptionViews = [
+  { title: 'Daily consumption cost', grouping: [] }
+  { title: 'Daily cost by service', grouping: [{ name: 'ServiceName', type: 'Dimension' }] }
+]
+var consumptionCostParts = [for (view, index) in consumptionViews: {
+  position: { x: index * 6, y: 8, colSpan: 6, rowSpan: 4 }
+  metadata: {
+    deepLink: nativeCostAnalysisPart.metadata.deepLink
+    inputs: [
+      { name: 'scope', value: rgResourceId }
+      { name: 'scopeName', value: targetResourceGroup }
+      {
+        name: 'view'
+        isOptional: true
+        value: union(nativeCostAnalysisPart.metadata.inputs[2].value, {
+          accumulated: 'false'
+          chart: 'StackedColumn'
+          displayName: view.title
+          kpis: []
+          query: union(nativeCostAnalysisPart.metadata.inputs[2].value.query, {
+            dataSet: union(nativeCostAnalysisPart.metadata.inputs[2].value.query.dataSet, {
+              grouping: view.grouping
+            })
+          })
+        })
+      }
+      { name: 'externalState', isOptional: true }
+    ]
+    type: 'Extension/Microsoft_Azure_CostManagement/PartType/CostAnalysisPinPart'
+  }
+}]
+
+var mlDataShortcutParts = concat(
+  (enableAzureMachineLearning || addAzureMachineLearning) ? [{
+    position: { x: 0, y: 7, colSpan: 1, rowSpan: 1 }
+    metadata: {
+      inputs: [{ name: 'id', isOptional: false, value: amlResId }]
+      type: 'Extension/HubsExtension/PartType/ResourcePart'
+      asset: { idInputName: 'id', type: 'Microsoft.MachineLearningServices/workspaces' }
+    }
+  }] : [],
+  enableDatabricks ? [{
+    position: { x: 1, y: 7, colSpan: 1, rowSpan: 1 }
+    metadata: {
+      inputs: [{ name: 'id', isOptional: false, value: databricksResId }]
+      type: 'Extension/HubsExtension/PartType/ResourcePart'
+      asset: { idInputName: 'id', type: 'Microsoft.Databricks/workspaces' }
+    }
+  }] : [],
+  enableDatafactory ? [{
+    position: { x: 2, y: 7, colSpan: 1, rowSpan: 1 }
+    metadata: {
+      inputs: [{ name: 'id', isOptional: false, value: dataFactoryResId }]
+      type: 'Extension/HubsExtension/PartType/ResourcePart'
+      asset: { idInputName: 'id', type: 'Microsoft.DataFactory/factories' }
+    }
+  }] : []
+)
+
+var foundryMetricsEnabled = enableAIFoundry || addAIFoundry
+var foundryMetricsHeight = foundryMetricsEnabled ? 8 : 0
+module foundryMetricTiles './foundryMetricTiles.bicep' = {
+  name: 'foundry-metric-tiles-${uniqueString(resourceGroup().id)}'
+  params: {
+    enabled: foundryMetricsEnabled
+    accountResourceId: foundryAccountResId
+    projectResourceId: foundryProjectResId
+  }
+}
+var foundryMetricNoticeParts = foundryMetricsEnabled ? [{
+  position: { x: 0, y: 12, colSpan: 12, rowSpan: 2 }
+  metadata: {
+    inputs: []
+    type: 'Extension/HubsExtension/PartType/MarkdownPart'
+    settings: {
+      content: {
+        settings: {
+          content: '## Foundry consumption - last 30 days, Sum\n\nAccount: **${aifV2AccountName}** | Agent project: **${aifV2ProjectName}** | [Account metrics](https://portal.azure.com/#@${tenant().tenantId}/resource${foundryAccountResId}/metrics) | [Project metrics](https://portal.azure.com/#@${tenant().tenantId}/resource${foundryProjectResId}/metrics)\n\nMissing/unsupported metrics are unavailable, not zero. Account totals may cover other Foundry projects. Total Calls / Blocked Calls / RateLimit exclude OpenAI; RateLimit sums limit values, not throttled requests. Estimated USD is not billed cost. Safety detections include annotate-only events; series overlap and must not be added.'
+          title: ''
+          subtitle: ''
+          markdownSource: 1
+          markdownUri: null
+        }
+      }
+    }
+  }
+}] : []
+
 var projectInsightsId = empty(myProjectApplicationInsightsResourceId)
   ? '${rgResourceId}/providers/Microsoft.Insights/components/${namingOutputs.applicationInsightName}'
   : myProjectApplicationInsightsResourceId
@@ -374,14 +472,14 @@ module myProjectWorkbook './myProjectWorkbook.bicep' = if (enableMyProjectDashbo
 }
 var myProjectEntryParts = enableMyProjectDashboard ? [
   {
-    position: { x: 0, y: 19, colSpan: 12, rowSpan: 3 }
+    position: { x: 0, y: 12 + foundryMetricsHeight, colSpan: 6, rowSpan: 2 }
     metadata: {
       inputs: []
       type: 'Extension/HubsExtension/PartType/MarkdownPart'
       settings: {
         content: {
           settings: {
-            content: '## My Project ${projectNumber} — Usage & Cost\n\n[Open the Azure-native My Project workbook](${myProjectWorkbook!.outputs.url} "Usage, customer outcomes and separately attributed meter costs")\n\nRetail (default), Booking and Support share exact project-scoped usage and feedback metrics. Select canonical factory/scale set, inclusive local dates (1–30), IANA time zone and store. Coverage defaults to unavailable until reviewed; no sample data is shown.\n\n**Cost:** separate actual / allocated / estimated evidence and currencies, with session/day, pseudonymous IP-group/day and meter views. Not a real-time invoice or an automatic billing collector. [Native billed project Cost Analysis](${costAnalysisUrl}) remains independent.'
+            content: '## Project usage & cost\n\n[Open My Project ${projectNumber}](${myProjectWorkbook!.outputs.url} "Native resource usage, tokens and project cost")\n\nStart with None — Generic project for native usage and Azure billing. Retail / Booking / Support outcomes remain optional and require business events. Missing telemetry is unavailable, not zero.'
             title: ''
             subtitle: ''
             markdownSource: 1
@@ -392,14 +490,14 @@ var myProjectEntryParts = enableMyProjectDashboard ? [
     }
   }
   {
-    position: { x: 0, y: 22, colSpan: 12, rowSpan: 3 }
+    position: { x: 6, y: 12 + foundryMetricsHeight, colSpan: 6, rowSpan: 2 }
     metadata: {
       inputs: []
       type: 'Extension/HubsExtension/PartType/MarkdownPart'
       settings: {
         content: {
           settings: {
-            content: '## Model tokens — Foundry & Azure OpenAI\n\n[Open native model-token report](${myProjectWorkbook!.outputs.tokensUrl} "Per deployment and model: input, output and cached tokens")\n\n**Scope:** discovered AIServices/OpenAI accounts in this exact project RG. Native Azure Monitor Metrics totals and separate request-log detail by model deployment, model name/version, plus trends. No factory/scale-set selection, business-event coverage declaration or new instrumentation is required for native Metrics.\n\n**Source coverage:** missing cached series/fields = **Unavailable, not zero**. Input includes cached tokens; never add input + cached. Metric aliases and request-log totals are not added together. Counts are observed usage, not billable costs or an invoice.'
+            content: '## Model consumption\n\n[Open native model-token report](${myProjectWorkbook!.outputs.tokensUrl} "Input, output and cached tokens by model deployment")\n\nFoundry / OpenAI in this project RG. Metrics and request logs remain separate. Missing series are unavailable, not zero. Input includes cached tokens; never add both. Token counts are not billed costs.'
             title: ''
             subtitle: ''
             markdownSource: 1
@@ -413,7 +511,7 @@ var myProjectEntryParts = enableMyProjectDashboard ? [
 
 var agentMonitoringEntryParts = empty(agentMonitoringWorkbookResourceId) ? [] : [
   {
-    position: { x: 0, y: 25, colSpan: 12, rowSpan: 3 }
+    position: { x: 0, y: 19 + foundryMetricsHeight, colSpan: 12, rowSpan: 2 }
     metadata: {
       inputs: []
       type: 'Extension/HubsExtension/PartType/MarkdownPart'
@@ -444,7 +542,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
     lenses: [
       {
         order: 0
-        parts: concat(concat([
+        parts: concat([
           // ── ROW 0-1: Full-width H1 banner (project · env · region) ────────────
           {
             position: { x: 0, y: 0, colSpan: 12, rowSpan: 2 }
@@ -454,7 +552,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
               settings: {
                 content: {
                   settings: {
-                    content: '# Project ${projectNumber} - ${toUpper(env)} (GenAI)\n\n**Team:** ${projectTeam}\n\n**Owner:** ${projectOwner}\n\n**Budget:** ${projectBudget} $/mon\n\n**Use case:** ${projectUseCase}\n\n[🗂️ Resource Group](${rgPortalUrl}) \u{2003}|\u{2003} [🤖 AI Foundry](${aiFoundryProjectUrl}) \u{2003}|\u{2003} [💰 Cost Analysis](${costAnalysisUrl})'
+                    content: '# Project ${projectNumber} - ${toUpper(env)} (GenAI)\n\n**Owner:** ${projectOwner} | **Team:** ${projectTeam} | **Budget:** ${projectBudget} $/mon\n\n**Use case:** ${projectUseCase} | [Resource Group](${rgPortalUrl}) | [AI Foundry](${aiFoundryProjectUrl}) | [Cost Analysis](${costAnalysisUrl})'
                     title: ''
                     subtitle: ''
                     markdownSource: 1
@@ -465,9 +563,9 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
 
-          // ── ROW 2-9: Resources list — project resource group (left half) ──────
+          // ── ROW 2-5: Project resource group and accumulated cost ─────────────
           {
-            position: { x: 0, y: 2, colSpan: 6, rowSpan: 8 }
+            position: { x: 0, y: 2, colSpan: 6, rowSpan: 4 }
             metadata: {
               inputs: [
                 { name: 'id', isOptional: false, value: rgResourceId }
@@ -484,9 +582,9 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
 
           nativeCostAnalysisPart
 
-          // ── ROW 10: 1x1 shortcut — AI Foundry V2 account ─────────────────────
+          // ── ROW 6: Existing 1x1 resource shortcuts ──────────────────────────
           {
-            position: { x: 0, y: 10, colSpan: 1, rowSpan: 1 }
+            position: { x: 0, y: 6, colSpan: 1, rowSpan: 1 }
             metadata: {
               inputs: [
                 { name: 'id', isOptional: false, value: foundryAccountResId }
@@ -501,9 +599,9 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
 
-          // ── ROW 10: 1x1 shortcut — Storage Account 2001 ──────────────────────
+          // Storage Account 2001
           {
-            position: { x: 1, y: 10, colSpan: 1, rowSpan: 1 }
+            position: { x: 1, y: 6, colSpan: 1, rowSpan: 1 }
             metadata: {
               inputs: [
                 { name: 'id', isOptional: false, value: storage2001ResId }
@@ -518,9 +616,9 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
 
-          // ── ROW 10: 1x1 shortcut — Key Vault ─────────────────────────────────
+          // Key Vault
           {
-            position: { x: 2, y: 10, colSpan: 1, rowSpan: 1 }
+            position: { x: 2, y: 6, colSpan: 1, rowSpan: 1 }
             metadata: {
               inputs: [
                 { name: 'id', isOptional: false, value: keyvaultResId }
@@ -535,9 +633,9 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
 
-          // ── ROW 10: 1x1 shortcut — AI Search ─────────────────────────────────
+          // AI Search
           {
-            position: { x: 3, y: 10, colSpan: 1, rowSpan: 1 }
+            position: { x: 3, y: 6, colSpan: 1, rowSpan: 1 }
             metadata: {
               inputs: [
                 { name: 'id', isOptional: false, value: aiSearchResId }
@@ -552,7 +650,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
           {
-            position: { x: 4, y: 10, colSpan: 1, rowSpan: 1 }
+            position: { x: 4, y: 6, colSpan: 1, rowSpan: 1 }
             metadata: {
               inputs: [
                 { name: 'id', isOptional: false, value: projectInsightsId }
@@ -567,14 +665,14 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
           {
-            position: { x: 5, y: 10, colSpan: 7, rowSpan: 1 }
+            position: { x: 5, y: 6, colSpan: 7, rowSpan: 1 }
             metadata: {
               inputs: []
               type: 'Extension/HubsExtension/PartType/MarkdownPart'
               settings: {
                 content: {
                   settings: {
-                    content: '**Data source:** Azure Cost Management · **Basis:** ActualCost · **Period:** This month. Azure forecast is a prediction, not a billed charge; unavailable when Azure cannot forecast.\n\n[📊 Open Cost Analysis](${costAnalysisUrl} "Go to Azure Cost analysis for project ${projectNumber}") | [Cost Alerts](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${replace(rgResourceId, '/', '%2F')}/alerts) | [Budgets](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/budgets/scope/${replace(rgResourceId, '/', '%2F')}) | [Advisor](https://portal.azure.com/#blade/Microsoft_Azure_Expert/AdvisorMenuBlade/Cost)'
+                    content: '**Consumption cost:** Azure Cost Management | ActualCost | This month. Forecast is a prediction, not a charge.\n\n[📊 Open Cost Analysis](${costAnalysisUrl}) | [Budgets](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/budgets/scope/${replace(rgResourceId, '/', '%2F')})'
                     title: ''
                     subtitle: ''
                     markdownSource: 1
@@ -584,9 +682,37 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
               }
             }
           }
-          // ── ROW 11-18: Service configuration inventory ───────────────────────
           {
-            position: { x: 0, y: 11, colSpan: 12, rowSpan: 8 }
+            position: { x: 3, y: 7, colSpan: 1, rowSpan: 1 }
+            metadata: {
+              inputs: [{ name: 'id', isOptional: false, value: projectWorkspaceId }]
+              #disable-next-line BCP088
+              type: 'Extension/HubsExtension/PartType/ResourcePart'
+              #disable-next-line BCP037
+              asset: { idInputName: 'id', type: 'Microsoft.OperationalInsights/workspaces' }
+            }
+          }
+          {
+            position: { x: 4, y: 7, colSpan: 8, rowSpan: 1 }
+            metadata: {
+              inputs: []
+              type: 'Extension/HubsExtension/PartType/MarkdownPart'
+              settings: {
+                content: {
+                  settings: {
+                    content: '**Monitor & optimize**\n\n[Application logs](https://portal.azure.com/#@${tenant().tenantId}/resource${projectInsightsId}/logs) | [Metrics](https://portal.azure.com/#@${tenant().tenantId}/resource${projectInsightsId}/metrics) | [Cost alerts](https://portal.azure.com/#@${tenant().tenantId}/blade/Microsoft_Azure_CostManagement/Menu/costanalysis/scope/${replace(rgResourceId, '/', '%2F')}/alerts) | [Advisor](https://portal.azure.com/#blade/Microsoft_Azure_Expert/AdvisorMenuBlade/Cost)'
+                    title: ''
+                    subtitle: ''
+                    markdownSource: 1
+                    markdownUri: null
+                  }
+                }
+              }
+            }
+          }
+          // Configuration follows the optional Foundry metrics and report cards.
+          {
+            position: { x: 0, y: 14 + foundryMetricsHeight, colSpan: 12, rowSpan: 5 }
             metadata: {
               inputs: []
               type: 'Extension/HubsExtension/PartType/MarkdownPart'
@@ -604,7 +730,7 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
             }
           }
 
-        ], myProjectEntryParts), agentMonitoringEntryParts)
+        ], mlDataShortcutParts, consumptionCostParts, foundryMetricNoticeParts, foundryMetricTiles.outputs.parts, myProjectEntryParts, agentMonitoringEntryParts)
       }
     ]
     metadata: {
@@ -612,8 +738,8 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
         timeRange: {
           value: {
             relative: {
-              duration: 24
-              timeUnit: 1
+              duration: 30
+              timeUnit: 2
             }
           }
           type: 'MsPortalFx.Composition.Configuration.ValueTypes.TimeRange'
@@ -627,11 +753,11 @@ resource projectDashboard 'Microsoft.Portal/dashboards@2020-09-01-preview' = {
               model: {
                 format: 'utc'
                 granularity: 'auto'
-                relative: '24h'
+                relative: '30d'
               }
               displayCache: {
                 name: 'UTC Time'
-                value: 'Past 24 hours'
+                value: 'Past 30 days'
               }
               filteredPartIds: []
             }

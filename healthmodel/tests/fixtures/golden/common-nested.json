@@ -1,0 +1,1028 @@
+{
+ "parameters": {
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+   "entities": {
+    "value": [
+     {
+      "name": "layer-data",
+      "properties": {
+       "canvasPosition": {
+        "x": -720,
+        "y": 220
+       },
+       "displayName": "Data storage and databases",
+       "icon": {
+        "iconName": "SystemComponent"
+       },
+       "impact": "Standard",
+       "signalGroups": {
+        "dependencies": {
+         "aggregationType": "WorstOf",
+         "ignoreUnknown": true
+        }
+       },
+       "tags": {
+        "layer": "data",
+        "managedBy": "aifactory-healthmodel",
+        "role": "layer"
+       }
+      },
+      "role": "layer"
+     },
+     {
+      "name": "layer-security",
+      "properties": {
+       "canvasPosition": {
+        "x": -360,
+        "y": 220
+       },
+       "displayName": "Security and secrets",
+       "icon": {
+        "iconName": "SystemComponent"
+       },
+       "impact": "Standard",
+       "signalGroups": {
+        "dependencies": {
+         "aggregationType": "WorstOf",
+         "ignoreUnknown": true
+        }
+       },
+       "tags": {
+        "layer": "security",
+        "managedBy": "aifactory-healthmodel",
+        "role": "layer"
+       }
+      },
+      "role": "layer"
+     },
+     {
+      "name": "layer-observability",
+      "properties": {
+       "canvasPosition": {
+        "x": 0,
+        "y": 220
+       },
+       "displayName": "Observability",
+       "icon": {
+        "iconName": "SystemComponent"
+       },
+       "impact": "Limited",
+       "signalGroups": {
+        "dependencies": {
+         "aggregationType": "WorstOf",
+         "ignoreUnknown": true
+        }
+       },
+       "tags": {
+        "layer": "observability",
+        "managedBy": "aifactory-healthmodel",
+        "role": "layer"
+       }
+      },
+      "role": "layer"
+     },
+     {
+      "name": "layer-compute",
+      "properties": {
+       "canvasPosition": {
+        "x": 360,
+        "y": 220
+       },
+       "displayName": "Virtual machines",
+       "icon": {
+        "iconName": "SystemComponent"
+       },
+       "impact": "Limited",
+       "signalGroups": {
+        "dependencies": {
+         "aggregationType": "WorstOf",
+         "ignoreUnknown": true
+        }
+       },
+       "tags": {
+        "layer": "compute",
+        "managedBy": "aifactory-healthmodel",
+        "role": "layer"
+       }
+      },
+      "role": "layer"
+     },
+     {
+      "name": "layer-projects",
+      "properties": {
+       "canvasPosition": {
+        "x": 720,
+        "y": 220
+       },
+       "displayName": "AI Factory projects",
+       "icon": {
+        "iconName": "SystemComponent"
+       },
+       "impact": "Standard",
+       "signalGroups": {
+        "dependencies": {
+         "aggregationType": "WorstOf",
+         "ignoreUnknown": true
+        }
+       },
+       "tags": {
+        "layer": "projects",
+        "managedBy": "aifactory-healthmodel",
+        "role": "layer"
+       }
+      },
+      "role": "layer"
+     },
+     {
+      "name": "adls-gen2-mrvelbltscesml001dev-ac7629",
+      "properties": {
+       "canvasPosition": {
+        "x": -810,
+        "y": 440
+       },
+       "displayName": "Data lake (ADLS Gen2): mrvelbltscesml001dev",
+       "icon": {
+        "iconName": "Resource"
+       },
+       "impact": "Standard",
+       "signalGroups": {
+        "azureResource": {
+         "authenticationSetting": "systemassigned",
+         "azureResourceId": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Storage/storageAccounts/mrvelbltscesml001dev",
+         "azureResourceKind": "StorageV2",
+         "resourceHealth": {
+          "enabled": "Enabled"
+         },
+         "signals": [
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "Availability (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "LessThan",
+             "threshold": 99
+            },
+            "unhealthyRule": {
+             "operator": "LessThan",
+             "threshold": 95
+            }
+           },
+           "metricName": "Availability",
+           "metricNamespace": "microsoft.storage/storageaccounts",
+           "name": "availability",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT5M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "MilliSeconds",
+           "displayName": "Successful end-to-end latency (ms)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 1000
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 5000
+            }
+           },
+           "metricName": "SuccessE2ELatency",
+           "metricNamespace": "microsoft.storage/storageaccounts",
+           "name": "e2e-latency",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT5M"
+          },
+          {
+           "aggregationType": "Total",
+           "dataUnit": "Count",
+           "dimensionFilter": "ResponseType eq 'ClientThrottlingError' or ResponseType eq 'ServerBusyError'",
+           "displayName": "Throttled transactions (count)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 10
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 100
+            }
+           },
+           "metricName": "Transactions",
+           "metricNamespace": "microsoft.storage/storageaccounts",
+           "name": "throttled-transactions",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT15M"
+          }
+         ]
+        }
+       },
+       "tags": {
+        "aifactoryScope": "common",
+        "layer": "data",
+        "managedBy": "aifactory-healthmodel",
+        "profile": "adls-gen2",
+        "role": "resource"
+       }
+      },
+      "role": "resource"
+     },
+     {
+      "name": "adls-gen2-spiderbltscesml001dev-840b79",
+      "properties": {
+       "canvasPosition": {
+        "x": -630,
+        "y": 440
+       },
+       "displayName": "Data lake (ADLS Gen2): spiderbltscesml001dev",
+       "icon": {
+        "iconName": "Resource"
+       },
+       "impact": "Standard",
+       "signalGroups": {
+        "azureResource": {
+         "authenticationSetting": "systemassigned",
+         "azureResourceId": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Storage/storageAccounts/spiderbltscesml001dev",
+         "azureResourceKind": "StorageV2",
+         "resourceHealth": {
+          "enabled": "Enabled"
+         },
+         "signals": [
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "Availability (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "LessThan",
+             "threshold": 99
+            },
+            "unhealthyRule": {
+             "operator": "LessThan",
+             "threshold": 95
+            }
+           },
+           "metricName": "Availability",
+           "metricNamespace": "microsoft.storage/storageaccounts",
+           "name": "availability",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT5M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "MilliSeconds",
+           "displayName": "Successful end-to-end latency (ms)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 1000
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 5000
+            }
+           },
+           "metricName": "SuccessE2ELatency",
+           "metricNamespace": "microsoft.storage/storageaccounts",
+           "name": "e2e-latency",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT5M"
+          },
+          {
+           "aggregationType": "Total",
+           "dataUnit": "Count",
+           "dimensionFilter": "ResponseType eq 'ClientThrottlingError' or ResponseType eq 'ServerBusyError'",
+           "displayName": "Throttled transactions (count)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 10
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 100
+            }
+           },
+           "metricName": "Transactions",
+           "metricNamespace": "microsoft.storage/storageaccounts",
+           "name": "throttled-transactions",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT15M"
+          }
+         ]
+        }
+       },
+       "tags": {
+        "aifactoryScope": "common",
+        "layer": "data",
+        "managedBy": "aifactory-healthmodel",
+        "profile": "adls-gen2",
+        "role": "resource"
+       }
+      },
+      "role": "resource"
+     },
+     {
+      "name": "keyvault-kv-cmnadmdev-bltsc-001-308c91",
+      "properties": {
+       "canvasPosition": {
+        "x": -450,
+        "y": 440
+       },
+       "displayName": "Key Vault: kv-cmnadmdev-bltsc-001",
+       "icon": {
+        "iconName": "Resource"
+       },
+       "impact": "Standard",
+       "signalGroups": {
+        "azureResource": {
+         "authenticationSetting": "systemassigned",
+         "azureResourceId": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.KeyVault/vaults/kv-cmnadmdev-bltsc-001",
+         "azureResourceKind": "",
+         "resourceHealth": {
+          "enabled": "Enabled"
+         },
+         "signals": [
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "Availability (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "LessThan",
+             "threshold": 99
+            },
+            "unhealthyRule": {
+             "operator": "LessThan",
+             "threshold": 95
+            }
+           },
+           "metricName": "Availability",
+           "metricNamespace": "microsoft.keyvault/vaults",
+           "name": "availability",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT5M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "Vault saturation (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 75
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 90
+            }
+           },
+           "metricName": "SaturationShoebox",
+           "metricNamespace": "microsoft.keyvault/vaults",
+           "name": "saturation",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT5M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "MilliSeconds",
+           "displayName": "Service API latency (ms)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 1000
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 5000
+            }
+           },
+           "metricName": "ServiceApiLatency",
+           "metricNamespace": "microsoft.keyvault/vaults",
+           "name": "api-latency",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT5M"
+          }
+         ]
+        }
+       },
+       "tags": {
+        "aifactoryScope": "common",
+        "layer": "security",
+        "managedBy": "aifactory-healthmodel",
+        "profile": "keyvault",
+        "role": "resource"
+       }
+      },
+      "role": "resource"
+     },
+     {
+      "name": "keyvault-kv-cmndev-bltsc-001-70a30c",
+      "properties": {
+       "canvasPosition": {
+        "x": -270,
+        "y": 440
+       },
+       "displayName": "Key Vault: kv-cmndev-bltsc-001",
+       "icon": {
+        "iconName": "Resource"
+       },
+       "impact": "Standard",
+       "signalGroups": {
+        "azureResource": {
+         "authenticationSetting": "systemassigned",
+         "azureResourceId": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.KeyVault/vaults/kv-cmndev-bltsc-001",
+         "azureResourceKind": "",
+         "resourceHealth": {
+          "enabled": "Enabled"
+         },
+         "signals": [
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "Availability (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "LessThan",
+             "threshold": 99
+            },
+            "unhealthyRule": {
+             "operator": "LessThan",
+             "threshold": 95
+            }
+           },
+           "metricName": "Availability",
+           "metricNamespace": "microsoft.keyvault/vaults",
+           "name": "availability",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT5M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "Vault saturation (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 75
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 90
+            }
+           },
+           "metricName": "SaturationShoebox",
+           "metricNamespace": "microsoft.keyvault/vaults",
+           "name": "saturation",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT5M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "MilliSeconds",
+           "displayName": "Service API latency (ms)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 1000
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 5000
+            }
+           },
+           "metricName": "ServiceApiLatency",
+           "metricNamespace": "microsoft.keyvault/vaults",
+           "name": "api-latency",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT5M"
+          }
+         ]
+        }
+       },
+       "tags": {
+        "aifactoryScope": "common",
+        "layer": "security",
+        "managedBy": "aifactory-healthmodel",
+        "profile": "keyvault",
+        "role": "resource"
+       }
+      },
+      "role": "resource"
+     },
+     {
+      "name": "loganalytics-la-cmn-sdc-dev-bltsc-001-7d04c4",
+      "properties": {
+       "canvasPosition": {
+        "x": 0,
+        "y": 440
+       },
+       "displayName": "Log Analytics workspace: la-cmn-sdc-dev-bltsc-001",
+       "icon": {
+        "iconName": "Resource"
+       },
+       "impact": "Standard",
+       "signalGroups": {
+        "azureResource": {
+         "authenticationSetting": "systemassigned",
+         "azureResourceId": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.OperationalInsights/workspaces/la-cmn-sdc-dev-bltsc-001",
+         "azureResourceKind": "",
+         "resourceHealth": {
+          "enabled": "Enabled"
+         },
+         "signals": [
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "Query availability (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "LessThan",
+             "threshold": 99
+            },
+            "unhealthyRule": {
+             "operator": "LessThan",
+             "threshold": 95
+            }
+           },
+           "metricName": "AvailabilityRate_Query",
+           "metricNamespace": "microsoft.operationalinsights/workspaces",
+           "name": "query-availability",
+           "refreshInterval": "PT15M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT15M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Seconds",
+           "displayName": "Ingestion time (seconds)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 300
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 900
+            }
+           },
+           "metricName": "Ingestion Time",
+           "metricNamespace": "microsoft.operationalinsights/workspaces",
+           "name": "ingestion-latency",
+           "refreshInterval": "PT15M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT15M"
+          }
+         ]
+        }
+       },
+       "tags": {
+        "aifactoryScope": "common",
+        "layer": "observability",
+        "managedBy": "aifactory-healthmodel",
+        "profile": "loganalytics",
+        "role": "resource"
+       }
+      },
+      "role": "resource"
+     },
+     {
+      "name": "vm-dsvm-cmn-sdc-dev-001-1c7030",
+      "properties": {
+       "canvasPosition": {
+        "x": 270,
+        "y": 440
+       },
+       "displayName": "Virtual machine: dsvm-cmn-sdc-dev-001",
+       "icon": {
+        "iconName": "Resource"
+       },
+       "impact": "Limited",
+       "signalGroups": {
+        "azureResource": {
+         "authenticationSetting": "systemassigned",
+         "azureResourceId": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-common-sdc-dev-001/providers/Microsoft.Compute/virtualMachines/dsvm-cmn-sdc-dev-001",
+         "azureResourceKind": "",
+         "resourceHealth": {
+          "enabled": "Disabled"
+         },
+         "signals": [
+          {
+           "aggregationType": "Minimum",
+           "dataUnit": "Count",
+           "displayName": "VM availability (1 = available)",
+           "evaluationRules": {
+            "unhealthyRule": {
+             "operator": "LessThan",
+             "threshold": 1
+            }
+           },
+           "metricName": "VmAvailabilityMetric",
+           "metricNamespace": "microsoft.compute/virtualmachines",
+           "name": "vm-availability",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT5M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "CPU (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 85
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 95
+            }
+           },
+           "metricName": "Percentage CPU",
+           "metricNamespace": "microsoft.compute/virtualmachines",
+           "name": "cpu",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT15M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "Available memory (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "LessThan",
+             "threshold": 15
+            },
+            "unhealthyRule": {
+             "operator": "LessThan",
+             "threshold": 5
+            }
+           },
+           "metricName": "Available Memory Percentage",
+           "metricNamespace": "microsoft.compute/virtualmachines",
+           "name": "available-memory",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT15M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "OS disk IOPS consumed (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 90
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 98
+            }
+           },
+           "metricName": "OS Disk IOPS Consumed Percentage",
+           "metricNamespace": "microsoft.compute/virtualmachines",
+           "name": "os-disk-iops",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT15M"
+          }
+         ]
+        }
+       },
+       "tags": {
+        "aifactoryScope": "common",
+        "layer": "compute",
+        "managedBy": "aifactory-healthmodel",
+        "profile": "vm",
+        "role": "resource"
+       }
+      },
+      "role": "resource"
+     },
+     {
+      "name": "vm-runner-ado-sdc-dev-001-2980df",
+      "properties": {
+       "canvasPosition": {
+        "x": 450,
+        "y": 440
+       },
+       "displayName": "Virtual machine: runner-ado-sdc-dev-001",
+       "icon": {
+        "iconName": "Resource"
+       },
+       "impact": "Limited",
+       "signalGroups": {
+        "azureResource": {
+         "authenticationSetting": "systemassigned",
+         "azureResourceId": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/SPIDER-ESML-COMMON-SDC-DEV-001/providers/Microsoft.Compute/virtualMachines/RUNNER-ADO-SDC-DEV-001",
+         "azureResourceKind": "",
+         "resourceHealth": {
+          "enabled": "Disabled"
+         },
+         "signals": [
+          {
+           "aggregationType": "Minimum",
+           "dataUnit": "Count",
+           "displayName": "VM availability (1 = available)",
+           "evaluationRules": {
+            "unhealthyRule": {
+             "operator": "LessThan",
+             "threshold": 1
+            }
+           },
+           "metricName": "VmAvailabilityMetric",
+           "metricNamespace": "microsoft.compute/virtualmachines",
+           "name": "vm-availability",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT5M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "CPU (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 85
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 95
+            }
+           },
+           "metricName": "Percentage CPU",
+           "metricNamespace": "microsoft.compute/virtualmachines",
+           "name": "cpu",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT15M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "Available memory (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "LessThan",
+             "threshold": 15
+            },
+            "unhealthyRule": {
+             "operator": "LessThan",
+             "threshold": 5
+            }
+           },
+           "metricName": "Available Memory Percentage",
+           "metricNamespace": "microsoft.compute/virtualmachines",
+           "name": "available-memory",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT15M"
+          },
+          {
+           "aggregationType": "Average",
+           "dataUnit": "Percent",
+           "displayName": "OS disk IOPS consumed (%)",
+           "evaluationRules": {
+            "degradedRule": {
+             "operator": "GreaterThan",
+             "threshold": 90
+            },
+            "unhealthyRule": {
+             "operator": "GreaterThan",
+             "threshold": 98
+            }
+           },
+           "metricName": "OS Disk IOPS Consumed Percentage",
+           "metricNamespace": "microsoft.compute/virtualmachines",
+           "name": "os-disk-iops",
+           "refreshInterval": "PT5M",
+           "signalKind": "AzureResourceMetric",
+           "timeGrain": "PT15M"
+          }
+         ]
+        }
+       },
+       "tags": {
+        "aifactoryScope": "common",
+        "layer": "compute",
+        "managedBy": "aifactory-healthmodel",
+        "profile": "vm",
+        "role": "resource"
+       }
+      },
+      "role": "resource"
+     },
+     {
+      "name": "health-model-hm-spider-prj001-sdc-dev-001-5f0b7f",
+      "properties": {
+       "canvasPosition": {
+        "x": 630,
+        "y": 440
+       },
+       "displayName": "Nested health model: hm-spider-prj001-sdc-dev-001",
+       "icon": {
+        "iconName": "Resource"
+       },
+       "impact": "Standard",
+       "signalGroups": {
+        "azureResource": {
+         "authenticationSetting": "systemassigned",
+         "azureResourceId": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.CloudHealth/healthmodels/hm-spider-prj001-sdc-dev-001",
+         "azureResourceKind": "microsoft.cloudhealth/healthmodels",
+         "resourceHealth": {
+          "enabled": "Disabled"
+         },
+         "signals": []
+        }
+       },
+       "tags": {
+        "aifactoryScope": "project",
+        "layer": "projects",
+        "managedBy": "aifactory-healthmodel",
+        "profile": "health-model",
+        "role": "resource"
+       }
+      },
+      "role": "resource"
+     },
+     {
+      "name": "health-model-hm-spider-prj002-sdc-dev-001-f23077",
+      "properties": {
+       "canvasPosition": {
+        "x": 810,
+        "y": 440
+       },
+       "displayName": "Nested health model: hm-spider-prj002-sdc-dev-001",
+       "icon": {
+        "iconName": "Resource"
+       },
+       "impact": "Standard",
+       "signalGroups": {
+        "azureResource": {
+         "authenticationSetting": "systemassigned",
+         "azureResourceId": "/subscriptions/00000000-0000-0000-0000-0000000000aa/resourceGroups/spider-esml-project001-sdc-dev-001-rg/providers/Microsoft.CloudHealth/healthmodels/hm-spider-prj002-sdc-dev-001",
+         "azureResourceKind": "microsoft.cloudhealth/healthmodels",
+         "resourceHealth": {
+          "enabled": "Disabled"
+         },
+         "signals": []
+        }
+       },
+       "tags": {
+        "aifactoryScope": "project",
+        "layer": "projects",
+        "managedBy": "aifactory-healthmodel",
+        "profile": "health-model",
+        "role": "resource"
+       }
+      },
+      "role": "resource"
+     }
+    ]
+   },
+   "healthModelName": {
+    "value": "hm-spider-cmn-sdc-dev-001"
+   },
+   "location": {
+    "value": "swedencentral"
+   },
+   "modelScope": {
+    "value": "common"
+   },
+   "readerResourceGroups": {
+    "value": [
+     "spider-esml-common-sdc-dev-001",
+     "spider-esml-project001-sdc-dev-001-rg"
+    ]
+   },
+   "relationships": {
+    "value": [
+     {
+      "childEntityName": "layer-data",
+      "name": "hm-spider-cmn-sdc-dev-001-to-layer-data",
+      "parentEntityName": "hm-spider-cmn-sdc-dev-001"
+     },
+     {
+      "childEntityName": "layer-security",
+      "name": "hm-spider-cmn-sdc-dev-001-to-layer-security",
+      "parentEntityName": "hm-spider-cmn-sdc-dev-001"
+     },
+     {
+      "childEntityName": "layer-observability",
+      "name": "hm-spider-cmn-sdc-dev-001-to-layer-observability",
+      "parentEntityName": "hm-spider-cmn-sdc-dev-001"
+     },
+     {
+      "childEntityName": "layer-compute",
+      "name": "hm-spider-cmn-sdc-dev-001-to-layer-compute",
+      "parentEntityName": "hm-spider-cmn-sdc-dev-001"
+     },
+     {
+      "childEntityName": "layer-projects",
+      "name": "hm-spider-cmn-sdc-dev-001-to-layer-projects",
+      "parentEntityName": "hm-spider-cmn-sdc-dev-001"
+     },
+     {
+      "childEntityName": "adls-gen2-mrvelbltscesml001dev-ac7629",
+      "name": "layer-data-to-adls-gen2-mrvelbltscesml001dev-ac7629",
+      "parentEntityName": "layer-data"
+     },
+     {
+      "childEntityName": "adls-gen2-spiderbltscesml001dev-840b79",
+      "name": "layer-data-to-adls-gen2-spiderbltscesml001dev-840b79",
+      "parentEntityName": "layer-data"
+     },
+     {
+      "childEntityName": "keyvault-kv-cmnadmdev-bltsc-001-308c91",
+      "name": "layer-security-to-keyvault-kv-cmnadmdev-bltsc-001-308c91",
+      "parentEntityName": "layer-security"
+     },
+     {
+      "childEntityName": "keyvault-kv-cmndev-bltsc-001-70a30c",
+      "name": "layer-security-to-keyvault-kv-cmndev-bltsc-001-70a30c",
+      "parentEntityName": "layer-security"
+     },
+     {
+      "childEntityName": "loganalytics-la-cmn-sdc-dev-bltsc-001-7d04c4",
+      "name": "layer-observability-to-loganalytics-la-cmn-sdc-dev-bltsc-001-7d04c4",
+      "parentEntityName": "layer-observability"
+     },
+     {
+      "childEntityName": "vm-dsvm-cmn-sdc-dev-001-1c7030",
+      "name": "layer-compute-to-vm-dsvm-cmn-sdc-dev-001-1c7030",
+      "parentEntityName": "layer-compute"
+     },
+     {
+      "childEntityName": "vm-runner-ado-sdc-dev-001-2980df",
+      "name": "layer-compute-to-vm-runner-ado-sdc-dev-001-2980df",
+      "parentEntityName": "layer-compute"
+     },
+     {
+      "childEntityName": "health-model-hm-spider-prj001-sdc-dev-001-5f0b7f",
+      "name": "layer-projects-to-health-model-hm-spider-prj001-sdc-dev-001-5f0b7f",
+      "parentEntityName": "layer-projects"
+     },
+     {
+      "childEntityName": "health-model-hm-spider-prj002-sdc-dev-001-f23077",
+      "name": "layer-projects-to-health-model-hm-spider-prj002-sdc-dev-001-f23077",
+      "parentEntityName": "layer-projects"
+     }
+    ]
+   },
+   "rootDisplayName": {
+    "value": "AI Factory common services (dev)"
+   }
+  }
+ },
+ "summary": {
+  "coverage": [],
+  "entities": 14,
+  "layers": {
+   "compute": 2,
+   "data": 2,
+   "observability": 1,
+   "projects": 2,
+   "security": 2
+  },
+  "model": "hm-spider-cmn-sdc-dev-001",
+  "modelScope": "common",
+  "notMonitorable": {
+   "microsoft.containerregistry/registries": 1
+  },
+  "profiles": {
+   "adls-gen2": 2,
+   "health-model": 2,
+   "keyvault": 2,
+   "loganalytics": 1,
+   "vm": 2
+  },
+  "readerResourceGroups": [
+   "spider-esml-common-sdc-dev-001",
+   "spider-esml-project001-sdc-dev-001-rg"
+  ],
+  "relationships": 14,
+  "resourceGroup": "spider-esml-common-sdc-dev-001",
+  "resources": 9,
+  "signals": 22,
+  "subscription": "00000000-0000-0000-0000-0000000000aa",
+  "unmodelled": [],
+  "warnings": []
+ }
+}

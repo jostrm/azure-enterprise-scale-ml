@@ -1,0 +1,17 @@
+FROM docker.io/library/python@sha256:88310c082760d93ac7c74d579e95e53a4ab6ea52dd8901abc61a103daf488ac4
+ARG RELEASE_HASH
+LABEL aifactory.release=$RELEASE_HASH
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN apt-get update && apt-get install --no-install-recommends -y libtk8.6 libtcl8.6 \
+    && rm -rf /var/lib/apt/lists/* && useradd --uid 10001 --create-home app
+COPY deploy/requirements.api.txt /tmp/requirements.txt
+COPY wheels /opt/wheels
+RUN python -m pip install --no-cache-dir --no-index --find-links /opt/wheels -r /tmp/requirements.txt \
+    && python -m pip freeze > /opt/installed-versions.txt \
+    && python -c "import tkinter"
+COPY api /opt/api
+COPY deploy/launch.py /opt/launch.py
+COPY release.json /opt/release.json
+USER 10001
+WORKDIR /opt/api
+ENTRYPOINT ["python", "/opt/launch.py", "api"]

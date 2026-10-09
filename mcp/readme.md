@@ -231,6 +231,84 @@ observation can persist audit/state updates, so it is not advertised as a
 strictly read-only tool. No arbitrary shell, URL, filesystem or approval tool
 is exposed. The fixed CLI health tool is excluded from the model host.
 
+### Optional dual-graph evidence
+
+The existing MCP server can expose the shared agent's `DualGraphStore`; no new
+server, model, endpoint, Graphify production dependency or startup indexing is
+introduced. Absent or disabled configuration leaves legacy tools unchanged.
+Enable only a reviewed corpus in the private agent configuration:
+
+```json
+{
+  "dual_graph": {
+    "snapshot_root": "C:\\reviewed\\meta\\graphify",
+    "expected_snapshot_id": "<reviewed-64-lowercase-hex-snapshot-id>",
+    "allowed_scopes": ["project001-dev"],
+    "allow_source_access": false
+  }
+}
+```
+
+This fragment does **not** grant access. The exact caller/scope needs both the
+existing `factory.read` gate and a separate `graph.read` grant.
+`factory.read`, `knowledge.read`, Entra app roles and registration plans alone
+never authorize corpus reads. Application identities additionally need each
+graph tool in their explicit `allowed_tools`; existing identities and default
+allowlists remain unchanged. Discovery and dispatch recheck these boundaries.
+Omit `dual_graph` or set it to `null` to disable it; a complete explicit section
+is the opt-in (there is no separate `enabled` switch).
+
+| Tool | Closed arguments / operation |
+| --- | --- |
+| `graph_status` | No arguments; snapshot provenance/freshness, not service health |
+| `graph_query` | `operation`: `symbols`, `usages`, `callers`, `dependencies`, `dependents`, `trace`, `pipeline`, `impact`; optional `query`, `node_id`, `depth`, `limit` |
+| `architecture_search` | Optional `operation`: `notes` (default) or `adrs`; `query`, `limit` |
+| `architecture_note` | Required `node_id`; optional `operation`: `note` (default) or `backlinks`; `limit`; **never writes a note** |
+| `dual_graph_context` | Required `query`; optional `depth`, `limit` |
+
+Query text is bounded to 2,000 characters, node IDs to 512, depth to 0–5,
+and results to 1–100 (default 20). Caller-supplied paths, roots, URLs and unknown
+arguments are rejected. Results use a structured `{ok, data}` envelope retaining
+the shared snapshot ID, citations, warnings, freshness and truncation evidence.
+Unavailable or invalid snapshots return a sanitized structured tool error;
+legacy Factory discovery/startup does not require graph files.
+All five tools are read-only and cannot approve or execute actions.
+
+Source freshness is checked only with explicit `allow_source_access: true`
+and an existing operator-configured `knowledge.repository_root`; no automatic
+fallback to the checkout occurs. With source access disabled, report the
+snapshot's freshness uncertainty, not inferred current source state.
+The host treats graph/architecture output as untrusted static evidence, never
+live deployment health or authorization. Impact/trace results are bounded
+analysis, not permission to change infrastructure.
+
+#### Corpus-only local registration
+
+Use the **existing** server's explicit `--graph-only` mode when registering a
+local corpus connection with Scout or another MCP host:
+
+```powershell
+& $Python -m aifactory_mcp serve --config $Config --scope $Scope `
+  --object-id $ObjectId --graph-only
+```
+
+This mode requires only the explicit exact-scope `graph.read` grant and matching
+`dual_graph.allowed_scopes`; it does not require or inherit `factory.read`.
+Both discovery and dispatch are fixed to the five graph tools above. It never
+constructs Factory tools or operation storage and exposes no approval method.
+Even broader caller grants cannot expose Factory tools on this connection.
+It uses the same runtime, stdio/HTTP transport and server identity, not a separate
+ungoverned Graphify server. Removing the flag restores the original Factory
+server behavior; **do not omit it** from a corpus-only registration.
+
+`tools` and `call` also accept `--graph-only` for their local child server.
+Remote clients cannot select this policy: the HTTP operator must set it on
+`serve`. Graph-only application HTTP additionally requires a graph-only explicit
+application tool allowlist. The mode does not grant permissions, edit host
+registration state, or hot-load tools into an already running host. For this
+mode `/health/ready` has no Factory API probe; inspect authorized `graph_status`
+instead of treating process liveness as graph readiness.
+
 ## Governed actions: prepare, human approval, execute, observe
 
 Action prerequisites remain those of the existing agent:
@@ -301,6 +379,77 @@ app registration, not ARM, Graph or an unrelated service. The example's
 before enabling HTTP. The inherited verifier currently supports one client
 registration; generic automatic client registration is not implemented.
 
+### Foundry project identity (opt-in and read-only)
+
+For a Foundry `ProjectManagedIdentity` connection, supply a separate
+`--application-auth` policy file. This is an additional application-token
+authentication path; it does not replace or relax delegated user validation.
+The policy must use a **different API application/audience** from the existing
+browser registration.
+
+```json
+{
+  "audience": "<new-mcp-api-application-uuid>",
+  "required_role": "AiFactory.Mcp.Read",
+  "identities": [{
+    "object_id": "<foundry-project-managed-identity-object-uuid>",
+    "client_id": "<foundry-project-managed-identity-client-uuid>",
+    "scope_keys": ["project001-dev"],
+    "allowed_tools": ["factory_health", "factory_capabilities", "factory_skills"]
+  }]
+}
+```
+
+Replace placeholders with actual reviewed identifiers. The same identity
+also needs an explicit `factory.read` grant for `project001-dev` in the agent
+configuration. Application grants cannot include write permissions. Cost
+tools additionally require `cost.read`; they are not enabled by the example.
+
+The new API registration must issue v2 access tokens, emit the `idtyp`
+optional access-token claim, and expose the application role
+`AiFactory.Mcp.Read` assigned only to the reviewed Foundry project identity.
+Validation checks signature, issuer, audience, tenant, lifetime, `idtyp=app`,
+`ver=2.0`, the exact role, `oid` and `azp`. Delegated tokens cannot masquerade
+as application tokens. Audience routing is only a dispatch hint: the
+selected verifier always performs full cryptographic validation, with no
+fallback after failure.
+
+```powershell
+& $Python -m aifactory_mcp serve --config $Config --scope $Scope `
+  --transport streamable-http --host 127.0.0.1 --port 8899 `
+  --resource-url https://factory-mcp.example.com/mcp `
+  --application-auth C:\private\application-auth.json
+```
+
+The injected verifier produces a distinct application principal. A separate
+read-only backend filters discovery **and** dispatch, so application callers
+cannot prepare, approve, execute, cancel, inspect operations, invoke shell/CLI
+tools or select another scope. The existing delegated operator path retains
+its same-caller, exact-hash human approval controls. No managed identity is
+mapped to a human user's identity.
+
+`usecase_code\foundry_connection_plan.py` produces a **plan only** for the
+new project connection, Entra role requirements, application policy and MCP
+tool attachment. It has no apply mode. The generated tool attachment requires
+Foundry tool-call approval and an explicit allowlist; that approval is not
+a Factory action approval. Inspect the existing agent version and preserve
+its existing tools before publishing an attachment.
+
+Do not overwrite the existing `aif-azure-mcp` connection or
+`aif-mcp-project001-dev` Container App: they belong to Microsoft's Azure MCP,
+not this Python Factory MCP. Use distinct names for this service.
+
+### Deployment probes
+
+HTTP hosting exposes `/health/live` for process liveness and `/health/ready`
+for the configured Factory API's credential-free `/health` contract. The CLI
+wires an injected `ApiReadinessProbe` with a two-second HTTP timeout, no
+redirects/proxy credentials, and bounded response size. Dependency failure
+returns 503 without leaking exception details. These endpoints do not grant
+access to `/mcp`, and API health does not prove action readiness or successful
+Azure provisioning. A programmatic host without a readiness dependency
+returns 503 rather than claiming readiness.
+
 ```powershell
 & $Python -m aifactory_mcp serve --config $Config --scope $Scope `
   --transport streamable-http --host 127.0.0.1 --port 8899 `
@@ -364,6 +513,137 @@ The host excludes prepare/approve/execute/cancel tools, validates model-selected
 names against discovery, preserves Responses reasoning items, and bounds
 rounds. It returns a trace distinguishing model output from MCP observations.
 No tool errors are converted into successful observations.
+
+## Read-only pilot deployment scaffold
+
+The scaffold lives in `infra\` and `deploy\`. It targets only the separately
+named `aifactory-mcp-project001-dev` app and `mi-aifactory-mcp-dev` identity.
+It references the existing private environment, Premium registry and Key
+Vault without replacing them. The two containers share a network namespace:
+MCP listens on 8080 and the API remains on `127.0.0.1:8765`. Each runs as UID
+10001 with 0.5 vCPU / 1 GiB; the app has one replica.
+
+The pilot launcher rejects writes, action skills and privileged grants. By
+default Foundry tools are health, capabilities and skill discovery only. It creates
+no customer catalog. Persistent single-writer catalog/worktree storage and
+signed operation storage remain prerequisites for a later action rollout.
+
+### Prepare and validate images locally
+
+The reviewed release uses purple commit
+`3e9102ee07c959d91e5ac508432bd1545d258a15` and API v0.47.7 commit
+`d4e2c7a1eda7f3d331b52bffe3646433ebf8680d`. The newer local API revision and
+dirty sibling agent/UI files are not silently included. MCP changes are
+included as an explicit per-file-hashed source snapshot.
+
+```powershell
+& $Python -m pip download --no-deps --only-binary=:all: `
+  --platform manylinux_2_28_x86_64 --platform manylinux2014_x86_64 `
+  --platform manylinux_2_17_x86_64 --python-version 313 --implementation cp --abi cp313 `
+  --dest .build\linux-wheels -r deploy\requirements.linux.lock.txt
+
+& $Python deploy\prepare-release.py --purple-root .. `
+  --purple-ref 3e9102ee07c959d91e5ac508432bd1545d258a15 `
+  --api-root C:\code\code_py_25\008_aifactory_admin_ux_tkinter `
+  --api-ref d4e2c7a1eda7f3d331b52bffe3646433ebf8680d `
+  --wheelhouse .build\linux-wheels --output .build\my-pilot-release
+
+$Release = ".build\my-pilot-release"
+$ReleaseHash = (Get-Content "$Release\release.json" -Raw | ConvertFrom-Json).release_hash
+docker build --platform linux/amd64 -f deploy\Dockerfile.mcp `
+  --build-arg "RELEASE_HASH=$ReleaseHash" -t aifactory-mcp-pilot:review $Release
+docker build --platform linux/amd64 -f deploy\Dockerfile.api `
+  --build-arg "RELEASE_HASH=$ReleaseHash" -t aifactory-api-pilot:review $Release
+& $Python deploy\smoke-images.py --mcp-image aifactory-mcp-pilot:review `
+  --api-image aifactory-api-pilot:review --config $Config
+```
+
+The base Linux image is pinned by digest. Python dependencies install offline
+from the hash-recorded Linux wheel bundle; TLS verification is never disabled.
+The API includes the Tcl/Tk runtime libraries needed by its existing imports.
+Each image records its release manifest and installed package versions.
+The smoke runner exercises both actual containers, authentication rejection
+and MCP-to-agent-to-API health/capabilities. It uses synthetic local identities,
+does not request Azure tokens, and removes its containers afterward.
+
+#### Package an explicitly pinned graph
+
+`deploy\prepare-release.py` accepts optional `--graph-config <private-agent.json>`.
+Only an explicitly enabled `dual_graph` section with a valid
+`expected_snapshot_id`, nonempty `allowed_scopes` and source access disabled is
+packaged. The reviewed purple commit must include the shared `dual_graph.py`
+runtime and matching agent configuration support; the older pilot commit above
+cannot supply this feature. The packager does not silently copy dirty agent
+sources or generate graph data.
+
+The exact archived runtime validates and exports the snapshot's manifest-bound
+files into `repository\meta\graphify\snapshots\<snapshot-id>` in the existing
+release context. No mutable `current.json`, arbitrary sibling files or source
+corpus are added. Release hashes bind the files and selected snapshot ID.
+The existing Dockerfile already copies this repository directory.
+Without the explicit option, no graph corpus is included.
+
+At startup the launcher requires an explicitly enabled configuration to match
+the packaged pin and binds it to that immutable container path; it never
+generates, downloads or selects a newer graph. Existing pilot tools remain the
+default. Opted-in graph tools still need separate read-only grants, exact
+configured scopes and application allowlists. Packaging and registration
+planning do not deploy, assign permissions, modify resources or enable current
+identities. `/health/ready` remains Factory API health only; use authorized
+`graph_status` for graph evidence.
+
+### Plan, approve and execute one stage at a time
+
+```powershell
+.\deploy\rollout.ps1 -Phase plan -Release $Release -BaseConfig $Config `
+  -McpImage aifactory-mcp-pilot:review -ApiImage aifactory-api-pilot:review `
+  -Plan .build\reviewed-rollout.json
+.\deploy\rollout.ps1 -Phase preflight -Plan .build\reviewed-rollout.json
+```
+
+Both commands are non-mutating in Azure. Review the generated `plan_hash`,
+source hashes, image IDs, exact scopes and effects. The write phases each
+require `-ApprovalHash` matching that reviewed plan and must run in order:
+`identity`, `secret`, `foundation`, `publish`, `application`, `connection`.
+Do not supply approval until resource deployment and permissions have been
+explicitly approved.
+
+The `identity` phase creates a dedicated Entra API app/SP and project read
+role; `secret` creates the dedicated API key in the existing vault; `foundation`
+creates only the new hosting identity and scoped pull/secret-read grants.
+`publish` pushes the already reviewed image IDs; `application` deploys their
+confirmed registry digests; `connection` creates the distinct Foundry
+connection after readiness and authentication checks. It **does not change
+the existing agent**: its output includes the tool attachment for separate
+review before publishing a new agent version.
+
+The deployment operator must already have the required Azure, Entra and
+Key Vault permissions. Bicep does not grant the operator broad Secrets
+Officer access. Existing names with unexpected ownership fail closed.
+Every stage is durably claimed in a local journal before its first write.
+A failed or uncertain stage is not automatically retried; inspect its
+journal and scoped resources before preparing a recovery plan. Keep these
+journals in an operator-controlled location.
+
+`infra\main.bicep` uses `deployApplication=false` for the foundation, not a
+placeholder application. Real deployment uses separate `mcpImage` and
+`apiImage` digest parameters. The generic AppOnboard single-image and
+new-vault/deployer-role checks do not describe this approved design; the
+actual two-image wiring and secret-scoped access have dedicated checks.
+
+### Rollback is containment, not deletion
+
+```powershell
+.\deploy\rollback.ps1 -Plan .build\reviewed-rollout.json
+```
+
+This prints a separate rollback approval hash. With explicit approval,
+rollback disables only the newly created MCP service principal and requests
+stop of the new Container App after live ownership checks. It does not
+delete resources, groups, secrets, connections or agents. It remains
+available if source files change or the build context is removed. Cloud
+job completion and a later cleanup inventory require separate observation
+and approval.
 
 ## Tests
 

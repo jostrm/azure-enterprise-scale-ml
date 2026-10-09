@@ -533,7 +533,9 @@ def merge(template_value, active_value):
         return merged
     return active_value
 
-merged = merge(template, active)
+sys.path[:0] = [str(Path("azure-enterprise-scale-ml/bootstrap/lib")), str(Path("bootstrap/lib"))]
+from aifactory_scaleset_config import preserve_template_configuration
+merged = preserve_template_configuration(active, merge(template, active))
 github_defaults = {
     "GITHUB_USERNAME": "",
     "GITHUB_USE_SSH": "false",
@@ -612,6 +614,12 @@ def read_assignments(path):
     return values
 
 current = read_assignments(current_path)
+if "ENABLE_PERSONAS" not in current and "PERSONA_ACCESS_MODE" in current:
+    sys.path[:0] = [str(Path("azure-enterprise-scale-ml/bootstrap/lib")), str(Path("bootstrap/lib"))]
+    from aifactory_scaleset_config import persona_mode
+    current["ENABLE_PERSONAS"] = str(persona_mode({
+        "PERSONA_ACCESS_MODE": current["PERSONA_ACCESS_MODE"].strip("'\"")
+    }) == "groups-v1").lower()
 aliases = {
     "DEV_NETWORK_ENV": ("NETWORK_ENV_DEV",),
     "STAGE_NETWORK_ENV": ("NETWORK_ENV_STAGE",),

@@ -265,8 +265,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     genaiSubnetId:genaiSubnetId
     aca2SubnetId: aca2SubnetId
     aks2SubnetId: aks2SubnetId
-    technicalAdminsObjectID: technicalAdminsObjectID
-    technicalAdminsEmail: technicalAdminsEmail
+    technicalAdminsObjectID: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? '' : technicalAdminsObjectID
+    technicalAdminsEmail: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? '' : technicalAdminsEmail
     addAzureMachineLearning: addAzureMachineLearning
   }
 }

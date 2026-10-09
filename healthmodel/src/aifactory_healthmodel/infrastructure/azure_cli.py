@@ -1,10 +1,9 @@
-"""Azure access for the health model tooling.
+"""Azure CLI family of adapters (Adapter pattern over ``az``).
 
-Only the operations this tool needs are built here; callers cannot pass
-arbitrary ``az`` commands. On Windows the Azure CLI is invoked through its
-bundled Python (never through ``az.cmd``) so URLs with ``&`` are not
-interpreted by a batch shell. Raw CLI output is never re-raised: errors carry
-the ARM error code and message only.
+Only the operations this tool needs are built here; callers cannot pass arbitrary
+``az`` commands. On Windows the Azure CLI is invoked through its bundled Python (never
+through ``az.cmd``) so URLs with ``&`` are not interpreted by a batch shell. Raw CLI
+output is never re-raised: errors carry the ARM error code, HTTP status and message only.
 """
 from __future__ import annotations
 
@@ -15,17 +14,28 @@ import shutil
 import subprocess
 import tempfile
 import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from .client import ARM, HealthModelError
+from ..application.ports import InfrastructureFactory
+from ..client import ARM, HealthModelError
 
 ARG_URL = f"{ARM}/providers/Microsoft.ResourceGraph/resources?api-version=2022-10-01"
 PROVIDER_API = "2021-04-01"
 NAMESPACE = "Microsoft.CloudHealth"
 ARM_ERROR = re.compile(r"\{.*\}", re.S)
+REASON = re.compile(r"ERROR:\s*([A-Za-z][A-Za-z ]*?)\s*\(")
+PAREN_CODE = re.compile(r"ERROR:\s*\(([A-Za-z0-9.]+)\)")
+REASON_STATUS = {
+    "bad request": 400, "unauthorized": 401, "forbidden": 403, "not found": 404, "request timeout": 408,
+    "conflict": 409, "precondition failed": 412, "too many requests": 429, "internal server error": 500,
+    "bad gateway": 502, "service unavailable": 503, "gateway timeout": 504,
+}
+CODE_STATUS = {
+    "TooManyRequests": 429, "ServiceUnavailable": 503, "ServerBusy": 503, "InternalServerError": 500,
+    "GatewayTimeout": 504, "BadGateway": 502, "RequestTimeout": 408, "ResourceNotFound": 404, "NotFound": 404,
+    "AuthorizationFailed": 403, "Conflict": 409,
+}
 
 
 def az_command() -> list[str]:
@@ -46,10 +56,11 @@ def default_runner(args: list[str], input_text: str | None = None) -> subprocess
                           errors="replace", input=input_text, shell=False, timeout=3600)
 
 
-def arm_error(result: subprocess.CompletedProcess, purpose: str) -> HealthModelError:
+def arm_error(result: subprocess.CompletedProcess, purpose: str, status: int | None = None) -> HealthModelError:
     """Build an error from the ARM error document only; never echo raw CLI output."""
+    stderr = result.stderr or ""
     code, message = "AzureCommandFailed", ""
-    for candidate in ARM_ERROR.findall(result.stderr or ""):
+    for candidate in ARM_ERROR.findall(stderr):
         try:
             document = json.loads(candidate)
         except ValueError:
@@ -59,8 +70,17 @@ def arm_error(result: subprocess.CompletedProcess, purpose: str) -> HealthModelE
             code = re.sub(r"[^A-Za-z0-9.]", "", str(error["code"]))[:80] or code
             message = str(error.get("message", ""))[:600]
             break
+    else:
+        match = PAREN_CODE.search(stderr)
+        if match:
+            code = match.group(1)[:80]
+    if status is None:
+        reason = REASON.search(stderr)
+        status = REASON_STATUS.get(reason.group(1).lower()) if reason else None
+    if status is None:
+        status = CODE_STATUS.get(code)
     text = f"{purpose} failed ({code})" + (f": {message}" if message else ".")
-    return HealthModelError(text, code)
+    return HealthModelError(text, code, status)
 
 
 class AzCliTransport:
@@ -90,37 +110,10 @@ class AzCliTransport:
         return json.loads(text) if text else None
 
 
-class TokenTransport:
-    """ARM transport with an azure-identity style credential (``get_token(scope)``)."""
-
-    def __init__(self, credential, timeout: int = 60):
-        self.credential = credential
-        self.timeout = timeout
-
-    def request(self, method: str, url: str, body: dict | None = None):
-        if not url.startswith(f"{ARM}/"):
-            raise ValueError("Only Azure Resource Manager URLs are allowed.")
-        token = self.credential.get_token(f"{ARM}/.default").token
-        data = json.dumps(body).encode("utf-8") if body is not None else None
-        request = urllib.request.Request(url, data=data, method=method.upper(), headers={
-            "Authorization": f"Bearer {token}", "Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                payload = response.read()
-        except urllib.error.HTTPError as error:
-            raw = error.read().decode("utf-8", "replace")
-            raise arm_error(subprocess.CompletedProcess([], 1, "", raw), f"{method.upper()} {urlsplit(url).path}") from None
-        return json.loads(payload) if payload else None
-
-
-class AzureBoundary:
-    """The exact Azure operations used by plan/deploy, scoped to one subscription."""
-
-    def __init__(self, subscription_id: str, runner=None, sleep=time.sleep):
+class _CliCommand:
+    def __init__(self, subscription_id: str, runner):
         self.subscription_id = subscription_id
         self.runner = runner or default_runner
-        self.transport = AzCliTransport(self.runner)
-        self.sleep = sleep
 
     def _json(self, args: list[str], purpose: str):
         result = self.runner(args)
@@ -129,6 +122,8 @@ class AzureBoundary:
         text = (result.stdout or "").strip()
         return json.loads(text) if text else {}
 
+
+class AzureCliAccount(_CliCommand):
     def verify_account(self, tenant_id: str) -> dict:
         try:
             account = self._json(["account", "show", "--subscription", self.subscription_id, "--output", "json",
@@ -140,6 +135,15 @@ class AzureBoundary:
             raise RuntimeError("The signed-in Azure account does not match the configured tenant/subscription. "
                                "No Azure reads or writes were performed beyond the account check.")
         return account
+
+
+class ArmProviderRegistrar(_CliCommand):
+    """Reads the Microsoft.CloudHealth registration through ARM; registers through ``az provider``."""
+
+    def __init__(self, subscription_id: str, transport, runner=None, sleep=time.sleep):
+        super().__init__(subscription_id, runner)
+        self.transport = transport
+        self.sleep = sleep
 
     def provider(self) -> dict:
         url = f"{ARM}/subscriptions/{self.subscription_id}/providers/{NAMESPACE}?api-version={PROVIDER_API}"
@@ -158,6 +162,14 @@ class AzureBoundary:
             if time.monotonic() > deadline:
                 raise RuntimeError(f"{NAMESPACE} registration did not complete in time; rerun later.")
             self.sleep(10)
+
+
+class ResourceGraphDiscovery:
+    """Discovers the factory's resources with one paged Azure Resource Graph query."""
+
+    def __init__(self, subscription_id: str, transport):
+        self.subscription_id = subscription_id
+        self.transport = transport
 
     def discover(self, resource_groups: list[str], include_health_models: bool = False) -> list[dict]:
         groups = ", ".join(f"'{g}'" for g in resource_groups if g)
@@ -178,6 +190,10 @@ class AzureBoundary:
             if not skip:
                 return rows
 
+
+class AzureCliDeployer(_CliCommand):
+    """Incremental resource group deployments and what-if of ``bicep/main.bicep``."""
+
     def _deployment_args(self, verb: str, resource_group: str, template: Path, parameters: Path) -> list[str]:
         return ["deployment", "group", verb, "--subscription", self.subscription_id, "--resource-group",
                 resource_group, "--template-file", str(template), "--parameters", f"@{parameters}"]
@@ -195,3 +211,29 @@ class AzureBoundary:
         args[3:3] = ["--name", name]
         return self._json([*args, "--mode", "Incremental", "--output", "json", "--only-show-errors"],
                           f"Deploying health model {name}")
+
+
+class AzureCliInfrastructure(InfrastructureFactory):
+    """The signed-in Azure CLI: discovery and reads through ARM, deployments through ``az deployment``."""
+
+    name = "azure-cli"
+
+    def __init__(self, subscription_id: str, runner=None, sleep=time.sleep):
+        self.subscription_id = subscription_id
+        self.runner = runner or default_runner
+        self.sleep = sleep
+
+    def create_transport(self) -> AzCliTransport:
+        return AzCliTransport(self.runner)
+
+    def create_account_verifier(self) -> AzureCliAccount:
+        return AzureCliAccount(self.subscription_id, self.runner)
+
+    def create_provider_registrar(self, transport) -> ArmProviderRegistrar:
+        return ArmProviderRegistrar(self.subscription_id, transport, self.runner, self.sleep)
+
+    def create_discovery(self, transport) -> ResourceGraphDiscovery:
+        return ResourceGraphDiscovery(self.subscription_id, transport)
+
+    def create_deployer(self) -> AzureCliDeployer:
+        return AzureCliDeployer(self.subscription_id, self.runner)

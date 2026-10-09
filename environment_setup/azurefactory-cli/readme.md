@@ -281,40 +281,105 @@ azurefactory parameters get --folder C:\factory --factory-id <uuid> --scale-set-
 
 ### Review scoped settings without deployment
 
-`AzureFactoryClient.catalog_settings_prepare()` and
+**Implemented in source:** `AzureFactoryClient.catalog_settings_prepare()` and
 `azurefactory catalog configure-settings` wrap the existing REST
-`POST /api/v1/factory-catalog/prepare` action `configure-settings`.
-There is no new endpoint. Installed clients/APIs may lag the source.
+`POST /api/v1/factory-catalog/prepare` action `configure-settings`. Confirmation
+still uses `catalog_confirm()` / `catalog confirm` and the same REST `/confirm`.
+There is no new API route or deployment capability. Installed clients may lag.
 
 Supply only intentional replacements: omitted keys remain unchanged. The API
-owns editable fields, defaults, identity checks and persistence. Discover supported
-keys with `catalog settings`. Factory scope omits both selectors; scale scope adds
-`--scale-set-id`; project scope adds `--project-id`. With both selectors, the scale
-must be a project placement. **Project settings remain shared project configuration,
-not an environment-only patch.** Disabling a flag never authorizes resource removal.
+owns `field_keys`, defaults, immutable identity checks, and persistence. Discover
+supported fields with `catalog settings`; do not infer gateway/MCP support from a
+newer document or source commit. Factory scope omits both selectors; scale scope
+adds `--scale-set-id`; project scope adds `--project-id`. With both selectors, the
+scale must be one of the project's placements. **Project settings are shared
+project configuration, not an environment-only patch**, even when a scale is
+selected. Registered project variable sections follow the canonical API rules.
+
+This advanced example needs an existing catalog; it is not an empty-catalog smoke
+test. It changes the saved Redis setting only. Disabling a flag does not authorize
+resource removal, deploy anything, or change a running job's frozen inputs.
+
+**Window A: inspect and prepare** (PowerShell 7; obtain URL/key from your API host):
 
 ```powershell
-# settings.json contains only intentional, nonsecret replacements, for example:
-# {"enableRedisCache":"false"}
-azurefactory catalog configure-settings --folder C:\consumer\azurefactory `
-  --factory-id <factory-uuid> --settings-json .\settings.json `
-  --expected-revision <catalog-revision> --save-receipt .\settings-review.json
+$env:AIFACTORY_API_URL = Read-Host 'Actual API host URL'
+$env:AIFACTORY_API_KEY = Read-Host 'API key' -MaskInput
+$folder = Read-Host 'Catalog folder on the API host'
+$factoryId = Read-Host 'Exact factory UUID'
+$receiptPath = Read-Host 'New local settings review receipt path'
+$current = azurefactory catalog settings --folder $folder --factory-id $factoryId | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw 'Settings inspection failed' }
+$current | ConvertTo-Json -Depth 30
+$changesPath = Join-Path $env:TEMP ("factory-settings-" + [guid]::NewGuid() + ".json")
+@{ enableRedisCache = 'false' } | ConvertTo-Json | Set-Content -LiteralPath $changesPath -Encoding utf8
+azurefactory catalog configure-settings --folder $folder --factory-id $factoryId `
+  --settings-json $changesPath --expected-revision $current.revision --save-receipt $receiptPath
+$prepareExit = $LASTEXITCODE
+Remove-Item -LiteralPath $changesPath
+if ($prepareExit -ne 0) { throw 'Preparation failed or was blocked; do not confirm' }
+Get-Content -LiteralPath $receiptPath
 ```
 
-Inspect the exact request, scope, effects, blockers, revision and expiry. Only
-after separate human approval:
+**Window B: review, approve, save, then observe.** Setup is repeated because
+PowerShell variables do not transfer between windows. Inspect both `request`
+(exact replacements) and `preview` (scope, effects, blockers, revision, expiry).
 
 ```powershell
-azurefactory catalog confirm --receipt .\settings-review.json --yes
+$env:AIFACTORY_API_URL = Read-Host 'Same API host URL used for preparation'
+$env:AIFACTORY_API_KEY = Read-Host 'Same API key used for preparation' -MaskInput
+$receiptPath = Read-Host 'Local settings review receipt path from Window A'
+$review = Get-Content -Raw -LiteralPath $receiptPath | ConvertFrom-Json
+$review | ConvertTo-Json -Depth 40
+if ((Read-Host 'Type SAVE to approve this exact configuration-only review') -cne 'SAVE') { throw 'Not approved' }
+azurefactory catalog confirm --receipt $receiptPath --yes
+if ($LASTEXITCODE -ne 0) { throw 'Save not confirmed; inspect current settings before any new review. Do not retry automatically.' }
+azurefactory catalog settings --folder $review.folder --factory-id $review.request.factory_id
+if ($LASTEXITCODE -ne 0) { throw 'Post-save inspection failed' }
 ```
 
-The SDK equivalent is
-`client.catalog_settings_prepare(folder, factory_id, settings, scale_set_id=None,
-project_id=None, expected_revision=revision)`. Save a receipt with
-`operation="catalog-settings"`, `purpose="catalog-confirm"` and the exact request.
-The response must acknowledge the selected scope/revision and configuration-only
-mode; older or contradictory acknowledgements fail closed. Unknown fields are
-rejected by the API, without translation, fallback or automatic retry.
+**Equivalent Python SDK flow** (one process, with a separate explicit approval
+prompt; stdlib plus the installed `azurefactory` package):
+
+```python
+import getpass
+import json
+from azurefactory import AzureFactoryClient, load_receipt, write_receipt
+
+client = AzureFactoryClient(input("Actual API host URL: "), getpass.getpass("API key: "))
+folder = input("Catalog folder on API host: ")
+factory_id = input("Exact factory UUID: ")
+receipt_path = input("New local settings review receipt path: ")
+current = client.catalog_settings(folder, factory_id)
+changes = {"enableRedisCache": "false"}
+request = {
+    "contract_version": 1, "action": "configure-settings", "folder": folder,
+    "factory_id": factory_id, "settings": changes, "expected_revision": current["revision"],
+}
+preview = client.catalog_settings_prepare(
+    folder, factory_id, changes, expected_revision=current["revision"],
+)
+print(json.dumps({"request": request, "preview": preview}, indent=2))
+write_receipt(receipt_path, client=client, purpose="catalog-confirm",
+              operation="catalog-settings", request_body=request, preview=preview)
+if preview.get("can_execute") is not True or preview.get("blockers"):
+    raise SystemExit("Blocked; do not confirm.")
+if input("Type SAVE to approve the exact review: ") != "SAVE":
+    raise SystemExit("Not approved.")
+review = load_receipt(receipt_path, client=client, purpose="catalog-confirm",
+                      operation_mode="configuration")
+result = client.catalog_confirm(review["folder"], review["confirmation_id"])
+print(json.dumps(result, indent=2))
+print(json.dumps(client.catalog_settings(folder, factory_id), indent=2))
+```
+
+The same `request` object is the complete REST prepare body; REST confirmation
+uses `folder`, `contract_version: 1`, and the returned `confirmation_id`. The
+server persists the frozen review and rejects changed revisions, expired/consumed
+reviews, or a different authenticated owner. Configuration confirmation returns
+`job: null`, not a deployment receipt. No client fallback or automatic retry is
+performed. After a timeout or lost acknowledgement, inspect saved settings before
+deciding whether a new review is needed; do not assume that the write failed.
 
 ### Read-only deployment preflight
 
@@ -443,16 +508,17 @@ For runnable SDK code using `ConfigurationDraft.load()`, `review()` and
 `save()`, see [edit_configuration.py](../install_config_wizard/api-usage-examples/python/edit_configuration.py)
 and its [two-phase usage](../install_config_wizard/api-usage-examples/readme.md#edit-a-legacy-json-configuration-with-the-python-sdk).
 
-### MCP & AI Gateway options (project001 Dev)
+### Factory Chat Agent, MCP & AI Gateway options
 
 `config review` and `config save` accept dedicated options for the opt-in AI
-Factory MCP and the new Azure AI Gateway SKU. Each sets exactly one variable,
-is merged with `--changes-json`, and a disagreeing value in that file is a
-`ConfigError` instead of a silent override:
+Factory Chat Agent, Factory MCP and the new Azure AI Gateway SKU. Each sets
+exactly one variable, is merged with `--changes-json`, and a disagreeing value
+in that file is a `ConfigError` instead of a silent override:
 
 | Option | Variable | Values |
 |---|---|---|
 | `--enable-aifactory-mcp` | `enableAIFactoryMCP` | `true` / `false` |
+| `--enable-factory-chat-agent` | `enableFactoryChatAgent` | `true` / `false` |
 | `--enable-ai-gateway-sku` | `enableAIGatewaySKU` | `true` / `false` |
 | `--add-aifactory-mcp-to-ai-gateway-sku` | `addAIFactoryMCP2AIGatewaySKU` | `true` / `false` |
 | `--aifactory-mcp-image` | `aifactoryMcpImage` | `<registry>.azurecr.io/<repository>@sha256:<digest>` |
@@ -464,13 +530,16 @@ is merged with `--changes-json`, and a disagreeing value in that file is a
 
 ```powershell
 azurefactory config review --folder C:\legacy\aifactory --project-number 001 `
-  --enable-aifactory-mcp true --enable-ai-gateway-sku true --add-aifactory-mcp-to-ai-gateway-sku true
+  --enable-factory-chat-agent true --enable-aifactory-mcp true `
+  --enable-ai-gateway-sku true --add-aifactory-mcp-to-ai-gateway-sku true
 ```
 
-The fields must exist in the selected draft/schema (wizard API v0.47.21 or later
-for the three flags). Saving never deploys: the project pipeline's late
-foundry-phase step `71-aifactory-mcp-ai-gateway` acts on them for project001
-Dev only. See [45-aifactory-mcp-gateway](../../usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md).
+The fields must exist in the selected draft/schema. Saving never deploys. The
+project pipeline's late Foundry phase creates or versions the Chat Agent in the
+selected project when `enableFactoryChatAgent` is true; the MCP/Gateway step
+remains project001 Dev only. See
+[40-aifactory-agent](../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md)
+and [45-aifactory-mcp-gateway](../../usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md).
 
 ## Preview then confirm
 

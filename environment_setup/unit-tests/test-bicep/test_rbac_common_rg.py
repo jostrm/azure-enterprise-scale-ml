@@ -107,6 +107,7 @@ class TestCommonRbacScript(unittest.TestCase):
         self.assertEqual(referenced, set(self.bindings))
         self.assertEqual("bastion_subscription_resource_group", self.bindings["RBAC_BASTION_RG"])
         self.assertEqual("bastion_custom_name", self.bindings["RBAC_BASTION_NAME"])
+        self.assertEqual("persona_access_mode", self.bindings["RBAC_PERSONA_ACCESS_MODE"])
 
     def test_absent_empty_and_unexpanded_optional_inputs_use_defaults(self) -> None:
         cases = {
@@ -124,10 +125,24 @@ class TestCommonRbacScript(unittest.TestCase):
                     "projectPrefix=", "projectSuffix=", "existingAcrPushUserPrincipals=",
                     "existingAcrPushSPPrincipals=", "addBastionHost=false",
                     "enableAzureMachineLearning=false", "disableSubnetJoinAction=false",
-                    "useCommonACR=true", "useAdGroups=true",
+                    "useCommonACR=true", "useAdGroups=true", "personaAccessMode=legacy",
                 ):
                     self.assertIn(expected, arguments)
                 self.assertNotRegex("\n".join(arguments), r"\$\([A-Za-z_]\w*\)")
+
+    def test_groups_mode_is_forwarded_without_skipping_cross_resource_rbac(self) -> None:
+        result, arguments = self.run_script({"RBAC_PERSONA_ACCESS_MODE": "groups-v1"})
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("", result.stderr)
+        self.assertIn("deployment", arguments)
+        self.assertIn("personaAccessMode=groups-v1", arguments)
+        self.assertIn("useCommonACR=true", arguments)
+
+    def test_invalid_persona_mode_fails_before_any_azure_call(self) -> None:
+        result, arguments = self.run_script({"RBAC_PERSONA_ACCESS_MODE": "unsupported"})
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Unsupported Common RG persona access mode", result.stdout)
+        self.assertEqual([], arguments)
 
     def test_custom_values_and_shell_metacharacters_stay_literal(self) -> None:
         value = 'custom "\' $(echo SHOULD_NOT_RUN >&2) `echo SHOULD_NOT_RUN >&2`'

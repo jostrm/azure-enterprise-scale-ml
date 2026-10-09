@@ -1,4 +1,4 @@
-"""Compile bicep/main.bicep and check the contract with the planner.
+"""Compile bicep/main.bicep and check the contract with the parameter renderer.
 
 Skipped when the Azure CLI with Bicep is not installed on the machine.
 """
@@ -12,7 +12,7 @@ from functools import lru_cache
 import pytest
 
 from aifactory_healthmodel import catalog as cat
-from aifactory_healthmodel import planner
+from aifactory_healthmodel.application.parameters import BICEP_OPTIONS
 from conftest import HEALTHMODEL
 
 BICEP = HEALTHMODEL / "bicep"
@@ -67,10 +67,10 @@ def test_cloudhealth_resources_use_the_catalog_api_version():
     assert all(versions == {cat.load_catalog()["apiVersion"]} for versions in types.values())
 
 
-def test_planner_parameters_match_template_parameters():
+def test_rendered_parameters_match_template_parameters():
     declared = template()["parameters"]
     produced = {"healthModelName", "location", "modelScope", "rootDisplayName", "readerResourceGroups",
-                "entities", "relationships"} | planner.BICEP_OPTIONS
+                "entities", "relationships"} | BICEP_OPTIONS
     assert produced <= set(declared)
     required = {name for name, item in declared.items() if "defaultValue" not in item}
     assert required <= {"healthModelName", "location", "rootDisplayName"}
@@ -113,7 +113,7 @@ def test_minimal_bicepparam_example_builds():
     assert len(parameters["entities"]["value"]) >= 3
 
 
-def test_example_parameters_were_generated_by_the_planner():
+def test_example_parameters_were_rendered_from_the_project_definition():
     import importlib.util
     import re
     path = BICEP / "examples" / "project001-dev.parameters.json"

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import importlib.util
+import itertools
 import json
 import math
 import os
@@ -183,6 +184,8 @@ class Arm:
             return args[0].format(*args[1:])
         if name == "replace":
             return args[0].replace(args[1], args[2])
+        if name == "split":
+            return args[0].split(args[1])
         if name == "substring":
             return args[0][args[1]:] if len(args) == 2 else args[0][args[1]:args[1] + args[2]]
         if name == "base64":
@@ -200,7 +203,21 @@ class Arm:
         if name == "tenant":
             return {"tenantId": "22222222-2222-4222-8222-222222222222"}
         if name == "resourceid":
+            if len(args) == 4:
+                return f"/subscriptions/{args[0]}/resourceGroups/{args[1]}/providers/{args[2]}/{args[3]}"
             return RG + "/providers/" + args[0] + "/" + args[1]
+        if name == "reference":
+            deployment = next(r for r in self.template["resources"]
+                              if r["type"] == "Microsoft.Resources/deployments"
+                              and args[0].endswith("/" + r["name"]))
+            child = Arm(deployment["properties"]["template"], {
+                key: self.value(binding["value"])
+                for key, binding in deployment["properties"]["parameters"].items()
+            })
+            return {"outputs": {
+                key: {"value": child.value(output["value"])}
+                for key, output in child.template["outputs"].items()
+            }}
         if name == "guid":
             # ARM's documented namespace and separator.
             return str(uuid.uuid5(uuid.UUID("11fb06fb-712d-4ddd-98c7-e71bbd588830"), "-".join(args)))
@@ -210,6 +227,12 @@ class Arm:
             return None
         if name == "equals":
             return args[0] == args[1]
+        if name == "or":
+            return any(args)
+        if name == "mul":
+            return args[0] * args[1]
+        if name == "add":
+            return args[0] + args[1]
         if name == "if":
             return args[1] if args[0] else args[2]
         raise AssertionError(f"Unsupported ARM expression: {name}")
@@ -233,13 +256,20 @@ def workbook_template(project_template):
     )["properties"]["template"]
 
 
+@pytest.fixture(scope="module")
+def foundry_tiles_template(project_template):
+    return next(r for r in project_template["resources"]
+                if "foundry-metric-tiles-" in r["name"])["properties"]["template"]
+
+
 def materialize(template, **overrides):
     arm = Arm(template, {
         "location": "swedencentral", "projectNumber": "001", "env": "test",
         "telemetryEnvironment": "stage", "applicationInsightsResourceId": COMPONENT,
         "logAnalyticsResourceId": WORKSPACE, "projectResourceGroupId": RG, **overrides,
     })
-    return arm, json.loads(arm.value(template["resources"][0]["properties"]["serializedData"]))
+    resource = next(r for r in template["resources"] if r["type"] == "Microsoft.Insights/workbooks")
+    return arm, json.loads(arm.value(resource["properties"]["serializedData"]))
 
 
 @pytest.fixture(scope="module")
@@ -248,18 +278,30 @@ def workbook(workbook_template):
 
 
 def items(workbook):
-    return {item["name"]: item for item in workbook["items"]}
+    result = {}
+    for item in workbook["items"]:
+        assert item["name"] not in result
+        result[item["name"]] = item
+        if item["type"] == 12:
+            children = items(item["content"])
+            assert not result.keys() & children.keys()
+            result.update(children)
+    return result
 
 
 def parameters(workbook):
     return {
-        p["name"]: p for item in workbook["items"] if item["type"] == 9
+        p["name"]: p for item in items(workbook).values() if item["type"] == 9
         for p in item["content"]["parameters"]
     }
 
 
 def test_only_saved_workbook_and_deterministic_name(workbook_template):
-    assert [r["type"] for r in workbook_template["resources"]] == ["Microsoft.Insights/workbooks"]
+    saved = [r for r in workbook_template["resources"] if r["type"] == "Microsoft.Insights/workbooks"]
+    assert len(saved) == 1
+    helpers = [r for r in workbook_template["resources"] if r not in saved]
+    assert all(r["type"] == "Microsoft.Resources/deployments"
+               and not r["properties"]["template"].get("resources") for r in helpers)
     arm, _ = materialize(workbook_template)
     expected = arm.variable("workbookName")
     assert expected == materialize(workbook_template)[0].variable("workbookName")
@@ -267,7 +309,7 @@ def test_only_saved_workbook_and_deterministic_name(workbook_template):
     assert expected != materialize(workbook_template, env="prod")[0].variable("workbookName")
     assert expected == materialize(workbook_template, telemetryEnvironment="custom")[0].variable("workbookName")
     assert "guid(resourceGroup().id, 'aifactory.my-project.v1'" in workbook_template["variables"]["workbookName"]
-    assert arm.value(workbook_template["resources"][0]["properties"]["sourceId"]) == COMPONENT
+    assert arm.value(saved[0]["properties"]["sourceId"]) == COMPONENT
 
 
 def test_enable_disable_and_stage_outputs(compiled, project_template):
@@ -291,6 +333,8 @@ def test_enable_disable_and_stage_outputs(compiled, project_template):
 
 
 def test_naming_outputs_scope_and_override_wiring(project_template):
+    naming = next(r for r in project_template["resources"] if "projectDash-naming-" in r["name"])
+    assert naming["properties"]["parameters"]["addAzureMachineLearning"]["value"] == "[parameters('addAzureMachineLearning')]"
     deployment = next(r for r in project_template["resources"] if "my-project-workbook" in r["name"])
     wired = deployment["properties"]["parameters"]
     insights = json.dumps(wired["applicationInsightsResourceId"])
@@ -309,15 +353,15 @@ def test_dashboard_existing_layout_and_native_cost_preserved():
     text = PROJECT.read_text(encoding="utf-8")
     for position in (
         "x: 0, y: 0, colSpan: 12, rowSpan: 2",
-        "x: 0, y: 2, colSpan: 6, rowSpan: 8",
-        "x: 6, y: 2, colSpan: 6, rowSpan: 8",
-        *(f"x: {x}, y: 10, colSpan: 1, rowSpan: 1" for x in range(5)),
-        "x: 5, y: 10, colSpan: 7, rowSpan: 1",
-        "x: 0, y: 11, colSpan: 12, rowSpan: 8",
-        "x: 0, y: 19, colSpan: 12, rowSpan: 3",
+        "x: 0, y: 2, colSpan: 6, rowSpan: 4",
+        "x: 6, y: 2, colSpan: 6, rowSpan: 4",
+        *(f"x: {x}, y: 6, colSpan: 1, rowSpan: 1" for x in range(5)),
+        "x: 5, y: 6, colSpan: 7, rowSpan: 1",
+        "x: 0, y: 14 + foundryMetricsHeight, colSpan: 12, rowSpan: 5",
+        "x: 0, y: 12 + foundryMetricsHeight, colSpan: 6, rowSpan: 2",
     ):
         assert position in text
-    assert "], myProjectEntryParts)" in text
+    assert "myProjectEntryParts" in text
     assert "var myProjectEntryParts = enableMyProjectDashboard ?" in text
     assert "Microsoft_Azure_CostManagement/Menu/open/costanalysis/scope/" in text
     assert "[📊 Open Cost Analysis](${costAnalysisUrl}" in text
@@ -326,16 +370,34 @@ def test_dashboard_existing_layout_and_native_cost_preserved():
 @pytest.mark.parametrize("project", ["001", "002"])
 @pytest.mark.parametrize("environment", ["dev", "test", "prod"])
 @pytest.mark.parametrize("override_insights", [False, True])
-def test_project_resource_group_five_shortcuts_and_cost_share_scope(
-    project_template, project, environment, override_insights,
+@pytest.mark.parametrize("ml,add_ml,dbx,adf", list(itertools.product((False, True), repeat=4)))
+@pytest.mark.parametrize("reports_enabled", [False, True])
+def test_project_resource_group_shortcuts_consumption_and_cost_share_scope(
+    project_template, foundry_tiles_template, project, environment, override_insights,
+    ml, add_ml, dbx, adf, reports_enabled,
 ):
     resource_name = f"project-{project}-{environment}"
     resource_id = RG.rsplit("/", 1)[0] + "/" + resource_name
     insights_id = resource_id + "/providers/Microsoft.Insights/components/existing-insights"
+    added_foundry = reports_enabled and project == "002"
+    foundry_name = "foundry-add" if added_foundry else "foundry"
+    foundry_project = "foundry-project-add" if added_foundry else "foundry-project"
+    foundry_id = f"{resource_id}/providers/Microsoft.CognitiveServices/accounts/{foundry_name}"
+    metrics_arm = Arm(foundry_tiles_template, {
+        "enabled": reports_enabled, "accountResourceId": foundry_id,
+        "projectResourceId": f"{foundry_id}/projects/{foundry_project}",
+    })
     arm = Arm(project_template, {
         "projectNumber": project, "env": environment,
         "myProjectApplicationInsightsResourceId": insights_id if override_insights else "",
-        "enableMyProjectDashboard": False,
+        "enableMyProjectDashboard": reports_enabled,
+        "enableAIFoundry": reports_enabled, "addAIFoundry": added_foundry,
+        "agentMonitoringWorkbookResourceId": WORKSPACE.replace(
+            "Microsoft.OperationalInsights/workspaces/shared", "Microsoft.Insights/workbooks/agent"),
+        "enableAzureMachineLearning": ml, "addAzureMachineLearning": add_ml,
+        "enableDatabricks": dbx, "enableDatafactory": adf,
+        "locationSuffix": "sdc", "resourceSuffix": "-001",
+        "myProjectLogAnalyticsResourceId": WORKSPACE,
     })
     arm.cache.update(
         rgResourceId=resource_id, targetResourceGroup=resource_name,
@@ -344,19 +406,22 @@ def test_project_resource_group_five_shortcuts_and_cost_share_scope(
             "aifV2PrjName": "foundry-project", "aifV2PrjNameAdd": "foundry-project-add",
             "storageAccount2001Name": "storage2001", "keyvaultName": "keyvault",
             "safeNameAISearch": "search", "applicationInsightName": "insights",
+            "amlName": "aml-added" if add_ml else "aml",
+            "dataFactoryName": "adf", "uniqueInAIFenv": "abcde", "laWorkspaceName": "shared",
         }}},
         fixtureWorkbookOutputs={
             "url": {"value": "https://example.invalid/workbook"},
             "tokensUrl": {"value": "https://example.invalid/tokens"},
         },
-        agentMonitoringEntryParts=[],
+        fixtureFoundryOutputs={"parts": {"value": metrics_arm.value(foundry_tiles_template["outputs"]["parts"]["value"])}},
         enabledByUserMarkdown="", mandatoryServicesMarkdown="",
     )
     dashboard = next(r for r in project_template["resources"] if r["type"] == "Microsoft.Portal/dashboards")
     expression = dashboard["properties"]["lenses"][0]["parts"]
     # Supply nested module outputs; evaluate the actual compiled tile expressions.
     for prefix, fixture in (("projectDash-naming-", "fixtureNamingOutputs"),
-                            ("my-project-workbook-", "fixtureWorkbookOutputs")):
+                            ("my-project-workbook-", "fixtureWorkbookOutputs"),
+                            ("foundry-metric-tiles-", "fixtureFoundryOutputs")):
         deployment = next(r for r in project_template["resources"] if prefix in r["name"])
         reference = (
             f"reference(resourceId('Microsoft.Resources/deployments', {deployment['name'][1:-1]}), "
@@ -373,25 +438,60 @@ def test_project_resource_group_five_shortcuts_and_cost_share_scope(
     assert group["metadata"]["asset"]["type"] == "ResourceGroup"
     assert group["metadata"]["inputs"][0]["value"] == resource_id
     expected = [
-        ("Microsoft.CognitiveServices/accounts", "foundry"),
+        ("Microsoft.CognitiveServices/accounts", foundry_name),
         ("Microsoft.Storage/storageAccounts", "storage2001"),
         ("Microsoft.KeyVault/vaults", "keyvault"),
         ("Microsoft.Search/searchServices", "search"),
         ("Microsoft.Insights/components", "existing-insights" if override_insights else "insights"),
     ]
-    assert len(shortcuts) == 5
-    for index, (part, (resource_type, name)) in enumerate(zip(shortcuts, expected)):
+    first_row = [p for p in shortcuts if p["position"]["y"] == 6]
+    assert len(first_row) == 5
+    for index, (part, (resource_type, name)) in enumerate(zip(first_row, expected)):
         assert part["metadata"]["asset"]["type"] == resource_type
         assert part["metadata"]["inputs"][0]["value"] == f"{resource_id}/providers/{resource_type}/{name}"
-        assert part["position"] == {"x": index, "y": 10, "colSpan": 1, "rowSpan": 1}
+        assert part["position"] == {"x": index, "y": 6, "colSpan": 1, "rowSpan": 1}
+    expected_optional = [
+        (0, "Microsoft.MachineLearningServices/workspaces", "aml-added" if add_ml else "aml", ml or add_ml),
+        (1, "Microsoft.Databricks/workspaces", f"dbx-{project}-sdc-{environment}-abcde-001", dbx),
+        (2, "Microsoft.DataFactory/factories", "adf", adf),
+    ]
+    for x, resource_type, name, enabled in expected_optional:
+        matching = [p for p in shortcuts if p["metadata"]["asset"]["type"] == resource_type]
+        assert len(matching) == int(enabled)
+        if enabled:
+            assert matching[0]["metadata"]["inputs"][0]["value"] == f"{resource_id}/providers/{resource_type}/{name}"
+            assert matching[0]["position"] == {"x": x, "y": 7, "colSpan": 1, "rowSpan": 1}
+    logs = next(p for p in shortcuts if p["metadata"]["asset"]["type"] == "Microsoft.OperationalInsights/workspaces")
+    assert logs["metadata"]["inputs"][0]["value"] == WORKSPACE
+    assert len(shortcuts) == 6 + int(ml or add_ml) + int(dbx) + int(adf)
     cost = next(p for p in parts if p["metadata"]["type"].endswith("CostAnalysisPinPart"))
     assert cost["position"]["x"] == group["position"]["x"] + group["position"]["colSpan"]
     inputs = {item["name"]: item.get("value") for item in cost["metadata"]["inputs"]}
     assert inputs["scope"] == resource_id
     assert inputs["view"]["query"]["type"] == "ActualCost"
     assert inputs["view"]["dateRange"] == "ThisMonth"
-    footer = next(p for p in parts if p["position"]["x"] == 5 and p["position"]["y"] == 10)
+    assert group["position"]["rowSpan"] == cost["position"]["rowSpan"] == 4
+    consumption = [p for p in parts if p["metadata"]["type"].endswith("CostAnalysisPinPart")
+                   and p["position"]["y"] == 8]
+    assert len(consumption) == 2
+    for index, part in enumerate(consumption):
+        values = {item["name"]: item.get("value") for item in part["metadata"]["inputs"]}
+        assert values["scope"] == resource_id
+        assert values["view"]["scope"] == resource_id.removeprefix("/")
+        assert values["view"]["chart"] == "StackedColumn"
+        assert values["view"]["accumulated"] == "false"
+        assert values["view"]["query"]["type"] == "ActualCost"
+        assert values["view"]["dateRange"] == "ThisMonth"
+        assert values["view"]["query"]["dataSet"]["grouping"] == (
+            [] if index == 0 else [{"name": "ServiceName", "type": "Dimension"}])
+        assert part["position"] == {"x": index * 6, "y": 8, "colSpan": 6, "rowSpan": 4}
+    footer = next(p for p in parts if p["position"]["x"] == 5 and p["position"]["y"] == 6)
     assert quote(resource_id, safe="") in footer["metadata"]["settings"]["content"]["settings"]["content"]
+    offset = 8 if reports_enabled else 0
+    cards = [p for p in parts if p["position"]["y"] == 12 + offset]
+    assert len(cards) == (2 if reports_enabled else 0)
+    for index, card in enumerate(cards):
+        assert card["position"] == {"x": index * 6, "y": 12 + offset, "colSpan": 6, "rowSpan": 2}
     for index, left in enumerate(parts):
         a = left["position"]
         for right in parts[index + 1:]:
@@ -400,6 +500,59 @@ def test_project_resource_group_five_shortcuts_and_cost_share_scope(
                 a["x"] + a["colSpan"] <= b["x"] or b["x"] + b["colSpan"] <= a["x"]
                 or a["y"] + a["rowSpan"] <= b["y"] or b["y"] + b["rowSpan"] <= a["y"]
             )
+
+
+@pytest.mark.parametrize("enable,add", list(itertools.product((False, True), repeat=2)))
+def test_foundry_category_tiles_are_sum_last_30_days_with_exact_scope(project_template, foundry_tiles_template, enable, add):
+    project_arm = Arm(project_template, {"enableAIFoundry": enable, "addAIFoundry": add})
+    account = RG + "/providers/Microsoft.CognitiveServices/accounts/foundry"
+    project = account + "/projects/project001"
+    arm = Arm(foundry_tiles_template, {
+        "enabled": enable or add, "accountResourceId": account, "projectResourceId": project,
+    })
+    parts = arm.value(foundry_tiles_template["outputs"]["parts"]["value"])
+    deployment = next(r for r in project_template["resources"] if "foundry-metric-tiles-" in r["name"])
+    wired = deployment["properties"]["parameters"]
+    assert project_arm.value(wired["enabled"]["value"]) == (enable or add)
+    assert "aifV2PrjNameAdd" in wired["projectResourceId"]["value"]
+    assert "aifV2NameAdd" in wired["accountResourceId"]["value"]
+    assert foundry_tiles_template.get("resources", []) == []
+    if not (enable or add):
+        assert parts == []
+        assert project_arm.variable("foundryMetricsHeight") == 0
+        return
+    assert len(parts) == 6
+    assert project_arm.variable("foundryMetricsHeight") == 8
+    expected = {
+        "AzureOpenAIRequests": account, "TotalCalls": account,
+        "GeneratedImages": account, "RAIHarmfulRequests": account,
+        "RAIRejectedRequests": account, "BlockedCalls": account, "Ratelimit": account,
+        "AgentToolCalls": project, "AgentResponses": project, "AgentModelEstimatedCost": project,
+    }
+    actual = {}
+    for part in parts:
+        assert part["metadata"]["type"] == "Extension/HubsExtension/PartType/MonitorChartPart"
+        chart = part["metadata"]["settings"]["content"]["options"]["chart"]
+        assert 1 <= len(chart["metrics"]) <= 5
+        assert chart["timeContext"]["durationMs"] == 30 * 24 * 60 * 60 * 1000
+        assert chart["visualization"]["legendVisualization"]["isVisible"] is True
+        for metric in chart["metrics"]:
+            assert metric["aggregationType"] == 1  # Native Portal Sum.
+            assert metric["name"] not in actual
+            actual[metric["name"]] = metric["resourceMetadata"]["id"]
+            assert metric["namespace"] == (
+                "microsoft.cognitiveservices/accounts/projects" if metric["name"].startswith("Agent")
+                else "microsoft.cognitiveservices/accounts")
+        if any(m["name"] == "AgentModelEstimatedCost" for m in chart["metrics"]):
+            assert len(chart["metrics"]) == 1
+            assert "USD" in chart["title"] and "estimated" in chart["title"]
+    assert actual == expected
+    positions = {(p["position"]["x"], p["position"]["y"]) for p in parts}
+    assert positions == {(x, y) for x in (0, 4, 8) for y in (14, 17)}
+    dashboard = next(r for r in project_template["resources"] if r["type"] == "Microsoft.Portal/dashboards")
+    model = dashboard["properties"]["metadata"]["model"]
+    assert model["timeRange"]["value"]["relative"] == {"duration": 30, "timeUnit": 2}
+    assert model["filters"]["value"]["MsPortalFx_TimeRange"]["model"]["relative"] == "30d"
 
 
 @pytest.mark.parametrize("project", ["001", "002"])
@@ -417,7 +570,6 @@ def test_native_cost_chart_matches_existing_factory_schema(project_template, pro
     actual = arm.variable("nativeCostAnalysisPart")
     expected = reference.cost_part(6, 2, {"id": resource_id, "name": resource_name},
                                    "22222222-2222-4222-8222-222222222222")
-    expected["position"]["rowSpan"] = 8
     assert actual == expected
     inputs = {item["name"]: item.get("value") for item in actual["metadata"]["inputs"]}
     assert inputs["scope"] == resource_id
@@ -441,10 +593,12 @@ def test_workbook_schema_shapes_and_real_query_items(workbook):
     assert workbook["version"] == "Notebook/1.0"
     assert workbook["fallbackResourceIds"] == [WORKSPACE]
     all_items = items(workbook)
-    assert len(all_items) == len(workbook["items"])
+    assert len(all_items) >= len(workbook["items"])
     assert len(all_items) >= 20
     for item in all_items.values():
-        assert item["type"] in (1, 3, 9, 10)
+        assert item["type"] in (1, 3, 9, 10, 12)
+        if item["name"].startswith("generic-"):
+            continue
         if item["type"] != 3:
             continue
         content = item["content"]
@@ -452,8 +606,10 @@ def test_workbook_schema_shapes_and_real_query_items(workbook):
         assert content["queryType"] == 0
         assert content["crossComponentResources"] == [WORKSPACE]
         assert content["resourceType"] == "microsoft.operationalinsights/workspaces"
-        assert content["timeContext"] == {"durationMs": 0}
-        assert content["visualization"] in ("table", "tiles", "timechart")
+        assert "timeContext" not in content
+        if item["name"].startswith("tokens-"):
+            assert content["timeContextFromParameter"] == "TokenTimeRange"
+        assert content["visualization"] in ("table", "tiles", "timechart", "barchart", "scatterchart")
         assert content["query"]
         if content["visualization"] == "timechart":
             assert content["chartSettings"]["xAxis"] == "Day"
@@ -469,9 +625,9 @@ def test_workbook_schema_shapes_and_real_query_items(workbook):
 
 def test_templates_scope_selection_and_coverage_defaults(workbook):
     params = parameters(workbook)
-    assert params["Template"]["value"] == "retail-chat"
-    assert {v["value"] for v in json.loads(params["Template"]["jsonData"])} == {"retail-chat", "booking-chat", "support-chat"}
-    assert {v["label"] for v in json.loads(params["Navigation"]["jsonData"])} == {"Usage & outcomes", "Cost", "Model tokens"}
+    assert params["Template"]["value"] == "none"
+    assert {v["value"] for v in json.loads(params["Template"]["jsonData"])} == {"none", "retail-chat", "booking-chat", "support-chat"}
+    assert {v["label"] for v in json.loads(params["Navigation"]["jsonData"])} == {"Usage", "Cost", "Model tokens"}
     assert params["Store"]["value"] == "All"
     for name in ("Factory", "ScaleSet"):
         assert params[name]["isRequired"]
@@ -512,7 +668,9 @@ def test_opaque_identifiers_and_query_substitution(workbook_template):
     assert params["ScaleSet"]["value"] == scale_set
     assert base64.b64encode(factory.encode()).decode() in params["Factory"]["query"]
     assert factory not in params["Factory"]["query"]
-    for item in workbook["items"]:
+    for item in items(workbook).values():
+        if item["name"].startswith("generic-"):
+            continue
         for query in ([item["content"]["query"]] if item["type"] == 3 else []):
             tokens = re.findall(r"\{([A-Za-z]+)(?::([^}]+))?\}", query)
             assert all(name in params and (formatting == "base64" or
@@ -541,6 +699,95 @@ def test_shared_metric_queries_are_template_independent(workbook):
     assert "Q and F" in query
     assert "Questions >= 3" in query
     assert "LatestStates" in query and "StateBaselineComplete" in query
+
+
+def test_generic_project_hides_scenario_controls_and_reports(workbook):
+    all_items = items(workbook)
+    generic = all_items["generic-project"]
+    business = all_items["business-scenario"]
+    assert generic["type"] == business["type"] == 12
+    assert generic["conditionalVisibility"] == {
+        "parameterName": "Template", "comparison": "isEqualTo", "value": "none"}
+    assert business["conditionalVisibility"] == {
+        "parameterName": "Template", "comparison": "isNotEqualTo", "value": "none"}
+    business_items = items(business["content"])
+    for name in ("domain-cards", "common-cards", "reviewed-coverage", "cost-summary", "business-filters"):
+        assert name in business_items
+    generic_content = json.dumps(generic)
+    for forbidden in ("{Factory", "{ScaleSet", "{Store", "QuestionsComplete", "aifactory.chat"):
+        assert forbidden not in generic_content
+    assert "tokens-account-and-time" not in business_items
+
+
+def test_compact_header_and_token_details_are_optional(workbook):
+    all_items = items(workbook)
+    assert len(all_items["my-project-heading"]["content"]["json"]) < 450
+    for name, child in (
+        ("workbook-source-help", "native-rg-cost-navigation"),
+        ("tokens-methodology", "tokens-notice"),
+        ("tokens-bindings-detail", "tokens-source-coverage"),
+        ("tokens-request-details", "tokens-log-model-totals"),
+    ):
+        group = all_items[name]["content"]
+        assert group["loadType"] == "explicit"
+        assert child in items(group)
+    for kind in ("foundry", "openai"):
+        assert all_items[f"tokens-native-{kind}-trend"]["customWidth"] == "60"
+        assert all_items[f"tokens-native-{kind}-table"]["customWidth"] == "40"
+
+
+def test_token_overview_kpis_preserve_missing_and_cached_subset_semantics(workbook):
+    overview = items(workbook)["tokens-log-kpis"]["content"]
+    assert overview["visualization"] == "tiles"
+    assert overview["size"] == 4
+    assert overview["timeContextFromParameter"] == "TokenTimeRange"
+    query = overview["query"].split("let Overview =", 1)[1]
+    assert "TokenTotals" in query
+    assert "MissingInputGroups=countif(isnull(InputTokens))" in query
+    assert "MissingOutputGroups=countif(isnull(OutputTokens))" in query
+    assert "MissingCachedGroups=countif(isnull(CachedTokens))" in query
+    assert query.count("pack('Metric'") == 5
+    assert "'Cached input subset'" in query
+    assert "InputTokens + CachedTokens" not in query
+    assert "Records > 0" in query and "'Unavailable'" in query
+    assert "Observed request logs only" in query
+
+
+def test_token_columns_and_scatter_use_comparable_observed_fields_only(workbook):
+    all_items = items(workbook)
+    columns = all_items["tokens-log-columns"]
+    scatter = all_items["tokens-log-scatter"]
+    assert columns["customWidth"] == "60" and scatter["customWidth"] == "40"
+    assert columns["content"]["visualization"] == "barchart"
+    assert scatter["content"]["visualization"] == "scatterchart"
+    assert scatter["content"]["chartSettings"]["xAxis"] == "InputTokens"
+    assert scatter["content"]["chartSettings"]["yAxis"] == ["OutputTokens"]
+    assert scatter["content"]["chartSettings"]["xSettings"]["numberFormatSettings"] == {
+        "unit": 0, "options": {"style": "decimal", "useGrouping": True},
+    }
+    for item in (columns, scatter):
+        assert item["content"]["timeContextFromParameter"] == "TokenTimeRange"
+        assert item["content"]["chartSettings"]["createOtherGroup"] == 0
+    columns_projection = columns["content"]["query"].split(";", -1)[-1]
+    assert "Tokens=InputTokens" in columns_projection and "Tokens=OutputTokens" in columns_projection
+    assert "CachedTokens" not in columns_projection
+    assert "isnotnull(InputTokens) and isnotnull(OutputTokens)" in scatter["content"]["query"]
+    assert workbook["styleSettings"] == {"spacingStyle": "none"}
+
+
+def test_token_logs_bind_real_time_range_not_zero_second_transport(workbook):
+    for name in ("tokens-source-coverage", "tokens-log-validation", "tokens-log-model-totals",
+                 "tokens-log-daily", "tokens-log-daily-details"):
+        content = items(workbook)[name]["content"]
+        assert content["timeContextFromParameter"] == "TokenTimeRange"
+        assert "timeContext" not in content
+    for name in ("TokenMetricAccount", "TokenMetricView", "TokenDeployment", "TokenModel"):
+        content = parameters(workbook)[name]
+        assert content["timeContextFromParameter"] == "TokenTimeRange"
+        assert content["timeContext"]["durationMs"] > 0
+    cache_group = items(workbook)["tokens-native-cache-optional"]
+    assert cache_group["content"]["loadType"] == "explicit"
+    assert "tokens-native-cached-table" in items(cache_group["content"])
 
 
 def test_filters_precede_aggregation_and_conflicts_reject(workbook):
@@ -629,7 +876,8 @@ def test_sql_structural_parity_exact_cohorts_and_duplicate_conflicts(workbook):
 
 def test_native_token_metrics_are_real_scoped_controls_and_not_alias_sums(workbook):
     params = parameters(workbook)
-    native = [item for item in workbook["items"] if item["type"] == 10]
+    native = [item for item in items(workbook).values()
+              if item["type"] == 10 and item["name"].startswith("tokens-")]
     assert len(native) == 5
     for item in native:
         content = item["content"]
@@ -639,7 +887,7 @@ def test_native_token_metrics_are_real_scoped_controls_and_not_alias_sums(workbo
         assert "resourceParameter" not in content  # Bind the validated scalar, not another resource picker.
         assert content["resourceLimit"] == 1
         assert content["timeContextFromParameter"] == "TokenTimeRange"
-        assert content["chartType"] in (0, 2)
+        assert content["chartType"] in (0, 3)
         assert item["conditionalVisibility"]["parameterName"] == "TokenMetricView"
         for metric in content["metrics"]:
             assert metric["aggregation"] == 1  # Total, not Count/Average
@@ -923,7 +1171,7 @@ def test_token_request_usage_nulls_privacy_and_explicit_source_separation(workbo
 
 def test_native_token_dashboard_direct_link_and_no_live_fixture_ids(workbook_template):
     text = PROJECT.read_text(encoding="utf-8")
-    assert "x: 0, y: 22, colSpan: 12, rowSpan: 3" in text
+    assert "x: 6, y: 12 + foundryMetricsHeight, colSpan: 6, rowSpan: 2" in text
     assert "myProjectWorkbook!.outputs.tokensUrl" in text
     arm, workbook = materialize(workbook_template)
     url = arm.value(workbook_template["outputs"]["tokensUrl"]["value"])

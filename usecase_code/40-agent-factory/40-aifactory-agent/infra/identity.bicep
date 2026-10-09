@@ -6,6 +6,13 @@ param searchName string
 param storageName string
 param storageContainer string
 param foundryAccount string
+param foundryProject string
+param agentName string = 'enterprise-scale-ai-factory'
+@allowed([
+  'project_reference'
+  'agent_endpoint'
+])
+param agentInvocation string = 'project_reference'
 
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: identityName
@@ -31,6 +38,13 @@ resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@20
 }
 resource foundry 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
   name: foundryAccount
+}
+resource project 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' existing = {
+  name: '${foundryAccount}/${foundryProject}'
+}
+resource agent 'Microsoft.CognitiveServices/accounts/projects/agents@2025-06-01' existing = {
+  parent: project
+  name: agentName
 }
 
 resource searchRead 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -58,6 +72,24 @@ resource inference 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     principalId: identity.properties.principalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+  }
+}
+resource projectRuntime 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (agentInvocation == 'project_reference') {
+  name: guid(project.id, identity.id, 'foundry-project-runtime')
+  scope: project
+  properties: {
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '142bfaed-a13f-4c2d-bed2-6db62c4a1009')
+  }
+}
+resource agentConsumer 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (agentInvocation == 'agent_endpoint') {
+  name: guid(agent.id, identity.id, 'foundry-agent-consumer')
+  scope: agent
+  properties: {
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'eed3b665-ab3a-47b6-8f48-c9382fb1dad6')
   }
 }
 resource inventory 'Microsoft.Authorization/roleAssignments@2022-04-01' = {

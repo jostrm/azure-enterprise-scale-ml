@@ -15,6 +15,7 @@ from mcp import McpError
 from .backend import BackendError
 from .client import ClientToolError, connect_http, connect_stdio, invoke
 from .runtime import load_runtime
+from .readiness import ApiReadinessProbe
 from .server import create_http_app, create_server, run_stdio
 
 
@@ -27,15 +28,19 @@ def parser() -> argparse.ArgumentParser:
         sub.add_argument("--repository-root", help="Purple checkout, required for an external wheel installation.")
         sub.add_argument("--scope", required=True, help="One exact configured scope key.")
         sub.add_argument("--object-id", help="Explicit trusted local operator identity; never used for HTTP.")
+        if command != "approve":
+            sub.add_argument("--graph-only", action="store_true",
+                             help="Expose only the five corpus read tools; requires explicit graph.read, not factory.read.")
         if command == "serve":
             sub.add_argument("--transport", choices=("stdio", "streamable-http"), default="stdio")
             sub.add_argument("--host", default="127.0.0.1", help="Bind address; use a TLS proxy for remote access.")
             sub.add_argument("--port", type=int, default=8899)
             sub.add_argument("--resource-url", help="External HTTPS resource URL ending in /mcp.")
+            sub.add_argument("--application-auth", help="Explicit read-only Foundry application identity policy JSON.")
         elif command in ("tools", "call"):
             sub.add_argument("--url", help="Connect to an existing authenticated HTTP MCP endpoint.")
             sub.add_argument("--token-env", default="AIFACTORY_MCP_TOKEN",
-                             help="Environment variable holding the delegated MCP access token.")
+                             help="Environment variable holding the MCP access token.")
             if command == "call":
                 sub.add_argument("tool")
                 sub.add_argument("--arguments", default="{}", help="Tool arguments as a JSON object; never put secrets here.")
@@ -79,11 +84,15 @@ def _child_arguments(options) -> list[str]:
     ]
     if options.repository_root:
         args.extend(["--repository-root", str(Path(options.repository_root).resolve())])
+    if options.graph_only:
+        args.append("--graph-only")
     return args
 
 
 async def _client(options) -> dict:
     if options.url:
+        if options.graph_only:
+            raise ValueError("--graph-only is a server policy; remote clients cannot override server tools.")
         if options.object_id:
             raise ValueError("HTTP uses the verified access token identity, not --object-id.")
         connection = connect_http(options.url, os.environ.get(options.token_env, ""))
@@ -107,7 +116,13 @@ def main(argv=None) -> int:
         if options.command in ("tools", "call"):
             result = asyncio.run(_client(options))
         else:
-            runtime = load_runtime(options.config, options.repository_root)
+            application_auth = getattr(options, "application_auth", None)
+            if application_auth and options.transport != "streamable-http":
+                raise ValueError("--application-auth is only supported by the authenticated HTTP server.")
+            runtime = load_runtime(
+                options.config, options.repository_root, application_auth=application_auth,
+                graph_only=getattr(options, "graph_only", False),
+            )
             if options.command == "approve":
                 if not options.object_id:
                     raise ValueError("An explicit --object-id is required for local approval.")
@@ -125,7 +140,10 @@ def main(argv=None) -> int:
                 if not 1 <= options.port <= 65535:
                     raise ValueError("The HTTP port must be between 1 and 65535.")
                 import uvicorn
-                app = create_http_app(runtime, options.scope, resource_url=options.resource_url)
+                app = create_http_app(
+                    runtime, options.scope, resource_url=options.resource_url,
+                    readiness=None if options.graph_only else ApiReadinessProbe(runtime.settings.factory.api_url),
+                )
                 uvicorn.run(app, host=options.host, port=options.port, log_level="warning", access_log=False)
                 return 0
         print(json.dumps(result, indent=2, allow_nan=False))

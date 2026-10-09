@@ -157,6 +157,21 @@ class TestDashboardCliLauncher(unittest.TestCase):
         ):
             self.assertIs(result, module.az_cli("rest"))
 
+    def test_usage_read_timeout_is_bounded_and_sanitized(self) -> None:
+        with (
+            patch.object(module.shutil, "which", return_value="az.exe"),
+            patch.object(module.sys, "platform", "win32"),
+            patch.object(module.usage, "is_read_command", return_value=True),
+            patch.object(module.subprocess, "run",
+                         side_effect=subprocess.TimeoutExpired("SECRET", 90)) as run,
+        ):
+            result = module.az_cli("rest", "--method", "get")
+        self.assertEqual(90, run.call_args.kwargs["timeout"])
+        self.assertNotEqual(0, result.returncode)
+        self.assertEqual("", result.stdout)
+        self.assertEqual("UsageReadTimeout", json.loads(result.stderr)["error"]["code"])
+        self.assertNotIn("SECRET", result.stderr)
+
     def test_main_reports_launch_failure_and_keeps_nonzero_exit(self) -> None:
         with (
             patch.dict(os.environ, environment(), clear=True),
@@ -258,6 +273,8 @@ class FakeAz:
             self.host_exists = True
             return response()
         if args[0] == "rest":
+            if module.usage.is_read_command(args):
+                return response(error='{"error":{"code":"AuthorizationFailed"}}')
             if "--method" in args and args[args.index("--method") + 1] == "put":
                 body_arg = args[args.index("--body") + 1]
                 self.rest_body = json.loads(
@@ -492,7 +509,152 @@ class TestAifactoryDashboard(unittest.TestCase):
             for part in shortcut_parts
         ))
 
-    def test_five_discovered_resource_shortcuts_are_kept_in_project_layout(self) -> None:
+    def test_every_cost_has_an_adjacent_usage_snapshot_without_overlap(self) -> None:
+        config = self.config()
+        inventory, tenant, _ = module.reconcile(config, FakeAz(config))
+        inventory["hubResourceGroups"] = [{
+            "name": "hub", "id": module.arm_id(DEV_SUB, "hub"),
+        }]
+        parts = module.dashboard_parts(inventory, tenant)
+        costs = [p for p in parts if p["metadata"]["type"].endswith("CostAnalysisPinPart")]
+        for cost in costs:
+            position = cost["position"]
+            adjacent = [p for p in parts
+                        if p["position"]["x"] == position["x"] + position["colSpan"]
+                        and p["position"]["y"] == position["y"]]
+            self.assertEqual(1, len(adjacent))
+            card = adjacent[0]
+            self.assertEqual("Extension/HubsExtension/PartType/MarkdownPart", card["metadata"]["type"])
+            text = card["metadata"]["settings"]["content"]["settings"]["content"]
+            self.assertIn("Activity & solution assets", text)
+            self.assertIn("Unavailable", text)
+            self.assertIn("Snapshot", text)
+        for index, left in enumerate(parts):
+            a = left["position"]
+            for right in parts[index + 1:]:
+                b = right["position"]
+                self.assertTrue(
+                    a["x"] + a["colSpan"] <= b["x"] or b["x"] + b["colSpan"] <= a["x"]
+                    or a["y"] + a["rowSpan"] <= b["y"] or b["y"] + b["rowSpan"] <= a["y"]
+                )
+
+    def test_factory_map_is_immediately_right_of_connectivity_and_preserves_hub_cost(self) -> None:
+        config = self.config()
+        inventory, tenant, _ = module.reconcile(config, FakeAz(config))
+        inventory["hubResourceGroups"] = [
+            {"name": f"hub-{i}", "id": module.arm_id(DEV_SUB, f"hub-{i}")} for i in range(3)
+        ]
+        parts = module.dashboard_parts(inventory, tenant)
+        maps = [p for p in parts if p["metadata"]["type"].endswith("/PinnedNotebookQueryPart")]
+        self.assertEqual(1, len(maps))
+        self.assertEqual({"x": 4, "y": 2, "colSpan": 12, "rowSpan": 4}, maps[0]["position"])
+        for hub in inventory["hubResourceGroups"]:
+            self.assertTrue(any(p["metadata"].get("asset", {}).get("type") == "ResourceGroup"
+                                and p["metadata"]["inputs"][0]["value"] == hub["id"] for p in parts))
+            self.assertTrue(any(p["metadata"]["type"].endswith("CostAnalysisPinPart")
+                                and p["metadata"]["inputs"][0]["value"] == hub["id"] for p in parts))
+        for index, left in enumerate(parts):
+            a = left["position"]
+            for right in parts[index + 1:]:
+                b = right["position"]
+                self.assertTrue(
+                    a["x"] + a["colSpan"] <= b["x"] or b["x"] + b["colSpan"] <= a["x"]
+                    or a["y"] + a["rowSpan"] <= b["y"] or b["y"] + b["rowSpan"] <= a["y"]
+                )
+
+    def test_factory_map_is_live_blue_inventory_across_exact_known_group_ids(self) -> None:
+        config = self.config()
+        inventory, _, _ = module.reconcile(config, FakeAz(config))
+        hub = module.arm_id(PROD_SUB, "connectivity")
+        inventory["hubResourceGroups"] = [
+            {"id": hub}, {"id": hub.upper()},
+            {"id": module.arm_id(DEV_SUB, "deleted"), "deploymentStatus": "not-deployed"},
+            {"id": "/subscriptions/invalid/resourceGroups/foreign"},
+        ]
+        part = module.factory_map_part(inventory)
+        inputs = {item["name"]: item["value"] for item in part["metadata"]["inputs"]}
+        content = json.loads(inputs["StepSettings"])
+        self.assertEqual("Number of resources by region", content["title"])
+        self.assertEqual("map", content["visualization"])
+        self.assertEqual(1, content["queryType"])
+        self.assertIn(json.dumps(hub.lower()), content["query"])
+        self.assertEqual(1, content["query"].count(hub.lower()))
+        self.assertNotIn("deleted", content["query"])
+        self.assertNotIn("invalid", content["query"])
+        self.assertIn("GroupId in~ (", content["query"])
+        self.assertEqual({}, inputs["ParameterValues"])
+        self.assertIn(inputs["ComponentId"].lower(), [
+            group["id"].lower() for group in module.inventory_groups(inventory)
+            if group.get("deploymentStatus") != "not-deployed"
+        ])
+        self.assertEqual("microsoft.resources/subscriptions/resourcegroups", inputs["GalleryResourceType"])
+        self.assertNotIn("ConfigurationId", inputs)
+        self.assertNotIn("Health", content["query"])
+        self.assertEqual("blue", content["mapSettings"]["itemColorSettings"]["thresholdsGrid"][0]["representation"])
+        empty = module.factory_map_part({"hubResourceGroups": [], "environments": []})
+        self.assertEqual("Extension/HubsExtension/PartType/MarkdownPart", empty["metadata"]["type"])
+        self.assertIn("No known factory resource groups", empty["metadata"]["settings"]["content"]["settings"]["content"])
+
+    def test_usage_tile_distinguishes_observed_zero_inventory_and_unavailable(self) -> None:
+        resource = {
+            "name": "project", "id": module.arm_id(DEV_SUB, "project"),
+            "usageSnapshot": {
+                "observedAt": "2026-10-08T20:00:00Z",
+                "windowStart": "2026-09-08T20:00:00Z", "windowEnd": "2026-10-08T20:00:00Z",
+                "metrics": {
+                    "activity": {"status": "ok", "value": 1234, "detail": "private@example.com"},
+                    "agents": {"status": "ok", "value": 3, "detail": "New agents: 2; classic: 1"},
+                    "models": {"status": "ok", "value": 0, "detail": "Registered model names"},
+                    "storage": {"status": "ok", "value": 1073741824, "detail": "Latest sample"},
+                    "adf": {"status": "unavailable", "value": None, "detail": "No observations"},
+                    "search": {"status": "not-deployed", "value": None, "detail": "Not deployed"},
+                },
+            },
+        }
+        card = module.usage_part(10, 12, resource, TENANT)
+        content = card["metadata"]["settings"]["content"]["settings"]["content"]
+        self.assertIn("1,234", content)
+        self.assertIn("1.00 GiB", content)
+        self.assertIn("**0**", content)
+        self.assertIn("Unavailable", content)
+        self.assertIn("Not deployed", content)
+        self.assertIn("2026-10-08 20:00 UTC", content)
+        self.assertIn("30d", content)
+        self.assertIn("not runtime usage", content)
+        self.assertIn("dashboard-only run", content)
+        self.assertIn("activitylog", content)
+        self.assertNotIn("private@example.com", content)
+
+    def test_usage_collection_covers_all_retained_rg_records_once_in_scope(self) -> None:
+        class Collector:
+            def __init__(self):
+                self.ids = []
+
+            def collect(self, resource_id):
+                self.ids.append(resource_id)
+                return {"observedAt": "2026-10-08T20:00:00Z", "metrics": {}}
+
+        current = {"id": module.arm_id(DEV_SUB, "project")}
+        duplicate = {"id": current["id"].upper()}
+        retained = {"id": module.arm_id(DEV_SUB, "retained")}
+        foreign = {"id": module.arm_id(PROD_SUB, "foreign"), "usageSnapshot": {"stale": True}}
+        absent = {"id": module.arm_id(DEV_SUB, "absent"), "deploymentStatus": "not-deployed"}
+        inventory = {
+            "hubResourceGroups": [current, foreign],
+            "environments": [
+                {"commonResourceGroup": duplicate, "projects": [retained]},
+                {"commonResourceGroup": absent, "projects": []},
+            ],
+        }
+        collector = Collector()
+        module.collect_usage(inventory, collector, {DEV_SUB})
+        self.assertEqual([current["id"], retained["id"]], collector.ids)
+        self.assertEqual(current["usageSnapshot"], duplicate["usageSnapshot"])
+        self.assertIn("usageSnapshot", retained)
+        self.assertNotIn("usageSnapshot", foreign)
+        self.assertNotIn("usageSnapshot", absent)
+
+    def test_eight_discovered_resource_shortcuts_are_kept_in_two_rows(self) -> None:
         config = self.config()
         fake = FakeAz(config)
         inventory, tenant, _ = module.reconcile(config, fake)
@@ -503,6 +665,9 @@ class TestAifactoryDashboard(unittest.TestCase):
             ("Key Vault", "Microsoft.KeyVault/vaults", "vault"),
             ("AI Search", "Microsoft.Search/searchServices", "search"),
             ("Application Insights", "Microsoft.Insights/components", "insights"),
+            ("Azure Machine Learning", "Microsoft.MachineLearningServices/workspaces", "aml"),
+            ("Azure Databricks", "Microsoft.Databricks/workspaces", "dbx"),
+            ("Azure Data Factory", "Microsoft.DataFactory/factories", "adf"),
         ]
         discovered = [
             {"id": f"{project['id']}/providers/{kind}/{name}", "type": kind, "name": name}
@@ -519,10 +684,12 @@ class TestAifactoryDashboard(unittest.TestCase):
             part for part in parts
             if part["metadata"].get("asset", {}).get("type") in {kind for _, kind, _ in expected}
         ]
-        self.assertEqual(5, len(shortcuts))
+        self.assertEqual(8, len(shortcuts))
         for index, (part, resource) in enumerate(zip(shortcuts, discovered)):
             self.assertEqual(resource["id"], part["metadata"]["inputs"][0]["value"])
-            self.assertEqual({"x": index, "y": 16, "colSpan": 1, "rowSpan": 1}, part["position"])
+            self.assertEqual(
+                {"x": index if index < 5 else index - 5, "y": 16 if index < 5 else 17,
+                 "colSpan": 1, "rowSpan": 1}, part["position"])
 
     def test_deploy_passes_reconciled_inventory_and_parts_to_bicep(self) -> None:
         config = self.config()
@@ -536,6 +703,62 @@ class TestAifactoryDashboard(unittest.TestCase):
         deployment_call = fake.calls[-1]
         self.assertIn(str(TEMPLATE), deployment_call)
         self.assertIn(config.dashboard_resource_group, deployment_call)
+
+    def test_optional_ml_data_shortcuts_use_second_row_even_without_base_services(self) -> None:
+        config = self.config()
+        inventory, tenant, _ = module.reconcile(config, FakeAz(config))
+        project = inventory["environments"][0]["projects"][0]
+        kinds = [
+            ("Azure Machine Learning", "Microsoft.MachineLearningServices/workspaces", "aml", "Default"),
+            ("Azure Databricks", "Microsoft.Databricks/workspaces", "dbx", ""),
+            ("Azure Data Factory", "Microsoft.DataFactory/factories", "adf", ""),
+        ]
+        for enabled in itertools.product((False, True), repeat=3):
+            with self.subTest(enabled=enabled):
+                discovered = [
+                    {"id": f"{project['id']}/providers/{kind}/{name}", "type": kind,
+                     "name": name, "kind": workspace_kind}
+                    for active, (_, kind, name, workspace_kind) in zip(enabled, kinds) if active
+                ]
+                # Foundry hubs/projects share the AML resource provider, but are not AML workspaces.
+                discovered += [
+                    {"id": f"{project['id']}/providers/{kinds[0][1]}/{kind}",
+                     "type": kinds[0][1], "name": f"aaa-{kind}", "kind": kind}
+                    for kind in ("Hub", "Project")
+                ]
+                with patch.object(module, "az_cli", return_value=response(discovered)) as az:
+                    project["shortcuts"] = module.resource_shortcuts(DEV_SUB, project["name"], [], az)
+                expected = [item for active, item in zip(enabled, kinds) if active]
+                self.assertEqual([item[0] for item in expected], [s["label"] for s in project["shortcuts"]])
+                # Include a following project to catch overlap with its heading.
+                inventory["environments"][0]["projects"] = [
+                    project, {**project, "projectNumber": "018", "shortcuts": []},
+                ]
+                parts = module.dashboard_parts(inventory, tenant)
+                shortcuts = [p for p in parts if p["metadata"].get("asset", {}).get("type")
+                             in {item[1] for item in kinds}]
+                self.assertEqual(len(expected), len(shortcuts))
+                for index, part in enumerate(shortcuts):
+                    self.assertEqual({"x": index, "y": 17, "colSpan": 1, "rowSpan": 1}, part["position"])
+                for index, left in enumerate(parts):
+                    a = left["position"]
+                    for right in parts[index + 1:]:
+                        b = right["position"]
+                        self.assertTrue(
+                            a["x"] + a["colSpan"] <= b["x"] or b["x"] + b["colSpan"] <= a["x"]
+                            or a["y"] + a["rowSpan"] <= b["y"] or b["y"] + b["rowSpan"] <= a["y"]
+                        )
+
+    def test_ml_discovery_keeps_legacy_kind_and_preserves_shortcuts_on_read_failure(self) -> None:
+        workspace = {"id": "/workspace", "type": "Microsoft.MachineLearningServices/workspaces",
+                     "name": "legacy-aml"}
+        with patch.object(module, "az_cli", return_value=response([workspace])) as az:
+            previous = module.resource_shortcuts(DEV_SUB, "project", [], az)
+        self.assertEqual(["Azure Machine Learning"], [s["label"] for s in previous])
+        with patch.object(module, "az_cli", return_value=response(error="AuthorizationFailed")) as az:
+            self.assertEqual(previous, module.resource_shortcuts(DEV_SUB, "project", previous, az))
+        with patch.object(module, "az_cli", return_value=response([])) as az:
+            self.assertEqual([], module.resource_shortcuts(DEV_SUB, "project", previous, az))
 
     def test_existing_dashboard_update_uses_etag_and_rest_put(self) -> None:
         config = self.config()

@@ -1,0 +1,18 @@
+FROM docker.io/library/python@sha256:88310c082760d93ac7c74d579e95e53a4ab6ea52dd8901abc61a103daf488ac4
+ARG RELEASE_HASH
+LABEL aifactory.release=$RELEASE_HASH
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+COPY deploy/requirements.mcp.txt /tmp/requirements.txt
+COPY wheels /opt/wheels
+RUN python -m pip install --no-cache-dir --no-index --find-links /opt/wheels -r /tmp/requirements.txt \
+    && python -m pip freeze > /opt/installed-versions.txt \
+    && useradd --uid 10001 --create-home app
+COPY repository /opt/repository
+COPY src/aifactory_mcp /opt/mcp/aifactory_mcp
+COPY deploy/launch.py /opt/launch.py
+COPY release.json /opt/release.json
+ENV PYTHONPATH=/opt/mcp
+USER 10001
+WORKDIR /opt
+EXPOSE 8080
+ENTRYPOINT ["python", "/opt/launch.py", "mcp"]

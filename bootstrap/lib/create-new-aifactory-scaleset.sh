@@ -41,6 +41,12 @@ Common non-interactive variables:
   AIF_PREFIX=acme-ai-
   AIF_SCALESET_SUFFIX=001
   AIF_PROJECT_NUMBER=001
+  AIF_PERSONA_ACCESS_MODE=legacy|groups-v1
+  AIF_ENABLE_PERSONAS=true|false (or ENABLE_PERSONAS; default false, overrides the old mode when supplied)
+  AIF_PERSONA_ACCESS_MANIFEST=access/dev-project001.json
+                         groups-v1 requires a reviewed repo-relative manifest and all
+                         nine groups already published to its seeding vault.
+                         Legacy team/admin inputs below are not used in groups-v1.
   AIF_TEAM_GROUP_NAME=acme-ai-prj001-team
   AIF_TEAM_MEMBER_EMAIL=jostrm@microsoft.com
   AIF_TEAM_GROUP_ID=<existing-group-object-id>
@@ -763,14 +769,22 @@ aif_collect_answers() {
   AIF_SEEDING_KEYVAULT_NAME="${AIF_SEEDING_KEYVAULT_NAME:-kv${prefix_compact}${AIF_LOCATION_SHORT}${AIF_SCALESET_SUFFIX}}"
   AIF_SEEDING_KEYVAULT_NAME="${AIF_SEEDING_KEYVAULT_NAME:0:24}"
   AIF_TEAM_GROUP_NAME="${AIF_TEAM_GROUP_NAME:-${AIF_PREFIX%-}prj${AIF_PROJECT_NUMBER}-team}"
-  aif_prompt_value AIF_TEAM_GROUP_NAME "Entra security group for the initial team" "$AIF_TEAM_GROUP_NAME"
-  aif_prompt_value AIF_TEAM_MEMBER_EMAIL "Initial team member" "$current_user"
+  if [[ "${AIF_PERSONA_ACCESS_MODE:-legacy}" != groups-v1 ]]; then
+    aif_prompt_value AIF_TEAM_GROUP_NAME "Entra security group for the initial team" "$AIF_TEAM_GROUP_NAME"
+    aif_prompt_value AIF_TEAM_MEMBER_EMAIL "Initial team member" "$current_user"
+  fi
   AIF_ADMIN_GROUP_ID="${AIF_ADMIN_GROUP_ID:-}"
   AIF_ADMIN_GROUP_NAME="${AIF_ADMIN_GROUP_NAME:-}"
   AIF_ADMIN_MEMBER_EMAIL="${AIF_ADMIN_MEMBER_EMAIL:-}"
   AIF_ADMIN_GROUP_MODE="${AIF_ADMIN_GROUP_MODE:-}"
   local admin_group_default=team
   [[ -z "$AIF_ADMIN_GROUP_ID$AIF_ADMIN_GROUP_NAME$AIF_ADMIN_MEMBER_EMAIL" ]] || admin_group_default=separate
+  if [[ "${AIF_PERSONA_ACCESS_MODE:-legacy}" == groups-v1 ]]; then
+    AIF_ADMIN_GROUP_MODE=team
+    AIF_ADMIN_GROUP_ID=""
+    AIF_ADMIN_GROUP_NAME=""
+    AIF_ADMIN_MEMBER_EMAIL=""
+  else
   aif_prompt_choice AIF_ADMIN_GROUP_MODE \
     "Technical administrators: reuse initial team (team) or separate Entra group (separate)" \
     "$admin_group_default" "team separate"
@@ -783,6 +797,7 @@ aif_collect_answers() {
   elif [[ -n "$AIF_ADMIN_GROUP_ID$AIF_ADMIN_GROUP_NAME$AIF_ADMIN_MEMBER_EMAIL" ]]; then
     aif_error "Separate administrator group inputs require AIF_ADMIN_GROUP_MODE=separate." >&2
     exit 1
+  fi
   fi
 
   aif_section "03 / Seeding Key Vault"
@@ -1722,6 +1737,11 @@ aif_ensure_seeding_keyvault() {
 
 aif_ensure_team_group() {
   aif_section "11 / Entra team"
+  if [[ "${AIF_PERSONA_ACCESS_MODE:-legacy}" == groups-v1 ]]; then
+    AIF_TEAM_GROUP_ID=""
+    aif_info "groups-v1 uses independently bootstrapped persona records; no legacy Graph discovery, creation or membership mutation."
+    return 0
+  fi
   if [[ -n "$AIF_TEAM_GROUP_ID" ]]; then
     if ! aif_validate_guid "$AIF_TEAM_GROUP_ID"; then
       aif_error "AIF_TEAM_GROUP_ID must be an existing Entra group object-ID GUID." >&2
@@ -1776,6 +1796,10 @@ aif_ensure_team_group() {
 }
 
 aif_ensure_admin_group() {
+  if [[ "${AIF_PERSONA_ACCESS_MODE:-legacy}" == groups-v1 ]]; then
+    AIF_ADMIN_GROUP_ID=""
+    return 0
+  fi
   if [[ "${AIF_ADMIN_GROUP_MODE:-team}" == team ]]; then
     AIF_ADMIN_GROUP_ID="$AIF_TEAM_GROUP_ID"
     return 0
@@ -2636,7 +2660,8 @@ aif_write_state_and_configure() {
     "$AIF_TEAM_MEMBER_EMAIL" "${AIF_SIMPLE_PROJECT_RESOURCES_JSON:-}" \
     "${GITHUB_REPOSITORY_VISIBILITY:-private}" "${AIF_ENABLE_APPLICATION_GATEWAY-true}" \
     "$AIF_RUNNER_VM_OS" "${GHA_RUNNER_NAME:-}" "${GHA_RUNNER_LABEL:-}" \
-    "${AIF_ADMIN_GROUP_ID:-}" "${AIF_ADMIN_MEMBER_EMAIL:-}" <<'PY'
+    "${AIF_ADMIN_GROUP_ID:-}" "${AIF_ADMIN_MEMBER_EMAIL:-}" \
+    "${AIF_PERSONA_ACCESS_MODE:-legacy}" "${AIF_PERSONA_ACCESS_MANIFEST:-}" <<'PY'
 import json
 import sys
 
@@ -2661,6 +2686,7 @@ keys = (
     "runner_vm_os",
     "github_runner_name", "github_runner_label",
     "admin_group_id", "admin_member_email",
+    "persona_access_mode", "persona_access_manifest",
 )
 values = dict(zip(keys, sys.argv[2:]))
 values["dev_service_connection"] = values["ado_service_connection"]
@@ -4086,6 +4112,66 @@ aif_verify_common_resource_group() {
   aif_success "Common resource group '$common_rg' exists."
 }
 
+aif_load_persona_configuration() {
+  local persona_settings
+  persona_settings="$("${AIF_PYTHON[@]}" -B - "$AIF_REPO_ROOT" "${AIF_PERSONA_ACCESS_MODE:-}" "${AIF_PERSONA_ACCESS_MANIFEST:-}" "$AIF_SCALESET_LIB_DIR" "${AIF_ENABLE_PERSONAS-${ENABLE_PERSONAS-}}" "${AIF_ENABLE_PERSONAS+x}${ENABLE_PERSONAS+x}" <<'PY'
+import json, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[4])
+from aifactory_scaleset_config import guard_persona_downgrade, persona_mode
+path = Path(sys.argv[1]) / "aifactory/variables.json"
+values = json.loads(path.read_text(encoding="utf-8-sig")).get("dev", {}) if path.is_file() else {}
+if sys.argv[2]:
+    values["persona_access_mode"] = sys.argv[2]
+if sys.argv[6]:
+    values["enablePersonas"] = sys.argv[5]
+mode = persona_mode(values)
+manifest = sys.argv[3] or values.get("persona_access_manifest", "")
+if mode not in ("legacy", "groups-v1"):
+    raise SystemExit("Unsupported persona_access_mode; use legacy or groups-v1.")
+guard_persona_downgrade(path, {"persona_access_mode": mode})
+if mode == "groups-v1" and not manifest:
+    raise SystemExit("groups-v1 requires AIF_PERSONA_ACCESS_MANIFEST and bootstrapped seeding records before factory creation.")
+if "\n" in manifest or "\r" in manifest:
+    raise SystemExit("Persona manifest path must be a single line.")
+print(mode)
+print(manifest)
+PY
+)" || return
+  AIF_PERSONA_ACCESS_MODE="$(printf '%s\n' "$persona_settings" | head -n 1 | tr -d '\r')"
+  AIF_PERSONA_ACCESS_MANIFEST="$(printf '%s\n' "$persona_settings" | tail -n +2 | tr -d '\r')"
+}
+
+aif_validate_simple_target() {
+  [[ "${AIF_SIMPLE_MODE:-false}" == true ]] || return 0
+  "${AIF_PYTHON[@]}" -B - "$AIF_SCALESET_LIB_DIR" "$AIF_REPO_ROOT" \
+    "$AIF_PERSONA_ACCESS_MODE" "$AIF_PERSONA_ACCESS_MANIFEST" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from aifactory_scaleset_config import validate_simple_target
+validate_simple_target(Path(sys.argv[2]), sys.argv[3], sys.argv[4])
+PY
+}
+
+aif_persona_preflight() {
+  "${AIF_PYTHON[@]}" -B - "$AIF_SCALESET_LIB_DIR" "$AIF_REPO_ROOT" \
+    "$AIF_PERSONA_ACCESS_MODE" "$AIF_PERSONA_ACCESS_MANIFEST" "$AIF_DRY_RUN" \
+    "$AIF_TENANT_ID" "$AIF_DEV_SUBSCRIPTION_ID" "$AIF_PREFIX" \
+    "$AIF_SCALESET_SUFFIX_DASH" "$AIF_LOCATION_SHORT" "$AIF_PROJECT_NUMBER" <<'PY'
+import sys
+from pathlib import Path
+library, root, mode, manifest, dry, tenant, subscription, prefix, suffix, location, project = sys.argv[1:]
+sys.path.insert(0, str(Path(library).resolve().parents[1] / "environment_setup/aifactory/bicep"))
+from personas.pipeline import run
+values = {"persona_access_mode": mode, "persona_access_manifest": manifest,
+          "tenantId": tenant, "dev_sub_id": subscription, "admin_aifactoryPrefixRG": prefix,
+          "admin_aifactorySuffixRG": suffix, "admin_locationSuffix": location, "project_number_000": project}
+run(values, "dev", Path(root), "common", "validate" if dry == "true" else "preflight")
+print("Persona access prerequisites validated; runtime does not create Entra groups.")
+PY
+}
+
 aif_scaleset_main() {
   AIF_ROUTE="$1"
   AIF_ENTRYPOINT="$2"
@@ -4157,6 +4243,7 @@ aif_scaleset_main() {
   aif_resolve_azure_cli
   [[ "$AIF_ROUTE" != "gha" ]] || aif_require_command gh
   aif_python
+  aif_load_persona_configuration || return
   local saved_runner_request
   saved_runner_request="$("${AIF_PYTHON[@]}" -B - "$AIF_SCALESET_LIB_DIR" "$AIF_REPO_ROOT" <<'PY'
 import sys
@@ -4180,11 +4267,7 @@ PY
       exit 1
     fi
   fi
-  if [[ "${AIF_SIMPLE_MODE:-false}" == "true" && -d "$AIF_REPO_ROOT" &&
-        -n "$(find "$AIF_REPO_ROOT" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
-    aif_error "Simple Mode requires a new empty target folder; existing repositories are never modified." >&2
-    exit 1
-  fi
+  aif_validate_simple_target || return
   local state_parent="$HOME/.aifactory-create-state"
   mkdir -p "$state_parent"
   AIF_STATE_DIR="$(mktemp -d "$state_parent/run.XXXXXX")"
@@ -4197,6 +4280,7 @@ PY
   aif_collect_answers
   aif_confirm_summary
   aif_ensure_azure_login
+  aif_persona_preflight || return
   aif_validate_simple_gateway_prerequisites
   aif_validate_admin_vm_size
   [[ "$AIF_ROUTE" != "ado" ]] || aif_ensure_ado_auth

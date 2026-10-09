@@ -17,6 +17,17 @@ This release builds on v1.24 and its v1.24.1 patch. It adds new application patt
 > [!IMPORTANT]
 > **Choose your target explicitly.** Some version defaults still point to v1.24. Source availability does not imply deployment in your tenant. Review the [upgrade checklist](#upgrade-checklist-and-compatibility-caveats) before adopting.
 
+> **Persona support clarification (5 October 2026).** The snapshot's "Entra group
+> personas" means group-principal RBAC support and legacy persona-labelled
+> configuration, not a complete nine-persona permission policy. The new opt-in
+> `groups-v1` implementation is a post-snapshot source change; it is not included
+> in the reviewed `1bd9020e` snapshot or implicitly available in installed
+> desktop/API packages. See the [evidence-backed persona specification](documentation/v2/20-29/25-personas-aifactory.md)
+> for its permission matrix, privileged seeding prerequisite, compatibility
+> changes, migration gates and live-authorization validation requirements.
+
+> **Later source developments:** see the [8 October 2026 post-v1.25 addendum](#post-v125-addendum--8-october-2026) for Factory Agent Chat, Factory MCP, shared graph evidence, Azure Monitor health models and opt-in personas. It does not change the original release snapshot.
+
 **Explore:** [At a glance](#at-a-glance) · [Documentation](#start-here-new-and-updated-documentation) · [Setup and lifecycle](#configure-and-deploy-with-more-control) · [Desktop and API](#operate-from-desktop-cli-or-api) · [Agents](#build-with-agent-factory) · [ML and data](#build-with-ml-model-factory) · [Monitoring](#see-usage-cost-and-model-health-in-context) · [Gateway and fixes](#strengthen-gateway-and-private-platform-operations) · [Upgrade](#upgrade-checklist-and-compatibility-caveats)
 
 ## At a glance
@@ -331,6 +342,39 @@ The two desktop screenshots come from the supplied 17 September 2026 demonstrati
 File hashes and transformation details are recorded in [visual provenance](documentation/images/releases/1.25/visual-provenance.json). The release banner is original editorial artwork.
 
 </details>
+
+---
+
+## Post-v1.25 addendum — 8 October 2026
+
+**Current-source update, not a new release or GA announcement.** The 23 September `1bd9020e` release assessment above and the 30 September roadmap snapshot are unchanged. This addendum reviews local accelerator HEAD `9386ccd208ceaf7f754b51f0efbdf7d4cd1d43ed` **plus existing uncommitted work**, and the canonical Factory API source at `732dc7b83d12e23e93b7197113c1f6c7abad0b7d` (Config Wizard v0.47.20). Neither identifies an installed application or deployed service. No remote fetch, deployment or live endpoint validation was performed for this update.
+
+### New interaction and operating capabilities
+
+| Capability | What teams can build on | Source and adoption status |
+|---|---|---|
+| **AI Factory Agent Chat** | A private, source-grounded assistant with citations, Platform/Project explanations, exact-scope authorization and governed Factory-operation adapters. Human approval remains separate from the model. | Initial source added after v1.25 in `0ccdc0db`; current browser/desktop-host integration and graph enhancements include working-tree changes. The [Agent Chat guide](usecase_code/40-agent-factory/40-aifactory-agent/readme.md) describes embedding the private web UX in ESAIF Agent Chat, not a second native provisioning engine. Current deployment and installed-host compatibility are not established by this review. |
+| **Factory MCP** | Standard MCP access to Factory discovery, skills and reviewed operations through existing backend adapters; local stdio and authenticated Streamable HTTP, with caller/scope/tool controls. | Added after v1.25 in `944d4bbd`; current authentication, graph and deployment scaffolding include working-tree changes. The [Factory MCP package](mcp/readme.md) is distinct from the earlier narrow `44-azure-mcp` resource-read example. Its read-only pilot scaffold does not enable general action rollout; model-facing tools cannot grant approval. |
+| **Factory CLI, Python SDK and Factory API** | Terminal, Python and language-neutral HTTP integration over the same supported backend operations: prepare, review, confirm and observe. | CLI/SDK/API were already present in the reviewed v1.25 source; later source adds capabilities such as saved-monitoring access. See the [current CLI/SDK guide](environment_setup/azurefactory-cli/readme.md) and [API examples](environment_setup/install_config_wizard/api-usage-examples/readme.md). Matching host capabilities, inputs and approval are required; not every API operation has a dedicated CLI/SDK convenience method. |
+| **Shared Factory dual knowledge graph** | Code/dependency structure plus curated architecture notes, queried by both Agent Chat and Factory MCP through the same `DualGraphStore`, with snapshot-bound citations and freshness/coverage warnings. | Opt-in **working-tree implementation, not a released package claim**. Separate exact-scope `graph.read` and corpus authorization are required. Queries do not generate graphs, deploy resources or call embedding/model services. Chat inference is a separate operation. See the [graph contract](documentation/architecture/contracts/dual-graph-lifecycle.md), [Chat integration](usecase_code/40-agent-factory/40-aifactory-agent/readme.md#optional-dual-graph-grounding) and [MCP integration](mcp/readme.md#optional-dual-graph-evidence). |
+| **Azure Monitor health models** | Workload health trees for project, common and agent views; infrastructure metrics, Resource Health and optional logs; state propagation, alerts, history and operator triage. Separate ADO/GHA workflows support explicit deployment. | Added after v1.25 in `944d4bbd`; the current multi-model/service redesign includes uncommitted changes. `Microsoft.CloudHealth` uses preview API `2026-09-01-preview`. The [health-model guide](healthmodel/readme.md) records a limited 3 October test deployment, not current universal availability or customer rollout. |
+| **Opt-in human-access personas** | Nine explicit team/access roles with scoped permission policies, group bootstrap, reviewed seeding and reconciliation, rather than persona labels alone. | **Unreleased `groups-v1` working-tree feature; `legacy` remains the default.** Adoption needs a reviewed manifest, matching scripts/pipelines, privileged seeding, migration review and live authorization validation. See the existing clarification above and [persona specification](documentation/v2/20-29/25-personas-aifactory.md#opt-in-nine-persona-model-groups-v1). These are access roles, not LLM personalities. |
+
+### Same outcomes do not mean every request starts a pipeline
+
+- **Configure is not deploy.** `factory create` / `project add` prepare configuration; catalog confirmation can save it with `job:null`. Selecting `orchestrator="gha"` does not itself dispatch GitHub Actions. Full bootstrap and runtime execution have separate reviewed entry points and authorization.
+- **Cloud execution depends on the supported route.** Deployment stages can dispatch GHA or ADO; bootstrap also has direct setup operations. Current selective project deletion runs through the governed lifecycle worker and direct ARM DELETE, while other deletion paths differ. It is incorrect to promise that all create/delete requests dispatch GHA. Trusted source pins, operation capabilities, scope, retention choices and exact approval still gate execution.
+- **Observation is not deployment.** Canonical monitoring reports reduce supplied/sample evidence, saved-report commands read stored observations, and workflow polling observes existing runs. Explicit live usage/cost collection queries Azure directly and can save observations locally. Report/query endpoints may use HTTP POST without changing cloud resources. Dashboard-resource refresh and reporting-job execution are separate explicit operations, not side effects of opening a report.
+
+See [CLI configuration versus runtime](environment_setup/azurefactory-cli/readme.md), [shared API/SDK boundaries](documentation/architecture/contracts/Factory-API-and-SDK.md), [lifecycle route selection](bootstrap/lib/factory_lifecycle.py) and [dashboard-only refresh](documentation/v2/30-39/32-dashboards.md). API credentials, host Azure/provider identity and user approval are separate prerequisites.
+
+### Integration and evidence limits
+
+**Health-model integration is not end-to-end yet.** The package has its own CLI/client and read-only MCP-ready tool definitions. Wiring it into the Factory API, `azurefactory healthmodel`, desktop settings, the Factory MCP registry and the main reviewed project pipelines remains documented follow-up work. MCP service-health probes are not Azure Monitor health models. Missing telemetry or unsupported resources must remain unknown/unmodelled, not inferred healthy. See [health-model limitations](healthmodel/readme.md#16-limitations-and-follow-ups).
+
+**Graph evidence is local static evidence, not live state.** On 8 October, accelerator snapshot `40fc94e3b805461d24f9b7a98d81003f3d0783f4eda570652acbcab1b56b0bb8` passed integrity checks but was **stale** against the checkout: one indexed project-deletion test had changed. Its 7 October snapshot covers 1,648 files and 27 architecture notes, with 23 partial-syntax files, 13,166 unresolved references and 2,936 inferred edges. Current source/tests were inspected for decisive claims; no graph was regenerated. The canonical API graph reported **current** at fingerprint `ad0bfd31a74bd70af5eafe357abc4a1b123971fd6a8361db68f58f46aa084f24`, covering 566 files, with unresolved/dynamic boundaries. The dual-graph ADR remains **proposed**, even where implementation exists.
+
+The component links in this addendum intentionally describe the current checkout, including unpublished work; the original release-reference links remain pinned. Presence of source, offline tests, documentation of a past demonstration or a graph snapshot does not prove that a customer's installed/deployed version contains these changes. No source pins, customer configuration, permissions or cloud resources were changed by this documentation update.
 
 ---
 

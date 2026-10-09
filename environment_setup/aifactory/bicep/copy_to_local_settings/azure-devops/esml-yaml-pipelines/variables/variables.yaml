@@ -1,4 +1,19 @@
 variables:
+  enablePersonas: false # True selects groups-v1; false preserves configured legacy human/group grants.
+  persona_access_mode: "legacy" # Derived from enablePersonas; mode-only opt-in is supported when the flag is absent.
+  persona_access_manifest: "" # Repository-relative reviewed manifest for this environment/project.
+  persona_preflight_ready: "false"
+  aksSkuTier: "Standard"
+  enableProjectVM: false
+  updateRbac: false
+  # Match Bicep defaults: diagnostic deployment remains opt-in per service.
+  skipDiagAISearch: true
+  skipDiagAIServices: true
+  skipDiagAOAI: true
+  skipDiagContentSafety: true
+  skipDiagDocIntelligence: true
+  skipDiagSpeech: true
+  skipDiagVision: true
   aifactory-dash-01: "" # <optional>Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard.<default>""
   scaling-mode: "shared-subscriptions" # <optional>Wizard network preset: own-subscriptions or shared-subscriptions. Does not provision subscriptions or resize existing networks.<default>shared-subscriptions
   # ============================================================f================  
@@ -391,8 +406,9 @@ variables:
   # === Container Apps ===
   enableContainerApps: "false" # <optional>Deploy Azure Container Apps<default>false<keep-as-is>
   enableAzureMcpServer: "false" # Private, read-only MCP deployment; requires prepared project-scoped configuration.
-  # === AI Factory MCP & new AI Gateway SKU (project001 Dev only; late foundry-phase step 71-aifactory-mcp-ai-gateway) ===
+  # === Factory Chat Agent, AI Factory MCP & new AI Gateway SKU (late Foundry-phase steps) ===
   enableAIFactoryMCP: "false" # <optional>Host the governed AI Factory MCP in project001 Dev<default>false<keep-as-is> Requires enableContainerApps:'true' and enableAIFoundry:'true' plus aifactoryMcpImage, aifactoryMcpApiImage and aifactoryMcpEntraAppId. false never deletes an existing MCP.
+  enableFactoryChatAgent: "false" # <optional>Create or update the owned Enterprise Scale AI Factory prompt Agent in the selected project Foundry<default>false<keep-as-is> Requires enableAIFoundry:'true' and a succeeded modelGPTXName deployment. false never deletes an existing Agent.
   enableAIGatewaySKU: "false" # <optional>Initialize the new Azure AI Gateway SKU (ai.gateway.azure.com) with the project001 Dev Foundry<default>false<keep-as-is> Requires enableAIFoundry:'true'. false never deletes an existing gateway.
   addAIFactoryMCP2AIGatewaySKU: "false" # <optional>Register the AI Factory MCP as a tool server on the AI Gateway SKU<default>false<keep-as-is> Requires enableAIFactoryMCP:'true', enableAIGatewaySKU:'true' and aiGatewaySkuOutboundSubnetId (or an adopted gateway with outbound VNet integration).
   aifactoryMcpImage: "" # <optional>Digest-pinned AI Factory MCP image<default>""<keep-as-is> <mandatory> if enableAIFactoryMCP:'true'. Format <registry>.azurecr.io/<repository>@sha256:<digest>; the registry must be in the project subscription.

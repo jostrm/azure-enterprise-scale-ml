@@ -564,7 +564,8 @@ def test_unexpected_error_is_generic_500_without_exception_body(authenticated, m
 def test_security_headers_csp_and_frontend_assets(isolated):
     app, _, _ = isolated
     with TestClient(app) as client:
-        for path in ("/", "/api/public-config", "/api/context", "/static/app.js", "/static/theme.css"):
+        for path in ("/", "/api/public-config", "/api/context", "/static/app.js", "/static/theme.css",
+                     "/static/markdown.js", "/static/vendor/markdown-it.min.js"):
             response = client.get(path)
             assert response.headers["x-content-type-options"] == "nosniff"
             assert response.headers["referrer-policy"] == "no-referrer"
@@ -577,6 +578,7 @@ def test_security_headers_csp_and_frontend_assets(isolated):
         assert f"'sha256-{digest}'" in html.headers["content-security-policy"]
         assert "scoutTheme" in script and "prefers-color-scheme" in script
         assert "https://cdn" not in html.text
+        assert html.text.index("/static/vendor/markdown-it.min.js") < html.text.index("/static/markdown.js") < html.text.index("/static/app.js")
         assert client.get("/docs").status_code == 404
         assert client.get("/static/../config.example.json").status_code == 404
     js = (web.STATIC / "app.js").read_text("utf-8")
@@ -585,7 +587,7 @@ def test_security_headers_csp_and_frontend_assets(isolated):
     css = (web.STATIC / "theme.css").read_text("utf-8")
     components = css[css.index("* {"):]
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(", components)
-    assert '--cp-bg: #f7f4ef;' in css and '"Segoe UI"' in css
+    assert '--cp-bg: #F7F6FA;' in css and '--cp-accent: #6750A4;' in css and '"Segoe UI"' in css
 
 
 def test_frontend_javascript_syntax():
@@ -593,10 +595,26 @@ def test_frontend_javascript_syntax():
     assert result.returncode == 0, result.stderr
 
 
+def test_frontend_confirmation_and_shortcuts_accessibility():
+    html = (web.STATIC / "index.html").read_text("utf-8")
+    assert 'id="question-examples"' in html and 'id="action-tiles"' in html
+    assert re.search(r'<dialog[^>]+id="confirmation-dialog"[^>]+aria-labelledby="confirmation-heading"', html)
+    assert 'aria-describedby="confirmation-action confirmation-description"' in html
+    assert re.search(r'<button[^>]+id="confirmation-cancel"[^>]+autofocus', html)
+    assert "Are you sure?" in html
+
+
 @pytest.mark.parametrize("mode", [
     "blocked", "pkce", "bad-state", "authenticated", "approval", "cancel-disabled",
     "discard", "out-of-sync", "reindex", "user-proposal", "proposal-blocked", "proposal-api-unavailable",
     "skill-cost", "skill-action", "skill-delete",
+    "markdown-answer",
+    "question-tiles", "question-tiles-denied", "action-tiles", "action-tiles-denied",
+    *[f"confirm-{action}-{scenario}" for action in (
+        "prepare", "propose", "approve", "execute", "continue", "cancel", "delete",
+    ) for scenario in ("consent", "scope", "signout")],
+    "confirm-approve-changed", "confirm-continue-changed", "confirm-prepare-permission",
+    "confirm-continue-expired", "confirm-continue-refresh",
 ])
 def test_mocked_browser_pkce_safe_rendering_and_separate_approval(mode):
     # Node's built-in VM/crypto exercise the shipped script; all HTTP/DOM objects are unit-test mocks.
@@ -606,6 +624,8 @@ const vm = require("node:vm");
 const assert = require("node:assert/strict");
 const {webcrypto, createHash} = require("node:crypto");
 const mode = process.argv[3];
+const confirmationAction = mode.startsWith("confirm-") ? mode.split("-")[1] : null;
+const confirmationScenario = mode.startsWith("confirm-") ? mode.split("-")[2] : null;
 const clientId = "11111111-1111-4111-8111-111111111111";
 const config = {
   tenant_id: "44444444-4444-4444-8444-444444444444",
@@ -624,6 +644,9 @@ class Element {
     this.disabled = false;
     this.dataset = {};
     this.checked = false;
+    this.open = false;
+    this.isConnected = true;
+    this.showCount = 0;
   }
   set textContent(value) { this._text = String(value); this.children = []; }
   get textContent() { return this._text + this.children.map(child => child.textContent).join(""); }
@@ -633,6 +656,13 @@ class Element {
   replaceChildren(...items) { this._text = ""; this.children = items; }
   addEventListener(name, callback) { this.handlers[name] = callback; }
   setAttribute(name, value) { this[name] = value; }
+  focus() { sandbox.document.activeElement = this; }
+  scrollIntoView() {}
+  showModal() { assert.equal(this.open, false); this.open = true; this.showCount++; }
+  close() { this.open = false; this.handlers.close?.({}); }
+}
+class TextNode {
+  constructor(value) { this.tagName = "#text"; this.children = []; this.textContent = String(value); }
 }
 function ui(id) {
   if (!elements.has(id)) { const element = new Element("div"); element.id = id; }
@@ -653,56 +683,79 @@ const location = {
 const storage = new Map(callbackMode
   ? [["aifactory.oauth.state", "expected"], ["aifactory.oauth.verifier", "v".repeat(43)]] : []);
 const calls = [];
-let operationStatus = "pending";
+let operationStatus = confirmationAction === "execute" ? "approved"
+  : confirmationAction === "continue" ? "awaiting_continuation" : "pending";
+let operationUpdatedAt = "2026-10-03T18:00:00Z";
 let proposalCreated = false;
 let resolveLate;
 const hash = "a".repeat(64);
 const operationId = "33333333-3333-4333-8333-333333333333";
 const operation = () => ({
-  id: operationId, correlation_id: operationId, tool_name: mode === "skill-delete" ? "delete-aifactory"
+  id: operationId, correlation_id: operationId, tool_name: mode === "skill-delete" || confirmationAction === "delete" ? "delete-aifactory"
+    : confirmationAction === "continue" ? "create-private-aifactory-full-bootstrap-private-with-own-hub-vpn-and-default-proj"
     : mode === "skill-action" ? "add-project-to-aifactory" : "factory_prepare_settings",
   scope_key: "project001-dev", scope: {factory: "factory", project: "001", environment: "dev"},
   factory_api_url: "https://factory-api.example",
   request: {settings: {department_name: "Research"}},
-  preview: {can_execute: true, ...(mode === "skill-delete" ? {confirmation_phrase: "DELETE factory-ai"} : {})},
-  affected_resources: [], created_at: "2026-10-03", expires_at: "2026-10-04",
-  status: operationStatus, plan_hash: hash, progress: {phase: operationStatus},
+  preview: {can_execute: true, effects: "<img src=x onerror=steal()>",
+    ...(mode === "skill-delete" || confirmationAction === "delete" ? {confirmation_phrase: "DELETE factory-ai"} : {})},
+  affected_resources: ["exact-resource-id"], created_at: "2026-10-03",
+  expires_at: confirmationScenario === "expired" ? "2026-10-03" : "2099-10-04",
+  updated_at: operationUpdatedAt, signature: operationUpdatedAt,
+  status: operationStatus, plan_hash: hash, progress: {phase: operationStatus,
+    continuation_allowed: true, observation_hash: "b".repeat(64)},
 });
 const context = {
   scopes: [{key: "project001-dev", label: "factory / 001 / dev",
     scope: {factory: "factory", project: "001", environment: "dev", tenant_id: config.tenant_id,
       subscription_id: clientId, resource_group: "project-rg"},
-    permissions: ["knowledge.read", "factory.read", "config.write", "project.add", "factory.delete", "cost.read"]}],
+    permissions: ["knowledge.read", "factory.read", "config.write", "project.add", "factory.delete", "cost.read",
+      "factory.create", "agent.create", "model.create"].filter(permission =>
+        !(mode === "question-tiles-denied" && permission === "knowledge.read")
+        && !(mode === "action-tiles-denied" && permission === "model.create"))}],
   settings: {writes_enabled: !["cancel-disabled", "proposal-blocked"].includes(mode)},
   capabilities: {
     model_read_only: true, proposal_creation: true,
-    skills_supported: mode.startsWith("skill-"),
+    skills_supported: mode.startsWith("skill-") || mode.startsWith("action-tiles") || confirmationAction === "prepare",
     proposal_blockers: mode === "proposal-blocked" ? ["writes_disabled", "factory_target_unconfigured"] : [],
   },
 };
+context.scopes.push({...context.scopes[0], key: "project002-dev", label: "factory / 002 / dev",
+  scope: {...context.scopes[0].scope, project: "002", resource_group: "other-rg"}});
 const skill = {
   name: mode === "skill-cost" ? "get-aifactory-common-estimated-azure-idle-running-cost" : "add-project-to-aifactory",
   command: "/skill", label: "Factory skill",
   kind: mode === "skill-cost" ? "monitoring" : "action", available: true, blockers: [],
+  permission: mode === "skill-cost" ? "cost.read" : "project.add",
   arguments_schema: {type: "object", additionalProperties: false,
     properties: mode === "skill-cost" ? {resource_group: {type: "string", title: "Resource group"}}
       : {project_number: {type: "string"}, display_name: {type: "string"}},
     required: mode === "skill-cost" ? ["resource_group"] : ["project_number", "display_name"]},
 };
+const tileSkills = [
+  ["create-private-aifactory-full-bootstrap-private-with-own-hub-vpn-and-default-proj", "factory.create"],
+  ["add-project-to-aifactory", "project.add"], ["delete-aifactory", "factory.delete"],
+  ["create-agent-oftype-for-project", "agent.create"], ["create-ml-model-oftype-for-project", "model.create"],
+].map(([name, permission]) => ({...skill, name, permission, label: name,
+  available: !(mode === "action-tiles-denied" && name === "delete-aifactory"),
+  blockers: name === "delete-aifactory" ? ["skill_disabled"] : []}));
 const answer = {
-  answer: '<img src=x onerror="steal()"> [S1]', scope_key: "project001-dev", audience: "project",
+  answer: mode === "markdown-answer"
+    ? '## Heading\n\n**Bold** and *emphasis*. [S1]\n\n- Item\n\n1. First\n\n```python\nprint("<img src=x onerror=steal()>")\n```\n\n| A | B |\n| --- | --- |\n| One | Two |'
+    : '<img src=x onerror="steal()"> [S1]', scope_key: "project001-dev", audience: "project",
   correlation_id: operationId, tool_activity: [],
   citations: [{citation_id: "S1", heading: "<script>bad</script>", is_history: true,
     source_type: "release_note", source_url: "javascript:steal()", version: "1.2"}],
 };
 const response = (data) => ({ok: true, status: 200, json: async () => data});
 const sandbox = {
-  document: {getElementById: ui, createElement: (tag) => new Element(tag)},
+  document: {getElementById: ui, createElement: (tag) => new Element(tag), createTextNode: (text) => new TextNode(text)},
   location, history: {replaceState(_, __, url) { historyCalls.push(url); current = new URL(url, current); }},
-  crypto: webcrypto, isSecureContext: true, URL, URLSearchParams, TextEncoder,
+  crypto: webcrypto, isSecureContext: true, URL, URLSearchParams, TextEncoder, TextDecoder,
   sessionStorage: {getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value),
     removeItem: key => storage.delete(key)},
   btoa: value => Buffer.from(value, "binary").toString("base64"),
+  atob: value => Buffer.from(value, "base64").toString("binary"),
   setInterval: () => 1,
   fetch: async (url, options = {}) => {
     calls.push({url, options, body: options.body ? String(options.body) : null, location: current.href});
@@ -711,7 +764,8 @@ const sandbox = {
       token_type: "Bearer", access_token: "UNIT_TEST_ACCESS_TOKEN", expires_in: 3600,
     });
     if (url === "/api/context") return response(context);
-    if (url.startsWith("/api/skills?")) return response({scope_key: "project001-dev", skills: [skill]});
+    if (url.startsWith("/api/skills?")) return response({scope_key: "project001-dev",
+      skills: mode.startsWith("action-tiles") ? tileSkills : [skill]});
     if (url.startsWith("/api/skills/") && url.endsWith("/run")) {
       return response({ok: true, data: {basis: "actual", source: "Cost Analysis", coverage: "partial"}});
     }
@@ -727,7 +781,8 @@ const sandbox = {
       },
     });
     if (url === "/api/operations") return response({
-      operations: ["approval", "cancel-disabled", "skill-delete"].includes(mode) || proposalCreated ? [operation()] : [],
+      operations: ["approval", "cancel-disabled", "skill-delete"].includes(mode) || proposalCreated
+        || confirmationAction && !["prepare", "propose"].includes(confirmationAction) ? [operation()] : [],
     });
     if (url === "/api/operations/propose") {
       if (mode === "proposal-api-unavailable") return {ok: false, status: 503, json: async () => ({
@@ -744,11 +799,18 @@ const sandbox = {
     if (url.endsWith("/approve")) { operationStatus = "approved"; return response(operation()); }
     if (url.endsWith("/execute")) { operationStatus = "executing"; return response(operation()); }
     if (url.endsWith("/cancel")) { operationStatus = "cancelled"; return response(operation()); }
+    if (url.endsWith("/continue")) { operationStatus = "continuing"; return response(operation()); }
+    if (url.endsWith("/status")) return response(operation());
     throw new Error("Unexpected mock request: " + url);
   },
 };
 sandbox.window = sandbox;
-vm.runInNewContext(fs.readFileSync(process.argv[2], "utf8"), sandbox);
+const browserContext = vm.createContext(sandbox);
+const path = require("node:path");
+const assets = path.dirname(process.argv[2]);
+for (const asset of ["vendor/markdown-it.min.js", "markdown.js", "app.js"]) {
+  vm.runInContext(fs.readFileSync(path.join(assets, asset), "utf8"), browserContext);
+}
 async function waitFor(predicate) {
   for (let attempt = 0; attempt < 100; attempt++) {
     if (predicate()) return;
@@ -756,11 +818,17 @@ async function waitFor(predicate) {
   }
   throw new Error("Mock browser condition did not complete");
 }
-async function dispatch(element, name) {
-  await element.handlers[name]({preventDefault() {}});
+async function dispatch(element, name, extra = {}) {
+  await element.handlers[name]({preventDefault() {}, ...extra});
 }
 function descendants(element) {
   return element.children.flatMap(child => [child, ...descendants(child)]);
+}
+const writes = () => calls.filter(call => call.options.method === "POST" && call.url !== "/api/chat"
+  && !call.url.endsWith("/oauth2/v2.0/token"));
+async function consent() {
+  await waitFor(() => ui("confirmation-dialog").open);
+  await dispatch(ui("confirmation-accept"), "click");
 }
 (async () => {
   await waitFor(() => calls.length && (ui("sign-in").disabled === false || mode === "blocked"
@@ -803,7 +871,170 @@ function descendants(element) {
     assert.equal(exchangeBody.has("client_secret"), false);
     assert(calls.filter(call => call.url.startsWith("/api/") && call.url !== "/api/public-config")
       .every(call => call.options.headers.Authorization === "Bearer UNIT_TEST_ACCESS_TOKEN"));
-    if (["skill-cost", "skill-action"].includes(mode)) {
+    if (mode.startsWith("question-tiles")) {
+      const tiles = descendants(ui("question-examples")).filter(child => child.tagName === "button");
+      assert.equal(tiles.length, 6);
+      const labels = tiles.map(tile => tile.textContent).join(" ");
+      for (const topic of ["Private", "Onboarding", "Project team", "Updates", "idle", "ML template"])
+        assert(labels.includes(topic), topic);
+      const before = calls.length;
+      for (const tile of tiles) {
+        assert.equal(tile.disabled, mode === "question-tiles-denied");
+        await dispatch(tile, "click");
+        if (tile.disabled) { assert.equal(ui("question").value, ""); continue; }
+        assert(ui("question").value.includes("active scope"));
+        assert.equal(ui("question-count").textContent, ui("question").value.length + " / 8000 characters");
+        assert.equal(sandbox.document.activeElement, ui("question"));
+        assert.equal(ui("ask").disabled, false);
+      }
+      assert.equal(calls.length, before, "example questions must never submit automatically");
+      assert.equal(ui("confirmation-dialog").open, false);
+    } else if (mode.startsWith("action-tiles")) {
+      await waitFor(() => calls.some(call => call.url.startsWith("/api/skills?")));
+      const tiles = descendants(ui("action-tiles")).filter(child => child.tagName === "button");
+      const actionTiles = tiles.filter(tile => tile.dataset.skill && tileSkills.some(skill => skill.name === tile.dataset.skill));
+      assert.equal(actionTiles.length, 5);
+      const before = calls.length;
+      for (const tile of actionTiles) {
+        const blocked = mode === "action-tiles-denied"
+          && ["delete-aifactory", "create-ml-model-oftype-for-project"].includes(tile.dataset.skill);
+        assert.equal(tile.disabled, blocked);
+        const previous = ui("skill-selector").value;
+        tile.focus();
+        await dispatch(tile, "click");
+        if (blocked) { assert.equal(ui("confirmation-dialog").open, false); continue; }
+        assert.equal(ui("confirmation-dialog").open, true);
+        assert.equal(ui("skill-selector").value, previous, "selection waits for explicit consent");
+        assert(ui("confirmation-description").textContent.includes("no request"));
+        await dispatch(ui("confirmation-cancel"), "click");
+        assert.equal(ui("skill-selector").value, previous);
+        assert.equal(sandbox.document.activeElement, tile);
+        await dispatch(tile, "click");
+        await consent();
+        await waitFor(() => ui("skill-selector").value === tile.dataset.skill);
+        assert.equal(sandbox.document.activeElement, ui("skill-selector"));
+        assert.equal(ui("run-skill").disabled, false);
+      }
+      assert.equal(calls.length, before, "action tiles only select the existing preparation form");
+      for (const tile of tiles.filter(tile => !tileSkills.some(skill => skill.name === tile.dataset.skill)))
+        assert.equal(tile.disabled, true, "missing registry skills stay disabled");
+    } else if (confirmationAction) {
+      await waitFor(() => !ui("refresh-status").disabled);
+      let launch, trigger, expectedPath, actionLabel;
+      if (confirmationAction === "prepare") {
+        ui("skill-selector").value = skill.name;
+        await dispatch(ui("skill-selector"), "change");
+        ui("skill-arg-project_number").value = "002";
+        ui("skill-arg-display_name").value = "<img src=x onerror=steal()>";
+        trigger = ui("run-skill");
+        launch = () => dispatch(ui("skill-form"), "submit");
+        expectedPath = "/api/skills/" + skill.name + "/propose";
+        actionLabel = "Prepare plan · do not execute";
+      } else if (confirmationAction === "propose") {
+        ui("department-name").value = "<img src=x onerror=steal()>";
+        await dispatch(ui("department-name"), "input");
+        trigger = ui("propose");
+        launch = () => dispatch(ui("proposal-form"), "submit");
+        expectedPath = "/api/operations/propose";
+        actionLabel = "Propose metadata plan · do not execute";
+      } else {
+        const container = confirmationAction === "continue" ? ui("operation-history") : ui("proposed-plans");
+        if (["approve", "delete"].includes(confirmationAction)) {
+          const form = descendants(container).find(child => child.tagName === "form");
+          ui("hash-" + operationId).value = hash;
+          await dispatch(ui("hash-" + operationId), "input");
+          if (confirmationAction === "delete") {
+            assert.equal(descendants(form).find(child => child.tagName === "button").disabled, true);
+            ui("phrase-" + operationId).value = "DELETE factory-ai";
+            await dispatch(ui("phrase-" + operationId), "input");
+          }
+          trigger = descendants(form).find(child => child.tagName === "button");
+          launch = () => dispatch(form, "submit");
+          actionLabel = "Approve this exact plan";
+        } else {
+          const starts = {execute: "Execute approved", continue: "Continue this", cancel: "Cancel unexecuted"};
+          trigger = descendants(container).find(child => child.tagName === "button"
+            && child.textContent.startsWith(starts[confirmationAction]));
+          launch = () => dispatch(trigger, "click");
+          actionLabel = trigger.textContent;
+        }
+        expectedPath = "/api/operations/" + operationId + "/" + (confirmationAction === "delete" ? "approve" : confirmationAction);
+      }
+      const initialWrites = writes().length;
+      trigger.focus();
+      await launch();
+      assert.equal(ui("confirmation-dialog").open, true);
+      assert.equal(writes().length, initialWrites, "no write before consent");
+      assert.equal(sandbox.document.activeElement, ui("confirmation-cancel"), "Cancel is the default focus");
+      assert.equal(ui("confirmation-action").textContent, actionLabel);
+      const review = ui("confirmation-details").textContent;
+      assert(review.includes("project001-dev") && review.includes("project-rg"));
+      assert(review.includes(expectedPath), "exact request endpoint is reviewed");
+      if (["approve", "execute", "continue", "cancel", "delete"].includes(confirmationAction)) {
+        for (const exact of [hash, "https://factory-api.example", "Research", operation().expires_at, "exact-resource-id", operationId])
+          assert(review.includes(exact), exact);
+      }
+      assert.equal(descendants(ui("confirmation-details")).some(child => ["img", "script"].includes(child.tagName)), false);
+      const shows = ui("confirmation-dialog").showCount;
+      await launch();
+      assert.equal(ui("confirmation-dialog").showCount, shows, "only one confirmation can be pending");
+      await dispatch(ui("confirmation-cancel"), "click");
+      assert.equal(writes().length, initialWrites);
+      assert.equal(sandbox.document.activeElement, trigger);
+      assert.equal(trigger.disabled, false);
+      await launch();
+      await dispatch(ui("confirmation-dialog"), "cancel");
+      assert.equal(ui("confirmation-dialog").open, false, "Escape dismisses without consenting");
+      assert.equal(writes().length, initialWrites);
+      await launch();
+      if (confirmationScenario === "scope") {
+        ui("scope-selector").value = "project002-dev";
+        await dispatch(ui("scope-selector"), "change");
+        ui("scope-selector").value = "project001-dev";
+        await dispatch(ui("scope-selector"), "change");
+        assert.equal(ui("confirmation-dialog").open, false, "even switching away and back invalidates consent");
+        await dispatch(ui("confirmation-accept"), "click");
+      } else if (confirmationScenario === "signout") {
+        await dispatch(ui("sign-out"), "click");
+        assert.equal(ui("confirmation-dialog").open, false);
+        await dispatch(ui("confirmation-accept"), "click");
+      } else if (confirmationScenario === "changed") {
+        operationStatus = "cancelled";
+        await dispatch(ui("refresh-status"), "click");
+        await waitFor(() => ui("operation-history").textContent.includes("Cancelled plan"));
+        await consent();
+      } else if (confirmationScenario === "permission") {
+        context.scopes[0].permissions = context.scopes[0].permissions.filter(permission => permission !== "project.add");
+        await consent();
+      } else {
+        if (confirmationScenario === "refresh") {
+          operationUpdatedAt = "2026-10-03T18:00:10Z";
+          await dispatch(ui("refresh-status"), "click");
+          await waitFor(() => ui("confirmation-accept").disabled === false);
+          await new Promise(resolve => setTimeout(resolve, 20));
+        }
+        await consent();
+        await waitFor(() => writes().length === initialWrites + 1);
+        const submitted = writes().at(-1);
+        assert.equal(submitted.url, expectedPath);
+        if (confirmationAction === "delete") assert.deepEqual(JSON.parse(submitted.body),
+          {plan_hash: hash, confirmation_phrase: "DELETE factory-ai"});
+        if (confirmationAction === "continue") assert.deepEqual(JSON.parse(submitted.body),
+          {plan_hash: hash, observation_hash: "b".repeat(64)});
+        if (confirmationAction === "prepare") assert.deepEqual(JSON.parse(submitted.body).arguments,
+          {project_number: "002", display_name: "<img src=x onerror=steal()>"});
+        if (["prepare", "propose"].includes(confirmationAction)) {
+          assert.equal(JSON.parse(submitted.body).scope_key, "project001-dev");
+          assert(!writes().some(call => call.url.endsWith("/execute") || call.url.endsWith("/approve")));
+        }
+        await dispatch(ui("confirmation-accept"), "click");
+        assert.equal(writes().length, initialWrites + 1, "double consent never replays a write");
+      }
+      if (!["consent", "expired", "refresh"].includes(confirmationScenario)) {
+        await new Promise(resolve => setTimeout(resolve, 20));
+        assert.equal(writes().length, initialWrites, "stale session, scope, plan or permission must fail closed");
+      }
+    } else if (["skill-cost", "skill-action"].includes(mode)) {
       await waitFor(() => calls.some(call => call.url.startsWith("/api/skills?")));
       ui("skill-selector").value = skill.name;
       await dispatch(ui("skill-selector"), "change");
@@ -813,6 +1044,8 @@ function descendants(element) {
         ui("skill-arg-display_name").value = "Research";
       }
       await dispatch(ui("skill-form"), "submit");
+      if (mode === "skill-action") await consent();
+      await waitFor(() => calls.some(call => call.url.startsWith("/api/skills/") && call.options.method === "POST"));
       const submitted = calls.find(call => call.url.startsWith("/api/skills/") && call.options.method === "POST");
       assert(submitted.url.endsWith(mode === "skill-cost" ? "/run" : "/propose"));
       assert.equal(JSON.parse(submitted.body).scope_key, "project001-dev");
@@ -835,6 +1068,7 @@ function descendants(element) {
       await dispatch(phraseInput, "input");
       assert.equal(approve.disabled, false);
       await dispatch(form, "submit");
+      await consent();
       await waitFor(() => calls.some(call => call.url.endsWith("/approve")));
       assert.deepEqual(JSON.parse(calls.find(call => call.url.endsWith("/approve")).body),
         {plan_hash: hash, confirmation_phrase: "DELETE factory-ai"});
@@ -852,6 +1086,7 @@ function descendants(element) {
       await dispatch(ui("department-name"), "input");
       assert.equal(ui("propose").disabled, false);
       await dispatch(ui("proposal-form"), "submit");
+      await consent();
       if (mode === "proposal-api-unavailable") {
         await waitFor(() => ui("error-message").textContent.includes("existing Factory API request failed"));
         assert(!ui("error-message").textContent.includes("SECRET"));
@@ -880,6 +1115,7 @@ function descendants(element) {
       const cancel = descendants(ui("proposed-plans")).find(child =>
         child.tagName === "button" && child.textContent.includes("Cancel unexecuted"));
       await dispatch(cancel, "click");
+      await consent();
       await waitFor(() => ui("operation-history").textContent.includes("Cancelled plan"));
       assert(!calls.some(call => call.url.endsWith("/execute") || call.url.endsWith("/approve")));
     } else if (mode === "approval") {
@@ -893,6 +1129,7 @@ function descendants(element) {
       await dispatch(input, "input");
       assert.equal(approve.disabled, false);
       await dispatch(form, "submit");
+      await consent();
       await waitFor(() => ui("proposed-plans").textContent.includes("Execute approved metadata"));
       const approval = calls.find(call => call.url.endsWith("/approve"));
       assert.deepEqual(JSON.parse(approval.body), {plan_hash: hash});
@@ -900,6 +1137,7 @@ function descendants(element) {
       const execute = descendants(ui("proposed-plans")).find(child =>
         child.tagName === "button" && child.textContent.includes("Execute approved"));
       await dispatch(execute, "click");
+      await consent();
       await waitFor(() => ui("operation-history").textContent.includes("Executing — completion not confirmed"));
       assert(!ui("operation-history").textContent.includes("Succeeded"));
     } else {
@@ -915,10 +1153,18 @@ function descendants(element) {
         assert.equal(ui("question").value, "");
       } else {
         await waitFor(() => ui("answer").textContent.includes("steal"));
-        assert.equal(ui("answer").textContent, answer.answer);
-        assert.equal(ui("answer").children.length, 0);
+        assert(ui("answer").children.length > 0, "answer must be rendered into Markdown elements");
+        assert(!descendants(ui("answer")).some(child => ["img", "script", "iframe"].includes(child.tagName)));
+        assert(descendants(ui("answer")).some(child => child.tagName === "a" && child.href === "#source-S1"));
+        if (mode === "markdown-answer") {
+          for (const tag of ["h2", "strong", "em", "ul", "ol", "pre", "code", "table", "th", "td"]) {
+            assert(descendants(ui("answer")).some(child => child.tagName === tag), "missing Markdown element: " + tag);
+          }
+          assert(!ui("answer").textContent.includes("## Heading") && !ui("answer").textContent.includes("**Bold**"));
+        } else assert.equal(ui("answer").textContent, answer.answer);
         assert(ui("citations").textContent.includes("HISTORICAL RELEASE NOTE"));
         assert(!descendants(ui("citations")).some(child => child.tagName === "a"));
+        assert.equal(ui("source-S1").tagName, "li");
       }
     }
     assert(![...elements.values()].some(element => element.textContent.includes("UNIT_TEST_ACCESS_TOKEN")));
@@ -931,3 +1177,301 @@ function descendants(element) {
         capture_output=True, text=True, encoding="utf-8", timeout=10,
     )
     assert result.returncode == 0, result.stderr
+
+
+EMBEDDED_HOST_HARNESS = r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+const path = require("node:path");
+const assert = require("node:assert/strict");
+const {webcrypto} = require("node:crypto");
+const mode = process.argv[3];
+const tenant = "44444444-4444-4444-8444-444444444444";
+const clientId = "11111111-1111-4111-8111-111111111111";
+const userA = "22222222-2222-4222-8222-222222222222";
+const userB = "33333333-3333-4333-8333-333333333333";
+const jwt = (name) => "eyJhbGciOiJSUzI1NiJ9." + Buffer.from(JSON.stringify({sub: name})).toString("base64url") + ".c2lnbmF0dXJl";
+const TOKEN_A = jwt("first"), TOKEN_B = jwt("renewed");
+const renewModes = ["host-renew-same", "host-renew-switch", "host-renew-transient", "host-renew-invalid", "host-renew-401"];
+const issuance = (number) => "IssuanceIdentifier_" + String(number).padStart(4, "0");
+const elements = new Map();
+class Element {
+  constructor(tag) { Object.assign(this, {tagName: tag, children: [], handlers: {}, _text: "", value: "",
+    disabled: false, hidden: false, dataset: {}, open: false, isConnected: true}); }
+  set textContent(value) { this._text = String(value); this.children = []; }
+  get textContent() { return this._text + this.children.map(child => child.textContent).join(""); }
+  set id(value) { this._id = value; elements.set(value, this); }
+  get id() { return this._id; }
+  append(...items) { this.children.push(...items); }
+  replaceChildren(...items) { this._text = ""; this.children = items; }
+  addEventListener(name, callback) { this.handlers[name] = callback; }
+  setAttribute(name, value) { this[name] = value; }
+  focus() {}
+  scrollIntoView() {}
+  showModal() { this.open = true; }
+  close() { this.open = false; }
+}
+class TextNode { constructor(value) { this.tagName = "#text"; this.children = []; this.textContent = String(value); } }
+function ui(id) {
+  if (!elements.has(id)) { const element = new Element("div"); element.id = id; }
+  return elements.get(id);
+}
+ui("sign-in").textContent = "Sign in with Microsoft";
+ui("sign-in").disabled = true;
+const current = new URL("https://factory.example/?host=esaif-maui&scoutTheme=dark");
+let assigned = null;
+const storageWrites = [];
+const requests = [];
+const statuses = [];
+const calls = [];
+let listener = null;
+let issued = 0;
+let contexts = 0;
+let offset = 0;
+let releaseChat = null;
+const rejections = [];
+class FakeDate extends Date { static now() { return Date.now() + offset; } }
+const now = () => Math.floor(Date.now() / 1000);
+function hostReply(request) {
+  issued += 1;
+  if (mode === "host-error" && issued === 1)
+    return {type: "esaif.agentChat.tokenError", version: 1, requestId: request.requestId, code: "signin_required",
+      message: "Use Login to Azure in the app for tenant " + tenant + "."};
+  if (mode === "host-foreign" && issued === 1)
+    return {type: "esaif.agentChat.token", version: 1, requestId: request.requestId, accessToken: "not a jwt", expiresOn: now() + 3600};
+  const renew = request.reason === "renew";
+  const short = renewModes.includes(mode) && !renew;
+  return {type: "esaif.agentChat.token", version: 1, requestId: request.requestId,
+    accessToken: renew ? TOKEN_B : TOKEN_A, expiresOn: now() + (short ? 180 : 3600), account: "user@contoso.example",
+    issuanceId: issuance(issued)};
+}
+const channel = {
+  addEventListener(name, callback) { assert.equal(name, "message"); listener = callback; },
+  postMessage(message) {
+    const copy = JSON.parse(JSON.stringify(message));
+    if (copy.type === "esaif.agentChat.status") { statuses.push(copy); return; }
+    if (copy.type === "esaif.agentChat.tokenRejected") {
+      assert.equal(Object.keys(copy).sort().join(), "issuanceId,type,version");
+      rejections.push(copy.issuanceId);
+      return;
+    }
+    requests.push(copy);
+    setTimeout(() => {
+      if (mode === "host-foreign") listener({data: {type: "esaif.agentChat.token", version: 1, requestId: "other-request-0000000000",
+        accessToken: jwt("foreign"), expiresOn: now() + 3600}});
+      listener({data: hostReply(message)});
+    }, 1);
+  },
+};
+const response = (data, status = 200) => ({ok: status < 400, status, json: async () => data});
+const context = (token) => ({
+  principal: {tenant_id: tenant, object_id: mode === "host-renew-switch" && token === TOKEN_B ? userB : userA},
+  scopes: [{key: "project001-dev", label: "factory / 001 / dev",
+    scope: {factory: "factory", project: "001", environment: "dev", tenant_id: tenant,
+      subscription_id: clientId, resource_group: "project-rg"},
+    permissions: ["knowledge.read", "factory.read"]}],
+  settings: {writes_enabled: false}, capabilities: {model_read_only: true, proposal_creation: true,
+    proposal_blockers: ["writes_disabled"], skills_supported: false},
+});
+const sandbox = {
+  document: {getElementById: ui, createElement: (tag) => new Element(tag), createTextNode: (text) => new TextNode(text),
+    documentElement: new Element("html")},
+  location: {get origin() { return current.origin; }, get pathname() { return current.pathname; },
+    get search() { return current.search; }, get hash() { return current.hash; }, assign(url) { assigned = url; }},
+  history: {replaceState(_, __, url) { Object.assign(current, {hash: new URL(url, current).hash}); }},
+  crypto: webcrypto, isSecureContext: true, URL, URLSearchParams, TextEncoder, TextDecoder,
+  sessionStorage: {getItem: () => null, setItem: (key) => storageWrites.push(key), removeItem: () => {}},
+  btoa: value => Buffer.from(value, "binary").toString("base64"),
+  atob: value => Buffer.from(value, "base64").toString("binary"),
+  setInterval: () => 1, setTimeout, clearTimeout, Date: FakeDate,
+  fetch: async (url, options = {}) => {
+    const authorization = options.headers?.Authorization || null;
+    calls.push({url, method: options.method || "GET", authorization});
+    if (url === "/api/public-config") return response({tenant_id: tenant, client_id: clientId,
+      audience: clientId, required_scope: "access_as_user"});
+    if (url.includes("login.microsoftonline.com")) throw new Error("Embedded mode must not call Microsoft sign-in");
+    if (url === "/api/context") {
+      contexts += 1;
+      if (mode === "host-bad-context" && contexts === 1) return response({});
+      if (mode === "host-initial-401" && contexts === 1) return response({error: {code: "authentication_required"}}, 401);
+      if (authorization === "Bearer " + TOKEN_B && mode === "host-renew-invalid") return response({principal: context(TOKEN_B).principal});
+      if (authorization === "Bearer " + TOKEN_B && mode === "host-renew-transient") return response({error: {code: "dependency_unavailable"}}, 503);
+      if (authorization === "Bearer " + TOKEN_B && mode === "host-renew-401") return response({error: {code: "authentication_required"}}, 401);
+      return response(context(authorization?.slice(7)));
+    }
+    if (url === "/api/operations") return response({operations: []});
+    if (url.startsWith("/api/knowledge/status")) return response({status: {status: "ready", stale: false,
+      indexed_document_count: 3, reconciliation_pending: false, search_document_count: 3}});
+    if (url === "/api/chat") {
+      if (mode === "host-401") return response({error: {code: "authentication_required"}}, 401);
+      if (mode === "host-401-text") return {ok: false, status: 401, json: async () => { throw new SyntaxError("Unauthorized"); }};
+      if (mode === "host-stale-401") return new Promise(resolve => {
+        releaseChat = () => resolve(response({error: {code: "authentication_required"}}, 401));
+      });
+      return response({answer: "Embedded answer", scope_key: "project001-dev", audience: "project",
+        correlation_id: "c", tool_activity: [], citations: []});
+    }
+    throw new Error("Unexpected mock request: " + url);
+  },
+};
+if (mode !== "host-absent") sandbox.chrome = {webview: channel};
+sandbox.window = sandbox;
+const browserContext = vm.createContext(sandbox);
+const assets = path.dirname(process.argv[2]);
+for (const asset of ["vendor/markdown-it.min.js", "markdown.js", "app.js"]) {
+  vm.runInContext(fs.readFileSync(path.join(assets, asset), "utf8"), browserContext);
+}
+async function waitFor(predicate, label) {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    if (predicate()) return;
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  throw new Error("Condition did not complete: " + label);
+}
+const apiCalls = () => calls.filter(call => call.url.startsWith("/api/") && call.url !== "/api/public-config");
+const states = () => statuses.map(status => status.state);
+async function ask() {
+  ui("question").value = "A scoped question";
+  await ui("question").handlers.input({});
+  await ui("question-form").handlers.submit({preventDefault() {}});
+}
+(async () => {
+  if (mode === "host-absent") {
+    await waitFor(() => ui("sign-in").disabled === false, "browser sign-in enabled");
+    assert.equal(ui("sign-in").textContent, "Sign in with Microsoft");
+    await ui("sign-in").handlers.click({});
+    await waitFor(() => assigned, "PKCE redirect");
+    assert.equal(new URL(assigned).hostname, "login.microsoftonline.com");
+    console.log("Embedded host behavior passed: " + mode);
+    return;
+  }
+  if (["host-error", "host-foreign", "host-bad-context", "host-initial-401"].includes(mode)) {
+    await waitFor(() => ui("error-message").textContent.length > 0, "host error shown");
+    const expectedError = {"host-error": "Login to Azure", "host-foreign": "unusable", "host-bad-context": "incomplete",
+      "host-initial-401": "rejected"}[mode];
+    assert(ui("error-message").textContent.includes(expectedError), ui("error-message").textContent);
+    if (mode === "host-initial-401") {
+      assert.deepEqual(statuses, [{type: "esaif.agentChat.status", version: 1, state: "rejected", issuanceId: issuance(1)}],
+        "a token the Agent rejects is reported with its exact issuance");
+      statuses.length = 0;
+    }
+    assert.equal(ui("sign-in").disabled, false);
+    assert.equal(ui("sign-in").hidden, false);
+    assert.equal(apiCalls().filter(call => call.url !== "/api/context").length, 0, "no Agent data call without a confirmed session");
+    assert.deepEqual(statuses, [], "nothing is acknowledged before the Agent confirms a session");
+    await ui("sign-in").handlers.click({});
+  }
+  const failedRenewal = ["host-renew-switch", "host-renew-401"].includes(mode);
+  await waitFor(() => !ui("scope-selector").disabled && calls.some(call => call.url === "/api/operations")
+    || failedRenewal && ui("error-message").textContent.length > 0, "session started");
+  assert.equal(assigned, null, "embedded mode never navigates to Microsoft sign-in");
+  assert.deepEqual(storageWrites, [], "embedded mode stores no sign-in transaction");
+  assert(!calls.some(call => call.url.includes("oauth2")));
+  assert.equal(requests[0].type, "esaif.agentChat.tokenRequest");
+  assert.equal(requests[0].version, 1);
+  assert.match(requests[0].requestId, /^[A-Za-z0-9_-]{16,64}$/);
+  assert.equal(requests[0].reason, "connect");
+  if (mode === "host-initial-401") assert.equal(requests[1].reason, "rejected");
+  assert(requests.every(request => Object.keys(request).sort().join() === "reason,requestId,type,version"));
+  assert(statuses.every(status => status.version === 1 && Object.keys(status).sort().join()
+    === (status.state === "rejected" ? "issuanceId,state,type,version" : "state,type,version")));
+  assert(new Set(requests.map(request => request.requestId)).size === requests.length, "request IDs are unique");
+  assert.equal(ui("sign-in").textContent, "Connect with app sign-in");
+  assert.equal(states()[0], "connected", "the app is told only after the Agent confirmed /api/context");
+  const noTokenInDom = () => assert(![...elements.values()].some(element =>
+    element.textContent.includes(TOKEN_A) || element.textContent.includes(TOKEN_B)));
+  if (failedRenewal) {
+    await waitFor(() => ui("error-message").textContent.includes(mode === "host-renew-switch" ? "different" : "rejected"), "renewal failure");
+    assert.deepEqual(requests.map(request => request.reason), ["connect", "renew"]);
+    assert(calls.some(call => call.url === "/api/context" && call.authorization === "Bearer " + TOKEN_B));
+    assert(!calls.some(call => ["/api/operations", "/api/chat"].includes(call.url)), "nothing is read or sent with an unconfirmed token");
+    assert(ui("scope-selector").disabled);
+    assert.equal(ui("sign-in").hidden, false);
+    assert.equal(states().at(-1), mode === "host-renew-401" ? "rejected" : "disconnected");
+    if (mode === "host-renew-401") assert.equal(statuses.at(-1).issuanceId, issuance(2), "the renewed token, not the confirmed one, was rejected");
+    if (mode === "host-renew-401") {
+      await ui("sign-in").handlers.click({});
+      await waitFor(() => requests.length === 3, "reconnect request");
+      assert.equal(requests[2].reason, "rejected");
+    }
+    noTokenInDom();
+    console.log("Embedded host behavior passed: " + mode);
+    return;
+  }
+  assert(ui("auth-status").textContent.includes("app sign-in"));
+  assert(ui("auth-status").textContent.includes("user@contoso.example"));
+  const expected = mode === "host-renew-same" ? TOKEN_B : TOKEN_A;
+  if (mode === "host-renew-same") {
+    assert.deepEqual(requests.map(request => request.reason), ["connect", "renew"], "parallel calls share one renewal");
+    assert.deepEqual(calls.filter(call => call.url === "/api/context").map(call => call.authorization),
+      ["Bearer " + TOKEN_A, "Bearer " + TOKEN_B], "renewal is confirmed by the server before use");
+    assert(apiCalls().filter(call => call.url !== "/api/context").every(call => call.authorization === "Bearer " + TOKEN_B));
+  } else if (mode === "host-renew-transient" || mode === "host-renew-invalid") {
+    assert.deepEqual(requests.map(request => request.reason), ["connect", "renew"]);
+    assert(apiCalls().filter(call => call.authorization === "Bearer " + TOKEN_B).every(call => call.url === "/api/context"));
+    assert(apiCalls().filter(call => call.url !== "/api/context").every(call => call.authorization === "Bearer " + TOKEN_A),
+      "a transient renewal failure keeps the still-valid session");
+    assert.equal(ui("error-message").textContent, "");
+  } else {
+    assert(apiCalls().every(call => call.authorization === "Bearer " + TOKEN_A), "host token authorizes Agent API calls");
+  }
+  if (mode === "host-foreign") assert(!calls.some(call => call.authorization === "Bearer " + jwt("foreign")), "foreign request IDs are ignored");
+  if (mode === "host-stale-401") {
+    await waitFor(() => ui("refresh-status").disabled === false, "initial refresh finished");
+    await ask();
+    await waitFor(() => releaseChat, "question in flight with the first token");
+    offset = 3400 * 1000;
+    await ui("refresh-status").handlers.click({});
+    await waitFor(() => requests.length === 2 && calls.some(call => call.url === "/api/operations"
+      && call.authorization === "Bearer " + TOKEN_B), "renewed while the question is in flight");
+    releaseChat();
+    await waitFor(() => rejections.length === 1, "stale token reported");
+    assert.deepEqual(rejections, [issuance(1)], "only the older token is quarantined");
+    assert.deepEqual(states(), ["connected"], "the renewed session is neither rejected nor cleared");
+    await waitFor(() => ui("error-message").textContent.includes("older"), "stale rejection explained");
+    assert(!ui("scope-selector").disabled && ui("sign-in").hidden);
+    noTokenInDom();
+    console.log("Embedded host behavior passed: " + mode);
+    return;
+  }
+  if (mode === "host-theme") {
+    listener({data: {type: "esaif.agentChat.theme", version: 1, theme: "dark"}});
+    assert.equal(sandbox.document.documentElement["data-theme"], "dark");
+    listener({data: {type: "esaif.agentChat.theme", version: 1, theme: "<script>"}});
+    assert.equal(sandbox.document.documentElement["data-theme"], "dark");
+  }
+  await ask();
+  if (mode === "host-401" || mode === "host-401-text") {
+    await waitFor(() => ui("sign-in").hidden === false, "session cleared after 401");
+    assert.equal(states().at(-1), "rejected");
+    assert.equal(statuses.at(-1).issuanceId, issuance(1));
+    await ui("sign-in").handlers.click({});
+    await waitFor(() => requests.length === 2, "reconnect request");
+    assert.equal(requests[1].reason, "rejected");
+  } else {
+    await waitFor(() => ui("answer").textContent.includes("Embedded answer"), "answer");
+    assert.equal(calls.find(call => call.url === "/api/chat").authorization, "Bearer " + expected);
+    assert.equal(ui("error-message").textContent, "");
+    if (mode === "host-connect") {
+      await ui("sign-out").handlers.click({});
+      assert.equal(states().at(-1), "disconnected");
+    }
+  }
+  noTokenInDom();
+  console.log("Embedded host behavior passed: " + mode);
+})().catch(error => { console.error(error); process.exitCode = 1; });
+"""
+
+
+@pytest.mark.parametrize("mode", [
+    "host-connect", "host-error", "host-foreign", "host-theme", "host-renew-same", "host-renew-switch",
+    "host-renew-transient", "host-renew-invalid", "host-renew-401", "host-401", "host-401-text", "host-bad-context",
+    "host-initial-401", "host-stale-401", "host-absent",
+])
+def test_embedded_app_host_bridge_reuses_app_sign_in_without_browser_redirects(mode):
+    # The MAUI WebView2 host answers token requests; the page never performs PKCE or stores tokens.
+    result = subprocess.run(
+        ["node", "-", str(web.STATIC / "app.js"), mode], input=EMBEDDED_HOST_HARNESS,
+        capture_output=True, text=True, encoding="utf-8", timeout=15,
+    )
+    assert result.returncode == 0, result.stderr + result.stdout

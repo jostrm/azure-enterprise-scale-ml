@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from aifactory_healthmodel import azure, deploy
+from aifactory_healthmodel import deploy
+from aifactory_healthmodel.application.ports import CallableClientFactory, ClientFactory
 
 SUB = "00000000-0000-0000-0000-0000000000aa"
 TENANT = "11111111-1111-1111-1111-111111111111"
@@ -97,69 +98,6 @@ def variables(tmp_path, **dev):
 def cli(tmp_path, *extra):
     return ["--consumer-root", str(tmp_path), "--variables-json", "aifactory/variables.json",
             "--environment", "dev", "--project", "001", *extra]
-
-
-def test_az_launcher_never_uses_a_batch_shell(tmp_path, monkeypatch):
-    wbin = tmp_path / "CLI2" / "wbin"
-    wbin.mkdir(parents=True)
-    (wbin / "az.cmd").write_text("@echo off", encoding="utf-8")
-    (tmp_path / "CLI2" / "python.exe").write_text("", encoding="utf-8")
-    monkeypatch.setattr(azure.shutil, "which", lambda name: str(wbin / "az.cmd") if name in ("az.cmd", "az") else None)
-    assert azure.az_command() == [str(tmp_path / "CLI2" / "python.exe"), "-IBm", "azure.cli"]
-    (tmp_path / "CLI2" / "python.exe").unlink()
-    with pytest.raises(RuntimeError, match="batch"):
-        azure.az_command()
-
-
-def test_az_cli_transport_passes_body_by_file_and_maps_arm_errors(test_env_resources):
-    seen = {}
-
-    def runner(args, input_text=None):
-        seen["args"] = args
-        seen["body"] = json.loads(Path(args[args.index("--body") + 1][1:]).read_text(encoding="utf-8"))
-        error = 'ERROR: Bad Request({"error":{"code":"InvalidEntity","message":"Signal x is invalid"}})'
-        return subprocess.CompletedProcess(args, 1, "", error)
-
-    transport = azure.AzCliTransport(runner)
-    with pytest.raises(azure.HealthModelError) as caught:
-        transport.request("POST", "https://management.azure.com/x?api-version=1&a=b", {"k": "v"})
-    assert caught.value.code == "InvalidEntity" and "Signal x is invalid" in str(caught.value)
-    assert seen["body"] == {"k": "v"}
-    assert seen["args"][seen["args"].index("--url") + 1].endswith("&a=b")
-    assert not Path(seen["args"][seen["args"].index("--body") + 1][1:]).exists(), "temporary body file removed"
-
-
-def test_token_transport_uses_bearer_token_and_json(monkeypatch):
-    class Credential:
-        def get_token(self, scope):
-            assert scope == "https://management.azure.com/.default"
-            return type("T", (), {"token": "secret-token"})()
-
-    captured = {}
-
-    class Response:
-        status = 200
-
-        def read(self):
-            return b'{"ok": true}'
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc):
-            return False
-
-    def fake_urlopen(request, timeout):
-        captured["auth"] = request.get_header("Authorization")
-        captured["body"] = request.data
-        return Response()
-
-    monkeypatch.setattr(azure.urllib.request, "urlopen", fake_urlopen)
-    result = azure.TokenTransport(Credential()).request("POST", "https://management.azure.com/x", {"a": 1})
-    assert result == {"ok": True} and captured["auth"] == "Bearer secret-token"
-    assert json.loads(captured["body"]) == {"a": 1}
-    with pytest.raises(ValueError):
-        azure.TokenTransport(Credential()).request("GET", "https://evil.example.com/x")
 
 
 def test_plan_is_read_only_and_reports_the_model(tmp_path, test_env_resources, capsys):
@@ -262,7 +200,7 @@ def test_overrides_and_alert_policy_files_are_validated(tmp_path, test_env_resou
         deploy.run(deploy.parse_args(["plan", *cli(tmp_path), "--alert-policy", str(tmp_path / "policy.json")]), az=fake)
 
 
-def test_prune_deletes_only_stale_managed_objects(tmp_path, test_env_resources, monkeypatch):
+def test_prune_deletes_only_stale_managed_objects(tmp_path, test_env_resources):
     variables(tmp_path)
     fake = FakeAz(test_env_resources)
     deleted = []
@@ -284,8 +222,10 @@ def test_prune_deletes_only_stale_managed_objects(tmp_path, test_env_resources, 
         def add_annotation(self, entity, details, description=None):
             deleted.append(("annotation", entity, details["event"]))
 
-    monkeypatch.setattr(deploy, "HealthModelClient", Client)
-    result = deploy.run(deploy.parse_args(["deploy", *cli(tmp_path), "--prune"]), az=fake)
+    def use_fake_client(services):
+        services.replace(ClientFactory, instance=CallableClientFactory(Client))
+
+    result = deploy.run(deploy.parse_args(["deploy", *cli(tmp_path), "--prune"]), az=fake, configure=use_fake_client)
     assert deleted == [("relationship", "layer-genai-to-foundry-old-abc123"), ("entity", "foundry-old-abc123"),
                        ("annotation", "root", "aifactory-healthmodel-deployment")]
     assert result["models"][0]["pruned"] == {"entities": ["foundry-old-abc123"],
@@ -343,3 +283,80 @@ def test_main_returns_nonzero_without_leaking_raw_errors(tmp_path, test_env_reso
     assert deploy.main(["plan", *cli(tmp_path)]) == 1
     err = capsys.readouterr().err
     assert "ERROR:" in err and "abc.def" not in err
+
+
+# ---------------------------------------------------------------- several model definitions
+def test_extra_models_join_the_built_in_scope(tmp_path, test_env_resources):
+    variables(tmp_path)
+    fake = FakeAz(test_env_resources)
+    result = deploy.run(deploy.parse_args(["plan", *cli(tmp_path), "--scope", "all", "--model", "agents"]), az=fake)
+    assert [m["definition"] for m in result["models"]] == ["project", "agents", "common"]
+    assert [m["model"] for m in result["models"]] == [
+        "hm-spider-prj001-sdc-dev-001", "hm-spider-agt001-sdc-dev-001", "hm-spider-cmn-sdc-dev-001"]
+    queries = [b for b in fake.bodies if "query" in b]
+    assert len(queries) == 1, "one Resource Graph discovery serves every model of the run"
+
+
+def test_model_without_scope_plans_only_that_model(tmp_path, test_env_resources):
+    variables(tmp_path)
+    result = deploy.run(deploy.parse_args(["plan", *cli(tmp_path), "--model", "agents"]), az=FakeAz(test_env_resources))
+    assert [m["definition"] for m in result["models"]] == ["agents"]
+
+
+def test_consumer_definitions_from_a_folder_and_a_file(tmp_path, test_env_resources):
+    variables(tmp_path)
+    folder = tmp_path / "healthmodels"
+    folder.mkdir()
+    definition = {"key": "lake", "nameToken": "lake", "home": "common", "rootDisplayName": "Data lake ({env})",
+                  "layers": [{"fromCatalog": True, "select": {"profile": "adls-gen2"}}]}
+    (folder / "lake.json").write_text(json.dumps(definition), encoding="utf-8")
+    other = {**definition, "key": "vault", "nameToken": "kv{project}",
+             "layers": [{"fromCatalog": True, "select": {"profile": "keyvault", "origin": "project"}}]}
+    (tmp_path / "vault.json").write_text(json.dumps(other), encoding="utf-8")
+    fake = FakeAz(test_env_resources)
+    result = deploy.run(deploy.parse_args(["deploy", *cli(tmp_path), "--definitions-dir", str(folder),
+                                           "--model", "lake", "--model", str(tmp_path / "vault.json"),
+                                           "--no-annotate"]), az=fake)
+    assert [(m["model"], m["profiles"]) for m in result["models"]] == [
+        ("hm-spider-lake-sdc-dev-001", {"adls-gen2": 2}), ("hm-spider-kv001-sdc-dev-001", {"keyvault": 1})]
+    assert [p["parameters"]["healthModelName"]["value"] for p in fake.deployed_parameters] == [
+        "hm-spider-lake-sdc-dev-001", "hm-spider-kv001-sdc-dev-001"]
+
+
+def test_unknown_model_definition_fails_before_azure_calls(tmp_path, test_env_resources):
+    variables(tmp_path)
+    fake = FakeAz(test_env_resources)
+    with pytest.raises(ValueError, match="Unknown model definition 'nope'"):
+        deploy.run(deploy.parse_args(["plan", *cli(tmp_path), "--model", "nope"]), az=fake)
+    assert fake.calls == []
+
+
+def test_offline_inventory_plan_needs_no_azure(tmp_path, test_env_resources):
+    variables(tmp_path)
+    inventory = tmp_path / "inventory.json"
+    inventory.write_text(json.dumps({"data": test_env_resources}), encoding="utf-8")
+    fake = FakeAz(test_env_resources)
+    result = deploy.run(deploy.parse_args(["plan", *cli(tmp_path), "--inventory", str(inventory), "--scope", "all",
+                                           "--what-if"]), az=fake)
+    assert fake.calls == [], "no az invocation at all"
+    assert [m["profiles"].get("health-model") for m in result["models"]] == [None, 1]
+    assert result["models"][0]["whatIf"] == "skipped: offline inventory"
+
+
+def test_models_command_lists_and_validates_definitions(tmp_path, capsys):
+    assert deploy.main(["models"]) == 0
+    listing = json.loads(capsys.readouterr().out)
+    keys = [d["key"] for d in listing["definitions"]]
+    assert keys == ["agents", "common", "project"]
+    common = next(d for d in listing["definitions"] if d["key"] == "common")
+    assert common["nests"] == ["project"] and common["layers"][1]["select"] == "nested model = project"
+    (tmp_path / "broken.json").write_text(json.dumps({"key": "broken"}), encoding="utf-8")
+    assert deploy.main(["models", "--model", str(tmp_path / "broken.json")]) == 1
+    assert "token" in capsys.readouterr().err
+
+
+def test_model_values_are_keys_unless_they_look_like_paths(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "agents").write_text("not json", encoding="utf-8")
+    assert deploy.main(["models", "--model", "agents"]) == 0, "a file named like a key must not shadow the key"
+    assert deploy.main(["models", "--model", "nope"]) == 1

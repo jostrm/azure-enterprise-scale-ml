@@ -14,7 +14,7 @@ import time
 
 import pytest
 
-from aifactory_healthmodel.azure import AzCliTransport
+from aifactory_healthmodel.bootstrap import runtime_transport
 from aifactory_healthmodel.client import HealthModelClient
 
 pytestmark = [
@@ -26,7 +26,7 @@ pytestmark = [
 
 @pytest.fixture(scope="module")
 def client():
-    return HealthModelClient(os.environ["AIF_HEALTHMODEL_ID"], AzCliTransport())
+    return HealthModelClient(os.environ["AIF_HEALTHMODEL_ID"], runtime_transport("cli"))
 
 
 def test_model_is_provisioned_with_identity(client):

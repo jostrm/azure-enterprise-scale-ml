@@ -1,9 +1,11 @@
 """Runtime client for an AI Factory health model: read health, history and alerts, set alerts.
 
-The client talks to Azure Resource Manager through a small transport interface
-(``request(method, url, body) -> dict | None``). ``azure.AzCliTransport`` uses
-the signed-in Azure CLI; ``azure.TokenTransport`` uses any azure-identity
-credential (managed identity in an app, DefaultAzureCredential locally).
+Bridge pattern: ``HealthModelClient`` is the abstraction, the ARM transport
+(``request(method, url, body) -> dict | None``) the implementation.
+``infrastructure.azure_cli.AzCliTransport`` uses the signed-in Azure CLI;
+``infrastructure.identity.TokenTransport`` uses any azure-identity credential (managed
+identity in an app, DefaultAzureCredential locally). Decorators add retries and a circuit
+breaker, and ``ReadOnlyTransport`` guarantees read-only use (``bootstrap.runtime_transport``).
 """
 from __future__ import annotations
 
@@ -126,9 +128,10 @@ class HealthModelClient:
             return list(reversed(chain))
 
         leaves = [n for n in entities if n != self.name and not children.get(n)]
-        # Leaves, plus parents whose own signals (for example an external report) are failing.
-        candidates = [n for n in entities if n != self.name
-                      and (not children.get(n) or failing_signals(entities[n]))]
+        # Leaves, plus any entity (the root included) whose own signals, such as an
+        # external report, are failing.
+        candidates = [n for n in entities
+                      if (n != self.name and not children.get(n)) or failing_signals(entities[n])]
         problems = sorted((n for n in candidates if state(n) in ("Unhealthy", "Degraded")),
                           key=lambda n: (SEVERITY_ORDER[state(n)], n))
         errors = [{"entity": n, "displayName": display(n), **item}
@@ -203,7 +206,11 @@ class HealthModelClient:
 
     def set_entity_alerts(self, entity: str, *, unhealthy=UNCHANGED, degraded=UNCHANGED,
                           wait_seconds: int = 120) -> dict:
-        """Change health-state alerts of one entity; None disables, UNCHANGED keeps the current value."""
+        """Change health-state alerts of one entity.
+
+        A dict changes only the fields it contains (existing action groups and description are kept;
+        pass ``actionGroupIds: []`` to clear them). None disables the alert, UNCHANGED keeps it.
+        """
         current = self.entity(entity)
         properties = writable_properties(current.get("properties", {}))
         alerts = dict(properties.get("alerts") or {})
@@ -214,7 +221,9 @@ class HealthModelClient:
             if change is None:
                 alerts.pop(key, None)
             else:
-                alerts[key] = validate_alert(change, f"{label} is {key}.")
+                if not isinstance(change, dict):
+                    raise ValueError("Alert configuration must be an object.")
+                alerts[key] = validate_alert({**(alerts.get(key) or {}), **change}, f"{label} is {key}.")
         properties["alerts"] = alerts
         result = self.transport.request("PUT", self._url(self._entity_path(entity)), {"properties": properties})
         return self._wait_for_entity(entity, result, wait_seconds)

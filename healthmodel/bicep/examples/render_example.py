@@ -11,7 +11,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
-from aifactory_healthmodel import catalog, naming, planner  # noqa: E402
+from aifactory_healthmodel import naming  # noqa: E402
+from aifactory_healthmodel.application.parameters import BicepParameterRenderer  # noqa: E402
+from aifactory_healthmodel.domain.definitions import DefinitionRegistry  # noqa: E402
+from aifactory_healthmodel.domain.resources import parse_resources  # noqa: E402
 
 TARGET = Path(__file__).with_name("project001-dev.parameters.json")
 INVENTORY = ROOT / "tests" / "fixtures" / "test-env-resources.json"
@@ -26,8 +29,8 @@ def render() -> dict:
         resource_group_suffix="-001",
     )
     rows = json.loads(INVENTORY.read_text(encoding="utf-8"))
-    plan = planner.build_plan(catalog.load_catalog(), scope, planner.parse_resources(rows), model_scope="project")
-    return planner.bicep_parameters(plan, location="swedencentral")
+    plan = DefinitionRegistry.builtin().plan("project", scope, parse_resources(rows))
+    return BicepParameterRenderer().render(plan, location="swedencentral")
 
 
 if __name__ == "__main__":

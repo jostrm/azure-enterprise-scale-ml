@@ -32,7 +32,7 @@ class Grant(ClosedModel):
     object_id: UUID
     scopes: list[str] = Field(min_length=1)
     permissions: list[Literal[
-        "knowledge.read", "factory.read", "config.write", "knowledge.refresh",
+        "knowledge.read", "factory.read", "config.write", "knowledge.refresh", "graph.read",
         "factory.create", "factory.delete", "project.add", "cost.read", "agent.create", "model.create",
     ]]
 
@@ -82,6 +82,20 @@ class KnowledgeSettings(ClosedModel):
     stale_after_hours: int = Field(default=48, ge=1)
 
 
+class DualGraphSettings(ClosedModel):
+    snapshot_root: Path
+    expected_snapshot_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    allowed_scopes: list[str] = Field(min_length=1)
+    allow_source_access: bool = False
+
+    @field_validator("allowed_scopes")
+    @classmethod
+    def distinct_scopes(cls, value):
+        if len(value) != len(set(value)):
+            raise ValueError("Graph scopes must be explicit and distinct.")
+        return value
+
+
 class FactorySettings(ClosedModel):
     api_url: str = "http://127.0.0.1:8765"
     api_key_secret_url: str | None = None
@@ -96,11 +110,31 @@ class FactorySettings(ClosedModel):
     allowed_write_environments: list[Literal["dev", "stage", "prod"]] = Field(default_factory=lambda: ["dev"])
 
 
+AZURE_CLI_CLIENT_ID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
+# Reviewed public clients that may call this API for the same user, audience and delegated scope.
+# Adding an entry is a security review decision: it also needs Entra pre-authorization (browser_auth.py).
+REVIEWED_ADDITIONAL_CLIENTS = {AZURE_CLI_CLIENT_ID: "Microsoft Azure CLI"}
+
+
 class AuthSettings(ClosedModel):
     client_id: str | None = None
     audience: str | None = None
     required_scope: str = "access_as_user"
+    additional_client_ids: list[UUID] = Field(default_factory=list, max_length=len(REVIEWED_ADDITIONAL_CLIENTS))
     grants: list[Grant] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def reviewed_additional_clients(self):
+        clients = [str(client) for client in self.additional_client_ids]
+        if len(set(clients)) != len(clients) or any(client not in REVIEWED_ADDITIONAL_CLIENTS for client in clients):
+            raise ValueError("Additional API clients must be distinct, reviewed public clients.")
+        try:
+            primary = str(UUID(str(self.client_id))) if self.client_id else None
+        except ValueError:
+            primary = None
+        if primary in clients:
+            raise ValueError("An additional API client cannot repeat the primary registration.")
+        return self
 
 
 class Settings(ClosedModel):
@@ -108,6 +142,7 @@ class Settings(ClosedModel):
     scopes: dict[str, Scope]
     azure: AzureSettings
     knowledge: KnowledgeSettings
+    dual_graph: DualGraphSettings | None = None
     factory: FactorySettings
     auth: AuthSettings
     actions: ActionSettings = Field(default_factory=ActionSettings)
@@ -115,12 +150,15 @@ class Settings(ClosedModel):
     workloads: WorkloadSettings = Field(default_factory=WorkloadSettings)
     agent_name: str = Field(default="enterprise-scale-ai-factory", pattern=r"^[a-zA-Z0-9][a-zA-Z0-9-]{1,62}$")
     agent_version: str | None = None
+    agent_invocation: Literal["project_reference", "agent_endpoint"] = "project_reference"
     max_tool_rounds: int = Field(default=6, ge=1, le=12)
     max_output_tokens: int = Field(default=1800, ge=100, le=10000)
     model_throttle_wait_seconds: int = Field(default=90, ge=0, le=180)
 
     @model_validator(mode="after")
     def valid_grants(self):
+        if self.agent_invocation == "agent_endpoint" and self.agent_version is not None:
+            raise ValueError("Agent endpoint mode uses its existing version selector; an agent_version override is not supported.")
         if not self.scopes:
             raise ValueError("At least one explicitly configured scope is required.")
         tenants = {s.tenant_id for s in self.scopes.values()}
@@ -129,6 +167,8 @@ class Settings(ClosedModel):
         for grant in self.auth.grants:
             if any(key not in self.scopes for key in grant.scopes):
                 raise ValueError("An access grant references an unknown scope.")
+        if self.dual_graph and set(self.dual_graph.allowed_scopes) - self.scopes.keys():
+            raise ValueError("Graph configuration references an unknown scope.")
         configured_skill_scopes = (
             set(self.actions.bootstrap_profiles) | set(self.actions.deletion_resource_groups)
             | set(self.costs.common_resource_groups)
@@ -153,6 +193,11 @@ def load_settings(path: str | Path | None = None) -> Settings:
         root = (selected.parent / root).resolve()
     knowledge = settings.knowledge.model_copy(update={"repository_root": root})
     updates = {"knowledge": knowledge}
+    if settings.dual_graph:
+        snapshot_root = settings.dual_graph.snapshot_root
+        if not snapshot_root.is_absolute():
+            snapshot_root = (selected.parent / snapshot_root).resolve()
+        updates["dual_graph"] = settings.dual_graph.model_copy(update={"snapshot_root": snapshot_root})
     if settings.workloads.repository_root:
         workload_root = Path(settings.workloads.repository_root)
         if not workload_root.is_absolute():

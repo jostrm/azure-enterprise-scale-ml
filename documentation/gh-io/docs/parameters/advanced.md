@@ -376,18 +376,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 366 |
-| `env` | 366 |
+| `yaml` | 381 |
+| `env` | 380 |
 | `bootstrap` | 90 |
 | `helper` | 17 |
-| `state` | 46 |
-| `json.dev` | 370 |
+| `state` | 47 |
+| `json.dev` | 384 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 135, 390; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 136, 391; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 392, 416; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 149, 405; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 150, 406; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 407, 431; one reference row.
 
 ## YAML and variables.json reference
 
@@ -469,9 +469,12 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:enableDeleteForDisabledResources --><!-- parameter json.dev:enableDeleteForDisabledResources -->`enableDeleteForDisabledResources` | `ENABLE_DELETE_FOR_DISABLED_RESOURCES` | O | Y: `"false"`<br>J.dev: `"false"` | Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval. |
 | <!-- parameter yaml:enableElasticsearch --><!-- parameter json.dev:enableElasticsearch -->`enableElasticsearch` | `ENABLE_ELASTICSEARCH` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Elasticsearch keep-as-is: Elastic Cloud managed service. |
 | <!-- parameter yaml:enableEventHubs --><!-- parameter json.dev:enableEventHubs -->`enableEventHubs` | `ENABLE_EVENT_HUBS` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Event Hubs |
+| <!-- parameter yaml:enableFactoryChatAgent --><!-- parameter json.dev:enableFactoryChatAgent -->`enableFactoryChatAgent` | `ENABLE_FACTORY_CHAT_AGENT` | O | Y: `"false"`<br>J.dev: `"false"` | Opt-in creation or versioning of the owned Enterprise Scale AI Factory prompt Agent in the selected project Foundry. Requires Foundry and a succeeded modelGPTXName deployment. False skips the step; it does not delete an existing Agent. |
 | <!-- parameter yaml:enableFunction --><!-- parameter json.dev:enableFunction -->`enableFunction` | `ENABLE_FUNCTION` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Function App |
 | <!-- parameter yaml:enableLogicApps --><!-- parameter json.dev:enableLogicApps -->`enableLogicApps` | `ENABLE_LOGIC_APPS` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Logic Apps |
+| <!-- parameter yaml:enablePersonas --><!-- parameter json.dev:enablePersonas -->`enablePersonas` | No verified binding | O | Y: `false`<br>J.dev: `false` | True selects groups-v1; false preserves configured legacy human/group grants. |
 | <!-- parameter yaml:enablePostgreSQL --><!-- parameter json.dev:enablePostgreSQL -->`enablePostgreSQL` | `ENABLE_POSTGRESQL` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure PostgreSQL |
+| <!-- parameter yaml:enableProjectVM --><!-- parameter json.dev:enableProjectVM -->`enableProjectVM` | `ENABLE_PROJECT_VM` | O | Y: `false`<br>J.dev: `false` | Enable project vm. |
 | <!-- parameter yaml:enableRedisCache --><!-- parameter json.dev:enableRedisCache -->`enableRedisCache` | `ENABLE_REDIS_CACHE` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Cache for Redis |
 | <!-- parameter yaml:enableRetries --><!-- parameter json.dev:enableRetries -->`enableRetries` | `ENABLE_RETRIES` | O | Y: `"false"`<br>J.dev: `"false"` | Enable automatic job retries otherwise: true, enable automatic retries on failure for GenAI services deployment. |
 | <!-- parameter yaml:enableSQLDatabase --><!-- parameter json.dev:enableSQLDatabase -->`enableSQLDatabase` | `ENABLE_SQL_DATABASE` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure SQL Database |
@@ -507,7 +510,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:admin_location --><!-- parameter json.dev:admin_location -->`admin_location` | `AIFACTORY_LOCATION` | M | Y: `"eastus2"`<br>J.dev: `"eastus2"` | Azure region mandatory: Azure region |
 | <!-- parameter yaml:admin_locationSuffix --><!-- parameter json.dev:admin_locationSuffix -->`admin_locationSuffix` | `AIFACTORY_LOCATION_SHORT` | M | Y: `"eus2"`<br>J.dev: `"eus2"` | Region short name mandatory: Region short name |
 | <!-- parameter yaml:admin_prjResourceSuffix --><!-- parameter json.dev:admin_prjResourceSuffix -->`admin_prjResourceSuffix` | `ADMIN_PRJ_RESOURCE_SUFFIX` | O | Y: `"-001"`<br>J.dev: `"-001"` | Project resources suffix otherwise: change to reprovision new services in the same project RG while keeping old ones. |
-| <!-- parameter yaml:admin_projectType --><!-- parameter json.dev:admin_projectType -->`admin_projectType` | `PROJECT_TYPE` | M | Y: `"all"`<br>J.dev: `"all"` |  |
+| <!-- parameter yaml:admin_projectType --><!-- parameter json.dev:admin_projectType -->`admin_projectType` | `ADMIN_PROJECT_TYPE`, `PROJECT_TYPE` | M | Y: `"all"`<br>J.dev: `"all"` |  |
 | <!-- parameter yaml:admin_semanticSearchTier --><!-- parameter json.dev:admin_semanticSearchTier -->`admin_semanticSearchTier` | `ADMIN_SEMANTIC_SEARCH_TIER`, `AISEARCH_SEMANTIC_TIER` | M | Y: `"free"`<br>J.dev: `"free"` | Semantic search tier mandatory: Semantic search tier |
 | <!-- parameter yaml:aiGatewaySkuResourceId --><!-- parameter json.dev:aiGatewaySkuResourceId -->`aiGatewaySkuResourceId` | `AI_GATEWAY_SKU_RESOURCE_ID` | O | Y: `""`<br>J.dev: `""` | Resource ID of an existing AI Gateway SKU to adopt (never modified) keep-as-is: Empty creates an owned gateway in the project resource group. |
 | <!-- parameter yaml:aiSearchLocation --><!-- parameter json.dev:aiSearchLocation -->`aiSearchLocation` | `AI_SEARCH_LOCATION` | O | Y: `""`<br>J.dev: `""` | AI Search region override. Empty keeps the project region; use another supported region only when regional Search capacity is unavailable. |
@@ -543,6 +546,9 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:lakeContainerName --><!-- parameter json.dev:lakeContainerName -->`lakeContainerName` | `LAKE_CONTAINER_NAME` | O | Y: `"lake3"`<br>J.dev: `"lake3"` | Data lake container name |
 | <!-- parameter yaml:org-department-id --><!-- parameter json.dev:org-department-id -->`org-department-id` | `ORG_DEPARTMENT_ID` | O | Y: `""`<br>J.dev: `""` | Project organizational department ID keep-as-is: Text, max 128 characters, not necessarily a GUID; identical across environments. No identity or authentication effect. |
 | <!-- parameter yaml:org-department-name --><!-- parameter json.dev:org-department-name -->`org-department-name` | `ORG_DEPARTMENT_NAME` | O | Y: `""`<br>J.dev: `""` | Project organizational department name keep-as-is: Unicode text, max 200 characters; identical across environments, independent of cost center. No factory inheritance or Azure tag writes. |
+| <!-- parameter yaml:persona_access_manifest --><!-- parameter json.dev:persona_access_manifest -->`persona_access_manifest` | `PERSONA_ACCESS_MANIFEST` | O | Y: `""`<br>J.dev: `""` | Repository-relative reviewed manifest for this environment/project. |
+| <!-- parameter yaml:persona_access_mode --><!-- parameter json.dev:persona_access_mode -->`persona_access_mode` | `PERSONA_ACCESS_MODE` | O | Y: `"legacy"`<br>J.dev: `"legacy"` | Derived from enablePersonas; mode-only opt-in is supported when the flag is absent. |
+| <!-- parameter yaml:persona_preflight_ready -->`persona_preflight_ready` | No verified binding | O | Y: `"false"`<br>J.dev: absent | Persona preflight ready. |
 | <!-- parameter yaml:postGresAdminEmails --><!-- parameter json.dev:postGresAdminEmails -->`postGresAdminEmails` | `POSTGRES_ADMIN_EMAILS` | C | Y: `"email_adress_only"`<br>J.dev: `"email_adress_only"` | PostgreSQL admin emails mandatory: if enablePostgreSQL:'true' ensure: valid comma-separated email addresses. |
 | <!-- parameter yaml:postgreSQLRetryCapacityArray --><!-- parameter json.dev:postgreSQLRetryCapacityArray -->`postgreSQLRetryCapacityArray` | `POSTGRESQL_RETRY_CAPACITY_ARRAY` | O | Y: `"true"`<br>J.dev: `"true"` | Retry only PostgreSQL regional/SKU capacity failures, with 240 seconds before attempts 2 and 3. |
 | <!-- parameter yaml:prod_admin_bicep_input_keyvault_subscription --><!-- parameter json.dev:prod_admin_bicep_input_keyvault_subscription -->`prod_admin_bicep_input_keyvault_subscription` | `AIFACTORY_SEEDING_KEYVAULT_SUBSCRIPTION_ID` | C | Y: `"<todo>_SubID"`<br>J.dev: `"<todo>_SubID"` | PROD seeding KV subscription ID mandatory: PROD seeding KV subscription ID ensure: subscription where the PROD seeding Key Vault resides. Required when deploying that environment. |
@@ -552,6 +558,13 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:projectPrefix --><!-- parameter json.dev:projectPrefix -->`projectPrefix` | `PROJECT_PREFIX` | O | Y: `"esml-"`<br>J.dev: `"esml-"` | Project resource group prefix |
 | <!-- parameter yaml:projectSuffix --><!-- parameter json.dev:projectSuffix -->`projectSuffix` | `PROJECT_SUFFIX` | O | Y: `"-rg"`<br>J.dev: `"-rg"` | Project resource group suffix |
 | <!-- parameter yaml:project_number_000 --><!-- parameter json.dev:project_number_000 -->`project_number_000` | `PROJECT_NUMBER` | M | Y: `"001"`<br>J.dev: `"001"` | Project number mandatory: Project number keep-as-is: For 1st project. otherwise: increment to '002', '003', etc. |
+| <!-- parameter yaml:skipDiagAISearch --><!-- parameter json.dev:skipDiagAISearch -->`skipDiagAISearch` | `SKIP_DIAG_AI_SEARCH` | O | Y: `true`<br>J.dev: `true` | Skip diag aisearch. |
+| <!-- parameter yaml:skipDiagAIServices --><!-- parameter json.dev:skipDiagAIServices -->`skipDiagAIServices` | `SKIP_DIAG_AI_SERVICES` | O | Y: `true`<br>J.dev: `true` | Skip diag aiservices. |
+| <!-- parameter yaml:skipDiagAOAI --><!-- parameter json.dev:skipDiagAOAI -->`skipDiagAOAI` | `SKIP_DIAG_AOAI` | O | Y: `true`<br>J.dev: `true` | Skip diag aoai. |
+| <!-- parameter yaml:skipDiagContentSafety --><!-- parameter json.dev:skipDiagContentSafety -->`skipDiagContentSafety` | `SKIP_DIAG_CONTENT_SAFETY` | O | Y: `true`<br>J.dev: `true` | Skip diag content safety. |
+| <!-- parameter yaml:skipDiagDocIntelligence --><!-- parameter json.dev:skipDiagDocIntelligence -->`skipDiagDocIntelligence` | `SKIP_DIAG_DOC_INTELLIGENCE` | O | Y: `true`<br>J.dev: `true` | Skip diag doc intelligence. |
+| <!-- parameter yaml:skipDiagSpeech --><!-- parameter json.dev:skipDiagSpeech -->`skipDiagSpeech` | `SKIP_DIAG_SPEECH` | O | Y: `true`<br>J.dev: `true` | Skip diag speech. |
+| <!-- parameter yaml:skipDiagVision --><!-- parameter json.dev:skipDiagVision -->`skipDiagVision` | `SKIP_DIAG_VISION` | O | Y: `true`<br>J.dev: `true` | Skip diag vision. |
 | <!-- parameter yaml:tag_costcenter --><!-- parameter json.dev:tag_costcenter -->`tag_costcenter` | `CostCenter` (not in .env template), `TAG_COSTCENTER` | O | Y: `"1234"`<br>J.dev: `"1234"` | Project cost center tag keep-as-is: Metadata for per-project cost tracking on resource group level. |
 | <!-- parameter yaml:tag_costceter_common --><!-- parameter json.dev:tag_costceter_common -->`tag_costceter_common` | `TAG_COSTCETER_COMMON` | O | Y: `"9999"`<br>J.dev: `"9999"` | Common cost center tag keep-as-is: Metadata for Resource group cost tracking. |
 | <!-- parameter yaml:tag_repository --><!-- parameter json.dev:tag_repository -->`tag_repository` | `TAG_REPOSITORY` | O | Y: `"aifactory"`<br>J.dev: `"aifactory"` | Repository name tag |
@@ -675,6 +688,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:aksOutboundType --><!-- parameter json.dev:aksOutboundType -->`aksOutboundType` | `AKS_OUTBOUND_TYPE` | O | Y: `"loadBalancer"`<br>J.dev: `"loadBalancer"` | AKS outbound traffic type otherwise: userDefinedRouting, if you have Azure Firewall and UDR configured. |
 | <!-- parameter yaml:aksPrivateDNSZone --><!-- parameter json.dev:aksPrivateDNSZone -->`aksPrivateDNSZone` | `AKS_PRIVATE_DNS_ZONE` | O | Y: `"system"`<br>J.dev: `"system"` | AKS private DNS zone otherwise: "none" or full resource ID of a private DNS zone. |
 | <!-- parameter yaml:aksSkuName --><!-- parameter json.dev:aksSkuName -->`aksSkuName` | `AKS_SKU_NAME` | O | Y: `"Base"`<br>J.dev: `"Base"` | AKS SKU name otherwise: "Standard" for production workloads. |
+| <!-- parameter yaml:aksSkuTier --><!-- parameter json.dev:aksSkuTier -->`aksSkuTier` | `AKS_SKU_TIER` | O | Y: `"Standard"`<br>J.dev: `"Standard"` | Aks sku tier. |
 | <!-- parameter yaml:skuAISearchDev --><!-- parameter json.dev:skuAISearchDev -->`skuAISearchDev` | `ADMIN_AISEARCH_TIER`, `SKU_AISEARCH_DEV` | O | Y: `"basic"`<br>J.dev: `"basic"` | AI Search SKU Dev ['free','basic','standard','standard2','standard3','storage_optimized_l1','storage_optimized_l2'] ('free' not allowed with private endpoints) |
 | <!-- parameter yaml:skuAISearchDevArray --><!-- parameter json.dev:skuAISearchDevArray -->`skuAISearchDevArray` | `SKU_AI_SEARCH_DEV_ARRAY` | O | Y: `"[\"basic\",\"standard\",\"standard2\"]"`<br>J.dev: `["basic","standard","standard2"]` | Sku aisearch dev array. |
 | <!-- parameter yaml:skuAISearchStageProd --><!-- parameter json.dev:skuAISearchStageProd -->`skuAISearchStageProd` | `ADMIN_AISEARCH_TIER`, `SKU_AISEARCH_STAGEPROD` | O | Y: `"standard"`<br>J.dev: `"standard"` | AI Search SKU Stage/Prod |
@@ -778,6 +792,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:test_seeding_kv_service_connection --><!-- parameter json.dev:test_seeding_kv_service_connection -->`test_seeding_kv_service_connection` | No verified binding | C | Y: `"<todo>_ado_service_connection"`<br>J.dev: `"<todo>_ado_service_connection"` | ADO service connection for STAGE seeding KV mandatory: ADO service connection for STAGE seeding KV ensure: name matches your service connection for the STAGE seeding KV subscription. otherwise: can be same as test_service_connection. Required when deploying that environment. |
 | <!-- parameter yaml:test_service_connection --><!-- parameter json.dev:test_service_connection -->`test_service_connection` | No verified binding | C | Y: `"<todo>_ado_service_connection"`<br>J.dev: `"<todo>_ado_service_connection"` | ADO service connection for STAGE mandatory: ADO service connection for STAGE ensure: name matches your Azure DevOps service connection for the STAGE subscription. Required when deploying that environment. |
 | <!-- parameter yaml:updateKeyvaultRbac --><!-- parameter json.dev:updateKeyvaultRbac -->`updateKeyvaultRbac` | `UPDATE_KEYVAULT_RBAC` | O | Y: `"false"`<br>J.dev: `"false"` | Update Key Vault RBAC otherwise: true, re-run to update RBAC properties. |
+| <!-- parameter yaml:updateRbac --><!-- parameter json.dev:updateRbac -->`updateRbac` | `UPDATE_RBAC` | O | Y: `false`<br>J.dev: `false` | Update rbac. |
 | <!-- parameter yaml:use_ad_groups --><!-- parameter json.dev:use_ad_groups -->`use_ad_groups` | `USE_AD_GROUPS` | O | Y: `"true"`<br>J.dev: `"true"` | Use AD groups for project members otherwise: false, use individual ObjectIDs and simple mode Personas. |
 
 ### Models and deployments
@@ -815,6 +830,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ADMIN_HYBRID_BENEFIT -->`ADMIN_HYBRID_BENEFIT` | `admin_hybridBenefit` | O | `"true"` | Azure Hybrid Benefit for VMs otherwise: true, if you have eligible Windows licenses with Software Assurance (pay-as-you-go avoided). |
 | <!-- parameter env:ADMIN_IP_FW -->`ADMIN_IP_FW` | `admin_ip_fw` | O | `""` | Admin IP for firewall rules keep-as-is: Used by GHA runner to whitelist its own IP. |
 | <!-- parameter env:ADMIN_PRJ_RESOURCE_SUFFIX -->`ADMIN_PRJ_RESOURCE_SUFFIX` | `admin_prjResourceSuffix` | O | `"-001"` | Project resources suffix otherwise: change to reprovision new services in the same project RG while keeping old ones. |
+| <!-- parameter env:ADMIN_PROJECT_TYPE -->`ADMIN_PROJECT_TYPE` | `admin_projectType` | O | `"all"` | Project service selection; matches JSON/YAML defaults. |
 | <!-- parameter env:ADMIN_SEMANTIC_SEARCH_TIER -->`ADMIN_SEMANTIC_SEARCH_TIER` | `admin_semanticSearchTier` | M | `"free"` | Semantic search tier mandatory: Semantic search tier |
 | <!-- parameter env:ADMIN_USERNAME -->`ADMIN_USERNAME` | `adminUsername` | O | `"esmladmin"` | VM admin username |
 | <!-- parameter env:AIFACTORY_BRANCH_CHOSEN -->`AIFACTORY_BRANCH_CHOSEN` | `aifactory_branch_chosen` | O | `"release/v1.24"` | Submodule release branch |
@@ -867,6 +883,8 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:MAX_RETRY_ATTEMPTS -->`MAX_RETRY_ATTEMPTS` | `maxRetryAttempts` | O | `"2"` | Maximum retry attempts keep-as-is: Valid values: 1, 2, or 3. |
 | <!-- parameter env:ORG_DEPARTMENT_ID -->`ORG_DEPARTMENT_ID` | `org-department-id` | O | `""` | Project organizational department ID keep-as-is: Text, max 128 characters, not necessarily a GUID; identical across environments. No identity or authentication effect. |
 | <!-- parameter env:ORG_DEPARTMENT_NAME -->`ORG_DEPARTMENT_NAME` | `org-department-name` | O | `""` | Project organizational department name keep-as-is: Unicode text, max 200 characters; identical across environments, independent of cost center. No factory inheritance or Azure tag writes. |
+| <!-- parameter env:PERSONA_ACCESS_MANIFEST -->`PERSONA_ACCESS_MANIFEST` | `persona_access_manifest` | O | `""` | Persona access manifest. |
+| <!-- parameter env:PERSONA_ACCESS_MODE -->`PERSONA_ACCESS_MODE` | `persona_access_mode` | O | `"legacy"` | Persona access mode. |
 | <!-- parameter env:POSTGRESQL_RETRY_CAPACITY_ARRAY -->`POSTGRESQL_RETRY_CAPACITY_ARRAY` | `postgreSQLRetryCapacityArray` | O | `"true"` | Retry only PostgreSQL capacity errors, waiting 240 seconds before attempts 2 and 3. |
 | <!-- parameter env:POSTGRES_ADMIN_EMAILS -->`POSTGRES_ADMIN_EMAILS` | `postGresAdminEmails` | C | `""` | PostgreSQL administrator email(s) mandatory: if ENABLE_POSTGRESQL:'true' ensure: single email address for the PostgreSQL administrator. |
 | <!-- parameter env:PROD_SUBSCRIPTION_ID -->`PROD_SUBSCRIPTION_ID` | `prod_sub_id` | C | `"<todo>"` | PROD subscription ID recommended: separate subscription from DEV. otherwise: can reuse DEV_SUBSCRIPTION_ID. Required when deploying that environment. |
@@ -874,6 +892,13 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:PROJECT_PREFIX -->`PROJECT_PREFIX` | `projectPrefix` | O | `"esml-"` | Project resource name prefix |
 | <!-- parameter env:PROJECT_SUFFIX -->`PROJECT_SUFFIX` | `projectSuffix` | O | `"-rg"` | Project resource name suffix |
 | <!-- parameter env:PROJECT_TYPE -->`PROJECT_TYPE` | `admin_projectType` | O | `"all"` | Project type keep-as-is: Not used anymore. Leave as is. |
+| <!-- parameter env:SKIP_DIAG_AI_SEARCH -->`SKIP_DIAG_AI_SEARCH` | `skipDiagAISearch` | O | `"true"` | Skip diag ai search. |
+| <!-- parameter env:SKIP_DIAG_AI_SERVICES -->`SKIP_DIAG_AI_SERVICES` | `skipDiagAIServices` | O | `"true"` | Skip diag ai services. |
+| <!-- parameter env:SKIP_DIAG_AOAI -->`SKIP_DIAG_AOAI` | `skipDiagAOAI` | O | `"true"` | Skip diag aoai. |
+| <!-- parameter env:SKIP_DIAG_CONTENT_SAFETY -->`SKIP_DIAG_CONTENT_SAFETY` | `skipDiagContentSafety` | O | `"true"` | Skip diag content safety. |
+| <!-- parameter env:SKIP_DIAG_DOC_INTELLIGENCE -->`SKIP_DIAG_DOC_INTELLIGENCE` | `skipDiagDocIntelligence` | O | `"true"` | Skip diag doc intelligence. |
+| <!-- parameter env:SKIP_DIAG_SPEECH -->`SKIP_DIAG_SPEECH` | `skipDiagSpeech` | O | `"true"` | Skip diag speech. |
+| <!-- parameter env:SKIP_DIAG_VISION -->`SKIP_DIAG_VISION` | `skipDiagVision` | O | `"true"` | Skip diag vision. |
 | <!-- parameter env:STAGE_SUBSCRIPTION_ID -->`STAGE_SUBSCRIPTION_ID` | `test_sub_id` | C | `"<todo>"` | STAGE subscription ID recommended: separate subscription from DEV. otherwise: can reuse DEV_SUBSCRIPTION_ID. Required when deploying that environment. |
 | <!-- parameter env:TAGS -->`TAGS` | `tags` | O | `"{\"CostCenter\":\"9999\",\"Description\":\"AI Factory common\",\"AIF-Repo\":\"aifactory\",\"AIF-Branch\":\"aifactory-001\",\"AIF-Version\":\"1.24\",\"AIF-Submodule-Chosen-Branch\":\"release/v1.24\",\"AIF-Scaleset\":\"-001\",\"AIF-Project Owners\":\"\",\"AIFactory project\":\"001\",\"AIF-Networking\":\"true,true,true\",\"AIF-enableAIFactoryCreatedDefaultProjectForAIFv2\":\"true\",\"AIF-disableAgentNetworkInjection\":\"false\",\"AIF-byoASEv3\":\"false\",\"AIF-BYO_subnets\":\"false\"}"` | Common-level Azure resource tags (JSON) keep-as-is: Update CostCenter, Description, and branch values to match your deployment. |
 | <!-- parameter env:TAGS_PROJECT -->`TAGS_PROJECT` | `tagsProject` | O | `"{\"CostCenter\":\"1234\",\"Description\":\"RAG Chat 1\",\"AIF-Branch\":\"aifactory-001/project001\",\"AIF-Scaleset\":\"-001\",\"AIF-Environment\":\"dev\",\"AIF-Project Owners\":\"\",\"AIFactory project\":\"001\",\"AIF-Networking\":\"true,true,true\",\"AIF-enableAIFactoryCreatedDefaultProjectForAIFv2\":\"true\",\"AIF-disableAgentNetworkInjection\":\"false\",\"AIF-byoASEv3\":\"false\",\"AIF-BYO_subnets\":\"false\"}"` | Project-level Azure resource tags (JSON) keep-as-is: Update CostCenter, Description, and project values to match your project. |
@@ -959,11 +984,14 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ENABLE_DELETE_FOR_DISABLED_RESOURCES -->`ENABLE_DELETE_FOR_DISABLED_RESOURCES` | `enableDeleteForDisabledResources` | O | `"false"` | Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval. |
 | <!-- parameter env:ENABLE_ELASTICSEARCH -->`ENABLE_ELASTICSEARCH` | `enableElasticsearch` | O | `"false"` | Enable Elasticsearch (Elastic Cloud) |
 | <!-- parameter env:ENABLE_EVENT_HUBS -->`ENABLE_EVENT_HUBS` | `enableEventHubs` | O | `"false"` | Enable Azure Event Hubs |
+| <!-- parameter env:ENABLE_FACTORY_CHAT_AGENT -->`ENABLE_FACTORY_CHAT_AGENT` | `enableFactoryChatAgent` | O | `"false"` | Opt-in creation or versioning of the owned Enterprise Scale AI Factory prompt Agent in the selected project Foundry. Requires Foundry and a succeeded modelGPTXName deployment. False skips the step; it does not delete an existing Agent. |
 | <!-- parameter env:ENABLE_FOUNDRY_CAPHOST -->`ENABLE_FOUNDRY_CAPHOST` | `enableAFoundryCaphost` | C | `"true"` | Enable the capability host for the selected standard private-agent architecture with its required Storage, Search and Cosmos DB dependencies. Other Foundry paths can have different requirements. |
 | <!-- parameter env:ENABLE_FUNCTION -->`ENABLE_FUNCTION` | `enableFunction` | O | `"false"` | Enable Azure Functions |
 | <!-- parameter env:ENABLE_KONG -->`ENABLE_KONG` | `ENABLE_KONG` | O | `"false"` | Enable kong. |
 | <!-- parameter env:ENABLE_LOGIC_APPS -->`ENABLE_LOGIC_APPS` | `enableLogicApps` | O | `"false"` | Enable Azure Logic Apps |
+| <!-- parameter env:ENABLE_PERSONAS -->`ENABLE_PERSONAS` | No verified counterpart | O | `false` | Enable personas. |
 | <!-- parameter env:ENABLE_POSTGRESQL -->`ENABLE_POSTGRESQL` | `enablePostgreSQL` | O | `"false"` | Enable Azure PostgreSQL Flexible Server |
+| <!-- parameter env:ENABLE_PROJECT_VM -->`ENABLE_PROJECT_VM` | `enableProjectVM` | O | `"false"` | Enable project vm. |
 | <!-- parameter env:ENABLE_REDIS_CACHE -->`ENABLE_REDIS_CACHE` | `enableRedisCache` | O | `"false"` | Enable Azure Cache for Redis |
 | <!-- parameter env:ENABLE_RETRIES -->`ENABLE_RETRIES` | `enableRetries` | O | `"false"` | Enable automatic job retries otherwise: true, enables retry logic for GenAI services deployment. |
 | <!-- parameter env:ENABLE_SQL_DATABASE -->`ENABLE_SQL_DATABASE` | `enableSQLDatabase` | O | `"false"` | Enable Azure SQL Database |
@@ -1055,7 +1083,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:AKS_OUTBOUND_TYPE -->`AKS_OUTBOUND_TYPE` | `aksOutboundType` | O | `"loadBalancer"` | AKS outbound network type otherwise: userDefinedRouting for firewall/UDR scenarios. |
 | <!-- parameter env:AKS_PRIVATE_DNS_ZONE -->`AKS_PRIVATE_DNS_ZONE` | `aksPrivateDNSZone` | O | `"system"` | AKS private DNS zone otherwise: none, or full resourceId of an existing private DNS zone. |
 | <!-- parameter env:AKS_SKU_NAME -->`AKS_SKU_NAME` | `aksSkuName` | O | `"Base"` | AKS SKU name otherwise: Standard for production. |
-| <!-- parameter env:AKS_SKU_TIER -->`AKS_SKU_TIER` | No verified counterpart | O | `"Standard"` | AKS SKU tier otherwise: Free or Premium. |
+| <!-- parameter env:AKS_SKU_TIER -->`AKS_SKU_TIER` | `aksSkuTier` | O | `"Standard"` | AKS SKU tier otherwise: Free or Premium. |
 | <!-- parameter env:ENABLE_AKS_FOR_AZURE_ML -->`ENABLE_AKS_FOR_AZURE_ML` | `enableAksForAzureML` | C | `"true"` | Enable AKS for Azure ML inference mandatory: if ENABLE_AZURE_MACHINE_LEARNING:'true' |
 | <!-- parameter env:SKU_AISEARCH_DEV -->`SKU_AISEARCH_DEV` | `skuAISearchDev` | O | `"basic"` | AI Search SKU for Dev. Must be included in SKU_ARRAY_AISEARCH_DEV when retry is enabled. |
 | <!-- parameter env:SKU_AISEARCH_STAGEPROD -->`SKU_AISEARCH_STAGEPROD` | `skuAISearchStageProd` | O | `"standard"` | AI Search SKU for Stage and Prod. Must be included in SKU_ARRAY_AISEARCH_STAGEPROD when retry is enabled. |
@@ -1156,6 +1184,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:TENANT_AZUREML_OID -->`TENANT_AZUREML_OID` | `azure_machinelearning_sp_oid` | C | `"<todo>"` | Azure ML service principal OID mandatory: Azure ML service principal OID ensure: find in Entra ID as 'Azure Machine Learning' app (AppId: 0736f41a-0425-4b46-bdb5-1563eff02385). otherwise: optional if ENABLE_AI_FOUNDRY:'false'. |
 | <!-- parameter env:TENANT_ID -->`TENANT_ID` | `tenantId` | M | `"<todo>"` | Azure tenant ID mandatory: Azure tenant ID ensure: find in Azure Portal &gt; Entra ID &gt; Overview (Directory ID). |
 | <!-- parameter env:UPDATE_KEYVAULT_RBAC -->`UPDATE_KEYVAULT_RBAC` | `updateKeyvaultRbac` | O | `"false"` | Update Key Vault RBAC otherwise: true enables updating KV RBAC by rerunning the pipeline. |
+| <!-- parameter env:UPDATE_RBAC -->`UPDATE_RBAC` | `updateRbac` | O | `"false"` | Update rbac. |
 | <!-- parameter env:USE_AD_GROUPS -->`USE_AD_GROUPS` | `use_ad_groups` | O | `"true"` | Use AD groups for project members otherwise: false, use individual ObjectIDs and simple mode Personas. |
 
 ### GHA: Operations, diagnostics and lifecycle
@@ -1371,6 +1400,7 @@ These exact fields are consumed by the Python helper's local `--state-file` API.
 | <!-- parameter state:location -->`location` | C | Required lookup | `apply_gha`, `common_values`; Location |
 | <!-- parameter state:location_short -->`location_short` | C | Required lookup | `apply_gha`, `common_values`; Location short |
 | <!-- parameter state:oidc_client_id -->`oidc_client_id` | O | `""` | `apply_gha`; Oidc client id |
+| <!-- parameter state:persona_access_manifest -->`persona_access_manifest` | O | `""` | `common_values`; Persona access manifest |
 | <!-- parameter state:prefix -->`prefix` | C | Required lookup | `apply_gha`, `common_values`; Prefix |
 | <!-- parameter state:prod_service_connection -->`prod_service_connection` | C | Required lookup | `apply_ado`; Prod service connection |
 | <!-- parameter state:prod_subscription_id -->`prod_subscription_id` | C | Required lookup | `apply_gha`, `common_values`; Prod subscription id |

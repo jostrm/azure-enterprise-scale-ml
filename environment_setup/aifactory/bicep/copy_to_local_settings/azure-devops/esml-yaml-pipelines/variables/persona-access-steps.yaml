@@ -1,0 +1,25 @@
+parameters:
+  - name: serviceConnection
+    type: string
+  - name: scope
+    type: string
+  - name: phase
+    type: string
+    default: preflight
+steps:
+- task: AzureCLI@2
+  displayName: 'Persona access ${{ parameters.scope }} ${{ parameters.phase }} (mandatory)'
+  condition: succeeded()
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: pscore
+    scriptLocation: inlineScript
+    inlineScript: |
+      $bridge = "$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/personas/pipeline.py"
+      python $bridge --config "$(configOverrideFile)" --repo-root "$(System.DefaultWorkingDirectory)" --environment "$(dev_test_prod)" --scope "${{ parameters.scope }}" --phase "${{ parameters.phase }}" --format azure-devops
+      if ($LASTEXITCODE -ne 0) { throw "Persona access prerequisite/reconciliation failed. No legacy fallback is permitted." }
+    workingDirectory: '$(System.DefaultWorkingDirectory)'
+  env:
+    ENABLE_PERSONAS: $(enablePersonas)
+    PERSONA_ACCESS_MODE: $(persona_access_mode)
+    PERSONA_ACCESS_MANIFEST: $(persona_access_manifest)

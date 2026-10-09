@@ -72,7 +72,12 @@ number / Environment**. There is no All-project choice in this view. The
 compound identity prevents Project `001` in one factory from including another
 factory's Project `001`.
 
-Select the business template in a dropdown. **Retail chat** is the default.
+The Azure-native workbook defaults to **None - Generic project**. This view
+needs no Retail/Booking/Support events: it reads native model usage, current
+resource inventory and Azure Cost Management for the project RG. Select a
+business template explicitly for instrumented outcomes. The separate
+application/API report examples below still use their explicit `retail-chat`
+template; native service activity is not relabeled as business activity.
 
 | Shared across every template | Retail chat | Booking chat | Support chat |
 |---|---|---|---|
@@ -424,31 +429,227 @@ The value model below makes that additional evidence explicit.
 
 ### Project resource groups, shortcuts and Cost analysis
 
-The project Portal dashboard retains the **resource-group resource list on the
-left** and **native Cost analysis on the right**, both scoped to the selected
-project resource group. Direct shortcuts below open **AI Foundry, Storage,
-Key Vault, AI Search and Application Insights**. Application Insights uses the
-same explicit resource-ID override as the companion workbook, when supplied.
-The Cost analysis tile shows this month's **ActualCost** and Azure's forecast;
-the direct Cost analysis link, Budgets and Cost Alerts remain available.
+The project Portal dashboard places the **resource group on the left** and
+**native accumulated Cost analysis on the right**, both scoped to the selected
+project resource group. Both tiles are four grid rows high (previously eight).
+The first shortcut row opens **AI Foundry, Storage, Key Vault, AI Search and
+Application Insights**. The second adds **Azure Machine Learning, Databricks
+and Data Factory** when their flags are enabled, plus the existing common
+**Log Analytics** workspace and links to application logs, metrics and cost
+alerts. Application Insights and Log Analytics honor the workbook's resource-ID
+overrides.
+
+Azure ML uses `enableAzureMachineLearning || addAzureMachineLearning`, including
+the added workspace's naming mode. Databricks uses `enableDatabricks`; Data
+Factory uses `enableDatafactory`. These shortcuts use the same project-scoped
+names as phase 07; they do not deploy services or prove their existence.
+
+Two native **daily consumption cost** column charts sit below the shortcuts:
+daily total and daily total split by service. Both use this month's project-RG
+**ActualCost**, not token-price estimates or live usage counters. The top chart
+retains Azure's forecast (a prediction, not a charge). These are different views
+of the same cost, not additive totals. Missing billing access/data is left to
+Azure's native unavailable/error display; no sample figures are inserted.
+Compact **Usage & outcomes** and **Model consumption** report cards follow,
+with service configuration below the charts and cards. Token metrics remain in
+the linked workbook and are not represented as billed costs.
+
+When `enableAIFoundry` or `addAIFoundry` is enabled, six native Azure Monitor
+tiles appear ahead of the report cards. Each contains **one or two metrics**
+(never more than five), using **Sum** and a **30-day** chart context. The project
+dashboard's shared time range also defaults to the past 30 days; viewers can
+change it in Azure Portal. Account and child-project scopes are kept separate.
+
+| Tile | Native metrics | Scope |
+|---|---|---|
+| Requests & calls | `AzureOpenAIRequests`, `TotalCalls` | Foundry account |
+| Generated images | `GeneratedImages` | Foundry account |
+| Content safety | `RAIHarmfulRequests`, `RAIRejectedRequests` | Foundry account |
+| Quota / limits | `BlockedCalls`, `Ratelimit` | Foundry account |
+| Agent activity | `AgentToolCalls`, `AgentResponses` | Foundry child project |
+| Agent model estimated USD | `AgentModelEstimatedCost` | Foundry child project |
+
+`TotalCalls`, `BlockedCalls` and `Ratelimit` are **non-OpenAI** Cognitive Services
+metrics. `BlockedCalls` means rate/quota blocking, not content safety blocking.
+`Ratelimit` sums published limit values as requested; it is **not a count of
+throttled requests**. Harmful volume includes annotate-only detections; it is
+not equivalent to blocked volume. Do not add overlapping series together.
+Agent estimated cost is an **estimate in USD**, never an invoice or part of the
+ActualCost total. An account can include multiple Foundry projects.
+
+These tiles use platform metrics directly and do not enable diagnostics,
+ingestion, paid advanced metrics, roles or model calls. Unsupported, unpublished
+or inaccessible metrics remain subject to the Portal's native no-data/error
+display, not an invented zero. The output-only `foundryMetricTiles.bicep` module
+isolates the native chart definitions from deployment-time naming.
+Metric names, scopes and Sum support follow the Microsoft references for
+[accounts](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-metrics/microsoft-cognitiveservices-accounts-metrics)
+and [projects](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-metrics/microsoft-cognitiveservices-accounts-projects-metrics).
 
 The factory landing dashboard keeps its common/project resource groups and
-their separate Cost analysis tiles. Each project now supports the same five
-shortcut types, showing only resources returned by existing inventory discovery
-(fewer shortcuts when a type is absent). The Bicep project shortcuts retain
-their configured naming bindings; they do not themselves provision the target
-services. Workbook and business-value reports supplement this resource/cost
-layout rather than replacing it. These are local source changes; existing Azure
-dashboards require a separately authorized dashboard deployment to update.
+their separate Cost analysis tiles. Each project supports the five original
+shortcut types plus a second row for **Azure ML, Databricks and Data Factory**,
+showing only resources returned by discovery. Foundry Hub/Project resources
+are excluded from Azure ML workspace selection. A failed discovery preserves
+the previous inventory; a successful empty result removes stale shortcuts.
+These are local source changes; existing Azure dashboards require a separately
+authorized dashboard deployment to update. Portal rendering and live billing
+data still require review after that deployment.
+
+#### Activity and solution assets beside accumulated cost
+
+The common AI Factory dashboard includes **Number of resources by region**,
+immediately right of the first connectivity/hub resource-group tile. Its native
+Workbook map pin queries Resource Graph live across the exact known hub, common
+and project RG IDs in the retained factory inventory, including configured
+environments. It never broadens to all resources in those subscriptions. Blue
+bubbles show resource counts only. Connectivity cost/activity tiles remain
+beside the map; additional hub rows do not overlap environment/project rows.
+The pin has no frozen health-parameter snapshot or misleading project-only
+workbook link. Inventory/read permission filtering still limits visible counts.
+
+The shared AI Factory dashboard adds an **Activity & solution assets** card
+immediately to the right of each hub, common and project accumulated-cost tile.
+Environment bands include the additional card without overlapping neighboring
+environments or the existing project shortcuts.
+
+These are **UTC-timestamped snapshots collected by a dashboard-only run**.
+Refreshing the browser does not collect new values; rerun the dashboard-only
+pipeline or its CLI runner to refresh them. The 30-day window ends at the snapshot time, not the
+time someone later opens the dashboard. Snapshot windows use UTC minute
+boundaries to match native metric bucket precision. Native cost tiles retain their own
+live date controls. Each usage card is scoped to its exact resource group and
+includes all discovered resources of the relevant type, not only the first
+resource selected for a shortcut.
+
+| Evidence | Definition and interpretation |
+|---|---|
+| Email-caller Activity Log, 30 days | Count of distinct Activity Log event records with an email-shaped caller and positive user/delegated-scope claims, excluding application and managed identities. An email-caller record without sufficient identity evidence makes the total unavailable; classified/unclassified counts remain in snapshot metadata. These are management-plane events, not application traffic or distinct operations: Started/Succeeded records can describe the same operation. Delegated automation using a user's credentials cannot be distinguished from manual activity. No caller addresses are stored in the dashboard. |
+| Foundry agents | Current new agent definitions plus classic assistants, not their versions or executions. Both populations must be readable for a complete combined count. |
+| Azure ML model names | Distinct registered model containers, including archived containers, not model versions, deployments, scoring calls or public catalog models. |
+| Storage used | Sum of the latest available `UsedCapacity` hourly Average byte sample across the RG's storage accounts, displayed as GiB. Never sum capacity over time or add blob capacity to the already-inclusive account capacity. Stored data is not evidence of recent reads/writes. |
+| ADF completed pipeline runs, 30 days | Sum of `PipelineSucceededRuns`, `PipelineFailedRuns` and `PipelineCancelledRuns` totals. This demonstrates execution, not merely configured pipelines; queued/in-progress runs are not included. |
+| AI Search indexes | Current index inventory from each service's metadata API, not index versions, indexed documents or search-query traffic. |
+
+Inventory indicates configured solution assets, **not proof of runtime usage**.
+There is deliberately no automatic "unused" judgment based on a zero count.
+Missing observations, incomplete pagination, unsupported response shapes and
+denied/unreachable sources display **Unavailable**, not zero. **Not deployed**
+means successful RG discovery found no applicable service; a measured zero is
+shown only when the relevant read completed successfully.
+
+The collector uses existing Azure Monitor/management reads and existing Entra
+data-plane access. Foundry and Search inventory can require private-network
+reachability and data-plane authorization even when ARM reads succeed. The
+pipeline does not retrieve keys, grant roles, enable diagnostics, open firewalls
+or create a collector service to fill a missing value. Only aggregate values,
+timestamps and source-status metadata are persisted.
+
+Source contracts: [Activity Log events](https://learn.microsoft.com/en-us/rest/api/monitor/activity-logs/list),
+[Foundry agents](https://ai.azure.com/api-reference/agents/list-agents/),
+[AML model containers](https://learn.microsoft.com/en-us/rest/api/azureml/model-containers/list?view=rest-azureml-2025-06-01),
+[storage metrics](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-metrics/microsoft-storage-storageaccounts-metrics),
+[Data Factory metrics](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-metrics/microsoft-datafactory-factories-metrics)
+and [Search index metadata](https://learn.microsoft.com/en-us/rest/api/searchservice/indexes/list?view=rest-searchservice-2025-09-01).
 
 ### Native My Project generated with the project dashboard
 
 `modules\projectDash01.bicep` now deploys a companion
-**My Project - Usage and Cost** Azure Monitor workbook and adds an entry tile
-below the existing project resource/service inventory. The existing resource
+**My Project - Usage and Cost** Azure Monitor workbook and adds compact entry
+cards below the consumption charts, ahead of service configuration. The existing resource
 links and native Cost Management link remain in place.
 
-The workbook provides **Usage & outcomes / Cost** navigation and
+#### Generic project view and source availability
+
+The native workbook uses compact spacing, paired chart widths and KPI strips,
+with methodology, binding diagnostics and full request/inventory tables behind
+explicit detail controls. These controls change presentation only: source
+limitations, exact scope and missing-value behavior are unchanged.
+
+Native area, bar/column, scatter, pie and Azure-region map visualizations are
+used where their data shapes are appropriate. Categorical bars can segment by
+region; numeric token scatter compares observed daily input and output for each
+deployment/model. Cached tokens are a subset and are never stacked on top of
+inclusive input. The map describes Azure resource placement, not user locations
+or application traffic. Global/non-geographic resources remain inventory, not
+invented map points. Native Portal styling applies; this is not a custom HTML
+dashboard or a pixel-identical rendering of the desktop charts.
+
+Both resource maps are titled **Number of resources by region** and use
+**blue circles**. Their numbers and circle sizes represent visible resources,
+not incidents or healthy/unhealthy status. For example, `87` means 87 resources,
+not 87 health issues. In the project workbook, **Explore resources by region**
+opens a region selector and a resource table; clicking a resource name opens its
+Azure resource page. Select `northeurope` to identify any resources placed there.
+Global/unmapped locations remain in the selector/table, not invented map points.
+
+Health is separate under **Regional advisories and issue details**, with a
+coverage table, clickable advisory titles, reported-resource links, and direct
+Azure Service Health navigation. A reported issue means Resource Health
+`Unavailable`/`Degraded` or an active
+subscription-level regional service issue/advisory/maintenance event whose
+impact has begun. A regional advisory is context, not proof the project or all
+its services are affected. Green requires every mapped resource to have a
+reported `Available` state, both source queries to complete, and no visible
+regional event. Unknown, unsupported or incomplete coverage stays unknown.
+The health details expose available/unknown resource counts separately from
+regional-event counts/services. Query/permission errors remain visible.
+
+Resource Health and Service Health are queried independently: Azure Resource
+Graph does not support joining both health tables in one cross-table query.
+Their scoped, bounded results feed the separate health details through escaped
+query-backed parameters. Service events are subscription-scoped; only locations
+containing this project's resources are displayed. Capacity issues appear only
+when Azure reports a related health event: there is no real-time regional/SKU
+capacity forecast, quota guarantee, or inferred application-health promise.
+
+Do not infer a separate `stackedarea` or doughnut configuration from an Azure
+Data Explorer screenshot: workbook types are `areachart`, `barchart`,
+`categoricalbar`, `scatterchart`, `piechart` and `map`. Microsoft publishes
+categorical stacking through the series/group mapping; unsupported custom
+chart flags are not added. See [native charts](https://learn.microsoft.com/en-us/azure/azure-monitor/visualize/workbooks-chart-visualizations)
+and [Azure-location maps](https://learn.microsoft.com/en-us/azure/azure-monitor/visualize/workbooks-map-visualizations).
+
+**Template = None - Generic project** is the default. The same workbook keeps
+**Usage / Cost / Model tokens** navigation without requiring a canonical
+factory, scale set, store, scenario or business-event coverage declaration for
+the generic view. Retail, Booking and Support remain optional and show their
+own controls and reports only when selected.
+
+Generic **Usage** prioritizes native input/output token charts for a discovered
+Foundry or OpenAI account in this exact RG. A unique account is auto-selected;
+multiple accounts require an explicit selection, and the label identifies the
+account rather than claiming an all-account total. Application HTTP request
+metrics are a separate optional section, followed by project resource inventory.
+Model calls, tokens and HTTP requests are not conversations, user questions or
+business outcomes.
+
+Generic **Cost** reads native RG `ActualCost` month-to-date through Azure
+Resource Manager / Cost Management. It does not depend on `aifactory.chat.meter`
+events. Returned currencies remain attached to their amounts; USD is only a
+labeled display fallback when no currency is available, never a conversion or
+an invented cost. Store/session attribution and imported/estimated meter costs
+remain separate business views, not substitutes for Azure billing. Native
+permission, throttling and API failures remain visible.
+
+The request-log token report binds its transport window to **TokenTimeRange**.
+Business KQL owns its explicit local-date and baseline-history bounds; discovery
+uses the last 90 days. Do not use `timeContext: { durationMs: 0 }` to mean
+"Set in query": the Portal emits `timespan=PT0S`, which can discard all matching
+observations even when the KQL date range is valid.
+
+Native `cacheReadInputTokens` is optional and model-dependent; its table is
+behind an explicit **Show optional native cache metric** control. Missing
+native cache series is not zero. Request-usage logs can still contain observed
+cached tokens independently. Business views require real `aifactory.chat` and
+`aifactory.chat.meter` events; no template can reconstruct cart/booking/support
+outcomes from service metrics.
+
+These workbook improvements are source changes until a separately approved
+dashboard-only deployment includes them. They add no telemetry collection,
+diagnostic settings, service resources or role assignments.
+
+The optional business view provides **Usage / Cost** navigation and
 **Retail / Booking / Support** templates. Shared usage, customer-feedback and
 three daily charts do not depend on the business template. The Cart section
 is replaced by booking or case state cards. Cost includes separate
@@ -649,6 +850,43 @@ The runner compiles and checks an allowed resource-type list before writing.
 It does not create missing resource groups, grant roles, create identities,
 enable diagnostics or rerun networking/Foundry/compute deployment. Read-only
 `existing` resource references used by naming are not resource creation.
+
+#### Refresh the AI Factory dashboard and Project001 without redeploying services
+
+One run of **infra-project-dashboards** refreshes both the shared AI Factory
+dashboard and the selected project's standalone dashboard. It also refreshes
+that project's **My Project workbook**; this is not a two-resource-only update.
+Other projects' standalone dashboards are not redeployed. Their navigation
+tiles remain in the shared factory inventory.
+
+Use these manual pipeline inputs for an existing Dev Project001:
+
+| Setting | Azure DevOps parameter | GitHub Actions input | Value |
+|---|---|---|---|
+| Environment | `environment` | `environment` | `dev` |
+| Project assertion | `projectNumber` | `project_number` | `001` |
+| Configuration | `configFile` | `config_file` | Consumer-relative path to Project001's existing persistent `variables.json` |
+| Operation | `mode` | `mode` | `plan` first; after reviewing its targets, rerun with `deploy` |
+| Runner | `runnerSelection` | `runner_selection` | `from-config`, or an explicitly selected available hosted runner |
+
+Select the configuration for the intended factory and scale set, not another
+project's file or a stale legacy copy. The project assertion must match
+`project_number_000`; existing project/common resource groups, Application
+Insights and Log Analytics must be readable. The deploy identity also needs
+the existing dashboard/workbook deployment permissions described above.
+
+**Source version matters:** the pipeline runs the accelerator revision pinned
+by the consumer checkout, not whichever `main` branch happens to be newer.
+Publish the reviewed dashboard source, update the consumer submodule pin to a
+revision containing it, and select that consumer branch when running the
+pipeline. The compact layout, ML/data shortcuts and Foundry metric tiles were
+introduced in accelerator commit `3f4bbd26` (or a later revision containing the
+same changes). A local commit alone cannot update a remote pipeline.
+
+After a successful deploy, open the shared AI Factory dashboard and the
+selected Project001 dashboard in Azure Portal and refresh the page. Native
+metric availability, access and data freshness are separate from deployment
+success. No general `infra-project` deployment is needed for this refresh.
 
 Use the existing environment service connection/OIDC identity. Runner selection
 can explicitly choose a hosted runner when self-hosted agents are offline;

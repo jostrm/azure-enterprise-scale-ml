@@ -87,8 +87,23 @@ def test_both_pipelines_offer_the_same_choices():
     assert params["mode"]["values"] == dispatch["mode"]["options"]
     for ado_name, gha_name in (("projectNumber", "project_number"), ("configFile", "config_file"),
                                ("alertEmails", "alert_emails"), ("registerProvider", "register_provider"),
-                               ("prune", "prune")):
+                               ("prune", "prune"), ("extraModels", "extra_models")):
         assert ado_name in params and gha_name in dispatch
+
+
+def test_extra_models_are_validated_keys_and_consumer_definitions_are_picked_up():
+    assert ado_parameters()["extraModels"]["default"] == "" and gha_inputs()["extra_models"]["default"] == ""
+    for path in (ADO, GHA):
+        text = path.read_text(encoding="utf-8")
+        assert "$env:HM_EXTRA_MODELS -split ','" in text
+        assert "-cnotmatch '^[a-z][a-z0-9-]{1,30}$'" in text, "only definition keys, never paths or flags"
+        assert "@('--model', $name)" in text
+        assert "'healthmodels'" in text and "$definitionArgs = @('--definitions-dir', $definitions)" in text
+        lines = [line.strip() for line in text.splitlines()]
+        lifecycle = next(line for line in lines if "$tool $env:HM_MODE" in line)
+        status = next(line for line in lines if "$tool status" in line)
+        assert lifecycle.endswith("@extra @definitionArgs") and status.endswith("@definitionArgs"), \
+            "plan/deploy and the status check resolve the same consumer definitions"
 
 
 def test_pipelines_never_echo_configuration_or_tokens():

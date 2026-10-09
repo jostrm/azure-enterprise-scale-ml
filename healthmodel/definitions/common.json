@@ -1,0 +1,19 @@
+{
+  "$schema": "./model-definition.schema.json",
+  "key": "common",
+  "description": "The AI Factory common resource group (admin VMs, data lake, Key Vaults, Log Analytics) with every project model of the factory nested under one Projects layer.",
+  "nameToken": "cmn",
+  "home": "common",
+  "rootDisplayName": "AI Factory common services ({env})",
+  "reportCoverage": true,
+  "layers": [
+    {
+      "fromCatalog": true,
+      "select": {"origin": "common"}
+    },
+    {
+      "key": "projects",
+      "select": {"nestedModel": "project"}
+    }
+  ]
+}

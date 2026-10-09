@@ -33,6 +33,7 @@ FEATURES = dict(
     for line in """
 ENABLE_AMPLS enableAMPLS
 ENABLE_ADMIN_VM enableAdminVM
+ENABLE_PROJECT_VM enableProjectVM
 ENABLE_AI_FACTORY_HUB enableAIFactoryHub
 ENABLE_PUBLIC_GENAI_ACCESS enablePublicGenAIAccess
 ENABLE_PUBLIC_ACCESS_WITH_PERIMETER enablePublicAccessWithPerimeter
@@ -69,6 +70,7 @@ ENABLE_WEBAPP enableWebApp
 ENABLE_CONTAINER_APPS enableContainerApps
 ENABLE_AZURE_MCP_SERVER enableAzureMcpServer
 ENABLE_AI_FACTORY_MCP enableAIFactoryMCP
+ENABLE_FACTORY_CHAT_AGENT enableFactoryChatAgent
 ENABLE_AI_GATEWAY_SKU enableAIGatewaySKU
 ENABLE_APPINSIGHTS_DASHBOARD enableAppInsightsDashboard
 ENABLE_APPLICATION_INSIGHTS enableApplicationInsights
@@ -80,6 +82,10 @@ ENABLE_AI_SERVICES enableAIServices
 ENABLE_AI_FOUNDRY_HUB enableAIFoundryHub
 """.strip().splitlines()
 )
+
+# Access mode is validated with manifests/marker guards by test_enable_personas,
+# not the service-flag matrix (true cannot be exercised without a manifest).
+ACCESS_FLAGS = {"ENABLE_PERSONAS": "enablePersonas"}
 
 # These flags are inventoried/default-checked, NOT claimed as deployable services.
 CONFIG_ONLY_EXCEPTIONS = {
@@ -100,7 +106,7 @@ COMMON_FLAGS = {"ENABLE_ADMIN_VM", "ENABLE_DATAFACTORY_COMMON"}
 
 PUBLIC_FLAGS = "enablePublicGenAIAccess enablePublicAccessWithPerimeter"
 MODULE_FLAGS = {
-    "02-core-infrastructure.bicep": PUBLIC_FLAGS + " enableApplicationInsights enableLogicApps",
+    "02-core-infrastructure.bicep": PUBLIC_FLAGS + " enableApplicationInsights enableLogicApps enableProjectVM",
     "03-cognitive-services.bicep": PUBLIC_FLAGS + " enableAIServices enableAISearch enableAzureOpenAI enableContentSafety enableAzureAIVision enableAzureSpeech enableAIDocIntelligence enableBingCustomSearch enableBing enableAFoundryCaphost enableAIFoundry enableAISearchSharedPrivateLink",
     "04-databases.bicep": PUBLIC_FLAGS + " enableCosmosDB enablePostgreSQL enableRedisCache enableSQLDatabase enableElasticsearch enableAFoundryCaphost enableAIFoundry",
     "05-compute-services.bicep": PUBLIC_FLAGS + " enableContainerApps enableFunction enableWebApp enableBingSearch enableAzureOpenAI enableAISearch enableAIServices enableAppInsightsDashboard enableAIFoundry enableAKS",
@@ -140,12 +146,13 @@ def load_pipeline(path: Path) -> dict:
 
 def inventory_errors(env: dict, ado: dict) -> list[str]:
     errors = []
-    for label, values, expected in ((".env.template", env, set(FEATURES)),
-                                     ("variables.yaml", ado, set(FEATURES.values()))):
+    inventory = {**FEATURES, **ACCESS_FLAGS}
+    for label, values, expected in ((".env.template", env, set(inventory)),
+                                     ("variables.yaml", ado, set(inventory.values()))):
         actual = {key for key in values if key.lower().startswith("enable")}
         if actual != expected:
             errors.append(f"{label}: uncontracted={sorted(actual - expected)}, missing={sorted(expected - actual)}")
-    for public, runtime in FEATURES.items():
+    for public, runtime in inventory.items():
         for label, values, key in (("GHA", env, public), ("ADO", ado, runtime)):
             if key in values and values[key] not in ("true", "false"):
                 errors.append(f"{label} {key}: expected canonical boolean string, got {values[key]!r}")

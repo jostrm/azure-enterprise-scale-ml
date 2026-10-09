@@ -167,6 +167,18 @@ def test_tool_audit_accepts_injected_storage_without_credential_construction(set
     container.get_blob_client.return_value.upload_blob.assert_called_once()
 
 
+def test_tool_audit_records_the_authorized_client_application(settings):
+    import json
+    from aifactory_agent.audit import ToolAudit
+    container = Mock()
+    client = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
+    audit = ToolAudit(settings, Principal(TENANT, CALLER, client_id=client), SCOPE, "correlation", container=container)
+    with audit.operation("factory_health") as event:
+        event["outcome"] = "completed"
+    uploaded = json.loads(container.get_blob_client.return_value.upload_blob.call_args.args[0])
+    assert uploaded["client_id"] == client and uploaded["object_id"] == CALLER
+
+
 def test_request_service_override_owns_conversation_tools_not_mutable_app_state(settings):
     from aifactory_agent import web
     dependencies, knowledge, _, conversation = injected_dependencies()

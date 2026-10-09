@@ -241,8 +241,8 @@ module projectDashboard '../modules/projectDash01.bicep' = {
     projectSuffix: projectSuffix
     
     // RBAC & Security
-    technicalAdminsObjectID: technicalAdminsObjectID
-    technicalAdminsEmail: technicalAdminsEmail
+    technicalAdminsObjectID: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? '' : technicalAdminsObjectID
+    technicalAdminsEmail: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? '' : technicalAdminsEmail
     
     // Networking (Required for naming convention)
     genaiSubnetId: genaiSubnetId

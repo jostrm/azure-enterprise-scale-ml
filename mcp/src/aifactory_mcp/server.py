@@ -22,6 +22,7 @@ from starlette.routing import Route
 
 from . import __version__
 from .client import validate_http_url
+from .readiness import ReadinessProbe
 
 LOGGER = logging.getLogger(__name__)
 INSTRUCTIONS = (
@@ -50,7 +51,13 @@ def create_server(runtime, scope_key: str, *, object_id: str | None = None, netw
     if not network and not object_id:
         raise ValueError("An explicit local operator identity is required for stdio.")
     local = runtime.local_principal(object_id) if not network else None
-    server = Server("enterprise-scale-ai-factory", version=__version__, instructions=INSTRUCTIONS)
+    instructions = INSTRUCTIONS
+    if getattr(runtime, "graph_only", False):
+        instructions += (
+            " This connection is graph-only: no Factory API, action, approval or operation tools are available."
+            " Graph and architecture results are static snapshot evidence, never live cloud state."
+        )
+    server = Server("enterprise-scale-ai-factory", version=__version__, instructions=instructions)
 
     def backend():
         principal = local
@@ -112,7 +119,9 @@ async def run_stdio(server: Server) -> None:
         await server.run(read, write, server.create_initialization_options())
 
 
-def create_http_app(runtime, scope_key: str, *, resource_url: str) -> Starlette:
+def create_http_app(
+    runtime, scope_key: str, *, resource_url: str, readiness: ReadinessProbe | None = None,
+) -> Starlette:
     resource_url = validate_http_url(resource_url)
     parsed = urlsplit(resource_url)
     if parsed.path != "/mcp":
@@ -168,6 +177,16 @@ def create_http_app(runtime, scope_key: str, *, resource_url: str) -> Starlette:
             "resource_name": "Enterprise Scale AI Factory MCP",
         })
 
+    async def live(request):
+        return JSONResponse({"status": "live"})
+
+    async def ready(request):
+        available = readiness is not None and await anyio.to_thread.run_sync(readiness.ready)
+        return JSONResponse({
+            "status": "ready" if available else "not_ready",
+            "coverage": "Factory API health only; not deployment or action readiness.",
+        }, status_code=200 if available else 503)
+
     @asynccontextmanager
     async def lifespan(app):
         async with manager.run():
@@ -177,6 +196,8 @@ def create_http_app(runtime, scope_key: str, *, resource_url: str) -> Starlette:
         routes=[
             Route("/mcp", endpoint=AuthenticatedEndpoint(), methods=["GET", "POST", "DELETE"]),
             Route("/.well-known/oauth-protected-resource/mcp", endpoint=metadata),
+            Route("/health/live", endpoint=live),
+            Route("/health/ready", endpoint=ready),
         ],
         lifespan=lifespan,
     )

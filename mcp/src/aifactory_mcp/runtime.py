@@ -6,12 +6,16 @@ import importlib.util
 import os
 import sys
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from types import ModuleType
 from uuid import UUID
 
 from .health import HealthModelFactory, default_health_models
+from .auth import (
+    ApplicationPrincipal, ApplicationTokenVerifier, AudienceTokenVerifier,
+    DelegatedTokenVerifier, TokenVerifier, load_application_auth,
+)
 
 
 _AGENT = Path("usecase_code") / "40-agent-factory" / "40-aifactory-agent"
@@ -68,6 +72,8 @@ class Runtime:
     costs: ModuleType
     sdk: ModuleType
     health_models_factory: HealthModelFactory = default_health_models
+    token_verifier: TokenVerifier | None = None
+    graph_only: bool = False
 
     def local_principal(self, object_id: str):
         """Trusted local stdio/approval CLI only; never use this for network callers."""
@@ -82,17 +88,30 @@ class Runtime:
         return self.security.Principal(tenant_id=self.settings.tenant_id, object_id=str(identity))
 
     def principal_from_token(self, token: str):
+        if self.token_verifier is not None:
+            return self.token_verifier.verify(token)
         return self.security.principal_from_token(self.settings, token)
 
     def backend(self, principal, scope_key: str):
         from .backend import AgentBackend
+        from .access import ReadOnlyApplicationBackend
+        from .graph import GraphOnlyBackend
 
-        return AgentBackend(self, principal, scope_key)
+        backend_type = GraphOnlyBackend if self.graph_only else AgentBackend
+        if isinstance(principal, ApplicationPrincipal):
+            if scope_key not in principal.scope_keys:
+                raise PermissionError("The application identity is not permitted in this scope.")
+            return ReadOnlyApplicationBackend(
+                backend_type(self, principal.principal, scope_key), principal.allowed_tools,
+            )
+        return backend_type(self, principal, scope_key)
 
 
 def load_runtime(
     agent_config: str | Path, repository_root: str | Path | None = None, *,
     health_models_factory: HealthModelFactory = default_health_models,
+    application_auth: str | Path | None = None,
+    graph_only: bool = False,
 ) -> Runtime:
     root = _repository(repository_root)
     try:
@@ -115,5 +134,39 @@ def load_runtime(
             "The agent runtime could not be loaded. Check the explicit configuration, repository, "
             "and installed shared agent dependencies."
         ) from None
-    return Runtime(settings=settings, repository_root=root, sdk=sdk,
-                   health_models_factory=health_models_factory, **modules)
+    runtime = Runtime(settings=settings, repository_root=root, sdk=sdk,
+                      health_models_factory=health_models_factory, graph_only=graph_only, **modules)
+    if application_auth is None:
+        return runtime
+    policy = load_application_auth(application_auth)
+    from .policy import GRAPH_APPLICATION_TOOLS
+
+    for identity in policy.identities:
+        grants = [grant for grant in settings.auth.grants if grant.object_id == identity.object_id]
+        if any(set(grant.permissions) - {"factory.read", "cost.read", "graph.read"} for grant in grants):
+            raise ValueError("Application identity grants must contain read-only permissions only.")
+        required = {"graph.read"} if graph_only else {"factory.read"}
+        if graph_only and not set(identity.allowed_tools) <= GRAPH_APPLICATION_TOOLS:
+            raise ValueError("Graph-only application identities may allow only explicit graph tools.")
+        if any(tool.startswith("cost_") for tool in identity.allowed_tools):
+            required.add("cost.read")
+        if GRAPH_APPLICATION_TOOLS.intersection(identity.allowed_tools):
+            required.add("graph.read")
+            graph = getattr(settings, "dual_graph", None)
+            if not graph or not set(identity.scope_keys) <= set(graph.allowed_scopes):
+                raise ValueError("Application graph tools require explicit enabled graph scope configuration.")
+        for scope in identity.scope_keys:
+            permissions = {
+                permission for grant in grants if scope in grant.scopes for permission in grant.permissions
+            }
+            if scope not in settings.scopes or not required <= permissions:
+                raise ValueError("Application identities require explicit matching read-only scope grants.")
+    verifier = AudienceTokenVerifier(
+        DelegatedTokenVerifier(lambda token: modules["security"].principal_from_token(settings, token)),
+        settings.auth.audience,
+        ApplicationTokenVerifier(
+            settings.tenant_id, policy,
+            lambda tenant, caller: modules["security"].Principal(tenant_id=tenant, object_id=caller),
+        ),
+    )
+    return replace(runtime, token_verifier=verifier)

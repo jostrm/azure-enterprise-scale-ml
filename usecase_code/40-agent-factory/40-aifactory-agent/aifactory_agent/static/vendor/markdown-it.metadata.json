@@ -1,0 +1,8 @@
+{
+  "package": "markdown-it",
+  "version": "15.0.2",
+  "license": "MIT",
+  "browser_distribution": "dist/browser/markdown-it.umd.min.js",
+  "npm_integrity": "sha512-q4IGxMv56jCqT4OCRCADBoDP3LO4MhmTXjFbphHPXs4g3j9Xg5RDnxqN8IF/3vIWEU+VCnUq+7JUg/cfy2E6Qw==",
+  "sha256": "635972b985228e8af9f0143647c68616b7a3bb09f6946e7e4a52e43dcf5e7be5"
+}

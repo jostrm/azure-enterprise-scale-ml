@@ -1,6 +1,6 @@
 """aif-healthmodel: deploy AI Factory health models and operate them.
 
-  plan | deploy                     model lifecycle (see deploy.py)
+  plan | deploy | models            model lifecycle and definitions (see deploy.py)
   status                            root/layer health, failing signals, entities without data
   alerts | alert-state              read health-state alerts, acknowledge or close them
   history                           entity state transitions or one signal's values
@@ -17,22 +17,19 @@ import sys
 from pathlib import Path
 
 from . import deploy, naming
-from .azure import AzCliTransport, TokenTransport
+from .bootstrap import build_registry, runtime_transport
 from .catalog import HEALTH_STATES, SEVERITIES
 from .client import ALERT_STATES, HealthModelClient
+from .infrastructure.proxies import ReadOnlyTransport
 
-LIFECYCLE = ("plan", "deploy")
+LIFECYCLE = ("plan", "deploy", "models")
+READ_ONLY_COMMANDS = frozenset({"status", "alerts", "history"})
 FAIL_ORDER = {"Degraded": 1, "Unhealthy": 2}
 
 
 def make_transport(auth: str):
-    if auth == "identity":
-        try:
-            from azure.identity import DefaultAzureCredential
-        except ImportError:
-            raise RuntimeError("--auth identity requires the azure-identity package.") from None
-        return TokenTransport(DefaultAzureCredential())
-    return AzCliTransport()
+    """Resilient ARM transport (retry + circuit breaker) for the chosen identity."""
+    return runtime_transport(auth)
 
 
 def model_id_from(args) -> str:
@@ -44,9 +41,10 @@ def model_id_from(args) -> str:
     if args.variables_json and args.environment and args.project:
         payload = naming.read_variables(deploy._bounded(Path(args.consumer_root or os.getcwd()), args.variables_json))
         scope = naming.from_variables(payload, args.environment, args.project)
-        group = scope.project_resource_group if args.scope == "project" else scope.common_resource_group
+        definition = build_registry(deploy.definition_dirs(args)).get(args.scope)
+        group = scope.project_resource_group if definition.home == "project" else scope.common_resource_group
         return (f"/subscriptions/{scope.subscription_id}/resourceGroups/{group}"
-                f"/providers/Microsoft.CloudHealth/healthmodels/{scope.model_name(args.scope)}")
+                f"/providers/Microsoft.CloudHealth/healthmodels/{definition.model_name(scope)}")
     raise ValueError("Identify the model with --model-id, with --subscription/--resource-group/--name, "
                      "or with --variables-json/--environment/--project [--scope].")
 
@@ -143,6 +141,8 @@ def _set_alert(client, args) -> int:
         config = {"severity": value}
         if args.action_group_id:
             config["actionGroupIds"] = list(args.action_group_id)
+        elif args.clear_action_groups:
+            config["actionGroupIds"] = []
         if args.description:
             config["description"] = args.description
         changes[key] = config
@@ -179,7 +179,11 @@ def build_parser() -> argparse.ArgumentParser:
         group.add_argument("--variables-json")
         group.add_argument("--environment", choices=sorted(naming.ENVIRONMENTS))
         group.add_argument("--project")
-        group.add_argument("--scope", choices=("project", "common"), default="project")
+        group.add_argument("--scope", default="project", metavar="DEFINITION",
+                           help="Model definition with --variables-json: project, common, agents, ...")
+        group.add_argument("--definitions-dir", action="append", default=[], metavar="DIR",
+                           help="Folder with consumer model definitions (repeat); <folder of --variables-json>"
+                                "/healthmodels is loaded automatically when it exists.")
         sub.add_argument("--auth", choices=("cli", "identity"), default="cli",
                          help="cli = signed-in Azure CLI; identity = azure-identity DefaultAzureCredential.")
         return sub
@@ -210,7 +214,9 @@ def build_parser() -> argparse.ArgumentParser:
     set_alert.add_argument("--entity", required=True)
     set_alert.add_argument("--unhealthy", choices=(*SEVERITIES, "off"))
     set_alert.add_argument("--degraded", choices=(*SEVERITIES, "off"))
-    set_alert.add_argument("--action-group-id", action="append", default=[])
+    set_alert.add_argument("--action-group-id", action="append", default=[],
+                           help="Replace the notified action groups (existing ones are kept when omitted).")
+    set_alert.add_argument("--clear-action-groups", action="store_true", help="Stop notifying any action group.")
     set_alert.add_argument("--description")
     alert_state = runtime("alert-state", "Acknowledge, close or reopen an alert.")
     alert_state.add_argument("--alert-id", required=True)
@@ -225,7 +231,10 @@ def main(argv=None) -> int:
         return deploy.main(argv)
     try:
         args = build_parser().parse_args(argv)
-        client = HealthModelClient(model_id_from(args), make_transport(args.auth))
+        transport = make_transport(args.auth)
+        if args.command in READ_ONLY_COMMANDS:
+            transport = ReadOnlyTransport(transport, f"'{args.command}' only reads")
+        client = HealthModelClient(model_id_from(args), transport)
         return HANDLERS[args.command](client, args)
     except (ValueError, RuntimeError) as error:
         print(f"ERROR: {error}", file=sys.stderr)

@@ -288,7 +288,7 @@ jobs:
     needs:
       - configure
       - deploy_infrastructure
-    if: ${{ needs.deploy_infrastructure.result == 'success' }}
+    if: ${{ needs.deploy_infrastructure.result == 'success' && needs.deploy_infrastructure.outputs.skip_foundry != 'true' }}
     uses: ./.github/workflows/infra-project-phase.yml
     with:
       environment: ${{ inputs.environment }}

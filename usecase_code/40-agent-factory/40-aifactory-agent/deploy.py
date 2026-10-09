@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import gzip
 import hashlib
+import io
 import json
 import shutil
 import subprocess
@@ -16,6 +16,7 @@ from azure.storage.blob import BlobServiceClient
 
 from aifactory_agent.config import credential, load_settings
 from aifactory_agent.costs import DEFAULT_VARIABLES_RELATIVE_PATH, default_template_source
+from aifactory_agent.knowledge import _excluded
 from aifactory_agent.workloads import package_sources
 
 BASE = Path(__file__).resolve().parent
@@ -37,7 +38,30 @@ def resource_names(settings):
         "storageName": urlsplit(settings.azure.storage_endpoint).hostname.split(".")[0],
         "storageContainer": settings.azure.storage_container,
         "foundryAccount": settings.azure.foundry_account,
+        "foundryProject": settings.azure.foundry_project,
+        "agentName": settings.agent_name,
+        "agentInvocation": settings.agent_invocation,
     }
+
+
+def graph_bundle(settings) -> dict | None:
+    config = settings.dual_graph
+    if config is None:
+        return None
+    if config.expected_snapshot_id is None:
+        raise RuntimeError("Graph packaging requires an approved expected_snapshot_id pin.")
+    from aifactory_agent.dual_graph import DualGraphStore, GraphError
+    immutable = config.snapshot_root.name == config.expected_snapshot_id
+    try:
+        bundle = DualGraphStore(
+            config.snapshot_root, expected_snapshot_id=config.expected_snapshot_id,
+            repository_root=None if immutable else settings.knowledge.repository_root,
+        ).export_snapshot()
+    except (GraphError, OSError) as error:
+        raise RuntimeError("Graph snapshot failed integrity validation; no bundle was created.") from error
+    if not immutable and bundle["freshness"]["status"] != "fresh":
+        raise RuntimeError("A moving graph root must be fresh; select a reviewed immutable snapshot explicitly.")
+    return bundle
 
 
 def package(settings, client_id: str, destination: Path) -> dict:
@@ -45,10 +69,16 @@ def package(settings, client_id: str, destination: Path) -> dict:
     if not wheels.exists() or not list(wheels.glob("*.whl")):
         raise RuntimeError("Download the locked Linux CPython 3.12 wheels before packaging.")
     root = settings.knowledge.repository_root
+    graph = graph_bundle(settings)
     cloud = settings.model_dump(mode="json")
     cloud["azure"]["credential"] = "managed_identity"
     cloud["azure"]["managed_identity_client_id"] = client_id
     cloud["knowledge"]["repository_root"] = "/tmp/agent-app/repository"
+    if graph is not None:
+        cloud["dual_graph"].update(
+            snapshot_root="/tmp/agent-app/dual_graph/snapshots/" + graph["snapshot_id"],
+            expected_snapshot_id=graph["snapshot_id"], allow_source_access=False,
+        )
     workload_sources = list(package_sources(settings))
     cloud["workloads"]["repository_root"] = "/tmp/agent-app/workload_sources"
     template, template_hash = default_template_source(root, settings.costs)
@@ -84,6 +114,12 @@ def package(settings, client_id: str, destination: Path) -> dict:
         for relative in ("aifactory_agent", "requirements.lock.txt"):
             archive.add(BASE / relative, arcname=relative, filter=normalize)
         archive.add(config, arcname="config.json", filter=normalize)
+        if graph is not None:
+            for relative, content in sorted(graph["files"].items()):
+                entry = tarfile.TarInfo("dual_graph/snapshots/" + graph["snapshot_id"] + "/" + relative)
+                entry.size = len(content)
+                entry.mode = 0o444
+                archive.addfile(normalize(entry), io.BytesIO(content))
         archive.add(wheels, arcname="wheels", filter=normalize)
         archive.add(BASE.parent / "agent_factory", arcname="shared/agent_factory",
                     filter=normalize)
@@ -103,8 +139,7 @@ def package(settings, client_id: str, destination: Path) -> dict:
                 if not path.is_file() or path.is_symlink():
                     continue
                 relative = path.relative_to(root).as_posix()
-                if relative in members or any(fnmatch.fnmatchcase(relative, rule)
-                                              for rule in settings.knowledge.excludes):
+                if relative in members or _excluded(relative, settings):
                     continue
                 if path.suffix.lower() not in {".md", ".py"}:
                     continue
@@ -145,7 +180,10 @@ def main():
             "reuse": {"environment": args.environment, **names},
             "image": IMAGE, "network_changes": False,
             "identity_permissions": ["Search index data read", "Owned Blob container read/write",
-                                    "Foundry inference", "Resource-group inventory read"],
+                                    "OpenAI embeddings/inference",
+                                    ("Invocation of the configured agent endpoint only" if settings.agent_invocation == "agent_endpoint"
+                                     else "Foundry project Responses execution"),
+                                    "Resource-group inventory read"],
             "refresh_job": {"schedule_utc": args.refresh_schedule, "source": "approved immutable repository snapshot",
                             "permissions": ["Search schema read/documents write", "Owned Blob state", "Embeddings"]},
             "entra_changes": False, "factory_api_host": False}

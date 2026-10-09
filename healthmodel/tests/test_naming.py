@@ -83,10 +83,45 @@ def test_long_prefixes_are_truncated_with_stable_hash():
     assert other.model_name("common") != name
 
 
+def test_hashed_project_model_names_differ_only_in_the_project_token():
+    """The common model finds sibling project models by swapping prjNNN, so the digest must not depend on it."""
+    prefix = "contoso-enterprise-aifact-"
+    first = naming.from_variables(payload(admin_aifactoryPrefixRG=prefix, project_number_000="001"), "dev", "001")
+    second = naming.from_variables(payload(admin_aifactoryPrefixRG=prefix, project_number_000="002"), "dev", "002")
+    name1, name2 = first.model_name("project"), second.model_name("project")
+    assert len(name1) <= 44 and name1 != name2
+    assert name1.replace("prj001", "prj002") == name2
+    other_factory = naming.from_variables(payload(admin_aifactoryPrefixRG="contoso-enterprise-aifact-x-"), "dev", "001")
+    assert other_factory.model_name("project") != name1
+
+
 def test_unknown_model_scope_is_rejected():
     scope = naming.from_variables(payload(), "dev", "001")
     with pytest.raises(ValueError):
         scope.model_name("factory")
+
+
+def test_definitions_name_models_with_their_own_token():
+    scope = naming.from_variables(payload(), "dev", "001")
+    assert scope.render_token("agt{project}") == "agt001"
+    assert scope.model_name_for("agt001") == "hm-spider-agt001-sdc-dev-001"
+    assert scope.model_name_for(scope.render_token("prj{project}")) == scope.model_name("project")
+    for bad in ("Agents", "a", "agt-{project}", "{project}", "agentsruntime{project}"):
+        with pytest.raises(ValueError, match="token"):
+            scope.render_token(bad)
+
+
+@pytest.mark.parametrize("prefix", ["spider-", "contoso-enterprise-aifact-"])
+def test_sibling_patterns_find_every_project_model_of_the_same_factory(prefix):
+    scopes = [naming.from_variables(payload(admin_aifactoryPrefixRG=prefix, project_number_000=n), "dev", n)
+              for n in ("001", "002")]
+    pattern = scopes[0].sibling_model_pattern("prj{project}")
+    assert all(pattern.fullmatch(s.model_name("project")) for s in scopes)
+    assert not pattern.fullmatch(scopes[0].model_name_for("agt001"))
+    assert not pattern.fullmatch(scopes[0].model_name("common"))
+    assert scopes[0].sibling_model_pattern("cmn").fullmatch(scopes[1].model_name("common"))
+    prod = naming.from_variables(payload(admin_aifactoryPrefixRG=prefix), "prod", "001")
+    assert not pattern.fullmatch(prod.model_name("project"))
 
 
 @pytest.mark.parametrize("location,expected", [

@@ -42,6 +42,16 @@ def test_plan_binds_caller_scope_revision_confirmation_and_resources(operation):
     assert operation["progress"]["underlying_job_cancellation_supported"] is False
 
 
+def test_transitions_and_approval_record_the_authorized_client(store, backend, settings):
+    client = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
+    caller = Principal(TENANT, CALLER, client_id=client)
+    pending = store.propose(caller, SCOPE, CONFIGURE_TOOL, request(settings), preview())
+    approved = store.approve(caller, pending["id"], pending["plan_hash"])
+    assert approved["approval"]["client_id"] == client
+    assert [event["event"] for event in backend.events] == ["proposed", "approved"]
+    assert all(event["client_id"] == client for event in backend.events)
+
+
 def test_durability_across_store_instances(settings, backend, principal, operation):
     reopened = OperationStore(settings, backend=backend)
     assert reopened.read(principal, operation["id"])["plan_hash"] == operation["plan_hash"]

@@ -19,6 +19,11 @@ steps:
     arguments: '--file "$(configOverrideFile)" --environment "$(dev_test_prod)" --format azure-devops'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 
+- template: ../../variables/persona-access-steps.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    scope: common
+
 # ---------------------------------------------------------------------------
 # PREFLIGHT (early, fail-fast): validate region support, resource-provider
 # registration and policy assignments for the common subscription BEFORE any
@@ -27,7 +32,7 @@ steps:
 # ---------------------------------------------------------------------------
 - task: AzureCLI@2
   displayName: '00_preflight_quota_policy_checks'
-  condition: ne(variables['debug_disable_validation_tasks'], 'true')
+  condition: and(succeeded(), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -124,6 +129,7 @@ steps:
      --parameters aifactorySuffixRG="$(admin_aifactorySuffixRG)" \
      --parameters commonRGNamePrefix="$(admin_aifactoryPrefixRG)" \
      --parameters esmlCommonOverride="$(vnetResourceGroupBase)" \
+     --parameters commonResourceGroup_param="$(commonResourceGroup_param)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters location="$(admin_location)" \
      --parameters tags='$(tags)' \
@@ -145,7 +151,7 @@ steps:
 # 03_az_bicep_deploy_resources after private networking is available.
 - task: AzureCLI@2
   displayName: '02_az_bicep_networking'
-  condition: and(eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'))
+  condition: and(succeeded(), eq(variables['runNetworkingVar'], 'true'),eq(variables['BYO_subnets'], 'false'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -268,5 +274,11 @@ steps:
      --parameters enableDatafactoryCommon="$(enableDatafactoryCommon)" \
      --parameters commonResourceName="$(vnetResourceGroupBase)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+
+- template: ../../variables/persona-access-steps.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    scope: common
+    phase: apply
 
 - template: region-report-steps.yaml

@@ -214,8 +214,8 @@ module namingConvention '../modules/common/CmnAIfactoryNaming.bicep' = {
     randomValue: randomValue
     aifactorySuffixRG: aifactorySuffixRG
     commonRGNamePrefix: commonRGNamePrefix
-    technicalAdminsObjectID: technicalAdminsObjectID
-    technicalAdminsEmail: technicalAdminsEmail
+    technicalAdminsObjectID: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? '' : technicalAdminsObjectID
+    technicalAdminsEmail: (contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') ? '' : technicalAdminsEmail
     commonResourceGroupName: commonResourceGroup
     subscriptionIdDevTestProd: subscriptionIdDevTestProd
     genaiSubnetId: genaiSubnetId
@@ -439,10 +439,10 @@ module sacc '../modules/storageAccount.bicep' = if(!storageAccount1001Exists) {
     filePrivateEndpointName: '${storageAccount1001Name}-file-pend'
     queuePrivateEndpointName: '${storageAccount1001Name}-queue-pend'
     tablePrivateEndpointName: '${storageAccount1001Name}-table-pend'
-    tags: {
+    tags: union(tagsProject, {
       Environment: env
       Project: projectNumber
-    }
+    })
     containers: [
       {
         name: 'default'
@@ -787,7 +787,7 @@ module kvPrjRbacAssignments '../modules/kvRbacAssignments.bicep' = if(!keyvaultE
 
 // Note: Common key vault still uses access policies (not changed per requirements)
 // Common key vault access policy for technical contact
-module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!empty(technicalContactId)) {
+module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!(contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') && !empty(technicalContactId)) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('02-kvSecretsGL${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -809,7 +809,7 @@ module kvCommonAccessPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if(!e
 
 // Service principal access to common key vault (keeping access policy model)
 // SP removal support: skip entirely when the SP OID seeding secret name is empty or a placeholder (<todo>/<optional>).
-module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if (!empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription) && !empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')) {
+module spCommonKeyvaultPolicyGetList '../modules/kvCmnAccessPolicys.bicep' = if (!(contains(tags, 'AIF-Persona-Access') && tags['AIF-Persona-Access'] == 'groups-v1') && !empty(inputKeyvault) && !empty(inputKeyvaultResourcegroup) && !empty(inputKeyvaultSubscription) && !empty(projectServicePrincipleOID_SeedingKeyvaultName) && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<todo>') && !contains(toLower(projectServicePrincipleOID_SeedingKeyvaultName), '<optional>')) {
   scope: resourceGroup(subscriptionIdDevTestProd, commonResourceGroup)
   name: take('02-spGetList${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

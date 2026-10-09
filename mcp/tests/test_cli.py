@@ -63,3 +63,10 @@ def test_parser_exposes_transport_and_rejects_approval_bypass():
         parser().parse_args(["approve", "--config", "config.json", "--scope", "dev",
                              "--object-id", "operator", "--operation-id", "operation", "--yes"])
 
+
+def test_cli_application_auth_is_explicit_http_configuration():
+    parsed = parser().parse_args([
+        "serve", "--config", "agent.json", "--scope", "dev", "--transport", "streamable-http",
+        "--application-auth", "application-auth.json", "--resource-url", "https://example.com/mcp",
+    ])
+    assert parsed.application_auth == "application-auth.json"

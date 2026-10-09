@@ -256,6 +256,8 @@ change does not automatically modify a consumer or publish its repository.
 | Same GitHub template directory: `infra-project-phase.yml` | `.github/workflows/infra-project-phase.yml` |
 | `environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/infra-project-genai.yaml` | `aifactory/esml-infra/azure-devops/bicep/yaml/esml-infra-project/infra-project-genai.yaml` |
 | Same ADO template directory: `jobs/job-0-reviewed-project-config.yaml` | Same consumer pipeline directory: `jobs/job-0-reviewed-project-config.yaml` |
+| Same ADO template directory: `jobs/job-2-genai-services.yaml` | Same consumer pipeline directory: `jobs/job-2-genai-services.yaml` (shared deletion invocation, budgets and reports) |
+| `environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh`, `project-deletion.py` | Keep together in the reviewed `azure-enterprise-scale-ml` submodule revision; do not copy one helper independently |
 
 Keep the existing root `ui/terminal.sh` and normal bootstrap dependencies installed.
 `00-start.sh` copies the launcher/helper family together. Stable relaunch and
@@ -268,6 +270,68 @@ terminal commit/push prompt. No deployment launcher should be run merely to test
 this installation; use the offline contract fixtures.
 
 [Prerequisites - End-to-end setup](./24-end-2-end-setup.md)
+
+### Project deletion outcomes and recovery
+
+The ADO and GitHub Actions project templates share
+`environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh`
+and its `project-deletion.py` lifecycle helper. Install the matching provider
+templates and accelerator submodule revision together through the normal reviewed
+update process. Updating this source alone does not update an existing consumer's
+copied YAML or change its submodule pin.
+
+Deletion still requires explicit deletion flags. `deleteAllForProject=true`
+includes all project services and Key Vault. GHA passes
+`AIF_DELETE_PRESERVE_FOUNDATION=true` to retain its existing services-only boundary:
+Key Vault, storage, Application Insights, dashboards, VMs, ACR, general managed
+identities, and common networking remain. Service-owned private endpoints and
+bot identities are still eligible for service cleanup. The scoped Foundry/Search
+orphan sweep checks parent absence before removing leftover endpoints or NICs.
+Explicit full-project
+deletion overrides this preservation flag.
+
+ADO's services-only behavior is unchanged: it retains the project resource group
+and preserves Key Vault unless `deleteKeyvaultAlso=true`, while cleaning other
+project foundation resources and project networking. Common resource groups,
+unrelated projects, and Databricks provider-managed groups are never deletion
+targets of the helper.
+
+ML workspaces/endpoints, Databricks, Data Factory and dashboards are discovered and
+removed through built-in ARM commands, not dynamically installed CLI extensions.
+This avoids the old-CLI/new-ML-extension metadata incompatibility that can cause
+repeated installation. Discovery errors are not treated as an empty inventory.
+Windows Git Bash passes ARM identifiers unchanged.
+
+Full project deletion is successful only after Azure confirms the project resource
+group is absent and the project-specific subnets/NSGs are absent. An accepted
+asynchronous delete is not completion. Resources already in `Deleting` are observed
+without submitting another delete. Resource-group rollback, authorization failures,
+blocked resources, and bounded-wait expiry fail the task instead of producing a
+green partial deletion.
+
+`AIF_DELETE_TIMEOUT_SECONDS` (default `1800`) and `AIF_DELETE_POLL_SECONDS`
+(default `15`) bound each lifecycle operation. The provider deletion tasks have
+larger job/task budgets to allow service cleanup followed by group verification.
+The always-published deletion reports distinguish `deletion-result.json` (the
+whole shell task outcome) from `last-deletion.json` (the last helper operation).
+A killed agent may leave only the last helper report; its success alone does not
+establish full project deletion.
+
+For `ApplianceBeingDeleted` or a resource that remains `Deleting`, inspect the
+reported resource ID and Azure activity log before rerunning. Allow the existing
+operation to finish, or ask Azure support to reconcile a stuck provider operation.
+Do not force-delete its managed resource group or launch overlapping deletion runs.
+No new purge behavior is introduced by this hardening.
+Existing purge eligibility is retained separately from updated live-resource
+existence flags, and confirmed deletion records retain every matching resource
+name rather than overwriting one name. After confirmed full-project deletion, the ADO purge step may
+still inspect soft-deleted resources at that same recorded project scope.
+Confirmed current-run ML targets use the documented
+[workspace DELETE API](https://github.com/Azure/azure-rest-api-specs/blob/main/specification/machinelearningservices/resource-manager/Microsoft.MachineLearningServices/MachineLearningServices/stable/2024-10-01/workspaceRP.json)
+with `forceToPurge=true`; they do not depend on a live-workspace GET returning a
+soft-delete state. A `202` purge response is logged as an accepted request, not
+proof that permanent data removal has finished. Existing no-record compatibility
+paths are unchanged.
 
 
 ## 1) Library-UPDATE: Updated feature or bug fixes

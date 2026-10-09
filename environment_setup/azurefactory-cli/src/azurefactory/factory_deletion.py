@@ -12,6 +12,7 @@ from .errors import ConfigError, FailureError
 
 PURPOSE = "delete-aifactory-confirm"
 CAPABILITY = "delete-aifactory-v1"
+RETENTION_CONTRACT = "ordered-project-pipelines-v1"
 REQUEST_FIELDS = {"contract_version", "folder", "factory_id", "expected_revision", "version_ref"}
 PLAN_CONTRACT = "ordered-project-pipelines-v1"
 DELETE_FLAGS = {"enableDeleteForDisabledResources": True, "deleteAllServicesForProject": True,

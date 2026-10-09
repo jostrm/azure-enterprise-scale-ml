@@ -33,6 +33,10 @@ steps:
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py'
     arguments: '--file "$(configOverrideFile)" --environment "$(dev_test_prod)" --format azure-devops'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
+- template: ../../variables/persona-access-steps.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    scope: project
 # ---------------------------------------------------------------------------
 # PREFLIGHT (early, fail-fast): validate AI Search/model quota, Elasticsearch
 # policy/RP blocks, resource-provider registration and region support for THIS
@@ -43,7 +47,7 @@ steps:
 # ---------------------------------------------------------------------------
 - task: AzureCLI@2
   displayName: '00_preflight_quota_policy_checks'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
+  condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -134,6 +138,7 @@ steps:
     project_IP_whitelist: $(project_IP_whitelist)
     acr_IP_whitelist: $(acr_IP_whitelist)
 - task: AzureCLI@2
+  name: deletionMode
   displayName: '00_resolve_network_env_placeholders'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -155,12 +160,24 @@ steps:
       #   - 06c2 (subnet-release wait) is excluded (no redeploy follows).
       #   - 07/08 firewall-cleanup tasks already run via `always()`.
       # ---------------------------------------------------------------
-      if [ "$(deleteAllForProject)" = "true" ]; then
+      deleteAllForProject="$(deleteAllForProject)"
+      deleteAllForProject="${deleteAllForProject,,}"
+      deleteAllServicesForProject="$(deleteAllServicesForProject)"
+      deleteAllServicesForProject="${deleteAllServicesForProject,,}"
+      if [ "$deleteAllForProject" = "true" ]; then
         echo "💀 ULTRA DELETE MODE detected (deleteAllForProject=true) — promoting upstream flags:"
         echo "   - deleteAllServicesForProject -> true (skips ALL creation tasks)"
         echo "   - enableDeleteForDisabledResources -> true (enables 06b delete-services script)"
-        echo "##vso[task.setvariable variable=deleteAllServicesForProject]true"
+        deleteAllServicesForProject=true
         echo "##vso[task.setvariable variable=enableDeleteForDisabledResources]true"
+      fi
+      echo "##vso[task.setvariable variable=deleteAllForProject]$deleteAllForProject"
+      echo "##vso[task.setvariable variable=deleteAllServicesForProject]$deleteAllServicesForProject"
+      if [ "$deleteAllServicesForProject" = "true" ]; then
+        echo "##vso[task.setvariable variable=enableDeleteForDisabledResources]true"
+        echo "##vso[task.setvariable variable=skipFoundry;isOutput=true]true"
+      else
+        echo "##vso[task.setvariable variable=skipFoundry;isOutput=true]false"
       fi
 
       # ---------------------------------------------------------------
@@ -236,7 +253,7 @@ steps:
       echo "Variables set: vnetResourceGroup_resolved, vnetNameFull_resolved, network_env=$NETWORK_ENV"
 - task: AzureCLI@2
   displayName: '00_validate_project_subnet_exists'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'), ne(variables['deleteAllForProject'], 'true'))
+  condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'), ne(variables['BYO_subnets'], 'true'), ne(variables['deleteAllForProject'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -302,7 +319,7 @@ steps:
 
 - task: PowerShell@2
   displayName: '00_check_for_submodule'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
+  condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     targetType: 'inline'
     script: |
@@ -358,7 +375,7 @@ steps:
   displayName: '00_generate_deployment_random_value'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: ps
+    scriptType: pscore
     scriptLocation: inlineScript
     inlineScript: |
       # Generate a random deployment ID for this entire pipeline run
@@ -375,7 +392,7 @@ steps:
   condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: ps
+    scriptType: pscore
     scriptLocation: inlineScript
     inlineScript: |
         Write-Host " - FOUNDRY"
@@ -643,7 +660,7 @@ steps:
   condition: and(succeeded(), eq(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnectionSeeding }}
-    scriptType: ps
+    scriptType: pscore
     scriptLocation: inlineScript
     inlineScript: |
      $ErrorActionPreference = 'Stop'
@@ -927,7 +944,7 @@ steps:
   displayName: '03b_create_temp_json_files'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: ps
+    scriptType: pscore
     scriptLocation: inlineScript
     inlineScript: |
       # Create temporary JSON files from YAML variables with correct filenames expected by task 04
@@ -1032,7 +1049,7 @@ steps:
       Get-ChildItem -Path $tempDir -Filter "*.json" | ForEach-Object { Write-Host "  Found: $($_.FullName)" }
 - task: PowerShell@2
   displayName: '04_debug_check_files_and_paths'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
+  condition: and(succeeded(), eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     targetType: 'inline'
     script: |
@@ -1084,7 +1101,7 @@ steps:
   condition: and(succeeded(), ne(variables['debug_disable_validation_tasks'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: ps
+    scriptType: pscore
     scriptLocation: inlineScript
     inlineScript: |
       $ErrorActionPreference = 'Stop'
@@ -1879,8 +1896,23 @@ steps:
     aifactory_salt_random: $(aifactory_salt_random)
     addAIFoundry: $(addAIFoundry)
     admin_prjResourceSuffix: $(admin_prjResourceSuffix)
+- task: Bash@3
+  displayName: 'Initialize AI Factory deletion reports'
+  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), eq(variables['enableDeleteForDisabledResources'], 'true'))
+  inputs:
+    targetType: inline
+    script: |
+      set -e
+      report_dir="$AIF_DELETE_REPORT_DIR"
+      if command -v cygpath >/dev/null 2>&1; then report_dir="$(cygpath -u "$report_dir")"; fi
+      mkdir -p "$report_dir"
+      echo "##vso[task.setvariable variable=aifactoryDeletionReportReady]true"
+  env:
+    AIF_DELETE_REPORT_DIR: $(Build.ArtifactStagingDirectory)/aifactory-deletion-reports/$(System.JobId)-$(System.JobAttempt)
+
 - task: AzureCLI@2
   displayName: '06b_Delete_Service_If_Not_Enabled_And_Exists'
+  timeoutInMinutes: 180
   condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), eq(variables['enableDeleteForDisabledResources'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
@@ -1888,6 +1920,9 @@ steps:
     scriptLocation: scriptPath
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/delete-services-if-disabled.sh'
   env:
+    AIF_DELETE_TIMEOUT_SECONDS: '1800'
+    AIF_DELETE_POLL_SECONDS: '15'
+    AIF_DELETE_REPORT_DIR: $(Build.ArtifactStagingDirectory)/aifactory-deletion-reports/$(System.JobId)-$(System.JobAttempt)
     dev_test_prod_sub_id: $(dev_test_prod_sub_id)
     admin_aifactoryPrefixRG: $(admin_aifactoryPrefixRG)
     admin_aifactorySuffixRG: $(admin_aifactorySuffixRG)
@@ -1961,6 +1996,15 @@ steps:
     enableAzureOpenAI: $(enableAzureOpenAI)
     enableContentSafety: $(enableContentSafety)
     contentSafetyExists: $(contentSafetyExists)
+- task: PublishPipelineArtifact@1
+  displayName: 'Publish AI Factory deletion reports'
+  condition: and(always(), eq(variables['aifactoryDeletionReportReady'], 'true'))
+  continueOnError: true
+  inputs:
+    targetPath: $(Build.ArtifactStagingDirectory)/aifactory-deletion-reports/$(System.JobId)-$(System.JobAttempt)
+    artifact: aifactory-deletion-reports-$(System.StageName)-$(System.JobName)-$(System.JobAttempt)
+    publishLocation: pipeline
+
 - task: AzureCLI@2
   name: purgeSoftDeleted
   displayName: '06c_Purge_SoftDeleted'
@@ -2002,16 +2046,19 @@ steps:
       echo "deleteAllServicesForProject: $deleteAll"
 
       # ---------------------------------------------------------------
-      # FAST-PATH: if the project resource group does not exist, no Foundry
-      # account / OpenAI / AI Services / AML workspace can possibly exist
-      # for this project — nothing to purge. Skip immediately to avoid the
-      # 5-minute settle sleep and unnecessary list-deleted scans.
+      # A missing RG is a noop unless this run confirmed its deletion. Successful
+      # ULTRA cleanup can leave soft-deleted resources at the same recorded scope.
       # Also signal 06c2 (subnet-release wait) to skip its 20-minute wait
       # by emitting a pipeline output variable.
       # ---------------------------------------------------------------
-      rg_exists=$(az group exists --name "$projectResourceGroup" --subscription "$subscription" 2>/dev/null || echo "false")
-      if [ "$rg_exists" != "true" ]; then
-        echo "ℹ️  Project resource group '$projectResourceGroup' does not exist — no Foundry account has ever been created for this project."
+      rg_exists=$(az group exists --name "$projectResourceGroup" --subscription "$subscription" -o tsv)
+      rg_exists="${rg_exists//$'\r'/}"
+      case "$rg_exists" in
+        true|false) ;;
+        *) echo "Cannot establish project resource-group existence for purge." >&2; exit 1 ;;
+      esac
+      if [ "$rg_exists" != "true" ] && [ "${aifProjectGroupDeletionConfirmed:-false}" != "true" ]; then
+        echo "ℹ️  Project resource group '$projectResourceGroup' is absent without a confirmed deletion in this run."
         echo "=== 04_Purge_SoftDeleted: skipping entirely (project RG missing) ==="
         echo "##vso[task.setvariable variable=purgeRan;isOutput=true]false"
         exit 0
@@ -2031,12 +2078,54 @@ steps:
       enableAIFoundry="${enableAIFoundry:-true}"
       openaiExists="${openaiExists:-false}"
       aiServicesExists="${aiServicesExists:-false}"
+      # JSON travels through env, not shell interpolation. Validate every record before
+      # purging; missing lists retain compatibility with older single-name callers.
+      recorded_targets=$(AIF_PURGE_PROJECT="$projectNumber" AIF_PURGE_LOCATION="$locationSuffix" AIF_PURGE_ENV="$envName" python - <<'PY'
+      import json
+      import os
+      import re
+      p, loc, env = (os.environ[k] for k in ("AIF_PURGE_PROJECT", "AIF_PURGE_LOCATION", "AIF_PURGE_ENV"))
+      prefixes = {
+          "aml": (f"aml-{p}-{loc}-{env}",),
+          "aifProject": (f"aif-p-{p}-1-{loc}-{env}", f"ai-prj{p}"),
+          "aiHub": (f"aif-hub-{p}-{loc}-{env}", f"ai-hub-prj{p}"),
+          "aiFoundryV2": ("aif2",),
+          "openai": (f"aoai-prj{p}-{loc}-{env}",),
+          "aiServices": (f"aiservicesprj{p}{loc}{env}",),
+      }
+      rows = []
+      for service, allowed in prefixes.items():
+          if os.environ.get(service + "Deleted") != "true":
+              continue
+          raw = os.environ.get(service + "DeletedNames", "")
+          try:
+              names = json.loads(raw) if raw else [os.environ.get(service + "ActualName", "")]
+          except ValueError as exc:
+              raise SystemExit(f"Invalid {service}DeletedNames: {exc}")
+          if not isinstance(names, list) or not names:
+              raise SystemExit(f"Invalid {service}DeletedNames: expected a nonempty list")
+          for name in names:
+              if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", name) or not name.lower().startswith(allowed):
+                  raise SystemExit(f"Invalid or out-of-scope {service} deletion name")
+              row = f"{service}\t{name}"
+              if row not in rows:
+                  rows.append(row)
+      print("\n".join(rows))
+      PY
+      )
+      recorded_targets="${recorded_targets//$'\r'/}"
+      declare -A recorded_names=()
+      while IFS=$'\t' read -r service name; do
+        [ -n "$service" ] || continue
+        recorded_names[$service]+="${name}"$'\n'
+      done <<< "$recorded_targets"
 
       echo "exists flags  — aml=$amlExists aifProject=$aifProjectExists aiHub=$aiHubExists aiFoundryV2=$aiFoundryV2Exists openai=$openaiExists aiServices=$aiServicesExists"
       echo "enable flags  — AML=$enableAML AIFoundryHub=$enableAIFoundryHubFlag AIFoundry=$enableAIFoundry"
 
       needs_purge=false
-      if { [ "$amlExists" = "true" ]         && { [ "$enableAML"             = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
+      if [ -n "$recorded_targets" ] || \
+         { [ "$amlExists" = "true" ]         && { [ "$enableAML"             = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
          { [ "$aifProjectExists" = "true" ]  && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
          { [ "$aiHubExists" = "true" ]       && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
          { [ "$aiFoundryV2Exists" = "true" ] && { [ "$enableAIFoundry"        = "false" ] || [ "$deleteAll" = "true" ]; }; } || \
@@ -2069,22 +2158,29 @@ steps:
         local prefix="$1"
         local rg="$2"
         local no_dash="${3:-false}"
+        local exact_names="${4:-}"
         echo "--- Checking soft-deleted CognitiveServices with prefix: $prefix (rg=$rg)"
 
-        local actual_name
-        if [ "$no_dash" = "true" ]; then
-          actual_name=$(az cognitiveservices account list-deleted \
-            --subscription "$subscription" \
-            --query "[?starts_with(name, '$prefix') && resourceGroup=='$rg'].name" \
-            -o tsv 2>/dev/null | grep -v -- '-' | head -n1 || echo "")
-        else
-          actual_name=$(az cognitiveservices account list-deleted \
-            --subscription "$subscription" \
-            --query "[?starts_with(name, '$prefix') && resourceGroup=='$rg'].name" \
-            -o tsv 2>/dev/null | head -n1 || echo "")
+        local actual_name actual_names name_filter="" query="starts_with(name, '$prefix') && resourceGroup=='$rg'"
+        if [ -n "$exact_names" ]; then
+          while IFS= read -r actual_name; do
+            [ -n "$actual_name" ] || continue
+            name_filter+="${name_filter:+ || }name=='${actual_name}'"
+          done <<< "$exact_names"
+          query+=" && (${name_filter})"
         fi
-
-        if [ -n "$actual_name" ]; then
+        actual_names=$(az cognitiveservices account list-deleted \
+          --subscription "$subscription" --query "[?${query}].name" -o tsv) || return $?
+        actual_names="${actual_names//$'\r'/}"
+        while IFS= read -r actual_name; do
+          [ -n "$actual_name" ] || continue
+          if [ -n "$exact_names" ]; then
+            if [[ $'\n'"$exact_names" != *$'\n'"$actual_name"$'\n'* ]]; then
+              echo "ERROR: Unrecorded Cognitive Services purge target." >&2; return 1
+            fi
+          elif [ "$no_dash" = "true" ] && [[ "$actual_name" == *-* ]]; then
+            continue
+          fi
           echo "Found soft-deleted CognitiveServices: $actual_name. Purging..."
           az cognitiveservices account purge \
             --subscription "$subscription" \
@@ -2092,9 +2188,9 @@ steps:
             --resource-group "$rg" \
             --name "$actual_name"
           echo "✅ Purged CognitiveServices account: $actual_name"
-        else
-          echo "ℹ️  No soft-deleted CognitiveServices found with prefix '$prefix' in rg '$rg' — skipping"
-        fi
+          # Retain the legacy first-match fallback when there are no current-run records.
+          [ -n "$exact_names" ] || break
+        done <<< "$actual_names"
       }
 
       # ---------------------------------------------------------------
@@ -2124,6 +2220,19 @@ steps:
         fi
       }
 
+      purge_recorded_workspaces() {
+        local name
+        # Records are confirmed prior soft-delete targets, not blind scope enumeration.
+        # The shared helper already confirmed live absence; a GET here would return 404.
+        while IFS= read -r name; do
+          [ -n "$name" ] || continue
+          az rest \
+            --method delete \
+            --url "https://management.azure.com/subscriptions/${subscription}/resourceGroups/${projectResourceGroup}/providers/Microsoft.MachineLearningServices/workspaces/${name}?api-version=2024-10-01&forceToPurge=true"
+          echo "AML workspace purge request accepted: $name"
+        done <<< "$1"
+      }
+
       # ---------------------------------------------------------------
       # AML workspace
       # Use actual name recorded by delete script (includes resource suffix like -001)
@@ -2131,7 +2240,9 @@ steps:
       amlActualName="${amlActualName:-}"  # set via env: block; safe empty if delete task didn't fire
       amlPrefixName="aml-${projectNumber}-${locationSuffix}-${envName}"
       amlPurgeName="${amlActualName:-$amlPrefixName}"
-      if [ "$amlExists" = "true" ] && { [ "$enableAML" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+      if [ -n "${recorded_names[aml]:-}" ]; then
+        purge_recorded_workspaces "${recorded_names[aml]}"
+      elif [ "$amlExists" = "true" ] && { [ "$enableAML" = "false" ] || [ "$deleteAll" = "true" ]; }; then
         purge_aml_workspace "$amlPurgeName" "$projectResourceGroup"
       else
         echo "Skipping AML purge (amlExists=$amlExists, enableAML=$enableAML)"
@@ -2145,7 +2256,9 @@ steps:
       aifProjectActualName="${aifProjectActualName:-}"  # set via env: block; safe empty if delete task didn't fire
       aifProjectPrefixName="aif-p-${projectNumber}-1-${locationSuffix}-${envName}"
       aifProjectPurgeName="${aifProjectActualName:-$aifProjectPrefixName}"
-      if [ "$aifProjectExists" = "true" ] && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+      if [ -n "${recorded_names[aifProject]:-}" ]; then
+        purge_recorded_workspaces "${recorded_names[aifProject]}"
+      elif [ "$aifProjectExists" = "true" ] && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
         purge_aml_workspace "$aifProjectPurgeName" "$projectResourceGroup"
       else
         echo "Skipping AI Foundry V1 Project purge (aifProjectExists=$aifProjectExists, enableAIFoundryHub=$enableAIFoundryHubFlag)"
@@ -2158,7 +2271,9 @@ steps:
       aiHubActualName="${aiHubActualName:-}"  # set via env: block; safe empty if delete task didn't fire
       aiHubPrefixName="aif-hub-${projectNumber}-${locationSuffix}-${envName}"
       aiHubPurgeName="${aiHubActualName:-$aiHubPrefixName}"
-      if [ "$aiHubExists" = "true" ] && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+      if [ -n "${recorded_names[aiHub]:-}" ]; then
+        purge_recorded_workspaces "${recorded_names[aiHub]}"
+      elif [ "$aiHubExists" = "true" ] && { [ "$enableAIFoundryHubFlag" = "false" ] || [ "$deleteAll" = "true" ]; }; then
         purge_aml_workspace "$aiHubPurgeName" "$projectResourceGroup"
       else
         echo "Skipping AI Foundry Hub purge (aiHubExists=$aiHubExists, enableAIFoundryHub=$enableAIFoundryHubFlag)"
@@ -2167,21 +2282,25 @@ steps:
       # ---------------------------------------------------------------
       # AI Foundry V2 account + project (CognitiveServices/accounts)
       # Use deterministic naming from salt values (same formula as 06a / CmnAIfactoryNaming.bicep)
-      # ALWAYS try purge (prevents FlagMustBeSetForRestore on next create)
-      # Safe: || true so purge failures never break the pipeline
+      # Confirmed deletion records take precedence over the legacy preemptive fallback.
       # ---------------------------------------------------------------
+      if [ -n "${recorded_names[aiFoundryV2]:-}" ]; then
+        purge_cognitive_service "aif2" "$projectResourceGroup" "false" "${recorded_names[aiFoundryV2]}"
+      else
       uniqueInAIFenv="${aifactory_salt:-}"
       saltRandom10="${aifactory_salt_random:-}"
 
       # Fallback: if saltRandom10 is empty, re-extract from managed identity (same logic as 05b)
-      if [ -z "$saltRandom10" ] || [ -z "$uniqueInAIFenv" ]; then
+      if [ "$rg_exists" = "true" ] && { [ -z "$saltRandom10" ] || [ -z "$uniqueInAIFenv" ]; }; then
         echo "Salt variables empty (salt='$uniqueInAIFenv', random='$saltRandom10'). Re-extracting from managed identity..."
         MI_PREFIX="mi-${projectName}-${locationSuffix}-${envName}"
-        MI_NAME=$(az resource list \
+        MI_NAMES=$(az resource list \
           --resource-group "$projectResourceGroup" \
           --resource-type "Microsoft.ManagedIdentity/userAssignedIdentities" \
           --query "[?starts_with(name, '$MI_PREFIX')].name" \
-          -o tsv 2>/dev/null | head -n 1)
+          -o tsv)
+        MI_NAMES="${MI_NAMES//$'\r'/}"
+        MI_NAME="${MI_NAMES%%$'\n'*}"
         if [ -n "$MI_NAME" ]; then
           echo "Found managed identity: $MI_NAME"
           MI_NO_SUFFIX="${MI_NAME%-*}"
@@ -2232,8 +2351,9 @@ steps:
           --name "$foundry_account_name" 2>/dev/null && echo "✅ Purged account: $foundry_account_name" || echo "ℹ️  Account $foundry_account_name not in soft-deleted state or already purged — skipping"
       else
         echo "⚠️  Salt variables not available (salt='$uniqueInAIFenv', random='$saltRandom10'). Falling back to list-deleted prefix scan."
-        purge_cognitive_service "aif2" "$projectResourceGroup" "true" || true
-        purge_cognitive_service "aif2-p" "$projectResourceGroup" "false" || true
+        purge_cognitive_service "aif2" "$projectResourceGroup" "true"
+        purge_cognitive_service "aif2-p" "$projectResourceGroup" "false"
+      fi
       fi
 
       # ---------------------------------------------------------------
@@ -2241,7 +2361,9 @@ steps:
       # Name prefix: aoai-{projectName}-{locationSuffix}-{envName} (may have resource suffix)
       # ---------------------------------------------------------------
       openaiPrefix="aoai-${projectName}-${locationSuffix}-${envName}"
-      if [ "$openaiExists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+      if [ -n "${recorded_names[openai]:-}" ]; then
+        purge_cognitive_service "$openaiPrefix" "$projectResourceGroup" "false" "${recorded_names[openai]}"
+      elif [ "$openaiExists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
         purge_cognitive_service "$openaiPrefix" "$projectResourceGroup"
       else
         echo "Skipping OpenAI purge (openaiExists=$openaiExists, enableAIFoundry=$enableAIFoundry)"
@@ -2252,7 +2374,9 @@ steps:
       # Name prefix: aiservices{projectName}{locationSuffix}{envName} (may have resource suffix)
       # ---------------------------------------------------------------
       aiServicesPrefix="aiservices${projectName}${locationSuffix}${envName}"
-      if [ "$aiServicesExists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
+      if [ -n "${recorded_names[aiServices]:-}" ]; then
+        purge_cognitive_service "$aiServicesPrefix" "$projectResourceGroup" "false" "${recorded_names[aiServices]}"
+      elif [ "$aiServicesExists" = "true" ] && { [ "$enableAIFoundry" = "false" ] || [ "$deleteAll" = "true" ]; }; then
         purge_cognitive_service "$aiServicesPrefix" "$projectResourceGroup"
       else
         echo "Skipping AI Services purge (aiServicesExists=$aiServicesExists, enableAIFoundry=$enableAIFoundry)"
@@ -2264,6 +2388,22 @@ steps:
     # or simply not defined yet) are passed through env: so bash always gets a safe empty/default
     # string instead of a bare $(varName) token that bash would try to execute as a command.
     amlActualName: $(amlActualName)
+    amlDeletedNames: $(amlDeletedNames)
+    aifProjectDeletedNames: $(aifProjectDeletedNames)
+    aiHubDeletedNames: $(aiHubDeletedNames)
+    aiFoundryV2DeletedNames: $(aiFoundryV2DeletedNames)
+    openaiDeletedNames: $(openaiDeletedNames)
+    aiServicesDeletedNames: $(aiServicesDeletedNames)
+    amlDeleted: $(amlDeleted)
+    aifProjectDeleted: $(aifProjectDeleted)
+    aiHubDeleted: $(aiHubDeleted)
+    aiFoundryV2Deleted: $(aiFoundryV2Deleted)
+    aiFoundryV2ActualName: $(aiFoundryV2ActualName)
+    openaiDeleted: $(openaiDeleted)
+    openaiActualName: $(openaiActualName)
+    aiServicesDeleted: $(aiServicesDeleted)
+    aiServicesActualName: $(aiServicesActualName)
+    aifProjectGroupDeletionConfirmed: $(aifProjectGroupDeletionConfirmed)
     aifProjectActualName: $(aifProjectActualName)
     aiHubActualName: $(aiHubActualName)
     amlExists: $(amlExists)
@@ -2723,7 +2863,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)'
 - task: AzureCLI@2
   displayName: 'Check and Delete Current Project Orphan Role Assignments'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['deleteAllServicesForProject'], 'true'))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), succeeded(), ne(variables['persona_access_mode'], 'groups-v1'), ne(variables['deleteAllServicesForProject'], 'true'))
   env:
     ORPHAN_SUBSCRIPTION_ID: $(dev_test_prod_sub_id)
     ORPHAN_RG_PREFIX: $(admin_aifactoryPrefixRG)
@@ -3034,6 +3174,13 @@ steps:
      --parameters enableAzureSpeech="$(enableAzureSpeech)" \
      --parameters enableAIDocIntelligence="$(enableAIDocIntelligence)" \
      --parameters deployModel_text_embedding_3_large="$(deployModel_text_embedding_3_large)" \
+     --parameters skipDiagAISearch="$(skipDiagAISearch)" \
+     --parameters skipDiagAIServices="$(skipDiagAIServices)" \
+     --parameters skipDiagAOAI="$(skipDiagAOAI)" \
+     --parameters skipDiagContentSafety="$(skipDiagContentSafety)" \
+     --parameters skipDiagDocIntelligence="$(skipDiagDocIntelligence)" \
+     --parameters skipDiagSpeech="$(skipDiagSpeech)" \
+     --parameters skipDiagVision="$(skipDiagVision)" \
      --parameters deployModel_text_embedding_3_small="$(deployModel_text_embedding_3_small)" \
      --parameters deployModel_text_embedding_ada_002="$(deployModel_text_embedding_ada_002)" \
      --parameters deployModel_gpt_54_mini="$(deployModel_gpt_54_mini)" \
@@ -3189,6 +3336,7 @@ steps:
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-genai-1/05-compute-services.bicep" \
+     --parameters aksSkuTier="$(aksSkuTier)" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters skuWebAppDev="$(skuWebAppDev)" \
@@ -3380,6 +3528,7 @@ steps:
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-genai-1/07-ml-data-platform.bicep" \
+     --parameters aksSkuTier="$(aksSkuTier)" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters skuAzureMLDev="$(skuAzureMLDev)" \
@@ -3785,6 +3934,7 @@ steps:
     RBAC_LAKE_ACCOUNT: $(datalakeName_param)
     RBAC_LAKE_CONTAINER: $(lakeContainerName)
     RBAC_PROJECT_LAKE_ACCESS: $(enableProjectLakeAccess)
+    RBAC_PERSONA_ACCESS_MODE: $(persona_access_mode)
     RBAC_GATEWAY_ONLY: $(deployOnlyAIGatewayNetworking)
     RBAC_PROJECT_PREFIX: $(projectPrefix)
     RBAC_PROJECT_SUFFIX: $(projectSuffix)
@@ -3816,6 +3966,11 @@ steps:
      # Older customer variable files may not define these optional overrides.
      RBAC_BASTION_RG="${RBAC_BASTION_RG:-}"
      RBAC_BASTION_NAME="${RBAC_BASTION_NAME:-}"
+     RBAC_PERSONA_ACCESS_MODE="${RBAC_PERSONA_ACCESS_MODE:-legacy}"
+     case "$RBAC_PERSONA_ACCESS_MODE" in
+       legacy|groups-v1) ;;
+       *) echo "##vso[task.logissue type=error]Unsupported Common RG persona access mode"; exit 1 ;;
+     esac
      az account set --subscription "$RBAC_SUBSCRIPTION_ID"
 
      # Compute effective RBAC flags: only true if the feature is enabled AND the resource
@@ -3830,6 +3985,7 @@ steps:
      --subscription "$RBAC_SUBSCRIPTION_ID" \
      --location "$RBAC_LOCATION" \
      --template-file "esml-genai-1/08b-rbac-common-rg.bicep" \
+     --parameters personaAccessMode="$RBAC_PERSONA_ACCESS_MODE" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
      --parameters env="$RBAC_ENV" \
      --parameters projectNumber="$RBAC_PROJECT_NUMBER" \
@@ -3882,7 +4038,7 @@ steps:
   # Runs on the same private agent and approved service connection as task 101.
   # Opt out with enableProjectLakeAccess=false; legacy folders require an explicit
   # projectLakeAccessLegacyLayout=true. Neither option migrates existing data.
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_101_rbac_common_rg'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['persona_access_mode'], 'groups-v1'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_101_rbac_common_rg'], 'true'), ne(variables['debug_disable_61_foundation'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
   env:
     PROJECT_LAKE_CONTRACT_READY: $(projectLakeAccessContractReady)
     PROJECT_LAKE_ACCESS_ENABLED: $(enableProjectLakeAccess)
@@ -5514,7 +5670,7 @@ steps:
   # If task 62 / 63 / etc. failed BEFORE 69a, the started markers are never set
   # (69a/69b's own conditions require the Foundry phase and succeeded()),
   # so 110 stays skipped and any healthy caphost from a prior run is preserved.
-  condition: and(eq('${{ parameters.phase }}', 'foundry'), or(and(eq(variables['foundry_69a_started'], 'true'), ne(variables['foundry_69a_deployment_succeeded'], 'true')), and(eq(variables['foundry_69b_started'], 'true'), ne(variables['foundry_69b_succeeded'], 'true')), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
+  condition: and(eq(variables['persona_preflight_ready'], 'true'), eq('${{ parameters.phase }}', 'foundry'), or(and(eq(variables['foundry_69a_started'], 'true'), ne(variables['foundry_69a_deployment_succeeded'], 'true')), and(eq(variables['foundry_69b_started'], 'true'), ne(variables['foundry_69b_succeeded'], 'true')), eq(variables['deleteAllForProject'], 'true')), eq(variables['enableAIFoundry'], 'true'), eq(variables['enableAFoundryCaphost'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5524,7 +5680,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '111_If_Error_AIFoundryHubAndProject_DeleteIt'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(eq(variables['persona_preflight_ready'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '66-ai-platform'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5534,7 +5690,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '112_If_Error_AIServices_DeleteIt'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '63-cognitive-services'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(eq(variables['persona_preflight_ready'], 'true'), ne(variables['deleteAllServicesForProject'], 'true'), eq('${{ parameters.phase }}', 'infra'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '63-cognitive-services'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5544,7 +5700,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '113_If_Error_AIFoundryProject_DeleteIt'
-  condition: and(eq('${{ parameters.phase }}', 'foundry'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '69-aifoundry-2025'), eq(variables['System.StageResult'], 'Failed')))
+  condition: and(eq(variables['persona_preflight_ready'], 'true'), eq('${{ parameters.phase }}', 'foundry'), failed(), eq(variables['debugEnableCleaning'], 'true'), or(contains(variables['Agent.JobStatus'], '69-aifoundry-2025'), eq(variables['System.StageResult'], 'Failed')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5554,7 +5710,7 @@ steps:
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
 - task: AzureCLI@2
   displayName: '114_Purge_If_SoftDeleted_111_112_After5minutes'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), eq(variables['debugEnableCleaning'], 'true'), or(eq(variables['71_deleted'], 'true'), eq(variables['72_deleted'], 'true')))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), eq(variables['debugEnableCleaning'], 'true'), or(eq(variables['71_deleted'], 'true'), eq(variables['72_deleted'], 'true')))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5718,6 +5874,18 @@ steps:
     DASHBOARD_VNET_RESOURCE_GROUP: $(vnetResourceGroup_resolved)
     DASHBOARD_CONFIG_FILE: $(configOverrideFile)
     DASHBOARD_TEMPLATE_FILE: $(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/modules/aifactory-dash-01.bicep
+- ${{ if eq(parameters.phase, 'foundry') }}:
+  - template: ../../variables/persona-access-steps.yaml
+    parameters:
+      serviceConnection: ${{ parameters.serviceConnection }}
+      scope: common
+      phase: apply
+  - template: ../../variables/persona-access-steps.yaml
+    parameters:
+      serviceConnection: ${{ parameters.serviceConnection }}
+      scope: project
+      phase: apply
+
 - task: AzureCLI@2
   displayName: '07_az_remove_ip_from_seeding_keyvault_FW_whitelist'
   condition: and(always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'), eq(variables['seeding_kv_ip_rule_added'], 'true'))
@@ -5768,7 +5936,7 @@ steps:
        --only-show-errors || echo "##[warning]Failed to remove Key Vault IP rule '$matching_rule'."
 - task: AzureCLI@2
   displayName: '08_az_remove_ips_from_ACR_FW_whitelist'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
+  condition: and(eq(variables['persona_preflight_ready'], 'true'), eq('${{ parameters.phase }}', 'infra'), always(), ne(variables['disable_whitelisting_for_build_agents'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -5829,6 +5997,11 @@ steps:
       fi
 
 - template: job-private-azure-mcp.yaml
+  parameters:
+    serviceConnection: ${{ parameters.serviceConnection }}
+    phase: ${{ parameters.phase }}
+
+- template: job-factory-chat-agent.yaml
   parameters:
     serviceConnection: ${{ parameters.serviceConnection }}
     phase: ${{ parameters.phase }}

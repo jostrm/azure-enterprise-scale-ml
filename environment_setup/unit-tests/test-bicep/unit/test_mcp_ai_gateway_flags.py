@@ -66,7 +66,7 @@ def test_github_binds_each_flag_as_a_boolean_string(flag, public, value):
 def test_github_step_runs_last_in_foundry_with_every_launcher_input_bound():
     job = load_pipeline(GHA_PHASE)["jobs"]["deploy-project"]
     names = [step.get("name") for step in job["steps"]]
-    assert names.index(STEP) == names.index("Deploy private Azure MCP") + 1
+    assert names.index(STEP) == names.index("Deploy Factory Chat Agent in Foundry") + 1
     step = job["steps"][names.index(STEP)]
     assert "45-aifactory-mcp-gateway/deploy.py\" apply --apply" in step["run"]
     assert launcher_inputs() - {"projectResourceGroup"} <= set(job["env"])

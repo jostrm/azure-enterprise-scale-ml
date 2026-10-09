@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import uuid
@@ -10,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from domain.pipeline_contracts import load_pipeline, objects
+from domain.pipeline_contracts import evaluate, load_pipeline, objects
 
 ROOT = Path(__file__).resolve().parents[3]
 BICEP = ROOT / "environment_setup/aifactory/bicep"
@@ -357,7 +358,6 @@ def test_both_pipelines_use_current_outputs_same_identity_and_fail_closed(path):
     assert "--parameters enableProjectLakeAccess=" in script
     assert "--parameters deployOnlyAIGatewayNetworking=" in script
     assert acl.get("continueOnError", acl.get("continue-on-error", False)) is False
-    assert acl.get("condition", acl.get("if")) == rbac.get("condition", rbac.get("if"))
     assert "PROJECT_LAKE_LEGACY_LAYOUT" in acl["env"]
     assert "enableAzureMachineLearning" in acl["env"]["PROJECT_LAKE_AML_ENABLED"]
     if path == ADO:
@@ -366,6 +366,20 @@ def test_both_pipelines_use_current_outputs_same_identity_and_fail_closed(path):
     else:
         assert "steps.common_rbac.outcome == 'success'" in acl["env"]["PROJECT_LAKE_CONTRACT_READY"]
         assert "-Execute" in acl["run"]
+
+    flags = ("deleteAllServicesForProject", "debug_disable_101_rbac_common_rg",
+             "debug_disable_61_foundation", "debug_disable_62_core_infrastructure")
+    for mode in ("legacy", "groups-v1"):
+        for phase in ("infra", "foundry"):
+            for disabled in (None, *flags):
+                context = {"parameters.phase": phase, "inputs.phase": phase, "success": True}
+                for prefix in ("variables.", "env."):
+                    context[prefix + "persona_access_mode"] = mode
+                    context.update({prefix + flag: str(flag == disabled).lower() for flag in flags})
+                rbac_runs = evaluate(rbac.get("condition", rbac.get("if")), context)
+                acl_runs = evaluate(acl.get("condition", acl.get("if")), context)
+                assert rbac_runs is (phase == "infra" and disabled is None)
+                assert acl_runs is (rbac_runs and mode == "legacy")
 
 
 def test_bicep_emits_resolved_identities_without_data_plane_deployment_script():
@@ -378,12 +392,31 @@ def test_bicep_emits_resolved_identities_without_data_plane_deployment_script():
         assert field in output
     assert "enableProjectLakeAccess && !deployOnlyAIGatewayNetworking" in output
     assert "Microsoft.Resources/deploymentScripts" not in source
-    assert "if(!enableProjectLakeAccess && !deployOnlyAIGatewayNetworking" in source
+    assert "if(personaAccessMode == 'legacy' && !enableProjectLakeAccess && !deployOnlyAIGatewayNetworking" in source
     assert "if (enableAzureMachineLearning)" in source
     caller = CALLER.read_text(encoding="utf-8")
     for forbidden in ("TemporaryDataOwner", "az account set", "--account-key", "--sas-token",
                       "publicNetworkAccess", "Storage Blob Data Reader", "mrvel"):
         assert forbidden not in caller
+
+
+@pytest.mark.parametrize("mode", ["legacy", "groups-v1"])
+@pytest.mark.parametrize("lake_access", [False, True])
+@pytest.mark.parametrize("gateway_only", [False, True])
+def test_bicep_legacy_lake_fallback_never_broadens_groups_mode(mode, lake_access, gateway_only):
+    source = RBAC.read_text(encoding="utf-8")
+    context = {"personaAccessMode": mode, "enableProjectLakeAccess": lake_access,
+               "deployOnlyAIGatewayNetworking": gateway_only, "aiHubExists": False, "amlExists": False,
+               "enableAIFoundryHub": True, "enableAzureMachineLearning": True}
+    conditions = re.findall(r"^module rbacLake\w+ .*? = if\((.+)\) \{", source, re.MULTILINE)
+    assert len(conditions) == 2
+    for condition in conditions:
+        expression = re.sub(r"!(\w+)", r"not(\1)", condition)
+        assert evaluate(expression, context) is (mode == "legacy" and not lake_access and not gateway_only)
+    output = source.split("output projectLakeAccess object = {", 1)[1].split("\n}", 1)[0]
+    enabled = re.search(r"^\s*enabled: (.+)$", output, re.MULTILINE)[1]
+    assert evaluate(re.sub(r"!(\w+)", r"not(\1)", enabled), context) is (
+        mode == "legacy" and lake_access and not gateway_only)
 
 
 def test_manual_member_caller_requires_execute_and_forwards_scope():
