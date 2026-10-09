@@ -16,6 +16,63 @@ DOCS = ROOT / "documentation" / "v2" / "10-19"
 LABELS = ["CLI (PowerShell)", "Python SDK", "REST (curl)"]
 CORE_TEAM = "Get started - CLI, SDK, API: Core team"
 PROJECT_TEAM = "Get started - Agent & ML Factory SDK: Project team"
+CONCEPT_ANIMATIONS = {
+    "concepts/index.md": ["factory-relationships", "map"],
+    "concepts/enterprise-scale.md": ["promotion"],
+    "architectures.md": [
+        "factory-topology-external-hub",
+        "factory-topology-standalone",
+        "factory-topology-own-hub",
+    ],
+    "concepts/templates/dataops.md": [
+        "dataops", "dataops-mlops", "dataops-rag", "dataops-finetuning",
+    ],
+    "concepts/templates/mlops.md": ["mlops"],
+    "concepts/templates/genaiops.md": ["rag"],
+}
+
+
+def test_site_header_identifies_main_instead_of_latest_github_release():
+    pytest.importorskip("mkdocs")
+    from mkdocs.config import load_config
+
+    site = ROOT / "documentation" / "gh-io"
+    config = load_config(str(site / "mkdocs.yml"))
+    header = config.theme.get_env().get_template("partials/source.html").render(config=config)
+    assert config.repo_name == "AI Factory - main"
+    assert f'href="{config.repo_url}/tree/main"' in header
+    assert "AI Factory - main" in header
+    # Material's source component fetches releases/latest, unrelated to the site build.
+    assert 'data-md-component="source"' not in header
+    assert "release_124" not in header
+
+
+@pytest.mark.parametrize("page,topics", CONCEPT_ANIMATIONS.items())
+def test_concept_pages_include_animation_pairs_and_reduced_motion_stills(page, topics):
+    import xml.etree.ElementTree as ET
+
+    docs = ROOT / "documentation" / "gh-io" / "docs"
+    text = (docs / page).read_text(encoding="utf-8")
+    assets = docs / "assets" / "animations"
+    font_license = (assets / "font-license.txt").read_text(encoding="utf-8")
+    assert "Google Corporation" in font_license and "Version 2.0, January 2004" in font_license
+    for topic in topics:
+        pictures = re.findall(r"<picture>\s*(.*?)</picture>", text, re.S)
+        selected = next(body for body in pictures if f"/{topic}.gif" in body)
+        assert 'media="(prefers-reduced-motion: reduce)"' in selected
+        assert f"/{topic}.png" in selected
+        assert 'loading="lazy"' in selected and re.search(r'alt="[^"]+"', selected)
+        assert f"/{topic}.svg)" in text and f"/{topic}.gif)" in text
+        assert (assets / f"{topic}.gif").read_bytes()[:6] in (b"GIF87a", b"GIF89a")
+        assert (assets / f"{topic}.png").read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+        svg = ET.parse(assets / f"{topic}.svg").getroot()
+        assert svg.tag == "{http://www.w3.org/2000/svg}svg"
+        assert svg.find("{http://www.w3.org/2000/svg}title") is not None
+        assert svg.findall(".//{http://www.w3.org/2000/svg}animate")
+        # Raw HTML URLs resolve from the generated directory URL, unlike Markdown links.
+        output_parent = Path(page).parent if page.endswith("/index.md") else Path(page).with_suffix("")
+        for url in re.findall(r'(?:src|srcset)="([^"]+)"', selected):
+            assert (docs / output_parent / url).resolve() == assets / Path(url).name
 
 
 def load_hook():

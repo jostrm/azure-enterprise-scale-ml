@@ -4,6 +4,24 @@ Agent Factory supplies reusable workload examples for persistent prompt agents,
 hosted agents, multi-agent patterns, ingestion and RAG. It is not a promise that
 one setup command deploys every agent framework or application.
 
+## Watch RAG step by step
+
+Follow approved documents through chunking and indexing, then an authorized
+question through retrieval to a grounded answer. RAG supplies context at
+question time; it does not train the answer model on your documents.
+This configuration-wizard lesson does not read files or call a model.
+
+<picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset="../../../assets/animations/rag.png">
+  <img src="../../../assets/animations/rag.gif" alt="RAG separates document preparation and indexing from question-time authorized retrieval and grounded answer generation." width="1400" height="940" loading="lazy">
+</picture>
+
+[Animated SVG](../../assets/animations/rag.svg) |
+[GIF](../../assets/animations/rag.gif) |
+[Still image](../../assets/animations/rag.png)
+
+See also [DataOps + RAG and fine-tuning](dataops.md#watch-the-data-flow).
+
 ## Choose a starting point
 
 | Example area | Use |

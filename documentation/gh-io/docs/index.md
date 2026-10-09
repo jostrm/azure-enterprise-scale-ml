@@ -15,6 +15,7 @@ need, and add projects without rebuilding every part of the platform.
 | Configure a new factory or add a project | [Add and update](factory-tools/19-cli-and-api-and-usage.md) |
 | Find a setting or default | [Parameters](parameters/index.md), [required inputs](parameters/standard.md), [complete reference](parameters/advanced.md) |
 | Understand factories, scale sets and projects | [Core concepts](concepts/index.md) |
+| Watch the concepts step by step | [Factory relationships and configuration map](concepts/index.md#watch-the-concepts), [DataOps](concepts/templates/dataops.md#watch-the-data-flow), [MLOps](concepts/templates/mlops.md#watch-the-model-lifecycle), [RAG](concepts/templates/genaiops.md#watch-rag-step-by-step) |
 | Build an agent, model or data workflow | [Agent SDK](project-team/agent-factory.md), [ML SDK](project-team/ml-model-factory.md), [DataOps](concepts/templates/dataops.md) |
 | Monitor usage, cost and health | [Monitor and operate](intelligence.md) |
 | Remove a draft or Azure resources | [Remove and recover](factory-tools/20-cli-and-api-and-usage.md) |
@@ -75,6 +76,9 @@ adoption points. This site follows published `main`; the
 [v1.25 release notes](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/RELEASE_125.md)
 describe an earlier, identified source snapshot. Check installed API/client
 compatibility before using a newer command.
+
+The header's **AI Factory - main** link identifies this site's source branch.
+Release notes and stable adoption points are listed separately in [News and releases](news.md).
 
 <details markdown="1">
 <summary>More info</summary>

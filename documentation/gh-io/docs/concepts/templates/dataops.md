@@ -3,6 +3,67 @@
 DataOps prepares data for your models and agents. Choose a data source, storage
 target, transformation and versioning approach before running a workload.
 
+## Watch the data flow
+
+These configuration-wizard lessons illustrate reusable data paths, not running
+pipelines. Choose a workload below. Reduced-motion preferences show still images.
+
+=== "DataOps"
+
+    Follow original inputs through Bronze, Silver and Gold, with explicit
+    versioning and producer/consumer ownership.
+
+    <picture>
+      <source media="(prefers-reduced-motion: reduce)" srcset="../../../assets/animations/dataops.png">
+      <img src="../../../assets/animations/dataops.gif" alt="DataOps prepares versioned data through Bronze, Silver and Gold for downstream workloads." width="1400" height="937" loading="lazy">
+    </picture>
+
+    [Animated SVG](../../assets/animations/dataops.svg) |
+    [GIF](../../assets/animations/dataops.gif) |
+    [Still image](../../assets/animations/dataops.png)
+
+=== "DataOps + MLOps"
+
+    Prepare reproducible training and inference data, keeping held-out
+    evaluation data separate from training.
+
+    <picture>
+      <source media="(prefers-reduced-motion: reduce)" srcset="../../../assets/animations/dataops-mlops.png">
+      <img src="../../../assets/animations/dataops-mlops.gif" alt="DataOps feeds versioned training, evaluation and inference data into an MLOps workload." width="1400" height="910" loading="lazy">
+    </picture>
+
+    [Animated SVG](../../assets/animations/dataops-mlops.svg) |
+    [GIF](../../assets/animations/dataops-mlops.gif) |
+    [Still image](../../assets/animations/dataops-mlops.png)
+
+=== "DataOps + RAG"
+
+    Prepare approved documents and retrieval copies without changing the
+    source owner's data or treating ingestion as model training.
+
+    <picture>
+      <source media="(prefers-reduced-motion: reduce)" srcset="../../../assets/animations/dataops-rag.png">
+      <img src="../../../assets/animations/dataops-rag.gif" alt="DataOps prepares approved, traceable document content for retrieval-augmented generation." width="1400" height="967" loading="lazy">
+    </picture>
+
+    [Animated SVG](../../assets/animations/dataops-rag.svg) |
+    [GIF](../../assets/animations/dataops-rag.gif) |
+    [Still image](../../assets/animations/dataops-rag.png)
+
+=== "DataOps + fine-tuning"
+
+    Prepare an approved, versioned training dataset with separate evaluation
+    inputs. This lesson does not submit a fine-tuning job.
+
+    <picture>
+      <source media="(prefers-reduced-motion: reduce)" srcset="../../../assets/animations/dataops-finetuning.png">
+      <img src="../../../assets/animations/dataops-finetuning.gif" alt="DataOps prepares curated training and separate evaluation data for fine-tuning." width="1400" height="937" loading="lazy">
+    </picture>
+
+    [Animated SVG](../../assets/animations/dataops-finetuning.svg) |
+    [GIF](../../assets/animations/dataops-finetuning.gif) |
+    [Still image](../../assets/animations/dataops-finetuning.png)
+
 ## A reusable data path
 
 | Stage | Purpose |

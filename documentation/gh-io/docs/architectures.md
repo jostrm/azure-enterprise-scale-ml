@@ -35,6 +35,52 @@ Existing hub/spoke, central DNS and BYO network designs require the correct
 resource references, permissions, routes and private connectivity. A topology
 diagram is not a substitute for checking that setup.
 
+### Watch the hub options
+
+Compare the configuration wizard's three illustrative network designs. These
+lessons do not provision connectivity or discover your existing network.
+Choose a tab; reduced-motion preferences show still images.
+
+=== "External hub"
+
+    Reuse a separately owned enterprise hub with explicit connectivity and
+    ownership checks.
+
+    <picture>
+      <source media="(prefers-reduced-motion: reduce)" srcset="../assets/animations/factory-topology-external-hub.png">
+      <img src="../assets/animations/factory-topology-external-hub.gif" alt="An AI Factory connects to a separately owned external enterprise hub." width="1400" height="943" loading="lazy">
+    </picture>
+
+    [Animated SVG](assets/animations/factory-topology-external-hub.svg) |
+    [GIF](assets/animations/factory-topology-external-hub.gif) |
+    [Still image](assets/animations/factory-topology-external-hub.png)
+
+=== "Standalone - no hub"
+
+    Keep the factory standalone without assuming access through a central hub.
+
+    <picture>
+      <source media="(prefers-reduced-motion: reduce)" srcset="../assets/animations/factory-topology-standalone.png">
+      <img src="../assets/animations/factory-topology-standalone.gif" alt="A standalone AI Factory operates without a hub connection." width="1400" height="889" loading="lazy">
+    </picture>
+
+    [Animated SVG](assets/animations/factory-topology-standalone.svg) |
+    [GIF](assets/animations/factory-topology-standalone.gif) |
+    [Still image](assets/animations/factory-topology-standalone.png)
+
+=== "Standalone - own hub"
+
+    Include a factory-owned hub and review its networking and access dependencies.
+
+    <picture>
+      <source media="(prefers-reduced-motion: reduce)" srcset="../assets/animations/factory-topology-own-hub.png">
+      <img src="../assets/animations/factory-topology-own-hub.gif" alt="A standalone AI Factory includes its own hub and connected project networks." width="1400" height="919" loading="lazy">
+    </picture>
+
+    [Animated SVG](assets/animations/factory-topology-own-hub.svg) |
+    [GIF](assets/animations/factory-topology-own-hub.gif) |
+    [Still image](assets/animations/factory-topology-own-hub.png)
+
 ![Enterprise landing-zone context](assets/images/14-eslz-full-1.png)
 
 ## Continue with your workload

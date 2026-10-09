@@ -25,6 +25,21 @@ service quotas. Add another scale set when the reviewed design requires it.
 Register only the environments you need. Stage and Prod are not created simply
 because Dev exists, and a subscription reference does not create a subscription.
 
+## Watch Dev, Stage and Prod
+
+Follow a versioned candidate through development, evaluation, release approval
+and observation. This is an illustrative recommended process, not an executable
+promotion workflow. Promote reviewed artifacts, not production data or secrets.
+
+<picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset="../../assets/animations/promotion.png">
+  <img src="../../assets/animations/promotion.gif" alt="A candidate moves from Dev to Stage evaluation and separate production approval, followed by monitoring and governed feedback." width="1400" height="910" loading="lazy">
+</picture>
+
+[Animated SVG](../assets/animations/promotion.svg) |
+[GIF](../assets/animations/promotion.gif) |
+[Still image](../assets/animations/promotion.png)
+
 ## Review each design concern
 
 | Concern | What to check |

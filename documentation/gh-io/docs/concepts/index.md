@@ -17,6 +17,41 @@ The registered format uses stable UUIDs for these objects. Human-readable names
 and three-digit numbers help navigation but are not interchangeable with UUIDs.
 See [scale and environment choices](enterprise-scale.md).
 
+## Watch the concepts
+
+These original animations come from the configuration wizard's **View > Concept
+animations** lessons. They explain an illustrative setup, not your deployed
+resources. Reduced-motion preferences show a still image instead; use the links
+below each animation to open it at full size or read the still.
+
+The SVGs include their own fonts for consistent rendering:
+[Open Sans font notices and license](../assets/animations/font-license.txt).
+
+### Factories, scale sets and projects
+
+<picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset="../assets/animations/factory-relationships.png">
+  <img src="../assets/animations/factory-relationships.gif" alt="Factories contain scale sets; projects select explicit environment placements." width="1400" height="863" loading="lazy">
+</picture>
+
+[Animated SVG](../assets/animations/factory-relationships.svg) |
+[GIF](../assets/animations/factory-relationships.gif) |
+[Still image](../assets/animations/factory-relationships.png)
+
+### Configuration map
+
+Follow ingestion, DataOps, training, inference and an agent in a small example.
+The sample region labels do not prescribe moving data between regions.
+
+<picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset="../assets/animations/map.png">
+  <img src="../assets/animations/map.gif" alt="Illustrative configuration map connecting ingestion, data preparation, training, inference and an agent." width="1400" height="750" loading="lazy">
+</picture>
+
+[Animated SVG](../assets/animations/map.svg) |
+[GIF](../assets/animations/map.gif) |
+[Still image](../assets/animations/map.png)
+
 ## Choose the layer you need
 
 | Goal | Guidance |

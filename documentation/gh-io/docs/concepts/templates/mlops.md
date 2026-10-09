@@ -3,6 +3,24 @@
 Use reusable examples and shared engines to prepare data, train and compare
 models, then deliberately deploy the selected result.
 
+## Watch the model lifecycle
+
+Follow versioned data through training, held-out evaluation and comparison,
+reviewed registration, separate deployment approval, and monitoring. This
+configuration-wizard lesson is illustrative: playback never submits a job,
+registers a model or approves a production release.
+
+<picture>
+  <source media="(prefers-reduced-motion: reduce)" srcset="../../../assets/animations/mlops.png">
+  <img src="../../../assets/animations/mlops.gif" alt="MLOps lifecycle from versioned data through training, evaluation, reviewed registration, separate deployment approval and monitoring." width="1400" height="995" loading="lazy">
+</picture>
+
+[Animated SVG](../../assets/animations/mlops.svg) |
+[GIF](../../assets/animations/mlops.gif) |
+[Still image](../../assets/animations/mlops.png)
+
+For the upstream data path, see [DataOps + MLOps](dataops.md#watch-the-data-flow).
+
 ## Choose your use case
 
 | Pattern | Typical use |
