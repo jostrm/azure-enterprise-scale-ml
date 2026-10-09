@@ -376,18 +376,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 366 |
-| `env` | 366 |
+| `yaml` | 367 |
+| `env` | 367 |
 | `bootstrap` | 90 |
 | `helper` | 17 |
 | `state` | 46 |
-| `json.dev` | 370 |
+| `json.dev` | 371 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 135, 390; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 136, 391; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 392, 416; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 135, 391; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 136, 392; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 393, 417; one reference row.
 
 ## YAML and variables.json reference
 
@@ -469,6 +469,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:enableDeleteForDisabledResources --><!-- parameter json.dev:enableDeleteForDisabledResources -->`enableDeleteForDisabledResources` | `ENABLE_DELETE_FOR_DISABLED_RESOURCES` | O | Y: `"false"`<br>J.dev: `"false"` | Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval. |
 | <!-- parameter yaml:enableElasticsearch --><!-- parameter json.dev:enableElasticsearch -->`enableElasticsearch` | `ENABLE_ELASTICSEARCH` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Elasticsearch keep-as-is: Elastic Cloud managed service. |
 | <!-- parameter yaml:enableEventHubs --><!-- parameter json.dev:enableEventHubs -->`enableEventHubs` | `ENABLE_EVENT_HUBS` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Event Hubs |
+| <!-- parameter yaml:enableFactoryChatAgent --><!-- parameter json.dev:enableFactoryChatAgent -->`enableFactoryChatAgent` | `ENABLE_FACTORY_CHAT_AGENT` | O | Y: `"false"`<br>J.dev: `"false"` | Opt-in creation or versioning of the owned Enterprise Scale AI Factory prompt Agent in the selected project Foundry. Requires Foundry and a succeeded modelGPTXName deployment. False skips the step; it does not delete an existing Agent. |
 | <!-- parameter yaml:enableFunction --><!-- parameter json.dev:enableFunction -->`enableFunction` | `ENABLE_FUNCTION` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Function App |
 | <!-- parameter yaml:enableLogicApps --><!-- parameter json.dev:enableLogicApps -->`enableLogicApps` | `ENABLE_LOGIC_APPS` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure Logic Apps |
 | <!-- parameter yaml:enablePostgreSQL --><!-- parameter json.dev:enablePostgreSQL -->`enablePostgreSQL` | `ENABLE_POSTGRESQL` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure PostgreSQL |
@@ -959,6 +960,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ENABLE_DELETE_FOR_DISABLED_RESOURCES -->`ENABLE_DELETE_FOR_DISABLED_RESOURCES` | `enableDeleteForDisabledResources` | O | `"false"` | Destructive cleanup switch for supported pipeline paths. Require an explicit target and reviewed deletion plan; a normal settings save or disabled feature alone is not deletion approval. |
 | <!-- parameter env:ENABLE_ELASTICSEARCH -->`ENABLE_ELASTICSEARCH` | `enableElasticsearch` | O | `"false"` | Enable Elasticsearch (Elastic Cloud) |
 | <!-- parameter env:ENABLE_EVENT_HUBS -->`ENABLE_EVENT_HUBS` | `enableEventHubs` | O | `"false"` | Enable Azure Event Hubs |
+| <!-- parameter env:ENABLE_FACTORY_CHAT_AGENT -->`ENABLE_FACTORY_CHAT_AGENT` | `enableFactoryChatAgent` | O | `"false"` | Opt-in creation or versioning of the owned Enterprise Scale AI Factory prompt Agent in the selected project Foundry. Requires Foundry and a succeeded modelGPTXName deployment. False skips the step; it does not delete an existing Agent. |
 | <!-- parameter env:ENABLE_FOUNDRY_CAPHOST -->`ENABLE_FOUNDRY_CAPHOST` | `enableAFoundryCaphost` | C | `"true"` | Enable the capability host for the selected standard private-agent architecture with its required Storage, Search and Cosmos DB dependencies. Other Foundry paths can have different requirements. |
 | <!-- parameter env:ENABLE_FUNCTION -->`ENABLE_FUNCTION` | `enableFunction` | O | `"false"` | Enable Azure Functions |
 | <!-- parameter env:ENABLE_KONG -->`ENABLE_KONG` | `ENABLE_KONG` | O | `"false"` | Enable kong. |

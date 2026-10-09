@@ -246,6 +246,7 @@
     "aseSkuWorkers": 1,
     "enableContainerApps": "false",
     "enableAIFactoryMCP": "false",
+    "enableFactoryChatAgent": "false",
     "enableAIGatewaySKU": "false",
     "addAIFactoryMCP2AIGatewaySKU": "false",
     "aifactoryMcpImage": "",

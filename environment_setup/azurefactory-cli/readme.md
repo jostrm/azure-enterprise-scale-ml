@@ -443,16 +443,17 @@ For runnable SDK code using `ConfigurationDraft.load()`, `review()` and
 `save()`, see [edit_configuration.py](../install_config_wizard/api-usage-examples/python/edit_configuration.py)
 and its [two-phase usage](../install_config_wizard/api-usage-examples/readme.md#edit-a-legacy-json-configuration-with-the-python-sdk).
 
-### MCP & AI Gateway options (project001 Dev)
+### Factory Chat Agent, MCP & AI Gateway options
 
 `config review` and `config save` accept dedicated options for the opt-in AI
-Factory MCP and the new Azure AI Gateway SKU. Each sets exactly one variable,
-is merged with `--changes-json`, and a disagreeing value in that file is a
-`ConfigError` instead of a silent override:
+Factory Chat Agent, Factory MCP and the new Azure AI Gateway SKU. Each sets
+exactly one variable, is merged with `--changes-json`, and a disagreeing value
+in that file is a `ConfigError` instead of a silent override:
 
 | Option | Variable | Values |
 |---|---|---|
 | `--enable-aifactory-mcp` | `enableAIFactoryMCP` | `true` / `false` |
+| `--enable-factory-chat-agent` | `enableFactoryChatAgent` | `true` / `false` |
 | `--enable-ai-gateway-sku` | `enableAIGatewaySKU` | `true` / `false` |
 | `--add-aifactory-mcp-to-ai-gateway-sku` | `addAIFactoryMCP2AIGatewaySKU` | `true` / `false` |
 | `--aifactory-mcp-image` | `aifactoryMcpImage` | `<registry>.azurecr.io/<repository>@sha256:<digest>` |
@@ -464,13 +465,16 @@ is merged with `--changes-json`, and a disagreeing value in that file is a
 
 ```powershell
 azurefactory config review --folder C:\legacy\aifactory --project-number 001 `
-  --enable-aifactory-mcp true --enable-ai-gateway-sku true --add-aifactory-mcp-to-ai-gateway-sku true
+  --enable-factory-chat-agent true --enable-aifactory-mcp true `
+  --enable-ai-gateway-sku true --add-aifactory-mcp-to-ai-gateway-sku true
 ```
 
-The fields must exist in the selected draft/schema (wizard API v0.47.21 or later
-for the three flags). Saving never deploys: the project pipeline's late
-foundry-phase step `71-aifactory-mcp-ai-gateway` acts on them for project001
-Dev only. See [45-aifactory-mcp-gateway](../../usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md).
+The fields must exist in the selected draft/schema. Saving never deploys. The
+project pipeline's late Foundry phase creates or versions the Chat Agent in the
+selected project when `enableFactoryChatAgent` is true; the MCP/Gateway step
+remains project001 Dev only. See
+[40-aifactory-agent](../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md)
+and [45-aifactory-mcp-gateway](../../usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md).
 
 ## Preview then confirm
 

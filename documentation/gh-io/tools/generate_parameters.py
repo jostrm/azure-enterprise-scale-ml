@@ -213,6 +213,8 @@ for names, text in (
      "Enable the capability host for the selected standard private-agent architecture with its required Storage, Search and Cosmos DB dependencies. Other Foundry paths can have different requirements."),
     (("enableAIFactoryMCP", "ENABLE_AI_FACTORY_MCP"),
      "Opt-in project001 Dev Factory MCP hosting through the matching project pipeline. Requires Foundry, Container Apps, approved image digests and an Entra application. False skips the step; it does not delete existing resources."),
+    (("enableFactoryChatAgent", "ENABLE_FACTORY_CHAT_AGENT"),
+     "Opt-in creation or versioning of the owned Enterprise Scale AI Factory prompt Agent in the selected project Foundry. Requires Foundry and a succeeded modelGPTXName deployment. False skips the step; it does not delete an existing Agent."),
     (("enableAIGatewaySKU", "ENABLE_AI_GATEWAY_SKU"),
      "Opt-in project001 Dev dedicated AI Gateway create/adopt integration. Requires Foundry and the component prerequisites. Not the regular APIM/Kong route. False skips the step; it does not delete existing resources."),
     (("addAIFactoryMCP2AIGatewaySKU", "ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU"),

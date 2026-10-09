@@ -278,14 +278,16 @@ def test_dedicated_mcp_gateway_options_map_to_exact_variable_names(command):
     extra = ["--expected-review", "a" * 64] if command == "save" else []
     args = cli.build_parser().parse_args([
         "config", command, *MCP_SCOPE, *extra,
-        "--enable-aifactory-mcp", "true", "--enable-ai-gateway-sku", "false",
+        "--enable-aifactory-mcp", "true", "--enable-factory-chat-agent", "true",
+        "--enable-ai-gateway-sku", "false",
         "--add-aifactory-mcp-to-ai-gateway-sku", "true", "--aifactory-mcp-image", MCP_IMAGE,
         "--aifactory-mcp-api-image", MCP_IMAGE, "--aifactory-mcp-entra-app-id", "33333333-3333-4333-8333-333333333333",
         "--aifactory-mcp-container-apps-environment", "aca-env-prj001",
         "--ai-gateway-sku-resource-id", "", "--ai-gateway-sku-outbound-subnet-id", "/subscriptions/x/subnets/y",
     ])
     assert cli.configuration_changes(args) == {
-        "enableAIFactoryMCP": "true", "enableAIGatewaySKU": "false", "addAIFactoryMCP2AIGatewaySKU": "true",
+        "enableAIFactoryMCP": "true", "enableFactoryChatAgent": "true",
+        "enableAIGatewaySKU": "false", "addAIFactoryMCP2AIGatewaySKU": "true",
         "aifactoryMcpImage": MCP_IMAGE, "aifactoryMcpApiImage": MCP_IMAGE,
         "aifactoryMcpEntraAppId": "33333333-3333-4333-8333-333333333333",
         "aifactoryMcpContainerAppsEnvironment": "aca-env-prj001", "aiGatewaySkuResourceId": "",

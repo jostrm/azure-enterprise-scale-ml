@@ -79,6 +79,8 @@ BOOLEAN = ("true", "false")
 MCP_GATEWAY_OPTIONS = (
     ("--enable-aifactory-mcp", "enableAIFactoryMCP", BOOLEAN,
      "Host the governed, read-only AI Factory MCP in project001 Dev (requires enableContainerApps and enableAIFoundry)."),
+    ("--enable-factory-chat-agent", "enableFactoryChatAgent", BOOLEAN,
+     "Create or update the owned Factory Chat Agent in the selected project Foundry (requires enableAIFoundry)."),
     ("--enable-ai-gateway-sku", "enableAIGatewaySKU", BOOLEAN,
      "Create or adopt the new Azure AI Gateway SKU wired to the project001 Dev Foundry (requires enableAIFoundry)."),
     ("--add-aifactory-mcp-to-ai-gateway-sku", "addAIFactoryMCP2AIGatewaySKU", BOOLEAN,
@@ -249,8 +251,8 @@ def build_parser() -> argparse.ArgumentParser:
         command.add_argument("--changes-json", help="Local JSON object with only intentional field replacements.")
         command.add_argument("--snapshot-only", action="store_true", help="Do not write pipeline variable files.")
         mcp_gateway = command.add_argument_group(
-            "MCP & AI Gateway (project001 Dev)",
-            "Dedicated replacements for the late foundry-phase pipeline step; saving never deploys.")
+            "Factory Chat Agent, MCP & AI Gateway",
+            "Dedicated options for late Foundry-phase pipeline steps; saving never deploys.")
         for option, key, choices, help_text in MCP_GATEWAY_OPTIONS:
             mcp_gateway.add_argument(option, dest=f"mcp_gateway_{key}", choices=choices, help=f"{help_text} Sets {key}.")
         if name == "save":
