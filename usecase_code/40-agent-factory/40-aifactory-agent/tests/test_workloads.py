@@ -91,7 +91,7 @@ def claim(record):
 
 
 @pytest.fixture
-def repo():
+def repo(monkeypatch):
     # Test artifacts stay in the project, never the OS temporary directory.
     root = Path(__file__).resolve().parents[1] / (".workload-test-" + uuid4().hex)
     agent = root / "usecase_code" / "40-agent-factory"
@@ -129,6 +129,30 @@ def repo():
         "dataset": {"provider": "lake", "kind": "dataset"},
         "custom": {"algorithm": "logistic_regression"}, "quality": {"min_accuracy": 0.65},
     }), encoding="utf-8")
+    from aifactory_agent import workloads
+
+    input_paths, read_source = workloads._input_paths, workloads._read_source
+    dependency_paths = None
+    dependency_data = {}
+
+    def isolated_input_paths(settings, profile, template):
+        nonlocal dependency_paths
+        if dependency_paths is None:
+            dependency_paths = frozenset(path for path in input_paths(settings, profile, template)
+                                         if not path.is_relative_to(root))
+        return sorted(set(workloads._profile_input_paths(settings, profile, template)) | dependency_paths, key=str)
+
+    def isolated_read_source(path, limits):
+        if dependency_paths is None or path not in dependency_paths:
+            return read_source(path, limits)
+        if path not in dependency_data:
+            dependency_data[path] = read_source(path, limits)
+        return dependency_data[path]
+
+    # Unit fixtures own their mutable provider inputs, not concurrently edited runtime/SDK checkouts.
+    # Freeze external dependency inputs while retaining real drift checks for the fixture's sources.
+    monkeypatch.setattr(workloads, "_input_paths", isolated_input_paths)
+    monkeypatch.setattr(workloads, "_read_source", isolated_read_source)
     try:
         yield root
     finally:
@@ -1174,6 +1198,32 @@ def test_known_prevalidation_failure_stays_failed_without_provider_invocation(co
         skills.execute_operation(record)
     assert exc.value.uncertain is False and exc.value.code == "dependency_missing"
     assert not adapter.executed
+
+
+def test_prevalidation_error_is_isolated_from_changes_to_external_sdk_source(configured, repo, monkeypatch):
+    from aifactory_agent.operations import OperationError
+    from azurefactory import client
+
+    _, _, adapter, _, skills = configured
+    dependency = repo.with_name(repo.name + "-sdk")
+    dependency.mkdir()
+    source = dependency / "client.py"
+    source.write_text("VERSION = 1\n", encoding="utf-8")
+    monkeypatch.setattr(client, "__file__", str(source))
+    try:
+        record = claim(skills.prepare(AGENT_CREATE, args()))
+        source.write_text("VERSION = 2\n", encoding="utf-8")
+
+        def plan(context):
+            raise ToolError("dependency_missing", "A known prevalidation blocker.", 503)
+
+        adapter.plan = plan
+        with pytest.raises(OperationError) as exc:
+            skills.execute_operation(record)
+        assert exc.value.code == "dependency_missing" and exc.value.uncertain is False
+        assert not adapter.executed
+    finally:
+        shutil.rmtree(dependency)
 
 
 @pytest.mark.parametrize("failure", ["typed_result", "operation_error"])
