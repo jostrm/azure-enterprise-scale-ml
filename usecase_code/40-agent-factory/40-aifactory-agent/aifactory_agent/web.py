@@ -135,15 +135,8 @@ def _failure(code: str, message: str, status: int, *, headers=None) -> JSONRespo
 
 
 def _knowledge_ready(status: dict) -> bool:
-    return (
-        status.get("status") == "ready" and status.get("stale") is False
-        and type(status.get("indexed_document_count")) is int
-        and status["indexed_document_count"] > 0
-        and status.get("reconciliation_pending") is False
-        and ("search_document_count" not in status
-             or (type(status["search_document_count"]) is int
-                 and status["search_document_count"] == status["indexed_document_count"]))
-    )
+    from .knowledge import knowledge_available
+    return knowledge_available(status)
 
 
 def get_readiness_knowledge(
@@ -289,7 +282,9 @@ def create_app(settings: Settings, *, services: AgentServices | None = None) -> 
         available = _knowledge_ready(status)
         return JSONResponse({
             "status": "ready" if available else "not_ready",
-            "checks": {"authentication": "configured", "knowledge": "ready" if available else "unavailable"},
+            "checks": {"authentication": "configured", "knowledge": (
+                "last_successful" if available and status.get("availability") == "last_successful"
+                else "ready" if available else "unavailable")},
             "coverage": "Authentication configuration and knowledge only; Foundry and Factory execution are not verified.",
         }, status_code=200 if available else 503)
 

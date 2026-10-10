@@ -30,20 +30,22 @@ graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::function:Conversation.answer
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/graph_service.py::class:GraphQueryService
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice.py::class:VoiceSession
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07; live voice observed 2026-10-09 at 29642909'
+reviewed_source: '21ea3380 + working tree; observed 2026-10-10; live voice observed 2026-10-09 at 29642909'
 ---
 # Chat and grounding
 
 ## Observed baseline flow
 
 1. Authenticate the user, validate configured tenant/audience/client and require a current exact-scope `knowledge.read` grant.
-2. Require ready, fresh, reconciled and nonempty knowledge state before inference.
+2. Pin a verified complete, reconciled and nonempty committed knowledge snapshot before inference. A blocked, failed, in-progress or stale refresh can use the last successful snapshot with its committed timestamp and explicit freshness warning; ownership/schema mismatch or uncertain legacy writes remain unavailable.
 3. Retrieve scope-filtered source chunks and assign server-owned citation identifiers.
 4. Send the question and evidence as untrusted data to the configured Foundry model/agent.
 5. Intersect canonical read-tool definitions with available backend descriptors; validate arguments and reauthorize each call.
 6. Bound tool rounds, require a completed answer, and reject unsupported citation IDs or omission of available citations.
 
 Citation validation prevents invented identifiers; it is not a proof that every sentence is entailed by a cited passage. Responses still need evidence-aware interpretation, especially for dated release notes and incomplete coverage.
+
+Changed refreshes stage an isolated owned Search generation and promote the manifest only after complete fingerprint, scope, ownership, schema and bounded visibility checks. Retrieval and knowledge-status tools use the same answer-local pin, so concurrent promotion cannot mix snapshots. See [[Retrieval-Provenance]] for separately approved generation permissions and retention/capacity maintenance. This source behavior does not establish cloud rollout.
 
 The injected model gateway supports existing project-reference and dedicated agent-endpoint modes. Endpoint invocation uses a narrower consumption permission; model inference permission alone does not establish agent-endpoint invocation rights. Version routing is a separately configured operation, not changed by asking a question.
 

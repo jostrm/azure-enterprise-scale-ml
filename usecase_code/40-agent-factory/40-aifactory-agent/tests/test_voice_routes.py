@@ -210,6 +210,29 @@ def test_a_governed_spoken_turn_uses_the_token_principal_the_hello_scope_and_the
     assert spoken["response"]["pre_generated_assistant_message"]["content"][0]["text"] == "Open the wizard."
 
 
+@pytest.mark.parametrize("refresh_status", ["blocked", "failed", "refreshing", "ready"])
+def test_spoken_answer_preserves_last_successful_knowledge_warning(app, conversation, refresh_status):
+    answer = conversation.answer
+    status = {
+        "status": refresh_status, "refresh_status": refresh_status, "stale": True,
+        "availability": "last_successful", "snapshot_verified": True,
+        "snapshot_id": "committed-generation", "refreshed_at": "2001-01-01T00:00:00+00:00",
+        "warning": "Using last successful knowledge; freshness is not confirmed.",
+    }
+    conversation.answer = lambda *args: {**answer(*args), "knowledge_status": status}
+    with TestClient(app) as client, client.websocket_connect("/api/voice/ws") as socket:
+        socket.send_text(hello())
+        collect(socket, got("ready"))
+        socket.send_bytes(PCM)
+        seen = collect(socket, lambda seen: states(seen)[-2:] == ["speaking", "listening"])
+        finish(socket)
+    result = next(item for item in seen if item.get("type") == "answer")
+    assert result["knowledge_status"] == status
+    assert result["citations"] == ANSWER["citations"]
+    assert {"audio": PCM} in seen
+    assert not any(item.get("type") == "error" for item in seen)
+
+
 @pytest.mark.parametrize("origin,accepted", [
     ("https://evil.example", False), ("https://testserver.evil.example", False),
     ("http://testserver", True), ("https://testserver", True),

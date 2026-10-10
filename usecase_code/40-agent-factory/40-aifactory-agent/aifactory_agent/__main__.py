@@ -71,7 +71,11 @@ def main(argv=None, *, services: AgentServices | None = None, principal_provider
                     ws_max_size=1 << 20)
         return
     print(json.dumps(result, indent=2, ensure_ascii=True, default=str))
+    if args.command == "ingest" and result.get("status") != "ready":
+        logging.getLogger(__name__).error("Knowledge refresh did not finish ready (status=%s).", result.get("status"))
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

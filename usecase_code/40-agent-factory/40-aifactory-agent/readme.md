@@ -137,8 +137,10 @@ Use this folder's `.venv` and `config.local.json`; the parent's
 ```
 
 Expect JSON command results and an evidence-grounded answer with citations.
-An unavailable/stale corpus, missing grant or unreachable endpoint is a setup
-blocker, not permission to disable authentication or enable public networking.
+A corpus without a verified complete committed snapshot, a missing grant or an
+unreachable endpoint is a setup blocker, not permission to disable authentication
+or enable public networking. A failed or stale refresh can use the last verified
+successful snapshot with an explicit dated freshness warning.
 Changing `--audience` adjusts explanations, not authorization.
 
 4. For a local development server process, start the command below. `serve`
@@ -226,12 +228,38 @@ excluded. Fenced commands, heading context and source lines are retained.
 Chunks carry source path/type, headings, content hash, version/release metadata,
 scope access and citations. Release notes remain historical information.
 
-Refresh reconciles changed and removed source chunks against a Blob manifest.
-Only task-owned index documents are reconciled. Partial indexing failures do not
-advance the committed manifest. The status endpoint distinguishes unavailable,
-stale and successful ingestion. Refreshing an immutable cloud source snapshot
-does not fetch newer repository content: package/deploy an updated approved
-snapshot first, then refresh it.
+Changed refreshes build a complete isolated Search generation named
+`<configured-index-prefix>-g-<snapshot-id>` without mutating the serving index.
+Upload acknowledgments are not immediate search visibility: refresh waits up to
+60 seconds under the renewing manifest lease for count, document fingerprints,
+schema, ownership and scope checks to pass. Only then does an atomic Blob
+manifest update promote the generation. Each answer pins its retrieval and
+knowledge-status tools to that same snapshot.
+
+Blocked, failed, in-progress or stale refreshes leave the last complete successful
+snapshot available for text and voice, with its committed timestamp and an
+explicit freshness warning. Status reports `availability: last_successful`
+separately from `refresh_status`; this is not a claim of fresh or live deployed
+evidence. Missing, corrupt, foreign-owned or unreconciled snapshots remain
+unavailable. A complete legacy index can serve fallback after verification, but
+an old pending in-place mutation cannot. The ingestion CLI exits nonzero when
+refresh does not finish ready even if fallback remains available.
+
+Creating generations requires separately approved index-definition write
+permission for the refresh operator/identity (for example, Search Service
+Contributor scoped to the configured Search service), in addition to document
+write permission. The application stays read-only. No permission is granted
+automatically. Unchanged verified refreshes reuse their index without creation.
+Generations, including failed stages, are retained; refresh never automatically
+deletes indexes or changes service capacity. Operators must separately approve
+capacity/retention maintenance, preserve the serving and still-pinned
+generations, and verify ownership before any cleanup. Quota exhaustion fails
+refresh explicitly without disabling the verified last-successful snapshot.
+`deleted_count` describes sources omitted from the new generation, not deletion
+from retained indexes.
+
+Refreshing an immutable cloud source snapshot does not fetch newer repository
+content: package/deploy an updated approved snapshot first, then refresh it.
 
 Hybrid text/vector retrieval uses configured semantic reranking. The initial
 Search service has free semantic ranking; its quota is shared. Errors are

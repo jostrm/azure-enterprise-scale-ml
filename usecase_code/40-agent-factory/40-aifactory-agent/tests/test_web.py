@@ -169,6 +169,24 @@ def test_mocked_readiness_explicitly_limits_its_claim(isolated):
         assert "not verified" in response.json()["coverage"]
 
 
+@pytest.mark.parametrize("refresh_status", ["blocked", "failed", "refreshing", "ready"])
+def test_readiness_allows_verified_fallback_without_claiming_freshness(authenticated, refresh_status):
+    app, knowledge, _ = authenticated
+    knowledge.status.return_value.update({
+        "status": refresh_status, "refresh_status": refresh_status, "stale": True,
+        "availability": "last_successful", "snapshot_verified": True, "snapshot_id": HASH,
+        "refreshed_at": "2001-01-01T00:00:00+00:00", "search_document_count": 10,
+        "warning": "Using last successful knowledge; freshness is not confirmed.",
+    })
+    with TestClient(app) as client:
+        response = client.get("/health/ready")
+        assert response.status_code == 200
+        assert response.json()["checks"]["knowledge"] == "last_successful"
+        status = client.get("/api/knowledge/status?scope_key=project001-dev").json()["status"]
+        assert status["availability"] == "last_successful"
+        assert status["snapshot_id"] == HASH and status["stale"] is True
+
+
 @pytest.mark.parametrize("method,path,body", [
     ("GET", "/api/context", None),
     ("GET", "/api/knowledge/status?scope_key=project001-dev", None),
@@ -608,7 +626,7 @@ def test_frontend_confirmation_and_shortcuts_accessibility():
     "blocked", "pkce", "bad-state", "authenticated", "approval", "cancel-disabled",
     "discard", "out-of-sync", "reindex", "user-proposal", "proposal-blocked", "proposal-api-unavailable",
     "skill-cost", "skill-action", "skill-delete",
-    "markdown-answer",
+    "markdown-answer", "fallback-blocked", "fallback-failed", "fallback-stale",
     "question-tiles", "question-tiles-denied", "action-tiles", "action-tiles-denied",
     *[f"confirm-{action}-{scenario}" for action in (
         "prepare", "propose", "approve", "execute", "continue", "cancel", "delete",
@@ -747,6 +765,15 @@ const answer = {
   citations: [{citation_id: "S1", heading: "<script>bad</script>", is_history: true,
     source_type: "release_note", source_url: "javascript:steal()", version: "1.2"}],
 };
+const fallbackStatus = mode.startsWith("fallback-") ? {
+  status: mode === "fallback-stale" ? "ready" : mode.slice(9),
+  refresh_status: mode === "fallback-stale" ? "ready" : mode.slice(9),
+  stale: true, indexed_document_count: 10, search_document_count: 10, reconciliation_pending: false,
+  availability: "last_successful", snapshot_verified: true, snapshot_id: "committed-snapshot",
+  refreshed_at: "2001-01-01T00:00:00+00:00",
+  warning: "Using last successful knowledge; freshness is not confirmed.",
+} : null;
+if (fallbackStatus) answer.knowledge_status = fallbackStatus;
 const response = (data) => ({ok: true, status: 200, json: async () => data});
 const sandbox = {
   document: {getElementById: ui, createElement: (tag) => new Element(tag), createTextNode: (text) => new TextNode(text)},
@@ -774,7 +801,7 @@ const sandbox = {
       return response(operation());
     }
     if (url.startsWith("/api/knowledge/status")) return response({
-      status: {
+      status: fallbackStatus || {
         status: mode === "out-of-sync" ? "index_out_of_sync" : mode === "reindex" ? "reindex_required" : "ready",
         stale: false, indexed_document_count: 10, reconciliation_pending: false,
         search_document_count: mode === "out-of-sync" ? 9 : 10,
@@ -1153,6 +1180,15 @@ async function consent() {
         assert.equal(ui("question").value, "");
       } else {
         await waitFor(() => ui("answer").textContent.includes("steal"));
+        if (fallbackStatus) {
+          assert(ui("knowledge-status").textContent.includes("Using last successful"));
+          assert(!ui("knowledge-status").textContent.includes("corpus age: fresh"));
+          assert(ui("request-status").textContent.includes(fallbackStatus.warning));
+          assert(ui("answer-context").textContent.includes("committed-snapshot"));
+          assert(ui("answer-context").textContent.includes(fallbackStatus.refreshed_at));
+          assert(calls.some(call => call.url === "/api/chat"), "fallback must not block typed questions");
+          assert.equal(ui("question").disabled, false);
+        }
         assert(ui("answer").children.length > 0, "answer must be rendered into Markdown elements");
         assert(!descendants(ui("answer")).some(child => ["img", "script", "iframe"].includes(child.tagName)));
         assert(descendants(ui("answer")).some(child => child.tagName === "a" && child.href === "#source-S1"));

@@ -20,6 +20,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote, urlsplit, urlunsplit
+from uuid import uuid4
 
 from azure.core.exceptions import AzureError, ResourceExistsError, ResourceNotFoundError
 from azure.identity import get_bearer_token_provider
@@ -52,7 +53,14 @@ _MANIFEST = "repository-manifest.json"
 _PENDING = "repository-pending.json"
 _STATUS = "repository-status.json"
 _BATCH = 32
+_INDEX_READY_TIMEOUT = 60
+_INDEX_READY_POLL = 1
 _ID = re.compile(r"^[a-f0-9]{64}$")
+_DOCUMENT_FIELDS = [
+    "id", "source_path", "heading", "source_type", "is_current", "is_history",
+    "release", "version", "source_url", "source_revision", "working_tree",
+    "line_start", "line_end", "content", "content_hash", "source_hash", "allowed_scope_keys",
+]
 _HARD_DIRS = {
     ".git", ".hg", ".svn", ".venv", "venv", "env", ".tox", ".mypy_cache",
     ".pytest_cache", "__pycache__", "node_modules", "site-packages", "vendor",
@@ -82,6 +90,10 @@ class OwnershipError(RuntimeError):
 
 class IndexingError(RuntimeError):
     """At least one document operation failed or was not acknowledged."""
+
+
+class _IndexVisibilityPending(IndexingError):
+    """Acknowledged documents are not yet completely visible to Search."""
 
 
 def _now() -> str:
@@ -442,10 +454,39 @@ class _RenewingLease:
             _LOG.warning("Lease release failed while refresh was already failing.")
 
 
+def knowledge_available(status: dict) -> bool:
+    counts = (type(status.get("indexed_document_count")) is int
+              and status["indexed_document_count"] > 0
+              and status.get("reconciliation_pending") is False
+              and ("search_document_count" not in status
+                   or (type(status["search_document_count"]) is int
+                       and status["search_document_count"] == status["indexed_document_count"])))
+    if "availability" in status:
+        return bool(counts and type(status.get("search_document_count")) is int
+                    and status.get("availability") in {"current", "last_successful"}
+                    and status.get("snapshot_verified") is True and status.get("snapshot_id")
+                    and status.get("refreshed_at"))
+    return bool(counts and status.get("status") == "ready" and status.get("stale") is False)
+
+
+class KnowledgeSnapshot:
+    """A turn-local pin; later promotion cannot change its index or evidence."""
+
+    def __init__(self, knowledge, manifest, client, status):
+        self.knowledge, self.manifest, self.client = knowledge, manifest, client
+        self._status = status
+
+    def status(self):
+        return dict(self._status)
+
+    def search(self, query, scope_key):
+        return self.knowledge._search(query, scope_key, self.manifest, self.client)
+
+
 class Knowledge:
     def __init__(self, settings: Settings, cred=None, *, index_client=None,
                  search_client=None, blob_service_client=None, container_client=None,
-                 embedding_client=None):
+                 embedding_client=None, search_client_factory=None):
         self.settings = settings
         # Use only the explicit deployment credential policy, never DefaultAzureCredential.
         self.cred = cred if cred is not None else credential(settings)
@@ -463,6 +504,9 @@ class Knowledge:
         self.search_client = search_client if search_client is not None else SearchClient(
             azure.search_endpoint, azure.search_index, self.cred,
         )
+        self._clients = {azure.search_index: self.search_client}
+        self._search_client_factory = search_client_factory or (
+            lambda name: SearchClient(azure.search_endpoint, name, self.cred))
         if container_client is not None:
             self.container = container_client
         else:
@@ -477,8 +521,9 @@ class Knowledge:
             timeout=60, max_retries=2,
         )
 
-    def _index_definition(self) -> SearchIndex:
+    def _index_definition(self, index_name=None) -> SearchIndex:
         azure = self.settings.azure
+        generation = index_name is not None and index_name != azure.search_index
         scalar = SearchFieldDataType
         fields = [
             SimpleField(name="id", type=scalar.String, key=True),
@@ -499,10 +544,12 @@ class Knowledge:
         fields.extend([
             SimpleField(name="ingested_at", type=scalar.DateTimeOffset, filterable=True, sortable=True),
             SimpleField(name="allowed_scope_keys", type=scalar.Collection(scalar.String), filterable=True),
-            SimpleField(name=self.owner_field, type=scalar.String, hidden=True),
+            SimpleField(name=self.owner_field, type=scalar.String, hidden=not generation, filterable=generation),
         ])
+        if generation:
+            fields.append(SimpleField(name="snapshot_id", type=scalar.String, filterable=True))
         return SearchIndex(
-            name=azure.search_index, fields=fields,
+            name=index_name or azure.search_index, fields=fields,
             vector_search=VectorSearch(
                 algorithms=[HnswAlgorithmConfiguration(
                     name="repository-hnsw-algorithm",
@@ -521,8 +568,10 @@ class Knowledge:
             ]),
         )
 
-    def _verify_index(self, actual):
-        expected = self._index_definition()
+    def _verify_index(self, actual, name=None):
+        expected = self._index_definition(name)
+        if actual.name != (name or self.settings.azure.search_index):
+            raise OwnershipError("Search index identity does not match the requested owned index.")
         fields = {field.name: field for field in actual.fields}
         if self.owner_field not in fields:
             raise OwnershipError("Search index name collision: ownership marker is missing.")
@@ -557,6 +606,83 @@ class Knowledge:
                 or [f.field_name for f in semantic.prioritized_fields.content_fields or []] != ["content"]):
             raise OwnershipError("Owned Search index semantic configuration is incompatible.")
         return actual
+
+    def _active_index(self, manifest):
+        base = self.settings.azure.search_index
+        name = manifest.get("active_index", base)
+        if name != base:
+            prefix = base[:93] + "-g-"
+            if (not isinstance(name, str) or not name.startswith(prefix)
+                    or not re.fullmatch(r"[a-f0-9]{32}", name[len(prefix):])
+                    or manifest.get("snapshot_id") != name[len(prefix):]):
+                raise OwnershipError("Repository manifest active index is outside the owned generation namespace.")
+        return name
+
+    def _client(self, name):
+        if name not in self._clients:
+            self._clients[name] = self._search_client_factory(name)
+        return self._clients[name]
+
+    def _validate_entries(self, manifest):
+        entries = manifest.get("entries")
+        if not isinstance(entries, dict) or any(
+                not isinstance(key, str) or not _ID.fullmatch(key)
+                or not isinstance(entry, dict)
+                or not isinstance(entry.get("fingerprint"), str)
+                or not _ID.fullmatch(entry["fingerprint"])
+                or not isinstance(entry.get("source_path"), str)
+                for key, entry in entries.items()):
+            raise OwnershipError("Repository manifest contains invalid document entries.")
+        self._active_index(manifest)
+
+    def _verify_row(self, row, manifest):
+        entry = manifest["entries"].get(row.get("id"))
+        document = {field: row.get(field) for field in _DOCUMENT_FIELDS}
+        if (not entry or _digest(_canonical(document)) != entry["fingerprint"]
+                or not isinstance(document["allowed_scope_keys"], list)
+                or not set(document["allowed_scope_keys"]) <= set(self.settings.scopes)):
+            raise IndexingError("Search returned evidence not matching the owned committed snapshot.")
+        if manifest.get("active_index") and (
+                row.get(self.owner_field) != self.owner or row.get("snapshot_id") != manifest["snapshot_id"]):
+            raise OwnershipError("Search returned a document outside the owned committed generation.")
+
+    def _selected_fields(self, manifest):
+        return _DOCUMENT_FIELDS + ([self.owner_field, "snapshot_id"] if manifest.get("active_index") else [])
+
+    def _verify_complete(self, manifest, client):
+        self._validate_entries(manifest)
+        index = self._verify_index(self.index_client.get_index(self._active_index(manifest)),
+                                   self._active_index(manifest))
+        if getattr(index, "e_tag", None) != manifest.get("index_etag"):
+            raise IndexingError("Committed Search index identity changed; reindex required.")
+        count = client.get_document_count()
+        if type(count) is int and 0 <= count < len(manifest["entries"]):
+            raise _IndexVisibilityPending("Committed Search index is out of sync with its manifest.")
+        if type(count) is not int or count != len(manifest["entries"]):
+            raise IndexingError("Committed Search index is out of sync with its manifest.")
+        seen = set()
+        for row in client.search(search_text="*", select=self._selected_fields(manifest)):
+            self._verify_row(row, manifest)
+            if row["id"] in seen:
+                raise IndexingError("Committed Search index returned duplicate documents.")
+            seen.add(row["id"])
+        if seen != set(manifest["entries"]):
+            raise _IndexVisibilityPending("Committed Search index did not return every manifest document.")
+        return count
+
+    def _wait_for_complete(self, manifest, client, guard):
+        deadline = time.monotonic() + _INDEX_READY_TIMEOUT
+        while True:
+            guard.check()
+            try:
+                return self._verify_complete(manifest, client)
+            except _IndexVisibilityPending as exc:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise IndexingError(
+                        "Staged Search index did not become completely visible before the refresh deadline."
+                    ) from exc
+                time.sleep(min(_INDEX_READY_POLL, remaining))
 
     def _verify_container(self, properties):
         if properties.metadata.get("aifactory_owner") != self.owner:
@@ -624,6 +750,30 @@ class Knowledge:
             content_settings=ContentSettings(content_type="application/json"),
         )
 
+    def _read_pending(self):
+        pending = self._read_state(_PENDING)
+        if pending is None:
+            return None
+        if (not isinstance(pending.get("managed_ids"), list)
+                or any(not isinstance(key, str) or not _ID.fullmatch(key)
+                       for key in pending["managed_ids"])):
+            raise OwnershipError("Repository pending journal contains invalid identifiers.")
+        if ("legacy_reconciliation_pending" in pending
+                and type(pending["legacy_reconciliation_pending"]) is not bool):
+            raise OwnershipError("Repository pending journal has an invalid reconciliation marker.")
+        if "staging_index" in pending:
+            name = pending["staging_index"]
+            if not isinstance(name, str):
+                raise OwnershipError("Repository pending journal has an invalid staging index.")
+            self._active_index({"active_index": name, "snapshot_id": name.rsplit("-g-", 1)[-1]})
+        return pending
+
+    @staticmethod
+    def _legacy_pending(manifest, pending):
+        return bool(not manifest.get("active_index") and pending and (
+            pending.get("legacy_reconciliation_pending")
+            or (pending.get("managed_ids") and not pending.get("staging_index"))))
+
     def _manifest_blob(self):
         if self._read_state(_MANIFEST) is None:
             try:
@@ -686,74 +836,74 @@ class Knowledge:
         return reused
 
     def refresh(self) -> dict:
-        resources = self.ensure_resources()
+        self.ensure_resources()
         with _RenewingLease(self._manifest_blob()) as guard:
             manifest = self._read_state(_MANIFEST)
-            pending = self._read_state(_PENDING)
+            pending = self._read_pending()
             self._read_state(_STATUS)  # Refuse state-name collisions before any overwrite.
-            if manifest is None or not isinstance(manifest.get("entries"), dict):
+            if manifest is None:
                 raise OwnershipError("Repository manifest is missing or invalid.")
+            self._validate_entries(manifest)
             previous = manifest["entries"]
-            if any(not isinstance(entry, dict) or not isinstance(entry.get("fingerprint"), str)
-                   or not _ID.fullmatch(entry["fingerprint"])
-                   or not isinstance(entry.get("source_path"), str) for entry in previous.values()):
-                raise OwnershipError("Repository manifest contains invalid document entries.")
-            if pending and (not isinstance(pending.get("managed_ids"), list)
-                            or any(not isinstance(key, str) for key in pending["managed_ids"])):
-                raise OwnershipError("Repository pending journal contains invalid identifiers.")
-            previous_ids = set(previous)
-            pending_ids = set(pending.get("managed_ids", [])) if pending else set()
-            if any(not _ID.fullmatch(key) for key in previous_ids | pending_ids):
-                raise OwnershipError("Repository manifest contains invalid document identifiers.")
+            legacy_pending = self._legacy_pending(manifest, pending)
             try:
+                self._write_state(_STATUS, {"status": "refreshing", "attempted_at": _now()})
                 report = scan_sources(self.settings)
                 guard.check()
                 report["manifest_provenance_reused_count"] = self._reuse_snapshot_provenance(report, manifest)
                 summary = {key: value for key, value in report.items() if key != "documents"}
                 summary["attempted_at"] = _now()
-                if report["status"] == "blocked":
+                if report["status"] == "blocked" or not report["documents"]:
+                    summary["status"] = "blocked" if report["status"] == "blocked" else "empty"
                     summary["refreshed_at"] = manifest.get("refreshed_at")
                     summary["indexed_document_count"] = len(previous)
                     self._write_state(_STATUS, summary)
                     return summary
                 desired = {doc["id"]: doc for doc in report["documents"]}
                 fingerprints = {key: _digest(_canonical(doc)) for key, doc in desired.items()}
-                reindex = resources["index_created"] or resources["index_etag"] != manifest.get("index_etag")
-                changed = [
-                    doc for key, doc in desired.items()
-                    if reindex or previous.get(key, {}).get("fingerprint") != fingerprints[key]
-                ]
-                deleted = sorted((previous_ids | pending_ids) - set(desired))
-                # Journal all possible partial writes BEFORE modifying the index. A retry
-                # can clean an abandoned attempt even when sources changed in between.
+                unchanged = ({key: entry["fingerprint"] for key, entry in previous.items()} == fingerprints
+                             and not legacy_pending)
+                if unchanged:
+                    try:
+                        self._verify_complete(manifest, self._client(self._active_index(manifest)))
+                    except (ResourceNotFoundError, IndexingError):
+                        unchanged = False
+                snapshot_id = manifest.get("snapshot_id")
+                active_index = self._active_index(manifest)
+                if not unchanged:
+                    snapshot_id = uuid4().hex
+                    active_index = self.settings.azure.search_index[:93] + "-g-" + snapshot_id
+                    # A generation is never reused, overwritten or automatically deleted.
+                    # Even failed staging leaves the committed index untouched.
+                    self.index_client.create_index(self._index_definition(active_index))
+                index = self._verify_index(self.index_client.get_index(active_index), active_index)
+                client = self._client(active_index)
                 self._write_state(_PENDING, {
-                    "managed_ids": sorted(previous_ids | pending_ids | set(desired)),
+                    "managed_ids": [] if unchanged else sorted(desired),
+                    "staging_index": active_index,
+                    "legacy_reconciliation_pending": legacy_pending,
                     "attempted_at": summary["attempted_at"],
                 })
-                for offset in range(0, len(changed), _BATCH):
+                staged = [] if unchanged else list(desired.values())
+                for offset in range(0, len(staged), _BATCH):
                     guard.check()
-                    batch = changed[offset:offset + _BATCH]
+                    batch = staged[offset:offset + _BATCH]
                     vectors = self._embeddings([doc["heading"] + "\n\n" + doc["content"] for doc in batch])
                     guard.check()
                     uploads = [
                         {**doc, "contentVector": vector, "ingested_at": summary["attempted_at"],
-                         self.owner_field: self.owner}
+                         self.owner_field: self.owner, "snapshot_id": snapshot_id}
                         for doc, vector in zip(batch, vectors)
                     ]
-                    self._check_actions(self.search_client.upload_documents(documents=uploads),
+                    self._check_actions(client.upload_documents(documents=uploads),
                                         [doc["id"] for doc in batch], "upload")
-                for offset in range(0, len(deleted), _BATCH):
-                    guard.check()
-                    keys = deleted[offset:offset + _BATCH]
-                    self._check_actions(self.search_client.delete_documents(
-                        documents=[{"id": key} for key in keys],
-                    ), keys, "delete")
                 guard.check()
                 completed = _now()
                 summary.update({
-                    "status": "ready" if desired else "empty", "refreshed_at": completed,
-                    "indexed_document_count": len(desired), "uploaded_count": len(changed),
-                    "deleted_count": len(deleted),
+                    "status": "ready", "refreshed_at": completed,
+                    "indexed_document_count": len(desired), "uploaded_count": len(staged),
+                    "deleted_count": len(set(previous) - set(desired)),
+                    "active_index": active_index, "snapshot_id": snapshot_id,
                 })
                 committed = {
                     "entries": {key: {
@@ -762,17 +912,21 @@ class Knowledge:
                         "source_url": doc["source_url"], "working_tree": doc["working_tree"],
                     }
                                 for key, doc in desired.items()},
-                    "refreshed_at": completed, "index_etag": resources["index_etag"],
+                    "refreshed_at": completed, "index_etag": getattr(index, "e_tag", None),
                     "summary": summary,
                 }
+                if snapshot_id:
+                    committed.update(active_index=active_index, snapshot_id=snapshot_id)
+                self._wait_for_complete(committed, client, guard)
+                guard.check()
                 # The manifest is the authoritative commit; status is observational.
                 self._write_state(_MANIFEST, committed, lease=guard.lease)
+                self.search_client = client
                 guard.check()
                 self._write_state(_PENDING, {"managed_ids": []})
                 self._write_state(_STATUS, summary)
                 return summary
             except (AzureError, OpenAIError, OSError, ValueError, RuntimeError) as exc:
-                guard.check()
                 failed = {
                     "status": "failed", "attempted_at": _now(),
                     "error_type": type(exc).__name__, "refreshed_at": manifest.get("refreshed_at"),
@@ -785,56 +939,95 @@ class Knowledge:
                 raise
 
     def status(self) -> dict:
+        return self._snapshot_state()[0]
+
+    def snapshot(self) -> KnowledgeSnapshot:
+        status, manifest, client = self._snapshot_state()
+        if not knowledge_available(status):
+            raise IndexingError("No verified complete committed knowledge snapshot is available.")
+        return KnowledgeSnapshot(self, manifest, client, status)
+
+    def _snapshot_state(self):
+        unavailable = {"status": "not_initialized", "index": self.settings.azure.search_index,
+                       "indexed_document_count": 0, "stale": True, "availability": "unavailable",
+                       "snapshot_verified": False}
         try:
             self._verify_container(self.container.get_container_properties())
-            index = self._verify_index(self.index_client.get_index(self.settings.azure.search_index))
         except ResourceNotFoundError:
-            return {"status": "not_initialized", "index": self.settings.azure.search_index,
-                    "indexed_document_count": 0, "stale": True}
+            return unavailable, None, None
+        # A cleared post-promotion journal must never authorize an older legacy manifest.
+        pending = self._read_pending()
         manifest = self._read_state(_MANIFEST)
         if manifest is None:
-            return {"status": "not_initialized", "index": self.settings.azure.search_index,
-                    "indexed_document_count": 0, "stale": True}
+            return unavailable, None, None
+        self._validate_entries(manifest)
         latest = self._read_state(_STATUS)
         summary = manifest.get("summary", {})
         # Recover status if a crash occurred after committing but before updating it.
         if latest and (latest.get("attempted_at") or "") > (summary.get("attempted_at") or ""):
             summary = latest
-        result = {**summary, "index": self.settings.azure.search_index,
+        name = self._active_index(manifest)
+        client = self._client(name)
+        result = {**summary, "index": name, "active_index": name,
                   "refreshed_at": manifest.get("refreshed_at"),
-                  "indexed_document_count": len(manifest["entries"])}
-        result["search_document_count"] = self.search_client.get_document_count()
+                  "indexed_document_count": len(manifest["entries"]),
+                  "availability": "unavailable", "snapshot_verified": False,
+                  "snapshot_id": manifest.get("snapshot_id") or _digest(_canonical(manifest))}
         refreshed = manifest.get("refreshed_at")
-        result["stale"] = not refreshed or (
-            datetime.now(timezone.utc) - datetime.fromisoformat(refreshed)
-        ).total_seconds() > self.settings.knowledge.stale_after_hours * 3600
+        try:
+            age = (datetime.now(timezone.utc) - datetime.fromisoformat(refreshed)).total_seconds()
+            result["stale"] = age > self.settings.knowledge.stale_after_hours * 3600
+            if age < 0:
+                refreshed = None
+                result["stale"] = True
+        except (TypeError, ValueError):
+            result["stale"] = True
+            refreshed = None
         result.setdefault("status", "not_initialized")
-        pending = self._read_state(_PENDING)
-        result["reconciliation_pending"] = bool(pending and pending.get("managed_ids"))
-        if result["reconciliation_pending"] and result["status"] == "ready":
+        staging_pending = bool(pending and pending.get("managed_ids"))
+        result["refresh_pending"] = staging_pending
+        result["reconciliation_pending"] = self._legacy_pending(manifest, pending)
+        result["refresh_status"] = result["status"]
+        if not manifest["entries"] or not refreshed or manifest.get("summary", {}).get("status") != "ready":
+            return result, manifest, client
+        if result["reconciliation_pending"]:
             result["status"] = "refresh_incomplete"
-        if getattr(index, "e_tag", None) != manifest.get("index_etag"):
+            return result, manifest, client
+        try:
+            result["search_document_count"] = self._verify_complete(manifest, client)
+        except ResourceNotFoundError:
             result["status"] = "reindex_required"
             result["stale"] = True
-        elif result["search_document_count"] != result["indexed_document_count"]:
+            return result, manifest, client
+        except IndexingError as exc:
+            result["status"] = "reindex_required" if "identity changed" in str(exc) else "index_out_of_sync"
+            result["search_document_count"] = client.get_document_count()
             result["stale"] = True
-            if result["status"] == "ready":
-                result["status"] = "index_out_of_sync"
-        return result
+            return result, manifest, client
+        fallback = result["stale"] or result["refresh_status"] != "ready" or staging_pending
+        result["snapshot_verified"] = True
+        result["availability"] = "last_successful" if fallback else "current"
+        result["warning"] = (
+            "Using last successful knowledge snapshot; freshness is not confirmed. "
+            f"Refresh status: {result['refresh_status']}; committed at {manifest['refreshed_at']}."
+            if fallback else None)
+        return result, manifest, client
 
     def search(self, query: str, scope_key: str) -> list[dict]:
         if scope_key not in self.settings.scopes:
             raise ValueError("Unknown configured knowledge scope.")
         if not isinstance(query, str) or not query.strip() or len(query) > 4000:
             raise ValueError("Provide a nonempty knowledge query of at most 4000 characters.")
-        self._verify_index(self.index_client.get_index(self.settings.azure.search_index))
+        return self.snapshot().search(query, scope_key)
+
+    def _search(self, query, scope_key, manifest, client):
+        if scope_key not in self.settings.scopes:
+            raise ValueError("Unknown configured knowledge scope.")
+        if not isinstance(query, str) or not query.strip() or len(query) > 4000:
+            raise ValueError("Provide a nonempty knowledge query of at most 4000 characters.")
+        self._verify_complete(manifest, client)
         vector = self._embeddings([query.strip()])[0]
-        fields = [
-            "id", "source_path", "heading", "source_type", "is_current", "is_history",
-            "release", "version", "source_url", "source_revision", "working_tree",
-            "line_start", "line_end", "content", "content_hash", "source_hash",
-            "ingested_at", "allowed_scope_keys",
-        ]
+        fields = self._selected_fields(manifest) + ["ingested_at"]
         options = {
             "search_text": query.strip(), "search_fields": ["content", "heading"],
             "filter": f"allowed_scope_keys/any(scope: scope eq '{scope_key}')",
@@ -842,19 +1035,26 @@ class Knowledge:
             "vector_filter_mode": "preFilter", "select": fields,
             "top": self.settings.knowledge.top_k,
         }
+        if manifest.get("active_index"):
+            options["filter"] += (f" and {self.owner_field} eq '{self.owner}'"
+                                  f" and snapshot_id eq '{manifest['snapshot_id']}'")
         if self.settings.azure.semantic_ranking:
             options.update(query_type="semantic",
                            semantic_configuration_name=self.settings.azure.semantic_configuration,
                            semantic_error_mode="fail")
         results = []
-        for row in self.search_client.search(**options):
+        for row in client.search(**options):
             if scope_key not in row.get("allowed_scope_keys", []):
                 raise RuntimeError("Search returned a document outside the requested knowledge scope.")
+            self._verify_row(row, manifest)
             if self.settings.azure.semantic_ranking and row.get("@search.reranker_score") is None:
                 raise RuntimeError("Semantic ranking was requested but not returned; no fallback is allowed.")
-            result = {field: row.get(field) for field in fields if field != "allowed_scope_keys"}
+            result = {field: row.get(field) for field in fields
+                      if field not in {"allowed_scope_keys", self.owner_field}}
             result["score"] = row.get("@search.reranker_score") if self.settings.azure.semantic_ranking else row.get("@search.score")
             result["search_score"] = row.get("@search.score")
             result["current_history"] = "current" if row.get("is_current") else "history"
+            result["snapshot_id"] = manifest.get("snapshot_id") or _digest(_canonical(manifest))
             results.append(result)
+        self._verify_complete(manifest, client)
         return results

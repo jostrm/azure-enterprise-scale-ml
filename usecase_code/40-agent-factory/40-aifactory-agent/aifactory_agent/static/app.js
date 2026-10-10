@@ -781,6 +781,15 @@
         + ". Consult persisted plans below; a call is not proof of successful execution."
       : "No backend tool calls reported for this answer.";
     ui("request-status").textContent = "Answer received. Chat is read-only; existing persisted plans require separate approval and execution.";
+    if (result.knowledge_status) {
+      const knowledge = result.knowledge_status;
+      ui("answer-context").textContent += " · knowledge snapshot: " + (knowledge.snapshot_id || "unconfirmed")
+        + " · committed: " + (knowledge.refreshed_at || "unconfirmed");
+      if (knowledge.availability === "last_successful") {
+        ui("request-status").textContent += " " + (knowledge.warning
+          || "Using last successful knowledge; freshness is not confirmed.");
+      }
+    }
     if (result.graph_context && result.graph_context.status !== "not_requested") {
       const graph = result.graph_context;
       ui("request-status").textContent += " Graph context: " + (graph.status || "unknown")
@@ -1198,17 +1207,25 @@
           const info = result.status;
           const reconciled = info.reconciliation_pending === false
             && (!Object.hasOwn(info, "search_document_count") || info.search_document_count === info.indexed_document_count);
-          const ready = info.status === "ready" && info.stale === false
+          const verified = info.snapshot_verified === true && !!info.snapshot_id && !!info.refreshed_at;
+          const fallback = info.availability === "last_successful" && verified;
+          const ready = (Object.hasOwn(info, "availability")
+            ? verified && ["current", "last_successful"].includes(info.availability)
+            : info.status === "ready" && info.stale === false)
             && Number.isInteger(info.indexed_document_count) && info.indexed_document_count > 0 && reconciled;
-          const label = info.status === "ready" && !ready
+          const label = ready && fallback
+            ? "Using last successful knowledge — freshness is not confirmed"
+            : info.status === "ready" && !ready
             ? "Not ready — freshness, population or reconciliation is unconfirmed"
             : knowledgeLabels[info.status] || "Unknown knowledge state — readiness is not confirmed";
           ui("knowledge-status").textContent = label + " (reported: " + info.status + ")"
-            + " · corpus age: " + (info.stale === false ? "fresh" : "stale / unknown")
+            + " · corpus age: " + (fallback ? "last successful / freshness unconfirmed" : info.stale === false ? "fresh" : "stale / unknown")
             + " · indexed: " + (info.indexed_document_count ?? "unknown")
             + " · Search confirms: " + (info.search_document_count ?? "not checked")
             + " · reconciliation: " + (info.reconciliation_pending === false ? "complete" : "pending / unknown")
-            + " · refreshed: " + (info.refreshed_at || "not confirmed");
+            + " · refreshed: " + (info.refreshed_at || "not confirmed")
+            + (info.snapshot_id ? " · snapshot: " + info.snapshot_id : "")
+            + (info.refresh_status ? " · refresh: " + info.refresh_status : "");
         }));
       } else {
         ui("knowledge-status").textContent = "Knowledge read is not granted in the active scope.";

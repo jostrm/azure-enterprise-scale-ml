@@ -31,7 +31,7 @@ if (-not (Test-Path -LiteralPath $Python -PathType Leaf)) {
     throw 'Ask your platform team to complete API setup first.'
 }
 Set-Location -LiteralPath $ApiRoot
-$env:AIFACTORY_API_KEY = 'local-parity-smoke-only'
+$env:AIFACTORY_API_KEY = 'example-local-parity-smoke-only'
 & $Python -m uvicorn src.api:app --host 127.0.0.1 --port 8876
 ```
 
@@ -55,7 +55,7 @@ if (-not (Test-Path -LiteralPath $Python -PathType Leaf) -or
 }
 $env:PYTHONPATH = $SdkSource
 $env:AIFACTORY_API_URL = 'http://127.0.0.1:8876'
-$env:AIFACTORY_API_KEY = 'local-parity-smoke-only'
+$env:AIFACTORY_API_KEY = 'example-local-parity-smoke-only'
 $DemoRoot = Join-Path $env:TEMP ('factory-smoke-' + [guid]::NewGuid())
 $env:FACTORY_FOLDER = Join-Path $DemoRoot 'azurefactory'
 New-Item -ItemType Directory -Path $env:FACTORY_FOLDER | Out-Null
@@ -123,7 +123,7 @@ if not (api_root / "src" / "api.py").is_file():
 
 os.chdir(api_root)
 sys.path.insert(0, str(api_root))
-os.environ["AIFACTORY_API_KEY"] = "local-parity-smoke-only"
+os.environ["AIFACTORY_API_KEY"] = "example-local-parity-smoke-only"
 uvicorn.run("src.api:app", host="127.0.0.1", port=8876)
 ```
 
@@ -215,7 +215,7 @@ Windows folder path. `cygpath` converts the path for Git Bash:
 read -r -p "Prepared API folder (Windows path): " api_windows
 api_root="$(cygpath -u "$api_windows")"
 cd "$api_root" || exit 1
-AIFACTORY_API_KEY='local-parity-smoke-only' \
+AIFACTORY_API_KEY='example-local-parity-smoke-only' \
   .venv/Scripts/python.exe -m uvicorn src.api:app --host 127.0.0.1 --port 8876
 ```
 

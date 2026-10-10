@@ -206,6 +206,47 @@ def test_fully_injected_answer_needs_no_cloud_constructors_or_monkeypatch(settin
     assert [item["call_id"] for item in outputs] == [call.call_id for call in calls]
 
 
+@pytest.mark.parametrize("refresh_status", ["blocked", "failed", "refreshing", "ready"])
+def test_verified_last_successful_answer_warns_and_pins_status(settings, refresh_status):
+    status = {
+        "status": refresh_status, "refresh_status": refresh_status, "stale": True,
+        "availability": "last_successful", "snapshot_verified": True,
+        "snapshot_id": "committed-generation", "refreshed_at": "2001-01-01T00:00:00+00:00",
+        "warning": "Using last successful knowledge; freshness is not confirmed.",
+        "reconciliation_pending": False, "refresh_pending": True,
+        "indexed_document_count": 2, "search_document_count": 2,
+    }
+    pinned = FakeKnowledge(status=status)
+    knowledge = FakeKnowledge(status={"status": "failed"})
+    knowledge.snapshot = lambda: pinned
+    harness = injected(settings, knowledge=knowledge, gateway=FakeGateway([
+        response(calls=[FakeItem("knowledge_status"), FakeItem("knowledge_search", {"query": "More"})]),
+        response(),
+    ]))
+    result = harness.conversation.answer("Explain setup", "platform", caller(settings), SCOPE)
+    assert result["knowledge_status"]["snapshot_id"] == "committed-generation"
+    assert result["knowledge_status"]["warning"] == status["warning"]
+    assert knowledge.searches == []
+    assert len(pinned.searches) == 2
+    request = harness.gateway.sessions[0].requests[0][0]
+    assert "last successful" in request[0]["content"][0]["text"].lower()
+    assert json.loads(request[1]["content"][0]["text"])["knowledge_status"]["stale"] is True
+    outputs = harness.gateway.sessions[0].requests[1][0]
+    status_output = next(item for item in outputs if item.get("call_id") == "call-knowledge_status"
+                         and item.get("type") == "function_call_output")
+    assert json.loads(status_output["output"])["snapshot_id"] == "committed-generation"
+
+
+def test_unverified_last_successful_claim_cannot_enable_inference(settings):
+    status = {"status": "failed", "availability": "last_successful",
+              "indexed_document_count": 2, "search_document_count": 2,
+              "reconciliation_pending": False}
+    harness = injected(settings, knowledge=FakeKnowledge(status=status))
+    with pytest.raises(IndexingError):
+        harness.conversation.answer("Explain setup", "platform", caller(settings), SCOPE)
+    assert not harness.gateway.sessions
+
+
 def test_two_agents_keep_settings_and_versioned_model_references_independent(settings):
     first = settings.model_copy(update={"agent_name": "first-agent", "agent_version": "7"})
     second = settings.model_copy(update={

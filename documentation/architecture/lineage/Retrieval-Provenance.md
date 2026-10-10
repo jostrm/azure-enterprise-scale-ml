@@ -16,7 +16,7 @@ graph_symbols:
   - usecase_code/40-agent-factory/agent_factory/rag_sources.py::function:parse_source
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/knowledge.py::function:scan_sources
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/knowledge.py::function:Knowledge.refresh
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
+reviewed_source: '21ea3380 + working tree; observed 2026-10-10'
 ---
 # Retrieval provenance
 
@@ -26,7 +26,9 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 
 **Factory Chat repository knowledge:** source scanning preserves source path/type, heading context, line ranges, content hash, revision/version/release metadata and working-tree provenance. Configured exclusions remove secrets, generated output, dependencies and unsupported material. Dated releases remain historical evidence.
 
-`Knowledge` verifies owned index/container state, serializes refresh with a renewing lease and reconciles changed/removed task-owned documents against a durable Blob manifest. Partial indexing failure does not advance the committed manifest. Status distinguishes unavailable, stale and reconciled state; Chat refuses unready evidence.
+`Knowledge` verifies owned index/container state and serializes refresh with a renewing lease. Changed refreshes stage a complete isolated owned Search index, wait boundedly for search visibility, verify all manifest fingerprints and scope metadata, then atomically promote the durable Blob manifest. Partial indexing failure does not mutate the serving generation or advance the committed manifest. Each answer pins retrieval and knowledge-status tools to one verified snapshot.
+
+Text and voice can use the complete last-successful snapshot after blocked, failed, in-progress or stale refreshes. The answer and status disclose its committed timestamp, availability and freshness warning; fallback never means fresh or live evidence. Ownership/schema mismatch, missing or corrupt evidence and an unreconciled legacy in-place mutation still prevent serving. Generation creation needs separately approved index-definition write permission; refresh grants no roles, deletes no indexes and changes no service tier. Retained/failed generations require separately approved quota and retention maintenance. This is local source behavior, not proof of cloud rollout.
 
 ## Separation and limits
 

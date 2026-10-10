@@ -94,18 +94,32 @@ class FakeContainer:
 
 class FakeIndex:
     def __init__(self):
-        self.index = None
+        self.indexes = {}
+        self.name = None
         self.created = 0
+        self.fail_create = False
+
+    @property
+    def index(self):
+        return self.indexes.get(self.name)
+
+    @index.setter
+    def index(self, value):
+        self.indexes[self.name] = value
 
     def get_index(self, name):
-        if self.index is None:
+        if name not in self.indexes:
             raise ResourceNotFoundError()
-        return self.index
+        self.name = name
+        return self.indexes[name]
 
     def create_index(self, index):
-        assert self.index is None
-        self.index = index
-        self.index.e_tag = "index-1"
+        if self.fail_create:
+            raise HttpResponseError("quota exceeded")
+        assert index.name not in self.indexes
+        self.name = index.name
+        self.indexes[index.name] = index
+        index.e_tag = "index-" + index.name
         self.created += 1
         return index
 
@@ -120,6 +134,17 @@ class FakeSearch:
         self.raise_upload = False
         self.rows = []
         self.search_options = None
+        self.clients = {}
+
+    def for_index(self, name):
+        if name not in self.clients:
+            child = FakeSearch()
+            child.fail_upload = self.fail_upload
+            child.raise_upload = self.raise_upload
+            child.upload_documents = (self.upload_documents if isinstance(self.upload_documents, Mock)
+                                      else child.upload_documents)
+            self.clients[name] = child
+        return self.clients[name]
 
     def upload_documents(self, documents):
         self.uploads.append(copy.deepcopy(documents))
@@ -144,8 +169,9 @@ class FakeSearch:
         return actions
 
     def search(self, **options):
-        self.search_options = options
-        return self.rows
+        if options.get("search_text") != "*":
+            self.search_options = options
+        return list(self.docs.values()) if options.get("search_text") == "*" else self.rows
 
     def get_document_count(self):
         return len(self.docs)
@@ -170,13 +196,308 @@ class FakeEmbeddings:
 
 @pytest.fixture
 def knowledge(settings):
-    return Knowledge(settings, cred=object(), index_client=FakeIndex(),
-                     container_client=FakeContainer(), search_client=FakeSearch(),
-                     embedding_client=FakeEmbeddings(settings.azure.embedding_dimensions))
+    search = FakeSearch()
+    search.clients[settings.azure.search_index] = search
+    def client(name):
+        selected = search.for_index(name)
+        selected.fail_upload = instance.search_client.fail_upload
+        selected.raise_upload = instance.search_client.raise_upload
+        if isinstance(instance.search_client.upload_documents, Mock):
+            selected.upload_documents = instance.search_client.upload_documents
+        return selected
+    instance = Knowledge(settings, cred=object(), index_client=FakeIndex(),
+                         container_client=FakeContainer(), search_client=search,
+                         search_client_factory=client,
+                         embedding_client=FakeEmbeddings(settings.azure.embedding_dimensions))
+    return instance
 
 
 def state(knowledge, name="repository-manifest.json"):
     return json.loads(knowledge.container.get_blob_client(name).body)
+
+
+@pytest.mark.parametrize("failure", ["blocked", "embedding", "upload", "transport", "quota", "promotion", "empty"])
+def test_safe_last_successful_snapshot_survives_failed_refresh(knowledge, settings, failure):
+    original = write(settings, "guide.md", "# Original\nCommitted safe knowledge.\n")
+    knowledge.refresh()
+    snapshot = knowledge.snapshot()
+    manifest = knowledge.container.blobs["repository-manifest.json"].body
+    original_docs = copy.deepcopy(snapshot.client.docs)
+    write(settings, "guide.md", "# Replacement\n" + "new paragraph\n" * 220)
+    if failure == "blocked":
+        write(settings, "bad.py", "password = 'ActualPassword987654'")
+    elif failure == "empty":
+        original.unlink()
+    elif failure == "embedding":
+        knowledge.embedding_client.fail = True
+    elif failure in {"upload", "transport"}:
+        knowledge.search_client.fail_upload = failure == "upload"
+        knowledge.search_client.raise_upload = failure == "transport"
+    elif failure == "quota":
+        knowledge.index_client.fail_create = True
+    else:
+        blob = knowledge.container.blobs["repository-manifest.json"]
+        blob.upload_blob = Mock(side_effect=HttpResponseError("promotion failed"))
+    if failure in {"blocked", "empty"}:
+        assert knowledge.refresh()["status"] == failure
+    else:
+        with pytest.raises((RuntimeError, HttpResponseError)):
+            knowledge.refresh()
+    assert knowledge.container.blobs["repository-manifest.json"].body == manifest
+    current = knowledge.snapshot()
+    assert current.status()["availability"] == "last_successful"
+    assert current.status()["snapshot_id"] == snapshot.status()["snapshot_id"]
+    assert current.status()["warning"]
+    assert current.client.docs == original_docs
+    knowledge.embedding_client.fail = False  # A refresh failure does not remove query service requirements.
+    current.client.rows = [{**next(iter(original_docs.values())), "@search.reranker_score": 3.8}]
+    assert "Committed safe" in current.search("question", "project001-dev")[0]["content"]
+
+
+def test_snapshot_pins_generation_across_promotion_and_in_progress_read(knowledge, settings):
+    write(settings, "guide.md", "# Original\nOld committed text.\n")
+    knowledge.refresh()
+    pinned = knowledge.snapshot()
+    original_create = knowledge.embedding_client.create
+
+    def during_refresh(**kwargs):
+        assert knowledge.status()["availability"] == "last_successful"
+        assert knowledge.snapshot().status()["snapshot_id"] == pinned.status()["snapshot_id"]
+        return original_create(**kwargs)
+
+    knowledge.embedding_client.create = during_refresh
+    write(settings, "guide.md", "# New\nNew committed text.\n")
+    knowledge.refresh()
+    assert knowledge.snapshot().status()["snapshot_id"] != pinned.status()["snapshot_id"]
+    knowledge.embedding_client.create = original_create
+    pinned.client.rows = [{**next(iter(pinned.client.docs.values())), "@search.reranker_score": 3.8}]
+    assert "Old committed" in pinned.search("question", "project001-dev")[0]["content"]
+
+
+@pytest.mark.parametrize("delay", ["count", "rows", "timeout", "corruption"])
+def test_refresh_waits_for_stage_visibility_without_retrying_corruption(knowledge, settings, monkeypatch, delay):
+    from aifactory_agent import knowledge as module
+
+    write(settings, "guide.md", "# Original\nOld committed text.\n")
+    knowledge.refresh()
+    manifest = knowledge.container.blobs["repository-manifest.json"].body
+    created = knowledge.index_client.created
+    original_factory = knowledge._search_client_factory
+    clock = [module.time.monotonic()]
+    sleeps = []
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        clock[0] += seconds
+        assert knowledge.container.blobs["repository-manifest.json"].body == manifest
+
+    monkeypatch.setattr(module.time, "sleep", sleep)
+    monkeypatch.setattr(module.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(module, "_INDEX_READY_TIMEOUT", 2, raising=False)
+
+    def factory(name):
+        client = original_factory(name)
+        count, search = client.get_document_count, client.search
+        observed = [False]
+
+        def delayed_count():
+            if delay == "timeout":
+                return 0
+            if delay == "count" and not observed[0]:
+                observed[0] = True
+                return 0
+            return count()
+
+        def delayed_search(**options):
+            if options.get("search_text") == "*" and not observed[0]:
+                observed[0] = True
+                if delay == "rows":
+                    return []
+                if delay == "corruption":
+                    next(iter(client.docs.values()))["content"] = "Uncommitted corruption."
+            return search(**options)
+
+        client.get_document_count = delayed_count
+        client.search = delayed_search
+        return client
+
+    knowledge._search_client_factory = factory
+    write(settings, "guide.md", "# Replacement\nNew committed text.\n")
+    if delay in {"timeout", "corruption"}:
+        with pytest.raises(IndexingError, match="visible|snapshot"):
+            knowledge.refresh()
+        assert knowledge.container.blobs["repository-manifest.json"].body == manifest
+        assert knowledge.status()["availability"] == "last_successful"
+    else:
+        assert knowledge.refresh()["status"] == "ready"
+        assert knowledge.status()["availability"] == "current"
+    assert knowledge.index_client.created == created + 1
+    assert bool(sleeps) is (delay != "corruption")
+
+
+@pytest.mark.parametrize("corruption", ["count", "content", "acl", "owner", "pointer", "pending",
+                                      "row_owner", "row_generation"])
+def test_unverified_snapshot_never_enables_fallback(knowledge, settings, corruption):
+    write(settings, "guide.md", "# Original\nSafe text.\n")
+    knowledge.refresh()
+    manifest = state(knowledge)
+    if corruption == "count":
+        knowledge.search_client.docs.clear()
+    elif corruption in {"content", "acl"}:
+        doc = next(iter(knowledge.search_client.docs.values()))
+        doc["content" if corruption == "content" else "allowed_scope_keys"] = (
+            "Other content" if corruption == "content" else ["project002-dev"])
+    elif corruption == "owner":
+        knowledge.index_client.index.fields = []
+    elif corruption == "pointer":
+        manifest["active_index"] = "another-tenant-index"
+        knowledge.container.blobs["repository-manifest.json"].body = json.dumps(manifest).encode()
+    elif corruption in {"row_owner", "row_generation"}:
+        next(iter(knowledge.search_client.docs.values()))[
+            knowledge.owner_field if corruption == "row_owner" else "snapshot_id"] = "another-tenant"
+    else:
+        knowledge.container.blobs["repository-manifest.json"].metadata = {}
+    with pytest.raises((IndexingError, OwnershipError)):
+        knowledge.snapshot()
+
+
+def legacy_snapshot(knowledge):
+    manifest = state(knowledge)
+    base = knowledge.settings.azure.search_index
+    client = knowledge._client(base)
+    client.docs = copy.deepcopy(knowledge.search_client.docs)
+    manifest.pop("active_index")
+    manifest.pop("snapshot_id")
+    for key in ("active_index", "snapshot_id"):
+        manifest["summary"].pop(key)
+    manifest["index_etag"] = knowledge.index_client.get_index(base).e_tag
+    knowledge.container.blobs["repository-manifest.json"].body = json.dumps(manifest).encode()
+    knowledge.search_client = client
+    return client
+
+
+@pytest.mark.parametrize("pending", [False, True])
+def test_legacy_complete_manifest_migrates_without_mutating_963_documents(knowledge, settings, pending):
+    from aifactory_agent.knowledge import _canonical, _digest
+
+    write(settings, "guide.md", "# Legacy\nLegacy knowledge.\n")
+    knowledge.refresh()
+    client = legacy_snapshot(knowledge)
+    manifest = state(knowledge)
+    template = next(iter(client.docs.values()))
+    template_entry = next(iter(manifest["entries"].values()))
+    client.docs.clear()
+    manifest["entries"].clear()
+    for number in range(963):
+        doc = {**template, "id": _digest(str(number))}
+        client.docs[doc["id"]] = doc
+        fingerprint = _digest(_canonical({field: doc[field] for field in (
+            "id", "source_path", "heading", "source_type", "is_current", "is_history",
+            "release", "version", "source_url", "source_revision", "working_tree",
+            "line_start", "line_end", "content", "content_hash", "source_hash", "allowed_scope_keys",
+        )}))
+        manifest["entries"][doc["id"]] = {**template_entry, "fingerprint": fingerprint}
+    manifest["summary"]["indexed_document_count"] = 963
+    knowledge.container.blobs["repository-manifest.json"].body = json.dumps(manifest).encode()
+    knowledge._write_state("repository-pending.json", {"managed_ids": list(client.docs) if pending else []})
+    write(settings, "bad.py", "password = 'ActualPassword987654'")
+    assert knowledge.refresh()["status"] == "blocked"
+    if pending:
+        assert knowledge.status()["availability"] == "unavailable"
+        with pytest.raises(IndexingError):
+            knowledge.snapshot()
+    else:
+        pinned = knowledge.snapshot()
+        assert pinned.status()["availability"] == "last_successful"
+        assert pinned.status()["indexed_document_count"] == 963
+        assert pinned.status()["search_document_count"] == 963
+    old = copy.deepcopy(client.docs)
+    (settings.knowledge.repository_root / "bad.py").unlink()
+    client.delete_documents = Mock(side_effect=HttpResponseError("partial delete failure"))
+    knowledge.refresh()
+    assert state(knowledge)["active_index"] != settings.azure.search_index
+    assert client.docs == old
+    client.delete_documents.assert_not_called()
+    assert knowledge.status()["availability"] == "current"
+
+
+@pytest.mark.parametrize("failure", ["blocked", "empty", "embedding"])
+def test_failed_initialization_has_no_fallback(knowledge, settings, failure):
+    if failure == "blocked":
+        write(settings, "bad.py", "password = 'ActualPassword987654'")
+    elif failure == "embedding":
+        write(settings, "guide.md", "# Safe\nText.\n")
+        knowledge.embedding_client.fail = True
+    if failure == "embedding":
+        with pytest.raises(RuntimeError):
+            knowledge.refresh()
+    else:
+        assert knowledge.refresh()["status"] == failure
+    assert knowledge.status()["availability"] == "unavailable"
+    with pytest.raises(IndexingError):
+        knowledge.snapshot()
+
+
+def test_failed_shadow_retry_cannot_clear_unreconciled_legacy_writes(knowledge, settings):
+    write(settings, "guide.md", "# Legacy\nSafe text.\n")
+    knowledge.refresh()
+    client = legacy_snapshot(knowledge)
+    knowledge._write_state("repository-pending.json", {"managed_ids": list(client.docs)})
+    manifest = knowledge.container.blobs["repository-manifest.json"].body
+    assert knowledge.status()["reconciliation_pending"] is True
+    write(settings, "guide.md", "# Replacement\nNew text.\n")
+    knowledge.embedding_client.fail = True
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="Embedding unavailable"):
+            knowledge.refresh()
+        assert knowledge.container.blobs["repository-manifest.json"].body == manifest
+        assert knowledge.status()["reconciliation_pending"] is True
+        assert knowledge.status()["availability"] == "unavailable"
+        with pytest.raises(IndexingError):
+            knowledge.snapshot()
+    knowledge.embedding_client.fail = False
+    assert knowledge.refresh()["status"] == "ready"
+    assert knowledge.status()["availability"] == "current"
+    assert knowledge.status()["reconciliation_pending"] is False
+
+
+def test_reader_cannot_pair_legacy_manifest_with_new_generation_cleared_journal(knowledge, settings, monkeypatch):
+    write(settings, "guide.md", "# Legacy\nSafe text.\n")
+    knowledge.refresh()
+    promoted = state(knowledge)
+    client = legacy_snapshot(knowledge)
+    knowledge._write_state("repository-pending.json", {"managed_ids": list(client.docs)})
+    read_state = knowledge._read_state
+    switched = [False]
+
+    def racing_read(name):
+        result = read_state(name)
+        if name == "repository-manifest.json" and not switched[0]:
+            switched[0] = True
+            knowledge._write_state("repository-manifest.json", promoted)
+            knowledge._write_state("repository-pending.json", {"managed_ids": []})
+        return result
+
+    monkeypatch.setattr(knowledge, "_read_state", racing_read)
+    with pytest.raises(IndexingError):
+        knowledge.snapshot()
+    assert switched[0]
+    assert knowledge.snapshot().status()["availability"] == "current"
+
+
+@pytest.mark.parametrize("patch", [
+    {"managed_ids": ["invalid-id"]},
+    {"managed_ids": [], "legacy_reconciliation_pending": "false"},
+    {"managed_ids": [], "staging_index": "another-tenant-index"},
+])
+def test_invalid_pending_state_blocks_snapshot_and_refresh(knowledge, settings, patch):
+    write(settings, "guide.md", "# Safe\nText.\n")
+    knowledge.refresh()
+    knowledge._write_state("repository-pending.json", patch)
+    with pytest.raises(OwnershipError):
+        knowledge.snapshot()
+    with pytest.raises(OwnershipError):
+        knowledge.refresh()
 
 
 def test_scan_includes_direct_recursive_files_and_future_releases(settings):
@@ -262,7 +583,7 @@ def test_symlink_escape_is_blocked(settings, tmp_path):
     assert scan_sources(settings)["status"] == "blocked"
 
 
-def test_initial_incremental_changed_deleted_and_foreign_id_not_deleted(knowledge, settings):
+def test_full_generation_refresh_excludes_removed_and_never_deletes_foreign_ids(knowledge, settings):
     write(settings, "first.md", "# First\nOne\n")
     second = write(settings, "second.md", "# Second\nTwo\n")
     first = knowledge.refresh()
@@ -271,6 +592,7 @@ def test_initial_incremental_changed_deleted_and_foreign_id_not_deleted(knowledg
     old_ids = set(knowledge.search_client.docs)
     unchanged = knowledge.refresh()
     assert unchanged["uploaded_count"] == unchanged["deleted_count"] == 0
+    old_client = knowledge.search_client
     foreign = "f" * 64
     knowledge.search_client.docs[foreign] = {"id": foreign}
     write(settings, "first.md", "# First\nChanged\n")
@@ -278,13 +600,13 @@ def test_initial_incremental_changed_deleted_and_foreign_id_not_deleted(knowledg
     updated = knowledge.refresh()
     assert updated["uploaded_count"] == 1 and updated["deleted_count"] == 2
     assert old_ids.isdisjoint(set(knowledge.search_client.docs))
-    assert foreign in knowledge.search_client.docs
-    assert foreign not in knowledge.search_client.deletes
+    assert foreign in old_client.docs
+    assert not old_client.deletes and not knowledge.search_client.deletes
     assert knowledge.container.blobs["repository-manifest.json"].lease.released
     assert state(knowledge)["summary"]["status"] == "ready"
 
 
-@pytest.mark.parametrize("failure", ["embedding", "upload", "delete", "transport"])
+@pytest.mark.parametrize("failure", ["embedding", "upload", "transport"])
 def test_failure_does_not_advance_manifest_and_retry_reconciles(knowledge, settings, failure):
     write(settings, "guide.md", "# Initial\nOriginal\n")
     knowledge.refresh()
@@ -294,8 +616,6 @@ def test_failure_does_not_advance_manifest_and_retry_reconciles(knowledge, setti
         knowledge.embedding_client.fail = True
     elif failure == "upload":
         knowledge.search_client.fail_upload = True
-    elif failure == "delete":
-        knowledge.search_client.fail_delete = True
     else:
         knowledge.search_client.raise_upload = True
     with pytest.raises((RuntimeError, HttpResponseError)):
@@ -312,20 +632,22 @@ def test_failure_does_not_advance_manifest_and_retry_reconciles(knowledge, setti
     assert not knowledge.status()["reconciliation_pending"]
 
 
-def test_abandoned_partial_upload_is_cleaned_when_retry_source_changes(knowledge, settings):
+def test_abandoned_partial_upload_is_isolated_and_not_deleted_when_retry_source_changes(knowledge, settings):
     write(settings, "guide.md", "# Initial\nOriginal\n")
     knowledge.refresh()
     write(settings, "guide.md", "# Intermediate\n" + "paragraph\n" * 220)
     knowledge.search_client.fail_upload = True
     with pytest.raises(IndexingError):
         knowledge.refresh()
-    intermediate = set(knowledge.search_client.docs) - set(state(knowledge)["entries"])
+    staging = knowledge._client(state(knowledge, "repository-pending.json")["staging_index"])
+    intermediate = set(staging.docs)
     assert intermediate
     write(settings, "guide.md", "# Final\nFinal text\n")
     knowledge.search_client.fail_upload = False
     knowledge.refresh()
     assert intermediate.isdisjoint(set(knowledge.search_client.docs))
     assert set(knowledge.search_client.docs) == set(state(knowledge)["entries"])
+    assert set(staging.docs) == intermediate and not staging.deletes
 
 
 def test_blocked_refresh_persists_safe_status_without_manifest_change(knowledge, settings):
@@ -339,12 +661,21 @@ def test_blocked_refresh_persists_safe_status_without_manifest_change(knowledge,
     assert "ActualPassword" not in knowledge.container.blobs["repository-status.json"].body.decode()
 
 
+def test_default_local_demo_tutorial_does_not_block_knowledge_ingestion():
+    from aifactory_agent.knowledge import _credential_line
+
+    tutorial = Path(__file__).resolve().parents[4] / "documentation" / "v2" / "10-19" / "18-cli-and-api-and-usage.md"
+    assert _credential_line(tutorial.read_text("utf-8")) is None
+    assert _credential_line("password = 'ActualPassword987654'") == 1
+
+
 def test_status_is_cloud_persisted_across_instances_and_stale(knowledge, settings):
     assert knowledge.status()["status"] == "not_initialized"
     write(settings, "guide.md", "# Current\nFresh.\n")
     knowledge.refresh()
     replacement = Knowledge(settings, cred=object(), index_client=knowledge.index_client,
                             container_client=knowledge.container, search_client=knowledge.search_client,
+                            search_client_factory=knowledge._client,
                             embedding_client=knowledge.embedding_client)
     assert replacement.status()["status"] == "ready"
     assert not replacement.status()["stale"]
@@ -352,6 +683,7 @@ def test_status_is_cloud_persisted_across_instances_and_stale(knowledge, setting
     manifest["refreshed_at"] = "2001-01-01T00:00:00+00:00"
     knowledge.container.blobs["repository-manifest.json"].body = json.dumps(manifest).encode()
     assert replacement.status()["stale"]
+    assert replacement.snapshot().status()["availability"] == "last_successful"
 
 
 def test_owned_resource_creation_rerun_and_collision_do_not_overwrite(knowledge):
@@ -403,7 +735,10 @@ def test_hybrid_semantic_query_has_exact_scope_prefilter_and_citations(knowledge
     knowledge.search_client.rows = [{**doc, "@search.score": 0.02, "@search.reranker_score": 3.8}]
     rows = knowledge.search("deployment", "project001-dev")
     options = knowledge.search_client.search_options
-    assert options["filter"] == "allowed_scope_keys/any(scope: scope eq 'project001-dev')"
+    assert options["filter"] == (
+        "allowed_scope_keys/any(scope: scope eq 'project001-dev')"
+        f" and {knowledge.owner_field} eq '{knowledge.owner}'"
+        f" and snapshot_id eq '{state(knowledge)['snapshot_id']}'")
     assert options["vector_filter_mode"] == "preFilter"
     assert options["query_type"] == "semantic" and options["semantic_error_mode"] == "fail"
     assert options["vector_queries"][0].fields == "contentVector"
