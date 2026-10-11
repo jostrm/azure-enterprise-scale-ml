@@ -666,8 +666,8 @@ def capabilities():
         "selective_project_deletion": SELECTIVE_PROJECT_DELETE,
         "factory_cohort": "physical-lease-cohort-v1",
         "creation": "frozen-arm-deployment-plan-v1", "shared_remote_namespaced_auth": True,
-        "native_foundry": "identity-receipt-account-uami-readiness-project-v3",
-        "native_foundry_identity_producer": "source-projected-project-uami-v1",
+        "native_foundry": "identity-receipt-account-uami-instance-closure-project-v4",
+        "native_foundry_identity_producer": "source-projected-project-uami-instance-v2",
         "blockers": {
             "legacy_creation": "A frozen complete ARM deployment plan and published scoped template are required.",
             "legacy_gha": "The published scoped GHA workflow is required; legacy workflow_dispatch is not used.",
@@ -2660,7 +2660,7 @@ def resolve_template_parameters(compiled_template, selected_values, parameter_so
 
 
 def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged_resources=None,
-                     resource_payloads=None, source_changes=None):
+                     resource_payloads=None, source_changes=None, phase_receipt=None):
     endpoint = deployment_endpoint(document, step)
     body = json.loads(canonical(payload))
     body["properties"]["whatIfSettings"] = {"resultFormat": "FullResourcePayloads"}
@@ -2686,23 +2686,11 @@ def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged
     foundation = document.get("deployment", {}).get("bootstrap_foundation", {})
     resources = (foundation["resources"] if foundation.get("contract") == EXACT_BOOTSTRAP_CONTRACT else {})
     if unchanged_resources:
-        phases = document.get("deployment", {}).get("foundry_lifecycle", {}).get("phases", [])
-        indices = [index for index, phase in enumerate(phases) if phase.get("id") == step.get("id")]
-        prior = ({row["resource_id"]: row for row in phases[indices[0] - 1].get("changes", [])}
-                 if len(indices) == 1 and indices[0] > 0 else {})
-        preserved = {key for key, row in resources.items() if row.get("disposition") == "preserve"}
-        def authorized_observation(key, value):
-            original = resources.get(key)
-            if original is None or original["body_hash"] == value.get("body_hash"):
-                return True
-            reviewed = prior.get(key, {})
-            return (original.get("disposition") == "owned" and hash_value(value.get("body_hash"))
-                    and reviewed.get("change_type") == "Modify"
-                    and reviewed.get("before_hash") == original["body_hash"]
-                    and hash_value(reviewed.get("after_hash"))
-                    and not any(key == parent or key.startswith(parent + "/") for parent in preserved))
-        require(all(authorized_observation(key, value) for key, value in unchanged_resources.items()),
-                "what-if-instance-proof-conflict")
+        if phase_receipt is not None:
+            verify_foundry_observation_context(cloud, document, phase_receipt, unchanged_resources)
+        require(all(key not in resources or resources[key]["body_hash"] == value["body_hash"]
+                    or phase_receipt is not None and foundry_owned_phase_write(document, phase_receipt, key)
+                    for key, value in unchanged_resources.items()), "what-if-instance-proof-conflict")
         resources = {**resources, **unchanged_resources}
     identity = document.get("deployment", {}).get("foundry_identity_continuation", {}).get("proof")
     if identity:
@@ -2783,13 +2771,13 @@ def combined_plan_payload(cloud, document, source_root, step_ids=None):
 
 
 FOUNDRY_TEMPLATE = "environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v4.bicep"
-FOUNDRY_CONTRACT = "identity-receipt-account-uami-readiness-project-v3"
+FOUNDRY_CONTRACT = "identity-receipt-account-uami-instance-closure-project-v4"
 FOUNDRY_API = "2025-04-01-preview"
 FOUNDRY_MI_API = "2024-11-30"
 FOUNDRY_NETWORK_ROLE = "4d97b98b-1d4f-4787-a291-c67834d212e7"
 FOUNDRY_FOUNDATION = "environment_setup/aifactory/bicep/esml-genai-1/01-foundation.bicep"
 FOUNDRY_NETWORK_RBAC = "environment_setup/aifactory/bicep/esml-genai-1/08b-rbac-common-rg.bicep"
-FOUNDRY_IDENTITY_CONTRACT = "source-projected-project-uami-v1"
+FOUNDRY_IDENTITY_CONTRACT = "source-projected-project-uami-instance-v2"
 FOUNDRY_MI_TEMPLATE = "environment_setup/aifactory/bicep/modules/mi.bicep"
 FOUNDRY_NAMING_TEMPLATE = "environment_setup/aifactory/bicep/modules/common/CmnAIfactoryNaming.bicep"
 FOUNDRY_LOOKUP_TEMPLATE = "environment_setup/aifactory/bicep/modules/get-managed-identity-info.bicep"
@@ -3014,7 +3002,8 @@ def verify_foundry_identity_receipt_effects(document, receipt):
             and set(receipt) <= {
                 "schema", "run_id", "manifest_hash", "source_commit", "target", "status", "deployments",
                 "ownership", "resource_groups", "mutation_started", "updated_at", "completion",
-                "continuation_required", "inventory_closure_hash", "foundry_identity_receipt"},
+                "continuation_required", "inventory_closure_hash", "foundry_identity_receipt",
+                "foundry_identity_final_closure"},
             "native-foundry-identity-receipt-invalid")
     proof = receipt.get("foundry_identity_receipt", {})
     require(receipt.get("schema") == 1 and receipt.get("status") == "succeeded"
@@ -3056,6 +3045,24 @@ def verify_foundry_identity_receipt_effects(document, receipt):
             and hash_value(receipt["resource_groups"][0].get("body_hash"))
             and hash_value(receipt.get("inventory_closure_hash")),
             "native-foundry-identity-receipt-ownership-incomplete")
+    closure = receipt.get("foundry_identity_final_closure")
+    observations = foundry_inventory_observations(document, closure)
+    before = proof.get("before")
+    require(isinstance(before, dict) and set(before) == {"group", "resources"}
+            and isinstance(before["resources"], dict)
+            and identifier not in before["resources"] and group not in before["resources"]
+            and all(hash_value(value) for value in before["resources"].values())
+            and (before["group"] is None or hash_value(before["group"]))
+            and set(closure["groups"]) == {group}
+            and set(closure["resources"]) == {identifier, *before["resources"]}
+            and digest(closure) == receipt["inventory_closure_hash"]
+            and all(observations[key]["body_hash"] == value for key, value in before["resources"].items())
+            and (before["group"] is None or observations[group]["body_hash"] == before["group"])
+            and observations[identifier]["body_hash"] == proof["body_hash"]
+            and receipt["resource_groups"][0]["body_hash"] == observations[group]["body_hash"]
+            and all(receipt["ownership"][0].get(key) == closure["resources"][identifier].get(key)
+                    for key in ("body_hash", "type", "api_version", "etag")),
+            "native-foundry-identity-final-instance-evidence-changed")
     at = timestamp(proof.get("observed_at"))
     require(timestamp(proof.get("producer_prepared_at")) <= at, "native-foundry-identity-receipt-time-invalid")
 
@@ -3077,6 +3084,7 @@ def verify_foundry_identity_receipt(document, receipt, *, continuation=False):
         require(receipt["run_id"] == document["run_id"] and receipt["manifest_hash"] == document["manifest_hash"]
                 and proof["producer_prepared_at"] == document["prepared_at"]
                 and proof["payload_hash"] == stage["payload_hash"] and proof["resource_id"] == stage["resource_id"]
+                and proof["before"] == stage["before"]
                 and at >= timestamp(document["prepared_at"]), "native-foundry-identity-receipt-run-mismatch")
 
 
@@ -3099,6 +3107,10 @@ def run_foundry_identity_stage(cloud, locks, document, source_root, receipt, per
     receipt.update(pending_deployment=endpoint.removeprefix(ARM), mutation_started=True)
     persist()
     locks.assert_held()
+    status, _, _ = cloud.arm("GET", stage["resource_id"], FOUNDRY_MI_API, allowed=(200, 404))
+    require(status == 404, "native-foundry-identity-stage-already-materialized")
+    require(foundry_identity_snapshot(cloud, stage["resource_group"]) == stage["before"],
+            "native-foundry-identity-instance-changed-before-write")
     locks.authorize(document)
     cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
     result = wait_foundry_resource(cloud, locks, endpoint.removeprefix(ARM),
@@ -3125,6 +3137,8 @@ def run_foundry_identity_stage(cloud, locks, document, source_root, receipt, per
     closure, bodies = collect_resource_closure(cloud, [stage["resource_group"]])
     require(set(bodies) == {stage["resource_group"], stage["resource_id"], *stage["before"]["resources"]}
             and all(digest(bodies[key]) == value for key, value in stage["before"]["resources"].items())
+            and (stage["before"]["group"] is None
+                 or digest(bodies[stage["resource_group"]]) == stage["before"]["group"])
             and digest(bodies[stage["resource_id"]]) == digest(body),
             "native-foundry-identity-unreviewed-side-effects")
     group = bodies[stage["resource_group"]]
@@ -3135,16 +3149,23 @@ def run_foundry_identity_stage(cloud, locks, document, source_root, receipt, per
                     **closure["resources"][stage["resource_id"]]}],
         resource_groups=[{"resource_id": stage["resource_group"], "owner": owner, "body_hash": digest(group),
                           "etag": group.get("etag")}], inventory_closure_hash=digest(closure),
+        foundry_identity_final_closure=copy.deepcopy(closure),
         foundry_identity_receipt={"contract": FOUNDRY_IDENTITY_CONTRACT, "binding_hash": stage["binding_hash"],
+            "before": copy.deepcopy(stage["before"]),
             "request_hash": foundry_identity_request_context(document), "producer_prepared_at": document["prepared_at"],
             "payload_hash": stage["payload_hash"], "producer_run_id": document["run_id"],
             "producer_manifest_hash": document["manifest_hash"], "resource_id": stage["resource_id"],
             "resource_group": stage["resource_group"], "body_hash": digest(body), "identity": metadata,
             "observed_at": utc_now(), "role_writes": [], "full_project_executed": False})
-    locks.authorize(document)
     receipt["status"] = "succeeded"
     receipt.pop("pending_deployment", None)
     verify_foundry_identity_receipt(document, receipt)
+    current, current_bodies = collect_resource_closure(cloud, [stage["resource_group"]])
+    require(digest(current) == digest(closure)
+            and foundry_inventory_observations(document, current, current_bodies)
+                == foundry_inventory_observations(document, closure, bodies),
+            "native-foundry-identity-final-instance-evidence-changed")
+    locks.authorize(document)
     persist()
 
 
@@ -3349,6 +3370,7 @@ def plan_foundry_lifecycle(document):
         return
     require(len(candidates) == 1 and document["operation"] == "deploy-project",
             "native-foundry-single-project-required")
+    require(not plan.get("persona_access"), "native-foundry-persona-write-evidence-required")
     full = candidates[0]
     p = full["parameters"]
     require(document["target"]["project_ids"] == [full.get("project_id")]
@@ -3360,6 +3382,11 @@ def plan_foundry_lifecycle(document):
             and isinstance(p.get("aca2SubnetId"), str)
             and p.get("aiFoundryV2ProjectExists") is False,
             "native-foundry-supported-topology-required")
+    defender_resource = p.get("enableDefenderforAIResourceLevel", False)
+    defender_subscription = p.get("enableDefenderforAISubLevel", False)
+    require(type(defender_resource) is bool and type(defender_subscription) is bool
+            and not (defender_resource and not defender_subscription),
+            "native-foundry-defender-phase-order-required")
     network = []
     if p["disableAgentNetworkInjection"] is False and p["aca2SubnetId"]:
         subnet = p["aca2SubnetId"].lower()
@@ -3695,6 +3722,174 @@ def freeze_foundry_lifecycle(cloud, document, source_root):
     freeze_foundry_agent_binding(cloud, document, payloads)
 
 
+def foundry_readiness_observations(document, receipt):
+    observed = {}
+    agent = receipt.get("foundry_agent_readiness")
+    if agent is not None:
+        verify_foundry_agent_receipt(document, receipt)
+        observed[agent["resource_id"]] = {
+            "body_hash": agent["identity_body_hash"], "api_version": FOUNDRY_MI_API}
+        observed.update({row["id"]: {"body_hash": row["body_hash"], "api_version": row["api_version"]}
+                         for row in agent["network_resources"]})
+        observed.update({row["id"]: {"body_hash": row["body_hash"], "api_version": "2022-04-01"}
+                         for row in agent["grants"]})
+    proof = receipt.get("foundry_readiness")
+    if proof is not None:
+        verify_foundry_readiness_receipt(document, receipt)
+        observed[proof["account_resource_id"]] = {
+            "body_hash": proof["account_body_hash"], "api_version": FOUNDRY_API}
+        if "capability_host" in proof:
+            host = proof["capability_host"]
+            observed[host["id"].lower()] = {"body_hash": host["body_hash"], "api_version": FOUNDRY_API}
+    return observed
+
+
+def verify_foundry_observation_context(cloud, document, receipt, observations):
+    phases = document["deployment"]["foundry_lifecycle"]["phases"]
+    completed = receipt.get("foundry_phases", [])
+    retained = receipt.get("foundry_phase_observations", [])
+    require(receipt.get("run_id") == document["run_id"]
+            and receipt.get("manifest_hash") == document["manifest_hash"]
+            and receipt.get("status") == "running" and not receipt.get("pending_deployment")
+            and not receipt.get("pending_foundry_gate")
+            and len(completed) <= 2 and len(retained) == len(completed)
+            and completed == [{"id": phase["id"], "status": "succeeded", "changes_hash": digest(phase["changes"])}
+                              for phase in phases[:len(completed)]]
+            and (retained[-1]["resources"] if retained else receipt.get("foundry_initial_observations")) == observations,
+            "native-foundry-phase-observation-context-required")
+    verify_foundry_observation_history(document, receipt)
+    for identifier, proof in observations.items():
+        status, _, body = cloud.arm("GET", identifier, proof["api_version"], allowed=(200, 404))
+        require(status == 200 and str(body.get("id", "")).lower() == identifier
+                and digest(body) == proof["body_hash"], "native-foundry-phase-instance-changed")
+
+
+def verify_foundry_observation_history(document, receipt):
+    phases = document["deployment"]["foundry_lifecycle"]["phases"]
+    retained = receipt.get("foundry_phase_observations", [])
+    require(isinstance(retained, list) and len(retained) <= len(phases),
+            "native-foundry-phase-observations-incomplete")
+    initial = document["deployment"].get("bootstrap_foundation", {}).get("resources", {})
+    previous, preceding = receipt.get("foundry_initial_observations"), {}
+    verify_foundry_observation_rows(document, previous)
+    before = {row["resource_id"]: row for row in phases[0]["changes"]}
+    require(all((key not in before or before[key]["change_type"] != "Create")
+                and (key not in before or before[key].get("before_hash") is None
+                     or value["body_hash"] == before[key]["before_hash"])
+                and (key not in initial or value["body_hash"] == initial[key]["body_hash"])
+                for key, value in previous.items()), "native-foundry-initial-instance-changed")
+    for index, record in enumerate(retained):
+        phase = phases[index]
+        readiness = foundry_readiness_observations(document, receipt) if index else {}
+        required = {row["resource_id"] for row in phase["changes"]} | set(previous) | set(readiness)
+        require(record.get("id") == phase["id"] and isinstance(record.get("resources"), dict)
+                and set(record["resources"]) == required and hash_value(record.get("closure_hash"))
+                and isinstance(record.get("executed_changes"), list),
+                "native-foundry-phase-observations-incomplete")
+        verify_foundry_observation_rows(document, record["resources"])
+        verify_foundry_phase_changes(record["executed_changes"], phase["changes"], preceding, previous)
+        written = {row["resource_id"] for row in record["executed_changes"]
+                   if row["change_type"] in ("Create", "Modify")}
+        require(all(key in written or record["resources"].get(key) == value for key, value in previous.items())
+                and all(key in written or value["body_hash"] == previous.get(key, initial[key])["body_hash"]
+                        for key, value in record["resources"].items() if key in initial),
+                "native-foundry-phase-instance-changed")
+        require(all(record["resources"][key]["body_hash"] == value["body_hash"]
+                    for key, value in readiness.items()), "native-foundry-readiness-instance-changed")
+        previous = record["resources"]
+        preceding = {row["resource_id"]: row for row in phase["changes"]}
+
+
+def foundry_owned_phase_write(document, receipt, identifier):
+    foundation = document["deployment"].get("bootstrap_foundation", {})
+    resources = foundation.get("resources", {})
+    if resources.get(identifier, {}).get("disposition") != "owned" or any(
+            row.get("disposition") == "preserve" and (identifier == key or identifier.startswith(key + "/"))
+            for key, row in resources.items()):
+        return False
+    return any(row["resource_id"] == identifier and row["change_type"] in ("Create", "Modify")
+               for phase in receipt.get("foundry_phase_observations", [])
+               for row in phase.get("executed_changes", []))
+
+def verify_foundry_observation_rows(document, observations):
+    require(isinstance(observations, dict) and all(
+        isinstance(key, str) and key == key.lower()
+        and arm_scope(key) in {scope.lower() for scope in document["locks"]["scopes"]}
+        and isinstance(row, dict) and hash_value(row.get("body_hash"))
+        and re.fullmatch(r"20[0-9]{2}-[0-9]{2}-[0-9]{2}(?:-preview)?", str(row.get("api_version", "")))
+        for key, row in observations.items()), "native-foundry-instance-evidence-required")
+
+def foundry_inventory_observations(document, closure, bodies=None):
+    require(isinstance(closure, dict) and isinstance(closure.get("groups"), dict)
+            and isinstance(closure.get("resources"), dict)
+            and isinstance(closure.get("providers"), dict) and isinstance(closure.get("collections"), dict),
+            "native-foundry-inventory-evidence-required")
+    groups, resources = closure["groups"], closure["resources"]
+    require(not set(groups) & set(resources)
+            and set(groups) <= {scope.lower() for scope in document["locks"]["scopes"]},
+            "native-foundry-inventory-scope-changed")
+    observed = {key: {"body_hash": row.get("body_hash"),
+                     "api_version": RG_API if key in groups else row.get("api_version")}
+                for key, row in {**groups, **resources}.items()}
+    verify_foundry_observation_rows(document, observed)
+    if bodies is not None:
+        require(set(bodies) == set(observed)
+                and all(str(bodies[key].get("id", "")).lower() == key
+                        and digest(bodies[key]) == row["body_hash"] for key, row in observed.items()),
+                "native-foundry-inventory-body-mismatch")
+    return observed
+
+def verify_foundry_live_inventory(cloud, locks, document, observations, *, closure_hash=None):
+    locks.assert_held()
+    scopes = []
+    for scope in document["locks"]["scopes"]:
+        status, _, body = cloud.arm("GET", scope, RG_API, allowed=(200, 404))
+        proof = observations.get(scope.lower())
+        require((proof is None and status == 404) or
+                (proof is not None and status == 200 and digest(body) == proof["body_hash"]),
+                "native-foundry-phase-instance-changed")
+        if proof is not None:
+            scopes.append(scope)
+    closure, bodies = collect_resource_closure(cloud, scopes,
+                                               bootstrap_resource_versions(document))
+    current = foundry_inventory_observations(document, closure, bodies)
+    require(set(current) == set(observations)
+            and all(current[key]["body_hash"] == row["body_hash"] for key, row in observations.items())
+            and (closure_hash is None or digest(closure) == closure_hash),
+            "native-foundry-phase-instance-changed")
+    if set(closure["groups"]) == {scope.lower() for scope in document["locks"]["scopes"]}:
+        verify_bootstrap_final_closure(document, closure, bodies)
+    return closure, bodies
+
+def observe_foundry_phase(cloud, document, phase, execution, previous, receipt):
+    readiness = foundry_readiness_observations(document, receipt)
+    identifiers = {row["resource_id"] for row in phase["changes"]} | set(previous) | set(readiness)
+    closure, bodies = collect_resource_closure(cloud, document["locks"]["scopes"],
+                                               bootstrap_resource_versions(document))
+    snapshot = foundry_inventory_observations(document, closure, bodies)
+    require(identifiers == set(snapshot), "native-foundry-phase-observation-incomplete")
+    verify_bootstrap_final_closure(document, closure, bodies)
+    written = {row["resource_id"] for row in execution if row["change_type"] in ("Create", "Modify")}
+    initial = document["deployment"].get("bootstrap_foundation", {}).get("resources", {})
+    unchanged = {row["resource_id"]: {"body_hash": row.get("before_hash") or row.get("after_hash")}
+                 for row in execution if row["change_type"] == "NoChange"}
+    expected = {**unchanged, **initial, **readiness, **previous}
+    observed = {}
+    for identifier in sorted(identifiers):
+        current_hash = digest(bodies[identifier])
+        # Cumulative preview membership never permits rebasing a resource this phase did not write.
+        require(identifier in written or current_hash == expected.get(identifier, {}).get("body_hash"),
+                "native-foundry-phase-instance-changed")
+        require(identifier not in readiness or current_hash == readiness[identifier]["body_hash"],
+                "native-foundry-readiness-instance-changed")
+        observed[identifier] = {
+            "body_hash": current_hash,
+            "api_version": RG_API if identifier in closure["groups"] else closure["resources"][identifier]["api_version"],
+        }
+    return {"id": phase["id"], "resources": observed, "executed_changes": copy.deepcopy(execution),
+            "closure_hash": digest(closure)}
+
+
 def verify_foundry_phase_changes(current, expected, preceding, observations=None):
     observations = observations or {}
     wanted = {row["resource_id"]: row for row in expected}
@@ -3791,6 +3986,8 @@ def foundry_agent_readiness(cloud, locks, document, receipt, persist, observatio
     identity = wait_foundry_resource(cloud, locks, identifier, materialized, sleep,
                                     api_version=FOUNDRY_MI_API, document=document)
     metadata = foundry_uami_metadata(document, identity)
+    require(identifier in observations and digest(identity) == observations[identifier]["body_hash"],
+            "native-foundry-agent-identity-changed")
     original = agent["existing_identity"]
     require(original is None or all(metadata[key] == original[key] for key in ("principal_id", "client_id", "tenant_id")),
             "native-foundry-agent-principal-changed")
@@ -3982,11 +4179,29 @@ def foundry_readiness(cloud, locks, document, receipt, persist, account_result, 
     persist()
 
 
+def verify_foundry_live_readiness(cloud, locks, document, receipt, sleep):
+    verify_foundry_readiness_receipt(document, receipt)
+    verify_foundry_agent_current(cloud, locks, document, receipt, sleep)
+    proof = receipt["foundry_readiness"]
+    account = wait_foundry_resource(cloud, locks, proof["account_resource_id"],
+        lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded",
+        sleep, attempts=1, document=document)
+    require(digest(account) == proof["account_body_hash"], "native-foundry-account-instance-changed")
+    verify_foundry_account_agent(document, account, receipt)
+    if "capability_host" in proof:
+        host = proof["capability_host"]
+        body = wait_foundry_resource(cloud, locks, host["id"],
+            lambda value: value.get("properties", {}).get("provisioningState") == "Succeeded",
+            sleep, attempts=1, document=document)
+        require(digest(body) == host["body_hash"], "native-foundry-capability-host-changed")
+
+
 def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sleep):
     data = document["deployment"]["foundry_lifecycle"]
     require("account_resource_id" in data and all(isinstance(phase.get("changes"), list)
             for phase in data["phases"]), "native-foundry-frozen-phases-required")
-    preceding, cumulative, observations, payloads, provenance = {}, [], {}, [], []
+    preceding, cumulative, observations, payloads, provenance = {}, [], receipt.get("foundry_initial_observations"), [], []
+    verify_foundry_observation_rows(document, observations)
     verify_foundry_identity_current(cloud, locks, document)
     if "foundry_identity_continuation" in document["deployment"]:
         receipt["foundry_identity_continuation"] = copy.deepcopy(document["deployment"]["foundry_identity_continuation"])
@@ -4025,7 +4240,8 @@ def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sl
                     "native-foundry-phase-instance-changed")
         source_changes = {}
         current = evaluate_what_if(cloud, document, root_step, payload, sleep,
-                                   unchanged_resources=observations, source_changes=source_changes)
+                                   unchanged_resources=observations, source_changes=source_changes,
+                                   phase_receipt=receipt)
         verify_bootstrap_preservation(document, current)
         verify_foundry_phase_changes(current, phase["changes"], preceding, observations)
         if phase["id"] == "foundry-prerequisites":
@@ -4048,6 +4264,15 @@ def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sl
         endpoint = deployment_endpoint(document, root_step)
         receipt.update(pending_deployment=endpoint.removeprefix(ARM), mutation_started=True)
         persist()
+        verify_foundry_identity_current(cloud, locks, document)
+        if phase["id"] == "foundry-account-phase":
+            verify_foundry_agent_current(cloud, locks, document, receipt, sleep)
+            status, _, _ = cloud.arm("GET", data["account_resource_id"], FOUNDRY_API, allowed=(200, 404))
+            require(status == 404, "native-foundry-first-run-account-already-exists")
+        elif phase["id"] == "foundry-project-phase":
+            verify_foundry_live_readiness(cloud, locks, document, receipt, sleep)
+        verify_foundry_live_inventory(cloud, locks, document, observations)
+        locks.authorize(document)
         cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
         wait_foundry_resource(cloud, locks, endpoint.removeprefix(ARM),
             lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded",
@@ -4064,27 +4289,17 @@ def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sl
             receipt["deployments"].append({"step_id": step["id"], "id": child, "status": "succeeded"})
             if step["id"] == data["account_step"]:
                 foundry_readiness(cloud, locks, document, receipt, persist, result, sleep)
+        observation = observe_foundry_phase(cloud, document, phase, current, observations, receipt)
         receipt["foundry_phases"].append({"id": phase["id"], "status": "succeeded",
                                          "changes_hash": digest(phase["changes"])})
-        if phase["id"] != "foundry-project-phase":
-            identifiers = {row["resource_id"] for row in phase["changes"]}
-            closure, bodies = collect_resource_closure(cloud, document["locks"]["scopes"],
-                                                       bootstrap_resource_versions(document))
-            require(identifiers <= set(bodies), "native-foundry-phase-observation-incomplete")
-            observations = {identifier: {
-                "body_hash": digest(bodies[identifier]),
-                "api_version": RG_API if identifier in closure["groups"]
-                               else closure["resources"][identifier]["api_version"],
-            } for identifier in sorted(identifiers)}
-            if data["agent_identity_binding"] and phase["id"] == "foundry-account-phase":
-                verify_foundry_agent_current(cloud, locks, document, receipt, sleep)
-            receipt["foundry_phase_observations"].append({"id": phase["id"], "resources": observations})
+        observations = observation["resources"]
+        receipt["foundry_phase_observations"].append(observation)
         receipt.pop("pending_deployment", None)
         persist()
         preceding = {row["resource_id"]: row for row in phase["changes"]}
 
 
-def verify_foundry_receipt(document, receipt):
+def verify_foundry_phase_receipts(document, receipt):
     data = document.get("deployment", {}).get("foundry_lifecycle")
     if data is None:
         return
@@ -4097,16 +4312,58 @@ def verify_foundry_receipt(document, receipt):
         {"id": phase["id"], "status": "succeeded", "changes_hash": digest(phase["changes"])}
         for phase in data["phases"]], "native-foundry-phase-receipts-incomplete")
     verify_foundry_readiness_receipt(document, receipt)
+    require(data.get("contract") == FOUNDRY_CONTRACT, "native-foundry-sequence-required")
     observations = receipt.get("foundry_phase_observations")
-    require(isinstance(observations, list) and len(observations) == 2,
+    require(isinstance(observations, list) and len(observations) == 3,
             "native-foundry-phase-observations-incomplete")
-    for phase, observed in zip(data["phases"], observations):
-        required = {row["resource_id"] for row in phase["changes"]}
-        require(observed.get("id") == phase["id"] and isinstance(observed.get("resources"), dict)
-                and set(observed["resources"]) == required
-                and all(isinstance(row, dict) and hash_value(row.get("body_hash"))
-                        and re.fullmatch(r"20[0-9]{2}-[0-9]{2}-[0-9]{2}(?:-preview)?", str(row.get("api_version", "")))
-                        for row in observed["resources"].values()), "native-foundry-phase-observations-incomplete")
+    verify_foundry_observation_history(document, receipt)
+    proof = receipt["foundry_readiness"]
+    require(observations[1]["resources"][data["account_resource_id"]]["body_hash"] == proof["account_body_hash"],
+            "native-foundry-account-observation-mismatch")
+    if data["agent_identity_binding"]:
+        agent = receipt["foundry_agent_readiness"]
+        require(observations[0]["resources"][agent["resource_id"]]["body_hash"] == agent["identity_body_hash"],
+                "native-foundry-agent-identity-observation-mismatch")
+
+
+def verify_foundry_receipt(document, receipt):
+    if "foundry_lifecycle" not in document.get("deployment", {}):
+        return
+    if "foundry_identity_stage" in document["deployment"]:
+        verify_foundry_identity_receipt(document, receipt)
+        return
+    require(receipt.get("run_id") == document["run_id"]
+            and receipt.get("manifest_hash") == document["manifest_hash"]
+            and receipt.get("source_commit") == document["source"]["commit"]
+            and receipt.get("target") == document["target"]
+            and not receipt.get("pending_deployment") and not receipt.get("pending_foundry_gate"),
+            "native-foundry-receipt-context-required")
+    verify_foundry_phase_receipts(document, receipt)
+    closure = receipt.get("foundry_final_closure")
+    observed = foundry_inventory_observations(document, closure)
+    last = receipt["foundry_phase_observations"][-1]
+    require(digest(closure) == last["closure_hash"] == receipt.get("inventory_closure_hash")
+            and observed == last["resources"], "native-foundry-final-instance-evidence-changed")
+    verify_bootstrap_final_closure(document, closure)
+    foundation = document["deployment"].get("bootstrap_foundation", {})
+    preserved = {key for key, row in foundation.get("resources", {}).items() if row.get("disposition") == "preserve"}
+    groups, ownership = receipt.get("resource_groups"), receipt.get("ownership")
+    require(isinstance(groups, list) and isinstance(ownership, list)
+            and all(isinstance(row, dict) and isinstance(row.get("resource_id"), str) for row in groups + ownership),
+            "native-foundry-final-ownership-evidence-required")
+    group_ids = [row["resource_id"] for row in groups]
+    owned_ids = [row["resource_id"] for row in ownership]
+    require(len(group_ids) == len(set(group_ids)) and len(owned_ids) == len(set(owned_ids))
+            and set(group_ids) == set(closure["groups"]) == {scope.lower() for scope in document["locks"]["scopes"]}
+            and set(owned_ids) == set(closure["resources"]) - preserved
+            and all(isinstance(row.get("owner"), dict) and all(
+                row["owner"].get(key) == document["target"][key] for key in ("factory_id", "scaleset_id"))
+                for row in groups + ownership)
+            and all(row.get("body_hash") == observed[row["resource_id"]]["body_hash"] for row in groups + ownership)
+            and all(all(row.get(key) == closure["resources"][row["resource_id"]].get(key)
+                        for key in ("type", "api_version", "body_hash", "etag")) for row in ownership)
+            and all(row.get("etag") == closure["groups"][row["resource_id"]].get("etag") for row in groups),
+            "native-foundry-final-ownership-evidence-changed")
 
 
 def verify_foundry_readiness_receipt(document, receipt):
@@ -4670,6 +4927,8 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         if "foundry_identity_stage" in document["deployment"]:
             run_foundry_identity_stage(cloud, locks, document, source_root, receipt, persist, sleep)
             return receipt
+        if "foundry_lifecycle" in document["deployment"]:
+            receipt["foundry_initial_observations"] = {}
         persona_worker(document, source_root)
         bootstrap_owners = bootstrap_ownership_snapshot(cloud, document)
         require(bootstrap_owners == document["deployment"].get("bootstrap_ownership", {}),
@@ -4694,6 +4953,8 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         if existing_scopes:
             closure, current_bodies = collect_resource_closure(cloud, existing_scopes,
                                                                bootstrap_resource_versions(document))
+            if "foundry_lifecycle" in document["deployment"]:
+                receipt["foundry_initial_observations"] = foundry_inventory_observations(document, closure, current_bodies)
             for scope in existing_scopes:
                 verify_group_ownership(current_bodies[scope.lower()],
                                        {key: document["target"][key] for key in ("factory_id", "scaleset_id")}, current_bodies)
@@ -4737,7 +4998,7 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
             verify_preserved_network(cloud, document, step, source_root)
         if "foundry_lifecycle" in document["deployment"]:
             run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sleep)
-            verify_foundry_receipt(document, receipt)
+            verify_foundry_phase_receipts(document, receipt)
         else:
             endpoint = deployment_endpoint(document, root_step)
             receipt["pending_deployment"] = endpoint.removeprefix(ARM)
@@ -4771,6 +5032,10 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
                                                    bootstrap_resource_versions(document))
         verify_bootstrap_final_closure(document, closure, bodies)
         if "foundry_lifecycle" in document["deployment"]:
+            last = receipt["foundry_phase_observations"][-1]
+            require(foundry_inventory_observations(document, closure, bodies) == last["resources"]
+                    and digest(closure) == last["closure_hash"], "native-foundry-final-instance-changed")
+            receipt["foundry_final_closure"] = copy.deepcopy(closure)
             account_id = document["deployment"]["foundry_lifecycle"]["account_resource_id"]
             require(str(bodies.get(account_id, {}).get("identity", {}).get("principalId", "")).lower()
                     == receipt["foundry_readiness"]["principal_id"], "foundry-final-principal-changed")
@@ -4824,6 +5089,11 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         require(set(document["target"]["project_ids"]) <= {
             row["owner"].get("project_id") for row in receipt["ownership"] + receipt["resource_groups"]},
             "selected-project-inventory-incomplete")
+        if "foundry_lifecycle" in document["deployment"]:
+            verify_foundry_receipt(document, receipt)
+            verify_foundry_identity_current(cloud, locks, document)
+            verify_foundry_live_readiness(cloud, locks, document, receipt, sleep)
+            verify_foundry_live_inventory(cloud, locks, document, last["resources"], closure_hash=last["closure_hash"])
         locks.authorize(document)
         receipt["status"] = "succeeded"
         persist()

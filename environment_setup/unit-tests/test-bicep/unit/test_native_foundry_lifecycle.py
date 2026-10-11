@@ -1,8 +1,10 @@
 """Offline native Foundry sequencing; never invokes Azure or a provider workflow."""
 
+import base64
 import copy
 import json
 import uuid
+import zlib
 from urllib.parse import unquote, urlsplit
 from unittest.mock import Mock
 
@@ -12,6 +14,239 @@ from .test_factory_lifecycle import (
     fl, scoped_manifest, GROUP, ROOT, no_real_services, PlanCloud,
     RESOURCE, simple_plan_closure, seal, workspace, setup_execute, COMMON,
 )
+
+NSG = GROUP.lower() + "/providers/microsoft.network/networksecuritygroups/reviewed"
+
+
+def reviewed_nsg(document, cloud):
+    body = copy.deepcopy(cloud.bodies[RESOURCE.lower()])
+    body.update(id=NSG, type="Microsoft.Network/networkSecurityGroups")
+    cloud.bodies[NSG] = copy.deepcopy(body)
+    cloud.planned[NSG] = body
+    phase = document["deployment"]["foundry_lifecycle"]["phases"][0]
+    cloud.expanded[tuple(phase["step_ids"])].append(NSG)
+
+
+@pytest.mark.parametrize("defect", ["lease", "claim", "nsg", "uami"])
+@pytest.mark.parametrize("producer", [False, True])
+def test_convergence_completion_revalidates_instances_and_authorization(monkeypatch, defect, producer):
+    document, cloud, locks = (prepare_identity_worker(monkeypatch) if producer else
+                              native_worker(monkeypatch, configure=reviewed_nsg))
+    original = fl.collect_resource_closure
+    scans = []
+    stopped = []
+    def closure(*args, **kwargs):
+        writes = len(cloud.arm_writes) if producer else len(cloud.executed)
+        if writes == (1 if producer else 3):
+            scans.append(True)
+            if len(scans) == (2 if producer else 3) and not stopped:
+                stopped.append(writes)
+                if defect == "lease":
+                    cloud.leases.clear()
+                elif defect == "claim":
+                    claim = cloud.runs["runs/" + document["run_id"] + ".json"]
+                    claim.pop("state", None)
+                    claim["status"] = "reconciliation-required"
+                else:
+                    key = UAMI if defect == "uami" else NSG
+                    if key not in cloud.bodies:
+                        cloud.bodies[key] = {**copy.deepcopy(cloud.identity), "id": key}
+                    cloud.bodies[key]["etag"] = '"replacement"'
+        return original(*args, **kwargs)
+    monkeypatch.setattr(fl, "collect_resource_closure", closure)
+    result = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
+        ROOT, document["run_id"], document["manifest_hash"], cloud, Mock())
+    assert stopped == [1 if producer else 3]
+    assert result["status"] == "reconciliation-required"
+    assert len(cloud.arm_writes) == 1 if producer else len(cloud.executed) == 3
+
+
+@pytest.mark.parametrize("boundary", ["project", "completion"])
+@pytest.mark.parametrize("instance", ["nsg", "uami"])
+def test_convergence_inventory_follows_last_readiness_get(monkeypatch, boundary, instance):
+    document, cloud, locks = native_worker(monkeypatch, configure=reviewed_nsg)
+    original_readiness, original_request = fl.verify_foundry_live_readiness, cloud.request
+    active, changed = [], []
+    def readiness(*args, **kwargs):
+        if len(cloud.executed) == (2 if boundary == "project" else 3):
+            active.append(True)
+        try:
+            return original_readiness(*args, **kwargs)
+        finally:
+            active.clear()
+    def request(method, url, *args, **kwargs):
+        result = original_request(method, url, *args, **kwargs)
+        if active and method == "GET" and "/capabilityhosts/" in url.lower() and not changed:
+            changed.append(len(cloud.executed))
+            cloud.bodies[UAMI if instance == "uami" else NSG]["etag"] = '"replacement"'
+        return result
+    monkeypatch.setattr(fl, "verify_foundry_live_readiness", readiness)
+    monkeypatch.setattr(cloud, "request", request)
+    result = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
+        ROOT, document["run_id"], document["manifest_hash"], cloud, Mock())
+    assert changed == [2 if boundary == "project" else 3]
+    assert result["status"] == "reconciliation-required"
+    assert len(cloud.executed) == changed[0]
+
+
+@pytest.mark.parametrize("instance", ["nsg", "uami"])
+def test_convergence_producer_inventory_follows_last_absence_get(monkeypatch, instance):
+    document, cloud, locks = prepare_identity_worker(monkeypatch)
+    original = cloud.request
+    pending, changed = [], []
+    def request(method, url, *args, **kwargs):
+        result = original(method, url, *args, **kwargs)
+        if method == "PUT" and not url.startswith(fl.ARM) and (kwargs.get("data") or {}).get("pending_deployment"):
+            pending.append(True)
+        if pending and method == "GET" and urlsplit(url).path.lower() == UAMI and result[0] == 404 and not changed:
+            changed.append(True)
+            cloud.bodies[GROUP.lower()] = copy.deepcopy(cloud.group)
+            key = UAMI if instance == "uami" else NSG
+            cloud.bodies[key] = {**copy.deepcopy(cloud.identity), "id": key}
+        return result
+    monkeypatch.setattr(cloud, "request", request)
+    result = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
+        ROOT, document["run_id"], document["manifest_hash"], cloud, Mock())
+    assert changed and not cloud.arm_writes
+    assert result["status"] == "reconciliation-required"
+
+
+@pytest.mark.parametrize("defect", ["initial", "phase", "executed", "phase-hash", "final-hash",
+                                    "ownership", "group", "old-contract"])
+def test_convergence_success_requires_complete_bound_observation_history(monkeypatch, defect):
+    document, cloud, locks = native_worker(monkeypatch, configure=reviewed_nsg)
+    receipt = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
+        ROOT, document["run_id"], document["manifest_hash"], cloud, Mock())
+    assert receipt["status"] == "succeeded"
+    if defect == "initial":
+        receipt.pop("foundry_initial_observations")
+    elif defect == "phase":
+        receipt["foundry_phase_observations"].pop()
+    elif defect == "executed":
+        receipt["foundry_phase_observations"][0]["executed_changes"] = []
+    elif defect == "phase-hash":
+        receipt["foundry_phase_observations"][0]["resources"][NSG]["body_hash"] = "f" * 64
+    elif defect == "final-hash":
+        receipt["foundry_final_closure"]["resources"][NSG]["body_hash"] = "f" * 64
+    elif defect == "ownership":
+        receipt["ownership"][0]["body_hash"] = "f" * 64
+    elif defect == "group":
+        receipt["resource_groups"][0]["etag"] = '"replacement"'
+    else:
+        document["deployment"]["foundry_lifecycle"]["contract"] = "identity-receipt-account-uami-readiness-project-v3"
+    with pytest.raises(fl.Blocked):
+        fl.verify_foundry_receipt(document, receipt)
+
+
+@pytest.mark.parametrize("revocation", ["lease", "claim", "nsg", "uami"])
+@pytest.mark.parametrize("phase", [0, 1, 2])
+def test_convergence_pending_intent_cannot_authorize_another_phase_put(monkeypatch, revocation, phase):
+    document, cloud, locks = native_worker(monkeypatch, configure=reviewed_nsg)
+    endpoint = fl.deployment_endpoint(document, {
+        "id": document["deployment"]["foundry_lifecycle"]["phases"][phase]["id"],
+        "scope": "subscription"}).removeprefix(fl.ARM)
+    original = cloud.request
+    stopped = []
+    def request(method, url, *args, **kwargs):
+        result = original(method, url, *args, **kwargs)
+        data = kwargs.get("data") or {}
+        if (method == "PUT" and not url.startswith(fl.ARM) and data.get("pending_deployment") == endpoint
+                and len(cloud.executed) == phase and not stopped):
+            stopped.append(len(cloud.executed))
+            if revocation == "lease":
+                cloud.leases.clear()
+            elif revocation == "claim":
+                claim = cloud.runs["runs/" + document["run_id"] + ".json"]
+                claim.pop("state", None)
+                claim["status"] = "reconciliation-required"
+            else:
+                key = UAMI if revocation == "uami" else NSG
+                cloud.bodies[key]["etag"] = '"replacement"'
+        return result
+    monkeypatch.setattr(cloud, "request", request)
+    result = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
+        ROOT, document["run_id"], document["manifest_hash"], cloud, Mock())
+    assert stopped == [phase]
+    assert len(cloud.executed) == phase
+    assert result["status"] == "reconciliation-required"
+    assert cloud.grant_writes == []
+
+
+@pytest.mark.parametrize("boundary", ["capability-host", "final-closure"])
+def test_convergence_cumulative_preview_cannot_rebase_unchanged_nsg(monkeypatch, boundary):
+    nsg = GROUP.lower() + "/providers/microsoft.network/networksecuritygroups/reviewed"
+    def configure(document, cloud):
+        body = copy.deepcopy(cloud.bodies[RESOURCE.lower()])
+        body.update(id=nsg, type="Microsoft.Network/networkSecurityGroups")
+        cloud.bodies[nsg] = copy.deepcopy(body)
+        cloud.planned[nsg] = body
+        phase = document["deployment"]["foundry_lifecycle"]["phases"][0]
+        cloud.expanded[tuple(phase["step_ids"])].append(nsg)
+    document, cloud, locks = native_worker(monkeypatch, configure=configure)
+    changed = []
+    def drift():
+        if not changed:
+            changed.append(len(cloud.executed))
+            cloud.bodies[nsg]["properties"]["securityRules"] = [{"name": "foreign"}]
+    original_request = cloud.request
+    def request(method, url, *args, **kwargs):
+        result = original_request(method, url, *args, **kwargs)
+        if boundary == "capability-host" and method == "GET" and "/capabilityhosts/" in url.lower():
+            drift()
+        return result
+    original_closure = fl.collect_resource_closure
+    def closure(*args, **kwargs):
+        if boundary == "final-closure" and len(cloud.executed) == 3:
+            drift()
+        return original_closure(*args, **kwargs)
+    monkeypatch.setattr(cloud, "request", request)
+    monkeypatch.setattr(fl, "collect_resource_closure", closure)
+    result = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
+        ROOT, document["run_id"], document["manifest_hash"], cloud, Mock())
+    assert changed
+    assert result["status"] == "reconciliation-required"
+    assert len(cloud.executed) == changed[0]
+
+
+@pytest.mark.parametrize("defect", ["identity", "nsg", "lease", "claim"])
+def test_convergence_producer_rechecks_inventory_after_persist(monkeypatch, defect):
+    document, cloud, locks = prepare_identity_worker(monkeypatch)
+    original = cloud.request
+    changed = []
+    def request(method, url, *args, **kwargs):
+        result = original(method, url, *args, **kwargs)
+        data = kwargs.get("data") or {}
+        if method == "PUT" and not url.startswith(fl.ARM) and data.get("pending_deployment") and not changed:
+            changed.append(True)
+            if defect == "lease":
+                cloud.leases.clear()
+                return result
+            if defect == "claim":
+                claim = cloud.runs["runs/" + document["run_id"] + ".json"]
+                claim.pop("state", None)
+                claim["status"] = "reconciliation-required"
+                return result
+            cloud.bodies[GROUP.lower()] = copy.deepcopy(cloud.group)
+            identifier = UAMI if defect == "identity" else GROUP.lower() + "/providers/microsoft.network/networksecuritygroups/foreign"
+            cloud.bodies[identifier] = {**copy.deepcopy(cloud.identity), "id": identifier}
+        return result
+    monkeypatch.setattr(cloud, "request", request)
+    result = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
+        ROOT, document["run_id"], document["manifest_hash"], cloud, Mock())
+    assert changed and not cloud.arm_writes
+    assert result["status"] == "reconciliation-required"
+
+
+@pytest.mark.parametrize("selection", ["defender", "persona"])
+def test_convergence_rejects_unordered_or_opaque_first_run_writes(selection):
+    document = foundry_document()
+    if selection == "defender":
+        document["deployment"]["steps"][-1]["parameters"].update(
+            enableDefenderforAIResourceLevel=True, enableDefenderforAISubLevel=False)
+    else:
+        document["deployment"]["persona_access"] = {"enabled": True}
+    with pytest.raises(fl.Blocked, match="native-foundry-(defender-phase-order|persona-write-evidence)-required"):
+        fl.plan_foundry_lifecycle(document)
 
 
 def identity_source_case():
@@ -520,8 +755,8 @@ def test_identity_continuation_drift_blocks_before_any_dependent_put(monkeypatch
     assert receipt["status"] == "reconciliation-required" and not cloud.executed
 
 
-def foundry_document():
-    document, templates = scoped_manifest(("017",), operation="deploy-project")
+def foundry_document(*, network=True, route="ado"):
+    document, templates = scoped_manifest(("017",), operation="deploy-project", route=route)
     for identifier, template in (("project-foundation", fl.FOUNDRY_FOUNDATION),
                                  ("project-network-rbac", fl.FOUNDRY_NETWORK_RBAC)):
         if any(item["template"] == template for item in document["deployment"]["steps"]):
@@ -540,7 +775,7 @@ def foundry_document():
     parameters.update(enableAIFoundry=True, foundryV22AccountOnly=False, aiFoundryV2Exists=False,
                       useAVMFoundry=False, cmk=False, cmkDisableForFoundry=False,
                       aiFoundryV2ProjectExists=False,
-                      disableAgentNetworkInjection=False,
+                      disableAgentNetworkInjection=not network,
                       aca2SubnetId=GROUP + "/providers/Microsoft.Network/virtualNetworks/owned/subnets/agent",
                       deployModel_gpt_54_mini=True, deployModel_text_embedding_3_small=True)
     document["deployment"]["steps"].append(step)
@@ -734,18 +969,37 @@ class FoundryCloud(PlanCloud):
                 network + ([self.network_grant] if network else []), [ACCOUNT], [self.model]]):
             self.expanded[tuple(stage["step_ids"])] = list(identifiers)
 
+    def payload_steps(self, payload):
+        if "step_ids" in payload:
+            return payload["step_ids"]
+        names = {row["name"] for row in payload["properties"]["template"]["resources"]}
+        return [step["id"] for step in self.document["deployment"]["steps"]
+                if fl.deployment_endpoint(self.document, step).rsplit("/", 1)[-1] in names]
+
     def request(self, method, url, audience, data=None, headers=None, allowed=(200,)):
         if not url.startswith(fl.ARM):
             return super().request(method, url, audience, data, headers, allowed)
         identifier = unquote(urlsplit(url).path).lower()
         self.events.append((method, identifier))
+        if method == "POST" and "/whatIf?" in url:
+            selected = self.payload_steps(data)
+            identifiers = [key for ids, values in self.expanded.items() if set(ids) <= set(selected) for key in values]
+            return 200, {}, {"properties": {"changes": [
+                {"resourceId": key, "changeType": "NoChange" if key in self.bodies else "Create",
+                 "before": copy.deepcopy(self.bodies.get(key)), "after": copy.deepcopy(self.planned[key])}
+                for key in identifiers]}}
         if method == "PUT" and "/providers/microsoft.resources/deployments/" in identifier:
-            ids = tuple(data["step_ids"])
+            ids = tuple(self.payload_steps(data))
             self.executed.append(ids)
             for resource in self.expanded[ids]:
                 self.bodies[resource] = copy.deepcopy(self.planned[resource])
                 if "/roleassignments/" in resource:
                     self.source_grant_writes.append(resource)
+                if resource == ACCOUNT and self.document["deployment"]["foundry_lifecycle"]["require_capability_host"]:
+                    host = ACCOUNT + "/capabilityhosts/" + ACCOUNT.rsplit("/", 1)[-1] + "@aml_aiagentservice"
+                    self.bodies[host] = {"id": host, "type": "Microsoft.CognitiveServices/accounts/capabilityHosts",
+                        "tags": copy.deepcopy(self.planned[ACCOUNT]["tags"]), "etag": '"observed"',
+                        "properties": {"provisioningState": "Succeeded"}}
             return 201, {}, {"id": identifier, "properties": {"provisioningState": "Accepted"}}
         if "/providers/microsoft.resources/deployments/" in identifier:
             body = {"id": identifier, "properties": {"provisioningState": "Succeeded"}}
@@ -787,9 +1041,10 @@ class FoundryCloud(PlanCloud):
         if "/capabilityhosts/" in identifier:
             if self.failure == "cancel":
                 raise KeyboardInterrupt()
-            return 200, {}, {"id": identifier, "properties": {
-                "provisioningState": "Creating" if self.failure == "timeout" else
-                "Failed" if self.failure == "caphost" else "Succeeded"}}
+            body = copy.deepcopy(self.bodies[identifier])
+            body["properties"]["provisioningState"] = ("Creating" if self.failure == "timeout" else
+                "Failed" if self.failure == "caphost" else "Succeeded")
+            return 200, {}, body
         if identifier == ACCOUNT and ACCOUNT in self.bodies:
             if self.failure == "account":
                 raise fl.Blocked("test-account-403")
@@ -809,7 +1064,7 @@ class FoundryCloud(PlanCloud):
         return 200, {}, copy.deepcopy(self.bodies[identifier])
 
     def preview(self, cloud, document, step, payload, sleep=None, unchanged_resources=None,
-                resource_payloads=None, source_changes=None):
+                resource_payloads=None, source_changes=None, phase_receipt=None):
         selected = payload["step_ids"]
         resources = [identifier for ids, values in self.expanded.items() if set(ids) <= set(selected)
                      for identifier in values]
@@ -829,8 +1084,29 @@ class FoundryCloud(PlanCloud):
         return changes
 
 
-def native_worker(monkeypatch, failure=None, configure=None, *, claim=True, injected=True):
-    document = foundry_document()
+def native_closure(cloud, scopes, resource_versions=None):
+    selected = {scope.lower() for scope in scopes}
+    bodies = {key: copy.deepcopy(body) for key, body in cloud.bodies.items() if fl.arm_scope(key) in selected}
+    groups = {key: {"body_hash": fl.digest(body), "etag": body.get("etag")}
+              for key, body in bodies.items() if fl.RG_ID.fullmatch(key)}
+    closure = {"providers": {}, "collections": {}, "groups": groups,
+               "resources": {key: {"body_hash": fl.digest(body), "etag": body.get("etag"),
+                                   "api_version": "2024-05-01"} for key, body in bodies.items() if key not in groups}}
+    for identifier, row in closure["resources"].items():
+        row["type"] = fl.resource_type_from_id(identifier)
+        if "/capabilityhosts/" in identifier or identifier == ACCOUNT:
+            row["api_version"] = fl.FOUNDRY_API
+        elif identifier == UAMI:
+            row["api_version"] = fl.FOUNDRY_MI_API
+        elif "/roleassignments/" in identifier:
+            row["api_version"] = "2022-04-01"
+    return closure, bodies
+
+
+def native_worker(monkeypatch, failure=None, configure=None, *, claim=True, injected=True, route="ado", prepare=None, real_payload=False):
+    document = foundry_document(route=route)
+    if prepare:
+        prepare(document)
     if not injected:
         document["deployment"]["steps"][-1]["parameters"]["disableAgentNetworkInjection"] = True
     fl.plan_foundry_lifecycle(document)
@@ -841,22 +1117,35 @@ def native_worker(monkeypatch, failure=None, configure=None, *, claim=True, inje
         templates[step["template"]] = template
         step["template_hash"] = fl.digest(template)
     cloud = FoundryCloud(document, templates, failure)
+    if route == "gha":
+        common = copy.deepcopy(cloud.bodies[GROUP.lower()])
+        common["id"] = COMMON
+        common["tags"].pop(fl.TAG_KEYS["project_id"], None)
+        cloud.bodies[COMMON.lower()] = common
     if configure:
         configure(document, cloud)
-    monkeypatch.setattr(fl, "combined_plan_payload", lambda cloud, doc, root, step_ids=None: {
-        "step_ids": step_ids or [step["id"] for step in doc["deployment"]["steps"]]})
-    monkeypatch.setattr(fl, "evaluate_what_if", cloud.preview)
-    document["deployment"]["changes"] = cloud.preview(
-        cloud, document, {}, {"step_ids": [step["id"] for step in document["deployment"]["steps"]]})
-    fl.freeze_foundry_lifecycle(cloud, document, ROOT)
+    monkeypatch.setattr(fl, "_verify_source", lambda cloud, root, source, **kwargs: root)
+    monkeypatch.setattr(fl, "collect_resource_closure", native_closure)
+    if real_payload:
+        payload = fl.combined_plan_payload(cloud, document, ROOT)
+        document["deployment"]["changes"] = fl.evaluate_what_if(
+            cloud, document, {"id": "factory", "scope": "subscription"}, payload)
+        fl.freeze_foundry_lifecycle(cloud, document, ROOT)
+    else:
+        monkeypatch.setattr(fl, "combined_plan_payload", lambda cloud, doc, root, step_ids=None: {
+            "step_ids": step_ids or [step["id"] for step in doc["deployment"]["steps"]]})
+        monkeypatch.setattr(fl, "evaluate_what_if", cloud.preview)
+        document["deployment"]["changes"] = cloud.preview(
+            cloud, document, {}, {"step_ids": [step["id"] for step in document["deployment"]["steps"]]})
+        fl.freeze_foundry_lifecycle(cloud, document, ROOT)
     document["locks"]["coordination_hash"] = fl.digest(cloud.enrollment)
     seal(document)
     locks = fl.BlobLocks(cloud, document)
-    locks.acquire()
     if claim:
+        locks.acquire()
         locks.claim_run()
     monkeypatch.setattr(fl, "_verify_source", lambda cloud, root, source, **kwargs: root)
-    monkeypatch.setattr(fl, "collect_resource_closure", simple_plan_closure)
+    monkeypatch.setattr(fl, "collect_resource_closure", native_closure)
     return document, cloud, locks
 
 
@@ -905,8 +1194,8 @@ def test_native_worker_never_continues_or_replays_failed_account_gate(monkeypatc
 @pytest.mark.parametrize("failure,code", [
     ("rbac", "test-role-403"), ("role-conflict", "native-foundry-phase-instance-changed"),
     ("role-timeout", "native-foundry-phase-instance-changed"),
-    ("uami-tenant", "native-foundry-agent-tenant-mismatch"),
-    ("uami-principal", "native-foundry-agent-principal-changed"),
+    ("uami-tenant", "native-foundry-phase-instance-changed"),
+    ("uami-principal", "native-foundry-phase-instance-changed"),
 ])
 def test_source_uami_or_grant_failure_blocks_account_creation(monkeypatch, failure, code):
     document, cloud, locks = native_worker(monkeypatch, failure)
@@ -1026,7 +1315,7 @@ def observation_case(monkeypatch, disposition="owned"):
                                    "api_version": "2024-05-01"}}}
     monkeypatch.setattr(fl, "combined_plan_payload", lambda cloud, doc, root, step_ids=None: {
         "step_ids": step_ids or [step["id"] for step in doc["deployment"]["steps"]], "properties": {}})
-    monkeypatch.setattr(fl, "collect_resource_closure", simple_plan_closure)
+    monkeypatch.setattr(fl, "collect_resource_closure", native_closure)
     payload = fl.combined_plan_payload(cloud, document, ROOT)
     document["deployment"]["changes"] = fl.evaluate_what_if(
         cloud, document, {"id": "factory", "scope": "subscription"}, payload)
@@ -1036,13 +1325,16 @@ def observation_case(monkeypatch, disposition="owned"):
 def test_real_multiphase_what_if_accepts_only_reviewed_owned_postphase_observations(monkeypatch):
     document, cloud, before, after = observation_case(monkeypatch)
     fl.freeze_foundry_lifecycle(cloud, document, ROOT)
-    receipt = {"deployments": []}
+    seal(document)
+    closure, bodies = native_closure(cloud, document["locks"]["scopes"])
+    receipt = {"deployments": [], "run_id": document["run_id"], "manifest_hash": document["manifest_hash"],
+               "status": "running", "foundry_initial_observations": fl.foundry_inventory_observations(document, closure, bodies)}
     fl.run_foundry_phases(cloud, Mock(spec=["assert_held", "authorize"]), document, ROOT, receipt, Mock(), Mock())
     assert len(cloud.executed) == 3
     assert cloud.bodies[RESOURCE.lower()] == after
     assert receipt["foundry_phase_observations"][0]["resources"][RESOURCE.lower()]["body_hash"] == fl.digest(after)
     assert document["deployment"]["bootstrap_foundation"]["resources"][RESOURCE.lower()]["body_hash"] == fl.digest(before)
-    fl.verify_foundry_receipt(document, receipt)
+    fl.verify_foundry_phase_receipts(document, receipt)
 
 
 def test_preserve_only_modification_is_rejected_before_any_native_phase_write(monkeypatch):
@@ -1329,9 +1621,13 @@ def test_real_ignored_grant_drift_stops_before_any_phase_put(monkeypatch, when):
         cloud.raw_grant_kind = "Ignore"
     else:
         cloud.ignore_on = 4
+    seal(document)
+    closure, bodies = native_closure(cloud, document["locks"]["scopes"])
+    receipt = {"deployments": [], "run_id": document["run_id"], "manifest_hash": document["manifest_hash"],
+               "status": "running", "foundry_initial_observations": fl.foundry_inventory_observations(document, closure, bodies)}
     with pytest.raises(fl.Blocked, match="native-foundry-reviewed-network-grants-required"):
         fl.run_foundry_phases(cloud, Mock(spec=["assert_held", "authorize"]), document, ROOT,
-                             {"deployments": []}, Mock(), Mock())
+                             receipt, Mock(), Mock())
     assert cloud.executed == [] and cloud.grant_writes == [] and cloud.source_grant_writes == []
     assert ACCOUNT not in cloud.bodies
 
@@ -1405,7 +1701,7 @@ def test_already_accepted_claim_can_finish_after_review_admission_deadline(monke
     assert len(cloud.executed) == 3 and cloud.grant_writes == []
 
 
-def test_unavailable_uami_is_bounded_and_blocks_account_put(monkeypatch):
+def test_missing_preobserved_uami_blocks_account_without_materialization_retry(monkeypatch):
     document, cloud, locks = native_worker(monkeypatch)
     original_request, unavailable = cloud.request, []
     def request(method, url, audience, data=None, headers=None, allowed=(200,)):
@@ -1418,8 +1714,8 @@ def test_unavailable_uami_is_bounded_and_blocks_account_put(monkeypatch):
     result = fl.run_deployment_worker({"manifest": document, "lease_context": locks.held},
         ROOT, document["run_id"], document["manifest_hash"], cloud, Mock())
     assert result["status"] == "reconciliation-required"
-    assert result["error_code"] == "foundry-readiness-timeout"
-    assert len(unavailable) == 180 and len(cloud.executed) == 1
+    assert result["error_code"] == "native-foundry-phase-instance-changed"
+    assert len(unavailable) == 1 and len(cloud.executed) == 1
     assert ACCOUNT not in cloud.bodies and cloud.grant_writes == []
 
 
@@ -1661,9 +1957,9 @@ def test_host_must_remain_exact_and_ready_until_full_put(monkeypatch, defect):
     assert result["status"] == "reconciliation-required", result
     assert result["error_code"] == {
         "initial-host-id": "foundry-resource-identity-mismatch",
-        "late-host-id": "foundry-resource-identity-mismatch",
-        "late-host-state": "foundry-resource-provisioning-failed",
-        "late-host-body": "native-foundry-capability-host-changed"}[defect]
+        "late-host-id": "native-foundry-phase-instance-changed",
+        "late-host-state": "native-foundry-phase-instance-changed",
+        "late-host-body": "native-foundry-phase-instance-changed"}[defect]
     assert len(host_reads) == (1 if defect == "initial-host-id" else 2)
     full = fl.deployment_endpoint(document, {"id": "foundry-project-phase", "scope": "subscription"})
     assert ("PUT", urlsplit(full).path.lower()) not in cloud.events
@@ -1671,3 +1967,47 @@ def test_host_must_remain_exact_and_ready_until_full_put(monkeypatch, defect):
     with pytest.raises(fl.Blocked):
         fl.run_deployment_worker(envelope, ROOT, document["run_id"], document["manifest_hash"], cloud, Mock())
     assert len(cloud.executed) == 2
+
+
+def offline_github_transport(cloud, source_root, *, expected_worker_status="succeeded"):
+    secrets, commands = {}, []
+    document = cloud.document
+    template = (source_root / fl.scoped_template(document)).read_text()
+    def command(argv, **kwargs):
+        commands.append(argv)
+        if argv[:2] == ["git", "show"]:
+            return template.strip()
+        if argv[:3] == ["gh", "api", "user"]:
+            return json.dumps({"id": document["route"]["github_user_id"]})
+        if argv[:3] == ["gh", "secret", "set"]:
+            secrets[argv[3]] = kwargs["data"]
+            return ""
+        if argv[:3] == ["gh", "secret", "delete"]:
+            del secrets[argv[3]]
+            return ""
+        assert argv[:3] == ["gh", "api", "--method"], argv
+        method, endpoint = argv[3:5]
+        if "/contents/" in endpoint:
+            return json.dumps({"encoding": "base64", "content": base64.b64encode(template.encode()).decode()})
+        if "/git/trees/" in endpoint:
+            return json.dumps({"tree": [{"path": "azure-enterprise-scale-ml", "mode": "160000",
+                                         "sha": document["source"]["commit"]}]})
+        if endpoint.endswith("/dispatches"):
+            inputs = json.loads(kwargs["data"])["inputs"]
+            raw = "".join(secrets[inputs["secret_prefix"] + "_" + str(index)]
+                          for index in range(int(inputs["secret_chunks"])))
+            envelope = json.loads(zlib.decompress(base64.b64decode(raw)))
+            result = fl.run_deployment_worker(envelope, source_root, inputs["run_id"],
+                                              inputs["manifest_hash"], cloud, Mock())
+            assert result["status"] == expected_worker_status, result.get("error_code")
+        if "/runs?event=" in endpoint:
+            return json.dumps({"workflow_runs": [{"id": 1, "head_sha": document["route"]["commit"],
+                                                  "display_title": "factory-lifecycle [" + document["run_id"] + "]"}]})
+        if endpoint.endswith("/actions/runs/1"):
+            return json.dumps({"status": "completed", "conclusion": "success", "head_sha": document["route"]["commit"]})
+        if "/git/ref/tags/" in endpoint:
+            return json.dumps({"object": {"sha": document["route"]["commit"]}})
+        assert method in ("POST", "DELETE"), argv
+        return "{}"
+    cloud.command = command
+    return commands

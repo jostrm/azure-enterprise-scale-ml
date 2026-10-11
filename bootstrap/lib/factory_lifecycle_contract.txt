@@ -55,12 +55,12 @@ run_id}, worker_receipt, projects_succeeded and deletion_complete. The catalog
 removes a factory only from a succeeded aggregate whose children carry exactly
 the reviewed deletions and successful worker evidence for every project.
 
-Native Foundry first run (identity-receipt-account-uami-readiness-project-v3)
+Native Foundry first run (identity-receipt-account-uami-instance-closure-project-v4)
 ---------------------------------------------------------
-capabilities.native_foundry advertises the v3 executable contract, accompanied by
-native_foundry_identity_producer="source-projected-project-uami-v1". This is a
-source capability, not live Azure acceptance or authorization. The v2 capability
-and an advertisement without the implemented producer/receipt entrypoints are not
+capabilities.native_foundry advertises the v4 executable contract, accompanied by
+native_foundry_identity_producer="source-projected-project-uami-instance-v2". This is a
+source capability, not live Azure acceptance or authorization. Earlier capabilities
+and advertisements without the implemented producer/receipt/inventory entrypoints are not
 sufficient. A declared blocker still takes precedence. Unverified source cannot
 contribute a capability. No general effective-access or actor probe is required.
 
@@ -81,10 +81,13 @@ resource fingerprints and a binding hash of source, configuration, target,
 operator/deployment identities, route, coordination and all complete source steps.
 The approval_purpose is identity-only; continuation_requires_new_approval is true.
 No Foundry account, model, role or persona access is executed in this stage.
-The existing guarded worker rechecks the source projection, preview, absence,
-ownership and claim before its single PUT. It persists intent before writing,
-validates actual output-bound GUID/client/tenant/ownership and exact closure,
-and persists success or reconciliation-required evidence without retry.
+The worker rechecks the source projection, preview, absence and ownership.
+After persisting intent it rereads the exact initial group/resource inventory and
+UAMI absence, then freshly authorizes the active claim and lease before its single
+PUT. It validates actual output-bound GUID/client/tenant/ownership and exact closure.
+The receipt retains the initial snapshot and final identity-only closure. Existing
+resources and the existing group cannot change. Completion repeats that closure
+check and authorization; failures retain reconciliation evidence without retry.
 
 A producer worker success receipt has completion="identity-only",
 continuation_required=true, only the foundry-identity-producer deployment and the
@@ -130,6 +133,10 @@ existence flags, project configuration and every selected model are not rewritte
 The account-only source does not deploy models; the full phase deploys them once.
 Explicit existing-account and disabled Foundry selections retain their old path.
 Standalone account-only, unresolved selections and unsupported topologies block.
+Resource-level Defender enabled without subscription-level Defender is rejected
+before expansion because its account-only dependency is unordered. Opaque persona
+writes are also blocked: they have no complete phase-specific instance/write proof.
+Neither guard rewrites the user's saved parameters.
 
 After identity production, freeze_deployment_plan reviews the complete combined graph and each cumulative
 phase using ARM what-if. Exact account absence and the single new Cognitive
@@ -140,13 +147,16 @@ scopes are included in the reviewed manifest; phase-specific preview hashes do
 not authorize changes outside its declared after-state. At execution each phase's
 current preview is compared to reviewed payload hashes and preceding postconditions.
 No broad stripping of runtime differences or guessed equivalence is permitted.
-Exact read-only provider closure observations are retained after each predecessor
-phase and re-read before continuation. They bind actual generated identities and
+Exact initial inventory and all three phase-specific provider closure observations
+are retained and re-read before continuation. They bind actual generated identities and
 unchanged resources, not guessed pre-deployment principal IDs. Ignore/NoChange may
 use only those exact observed instances; new/modified after-payloads still require
 the reviewed desired hash. An observed hash may supersede a bootstrap-owned
 original only after an explicit reviewed Modify with that original before-hash
-in the preceding cumulative phase. Preserve-only resources and descendants never
+in an actually executed phase write. A cumulative prior preview alone is never
+write evidence. Each phase retains executed_changes, resources and closure_hash;
+unchanged resources remain byte-hash identical across the complete history.
+Preserve-only resources and descendants never
 gain that permission. Original snapshots and their ownership proofs stay unchanged.
 Native phases separately retain source_changes, the exact raw ARM change type for
 each normalized resource ID. Ignore may normalize to NoChange for preservation,
@@ -215,6 +225,13 @@ Readiness polls are bounded to 180 attempts at five-second intervals; deployment
 are bounded to 1440 attempts. Every poll checks lease/claim ownership, and every
 write rechecks authorization. No failed write is retried. Pending deployment/gate,
 completed phases, exact identity, grant and capability-host hashes are persisted.
+Each phase persists its pending intent, rechecks required identity/readiness and
+the complete current instance inventory, then freshly authorizes immediately
+before ARM PUT. Final success binds the last phase's exact closure to the final
+inventory and ownership rows, including resource types, API versions and etags.
+Completion rechecks readiness, the same complete closure and active authorization.
+Missing initial evidence, truncated phase history or differing final ownership
+cannot be accepted as a successful v4 receipt.
 Expired review windows reject new claims; an already accepted, still-active durable
 claim retains the existing continuation semantics beyond its admission deadline.
 Any failure/interruption keeps reconciliation-required evidence and the durable
