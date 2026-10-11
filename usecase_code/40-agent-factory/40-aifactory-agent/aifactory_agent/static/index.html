@@ -67,7 +67,10 @@
       <div class="content">
         <section id="voice-card" class="card voice-card" aria-labelledby="voice-heading" hidden>
           <h2 id="voice-heading">Talk to the Factory Agent</h2>
-          <p id="voice-help" class="muted">Live voice asks the same read-only, scope-bound agent as typed questions and reads the answer back. The full answer and its sources appear below. The microphone is used only while a session is running; this app does not store audio.</p>
+          <p id="voice-help" class="muted">Voice uses the same sign-in and governed read tools as typed chat. Typing remains available if voice fails.</p>
+          <details><summary>More info</summary><p class="muted">The microphone is used only during a voice session; this app does not store audio. Native voice audio and live transcripts are provisional until final citation checks; checked answers and sources appear below. Changing language restarts voice only.</p></details>
+          <label for="voice-language">Voice language</label>
+          <select id="voice-language" hidden aria-label="Voice language"></select>
           <div class="voice-stage">
             <canvas id="voice-orb" class="voice-orb" width="320" height="320" role="img" aria-label="Voice activity light"></canvas>
             <p id="voice-state" class="voice-state" role="status" aria-live="polite">Voice is off</p>
@@ -76,6 +79,8 @@
             <button id="voice-toggle" type="button" aria-pressed="false" disabled>Start talking</button>
             <button id="voice-mute" type="button" class="secondary" aria-pressed="false" disabled>Mute microphone</button>
             <button id="voice-interrupt" type="button" class="secondary" disabled>Stop speaking</button>
+            <button id="voice-use-text" type="button" class="secondary">Use typed chat</button>
+            <button id="voice-retry" type="button" class="secondary">Check voice again</button>
           </div>
           <div id="voice-transcript" class="voice-transcript" aria-live="polite"></div>
           <p id="voice-error" class="error" role="status" hidden></p>

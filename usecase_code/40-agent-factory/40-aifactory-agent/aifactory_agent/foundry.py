@@ -6,6 +6,7 @@ import math
 import sys
 import time
 from contextlib import contextmanager
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import Callable, Iterator
@@ -202,6 +203,39 @@ class Conversation:
         self.live_state_reader = live_state_reader if live_state_reader is not None else live_state
 
     def answer(self, question: str, audience: str, principal: Principal, scope_key: str) -> dict:
+        turn = self.prepare(question, audience, principal, scope_key)
+        messages = turn.messages
+        tokens = {"input_tokens": 0, "output_tokens": 0}
+        with self.model_gateway.open(self.settings) as session:
+            reference = {"type": "agent_reference", "name": self.settings.agent_name}
+            if self.settings.agent_version:
+                reference["version"] = self.settings.agent_version
+            for _ in range(self.settings.max_tool_rounds):
+                from openai import OpenAIError
+                from .telemetry import MODEL_FAILURES
+                try:
+                    response = session.respond(messages, reference)
+                except OpenAIError:
+                    MODEL_FAILURES.add(1, {"scope": scope_key})
+                    raise
+                if response.usage:
+                    tokens["input_tokens"] += response.usage.input_tokens
+                    tokens["output_tokens"] += response.usage.output_tokens
+                messages.extend([item.model_dump(exclude_none=True) for item in response.output])
+                calls = [item for item in response.output if item.type == "function_call"]
+                if not calls:
+                    if response.status != "completed":
+                        MODEL_FAILURES.add(1, {"scope": scope_key})
+                        raise RuntimeError(f"Model response {response.id} did not complete: {response.status}.")
+                    return turn.finish(response.output_text, response.id, tokens)
+                for call in calls:
+                    output = turn.execute(call.name, call.call_id, call.arguments)
+                    messages.append({"type": "function_call_output", "call_id": call.call_id,
+                                     "output": json.dumps(output, ensure_ascii=False)})
+        raise RuntimeError("The bounded tool-call limit was reached without a completed answer.")
+
+    def prepare(self, question: str, audience: str, principal: Principal, scope_key: str) -> PreparedTurn:
+        """Prepare governed evidence and read tools without making an answer-model request."""
         from .security import authorize
 
         if audience not in {"platform", "project"}:
@@ -322,88 +356,93 @@ class Conversation:
                 "dual_graph_evidence_data": graph_context,
             }, ensure_ascii=False)}]},
         ]
-        tokens = {"input_tokens": 0, "output_tokens": 0}
         observed_tools = []
-        with self.model_gateway.open(self.settings) as session:
-            reference = {"type": "agent_reference", "name": self.settings.agent_name}
-            if self.settings.agent_version:
-                reference["version"] = self.settings.agent_version
-            for _ in range(self.settings.max_tool_rounds):
-                from openai import OpenAIError
-                from .telemetry import MODEL_FAILURES
-                try:
-                    response = session.respond(messages, reference)
-                except OpenAIError:
-                    MODEL_FAILURES.add(1, {"scope": scope_key})
-                    raise
-                if response.usage:
-                    tokens["input_tokens"] += response.usage.input_tokens
-                    tokens["output_tokens"] += response.usage.output_tokens
-                messages.extend([item.model_dump(exclude_none=True) for item in response.output])
-                calls = [item for item in response.output if item.type == "function_call"]
-                if not calls:
-                    if response.status != "completed":
-                        MODEL_FAILURES.add(1, {"scope": scope_key})
-                        raise RuntimeError(f"Model response {response.id} did not complete: {response.status}.")
-                    text = response.output_text
-                    if not text:
-                        raise RuntimeError("The model returned no answer.")
-                    import re
-                    references = set(re.findall(r"\[([SGA]\d+)\]", text))
-                    if not references <= set(seen.values()) | graph_ids:
-                        raise RuntimeError("The model returned an unsupported source citation.")
-                    if citations and not references:
-                        raise RuntimeError("The answer omitted available source citations.")
-                    LOGGER.info("agent_answer correlation=%s scope=%s audience=%s latency_ms=%d input_tokens=%d output_tokens=%d",
-                                correlation, scope_key, audience, int((time.monotonic()-started)*1000),
-                                tokens["input_tokens"], tokens["output_tokens"])
-                    from .telemetry import ANSWER_LATENCY, MODEL_TOKENS
-                    ANSWER_LATENCY.record(time.monotonic()-started, {"scope": scope_key, "audience": audience})
-                    for kind, count in tokens.items():
-                        MODEL_TOKENS.add(count, {"kind": kind, "scope": scope_key})
-                    return {"answer": text, "citations": citations, "scope_key": scope_key,
-                            "audience": audience, "correlation_id": correlation,
-                            "response_id": response.id, "model_usage": tokens,
-                            "tool_activity": observed_tools,
-                            "knowledge_status": knowledge_status,
-                            "graph_context": {key: value for key, value in graph_context.items()
-                                              if key in {"status", "snapshot_id", "source", "freshness",
-                                                         "warnings", "truncated", "context_planes"}}}
-                for call in calls:
-                    with audit.operation(call.name, call.call_id) as event:
-                        if call.name not in allowed_tools:
-                            raise PermissionError("The requested tool is not permitted by the read-only model tool policy.")
-                        arguments = json.loads(call.arguments)
-                        if not isinstance(arguments, dict):
-                            raise ValueError("Tool arguments must be an object.")
-                        parameters = allowed_tools[call.name]["parameters"]
-                        if (set(arguments) - parameters["properties"].keys()
-                                or not set(parameters.get("required", [])) <= arguments.keys()):
-                            raise ValueError("Tool arguments must match the server-approved read-only descriptor.")
-                        permission = ("graph.read" if call.name == "graph_query" else
-                                      "knowledge.read" if call.name.startswith("knowledge_") else "factory.read")
-                        authorize(self.settings, principal, scope_key, permission)
-                        if call.name.startswith("cost_"):
-                            authorize(self.settings, principal, scope_key, "cost.read")
-                        if call.name == "graph_query":
-                            output = graph_evidence(**arguments)
-                        elif call.name == "knowledge_search":
-                            if not isinstance(arguments["query"], str):
-                                raise ValueError("knowledge_search accepts only a query string.")
-                            output = evidence(arguments["query"])
-                        elif call.name == "knowledge_status":
-                            output = knowledge_status
-                        elif call.name == "azure_live_state":
-                            output = self.live_state_reader(self.settings, scope_key)
-                        else:
-                            output = tools.execute(call.name, arguments)
-                        event["outcome"] = "failed" if output.get("ok") is False else "completed"
-                    observed_tools.append({"name": call.name, "call_id": call.call_id})
-                    from .telemetry import TOOL_CALLS
-                    TOOL_CALLS.add(1, {"tool": call.name, "scope": scope_key})
-                    if isinstance(output, dict) and output.get("ok") is False:
-                        from .telemetry import TOOL_FAILURES
-                        TOOL_FAILURES.add(1, {"tool": call.name, "scope": scope_key})
-                    messages.append({"type": "function_call_output", "call_id": call.call_id,
-                                     "output": json.dumps(output, ensure_ascii=False)})
-        raise RuntimeError("The bounded tool-call limit was reached without a completed answer.")
+
+        def execute(name: str, call_id: str, raw_arguments: str) -> dict:
+            with audit.operation(name, call_id) as event:
+                if name not in allowed_tools:
+                    raise PermissionError("The requested tool is not permitted by the read-only model tool policy.")
+                if not isinstance(raw_arguments, str) or len(raw_arguments) > 16384:
+                    raise ValueError("Tool arguments exceed the approved bound.")
+                arguments = json.loads(raw_arguments)
+                validate_tool_arguments(arguments, allowed_tools[name]["parameters"])
+                permission = ("graph.read" if name == "graph_query" else
+                              "knowledge.read" if name.startswith("knowledge_") else "factory.read")
+                authorize(self.settings, principal, scope_key, permission)
+                if name.startswith("cost_"):
+                    authorize(self.settings, principal, scope_key, "cost.read")
+                if name == "graph_query":
+                    output = graph_evidence(**arguments)
+                elif name == "knowledge_search":
+                    output = evidence(arguments["query"])
+                elif name == "knowledge_status":
+                    output = knowledge_status
+                elif name == "azure_live_state":
+                    output = self.live_state_reader(self.settings, scope_key)
+                else:
+                    output = tools.execute(name, arguments)
+                event["outcome"] = "failed" if output.get("ok") is False else "completed"
+            observed_tools.append({"name": name, "call_id": call_id})
+            from .telemetry import TOOL_CALLS, TOOL_FAILURES
+            TOOL_CALLS.add(1, {"tool": name, "scope": scope_key})
+            if output.get("ok") is False:
+                TOOL_FAILURES.add(1, {"tool": name, "scope": scope_key})
+            return output
+
+        def finish(text: str, response_id: str, tokens: dict | None = None) -> dict:
+            authorize(self.settings, principal, scope_key, "knowledge.read")
+            if not text:
+                raise RuntimeError("The model returned no answer.")
+            import re
+            references = set(re.findall(r"\[([SGA]\d+)\]", text))
+            if not references <= set(seen.values()) | graph_ids:
+                raise RuntimeError("The model returned an unsupported source citation.")
+            if citations and not references:
+                raise RuntimeError("The answer omitted available source citations.")
+            tokens = tokens or {"input_tokens": 0, "output_tokens": 0}
+            LOGGER.info("agent_answer correlation=%s scope=%s audience=%s latency_ms=%d input_tokens=%d output_tokens=%d",
+                        correlation, scope_key, audience, int((time.monotonic()-started)*1000),
+                        tokens["input_tokens"], tokens["output_tokens"])
+            from .telemetry import ANSWER_LATENCY, MODEL_TOKENS
+            ANSWER_LATENCY.record(time.monotonic()-started, {"scope": scope_key, "audience": audience})
+            for kind, count in tokens.items():
+                MODEL_TOKENS.add(count, {"kind": kind, "scope": scope_key})
+            return {"answer": text, "citations": citations, "scope_key": scope_key,
+                    "audience": audience, "correlation_id": correlation,
+                    "response_id": response_id, "model_usage": tokens, "tool_activity": observed_tools,
+                    "knowledge_status": knowledge_status,
+                    "graph_context": {key: value for key, value in graph_context.items()
+                                      if key in {"status", "snapshot_id", "source", "freshness",
+                                                 "warnings", "truncated", "context_planes"}}}
+
+        return PreparedTurn(messages, list(allowed_tools.values()), execute, finish)
+
+
+@dataclass
+class PreparedTurn:
+    messages: list[dict]
+    tools: list[dict]
+    execute: Callable[[str, str, str], dict]
+    finish: Callable[..., dict]
+
+
+def validate_tool_arguments(arguments: object, parameters: dict) -> None:
+    import re
+    if (not isinstance(arguments, dict)
+            or set(arguments) - parameters["properties"].keys()
+            or not set(parameters.get("required", [])) <= arguments.keys()):
+        raise ValueError("Tool arguments must match the server-approved read-only descriptor.")
+    for name, value in arguments.items():
+        rule = parameters["properties"][name]
+        kind = rule.get("type")
+        if ((kind == "string" and not isinstance(value, str))
+                or (kind == "integer" and type(value) is not int)
+                or (kind == "boolean" and type(value) is not bool)
+                or (kind == "number" and (type(value) not in (int, float) or not math.isfinite(value)))
+                or ("enum" in rule and value not in rule["enum"])
+                or (isinstance(value, str) and len(value) > rule.get("maxLength", 8000))
+                or (isinstance(value, str) and len(value) < rule.get("minLength", 0))
+                or (isinstance(value, str) and "pattern" in rule and re.fullmatch(rule["pattern"], value) is None)
+                or (type(value) in (int, float) and (
+                    value < rule.get("minimum", -math.inf) or value > rule.get("maximum", math.inf)))):
+            raise ValueError("Tool argument value does not match the server-approved descriptor.")

@@ -19,17 +19,26 @@ _HOST = re.compile(r"[a-z0-9][a-z0-9-]{0,62}\.(?:services\.ai|cognitiveservices)
 _LANGUAGE = re.compile(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}")
 
 
+class VoiceLanguageProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    voice_name: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9:._-]{1,99}$")
+    voice_type: Literal["azure-standard", "openai"] = "azure-standard"
+    greeting: str | None = Field(default=None, max_length=200)
+
+
 class VoiceSettings(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     # Code-level mirror of the pipeline switch enableAIFactoryAgentLiveVoice / ENABLE_AI_FACTORY_AGENT_LIVE_VOICE.
     enabled: bool = False
+    mode: Literal["speech_shell", "realtime"] = "speech_shell"
     api_version: str = Field(default="2026-04-10", pattern=r"^\d{4}-\d{2}-\d{2}(?:-preview)?$")
     # Voice Live bills by the tier of this model even though it never writes an answer (speech shell), so use a lite one.
     model: str = Field(default="gpt-4.1-nano", pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
     endpoint: str | None = None
     token_scope: Literal["https://ai.azure.com/.default", "https://cognitiveservices.azure.com/.default"] = DEFAULT_TOKEN_SCOPE
     voice_name: str = Field(default=DEFAULT_VOICE, pattern=r"^[A-Za-z0-9][A-Za-z0-9:._-]{1,99}$")
+    voice_type: Literal["azure-standard", "openai"] = "azure-standard"
     voice_temperature: float | None = Field(default=None, ge=0.0, le=1.0)
     input_languages: list[str] = Field(default_factory=lambda: ["en-US"], min_length=1, max_length=10)
     turn_detection: Literal["azure_semantic_vad", "azure_semantic_vad_multilingual", "server_vad"] = "azure_semantic_vad"
@@ -45,6 +54,8 @@ class VoiceSettings(BaseModel):
     greeting: str | None = Field(default="Factory Agent online. How can I help?", max_length=200)
     # Browsers must call from the app's own origin; list extra HTTPS origins only when a front door rewrites Host.
     allowed_origins: list[str] = Field(default_factory=list, max_length=10)
+    default_language: str = Field(default="en-US", pattern=r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$")
+    language_profiles: dict[str, VoiceLanguageProfile] = Field(default_factory=dict, max_length=256)
 
     @field_validator("endpoint")
     @classmethod
@@ -92,7 +103,37 @@ class VoiceSettings(BaseModel):
     def idle_before_limit(self):
         if self.idle_timeout_seconds >= self.max_session_seconds:
             raise ValueError("The idle timeout must be shorter than the maximum session length.")
+        if not all(_LANGUAGE.fullmatch(code) for code in self.language_profiles):
+            raise ValueError("Language profile keys must be BCP-47 locale codes.")
+        if self.language_profiles and self.default_language not in self.language_profiles:
+            raise ValueError("The default language must have a configured profile.")
+        if self.mode == "realtime" and self.model not in {"gpt-realtime", "gpt-realtime-mini", "gpt-realtime-datazone"}:
+            raise ValueError("Realtime mode requires a native speech-to-speech model.")
+        if self.mode == "realtime" and len(self.input_languages) != 1:
+            raise ValueError("Realtime mode requires one selected profile language.")
+        for name, kind in [(self.voice_name, self.voice_type)] + [
+                (profile.voice_name, profile.voice_type) for profile in self.language_profiles.values()]:
+            if kind == "openai" and (self.mode != "realtime" or name not in {
+                    "alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar"}):
+                raise ValueError("Native OpenAI voices require realtime mode and an approved voice name.")
         return self
+
+    def for_language(self, language: str | None) -> VoiceSettings:
+        if not self.language_profiles:
+            if language is not None and language != self.input_languages[0]:
+                raise ValueError("Language is not configured.")
+            return self.model_copy(update={"turn_detection": "server_vad"}) if self.mode == "realtime" else self
+        selected = language or self.default_language
+        if selected not in self.language_profiles:
+            raise ValueError("Language is not configured.")
+        profile = self.language_profiles[selected]
+        # Do not apply English semantic VAD to an operator-configured non-English language.
+        return self.model_copy(update={
+            "voice_name": profile.voice_name, "input_languages": [selected],
+            "voice_type": profile.voice_type,
+            "turn_detection": "server_vad" if not selected.lower().startswith("en-") or self.mode == "realtime" else self.turn_detection,
+            "greeting": profile.greeting, "default_language": selected,
+        })
 
 
 def effective_endpoint(voice: VoiceSettings, foundry_account: str) -> str:

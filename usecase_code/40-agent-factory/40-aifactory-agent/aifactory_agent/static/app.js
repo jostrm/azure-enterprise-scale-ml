@@ -1342,6 +1342,16 @@
         return {token: state.token, expiresAt: state.expiresAt, scopeKey: state.scopeKey, audience: state.audience};
       },
       showAnswer,
+      focusTypedChat(question) {
+        const input = ui("question");
+        if (input.disabled) return;
+        if (!input.value.trim() && question) {
+          input.value = String(question).slice(0, 8000);
+          input.dispatchEvent(new Event("input", {bubbles: true}));
+        }
+        input.focus();
+        input.scrollIntoView?.({block: "center", behavior: "smooth"});
+      },
       subscribe(listener) {
         moduleListeners.add(listener);
         return () => moduleListeners.delete(listener);

@@ -412,7 +412,8 @@ deployed by hand, add the `voice` block to your own `config.local.json` and run 
 
 **How it works**
 
-- Azure **Voice Live** (`api-version` `2026-04-10`) is a *speech shell*: speech to
+- The compatibility default, `voice.mode: "speech_shell"`, uses Azure **Voice Live**
+  (`api-version` `2026-04-10`) as a *speech shell*: speech to
   text, turn detection, noise suppression, echo cancellation and text to speech.
   It never writes the answer (`create_response` is off).
 - Every final transcript is answered by the same governed `Conversation.answer()`
@@ -420,6 +421,21 @@ deployed by hand, add the `voice` block to your own `config.local.json` and run 
   retrieval, tools, citations and audit. The full answer and its citations appear
   in the normal answer card; a short spoken rendition (no citation markers,
   markdown, URLs or code, long tables summarised as "...is on screen") is spoken.
+- Opt-in `voice.mode: "realtime"` uses `gpt-realtime-mini`, `gpt-realtime` or `gpt-realtime-datazone` on the
+  same Voice Live connection. The native model receives audio and streams its own
+  reply; it never invokes the external full-text `Conversation.answer` model or
+  sends an answer as `pre_generated_assistant_message`. Transcription is used only
+  as a scoped retrieval query. `Conversation.prepare` supplies the same readiness,
+  evidence, approved read-tool intersection, argument checks, authorization, audit
+  and final citation validation as text. VAD automatic response creation remains
+  off so evidence readiness is checked **before** native `response.create`.
+- Native audio and live transcripts are **provisional**. Only completed, citation-
+  checked responses populate the authoritative answer card. Invalid/omitted
+  citation IDs stop the turn and flush queued audio, but audio already heard
+  cannot be recalled. Citation checks do not prove semantic entailment. This
+  latency/verification trade-off is explicit, not equivalent to validating all
+  speech before playback. Tool failures and bounded-round exhaustion are shown;
+  the model can never approve or execute writes.
 - The browser never receives Foundry credentials. It opens
   `WS /api/voice/ws` on the application; the backend connects to
   `wss://<foundry-account>.services.ai.azure.com/voice-live/realtime` with its
@@ -429,28 +445,48 @@ deployed by hand, add the `voice` block to your own `config.local.json` and run 
   `knowledge.read` grant, checks the `Origin`, caps pre-authentication sockets,
   rate-limits audio, ends idle or over-long sessions (never later than the expiry of
   the token that opened them) and replaces a user's older session with the newer one. The browser cannot choose the model, voice,
-  instructions or tools.
+  instructions or tools. It can select only an operator-configured language profile.
 - Speaking while the agent answers (barge-in) cancels the pending answer and the
   speech. Tokens and transcripts are never logged; errors shown to the browser
   carry no internal detail.
+- Voice failures (including a status 401 or voice-only authentication error) never
+  clear or renew the text token. **Use typed chat** focuses the existing form,
+  optionally copies the last utterance without submitting, and releases voice.
+  **Check voice again** rechecks capabilities; **Start talking** retries a failed
+  voice session. Language changes close/reopen voice only, with the same Chat sign-in.
+  Native service rejection or a failed native response ends voice and directs the
+  user to typing; it never silently switches to the shell, another model, or
+  ungrounded generation, and never asks for service secrets or new consent.
 - The `Permissions-Policy` header allows the microphone only for the application
   itself when voice is enabled and denies it otherwise. The routes
   `/api/voice/status` and `/api/voice/ws` do not exist when voice is disabled.
+
+**Embedded MAUI compatibility.** `host=esaif-maui` is text-only unless the
+compatible desktop host explicitly opens `voice=on` and the authenticated
+capability response declares `mode: realtime`, `protocol: 1` and
+`embedded_voice_version: 1`. Older/speech-shell deployments and `voice=off`
+remain microphone-denied. A compatible host must independently pin the HTTPS
+origin and document and permit only user-initiated microphone access; a query
+parameter is not a desktop permission grant. Voice status and language changes
+reuse the current text session rather than acquiring a separate token.
 
 **Configuration** (`voice` block; all optional except `enabled`)
 
 | Field | Default | Meaning |
 |---|---|---|
 | `enabled` | `false` | Registers the voice routes and shows the voice card. |
+| `mode` | `speech_shell` | Set `realtime` with a supported native model to remove the external answer-model/TTS chain. |
 | `endpoint` | derived | `https://<foundry-account>.services.ai.azure.com` from `azure.foundry_account`; only Foundry/Cognitive Services hosts are accepted. |
-| `model` | `gpt-4.1-nano` | Voice Live billing tier (the model does not answer). Pick a tier available in your region. |
+| `model` | `gpt-4.1-nano` | Shell billing tier; native mode requires `gpt-realtime-mini`, `gpt-realtime` or `gpt-realtime-datazone`. Approve regional availability and processing scope separately. |
 | `voice_name` | `en-US-Ava:DragonHDLatestNeural` | Fixed for the whole session. |
+| `voice_type` | `azure-standard` | `openai` with an approved native voice (for example `coral`) produces model-native audio. `azure-standard` selects Azure synthesis within Voice Live instead. |
 | `input_languages` | `["en-US"]` | Explicit BCP-47 speech languages (1-10). |
 | `turn_detection` | `azure_semantic_vad` | Also `azure_semantic_vad_multilingual`, `server_vad`; `silence_duration_ms` 500. |
 | `max_session_seconds` / `idle_timeout_seconds` | `900` / `120` | Session bounds. |
 | `max_concurrent_sessions` | `4` | Per application replica. |
-| `max_spoken_characters` / `answer_timeout_seconds` | `1200` / `120` | Spoken length and backend answer deadline. |
-| `greeting` | "Factory Agent online. How can I help?" | `null` for silence. |
+| `max_spoken_characters` / `answer_timeout_seconds` | `1200` / `120` | Shell speech length; native responses are capped at 1024 output tokens. Deadline covers native preparation, tools and response. |
+| `greeting` | "Factory Agent online. How can I help?" | Shell speaks it; native displays it without a separate synthesis request. `null` disables it. |
+| `default_language` / `language_profiles` | `en-US` / `{}` | Optional server-owned BCP-47 locale profiles; each specifies `voice_name`, optional `voice_type`, optional `greeting`. The default must be a configured profile. |
 | `allowed_origins` | `[]` | Extra browser origins; same-origin is always allowed. |
 
 **Identity and network.** With voice enabled, `deploy.py` adds two roles to the
@@ -463,19 +499,94 @@ broader role in `infra/identity.bicep`. The application must resolve and reach t
 Foundry `services.ai.azure.com` private endpoint. The ingress transport (`http`, HTTP/1.1)
 already supports WebSockets.
 
-**Languages.** Swedish is not in the automatic multilingual language list: set
+**Native operator configuration with English/Swedish examples** (merge into your existing config,
+do not replace auth, grants, ownership, endpoints or scope settings):
+
+```json
+"voice": {
+  "enabled": true,
+  "mode": "realtime",
+  "api_version": "2026-04-10",
+  "model": "gpt-realtime-mini",
+  "token_scope": "https://ai.azure.com/.default",
+  "voice_type": "openai",
+  "voice_name": "coral",
+  "input_languages": ["en-US"],
+  "default_language": "en-US",
+  "language_profiles": {
+    "en-US": {"voice_type": "openai", "voice_name": "coral", "greeting": "How can I help?"},
+    "sv-SE": {"voice_type": "openai", "voice_name": "coral", "greeting": "Hej! Hur kan jag hjälpa dig?"}
+  },
+  "turn_detection": "server_vad",
+  "silence_duration_ms": 350,
+  "noise_suppression": true,
+  "echo_cancellation": true,
+  "max_session_seconds": 900,
+  "idle_timeout_seconds": 120,
+  "max_concurrent_sessions": 4,
+  "answer_timeout_seconds": 60,
+  "greeting": null,
+  "allowed_origins": []
+}
+```
+
+Profiles are not restricted to two languages: add supported locales such as
+`de-DE`, `fr-FR` or `ja-JP` to `language_profiles` using the same profile shape. The browser
+lists every configured profile. Verify the selected model's input language and
+voice's output support first: Voice Live's broad Azure Speech locale coverage is
+not a claim that every native model supports every locale.
+
+**Processing approval.** Microsoft lists Sweden Central `gpt-realtime-mini` and
+`gpt-realtime` as **Global** inference. `gpt-realtime-datazone` is **Data zone**,
+not Sweden-only processing; that does not establish the separate transcription
+or synthesis processing scope. Approve the exact model and component scopes
+before rollout. The native-input table lists 57 languages for `gpt-realtime` and
+`gpt-realtime-mini`, not the 150+ Azure TTS locales; it does not separately
+enumerate data-zone model language support.
+See [regional processing scopes](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/regions?tabs=voice-live#llm-availability-and-processing-scope)
+and [native input languages](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/voice-live-language-support?tabs=speechinput#gpt-realtime-and-gpt-realtime-mini-supported-languages).
+
+The backend uses `gpt-4o-mini-transcribe` with the locale's ISO language code for native
+retrieval transcription, and `server_vad` for these profiles (English semantic
+VAD is not used for Swedish). The reply language is server-selected instructions;
+the browser cannot send arbitrary instructions or a voice name. Voice is fixed
+after the first speech, so the selector starts a fresh voice session.
+
+If you prefer a specifically Swedish Azure synthesis voice, configure the Swedish
+profile as `{"voice_type":"azure-standard","voice_name":"sv-SE-SofieNeural"}`.
+This is Azure TTS **within Voice Live**, not native model audio; there is still no
+application-side full-answer/TTS chain. Verify the voice and model availability
+in the resource region. In legacy shell mode, Swedish is not in the automatic multilingual list: set
 `input_languages` to, for example, `["sv-SE", "en-US"]` and a Swedish voice such as
 `sv-SE-SofieNeural`. Voice quality and language coverage differ per region and voice.
 
 **Cost.** Voice Live is billed per use by the tier of the configured `model`, even
-though that model writes no answer here, in addition to the grounded answer's model
-and Search usage. HD voices are regional. Sessions are bounded by
+though the shell model writes no answer, in addition to the shell's external model
+and Search usage. Native mode eliminates that external answer inference, not
+retrieval/embedding costs. HD voices are regional. Sessions are bounded by
 `max_session_seconds`. Verify current rates for your agreement; none are invented here.
 
-**Limits.** Each utterance is a standalone question (the same as typed chat); the
+**Limits and measurement.** Utterances are standalone questions, as in typed chat.
+Native turns isolate conversation history because their citation identifiers are
+question-local. Each prepared turn pins retrieval and knowledge-status tools to
+the same complete committed snapshot, including explicitly warned last-successful
+fallback. No browser playback-clock acknowledgement is available. Canceled read-only worker calls
+may finish in their thread, but their results cannot resume a canceled turn.
+The native first-audio histogram `aifactory.voice.first_audio.duration` and safe
+`voice_first_audio` log measure end-of-speech to the first relayed audio frame;
+they do not measure browser speaker playback. Compare warmed English/Swedish
+median/p95 and interrupted turns on the approved private network after deployment.
+Initial transcription, readiness, Search, optional embeddings/graph queries, tools,
+network and cold-start latency remain; no sub-second claim is made from fake tests.
+The compatibility
 agent does not speak filler while it thinks; session caps are per replica; and the
 live handshake through the private endpoint was not exercised against Azure in this
 repository's tests, which use fakes and a real browser.
+
+Protocol authority: [Voice Live overview](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/voice-live),
+[configuration/transcription](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/voice-live-how-to),
+and [Voice Live 2026-04-10 events](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/voice-live-api-reference-2026-04-10).
+Passing offline tests is not proof that the operator-owned live revision has changed.
 
 ## Authentication, tools and approvals
 
@@ -701,6 +812,17 @@ in the offline application bundle. A template override additionally requires
 Grant the execution identity resource Reader and the appropriate Azure Cost
 Management read access only on approved billing targets. The skills do not
 grant roles or elevate the caller.
+
+### Skill result presentation
+
+The web panel presents cost figures as separate per-currency actual and forecast
+cards, with service/component tables, billing periods, posted-data cutoffs and
+explicit partial-estimate coverage. Amounts retain the server's decimal strings;
+the browser does not sum costs, round them or convert currencies. Unknown idle
+totals remain unknown. Diagnostic/template results and saved operation evidence
+use labeled fields and lists. Raw responses and full pricing evidence remain
+available in collapsed disclosures. This presentation does not change signed
+plans, approval controls, operation states or provisioning behavior.
 
 ### Project-template workload strategies
 

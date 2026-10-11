@@ -109,3 +109,67 @@ def test_voice_block_does_not_change_other_settings_equality():
     enabled = Settings.model_validate(example(enabled=True))
     assert base != enabled
     assert enabled.model_copy(update={"voice": VoiceSettings()}) == base
+
+
+def test_native_mode_requires_native_model_and_uses_server_language_profiles():
+    with pytest.raises(ValidationError):
+        VoiceSettings(mode="realtime")
+    voice = VoiceSettings(mode="realtime", model="gpt-realtime-mini", language_profiles={
+        "en-US": {"voice_name": "en-US-Ava:DragonHDLatestNeural"},
+        "sv-SE": {"voice_name": "sv-SE-SofieNeural", "greeting": "Hej! Hur kan jag hjälpa dig?"},
+    })
+    selected = voice.for_language("sv-SE")
+    assert selected.voice_name == "sv-SE-SofieNeural"
+    assert selected.input_languages == ["sv-SE"] and selected.turn_detection == "server_vad"
+    assert selected.greeting.startswith("Hej")
+    with pytest.raises(ValueError):
+        voice.for_language("fr-FR")
+    with pytest.raises(ValidationError):
+        VoiceSettings(mode="realtime", model="gpt-realtime-mini",
+                      language_profiles={"sv-SE": {"voice_name": "sv-SE-SofieNeural"}},
+                      default_language="en-US")
+
+
+@pytest.mark.parametrize("voice", [
+    {"mode": "realtime", "model": "gpt-realtime-mini", "voice_type": "openai", "voice_name": "attacker"},
+    {"voice_type": "openai", "voice_name": "coral"},
+    {"mode": "realtime", "model": "gpt-realtime-mini", "input_languages": ["not-a-valid-locale!"]},
+    {"mode": "realtime", "model": "gpt-realtime-mini", "input_languages": ["en-US", "sv-SE"]},
+    {"language_profiles": {"en-US": {"voice_name": "voice", "instructions": "client policy"}}},
+])
+def test_invalid_native_profile_configuration_fails_closed(voice):
+    with pytest.raises(ValidationError):
+        VoiceSettings(**voice)
+
+
+def test_native_swedish_single_profile_never_uses_english_semantic_vad():
+    voice = VoiceSettings(mode="realtime", model="gpt-realtime-mini", input_languages=["sv-SE"])
+    assert voice.for_language("sv-SE").turn_detection == "server_vad"
+
+
+@pytest.mark.parametrize("model", ["gpt-realtime-mini", "gpt-realtime", "gpt-realtime-datazone"])
+@pytest.mark.parametrize("voice_name", ["coral", "marin", "cedar"])
+def test_documented_native_model_and_voice_choices_remain_operator_selected(model, voice_name):
+    voice = VoiceSettings(mode="realtime", model=model, voice_type="openai", voice_name=voice_name)
+    selected = voice.for_language(None)
+    assert selected.model == model and selected.voice_name == voice_name
+    assert selected.turn_detection == "server_vad"
+
+
+def test_native_profiles_are_not_limited_to_english_and_swedish():
+    profiles = {code: {"voice_type": "openai", "voice_name": "coral"}
+                for code in ("en-US", "sv-SE", "de-DE", "fr-FR", "ja-JP")}
+    voice = VoiceSettings(mode="realtime", model="gpt-realtime-mini", language_profiles=profiles,
+                          default_language="fr-FR")
+    for code in profiles:
+        selected = voice.for_language(code)
+        assert selected.input_languages == [code] and selected.turn_detection == "server_vad"
+        assert selected.voice_type == "openai" and selected.voice_name == "coral"
+    with pytest.raises(ValueError):
+        voice.for_language("es-ES")
+
+
+@pytest.mark.parametrize("code", ["en-US; instructions", "", "en_US", "x" * 100])
+def test_malformed_server_profile_locale_is_rejected(code):
+    with pytest.raises(ValidationError):
+        VoiceSettings(language_profiles={code: {"voice_name": "voice"}}, default_language=code)

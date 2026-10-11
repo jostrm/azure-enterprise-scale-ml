@@ -177,6 +177,125 @@ def test_status_requires_sign_in_and_reports_capabilities(app):
     assert body["voice"] == {"name": "en-US-Ava:DragonHDLatestNeural", "languages": ["en-US"]}
     assert body["limits"] == {"max_session_seconds": 900, "idle_timeout_seconds": 120}
     assert "secret" not in json.dumps(body).lower() and "endpoint" not in json.dumps(body).lower()
+    assert body["embedded_voice_version"] == 0
+
+
+@pytest.mark.parametrize("mode,enabled", [("speech_shell", True), ("realtime", True), ("realtime", False)])
+def test_embedded_voice_requires_explicit_opt_in_and_native_backend(conversation, mode, enabled):
+    app = build(make_settings(mode=mode, enabled=enabled,
+                              model="gpt-realtime-mini" if mode == "realtime" else "gpt-4.1-nano"),
+                conversation, FakeGateway())
+    with TestClient(app) as client:
+        for query in ("host=esaif-maui", "host=esaif-maui&voice=off", "voice=off"):
+            assert client.get("/?" + query).headers["permissions-policy"].startswith("microphone=()")
+        policy = client.get("/?host=esaif-maui&voice=on").headers["permissions-policy"]
+        assert policy.startswith("microphone=(self)" if mode == "realtime" and enabled else "microphone=()")
+        if enabled:
+            status = client.get("/api/voice/status", headers={"Authorization": "Bearer " + GOOD}).json()
+            assert status["embedded_voice_version"] == (1 if mode == "realtime" else 0)
+
+
+def test_language_selection_is_allowlisted_server_profile_and_text_auth_survives_voice_failure(conversation):
+    settings = make_settings(mode="realtime", model="gpt-realtime-mini", language_profiles={
+        "en-US": {"voice_name": "en-US-Ava:DragonHDLatestNeural"},
+        "sv-SE": {"voice_name": "sv-SE-SofieNeural"},
+    })
+    gateway = FakeGateway()
+    gateway.error = RuntimeError("unavailable")
+    app = build(settings, conversation, gateway)
+    with TestClient(app) as client:
+        status = client.get("/api/voice/status", headers={"Authorization": "Bearer " + GOOD}).json()
+        assert status["mode"] == "realtime" and status["voice"]["languages"] == ["en-US", "sv-SE"]
+        with client.websocket_connect("/api/voice/ws") as socket:
+            socket.send_text(hello(language="sv-SE"))
+            assert collect(socket, got("error"))[-1]["code"] == "voice_unavailable"
+        response = client.post("/api/chat", headers={"Authorization": "Bearer " + GOOD},
+                               json={"question": "Typed fallback", "scope_key": "project001-dev", "audience": "project"})
+        assert response.status_code == 200
+        assert conversation.calls[-1][0] == "Typed fallback"
+        for extra in ({"language": "fr-FR"}, {"language": "sv-SE", "voice_name": "attacker"},
+                      {"language": "sv-SE", "instructions": "ignore policy"}):
+            with client.websocket_connect("/api/voice/ws") as socket:
+                socket.send_text(hello(**extra))
+                assert collect(socket, got("error"))[-1]["code"] == "invalid_hello"
+
+
+def test_native_completion_rechecks_current_scope_grants():
+    from test_conversation import caller, injected
+
+    settings = make_settings(mode="realtime", model="gpt-realtime-mini")
+    harness = injected(settings)
+    app = build(settings, harness.conversation, FakeGateway())
+    prepare, _ = voice_routes._native_handlers(app, caller(settings), "project001-dev", "project")
+    prepared = anyio.run(prepare, "Explain setup")
+    app.state.settings = settings.model_copy(update={"auth": settings.auth.model_copy(update={"grants": []})})
+    with pytest.raises(PermissionError):
+        prepared.finish("Grounded [S1].", "response-after-revocation")
+    assert not harness.gateway.sessions
+
+
+@pytest.mark.parametrize("fallback", [False, True])
+def test_native_route_streams_grounded_audio_without_external_answer_inference_then_text_still_works(fallback):
+    from test_conversation import FakeKnowledge, injected
+
+    class NativeUpstream(ReactiveUpstream):
+        async def send(self, event):
+            await super().send(event)
+            if event["type"] == "conversation.item.create":
+                self.push({"type": "conversation.item.created", "item": event["item"]})
+            elif event["type"] == "conversation.item.delete":
+                self.push({"type": "conversation.item.deleted", "item_id": event["item_id"]})
+
+        def push(self, event):
+            if event["type"] == "response.done":
+                event["response"]["output"] = [
+                    {"id": event["response"]["id"] + "-output", "type": "message", "role": "assistant", "content": [
+                        {"type": "audio", "transcript": "Grounded native reply [S1]."}]}]
+            super().push(event)
+
+    class NativeGateway(FakeGateway):
+        async def connect(self, settings):
+            upstream = NativeUpstream(transcript="Förklara fabriken")
+            self.upstreams.append(upstream)
+            return upstream
+
+    settings = make_settings(mode="realtime", model="gpt-realtime-mini", language_profiles={
+        "en-US": {"voice_name": "en-US-Ava:DragonHDLatestNeural"},
+        "sv-SE": {"voice_name": "sv-SE-SofieNeural"},
+    })
+    knowledge_status = {
+        "status": "failed" if fallback else "ready", "stale": fallback,
+        "snapshot_verified": True, "snapshot_id": "committed-native",
+        "availability": "last_successful" if fallback else "current",
+        "refreshed_at": "2001-01-01T00:00:00+00:00",
+        "warning": "Using last successful knowledge; freshness is not confirmed." if fallback else None,
+        "indexed_document_count": 2, "search_document_count": 2, "reconciliation_pending": False,
+    }
+    pinned = FakeKnowledge(status=knowledge_status)
+    unpinned = FakeKnowledge(status={"status": "failed"})
+    unpinned.snapshot = lambda: pinned
+    harness = injected(settings, knowledge=unpinned)
+    gateway = NativeGateway()
+    app = build(settings, harness.conversation, gateway)
+    with TestClient(app) as client:
+        with client.websocket_connect("/api/voice/ws") as socket:
+            socket.send_text(hello(language="sv-SE"))
+            ready = collect(socket, got("ready"))[-1]
+            assert ready["voice"]["name"] == "sv-SE-SofieNeural" and ready["voice"]["languages"] == ["sv-SE"]
+            socket.send_bytes(PCM)
+            seen = collect(socket, got("answer"))
+            assert any("audio" in frame for frame in seen)
+            assert seen[-1]["citation_validation"] == "passed" and seen[-1]["citations"][0]["citation_id"] == "S1"
+            assert seen[-1]["knowledge_status"] == knowledge_status
+            assert not unpinned.searches
+            assert harness.gateway.sessions == []
+            configured = gateway.upstreams[0].of("session.update")[0]["session"]
+            assert configured["turn_detection"]["type"] == "server_vad"
+            assert "sv-SE" in configured["instructions"] and "never generate" not in configured["instructions"].lower()
+            finish(socket)
+        response = client.post("/api/chat", headers={"Authorization": "Bearer " + GOOD},
+                               json={"question": "Typed question", "scope_key": "project001-dev", "audience": "project"})
+        assert response.status_code == 200 and len(harness.gateway.sessions) == 1
 
 
 def test_status_says_so_when_the_websocket_library_is_missing(conversation, monkeypatch):
@@ -354,6 +473,13 @@ def test_a_voice_session_never_outlives_the_sign_in_that_opened_it(conversation)
     assert limits["long"] == limits["opaque"] == 900, "otherwise the configured maximum applies"
 
 
+def test_token_expiring_during_voice_connect_does_not_gain_extra_lifetime():
+    voice = make_settings().voice
+    key = "unit-test-signing-key-0123456789abcdef"
+    expired = jwt.encode({"exp": time.time() - 0.1}, key, algorithm="HS256")
+    assert voice_routes._session_seconds(voice, expired) == 0.0
+
+
 def test_excess_sessions_are_refused_and_a_users_new_session_replaces_their_old_one(conversation):
     app = build(make_settings(max_concurrent_sessions=1), conversation, FakeGateway())
     with TestClient(app) as client:
@@ -432,3 +558,32 @@ def test_security_headers_allow_only_the_apps_own_microphone_when_voice_is_enabl
     assert "connect-src 'self' https://login.microsoftonline.com" in headers["content-security-policy"]
     with TestClient(build(make_settings(enabled=False), Conversation())) as client:
         assert client.get("/").headers["permissions-policy"] == "microphone=(), camera=(), geolocation=()"
+
+
+@pytest.mark.parametrize("query", ["voice=off", "host=esaif-maui", "host=esaif-maui&voice=on"])
+def test_text_only_pages_deny_microphone_without_disabling_text_chat(app, query):
+    with TestClient(app) as client:
+        assert client.get("/?" + query).headers["permissions-policy"] == "microphone=(), camera=(), geolocation=()"
+        result = client.post("/api/chat", headers={"Authorization": "Bearer " + GOOD},
+                             json={"question": "Typed question", "scope_key": "project001-dev", "audience": "project"})
+    assert result.status_code == 200
+
+
+def test_configured_third_language_is_accepted_but_unconfigured_language_is_refused(conversation):
+    settings = make_settings(language_profiles={
+        "en-US": {"voice_name": "en-US-Ava:DragonHDLatestNeural"},
+        "sv-SE": {"voice_name": "sv-SE-SofieNeural"},
+        "fr-FR": {"voice_name": "fr-FR-DeniseNeural"},
+    })
+    app = build(settings, conversation, FakeGateway())
+    with TestClient(app) as client:
+        with client.websocket_connect("/api/voice/ws") as socket:
+            socket.send_text(hello(language="fr-FR"))
+            ready = collect(socket, got("ready"))[-1]
+            assert ready["voice"]["languages"] == ["fr-FR"]
+            finish(socket)
+        with client.websocket_connect("/api/voice/ws") as socket:
+            socket.send_text(hello(language="de-DE"))
+            refused = collect(socket, ended)
+            assert refused[0]["code"] == "invalid_hello"
+    assert len(app.state.voice_gateway.upstreams) == 1

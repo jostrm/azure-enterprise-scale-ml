@@ -422,6 +422,19 @@ def test_start_requests_the_microphone_loads_worklets_and_authenticates_in_the_f
 """, STATIC / "voice.js")
 
 
+def test_microphone_request_stays_in_the_explicit_start_gesture():
+    node(CLIENT_HARNESS + r"""
+(async () => {
+  const rig = make();
+  const starting = rig.client.start();
+  assert.equal(rig.env.navigator.mediaDevices.requests.length, 1,
+    "WebView2 user-initiated microphone permission must be requested before awaiting worklet/network setup");
+  await starting;
+  await rig.client.stop();
+})().catch((error) => { console.error(error); process.exit(1); });
+""", STATIC / "voice.js")
+
+
 def test_microphone_frames_are_batched_sent_as_binary_and_stop_when_muted():
     node(CLIENT_HARNESS + r"""
 (async () => {
@@ -495,7 +508,7 @@ def test_stopping_or_restarting_while_the_microphone_prompt_is_open_never_leaves
 """, STATIC / "voice.js")
 
 
-def test_stopping_before_the_worklets_load_never_asks_for_the_microphone():
+def test_stopping_while_worklets_load_releases_the_user_requested_microphone():
     node(CLIENT_HARNESS + r"""
 (async () => {
   const env = environment();
@@ -513,12 +526,15 @@ def test_stopping_before_the_worklets_load_never_asks_for_the_microphone():
   const rig = make({}, env);
   const starting = rig.client.start();
   await tick();
-  assert.equal(env.navigator.mediaDevices.requests.length, 0);
+  assert.equal(env.navigator.mediaDevices.requests.length, 1, "capture is requested in the explicit Start gesture");
   await rig.client.stop();
+  assert.equal(env.tracks[0].stopped, 1);
+  assert.equal(FakeContext.instances.at(-1).closed, true);
   loaded();
   await starting;
   await tick();
-  assert.equal(env.navigator.mediaDevices.requests.length, 0, "a cancelled start never prompts for the microphone");
+  assert.equal(env.navigator.mediaDevices.requests.length, 1, "a cancelled start never requests capture again");
+  assert.equal(FakeSocket.instances.length, 0, "a cancelled start never opens the relay");
   assert.equal(rig.client.phase, "off");
 })().catch((error) => { console.error(error); process.exit(1); });
 """, STATIC / "voice.js")
@@ -665,6 +681,184 @@ def test_interrupt_sends_a_control_message_and_flushes_local_playback():
   assert.deepEqual(JSON.parse(rig.socket.sent.at(-1)), {type: "interrupt"});
   assert.equal(rig.playback.port.posts.at(-1), null);
 })().catch((error) => { console.error(error); process.exit(1); });
+""", STATIC / "voice.js")
+
+
+@pytest.mark.parametrize("language", ["sv-SE", "fr-FR", "de-DE", "ja-JP", "zh-Hant-TW"])
+def test_language_switch_restarts_only_voice_with_same_authenticated_text_session(language):
+    node(CLIENT_HARNESS + r"""
+(async () => {
+  const rig = await started({language: "en-US"});
+  rig.socket.json({type: "ready"});
+  assert.equal(JSON.parse(rig.socket.sent[0]).language, "en-US");
+  await rig.client.setLanguage(process.argv[3]);
+  assert.equal(rig.socket.closed, 1000);
+  assert.ok(rig.context.closed && rig.env.tracks[0].stopped);
+  const next = FakeSocket.instances.at(-1);
+  next.open();
+  assert.equal(JSON.parse(next.sent[0]).language, process.argv[3]);
+  assert.equal(JSON.parse(next.sent[0]).token, session.token);
+  rig.socket.audio(new Int16Array(480).fill(4));
+  assert.equal(rig.playback.port.posts.length, 0, "old language session cannot resume audio");
+  assert.equal(session.token, "TOKEN-ABC-123", "text session was not cleared");
+  await rig.client.stop();
+})().catch((error) => { console.error(error); process.exit(1); });
+""", STATIC / "voice.js", language)
+
+
+def test_text_only_page_never_initializes_voice_or_touches_auth_microphone_and_orb():
+    node(r"""
+const assert = require("node:assert/strict");
+const voice = require(process.argv[2]);
+for (const search of ["?voice=off", "?host=esaif-maui", "?host=esaif-maui&voice=off"]) {
+  const card = {hidden: false};
+  const env = {
+    location: {search},
+    document: {getElementById: (id) => id === "voice-card" ? card : null},
+    AIFactoryAgent: {
+      voiceSession() { throw Error("text token must not be requested by disabled voice"); },
+      subscribe() { throw Error("disabled voice must not subscribe"); }
+    },
+    AIFactoryVoiceOrb: {createOrb() { throw Error("disabled voice must not create an orb"); }}
+  };
+  assert.equal(voice.initialize(env), null);
+  assert.equal(card.hidden, true);
+}
+""", STATIC / "voice.js")
+
+
+PAGE_HARNESS = CLIENT_HARNESS + r"""
+function page(status, search = "?host=esaif-maui&voice=on") {
+  class Element {
+    constructor() { this.hidden = false; this.disabled = false; this.handlers = {}; this.children = []; this.textContent = ""; }
+    addEventListener(kind, handler) { this.handlers[kind] = handler; }
+    setAttribute() {}
+    append(...children) { this.children.push(...children); }
+    replaceChildren(...children) { this.children = children; }
+  }
+  const elements = new Map();
+  const element = (id) => { if (!elements.has(id)) elements.set(id, new Element()); return elements.get(id); };
+  const requests = [];
+  const listeners = {};
+  const env = environment({
+    location: {protocol: "https:", host: "agent.example", search}, Intl,
+    document: {getElementById: element, createElement: () => new Element()},
+    AIFactoryAgent: {voiceSession: () => session, subscribe() {}, showAnswer() {}},
+    addEventListener: (name, handler) => { listeners[name] = handler; },
+    fetch: async (url, options) => {
+      requests.push([url, options]);
+      return {ok: true, json: async () => status};
+    },
+  });
+  return {env, element, requests, controller: voice.initialize(env),
+    grant: (enabled) => listeners["esaif:embedded-voice"]({detail: {enabled}})};
+}
+const capabilities = {
+  enabled: true, ready: true, mode: "realtime", protocol: 1, embedded_voice_version: 1,
+  voice: {languages: ["fr-FR", "de-DE", "ja-JP"], default_language: "fr-FR",
+    profiles: {"fr-FR": {name: "coral"}, "de-DE": {name: "coral"}, "ja-JP": {name: "coral"}}},
+};
+"""
+
+
+@pytest.mark.parametrize("change", [
+    {"mode": "speech_shell"}, {"embedded_voice_version": 0}, {"embedded_voice_version": None},
+    {"embedded_voice_version": "1"}, {"protocol": 2}, {"ready": False}, {"enabled": False},
+])
+def test_embedded_voice_rejects_incompatible_capability_without_microphone_or_token_changes(change):
+    node(PAGE_HARNESS + r"""
+(async () => {
+  const rig = page({...capabilities, ...JSON.parse(process.argv[3])});
+  assert(rig.controller, "explicit native embed can probe without starting capture");
+  rig.grant(true);
+  await tick();
+  assert.equal(rig.element("voice-toggle").disabled, true);
+  rig.element("voice-toggle").handlers.click();
+  await tick();
+  assert.equal(rig.env.navigator.mediaDevices.requests.length, 0);
+  assert.equal(FakeSocket.instances.length, 0);
+  assert.equal(session.token, "TOKEN-ABC-123");
+  assert.equal(rig.requests[0][1].headers.Authorization, "Bearer " + session.token);
+})().catch((error) => { console.error(error); process.exit(1); });
+""", STATIC / "voice.js", json.dumps(change))
+
+
+def test_embedded_native_page_uses_server_profiles_and_requires_explicit_start():
+    node(PAGE_HARNESS + r"""
+(async () => {
+  const rig = page(capabilities);
+  assert(rig.controller);
+  rig.grant(true);
+  await tick();
+  assert.equal(rig.element("voice-card").hidden, false);
+  assert.equal(rig.element("voice-toggle").disabled, false);
+  assert.deepEqual(rig.element("voice-language").children.map(item => item.value), ["fr-FR", "de-DE", "ja-JP"]);
+  assert.equal(rig.element("voice-language").value, "fr-FR");
+  await rig.controller.probe();
+  assert.equal(rig.element("voice-toggle").disabled, false, "same text session keeps its verified voice capability");
+  assert.equal(rig.requests.length, 1);
+  assert.equal(rig.env.navigator.mediaDevices.requests.length, 0);
+  rig.element("voice-toggle").handlers.click();
+  await tick();
+  const socket = FakeSocket.instances.at(-1);
+  socket.open();
+  assert.equal(JSON.parse(socket.sent[0]).language, "fr-FR");
+  assert.equal(JSON.parse(socket.sent[0]).token, session.token);
+  await rig.controller.client.stop();
+})().catch((error) => { console.error(error); process.exit(1); });
+""", STATIC / "voice.js")
+
+
+def test_embedded_host_revocation_stops_capture_and_preserves_text_session():
+    node(PAGE_HARNESS + r"""
+(async () => {
+  const rig = page(capabilities);
+  await tick();
+  assert.equal(rig.requests.length, 0, "do not probe before native host grant");
+  rig.grant(true);
+  await tick();
+  rig.element("voice-toggle").handlers.click();
+  await tick();
+  const socket = FakeSocket.instances.at(-1);
+  socket.open();
+  socket.json({type: "ready"});
+  rig.grant(false);
+  await tick();
+  assert.equal(socket.closed, 1000);
+  assert.ok(rig.env.tracks[0].stopped);
+  assert.equal(rig.element("voice-toggle").disabled, true);
+  assert.equal(rig.element("voice-card").hidden, true);
+  rig.element("voice-toggle").handlers.click();
+  await tick();
+  assert.equal(FakeSocket.instances.length, 1);
+  assert.equal(session.token, "TOKEN-ABC-123");
+})().catch((error) => { console.error(error); process.exit(1); });
+""", STATIC / "voice.js")
+
+
+def test_embedded_revocation_during_probe_cannot_restore_the_cancelled_grant():
+    node(PAGE_HARNESS + r"""
+(async () => {
+  const rig = page(capabilities);
+  rig.grant(true);
+  rig.grant(false);
+  await tick();
+  assert.equal(rig.requests.length, 0);
+  assert.equal(rig.element("voice-toggle").disabled, true);
+  assert.equal(rig.element("voice-card").hidden, true);
+  assert.equal(rig.env.navigator.mediaDevices.requests.length, 0);
+})().catch((error) => { console.error(error); process.exit(1); });
+""", STATIC / "voice.js")
+
+
+def test_language_labels_distinguish_configured_locales_and_keep_unknown_code():
+    node(r"""
+const assert = require("node:assert/strict");
+const voice = require(process.argv[2]);
+assert.match(voice.languageLabel("fr-FR", {Intl}), /French/);
+assert.match(voice.languageLabel("de-DE", {Intl}), /German/);
+assert.equal(voice.languageLabel("fr-FR", {}), "fr-FR");
+assert.equal(voice.languageLabel("en-12", {Intl}), "en-12", "unsupported browser label must keep the exact configured code");
 """, STATIC / "voice.js")
 
 

@@ -207,7 +207,8 @@ def test_fully_injected_answer_needs_no_cloud_constructors_or_monkeypatch(settin
 
 
 @pytest.mark.parametrize("refresh_status", ["blocked", "failed", "refreshing", "ready"])
-def test_verified_last_successful_answer_warns_and_pins_status(settings, refresh_status):
+@pytest.mark.parametrize("mode", ["typed", "native"])
+def test_verified_last_successful_answer_warns_and_pins_status(settings, refresh_status, mode):
     status = {
         "status": refresh_status, "refresh_status": refresh_status, "stale": True,
         "availability": "last_successful", "snapshot_verified": True,
@@ -223,18 +224,29 @@ def test_verified_last_successful_answer_warns_and_pins_status(settings, refresh
         response(calls=[FakeItem("knowledge_status"), FakeItem("knowledge_search", {"query": "More"})]),
         response(),
     ]))
-    result = harness.conversation.answer("Explain setup", "platform", caller(settings), SCOPE)
+    if mode == "native":
+        prepared = harness.conversation.prepare("Explain setup", "platform", caller(settings), SCOPE)
+        knowledge.snapshot = lambda: FakeKnowledge(status={"status": "failed"})
+        assert prepared.execute("knowledge_status", "status-call", "{}") == status
+        prepared.execute("knowledge_search", "search-call", '{"query":"More"}')
+        result = prepared.finish("Grounded [S1].", "native-response")
+        assert not harness.gateway.sessions
+        request = prepared.messages
+    else:
+        result = harness.conversation.answer("Explain setup", "platform", caller(settings), SCOPE)
+        request = harness.gateway.sessions[0].requests[0][0]
     assert result["knowledge_status"]["snapshot_id"] == "committed-generation"
     assert result["knowledge_status"]["warning"] == status["warning"]
     assert knowledge.searches == []
     assert len(pinned.searches) == 2
-    request = harness.gateway.sessions[0].requests[0][0]
     assert "last successful" in request[0]["content"][0]["text"].lower()
     assert json.loads(request[1]["content"][0]["text"])["knowledge_status"]["stale"] is True
-    outputs = harness.gateway.sessions[0].requests[1][0]
-    status_output = next(item for item in outputs if item.get("call_id") == "call-knowledge_status"
-                         and item.get("type") == "function_call_output")
-    assert json.loads(status_output["output"])["snapshot_id"] == "committed-generation"
+    if mode == "typed":
+        outputs = harness.gateway.sessions[0].requests[1][0]
+        status_output = next(item for item in outputs if item.get("call_id") == "call-knowledge_status"
+                             and item.get("type") == "function_call_output")
+        assert json.loads(status_output["output"])["snapshot_id"] == "committed-generation"
+    assert pinned.status_calls == 1
 
 
 def test_unverified_last_successful_claim_cannot_enable_inference(settings):
@@ -245,6 +257,32 @@ def test_unverified_last_successful_claim_cannot_enable_inference(settings):
     with pytest.raises(IndexingError):
         harness.conversation.answer("Explain setup", "platform", caller(settings), SCOPE)
     assert not harness.gateway.sessions
+
+
+def test_prepared_turn_reuses_grounding_tools_and_citations_without_external_inference(settings):
+    harness = injected(settings)
+    prepared = harness.conversation.prepare("Explain setup", "project", caller(settings), SCOPE)
+    assert harness.gateway.sessions == []
+    assert prepared.messages[1]["role"] == "user"
+    assert "Evidence for source-1" in prepared.messages[1]["content"][0]["text"]
+    assert prepared.execute("factory_health", "call-1", "{}") == {"ok": True}
+    result = prepared.finish("Grounded [S1].", "native-response")
+    assert result["citations"][0]["citation_id"] == "S1"
+    assert result["tool_activity"] == [{"name": "factory_health", "call_id": "call-1"}]
+    with pytest.raises(RuntimeError, match="unsupported source citation"):
+        prepared.finish("Invented [S9].", "native-response")
+    with pytest.raises(RuntimeError, match="omitted available"):
+        prepared.finish("No citations.", "native-response")
+    with pytest.raises(PermissionError):
+        prepared.execute("operation_execute", "call-2", "{}")
+
+
+@pytest.mark.parametrize("arguments", ['{"query": 1}', '{"query": true}', '{"query": "x", "scope": "other"}'])
+def test_prepared_turn_rejects_invalid_native_tool_arguments(settings, arguments):
+    harness = injected(settings)
+    prepared = harness.conversation.prepare("Explain setup", "project", caller(settings), SCOPE)
+    with pytest.raises(ValueError):
+        prepared.execute("knowledge_search", "call-1", arguments)
 
 
 def test_two_agents_keep_settings_and_versioned_model_references_independent(settings):

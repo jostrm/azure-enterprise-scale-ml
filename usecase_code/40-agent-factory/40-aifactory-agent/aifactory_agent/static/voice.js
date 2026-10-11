@@ -57,6 +57,7 @@
     };
     const run = {phase: "off", muted: false, generation: 0};
     let resources = null;
+    let language = options.language || null;
 
     function release() {
       const current = resources;
@@ -135,7 +136,8 @@
           show(message.state);
           break;
         case "transcript":
-          emit("onTranscript", message.role, String(message.text || ""), Boolean(message.final));
+          if (message.provisional) emit("onTranscript", message.role, String(message.text || ""), Boolean(message.final), true);
+          else emit("onTranscript", message.role, String(message.text || ""), Boolean(message.final));
           break;
         case "answer":
           emit("onAnswer", message);
@@ -182,11 +184,7 @@
       try {
         const context = new env.AudioContext({sampleRate: SAMPLE_RATE, latencyHint: "interactive"});
         current.context = context;
-        await context.resume();
-        if (generation !== run.generation) return;
-        await context.audioWorklet.addModule("/static/voice-capture-worklet.js");
-        await context.audioWorklet.addModule("/static/voice-playback-worklet.js");
-        if (generation !== run.generation) return;
+        // WebView2 requires this call to retain the explicit Start talking gesture.
         const stream = await env.navigator.mediaDevices.getUserMedia({audio: {
           channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true}});
         if (generation !== run.generation) {
@@ -197,6 +195,11 @@
           return;
         }
         current.stream = stream;
+        await context.resume();
+        if (generation !== run.generation) return;
+        await context.audioWorklet.addModule("/static/voice-capture-worklet.js");
+        await context.audioWorklet.addModule("/static/voice-playback-worklet.js");
+        if (generation !== run.generation) return;
         const source = context.createMediaStreamSource(current.stream);
         const capture = new env.AudioWorkletNode(context, "voice-capture", {numberOfInputs: 1, numberOfOutputs: 1});
         const silent = context.createGain();
@@ -235,8 +238,9 @@
         socket.binaryType = "arraybuffer";
         current.socket = socket;
         socket.onopen = () => {
+          if (generation !== run.generation) { socket.close(1000); return; }
           socket.send(JSON.stringify({type: "hello", token: session.token, scope_key: session.scopeKey,
-            audience: session.audience}));
+            audience: session.audience, ...(language ? {language} : {})}));
         };
         socket.onmessage = (event) => handleMessage(current, generation, event);
         socket.onclose = () => {
@@ -283,8 +287,16 @@
       }
     }
 
+    async function setLanguage(value) {
+      if (value === language) return;
+      const restart = run.phase === "active" || run.phase === "connecting";
+      await stop();
+      language = value || null;
+      if (restart) await start();
+    }
+
     return {
-      start, stop, interrupt, setMuted,
+      start, stop, interrupt, setMuted, setLanguage,
       get phase() { return run.phase; },
       get muted() { return run.muted; },
     };
@@ -292,6 +304,18 @@
 
   function statusText(state, muted) {
     return muted && state === "listening" ? "Microphone muted" : LABELS[state] || LABELS.off;
+  }
+
+  function languageLabel(code, env = globalThis) {
+    if (!(env.Intl && env.Intl.DisplayNames)) return code;
+    let name;
+    try {
+      name = new env.Intl.DisplayNames(["en"], {type: "language"}).of(code);
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+      return code;
+    }
+    return name && name !== code ? `${name} (${code})` : code;
   }
 
   /* Page glue: wires the Voice card, the orb and the Factory Agent page (app.js) together. */
@@ -302,6 +326,13 @@
     const element = (id) => (doc ? doc.getElementById(id) : null);
     const card = element("voice-card");
     if (!doc || !host || !card) return null;
+    const parameters = new URLSearchParams(env.location ? env.location.search || "" : "");
+    const embedded = parameters.get("host") === "esaif-maui";
+    if (parameters.get("voice") === "off"
+        || (embedded && (parameters.getAll("voice").length !== 1 || parameters.get("voice") !== "on"))) {
+      card.hidden = true;
+      return null;
+    }
     const toggle = element("voice-toggle");
     const mute = element("voice-mute");
     const interrupt = element("voice-interrupt");
@@ -309,15 +340,19 @@
     const transcript = element("voice-transcript");
     const problem = element("voice-error");
     const help = element("voice-help");
+    const language = element("voice-language");
+    const fallback = element("voice-use-text");
     const orb = orbApi && element("voice-orb") ? orbApi.createOrb(element("voice-orb"), {environment: env}) : null;
     if (orb) orb.start();
-    const lines = {user: "", agent: ""};
+    const lines = {user: "", agent: "", provisional: false};
     let enabled = false;
     let probedFor = null;
+    let probeGeneration = 0;
+    let embeddedGranted = !embedded;
 
     const render = () => {
       transcript.replaceChildren();
-      for (const [label, text] of [["You", lines.user], ["Agent", lines.agent]]) {
+      for (const [label, text] of [["You", lines.user], [lines.provisional ? "Agent (provisional)" : "Agent", lines.agent]]) {
         if (!text) continue;
         const paragraph = doc.createElement("p");
         const name = doc.createElement("strong");
@@ -327,7 +362,7 @@
       }
     };
     const message = (text, fatal) => {
-      problem.textContent = text || "";
+      problem.textContent = text ? text + " Typed chat remains available below." : "";
       problem.hidden = !text;
       if (fatal) problem.setAttribute("role", "alert");
     };
@@ -348,13 +383,14 @@
         controls(state);
       },
       onLevel: (level) => { if (orb) orb.setLevel(level); },
-      onTranscript: (role, text, final) => {
+      onTranscript: (role, text, final, provisional) => {
         if (role === "user") lines.user = text;
-        else lines.agent = text;
+        else { lines.agent = text; lines.provisional = Boolean(provisional); }
         if (role === "user" && final) lines.agent = "";
         render();
       },
       onAnswer: (answer) => {
+        lines.provisional = false;
         lines.agent = String(answer.spoken || "");
         render();
         host.showAnswer(answer);
@@ -363,7 +399,9 @@
     });
 
     toggle.addEventListener("click", () => {
-      if (client.phase === "off" || client.phase === "error") client.start();
+      if (client.phase === "off" || client.phase === "error") {
+        if (enabled && !toggle.disabled) void client.start();
+      }
       else client.stop();
     });
     mute.addEventListener("click", () => {
@@ -373,41 +411,98 @@
       stateLabel.textContent = statusText(client.phase === "active" ? "listening" : "off", client.muted);
     });
     interrupt.addEventListener("click", () => client.interrupt());
+    if (language) language.addEventListener("change", () => {
+      void client.setLanguage(language.value);
+    });
+    if (fallback) fallback.addEventListener("click", () => {
+      void client.stop();
+      if (host.focusTypedChat) host.focusTypedChat(lines.user);
+    });
 
     async function probe() {
-      const session = host.voiceSession();
+      const session = embeddedGranted ? host.voiceSession() : null;
       if (!session) {
+        probeGeneration += 1;
         enabled = false;
+        toggle.disabled = true;
         probedFor = null;
         card.hidden = true;
         await client.stop();
         return;
       }
-      if (probedFor === session.token) return;
-      probedFor = session.token;
+      const identity = `${session.token}:${session.scopeKey}:${session.audience}`;
+      if (probedFor === identity) return;
+      enabled = false;
+      toggle.disabled = true;
+      probedFor = identity;
+      const generation = ++probeGeneration;
+      await client.stop();
+      if (generation !== probeGeneration) return;
       try {
         const response = await env.fetch("/api/voice/status", {
           credentials: "omit", cache: "no-store", redirect: "error", headers: {Authorization: "Bearer " + session.token}});
-        if (!response.ok) { card.hidden = true; enabled = false; return; }
+        if (generation !== probeGeneration) return;
+        if (!response.ok) {
+          card.hidden = response.status === 404;
+          enabled = false;
+          probedFor = null;
+          toggle.disabled = true;
+          message("Live voice is unavailable. Your Chat sign-in has not been changed.", false);
+          return;
+        }
         const status = await response.json();
-        enabled = Boolean(status.enabled);
+        if (generation !== probeGeneration) return;
+        const compatible = !embedded || (status.mode === "realtime"
+          && status.protocol === 1 && status.embedded_voice_version === 1);
+        enabled = status.enabled === true && compatible;
         card.hidden = !enabled;
-        toggle.disabled = !status.ready;
+        toggle.disabled = !enabled || status.ready !== true;
+        if (!compatible) {
+          message("This deployment does not support native voice inside the app. Your Chat sign-in has not been changed.", false);
+          return;
+        }
+        if (language) {
+          const profiles = status.voice && status.voice.profiles;
+          language.hidden = !profiles;
+          language.replaceChildren();
+          for (const code of Object.keys(profiles || {})) {
+            const option = doc.createElement("option");
+            option.value = code;
+            option.textContent = languageLabel(code, env);
+            language.append(option);
+          }
+          language.value = status.voice.default_language || status.voice.languages[0];
+          await client.setLanguage(profiles ? language.value : null);
+        }
+        if (status.mode === "realtime" && help) help.textContent =
+          "Native voice streams a reply. Live audio and transcript are provisional until the final sources are checked. Typing remains available.";
         if (!status.ready && help) help.textContent = "Live voice is enabled but not ready on this deployment; ask the operator to check the voice dependencies.";
       } catch {
-        card.hidden = true;
+        if (generation !== probeGeneration) return;
+        card.hidden = false;
         enabled = false;
+        probedFor = null;
+        toggle.disabled = true;
+        message("Live voice status could not be checked. Your Chat sign-in has not been changed.", false);
       }
     }
 
     controls("off");
     stateLabel.textContent = statusText("off", false);
+    if (embedded) env.addEventListener("esaif:embedded-voice", (event) => {
+      embeddedGranted = event.detail && event.detail.enabled === true;
+      probedFor = null;
+      probeGeneration += 1;
+      void probe();
+    });
     host.subscribe(probe);
     probe();
+    const retry = element("voice-retry");
+    if (retry) retry.addEventListener("click", () => { probedFor = null; void probe(); });
     return {client, probe, get enabled() { return enabled; }};
   }
 
-  const exported = {createVoiceClient, initialize, rms, levelFromRms, statusText, LABELS};
+  const exported = {createVoiceClient, initialize, rms, levelFromRms, statusText, languageLabel, LABELS};
   if (typeof module === "object" && module.exports) {
     module.exports = exported;
   } else {

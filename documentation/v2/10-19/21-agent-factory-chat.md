@@ -13,6 +13,11 @@ Voice is **optional and off by default**. It never gives the agent more power: a
 goes through exactly the same sign-in, scope, permissions, retrieval, tools and citations as a typed
 one. Typing keeps working when voice is off, unavailable or blocked.
 
+For low-latency **native speech-to-speech**, an operator selects `voice.mode: "realtime"`
+and a supported native model. The compatibility default is still a speech shell; merely
+enabling voice does not change that mode. Native live audio/transcripts are provisional
+until final source checks. A voice-only failure never signs you out of text chat.
+
 !!! note "What this chapter covers"
 
     How the pieces fit, the switches that turn them on, the two ways to deploy (pipeline or operator),
@@ -150,14 +155,32 @@ runs skip it; the run reports every step and never prints secrets.
 
 ### B. Operator flow (existing or customized app)
 
+Approve the model's processing scope before deploying this example. In Sweden Central,
+Microsoft lists `gpt-realtime-mini` and `gpt-realtime` as **Global** inference;
+`gpt-realtime-datazone` is **Data zone**, not Sweden-only. Transcription and synthesis
+have separate processing scopes. Check [regional processing](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/regions?tabs=voice-live#llm-availability-and-processing-scope)
+and [model-specific input languages](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/voice-live-language-support?tabs=speechinput#gpt-realtime-and-gpt-realtime-mini-supported-languages);
+Azure TTS's 150+ locales are not the native model's input-language guarantee.
+
 If you already run the chat app (or need more than read-only grants, extra clients or a different agent
 invocation), keep using your own `config.local.json` and add the voice block:
 
 ```json
 "voice": {
   "enabled": true,
-  "voice_name": "en-US-Ava:DragonHDLatestNeural",
-  "input_languages": ["en-US"]
+  "mode": "realtime",
+  "model": "gpt-realtime-mini",
+  "voice_type": "openai",
+  "voice_name": "coral",
+  "input_languages": ["en-US"],
+  "default_language": "en-US",
+  "language_profiles": {
+    "en-US": {"voice_type": "openai", "voice_name": "coral", "greeting": "How can I help?"},
+    "sv-SE": {"voice_type": "openai", "voice_name": "coral", "greeting": "Hej! Hur kan jag hjälpa dig?"}
+  },
+  "turn_detection": "server_vad",
+  "silence_duration_ms": 350,
+  "answer_timeout_seconds": 60
 }
 ```
 
@@ -177,7 +200,9 @@ The deployment adds one **revision** of the same app. With voice enabled it also
 
 1. Open the app's private address in **Edge, Chrome, Safari or Firefox** (the page needs HTTPS and a microphone)
    and sign in with Microsoft. Choose the factory/project/environment you are authorized for.
-2. Select **Start talking** and allow the microphone for the site. The orb shows what the agent is doing:
+2. Choose a language from the operator-configured profiles (for example English, Swedish, French or Japanese). Changing language
+   restarts voice only; your Chat sign-in and typed-chat form remain usable. Select **Start talking**
+   and allow the microphone for the site. The orb shows what the agent is doing:
 
    | State | Meaning |
    |---|---|
@@ -187,26 +212,38 @@ The deployment adds one **revision** of the same app. With voice enabled it also
    | Speaking | A short spoken summary is playing. |
    | Voice unavailable | The session ended or could not start; typing still works. |
 
-3. Ask your question. The **full answer and its sources appear on the page**; what is spoken is a shorter
-   rendition with no citation markers, links, code or long tables ("...the table is on screen").
+3. Ask your question. In native mode the model streams audio directly through Voice Live
+   (no external full-text answer request followed by TTS). Live audio/transcripts are **provisional**;
+   only a completed, source-checked answer appears in the answer card. A failed source check is
+   shown explicitly; already heard audio cannot be recalled. In compatibility shell mode the full
+   answer appears first and a shorter rendition is spoken.
 4. **Interrupt any time** by speaking over the agent or selecting *Stop speaking*. *Mute microphone* keeps the
    session but sends no audio. *Stop talking* ends the session.
+5. If voice fails, select **Use typed chat**. It releases the microphone and focuses the existing
+   text form; it never submits automatically or changes your sign-in. **Check voice again** and
+   **Start talking** allow a voice-only retry.
 
 !!! note "Embedded ESAIF Agent Chat"
 
-    The chat embedded in the MAUI app blocks browser permission prompts, so it cannot ask for the microphone.
-    Use a regular browser for voice.
+    Older desktop builds remain text-only; their explicit browser voice button is a workaround.
+    A compatible desktop build can open `host=esaif-maui&voice=on` after independently confirming
+    the pinned backend's authenticated native-voice capability (`embedded_voice_version: 1`,
+    `mode: realtime`, `protocol: 1`). Microphone access is confined to that origin and document
+    and starts only on **Start talking**. Speech-shell/incompatible deployments, the default embedded
+    page and `voice=off` stay text-only. This source contract does not establish what is installed.
 
 ## Security and privacy
 
-- **One governed brain.** Voice Live only turns speech into text and text into speech. It never writes the
-  answer. Every transcript is answered by the same backend as typed chat: Entra sign-in, exact-scope
-  `knowledge.read` grant, retrieval, tools, citations and audit.
+- **One governed core.** The compatibility shell speaks the typed backend's answer. Native Voice Live
+  generates and streams the reply itself using the same shared preparation, exact-scope permissions,
+  readiness, evidence, read-tool policy, audit and final citation checks. The native model cannot
+  approve or execute writes. It cannot bypass grounding readiness.
 - **No credentials in the browser.** The browser talks to your app's WebSocket (`/api/voice/ws`), which connects to
   Azure Voice Live with the app's managed identity. Your sign-in token is sent in the **first frame**, never in a URL,
   and a voice session **ends no later than the token expires**.
 - **The browser cannot choose** the model, voice, instructions or tools. Origin, size, rate and concurrency limits
-  apply, and errors shown to you never include internal detail.
+  apply, and errors shown to you never include internal detail. Language is only a server-approved profile;
+  English-only semantic VAD is not used for Swedish.
 - **Audio and tokens are not stored or logged.** The microphone is used only while a session is running, and the
   page's `Permissions-Policy` allows it for the app itself only. If voice is disabled the voice routes do not exist.
 - **Roles.** With voice enabled, the app identity gets **Cognitive Services User** and **Foundry User** (formerly
@@ -219,12 +256,13 @@ The deployment adds one **revision** of the same app. With voice enabled it also
 | Topic | Details |
 |---|---|
 | Limits (defaults) | 15 minutes per session, idle end after 2 minutes, 4 concurrent sessions per app replica, one session per user (a newer one replaces the older). |
-| Spoken length | `voice.max_spoken_characters` defaults to `1200` (allowed range: `200` to `4000`). Long spoken replies are shortened; the full answer stays on screen. Adjust your operator configuration and redeploy if you need longer speech. |
-| Cost | Voice Live is billed per use by the tier of the configured speech `model` (default `gpt-4.1-nano`), in addition to the grounded answer's model and Search usage. HD voices are regional. Check your agreement's current rates. |
-| Languages | English by default. Swedish is not in the automatic multilingual list: set `sv-SE,en-US` and a Swedish voice such as `sv-SE-SofieNeural`. The voice is fixed per session. |
-| Knowledge | The index is rebuilt by a nightly refresh job and by `ingest`. Re-run `ingest` after large documentation changes. |
+| Spoken length | Shell: `voice.max_spoken_characters` defaults to `1200`. Native: brief responses capped at 1024 output tokens; long code/operations belong in typed chat. |
+| Cost | Shell uses a Voice Live model tier plus external answer inference. Native uses `gpt-realtime-mini`/`gpt-realtime` directly, removing that external answer request; Search/embedding/tool costs remain. Check your agreement's current rates. |
+| Languages | Operator-configured locale profiles, not an English/Swedish-only list. Add languages supported by the selected model and voice. OpenAI voices give model-native audio; `sv-SE-SofieNeural` with `voice_type: azure-standard` gives Azure synthesis inside Voice Live. Switching safely restarts voice only. |
+| Latency | Measure warmed English/Swedish end-of-speech to first audible reply after approved deployment. Server `aifactory.voice.first_audio.duration` measures first relayed frame, not speaker playback; readiness/Search/network/tool latency remains. Offline tests cannot promise sub-second replies. |
+| Knowledge | Refresh stages a complete isolated generation before atomic promotion. Each text/native turn pins a complete committed snapshot; failed, blocked or stale refreshes can use the last success with a dated freshness warning. No unverified or partially written fallback is served. |
 | Turn voice off | Set `voice.enabled` to `false` (operator flow) or the flag to `false`; the app keeps running as a text chat. Nothing is deleted. |
-| Roll back | Container Apps keep earlier revisions; activate the previous revision. |
+| Roll back | Retain earlier revisions and serving state. A revision using a legacy manifest/index contract may be incompatible with a newly promoted generation; review code, configuration and saved state together rather than blindly switching traffic or overwriting the manifest. |
 
 ## Troubleshooting
 

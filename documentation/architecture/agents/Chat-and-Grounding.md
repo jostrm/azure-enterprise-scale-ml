@@ -10,6 +10,7 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/browser_auth.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/graph_service.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_realtime.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_routes.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice_settings.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/speech.py
@@ -23,6 +24,7 @@ tests:
   - usecase_code/40-agent-factory/tests/test_factory_chat_agent.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_routes.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_session.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_realtime.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_speech.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_voice_frontend.py
 graph_symbols:
@@ -30,7 +32,7 @@ graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::function:Conversation.answer
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/graph_service.py::class:GraphQueryService
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice.py::class:VoiceSession
-reviewed_source: '21ea3380 + working tree; observed 2026-10-10; live voice observed 2026-10-09 at 29642909'
+reviewed_source: '66f7ea35 + native voice working tree; observed 2026-10-11; no native live deployment asserted'
 ---
 # Chat and grounding
 
@@ -55,11 +57,21 @@ citations and freshness limitations. The app appends `graph_query` only when
 dual-graph configuration is present, before hashing the deployment definition;
 the shared pipeline definition does not enable graph access by itself.
 
-## Optional live voice (speech shell)
+## Optional live voice (compatibility shell and native realtime)
 
-When `voice.enabled` is set, the application registers `GET /api/voice/status` and `WS /api/voice/ws`; otherwise neither route exists. Azure Voice Live is used only for speech to text, turn detection, noise suppression, echo cancellation and text to speech. The session is configured server side with `create_response` off, so the speech service never writes an answer. Each final transcript is answered by the same `Conversation.answer` call as a typed question (same exact-scope `knowledge.read` grant, readiness checks, retrieval, tools and citations). The answer is shown on the page and a shortened rendition from `speech.spoken_text` (no citation markers, links, code or long tables) is spoken.
+When `voice.enabled` is set, the application registers `GET /api/voice/status` and `WS /api/voice/ws`; otherwise neither route exists. In the compatibility shell, Azure Voice Live is used only for speech to text, turn detection, noise suppression, echo cancellation and text to speech. The session is configured server side with `create_response` off, so the speech service never writes an answer. Each final transcript is answered by the same `Conversation.answer` call as a typed question (same exact-scope `knowledge.read` grant, readiness checks, retrieval, tools and citations). The answer is shown on the page and a shortened rendition from `speech.spoken_text` (no citation markers, links, code or long tables) is spoken.
+
+That flow remains the default `voice.mode: speech_shell`, not a native speech-to-speech latency claim. Opt-in `realtime` uses Voice Live `gpt-realtime-mini`/`gpt-realtime` directly with incoming audio and server-triggered native response/audio streaming. `Conversation.prepare` extracts the shared governed readiness, retrieval, canonical read-tool intersection, per-call authorization/argument validation/audit and final citation checks; typed `Conversation.answer` uses that same prepared turn and retains the existing model gateway/reference. Native voice never invokes the external full-answer gateway or sends an answer as predefined TTS. VAD automatic response creation stays off to gate response creation on evidence readiness. Native output uses configured OpenAI voices; optionally Azure-standard voices select Azure synthesis within Voice Live, not model-native audio.
+
+Native live transcripts and audio are explicitly provisional. Only completed, citation-validated replies enter the authoritative answer card. Invalid/omitted citations or denied/failed tools stop the turn; already played speech cannot be recalled. Citation validation still does not establish semantic entailment. Readiness, transcription, Search/embedding, optional graph, network and tools still contribute latency. A first-relayed-audio histogram/log records end-of-speech latency without transcript/token content; live deployment and browser playback measurements remain separate requirements.
+
+Unsupported native capabilities, upstream authentication/protocol rejection and failed native responses terminate voice and preserve typed chat. There is no automatic mode/model downgrade or ungrounded generation fallback, and no request for service secrets or extra consent. Native failure telemetry records server-owned error codes only, not service messages or transcripts.
 
 The browser never receives Foundry credentials: it connects to the application's relay, which holds the managed-identity connection to Voice Live. The Entra access token travels in the first WebSocket frame (never a URL), is validated by `principal_from_token` and `authorize`, and bounds the session so it ends no later than token expiry. Origin, pre-authentication, concurrency, audio-rate, idle and maximum-duration limits are enforced by the relay; the browser cannot choose the model, voice, instructions or tools. A transcript or spoken text is user input or evidence, never authorization. Audio is not stored; tokens and transcripts are not logged.
+
+An optional hello `language` selects only a configured server-owned BCP-47 locale profile, not an English/Swedish-only list; arbitrary voice/model/instructions/tools fields remain forbidden. Native transcription uses `gpt-4o-mini-transcribe` with the locale's base language code, and native profiles use `server_vad`. Operators verify model-specific input and voice output support separately. The browser closes/reopens voice when language changes, retaining the authenticated text session. Voice-only status/auth/transport failures release audio but never clear or reacquire the text token. Explicit typed-chat fallback copies an utterance only on user request, without submitting it. Canceled tools cannot resume an old turn; in-flight synchronous read workers may finish but are never replayed or allowed to approve/execute writes. Native completion rechecks the current exact-scope knowledge grant before publishing an authoritative answer.
+
+`host=esaif-maui` stays text-only by default. An explicit `voice=on` embedded page may enable native voice only when the authenticated status declares `mode: realtime`, relay `protocol: 1` and `embedded_voice_version: 1`. Speech-shell and incompatible deployments remain text-only. The page requests a microphone only on Start talking; the compatible desktop host must independently enforce exact-origin permission and current document binding. This backend capability is not proof that an installed desktop build implements it. `voice=off` always denies microphone use.
 
 Live voice needs Cognitive Services User and Foundry User on the project Foundry account (assigned from `infra/voice-roles.bicep` only when voice is enabled) and private reachability of the account's `services.ai.azure.com` endpoint from the application. Offline tests with fake backends, mutation checks of the relay's safety properties and real-browser runs cover the relay and UI. A live Voice Live session in a tenant is a separate observation (region, DNS, roles); passing tests do not establish it.
 

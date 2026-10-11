@@ -627,6 +627,7 @@ def test_frontend_confirmation_and_shortcuts_accessibility():
     "discard", "out-of-sync", "reindex", "user-proposal", "proposal-blocked", "proposal-api-unavailable",
     "skill-cost", "skill-action", "skill-delete",
     "markdown-answer", "fallback-blocked", "fallback-failed", "fallback-stale",
+    "voice-status-401-fallback", "voice-fatal-fallback",
     "question-tiles", "question-tiles-denied", "action-tiles", "action-tiles-denied",
     *[f"confirm-{action}-{scenario}" for action in (
         "prepare", "propose", "approve", "execute", "continue", "cancel", "delete",
@@ -673,6 +674,7 @@ class Element {
   append(...items) { this.children.push(...items); }
   replaceChildren(...items) { this._text = ""; this.children = items; }
   addEventListener(name, callback) { this.handlers[name] = callback; }
+  dispatchEvent(event) { this.handlers[event.type]?.(event); }
   setAttribute(name, value) { this[name] = value; }
   focus() { sandbox.document.activeElement = this; }
   scrollIntoView() {}
@@ -779,11 +781,13 @@ const sandbox = {
   document: {getElementById: ui, createElement: (tag) => new Element(tag), createTextNode: (text) => new TextNode(text)},
   location, history: {replaceState(_, __, url) { historyCalls.push(url); current = new URL(url, current); }},
   crypto: webcrypto, isSecureContext: true, URL, URLSearchParams, TextEncoder, TextDecoder,
+  Event: class { constructor(type) { this.type = type; } },
   sessionStorage: {getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value),
     removeItem: key => storage.delete(key)},
   btoa: value => Buffer.from(value, "binary").toString("base64"),
   atob: value => Buffer.from(value, "base64").toString("binary"),
   setInterval: () => 1,
+  clearInterval() {},
   fetch: async (url, options = {}) => {
     calls.push({url, options, body: options.body ? String(options.body) : null, location: current.href});
     if (url === "/api/public-config") return response(config);
@@ -791,6 +795,10 @@ const sandbox = {
       token_type: "Bearer", access_token: "UNIT_TEST_ACCESS_TOKEN", expires_in: 3600,
     });
     if (url === "/api/context") return response(context);
+    if (url === "/api/voice/status") {
+      if (mode === "voice-status-401-fallback") return {ok: false, status: 401, json: async () => ({})};
+      return response({enabled: true, ready: true, mode: "realtime", voice: {languages: ["en-US"]}});
+    }
     if (url.startsWith("/api/skills?")) return response({scope_key: "project001-dev",
       skills: mode.startsWith("action-tiles") ? tileSkills : [skill]});
     if (url.startsWith("/api/skills/") && url.endsWith("/run")) {
@@ -1168,8 +1176,50 @@ async function consent() {
       await waitFor(() => ui("operation-history").textContent.includes("Executing — completion not confirmed"));
       assert(!ui("operation-history").textContent.includes("Succeeded"));
     } else {
+      if (mode.startsWith("voice-")) {
+        const before = sandbox.AIFactoryAgent.voiceSession();
+        const track = {stopped: false, stop() { this.stopped = true; }};
+        class AudioNode {
+          constructor() { this.gain = {value: 1}; this.port = {postMessage() {}}; }
+          connect() {} disconnect() {} getFloatTimeDomainData() {}
+        }
+        sandbox.AudioContext = class {
+          constructor() { this.destination = new AudioNode(); this.audioWorklet = {addModule: async () => {}}; }
+          async resume() {} async close() {}
+          createMediaStreamSource() { return new AudioNode(); }
+          createGain() { return new AudioNode(); }
+          createAnalyser() { return new AudioNode(); }
+        };
+        sandbox.AudioWorkletNode = AudioNode;
+        sandbox.navigator = {mediaDevices: {getUserMedia: async () => ({getTracks: () => [track]})}};
+        let socket;
+        sandbox.WebSocket = class {
+          constructor() { socket = this; this.readyState = 1; }
+          send(value) { this.last = value; }
+          close() { this.readyState = 3; }
+        };
+        vm.runInContext(fs.readFileSync(path.join(assets, "voice.js"), "utf8"), browserContext);
+        await waitFor(() => calls.some(call => call.url === "/api/voice/status"));
+        if (mode === "voice-fatal-fallback") {
+          await waitFor(() => !ui("voice-toggle").disabled);
+          await dispatch(ui("voice-toggle"), "click");
+          await waitFor(() => socket);
+          socket.onopen();
+          socket.onmessage({data: JSON.stringify({type: "error", fatal: true,
+            code: "authentication_required", message: "Voice sign-in failed."})});
+          assert(track.stopped, "fatal voice failure released the microphone");
+        }
+        await waitFor(() => ui("voice-error").textContent.includes("Typed chat"));
+        assert.equal(sandbox.AIFactoryAgent.voiceSession().token, before.token);
+        assert.equal(ui("question").disabled, false);
+        await dispatch(ui("voice-use-text"), "click");
+        assert.equal(sandbox.document.activeElement, ui("question"));
+        assert.equal(calls.filter(call => call.url.endsWith("/oauth2/v2.0/token")).length, 1,
+          "voice failures must not reacquire or clear the text token");
+      }
       ui("question").value = "A scoped question";
       await dispatch(ui("question"), "input");
+      if (mode.startsWith("voice-")) assert.equal(ui("ask").disabled, false);
       await dispatch(ui("question-form"), "submit");
       if (mode === "discard") {
         await waitFor(() => resolveLate);
@@ -1201,6 +1251,11 @@ async function consent() {
         assert(ui("citations").textContent.includes("HISTORICAL RELEASE NOTE"));
         assert(!descendants(ui("citations")).some(child => child.tagName === "a"));
         assert.equal(ui("source-S1").tagName, "li");
+        if (mode.startsWith("voice-")) {
+          const submitted = calls.find(call => call.url === "/api/chat");
+          assert.equal(submitted.options.headers.Authorization,
+            calls.find(call => call.url === "/api/context").options.headers.Authorization);
+        }
       }
     }
     assert(![...elements.values()].some(element => element.textContent.includes("UNIT_TEST_ACCESS_TOKEN")));
