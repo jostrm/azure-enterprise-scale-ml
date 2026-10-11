@@ -1,6 +1,7 @@
 """Native Voice Live streaming: offline protocol and governed turn tests."""
 import asyncio
 import base64
+import logging
 import json
 from types import SimpleNamespace
 
@@ -21,6 +22,8 @@ class NativeUpstream(FakeUpstream):
         self.ack_creations, self.ack_deletions = ack_creations, ack_deletions
 
     async def send(self, event):
+        if event["type"] == "conversation.item.create":
+            assert len(event["item"]["id"]) <= 32, "Voice Live item.id maximum is 32 characters"
         await super().send(event)
         if event["type"] == "conversation.item.create" and self.ack_creations:
             self.push({"type": "conversation.item.created", "item": event["item"]})
@@ -109,6 +112,46 @@ class NativeHarness(Harness):
         for index, item in enumerate(response["output"]):
             item.setdefault("id", f"{identifier}-output-{index}")
         self.upstream.push({"type": "response.done", "response": response})
+
+
+def test_native_context_and_tool_output_ids_fit_live_provider_32_character_limit():
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("First")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+        harness.response(output=[{"type": "function_call", "name": "knowledge_search",
+                                  "call_id": "c1", "arguments": '{"query":"more"}'}])
+        await harness.until(lambda: len(harness.upstream.of("response.create")) == 2)
+        identifiers = [event["item"]["id"] for event in harness.upstream.of("conversation.item.create")]
+        assert len(identifiers) == 2 and len(set(identifiers)) == 2
+        assert identifiers[0].startswith("ctx_") and identifiers[1].startswith("out_")
+        assert all(len(identifier) <= 32 for identifier in identifiers)
+        await harness.finish()
+    run(scenario)
+
+
+def test_native_provider_rejection_logs_only_bounded_code_and_parameter(caplog):
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.upstream.push({"type": "error", "error": {
+            "code": "string_above_max_length", "param": "item.id",
+            "message": "SENSITIVE_PROVIDER_DETAIL", "event_id": "SENSITIVE_EVENT"}})
+        await harness.until(lambda: harness.task.done())
+        messages = "\n".join(record.getMessage() for record in caplog.records)
+        assert "string_above_max_length" in messages and "parameter=item.id" in messages
+        assert "SENSITIVE" not in messages
+        assert not any("string_above_max_length" in item.get("message", "")
+                       for item in harness.channel.of("error"))
+        await harness.finish()
+    caplog.set_level(logging.WARNING)
+    run(scenario)
+
+
+@pytest.mark.parametrize("value", ["x" * 81, "item.id\nSENSITIVE", "Bearer SENSITIVE", None, {}])
+def test_native_diagnostics_reject_unsafe_or_unbounded_labels(value):
+    from aifactory_agent.voice_realtime import _diagnostic_label
+    assert _diagnostic_label(value) == "unknown"
 
 
 @pytest.mark.parametrize("kind", ["audio", "transcript"])
