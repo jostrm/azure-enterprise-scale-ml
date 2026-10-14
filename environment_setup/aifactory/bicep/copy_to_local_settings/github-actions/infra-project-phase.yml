@@ -8,8 +8,9 @@ on:
         required: true
         type: string
       config_file:
-        required: true
+        required: false
         type: string
+        default: ''
       config_secret:
         required: false
         type: string
@@ -452,14 +453,21 @@ jobs:
           New-Item -ItemType Directory -Force -Path $azureConfig | Out-Null
 
       - name: 00_Validate_Reviewed_Target
-        if: ${{ inputs.deployment_id != '' }}
+        if: ${{ inputs.deployment_id != '' || inputs.config_hash != '' || inputs.config_file == 'aifactory/.reviewed-project-config.json' }}
         shell: bash
         env:
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          CONFIG_FILE: ${{ inputs.config_file }}
           CONFIG_HASH: ${{ inputs.config_hash }}
           TARGET_ENVIRONMENT: ${{ inputs.environment }}
         run: |
           python3 - <<'PY'
-          import hashlib, json, os, re
+          import hashlib, json, os, re, uuid
+          if not all(os.environ[key] for key in ("DEPLOYMENT_ID", "CONFIG_HASH", "CONFIG_FILE")):
+              raise SystemExit("Reviewed phases require deployment_id, config_hash and config_file")
+          uuid.UUID(os.environ["DEPLOYMENT_ID"])
+          if os.environ["CONFIG_FILE"] != "aifactory/.reviewed-project-config.json":
+              raise SystemExit("Reviewed deployment configuration path mismatch")
           raw = os.environ.get("AIFACTORY_CONFIG_JSON", "")
           if not raw or hashlib.sha256(raw.encode("utf-8")).hexdigest() != os.environ["CONFIG_HASH"]:
               raise SystemExit("Run-specific configuration missing or changed")

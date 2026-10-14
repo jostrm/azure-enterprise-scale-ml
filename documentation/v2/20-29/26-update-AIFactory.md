@@ -40,6 +40,25 @@ Dev-only execution.
 
 See [setup: manual ADO parameters](24-end-2-end-setup.md#manual-azure-devops-run-pipeline-variablesyaml).
 
+## Manual GitHub Actions workflow
+
+Choose the consumer branch and target `environment` in `infra-project.yml`.
+Normal manual runs leave the optional `deployment_id`, `project_number` and
+`config_hash` empty; GitHub does not need ADO's nonempty placeholders.
+Clear `config_file` to use only existing GitHub Environment variables/secrets,
+or keep its `aifactory/variables.json` default for a JSON override.
+
+Reviewed runs require the complete protected-secret/project/hash/target contract.
+Partial metadata no longer silently skips reviewed validation. GitHub subnet
+allocation already uses authenticated Azure CLI, avoiding the ADO Az.Network
+assembly-loading problem.
+
+Update the submodule and re-copy **both** `infra-project.yml` and
+`infra-project-phase.yml` into `.github/workflows`; updating only the submodule
+does not refresh existing consumer workflow copies.
+See [GitHub manual setup](24-end-2-end-setup.md#manual-github-actions-project-run)
+and the [workflow input guide](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md#manual-inputs-and-subnet-authentication).
+
 ## Quick Feature-update & run
 
 After `00-start.sh` has copied the scripts to your repository root, use the script for your orchestrator:
@@ -85,6 +104,18 @@ When JSON override is enabled, the GitHub script asks `Update GitHub variables a
 Skipping bulk synchronization still uploads the selected JSON as **one** `AIFACTORY_CONFIG_JSON` environment secret and passes `aifactory/variables.json` as the GitHub Actions `config_file` input. The workflow restores that file from the secret, so the local configuration does not need to be committed. Existing GitHub authentication secrets must already be configured. This avoids uploading every JSON configuration value as a separate GitHub variable.
 
 On the first Azure DevOps run, the ADO script prompts for your organization name or URL and project name, then saves them locally for future runs. Microsoft Entra ID is the default authentication method. The script reads `azureDevOpsTenantId` from `variables.yaml`, or from the `dev` section of `variables.json` when JSON override is enabled, and passes that tenant explicitly to every Azure CLI login and token request. It never attempts authentication against all available tenants. In the browser account picker, select **Use another account** and enter the account's full email address. No Azure subscription is required.
+
+Before authentication, the legacy update flow shows the resolved organization and
+project and asks **Do you want to override with a custom Azure DevOps URL? [y/N]**,
+even when saved settings exist. Answer `y` and paste the full project URL, for
+example `https://example-org.visualstudio.com/AIFactory` or
+`https://dev.azure.com/example-org/AIFactory`. The launcher validates and replaces
+both destination values, then saves them in `~/.aifactory-ado-settings.json` (or
+`ADO_SETTINGS_FILE`). Enter/`n` retains the current destination. This fixes stale
+organization/project defaults; it does not grant access or change the Entra
+tenant. Noninteractive runs do not prompt and retain the existing environment ->
+saved settings -> CLI defaults lookup. Reviewed routes keep their separate
+exact-target authorization contracts.
 
 `azureDevOpsTenantId` is the **Microsoft Entra ID directory connected to the Azure DevOps organization**. It can differ from `tenantId`, which is used for Azure deployments. The script generates a direct link using the organization name: `https://dev.azure.com/<organization>/_settings/organizationAad`. That link opens the Microsoft Entra settings directly. Alternatively, open the Azure DevOps organization, click **Organization settings** in the lower-left corner, then click **Microsoft Entra** in the left menu. Copy the **Directory (tenant) ID** into `azureDevOpsTenantId`. Tenant-specific values and PATs are never embedded in the script.
 

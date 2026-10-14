@@ -258,6 +258,83 @@ for line in sys.stdin:
 ' "$name"
 }
 
+parse_ado_project_url() {
+  "${PYTHON[@]}" - "$1" <<'PY'
+import re
+import sys
+from urllib.parse import unquote, urlsplit
+
+message = (
+    "Invalid Azure DevOps project URL. Use https://dev.azure.com/organization/project "
+    "or https://organization.visualstudio.com/project without credentials, ports, "
+    "query strings or fragments."
+)
+try:
+    url = sys.argv[1].strip()
+    if not url or any(ord(char) < 32 or ord(char) == 127 for char in url):
+        raise ValueError
+    parsed = urlsplit(url)
+    host = parsed.hostname or ""
+    if (parsed.scheme != "https" or parsed.netloc.lower() != host
+            or parsed.query or parsed.fragment):
+        raise ValueError
+    parts = [unquote(part, errors="strict") for part in parsed.path.strip("/").split("/")]
+    if any(not part or part in {".", ".."} or any(
+        ord(char) < 32 or ord(char) == 127 or char in "/\\" for char in part
+    ) for part in parts):
+        raise ValueError
+    if host == "dev.azure.com":
+        if len(parts) < 2 or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]*", parts[0]):
+            raise ValueError
+        organization = f"https://dev.azure.com/{parts[0]}"
+        project, remaining = parts[1], parts[2:]
+    elif re.fullmatch(r"[a-z0-9][a-z0-9-]*\.visualstudio\.com", host):
+        organization = f"https://{host}"
+        project, remaining = parts[0], parts[1:]
+    else:
+        raise ValueError
+    if project.startswith("_") or (remaining and remaining[0] not in {
+        "_build", "_git", "_release", "_workitems", "_boards", "_wiki", "_settings"
+    }):
+        raise ValueError
+except ValueError:
+    print(message, file=sys.stderr)
+    raise SystemExit(1)
+sys.stdout.write(f"{organization}\t{project}")
+PY
+}
+
+prompt_ado_custom_url_override() {
+  local choice custom_url destination
+  while true; do
+    if ! read -r -p "$(aif_prompt "Do you want to override with a custom Azure DevOps URL? [y/N]: ")" choice; then
+      aif_error "Could not read the Azure DevOps URL override choice." >&2
+      return 1
+    fi
+    case "${choice,,}" in
+      ""|n|no)
+        return 0
+        ;;
+      y|yes)
+        while true; do
+          if ! read -r -p "$(aif_prompt "Azure DevOps project URL: ")" custom_url; then
+            aif_error "Could not read the custom Azure DevOps project URL." >&2
+            return 1
+          fi
+          if destination="$(parse_ado_project_url "$custom_url")"; then
+            IFS=$'\t' read -r ado_organization ado_project <<< "$destination"
+            devops_defaults_prompted=true
+            return 0
+          fi
+        done
+        ;;
+      *)
+        aif_warn "Please enter 'y' for Yes or 'n' for No. Press Enter for No." >&2
+        ;;
+    esac
+  done
+}
+
 ado_organization="${ADO_ORGANIZATION:-}"
 ado_project="${ADO_PROJECT:-}"
 if [[ -z "$ado_organization" ]]; then
@@ -273,6 +350,13 @@ if [[ -z "$ado_project" ]]; then
   ado_project="$(read_devops_default project)"
 fi
 devops_defaults_prompted=false
+if [[ -n "$ado_organization" || -n "$ado_project" ]]; then
+  aif_value "Configured organization" "${ado_organization:-Not configured}"
+  aif_value "Configured project" "${ado_project:-Not configured}"
+fi
+if [[ -t 0 ]]; then
+  prompt_ado_custom_url_override
+fi
 if [[ -z "$ado_organization" || -z "$ado_project" ]]; then
   if [[ ! -t 0 ]]; then
     aif_error "Azure DevOps organization and project are required in non-interactive mode." >&2
@@ -294,6 +378,8 @@ case "$ado_organization" in
   *) ado_organization="https://dev.azure.com/$ado_organization" ;;
 esac
 ado_organization="${ado_organization%/}"
+aif_value "Selected organization" "$ado_organization"
+aif_value "Selected project" "$ado_project"
 if [[ "$devops_defaults_prompted" == "true" ]]; then
   "${PYTHON[@]}" - "$ADO_SETTINGS_FILE" "$ado_organization" "$ado_project" <<'PY'
 import json

@@ -45,6 +45,27 @@ those checks. Never invent a hash or set only the reviewed target.
 See [manual update settings](26-update-AIFactory.md#manual-azure-devops-run-pipeline)
 when rerunning an existing project deployment.
 
+## Manual GitHub Actions project run
+
+For `infra-project.yml`, select the consumer branch and one `environment`
+(`dev`, `stage` or `prod`). GitHub accepts empty optional inputs: leave
+`deployment_id`, `project_number` and `config_hash` empty for a normal manual
+run. Do not enter ADO's `manual` / `not-applicable` values. The actual project
+comes from the selected configuration.
+
+`config_file` defaults to `aifactory/variables.json`. Clear it to use existing
+GitHub Environment variables/secrets without a JSON override; GitHub does not
+read the ADO `variables.yaml`. Custom runner labels may remain empty. Select
+`github-hosted` only when its network and identity are compatible with the target.
+
+Reviewed launches still require their protected configuration secret, exact
+target/project and matching hash. Partial reviewed metadata is an error, not an
+optional manual override. The subnet task already uses the CLI session from
+`azure/login`, not Az.Network imports. After upgrading the submodule, re-copy
+**both** `infra-project.yml` and `infra-project-phase.yml` into the consumer's
+`.github/workflows` directory.
+See the [GitHub workflow guide](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md#manual-inputs-and-subnet-authentication).
+
 ## Prerequisites
 [Prerequisites](../10-19/12-prerequisites-setup.md) for Azure and Azure Devops/Github
 
