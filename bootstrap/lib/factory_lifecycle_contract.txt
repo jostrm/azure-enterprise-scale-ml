@@ -55,6 +55,209 @@ run_id}, worker_receipt, projects_succeeded and deletion_complete. The catalog
 removes a factory only from a succeeded aggregate whose children carry exactly
 the reviewed deletions and successful worker evidence for every project.
 
+Native Foundry first run (identity-receipt-account-uami-instance-closure-project-v4)
+---------------------------------------------------------
+capabilities.native_foundry advertises the v4 executable contract, accompanied by
+native_foundry_identity_producer="source-projected-project-uami-instance-v2". This is a
+source capability, not live Azure acceptance or authorization. Earlier capabilities
+and advertisements without the implemented producer/receipt/inventory entrypoints are not
+sufficient. A declared blocker still takes precedence. Unverified source cannot
+contribute a capability. No general effective-access or actor probe is required.
+
+Read-only source-shaped ARM evidence omitted the new UAMI's VNet grant and retained
+an unresolved principal reference. Therefore a cold injected first run does not
+attempt to approve the dependent graph with a hypothetical principal. Preparation
+first projects the exact compiled-v2 foundation symbols projectResourceGroup,
+namingConvention and miForPrj, verifies the nested canonical naming and mi.bicep
+modules, and retains only the managedIdentity leaf of mi.bicep. Its Cognitive
+Services User assignment is excluded. Existing-only naming resource declarations
+are reads, not writes. miPrjExists must be explicitly false. Template-spec variants,
+changed source selectors, extra leaves or ambiguous scope/what-if evidence block.
+The complete requested parameters/source/configuration remain bound, unchanged.
+
+deployment.foundry_identity_stage freezes only the minimal source payload hash,
+exact UAMI/RG IDs, source-declared Create/NoChange changes, pre-existing group
+resource fingerprints and a binding hash of source, configuration, target,
+operator/deployment identities, route, coordination and all complete source steps.
+The approval_purpose is identity-only; continuation_requires_new_approval is true.
+No Foundry account, model, role or persona access is executed in this stage.
+The worker rechecks the source projection, preview, absence and ownership.
+After persisting intent it rereads the exact initial group/resource inventory and
+UAMI absence, then freshly authorizes the active claim and lease before its single
+PUT. It validates actual output-bound GUID/client/tenant/ownership and exact closure.
+The receipt retains the initial snapshot and final identity-only closure. Existing
+resources and the existing group cannot change. Completion repeats that closure
+check and authorization; failures retain reconciliation evidence without retry.
+
+A producer worker success receipt has completion="identity-only",
+continuation_required=true, only the foundry-identity-producer deployment and the
+exact UAMI/RG ownership rows. foundry_identity_receipt binds the original run and
+manifest, payload and configuration/source context hashes, output-bound resource
+IDs, real identity metadata/body hash, observed_at, role_writes=[] and
+full_project_executed=false. It is not full project success. Catalog registration
+records this ownership but does not mark project/factory deployment configured.
+The worker proof also records producer_prepared_at and request_hash, binding source,
+configuration, target, identities, route and locks before generated step parameters.
+foundry_identity_preparation reads the exact ownership-linked durable receipt and
+fresh identity body to recover only the original run/time inputs. Catalog bootstrap
+projection reuses these inputs instead of generating different deploymentId/random
+values during the second preparation. This is not a dependent-plan approval:
+the complete rebuilt source/parameter context must still match at native freezing.
+
+Only a NEW preparation/run and separate approval can continue. Preparation reads
+the producer worker receipt from the enrolled durable store using exact recorded
+run_id/receipt_hash ownership, requires the same source/configuration/target/route/
+coordination context, and re-observes the exact identity instance. The next review
+must start within one hour of producer observation; expired or mismatched receipts
+require reconciliation, never automatic recreation, refresh or a new grant.
+deployment.foundry_identity_continuation binds that immutable receipt. Only the
+source-selected project-UAMI lookup and producer outputs are replaced with its
+validated literals. The already-produced identity leaf is omitted from the full
+foundation payload; its source Cognitive Services User role remains, with the
+literal principal. Canonical passwordless spAndMiArray outputs become the exact
+MI-only literal array, preserving source VNet role names. A secret-backed SP array
+is unsupported by this continuation; it is not read or silently discarded.
+No unrelated or arbitrary future identity receives this treatment.
+Catalog prepare/review can freeze this identity-only stage without a global
+full-project preflight-ready assertion. Preflight availability is not a receipt.
+Verified catalog jobs expose completion="identity-only", continuation_required=true.
+Creation workflows retain that completed producer child without marking the
+project-deployment stage complete. Any former whole-workflow authorization is
+retained as invalidated history; the automatic runner stops. The same project
+stage requires a fresh catalog freeze and new explicit approval, and any remaining
+workflow stages also require explicit reviews rather than inheriting retired consent.
+plan_foundry_lifecycle expands one exact deploy-project manifest's
+non-AVM, non-CMK 09-ai-foundry-2025-v4 entrypoint into prerequisites, account-only,
+and full-project phases. All parameters except foundryV22AccountOnly are retained:
+existence flags, project configuration and every selected model are not rewritten.
+The account-only source does not deploy models; the full phase deploys them once.
+Explicit existing-account and disabled Foundry selections retain their old path.
+Standalone account-only, unresolved selections and unsupported topologies block.
+Resource-level Defender enabled without subscription-level Defender is rejected
+before expansion because its account-only dependency is unordered. Opaque persona
+writes are also blocked: they have no complete phase-specific instance/write proof.
+Neither guard rewrites the user's saved parameters.
+
+After identity production, freeze_deployment_plan reviews the complete combined graph and each cumulative
+phase using ARM what-if. Exact account absence and the single new Cognitive
+account in the account-phase difference bind the future output, not an account
+name-prefix search. Missing, ignored, unresolved, destructive or out-of-scope
+what-if evidence remains blocked. Frozen phase metadata and exact network grant
+scopes are included in the reviewed manifest; phase-specific preview hashes do
+not authorize changes outside its declared after-state. At execution each phase's
+current preview is compared to reviewed payload hashes and preceding postconditions.
+No broad stripping of runtime differences or guessed equivalence is permitted.
+Exact initial inventory and all three phase-specific provider closure observations
+are retained and re-read before continuation. They bind actual generated identities and
+unchanged resources, not guessed pre-deployment principal IDs. Ignore/NoChange may
+use only those exact observed instances; new/modified after-payloads still require
+the reviewed desired hash. An observed hash may supersede a bootstrap-owned
+original only after an explicit reviewed Modify with that original before-hash
+in an actually executed phase write. A cumulative prior preview alone is never
+write evidence. Each phase retains executed_changes, resources and closure_hash;
+unchanged resources remain byte-hash identical across the complete history.
+Preserve-only resources and descendants never
+gain that permission. Original snapshots and their ownership proofs stay unchanged.
+Native phases separately retain source_changes, the exact raw ARM change type for
+each normalized resource ID. Ignore may normalize to NoChange for preservation,
+but never qualifies a source-declared UAMI grant. The phase provenance is bound to
+the frozen manifest and required by validation. Live provenance is checked again
+during initial previews and immediately before the prerequisite root PUT; genuine
+source-reasserted NoChange grants still allow exact GET payload verification.
+
+The same enrolled provider worker and durable claim execute separate ARM root
+deployments. For injection, the exact single UAMI selected by the reviewed account
+identity payload is bound to 01-foundation's actual MI-name/resource-group outputs
+and 09's getProjectMIPrincipalId source selector. Before the account deployment,
+the worker checks the completed foundation deployment, materialized UAMI principal,
+client and tenant IDs, VNet/subnet readiness and exact source-reviewed VNet Network
+Contributor assignment. A UAMI GET does not invent a provisioningState when that
+API omits it; producer completion and materialized identifiers are recorded instead.
+Existing UAMI principal/client/tenant bindings cannot change after preparation.
+
+There are no ad-hoc Network Contributor PUTs, no added SAMI grants and no invented
+subnet grant. Source 08b-rbac-common-rg/vnetRBACReader assignments remain part of
+the original reviewed ARM phases. Each phase checks preservation before writes;
+unchanged preserved networks may be read but missing grants below them cannot be
+created. Missing/unresolved resource IDs or grant payloads block preparation.
+A candidate grant must occur in the prerequisite source what-if, including a
+source-reasserted NoChange assignment. An existing bootstrap grant outside that
+graph cannot substitute for the declared assignment or become a second candidate.
+All other source roles, including mi.bicep's RG-scoped Cognitive Services User
+assignment, remain in the complete cumulative previews and phase observations.
+The receipt-bound continuation additionally freezes identity_dependent_grants,
+requires the Cognitive Services User grant and exact literal project principal,
+and retains source-declaration provenance. Raw Ignore is never a declaration,
+including for that grant. planned-create agent identities are rejected: producing
+the identity, observing it and separately reviewing concrete dependent changes is
+mandatory. Every continuation phase rereads the durable producer receipt and exact
+identity body before its write; full success includes the bound receipt reference.
+Offline source compilation and state-machine tests are not real-cloud execution.
+
+After the account phase, exact aiFoundryV2ResourceId/aiFoundryV2Name outputs, account
+SAMI/tenant, owner, region, injection subnet and attached UAMI principal/client are
+checked. The exact account capability host must reach Succeeded. Its provider proof names
+the configured UAMI and hashes the earlier identity/grant observations; it never
+credits subsequently added SAMI roles. Identity/grant drift is checked again before
+the full-continuation boundary. Foreign scopes, wrong subjects, conditional
+or delegated grants, incomplete observations and authorization errors fail closed.
+Role visibility is explicitly observation, not effective-permission proof.
+Provider readiness is evidence for the account's configured UAMI/network setup,
+not an independent effective-access test for that principal or a runtime agent test.
+The capability-host response does not identify the operation actor. Naming the
+configured UAMI in a receipt therefore does not independently prove which identity
+performed injection, or prove general RBAC propagation for that identity. Those
+limitations are explicit false fields, not an independent actor-probe requirement.
+For injected accounts the proof status is provider-ready and the required gates are
+account-identity and configured-agent-network-ready. Both receipt validators require
+the complete exact source/identity/grant/configuration-bound provider proof before
+full continuation. The live host ID/state/body is rechecked immediately before the
+full root PUT. Missing, changed or overstated evidence cannot be replaced by a
+claimed successful phase. Account/provider failures retain reconciliation state
+without automatic replay. No impersonation, additional probe resources, identity
+attachment or unadvertised permission API is required or used.
+The account's existing reviewed source dependency on subnetDelegationAca orders
+delegation before account creation; no extra internal subnet phase is required.
+Explicit empty aca2SubnetId follows the source's no-injection branch without
+changing configuration flags. CMK/key-vault sequencing remains unsupported.
+
+Readiness polls are bounded to 180 attempts at five-second intervals; deployments
+are bounded to 1440 attempts. Every poll checks lease/claim ownership, and every
+write rechecks authorization. No failed write is retried. Pending deployment/gate,
+completed phases, exact identity, grant and capability-host hashes are persisted.
+Each phase persists its pending intent, rechecks required identity/readiness and
+the complete current instance inventory, then freshly authorizes immediately
+before ARM PUT. Final success binds the last phase's exact closure to the final
+inventory and ownership rows, including resource types, API versions and etags.
+Completion rechecks readiness, the same complete closure and active authorization.
+Missing initial evidence, truncated phase history or differing final ownership
+cannot be accepted as a successful v4 receipt.
+Expired review windows reject new claims; an already accepted, still-active durable
+claim retains the existing continuation semantics beyond its admission deadline.
+Any failure/interruption keeps reconciliation-required evidence and the durable
+claim; no suffix phase or automatic account replay is allowed. Success requires
+ordered phase/readiness receipts plus the unchanged final ownership closure.
+Identity-only success cannot be substituted for any full phase/readiness receipt.
+Local source/state-machine acceptance does not establish live provider success.
+Publication, helper hashing, clean immutable source and user review remain required.
+
+foundry_lifecycle.principal_binding is the closed source-enforced symbolic binding
+for the account system identity only (foundry-account-system-identity-v1). It names
+the source commit, canonical template/module/resource, producer phase/step, exact
+resource ID/name output paths, the frozen account_resource_id field, principal and
+tenant property paths, API version, tenant/subscription and required gate IDs in
+order before the full-project step. Account identity.tenantId must match the target.
+foundry_readiness records principal_binding_hash and completed_gates alongside the
+exact resolved account ID, principal GUID and observation hashes. Missing gate or
+binding evidence rejects continuation and success. A source dependency alone is
+not this binding. Injection also requires agent_identity_binding
+(foundry-source-project-uami-v1), naming its source selector, producer outputs,
+properties.principalId/clientId/tenantId, required grant source, API and before-account
+ordering. Frozen account/grant payload hashes bind the selected UAMI and candidate
+grant IDs; foundry_agent_readiness records exact observed subject and grant hashes.
+Neither these bindings nor generic properties.principalId references certify other
+identities. Obsolete v1 SAMI-grant and v2 cold-preview contracts are not v3 support.
+
 Opt-in single-writer coordination (provider-repository-cas-v1)
 -----------------------------------------------------------
 Blob coordination remains the default. Enrollment options may explicitly select

@@ -6,6 +6,10 @@ private web frontend. Selecting Platform or Project changes explanations, not
 permissions. Configuration persistence, agent deployment and Azure provisioning
 are distinct operations.
 
+You can also [ask about Azure dashboards and current project costs](#ask-about-azure-dashboards-and-current-project-costs):
+the chatbot can retrieve Azure Cost Management analysis for the selected project's
+resource group, rather than guessing spend from documentation or resource names.
+
 ## Boundaries
 
 - Use existing Foundry, Search, project data storage and internal Container Apps
@@ -338,6 +342,143 @@ Search ingestion and corpus packaging even under broad documentation includes.
 Both commands use the persisted Foundry agent and real Search retrieval. Model
 answers must cite supplied evidence. Tool calls are bounded, errors propagate,
 and inference/writes are not blindly retried.
+
+## Ask about Azure dashboards and current project costs
+
+Use the AI Factory chatbot to ask about the information behind Azure dashboards,
+including **Cost Analysis for the currently selected project's resource group**.
+For example, select the authorized `project001-dev` scope in the chat application
+and ask:
+
+> What is the current Azure running cost for the currently selected project001 in the current AI Factory?
+
+For this question, "current running cost" means **actual month-to-date (MTD)
+charges**, alongside Azure's separate **full-month forecast**. It is not an
+instantaneous hourly burn rate or an idle-cost estimate. A successful cost-tool
+response supplies the selected subscription/resource group, billing period,
+actual totals and breakdown by Azure service, forecast, currency and observation
+time for the agent to explain. No example monetary amounts are invented here.
+
+The scope selected in **chat** is authoritative: confirm its factory, project
+and environment before asking. `project001` alone is not a globally unique
+resource-group name, and naming another project in the question does not change
+scope or grant access. The operator CLI uses the same scoped conversation:
+
+```powershell
+.\.venv\Scripts\python.exe -m aifactory_agent --config config.local.json ask `
+  --scope project001-dev --audience project `
+  --question "What is the current Azure running cost for the currently selected project001 in the current AI Factory?"
+```
+
+Chat summarizes the returned cost analysis; it does **not** scrape, embed or
+automatically open the Azure Portal Cost Analysis blade. For a direct structured
+report without model tool selection, use
+`/get-monthly-forecasted-project-estimated-azure-cost` in the authenticated
+**Factory actions and cost monitoring** panel and supply the exact project
+resource-group name. The original `monthtly` spelling remains supported.
+
+### How the agent knows: scope, tools and live Azure calls
+
+1. **Authenticate and resolve the selection.** `POST /api/chat` carries the
+   question, `scope_key` and audience. The backend validates the caller and
+   `knowledge.read`, checks knowledge readiness and retrieves documentation.
+   `Conversation.answer()` supplies the server-configured `active_scope` to the
+   Foundry agent, including the factory/project/environment, subscription and
+   resource group. Search and optional dual-graph evidence explain the Factory;
+   neither contains authoritative current billing.
+2. **Request the read-only cost tool.** The Foundry agent can issue
+   `cost_monthly_project_forecast` with
+   `{"resource_group": "<resource-group-from-active_scope>"}`.
+   `FactoryTools.descriptors()` exposes cost tools only for callers with both
+   `factory.read` and `cost.read`. The conversation intersects canonical tools
+   with those descriptors, validates arguments, rechecks authorization and
+   dispatches through `FactoryTools.execute()` to `CostSkills.execute()`.
+3. **Enforce the target and obtain an ARM token.** `CostSkills` checks the same
+   exact-scope grants and rejects a project resource group different from the
+   configured selection. The subscription is server-selected, not a model
+   argument. The backend uses `ManagedIdentityCredential` in the hosted app
+   (or configured `AzureCliCredential` for operator use) to request
+   `https://management.azure.com/.default`. The browser/model does not receive
+   that token.
+4. **Read Azure Cost Management now.** `CostSkills._execute()` calls
+   `_billing()` twice: once for actual MTD charges and once for Azure's
+   full-month forecast, using the resource-group-scoped endpoints below.
+   These are read-only analytics requests even though the HTTP method is POST.
+   This path calls ARM directly; it does not require a separate Factory HTTP
+   API, scrape dashboard tiles, run arbitrary shell commands or refresh Search.
+5. **Explain the returned evidence.** The backend returns `actual_mtd` and
+   `azure_forecast_full_month` as a `function_call_output` to the Foundry agent.
+   The agent then composes the chat answer. Tool calls are bounded and audited;
+   the chat response records their names in `tool_activity`. Documentation
+   citations support the explanation, not the live monetary amounts: those
+   come from the Azure tool response and its reported scope/time/currency.
+
+The two Azure requests are:
+
+```http
+POST https://management.azure.com/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.CostManagement/query?api-version=2025-03-01
+POST https://management.azure.com/subscriptions/{subscriptionId}/resourceGroups/{resourceGroup}/providers/Microsoft.CostManagement/forecast?api-version=2025-03-01
+```
+
+Both send `type: "ActualCost"`, `timeframe: "Custom"`, daily granularity and
+`Sum(Cost)`. The actual query covers the UTC calendar-month start through the
+observation time and groups by `ServiceName`. The forecast covers the whole UTC
+calendar month with `includeActualCost: true` and
+`includeFreshPartialCost: false`. Its total already includes its actual-cost
+component: **do not add the independent MTD total again**. Amounts are retained
+as decimal strings per returned billing currency, with no currency conversion.
+
+The panel is an alternative entry point into the same cost adapter:
+`POST /api/skills/get-monthly-forecasted-project-estimated-azure-cost/run` with
+`{"scope_key": "project001-dev", "arguments": {"resource_group": "<selected-project-rg>"}}`.
+It returns the structured report directly, without the Foundry answer loop.
+
+### What "real time" means, and what it does not
+
+**The Azure API is queried on demand; Azure billing is not instantaneous.**
+`observed_at` records when the backend made the observation, not when every
+resource last incurred a charge. Open-period charges can arrive late. The
+forecast report includes `actual_cutoff_by_currency` and
+`actual_data_lag_days_by_currency`, based on Azure's posted `CostStatus` rows.
+Forecast rows after that cutoff can therefore include dates before the query
+time. The agent does not extrapolate its own forecast or treat missing data as
+zero spend.
+
+Compare with Portal Cost Analysis using the same resource group, **Actual cost**
+basis, period and currency; a differently filtered dashboard need not match.
+This is the selected resource group's cost, not the whole factory or all shared
+dependencies. Other cost questions use distinct tools:
+
+| Question | Backend tool | Evidence and boundary |
+| --- | --- | --- |
+| Current project spend and monthly outlook | `cost_monthly_project_forecast` | Azure actual MTD and Azure full-month forecast for the exact selected project RG. |
+| Default project's idle baseline | `cost_default_project_idle` | Pinned canonical default `variables.json` plus Azure Retail Prices, separately compared with actual MTD; not the project's applied settings or measured inactivity. |
+| Common/shared RG idle baseline and spend | `cost_common_idle` | ARM resource inventory and Azure Retail Prices, separately compared with actual MTD; requires an explicit `costs.common_resource_groups` allowlist entry for this scope. |
+
+The execution identity needs appropriate Azure Cost Management read access
+(for example, **Cost Management Reader** at the approved scope); resource
+inventory reads also need resource Reader access. These Azure permissions do
+not replace the application's per-user scope grants. Selecting Platform view,
+having a dashboard link or enabling the chatbot does not grant billing access.
+Azure denials, insufficient billing/forecast history, invalid responses and
+incomplete pagination are surfaced as unavailable, never replaced with invented
+totals. The current monthly tool requires both actual and forecast data to
+produce its combined report.
+
+Questions about other dashboard measures, such as token usage, latency or
+resource health, require corresponding authorized live tools; these cost tools
+do not read every dashboard tile. A deployed agent definition and backend that
+include the tools, valid sign-in/grants, service connectivity and normal chat
+knowledge readiness are prerequisites. This documentation describes source
+behavior, not proof that a particular deployed app has those prerequisites.
+
+Implementation: [canonical tool definitions](../agent_factory/factory_chat_agent.py),
+[conversation and tool loop](aifactory_agent/foundry.py),
+[authorized tool dispatch](aifactory_agent/tools.py),
+[Azure cost adapter](aifactory_agent/costs.py), and
+[HTTP entry points](aifactory_agent/web.py). The
+[cost contract tests](tests/test_costs.py) cover scope enforcement, billing lag,
+currency separation, forecast double-counting and unavailable data.
 
 ## Private application deployment
 
