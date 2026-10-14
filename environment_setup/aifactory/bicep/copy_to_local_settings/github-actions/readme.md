@@ -242,10 +242,35 @@ Start with setting up a common AIFactory environment, example, the DEV environme
 Then you can import and run the pipelines to setup 1-M projects. There are 2 AIFactory project types supported as of now: 
 - [infra-project.yml](./infra-project.yml)
 
+### Manual inputs and subnet authentication
+
+For an ordinary manual run, select the target `environment` and leave
+`deployment_id`, `project_number`, and `config_hash` empty. GitHub accepts these
+optional empty strings; no Azure DevOps-style `manual` sentinel is needed.
+`config_file` still defaults to `aifactory/variables.json`. Clear it to use only
+the existing GitHub Environment variables/secrets without a JSON override; the
+reusable phase workflow also accepts an empty configuration path. Custom runner
+labels may remain empty to retain the existing runner defaults.
+
+Reviewed deployments require the complete UUID/project/hash contract,
+`aifactory/.reviewed-project-config.json`, and the run-specific protected
+configuration secret. Partial reviewed inputs, missing secrets, changed hashes,
+and mismatched target identities fail preflight rather than selecting legacy
+mode. JSON-first identity selection is a separate mode: do not combine
+`json_identity_auth: true` with reviewed deployment inputs.
+
+The subnet PowerShell step uses the Azure CLI context established by
+`azure/login@v2`, with an explicit target subscription. It does not enable an Az
+PowerShell login session or load Az.Accounts/Az.Network for subnet reads. The
+current allocator performs subnet arithmetic without PowerShell gallery modules.
+Update the submodule and re-copy **both** `infra-project.yml` and
+`infra-project-phase.yml` into the consumer's `.github/workflows` directory;
+updating the submodule alone does not update existing workflow copies.
+
 ## Canonical JSON configuration
 
 `infra-project.yml` loads the canonical
-`azure-enterprise-scale-ml/environment_setup/aifactory/variables.json` file by
+`aifactory/variables.json` file by
 default. It contains one `dev` object sourced from the Azure DevOps
 `variables.yaml` defaults. The object is the shared baseline for Dev, Stage,
 and Prod; add an optional `stage_prod` object only when Stage/Prod need

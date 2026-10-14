@@ -28,6 +28,14 @@ ADO/GHA templates orchestrate common and selected project infrastructure. Projec
 
 Legacy update distinguishes library/template refresh from feature update and project-only execution. Normal helper workflows can update templates/configuration, commit, push, dispatch and monitor. They are not read-only inspection commands.
 
+The legacy ADO updater prompts before authentication for an optional project-URL
+override, even when organization/project defaults were previously saved. Official
+HTTPS `dev.azure.com` and `*.visualstudio.com` URLs are split into organization and
+project, validated, displayed and persisted through the existing local settings
+writer. Noninteractive destination lookup and reviewed/registered routing remain
+unchanged. The override selects a destination; it does not grant tenant access or
+authorize a deployment.
+
 The legacy project ADO Run UI uses `deploymentTarget: manual` and
 `not-applicable` project/hash defaults because empty string parameters are treated
 as required by that UI. A compile-time `reviewedDeploymentTarget` maps manual to
@@ -36,6 +44,14 @@ compatible. The JSON override selects configuration input independently of this
 mode. Explicit reviewed Dev/Stage/Prod targets still invoke protected per-run
 configuration validation even with the override unchecked. Manual Dev-only runs
 must explicitly deselect Stage and Prod in the Run UI.
+
+GitHub manual project dispatch accepts empty optional reviewed fields and an empty
+configuration path without ADO sentinels. Any reviewed metadata or reserved path
+activates protected-secret/hash/exact-target checks before phase overrides/login.
+JSON-first identity selection is independent and cannot replace that contract.
+The reusable phase workflow's configuration path is optional, matching the
+variables/secrets-only dispatch route. GitHub subnet allocation uses the
+authenticated Azure CLI context rather than an Az PowerShell session.
 
 Explicit Stage/Prod selection uses the reviewed single-project route. Stage requires a real Dev project resource group; Prod requires real Dev **or** Stage. The checks validate exact subscription/tenant, resource identity and applicable location/provisioning state. Failed reads block rather than being interpreted as absence. A saved review, common resource group or pipeline receipt is not predecessor-deployment proof.
 

@@ -121,25 +121,36 @@ jobs:
             --github-identity-output
 
       - name: Validate reviewed project and target
-        if: ${{ inputs.deployment_id != '' && !inputs.json_identity_auth }}
+        if: ${{ inputs.deployment_id != '' || inputs.project_number != '' || inputs.config_hash != '' || inputs.config_file == 'aifactory/.reviewed-project-config.json' }}
         shell: bash
         env:
           PROJECT_NUMBER: ${{ inputs.project_number }}
           TARGET_ENVIRONMENT: ${{ inputs.environment }}
           CONFIG_HASH: ${{ inputs.config_hash }}
           CONFIG_FILE: ${{ inputs.config_file }}
+          CONFIG_SECRET: ${{ inputs.config_secret }}
           DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          JSON_IDENTITY_AUTH: ${{ inputs.json_identity_auth }}
           EXPECTED_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
           EXPECTED_TENANT: ${{ secrets.TENANT_ID }}
         run: |
           python3 - <<'PY'
           import hashlib, json, os, re, uuid
           from pathlib import Path
+          if os.environ["JSON_IDENTITY_AUTH"] == "true":
+              raise SystemExit("JSON identity mode cannot replace the reviewed deployment secret contract")
+          if not all(os.environ[key] for key in ("DEPLOYMENT_ID", "PROJECT_NUMBER", "CONFIG_HASH", "CONFIG_FILE", "CONFIG_SECRET")):
+              raise SystemExit("Reviewed deployments require deployment_id, project_number, config_hash, config_file and config_secret")
           uuid.UUID(os.environ["DEPLOYMENT_ID"])
           path = Path(os.environ["CONFIG_FILE"])
           if path.as_posix() != "aifactory/.reviewed-project-config.json":
               raise SystemExit("Reviewed deployment configuration path mismatch")
           raw = path.read_bytes()
+          protected = os.environ.get("AIFACTORY_CONFIG_JSON", "")
+          if not os.environ["CONFIG_SECRET"] or not protected:
+              raise SystemExit("Reviewed deployment requires its run-specific configuration secret")
+          if raw != protected.encode("utf-8"):
+              raise SystemExit("Reviewed configuration file differs from the run-specific secret")
           if hashlib.sha256(raw).hexdigest() != os.environ["CONFIG_HASH"]:
               raise SystemExit("Reviewed deployment configuration hash mismatch")
           payload = json.loads(raw)

@@ -12,8 +12,9 @@ on:
         required: true
         type: string
       config_file:
-        required: true
+        required: false
         type: string
+        default: ''
       config_secret:
         required: false
         type: string
@@ -530,6 +531,39 @@ jobs:
           $azureConfig = Join-Path $HOME '.azure'
           New-Item -ItemType Directory -Force -Path $azureConfig | Out-Null
 
+      - name: 00_Validate_Reviewed_Target
+        if: ${{ inputs.deployment_id != '' || inputs.config_hash != '' || inputs.config_file == 'aifactory/.reviewed-project-config.json' }}
+        shell: bash
+        env:
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          CONFIG_FILE: ${{ inputs.config_file }}
+          CONFIG_HASH: ${{ inputs.config_hash }}
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          JSON_IDENTITY_AUTH: ${{ inputs.json_identity_auth }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, re, uuid
+          if os.environ["JSON_IDENTITY_AUTH"] == "true":
+              raise SystemExit("JSON identity mode cannot replace the reviewed deployment secret contract")
+          if not all(os.environ[key] for key in ("DEPLOYMENT_ID", "CONFIG_HASH", "CONFIG_FILE")):
+              raise SystemExit("Reviewed phases require deployment_id, config_hash and config_file")
+          uuid.UUID(os.environ["DEPLOYMENT_ID"])
+          if os.environ["CONFIG_FILE"] != "aifactory/.reviewed-project-config.json":
+              raise SystemExit("Reviewed deployment configuration path mismatch")
+          raw = os.environ.get("AIFACTORY_CONFIG_JSON", "")
+          if not raw or hashlib.sha256(raw.encode("utf-8")).hexdigest() != os.environ["CONFIG_HASH"]:
+              raise SystemExit("Run-specific configuration missing or changed")
+          target = os.environ["TARGET_ENVIRONMENT"]
+          values = json.loads(raw)["dev" if target == "dev" else "stage_prod"]
+          key = {"dev":"dev_sub_id","stage":"test_sub_id","prod":"prod_sub_id"}[target]
+          if str(values.get(key, "")).lower() != os.environ["dev_test_prod_sub_id"].lower() or str(values.get("tenantId", "")).lower() != os.environ["tenantId"].lower():
+              raise SystemExit("GitHub environment identity differs from the reviewed target")
+          for key, value in values.items():
+              if re.search(r"secret|password|token", key, re.I) and isinstance(value, str) and len(value) > 3:
+                  escaped = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                  print("::add-mask::" + escaped)
+          PY
+
       - name: 00_Materialize_Protected_JSON_Config
         if: ${{ !inputs.json_identity_auth && inputs.config_file != '' && env.AIFACTORY_CONFIG_JSON != '' }}
         shell: bash
@@ -552,29 +586,6 @@ jobs:
             --environment "${{ inputs.environment }}" \
             --format github \
             --github-workflow "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml"
-
-      - name: 00_Validate_Reviewed_Target
-        if: ${{ inputs.deployment_id != '' && !inputs.json_identity_auth }}
-        shell: bash
-        env:
-          CONFIG_HASH: ${{ inputs.config_hash }}
-          TARGET_ENVIRONMENT: ${{ inputs.environment }}
-        run: |
-          python3 - <<'PY'
-          import hashlib, json, os, re
-          raw = os.environ.get("AIFACTORY_CONFIG_JSON", "")
-          if not raw or hashlib.sha256(raw.encode("utf-8")).hexdigest() != os.environ["CONFIG_HASH"]:
-              raise SystemExit("Run-specific configuration missing or changed")
-          target = os.environ["TARGET_ENVIRONMENT"]
-          values = json.loads(raw)["dev" if target == "dev" else "stage_prod"]
-          key = {"dev":"dev_sub_id","stage":"test_sub_id","prod":"prod_sub_id"}[target]
-          if str(values.get(key, "")).lower() != os.environ["dev_test_prod_sub_id"].lower() or str(values.get("tenantId", "")).lower() != os.environ["tenantId"].lower():
-              raise SystemExit("GitHub environment identity differs from the reviewed target")
-          for key, value in values.items():
-              if re.search(r"secret|password|token", key, re.I) and isinstance(value, str) and len(value) > 3:
-                  escaped = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-                  print("::add-mask::" + escaped)
-          PY
 
       - name: Azure login with OpenID Connect (OIDC)
         if: ${{ inputs.json_identity_auth }}

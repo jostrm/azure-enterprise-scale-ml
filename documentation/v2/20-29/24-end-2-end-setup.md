@@ -60,6 +60,28 @@ does not bypass those checks. Never invent a hash or set only the reviewed targe
 See [manual update settings](26-update-AIFactory.md#manual-azure-devops-run-pipeline)
 when rerunning an existing project deployment.
 
+## Manual GitHub Actions project run
+
+For the legacy `infra-project.yml` workflow, select the consumer branch and one
+`environment` (`dev`, `stage` or `prod`). Unlike the ADO Run UI, GitHub accepts
+empty optional inputs: leave `deployment_id`, `project_number` and `config_hash`
+empty for a normal manual run; do not enter ADO's `manual` / `not-applicable`
+values. The actual project comes from the selected configuration.
+
+`config_file` defaults to `aifactory/variables.json`. Clear it to use existing
+GitHub Environment variables/secrets without a JSON override; GitHub does not
+read the ADO `variables.yaml`. Keep `json_identity_auth: false` for that route.
+Custom runner labels can remain empty. Select `github-hosted` only when its
+network and identity are compatible with the target.
+
+Reviewed launches still require their protected configuration secret, exact
+target/project and matching hash. Partial reviewed metadata is an error, not an
+optional manual override; JSON identity selection does not replace that contract.
+The subnet task already uses the CLI session from `azure/login`, not Az.Network
+imports. After upgrading the submodule, re-copy **both** `infra-project.yml` and
+`infra-project-phase.yml` into the consumer's `.github/workflows` directory.
+See the [GitHub workflow guide](../../../environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/readme.md#manual-inputs-and-subnet-authentication).
+
 ## Two common workflows
 
 - **ITSM or self-service portal integration:** Teams order projects through ServiceNow,

@@ -8,6 +8,11 @@ Prod under Stages to run.** See the
 [manual ADO setup parameters](../../../../../../documentation/v2/20-29/24-end-2-end-setup.md#manual-azure-devops-run-pipeline-variablesyaml)
 and [manual update settings](../../../../../../documentation/v2/20-29/26-update-AIFactory.md#manual-azure-devops-run-pipeline).
 
+The legacy ADO update launcher can override stale organization/project defaults
+before sign-in: answer `y` to its custom Azure DevOps URL prompt and paste a full
+project URL such as `https://example-org.visualstudio.com/AIFactory`.
+It saves the selected destination locally; no customer URL is embedded in source.
+
 ## See [Full Prerequisites](../../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
 
 ### Prerequisite reminder - setup tools:  on your laptop (for both option A) Azure Devops and B) Github):
