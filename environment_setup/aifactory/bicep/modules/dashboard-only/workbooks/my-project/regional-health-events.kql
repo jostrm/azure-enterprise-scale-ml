@@ -1,0 +1,14 @@
+Resources
+| where tolower(id) startswith '__PROJECT_PREFIX__'
+| where isnotempty(location) and location !~ 'global'
+| summarize by Location=tolower(location)
+| extend RegionalHealth=parse_json("{GenericRegionalHealth:escapejson}")
+| extend Events=array_concat(coalesce(RegionalHealth.regions[Location].details, dynamic([])),
+    coalesce(RegionalHealth.regions['global'].details, dynamic([])))
+| mv-expand Notice=Events limit 2000
+| project Region=Location, Title=tostring(Notice['title']), Type=tostring(Notice['type']), Status=tostring(Notice['status']),
+    Service=tostring(Notice['service']), EventRegion=tostring(Notice['region']), Start=todatetime(Notice['start']),
+    TrackingId=tostring(Notice['trackingId']), URL=tostring(Notice['url']),
+    Meaning='Regional notice - not confirmed project impact'
+| where isnotempty(TrackingId)
+| order by Region asc, Title asc

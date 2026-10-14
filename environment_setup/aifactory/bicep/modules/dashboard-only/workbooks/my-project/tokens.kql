@@ -1,0 +1,102 @@
+// Supported table/category: https://learn.microsoft.com/azure/azure-monitor/reference/supported-logs/microsoft-cognitiveservices-accounts-logs
+// Response cache semantics: https://learn.microsoft.com/azure/foundry/openai/how-to/prompt-caching
+// Missing tables yield an empty typed stream + service warning, never a fabricated zero.
+// Access/query errors are not suppressed. No AppDependencies, RequestResponse or metrics union.
+// Keep null/empty inputs as one invalid element so mv-apply never drops their request row.
+let TokenValueArray = (v:dynamic) {
+    iff(gettype(v) == 'array' and array_length(v) > 0, v, pack_array(v))
+};
+let InvalidTokenElement = (v:dynamic) {
+    let n = toreal(v);
+    gettype(v) !in ('int', 'long', 'real', 'decimal') or isnull(n) or not(isfinite(n))
+        or n < 0 or n != floor(n, 1.0)
+};
+let TokenRaw = union isfuzzy=true
+    (datatable(TimeGenerated:datetime, _ResourceId:string, Category:string)[]),
+    AzureDiagnostics
+    | where AccountSelected and WindowValid and TimeGenerated >= StartUtc and TimeGenerated < EndUtc
+    | where Category == 'AzureOpenAIRequestUsage'
+    | extend AccountId=tolower(tostring(column_ifexists('_ResourceId', '')))
+    | where AccountId startswith AccountPrefix
+    | where substring(AccountId, strlen(AccountPrefix)) !contains '/'
+    | where AccountId in (Inventory | project AccountId)
+    | where AccountId == SelectedAccount
+    | extend Extra=todynamic(column_ifexists('AdditionalFields', dynamic({})))
+    | extend P=parse_json(coalesce(tostring(column_ifexists('properties_s', '')), tostring(column_ifexists('properties_d', dynamic(null))), tostring(Extra.properties_s), tostring(Extra.properties)))
+    | extend Response=parse_json(coalesce(tostring(P.response), tostring(column_ifexists('response_s', '')))),
+        ResponseBody=parse_json(coalesce(tostring(P.responseBody), tostring(column_ifexists('responseBody_s', ''))))
+    | extend U=parse_json(coalesce(tostring(Response.usage), tostring(ResponseBody.usage), tostring(P.responseUsage), tostring(P.usage), tostring(column_ifexists('usage_s', '')), tostring(Extra.usage_s)))
+    | extend Deployment=coalesce(tostring(column_ifexists('modelDeploymentName_s', '')), tostring(column_ifexists('deploymentName_s', '')), tostring(P.modelDeploymentName), tostring(P.deploymentName), tostring(Extra.modelDeploymentName_s), '[not emitted]'),
+        ModelName=coalesce(tostring(column_ifexists('modelName_s', '')), tostring(P.modelName), tostring(P['gen_ai.response.model']), tostring(Response.model), tostring(ResponseBody.model), tostring(Extra.modelName_s), '[not emitted]'),
+        ModelVersion=coalesce(tostring(column_ifexists('modelVersion_s', '')), tostring(P.modelVersion), tostring(Extra.modelVersion_s), '[not emitted]'),
+        RequestId=coalesce(tostring(column_ifexists('requestId_s', '')), tostring(column_ifexists('RequestId', '')), tostring(P.requestId), tostring(Extra.requestId_s), tostring(column_ifexists('CorrelationId', '')))
+    // Prefer canonical inclusive input. Anthropic raw input_tokens excludes cache reads/writes;
+    // do not silently interpret that schema as OpenAI Responses inclusive input_tokens.
+    // Preserve dynamic types: live request-usage fields are arrays, not scalar doubles.
+    | extend InputRaw=coalesce(P['gen_ai.usage.input_tokens'], Extra['gen_ai.usage.input_tokens'], P.promptTokens, P.inputTokens,
+            pack_array(column_ifexists('promptTokens_d', real(null)))[0], pack_array(column_ifexists('inputTokens_d', real(null)))[0],
+            Extra.promptTokens_d, Extra.inputTokens_d, U.prompt_tokens,
+            iff(isnull(U.cache_read_input_tokens) and isnull(U.cache_creation_input_tokens), U.input_tokens, dynamic(null))),
+        OutputRaw=coalesce(P['gen_ai.usage.output_tokens'], Extra['gen_ai.usage.output_tokens'], P.generatedTokens,
+            pack_array(column_ifexists('generatedTokens_d', real(null)))[0], Extra.generatedTokens_d,
+            pack_array(column_ifexists('completionTokens_d', real(null)))[0], pack_array(column_ifexists('outputTokens_d', real(null)))[0],
+            P.completionTokens, P.outputTokens, Extra.completionTokens_d, Extra.outputTokens_d, U.completion_tokens, U.output_tokens),
+        CachedRaw=coalesce(P['gen_ai.usage.cache_read.input_tokens'], Extra['gen_ai.usage.cache_read.input_tokens'], P.cachedTokens,
+            U.prompt_tokens_details.cached_tokens, U.input_tokens_details.cached_tokens,
+            pack_array(column_ifexists('cachedTokens_d', real(null)))[0], pack_array(column_ifexists('cacheReadInputTokens_d', real(null)))[0],
+            P.cacheReadInputTokens, Extra.cachedTokens_d, Extra.cacheReadInputTokens_d)
+    | extend InputValues=TokenValueArray(InputRaw), OutputValues=TokenValueArray(OutputRaw), CachedValues=TokenValueArray(CachedRaw)
+    | mv-apply Element=InputValues on (
+        summarize InvalidInputElements=countif(InvalidTokenElement(Element))
+    )
+    | mv-apply Element=OutputValues on (
+        summarize InvalidOutputElements=countif(InvalidTokenElement(Element))
+    )
+    | mv-apply Element=CachedValues on (
+        summarize InvalidCachedElements=countif(InvalidTokenElement(Element))
+    )
+    | extend InputValue=iff(InvalidInputElements == 0, toreal(array_sum(InputValues)), real(null)),
+        OutputValue=iff(InvalidOutputElements == 0, toreal(array_sum(OutputValues)), real(null)),
+        CachedValue=iff(InvalidCachedElements == 0, toreal(array_sum(CachedValues)), real(null))
+    | extend InvalidValues=(isnotnull(InputRaw) and (InvalidInputElements > 0 or not(isfinite(InputValue)) or isnull(tolong(InputValue))))
+            or (isnotnull(OutputRaw) and (InvalidOutputElements > 0 or not(isfinite(OutputValue)) or isnull(tolong(OutputValue))))
+            or (isnotnull(CachedRaw) and (InvalidCachedElements > 0 or not(isfinite(CachedValue)) or isnull(tolong(CachedValue))))
+            or coalesce(CachedValue > InputValue, false),
+        HasRequestId=isnotempty(RequestId) and RequestId == trim(@'\s+', RequestId)
+            and tolower(RequestId) !in ('null', 'none', 'unknown', 'n/a', '0', '00000000-0000-0000-0000-000000000000')
+    | project Day=startofday(datetime_utc_to_local(TimeGenerated, SafeZone)), TimeGenerated, AccountId, Deployment, ModelName, ModelVersion,
+        RequestId, HasRequestId, InvalidValues, InputTokens=tolong(InputValue), OutputTokens=tolong(OutputValue), CachedTokens=tolong(CachedValue)
+    | serialize RowNumber=row_number()
+    | extend RequestKey=iff(HasRequestId, strcat('request:', RequestId), strcat('unidentified-row:', RowNumber));
+// Only a valid request ID deduplicates. Distinct normalized variants are conflicts, not extra calls.
+let TokenVariants = TokenRaw
+    | summarize IngestedRecords=count(), FirstObservedUtc=min(TimeGenerated), LastObservedUtc=max(TimeGenerated)
+        by AccountId, RequestKey, Day, Deployment, ModelName, ModelVersion,
+        HasRequestId, InvalidValues, InputTokens, OutputTokens, CachedTokens;
+let TokenConflicts = TokenVariants
+    | summarize Variants=count() by AccountId, RequestKey
+    | where Variants > 1
+    | project AccountId, RequestKey, Conflict=true;
+let TokenRecords = TokenVariants
+    | join kind=leftouter TokenConflicts on AccountId, RequestKey
+    | extend Conflict=coalesce(Conflict, false), ModelKey=tostring(pack_array(ModelName, ModelVersion));
+let AggregateTokens = (T:(AccountId:string, Day:datetime, Deployment:string, ModelName:string, ModelVersion:string,
+        InputTokens:long, OutputTokens:long, CachedTokens:long, HasRequestId:bool, InvalidValues:bool, Conflict:bool, IngestedRecords:long,
+        FirstObservedUtc:datetime, LastObservedUtc:datetime)) {
+    T
+    | summarize ObservedRecords=count(), IngestedRecords=sum(IngestedRecords),
+        MissingInput=countif(isnull(InputTokens)), MissingOutput=countif(isnull(OutputTokens)), MissingCached=countif(isnull(CachedTokens)),
+        MissingRequestId=countif(not(HasRequestId)), ConflictingRecords=countif(Conflict), InvalidRecords=countif(InvalidValues),
+        InputSum=sum(InputTokens), OutputSum=sum(OutputTokens), CachedSum=sum(CachedTokens),
+        FirstObservedUtc=min(FirstObservedUtc), LastObservedUtc=max(LastObservedUtc)
+        by AccountId, Day, Deployment, ModelName, ModelVersion
+    | extend IdentityValid=ConflictingRecords == 0 and InvalidRecords == 0
+    | extend InputTokens=iff(IdentityValid and MissingInput == 0, InputSum, long(null)),
+        OutputTokens=iff(IdentityValid and MissingOutput == 0, OutputSum, long(null)),
+        CachedTokens=iff(IdentityValid and MissingCached == 0, CachedSum, long(null)),
+        CachedCoverage=case(MissingCached == ObservedRecords, 'Not available — cached field not emitted',
+            MissingCached > 0, 'Partial — cached total withheld', not(IdentityValid), 'Invalid identity/value — total withheld',
+            'Observed field coverage only — explicit zero is measured zero'),
+        Deduplication=iff(MissingRequestId > 0, 'Partial — rows without request identity retained; not proven unique calls', 'Exact request identity within selected account; conflicts withheld')
+    | project-away InputSum, OutputSum, CachedSum, IdentityValid
+};

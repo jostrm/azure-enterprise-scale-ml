@@ -3,11 +3,27 @@ on:
   push:
     paths:
       - "environment_setup/aifactory/bicep/copy_to_local_settings/**"
+      - "environment_setup/aifactory/bicep/modules/dashboard-only/**"
+      - "environment_setup/aifactory/bicep/modules/common/CmnAIfactoryNaming.bicep"
+      - "environment_setup/aifactory/bicep/modules/types/aifactoryNaming.bicep"
+      - "environment_setup/aifactory/bicep/scripts/dashboard-only-shared.py"
+      - "environment_setup/aifactory/bicep/scripts/dashboard_usage.py"
+      - "environment_setup/aifactory/bicep/scripts/deploy-dashboards-only.py"
+      - "environment_setup/aifactory/bicep/scripts/resolve_managed_identities.py"
+      - "environment_setup/aifactory/bicep/scripts/generate_hosts_file_info.py"
       - "environment_setup/unit-tests/**"
       - ".github/workflows/verify-aifactory-dev.yml"
   pull_request:
     paths:
       - "environment_setup/aifactory/bicep/copy_to_local_settings/**"
+      - "environment_setup/aifactory/bicep/modules/dashboard-only/**"
+      - "environment_setup/aifactory/bicep/modules/common/CmnAIfactoryNaming.bicep"
+      - "environment_setup/aifactory/bicep/modules/types/aifactoryNaming.bicep"
+      - "environment_setup/aifactory/bicep/scripts/dashboard-only-shared.py"
+      - "environment_setup/aifactory/bicep/scripts/dashboard_usage.py"
+      - "environment_setup/aifactory/bicep/scripts/deploy-dashboards-only.py"
+      - "environment_setup/aifactory/bicep/scripts/resolve_managed_identities.py"
+      - "environment_setup/aifactory/bicep/scripts/generate_hosts_file_info.py"
       - "environment_setup/unit-tests/**"
       - ".github/workflows/verify-aifactory-dev.yml"
   workflow_dispatch:
@@ -36,9 +52,34 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+      - name: Install declared test dependencies
+        run: python -m pip install -r environment_setup/unit-tests/test-bicep/requirements.txt
       - name: "Run unit tests"
         working-directory: environment_setup/unit-tests
         run: python -m unittest discover -s test-bicep -p "test_*.py" -v
+  dashboard-only-regressions:
+    name: Run offline v1.24 dashboard-only regressions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install declared test dependencies
+        run: python -m pip install -r environment_setup/unit-tests/test-bicep/requirements.txt
+      - name: Install Bicep for offline template checks
+        run: |
+          az bicep install --version v0.37.4
+          echo "$HOME/.azure/bin" >> "$GITHUB_PATH"
+      - name: Run offline dashboard-only regressions
+        run: >-
+          python -m pytest
+          environment_setup/unit-tests/test-bicep/test_dashboard_only.py
+          environment_setup/unit-tests/test-bicep/test_dashboard_only_shared.py
+          environment_setup/unit-tests/test-bicep/test_dashboard_usage.py
+          environment_setup/unit-tests/test-bicep/test_my_project_workbook.py
+          environment_setup/unit-tests/test-bicep/test_generic_project_workbook.py
+          -q
   verify-dataops-template:
     name: Verifies DATAOPS template in DEV for DataOps, ingestion from sources to ESML datalake
     environment:

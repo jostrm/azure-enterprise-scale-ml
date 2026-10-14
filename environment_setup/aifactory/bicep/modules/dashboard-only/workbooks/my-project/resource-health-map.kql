@@ -1,0 +1,22 @@
+Resources
+| where tolower(id) startswith '__PROJECT_PREFIX__'
+| where isnotempty(location) and location !~ 'global'
+| extend ResourceHealth=parse_json("{GenericResourceHealth:escapejson}"),
+    RegionalHealth=parse_json("{GenericRegionalHealth:escapejson}")
+| extend ResourceState=tostring(ResourceHealth.states[tolower(id)]),
+    SourcesComplete=tobool(ResourceHealth.complete) and tobool(RegionalHealth.complete),
+    Location=tolower(location)
+| extend RegionEvidence=RegionalHealth.regions[Location], GlobalEvidence=RegionalHealth.regions['global']
+| extend RegionalEvents=coalesce(toint(RegionEvidence.events), 0) + coalesce(toint(GlobalEvidence.events), 0),
+    RegionalServices=tostring(RegionEvidence.services)
+| summarize Resources=count(), AvailableResources=countif(ResourceState == 'Available'),
+    ResourceIssues=countif(ResourceState == 'Issue'),
+    UnknownResources=countif(isempty(ResourceState) or ResourceState == 'Unknown')
+    by Location, SourcesComplete, RegionalEvents, RegionalServices
+| extend HealthCode=case(ResourceIssues > 0 or RegionalEvents > 0, 2,
+    SourcesComplete and AvailableResources == Resources and UnknownResources == 0, 0, 1)
+| extend Health=case(HealthCode == 2, 'Reported issue / regional advisory',
+    HealthCode == 0, 'Available - complete reported resource coverage', 'Unknown / incomplete health coverage')
+| project Location, Resources, HealthCode, Health, AvailableResources, ResourceIssues,
+    UnknownResources, RegionalEvents, RegionalServices
+| order by Resources desc

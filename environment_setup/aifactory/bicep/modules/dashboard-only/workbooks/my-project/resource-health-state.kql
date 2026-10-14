@@ -1,0 +1,11 @@
+HealthResources
+| where type =~ 'microsoft.resourcehealth/availabilitystatuses'
+| extend ResourceId=tolower(tostring(properties.targetResourceId)), State=tostring(properties.availabilityState)
+| where ResourceId startswith '__PROJECT_PREFIX__'
+| summarize States=make_set(State) by ResourceId
+| extend ResourceState=case(
+    States has 'Unavailable' or States has 'Degraded', 'Issue',
+    array_length(States) == 1 and States has 'Available', 'Available',
+    'Unknown')
+| summarize StateCount=count(), States=make_bag(pack(ResourceId, ResourceState), 10000)
+| project value=tostring(pack('complete', StateCount <= 10000, 'states', States))
