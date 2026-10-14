@@ -3,6 +3,8 @@ id: chat-and-grounding
 status: observed
 sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/tools.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/costs.py
   - usecase_code/40-agent-factory/agent_factory/factory_chat_agent.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/knowledge.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py
@@ -16,6 +18,7 @@ sources:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/static/voice.js
 tests:
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_conversation.py
+  - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_costs.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_knowledge.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_browser_auth.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_web.py
@@ -28,6 +31,9 @@ tests:
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::class:Conversation
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/foundry.py::function:Conversation.answer
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/tools.py::function:FactoryTools.execute
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/costs.py::class:CostSkills
+  - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/costs.py::function:CostSkills._billing
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/graph_service.py::class:GraphQueryService
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/voice.py::class:VoiceSession
 reviewed_source: '3e9102ee + working tree; observed 2026-10-07; live voice observed 2026-10-09 at 29642909'
@@ -52,6 +58,40 @@ The app and opt-in project pipeline reuse the canonical prompt definition in
 citations and freshness limitations. The app appends `graph_query` only when
 dual-graph configuration is present, before hashing the deployment definition;
 the shared pipeline definition does not enable graph access by itself.
+
+## Selected-project cost observations
+
+Cost path source reviewed against main revision `99e6fb1c` on 2026-10-14;
+this is not an observation of a deployed agent or live Azure billing.
+
+`POST /api/chat` binds the authenticated caller to a configured scope.
+`Conversation.answer` supplies that `active_scope`, retrieves explanatory
+knowledge and dispatches permitted read-only model function calls.
+`cost_monthly_project_forecast` flows through `FactoryTools.execute` to
+`CostSkills.execute`, which requires both `factory.read` and `cost.read` and
+checks the exact configured project RG. Chat additionally needs `knowledge.read`
+and knowledge readiness. The scope's subscription is not a model argument.
+
+`CostSkills._billing` obtains an ARM token through the configured credential and
+POSTs directly to RG-scoped `Microsoft.CostManagement/query` and `/forecast`
+(`2025-03-01`). No Factory HTTP API or dashboard scraping is involved.
+ActualCost is summed daily by service for MTD; the full-month forecast includes
+its own actual component and must not be added to the separate MTD total.
+Results return to the model as `function_call_output`. The authenticated skill
+panel's `/api/skills/{skill_name}/run` calls the same cost adapter directly.
+
+On-demand reads are not instantaneous billing: observation time, posted actual
+cutoff and billing lag are separate evidence. Currency partitions are retained,
+and missing actual/forecast data, access failures or incomplete pagination do not
+become zero or synthetic estimates. Azure execution-identity RBAC and application
+caller grants are independent. Common-RG cost reads require an explicit allowlist;
+default-template idle estimates use a pinned template and public retail prices,
+not applied settings or measured inactivity.
+
+These tools return cost reports, not embedded Portal blades or arbitrary
+dashboard telemetry. Search/graph evidence explains implementation but does not
+establish spend. See the
+[dashboard and cost question walkthrough](../../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md#ask-about-azure-dashboards-and-current-project-costs).
 
 ## Optional live voice (speech shell)
 
