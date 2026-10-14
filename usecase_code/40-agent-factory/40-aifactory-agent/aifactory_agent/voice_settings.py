@@ -54,8 +54,8 @@ class VoiceSettings(BaseModel):
     greeting: str | None = Field(default="Factory Agent online. How can I help?", max_length=200)
     # Browsers must call from the app's own origin; list extra HTTPS origins only when a front door rewrites Host.
     allowed_origins: list[str] = Field(default_factory=list, max_length=10)
-    default_language: Literal["en-US", "sv-SE"] = "en-US"
-    language_profiles: dict[str, VoiceLanguageProfile] = Field(default_factory=dict, max_length=2)
+    default_language: str = Field(default="en-US", pattern=r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$")
+    language_profiles: dict[str, VoiceLanguageProfile] = Field(default_factory=dict, max_length=256)
 
     @field_validator("endpoint")
     @classmethod
@@ -103,14 +103,14 @@ class VoiceSettings(BaseModel):
     def idle_before_limit(self):
         if self.idle_timeout_seconds >= self.max_session_seconds:
             raise ValueError("The idle timeout must be shorter than the maximum session length.")
-        if set(self.language_profiles) - {"en-US", "sv-SE"}:
-            raise ValueError("Only server-owned English and Swedish language profiles are supported.")
+        if not all(_LANGUAGE.fullmatch(code) for code in self.language_profiles):
+            raise ValueError("Language profile keys must be BCP-47 locale codes.")
         if self.language_profiles and self.default_language not in self.language_profiles:
             raise ValueError("The default language must have a configured profile.")
         if self.mode == "realtime" and self.model not in {"gpt-realtime", "gpt-realtime-mini"}:
             raise ValueError("Realtime mode requires a native speech-to-speech model.")
-        if self.mode == "realtime" and (len(self.input_languages) != 1 or self.input_languages[0] not in {"en-US", "sv-SE"}):
-            raise ValueError("Realtime mode requires one English or Swedish profile language.")
+        if self.mode == "realtime" and len(self.input_languages) != 1:
+            raise ValueError("Realtime mode requires one selected profile language.")
         for name, kind in [(self.voice_name, self.voice_type)] + [
                 (profile.voice_name, profile.voice_type) for profile in self.language_profiles.values()]:
             if kind == "openai" and (self.mode != "realtime" or name not in {
@@ -127,11 +127,11 @@ class VoiceSettings(BaseModel):
         if selected not in self.language_profiles:
             raise ValueError("Language is not configured.")
         profile = self.language_profiles[selected]
-        # The English semantic VAD is not a Swedish turn detector. server_vad works for both native profiles.
+        # Do not apply English semantic VAD to an operator-configured non-English language.
         return self.model_copy(update={
             "voice_name": profile.voice_name, "input_languages": [selected],
             "voice_type": profile.voice_type,
-            "turn_detection": "server_vad" if selected == "sv-SE" or self.mode == "realtime" else self.turn_detection,
+            "turn_detection": "server_vad" if not selected.lower().startswith("en-") or self.mode == "realtime" else self.turn_detection,
             "greeting": profile.greeting, "default_language": selected,
         })
 

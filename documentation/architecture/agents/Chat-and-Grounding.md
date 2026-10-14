@@ -67,11 +67,21 @@ Unsupported native capabilities, upstream authentication/protocol rejection and 
 
 The browser never receives Foundry credentials: it connects to the application's relay, which holds the managed-identity connection to Voice Live. The Entra access token travels in the first WebSocket frame (never a URL), is validated by `principal_from_token` and `authorize`, and bounds the session so it ends no later than token expiry. Origin, pre-authentication, concurrency, audio-rate, idle and maximum-duration limits are enforced by the relay; the browser cannot choose the model, voice, instructions or tools. A transcript or spoken text is user input or evidence, never authorization. Audio is not stored; tokens and transcripts are not logged.
 
-An optional hello `language` selects only a configured server-owned `en-US` or `sv-SE` profile; arbitrary voice/model/instructions/tools fields remain forbidden. Native transcription uses `gpt-4o-mini-transcribe` with `en`/`sv`, and native profiles use `server_vad` (no English-only semantic VAD for Swedish). The browser closes/reopens voice when language changes, retaining the authenticated text session. Voice-only status/auth/transport failures release audio but never clear or reacquire the text token. Explicit typed-chat fallback copies an utterance only on user request, without submitting it. Canceled tools cannot resume an old turn; in-flight synchronous read workers may finish but are never replayed or allowed to approve/execute writes.
+An optional hello `language` selects only a configured server-owned BCP-47 locale profile; the allowlist is not limited to English/Swedish, and arbitrary voice/model/instructions/tools fields remain forbidden. Native transcription uses `gpt-4o-mini-transcribe` with the locale's ISO language code, and native profiles use `server_vad`. Operators verify model-specific language support before configuring profiles. The browser closes/reopens voice when language changes, retaining the authenticated text session. Embedded `host=esaif-maui` pages and `voice=off` links deny microphone access and do not initialize voice. Voice-only status/auth/transport failures release audio but never clear or reacquire the text token. Explicit typed-chat fallback copies an utterance only on user request, without submitting it. Canceled tools cannot resume an old turn; in-flight synchronous read workers may finish but are never replayed or allowed to approve/execute writes.
 
 Live voice needs Cognitive Services User and Foundry User on the project Foundry account (assigned from `infra/voice-roles.bicep` only when voice is enabled) and private reachability of the account's `services.ai.azure.com` endpoint from the application. Offline tests with fake backends, mutation checks of the relay's safety properties and real-browser runs cover the relay and UI. A live Voice Live session in a tenant is a separate observation (region, DNS, roles); passing tests do not establish it.
 
 ## Separation of operations
+
+The browser's `static/skill-results.js` is a presentation-only adapter for the
+existing skill and operation contracts. It renders separate per-currency actual
+and forecast cards, partial idle estimates, labeled diagnostic fields and saved
+operation evidence. Decimal strings are retained without browser-side billing
+arithmetic; raw evidence stays available in collapsed disclosures. It exposes no
+transport or approval capability and does not mutate signed operation records.
+`tests/test_skill_results.py` exercises real mocked CostSkills report shapes,
+exact decimal display, unknown amounts, text-only DOM sinks and unchanged
+operation evidence; `tests/test_web.py` covers the shipped script integration.
 
 Repository packaging, cloud deployment, ingestion, model inference and configuration/runtime actions are distinct. The knowledge refresh can create owned retrieval resources and make embedding calls; ordinary source/graph generation must not invoke it. Private web sign-in and scope grants remain necessary even when the server is reachable.
 

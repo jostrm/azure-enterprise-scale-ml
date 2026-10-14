@@ -63,7 +63,7 @@ class HelloMessage(BaseModel):
     token: str = Field(min_length=20, max_length=8192)
     scope_key: str = Field(pattern=r"^[A-Za-z0-9_-]{1,80}$")
     audience: Literal["platform", "project"]
-    language: Literal["en-US", "sv-SE"] | None = None
+    language: str | None = Field(default=None, pattern=r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$")
 
 
 class StarletteChannel:

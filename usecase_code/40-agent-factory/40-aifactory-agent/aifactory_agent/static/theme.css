@@ -146,6 +146,20 @@ a { color: var(--cp-link); }
 .status-good { color: var(--cp-success); }
 .status-bad { color: var(--cp-danger); }
 .status-pending { color: var(--cp-text-muted); }
+.skill-report { min-width: 0; margin: 16px 0; }
+.result-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.result-metric { background: var(--cp-surface-soft); border: 1px solid var(--cp-border); border-radius: 12px; padding: 16px; }
+.result-metric h4 { color: var(--cp-text-muted); font-size: .875rem; margin: 0 0 8px; }
+.result-metric strong { font-size: 1.35rem; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.result-metric p { margin: 8px 0 0; }
+.result-metadata { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 3fr); gap: 6px 16px; font-size: .875rem; }
+.result-metadata dt { color: var(--cp-text-muted); }
+.result-metadata dd { margin: 0; overflow-wrap: anywhere; }
+.result-table-wrap { max-width: 100%; overflow-x: auto; margin: 16px 0; }
+.result-table-wrap table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.result-table-wrap caption { text-align: left; font-weight: 600; margin-bottom: 8px; }
+.result-table-wrap th, .result-table-wrap td { padding: 10px 12px; border: 1px solid var(--cp-border); text-align: left; vertical-align: top; }
+.result-table-wrap th { background: var(--cp-surface-soft); }
 summary { cursor: pointer; font-weight: 600; margin: 12px 0; }
 footer { border-top: 1px solid var(--cp-border); }
 @media (max-width: 840px) {

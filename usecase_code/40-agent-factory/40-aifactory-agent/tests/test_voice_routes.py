@@ -240,7 +240,7 @@ def test_native_route_streams_grounded_audio_without_external_answer_inference_t
             assert harness.gateway.sessions == []
             configured = gateway.upstreams[0].of("session.update")[0]["session"]
             assert configured["turn_detection"]["type"] == "server_vad"
-            assert "Swedish" in configured["instructions"] and "never generate" not in configured["instructions"].lower()
+            assert "sv-SE" in configured["instructions"] and "never generate" not in configured["instructions"].lower()
             finish(socket)
         response = client.post("/api/chat", headers={"Authorization": "Bearer " + GOOD},
                                json={"question": "Typed question", "scope_key": "project001-dev", "audience": "project"})
@@ -484,3 +484,32 @@ def test_security_headers_allow_only_the_apps_own_microphone_when_voice_is_enabl
     assert "connect-src 'self' https://login.microsoftonline.com" in headers["content-security-policy"]
     with TestClient(build(make_settings(enabled=False), Conversation())) as client:
         assert client.get("/").headers["permissions-policy"] == "microphone=(), camera=(), geolocation=()"
+
+
+@pytest.mark.parametrize("query", ["voice=off", "host=esaif-maui", "host=esaif-maui&voice=on"])
+def test_text_only_pages_deny_microphone_without_disabling_text_chat(app, query):
+    with TestClient(app) as client:
+        assert client.get("/?" + query).headers["permissions-policy"] == "microphone=(), camera=(), geolocation=()"
+        result = client.post("/api/chat", headers={"Authorization": "Bearer " + GOOD},
+                             json={"question": "Typed question", "scope_key": "project001-dev", "audience": "project"})
+    assert result.status_code == 200
+
+
+def test_configured_third_language_is_accepted_but_unconfigured_language_is_refused(conversation):
+    settings = make_settings(language_profiles={
+        "en-US": {"voice_name": "en-US-Ava:DragonHDLatestNeural"},
+        "sv-SE": {"voice_name": "sv-SE-SofieNeural"},
+        "fr-FR": {"voice_name": "fr-FR-DeniseNeural"},
+    })
+    app = build(settings, conversation, FakeGateway())
+    with TestClient(app) as client:
+        with client.websocket_connect("/api/voice/ws") as socket:
+            socket.send_text(hello(language="fr-FR"))
+            ready = collect(socket, got("ready"))[-1]
+            assert ready["voice"]["languages"] == ["fr-FR"]
+            finish(socket)
+        with client.websocket_connect("/api/voice/ws") as socket:
+            socket.send_text(hello(language="de-DE"))
+            refused = collect(socket, ended)
+            assert refused[0]["code"] == "invalid_hello"
+    assert len(app.state.voice_gateway.upstreams) == 1

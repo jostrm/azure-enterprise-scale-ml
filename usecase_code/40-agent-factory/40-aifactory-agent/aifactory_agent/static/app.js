@@ -972,8 +972,9 @@
       } else {
         ui("skill-status").textContent = skill.kind === "diagnostic" ? "Read-only Factory observation received."
           : "Read-only cost analysis received. Estimates, actual charges and forecasts have different bases.";
-        ui("skill-result").append(details(skill.kind === "diagnostic" ? "Factory observation"
-          : "Cost analysis, sources, assumptions and coverage", result.data || result));
+        const renderer = new window.FactorySkillResultRenderer({document});
+        if (skill.kind === "diagnostic") renderer.renderObservation(result.data, ui("skill-result"));
+        else renderer.renderCost(result.data, ui("skill-result"));
       }
     } catch (error) {
       showError(error.message);
@@ -993,7 +994,8 @@
     try {
       const result = await api("/api/templates?scope_key=" + encodeURIComponent(scopeKey));
       if (scopeKey !== state.scopeKey) return;
-      ui("template-result").replaceChildren(details("Source types, exact targets and creation blockers", result));
+      new window.FactorySkillResultRenderer({document}).renderObservation(result, ui("template-result"),
+        "Template types, exact targets and creation blockers");
     } catch (error) {
       showError(error.message);
     } finally {
@@ -1080,6 +1082,7 @@
     card.append(node("p", "Operation: " + operation.id + " · correlation: " + operation.correlation_id, "muted"));
     card.append(node("p", "Created: " + operation.created_at + " · expires: " + operation.expires_at, "muted"));
     card.append(node("p", "Exact plan hash: " + operation.plan_hash, "plan-hash"));
+    new window.FactorySkillResultRenderer({document}).appendOperation(operation, card);
     card.append(details("Review target, proposed changes and affected resources", {
       scope: operation.scope, factory_api_url: operation.factory_api_url,
       request: operation.request, preview: operation.preview,

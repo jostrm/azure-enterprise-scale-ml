@@ -199,6 +199,8 @@ def create_app(settings: Settings, *, services: AgentServices | None = None) -> 
     async def security_headers(request: Request, call_next):
         response = await call_next(request)
         response.headers.update(headers)
+        if request.query_params.get("voice") == "off" or request.query_params.get("host") == "esaif-maui":
+            response.headers["Permissions-Policy"] = "microphone=(), camera=(), geolocation=()"
         return response
 
     @app.exception_handler(500)

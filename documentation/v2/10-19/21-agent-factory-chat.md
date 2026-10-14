@@ -219,7 +219,8 @@ The deployment adds one **revision** of the same app. With voice enabled it also
 !!! note "Embedded ESAIF Agent Chat"
 
     The chat embedded in the MAUI app blocks browser permission prompts, so it cannot ask for the microphone.
-    Use a regular browser for voice.
+    Embedded `host=esaif-maui` pages and `voice=off` links stay text-only: they do not initialize voice,
+    request a voice token or prompt for a microphone. Use a regular browser for voice.
 
 ## Security and privacy
 
@@ -247,7 +248,7 @@ The deployment adds one **revision** of the same app. With voice enabled it also
 | Limits (defaults) | 15 minutes per session, idle end after 2 minutes, 4 concurrent sessions per app replica, one session per user (a newer one replaces the older). |
 | Spoken length | Shell: `voice.max_spoken_characters` defaults to `1200`. Native: brief responses capped at 1024 output tokens; long code/operations belong in typed chat. |
 | Cost | Shell uses a Voice Live model tier plus external answer inference. Native uses `gpt-realtime-mini`/`gpt-realtime` directly, removing that external answer request; Search/embedding/tool costs remain. Check your agreement's current rates. |
-| Languages | Server-owned English/Swedish profiles. OpenAI voices give model-native audio; `sv-SE-SofieNeural` with `voice_type: azure-standard` gives Swedish Azure synthesis inside Voice Live instead. Voice is fixed per session, so switching safely restarts voice only. |
+| Languages | Operator-configured locale profiles, not an English/Swedish-only list. Add languages supported by the selected model and voice. OpenAI voices give model-native audio; `sv-SE-SofieNeural` with `voice_type: azure-standard` gives Azure synthesis inside Voice Live. Switching safely restarts voice only. |
 | Latency | Measure warmed English/Swedish end-of-speech to first audible reply after approved deployment. Server `aifactory.voice.first_audio.duration` measures first relayed frame, not speaker playback; readiness/Search/network/tool latency remains. Offline tests cannot promise sub-second replies. |
 | Knowledge | The index is rebuilt by a nightly refresh job and by `ingest`. Re-run `ingest` after large documentation changes. |
 | Turn voice off | Set `voice.enabled` to `false` (operator flow) or the flag to `false`; the app keeps running as a text chat. Nothing is deleted. |

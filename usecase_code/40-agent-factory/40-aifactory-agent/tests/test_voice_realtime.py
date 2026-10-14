@@ -178,6 +178,151 @@ def test_native_discards_late_input_transcription_from_interrupted_utterance():
     run(scenario)
 
 
+def test_explicit_interrupt_does_not_resurrect_late_transcription():
+    async def scenario():
+        harness = await NativeHarness().start()
+        await harness.session._handle_upstream({"type": "input_audio_buffer.speech_started", "item_id": "old"})
+        await harness.session._handle_upstream({"type": "input_audio_buffer.speech_stopped", "item_id": "old"})
+        await harness.session.handle_control({"type": "interrupt"})
+        await harness.session._handle_upstream({
+            "type": "conversation.item.input_audio_transcription.completed",
+            "item_id": "old", "transcript": "Cancelled question"})
+        await asyncio.sleep(0.02)
+        assert not harness.prepared and not harness.upstream.of("response.create")
+        harness.hear("New question", item="new")
+        await harness.until(lambda: harness.prepared)
+        assert harness.prepared == ["New question"]
+        await harness.finish()
+    run(scenario)
+
+
+def test_interrupt_during_awaited_speech_start_cleanup_cannot_register_cancelled_input():
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("First", item="first")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        await harness.session._handle_upstream({"type": "response.created", "response": {"id": "r1"}})
+        entered, release = asyncio.Event(), asyncio.Event()
+        send = harness.upstream.send
+
+        async def blocked(event):
+            if event["type"] == "response.cancel":
+                entered.set()
+                await release.wait()
+            await send(event)
+
+        harness.upstream.send = blocked
+        starting = asyncio.create_task(harness.session._handle_upstream(
+            {"type": "input_audio_buffer.speech_started", "item_id": "cancelled"}))
+        await entered.wait()
+        await harness.session.handle_control({"type": "interrupt"})
+        release.set()
+        await starting
+        await harness.session._handle_upstream({
+            "type": "conversation.item.input_audio_transcription.completed",
+            "item_id": "cancelled", "transcript": "Cancelled second"})
+        await asyncio.sleep(0.02)
+        assert harness.prepared == ["First"]
+        assert len(harness.upstream.of("response.create")) == 1
+        await harness.finish()
+    run(scenario)
+
+
+@pytest.mark.parametrize("blocked_kind", ["session.update", "conversation.item.create"])
+def test_cancelled_context_send_does_not_delete_an_item_never_created(blocked_kind):
+    async def scenario():
+        harness = await NativeHarness(handshake_timeout=0.05).start()
+        entered, release = asyncio.Event(), asyncio.Event()
+        send = harness.upstream.send
+
+        async def blocked(event):
+            if event["type"] == blocked_kind:
+                entered.set()
+                await release.wait()
+            await send(event)
+
+        harness.upstream.send = blocked
+        harness.hear("First", item="first")
+        await entered.wait()
+        await harness.session.handle_control({"type": "interrupt"})
+        harness.upstream.send = send
+        harness.hear("Current", item="current")
+        if blocked_kind == "conversation.item.create":
+            await harness.until(lambda: harness.task.done())
+            assert not harness.upstream.of("response.create")
+            assert harness.channel.of("error")[-1]["fatal"] is True
+        else:
+            await harness.until(lambda: harness.upstream.of("response.create"))
+        created = {event["item"]["id"] for event in harness.upstream.of("conversation.item.create")}
+        deleted_context = {event["item_id"] for event in harness.upstream.of("conversation.item.delete")
+                           if event["item_id"].startswith("ctx_")}
+        assert deleted_context <= created
+        assert harness.prepared == ["First", "Current"]
+        await harness.finish()
+    run(scenario)
+
+
+def test_next_response_waits_for_uncertain_old_creation_ack_and_deletion():
+    async def scenario():
+        harness = await NativeHarness().start()
+        entered, release = asyncio.Event(), asyncio.Event()
+        send = harness.upstream.send
+
+        async def transmitted_then_blocked(event):
+            await send(event)
+            if event["type"] == "conversation.item.create":
+                entered.set()
+                await release.wait()
+
+        harness.upstream.send = transmitted_then_blocked
+        harness.hear("First", item="first")
+        await entered.wait()
+        old_item = harness.upstream.of("conversation.item.create")[-1]["item"]
+        await harness.session.handle_control({"type": "interrupt"})
+        harness.upstream.send = send
+        harness.hear("Current", item="current")
+        await harness.until(lambda: len(harness.prepared) == 2)
+        await asyncio.sleep(0.02)
+        assert not harness.upstream.of("response.create")
+        harness.upstream.push({"type": "conversation.item.created", "item": old_item})
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        deleted = harness.upstream.of("conversation.item.delete")
+        assert any(event["item_id"] == old_item["id"] for event in deleted)
+        delete_index = next(index for index, event in enumerate(harness.upstream.sent)
+                            if event["type"] == "conversation.item.delete" and event["item_id"] == old_item["id"])
+        response_index = next(index for index, event in enumerate(harness.upstream.sent)
+                              if event["type"] == "response.create")
+        assert delete_index < response_index
+        await harness.finish()
+    run(scenario)
+
+
+def test_new_grounded_turn_removes_all_old_cited_history_and_preserves_current_audio():
+    async def scenario():
+        harness = await NativeHarness().start()
+        harness.hear("First", item="old-user")
+        await harness.until(lambda: harness.upstream.of("response.create"))
+        context_id = harness.upstream.of("conversation.item.create")[0]["item"]["id"]
+        harness.upstream.push({"type": "conversation.item.created", "item": {"id": "old-user", "type": "message"}})
+        harness.upstream.push({"type": "response.created", "response": {"id": "r1"}})
+        harness.upstream.push({"type": "response.output_item.added", "response_id": "r1",
+                              "item": {"id": "old-assistant", "type": "message", "role": "assistant"}})
+        harness.upstream.push({"type": "conversation.item.created",
+                              "item": {"id": "old-tool-call", "type": "function_call"}})
+        harness.upstream.push({"type": "conversation.item.created",
+                              "item": {"id": "old-tool-result", "type": "function_call_output"}})
+        harness.response()
+        await harness.until(lambda: harness.channel.of("answer"))
+        harness.hear("Second", item="current-user")
+        await harness.until(lambda: len(harness.upstream.of("response.create")) == 2)
+        deleted = {event["item_id"] for event in harness.upstream.of("conversation.item.delete")}
+        assert {context_id, "old-user", "old-assistant", "old-tool-call", "old-tool-result"} <= deleted
+        assert "current-user" not in deleted
+        assert harness.prepared == ["First", "Second"]
+        await harness.finish()
+    run(scenario)
+
+
 def test_native_turn_deadline_reports_failure_without_poisoning_session():
     async def scenario():
         harness = await NativeHarness(answer_timeout=0.05).start()

@@ -523,6 +523,7 @@ def validate_deployment_plan(document):
                 "combined-plan-change-outside-scope")
         require(change["resource_id"].lower() not in combined_ids, "duplicate-combined-plan-change")
         combined_ids.add(change["resource_id"].lower())
+    validate_foundry_lifecycle(document)
 
 
 def protect_coordination_storage(document):
@@ -665,6 +666,8 @@ def capabilities():
         "selective_project_deletion": SELECTIVE_PROJECT_DELETE,
         "factory_cohort": "physical-lease-cohort-v1",
         "creation": "frozen-arm-deployment-plan-v1", "shared_remote_namespaced_auth": True,
+        "native_foundry": "identity-receipt-account-uami-readiness-project-v3",
+        "native_foundry_identity_producer": "source-projected-project-uami-v1",
         "blockers": {
             "legacy_creation": "A frozen complete ARM deployment plan and published scoped template are required.",
             "legacy_gha": "The published scoped GHA workflow is required; legacy workflow_dispatch is not used.",
@@ -2609,6 +2612,7 @@ def compiled_plan_step(cloud, document, step, source_root):
     require(("subscriptiondeploymenttemplate" in schema) == (step["scope"] == "subscription"),
             "compiled-template-scope-mismatch")
     verify_preserved_network(cloud, document, step, source_root, template=template)
+    template = bind_foundry_identity_template(cloud, document, step, source_root, template)
     return {"location": document["target"]["region"],
             "properties": {"mode": "Incremental", "template": template,
                            "parameters": {key: {"value": value} for key, value in step["parameters"].items()}}}
@@ -2655,7 +2659,8 @@ def resolve_template_parameters(compiled_template, selected_values, parameter_so
             "unused_configuration_keys": sorted(set(selected_values) - consumed), "published_defaults": sorted(defaults)}
 
 
-def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep):
+def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep, unchanged_resources=None,
+                     resource_payloads=None, source_changes=None):
     endpoint = deployment_endpoint(document, step)
     body = json.loads(canonical(payload))
     body["properties"]["whatIfSettings"] = {"resultFormat": "FullResourcePayloads"}
@@ -2680,7 +2685,44 @@ def evaluate_what_if(cloud, document, step, payload, sleep=time.sleep):
             raise Blocked("arm-what-if-incomplete")
     foundation = document.get("deployment", {}).get("bootstrap_foundation", {})
     resources = (foundation["resources"] if foundation.get("contract") == EXACT_BOOTSTRAP_CONTRACT else {})
-    return arm_changes(response, resources)
+    if unchanged_resources:
+        phases = document.get("deployment", {}).get("foundry_lifecycle", {}).get("phases", [])
+        indices = [index for index, phase in enumerate(phases) if phase.get("id") == step.get("id")]
+        prior = ({row["resource_id"]: row for row in phases[indices[0] - 1].get("changes", [])}
+                 if len(indices) == 1 and indices[0] > 0 else {})
+        preserved = {key for key, row in resources.items() if row.get("disposition") == "preserve"}
+        def authorized_observation(key, value):
+            original = resources.get(key)
+            if original is None or original["body_hash"] == value.get("body_hash"):
+                return True
+            reviewed = prior.get(key, {})
+            return (original.get("disposition") == "owned" and hash_value(value.get("body_hash"))
+                    and reviewed.get("change_type") == "Modify"
+                    and reviewed.get("before_hash") == original["body_hash"]
+                    and hash_value(reviewed.get("after_hash"))
+                    and not any(key == parent or key.startswith(parent + "/") for parent in preserved))
+        require(all(authorized_observation(key, value) for key, value in unchanged_resources.items()),
+                "what-if-instance-proof-conflict")
+        resources = {**resources, **unchanged_resources}
+    identity = document.get("deployment", {}).get("foundry_identity_continuation", {}).get("proof")
+    if identity:
+        require(identity.get("binding_hash") == foundry_identity_context(document)
+                and hash_value(identity.get("body_hash")), "native-foundry-identity-proof-invalid")
+        resources = {**resources, identity["resource_id"]: {"body_hash": identity["body_hash"]}}
+    changes = arm_changes(response, resources)
+    raw_changes = response.get("properties", response)["changes"]
+    if source_changes is not None:
+        # Preservation-normalized Ignore is not evidence of a source declaration.
+        source_changes.clear()
+        source_changes.update({row["resourceId"].lower(): row["changeType"] for row in raw_changes})
+    if resource_payloads is not None:
+        for row in raw_changes:
+            identifier = str(row.get("resourceId", "")).lower()
+            if (isinstance(row.get("after"), dict) and resource_type_from_id(identifier) in (
+                    "microsoft.cognitiveservices/accounts", "microsoft.managedidentity/userassignedidentities",
+                    "microsoft.authorization/roleassignments")):
+                resource_payloads[identifier] = copy.deepcopy(row["after"])
+    return changes
 
 
 def frozen_step(cloud, document, step, source_root):
@@ -2699,9 +2741,11 @@ def frozen_step(cloud, document, step, source_root):
     return frozen
 
 
-def combined_plan_payload(cloud, document, source_root):
+def combined_plan_payload(cloud, document, source_root, step_ids=None):
     """Deploy ordered phases together so preview sees their dependency graph."""
     target, steps = document["target"], document["deployment"]["steps"]
+    if step_ids is not None:
+        steps = [step for step in steps if step["id"] in step_ids]
     outer = {"$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
              "contentVersion": "1.0.0.0", "parameters": {}, "resources": []}
     parameters = {}
@@ -2713,7 +2757,7 @@ def combined_plan_payload(cloud, document, source_root):
         parameters[parameter_name] = {"value": step["parameters"]}
         nested = {"type": "Microsoft.Resources/deployments", "apiVersion": "2022-09-01",
                   "name": ids[step["id"]].rsplit("/", 1)[-1], "subscriptionId": target["subscription_id"],
-                  "dependsOn": [ids[value] for value in step["depends_on"]],
+                  "dependsOn": [ids[value] for value in step["depends_on"] if value in ids],
                   "properties": {"mode": "Incremental", "expressionEvaluationOptions": {"scope": "inner"},
                                  "template": payload["properties"]["template"],
                                  "parameters": {key: {"value": "[parameters('" + parameter_name + "')['" + key + "']]"}
@@ -2736,6 +2780,1365 @@ def combined_plan_payload(cloud, document, source_root):
         outer["resources"].append(nested)
     require(len(canonical(outer)) <= 4 * 1024 * 1024, "combined-template-too-large-use-reviewed-template-specs")
     return {"location": target["region"], "properties": {"mode": "Incremental", "template": outer, "parameters": parameters}}
+
+
+FOUNDRY_TEMPLATE = "environment_setup/aifactory/bicep/esml-genai-1/09-ai-foundry-2025-v4.bicep"
+FOUNDRY_CONTRACT = "identity-receipt-account-uami-readiness-project-v3"
+FOUNDRY_API = "2025-04-01-preview"
+FOUNDRY_MI_API = "2024-11-30"
+FOUNDRY_NETWORK_ROLE = "4d97b98b-1d4f-4787-a291-c67834d212e7"
+FOUNDRY_FOUNDATION = "environment_setup/aifactory/bicep/esml-genai-1/01-foundation.bicep"
+FOUNDRY_NETWORK_RBAC = "environment_setup/aifactory/bicep/esml-genai-1/08b-rbac-common-rg.bicep"
+FOUNDRY_IDENTITY_CONTRACT = "source-projected-project-uami-v1"
+FOUNDRY_MI_TEMPLATE = "environment_setup/aifactory/bicep/modules/mi.bicep"
+FOUNDRY_NAMING_TEMPLATE = "environment_setup/aifactory/bicep/modules/common/CmnAIfactoryNaming.bicep"
+FOUNDRY_LOOKUP_TEMPLATE = "environment_setup/aifactory/bicep/modules/get-managed-identity-info.bicep"
+FOUNDRY_ARRAY_TEMPLATE = "environment_setup/aifactory/bicep/modules/spAndMiArray.bicep"
+
+
+def foundry_identity_context(document):
+    """The second review may change run/time/ownership evidence, not the requested source or configuration."""
+    return digest({**{key: document[key] for key in ("source", "config", "target", "identity", "route", "locks")},
+                   "steps": [{key: value for key, value in step.items() if key != "changes"}
+                             for step in document["deployment"]["steps"]]})
+
+
+def foundry_identity_request_context(document):
+    return digest({key: document[key] for key in ("source", "config", "target", "identity", "route", "locks")})
+
+
+def foundry_identity_preparation(cloud, document, known_ownership):
+    """Recover generated run inputs only; complete source/step binding is checked after rebuilding the plan."""
+    matches = []
+    for identifier, evidence in known_ownership.items():
+        if resource_type_from_id(identifier) != "microsoft.managedidentity/userassignedidentities":
+            continue
+        require(isinstance(evidence, dict) and guid(evidence.get("run_id")) and hash_value(evidence.get("receipt_hash")),
+                "native-foundry-identity-producer-receipt-required")
+        _, _, receipt = coordination(cloud, document).request("GET", "runs/" + evidence["run_id"] + ".worker.json")
+        require(isinstance(receipt, dict) and digest(receipt) == evidence["receipt_hash"],
+                "native-foundry-identity-receipt-hash-mismatch")
+        proof = receipt.get("foundry_identity_receipt")
+        if not isinstance(proof, dict) or proof.get("request_hash") != foundry_identity_request_context(document):
+            continue
+        require(receipt.get("schema") == 1 and receipt.get("status") == "succeeded"
+                and receipt.get("completion") == "identity-only" and receipt.get("continuation_required") is True
+                and receipt.get("target") == document["target"] and receipt.get("source_commit") == document["source"]["commit"]
+                and receipt.get("run_id") == evidence["run_id"] == proof.get("producer_run_id")
+                and receipt.get("manifest_hash") == proof.get("producer_manifest_hash")
+                and hash_value(receipt.get("manifest_hash")) and hash_value(proof.get("binding_hash"))
+                and proof.get("contract") == FOUNDRY_IDENTITY_CONTRACT
+                and proof.get("resource_id") == identifier == identifier.lower()
+                and NESTED_ID.fullmatch(identifier) and proof.get("resource_group") == arm_scope(identifier)
+                and arm_scope(identifier) in {scope.lower() for scope in document["locks"]["scopes"]}
+                and proof.get("role_writes") == [] and proof.get("full_project_executed") is False,
+                "native-foundry-identity-preparation-receipt-invalid")
+        require(receipt["run_id"] != document["run_id"]
+                and timestamp(proof.get("producer_prepared_at")) <= timestamp(proof.get("observed_at"))
+                and 0 <= timestamp(document["prepared_at"]) - timestamp(proof.get("observed_at")) <= 3600,
+                "native-foundry-identity-receipt-stale-or-replayed")
+        status, _, body = cloud.arm("GET", identifier, FOUNDRY_MI_API, allowed=(200, 404))
+        require(status == 200 and str(body.get("id", "")).lower() == identifier
+                and foundry_uami_metadata(document, body) == proof.get("identity")
+                and digest(body) == proof.get("body_hash"), "native-foundry-identity-receipt-instance-changed")
+        matches.append({"run_id": receipt["run_id"], "prepared_at": proof["producer_prepared_at"]})
+    require(len(matches) <= 1, "native-foundry-identity-preparation-ambiguous")
+    return matches[0] if matches else None
+
+
+def foundry_identity_projection(cloud, document, source_root):
+    data = document["deployment"]["foundry_lifecycle"]
+    binding = data["agent_identity_binding"]
+    require(binding is not None, "native-foundry-identity-producer-not-selected")
+    step = next(step for step in document["deployment"]["steps"] if step["id"] == binding["producer_step"])
+    require(step["parameters"].get("miPrjExists") is False and "template_spec_id" not in step,
+            "native-foundry-identity-source-producer-required")
+    require(not any("template_spec_id" in row for row in document["deployment"]["steps"]),
+            "native-foundry-identity-template-spec-unsupported")
+    owner = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
+    owner["project_id"] = document["target"]["project_ids"][0]
+    verify_ownership({"tags": step["parameters"].get("tagsProject")}, owner)
+    template = copy.deepcopy(cloud.compile_template(source_root, step["template"]))
+    require(digest(template) == step["template_hash"], "compiled-template-hash-mismatch")
+    resources = template.get("resources")
+    require(template.get("languageVersion") == "2.0" and isinstance(resources, dict)
+            and {"projectResourceGroup", "namingConvention", "miForPrj"} <= set(resources),
+            "native-foundry-identity-source-selectors-required")
+    producer, naming, group = (resources[key] for key in ("miForPrj", "namingConvention", "projectResourceGroup"))
+    mi = cloud.compile_template(source_root, FOUNDRY_MI_TEMPLATE)
+    names = cloud.compile_template(source_root, FOUNDRY_NAMING_TEMPLATE)
+    require(producer.get("type") == naming.get("type") == "Microsoft.Resources/deployments"
+            and producer.get("properties", {}).get("template") == mi
+            and naming.get("properties", {}).get("template") == names
+            and (not names.get("resources") or names["resources"] == {"commonResourceGroupRef": {
+                "existing": True, "type": "Microsoft.Resources/resourceGroups", "apiVersion": "2024-07-01",
+                "subscriptionId": "[parameters('subscriptionIdDevTestProd')]",
+                "name": "[parameters('commonResourceGroupName')]"}})
+            and producer.get("condition") == "[not(variables('resourceExists').miPrj)]"
+            and producer.get("properties", {}).get("parameters") == {
+                "name": {"value": "[reference('namingConvention').outputs.namingConvention.value.miPrjName]"},
+                "location": {"value": "[parameters('location')]"}, "tags": {"value": "[parameters('tagsProject')]"}}
+            and producer.get("resourceGroup") == naming.get("resourceGroup") == "[variables('targetResourceGroup')]"
+            and producer.get("subscriptionId") == naming.get("subscriptionId") == "[variables('subscriptionIdDevTestProd')]"
+            and group.get("type") == "Microsoft.Resources/resourceGroups"
+            and group.get("name") == "[variables('targetResourceGroup')]"
+            and group.get("location") == "[parameters('location')]"
+            and group.get("tags") == "[parameters('tagsProject')]"
+            and set(group) <= {"type", "apiVersion", "name", "location", "tags"},
+            "native-foundry-identity-source-selector-mismatch")
+    leaves = mi.get("resources")
+    require(isinstance(leaves, list) and len(leaves) == 2
+            and [row.get("type") for row in leaves] == [
+                "Microsoft.ManagedIdentity/userAssignedIdentities", "Microsoft.Authorization/roleAssignments"]
+            and set(leaves[0]) == {"type", "apiVersion", "name", "location", "tags"}
+            and leaves[0]["apiVersion"] == FOUNDRY_MI_API
+            and leaves[0]["name"] == "[parameters('name')]"
+            and leaves[0]["location"] == "[parameters('location')]",
+            "native-foundry-identity-minimal-source-required")
+    producer["properties"]["template"]["resources"] = [copy.deepcopy(leaves[0])]
+    producer["properties"]["template"]["outputs"] = {
+        key: value for key, value in mi.get("outputs", {}).items() if key in ("managedIdentityName", "managedIdentityId")}
+    template["resources"] = {key: resources[key] for key in ("projectResourceGroup", "namingConvention", "miForPrj")}
+    for row in template["resources"].values():
+        require(set(row.get("dependsOn", [])) <= set(template["resources"]),
+                "native-foundry-identity-source-dependency-outside-projection")
+    outputs = template.get("outputs", {}).get("foundationOutputs", {}).get("value", {})
+    require(outputs.get("miProjectName") == producer["properties"]["parameters"]["name"]["value"]
+            and outputs.get("projectResourceGroupName") == group["name"],
+            "native-foundry-identity-source-output-mismatch")
+    template["outputs"] = {"foundationOutputs": {"type": "object", "value": {
+        key: outputs[key] for key in ("miProjectName", "projectResourceGroupName")}}}
+    return {"location": document["target"]["region"], "properties": {
+        "mode": "Incremental", "template": template,
+        "parameters": {key: {"value": value} for key, value in step["parameters"].items()}}}
+
+
+def validate_foundry_identity_stage(document):
+    stage = document["deployment"].get("foundry_identity_stage")
+    require(isinstance(stage, dict) and stage.get("contract") == FOUNDRY_IDENTITY_CONTRACT
+            and stage.get("binding_hash") == foundry_identity_context(document)
+            and hash_value(stage.get("payload_hash")) and stage.get("approval_purpose") == "identity-only"
+            and stage.get("continuation_requires_new_approval") is True,
+            "native-foundry-identity-stage-binding-mismatch")
+    identifier, group = stage.get("resource_id", ""), stage.get("resource_group", "")
+    require(NESTED_ID.fullmatch(identifier) and identifier == identifier.lower()
+            and resource_type_from_id(identifier) == "microsoft.managedidentity/userassignedidentities"
+            and group == arm_scope(identifier)
+            and group in {scope.lower() for scope in document["locks"]["scopes"]},
+            "native-foundry-identity-stage-scope-mismatch")
+    changes = stage.get("changes")
+    require(isinstance(changes, list) and len(changes) == 2
+            and {row.get("resource_id") for row in changes} == {identifier, group}
+            and all(row.get("change_type") in ("Create", "NoChange") and hash_value(row.get("after_hash"))
+                    for row in changes)
+            and next(row for row in changes if row["resource_id"] == identifier)["change_type"] == "Create"
+            and stage.get("source_changes") == {row["resource_id"]: row["change_type"] for row in changes}
+            and document["deployment"]["changes"] == changes
+            and "account_resource_id" not in document["deployment"]["foundry_lifecycle"]
+            and "foundry_identity_continuation" not in document["deployment"],
+            "native-foundry-identity-stage-footprint-invalid")
+
+
+def foundry_identity_snapshot(cloud, group):
+    status, _, body = cloud.arm("GET", group, RG_API, allowed=(200, 404))
+    if status == 404:
+        return {"group": None, "resources": {}}
+    closure, bodies = collect_resource_closure(cloud, [group])
+    require(group in bodies and digest(bodies[group]) == digest(body), "native-foundry-identity-group-drift")
+    return {"group": digest(body), "resources": {key: digest(value) for key, value in bodies.items() if key != group}}
+
+
+def freeze_foundry_identity_stage(cloud, document, source_root, *, sleep=time.sleep):
+    """Return before dependent previews on a cold run; never materialize an identity while preparing."""
+    plan = document["deployment"]
+    data = plan.get("foundry_lifecycle")
+    if not data or not data["agent_identity_binding"]:
+        return False
+    payload = foundry_identity_projection(cloud, document, source_root)
+    captured, provenance = {}, {}
+    changes = evaluate_what_if(cloud, document, {"id": "foundry-identity-producer", "scope": "subscription"},
+                               payload, sleep, resource_payloads=captured, source_changes=provenance)
+    identities = [row["resource_id"] for row in changes
+                  if resource_type_from_id(row["resource_id"]) == "microsoft.managedidentity/userassignedidentities"]
+    require(len(identities) == 1 and NESTED_ID.fullmatch(identities[0]),
+            "native-foundry-identity-source-preview-incomplete")
+    identifier = identities[0]
+    group = arm_scope(identifier)
+    require(group in {scope.lower() for scope in document["locks"]["scopes"]}
+            and {row["resource_id"] for row in changes} == {group, identifier}
+            and all(provenance.get(row["resource_id"]) in ("Create", "NoChange") for row in changes),
+            "native-foundry-identity-preview-footprint-invalid")
+    status, _, body = cloud.arm("GET", identifier, FOUNDRY_MI_API, allowed=(200, 404))
+    if status == 200:
+        require("foundry_identity_stage" not in plan, "native-foundry-identity-stage-already-materialized")
+        evidence = plan.get("known_ownership", {}).get(identifier)
+        require(isinstance(evidence, dict) and guid(evidence.get("run_id")) and hash_value(evidence.get("receipt_hash")),
+                "native-foundry-identity-producer-receipt-required")
+        _, _, receipt = coordination(cloud, document).request("GET", "runs/" + evidence["run_id"] + ".worker.json")
+        require(digest(receipt) == evidence["receipt_hash"], "native-foundry-identity-receipt-hash-mismatch")
+        verify_foundry_identity_receipt(document, receipt, continuation=True)
+        proof = receipt["foundry_identity_receipt"]
+        require(proof["payload_hash"] == digest(payload) and proof["resource_id"] == identifier
+                and proof["identity"] == foundry_uami_metadata(document, body)
+                and proof["body_hash"] == digest(body),
+                "native-foundry-identity-receipt-instance-changed")
+        bound = {"run_id": receipt["run_id"], "receipt_hash": digest(receipt),
+                 "proof": copy.deepcopy(proof)}
+        require("foundry_identity_continuation" not in plan or plan["foundry_identity_continuation"] == bound,
+                "native-foundry-identity-continuation-changed")
+        plan["foundry_identity_continuation"] = bound
+        validate_foundry_identity_continuation(document)
+        return False
+    require("foundry_identity_continuation" not in plan, "native-foundry-identity-continuation-missing-instance")
+    status, _, group_body = cloud.arm("GET", group, RG_API, allowed=(200, 404))
+    if status == 200:
+        verify_ownership(group_body, {**{key: document["target"][key] for key in ("factory_id", "scaleset_id")},
+                                      "project_id": document["target"]["project_ids"][0]})
+    stage = {"contract": FOUNDRY_IDENTITY_CONTRACT, "approval_purpose": "identity-only",
+             "continuation_requires_new_approval": True, "binding_hash": foundry_identity_context(document),
+             "payload_hash": digest(payload), "resource_id": identifier, "resource_group": group,
+             "changes": changes, "source_changes": provenance,
+             "before": foundry_identity_snapshot(cloud, group)}
+    require("foundry_identity_stage" not in plan or plan["foundry_identity_stage"] == stage,
+            "native-foundry-identity-stage-changed")
+    plan["foundry_identity_stage"] = stage
+    plan["changes"] = changes
+    validate_foundry_identity_stage(document)
+    verify_bootstrap_preservation(document, changes)
+    return True
+
+
+def verify_foundry_identity_receipt_effects(document, receipt):
+    """Check the minimal receipt footprint; context, provenance and freshness require separate verification."""
+    require(isinstance(receipt, dict) and isinstance(receipt.get("foundry_identity_receipt"), dict)
+            and set(receipt) <= {
+                "schema", "run_id", "manifest_hash", "source_commit", "target", "status", "deployments",
+                "ownership", "resource_groups", "mutation_started", "updated_at", "completion",
+                "continuation_required", "inventory_closure_hash", "foundry_identity_receipt"},
+            "native-foundry-identity-receipt-invalid")
+    proof = receipt.get("foundry_identity_receipt", {})
+    require(receipt.get("schema") == 1 and receipt.get("status") == "succeeded"
+            and receipt.get("completion") == "identity-only" and receipt.get("continuation_required") is True
+            and receipt.get("source_commit") == document["source"]["commit"]
+            and receipt.get("target") == document["target"]
+            and guid(receipt.get("run_id")) and hash_value(receipt.get("manifest_hash"))
+            and proof.get("contract") == FOUNDRY_IDENTITY_CONTRACT
+            and hash_value(proof.get("binding_hash")) and hash_value(proof.get("request_hash"))
+            and proof.get("producer_run_id") == receipt["run_id"]
+            and proof.get("producer_manifest_hash") == receipt["manifest_hash"]
+            and hash_value(proof.get("payload_hash")) and hash_value(proof.get("body_hash"))
+            and proof.get("role_writes") == [] and proof.get("full_project_executed") is False
+            and isinstance(document["target"].get("project_ids"), list)
+            and len(document["target"]["project_ids"]) == 1,
+            "native-foundry-identity-receipt-invalid")
+    observed = proof.get("identity", {})
+    require(all(foundry_identity_guid(observed.get(key)) for key in ("principal_id", "client_id", "tenant_id"))
+            and observed["principal_id"] != observed["client_id"]
+            and observed["tenant_id"] == document["target"]["tenant_id"].lower(),
+            "native-foundry-identity-receipt-guid-invalid")
+    identifier, group = proof.get("resource_id", ""), proof.get("resource_group", "")
+    require(NESTED_ID.fullmatch(identifier) and identifier == identifier.lower()
+            and resource_type_from_id(identifier) == "microsoft.managedidentity/userassignedidentities"
+            and group == arm_scope(identifier) and group in {scope.lower() for scope in document["locks"]["scopes"]}
+            and receipt.get("deployments") == [{"step_id": "foundry-identity-producer",
+                "id": deployment_endpoint({**document, "run_id": receipt["run_id"]},
+                    {"id": "foundry-identity-producer", "scope": "subscription"}).removeprefix(ARM), "status": "succeeded"}],
+            "native-foundry-identity-receipt-scope-invalid")
+    owner = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
+    owner["project_id"] = document["target"]["project_ids"][0]
+    require(isinstance(receipt.get("ownership"), list) and len(receipt["ownership"]) == 1
+            and receipt["ownership"][0].get("resource_id") == identifier
+            and receipt["ownership"][0].get("body_hash") == proof["body_hash"]
+            and receipt["ownership"][0].get("owner") == owner
+            and isinstance(receipt.get("resource_groups"), list) and len(receipt["resource_groups"]) == 1
+            and receipt["resource_groups"][0].get("resource_id") == group
+            and receipt["resource_groups"][0].get("owner") == owner
+            and hash_value(receipt["resource_groups"][0].get("body_hash"))
+            and hash_value(receipt.get("inventory_closure_hash")),
+            "native-foundry-identity-receipt-ownership-incomplete")
+    at = timestamp(proof.get("observed_at"))
+    require(timestamp(proof.get("producer_prepared_at")) <= at, "native-foundry-identity-receipt-time-invalid")
+
+
+def verify_foundry_identity_receipt(document, receipt, *, continuation=False):
+    verify_foundry_identity_receipt_effects(document, receipt)
+    proof = receipt["foundry_identity_receipt"]
+    require(proof["binding_hash"] == foundry_identity_context(document)
+            and proof["request_hash"] == foundry_identity_request_context(document),
+            "native-foundry-identity-receipt-invalid")
+    at = timestamp(proof["observed_at"])
+    if continuation:
+        require(receipt["run_id"] != document["run_id"]
+                and 0 <= timestamp(document["prepared_at"]) - at <= 3600,
+                "native-foundry-identity-receipt-stale-or-replayed")
+    else:
+        validate_foundry_identity_stage(document)
+        stage = document["deployment"]["foundry_identity_stage"]
+        require(receipt["run_id"] == document["run_id"] and receipt["manifest_hash"] == document["manifest_hash"]
+                and proof["producer_prepared_at"] == document["prepared_at"]
+                and proof["payload_hash"] == stage["payload_hash"] and proof["resource_id"] == stage["resource_id"]
+                and at >= timestamp(document["prepared_at"]), "native-foundry-identity-receipt-run-mismatch")
+
+
+def run_foundry_identity_stage(cloud, locks, document, source_root, receipt, persist, sleep):
+    stage = document["deployment"]["foundry_identity_stage"]
+    validate_foundry_identity_stage(document)
+    refreshed = copy.deepcopy(document)
+    require(freeze_foundry_identity_stage(cloud, refreshed, source_root, sleep=sleep),
+            "native-foundry-identity-stage-required")
+    payload = foundry_identity_projection(cloud, document, source_root)
+    locks.assert_held()
+    locks.authorize(document)
+    require(foundry_identity_snapshot(cloud, stage["resource_group"]) == stage["before"],
+            "native-foundry-identity-instance-changed-before-write")
+    status, _, _ = cloud.arm("GET", stage["resource_id"], FOUNDRY_MI_API, allowed=(200, 404))
+    require(status == 404, "native-foundry-identity-stage-already-materialized")
+    locks.assert_held()
+    locks.authorize(document)
+    endpoint = deployment_endpoint(document, {"id": "foundry-identity-producer", "scope": "subscription"})
+    receipt.update(pending_deployment=endpoint.removeprefix(ARM), mutation_started=True)
+    persist()
+    locks.assert_held()
+    locks.authorize(document)
+    cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
+    result = wait_foundry_resource(cloud, locks, endpoint.removeprefix(ARM),
+        lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded", sleep, attempts=1440,
+        read=lambda: cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM), document=document)
+    outputs = result.get("properties", {}).get("outputs", {}).get("foundationOutputs", {}).get("value", {})
+    require(isinstance(outputs.get("miProjectName"), str) and isinstance(outputs.get("projectResourceGroupName"), str)
+            and ("/subscriptions/" + document["target"]["subscription_id"] + "/resourceGroups/"
+                 + outputs["projectResourceGroupName"] + "/providers/Microsoft.ManagedIdentity/userAssignedIdentities/"
+                 + outputs["miProjectName"]).lower() == stage["resource_id"],
+            "native-foundry-identity-output-mismatch")
+    def materialized(value):
+        properties = value.get("properties", {})
+        require(isinstance(properties, dict), "native-foundry-agent-identifiers-invalid")
+        if any(properties.get(key) in (None, "") for key in ("principalId", "clientId", "tenantId")):
+            return False
+        return bool(foundry_uami_metadata(document, value))
+    body = wait_foundry_resource(cloud, locks, stage["resource_id"], materialized, sleep,
+        api_version=FOUNDRY_MI_API, document=document)
+    metadata = foundry_uami_metadata(document, body)
+    owner = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
+    owner["project_id"] = document["target"]["project_ids"][0]
+    verify_ownership(body, owner)
+    closure, bodies = collect_resource_closure(cloud, [stage["resource_group"]])
+    require(set(bodies) == {stage["resource_group"], stage["resource_id"], *stage["before"]["resources"]}
+            and all(digest(bodies[key]) == value for key, value in stage["before"]["resources"].items())
+            and digest(bodies[stage["resource_id"]]) == digest(body),
+            "native-foundry-identity-unreviewed-side-effects")
+    group = bodies[stage["resource_group"]]
+    verify_ownership(group, owner)
+    receipt.update(completion="identity-only", continuation_required=True,
+        deployments=[{"step_id": "foundry-identity-producer", "id": endpoint.removeprefix(ARM), "status": "succeeded"}],
+        ownership=[{"resource_id": stage["resource_id"], "owner": owner,
+                    **closure["resources"][stage["resource_id"]]}],
+        resource_groups=[{"resource_id": stage["resource_group"], "owner": owner, "body_hash": digest(group),
+                          "etag": group.get("etag")}], inventory_closure_hash=digest(closure),
+        foundry_identity_receipt={"contract": FOUNDRY_IDENTITY_CONTRACT, "binding_hash": stage["binding_hash"],
+            "request_hash": foundry_identity_request_context(document), "producer_prepared_at": document["prepared_at"],
+            "payload_hash": stage["payload_hash"], "producer_run_id": document["run_id"],
+            "producer_manifest_hash": document["manifest_hash"], "resource_id": stage["resource_id"],
+            "resource_group": stage["resource_group"], "body_hash": digest(body), "identity": metadata,
+            "observed_at": utc_now(), "role_writes": [], "full_project_executed": False})
+    locks.authorize(document)
+    receipt["status"] = "succeeded"
+    receipt.pop("pending_deployment", None)
+    verify_foundry_identity_receipt(document, receipt)
+    persist()
+
+
+def foundry_module_reference(symbol, resource):
+    if symbol is not None:
+        return "reference('" + symbol + "')"
+    def expression(value):
+        require(isinstance(value, str) and value.startswith("[") and value.endswith("]"),
+                "native-foundry-identity-reference-unresolved")
+        return value[1:-1]
+    return ("reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', "
+            + expression(resource.get("subscriptionId")) + ", " + expression(resource.get("resourceGroup"))
+            + "), 'Microsoft.Resources/deployments', " + expression(resource.get("name"))
+            + "), '2022-09-01')")
+
+
+def validate_foundry_identity_continuation(document):
+    bound = document["deployment"].get("foundry_identity_continuation")
+    if bound is None:
+        return
+    require(isinstance(bound, dict) and guid(bound.get("run_id")) and hash_value(bound.get("receipt_hash"))
+            and bound["run_id"] != document["run_id"] and isinstance(bound.get("proof"), dict),
+            "native-foundry-identity-continuation-invalid")
+    proof = bound["proof"]
+    identifier = proof.get("resource_id", "")
+    identity = proof.get("identity", {})
+    require(proof.get("contract") == FOUNDRY_IDENTITY_CONTRACT
+            and proof.get("binding_hash") == foundry_identity_context(document)
+            and proof.get("request_hash") == foundry_identity_request_context(document)
+            and proof.get("producer_run_id") == bound["run_id"]
+            and hash_value(proof.get("producer_manifest_hash")) and hash_value(proof.get("payload_hash"))
+            and hash_value(proof.get("body_hash"))
+            and NESTED_ID.fullmatch(identifier) and identifier == identifier.lower()
+            and resource_type_from_id(identifier) == "microsoft.managedidentity/userassignedidentities"
+            and proof.get("resource_group") == arm_scope(identifier)
+            and arm_scope(identifier) in {scope.lower() for scope in document["locks"]["scopes"]}
+            and isinstance(identity, dict)
+            and all(foundry_identity_guid(identity.get(key)) for key in ("principal_id", "client_id", "tenant_id"))
+            and identity["principal_id"] != identity["client_id"]
+            and identity["tenant_id"] == document["target"]["tenant_id"].lower()
+            and identity.get("provisioning_state") in (None, "Succeeded")
+            and proof.get("role_writes") == [] and proof.get("full_project_executed") is False
+            and timestamp(proof.get("producer_prepared_at")) <= timestamp(proof.get("observed_at"))
+            and 0 <= timestamp(document["prepared_at"]) - timestamp(proof.get("observed_at")) <= 3600,
+            "native-foundry-identity-continuation-binding-mismatch")
+
+
+def foundry_replace_outputs(template, replacements):
+    """Replace only source-selected module output expressions in their owning ARM scope."""
+    def literal(value):
+        if isinstance(value, str):
+            return "'" + value.replace("'", "''") + "'"
+        require(isinstance(value, list) and all(isinstance(item, str) for item in value),
+                "native-foundry-identity-literal-invalid")
+        return "createArray(" + ", ".join(literal(item) for item in value) + ")"
+    def visit(value):
+        if isinstance(value, dict):
+            return {key: child if key == "template" else visit(child) for key, child in value.items()}
+        if isinstance(value, list):
+            return [visit(child) for child in value]
+        if not isinstance(value, str) or not value.startswith("["):
+            return value
+        for expression, replacement in replacements.items():
+            if value == "[" + expression + "]":
+                return copy.deepcopy(replacement)
+            value = value.replace(expression, literal(replacement))
+        return value
+    return visit(template)
+
+
+def bind_foundry_identity_template(cloud, document, step, source_root, template):
+    continuation = document["deployment"].get("foundry_identity_continuation")
+    if continuation is None:
+        return template
+    validate_foundry_identity_continuation(document)
+    require("template_spec_id" not in step, "native-foundry-identity-template-spec-unsupported")
+    proof = continuation.get("proof", {})
+    require(proof.get("binding_hash") == foundry_identity_context(document),
+            "native-foundry-identity-continuation-binding-mismatch")
+    identity = proof.get("identity", {})
+    require(all(foundry_identity_guid(identity.get(key)) for key in ("principal_id", "client_id", "tenant_id"))
+            and identity["tenant_id"] == document["target"]["tenant_id"].lower(),
+            "native-foundry-identity-continuation-guid-invalid")
+    template = copy.deepcopy(template)
+    resources = template.get("resources", {})
+    items = list(resources.items()) if isinstance(resources, dict) else [(None, row) for row in resources]
+    module_outputs = {"principalId": identity["principal_id"], "clientId": identity["client_id"],
+                      "resourceId": proof["resource_id"], "name": proof["resource_id"].rsplit("/", 1)[-1]}
+    replacements = {}
+    if step["template"] == FOUNDRY_FOUNDATION:
+        # Revalidate the role-free slice before modifying the full source's dependent grant.
+        require(digest(foundry_identity_projection(cloud, document, source_root)) == proof["payload_hash"],
+                "native-foundry-identity-projection-changed")
+        mi = template["resources"]["miForPrj"]["properties"]["template"]
+        role = mi["resources"][1]
+        require(role.get("properties", {}).get("principalId") ==
+                "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').principalId]",
+                "native-foundry-identity-source-role-selector-mismatch")
+        role["properties"]["principalId"] = identity["principal_id"]
+        require(all(value == "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name'))]"
+                    for value in role.get("dependsOn", [])),
+                "native-foundry-identity-source-role-dependency-mismatch")
+        role.pop("dependsOn", None)
+        mi["resources"] = [role]
+        for key, value in {"managedIdentityPrincipalId": identity["principal_id"],
+                           "managedIdentityClientId": identity["client_id"],
+                           "managedIdentityName": module_outputs["name"],
+                           "managedIdentityId": proof["resource_id"]}.items():
+            if key in mi.get("outputs", {}):
+                mi["outputs"][key]["value"] = value
+                replacements["reference('miForPrj').outputs." + key + ".value"] = value
+    else:
+        candidates = [(symbol, resource) for symbol, resource in items
+                      if "managedIdentityName" in resource.get("properties", {}).get("parameters", {})]
+        lookup_source = cloud.compile_template(source_root, FOUNDRY_LOOKUP_TEMPLATE) if candidates else None
+        lookups = [(symbol, resource) for symbol, resource in candidates
+                   if resource.get("properties", {}).get("template") == lookup_source]
+        if lookups:
+            foundation = next(row for row in document["deployment"]["steps"] if row["template"] == FOUNDRY_FOUNDATION)
+            naming_source = cloud.compile_template(source_root, FOUNDRY_NAMING_TEMPLATE)
+            naming = [(symbol, resource) for symbol, resource in items
+                      if resource.get("properties", {}).get("template") == naming_source]
+            require(len(naming) == 1, "native-foundry-identity-naming-source-required")
+            name_reference = foundry_module_reference(*naming[0])
+            for symbol, resource in lookups:
+                selector = resource.get("properties", {}).get("parameters", {}).get("managedIdentityName")
+                if selector not in (
+                        {"value": "[" + name_reference + ".outputs.miPrjName.value]"},
+                        {"value": "[" + name_reference + ".outputs.namingConvention.value.miPrjName]"}):
+                    continue
+                require(resource.get("resourceGroup") == "[variables('targetResourceGroup')]"
+                        and all(step["parameters"].get(key) == foundation["parameters"].get(key) for key in (
+                            "projectNumber", "env", "locationSuffix", "resourceSuffix", "commonResourceSuffix",
+                            "aifactorySalt10char", "randomValue", "commonRGNamePrefix", "aifactorySuffixRG",
+                            "commonResourceGroup_param", "commonResourceName", "projectPrefix", "projectSuffix"))
+                        and template.get("variables", {}).get("targetResourceGroup") ==
+                        cloud.compile_template(source_root, FOUNDRY_FOUNDATION).get("variables", {}).get("targetResourceGroup"),
+                        "native-foundry-identity-source-naming-mismatch")
+                reference = foundry_module_reference(symbol, resource)
+                for key, value in module_outputs.items():
+                    require(key in resource["properties"]["template"].get("outputs", {}),
+                            "native-foundry-identity-source-output-missing")
+                    resource["properties"]["template"]["outputs"][key]["value"] = value
+                    replacements[reference + ".outputs." + key + ".value"] = value
+    template = foundry_replace_outputs(template, replacements)
+    resources = template.get("resources", {})
+    items = list(resources.items()) if isinstance(resources, dict) else [(None, row) for row in resources]
+    arrays = {}
+    for symbol, resource in items:
+        properties = resource.get("properties", {})
+        if (properties.get("parameters", {}).get("managedIdentityOID") != {"value": identity["principal_id"]}
+                or properties.get("template") != cloud.compile_template(source_root, FOUNDRY_ARRAY_TEMPLATE)):
+            continue
+        parameters = properties["parameters"]
+        secret_name = step["parameters"].get("projectServicePrincipleOID_SeedingKeyvaultName")
+        require(parameters.get("includeManagedIdentity", {"value": True}) == {"value": True}
+                and (parameters.get("servicePrincipleOIDFromSecret") == {"value": ""}
+                     or isinstance(secret_name, str) and (
+                         not secret_name or "<todo>" in secret_name.lower() or "<optional>" in secret_name.lower())),
+                "native-foundry-identity-source-passwordless-array-required")
+        parameters["servicePrincipleOIDFromSecret"] = {"value": ""}
+        properties["template"]["outputs"]["spAndMiArray"]["value"] = [identity["principal_id"]]
+        arrays[foundry_module_reference(symbol, resource) + ".outputs.spAndMiArray.value"] = [identity["principal_id"]]
+    return foundry_replace_outputs(template, arrays)
+
+
+def verify_foundry_identity_current(cloud, locks, document):
+    bound = document["deployment"].get("foundry_identity_continuation")
+    if bound is None:
+        return
+    validate_foundry_identity_continuation(document)
+    _, _, receipt = locks.request("GET", "runs/" + bound["run_id"] + ".worker.json")
+    require(digest(receipt) == bound["receipt_hash"] and receipt.get("foundry_identity_receipt") == bound["proof"],
+            "native-foundry-identity-continuation-receipt-changed")
+    verify_foundry_identity_receipt(document, receipt, continuation=True)
+    proof = bound["proof"]
+    status, _, body = cloud.arm("GET", proof["resource_id"], FOUNDRY_MI_API, allowed=(200, 404))
+    require(status == 200 and str(body.get("id", "")).lower() == proof["resource_id"]
+            and foundry_uami_metadata(document, body) == proof["identity"] and digest(body) == proof["body_hash"],
+            "native-foundry-identity-continuation-instance-changed")
+    locks.assert_held()
+    locks.authorize(document)
+
+
+def foundry_first_run(parameters):
+    if parameters.get("enableAIFoundry") is False:
+        return False
+    require(parameters.get("enableAIFoundry") is True
+            and type(parameters.get("aiFoundryV2Exists")) is bool
+            and type(parameters.get("foundryV22AccountOnly")) is bool,
+            "native-foundry-topology-unverified")
+    return parameters["aiFoundryV2Exists"] is False
+
+
+def plan_foundry_lifecycle(document):
+    """Expand one non-CMK, non-AVM first run; no resource existence is inferred."""
+    plan = document["deployment"]
+    require("foundry_lifecycle" not in plan, "native-foundry-already-planned")
+    candidates = [step for step in plan["steps"] if step["template"] == FOUNDRY_TEMPLATE
+                  and foundry_first_run(step["parameters"])]
+    if not candidates:
+        return
+    require(len(candidates) == 1 and document["operation"] == "deploy-project",
+            "native-foundry-single-project-required")
+    full = candidates[0]
+    p = full["parameters"]
+    require(document["target"]["project_ids"] == [full.get("project_id")]
+            and p.get("projectNumber") == full.get("project_id"),
+            "native-foundry-single-project-required")
+    require(p["foundryV22AccountOnly"] is False and p.get("useAVMFoundry") is False
+            and (p.get("cmk") is False or p.get("cmk") is True and p.get("cmkDisableForFoundry") is True)
+            and type(p.get("disableAgentNetworkInjection")) is bool
+            and isinstance(p.get("aca2SubnetId"), str)
+            and p.get("aiFoundryV2ProjectExists") is False,
+            "native-foundry-supported-topology-required")
+    network = []
+    if p["disableAgentNetworkInjection"] is False and p["aca2SubnetId"]:
+        subnet = p["aca2SubnetId"].lower()
+        require(NESTED_ID.fullmatch(subnet)
+                and resource_type_from_id(subnet) == "microsoft.network/virtualnetworks/subnets"
+                and arm_scope(subnet) in {scope.lower() for scope in document["locks"]["scopes"]},
+                "native-foundry-owned-agent-subnet-required")
+        network = [subnet.rsplit("/subnets/", 1)[0], subnet]
+    index = plan["steps"].index(full)
+    require(index > 0, "native-foundry-prerequisite-phases-required")
+    foundation_steps = [step for step in plan["steps"][:index] if step["template"] == FOUNDRY_FOUNDATION]
+    rbac_steps = [step for step in plan["steps"][:index] if step["template"] == FOUNDRY_NETWORK_RBAC]
+    require(not network or len(foundation_steps) == len(rbac_steps) == 1,
+            "native-foundry-agent-prerequisite-source-required")
+    account = copy.deepcopy(full)
+    account["id"] = "foundry-account"
+    require(account["id"] not in {step["id"] for step in plan["steps"]},
+            "native-foundry-account-step-collision")
+    account["parameters"]["foundryV22AccountOnly"] = True
+    account.pop("changes", None)
+    full["depends_on"] = [account["id"]]
+    plan["steps"].insert(index, account)
+    plan["foundry_lifecycle"] = {
+        "contract": FOUNDRY_CONTRACT, "account_step": account["id"], "full_step": full["id"],
+        "full_parameters_hash": digest(p), "network_scopes": network,
+        "role_definition_id": "/subscriptions/" + document["target"]["subscription_id"]
+                              + "/providers/Microsoft.Authorization/roleDefinitions/" + FOUNDRY_NETWORK_ROLE,
+        "require_capability_host": bool(network),
+        "principal_binding": {
+            "contract": "foundry-account-system-identity-v1",
+            "source_commit": document["source"]["commit"],
+            "template": FOUNDRY_TEMPLATE,
+            "module": "aiFoundry2025NoAvmV22AccountOnly", "resource": "aiAccount",
+            "producer_phase": "foundry-account-phase", "producer_step": account["id"],
+            "resource_id_output": ["properties", "outputs", "aiFoundryV2ResourceId", "value"],
+            "resource_name_output": ["properties", "outputs", "aiFoundryV2Name", "value"],
+            "resolved_resource_id_field": "deployment.foundry_lifecycle.account_resource_id",
+            "principal_property": ["identity", "principalId"], "tenant_property": ["identity", "tenantId"],
+            "api_version": FOUNDRY_API, "tenant_id": document["target"]["tenant_id"],
+            "subscription_id": document["target"]["subscription_id"],
+            "required_gates": ["account-identity"] + (
+                ["configured-agent-network-ready"] if network else []),
+            "before_phase": "foundry-project-phase", "before_step": full["id"],
+        },
+        "agent_identity_binding": ({
+            "contract": "foundry-source-project-uami-v1", "source_commit": document["source"]["commit"],
+            "template": FOUNDRY_TEMPLATE, "module": "getProjectMIPrincipalId",
+            "module_template": "environment_setup/aifactory/bicep/modules/get-managed-identity-info.bicep",
+            "module_output": "resourceId",
+            "account_identity_selector": ["identity", "userAssignedIdentities"],
+            "producer_phase": "foundry-prerequisites", "producer_step": foundation_steps[0]["id"],
+            "producer_template": FOUNDRY_FOUNDATION,
+            "name_output": ["properties", "outputs", "foundationOutputs", "value", "miProjectName"],
+            "group_output": ["properties", "outputs", "foundationOutputs", "value", "projectResourceGroupName"],
+            "principal_property": ["properties", "principalId"], "tenant_property": ["properties", "tenantId"],
+            "client_property": ["properties", "clientId"], "api_version": FOUNDRY_MI_API,
+            "tenant_id": document["target"]["tenant_id"], "subscription_id": document["target"]["subscription_id"],
+            "grant_step": rbac_steps[0]["id"], "grant_template": FOUNDRY_NETWORK_RBAC,
+            "grant_module": "cmnRbacVNet", "grant_resource": "networkContributorSPVnet",
+            "grant_scope": network[0], "grant_role": FOUNDRY_NETWORK_ROLE,
+            "required_gates": ["agent-uami-identity", "agent-network-role-observation"],
+            "before_phase": "foundry-account-phase", "before_step": account["id"],
+        } if network else None),
+        "phases": [
+            {"id": "foundry-prerequisites", "step_ids": [step["id"] for step in plan["steps"][:index]]},
+            {"id": "foundry-account-phase", "step_ids": [account["id"]]},
+            {"id": "foundry-project-phase", "step_ids": [step["id"] for step in plan["steps"][index + 1:]]},
+        ],
+    }
+
+
+def validate_foundry_lifecycle(document):
+    plan = document.get("deployment", {})
+    steps = plan.get("steps", [])
+    first = [step for step in steps if step.get("template") == FOUNDRY_TEMPLATE
+             and foundry_first_run(step.get("parameters", {}))]
+    data = plan.get("foundry_lifecycle")
+    require(not any(key in plan for key in ("foundry_identity_stage", "foundry_identity_continuation")) or data,
+            "native-foundry-identity-sequence-required")
+    if not first:
+        require(data is None and not any(step.get("template") == FOUNDRY_TEMPLATE
+                and step.get("parameters", {}).get("foundryV22AccountOnly") is True for step in steps),
+                "native-foundry-account-only-incomplete")
+        return
+    require(isinstance(data, dict) and data.get("contract") == FOUNDRY_CONTRACT and len(first) == 2,
+            "native-foundry-sequence-required")
+    account, full = first
+    require(account["id"] == data.get("account_step") and full["id"] == data.get("full_step")
+            and account["parameters"].get("foundryV22AccountOnly") is True
+            and full["parameters"].get("foundryV22AccountOnly") is False
+            and digest(full["parameters"]) == data.get("full_parameters_hash"),
+            "native-foundry-phase-binding-mismatch")
+    # Reconstruct the pure expansion instead of trusting caller-supplied grant scopes.
+    draft = copy.deepcopy(document)
+    draft["deployment"].pop("foundry_lifecycle")
+    draft["deployment"]["steps"].remove(draft["deployment"]["steps"][steps.index(account)])
+    restored = next(step for step in draft["deployment"]["steps"] if step["id"] == full["id"])
+    restored["depends_on"] = account["depends_on"]
+    plan_foundry_lifecycle(draft)
+    expected = draft["deployment"]["foundry_lifecycle"]
+    require(all(data.get(key) == value for key, value in expected.items() if key != "phases")
+            and [{key: phase.get(key) for key in ("id", "step_ids")} for phase in data.get("phases", [])]
+            == expected["phases"]
+            and plan["steps"] == draft["deployment"]["steps"],
+            "native-foundry-phase-binding-mismatch")
+    if "foundry_identity_stage" in plan:
+        validate_foundry_identity_stage(document)
+    validate_foundry_identity_continuation(document)
+    if "account_resource_id" in data:
+        identifier = data["account_resource_id"]
+        require(isinstance(identifier, str) and NESTED_ID.fullmatch(identifier)
+                and resource_type_from_id(identifier) == "microsoft.cognitiveservices/accounts"
+                and arm_scope(identifier) in {scope.lower() for scope in document["locks"]["scopes"]},
+                "native-foundry-account-binding-invalid")
+        phases = data["phases"]
+        for phase in phases:
+            changes = phase.get("changes")
+            require(isinstance(changes, list) and all(isinstance(row, dict)
+                    and isinstance(row.get("resource_id"), str)
+                    and (RG_ID.fullmatch(row["resource_id"]) or NESTED_ID.fullmatch(row["resource_id"]))
+                    and arm_scope(row["resource_id"]) in {scope.lower() for scope in document["locks"]["scopes"]}
+                    and row.get("change_type") in ("Create", "Modify", "NoChange") for row in changes),
+                    "native-foundry-frozen-phases-required")
+            require(len({row["resource_id"].lower() for row in changes}) == len(changes),
+                    "native-foundry-duplicate-phase-change")
+            source_changes = phase.get("source_changes")
+            require(isinstance(source_changes, dict)
+                    and set(source_changes) == {row["resource_id"] for row in changes}
+                    and all(source_changes[row["resource_id"]] == row["change_type"]
+                            or source_changes[row["resource_id"]] == "Ignore"
+                            and row["change_type"] == "NoChange" for row in changes),
+                    "native-foundry-phase-source-provenance-required")
+        prior_ids = {row["resource_id"] for row in phases[0]["changes"]}
+        added = [row["resource_id"] for row in phases[1]["changes"] if row["change_type"] == "Create"
+                 and row["resource_id"] not in prior_ids
+                 and resource_type_from_id(row["resource_id"]) == "microsoft.cognitiveservices/accounts"]
+        require(added == [identifier] and phases[-1]["changes"] == plan["changes"],
+                "native-foundry-account-preview-binding-mismatch")
+        if data["agent_identity_binding"]:
+            validate_foundry_agent_binding(document)
+        else:
+            require("agent_identity" not in data, "native-foundry-unexpected-agent-identity")
+
+
+def foundry_selected_uami(account):
+    identity = account.get("identity", {})
+    require(isinstance(identity, dict), "native-foundry-source-uami-required")
+    kinds = {value.strip().lower() for value in str(identity.get("type", "")).split(",")}
+    assigned = identity.get("userAssignedIdentities")
+    require(kinds == {"systemassigned", "userassigned"} and isinstance(assigned, dict) and len(assigned) == 1,
+            "native-foundry-source-uami-required")
+    identifier = next(iter(assigned)).lower()
+    require(NESTED_ID.fullmatch(identifier)
+            and resource_type_from_id(identifier) == "microsoft.managedidentity/userassignedidentities",
+            "native-foundry-source-uami-required")
+    return identifier
+
+
+def foundry_grant_scope(identifier):
+    return identifier.lower().rsplit("/providers/microsoft.authorization/roleassignments/", 1)[0]
+
+
+def verify_foundry_source_grants(document, source_changes):
+    data = document["deployment"]["foundry_lifecycle"]
+    if not data["agent_identity_binding"]:
+        return
+    grants = data.get("agent_identity", {}).get("candidate_grants", [])
+    require(isinstance(source_changes, dict) and grants
+            and all(source_changes.get(grant.get("id")) in ("Create", "Modify", "NoChange") for grant in grants),
+            "native-foundry-reviewed-network-grants-required")
+    bound = document["deployment"].get("foundry_identity_continuation")
+    if bound:
+        dependent = data.get("identity_dependent_grants", [])
+        prior = {row["resource_id"]: row for row in data["phases"][0]["changes"]}
+        require(isinstance(dependent, list) and dependent
+                and any(foundry_grant_scope(row["id"]) == bound["proof"]["resource_group"]
+                        and str(row["intent"].get("properties", {}).get("roleDefinitionId", "")).lower().endswith(
+                            "/5e0bd9bd-7b93-4f28-af87-19fc36ad61bd") for row in dependent),
+                "native-foundry-dependent-cognitive-grant-required")
+        for row in dependent:
+            identifier, intent = row.get("id", ""), row.get("intent", {})
+            change = prior.get(identifier, {})
+            properties = intent.get("properties", {})
+            require(NESTED_ID.fullmatch(identifier) and guid(identifier.rsplit("/", 1)[-1])
+                    and source_changes.get(identifier) in ("Create", "Modify", "NoChange")
+                    and str(properties.get("principalId", "")).lower() == bound["proof"]["identity"]["principal_id"]
+                    and properties.get("principalType") == "ServicePrincipal"
+                    and (digest(intent) == change.get("after_hash") or change.get("change_type") == "NoChange"
+                         and digest(intent) == change.get("before_hash")),
+                    "native-foundry-literal-dependent-grants-required")
+
+
+def validate_foundry_agent_binding(document):
+    data = document["deployment"]["foundry_lifecycle"]
+    agent = data.get("agent_identity", {})
+    account = agent.get("account_intent")
+    account_change = next(row for row in data["phases"][1]["changes"]
+                          if row["resource_id"] == data["account_resource_id"])
+    require(isinstance(account, dict) and digest(account) == account_change["after_hash"]
+            and foundry_selected_uami(account) == agent.get("resource_id")
+            and arm_scope(agent["resource_id"]) in {scope.lower() for scope in document["locks"]["scopes"]}
+            and agent.get("binding_hash") == digest(data["agent_identity_binding"]),
+            "native-foundry-agent-binding-mismatch")
+    prior = {row["resource_id"]: row for row in data["phases"][0]["changes"]}
+    require(agent.get("existence") == "existing",
+            "native-foundry-agent-producer-required")
+    observed = agent.get("existing_identity")
+    require((agent["existence"] == "planned-create" and observed is None)
+            or (isinstance(observed, dict) and all(foundry_identity_guid(observed.get(key)) for key in (
+                "principal_id", "client_id", "tenant_id"))
+                and observed["principal_id"] != observed["client_id"]
+                and observed["tenant_id"] == document["target"]["tenant_id"].lower()),
+            "native-foundry-agent-identity-invalid")
+    grants = agent.get("candidate_grants")
+    require(isinstance(grants, list) and 0 < len(grants) <= 20
+            and len({row.get("id") for row in grants}) == len(grants),
+            "native-foundry-reviewed-network-grants-required")
+    verify_foundry_source_grants(document, data["phases"][0].get("source_changes"))
+    for grant in grants:
+        identifier, intent = grant.get("id", ""), grant.get("intent")
+        change = prior.get(identifier)
+        properties = intent.get("properties", {}) if isinstance(intent, dict) else {}
+        require(NESTED_ID.fullmatch(identifier) and identifier == identifier.lower()
+                and resource_type_from_id(identifier) == "microsoft.authorization/roleassignments"
+                and guid(identifier.rsplit("/", 1)[-1])
+                and foundry_grant_scope(identifier) == data["network_scopes"][0]
+                and str(properties.get("scope", data["network_scopes"][0])).lower() == data["network_scopes"][0]
+                and properties.get("roleDefinitionId", "").lower() == data["role_definition_id"].lower()
+                and properties.get("principalType") == "ServicePrincipal"
+                and foundry_identity_guid(properties.get("principalId"))
+                and properties["principalId"].lower() == observed["principal_id"]
+                and properties.get("principalId") != "00000000-0000-0000-0000-000000000000"
+                and all(properties.get(key) in (None, "") for key in (
+                    "condition", "conditionVersion", "delegatedManagedIdentityResourceId"))
+                and change and (digest(intent) == change.get("after_hash")
+                                or change["change_type"] == "NoChange"
+                                and digest(intent) == grant.get("observed_hash")),
+                "native-foundry-reviewed-network-grants-required")
+
+
+def freeze_foundry_agent_binding(cloud, document, payloads):
+    data = document["deployment"]["foundry_lifecycle"]
+    if not data["agent_identity_binding"]:
+        return
+    account = payloads[1].get(data["account_resource_id"])
+    require(isinstance(account, dict), "native-foundry-source-account-payload-required")
+    identifier = foundry_selected_uami(account)
+    require(arm_scope(identifier) in {scope.lower() for scope in document["locks"]["scopes"]},
+            "native-foundry-agent-identity-outside-scope")
+    status, _, identity = cloud.arm("GET", identifier, FOUNDRY_MI_API, allowed=(200, 404))
+    observed = foundry_uami_metadata(document, identity) if status == 200 else None
+    if status == 200:
+        require(str(identity.get("id", "")).lower() == identifier, "native-foundry-agent-identity-mismatch")
+    agent = {"resource_id": identifier, "account_intent": account,
+             "binding_hash": digest(data["agent_identity_binding"]),
+             "existence": "existing" if status == 200 else "planned-create",
+             "existing_identity": observed, "candidate_grants": []}
+    prior = {row["resource_id"]: row for row in data["phases"][0]["changes"]}
+    source_changes = data["phases"][0].get("source_changes", {})
+    for resource in sorted(prior):
+        if (source_changes.get(resource) not in ("Create", "Modify", "NoChange")
+                or resource_type_from_id(resource) != "microsoft.authorization/roleassignments"
+                or foundry_grant_scope(resource) != data["network_scopes"][0]):
+            continue
+        intent, observed_hash = payloads[0].get(resource), None
+        if intent is None:
+            require(prior[resource]["change_type"] == "NoChange",
+                    "native-foundry-grant-payload-required")
+            code, _, intent = cloud.arm("GET", resource, "2022-04-01", allowed=(200, 404))
+            require(code == 200 and str(intent.get("id", "")).lower() == resource,
+                    "native-foundry-existing-grant-unverified")
+            observed_hash = digest(intent)
+        properties = intent.get("properties", {})
+        if (properties.get("roleDefinitionId", "").lower() != data["role_definition_id"].lower()
+                or properties.get("principalType") != "ServicePrincipal"):
+            continue
+        principal = properties.get("principalId")
+        if observed and guid(principal) and principal.lower() != observed["principal_id"]:
+            continue
+        agent["candidate_grants"].append({"id": resource, "intent": intent, "observed_hash": observed_hash})
+    data["agent_identity"] = agent
+    validate_foundry_agent_binding(document)
+
+
+def freeze_foundry_lifecycle(cloud, document, source_root):
+    data = document["deployment"].get("foundry_lifecycle")
+    if data is None:
+        return
+    validate_foundry_lifecycle(document)
+    cumulative, preceding, payloads = [], {}, []
+    for phase in data["phases"]:
+        cumulative.extend(phase["step_ids"])
+        payload = combined_plan_payload(cloud, document, source_root, cumulative)
+        captured, source_changes = {}, {}
+        changes = evaluate_what_if(cloud, document, {"id": phase["id"], "scope": "subscription"}, payload,
+                                  resource_payloads=captured, source_changes=source_changes)
+        payloads.append(captured)
+        verify_bootstrap_preservation(document, changes)
+        require(all(RG_ID.fullmatch(row["resource_id"]) or NESTED_ID.fullmatch(row["resource_id"])
+                    for row in changes), "native-foundry-unresolved-preview-resource")
+        require(all(arm_scope(row["resource_id"]) in {scope.lower() for scope in document["locks"]["scopes"]}
+                    for row in changes), "native-foundry-preview-outside-scope")
+        phase["changes"] = changes
+        phase["source_changes"] = source_changes
+        if phase["id"] == "foundry-account-phase":
+            added = [row["resource_id"] for row in changes if row["change_type"] == "Create"
+                     and row["resource_id"] not in preceding
+                     and resource_type_from_id(row["resource_id"]) == "microsoft.cognitiveservices/accounts"]
+            require(len(added) == 1, "native-foundry-exact-created-account-required")
+            identifier = added[0]
+            status, _, _ = cloud.arm("GET", identifier, FOUNDRY_API, allowed=(200, 404))
+            require(status == 404, "native-foundry-first-run-account-already-exists")
+            data["account_resource_id"] = identifier
+        preceding = {row["resource_id"]: row for row in changes}
+    require(data["phases"][-1]["changes"] == document["deployment"]["changes"],
+            "native-foundry-full-preview-changed")
+    bound = document["deployment"].get("foundry_identity_continuation")
+    if bound:
+        dependent = []
+        for row in data["phases"][0]["changes"]:
+            identifier = row["resource_id"]
+            if (resource_type_from_id(identifier) != "microsoft.authorization/roleassignments"
+                    or data["phases"][0]["source_changes"].get(identifier) not in ("Create", "Modify", "NoChange")):
+                continue
+            body = payloads[0].get(identifier)
+            if body is None and row["change_type"] == "NoChange":
+                status, _, body = cloud.arm("GET", identifier, "2022-04-01", allowed=(200, 404))
+                require(status == 200 and str(body.get("id", "")).lower() == identifier,
+                        "native-foundry-dependent-grant-observation-required")
+            if isinstance(body, dict) and str(body.get("properties", {}).get("principalId", "")).lower() == bound["proof"]["identity"]["principal_id"]:
+                dependent.append({"id": identifier, "intent": body})
+        data["identity_dependent_grants"] = dependent
+    freeze_foundry_agent_binding(cloud, document, payloads)
+
+
+def verify_foundry_phase_changes(current, expected, preceding, observations=None):
+    observations = observations or {}
+    wanted = {row["resource_id"]: row for row in expected}
+    observed = {row["resource_id"]: row for row in current}
+    require(len(observed) == len(current) and set(observed) <= set(wanted), "foundry-phase-what-if-changed")
+    for identifier, row in observed.items():
+        before = preceding.get(identifier)
+        target = wanted[identifier]
+        if before is None:
+            require(row == target, "foundry-phase-what-if-changed")
+        elif row["change_type"] == "NoChange" and identifier in observations:
+            observed_hash = observations[identifier]["body_hash"]
+            require(target.get("after_hash") == before.get("after_hash")
+                    and row.get("before_hash") in (None, observed_hash)
+                    and row.get("after_hash") in (None, observed_hash), "foundry-phase-what-if-changed")
+        else:
+            require(row["change_type"] in ("Modify", "NoChange")
+                    and (row["change_type"] != "Modify" or target["change_type"] != "NoChange")
+                    and hash_value(observations.get(identifier, {}).get("body_hash", before.get("after_hash")))
+                    and row.get("before_hash") == observations.get(identifier, {}).get("body_hash", before["after_hash"])
+                    and row.get("after_hash") == target.get("after_hash"),
+                    "foundry-phase-what-if-changed")
+    required = {identifier for identifier, row in wanted.items()
+                if row["change_type"] != "NoChange" and
+                (identifier not in preceding or preceding[identifier].get("after_hash") != row.get("after_hash"))}
+    require(required <= set(observed), "foundry-phase-what-if-incomplete")
+
+
+def wait_foundry_resource(cloud, locks, identifier, ready, sleep, *, api_version=FOUNDRY_API,
+                         attempts=180, read=None, document=None):
+    for attempt in range(attempts):
+        locks.assert_held()
+        if document is not None:
+            locks.authorize(document)
+        status, _, body = (read() if read else cloud.arm("GET", identifier, api_version, allowed=(200, 404)))
+        if document is not None:
+            locks.authorize(document)
+        if status == 200:
+            require(str(body.get("id", "")).lower() == identifier.lower(), "foundry-resource-identity-mismatch")
+            state = body.get("properties", {}).get("provisioningState")
+            require(state not in ("Failed", "Canceled", "Cancelled"), "foundry-resource-provisioning-failed")
+            if ready(body):
+                return body
+            require(state in (None, "Succeeded", "Accepted", "Running", "Creating", "Updating"),
+                    "foundry-resource-state-unverified")
+        if attempt + 1 < attempts:
+            sleep(5)
+    raise Blocked("foundry-readiness-timeout")
+
+
+def foundry_identity_guid(value):
+    return guid(value) and value != "00000000-0000-0000-0000-000000000000"
+
+
+def foundry_uami_metadata(document, body):
+    properties = body.get("properties", {})
+    require(isinstance(properties, dict), "native-foundry-agent-identifiers-invalid")
+    require(all(foundry_identity_guid(properties.get(key)) for key in ("principalId", "clientId", "tenantId"))
+            and properties["principalId"].lower() != properties["clientId"].lower(),
+            "native-foundry-agent-identifiers-invalid")
+    require(properties["tenantId"].lower() == document["target"]["tenant_id"].lower(),
+            "native-foundry-agent-tenant-mismatch")
+    state = properties.get("provisioningState")
+    require(state in (None, "Succeeded"), "native-foundry-agent-provisioning-unverified")
+    return {"principal_id": properties["principalId"].lower(), "client_id": properties["clientId"].lower(),
+            "tenant_id": properties["tenantId"].lower(), "provisioning_state": state}
+
+
+def foundry_agent_readiness(cloud, locks, document, receipt, persist, observations, sleep):
+    data = document["deployment"]["foundry_lifecycle"]
+    binding = data["agent_identity_binding"]
+    if binding is None:
+        return
+    receipt["pending_foundry_gate"] = "agent-before-account"
+    persist()
+    agent = data["agent_identity"]
+    producer = next(step for step in document["deployment"]["steps"] if step["id"] == binding["producer_step"])
+    endpoint = deployment_endpoint(document, producer)
+    result = wait_foundry_resource(cloud, locks, endpoint.removeprefix(ARM),
+        lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded", sleep, attempts=1,
+        read=lambda: cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM), document=document)
+    output = result.get("properties", {}).get("outputs", {}).get("foundationOutputs", {}).get("value", {})
+    identifier = agent["resource_id"]
+    require(str(output.get("miProjectName", "")).lower() == identifier.rsplit("/", 1)[-1]
+            and str(output.get("projectResourceGroupName", "")).lower() == arm_scope(identifier).split("/")[4],
+            "native-foundry-agent-producer-output-mismatch")
+    def materialized(body):
+        properties = body.get("properties", {})
+        if properties.get("tenantId"):
+            require(str(properties["tenantId"]).lower() == document["target"]["tenant_id"].lower(),
+                    "native-foundry-agent-tenant-mismatch")
+        return (all(foundry_identity_guid(properties.get(key)) for key in ("principalId", "clientId", "tenantId"))
+                and properties.get("provisioningState") in (None, "Succeeded"))
+    identity = wait_foundry_resource(cloud, locks, identifier, materialized, sleep,
+                                    api_version=FOUNDRY_MI_API, document=document)
+    metadata = foundry_uami_metadata(document, identity)
+    original = agent["existing_identity"]
+    require(original is None or all(metadata[key] == original[key] for key in ("principal_id", "client_id", "tenant_id")),
+            "native-foundry-agent-principal-changed")
+    foundation = document["deployment"].get("bootstrap_foundation", {})
+    original_resource = (foundation.get("resources", {}).get(identifier, {})
+                         if foundation.get("contract") == EXACT_BOOTSTRAP_CONTRACT else {})
+    if original_resource.get("disposition") == "preserve":
+        require(digest(identity) == original_resource["body_hash"], "native-foundry-preserved-identity-changed")
+    else:
+        verify_ownership(identity, {**{key: document["target"][key] for key in ("factory_id", "scaleset_id")},
+                                    "project_id": document["target"]["project_ids"][0]})
+    proof = {"contract": binding["contract"], "resource_id": identifier, **metadata,
+             "identity_body_hash": digest(identity), "producer_deployment_id": endpoint.removeprefix(ARM),
+             "producer_body_hash": digest(result), "binding_hash": digest(binding),
+             "completed_gates": ["agent-uami-identity"], "grants": [], "network_resources": [],
+             "effective_permissions_proven": False, "status": "observing"}
+    receipt["foundry_agent_readiness"] = proof
+    persist()
+    for scope in data["network_scopes"]:
+        api = observations.get(scope, {}).get("api_version") or bootstrap_resource_versions(document).get(
+            scope, "2023-11-01")
+        network = wait_foundry_resource(cloud, locks, scope,
+            lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded",
+            sleep, api_version=api, document=document)
+        require(scope != data["network_scopes"][0]
+                or str(network.get("location", "")).lower() == document["target"]["region"].lower(),
+                "native-foundry-agent-network-region-mismatch")
+        expected_hash = observations.get(scope, {}).get("body_hash")
+        require(not expected_hash or digest(network) == expected_hash, "native-foundry-agent-network-instance-changed")
+        proof["network_resources"].append({"id": scope, "body_hash": digest(network), "api_version": api,
+                                           "provisioning_state": "Succeeded"})
+    for candidate in agent["candidate_grants"]:
+        expected_principal = candidate["intent"].get("properties", {}).get("principalId")
+        if guid(expected_principal) and expected_principal.lower() != metadata["principal_id"]:
+            continue
+        grant = wait_foundry_resource(cloud, locks, candidate["id"], lambda body: True, sleep,
+                                     api_version="2022-04-01", document=document)
+        expected_hash = observations.get(candidate["id"], {}).get("body_hash") or candidate["observed_hash"]
+        require(expected_hash and digest(grant) == expected_hash, "native-foundry-agent-grant-instance-changed")
+        properties = grant.get("properties", {})
+        if not guid(expected_principal) and str(properties.get("principalId", "")).lower() != metadata["principal_id"]:
+            continue
+        require(str(properties.get("principalId", "")).lower() == metadata["principal_id"]
+                and str(properties.get("roleDefinitionId", "")).lower() == data["role_definition_id"].lower()
+                and properties.get("principalType") == "ServicePrincipal"
+                and all(properties.get(key) in (None, "") for key in (
+                    "condition", "conditionVersion", "delegatedManagedIdentityResourceId"))
+                and str(properties.get("scope", data["network_scopes"][0])).lower() == data["network_scopes"][0],
+                "native-foundry-agent-network-grant-conflict")
+        proof["grants"].append({"id": candidate["id"], "scope": data["network_scopes"][0],
+                                "principal_id": metadata["principal_id"], "role_definition_id": data["role_definition_id"],
+                                "body_hash": digest(grant)})
+    require(len(proof["grants"]) == 1, "native-foundry-agent-network-grant-required")
+    proof["completed_gates"].append("agent-network-role-observation")
+    proof["status"] = "observed"
+    receipt.pop("pending_foundry_gate", None)
+    persist()
+
+
+def verify_foundry_agent_receipt(document, receipt):
+    data = document["deployment"]["foundry_lifecycle"]
+    binding = data["agent_identity_binding"]
+    if binding is None:
+        require("foundry_agent_readiness" not in receipt, "native-foundry-unexpected-agent-proof")
+        return
+    proof = receipt.get("foundry_agent_readiness", {})
+    candidates = {row["id"] for row in data["agent_identity"]["candidate_grants"]}
+    grants = proof.get("grants")
+    producer = next(step for step in document["deployment"]["steps"] if step["id"] == binding["producer_step"])
+    require(proof.get("contract") == binding["contract"] and proof.get("status") == "observed"
+            and proof.get("resource_id") == data["agent_identity"]["resource_id"]
+            and proof.get("tenant_id") == document["target"]["tenant_id"].lower()
+            and foundry_identity_guid(proof.get("principal_id")) and foundry_identity_guid(proof.get("client_id"))
+            and proof["principal_id"] != proof["client_id"]
+            and proof.get("provisioning_state") in (None, "Succeeded")
+            and proof.get("binding_hash") == digest(binding)
+            and hash_value(proof.get("identity_body_hash")) and hash_value(proof.get("producer_body_hash"))
+            and proof.get("producer_deployment_id") == deployment_endpoint(document, producer).removeprefix(ARM)
+            and proof.get("completed_gates") == binding["required_gates"]
+            and proof.get("effective_permissions_proven") is False
+            and isinstance(grants, list) and len(grants) == 1,
+            "native-foundry-agent-receipt-incomplete")
+    original = data["agent_identity"]["existing_identity"]
+    require(original is None or all(proof[key] == original[key] for key in ("principal_id", "client_id", "tenant_id")),
+            "native-foundry-agent-receipt-incomplete")
+    require(all(row.get("id") in candidates and row.get("scope") == data["network_scopes"][0]
+                and row.get("principal_id") == proof["principal_id"]
+                and row.get("role_definition_id") == data["role_definition_id"]
+                and hash_value(row.get("body_hash")) for row in grants), "native-foundry-agent-grant-receipt-incomplete")
+    network = proof.get("network_resources", [])
+    require([row.get("id") for row in network] == data["network_scopes"]
+            and all(row.get("provisioning_state") == "Succeeded" and hash_value(row.get("body_hash"))
+                    and re.fullmatch(r"20\d{2}-\d{2}-\d{2}(?:-preview)?", str(row.get("api_version", "")))
+                    for row in network), "native-foundry-agent-network-receipt-incomplete")
+
+
+def verify_foundry_agent_current(cloud, locks, document, receipt, sleep):
+    verify_foundry_agent_receipt(document, receipt)
+    if not document["deployment"]["foundry_lifecycle"]["agent_identity_binding"]:
+        return
+    proof = receipt["foundry_agent_readiness"]
+    identity = wait_foundry_resource(cloud, locks, proof["resource_id"], lambda body: True, sleep,
+                                    api_version=FOUNDRY_MI_API, attempts=1, document=document)
+    metadata = foundry_uami_metadata(document, identity)
+    require(all(metadata[key] == proof[key] for key in ("principal_id", "client_id", "tenant_id"))
+            and digest(identity) == proof["identity_body_hash"], "native-foundry-agent-identity-changed")
+    for grant in proof["grants"]:
+        body = wait_foundry_resource(cloud, locks, grant["id"], lambda body: True, sleep,
+                                    api_version="2022-04-01", attempts=1, document=document)
+        require(digest(body) == grant["body_hash"], "native-foundry-agent-grant-instance-changed")
+
+
+def verify_foundry_account_agent(document, account, receipt):
+    data = document["deployment"]["foundry_lifecycle"]
+    injections = account.get("properties", {}).get("networkInjections") or []
+    if not data["agent_identity_binding"]:
+        require(not injections and str(account.get("identity", {}).get("type", "")).lower() == "systemassigned",
+                "foundry-account-network-injection-mismatch")
+        return
+    agent = receipt["foundry_agent_readiness"]
+    require(foundry_selected_uami(account) == agent["resource_id"], "native-foundry-account-agent-identity-mismatch")
+    identity = account["identity"]
+    attached = next(iter(identity["userAssignedIdentities"].values()))
+    require(isinstance(attached, dict) and str(attached.get("principalId", "")).lower() == agent["principal_id"]
+            and str(attached.get("clientId", "")).lower() == agent["client_id"]
+            and str(identity.get("principalId", "")).lower() != agent["principal_id"],
+            "native-foundry-account-agent-identity-mismatch")
+    require(isinstance(injections, list) and len(injections) == 1 and isinstance(injections[0], dict)
+            and injections[0].get("scenario") == "agent"
+            and str(injections[0].get("subnetArmId", "")).lower() == data["network_scopes"][-1]
+            and injections[0].get("useMicrosoftManagedNetwork") is False,
+            "foundry-account-network-injection-mismatch")
+
+
+def foundry_readiness(cloud, locks, document, receipt, persist, account_result, sleep):
+    data = document["deployment"]["foundry_lifecycle"]
+    identifier = data["account_resource_id"]
+    outputs = account_result.get("properties", {}).get("outputs", {})
+    require(outputs.get("aiFoundryV2ResourceId", {}).get("value", "").lower() == identifier
+            and outputs.get("aiFoundryV2Name", {}).get("value", "").lower() == identifier.rsplit("/", 1)[-1],
+            "foundry-account-outputs-mismatch")
+    account = wait_foundry_resource(cloud, locks, identifier,
+        lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded"
+        and foundry_identity_guid(body.get("identity", {}).get("principalId")), sleep, document=document)
+    require(str(account.get("identity", {}).get("tenantId", "")).lower()
+            == document["target"]["tenant_id"].lower(), "foundry-account-tenant-mismatch")
+    owner = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
+    owner["project_id"] = document["target"]["project_ids"][0]
+    verify_ownership(account, owner)
+    require(account.get("kind") == "AIServices"
+            and account.get("location", "").lower() == document["target"]["region"].lower(),
+            "foundry-account-topology-mismatch")
+    injections = account.get("properties", {}).get("networkInjections") or []
+    if data["network_scopes"]:
+        verify_foundry_agent_current(cloud, locks, document, receipt, sleep)
+        agent = receipt["foundry_agent_readiness"]
+    verify_foundry_account_agent(document, account, receipt)
+    principal = account["identity"]["principalId"].lower()
+    proof = {"contract": FOUNDRY_CONTRACT, "account_resource_id": identifier,
+             "principal_id": principal, "account_body_hash": digest(account),
+             "principal_binding_hash": digest(data["principal_binding"]),
+             "completed_gates": ["account-identity"]}
+    receipt["foundry_readiness"] = proof
+    persist()
+    if data["require_capability_host"]:
+        host = identifier + "/capabilityHosts/" + identifier.rsplit("/", 1)[-1] + "@aml_aiagentservice"
+        ready = wait_foundry_resource(cloud, locks, host,
+            lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded", sleep, document=document)
+        proof["capability_host"] = {
+            "id": host, "body_hash": digest(ready), "status": "Succeeded",
+            "configured_identity_id": agent["resource_id"], "configured_principal_id": agent["principal_id"],
+            "agent_proof_hash": digest(agent),
+            "evidence": "account-provider-readiness-with-source-selected-uami",
+            "general_effective_permissions_proven": False}
+        proof["completed_gates"].append("configured-agent-network-ready")
+    current = wait_foundry_resource(cloud, locks, identifier,
+        lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded", sleep, document=document)
+    require(str(current.get("identity", {}).get("principalId", "")).lower() == principal,
+            "foundry-account-principal-changed")
+    require(str(current.get("identity", {}).get("tenantId", "")).lower()
+            == document["target"]["tenant_id"].lower(), "foundry-account-tenant-mismatch")
+    if data["agent_identity_binding"]:
+        require(current.get("identity") == account.get("identity")
+                and current.get("properties", {}).get("networkInjections") == injections,
+                "native-foundry-account-agent-identity-changed")
+        verify_foundry_agent_current(cloud, locks, document, receipt, sleep)
+    verify_foundry_account_agent(document, current, receipt)
+    proof["status"] = "provider-ready" if data["require_capability_host"] else "succeeded"
+    persist()
+
+
+def run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sleep):
+    data = document["deployment"]["foundry_lifecycle"]
+    require("account_resource_id" in data and all(isinstance(phase.get("changes"), list)
+            for phase in data["phases"]), "native-foundry-frozen-phases-required")
+    preceding, cumulative, observations, payloads, provenance = {}, [], {}, [], []
+    verify_foundry_identity_current(cloud, locks, document)
+    if "foundry_identity_continuation" in document["deployment"]:
+        receipt["foundry_identity_continuation"] = copy.deepcopy(document["deployment"]["foundry_identity_continuation"])
+    # Before any mutation, every cumulative preview must still equal its reviewed bytes.
+    for phase in data["phases"]:
+        cumulative.extend(phase["step_ids"])
+        locks.assert_held()
+        captured, source_changes = {}, {}
+        observed = evaluate_what_if(cloud, document, {"id": phase["id"], "scope": "subscription"},
+            combined_plan_payload(cloud, document, source_root, cumulative), sleep,
+            resource_payloads=captured, source_changes=source_changes)
+        require(observed == phase["changes"], "native-foundry-preview-changed")
+        verify_bootstrap_preservation(document, observed)
+        payloads.append(captured)
+        provenance.append(source_changes)
+    if data["agent_identity_binding"]:
+        rebound = copy.deepcopy(document)
+        rebound["deployment"]["foundry_lifecycle"]["phases"][0]["source_changes"] = provenance[0]
+        freeze_foundry_agent_binding(cloud, rebound, payloads)
+        require(rebound["deployment"]["foundry_lifecycle"]["agent_identity"] == data["agent_identity"],
+                "native-foundry-agent-binding-changed")
+    receipt["foundry_phases"] = []
+    receipt["foundry_phase_observations"] = []
+    for phase in data["phases"]:
+        locks.assert_held()
+        locks.authorize(document)
+        verify_foundry_identity_current(cloud, locks, document)
+        if phase["id"] == "foundry-project-phase":
+            verify_foundry_provider_readiness_receipt(document, receipt)
+            verify_foundry_agent_current(cloud, locks, document, receipt, sleep)
+        root_step = {"id": phase["id"], "scope": "subscription"}
+        payload = combined_plan_payload(cloud, document, source_root, phase["step_ids"])
+        for identifier, proof in observations.items():
+            status, _, body = cloud.arm("GET", identifier, proof["api_version"], allowed=(200, 404))
+            require(status == 200 and digest(body) == proof["body_hash"],
+                    "native-foundry-phase-instance-changed")
+        source_changes = {}
+        current = evaluate_what_if(cloud, document, root_step, payload, sleep,
+                                   unchanged_resources=observations, source_changes=source_changes)
+        verify_bootstrap_preservation(document, current)
+        verify_foundry_phase_changes(current, phase["changes"], preceding, observations)
+        if phase["id"] == "foundry-prerequisites":
+            verify_foundry_source_grants(document, source_changes)
+        if phase["id"] == "foundry-project-phase":
+            verify_foundry_readiness_receipt(document, receipt)
+            if data["require_capability_host"]:
+                host = receipt["foundry_readiness"]["capability_host"]
+                current_host = wait_foundry_resource(cloud, locks, host["id"],
+                    lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded",
+                    sleep, attempts=1, document=document)
+                require(digest(current_host) == host["body_hash"], "native-foundry-capability-host-changed")
+        if phase["id"] == "foundry-account-phase":
+            foundry_agent_readiness(cloud, locks, document, receipt, persist, observations, sleep)
+            verify_foundry_agent_current(cloud, locks, document, receipt, sleep)
+            status, _, _ = cloud.arm("GET", data["account_resource_id"], FOUNDRY_API, allowed=(200, 404))
+            require(status == 404, "native-foundry-first-run-account-already-exists")
+        locks.assert_held()
+        locks.authorize(document)
+        endpoint = deployment_endpoint(document, root_step)
+        receipt.update(pending_deployment=endpoint.removeprefix(ARM), mutation_started=True)
+        persist()
+        cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
+        wait_foundry_resource(cloud, locks, endpoint.removeprefix(ARM),
+            lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded",
+            sleep, attempts=1440, read=lambda: cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM),
+            document=document)
+        for step in document["deployment"]["steps"]:
+            if step["id"] not in phase["step_ids"]:
+                continue
+            child = deployment_endpoint(document, step).removeprefix(ARM)
+            result = wait_foundry_resource(cloud, locks, child,
+                lambda body: body.get("properties", {}).get("provisioningState") == "Succeeded",
+                sleep, attempts=1, read=lambda: cloud.request(
+                    "GET", ARM + child + "?api-version=2022-09-01", ARM), document=document)
+            receipt["deployments"].append({"step_id": step["id"], "id": child, "status": "succeeded"})
+            if step["id"] == data["account_step"]:
+                foundry_readiness(cloud, locks, document, receipt, persist, result, sleep)
+        receipt["foundry_phases"].append({"id": phase["id"], "status": "succeeded",
+                                         "changes_hash": digest(phase["changes"])})
+        if phase["id"] != "foundry-project-phase":
+            identifiers = {row["resource_id"] for row in phase["changes"]}
+            closure, bodies = collect_resource_closure(cloud, document["locks"]["scopes"],
+                                                       bootstrap_resource_versions(document))
+            require(identifiers <= set(bodies), "native-foundry-phase-observation-incomplete")
+            observations = {identifier: {
+                "body_hash": digest(bodies[identifier]),
+                "api_version": RG_API if identifier in closure["groups"]
+                               else closure["resources"][identifier]["api_version"],
+            } for identifier in sorted(identifiers)}
+            if data["agent_identity_binding"] and phase["id"] == "foundry-account-phase":
+                verify_foundry_agent_current(cloud, locks, document, receipt, sleep)
+            receipt["foundry_phase_observations"].append({"id": phase["id"], "resources": observations})
+        receipt.pop("pending_deployment", None)
+        persist()
+        preceding = {row["resource_id"]: row for row in phase["changes"]}
+
+
+def verify_foundry_receipt(document, receipt):
+    data = document.get("deployment", {}).get("foundry_lifecycle")
+    if data is None:
+        return
+    if "foundry_identity_stage" in document["deployment"]:
+        verify_foundry_identity_receipt(document, receipt)
+        return
+    require(receipt.get("foundry_identity_continuation") == document["deployment"].get("foundry_identity_continuation"),
+            "native-foundry-identity-continuation-receipt-missing")
+    require(receipt.get("foundry_phases") == [
+        {"id": phase["id"], "status": "succeeded", "changes_hash": digest(phase["changes"])}
+        for phase in data["phases"]], "native-foundry-phase-receipts-incomplete")
+    verify_foundry_readiness_receipt(document, receipt)
+    observations = receipt.get("foundry_phase_observations")
+    require(isinstance(observations, list) and len(observations) == 2,
+            "native-foundry-phase-observations-incomplete")
+    for phase, observed in zip(data["phases"], observations):
+        required = {row["resource_id"] for row in phase["changes"]}
+        require(observed.get("id") == phase["id"] and isinstance(observed.get("resources"), dict)
+                and set(observed["resources"]) == required
+                and all(isinstance(row, dict) and hash_value(row.get("body_hash"))
+                        and re.fullmatch(r"20[0-9]{2}-[0-9]{2}-[0-9]{2}(?:-preview)?", str(row.get("api_version", "")))
+                        for row in observed["resources"].values()), "native-foundry-phase-observations-incomplete")
+
+
+def verify_foundry_readiness_receipt(document, receipt):
+    """Require service readiness for the reviewed configuration, not general effective access."""
+    verify_foundry_provider_readiness_receipt(document, receipt)
+
+
+def verify_foundry_provider_readiness_receipt(document, receipt):
+    data = document["deployment"]["foundry_lifecycle"]
+    verify_foundry_agent_receipt(document, receipt)
+    proof = receipt.get("foundry_readiness", {})
+    expected_status = "provider-ready" if data["require_capability_host"] else "succeeded"
+    completed = data["principal_binding"]["required_gates"]
+    require(proof.get("contract") == FOUNDRY_CONTRACT and proof.get("status") == expected_status
+            and proof.get("account_resource_id") == data["account_resource_id"]
+            and foundry_identity_guid(proof.get("principal_id")) and hash_value(proof.get("account_body_hash"))
+            and proof.get("principal_binding_hash") == digest(data["principal_binding"])
+            and proof.get("completed_gates") == completed,
+            "native-foundry-readiness-receipt-incomplete")
+    require("grants" not in proof, "native-foundry-unreviewed-sami-grants-forbidden")
+    if data["require_capability_host"]:
+        host = proof.get("capability_host", {})
+        agent = receipt["foundry_agent_readiness"]
+        require(host.get("id") == data["account_resource_id"] + "/capabilityHosts/"
+                + data["account_resource_id"].rsplit("/", 1)[-1] + "@aml_aiagentservice"
+                and host.get("status") == "Succeeded" and hash_value(host.get("body_hash"))
+                and host.get("configured_identity_id") == agent["resource_id"]
+                and host.get("configured_principal_id") == agent["principal_id"]
+                and host.get("agent_proof_hash") == digest(agent)
+                and host.get("evidence") == "account-provider-readiness-with-source-selected-uami"
+                and host.get("general_effective_permissions_proven") is False,
+                "native-foundry-capability-host-receipt-incomplete")
 
 
 def validate_preservation_permit(document):
@@ -3191,9 +4594,13 @@ def _freeze_deployment_contents(cloud, document, source_root):
         require(set(template["parameters"]) == set(step["parameters"]), "parameters-not-fully-resolved")
         step["template_hash"] = digest(template)
         verify_preserved_network(cloud, draft, step, source_root, template=template, freeze=True)
+    if freeze_foundry_identity_stage(cloud, draft, source_root):
+        result["configuration_hash"] = digest(document["config"])
+        return result
     payload = combined_plan_payload(cloud, draft, source_root)
     result["changes"] = evaluate_what_if(cloud, draft, {"id": "factory", "scope": "subscription"}, payload)
     verify_bootstrap_preservation(draft, result["changes"])
+    freeze_foundry_lifecycle(cloud, draft, source_root)
     result["configuration_hash"] = digest(document["config"])
     return result
 
@@ -3238,6 +4645,13 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
     locks.assert_held()
     locks.execution_claim = _ExecutionClaim(document, locks.read_claim())
     locks.authorize(document)
+    if "foundry_lifecycle" in document["deployment"]:
+        original_sleep = sleep
+        def guarded_sleep(seconds):
+            locks.assert_held()
+            original_sleep(seconds)
+            locks.assert_held()
+        sleep = guarded_sleep
     # Publication was checked before the parent's durable claim. A moving ref
     # cannot replace the accepted checkout or invalidate its exact commit.
     source_root = _verify_source(cloud, source_root, document["source"], published=False)
@@ -3253,6 +4667,9 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         locks.request("PUT", blob, data=receipt, headers={"x-ms-blob-type": "BlockBlob", "If-Match": "*"}, allowed=(201,))
 
     try:
+        if "foundry_identity_stage" in document["deployment"]:
+            run_foundry_identity_stage(cloud, locks, document, source_root, receipt, persist, sleep)
+            return receipt
         persona_worker(document, source_root)
         bootstrap_owners = bootstrap_ownership_snapshot(cloud, document)
         require(bootstrap_owners == document["deployment"].get("bootstrap_ownership", {}),
@@ -3305,6 +4722,7 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
                         "existing-other-project-resource-write-forbidden")
         locks.assert_held()
         cloud.verify_identity(require_default=True)
+        verify_foundry_identity_current(cloud, locks, document)
         payload = combined_plan_payload(cloud, document, source_root)
         root_step = {"id": "factory", "scope": "subscription"}
         reviewed = sorted(({**row, "resource_id": row["resource_id"].lower()}
@@ -3317,28 +4735,32 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
                 "bootstrap-resource-inventory-changed-before-write")
         for step in document["deployment"]["steps"]:
             verify_preserved_network(cloud, document, step, source_root)
-        endpoint = deployment_endpoint(document, root_step)
-        receipt["pending_deployment"] = endpoint.removeprefix(ARM)
-        receipt["mutation_started"] = True
-        persist()
-        cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
-        for _ in range(1440):
-            locks.assert_held()
-            _, _, state = cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM)
-            provisioned = state.get("properties", {}).get("provisioningState")
-            if provisioned in ("Succeeded", "Failed", "Canceled"):
-                require(provisioned == "Succeeded", "arm-deployment-failed")
-                break
-            require(provisioned in ("Accepted", "Running", "Creating", "Updating"), "arm-deployment-state-unverified")
-            sleep(5)
+        if "foundry_lifecycle" in document["deployment"]:
+            run_foundry_phases(cloud, locks, document, source_root, receipt, persist, sleep)
+            verify_foundry_receipt(document, receipt)
         else:
-            raise Blocked("arm-deployment-completion-unverified")
-        for step in document["deployment"]["steps"]:
-            child_endpoint = deployment_endpoint(document, step)
-            _, _, child = cloud.request("GET", child_endpoint + "?api-version=2022-09-01", ARM)
-            require(child.get("properties", {}).get("provisioningState") == "Succeeded",
-                    "scoped-child-deployment-unverified")
-            receipt["deployments"].append({"step_id": step["id"], "id": child_endpoint.removeprefix(ARM), "status": "succeeded"})
+            endpoint = deployment_endpoint(document, root_step)
+            receipt["pending_deployment"] = endpoint.removeprefix(ARM)
+            receipt["mutation_started"] = True
+            persist()
+            cloud.request("PUT", endpoint + "?api-version=2022-09-01", ARM, data=payload, allowed=(200, 201, 202))
+            for _ in range(1440):
+                locks.assert_held()
+                _, _, state = cloud.request("GET", endpoint + "?api-version=2022-09-01", ARM)
+                provisioned = state.get("properties", {}).get("provisioningState")
+                if provisioned in ("Succeeded", "Failed", "Canceled"):
+                    require(provisioned == "Succeeded", "arm-deployment-failed")
+                    break
+                require(provisioned in ("Accepted", "Running", "Creating", "Updating"), "arm-deployment-state-unverified")
+                sleep(5)
+            else:
+                raise Blocked("arm-deployment-completion-unverified")
+            for step in document["deployment"]["steps"]:
+                child_endpoint = deployment_endpoint(document, step)
+                _, _, child = cloud.request("GET", child_endpoint + "?api-version=2022-09-01", ARM)
+                require(child.get("properties", {}).get("provisioningState") == "Succeeded",
+                        "scoped-child-deployment-unverified")
+                receipt["deployments"].append({"step_id": step["id"], "id": child_endpoint.removeprefix(ARM), "status": "succeeded"})
         receipt.pop("pending_deployment", None)
         locks.assert_held()
         cloud.verify_identity(require_default=True)
@@ -3348,6 +4770,14 @@ def run_deployment_worker(envelope, source_root, expected_run, expected_hash, cl
         closure, bodies = collect_resource_closure(cloud, document["locks"]["scopes"],
                                                    bootstrap_resource_versions(document))
         verify_bootstrap_final_closure(document, closure, bodies)
+        if "foundry_lifecycle" in document["deployment"]:
+            account_id = document["deployment"]["foundry_lifecycle"]["account_resource_id"]
+            require(str(bodies.get(account_id, {}).get("identity", {}).get("principalId", "")).lower()
+                    == receipt["foundry_readiness"]["principal_id"], "foundry-final-principal-changed")
+            require(str(bodies.get(account_id, {}).get("identity", {}).get("tenantId", "")).lower()
+                    == document["target"]["tenant_id"].lower(), "foundry-final-tenant-changed")
+            verify_foundry_account_agent(document, bodies.get(account_id, {}), receipt)
+            verify_foundry_agent_current(cloud, locks, document, receipt, sleep)
         for scope in document["locks"]["scopes"]:
             body = bodies[scope.lower()]
             verify_group_ownership(body,
@@ -3414,9 +4844,13 @@ def verify_worker_receipt(locks, document):
             and result.get("run_id") == document["run_id"] and result.get("manifest_hash") == document["manifest_hash"]
             and result.get("source_commit") == document["source"]["commit"] and result.get("target") == document["target"],
             "scoped-worker-receipt-unverified")
+    if "foundry_identity_stage" in document["deployment"]:
+        verify_foundry_identity_receipt(document, result)
+        return result
     expected = [step["id"] for step in document["deployment"]["steps"]]
     require([step.get("step_id") for step in result.get("deployments", [])] == expected,
             "scoped-worker-steps-incomplete")
+    verify_foundry_receipt(document, result)
     groups = result.get("resource_groups")
     require(isinstance(groups, list) and len(groups) == len(document["locks"]["scopes"])
             and all(isinstance(row, dict) and isinstance(row.get("resource_id"), str)
@@ -4211,7 +5645,8 @@ def execute(document, source_root, execution_root, receipt_path, cloud=None, loc
         receipt["status"] = "running"
         persist()
         for scope in document["locks"]["scopes"] + document["locks"]["common_dependencies"]:
-            if document["operation"] in ("create-factory", "create-scaleset"):
+            if (document["operation"] in ("create-factory", "create-scaleset")
+                    or "foundry_lifecycle" in document.get("deployment", {})):
                 status, _, _ = cloud.arm("GET", scope, RG_API, allowed=(200, 404))
                 if status == 404:
                     require(scope in document["locks"]["scopes"], "common-dependency-does-not-exist")
@@ -4237,6 +5672,9 @@ def execute(document, source_root, execution_root, receipt_path, cloud=None, loc
         else:
             raise Blocked("published-scoped-creation-contract-required")
         locks.authorize(document)
+        if "foundry_identity_stage" in document.get("deployment", {}):
+            verify_foundry_identity_receipt(document, receipt.get("worker_receipt", {}))
+            receipt.update(completion="identity-only", continuation_required=True)
         receipt["status"] = "succeeded"
         persist()
         locks.release()

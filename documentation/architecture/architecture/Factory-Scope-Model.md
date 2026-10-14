@@ -8,10 +8,15 @@ sources:
   - bootstrap/lib/project_environment.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py
   - environment_setup/azurefactory-cli/src/azurefactory/review.py
+  - environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/operations/Optimizer-Configuration.ps1
+  - environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/operations/New-CostOptimizerPlan.ps1
+  - environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/operations/Tenant-Cost-Optimizer.ps1
 tests:
   - environment_setup/unit-tests/test-bicep/unit/test_factory_lifecycle.py
   - environment_setup/unit-tests/test-bicep/unit/test_project_promotion.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_security.py
+  - environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/operations/tests/Optimizer-Configuration.Tests.ps1
+  - environment_setup/aifactory/bicep/copy_to_local_settings/automation/coreteam/operations/tests/Tenant-Cost-Optimizer.Tests.ps1
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py::function:authorize
   - bootstrap/lib/factory_lifecycle.py::function:validate_manifest
@@ -35,6 +40,28 @@ Registered operations bind factory/scale-set/project IDs, exact environment, sou
 Do not infer a target from the current CLI account, first discovered resource, department label or audience selector. Factory type extension points are not executable engines simply because a type appears in a catalog. `factory_lifecycle` rejects unsupported types.
 
 Consumer layouts and naming versions matter; a familiar resource-group name is not ownership proof. Runtime manifests and immutable receipts are stronger than labels, but still require fresh live checks before execution.
+
+## Standalone development cost operations
+
+The operator-owned cost optimizer resolves `dev` or physical `test` from the
+canonical variables file. Shared naming uses the dev baseline with a
+`stage_prod` overlay, while tenant/subscription identity must be present in the
+exact selected section. Production is rejected. Common VMs are separately
+opted in; project groups are explicit. Resource names come from bounded live
+inventory inside those groups, not fabricated naming salts.
+
+The generated plan freezes exact standalone VM/Container App IDs and requires
+an explicitly supplied matching plan hash before deployment. This checksum
+detects drift; it does not authenticate an approver or replace Azure RBAC.
+AKS and other service types are excluded. STOP saves original running states;
+START restores only confirmed STOP-owned resources. Separate deployments do
+not share a lock, so overlapping schedules need operator coordination.
+
+This is a standalone Azure Automation script package, not a newly exposed
+Factory SDK/API/CLI/MCP operation. Its private ARM container-metadata journal
+and job-bound cooperative mutex are not a compare-and-swap guarantee against
+unrelated writers or an atomic transaction across resources. Repository code
+does not establish a customer's installed automation or schedule state.
 
 See [[System-Context]], [[Reviewed-Operations]], [[Identity-and-Personas]], [[Lake-and-Data-Lineage]], [[Orchestration-and-Updates]] and [[Index]].
 

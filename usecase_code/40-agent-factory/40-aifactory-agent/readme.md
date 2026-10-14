@@ -417,7 +417,7 @@ deployed by hand, add the `voice` block to your own `config.local.json` and run 
   `knowledge.read` grant, checks the `Origin`, caps pre-authentication sockets,
   rate-limits audio, ends idle or over-long sessions (never later than the expiry of
   the token that opened them) and replaces a user's older session with the newer one. The browser cannot choose the model, voice,
-  instructions or tools. It can select only a configured English/Swedish profile.
+  instructions or tools. It can select only an operator-configured language profile.
 - Speaking while the agent answers (barge-in) cancels the pending answer and the
   speech. Tokens and transcripts are never logged; errors shown to the browser
   carry no internal detail.
@@ -449,7 +449,7 @@ deployed by hand, add the `voice` block to your own `config.local.json` and run 
 | `max_concurrent_sessions` | `4` | Per application replica. |
 | `max_spoken_characters` / `answer_timeout_seconds` | `1200` / `120` | Shell speech length; native responses are capped at 1024 output tokens. Deadline covers native preparation, tools and response. |
 | `greeting` | "Factory Agent online. How can I help?" | Shell speaks it; native displays it without a separate synthesis request. `null` disables it. |
-| `default_language` / `language_profiles` | `en-US` / `{}` | Optional server-owned `en-US`, `sv-SE` profiles; each specifies `voice_name`, optional `voice_type`, optional `greeting`. |
+| `default_language` / `language_profiles` | `en-US` / `{}` | Optional server-owned BCP-47 locale profiles; each specifies `voice_name`, optional `voice_type`, optional `greeting`. The default must be a configured profile. |
 | `allowed_origins` | `[]` | Extra browser origins; same-origin is always allowed. |
 
 **Identity and network.** With voice enabled, `deploy.py` adds two roles to the
@@ -462,7 +462,7 @@ broader role in `infra/identity.bicep`. The application must resolve and reach t
 Foundry `services.ai.azure.com` private endpoint. The ingress transport (`http`, HTTP/1.1)
 already supports WebSockets.
 
-**Native English/Swedish operator configuration** (merge into your existing config,
+**Native operator configuration with English/Swedish examples** (merge into your existing config,
 do not replace auth, grants, ownership, endpoints or scope settings):
 
 ```json
@@ -493,7 +493,13 @@ do not replace auth, grants, ownership, endpoints or scope settings):
 }
 ```
 
-The backend uses `gpt-4o-mini-transcribe` with ISO language `en`/`sv` for native
+Profiles are not restricted to two languages: add supported locales such as
+`de-DE` or `fr-FR` to `language_profiles` using the same profile shape. The browser
+lists every configured profile. Verify the selected model's input language and
+voice's output support first: Voice Live's broad Azure Speech locale coverage is
+not a claim that every native model supports every locale.
+
+The backend uses `gpt-4o-mini-transcribe` with the locale's ISO language code for native
 retrieval transcription, and `server_vad` for these profiles (English semantic
 VAD is not used for Swedish). The reply language is server-selected instructions;
 the browser cannot send arbitrary instructions or a voice name. Voice is fixed
@@ -758,6 +764,17 @@ in the offline application bundle. A template override additionally requires
 Grant the execution identity resource Reader and the appropriate Azure Cost
 Management read access only on approved billing targets. The skills do not
 grant roles or elevate the caller.
+
+### Skill result presentation
+
+The web panel presents cost figures as separate per-currency actual and forecast
+cards, with service/component tables, billing periods, posted-data cutoffs and
+explicit partial-estimate coverage. Amounts retain the server's decimal strings;
+the browser does not sum costs, round them or convert currencies. Unknown idle
+totals remain unknown. Diagnostic/template results and saved operation evidence
+use labeled fields and lists. Raw responses and full pricing evidence remain
+available in collapsed disclosures. This presentation does not change signed
+plans, approval controls, operation states or provisioning behavior.
 
 ### Project-template workload strategies
 

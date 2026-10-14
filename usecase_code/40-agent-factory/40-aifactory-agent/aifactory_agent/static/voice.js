@@ -305,6 +305,12 @@
     return muted && state === "listening" ? "Microphone muted" : LABELS[state] || LABELS.off;
   }
 
+  function languageLabel(code, env = globalThis) {
+    if (!(env.Intl && env.Intl.DisplayNames)) return code;
+    const name = new env.Intl.DisplayNames(["en"], {type: "language"}).of(code);
+    return name && name !== code ? `${name} (${code})` : code;
+  }
+
   /* Page glue: wires the Voice card, the orb and the Factory Agent page (app.js) together. */
   function initialize(env = globalThis) {
     const doc = env.document;
@@ -313,6 +319,11 @@
     const element = (id) => (doc ? doc.getElementById(id) : null);
     const card = element("voice-card");
     if (!doc || !host || !card) return null;
+    const parameters = new URLSearchParams(env.location ? env.location.search || "" : "");
+    if (parameters.get("voice") === "off" || parameters.get("host") === "esaif-maui") {
+      card.hidden = true;
+      return null;
+    }
     const toggle = element("voice-toggle");
     const mute = element("voice-mute");
     const interrupt = element("voice-interrupt");
@@ -435,7 +446,7 @@
           for (const code of Object.keys(profiles || {})) {
             const option = doc.createElement("option");
             option.value = code;
-            option.textContent = code === "sv-SE" ? "Svenska" : "English";
+            option.textContent = languageLabel(code, env);
             language.append(option);
           }
           language.value = status.voice.default_language || "en-US";
@@ -463,7 +474,7 @@
     return {client, probe, get enabled() { return enabled; }};
   }
 
-  const exported = {createVoiceClient, initialize, rms, levelFromRms, statusText, LABELS};
+  const exported = {createVoiceClient, initialize, rms, levelFromRms, statusText, languageLabel, LABELS};
   if (typeof module === "object" && module.exports) {
     module.exports = exported;
   } else {

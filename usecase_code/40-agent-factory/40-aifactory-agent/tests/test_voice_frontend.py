@@ -689,6 +689,37 @@ def test_language_switch_restarts_only_voice_with_same_authenticated_text_sessio
 """, STATIC / "voice.js")
 
 
+def test_text_only_page_never_initializes_voice_or_touches_auth_microphone_and_orb():
+    node(r"""
+const assert = require("node:assert/strict");
+const voice = require(process.argv[2]);
+for (const search of ["?voice=off", "?host=esaif-maui", "?host=esaif-maui&voice=on"]) {
+  const card = {hidden: false};
+  const env = {
+    location: {search},
+    document: {getElementById: (id) => id === "voice-card" ? card : null},
+    AIFactoryAgent: {
+      voiceSession() { throw Error("text token must not be requested by disabled voice"); },
+      subscribe() { throw Error("disabled voice must not subscribe"); }
+    },
+    AIFactoryVoiceOrb: {createOrb() { throw Error("disabled voice must not create an orb"); }}
+  };
+  assert.equal(voice.initialize(env), null);
+  assert.equal(card.hidden, true);
+}
+""", STATIC / "voice.js")
+
+
+def test_language_labels_distinguish_configured_locales_and_keep_unknown_code():
+    node(r"""
+const assert = require("node:assert/strict");
+const voice = require(process.argv[2]);
+assert.match(voice.languageLabel("fr-FR", {Intl}), /French/);
+assert.match(voice.languageLabel("de-DE", {Intl}), /German/);
+assert.equal(voice.languageLabel("fr-FR", {}), "fr-FR");
+""", STATIC / "voice.js")
+
+
 def test_levels_follow_the_microphone_while_listening_and_the_speakers_while_speaking():
     node(CLIENT_HARNESS + r"""
 (async () => {

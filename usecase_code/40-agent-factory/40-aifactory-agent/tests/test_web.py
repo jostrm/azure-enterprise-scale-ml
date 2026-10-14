@@ -564,7 +564,7 @@ def test_unexpected_error_is_generic_500_without_exception_body(authenticated, m
 def test_security_headers_csp_and_frontend_assets(isolated):
     app, _, _ = isolated
     with TestClient(app) as client:
-        for path in ("/", "/api/public-config", "/api/context", "/static/app.js", "/static/theme.css",
+        for path in ("/", "/api/public-config", "/api/context", "/static/app.js", "/static/theme.css", "/static/skill-results.js",
                      "/static/markdown.js", "/static/vendor/markdown-it.min.js"):
             response = client.get(path)
             assert response.headers["x-content-type-options"] == "nosniff"
@@ -775,7 +775,9 @@ const sandbox = {
     if (url.startsWith("/api/skills?")) return response({scope_key: "project001-dev",
       skills: mode.startsWith("action-tiles") ? tileSkills : [skill]});
     if (url.startsWith("/api/skills/") && url.endsWith("/run")) {
-      return response({ok: true, data: {basis: "actual", source: "Cost Analysis", coverage: "partial"}});
+      return response({ok: true, data: {basis: "actual", scope_key: "project001-dev", resource_group: "common-rg",
+        actual_mtd: {totals_by_currency: {USD: "2.125"}, source: "Cost Analysis",
+          period: {from: "2026-10-01", to: "2026-10-03", time_zone: "UTC"}, services: []}}});
     }
     if (url.startsWith("/api/skills/") && url.endsWith("/propose")) {
       proposalCreated = true;
@@ -816,7 +818,7 @@ sandbox.window = sandbox;
 const browserContext = vm.createContext(sandbox);
 const path = require("node:path");
 const assets = path.dirname(process.argv[2]);
-for (const asset of ["vendor/markdown-it.min.js", "markdown.js", "app.js"]) {
+for (const asset of ["vendor/markdown-it.min.js", "markdown.js", "skill-results.js", "app.js"]) {
   vm.runInContext(fs.readFileSync(path.join(assets, asset), "utf8"), browserContext);
 }
 async function waitFor(predicate) {
@@ -1057,7 +1059,11 @@ async function consent() {
       const submitted = calls.find(call => call.url.startsWith("/api/skills/") && call.options.method === "POST");
       assert(submitted.url.endsWith(mode === "skill-cost" ? "/run" : "/propose"));
       assert.equal(JSON.parse(submitted.body).scope_key, "project001-dev");
-      if (mode === "skill-cost") await waitFor(() => ui("skill-result").textContent.includes("Cost Analysis"));
+      if (mode === "skill-cost") {
+        await waitFor(() => ui("skill-result").textContent.includes("Cost Analysis"));
+        assert(ui("skill-result").textContent.includes("USD 2.125"));
+        assert(descendants(ui("skill-result")).some(child => child.tagName === "article"));
+      }
       else await waitFor(() => ui("proposed-plans").textContent.includes("Pending review"));
       assert(!calls.some(call => call.url.endsWith("/approve") || call.url.endsWith("/execute")));
     } else if (mode === "skill-delete") {
@@ -1373,7 +1379,7 @@ if (mode !== "host-absent") sandbox.chrome = {webview: channel};
 sandbox.window = sandbox;
 const browserContext = vm.createContext(sandbox);
 const assets = path.dirname(process.argv[2]);
-for (const asset of ["vendor/markdown-it.min.js", "markdown.js", "app.js"]) {
+for (const asset of ["vendor/markdown-it.min.js", "markdown.js", "skill-results.js", "app.js"]) {
   vm.runInContext(fs.readFileSync(path.join(assets, asset), "utf8"), browserContext);
 }
 async function waitFor(predicate, label) {
