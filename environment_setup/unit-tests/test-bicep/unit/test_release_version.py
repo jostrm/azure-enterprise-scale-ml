@@ -76,7 +76,7 @@ class TestReleaseVersion(unittest.TestCase):
     def test_ado_default_target_does_not_use_empty_allowed_value(self):
         path = ROOT / "environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/infra-project-genai.yaml"
         params = {p["name"]: p for p in yaml.safe_load(path.read_text(encoding="utf-8"))["parameters"]}
-        self.assertEqual("", params["deploymentTarget"]["default"])
+        self.assertEqual("manual", params["deploymentTarget"]["default"])
         self.assertNotIn("", params["deploymentTarget"].get("values", []))
 
 

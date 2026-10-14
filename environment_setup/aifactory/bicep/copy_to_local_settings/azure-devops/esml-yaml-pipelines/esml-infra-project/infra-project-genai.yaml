@@ -15,16 +15,17 @@
 
 parameters:
   - name: deploymentTarget
-    displayName: Reviewed single-environment target (empty preserves promotion flow)
+    displayName: Deployment mode (manual preserves promotion flow; dev/stage/prod require reviewed inputs)
     type: string
-    default: ''
-    # ADO rejects empty entries in values; job-0 validates non-empty reviewed targets.
+    default: manual
   - name: deploymentProjectNumber
+    displayName: Reviewed project number (manual mode keeps not-applicable)
     type: string
-    default: ''
+    default: not-applicable
   - name: deploymentConfigHash
+    displayName: Reviewed configuration hash (manual mode keeps not-applicable)
     type: string
-    default: ''
+    default: not-applicable
   - name: deploymentSettings
     type: object
     default: {}
@@ -51,7 +52,13 @@ trigger: none
       # - release/project*
 variables:
   - template: ../variables/variables.yaml
-  - ${{ if ne(parameters.deploymentTarget, '') }}:
+  # ADO's Run UI rejects empty string inputs; preserve empty-target API compatibility internally.
+  - name: reviewedDeploymentTarget
+    ${{ if eq(parameters.deploymentTarget, 'manual') }}:
+      value: ''
+    ${{ else }}:
+      value: ${{ parameters.deploymentTarget }}
+  - ${{ if ne(variables.reviewedDeploymentTarget, '') }}:
     - name: runNetworkingVar
       value: ${{ parameters.deploymentSettings.runNetworkingVar }}
     - name: BYO_subnets
@@ -73,7 +80,7 @@ variables:
 stages:
 - stage: Dev_GenAI_Project
   displayName: Dev GenAI Project
-  condition: and(succeeded(), or(eq('${{ parameters.deploymentTarget }}', ''), eq('${{ parameters.deploymentTarget }}', 'dev')))
+  condition: and(succeeded(), or(eq('${{ variables.reviewedDeploymentTarget }}', ''), eq('${{ variables.reviewedDeploymentTarget }}', 'dev')))
   variables:
     dev_test_prod: "dev"
     ${{ if eq(parameters.useJsonConfigOverride, true) }}:
@@ -113,7 +120,7 @@ stages:
                 displayName: 'Checkout with submodules'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
@@ -123,7 +130,7 @@ stages:
                   serviceConnectionSeeding: ${{ variables.dev_seeding_kv_service_connection }}
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   cleanup: true
     - deployment: ESGenAI_Services
       condition: or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
@@ -151,7 +158,7 @@ stages:
                 displayName: 'Checkout with submodules'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
@@ -162,7 +169,7 @@ stages:
                   phase: 'infra'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   cleanup: true
     # AI Foundry runs in its own deployment job. The phase parameter excludes all infra
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
@@ -193,7 +200,7 @@ stages:
                 displayName: 'Checkout with submodules'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
@@ -204,11 +211,11 @@ stages:
                   phase: 'foundry'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   cleanup: true
 - stage: Stage_GenAI_Project
   displayName: Stage GenAI Project
-  condition: and(not(canceled()), eq(variables['Build.Reason'], 'Manual'), or(and(eq('${{ parameters.deploymentTarget }}', ''), eq(dependencies.Dev_GenAI_Project.result, 'Succeeded')), and(eq('${{ parameters.deploymentTarget }}', 'stage'), eq(dependencies.Dev_GenAI_Project.result, 'Skipped'))))
+  condition: and(not(canceled()), eq(variables['Build.Reason'], 'Manual'), or(and(eq('${{ variables.reviewedDeploymentTarget }}', ''), eq(dependencies.Dev_GenAI_Project.result, 'Succeeded')), and(eq('${{ variables.reviewedDeploymentTarget }}', 'stage'), eq(dependencies.Dev_GenAI_Project.result, 'Skipped'))))
   dependsOn: Dev_GenAI_Project
   variables:
     dev_test_prod: "test"
@@ -249,7 +256,7 @@ stages:
                 displayName: 'Checkout with submodules'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
@@ -259,7 +266,7 @@ stages:
                   serviceConnectionSeeding: ${{ variables.test_seeding_kv_service_connection }}
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   cleanup: true
     - deployment: ESGenAI_Services
       condition: or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
@@ -287,7 +294,7 @@ stages:
                 displayName: 'Checkout with submodules'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
@@ -298,7 +305,7 @@ stages:
                   phase: 'infra'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   cleanup: true
     # AI Foundry runs in its own deployment job. The phase parameter excludes all infra
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
@@ -329,7 +336,7 @@ stages:
                 displayName: 'Checkout with submodules'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
@@ -340,11 +347,11 @@ stages:
                   phase: 'foundry'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   cleanup: true
 - stage: Prod_GenAI_Project
   displayName: Prod GenAI Project
-  condition: and(not(canceled()), eq(variables['Build.Reason'], 'Manual'), or(and(eq('${{ parameters.deploymentTarget }}', ''), eq(dependencies.Dev_GenAI_Project.result, 'Succeeded'), eq(dependencies.Stage_GenAI_Project.result, 'Succeeded')), and(eq('${{ parameters.deploymentTarget }}', 'prod'), eq(dependencies.Dev_GenAI_Project.result, 'Skipped'), eq(dependencies.Stage_GenAI_Project.result, 'Skipped'))))
+  condition: and(not(canceled()), eq(variables['Build.Reason'], 'Manual'), or(and(eq('${{ variables.reviewedDeploymentTarget }}', ''), eq(dependencies.Dev_GenAI_Project.result, 'Succeeded'), eq(dependencies.Stage_GenAI_Project.result, 'Succeeded')), and(eq('${{ variables.reviewedDeploymentTarget }}', 'prod'), eq(dependencies.Dev_GenAI_Project.result, 'Skipped'), eq(dependencies.Stage_GenAI_Project.result, 'Skipped'))))
   dependsOn: 
     - Stage_GenAI_Project
     - Dev_GenAI_Project
@@ -387,7 +394,7 @@ stages:
                 displayName: 'Checkout with submodules'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
@@ -397,7 +404,7 @@ stages:
                   serviceConnectionSeeding: ${{ variables.prod_seeding_kv_service_connection }}
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   cleanup: true
     - deployment: ESGenAI_Services
       condition: or(in(dependencies.ESGenAI_Networking.result, 'Succeeded', 'Skipped'), eq(variables['runNetworkingVar'], 'false'), eq(variables['BYO_subnets'], 'true'))
@@ -425,7 +432,7 @@ stages:
                 displayName: 'Checkout with submodules'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
@@ -436,7 +443,7 @@ stages:
                   phase: 'infra'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   cleanup: true
     # AI Foundry runs in its own deployment job. The phase parameter excludes all infra
     # deployment tasks; only job-scoped prerequisites (configuration, Key Vault secrets,
@@ -467,7 +474,7 @@ stages:
                 displayName: 'Checkout with submodules'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   project: ${{ parameters.deploymentProjectNumber }}
                   configFile: ${{ parameters.configFile }}
                   configHash: ${{ parameters.deploymentConfigHash }}
@@ -478,5 +485,5 @@ stages:
                   phase: 'foundry'
               - template: ./jobs/job-0-reviewed-project-config.yaml
                 parameters:
-                  target: ${{ parameters.deploymentTarget }}
+                  target: ${{ variables.reviewedDeploymentTarget }}
                   cleanup: true

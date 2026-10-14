@@ -318,6 +318,7 @@ def test_protected_config_decrypts_only_for_bound_factory_project_target(tmp_pat
 
 def evaluate_condition(source, target, dev, stage="Skipped"):
     source = source.replace("'${{ parameters.deploymentTarget }}'", repr(target))
+    source = source.replace("'${{ variables.reviewedDeploymentTarget }}'", repr("" if target == "manual" else target))
     source = source.replace("variables['Build.Reason']", "'Manual'")
     source = source.replace("dependencies.Dev_GenAI_Project.result", repr(dev))
     source = source.replace("dependencies.Stage_GenAI_Project.result", repr(stage))

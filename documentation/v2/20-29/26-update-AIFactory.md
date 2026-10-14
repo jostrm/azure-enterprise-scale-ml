@@ -3,6 +3,43 @@ There are two types of updates you can do: `Library-UPDATE` or `Feature-UPDATE`.
 
 For a `Feature-UPDATE`, you can use a **Quick Feature-update & run** script or follow the manual instructions in [2) Feature-UPDATE: NEW feature, such as "BYOVNet"](#2-feature-update-new-feature-such-as-byovnet).
 
+## Manual Azure DevOps Run pipeline
+
+When starting the existing `infra-project-genai` pipeline directly in ADO using
+`variables.yaml`, select the intended **consumer branch**, for example `prj001`,
+not `release/v1.24`. These settings are for the infrastructure pipeline, not the
+separate dashboard pipeline:
+
+| Field | Manual YAML run |
+|---|---|
+| Deployment mode (`deploymentTarget`) | `manual` |
+| `deploymentProjectNumber` | `not-applicable` |
+| `deploymentConfigHash` | `not-applicable` |
+| `deploymentSettings` | Default `{}` |
+| Build agent selection | `microsoft-hosted`, when compatible with connection/network |
+| Override variables.yaml with variables.json | **Unchecked** |
+| `configFile` | Default value; ignored with override unchecked |
+
+Keep those nonempty defaults; do not clear them. ADO's Run UI rejects the earlier
+empty-string defaults as missing required input. Publish the refreshed copied
+pipeline if its UI still shows the old fields. `manual` maps internally to the
+legacy empty target; existing API requests with an empty target remain supported.
+`project_number_000` in the selected branch's YAML supplies the actual project
+number, such as `"001"`; no reviewed hash is needed for this manual route.
+
+**For Dev-only deployment, use Stages to run: select Dev GenAI Project only;
+deselect Stage and Prod.** `manual` preserves promotion behavior. It does not
+disable later environments if they remain selected. Hosted agents still require
+a compatible service connection and sufficient network access.
+
+The JSON checkbox and reviewed mode are independent. Choosing a reviewed target
+`dev`, `stage` or `prod` still requires its protected JSON, real project number,
+hash and scheduling settings from the reviewed launcher/API, even if the checkbox
+is unchecked. Do not guess those fields or use `dev` as a shortcut for manual
+Dev-only execution.
+
+See [setup: manual ADO parameters](24-end-2-end-setup.md#manual-azure-devops-run-pipeline-variablesyaml).
+
 ## Quick Feature-update & run
 
 After `00-start.sh` has copied the scripts to your repository root, use the script for your orchestrator:
