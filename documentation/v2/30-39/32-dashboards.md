@@ -12,6 +12,9 @@ read-only native Portal/Foundry capture: **21 September 2026**.
 Local artifacts and sample captures are not evidence
 that a resource has been deployed in Azure.
 
+[Get the new dashboards: How to](32-new-dashboard-howto.md) - step-by-step Azure
+DevOps instructions for the v1.24 dashboard backport, using an anonymized Project001.
+
 ## Start here: one monitoring story, four delivery groups
 
 Organize the experience along two axes. **Value, cost, quality and security**
