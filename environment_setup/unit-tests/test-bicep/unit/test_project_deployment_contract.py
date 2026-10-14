@@ -458,6 +458,7 @@ def test_protected_config_decrypts_only_for_bound_factory_project_target(tmp_pat
 
 def evaluate_condition(source, target, dev, stage="Skipped"):
     source = source.replace("'${{ parameters.deploymentTarget }}'", repr(target))
+    source = source.replace("'${{ variables.reviewedDeploymentTarget }}'", repr("" if target == "manual" else target))
     source = source.replace("variables['Build.Reason']", "'Manual'")
     source = source.replace("dependencies.Dev_GenAI_Project.result", repr(dev))
     source = source.replace("dependencies.Stage_GenAI_Project.result", repr(stage))
@@ -500,10 +501,10 @@ def test_ado_stage_only_preserves_genuine_failure_dependencies_and_legacy_flow()
     assert stage["variables"]["dev_test_prod"] == "test"
 
 
-def test_ado_deployment_target_keeps_empty_legacy_default_without_invalid_enum():
+def test_ado_deployment_target_uses_manual_ui_default_without_invalid_empty_enum():
     pipeline = yaml.safe_load((ADO / "infra-project-genai.yaml").read_text(encoding="utf-8"))
     target = next(item for item in pipeline["parameters"] if item["name"] == "deploymentTarget")
-    assert target["default"] == ""
+    assert target["default"] == "manual"
     assert "values" not in target
 
 

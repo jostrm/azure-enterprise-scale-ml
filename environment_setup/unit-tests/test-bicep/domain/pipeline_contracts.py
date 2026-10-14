@@ -238,10 +238,10 @@ def evaluate(expression: str, context: dict[str, Any]) -> Any:
     expression = expression.strip()
     if expression.startswith("${{") and expression.endswith("}}"):
         expression = expression[3:-2].strip()
-    # ADO substitutes these parameters before evaluating runtime conditions.
+    # ADO substitutes compile-time parameters/variables before runtime conditions.
     expression = re.sub(
-        r"'\$\{\{\s*parameters\.(\w+)\s*\}\}'",
-        lambda match: "'" + str(context["parameters." + match[1]]) + "'",
+        r"'\$\{\{\s*((?:parameters|variables)\.\w+)\s*\}\}'",
+        lambda match: "'" + str(context[match[1]]).replace("'", "''") + "'",
         expression,
     )
     tokens, position = [], 0

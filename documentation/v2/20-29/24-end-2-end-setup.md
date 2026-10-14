@@ -19,6 +19,47 @@ Start by [choosing a setup path](#choose-the-setup-path), then follow the
 The [legacy setup](#existing-single-factory-setup) section covers existing
 single-factory repositories.
 
+## Manual Azure DevOps Run pipeline: variables.yaml
+
+For a manual run of the copied `infra-project-genai.yaml` in a legacy `aifactory`
+consumer, choose your **consumer branch** (for example `prj001`) and use:
+
+| Run pipeline field | Value for a normal YAML-based run |
+|---|---|
+| Deployment mode (`deploymentTarget`) | Keep `manual` |
+| `deploymentProjectNumber` | Keep `not-applicable` |
+| `deploymentConfigHash` | Keep `not-applicable` |
+| `deploymentSettings` | Keep the default object `{}` |
+| Build agent selection | `microsoft-hosted`, if compatible with your service connection/network |
+| Override variables.yaml with variables.json | **Unchecked** |
+| `configFile` | Leave its default; ignored while the override is unchecked |
+
+The actual project number, such as `"001"`, comes from `project_number_000` in
+`aifactory\esml-infra\azure-devops\bicep\yaml\variables\variables.yaml`.
+Do not put it in the reviewed project-number field for this manual flow.
+
+**For Dev only, open Stages to run and select only Dev GenAI Project. Deselect
+Stage and Prod.** `manual` preserves the normal promotion flow; it does not mean
+Dev-only. Stage/Prod can run after successful predecessors if left selected.
+Microsoft-hosted agents do not grant private-network access or an agent's managed
+identity; choose a compatible existing runner.
+
+ADO's Run UI treats empty string parameters as required, even with `default: ''`.
+The nonempty `manual` / `not-applicable` defaults avoid that UI problem. If the
+old labels still ask for blank reviewed fields, refresh and publish the consumer's
+copied pipeline from the fixed source before starting a new run.
+`manual` is normalized to the original empty target internally; old API callers
+that explicitly send an empty target remain compatible.
+
+The JSON override checkbox selects configuration input; it does **not** select
+reviewed-deployment mode. Explicit `dev`, `stage` or `prod` reviewed targets still
+require the protected per-run JSON, exact project, configuration hash and scheduling
+settings supplied together by the reviewed launcher/API. Unchecking the override
+does not bypass those checks. Never invent a hash or set only the reviewed target.
+
+See [manual update settings](26-update-AIFactory.md#manual-azure-devops-run-pipeline)
+when rerunning an existing project deployment.
+
 ## Two common workflows
 
 - **ITSM or self-service portal integration:** Teams order projects through ServiceNow,

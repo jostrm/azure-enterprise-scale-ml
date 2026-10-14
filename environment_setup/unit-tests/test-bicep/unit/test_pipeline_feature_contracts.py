@@ -293,6 +293,7 @@ def test_ado_reviewed_project_only_route_uses_exact_target_and_service_connectio
     for stage in stages:
         context = {
             "parameters.deploymentTarget": target,
+            "variables.reviewedDeploymentTarget": target,
             "variables.Build.Reason": "Manual",
             "dependencies.Dev_GenAI_Project.result": "Skipped",
             "dependencies.Stage_GenAI_Project.result": "Skipped",

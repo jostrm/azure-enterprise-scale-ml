@@ -28,6 +28,15 @@ ADO/GHA templates orchestrate common and selected project infrastructure. Projec
 
 Legacy update distinguishes library/template refresh from feature update and project-only execution. Normal helper workflows can update templates/configuration, commit, push, dispatch and monitor. They are not read-only inspection commands.
 
+The legacy project ADO Run UI uses `deploymentTarget: manual` and
+`not-applicable` project/hash defaults because empty string parameters are treated
+as required by that UI. A compile-time `reviewedDeploymentTarget` maps manual to
+the existing empty-target promotion flow; explicitly empty API targets remain
+compatible. The JSON override selects configuration input independently of this
+mode. Explicit reviewed Dev/Stage/Prod targets still invoke protected per-run
+configuration validation even with the override unchecked. Manual Dev-only runs
+must explicitly deselect Stage and Prod in the Run UI.
+
 Explicit Stage/Prod selection uses the reviewed single-project route. Stage requires a real Dev project resource group; Prod requires real Dev **or** Stage. The checks validate exact subscription/tenant, resource identity and applicable location/provisioning state. Failed reads block rather than being interpreted as absence. A saved review, common resource group or pipeline receipt is not predecessor-deployment proof.
 
 Registered roots instead use protected scoped lifecycle manifests; ordinary legacy flags cannot replace exact reviewed factory, scale set, project, environment, version and commit. Source version selection does not migrate directories.
