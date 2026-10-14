@@ -741,16 +741,18 @@ steps:
       
       Write-Host "=== ALL PATHS VALIDATED SUCCESSFULLY ==="
 
-- task: AzurePowerShell@5
+- task: AzureCLI@2
   displayName: '04_pwsh_calculate_subnet_allocations'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    ScriptType: FilePath
-    ScriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc_v2.ps1'
-    ScriptArguments: '-filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -subscriptionId "$(dev_test_prod_sub_id)" -prjResourceSuffix "$(admin_prjResourceSuffix)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -commonResourceSuffixADO "$(admin_commonResourceSuffix)" -locationADO "$(admin_location)" -locationSuffixADO "$(admin_locationSuffix)" -projectTypeADO "$(admin_projectType)" -aifactorySuffixRG "$(admin_aifactorySuffixRG)" -commonRGNamePrefix "$(admin_aifactoryPrefixRG)" -locationSuffix "$(admin_locationSuffix)" -location "$(admin_location)" -commonResourceSuffix "$(admin_commonResourceSuffix)" -vnetNameBase "$(vnetNameBase)" -tenantId "$(tenantId)" -vnetResourceGroupBase "$(vnetResourceGroupBase)" -vnetResourceGroup_param "$(vnetResourceGroup_resolved)" -vnetNameFull_param "$(vnetNameFull_resolved)"'
-    azurePowerShellVersion: LatestVersion
-    pwsh: true
+    scriptType: pscore
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc_v2.ps1'
+    arguments: '-filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -subscriptionId "$(dev_test_prod_sub_id)" -prjResourceSuffix "$(admin_prjResourceSuffix)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -commonResourceSuffixADO "$(admin_commonResourceSuffix)" -locationADO "$(admin_location)" -locationSuffixADO "$(admin_locationSuffix)" -projectTypeADO "$(admin_projectType)" -aifactorySuffixRG "$(admin_aifactorySuffixRG)" -commonRGNamePrefix "$(admin_aifactoryPrefixRG)" -locationSuffix "$(admin_locationSuffix)" -location "$(admin_location)" -commonResourceSuffix "$(admin_commonResourceSuffix)" -vnetNameBase "$(vnetNameBase)" -tenantId "$(tenantId)" -vnetResourceGroupBase "$(vnetResourceGroupBase)" -vnetResourceGroup_param "$(vnetResourceGroup_resolved)" -vnetNameFull_param "$(vnetNameFull_resolved)"'
+    powerShellErrorActionPreference: stop
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
+  env:
+    AIFACTORY_USE_AZURE_CLI: 'true'
 - task: AzureCLI@2
   displayName: '04b_check_subnet_exists_for_project'
   inputs:

@@ -145,7 +145,7 @@ function Import-Dependencies {
         }
         "subnetCalc_v2.ps1" { 
             Write-Verbose "Installing dependencies for $callingScriptName"
-            if ($env:GITHUB_ACTIONS -eq 'true') {
+            if ($env:GITHUB_ACTIONS -eq 'true' -or $env:AIFACTORY_USE_AZURE_CLI -eq 'true') {
                 Install-DependencyIfMissing -Name Subnet -RequiredVersion $subnetVersion
                 Import-Module Subnet -RequiredVersion $subnetVersion -Force
                 break

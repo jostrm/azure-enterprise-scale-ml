@@ -50,6 +50,11 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for DBX private subnet when projectType=all")][string]$dbxPrivSubnetCidrAll = '26'
 )
 
+$useAzureCli = $env:GITHUB_ACTIONS -eq 'true' -or $env:AIFACTORY_USE_AZURE_CLI -eq 'true'
+if ($useAzureCli -and $useServicePrincipal) {
+    throw "Azure CLI mode requires an already authenticated CLI context; do not pass useServicePrincipal."
+}
+
 filter ConvertTo-BinaryIP {
     [CmdletBinding()]
     [OutputType([String])]
@@ -335,7 +340,7 @@ if ($PSBoundParameters.ContainsKey('vnetNameFull_param') -and $vnetNameFull_para
 if ( $useServicePrincipal -eq $null -or $useServicePrincipal -eq "" -or $useServicePrincipal -eq $false )
 {
     $useServicePrincipal = $false
-    Write-Host $(if ($env:GITHUB_ACTIONS -eq 'true') { "Using authenticated Azure CLI context" } else { "Using current AzContext (AzurePowerShell task service connection)" })
+    Write-Host $(if ($useAzureCli) { "Using authenticated Azure CLI context" } else { "Using current AzContext (AzurePowerShell task service connection)" })
 }
 else
 {
@@ -351,12 +356,12 @@ else
 }
 $vnetObj = $null
 
-$hasAzureContext = $env:GITHUB_ACTIONS -eq 'true'
+$hasAzureContext = $useAzureCli
 if (-not $hasAzureContext) {
     $hasAzureContext = $(Get-AzContext).Subscription -ne ""
 }
 if ($hasAzureContext) {
-    if ($env:GITHUB_ACTIONS -eq 'true') {
+    if ($useAzureCli) {
         Write-Host "Using Azure CLI subscription '$subscriptionId'."
     }
     else {
@@ -471,7 +476,7 @@ if ($hasAzureContext) {
 
     Write-Host "vnetName: $($vnetName)"
     Write-Host "vnetResourceGroup: $($vnetResourceGroup)"
-    if ($env:GITHUB_ACTIONS -eq 'true') {
+    if ($useAzureCli) {
         $vnetJson = & az network vnet show `
             --subscription $subscriptionId `
             --resource-group $vnetResourceGroup `
@@ -481,7 +486,7 @@ if ($hasAzureContext) {
         if ($LASTEXITCODE -ne 0) {
             throw "Unable to read VNet '$vnetResourceGroup/$vnetName': $($vnetJson -join [Environment]::NewLine)"
         }
-        $vnetObj = ($vnetJson -join [Environment]::NewLine) | ConvertFrom-Json
+        $vnetObj = ($vnetJson -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop
     }
     else {
         $vnetObj = Get-AzVirtualNetwork -ResourceGroupName $vnetResourceGroup -Name $vnetName
