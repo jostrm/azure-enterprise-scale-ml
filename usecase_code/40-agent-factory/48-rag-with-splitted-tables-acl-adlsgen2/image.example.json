@@ -1,0 +1,20 @@
+{
+  "owner": "aif48-project001-dev",
+  "version": "v1",
+  "synthetic_only": true,
+  "search_endpoint": "https://<existing-search-service>.search.windows.net",
+  "source_storage_resource_id": "/subscriptions/<subscription>/resourceGroups/<isolated-group>/providers/Microsoft.Storage/storageAccounts/<synthetic-source-account>",
+  "asset_storage_resource_id": "/subscriptions/<subscription>/resourceGroups/<isolated-group>/providers/Microsoft.Storage/storageAccounts/<synthetic-asset-account>",
+  "protected_storage_resource_ids": [
+    "/subscriptions/<subscription>/resourceGroups/<common-group>/providers/Microsoft.Storage/storageAccounts/<protected-common-lake>"
+  ],
+  "source_container": "synthetic-documents",
+  "asset_container": "synthetic-assets",
+  "source_prefix": "synthetic/images/v1/png-derivative",
+  "input_kind": "png-derivative",
+  "ai_services_endpoint": "https://<foundry-account>.services.ai.azure.com",
+  "model_endpoint": "https://<foundry-account>.services.ai.azure.com",
+  "chat_deployment": "<approved-multimodal-deployment>",
+  "chat_model": "<actual-multimodal-model-name>",
+  "embedding_deployment": "text-embedding-3-large"
+}

@@ -34,6 +34,7 @@ own commands, required inputs and expected results.
   43-data\                     Managed-identity ingestion and optional Azure-hosted worker
   44-azure-mcp\                Private, read-only Azure inventory service setup
   45-rag-agent\                Explicit source-bound common/project storage RAG
+  48-rag-with-splitted-tables-acl-adlsgen2\ Native-ACL split tables and exact multi-source sales
   agent_factory\              Shared Python operator/library; python -m agent_factory
   tests\                      Offline regressions; fixtures\ contains synthetic JSON
 ```
@@ -47,6 +48,7 @@ own commands, required inputs and expected results.
 | [43-data](43-data/readme.md) | Shared `*-datafactory` commands; optional `worker.py` runs only on approved managed-identity compute. |
 | [44-azure-mcp](44-azure-mcp/readme.md) | `44-azure-mcp\deploy.py` for infrastructure planning; shared commands configure/verify the connection. |
 | [45-rag-agent](45-rag-agent/readme.md) | `45-rag-agent\main.py` with one explicit `--source`; its own prepare/deploy/ask lifecycle. |
+| [48-rag-with-splitted-tables-acl-adlsgen2](48-rag-with-splitted-tables-acl-adlsgen2/readme.md) | Whole-table Text Split, native ADLS chunk permissions, two-index evidence and an exhaustive calculator; isolated synthetic image branch. Separate environment/configuration and explicit deployment/paid-call approval. |
 | [agent_factory](agent_factory/readme.md) | Shared library/CLI, not another agent to deploy. |
 | [tests](tests/readme.md) / [fixtures](tests/fixtures/readme.md) | `unittest` from this directory; no agent, Azure login or live dataset needed. |
 
