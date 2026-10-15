@@ -122,8 +122,14 @@ AIFACTORY_USE_JSON_OVERRIDE=no ADO_BRANCH=prj001 bash ./ADO-update-aifactory-and
 ```
 
 These anonymized examples run from the consumer repository root in Git Bash.
-Replace `prj001` with your existing consumer branch. `yes` requires the intended,
-valid `aifactory/variables.json` to exist; it does not generate the configuration.
+Replace `prj001` with your existing consumer branch. For a normal ADO update, `yes`
+creates a missing `aifactory/variables.json` from the active `variables.yaml`
+before tenant lookup, preserving existing values instead of copying template
+identities. The normal refresh/merge then adds missing settings, including the
+Search fallback arrays. Existing JSON files are never replaced by initialization.
+Malformed or unsupported YAML fails explicitly without creating JSON.
+`--project-only` and reviewed routes still require their existing configuration
+and do not initialize it; GitHub configuration behavior is unchanged.
 `no` keeps Azure DevOps on `variables.yaml`. When unset, the interactive launcher
 asks which source to use.
 

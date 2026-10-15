@@ -470,6 +470,55 @@ def update_json(path: Path, values: dict[str, Any]) -> None:
     path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
 
+def initialize_json_from_ado_yaml(yaml_path: Path, json_path: Path) -> bool:
+    """Seed only absent JSON from literal active YAML, never template identities."""
+    if json_path.exists() or json_path.is_symlink():
+        if not json_path.is_file() or json_path.is_symlink():
+            raise ValueError("Existing JSON configuration must be an ordinary file.")
+        return False
+    values: dict[str, Any] = {}
+    header_seen = False
+    for number, line in enumerate(yaml_path.read_text(encoding="utf-8-sig").splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith("#") or line.strip() in ("---", "..."):
+            continue
+        if split_comment(line)[0] == "variables:" and not header_seen:
+            header_seen = True
+            continue
+        match = YAML_ASSIGNMENT.fullmatch(line) if header_seen and line.startswith("  ") else None
+        if not match:
+            raise ValueError(f"YAML line {number}: expected a flat literal variables mapping; cannot safely create JSON.")
+        key = match.group("key")
+        if key in values:
+            raise ValueError(f"YAML line {number}: duplicate variable '{key}'.")
+        raw, _ = split_comment(match.group("rest"))
+        raw = raw.strip()
+        if raw.startswith('"'):
+            try:
+                value = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"YAML line {number}: invalid quoted value for '{key}'.") from exc
+        elif raw.startswith("'"):
+            if not re.fullmatch(r"'(?:[^']|'')*'", raw):
+                raise ValueError(f"YAML line {number}: invalid quoted value for '{key}'.")
+            value = raw[1:-1].replace("''", "'")
+        else:
+            if raw.startswith(("|", ">", "!", "&", "*")):
+                raise ValueError(f"YAML line {number}: unsupported value syntax for '{key}'.")
+            value = raw
+        if isinstance(value, str) and value.startswith(("[", "{")):
+            try:
+                value = json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"YAML line {number}: invalid JSON array/object for '{key}'.") from exc
+        values[key] = value
+    if not header_seen or not values:
+        raise ValueError("Active YAML must contain a nonempty literal variables mapping.")
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+    with json_path.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps({"dev": values}, indent=2) + "\n")
+    return True
+
+
 def merge_yaml_template(template_path: Path, active_path: Path) -> None:
     active_values: dict[str, str] = {}
     active_lines: dict[str, str] = {}
