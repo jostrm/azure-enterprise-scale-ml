@@ -112,6 +112,10 @@ This patch focuses on **simpler configuration**, **per-environment cost control 
   other environment's SKU. Separate local step 63b publishes canonical/effective
   location/SKU and ready state only after actual successful step 63. Skipped or
   failed networking cannot finalize readiness; failures block downstream tasks.
+- Search-only provisioning does not declare existing VNet/subnet resources with
+  empty names. The subnet ID is constructed only in the gated private-endpoint
+  resource, retaining the configured VNet resource group and project region
+  during the later networking task.
 - The subscription-scoped Search template supplies both subscription ID and
   resource-group name explicitly when constructing the Search and user-assigned
   identity resource IDs. A resource-group name alone is not a valid subscription

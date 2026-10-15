@@ -70,16 +70,6 @@ var identity = !empty(managedIdentities)
     }
   : {type:'SystemAssigned'}
 
-resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
-  name: vnetName
-  scope: resourceGroup(vnetResourceGroupName)
-}
-
-resource subnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
-  name: subnetName
-  parent: vnet
-}
-
 // To add Azure Portal. ipRules and add: nslookup on stamp2.ext.search.windows.net (Non-authorative answer)
 // 2025-05-01
 //resource aiSearch 'Microsoft.Search/searchServices@2024-03-01-preview' = {
@@ -130,7 +120,8 @@ resource pendAISearch 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enab
   tags: tags
   properties: {
     subnet: {
-      id: subnet.id
+      // Keep network identifiers inside the gated endpoint; service-only mode has no VNet inputs.
+      id: resourceId(subscription().subscriptionId, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, subnetName)
     }
     customNetworkInterfaceName: '${aiSearch.name}-pend-nic'
     privateLinkServiceConnections: [

@@ -148,6 +148,57 @@ def test_compiled_search_user_assigned_identities_use_explicit_subscription_and_
     assert "resourceId(variables('targetResourceGroup')," not in identities
 
 
+def compiled_search_module(template):
+    deployment = next(resource for resource in template["resources"]
+                      if "serviceOnly" in resource.get("properties", {}).get("parameters", {}))
+    assert deployment["properties"]["parameters"]["serviceOnly"] == {"value": True}
+    assert deployment["properties"]["parameters"]["vnetName"] == {"value": ""}
+    assert deployment["properties"]["parameters"]["subnetName"] == {"value": ""}
+    return deployment["properties"]["template"]
+
+
+def test_compiled_search_only_has_no_empty_existing_network_resources(compiled_search_template):
+    module = compiled_search_module(compiled_search_template)
+    assert not any(resource["type"] in {
+        "Microsoft.Network/virtualNetworks", "Microsoft.Network/virtualNetworks/subnets",
+    } for resource in module["resources"].values())
+    endpoint = module["resources"]["pendAISearch"]
+    assert endpoint["properties"]["subnet"]["id"] == (
+        "[resourceId(subscription().subscriptionId, parameters('vnetResourceGroupName'), "
+        "'Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('subnetName'))]"
+    )
+    assert endpoint["location"] == "[parameters('privateEndpointLocation')]"
+
+
+@pytest.mark.parametrize("service_only", [False, True])
+@pytest.mark.parametrize("perimeter", [False, True])
+def test_compiled_search_only_gates_all_network_resources_and_dns(
+        compiled_search_template, service_only, perimeter):
+    module = compiled_search_module(compiled_search_template)
+    values = {"serviceOnly": service_only, "enablePublicAccessWithPerimeter": perimeter,
+              "enableSharedPrivateLink": True, "approveStorageSharedLinks": True,
+              "sharedPrivateLinks": [{"groupId": "blob"}], "privateEndpointName": "search-pend"}
+
+    def evaluate(expression):
+        # Only the emitted literal-parameter boolean/array gate subset is supported.
+        expression = re.sub(r"\b(and|not|if)\(", lambda match: match[1].upper() + "(", expression[1:-1])
+        return eval(expression, {"__builtins__": {}}, {
+            "parameters": values.__getitem__, "AND": lambda *args: all(args),
+            "NOT": lambda value: not value, "IF": lambda condition, yes, no: yes if condition else no,
+            "length": len, "createArray": lambda: [],
+        })
+
+    resources = module["resources"]
+    assert evaluate(resources["pendAISearch"]["condition"]) == (not service_only and not perimeter)
+    assert evaluate(resources["storageAccountForSharedLinks"]["condition"]) == (not service_only)
+    assert evaluate(resources["approveSharedPrivateLinkBlob"]["condition"]) == (not service_only)
+    links = resources["aiSearch::sharedPrivateLinkResource"]["copy"]
+    assert evaluate(links["count"]) == (0 if service_only else 1)
+    dns_name = module["outputs"]["dnsConfig"]["value"][0]["name"]
+    assert evaluate(dns_name) == ("search-pend" if not service_only and not perimeter else "")
+    assert "condition" not in resources["aiSearch"]
+
+
 def test_templates_and_provider_execution_are_connected():
     config = json.loads((ROOT / "environment_setup/aifactory/variables.json").read_text(encoding="utf-8"))
     ado_root = BICEP / "copy_to_local_settings/azure-devops/esml-yaml-pipelines"
