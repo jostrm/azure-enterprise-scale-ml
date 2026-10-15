@@ -112,6 +112,11 @@ This patch focuses on **simpler configuration**, **per-environment cost control 
   other environment's SKU. Separate local step 63b publishes canonical/effective
   location/SKU and ready state only after actual successful step 63. Skipped or
   failed networking cannot finalize readiness; failures block downstream tasks.
+- The subscription-scoped Search template supplies both subscription ID and
+  resource-group name explicitly when constructing the Search and user-assigned
+  identity resource IDs. A resource-group name alone is not a valid subscription
+  argument; compiled ARM regressions protect both the context-only output and
+  the service's identity bindings.
 - Only exclusively nested `InsufficientResourcesAvailable` permits fallback.
   Authorization, policy, quota, template, mixed and unknown failures stop.
   Existing healthy services keep their actual location while honoring configured

@@ -99,8 +99,8 @@ module search '../modules/aiSearch.bicep' = if (!contextOnly) {
     managedIdentities: {
       systemAssigned: true
       userAssignedResourceIds: union(
-        !empty(miPrjName) ? [resourceId(targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)] : [],
-        !empty(miACAName) ? [resourceId(targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)] : []
+        !empty(miPrjName) ? [resourceId(subscription().subscriptionId, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miPrjName)] : [],
+        !empty(miACAName) ? [resourceId(subscription().subscriptionId, targetResourceGroup, 'Microsoft.ManagedIdentity/userAssignedIdentities', miACAName)] : []
       )
     }
     // Unused in serviceOnly mode; networking remains in task 63 with its original dependencies.
@@ -113,7 +113,7 @@ module search '../modules/aiSearch.bicep' = if (!contextOnly) {
 }
 
 output aiSearchName string = searchName
-output aiSearchResourceId string = resourceId(targetResourceGroup, 'Microsoft.Search/searchServices', searchName)
+output aiSearchResourceId string = resourceId(subscription().subscriptionId, targetResourceGroup, 'Microsoft.Search/searchServices', searchName)
 output targetResourceGroup string = targetResourceGroup
 output effectiveAiSearchLocation string = searchLocation
 output effectiveAiSearchSku string = searchSku

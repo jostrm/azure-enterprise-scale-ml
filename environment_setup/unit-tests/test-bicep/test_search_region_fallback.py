@@ -115,6 +115,39 @@ def test_bicep_isolates_only_search_creation_and_preserves_network_location():
     assert "aiSearchExists || aiSearchProvisioned" in cognitive
 
 
+@pytest.fixture(scope="module")
+def compiled_search_template():
+    executable = shutil.which("bicep")
+    if executable is None:
+        pytest.skip("Installed Bicep CLI required for compiled resource-identity checks")
+    result = REAL_RUN(
+        [executable, "build", str(BICEP / "esml-genai-1/03b-ai-search.bicep"), "--stdout", "--no-restore"],
+        capture_output=True, text=True, timeout=90, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def test_compiled_search_identity_uses_explicit_subscription_and_resource_group(compiled_search_template):
+    expression = compiled_search_template["outputs"]["aiSearchResourceId"]["value"]
+    assert expression.startswith(
+        "[resourceId(subscription().subscriptionId, variables('targetResourceGroup'), "
+        "'Microsoft.Search/searchServices', "
+    )
+    assert not expression.startswith("[resourceId(variables('targetResourceGroup'),")
+
+
+def test_compiled_search_user_assigned_identities_use_explicit_subscription_and_rg(compiled_search_template):
+    search = next(resource for resource in compiled_search_template["resources"]
+                  if "managedIdentities" in resource.get("properties", {}).get("parameters", {}))
+    identities = search["properties"]["parameters"]["managedIdentities"]["value"]["userAssignedResourceIds"]
+    assert identities.count(
+        "resourceId(subscription().subscriptionId, variables('targetResourceGroup'), "
+        "'Microsoft.ManagedIdentity/userAssignedIdentities', "
+    ) == 2
+    assert "resourceId(variables('targetResourceGroup')," not in identities
+
+
 def test_templates_and_provider_execution_are_connected():
     config = json.loads((ROOT / "environment_setup/aifactory/variables.json").read_text(encoding="utf-8"))
     ado_root = BICEP / "copy_to_local_settings/azure-devops/esml-yaml-pipelines"
