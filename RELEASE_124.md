@@ -77,7 +77,63 @@ This patch focuses on **simpler configuration**, **per-environment cost control 
   skuFunctionStageProd: "EP2"
   ```
 
+## AI Search provisioning-region recovery (focused v1.24 backport)
+
+- `aiSearchLocation` (`AI_SEARCH_LOCATION`) optionally selects the primary Search
+  region; empty retains the project region. `aiSearchFallbackLocationArrayDev` and
+  `aiSearchFallbackLocationArrayStageProd` map to
+  `AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV` / `_STAGEPROD`. Both new-config defaults
+  are exactly `["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]`
+  in that order (Germany last): native arrays in JSON, serialized JSON in YAML/dotenv.
+  Missing runtime variables remain `[]` for existing configurations; explicit `[]`
+  or blank disables fallback. CSV or JSON lists accept up to five unique normalized
+  Azure region names.
+  Test/stage and production use the StageProd list.
+  Denmark East is deliberately retained in the defaults; configured regions are
+  residency choices, not a guarantee of Search SKU availability or live capacity.
+- A nonempty region list independently opts into provisioning elsewhere.
+  `aisearchRetryCapcityArray` (historical spelling; default false) controls only
+  SKU changes using `skuAISearchDevArray` / `skuAISearchStageProdArray`.
+  The selected SKU is first, then configured remaining SKUs (three total),
+  exhausting each approved region in order; six regions including the primary
+  and eighteen creation attempts maximum.
+- Local step `63a-search-mode` validates the selected environment's configuration.
+  With `[]`, blank or a missing runtime list, the separate
+  `63a-search-regional-fallback` task is **skipped**, while
+  `63a-search-provisioning` performs normal primary/existing-region provisioning
+  and any approved SKU-only retries. A nonempty list runs only the regional task.
+  If Search is disabled and not required by the release's Foundry capability-host
+  dependency, both provisioning tasks skip without marking Search ready.
+- Either task 63a provisions **only Search** through `03b-ai-search.bicep`; task 63
+  retains Storage, inbound PE, shared links, DNS ownership, CMK/RBAC, diagnostics
+  and identity dependencies. Its network failures are terminal, never regional
+  capacity evidence. Step 63a publishes only internal provisioned location/SKU
+  and `aiSearchProvisioned`; step 63 forwards those values without changing the
+  other environment's SKU. Separate local step 63b publishes canonical/effective
+  location/SKU and ready state only after actual successful step 63. Skipped or
+  failed networking cannot finalize readiness; failures block downstream tasks.
+- Only exclusively nested `InsufficientResourcesAvailable` permits fallback.
+  Authorization, policy, quota, template, mixed and unknown failures stop.
+  Existing healthy services keep their actual location while honoring configured
+  SKU updates there. Only an explicit not-found result from the exact Search
+  resource GET establishes absence; collection omissions never do. Read failures and
+  failed/partial region-bound resources stop for explicit operator recovery;
+  recovery never deletes or moves a Search service or its indexes. The exact
+  resource is re-read after each five-second retry delay; delayed name binding,
+  read denial, disappearance or a changed/unhealthy existing service stops
+  before another attempt.
+- Effective Search location/SKU are published in CI state, not written into user
+  configuration. VNet/PE, ARM deployment, Storage/Foundry targets and shared-link
+  `resourceRegion` remain in their original regions. Preflight checks each
+  candidate's provider/SKU/quota and emits separate regional reports; quota
+  headroom does not establish allocation capacity.
+- Approve every fallback region for **index/content residency** beforehand.
+  Cross-region Search can add latency, egress cost and compliance obligations.
+  This is new-service provisioning recovery, not runtime failover, index
+  migration or automatic target-side shared-link approval.
+
 ## 🗑️ Project Delete Modes
+
 **Graduated, opt-in deletion — from a single service sweep to full teardown**
 
 | Mode | Variable | Scope |

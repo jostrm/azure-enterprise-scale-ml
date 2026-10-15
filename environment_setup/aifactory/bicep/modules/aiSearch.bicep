@@ -4,6 +4,10 @@ param aiSearchName string
 param subnetName string
 param tags object
 param location string
+@description('Inbound private endpoint stays in the project/VNet region when Search is provisioned elsewhere.')
+param privateEndpointLocation string = location
+@description('Internal provisioning-only boundary. Network/shared-link failures must never trigger regional capacity retries.')
+param serviceOnly bool = false
 param enableSharedPrivateLink bool
 param acrNameDummy string = ''
 
@@ -114,15 +118,15 @@ resource aiSearch 'Microsoft.Search/searchServices@2025-05-01' = {
   }
   
   @batchSize(1)
-  resource sharedPrivateLinkResource 'sharedPrivateLinkResources@2025-05-01' = [for (sharedPL, i) in (enableSharedPrivateLink ? sharedPrivateLinks : []): {
+  resource sharedPrivateLinkResource 'sharedPrivateLinkResources@2025-05-01' = [for (sharedPL, i) in (enableSharedPrivateLink && !serviceOnly ? sharedPrivateLinks : []): {
     name: '${aiSearchName}-shared-pe-${i}'
     properties: sharedPL
   }]
 }
 
-resource pendAISearch 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enablePublicAccessWithPerimeter) {
+resource pendAISearch 'Microsoft.Network/privateEndpoints@2024-05-01' = if(!enablePublicAccessWithPerimeter && !serviceOnly) {
   name: privateEndpointName
-  location: location
+  location: privateEndpointLocation
   tags: tags
   properties: {
     subnet: {
@@ -158,18 +162,18 @@ output principalId string = aiSearch.identity.principalId
 
 output dnsConfig array = [
   {
-    name:!enablePublicAccessWithPerimeter ? pendAISearch.name : ''
+    name:!enablePublicAccessWithPerimeter && !serviceOnly ? pendAISearch.name : ''
     type: 'searchService'
     id:aiSearch.id
   }
 ]
 
 // Auto-approve shared private link requests when requested
-resource storageAccountForSharedLinks 'Microsoft.Storage/storageAccounts@2024-01-01' existing = if (approveStorageSharedLinks && enableSharedPrivateLink) {
+resource storageAccountForSharedLinks 'Microsoft.Storage/storageAccounts@2024-01-01' existing = if (approveStorageSharedLinks && enableSharedPrivateLink && !serviceOnly) {
   name: storageAccountNameForSharedLinks
 }
 
-resource approveSharedPrivateLinkBlob 'Microsoft.Storage/storageAccounts/privateEndpointConnections@2024-01-01' = if (approveStorageSharedLinks && enableSharedPrivateLink) {
+resource approveSharedPrivateLinkBlob 'Microsoft.Storage/storageAccounts/privateEndpointConnections@2024-01-01' = if (approveStorageSharedLinks && enableSharedPrivateLink && !serviceOnly) {
   name: '${aiSearch.name}-shared-pe-0'
   parent: storageAccountForSharedLinks
   properties: {

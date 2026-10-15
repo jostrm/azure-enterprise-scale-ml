@@ -119,6 +119,10 @@ param resolvedManagedIdentityNames object = {}
 
 @description('Location for all resources')
 param location string
+@description('Effective Search service region, published by the isolated provisioning step; never used for PE/VNet/target resource placement.')
+param aiSearchLocation string = ''
+@description('Internal: isolated Search provisioning succeeded. Preserve original existence flags for DNS and CMK RBAC creation.')
+param aiSearchProvisioned bool = false
 
 @description('Location suffix (e.g., "weu", "swc")')
 param locationSuffix string
@@ -699,7 +703,8 @@ module aiSearchService '../modules/aiSearch.bicep' = if (needsAISearch) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     aiSearchName: safeNameAISearch
-    location: location
+    location: empty(aiSearchLocation) ? location : aiSearchLocation
+    privateEndpointLocation: location
     replicaCount: aiSearchReplicaCount
     partitionCount: aiSearchPartitionCount
     privateEndpointName: '${safeNameAISearch}-pend'
@@ -800,7 +805,7 @@ module getAISearchInfo '../modules/get-aisearch-info.bicep' = {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   params: {
     aiSearchName: safeNameAISearch
-    aiSearchExists: aiSearchExists
+    aiSearchExists: aiSearchExists || aiSearchProvisioned
     aiSearchEnabled: needsAISearch
   }
 }

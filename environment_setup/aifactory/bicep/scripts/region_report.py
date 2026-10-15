@@ -22,6 +22,7 @@ SEARCH_SERVICE = "microsoft.search/searchservices"
 CAPACITY_CODES = {
     "SkuNotAvailable", "InsufficientCapacity", "AllocationFailed",
     "ZonalAllocationFailed", "CapacityUnavailable", "RegionCapacityUnavailable",
+    "InsufficientResourcesAvailable",
 }
 MAX_INPUT = 1024 * 1024
 
@@ -148,6 +149,9 @@ def capacity_observations(path: Path) -> list[dict]:
     payload = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(payload, dict) or payload.get("service") not in {"Azure AI Search", SEARCH_SERVICE}:
         return []
+    # A command from a fallback region is never evidence about the project region.
+    if payload.get("region") and payload["region"] != first("AIFACTORY_REPORT_REGION", "admin_location", "AIFACTORY_LOCATION"):
+        return []
     sku = str(payload.get("sku", "")).lower()
     if sku not in SEARCH_SKUS:
         return []
@@ -155,16 +159,18 @@ def capacity_observations(path: Path) -> list[dict]:
     def known_code(node: object, depth: int = 0) -> str | None:
         if not isinstance(node, dict) or depth > 12:
             return None
-        if node.get("code") in CAPACITY_CODES:
-            return node["code"]
+        code = node.get("code")
+        if code and code not in CAPACITY_CODES | {"DeploymentFailed", "ResourceDeploymentFailure", "DeploymentOperationFailed"}:
+            return None
         children = node.get("details", [])
         if not isinstance(children, list):
-            children = []
-        for child in [node.get("error"), node.get("innererror"), *children]:
-            code = known_code(child, depth + 1)
-            if code:
-                return code
-        return None
+            return None
+        descendants = [child for child in [node.get("error"), node.get("innererror"), node.get("innerError"), *children]
+                       if child is not None]
+        if descendants:
+            codes = [known_code(child, depth + 1) for child in descendants]
+            return codes[0] if all(codes) else None
+        return code if code in CAPACITY_CODES else None
 
     code = known_code(payload.get("error"))
     if not code:
@@ -188,44 +194,50 @@ def write_report(directory: Path, name: str, payload: dict) -> None:
 
 
 def preflight_reports(raw: str, completed: bool) -> list[dict]:
-    # NUL-delimited groups: environment, subscription, severity, code, message, SKU.
+    # Legacy streams contain six fields; current streams add actual candidate region.
     fields = raw.split("\0")
     if fields[-1:] == [""]:
         fields.pop()
-    if len(fields) % 6:
+    width = 7 if first("PF_REPORT_FIELD_COUNT") == "7" else 6
+    if len(fields) % width:
         raise ValueError("Invalid finding stream")
-    records = [fields[i:i + 6] for i in range(0, len(fields), 6)]
+    records = [fields[i:i + width] for i in range(0, len(fields), width)]
+    if width == 6:
+        records = [record + [first("PF_REPORT_REGION")] for record in records]
     targets = [t.split("|", 1) for t in os.environ.get("PF_REPORT_TARGETS", "").splitlines() if "|" in t]
     if not targets:
         targets = [[first("PF_REPORT_ENVIRONMENT", "AIFACTORY_REPORT_ENVIRONMENT", "dev_test_prod"),
                     first("PF_REPORT_SUBSCRIPTION_ID", "AIFACTORY_REPORT_SUBSCRIPTION_ID", "dev_test_prod_sub_id")]]
     reports = []
     for environment, subscription in targets:
-        observations = {}
-        failures = False
-        warnings = False
-        for record_env, record_sub, severity, code, _message, sku in records:
-            if record_sub and (record_sub != subscription or record_env != environment):
-                continue
-            item = finding_observation(severity, code, sku)
-            key = (item["check_id"], item["sku"])
-            previous = observations.get(key)
-            # A later unknown/pass within this invocation never hides a failure.
-            if not previous or previous["status"] != "failed":
-                observations[key] = item
-            failures |= severity == "FAIL"
-            warnings |= severity == "WARN"
-        failures |= completed and first("PF_REPORT_EXIT_CODE") in {"1", "2"}
-        status = "failed" if failures else ("passed" if completed and not warnings else "unknown")
-        summary = observation(f"preflight-job:{job_name()}", "preflight_error", "AI Factory preflight",
-                              status, "Preflight completed; inspect individual findings. No live capacity "
-                              "guarantee is made." if completed else
-                              "Preflight was skipped or did not complete; unchecked services remain unknown.")
-        try:
-            reports.append(report([summary, *observations.values()], region=first("PF_REPORT_REGION"),
-                                  subscription=subscription, environment=environment))
-        except ValueError:
-            warning("no report written for a target with missing/invalid region, subscription, tenant, or environment.")
+        target_records = [record for record in records if not record[1] or
+                          (record[1] == subscription and record[0] == environment)]
+        candidate_regions = list(dict.fromkeys([first("PF_REPORT_REGION"), *[record[6] for record in target_records]]))
+        for candidate_region in candidate_regions:
+            observations = {}
+            failures = False
+            warnings = False
+            for _, _, severity, code, _message, sku, actual_region in target_records:
+                if actual_region != candidate_region:
+                    continue
+                item = finding_observation(severity, code, sku)
+                key = (item["check_id"], item["sku"])
+                previous = observations.get(key)
+                if not previous or previous["status"] != "failed":
+                    observations[key] = item
+                failures |= severity == "FAIL"
+                warnings |= severity == "WARN"
+            failures |= completed and candidate_region == first("PF_REPORT_REGION") and first("PF_REPORT_EXIT_CODE") in {"1", "2"}
+            status = "failed" if failures else ("passed" if completed and not warnings else "unknown")
+            summary = observation(f"preflight-job:{job_name()}", "preflight_error", "AI Factory preflight",
+                                  status, "Preflight completed; inspect individual findings. No live capacity "
+                                  "guarantee is made." if completed else
+                                  "Preflight was skipped or did not complete; unchecked services remain unknown.")
+            try:
+                reports.append(report([summary, *observations.values()], region=candidate_region,
+                                      subscription=subscription, environment=environment))
+            except ValueError:
+                warning("no report written for a target with missing/invalid region, subscription, tenant, or environment.")
     return reports
 
 
@@ -253,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
                     warning("structured command error could not be used; retaining the generic job result.")
             reports = [report(observations)]
         for payload in reports:
-            name = f"{args.mode}-{payload['environment'] or 'current'}-{payload['subscription_id']}"
+            name = f"{args.mode}-{payload['region']}-{payload['environment'] or 'current'}-{payload['subscription_id']}"
             write_report(Path(directory), name, payload)
     except (ValueError, OSError, TypeError, RecursionError):
         warning("no report written: missing/invalid region, subscription, tenant, environment, or report input/output.")

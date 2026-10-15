@@ -142,6 +142,13 @@ create_or_update_repo_variable() {
     return
   fi
   
+  if [[ -z "$value" && -v "$name" ]]; then
+    case "$name" in
+      AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV|AI_SEARCH_FALLBACK_LOCATION_ARRAY_STAGEPROD)
+        value='[]' # An explicit empty value disables a previously approved regional opt-in.
+        ;;
+    esac
+  fi
   if [[ -z "$value" ]]; then
     echo -e "${YELLOW}Skipping repo variable '$name' because the value is empty.${NC}"
     return
@@ -572,6 +579,12 @@ repo_level_vars=(
   "POLICY_EXEMPTION_DEFINITION_REFERENCE_IDS"
 
   # === PER-ENVIRONMENT SERVICE SKUs (Dev vs Stage/Prod) ===
+  "AI_SEARCH_LOCATION"
+  "AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV"
+  "AI_SEARCH_FALLBACK_LOCATION_ARRAY_STAGEPROD"
+  "SKU_AISEARCH_DEV_ARRAY"
+  "SKU_AISEARCH_STAGEPROD_ARRAY"
+  "AISEARCH_RETRY_CAPCITY_ARRAY"
   # Consumed by infra-project.yml as vars.SKU_<SERVICE>_DEV / vars.SKU_<SERVICE>_STAGEPROD.
   # Core Infrastructure (02)
   "SKU_STORAGEACCOUNT_DEV"

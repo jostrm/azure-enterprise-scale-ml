@@ -56,6 +56,14 @@ steps:
     AIFACTORY_REPORT_TENANT_ID: $(tenantId)
     admin_location: $(admin_location)
     admin_aiSearchTier: $(admin_aiSearchTier)
+    aiSearchLocation: $[coalesce(variables['aiSearchLocation'], variables['admin_location'])]
+    aiSearchFallbackLocationArrayDev: $[coalesce(variables['aiSearchFallbackLocationArrayDev'], '[]')]
+    aiSearchFallbackLocationArrayStageProd: $[coalesce(variables['aiSearchFallbackLocationArrayStageProd'], '[]')]
+    skuAISearchDev: $(skuAISearchDev)
+    skuAISearchStageProd: $(skuAISearchStageProd)
+    skuAISearchDevArray: $[coalesce(variables['skuAISearchDevArray'], '[]')]
+    skuAISearchStageProdArray: $[coalesce(variables['skuAISearchStageProdArray'], '[]')]
+    aisearchRetryCapcityArray: $[coalesce(variables['aisearchRetryCapcityArray'], 'false')]
     enableAISearch: $(enableAISearch)
     enableAIFoundry: $(enableAIFoundry)
     enableAFoundryCaphost: $(enableAFoundryCaphost)
@@ -2814,21 +2822,145 @@ steps:
      --parameters updateKeyvaultRbac="$(updateKeyvaultRbac)" \
      --parameters enableLogicApps="$(enableLogicApps)"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
-- task: AzureCLI@2
-  displayName: '63-cognitive-services'
+- task: PythonScript@0
+  displayName: '63a-search-mode'
   condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
-  retryCountOnTaskFailure: 2
+  inputs:
+    scriptSource: filePath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/search-region-fallback.py'
+    arguments: --select-mode
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+  env:
+    dev_test_prod: $(dev_test_prod)
+    admin_location: $(admin_location)
+    aiSearchLocation: $[coalesce(variables['aiSearchLocation'], variables['admin_location'])]
+    aiSearchFallbackLocationArrayDev: $[coalesce(variables['aiSearchFallbackLocationArrayDev'], '[]')]
+    aiSearchFallbackLocationArrayStageProd: $[coalesce(variables['aiSearchFallbackLocationArrayStageProd'], '[]')]
+    skuAISearchDev: $(skuAISearchDev)
+    skuAISearchStageProd: $(skuAISearchStageProd)
+    skuAISearchDevArray: $[coalesce(variables['skuAISearchDevArray'], '[]')]
+    skuAISearchStageProdArray: $[coalesce(variables['skuAISearchStageProdArray'], '[]')]
+    aisearchRetryCapcityArray: $[coalesce(variables['aisearchRetryCapcityArray'], 'false')]
+    enableAISearch: $(enableAISearch)
+    enableAFoundryCaphost: $(enableAFoundryCaphost)
+    enableAIFoundry: $(enableAIFoundry)
+- task: AzureCLI@2
+  displayName: '63a-search-provisioning'
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['AIF_AISEARCH_MODE'], 'normal'), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
+      set -euo pipefail
+      az account set --subscription "$(dev_test_prod_sub_id)"
+      python scripts/search-region-fallback.py --provisioning-mode normal --network-parameters "../../../../aifactory/parameters/dynamicNetworkParams.json"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+  env:
+    dev_test_prod: $(dev_test_prod)
+    project_number_000: $(project_number_000)
+    admin_location: $(admin_location)
+    aiSearchLocation: $[coalesce(variables['aiSearchLocation'], variables['admin_location'])]
+    aiSearchFallbackLocationArrayDev: $[coalesce(variables['aiSearchFallbackLocationArrayDev'], '[]')]
+    aiSearchFallbackLocationArrayStageProd: $[coalesce(variables['aiSearchFallbackLocationArrayStageProd'], '[]')]
+    skuAISearchDev: $(skuAISearchDev)
+    skuAISearchStageProd: $(skuAISearchStageProd)
+    skuAISearchDevArray: $[coalesce(variables['skuAISearchDevArray'], '[]')]
+    skuAISearchStageProdArray: $[coalesce(variables['skuAISearchStageProdArray'], '[]')]
+    aisearchRetryCapcityArray: $[coalesce(variables['aisearchRetryCapcityArray'], 'false')]
+    enableAISearch: $(enableAISearch)
+    enableAFoundryCaphost: $(enableAFoundryCaphost)
+    enableAIFoundry: $(enableAIFoundry)
+    admin_locationSuffix: $(admin_locationSuffix)
+    admin_commonResourceSuffix: $(admin_commonResourceSuffix)
+    admin_prjResourceSuffix: $(admin_prjResourceSuffix)
+    deployment_random_value: $(deployment_random_value)
+    aifactory_salt_random: $(aifactory_salt_random)
+    admin_aifactorySuffixRG: $(admin_aifactorySuffixRG)
+    admin_aifactoryPrefixRG: $(admin_aifactoryPrefixRG)
+    vnetResourceGroupBase: $(vnetResourceGroupBase)
+    commonResourceGroup_param: $(commonResourceGroup_param)
+    projectPrefix: $(projectPrefix)
+    projectSuffix: $(projectSuffix)
+    resolvedManagedIdentityNames: $(resolvedManagedIdentityNames)
+    tagsProject: $(tagsProject)
+    addAISearch: $(addAISearch)
+    admin_semanticSearchTier: $(admin_semanticSearchTier)
+    enablePublicGenAIAccess: $(enablePublicGenAIAccess)
+    enablePublicAccessWithPerimeter: $(enablePublicAccessWithPerimeter)
+    project_IP_whitelist: $(project_IP_whitelist)
+    cmk: $(cmk)
+    cmkDisableForAISearch: $(cmkDisableForAISearch)
+- task: AzureCLI@2
+  displayName: '63a-search-regional-fallback'
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['AIF_AISEARCH_MODE'], 'regional'), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      set -euo pipefail
+      az account set --subscription "$(dev_test_prod_sub_id)"
+      python scripts/search-region-fallback.py --provisioning-mode regional --network-parameters "../../../../aifactory/parameters/dynamicNetworkParams.json"
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+  env:
+    dev_test_prod: $(dev_test_prod)
+    project_number_000: $(project_number_000)
+    admin_location: $(admin_location)
+    aiSearchLocation: $[coalesce(variables['aiSearchLocation'], variables['admin_location'])]
+    aiSearchFallbackLocationArrayDev: $[coalesce(variables['aiSearchFallbackLocationArrayDev'], '[]')]
+    aiSearchFallbackLocationArrayStageProd: $[coalesce(variables['aiSearchFallbackLocationArrayStageProd'], '[]')]
+    skuAISearchDev: $(skuAISearchDev)
+    skuAISearchStageProd: $(skuAISearchStageProd)
+    skuAISearchDevArray: $[coalesce(variables['skuAISearchDevArray'], '[]')]
+    skuAISearchStageProdArray: $[coalesce(variables['skuAISearchStageProdArray'], '[]')]
+    aisearchRetryCapcityArray: $[coalesce(variables['aisearchRetryCapcityArray'], 'false')]
+    enableAISearch: $(enableAISearch)
+    enableAFoundryCaphost: $(enableAFoundryCaphost)
+    enableAIFoundry: $(enableAIFoundry)
+    admin_locationSuffix: $(admin_locationSuffix)
+    admin_commonResourceSuffix: $(admin_commonResourceSuffix)
+    admin_prjResourceSuffix: $(admin_prjResourceSuffix)
+    deployment_random_value: $(deployment_random_value)
+    aifactory_salt_random: $(aifactory_salt_random)
+    admin_aifactorySuffixRG: $(admin_aifactorySuffixRG)
+    admin_aifactoryPrefixRG: $(admin_aifactoryPrefixRG)
+    vnetResourceGroupBase: $(vnetResourceGroupBase)
+    commonResourceGroup_param: $(commonResourceGroup_param)
+    projectPrefix: $(projectPrefix)
+    projectSuffix: $(projectSuffix)
+    resolvedManagedIdentityNames: $(resolvedManagedIdentityNames)
+    tagsProject: $(tagsProject)
+    addAISearch: $(addAISearch)
+    admin_semanticSearchTier: $(admin_semanticSearchTier)
+    enablePublicGenAIAccess: $(enablePublicGenAIAccess)
+    enablePublicAccessWithPerimeter: $(enablePublicAccessWithPerimeter)
+    project_IP_whitelist: $(project_IP_whitelist)
+    cmk: $(cmk)
+    cmkDisableForAISearch: $(cmkDisableForAISearch)
+- task: AzureCLI@2
+  displayName: '63-cognitive-services'
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), in(variables['AIF_AISEARCH_STATE'], 'provisioned', 'disabled'), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+     set -eo pipefail
+     searchSkuDev="$(skuAISearchDev)"
+     searchSkuStageProd="$(skuAISearchStageProd)"
+     if [ "$(dev_test_prod)" = dev ]; then
+       searchSkuDev="$(AIF_AISEARCH_PROVISIONED_SKU)"
+     else
+       searchSkuStageProd="$(AIF_AISEARCH_PROVISIONED_SKU)"
+     fi
      az account set --subscription "$(dev_test_prod_sub_id)"
-     az deployment sub create \
+     if az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-62-cognitive-services" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \
      --template-file "esml-genai-1/03-cognitive-services.bicep" \
+     --parameters aiSearchLocation="$(AIF_AISEARCH_PROVISIONED_LOCATION)" aiSearchProvisioned="$(aiSearchProvisioned)" \
      --parameters "@../../../../aifactory/parameters/dynamicNetworkParams.json" \
      --parameters env="$(dev_test_prod)" \
      --parameters projectNumber="$(project_number_000)" \
@@ -2862,8 +2994,8 @@ steps:
      --parameters resolvedManagedIdentityNames='$(resolvedManagedIdentityNames)' \
      --parameters enableAIServices="$(enableAIServices)" \
      --parameters enableAISearch="$(enableAISearch)" \
-     --parameters skuAISearchDev="$(skuAISearchDev)" \
-     --parameters skuAISearchStageProd="$(skuAISearchStageProd)" \
+     --parameters skuAISearchDev="$searchSkuDev" \
+     --parameters skuAISearchStageProd="$searchSkuStageProd" \
      --parameters skuAIServicesDev="$(skuAIServicesDev)" \
      --parameters skuAIServicesStageProd="$(skuAIServicesStageProd)" \
      --parameters skuOpenAIDev="$(skuOpenAIDev)" \
@@ -2909,13 +3041,33 @@ steps:
      --parameters enableAIFoundry="$(enableAIFoundry)" \
      --parameters enableAISearchSharedPrivateLink="$(enableAISearchSharedPrivateLink)" \
      --parameters cmk="$(cmk)" \
+     --parameters cmkDisableForAISearch="$(cmkDisableForAISearch)" \
      --parameters cmkKeyName="$(cmkKeyName)" \
      --parameters admin_bicep_kv_fw="$(admin_bicep_kv_fw)" \
      --parameters admin_bicep_kv_fw_rg="$(admin_bicep_kv_fw_rg)" \
      --parameters admin_bicep_input_keyvault_subscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters addAISearch="$(addAISearch)" \
-     --parameters enablePublicNetworkAccessForCognitive="$(allowPublicAccessWhenBehindVnet)"
+     --parameters enablePublicNetworkAccessForCognitive="$(allowPublicAccessWhenBehindVnet)"; then
+       echo "##vso[task.setvariable variable=AIF_AISEARCH_NETWORK_SUCCEEDED]true"
+     else
+       exit $?
+     fi
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+- task: PythonScript@0
+  displayName: '63b-search-ready'
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['aiSearchProvisioned'], 'true'), eq(variables['AIF_AISEARCH_STATE'], 'provisioned'), eq(variables['AIF_AISEARCH_NETWORK_SUCCEEDED'], 'true'), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+  inputs:
+    scriptSource: filePath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/search-region-fallback.py'
+    arguments: --finalize
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
+  env:
+    dev_test_prod: $(dev_test_prod)
+    aiSearchProvisioned: $(aiSearchProvisioned)
+    AIF_AISEARCH_STATE: $(AIF_AISEARCH_STATE)
+    AIF_AISEARCH_PROVISIONED_LOCATION: $(AIF_AISEARCH_PROVISIONED_LOCATION)
+    AIF_AISEARCH_PROVISIONED_SKU: $(AIF_AISEARCH_PROVISIONED_SKU)
+    AIF_AISEARCH_NETWORK_SUCCEEDED: $(AIF_AISEARCH_NETWORK_SUCCEEDED)
 - task: AzureCLI@2
   displayName: '64-databases'
   condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), or(ne(variables['debug_disable_64_databases'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))

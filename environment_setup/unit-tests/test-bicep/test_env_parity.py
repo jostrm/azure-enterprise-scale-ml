@@ -17,6 +17,12 @@ ENV_TEMPLATE_PATH = ROOT / (
 
 # ADO -> GitHub variable renames. Keys not listed default to their upper-cased name.
 ALIASES = {
+    "aiSearchLocation": "AI_SEARCH_LOCATION",
+    "aiSearchFallbackLocationArrayDev": "AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV",
+    "aiSearchFallbackLocationArrayStageProd": "AI_SEARCH_FALLBACK_LOCATION_ARRAY_STAGEPROD",
+    "skuAISearchDevArray": "SKU_AISEARCH_DEV_ARRAY",
+    "skuAISearchStageProdArray": "SKU_AISEARCH_STAGEPROD_ARRAY",
+    "aisearchRetryCapcityArray": "AISEARCH_RETRY_CAPCITY_ARRAY",
     "admin_location": "AIFACTORY_LOCATION",
     "admin_locationSuffix": "AIFACTORY_LOCATION_SHORT",
     "admin_aifactoryPrefixRG": "AIFACTORY_PREFIX",

@@ -20,6 +20,12 @@ variables:
   admin_location: "eastus2" # <mandatory>Azure region<default>eastus2 Main Azure region for AI Factory.
   admin_locationSuffix: "eus2" # <mandatory>Region short name<default>eus2
   admin_aiSearchTier: "basic" # <mandatory>AI Search SKU tier<default>basic<ensure> 'free' is not allowed when using private endpoints. ['free', 'basic', 'standard', 'standard2', 'standard3', 'storage_optimized_l1', 'storage_optimized_l2']
+  aiSearchLocation: '' # Empty uses project location; Search service only, not PE/VNet.
+  aiSearchFallbackLocationArrayDev: '["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]' # Ordered residency choices: max 5 unique fallback regions; CSV or JSON; [] or blank disables.
+  aiSearchFallbackLocationArrayStageProd: '["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]' # test/stage and prod share this list.
+  skuAISearchDevArray: '[]' # Optional remaining SKUs, at most 3 including the selected SKU.
+  skuAISearchStageProdArray: '[]'
+  aisearchRetryCapcityArray: 'false' # Historical spelling; controls SKU changes only, never regional opt-in.
   admin_semanticSearchTier: "free" # <mandatory>Semantic search tier<default>free ['disabled', 'free', 'standard']
   admin_aifactoryPrefixRG: "mrvel-1-" # <optional>AI Factory resource group prefix<default>mrvel-1-<keep-as-is> Max 6 chars. <otherwise> set your company prefix, e.g. "acme-ai-", "contoso-".
   

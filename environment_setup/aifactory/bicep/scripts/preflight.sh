@@ -142,7 +142,7 @@ record_report_finding() {
   if [ "$report_code" = "SEARCH_SKU_UNAVAILABLE" ] && [ "${search_discovery_valid:-}" != "true" ]; then
     report_code="SEARCH_QUOTA_UNVALIDATED"
   fi
-  REPORT_FINDINGS+=("${envname:-}" "${sub:-}" "$1" "$report_code" "$3" "${AI_SEARCH_TIER:-}")
+  REPORT_FINDINGS+=("${envname:-}" "${sub:-}" "$1" "$report_code" "$3" "${AI_SEARCH_TIER:-}" "${LOCATION:-}")
 }
 
 add_finding() { # $1 sev  $2 code  $3 msg  $4 hint
@@ -179,6 +179,7 @@ write_preflight_report() {
       export PF_REPORT_COMPLETED="$REPORT_COMPLETED"
       export PF_REPORT_EXIT_CODE="$original_status"
       export PF_REPORT_TARGETS="$(printf '%s\n' "${TARGETS[@]:-}")"
+      export PF_REPORT_FIELD_COUNT=7
       { if [ "${#REPORT_FINDINGS[@]}" -gt 0 ]; then printf '%s\0' "${REPORT_FINDINGS[@]}"; fi; } |
         "$report_python" "$report_script" preflight ||
         echo "WARNING: AI Factory preflight report unavailable; original exit status is unchanged." >&2
@@ -258,19 +259,32 @@ yaml_get() { # $1 = key
   line="$(grep -E "^[[:space:]]*$1[[:space:]]*:" "$VARS_YAML" 2>/dev/null | head -n1)"
   [ -n "$line" ] || return 0
   val="${line#*:}"
+  val="${val%%#*}"
+  val="$(printf '%s' "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   # quoted value -> take inside the first quote pair
-  if printf '%s' "$val" | grep -q '"'; then
+  if [[ "$val" == \'*\' ]]; then
+    val="${val#\'}"; val="${val%\'}"
+  elif [[ "$val" == \"*\" ]]; then
     val="$(printf '%s' "$val" | sed -E 's/^[^"]*"([^"]*)".*$/\1/')"
-  else
-    val="${val%%#*}"
-    val="$(printf '%s' "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   fi
   printf '%s' "$val"
 }
 
 # Resolve a logical setting: env(camel) -> env(UPPER) -> yaml(camel) -> dotenv(UPPER) -> default
-getval() { # $1 camel  $2 UPPER  $3 default
+getval() { # $1 camel  $2 UPPER  $3 default  $4 optional preserve-empty
   local camel="$1" upper="$2" def="$3" v=""
+  if [ "${4:-}" = preserve-empty ]; then
+    # Empty Search fallback fields disable recovery, even over nonempty template defaults.
+    v="$(printenv "$camel" 2>/dev/null)" && { printf '%s' "$v"; return; }
+    v="$(printenv "$upper" 2>/dev/null)" && { printf '%s' "$v"; return; }
+    if [ -n "$VARS_YAML" ] && grep -qE "^[[:space:]]*$camel[[:space:]]*:" "$VARS_YAML"; then
+      yaml_get "$camel"; return
+    fi
+    if [ -n "$ENV_FILE" ] && grep -qE "^[[:space:]]*$upper[[:space:]]*=" "$ENV_FILE"; then
+      dotenv_get "$upper"; return
+    fi
+    printf '%s' "$def"; return
+  fi
   v="$(printenv "$camel" 2>/dev/null || true)"; [ -n "$v" ] && { printf '%s' "$v"; return; }
   v="$(printenv "$upper" 2>/dev/null || true)"; [ -n "$v" ] && { printf '%s' "$v"; return; }
   v="$(yaml_get "$camel")";                     [ -n "$v" ] && { printf '%s' "$v"; return; }
@@ -479,6 +493,32 @@ check_ai_search_quota() { # $1 subId
     echo "  [OK] AI Search '$AI_SEARCH_TIER' in $LOCATION: $avail of $limit available."
     record_report_finding PASS SEARCH_QUOTA_HEADROOM "Quota headroom; live capacity is not established."
   fi
+}
+
+check_search_candidates() {
+  is_true "$ENABLE_AI_SEARCH" || return 0
+  local LOCATION="$LOCATION" AI_SEARCH_TIER="$AI_SEARCH_TIER" plan suffix upper selected driver
+  if [ "$envname" = dev ]; then suffix=Dev; upper=DEV; else suffix=StageProd; upper=STAGEPROD; fi
+  selected="$(getval "skuAISearch${suffix}" "SKU_AISEARCH_${upper}" "$AI_SEARCH_TIER")"
+  driver="$SCRIPT_DIR/search-region-fallback.py"
+  if command -v cygpath >/dev/null 2>&1; then driver="$(cygpath -m "$driver")"; fi
+  # A subshell export supports dynamic Dev/StageProd names and Python shell wrappers.
+  plan="$(export dev_test_prod="$envname" admin_location="$LOCATION" \
+    aiSearchLocation="$(getval aiSearchLocation AI_SEARCH_LOCATION '')" \
+    "aiSearchFallbackLocationArray${suffix}=$(getval "aiSearchFallbackLocationArray${suffix}" "AI_SEARCH_FALLBACK_LOCATION_ARRAY_${upper}" '[]' preserve-empty)" \
+    "skuAISearch${suffix}=$selected" \
+    "skuAISearch${suffix}Array=$(getval "skuAISearch${suffix}Array" "SKU_AISEARCH_${upper}_ARRAY" '[]')" \
+    aisearchRetryCapcityArray="$(getval aisearchRetryCapcityArray AISEARCH_RETRY_CAPCITY_ARRAY false)"
+    "$PYBIN" "$driver" --network-parameters unused --plan)"
+  if [ "$?" -ne 0 ]; then
+    add_finding FAIL SEARCH_CANDIDATES_INVALID "Invalid Search region/SKU candidates." "Correct the Search fallback lists; at most five unique fallback regions plus the primary and three SKUs including the selected SKU (18 combinations maximum)."
+    return 0
+  fi
+  while IFS=$'\t' read -r LOCATION AI_SEARCH_TIER; do
+    [ -n "$LOCATION" ] || continue
+    check_provider_region Microsoft.Search searchServices "Azure AI Search" SEARCH
+    check_ai_search_quota "$1"
+  done < <(printf '%s' "$plan" | "$PYBIN" -c 'import json,sys; [print(region + "\t" + sku) for region,sku in json.load(sys.stdin)]' | tr -d '\r')
 }
 
 # helper: parse Microsoft.Search usages JSON via az/python and emit "limit currentValue"
@@ -1114,7 +1154,6 @@ for t in "${TARGETS[@]:-}"; do
 
   echo ""
   echo "=== Regional readiness: provider/region support ==="
-  is_true "$ENABLE_AI_SEARCH"  && check_provider_region Microsoft.Search           searchServices    "Azure AI Search"            SEARCH
   is_true "$ENABLE_COSMOS"     && check_provider_region Microsoft.DocumentDB        databaseAccounts  "Azure Cosmos DB"            COSMOS
   is_true "$ENABLE_AI_FOUNDRY" && check_provider_region Microsoft.CognitiveServices accounts          "Azure AI Foundry / OpenAI"  COGSVC
   is_true "$ENABLE_WEBAPP" || is_true "$ENABLE_FUNCTION" && check_provider_region Microsoft.Web sites "Azure App Service / Functions" WEB
@@ -1125,7 +1164,7 @@ for t in "${TARGETS[@]:-}"; do
 
   echo ""
   echo "=== Regional readiness: quotas & service availability ==="
-  check_ai_search_quota "$sub"
+  check_search_candidates "$sub"
   check_model_quota "$sub"
   check_cs_headroom "$sub"
   check_cosmos_region

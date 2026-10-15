@@ -144,6 +144,15 @@ jobs:
       skuStorageAccountStageProd: ${{ vars.SKU_STORAGEACCOUNT_STAGEPROD || 'Standard_LRS' }}
       skuAISearchDev: ${{ vars.SKU_AISEARCH_DEV || vars.ADMIN_AISEARCH_TIER || 'standard' }}
       skuAISearchStageProd: ${{ vars.SKU_AISEARCH_STAGEPROD || vars.ADMIN_AISEARCH_TIER || 'standard' }}
+      aiSearchLocation: ${{ vars.AI_SEARCH_LOCATION || '' }}
+      aiSearchFallbackLocationArrayDev: ${{ vars.AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV || '[]' }}
+      aiSearchFallbackLocationArrayStageProd: ${{ vars.AI_SEARCH_FALLBACK_LOCATION_ARRAY_STAGEPROD || '[]' }}
+      skuAISearchDevArray: ${{ vars.SKU_AISEARCH_DEV_ARRAY || '[]' }}
+      skuAISearchStageProdArray: ${{ vars.SKU_AISEARCH_STAGEPROD_ARRAY || '[]' }}
+      aisearchRetryCapcityArray: ${{ vars.AISEARCH_RETRY_CAPCITY_ARRAY || 'false' }}
+      aiSearchProvisioned: 'false'
+      debug_disable_63_cognitive_services: ${{ vars.DEBUG_DISABLE_63_COGNITIVE_SERVICES || 'false' }}
+      admin_semanticSearchTier: ${{ vars.AISEARCH_SEMANTIC_TIER || 'free' }}
       skuAIServicesDev: ${{ vars.SKU_AISERVICES_DEV || 'S0' }}
       skuAIServicesStageProd: ${{ vars.SKU_AISERVICES_STAGEPROD || 'S0' }}
       skuOpenAIDev: ${{ vars.SKU_OPENAI_DEV || 'S0' }}
@@ -2193,16 +2202,56 @@ jobs:
               --parameters updateKeyvaultRbac="${{ env.updateKeyvaultRbac }}" \
               --parameters enableLogicApps="${{ env.enableLogicApps }}"
 
-      - name: 63-cognitive-services
-        if: inputs.phase == 'infra' && (env.deleteAllServicesForProject != 'true')
+      - name: 63a-search-mode
+        id: search_mode_63a
+        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true'))
         shell: bash
         run: |
+          set -euo pipefail
+          python azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/search-region-fallback.py --select-mode
+
+      - name: 63a-search-provisioning
+        id: search_provisioning_63a
+        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && steps.search_mode_63a.outcome == 'success' && env.AIF_AISEARCH_MODE == 'normal' && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true'))
+        shell: bash
+        run: |
+          set -euo pipefail
+          az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+          python azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/search-region-fallback.py \
+            --provisioning-mode normal \
+            --network-parameters "./aifactory/parameters/dynamicNetworkParams.json"
+
+      - name: 63a-search-regional-fallback
+        id: search_regional_fallback_63a
+        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && steps.search_mode_63a.outcome == 'success' && env.AIF_AISEARCH_MODE == 'regional' && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true'))
+        shell: bash
+        run: |
+          set -euo pipefail
+          az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+          python azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/search-region-fallback.py \
+            --provisioning-mode regional \
+            --network-parameters "./aifactory/parameters/dynamicNetworkParams.json"
+
+      - name: 63-cognitive-services
+        id: cognitive_services_63
+        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && steps.search_mode_63a.outcome == 'success' && (steps.search_provisioning_63a.outcome == 'success' || steps.search_regional_fallback_63a.outcome == 'success' || env.AIF_AISEARCH_MODE == 'disabled') && (env.AIF_AISEARCH_STATE == 'provisioned' || env.AIF_AISEARCH_STATE == 'disabled') && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true'))
+        shell: bash
+        run: |
+            set -eo pipefail
+            searchSkuDev="${{ env.skuAISearchDev }}"
+            searchSkuStageProd="${{ env.skuAISearchStageProd }}"
+            if [ "${{ env.dev_test_prod }}" = dev ]; then
+              searchSkuDev="${{ env.AIF_AISEARCH_PROVISIONED_SKU }}"
+            else
+              searchSkuStageProd="${{ env.AIF_AISEARCH_PROVISIONED_SKU }}"
+            fi
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
             az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-63-cognitive-services" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \
               --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/03-cognitive-services.bicep" \
+              --parameters aiSearchLocation="${{ env.AIF_AISEARCH_PROVISIONED_LOCATION }}" aiSearchProvisioned="${{ env.aiSearchProvisioned }}" \
               --parameters @"./aifactory/parameters/dynamicNetworkParams.json" \
               --parameters env="${{ env.dev_test_prod }}" \
               --parameters projectNumber="${{ env.project_number_000 }}" \
@@ -2236,8 +2285,8 @@ jobs:
               --parameters resolvedManagedIdentityNames='${{ env.resolvedManagedIdentityNames }}' \
               --parameters enableAIServices="${{ env.enableAIServices }}" \
               --parameters enableAISearch="${{ env.enableAISearch }}" \
-              --parameters skuAISearchDev="${{ env.skuAISearchDev }}" \
-              --parameters skuAISearchStageProd="${{ env.skuAISearchStageProd }}" \
+              --parameters skuAISearchDev="$searchSkuDev" \
+              --parameters skuAISearchStageProd="$searchSkuStageProd" \
               --parameters skuAIServicesDev="${{ env.skuAIServicesDev }}" \
               --parameters skuAIServicesStageProd="${{ env.skuAIServicesStageProd }}" \
               --parameters skuOpenAIDev="${{ env.skuOpenAIDev }}" \
@@ -2253,7 +2302,7 @@ jobs:
               --parameters skuBingDev="${{ env.skuBingDev }}" \
               --parameters skuBingStageProd="${{ env.skuBingStageProd }}" \
               --parameters storageAccountSkuName="${{ env.dev_test_prod == 'dev' && (vars.SKU_STORAGEACCOUNT_DEV || 'Standard_LRS') || (vars.SKU_STORAGEACCOUNT_STAGEPROD || 'Standard_LRS') }}" \
-              --parameters semanticSearchTier="${{ env.AISEARCH_SEMANTIC_TIER || 'free' }}" \
+              --parameters semanticSearchTier="${{ env.admin_semanticSearchTier }}" \
               --parameters enableAzureOpenAI="${{ env.enableAzureOpenAI }}" \
               --parameters enableContentSafety="${{ env.enableContentSafety }}" \
               --parameters enableAzureAIVision="${{ env.enableAzureAIVision }}" \
@@ -2284,9 +2333,19 @@ jobs:
               --parameters enableAIFoundry="${{ env.enableAIFoundry }}" \
               --parameters enableAISearchSharedPrivateLink="${{ env.enableAISearchSharedPrivateLink }}" \
               --parameters cmk="${{ env.cmk }}" \
+              --parameters cmkDisableForAISearch="${{ env.cmkDisableForAISearch }}" \
               --parameters cmkKeyName="${{ env.cmkKeyName }}" \
               --parameters addAISearch="${{ env.addAISearch }}" \
               --parameters disableLocalAuth="${{ env.disableLocalAuth }}"
+
+      - name: 63b-search-ready
+        if: success() && inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && (steps.search_provisioning_63a.outcome == 'success' || steps.search_regional_fallback_63a.outcome == 'success') && steps.cognitive_services_63.outcome == 'success' && env.aiSearchProvisioned == 'true' && env.AIF_AISEARCH_STATE == 'provisioned' && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true'))
+        shell: bash
+        env:
+          AIF_AISEARCH_NETWORK_SUCCEEDED: ${{ steps.cognitive_services_63.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          python azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/search-region-fallback.py --finalize
 
       - name: 64-databases
         if: inputs.phase == 'infra' && (env.deleteAllServicesForProject != 'true')
