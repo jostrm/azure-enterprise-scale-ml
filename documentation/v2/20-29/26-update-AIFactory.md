@@ -61,17 +61,52 @@ and the [workflow input guide](../../../environment_setup/aifactory/bicep/copy_t
 
 ## Quick Feature-update & run
 
-After `00-start.sh` has copied the scripts to your repository root, use the script for your orchestrator:
+After `00-start.sh` has copied the scripts to your consumer repository root, run
+the following from that root in **Git Bash**. The ADO example targets the
+anonymized consumer branch `prj001` and stable accelerator version `124`; replace
+`prj001` with your existing customer/project branch.
 
 ```bash
-# Azure DevOps
-bash ./ADO-update-aifactory-and-run-project.sh
+# Azure DevOps: consumer branch prj001, accelerator release/v1.24
+ADO_BRANCH=prj001 bash ./ADO-update-aifactory-and-run-project.sh --aifactory-version 124
 
 # GitHub Actions
 bash ./GH-update-aifactory-and-run-project.sh
 ```
 
 These scripts replace the manual feature-update steps below. They protect existing work, update the AI Factory submodule and templates, merge the existing configuration into the latest templates, commit and push the changes, start the project pipeline or workflow, and monitor the run until it finishes.
+
+### ADO_BRANCH: when it is needed
+
+**`ADO_BRANCH` is optional only when the intended consumer branch is `main`, or
+the correct value is already exported in your shell. For any other consumer
+branch, explicitly set it.** The legacy ADO launcher uses
+`BRANCH="${ADO_BRANCH:-main}"`: it does not infer the branch from your current
+Git checkout, project number, `variables.yaml` or `variables.json`.
+
+In a normal update, this branch controls checkout/pull, the destination of an
+approved commit/push, and the branch used for pipeline preview and execution.
+Without an override, running the script while checked out on `prj001` can still
+switch to and deploy from `main`. Ensure the intended branch already exists
+locally and on the consumer's `origin`.
+
+| Selector | Meaning | Example |
+|---|---|---|
+| `ADO_BRANCH` | Customer/consumer repository branch | `prj001` |
+| `--aifactory-version` | Accelerator submodule code/templates | `124` selects `release/v1.24` |
+| `project_number_000` | Azure AI Factory project number in the selected configuration | `"001"` |
+
+The branch name does not set the project number or choose Dev/Stage/Prod.
+`ADO_BRANCH=prj001` is a one-command environment assignment; a separate `export`
+is unnecessary and the value does not persist in your shell.
+The old command `bash ./ADO-update-aifactory-and-run-project.sh` remains valid
+when `main` is the intended consumer branch; it leaves version selection to the
+launcher's normal saved/default version rules.
+
+These branch-override instructions apply to the **legacy Dev/YAML update and
+project-only flow**. Reviewed deployments retain their published exact-target
+contracts: the reviewed helper requires the published consumer `main`, not an
+arbitrary project-branch override.
 
 ### Add a project without updating AI Factory
 
@@ -80,8 +115,8 @@ want, use `--project-only` to skip all update work and trigger the existing
 project pipeline or workflow:
 
 ```bash
-# Azure DevOps
-bash ./ADO-update-aifactory-and-run-project.sh --project-only
+# Azure DevOps: trigger the existing pipeline from consumer branch prj001
+ADO_BRANCH=prj001 bash ./ADO-update-aifactory-and-run-project.sh --project-only
 
 # GitHub Actions
 bash ./GH-update-aifactory-and-run-project.sh --project-only
