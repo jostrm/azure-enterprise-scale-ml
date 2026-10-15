@@ -15,6 +15,7 @@ sources:
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/main.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/runtime.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/search.py
+  - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/deployment.py
 tests:
   - usecase_code/40-agent-factory/tests/test_prompt.py
   - usecase_code/40-agent-factory/tests/test_hosted.py
@@ -69,6 +70,11 @@ native Search authorization and source access still have to succeed. Independent
 evaluation answers are excluded from ingestion and agent tools. A separate
 synthetic image-serving branch is necessary because asset stores cannot be
 combined with native permission ingestion.
+
+The publisher plans missing parents only inside its two owned `car-sales` roots.
+Shared `datasets`/`usecases` parents are never modified. Existing task ancestors
+retain their ACLs and require sufficient traversal; an ownership or access
+mismatch blocks rather than rewriting permissions for earlier publications.
 
 Local fixtures or passing unit tests do not establish three real service chunks,
 successful revocation, image use, or a deployed Foundry agent. The example's

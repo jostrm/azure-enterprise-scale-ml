@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from email.utils import format_datetime
 from fnmatch import fnmatchcase
 from pathlib import Path
+import re
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
@@ -15,7 +16,39 @@ from .configuration import digest, local_file, readiness, relative_path
 STORAGE_API = "2023-11-03"
 
 
+def owned_roots(config: dict) -> tuple[str, str]:
+    if (config["dataset"] != "car-sales" or config["environment"] not in {"dev", "test", "prod"}
+            or not re.fullmatch(r"project[0-9]{3}", config["project"])
+            or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,30}", config["version"])):
+        raise ValueError("Task-owned paths require a valid car-sales project/environment/version.")
+    master = f"mlops/v1/master/environments/{config['environment']}/datasets/car-sales"
+    project = f"mlops/v1/projects/{config['project']}/environments/{config['environment']}/usecases/car-sales"
+    if (config["master_prefix"] != f"{master}/versions/{config['version']}"
+            or config["project_prefix"] != f"{project}/rag/corpora/car-sales/versions/{config['version']}"):
+        raise ValueError("Publication paths differ from the selected task-owned lineage.")
+    return master, project
+
+
+def _directories(config: dict, files: list[dict]) -> list[dict]:
+    paths = set()
+    versions = (config["master_prefix"], config["project_prefix"])
+    for base, version in zip(owned_roots(config), versions):
+        tail = version[len(base):].strip("/").split("/")
+        paths.add(base)
+        for length in range(1, len(tail) + 1):
+            paths.add(base + "/" + "/".join(tail[:length]))
+        for item in files:
+            parts = item["path"].split("/")[:-1]
+            for length in range(1, len(parts) + 1):
+                paths.add(version + "/" + "/".join(parts[:length]))
+    return [
+        {"path": path, "preserve_existing": not any(path == v or path.startswith(v + "/") for v in versions)}
+        for path in sorted(paths, key=lambda value: (value.count("/"), value))
+    ]
+
+
 def publication_plan(config: dict) -> dict:
+    roots = owned_roots(config)
     root = Path(config["artifacts_root"])
     files, excluded, seen = [], [], set()
     for entry in config["publication"]["files"]:
@@ -43,8 +76,10 @@ def publication_plan(config: dict) -> dict:
         raise ValueError("The publication contains no sales files.")
     return {
         "mutations": False, "container": config["container"], "files": files, "excluded": excluded,
+        "directories": _directories(config, files),
+        "required_existing_parents": [root.rsplit("/", 1)[0] for root in roots],
         "copy_method": "Upload master once; read pinned master bytes and copy to immutable project paths.",
-        "ancestor_policy": "Existing ancestors must already allow traversal; this tool never changes them.",
+        "ancestor_policy": "Create missing task-owned car-sales ancestors only; never change shared ancestors or overwrite existing task-ancestor ACLs.",
         "cleanup": "No delete operation is implemented. Shared services and unrelated paths are never removed.",
     }
 
@@ -203,14 +238,16 @@ class StorageWriter:
 
     def __init__(self, config: dict, session):
         self.config, self.session = config, session
-        self.roots = (config["master_prefix"], config["project_prefix"])
+        self.roots = owned_roots(config)
         self.opener = build_opener(ProxyHandler({}), _NoRedirects())
 
     def request(self, method: str, path: str, *, dfs: bool = True, query=None,
                 body: bytes | None = None, headers=None):
         relative_path(path)
+        if method not in {"GET", "HEAD", "PUT", "PATCH"}:
+            raise ValueError("Only scoped reads, creation and permission updates are supported; deletion is forbidden.")
         if not any(path == root or path.startswith(root + "/") for root in self.roots):
-            raise ValueError("Write/read path escapes the two approved dataset version roots.")
+            raise ValueError("Write/read path escapes the two approved car-sales task roots.")
         service = "dfs" if dfs else "blob"
         url = f"https://{self.config['storage_account']}.{service}.core.windows.net/{self.config['container']}/{path}"
         if query:
@@ -229,8 +266,9 @@ class StorageWriter:
         except HTTPError as error:
             raise StorageError(error.code) from None
 
-    def directory(self, path: str, groups: list[str], users: list[str]) -> None:
+    def directory(self, path: str, groups: list[str], users: list[str], *, preserve_existing=False) -> None:
         owner = base64.b64encode(self.config["owner"].encode()).decode()
+        created = True
         try:
             self.request("PUT", path, query={"resource": "directory"}, headers={
                 "If-None-Match": "*", "x-ms-permissions": "rwx------", "x-ms-properties": f"aif48owner={owner}",
@@ -238,9 +276,25 @@ class StorageWriter:
         except StorageError as error:
             if error.status not in {409, 412}:
                 raise
+            created = False
             _, headers = self.request("HEAD", path, query={"action": "getStatus"})
             if f"aif48owner={owner}" not in headers.get("x-ms-properties", "").split(","):
                 raise ValueError("Existing directory is not task-owned; refusing permission changes.") from None
+        if preserve_existing and not created:
+            _, headers = self.request("HEAD", path, query={"action": "getAccessControl"})
+            entries = {}
+            for entry in headers.get("x-ms-acl", "").split(","):
+                parts = entry.split(":")
+                if len(parts) == 3:
+                    entries[tuple(parts[:2])] = parts[2]
+            required = {("group", group): "x" for group in groups}
+            required.update({("user", user): "x" for user in users})
+            required[("user", self.config["search_identity_object_id"])] = "rx"
+            mask = entries.get(("mask", ""), "")
+            if any(not set(rights) <= set(entries.get(identity, "")) & set(mask)
+                   for identity, rights in required.items()):
+                raise ValueError("Existing task ancestor lacks required traversal; review its ACL without broadening shared ancestors.")
+            return
         self.permissions(path, groups, users, directory=True)
 
     def permissions(self, path: str, groups: list[str], users: list[str], *, directory=False):
@@ -286,16 +340,8 @@ def publish(config: dict, store, *, apply: bool = False) -> dict:
     policies = {item["id"]: item for item in config["partitions"]}
     groups = sorted({group for p in policies.values() for group in p.get("allowed_group_ids", [])})
     users = sorted({user for p in policies.values() for user in p.get("allowed_user_ids", [])})
-    directories = set()
-    for root in (config["master_prefix"], config["project_prefix"]):
-        directories.add(root)
-        for item in plan["files"]:
-            parts = item["path"].split("/")[:-1]
-            for length in range(1, len(parts) + 1):
-                directories.add(root + "/" + "/".join(parts[:length]))
-    # Existing ancestors above these immutable version roots are deliberately untouched.
-    for directory in sorted(directories, key=lambda value: (value.count("/"), value)):
-        store.directory(directory, groups, users)
+    for directory in plan["directories"]:
+        store.directory(directory["path"], groups, users, preserve_existing=directory["preserve_existing"])
     root = Path(config["artifacts_root"])
     for item in plan["files"]:
         policy = policies[item["source"]]

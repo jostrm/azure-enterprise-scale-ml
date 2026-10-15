@@ -211,10 +211,14 @@ mlops/v1/master/environments/<env>/datasets/car-sales/versions/<version>/
 mlops/v1/projects/projectNNN/environments/<env>/usecases/car-sales/rag/corpora/car-sales/versions/<version>/
 ```
 
-These paths are **candidates until approved**. Existing ancestors must already
-exist and provide the necessary traversal permissions. The publisher only
-creates directories beneath the exact version roots; it will not broaden
-shared ancestors or silently replace another owner's directory. Oracle data,
+These paths are **candidates until approved**. The shared `datasets` and
+project `usecases` parents must already exist and provide necessary traversal.
+The plan lists every directory to create, starting at the two task-owned
+`car-sales` roots and ending at this version's source directories. After
+approval the publisher can create missing task-owned parents; it never changes
+the shared parents. Existing task ancestors retain their ACLs, and insufficient
+traversal blocks the operation rather than silently broadening those ACLs.
+Foreign-owned directories are never replaced. Oracle data,
 debug chunks and images are excluded from protected sales ingestion.
 
 ## Approved cloud execution
@@ -421,7 +425,7 @@ answers and tool traces from the deployed agent. Do not put expected totals in
 instructions, search content, calculator code, or model mocks presented as live
 results.
 
-Locally exercised: 110 passing offline tests and two skipped opt-in cloud entry
+Locally exercised: 114 passing offline tests and two skipped opt-in cloud entry
 points, generated/read-back workbook, exact independent oracle, both >9,000-token
 inputs, master/project hashes, original embedded image and rendered DOCX.
 Live Search chunk output, group-based allow/deny and revocation, deployed agent
@@ -438,8 +442,9 @@ the separate image branch or cloud fault injection.
   host context. Do not replace it with a broadly privileged user token.
 - `403`, unknown membership, hash mismatch or failed indexer status are blockers,
   not a reason to enable public access or omit a partition.
-- Missing source ancestors/traversal must be resolved through approved path
-  provisioning, not recursive ACL broadening of the shared lake.
+- Missing task-owned source parents are included in the publication plan.
+  Missing shared parents or traversal require a separately reviewed change,
+  never recursive ACL broadening of the shared lake.
 - A collision with a foreign-owned Search object or directory is an error. Use a
   new task/version prefix rather than overwriting it.
 - No destructive cleanup command is implemented. Retire only resources listed
