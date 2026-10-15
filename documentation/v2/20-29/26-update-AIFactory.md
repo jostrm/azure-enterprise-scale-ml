@@ -108,6 +108,31 @@ project-only flow**. Reviewed deployments retain their published exact-target
 contracts: the reviewed helper requires the published consumer `main`, not an
 arbitrary project-branch override.
 
+### Select JSON override without the terminal prompt
+
+For the legacy Dev update flow, set `AIFACTORY_USE_JSON_OVERRIDE` to answer the
+JSON-selection question in advance:
+
+```bash
+# Use aifactory/variables.json as the deployment override; do not ask that question
+AIFACTORY_USE_JSON_OVERRIDE=yes ADO_BRANCH=prj001 bash ./ADO-update-aifactory-and-run-project.sh --aifactory-version 124
+
+# Use variables.yaml instead; do not ask that question
+AIFACTORY_USE_JSON_OVERRIDE=no ADO_BRANCH=prj001 bash ./ADO-update-aifactory-and-run-project.sh --aifactory-version 124
+```
+
+These anonymized examples run from the consumer repository root in Git Bash.
+Replace `prj001` with your existing consumer branch. `yes` requires the intended,
+valid `aifactory/variables.json` to exist; it does not generate the configuration.
+`no` keeps Azure DevOps on `variables.yaml`. When unset, the interactive launcher
+asks which source to use.
+
+**This skips only the JSON override question, not all interaction.** Sign-in,
+destination/version questions, commit/push confirmation and deployment approvals
+still apply where required. These inline assignments last for this command only;
+no separate `export` is needed. Reviewed deployments retain their mandatory
+protected configuration contract; `no` is not a way to bypass it.
+
 ### Add a project without updating AI Factory
 
 When the existing submodule, templates, and pipeline are already the versions you
@@ -128,7 +153,7 @@ It preserves the normal authentication and optional `variables.json` override
 flow, then dispatches the project deployment. For unattended execution, set
 `AIFACTORY_PROJECT_ONLY=true`.
 
-Both scripts ask `Do you want to override with variables.json? [y/N]` before starting the update. Enter `y` to pass `aifactory/variables.json` as the deployment override. Enter `n`, or press Enter, to pass an empty configuration path: Azure DevOps then uses `variables.yaml`, while GitHub Actions uses its configured variables and secrets without applying `variables.json`.
+Both scripts ask `Do you want to override with variables.json? [y/N]` before starting the update unless `AIFACTORY_USE_JSON_OVERRIDE=yes` or `no` already supplies the answer. Enter `y` to pass `aifactory/variables.json` as the deployment override. Enter `n`, or press Enter, to pass an empty configuration path: Azure DevOps then uses `variables.yaml`, while GitHub Actions uses its configured variables and secrets without applying `variables.json`.
 
 `useAdminVMBuildAgent` has been removed. Existing configurations must use `useSelfHostedBuildAgent` instead. The update scripts remove the deprecated key while merging configuration templates.
 
