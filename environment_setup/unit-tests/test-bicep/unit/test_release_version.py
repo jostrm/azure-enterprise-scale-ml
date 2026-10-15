@@ -44,7 +44,7 @@ class TestReleaseVersion(unittest.TestCase):
         script = (ROOT / "bootstrap/ADO-update-aifactory-and-run-project.sh").read_text(encoding="utf-8")
         self.assertIn(VERSION.CONTRACT, script)
         self.assertIn('version_default="${AIF_UPDATE_DEFAULT_VERSION:-124}"', script)
-        self.assertIn('git -C "$SUBMODULE_PATH" checkout --detach "$AIF_SUBMODULE_REF"', script)
+        self.assertIn('aif_version_checkout "$REPO_ROOT"', script)
         self.assertNotIn("git submodule update --init --recursive --remote", script)
         self.assertIn('aif_version_save "$REPO_ROOT"', script)
         self.assertIn('validate_pipeline_preview "$state_dir/published-preview-request.json"', script)

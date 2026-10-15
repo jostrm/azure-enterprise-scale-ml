@@ -825,8 +825,7 @@ else
   git checkout "$BRANCH"
   git pull --ff-only origin "$BRANCH"
   git submodule update --init --recursive
-  git -C "$SUBMODULE_PATH" fetch origin "$AIF_SUBMODULE_REF"
-  git -C "$SUBMODULE_PATH" checkout --detach "$AIF_SUBMODULE_REF"
+  aif_version_checkout "$REPO_ROOT"
   aif_version_save "$REPO_ROOT"
 
   printf 'a\n' | bash "$SUBMODULE_PATH/00-start.sh"
