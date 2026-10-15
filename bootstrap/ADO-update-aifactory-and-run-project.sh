@@ -495,6 +495,39 @@ login_with_entra() {
   AZURE_CORE_LOGIN_EXPERIENCE_V2=off az "${login_args[@]}" >/dev/null
 }
 
+ensure_json_configuration() {
+  if [[ "$use_json_override" != "true" || "$project_only" == "true" || -f "$CONFIG_FILE" ]]; then
+    return 0
+  fi
+  aif_info "Creating missing $CONFIG_FILE from existing $VARIABLES_FILE; preserving configured values."
+  "${PYTHON[@]}" - "$SCRIPT_DIR" "$REPO_ROOT" "$VARIABLES_FILE" "$CONFIG_FILE" <<'PY'
+import importlib.util
+import sys
+from pathlib import Path
+
+script_dir, repo_root, yaml_path, json_path = map(Path, sys.argv[1:])
+for library in (script_dir / "lib", repo_root / "azure-enterprise-scale-ml/bootstrap/lib"):
+    helper = library / "aifactory_scaleset_config.py"
+    if not helper.is_file():
+        continue
+    spec = importlib.util.spec_from_file_location("ado_configuration_initializer", helper)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    initialize = getattr(module, "initialize_json_from_ado_yaml", None)
+    if callable(initialize):
+        break
+else:
+    raise SystemExit("Configuration helper is missing; refresh the complete launcher bundle from the submodule.")
+
+try:
+    initialize(yaml_path, json_path)
+except (OSError, ValueError) as exc:
+    raise SystemExit(f"Could not create JSON configuration from existing YAML: {exc}") from None
+PY
+  aif_success "JSON configuration is ready. The normal template merge will add missing settings."
+}
+ensure_json_configuration
+
 ado_tenant="${ADO_TENANT:-}"
 tenant_config_prompted=false
 if [[ -z "$ado_tenant" ]]; then

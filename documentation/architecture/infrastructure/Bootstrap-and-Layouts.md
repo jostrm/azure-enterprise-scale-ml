@@ -61,6 +61,16 @@ normalize flag/mode/manifest aliases inside each section before overlaying it.
 A later section's alias overrides an earlier section's canonical value;
 canonical spelling wins only among duplicates within the same section.
 
+For normal legacy ADO updates with JSON override selected, an absent
+`aifactory/variables.json` is initialized before tenant lookup from the active,
+literal `variables.yaml` mapping. `initialize_json_from_ado_yaml` reuses the
+configuration parser's assignment/comment rules, preserves YAML identities and
+explicit empty settings, and creates the JSON exclusively without overwriting
+existing files. Invalid, duplicate or unsupported YAML fails before creation.
+The later template merge adds missing defaults. Project-only, reviewed and
+registered routes retain their existing configuration requirements; no template
+identity, tenant fallback or deployment authorization is inferred.
+
 The canonical JSON, ADO YAML and GHA environment templates expose the project VM,
 AKS tier, RBAC-update and seven per-service diagnostic switches using existing
 Bicep defaults. Diagnostic values are passed to cognitive-service deployments;
