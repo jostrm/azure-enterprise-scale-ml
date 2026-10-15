@@ -1774,7 +1774,7 @@ def execute(plan, *, expected_plan_hash, state_dir, runtime=None,
                 unchanged = fresh[key] == plan[key]
             require(unchanged, "prerequisite-live-state-or-plan-changed:" + key)
         require(time.time() < plan["expires_at"], "prerequisite-review-expired")
-    except (ValueError, RuntimeError, OSError) as exc:
+    except (ValueError, RuntimeError, OSError, enrollment.EnrollmentError) as exc:
         code = getattr(exc, "code", "prerequisite-preflight-io-failed")
         if not isinstance(code, str) or not re.fullmatch(r"[A-Za-z0-9:/._-]{1,256}", code):
             code = "prerequisite-preflight-rejected"

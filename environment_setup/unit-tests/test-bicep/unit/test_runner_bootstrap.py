@@ -1205,6 +1205,79 @@ class RunnerEnsureTests(unittest.TestCase):
         self.assertTrue(all(identifier.startswith(request["rg_id"] + "/providers/") for identifier in first))
         self.assertFalse(any("publicIPAddresses" in identifier or "deployments" in identifier for identifier in first))
 
+    def deployment_identity_id(self, name="deploy"):
+        return (f"/subscriptions/{self.values['dev_sub_id']}/resourceGroups/fixture-esml-common-sdc-dev-001"
+                f"/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{name}")
+
+    def existing_linux_runner(self, request):
+        cloud = self.cloud(request)
+        key = self.root / "public-key"
+        key.write_text("ssh-ed25519 YWJjZA== offline-fixture", encoding="utf-8")
+        with mock.patch.object(self.core.subprocess, "run", side_effect=AssertionError("host install/keygen")):
+            self.core.ensure_vm(request, yes=True, cloud=cloud, ssh_public_key=key)
+        return cloud
+
+    def test_existing_linux_runner_accepts_exact_deployment_uami(self):
+        identity_id = self.deployment_identity_id()
+        request = self.request(deployment_identity_id=identity_id)
+        cloud = self.existing_linux_runner(request)
+        cloud.data[request["vm_id"]]["identity"] = {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {identity_id.upper(): {}},
+        }
+        report = self.core.plan(request, cloud)
+        self.assertEqual(report["actions"]["vm"], "reuse")
+
+    def test_existing_linux_runner_rejects_deployment_uami_without_request_field(self):
+        request = self.request()
+        cloud = self.existing_linux_runner(request)
+        cloud.data[request["vm_id"]]["identity"] = {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {self.deployment_identity_id(): {}},
+        }
+        with self.assertRaisesRegex(self.core.EnrollmentError, "size-or-identity-mismatch"):
+            self.core.plan(request, cloud)
+
+    def test_existing_linux_runner_rejects_system_assigned_only_with_deployment_uami(self):
+        request = self.request(deployment_identity_id=self.deployment_identity_id())
+        cloud = self.existing_linux_runner(request)
+        cloud.data[request["vm_id"]]["identity"] = {"type": "SystemAssigned"}
+        with self.assertRaisesRegex(self.core.EnrollmentError, "size-or-identity-mismatch"):
+            self.core.plan(request, cloud)
+
+    def test_existing_linux_runner_rejects_deployment_uami_mismatches(self):
+        identity_id = self.deployment_identity_id()
+        request = self.request(deployment_identity_id=identity_id)
+        cases = [
+            {"type": "SystemAssigned, UserAssigned", "userAssignedIdentities": {identity_id: {}}},
+            {"type": "UserAssigned", "userAssignedIdentities": {
+                identity_id: {}, self.deployment_identity_id("extra"): {}}},
+            {"type": "UserAssigned", "userAssignedIdentities": {self.deployment_identity_id("other"): {}}},
+        ]
+        for identity in cases:
+            with self.subTest(identity=identity):
+                cloud = self.existing_linux_runner(request)
+                cloud.data[request["vm_id"]]["identity"] = identity
+                with self.assertRaisesRegex(self.core.EnrollmentError, "size-or-identity-mismatch"):
+                    self.core.plan(request, cloud)
+
+    def test_load_request_rejects_invalid_deployment_identity_ids(self):
+        valid = self.deployment_identity_id()
+        cases = [
+            (valid.replace("fixture-esml-common-sdc-dev-001", "other-rg"),
+             "deployment-identity-id-must-be-in-common-resource-group"),
+            (valid.replace(self.values["dev_sub_id"], self.values["test_sub_id"]),
+             "deployment-identity-id-must-be-in-common-resource-group"),
+            (valid.replace("Microsoft.ManagedIdentity", "Microsoft.Compute"),
+             "deployment-identity-id-must-be-in-common-resource-group"),
+            (valid + "/extra", "deployment-identity-id-must-be-in-common-resource-group"),
+            ({"id": valid}, "deployment-identity-id-required"),
+        ]
+        for identity_id, code in cases:
+            with self.subTest(identity_id=identity_id):
+                with self.assertRaisesRegex(self.core.EnrollmentError, code):
+                    self.request(deployment_identity_id=identity_id)
+
     def test_exact_existing_windows_reused_without_ownership_adoption(self):
         request = self.request("ado")
         cloud = self.cloud(request)

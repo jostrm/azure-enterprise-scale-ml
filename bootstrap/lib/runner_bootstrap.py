@@ -203,7 +203,7 @@ def load_request(root, provider, environment="dev", config_source=None, factory_
                  scale_set_id=None, repository=None, ado_organization=None, ado_tenant=None,
                  pool=None, agent_name=None, runner_label=None, vm_os=None, vm_name=None,
                  common_rg=None, subnet_id=None, separate_github=False, prereqs_only=False,
-                 environ=None):
+                 deployment_identity_id=None, environ=None):
     root = consumer_root(root)
     require(provider in ("ado", "gha") and environment in ENVIRONMENTS, "invalid-runner-scope")
     require(not separate_github or provider == "gha", "separate-github-requires-gha-provider")
@@ -309,6 +309,14 @@ def load_request(root, provider, environment="dev", config_source=None, factory_
     require(common_rg.casefold() == expected_rg.casefold(), "common-resource-group-mismatch")
     literal(common_rg, "common-resource-group")
     rg_id = f"/subscriptions/{subscription}/resourceGroups/{common_rg}"
+    if deployment_identity_id is not None:
+        require(isinstance(deployment_identity_id, str), "deployment-identity-id-required")
+        match = re.fullmatch(
+            r"/subscriptions/([0-9a-fA-F-]{36})/resourceGroups/([^/]+)/providers/"
+            r"Microsoft\.ManagedIdentity/userAssignedIdentities/([A-Za-z0-9][A-Za-z0-9_-]{0,127})",
+            deployment_identity_id, flags=re.I)
+        require(match and guid(match[1]) == subscription and match[2].casefold() == common_rg.casefold(),
+                "deployment-identity-id-must-be-in-common-resource-group")
     network_env = pick(sources, "network_env_" + environment, "NETWORK_ENV_" + environment.upper(), default=azure_env + "-")
     vnet_rg = pick(sources, "vnetResourceGroup_param", "VNET_RESOURCE_GROUP_PARAM", default=common_rg).replace("<network_env>", network_env)
     vnet_name = pick(sources, "vnetNameFull_param", "VNET_NAME_FULL_PARAM")
@@ -371,6 +379,7 @@ def load_request(root, provider, environment="dev", config_source=None, factory_
                    common_rg=common_rg, rg_id=rg_id, subnet=subnet_id, location=location,
                    vm_os=vm_os, vm_name=vm_name, vm_id=rg_id + "/providers/Microsoft.Compute/virtualMachines/" + vm_name,
                    size=SIZE, legacy_windows=legacy_windows, repository=repository,
+                   deployment_identity_id=deployment_identity_id,
                    ado_organization=organization, ado_tenant_id=guid(ado_tenant) if ado_tenant else None,
                    pool=pool, agent_name=name, runner_label=label,
                    tags={"aifactory-runner-owner": owner, "aifactory-runner-provider": provider})
@@ -431,6 +440,17 @@ def validate_nic(request, nic, *, managed=True):
             "runner-network-or-public-ip-mismatch")
 
 
+def runner_identity_matches(request, identity):
+    identity_type = (identity or {}).get("type", "None")
+    if identity_type == "None":
+        return True
+    expected = request.get("deployment_identity_id")
+    user_assigned = (identity or {}).get("userAssignedIdentities")
+    return (isinstance(expected, str) and identity_type.casefold() == "userassigned"
+            and isinstance(user_assigned, dict) and len(user_assigned) == 1
+            and {key.casefold() for key in user_assigned} == {expected.casefold()})
+
+
 def snapshot(request, cloud):
     fresh(request)
     account = cloud.az("account", "show", "--subscription", request["target"]["subscription_id"])
@@ -461,7 +481,8 @@ def snapshot(request, cloud):
         if not request["legacy_windows"]:
             owned(request, vm, request["vm_id"])
             require(props.get("hardwareProfile", {}).get("vmSize") == SIZE
-                    and vm.get("identity", {}).get("type", "None") == "None", "existing-runner-size-or-identity-mismatch")
+                    and runner_identity_matches(request, vm.get("identity", {})),
+                    "existing-runner-size-or-identity-mismatch")
         else:
             require(not any(key in tag_values(vm) and tag_values(vm)[key] != value
                             for key, value in request["tags"].items()), "existing-windows-owner-conflict")
@@ -774,6 +795,7 @@ def parser(provider):
     result.add_argument("--subnet-id", help="Must equal selected config's common subnet ARM ID.")
     result.add_argument("--separate-github", action="store_true", help="GHA-only runner setup using registered Azure placement without changing its orchestrator.")
     result.add_argument("--prereqs-only", action="store_true", help="VM and guest prerequisites only, no provider registration or readiness claim.")
+    result.add_argument("--deployment-identity-id", help="Optional common-RG UAMI already attached by the factory deployment stage.")
     result.add_argument("--ssh-public-key", help="Optional existing public key file; otherwise an ephemeral key is generated only for VM creation.")
     result.add_argument("--yes", action="store_true", help="Approve cloud writes; serialize all provisioning of these exact names. No atomic ARM create-only guarantee.")
     return result

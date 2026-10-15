@@ -404,6 +404,41 @@ def execute(plan, workspace, runtime):
                         acknowledge_exclusive_writer_governance=True, sleep=lambda _: pytest.fail("unexpected wait"))
 
 
+def test_execute_prewrite_enrollment_error_persists_rejected_receipt(workspace, monkeypatch):
+    runtime = Runtime()
+    plan = core.prepare(**arguments(workspace), runtime=runtime)
+
+    def fail_preflight(**kwargs):
+        raise core.enrollment.EnrollmentError("fixture-prewrite-enrollment-error")
+
+    monkeypatch.setattr(core, "prepare", fail_preflight)
+    with pytest.raises(core.enrollment.EnrollmentError, match="fixture-prewrite-enrollment-error"):
+        execute(plan, workspace, runtime)
+    receipt = core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"])
+    assert receipt["status"] == "rejected"
+    assert receipt["error"] == "fixture-prewrite-enrollment-error"
+    assert receipt["requires_fresh_review"] is True
+    assert receipt["cloud_writes_started"] is False
+    assert not runtime.writes and not runtime.blobs
+
+
+def test_execute_postwrite_enrollment_error_remains_uncertain(workspace):
+    runtime = Runtime()
+    plan = core.prepare(**arguments(workspace), runtime=runtime)
+
+    def fail_blob(method, blob, data=None, headers=None, allowed=(200,), query=""):
+        if method != "GET":
+            raise core.enrollment.EnrollmentError("fixture-postwrite-enrollment-error")
+        return 404, {}, None
+
+    runtime.blob = fail_blob
+    result = execute(plan, workspace, runtime)
+    assert result["status"] == "uncertain"
+    assert result["error"] == "fixture-postwrite-enrollment-error"
+    assert result["cloud_writes_started"] is True
+    assert core.read_result(state_dir=workspace[2], plan_id=plan["plan_id"]) == result
+
+
 def dns_arguments(workspace):
     args = arguments(workspace, dev_vnet_cidr="172.16.0.0/20")
     project_id = "55555555-5555-5555-5555-555555555555"
