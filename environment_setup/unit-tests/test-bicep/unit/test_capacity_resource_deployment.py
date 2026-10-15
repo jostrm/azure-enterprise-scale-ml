@@ -1491,6 +1491,16 @@ def test_source_parameter_mock_matches_real_compilation(compiled):
             assert ("defaultValue" in actual[name]) == ("defaultValue" in exposed[name])
 
 
+def test_compiled_search_identity_uses_explicit_subscription_and_resource_group(compiled):
+    expression = compiled["03b-ai-search.bicep"]["outputs"]["aiSearchResourceId"]["value"]
+    assert expression.startswith("[resourceId(")
+    assert re.search(
+        r"\.outputs\.context\.value\.subscriptionId, reference\(.*?"
+        r"\.outputs\.context\.value\.targetResourceGroup, 'Microsoft.Search/searchServices', ",
+        expression,
+    )
+
+
 @pytest.mark.parametrize("profile", ["Consumption", "D4", "D8"])
 def test_compiled_container_apps_profiles_are_deployable_and_select_matching_app_profile(compiled, profile):
     template = compiled["05b-container-apps.bicep"]

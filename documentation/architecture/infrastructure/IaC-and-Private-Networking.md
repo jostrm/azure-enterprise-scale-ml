@@ -66,6 +66,13 @@ distinct from allocation capacity. V1 reports split by observation region rather
 than collapsing same-SKU observations across regions. Offline source/tests do not
 establish deployed capacity or a supported runtime failover/data-migration path.
 
+Subscription-scope Search resource-ID expressions must include both subscription
+and resource-group arguments. Main resolves both from the deployment context.
+The v1.24 standalone backport now supplies `subscription().subscriptionId`
+explicitly for its Search output and both user-assigned identity IDs; the former
+three-argument form misinterpreted the RG as a subscription at ARM evaluation.
+Compiled-output regressions cover these scope arguments, not merely Bicep syntax.
+
 Network addressing must be aligned and nonoverlapping. Shared/own-subscription presets are configuration choices, not commands to create subscriptions. Allocation must respect existing subnets, gateway/DNS reservations and fragmentation; headline project counts are not guarantees.
 
 The opt-in `preserve-v1` common-network profile is add-only, not a blanket networking skip. `common_network_preservation.py` freezes source/compiled ARM, approved address space, native inventories and exact new/retained resource bodies. Revalidation and lease checks precede deployment; post-checks compare native resource snapshots. Retained resources are preserved without reconciliation. Unexpected changes retain failure evidence rather than triggering destructive rollback.
