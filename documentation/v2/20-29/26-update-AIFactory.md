@@ -43,6 +43,17 @@ push and the subsequent pipeline run. No changes can mean no commit prompt.
 The project pipeline creates/updates the selected project using the existing
 common factory; this is not a promise to redeploy every common resource.
 
+Ordinary version-aware updates leave the submodule on the selected named branch,
+for example `release/v1.24`, with its `origin` upstream configured. Only a
+fast-forward to the resolved commit is allowed; local ahead/diverged commits are
+never reset. If the remote changes after selection, rerun the update instead of
+silently deploying a different revision. `git pull --ff-only` then works manually.
+The parent gitlink and version record still store an exact commit.
+An explicitly supplied `AIF_SUBMODULE_REF` or reviewed version keeps detached
+exact-commit checkout. Project-only, reviewed/registered deployment and creation
+paths retain their existing source-pin rules. The historical v1.24 GitHub updater
+already keeps its release branch attached.
+
 ## v1.24 different tools for same scenario
 
 Use [Update a v1.24 factory/project: Bash, Python, REST and CLI](26-update-aifactory-v124-tools.md)

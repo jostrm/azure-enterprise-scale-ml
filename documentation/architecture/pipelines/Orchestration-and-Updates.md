@@ -28,6 +28,16 @@ ADO/GHA templates orchestrate common and selected project infrastructure. Projec
 
 Legacy update distinguishes library/template refresh from feature update and project-only execution. Normal helper workflows can update templates/configuration, commit, push, dispatch and monitor. They are not read-only inspection commands.
 
+Ordinary version-aware ADO/GHA updates use `aif_version_checkout` to attach the
+selected source branch and configure its origin upstream. Local branches may
+only fast-forward to the already resolved exact SHA; dirty/ahead/diverged work
+or a remote tip changed since selection blocks rather than resets or changes
+the selected revision. The exact SHA remains in the parent gitlink and version
+record. `aif_version_prepare` captures caller pin/review intent before exporting
+the resolved SHA; explicit pins/reviewed versions stay detached. Creation,
+project-only and governed deployment routes are not switched to floating refs.
+The older v1.24 GH launcher already attaches its release branch and is unchanged.
+
 The legacy ADO updater prompts before authentication for an optional project-URL
 override, even when organization/project defaults were previously saved. Official
 HTTPS `dev.azure.com` and `*.visualstudio.com` URLs are split into organization and

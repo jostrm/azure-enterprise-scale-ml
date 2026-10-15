@@ -330,8 +330,7 @@ else
   git checkout main
   git pull --ff-only origin main
   git submodule update --init --recursive
-  git -C "$SUBMODULE_PATH" fetch origin "$AIF_SUBMODULE_REF"
-  git -C "$SUBMODULE_PATH" checkout --detach "$AIF_SUBMODULE_REF"
+  aif_version_checkout "$REPO_ROOT"
   aif_version_save "$REPO_ROOT"
 
   AIF_LAUNCHER_RESTORE_REQUIRED=true

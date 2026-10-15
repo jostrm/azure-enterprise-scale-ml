@@ -73,6 +73,12 @@ explicitly for its Search output and both user-assigned identity IDs; the former
 three-argument form misinterpreted the RG as a subscription at ARM evaluation.
 Compiled-output regressions cover these scope arguments, not merely Bicep syntax.
 
+The v1.24 service-only boundary passes no VNet/subnet names and must not emit
+unconditional existing network resources. Its subnet ID is constructed inside
+the private-endpoint resource, gated off for service-only provisioning. The
+normal networking call keeps its explicit VNet RG/subnet and PE location; shared
+links, approvals and DNS outputs retain their separate service-only gates.
+
 Network addressing must be aligned and nonoverlapping. Shared/own-subscription presets are configuration choices, not commands to create subscriptions. Allocation must respect existing subnets, gateway/DNS reservations and fragmentation; headline project counts are not guarantees.
 
 The opt-in `preserve-v1` common-network profile is add-only, not a blanket networking skip. `common_network_preservation.py` freezes source/compiled ARM, approved address space, native inventories and exact new/retained resource bodies. Revalidation and lease checks precede deployment; post-checks compare native resource snapshots. Retained resources are preserved without reconciliation. Unexpected changes retain failure evidence rather than triggering destructive rollback.

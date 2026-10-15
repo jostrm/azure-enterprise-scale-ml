@@ -39,8 +39,7 @@ def test_project_only_flag_skips_update_and_publish_operations() -> None:
         assert 'if [[ "$project_only" == "false" ]]; then' in source
         pinned_update = (
             "git submodule update --init --recursive",
-            'git -C "$SUBMODULE_PATH" fetch origin "$AIF_SUBMODULE_REF"',
-            'git -C "$SUBMODULE_PATH" checkout --detach "$AIF_SUBMODULE_REF"',
+            'aif_version_checkout "$REPO_ROOT"',
             'aif_version_save "$REPO_ROOT"',
         )
         assert "\n  ".join(pinned_update) in source
