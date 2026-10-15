@@ -1,4 +1,57 @@
 # Update existing AI Factory
+
+## Choose your update path
+
+| | v1.24 and earlier: file-first legacy layout | v1.25 and higher: registered layout available |
+|---|---|---|
+| Consumer configuration | `aifactory` with `variables.yaml` or `variables.json` | `azurefactory` register and scoped factory/scale-set/project settings |
+| Usual configuration step | Edit the active file directly; API/CLI/Wizard not required | Prepare scoped configuration through the shared API, using the app, Python SDK, REST or CLI |
+| Update workflow | One provider Bash launcher, followed by its review/commit/run prompts | Prepare/inspect the exact operation, review, confirm/execute, then observe |
+| Existing legacy consumers | Remain on the file-first path | May keep their legacy `aifactory` layout even when the source version is v1.25/main |
+| Start here | [v1.24: different tools for the same scenario](#v124-different-tools-for-same-scenario) | [Current registered configuration and operations](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/documentation/v2/10-19/19-cli-and-api-and-usage.md) |
+
+**Choose by both version and existing folder layout.** Selecting a newer source
+version does not migrate `aifactory` to `azurefactory`. The commands below use
+the maintained v1.24 launcher; older installed releases may lack these flags or
+fixes and must not be assumed equivalent without checking their contracts.
+
+### File-first quick path: edit, then one command
+
+1. Edit the intended project's **active** configuration file.
+2. From the consumer root in Git Bash, run the matching command and review the
+   launcher's proposed changes before approving commit/push and deployment:
+
+```bash
+# Edited variables.yaml: keep YAML as the deployment configuration
+AIFACTORY_USE_JSON_OVERRIDE=no ADO_BRANCH=prj001 bash ./ADO-update-aifactory-and-run-project.sh --aifactory-version 124
+
+# Edited aifactory/variables.json: select that JSON override
+AIFACTORY_USE_JSON_OVERRIDE=yes ADO_BRANCH=prj001 bash ./ADO-update-aifactory-and-run-project.sh --aifactory-version 124
+```
+
+> **Match the command to the file you edited.** `yes` selects JSON, not YAML.
+> The current ADO launcher can initialize a missing JSON file from active YAML,
+> but it never overwrites an existing JSON file that may contain different values.
+> Editing YAML and then selecting stale JSON does not apply your YAML edits.
+
+The script resolves the selected release to an exact commit, refreshes local
+provider templates, and deterministically merges missing defaults while preserving
+existing configuration. **It does not invoke GitHub Copilot.** It reports new/
+removed settings, not a complete Git diff; review the full diff separately.
+If tracked changes need publication, **Commit and continue? [y/N]** gates commit,
+push and the subsequent pipeline run. No changes can mean no commit prompt.
+The project pipeline creates/updates the selected project using the existing
+common factory; this is not a promise to redeploy every common resource.
+
+## v1.24 different tools for same scenario
+
+Use [Update a v1.24 factory/project: Bash, Python, REST and CLI](26-update-aifactory-v124-tools.md)
+for the same legacy update objective with four tools, prerequisites, explicit
+review/confirmation steps, and the differences between the direct Bash and
+API-backed routes. The API/SDK/CLI are optional for the file-first route.
+
+---
+
 There are two types of updates you can do: `Library-UPDATE` or `Feature-UPDATE`.
 
 For a `Feature-UPDATE`, you can use a **Quick Feature-update & run** script or follow the manual instructions in [2) Feature-UPDATE: NEW feature, such as "BYOVNet"](#2-feature-update-new-feature-such-as-byovnet).
