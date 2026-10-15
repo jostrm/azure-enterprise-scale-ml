@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Search-only v1.24 provisioning recovery; never moves or deletes an existing service."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -16,6 +17,10 @@ SEARCH_SKUS = {
     "storage_optimized_l1", "storage_optimized_l2",
 }
 WRAPPERS = {"DeploymentFailed", "ResourceDeploymentFailure", "DeploymentOperationFailed"}
+
+
+class CapacityExhausted(RuntimeError):
+    """All candidates failed only with verified Search capacity errors."""
 
 
 def region(value):
@@ -75,6 +80,12 @@ def is_capacity(node, depth=0):
     """Only exact, exclusively Search capacity leaves under known ARM wrappers."""
     if not isinstance(node, dict) or depth > 12:
         return False
+    target = node.get("target", "")
+    if isinstance(target, str) and "/providers/" in target.lower():
+        resource_type = target.lower().rsplit("/providers/", 1)[1]
+        if not (re.fullmatch(r"microsoft\.resources/deployments/[^/]+", resource_type)
+                or re.fullmatch(r"microsoft\.search/searchservices/[^/]+", resource_type)):
+            return False
     code = node.get("code")
     if code and code not in WRAPPERS | {"InsufficientResourcesAvailable"}:
         return False
@@ -91,6 +102,45 @@ def is_capacity(node, depth=0):
     if children:
         return all(is_capacity(child, depth + 1) for child in children)
     return code == "InsufficientResourcesAvailable"
+
+
+def deployment_error(deployment_name, search_id):
+    """Resolve truncated ARM deployment wrappers only within the exact Search RG."""
+    scope = search_id.rsplit("/providers/", 1)[0]
+    seen = set()
+
+    def expand(node, depth=0):
+        if not isinstance(node, dict) or depth > 12:
+            return node
+        expanded = dict(node)
+        for key in ("error", "innererror", "innerError"):
+            if key in node:
+                expanded[key] = expand(node[key], depth + 1)
+        if isinstance(node.get("details"), list):
+            expanded["details"] = [expand(child, depth + 1) for child in node["details"]]
+        target = node.get("target", "")
+        has_children = any(node.get(key) for key in ("error", "innererror", "innerError", "details"))
+        if node.get("code") in WRAPPERS and not has_children and isinstance(target, str):
+            match = re.fullmatch(
+                re.escape(scope) + r"/providers/Microsoft\.Resources/deployments/([^/]+)",
+                target, re.IGNORECASE,
+            )
+            if match and target.lower() not in seen:
+                seen.add(target.lower())
+                _, nested = az("deployment", "group", "show",
+                               "--subscription", scope.split("/")[2],
+                               "--resource-group", scope.split("/")[4], "--name", match[1],
+                               "--query", "properties.error")
+                expanded["error"] = expand(nested, depth + 1)
+        return expanded
+
+    _, error = az("deployment", "sub", "show", "--name", deployment_name, "--query", "properties.error")
+    return expand(error)
+
+
+def fallback_fingerprint(search_id, environment, sequence):
+    payload = [search_id.lower(), environment, sequence]
+    return hashlib.sha256(json.dumps(payload, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
 def existing_candidate(resource):
@@ -219,7 +269,8 @@ def publish_provisioned(location, sku, provisioned=True, existed=None):
     values = {"AIF_AISEARCH_PROVISIONED_LOCATION": location, "AIF_AISEARCH_PROVISIONED_SKU": sku,
               "AIF_AISEARCH_STATE": "provisioned" if provisioned else "disabled",
               "AIF_AISEARCH_READY": "false", "AIF_AISEARCH_NETWORK_SUCCEEDED": "false",
-              "aiSearchProvisioned": str(provisioned).lower()}
+              "aiSearchProvisioned": str(provisioned).lower(),
+              "AIF_AISEARCH_FALLBACK_PENDING": "false"}
     if existed is not None:
         # DNS and CMK gates describe pre-provisioning existence, not the post-create state.
         values["aiSearchExists"] = str(existed).lower()
@@ -259,7 +310,7 @@ def recover(sequence, existing, attempt, lookup, delay=5):
             raise RuntimeError("Previously existing Search is now absent; refusing automatic recreation or relocation.")
 
     for index, (location, sku) in enumerate(sequence):
-        print(f"Search provisioning attempt {index + 1}/{len(sequence)}: location={location}, sku={sku}")
+        print(f"Search provisioning attempt {index + 1}/{len(sequence)}: location={location}, sku={sku}", flush=True)
         success, error = attempt(location, sku, index)
         if success:
             actual = lookup()
@@ -274,7 +325,7 @@ def recover(sequence, existing, attempt, lookup, delay=5):
             time.sleep(delay)
             # ARM can bind a failed creation while the retry delay is running.
             validate_binding(lookup())
-    raise RuntimeError("Search provisioning exhausted all approved region/SKU candidates; downstream deployment blocked.")
+    raise CapacityExhausted("Search provisioning exhausted all approved region/SKU candidates; downstream deployment blocked.")
 
 
 def main():
@@ -286,7 +337,7 @@ def main():
     modes.add_argument("--finalize", action="store_true", help="Publish readiness after successful cognitive task 63; local only.")
     modes.add_argument("--select-mode", action="store_true", help="Select normal/regional/disabled CI tasks; local only.")
     parser.add_argument("--provisioning-mode", choices=("normal", "regional"),
-                        help="Require the selected CI provisioning path; prevents running the wrong task.")
+                        help="normal tries the primary; regional consumes a verified capacity handoff and tries only fallback regions.")
     args = parser.parse_args()
     environment = os.environ.get("dev_test_prod", "dev")
     if environment not in {"dev", "test", "prod"}:
@@ -301,24 +352,33 @@ def main():
     if region(primary) in fallback_regions:
         print("Search fallback list repeats the primary region; omitting that redundant regional attempt.", file=sys.stderr)
     configured = skus(os.environ.get(f"skuAISearch{suffix}Array", "[]"))
-    sequence = candidates(primary, selected, configured,
-                          enabled(os.environ.get("aisearchRetryCapcityArray", "false")), fallback_regions)
+    all_candidates = candidates(primary, selected, configured,
+                                enabled(os.environ.get("aisearchRetryCapcityArray", "false")), fallback_regions)
+    primary = region(primary)
+    primary_candidates = [candidate for candidate in all_candidates if candidate[0] == primary]
+    regional_candidates = [candidate for candidate in all_candidates if candidate[0] != primary]
+    sequence = regional_candidates if args.provisioning_mode == "regional" else primary_candidates
     if args.plan:
-        print(json.dumps(sequence))
+        print(json.dumps(sequence if args.provisioning_mode else all_candidates))
         return
     needs_search = enabled(os.environ.get("enableAISearch", "true")) or (
         enabled(os.environ.get("enableAFoundryCaphost", "false")) and
         enabled(os.environ.get("enableAIFoundry", "false")))
-    mode = ("regional" if fallback_regions else "normal") if needs_search else "disabled"
+    mode = "normal" if needs_search else "disabled"
     if args.select_mode:
         publish({"AIF_AISEARCH_MODE": mode, "AIF_AISEARCH_STATE": "pending",
                  "AIF_AISEARCH_READY": "false", "AIF_AISEARCH_NETWORK_SUCCEEDED": "false",
-                 "aiSearchProvisioned": "false"})
+                 "aiSearchProvisioned": "false", "AIF_AISEARCH_FALLBACK_PENDING": "false",
+                 "AIF_AISEARCH_REGIONAL_FALLBACK_ENABLED": str(bool(regional_candidates)).lower(),
+                 "AIF_AISEARCH_FALLBACK_RESOURCE_ID": "", "AIF_AISEARCH_FALLBACK_CONFIG_SHA256": ""})
         if not needs_search:
             publish_provisioned(region(primary), selected, provisioned=False)
         return
-    if args.provisioning_mode and args.provisioning_mode != mode:
-        raise ValueError(f"Search provisioning mode {args.provisioning_mode} does not match selected mode {mode}.")
+    if args.provisioning_mode == "regional" and (
+            not needs_search or not regional_candidates
+            or os.environ.get("AIF_AISEARCH_FALLBACK_PENDING") != "true"
+            or os.environ.get("AIF_AISEARCH_STATE") != "fallback_pending"):
+        raise ValueError("Regional provisioning mode requires nonempty fallback regions and a verified primary capacity handoff.")
     if not needs_search:
         print("Search disabled and not required by the Foundry capability host.")
         publish_provisioned(region(primary), selected, provisioned=False)
@@ -338,6 +398,19 @@ def main():
         outputs = context["properties"]["outputs"]
         search_id = outputs["aiSearchResourceId"]["value"]
         existing = read_service(search_id)
+        fingerprint = fallback_fingerprint(search_id, environment, all_candidates)
+        if args.provisioning_mode == "regional":
+            if (os.environ.get("AIF_AISEARCH_FALLBACK_RESOURCE_ID", "").lower() != search_id.lower()
+                    or os.environ.get("AIF_AISEARCH_FALLBACK_CONFIG_SHA256") != fingerprint):
+                raise ValueError("Primary capacity handoff identity/configuration changed; rerun primary provisioning.")
+            if existing is not None:
+                raise RuntimeError("Search became bound after primary provisioning; refusing regional relocation.")
+            publish({"AIF_AISEARCH_FALLBACK_PENDING": "false", "AIF_AISEARCH_STATE": "pending"})
+            time.sleep(5)
+            if read_service(search_id) is not None:
+                raise RuntimeError("Search became bound before regional fallback; refusing regional relocation.")
+        else:
+            publish({"AIF_AISEARCH_FALLBACK_PENDING": "false"})
         sku_parameter = f"skuAISearch{suffix}"
 
         def attempt(location, sku, index):
@@ -347,11 +420,20 @@ def main():
             if not result.returncode:
                 return True, None
             print(result.stderr, file=sys.stderr)
-            _, error = az("deployment", "sub", "show", "--name", deployment_name,
-                          "--query", "properties.error")
-            return False, error
+            return False, deployment_error(deployment_name, search_id)
 
-        location, sku = recover(sequence, existing, attempt, lambda: read_service(search_id))
+        try:
+            location, sku = recover(sequence, existing, attempt, lambda: read_service(search_id))
+        except CapacityExhausted:
+            if args.provisioning_mode != "normal" or existing is not None or not regional_candidates:
+                raise
+            publish({"AIF_AISEARCH_FALLBACK_PENDING": "true", "AIF_AISEARCH_STATE": "fallback_pending",
+                     "AIF_AISEARCH_FALLBACK_RESOURCE_ID": search_id,
+                     "AIF_AISEARCH_FALLBACK_CONFIG_SHA256": fingerprint,
+                     "AIF_AISEARCH_READY": "false", "AIF_AISEARCH_NETWORK_SUCCEEDED": "false",
+                     "aiSearchProvisioned": "false"})
+            print("Primary Search capacity exhausted; regional fallback is pending, not provisioned.", flush=True)
+            return
         publish_provisioned(location, sku, existed=existing is not None)
     finally:
         parameter_file.unlink(missing_ok=True)

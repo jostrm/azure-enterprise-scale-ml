@@ -2893,7 +2893,7 @@ steps:
     cmkDisableForAISearch: $(cmkDisableForAISearch)
 - task: AzureCLI@2
   displayName: '63a-search-regional-fallback'
-  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['AIF_AISEARCH_MODE'], 'regional'), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
+  condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), succeeded(), eq(variables['AIF_AISEARCH_REGIONAL_FALLBACK_ENABLED'], 'true'), eq(variables['AIF_AISEARCH_FALLBACK_PENDING'], 'true'), eq(variables['AIF_AISEARCH_STATE'], 'fallback_pending'), or(ne(variables['debug_disable_63_cognitive_services'], 'true'), and(eq(variables['enableAFoundryCaphost'], 'true'), eq(variables['enableAIFoundry'], 'true'))))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -2904,6 +2904,10 @@ steps:
       python scripts/search-region-fallback.py --provisioning-mode regional --network-parameters "../../../../aifactory/parameters/dynamicNetworkParams.json"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
   env:
+    AIF_AISEARCH_FALLBACK_PENDING: $(AIF_AISEARCH_FALLBACK_PENDING)
+    AIF_AISEARCH_STATE: $(AIF_AISEARCH_STATE)
+    AIF_AISEARCH_FALLBACK_RESOURCE_ID: $(AIF_AISEARCH_FALLBACK_RESOURCE_ID)
+    AIF_AISEARCH_FALLBACK_CONFIG_SHA256: $(AIF_AISEARCH_FALLBACK_CONFIG_SHA256)
     dev_test_prod: $(dev_test_prod)
     project_number_000: $(project_number_000)
     admin_location: $(admin_location)

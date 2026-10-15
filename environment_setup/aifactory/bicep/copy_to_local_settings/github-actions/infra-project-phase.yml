@@ -2223,7 +2223,7 @@ jobs:
 
       - name: 63a-search-regional-fallback
         id: search_regional_fallback_63a
-        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && steps.search_mode_63a.outcome == 'success' && env.AIF_AISEARCH_MODE == 'regional' && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true'))
+        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && steps.search_mode_63a.outcome == 'success' && steps.search_provisioning_63a.outcome == 'success' && env.AIF_AISEARCH_REGIONAL_FALLBACK_ENABLED == 'true' && env.AIF_AISEARCH_FALLBACK_PENDING == 'true' && env.AIF_AISEARCH_STATE == 'fallback_pending' && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true'))
         shell: bash
         run: |
           set -euo pipefail

@@ -98,10 +98,17 @@ This patch focuses on **simpler configuration**, **per-environment cost control 
   exhausting each approved region in order; six regions including the primary
   and eighteen creation attempts maximum.
 - Local step `63a-search-mode` validates the selected environment's configuration.
-  With `[]`, blank or a missing runtime list, the separate
-  `63a-search-regional-fallback` task is **skipped**, while
-  `63a-search-provisioning` performs normal primary/existing-region provisioning
-  and any approved SKU-only retries. A nonempty list runs only the regional task.
+  `63a-search-provisioning` always tries only the primary (or existing service's
+  actual region) with approved SKU-only retries. Success skips regional fallback.
+  Only verified capacity exhaustion with the named service still absent can
+  publish a `fallback_pending` handoff; that is not provisioned or ready.
+  `63a-search-regional-fallback` then tries **only** the configured fallback array
+  in its exact order, excluding a repeated primary, never starting at the primary
+  again. For `["denmarkeast","italynorth"]`, Denmark is first in that task.
+  With `[]`, blank or a missing runtime list, the regional task is **skipped**.
+  Primary exhaustion then fails; unrelated, mixed and read errors always fail.
+  The regional task requires a matching resource/configuration fingerprint and
+  rechecks absence after the delay; late-bound/existing services cannot relocate.
   If Search is disabled and not required by the release's Foundry capability-host
   dependency, both provisioning tasks skip without marking Search ready.
 - Either task 63a provisions **only Search** through `03b-ai-search.bicep`; task 63
@@ -122,6 +129,9 @@ This patch focuses on **simpler configuration**, **per-environment cost control 
   argument; compiled ARM regressions protect both the context-only output and
   the service's identity bindings.
 - Only exclusively nested `InsufficientResourcesAvailable` permits fallback.
+  Persisted ARM wrapper errors missing the inner leaf are resolved read-only
+  through nested deployment records in the exact Search resource group;
+  missing, unreadable or noncapacity evidence cannot authorize fallback.
   Authorization, policy, quota, template, mixed and unknown failures stop.
   Existing healthy services keep their actual location while honoring configured
   SKU updates there. Only an explicit not-found result from the exact Search

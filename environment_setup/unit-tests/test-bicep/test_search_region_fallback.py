@@ -520,7 +520,10 @@ def main_cli(monkeypatch):
             state["resource"] = healthy(location, sku)
             return result({})
         if args[:3] == ["deployment", "sub", "show"]:
-            return result({"code": "InsufficientResourcesAvailable"})
+            return result(state.get("error", {"code": "InsufficientResourcesAvailable"}))
+        if args[:3] == ["deployment", "group", "show"]:
+            state.setdefault("nested_reads", []).append(args)
+            return result(state["nested_error"])
         if args[:2] == ["resource", "list"]:
             state["list_calls"] += 1
             return result([])  # Deliberately stale; must never establish absence.
@@ -537,6 +540,178 @@ def main_cli(monkeypatch):
     yield env, state
     monkeypatch.chdir(ROOT)
     shutil.rmtree(work)
+
+
+@pytest.mark.parametrize("environment", ["dev", "test", "prod"])
+@pytest.mark.parametrize("retry_skus", [False, True])
+def test_primary_task_hands_off_only_capacity_then_regional_task_uses_array_order(
+        main_cli, monkeypatch, capsys, environment, retry_skus):
+    env, state = main_cli
+    suffix = "Dev" if environment == "dev" else "StageProd"
+    env.update(dev_test_prod=environment, admin_location="swedencentral",
+               aisearchRetryCapcityArray=str(retry_skus).lower())
+    env[f"aiSearchFallbackLocationArray{suffix}"] = '["denmarkeast","swedencentral","italynorth"]'
+    env[f"skuAISearch{suffix}Array"] = '["standard2","basic"]'
+    state.update(resource=None, leave_unbound=True, capacity_failure=True)
+    arguments = fallback.sys.argv[:]
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "normal"])
+    fallback.main()
+    selected_skus = ["standard2", "basic"] if retry_skus else ["standard2"]
+    assert state["attempts"] == [("swedencentral", sku) for sku in selected_skus]
+    pending = ado_values(capsys.readouterr().out)
+    assert pending["AIF_AISEARCH_FALLBACK_PENDING"] == "true"
+    assert pending["AIF_AISEARCH_STATE"] == "fallback_pending"
+    assert pending["aiSearchProvisioned"] == pending["AIF_AISEARCH_READY"] == "false"
+    env.update(pending)
+    state["capacity_failure"] = False
+    state["failures_remaining"] = len(selected_skus)
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "regional"])
+    fallback.main()
+    assert state["attempts"] == [
+        *(("swedencentral", sku) for sku in selected_skus),
+        *(("denmarkeast", sku) for sku in selected_skus),
+        ("italynorth", "standard2"),
+    ]
+    completed = ado_values(capsys.readouterr().out)
+    assert completed["AIF_AISEARCH_FALLBACK_PENDING"] == "false"
+    assert completed["AIF_AISEARCH_PROVISIONED_LOCATION"] == "italynorth"
+
+
+@pytest.mark.parametrize("setting", ["", "[]", '["westeurope"]'])
+def test_primary_capacity_without_distinct_fallback_is_terminal(main_cli, monkeypatch, setting, capsys):
+    env, state = main_cli
+    env["aiSearchFallbackLocationArrayDev"] = setting
+    state.update(resource=None, leave_unbound=True, capacity_failure=True)
+    monkeypatch.setattr(fallback.sys, "argv", [*fallback.sys.argv, "--provisioning-mode", "normal"])
+    with pytest.raises(RuntimeError, match="exhausted"):
+        fallback.main()
+    assert "AIF_AISEARCH_FALLBACK_PENDING]true" not in capsys.readouterr().out
+    assert state["attempts"] == [("westeurope", "standard2")]
+
+
+@pytest.mark.parametrize("change", ["missing", "config", "identity", "late-bound"])
+def test_regional_task_requires_matching_absent_primary_handoff(
+        main_cli, monkeypatch, capsys, change):
+    env, state = main_cli
+    env["aiSearchFallbackLocationArrayDev"] = '["denmarkeast","italynorth"]'
+    state.update(resource=None, leave_unbound=True, capacity_failure=True)
+    arguments = fallback.sys.argv[:]
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "normal"])
+    fallback.main()
+    env.update(ado_values(capsys.readouterr().out))
+    attempts = state["attempts"][:]
+    if change == "missing":
+        env["AIF_AISEARCH_FALLBACK_PENDING"] = "false"
+    elif change == "config":
+        env["aiSearchFallbackLocationArrayDev"] = '["italynorth","denmarkeast"]'
+    elif change == "identity":
+        env["AIF_AISEARCH_FALLBACK_RESOURCE_ID"] = SEARCH_ID + "-different"
+    else:
+        state["resource"] = healthy()
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "regional"])
+    with pytest.raises((ValueError, RuntimeError)):
+        fallback.main()
+    assert state["attempts"] == attempts
+
+
+def test_regional_plan_does_not_include_primary_even_when_in_array(main_cli, monkeypatch, capsys):
+    env, _ = main_cli
+    env["aiSearchFallbackLocationArrayDev"] = '["denmarkeast","westeurope","italynorth"]'
+    monkeypatch.setattr(fallback.sys, "argv", [
+        "search-region-fallback.py", "--plan", "--provisioning-mode", "regional",
+    ])
+    fallback.main()
+    assert json.loads(capsys.readouterr().out) == [["denmarkeast", "standard2"], ["italynorth", "standard2"]]
+
+
+def test_persisted_nested_deployment_capacity_is_resolved_for_handoff(main_cli, monkeypatch, capsys):
+    env, state = main_cli
+    env["aiSearchFallbackLocationArrayDev"] = '["denmarkeast"]'
+    nested_id = SEARCH_ID.rsplit("/providers/", 1)[0] + "/providers/Microsoft.Resources/deployments/search-service"
+    state.update(resource=None, leave_unbound=True, capacity_failure=True,
+                 error={"code": "DeploymentFailed", "details": [
+                     {"code": "ResourceDeploymentFailure", "target": nested_id}]},
+                 nested_error={"code": "DeploymentFailed", "details": [
+                     {"code": "InsufficientResourcesAvailable"}]})
+    monkeypatch.setattr(fallback.sys, "argv", [*fallback.sys.argv, "--provisioning-mode", "normal"])
+    fallback.main()
+    assert ado_values(capsys.readouterr().out)["AIF_AISEARCH_FALLBACK_PENDING"] == "true"
+    assert len(state["nested_reads"]) == 1
+    read = state["nested_reads"][0]
+    assert read[read.index("--resource-group") + 1] == "project-rg"
+    assert read[read.index("--name") + 1] == "search-service"
+
+
+@pytest.mark.parametrize("error", [
+    {"code": "DeploymentFailed", "details": [
+        {"code": "InsufficientResourcesAvailable"}, {"code": "AuthorizationFailed"}]},
+    {"code": "InvalidTemplate"},
+    {"code": "ResourceDeploymentFailure"},
+    {"code": "InsufficientResourcesAvailable",
+     "target": SEARCH_ID.rsplit("/providers/", 1)[0] + "/providers/Microsoft.Network/privateEndpoints/pe"},
+    None,
+])
+def test_primary_noncapacity_and_mixed_errors_never_arm_fallback(
+        main_cli, monkeypatch, capsys, error):
+    env, state = main_cli
+    env["aiSearchFallbackLocationArrayDev"] = '["denmarkeast"]'
+    state.update(resource=None, leave_unbound=True, capacity_failure=True, error=error)
+    monkeypatch.setattr(fallback.sys, "argv", [*fallback.sys.argv, "--provisioning-mode", "normal"])
+    with pytest.raises(RuntimeError, match="fatal"):
+        fallback.main()
+    assert state["attempts"] == [("westeurope", "standard2")]
+    assert "AIF_AISEARCH_FALLBACK_PENDING]true" not in capsys.readouterr().out
+
+
+def test_existing_primary_capacity_exhaustion_cannot_relocate(main_cli, monkeypatch, capsys):
+    env, state = main_cli
+    env["aiSearchFallbackLocationArrayDev"] = '["denmarkeast"]'
+    state.update(capacity_failure=True, leave_unbound=True)
+    monkeypatch.setattr(fallback.sys, "argv", [*fallback.sys.argv, "--provisioning-mode", "normal"])
+    with pytest.raises(RuntimeError, match="exhausted"):
+        fallback.main()
+    assert state["attempts"] == [("northeurope", "standard2")]
+    assert "AIF_AISEARCH_FALLBACK_PENDING]true" not in capsys.readouterr().out
+
+
+def test_regional_terminal_error_stops_at_first_array_entry(main_cli, monkeypatch, capsys):
+    env, state = main_cli
+    env["aiSearchFallbackLocationArrayDev"] = '["denmarkeast","italynorth"]'
+    state.update(resource=None, capacity_failure=True, leave_unbound=True)
+    arguments = fallback.sys.argv[:]
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "normal"])
+    fallback.main()
+    env.update(ado_values(capsys.readouterr().out))
+    state["error"] = {"code": "DeploymentFailed", "details": [
+        {"code": "InsufficientResourcesAvailable"}, {"code": "RequestDisallowedByPolicy"}]}
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "regional"])
+    with pytest.raises(RuntimeError, match="fatal"):
+        fallback.main()
+    assert state["attempts"] == [("westeurope", "standard2"), ("denmarkeast", "standard2")]
+    values = ado_values(capsys.readouterr().out)
+    assert values["AIF_AISEARCH_FALLBACK_PENDING"] == "false"
+    assert "AIF_AISEARCH_PROVISIONED_LOCATION" not in values
+
+
+@pytest.mark.parametrize("nested_error", [
+    {"code": "DeploymentFailed", "details": [{"code": "AuthorizationFailed"}]},
+    {"code": "DeploymentFailed", "details": [
+        {"code": "InsufficientResourcesAvailable"}, {"code": "QuotaExceeded"}]},
+    None,
+])
+def test_resolved_nested_deployment_must_contain_only_capacity(
+        main_cli, monkeypatch, capsys, nested_error):
+    env, state = main_cli
+    env["aiSearchFallbackLocationArrayDev"] = '["denmarkeast"]'
+    nested_id = SEARCH_ID.rsplit("/providers/", 1)[0] + "/providers/Microsoft.Resources/deployments/search-service"
+    state.update(resource=None, leave_unbound=True, capacity_failure=True,
+                 error={"code": "ResourceDeploymentFailure", "target": nested_id},
+                 nested_error=nested_error)
+    monkeypatch.setattr(fallback.sys, "argv", [*fallback.sys.argv, "--provisioning-mode", "normal"])
+    with pytest.raises(RuntimeError, match="fatal"):
+        fallback.main()
+    assert "AIF_AISEARCH_FALLBACK_PENDING]true" not in capsys.readouterr().out
+    assert len(state["nested_reads"]) == 1
 
 
 @pytest.mark.parametrize("environment", ["dev", "test", "prod"])
@@ -557,7 +732,7 @@ def test_main_missing_or_empty_region_lists_still_disable_fallback(main_cli, mon
 
 @pytest.mark.parametrize("environment", ["dev", "test", "prod"])
 @pytest.mark.parametrize("setting,expected", [(None, "normal"), ("", "normal"), ("[]", "normal"),
-                                              (" [ ] ", "normal"), (SERIALIZED_FALLBACK_REGIONS, "regional")])
+                                              (" [ ] ", "normal"), (SERIALIZED_FALLBACK_REGIONS, "normal")])
 def test_mode_selection_is_local_and_runtime_missing_never_uses_template_defaults(
         main_cli, monkeypatch, capsys, environment, setting, expected):
     env, state = main_cli
@@ -571,6 +746,8 @@ def test_mode_selection_is_local_and_runtime_missing_never_uses_template_default
     fallback.main()
     values = ado_values(capsys.readouterr().out)
     assert values["AIF_AISEARCH_MODE"] == expected
+    assert values["AIF_AISEARCH_REGIONAL_FALLBACK_ENABLED"] == str(setting == SERIALIZED_FALLBACK_REGIONS).lower()
+    assert values["AIF_AISEARCH_FALLBACK_PENDING"] == "false"
     assert values["AIF_AISEARCH_STATE"] == "pending"
     assert values["aiSearchProvisioned"] == values["AIF_AISEARCH_READY"] == "false"
     assert values["AIF_AISEARCH_NETWORK_SUCCEEDED"] == "false"
@@ -578,7 +755,7 @@ def test_mode_selection_is_local_and_runtime_missing_never_uses_template_default
     assert state["reads"] == state["attempts"] == []
 
 
-@pytest.mark.parametrize("mode,setting", [("normal", SERIALIZED_FALLBACK_REGIONS), ("regional", ""), ("regional", "[]")])
+@pytest.mark.parametrize("mode,setting", [("regional", SERIALIZED_FALLBACK_REGIONS), ("regional", ""), ("regional", "[]")])
 def test_explicit_provisioning_task_mode_cannot_run_the_wrong_path(main_cli, monkeypatch, mode, setting):
     env, state = main_cli
     env["aiSearchFallbackLocationArrayDev"] = setting
@@ -801,11 +978,15 @@ def test_retry_rechecks_identity_after_sleep_before_any_next_attempt(monkeypatch
 
 
 @pytest.mark.parametrize("change", ["healthy-binding", "failed-binding", "denial"])
-def test_main_rechecks_same_exact_id_after_delay_and_stops(main_cli, monkeypatch, change):
+def test_main_rechecks_same_exact_id_after_delay_and_stops(main_cli, monkeypatch, capsys, change):
     env, state = main_cli
     env["dev_test_prod"] = "dev"
     env["aiSearchFallbackLocationArrayDev"] = '["northeurope"]'
     state.update(resource=None, capacity_failure=True, leave_unbound=True)
+    arguments = fallback.sys.argv[:]
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "normal"])
+    fallback.main()
+    env.update(ado_values(capsys.readouterr().out))
 
     def sleep(delay):
         assert delay == 5
@@ -817,10 +998,11 @@ def test_main_rechecks_same_exact_id_after_delay_and_stops(main_cli, monkeypatch
                 state["resource"]["properties"]["provisioningState"] = "Failed"
 
     monkeypatch.setattr(fallback.time, "sleep", sleep)
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "regional"])
     with pytest.raises(RuntimeError, match="bound|Exact Search resource GET failed"):
         fallback.main()
     assert state["attempts"] == [("westeurope", "standard2")]
-    assert state["reads"] == [SEARCH_ID] * 3
+    assert state["reads"] == [SEARCH_ID] * 4
 
 
 def ado_values(output):
@@ -954,7 +1136,8 @@ def test_ado_optional_bindings_preserve_legacy_missing_settings(
         monkeypatch.setattr(fallback.sys, "argv", ["search-region-fallback.py", "--select-mode"])
         fallback.main()
         values = ado_values(capsys.readouterr().out)
-        assert values["AIF_AISEARCH_MODE"] == ("regional" if setting == SERIALIZED_FALLBACK_REGIONS else "normal")
+        assert values["AIF_AISEARCH_MODE"] == "normal"
+        assert values["AIF_AISEARCH_REGIONAL_FALLBACK_ENABLED"] == str(setting == SERIALIZED_FALLBACK_REGIONS).lower()
         assert state["reads"] == state["attempts"] == []
 
 
@@ -999,24 +1182,33 @@ def test_provider_split_lifecycle_executes_network_script_and_only_finalizes_ful
     env.update(ado_values(capsys.readouterr().out))
     outcomes["search_mode_63a"] = "success"
     is_regional = regional_setting == SERIALIZED_FALLBACK_REGIONS
-    assert step_enabled(normal, provider, env, outcomes, True) == (scenario != "no-search" and not is_regional)
-    assert step_enabled(regional, provider, env, outcomes, True) == (scenario != "no-search" and is_regional)
-    provision = regional if is_regional else normal
-    provision_id = "search_regional_fallback_63a" if is_regional else "search_provisioning_63a"
-    mode = "regional" if is_regional else "normal"
-    command = provision.get("run", provision.get("inputs", {}).get("inlineScript", ""))
-    assert f"--provisioning-mode {mode}" in command
-    monkeypatch.setattr(fallback.sys, "argv", [*original_args, "--provisioning-mode", mode])
+    assert step_enabled(normal, provider, env, outcomes, True) == (scenario != "no-search")
+    assert not step_enabled(regional, provider, env, outcomes, True)
     successful = True
-    try:
-        if scenario != "no-search":
+    provisional = {}
+    for mode, provision, provision_id in (
+            ("normal", normal, "search_provisioning_63a"),
+            ("regional", regional, "search_regional_fallback_63a")):
+        if not step_enabled(provision, provider, env, outcomes, successful):
+            continue
+        command = provision.get("run", provision.get("inputs", {}).get("inlineScript", ""))
+        assert f"--provisioning-mode {mode}" in command
+        previous_attempts = len(state["attempts"])
+        monkeypatch.setattr(fallback.sys, "argv", [*original_args, "--provisioning-mode", mode])
+        try:
             fallback.main()
             outcomes[provision_id] = "success"
-    except RuntimeError:
-        assert scenario in {"provision-failed", "exhausted"}
-        successful = False
-        outcomes[provision_id] = "failure"
-    provisional = ado_values(capsys.readouterr().out)
+        except RuntimeError:
+            assert scenario in {"provision-failed", "exhausted"}
+            successful = False
+            outcomes[provision_id] = "failure"
+        values = ado_values(capsys.readouterr().out)
+        provisional.update(values)
+        env.update(values)
+        if mode == "regional":
+            assert all(location != "westeurope" for location, _ in state["attempts"][previous_attempts:])
+    assert (outcomes["search_regional_fallback_63a"] != "skipped") == (
+        is_regional and scenario in {"exhausted", "ready"})
     assert not set(provisional) & {"aiSearchLocation", "effectiveAiSearchLocation", "effectiveAiSearchSku",
                                    "skuAISearchDev", "skuAISearchStageProd"}
     env.update(provisional)
@@ -1036,7 +1228,7 @@ def test_provider_split_lifecycle_executes_network_script_and_only_finalizes_ful
             (location, sku) for location in ["westeurope", *(DEFAULT_FALLBACK_REGIONS if is_regional else [])]
             for sku in ("standard2", "basic", "standard")
         ]
-        assert state["reads"] == [SEARCH_ID] * (attempt_count * 2)
+        assert state["reads"] == [SEARCH_ID] * (attempt_count * 2 + (1 if is_regional else 0))
         assert [call.args for call in fallback.time.sleep.call_args_list] == [(5,)] * (attempt_count - 1)
         if scenario == "ready":
             assert env["aiSearchExists"] == "false"
