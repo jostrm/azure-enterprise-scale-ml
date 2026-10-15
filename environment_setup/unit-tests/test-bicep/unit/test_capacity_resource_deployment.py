@@ -55,6 +55,7 @@ SERVICES = {
 }
 TAGS = {"owner": "unit 'quoted' $HOME ;", "nested": {"region": ["one", "two"]}}
 PRIVATE_VALUE = "offline-private-value-must-not-appear-in-argv-or-logs"
+SEARCH_FALLBACK_REGIONS = ["francecentral", "denmarkeast", "italynorth", "norwayeast", "germanywestcentral"]
 
 
 @pytest.fixture
@@ -113,6 +114,8 @@ def environment(service, target="dev"):
         "project_IP_whitelist": "192.0.2.1/32", "use_ad_groups": "true",
         "enablePublicGenAIAccess": "false", "enablePublicAccessWithPerimeter": "false",
         "enableAIFoundry": "false", "enableAFoundryCaphost": "false",
+        "aiSearchFallbackLocationArrayDev": "[]",
+        "aiSearchFallbackLocationArrayStageProd": "[]",
         "deleteAllServicesForProject": "false",
         spec["flag"]: "true", spec["debug"]: "false",
         spec["sku"] + suffix: spec["selected"],
@@ -163,6 +166,8 @@ def runtime(runner, workspace, monkeypatch, capsys):
         def azure(self, command, **kwargs):
             assert kwargs == {"capture_output": True, "text": True, "check": False}
             self.calls.append(command)
+            if command[1:4] == ["rest", "--method", "get"]:
+                return subprocess.CompletedProcess(command, 1, "", "(ResourceNotFound) Not found")
             if command[1:3] == ["bicep", "build"]:
                 if self.build_outcome:
                     return subprocess.CompletedProcess(command, *self.build_outcome)
@@ -172,6 +177,11 @@ def runtime(runner, workspace, monkeypatch, capsys):
             parameter_arg = command[command.index("--parameters") + 1]
             assert parameter_arg.startswith("@") and command.count("--parameters") == 1
             path = Path(parameter_arg[1:])
+            parameters = json.loads(path.read_text(encoding="utf-8"))["parameters"]
+            if parameters.get("capacityIdentityOnly", {}).get("value"):
+                return subprocess.CompletedProcess(command, 0, json.dumps({"properties": {"outputs": {
+                    "aiSearchResourceId": {"value": "/subscriptions/unit-subscription/resourceGroups/rg/providers/Microsoft.Search/searchServices/search"},
+                }}}), "")
             self.paths.append(path)
             self.parameters.append(json.loads(path.read_text(encoding="utf-8"))["parameters"])
             assert PRIVATE_VALUE not in " ".join(command)
@@ -562,13 +572,340 @@ def test_cli_parser_rejects_a_fourth_attempt(runtime, runner, monkeypatch, capsy
     assert runtime.calls == []
 
 
-def expanded_steps(provider, service):
+@pytest.mark.parametrize("value,expected", [
+    ("", []), ("[]", []), ([], []),
+    (" West Europe , North Europe ", ["westeurope", "northeurope"]),
+    ('["East US 2","Sweden Central"]', ["eastus2", "swedencentral"]),
+    (["West Europe"], ["westeurope"]),
+    (SEARCH_FALLBACK_REGIONS[:4], SEARCH_FALLBACK_REGIONS[:4]),
+    (SEARCH_FALLBACK_REGIONS, SEARCH_FALLBACK_REGIONS),
+    (json.dumps(SEARCH_FALLBACK_REGIONS), SEARCH_FALLBACK_REGIONS),
+    (",".join(SEARCH_FALLBACK_REGIONS), SEARCH_FALLBACK_REGIONS),
+])
+def test_search_region_normalization(runner, value, expected):
+    assert runner.normalize_search_regions(value) == expected
+
+
+@pytest.mark.parametrize("value", [
+    None, {}, 1, True, "null", "false", '"eastus"', "[eastus]", '["eastus",1]',
+    ["eastus", ""], "eastus,", "eastus,,westus", "eastus,EAST US",
+    "$(region)", "${{ vars.REGION }}", "east-us", "eastus\nwestus",
+    SEARCH_FALLBACK_REGIONS + ["eastus"],
+    json.dumps(SEARCH_FALLBACK_REGIONS + ["eastus"]),
+    ",".join(SEARCH_FALLBACK_REGIONS + ["eastus"]),
+])
+def test_search_region_normalization_rejects_unsafe_inputs(runner, value):
+    with pytest.raises(ValueError):
+        runner.normalize_search_regions(value)
+
+
+@pytest.mark.parametrize("suffix", ["Dev", "StageProd"])
+def test_sixth_search_fallback_is_rejected_before_azure(runtime, suffix):
+    runtime.configure("ai-search", "dev" if suffix == "Dev" else "prod")
+    runtime.env[("aiSearchFallbackLocationArray" + suffix).upper()] = json.dumps(
+        SEARCH_FALLBACK_REGIONS + ["eastus"])
+    with pytest.raises(ValueError, match="at most five"):
+        runtime.attempt()
+    assert runtime.calls == [] and runtime.sleeps == []
+
+
+def test_search_region_candidates_are_region_major_and_independent_of_sku_switch(runner):
+    assert runner.search_candidate_order("East US 2", '["eastus2","West Europe"]',
+                                         "standard", "basic,standard,standard2", "true") == [
+        ("eastus2", "standard"), ("eastus2", "basic"), ("eastus2", "standard2"),
+        ("westeurope", "standard"), ("westeurope", "basic"), ("westeurope", "standard2"),
+    ]
+    assert runner.search_candidate_order("eastus2", "westeurope", "standard", "unused", "false") == [
+        ("eastus2", "standard"), ("westeurope", "standard"),
+    ]
+    assert runner.search_candidate_order("France Central", SEARCH_FALLBACK_REGIONS,
+                                         "standard", "basic,standard,standard2", "true") == [
+        (region, sku) for region in SEARCH_FALLBACK_REGIONS
+        for sku in ["standard", "basic", "standard2"]
+    ]
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
+def test_search_regional_driver_exhausts_primary_then_publishes_effective_location(
+        runtime, runner, monkeypatch, provider, target, suffix):
+    runtime.configure("ai-search", target)
+    runtime.env[("aiSearchFallbackLocationArray" + suffix).upper()] = '["West Europe"]'
+    monkeypatch.setattr(runner, "search_identity", lambda *args: "/subscriptions/unit-subscription/resourceGroups/rg/providers/Microsoft.Search/searchServices/search")
+    monkeypatch.setattr(runner, "read_search", lambda *args: None)
+    original = runtime.azure
+    def azure(command, **kwargs):
+        if command[1:4] == ["deployment", "sub", "create"]:
+            runtime.outcome = (9, "", '{"error":{"code":"InsufficientResourcesAvailable"}}') if len(runtime.parameters) < 3 else (0, "", "")
+        return original(command, **kwargs)
+    monkeypatch.setattr(runner.subprocess, "run", azure)
+    status, values, _ = runtime.attempt(provider=provider)
+    assert status == 0 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "0"
+    assert values["aiSearchLocation"] == "westeurope"
+    assert values["skuAISearch" + suffix] == "standard"
+    assert [p["aiSearchLocation"]["value"] for p in runtime.parameters] == [
+        "swedencentral", "swedencentral", "swedencentral", "westeurope",
+    ]
+    assert all(p["location"]["value"] == "swedencentral" for p in runtime.parameters)
+    assert runtime.sleeps == [240, 240, 240]
+
+
+@pytest.mark.parametrize("existing", [
+    {"location": "West Europe", "properties": {"provisioningState": "succeeded"}},
+    {"location": "West Europe", "properties": {"provisioningState": "failed"}},
+])
+def test_existing_search_is_never_relocated(runtime, runner, monkeypatch, existing):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "northeurope"
+    monkeypatch.setattr(runner, "search_identity", lambda *args: "search-id")
+    monkeypatch.setattr(runner, "read_search", lambda *args: existing)
+    runtime.outcome = (9, "", "InsufficientResourcesAvailable")
+    status, values, captured = runtime.attempt()
+    assert status == 9 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "failed"
+    assert len(runtime.parameters) == 3
+    assert all(p["aiSearchLocation"]["value"] == "westeurope" for p in runtime.parameters)
+    assert "never delete" in captured.err.lower()
+
+
+def test_search_partial_creation_stops_before_relocation(runtime, runner, monkeypatch):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "westeurope"
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = "false"
+    monkeypatch.setattr(runner, "search_identity", lambda *args: "search-id")
+    reads = iter([None, {"location": "swedencentral", "properties": {"provisioningState": "failed"}}])
+    monkeypatch.setattr(runner, "read_search", lambda *args: next(reads))
+    runtime.outcome = (9, "", "InsufficientResourcesAvailable")
+    status, values, captured = runtime.attempt()
+    assert status == 9 and len(runtime.parameters) == 1 and runtime.sleeps == []
+    assert values["AIF_AISEARCH_CAPACITY_NEXT"] == "failed"
+    assert "bound" in captured.err.lower()
+
+
+@pytest.mark.parametrize("error,attempts", [
+    ("InsufficientResourcesAvailable", 18),
+    ("AuthorizationFailed\nInsufficientResourcesAvailable", 1),
+    ('{"error":{"code":"UnexpectedError","details":[{"code":"InsufficientResourcesAvailable"}]}}', 1),
+    ('{"error":{"details":[{"code":"InsufficientResourcesAvailable"},{"code":"QuotaExceeded"}]}}', 1),
+    ('{"error":{"code":"InsufficientResourcesAvailable","target":"Microsoft.Network/privateEndpoints/pe"}}', 1),
+])
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
+def test_regional_search_exhaustion_and_terminal_failures_never_arm_legacy_steps(
+        runtime, runner, monkeypatch, error, attempts, provider, target, suffix):
+    runtime.configure("ai-search", target)
+    runtime.env[("aiSearchFallbackLocationArray" + suffix).upper()] = json.dumps(SEARCH_FALLBACK_REGIONS)
+    monkeypatch.setattr(runner, "search_identity", lambda *args: "search-id")
+    monkeypatch.setattr(runner, "read_search", lambda *args: None)
+    runtime.outcome = (19, "", error)
+    status, values, captured = runtime.attempt(provider=provider)
+    assert status == 19 and values == {"AIF_AISEARCH_CAPACITY_NEXT": "failed"}
+    assert len(runtime.parameters) == attempts and runtime.sleeps == [240] * (attempts - 1)
+    expected = [(region, sku) for region in ["swedencentral", *SEARCH_FALLBACK_REGIONS]
+                for sku in SERVICES["ai-search"]["order"]]
+    assert [(p["aiSearchLocation"]["value"], p["skuAISearch" + suffix]["value"])
+            for p in runtime.parameters] == expected[:attempts]
+    assert all(p["location"]["value"] == "swedencentral" for p in runtime.parameters)
+    if attempts == 18:
+        assert "attempt 18/18" in captured.out
+        assert "candidates exhausted" in captured.err
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
+@pytest.mark.parametrize("regions", [None, "", " ", "[]"])
+def test_missing_or_empty_search_regions_retain_legacy_sku_steps(runtime, provider, target, suffix, regions):
+    runtime.configure("ai-search", target)
+    key = ("aiSearchFallbackLocationArray" + suffix).upper()
+    if regions is None:
+        runtime.env.pop(key)
+    else:
+        runtime.env[key] = regions
+    runtime.outcome = (19, "", "InsufficientResourcesAvailable")
+    status, values, _ = runtime.attempt(provider=provider)
+    assert status == 0 and values == {"AIF_AISEARCH_CAPACITY_NEXT": "2"}
+    assert len(runtime.parameters) == 1 and runtime.sleeps == []
+    assert runtime.parameters[0]["aiSearchLocation"]["value"] == "swedencentral"
+
+
+def test_region_only_search_ignores_malformed_sku_arrays(runtime, runner, monkeypatch):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = json.dumps(SEARCH_FALLBACK_REGIONS)
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = "false"
+    runtime.env["SKUARRAYAISEARCHDEV"] = "malformed,,,"
+    monkeypatch.setattr(runner, "search_identity", lambda *args: "search-id")
+    monkeypatch.setattr(runner, "read_search", lambda *args: None)
+    runtime.outcome = (19, "", "InsufficientResourcesAvailable")
+    status, _, _ = runtime.attempt()
+    assert status == 19
+    assert [(p["aiSearchLocation"]["value"], p["skuAISearchDev"]["value"]) for p in runtime.parameters] == [
+        (region, "standard") for region in ["swedencentral", *SEARCH_FALLBACK_REGIONS]
+    ]
+    assert runtime.sleeps == [240] * 5
+
+
+def test_delayed_search_name_binding_is_rechecked_after_retry_delay(runtime, runner, monkeypatch):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "westeurope"
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = "false"
+    monkeypatch.setattr(runner, "search_identity", lambda *args: "search-id")
+    reads = iter([None, None, {
+        "location": "swedencentral", "properties": {"provisioningState": "failed"},
+    }])
+    monkeypatch.setattr(runner, "read_search", lambda *args: next(reads))
+    runtime.outcome = (19, "", "InsufficientResourcesAvailable")
+    status, values, captured = runtime.attempt()
+    assert status == 19 and len(runtime.parameters) == 1
+    assert runtime.sleeps == [240] and values["AIF_AISEARCH_CAPACITY_NEXT"] == "failed"
+    assert "bound" in captured.err.lower()
+
+
+def test_private_endpoint_capacity_is_not_search_region_exhaustion(runner):
+    error = json.dumps({"error": {"code": "DeploymentFailed", "details": [{
+        "code": "InsufficientResourcesAvailable",
+        "target": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/privateEndpoints/pe",
+    }]}})
+    assert not runner.is_search_capacity_failure(error, "search-id")
+    assert runner.is_search_capacity_failure('{"error":{"code":"InsufficientResourcesAvailable"}}', "search-id")
+    assert not runner.is_search_capacity_failure('{"error":{"details":[{"code":"InsufficientResourcesAvailable"},{"code":"QuotaExceeded"}]}}', "search-id")
+
+
+def test_empty_regions_rerun_keeps_existing_actual_location(runtime, runner, monkeypatch):
+    monkeypatch.setattr(runner, "read_search", lambda *args: {
+        "location": "West Europe", "properties": {"provisioningState": "succeeded"},
+    })
+    _, values, _ = runtime.attempt()
+    assert runtime.parameters[-1]["aiSearchLocation"]["value"] == "westeurope"
+    assert values["aiSearchLocation"] == "westeurope"
+
+
+@pytest.fixture
+def exact_search_read(runtime, runner, monkeypatch):
+    original = runtime.azure
+
+    def configure(outcome):
+        def azure(command, **kwargs):
+            if command[1:4] == ["rest", "--method", "get"]:
+                runtime.calls.append(command)
+                assert command[command.index("--url") + 1] == (
+                    "https://management.azure.com/subscriptions/unit-subscription/resourceGroups/rg/"
+                    "providers/Microsoft.Search/searchServices/search?api-version=2025-05-01"
+                )
+                return subprocess.CompletedProcess(command, *outcome)
+            return original(command, **kwargs)
+
+        monkeypatch.setattr(runner.subprocess, "run", azure)
+
+    return configure
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
+@pytest.mark.parametrize("regions", ["", "[]", "northeurope"])
+@pytest.mark.parametrize("retry", ["false", "true"])
+def test_existing_region_pinning_keeps_explicit_scalar_sku_update(
+        runtime, exact_search_read, provider, target, suffix, regions, retry):
+    runtime.configure("ai-search", target)
+    runtime.env[("skuAISearch" + suffix).upper()] = "standard2"
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = retry
+    runtime.env[("skuArrayAISearch" + suffix).upper()] = (
+        "basic,standard,standard2" if retry == "true" else "unused,,"
+    )
+    runtime.env[("aiSearchFallbackLocationArray" + suffix).upper()] = regions
+    exact_search_read((0, json.dumps({
+        "location": "West Europe", "sku": {"name": "standard"},
+        "properties": {"provisioningState": "Succeeded"},
+    }), ""))
+
+    status, values, _ = runtime.attempt(provider=provider)
+
+    assert status == 0 and len(runtime.parameters) == 1 and runtime.sleeps == []
+    assert runtime.parameters[0]["skuAISearch" + suffix] == {"value": "standard2"}
+    assert runtime.parameters[0]["aiSearchLocation"] == {"value": "westeurope"}
+    assert runtime.parameters[0]["location"] == {"value": "swedencentral"}
+    assert values["skuAISearch" + suffix] == "standard2"
+    assert values["aiSearchLocation"] == "westeurope"
+    assert values["AIF_AISEARCH_CAPACITY_NEXT"] == "0"
+    assert not any("list" in command for command in runtime.calls)
+
+
+@pytest.mark.parametrize("regions", ["[]", "northeurope"])
+@pytest.mark.parametrize("code,status", [("ResourceNotFound", 404), ("AuthorizationFailed", 403)])
+def test_exact_search_get_is_required_before_any_search_creation(
+        runtime, exact_search_read, regions, code, status):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = regions
+    exact_search_read((1, "", json.dumps({"error": {"code": code}, "status": status})))
+
+    if status == 404:
+        result, _, _ = runtime.attempt()
+        assert result == 0 and len(runtime.parameters) == 1
+    else:
+        with pytest.raises(ValueError, match="Cannot read the named Search service"):
+            runtime.attempt()
+        assert runtime.parameters == [] and runtime.sleeps == []
+    assert sum(command[1:4] == ["rest", "--method", "get"] for command in runtime.calls) == 1
+    assert not any("list" in command for command in runtime.calls)
+
+
+@pytest.mark.parametrize("error", [
+    "AuthorizationFailed", "NotFound", "timeout", "(ResourceNotFound) AuthorizationFailed",
+    '{"error":{"code":"UnexpectedError","details":[{"code":"ResourceNotFound"}]}}',
+    '{"error":{"code":"ResourceNotFound"',
+    '{"error":{"code":"ResourceNotFound"}} trailing text',
+    '{"error":{"code":"ResourceNotFound"},"statusCode":403}',
+    '{"error":{"code":"ResourceNotFound"},"statusCode":500}',
+    '{"statusCode":404}', "HTTP 404 Not Found",
+    "(ResourceNotFound) Missing.\nCode: AuthorizationFailed",
+    "(ResourceNotFound) Missing.\nHTTP 500 Internal Server Error",
+])
+def test_search_read_denial_is_not_absence(runtime, runner, monkeypatch, error):
+    monkeypatch.setattr(runner.subprocess, "run", lambda command, **kwargs:
+                        subprocess.CompletedProcess(command, 1, "", error))
+    with pytest.raises(ValueError, match="Cannot read"):
+        runner.read_search("offline-az", "search-id")
+
+
+@pytest.mark.parametrize("error", [
+    '{"error":{"code":"ResourceNotFound"}}',
+    'ERROR: {"error":{"code":"ResourceNotFound"},"statusCode":404}',
+    "(ResourceNotFound) Missing.",
+    "ERROR: (ResourceNotFound) Missing.\nCode: ResourceNotFound",
+])
+def test_search_read_accepts_only_complete_explicit_not_found(runner, monkeypatch, error):
+    monkeypatch.setattr(runner.subprocess, "run", lambda command, **kwargs:
+                        subprocess.CompletedProcess(command, 1, "", error))
+    assert runner.read_search("offline-az", "search-id") is None
+
+
+def test_private_foundry_search_dependency_is_not_disabled(runtime):
+    runtime.env["ENABLEAISEARCH"] = "false"
+    runtime.env["ENABLEAIFOUNDRY"] = "true"
+    runtime.env["ENABLEPUBLICGENAIACCESS"] = "false"
+    status, _, _ = runtime.attempt()
+    assert status == 0 and len(runtime.parameters) == 1
+
+
+def test_public_private_foundry_flags_reach_same_dependency_and_deployment(runtime):
+    for canonical, public, value in [
+        ("ENABLEAISEARCH", "ENABLE_AI_SEARCH", "false"),
+        ("ENABLEAIFOUNDRY", "ENABLE_AI_FOUNDRY", "true"),
+        ("ENABLEPUBLICGENAIACCESS", "ENABLE_PUBLIC_GENAI_ACCESS", "false"),
+    ]:
+        runtime.env.pop(canonical, None)
+        runtime.env[public] = value
+    status, _, _ = runtime.attempt()
+    assert status == 0
+    params = runtime.parameters[-1]
+    assert params["enableAISearch"]["value"] is False
+    assert params["enableAIFoundry"]["value"] is True
+    assert params["enablePublicGenAIAccess"]["value"] is False
+
+
+def expanded_steps(provider, service, include_search_routing=False):
     if provider == "github":
         return [
             step for step in objects(load_pipeline(GHA))
             if isinstance(step.get("run"), str)
-            and re.search(r"--service\s+" + re.escape(service) + r"\s", step["run"])
+            and (re.search(r"--service\s+" + re.escape(service) + r"\s", step["run"])
+                 or (include_search_routing and service == "ai-search"
+                     and "--publish-search-region-gate" in step["run"]))
             and "deploy-capacity-resource.py" in step.get("run", "")
+            and (include_search_routing or "region-fallback" not in step.get("name", ""))
         ]
     includes = [
         step for step in load_pipeline(ADO_JOB)["steps"]
@@ -577,14 +914,25 @@ def expanded_steps(provider, service):
     assert len(includes) == 1
     parameters = includes[0]["parameters"]
     result = []
+    templates = []
     for step in load_pipeline(ADO_ATTEMPTS)["steps"]:
+        if "${{ if eq(parameters.service, 'ai-search') }}" in step:
+            if service == "ai-search":
+                templates.extend(step["${{ if eq(parameters.service, 'ai-search') }}"])
+        else:
+            templates.append(step)
+    for step in templates:
         expanded = json.dumps(step)
         # Replace only CI template syntax, never Bash substitutions or $variables.
         expanded = re.sub(
             r"\$\{\{\s*parameters\.(\w+)\s*\}\}",
             lambda match: parameters[match[1]], expanded,
         )
-        result.append(json.loads(expanded))
+        item = json.loads(expanded)
+        if not include_search_routing and any(
+                marker in item.get("displayName", "") for marker in ("region-fallback", "region-gate")):
+            continue
+        result.append(item)
     return result
 
 
@@ -595,6 +943,8 @@ def allowed(step, provider, env, phase="infra", success=True):
     for spec in SERVICES.values():
         context.setdefault("env." + spec["state"], "")
         context.setdefault("variables." + spec["state"], "")
+    context.setdefault("env.AIF_AISEARCH_REGION_FALLBACK_ENABLED", "false")
+    context.setdefault("variables.AIF_AISEARCH_REGION_FALLBACK_ENABLED", "false")
     expression = step["if"] if provider == "github" else step["condition"]
     expression = re.sub(r"\$\{\{\s*parameters\.phase\s*\}\}", phase, expression)
     # GHA adds an implicit success() unless a status-check function is supplied.
@@ -662,6 +1012,9 @@ def script_harness(workspace):
         import json, os, pathlib, sys
         root = pathlib.Path(os.environ["CAPACITY_TEST_ROOT"])
         args = sys.argv[1:]
+        if args[:3] == ["rest", "--method", "get"]:
+            print("(ResourceNotFound) Not found", file=sys.stderr)
+            sys.exit(1)
         record = {"argv": args}
         if args[:2] == ["bicep", "build"]:
             name = pathlib.Path(args[args.index("--file") + 1]).name
@@ -674,12 +1027,24 @@ def script_harness(workspace):
         parameter = args[args.index("--parameters") + 1]
         assert parameter.startswith("@") and args.count("--parameters") == 1
         path = pathlib.Path(parameter[1:])
+        parameters = json.loads(path.read_text(encoding="utf-8"))["parameters"]
+        if parameters.get("capacityIdentityOnly", {}).get("value"):
+            print(json.dumps({"properties": {"outputs": {"aiSearchResourceId": {
+                "value": "/subscriptions/unit-subscription/resourceGroups/rg/providers/Microsoft.Search/searchServices/search"
+            }}}}))
+            sys.exit(0)
         record["path"] = str(path)
         record["parameters"] = json.loads(path.read_text(encoding="utf-8"))["parameters"]
         with (root / "az.jsonl").open("a", encoding="utf-8") as output:
             output.write(json.dumps(record) + "\\n")
-        print(os.environ.get("CAPACITY_TEST_ERROR", ""), file=sys.stderr)
-        sys.exit(int(os.environ["CAPACITY_TEST_STATUS"]))
+        status = int(os.environ["CAPACITY_TEST_STATUS"])
+        if os.environ.get("CAPACITY_TEST_SUCCEED_AT"):
+            creates = [json.loads(line) for line in (root / "az.jsonl").read_text(encoding="utf-8").splitlines()
+                       if "parameters" in json.loads(line)]
+            status = 0 if len(creates) == int(os.environ["CAPACITY_TEST_SUCCEED_AT"]) else 29
+        if status:
+            print(os.environ.get("CAPACITY_TEST_ERROR", ""), file=sys.stderr)
+        sys.exit(status)
     """), encoding="utf-8")
     az = workspace / ("az.cmd" if os.name == "nt" else "az")
     if os.name == "nt":
@@ -706,6 +1071,7 @@ def script_harness(workspace):
     class Harness:
         def __init__(self):
             self.results, self.published = [], []
+            self.executed, self.skipped, self.preparations = [], [], []
 
         def execute(self, service, provider, target="dev", succeed_at=3, error="SkuNotAvailable",
                     overrides=None, remove=()):
@@ -713,12 +1079,18 @@ def script_harness(workspace):
             env.update(overrides or {})
             for key in remove:
                 env.pop(key)
-            steps = expanded_steps(provider, service)
+            steps = expanded_steps(provider, service, include_search_routing=True)
             success = True
-            for attempt, step in enumerate(steps, 1):
+            for step in steps:
+                name = step.get("name", step.get("displayName"))
                 if not allowed(step, provider, env, success=success):
+                    self.skipped.append(name)
                     continue
-                script = step["run"] if provider == "github" else step["inputs"]["inlineScript"]
+                self.executed.append(name)
+                script = step["run"] if provider == "github" else step["inputs"].get("inlineScript", step["inputs"].get("script"))
+                prepare = "--publish-search-region-gate" in script
+                attempt_match = re.search(r"--attempt\s+(\d)", script)
+                attempt = int(attempt_match[1]) if attempt_match else 0
                 script = re.sub(r"\$\{\{\s*env\.(\w+)\s*\}\}", lambda m: env[m[1]], script)
                 script = re.sub(r"\$\(([A-Za-z_][A-Za-z0-9_.]*)\)", lambda m: env[m[1]], script)
                 assert "${{" not in script
@@ -732,8 +1104,11 @@ def script_harness(workspace):
                 })
                 for key, value in step.get("env", {}).items():
                     if key.startswith("${{"):
-                        if service == "postgresql":
-                            child_env.update(value)
+                        if f"'{service}'" in key:
+                            child_env.update({
+                                name: re.sub(r"\$\(([A-Za-z_][A-Za-z0-9_.]*)\)", lambda m: env[m[1]], raw)
+                                for name, raw in value.items()
+                            })
                     else:
                         child_env[key] = re.sub(
                             r"\$\(([A-Za-z_][A-Za-z0-9_.]*)\)", lambda m: env[m[1]], value,
@@ -750,9 +1125,12 @@ def script_harness(workspace):
                     cwd=workspace / "work" if provider == "github" else mirrored_bicep,
                     env=child_env, capture_output=True, text=True, timeout=30, check=False,
                 )
-                self.results.append(result)
                 values = publications(provider, result.stdout, github_env)
-                self.published.append(values)
+                if prepare:
+                    self.preparations.append(result)
+                else:
+                    self.results.append(result)
+                    self.published.append(values)
                 env.update(values)
                 success = result.returncode == 0
             return env
@@ -764,6 +1142,94 @@ def script_harness(workspace):
             return [json.loads(line) for line in sleeps.read_text(encoding="utf-8").splitlines()] if sleeps.exists() else []
 
     return Harness()
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("target,suffix,other", [
+    ("dev", "Dev", "StageProd"), ("test", "StageProd", "Dev"), ("prod", "StageProd", "Dev"),
+])
+@pytest.mark.parametrize("value,enabled", [
+    ("", False), ("[]", False), (" [ ] ", False), (None, False),
+    ("francecentral,Denmark East", True),
+    (json.dumps(SEARCH_FALLBACK_REGIONS), True),
+])
+def test_actual_ci_region_task_skip_and_enable_routing(
+        script_harness, provider, target, suffix, other, value, enabled):
+    key = "aiSearchFallbackLocationArray" + suffix
+    overrides = {
+        "aiSearchFallbackLocationArray" + other: json.dumps(SEARCH_FALLBACK_REGIONS),
+        "aisearchRetryCapcityArray": "false",
+    }
+    if value is not None:
+        overrides[key] = value
+    final = script_harness.execute("ai-search", provider, target, succeed_at=1,
+                                   overrides=overrides, remove=(key,) if value is None else ())
+    assert len(script_harness.preparations) == 1
+    assert script_harness.preparations[0].returncode == 0
+    assert final["AIF_AISEARCH_REGION_FALLBACK_ENABLED"] == str(enabled).lower()
+    assert any("region-fallback" in name for name in script_harness.executed) is enabled
+    assert any("region-fallback" in name for name in script_harness.skipped) is not enabled
+    assert any(name.endswith("attempt-1") for name in script_harness.executed) is not enabled
+    assert len(script_harness.results) == 1 and script_harness.results[0].returncode == 0
+    assert len([record for record in script_harness.records() if "parameters" in record]) == 1
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("value", ["", "[]"])
+@pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
+def test_actual_ci_empty_regions_skip_task_but_keep_all_sku_retries(
+        script_harness, provider, value, target, suffix):
+    final = script_harness.execute("ai-search", provider, target, succeed_at=3, overrides={
+        "aiSearchFallbackLocationArray" + suffix: value,
+    })
+    assert final["AIF_AISEARCH_REGION_FALLBACK_ENABLED"] == "false"
+    assert not any("region-fallback" in name for name in script_harness.executed)
+    assert any("region-fallback" in name for name in script_harness.skipped)
+    assert len(script_harness.results) == 3
+    assert final["skuAISearch" + suffix] == "standard2"
+    assert script_harness.sleep_values() == [240, 240]
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("value", [
+    json.dumps(SEARCH_FALLBACK_REGIONS + ["eastus"]), '["francecentral",1]', "$(region)",
+])
+def test_actual_ci_invalid_region_gate_blocks_all_provisioning(script_harness, provider, value):
+    script_harness.execute("ai-search", provider, overrides={"aiSearchFallbackLocationArrayDev": value})
+    assert len(script_harness.preparations) == 1 and script_harness.preparations[0].returncode == 2
+    assert script_harness.results == [] and script_harness.records() == []
+    assert "configuration error" in script_harness.preparations[0].stderr
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("cap_host,debug", [("false", "false"), ("true", "true")])
+def test_region_tasks_keep_main_private_foundry_dependency_and_debug_exception(provider, cap_host, debug):
+    env = environment("ai-search")
+    env.update({
+        "enableAISearch": "false", "enableAIFoundry": "true", "enablePublicGenAIAccess": "false",
+        "enableAFoundryCaphost": cap_host, "debug_disable_63_cognitive_services": debug,
+        "AIF_AISEARCH_REGION_FALLBACK_ENABLED": "true",
+    })
+    steps = expanded_steps(provider, "ai-search", include_search_routing=True)
+    assert [allowed(step, provider, env) for step in steps] == [True, True, False, False, False]
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("blocked", ["disabled", "deleted", "phase", "debug", "failed"])
+def test_search_regional_tasks_preserve_all_original_ci_gates(provider, blocked):
+    env = environment("ai-search")
+    env["AIF_AISEARCH_REGION_FALLBACK_ENABLED"] = "true"
+    env["AIF_AISEARCH_CAPACITY_NEXT"] = "2"
+    if blocked == "disabled":
+        env["enableAISearch"] = "false"
+    elif blocked == "deleted":
+        env["deleteAllServicesForProject"] = "true"
+    elif blocked == "debug":
+        env["debug_disable_63_cognitive_services"] = "true"
+    steps = expanded_steps(provider, "ai-search", include_search_routing=True)
+    assert len(steps) == 5
+    assert not any(allowed(step, provider, env, phase="apps" if blocked == "phase" else "infra",
+                           success=blocked != "failed") for step in steps)
 
 
 @pytest.mark.parametrize("provider", ["ado", "github"])
@@ -799,6 +1265,31 @@ def test_extracted_ci_scripts_execute_real_cli_offline(script_harness, provider,
             assert params["postgreSQLVersion"] == {"value": "17"}
             assert params["projectServicePrincipleOID_SeedingKeyvaultName"] == {"value": PRIVATE_VALUE}
     assert all(PRIVATE_VALUE not in result.stdout + result.stderr for result in script_harness.results)
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
+def test_extracted_ci_search_regions_complete_in_first_step_and_never_arm_legacy_steps(
+        script_harness, provider, target, suffix):
+    final = script_harness.execute("ai-search", provider, target, overrides={
+        "aiSearchFallbackLocationArray" + suffix: json.dumps(SEARCH_FALLBACK_REGIONS),
+        "CAPACITY_TEST_SUCCEED_AT": "18",
+    })
+    assert len(script_harness.results) == 1
+    assert script_harness.results[0].returncode == 0, script_harness.results[0].stderr
+    assert final["AIF_AISEARCH_CAPACITY_NEXT"] == "0"
+    assert final["aiSearchLocation"] == "germanywestcentral"
+    assert final["skuAISearch" + suffix] == "standard2"
+    creates = [record for record in script_harness.records() if "parameters" in record]
+    assert [(record["parameters"]["aiSearchLocation"]["value"],
+             record["parameters"]["skuAISearch" + suffix]["value"]) for record in creates] == [
+        (region, sku) for region in ["swedencentral", *SEARCH_FALLBACK_REGIONS]
+        for sku in SERVICES["ai-search"]["order"]
+    ]
+    assert all(record["argv"][record["argv"].index("--location") + 1] == "swedencentral" for record in creates)
+    assert all(record["parameters"]["location"]["value"] == "swedencentral" for record in creates)
+    assert "attempt 18/18" in script_harness.results[0].stdout
+    assert script_harness.sleep_values() == [240] * 17
 
 
 @pytest.mark.parametrize("provider", ["ado", "github"])
@@ -895,6 +1386,9 @@ def test_actual_json_exporter_maps_public_capacity_aliases_and_preserves_tags(wo
     }
     values = {"tagsProject": TAGS}
     expected = {"tagsProject": TAGS}
+    for suffix, public in [("Dev", "DEV"), ("StageProd", "STAGEPROD")]:
+        values["AI_SEARCH_FALLBACK_LOCATION_ARRAY_" + public] = ["West Europe"]
+        expected["aiSearchFallbackLocationArray" + suffix] = ["West Europe"]
     for service, spec in SERVICES.items():
         for suffix, public_suffix in [("Dev", "DEV"), ("StageProd", "STAGEPROD")]:
             values[f"SKU_ARRAY_{spec['public']}_{public_suffix}"] = spec["array_value"]
@@ -920,7 +1414,7 @@ def test_actual_json_exporter_maps_public_capacity_aliases_and_preserves_tags(wo
         assert lines[index + 2] == delimiter
         exported[name] = lines[index + 1]
     for name, value in expected.items():
-        assert (json.loads(exported[name]) if name == "tagsProject" else exported[name]) == value
+        assert (json.loads(exported[name]) if isinstance(value, (dict, list)) else exported[name]) == value
     assert PRIVATE_VALUE not in result.stdout + result.stderr
 
 

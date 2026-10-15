@@ -152,7 +152,7 @@ record_report_finding() {
   if [ "$report_code" = "SEARCH_SKU_UNAVAILABLE" ] && [ "${search_discovery_valid:-}" != "true" ]; then
     report_code="SEARCH_QUOTA_UNVALIDATED"
   fi
-  REPORT_FINDINGS+=("${envname:-}" "${sub:-}" "$1" "$report_code" "$3" "${AI_SEARCH_TIER:-}")
+  REPORT_FINDINGS+=("${envname:-}" "${sub:-}" "$1" "$report_code" "$3" "${AI_SEARCH_TIER:-}" "${REPORT_LOCATION:-${LOCATION:-}}")
 }
 
 add_finding() { # $1 sev  $2 code  $3 msg  $4 hint
@@ -195,6 +195,7 @@ write_preflight_report() {
       export PF_REPORT_COMPLETED="$REPORT_COMPLETED"
       export PF_REPORT_EXIT_CODE="$original_status"
       export PF_REPORT_TARGETS="$(printf '%s\n' "${TARGETS[@]:-}")"
+      export PF_REPORT_FINDING_FIELDS=7
       { if [ "${#REPORT_FINDINGS[@]}" -gt 0 ]; then printf '%s\0' "${REPORT_FINDINGS[@]}"; fi; } |
         "$report_python" "$report_script" preflight ||
         echo "WARNING: AI Factory preflight report unavailable; original exit status is unchanged." >&2
@@ -218,6 +219,10 @@ PYBIN="$(command -v python3 2>/dev/null || command -v python 2>/dev/null || true
 # 4. Settings file auto-detection + parsers
 # -----------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+CAPACITY_RUNNER="$SCRIPT_DIR/deploy-capacity-resource.py"
+if command -v cygpath >/dev/null 2>&1; then
+  CAPACITY_RUNNER="$(cygpath -m "$CAPACITY_RUNNER")"
+fi
 if [ -z "$REPO_ROOT" ]; then
   # default working dir of the pipeline checkout
   REPO_ROOT="${SYSTEM_DEFAULTWORKINGDIRECTORY:-${GITHUB_WORKSPACE:-$PWD}}"
@@ -327,6 +332,8 @@ AI_SEARCH_SKU_ARRAY_LEGACY_DEV="$(get_capacity_value skuAISearchDevArray SKU_AI_
 AI_SEARCH_SKU_ARRAY_LEGACY_STAGE_PROD="$(get_capacity_value skuAISearchStageProdArray SKU_AI_SEARCH_STAGE_PROD_ARRAY '')"
 AI_SEARCH_RETRY_CAPACITY_ARRAY="$(get_capacity_value aisearchRetryCapcityArray AISEARCH_RETRY_CAPCITY_ARRAY true)"
 AI_SEARCH_LOCATION_OVERRIDE="$(getval aiSearchLocation AI_SEARCH_LOCATION '')"
+AI_SEARCH_FALLBACK_DEV="$(get_capacity_value aiSearchFallbackLocationArrayDev AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV '[]')"
+AI_SEARCH_FALLBACK_STAGE_PROD="$(get_capacity_value aiSearchFallbackLocationArrayStageProd AI_SEARCH_FALLBACK_LOCATION_ARRAY_STAGEPROD '[]')"
 AI_SEARCH_TIER="$AI_SEARCH_SKU_DEV"
 ENABLE_AI_FOUNDRY="$(getval enableAIFoundry ENABLE_AI_FOUNDRY true)"
 ENABLE_FOUNDRY_CAPHOST="$(getval enableAFoundryCaphost ENABLE_FOUNDRY_CAPHOST true)"
@@ -334,6 +341,10 @@ ENABLE_AOAI="$(getval enableAzureOpenAI ENABLE_AZURE_OPENAI false)"
 ENABLE_COSMOS="$(getval enableCosmosDB ENABLE_COSMOS_DB false)"
 ENABLE_ELASTIC="$(getval enableElasticsearch ENABLE_ELASTICSEARCH false)"
 ENABLE_PUBLIC_GENAI="$(getval enablePublicGenAIAccess ENABLE_PUBLIC_GENAI_ACCESS true)"
+# Match the isolated Search deployment's automatic private-Foundry dependency.
+if is_true "$ENABLE_AI_FOUNDRY" && ! is_true "$ENABLE_PUBLIC_GENAI"; then
+  ENABLE_AI_SEARCH=true
+fi
 CMK_ENABLED="$(getval cmk CMK false)"
 
 # Model deployments
@@ -472,14 +483,13 @@ check_private_foundry_capability_host() {
   fi
   local missing=()
   is_true "$ENABLE_FOUNDRY_CAPHOST" || missing+=("capability host")
-  is_true "$ENABLE_AI_SEARCH" || missing+=("Azure AI Search")
   is_true "$ENABLE_COSMOS" || missing+=("Azure Cosmos DB")
   if [ "${#missing[@]}" -gt 0 ]; then
     local joined
     joined="$(IFS=', '; printf '%s' "${missing[*]}")"
     add_finding FAIL PRIVATE_FOUNDRY_CAPABILITY_HOST_REQUIRED \
       "Private Foundry standard agents require: $joined." \
-      "Enable capability host, AI Search, and Cosmos DB; project Storage is always included by the AI Factory project baseline."
+      "Enable capability host and Cosmos DB; private Foundry automatically includes AI Search, and project Storage is always included."
     return 1
   fi
   echo "  [OK] Private Foundry standard-agent bundle: capability host + Storage + AI Search + Cosmos DB."
@@ -515,7 +525,8 @@ check_ai_search_quota() { # $1 subId $2 sku
   local sub="$1" sku url payload limit cur avail search_discovery_valid search_location
   sku="$(aif_capacity_normalize "${2:-$AI_SEARCH_TIER}")"
   local AI_SEARCH_TIER="$sku" # Report this candidate, not the original selected SKU.
-  search_location="${AI_SEARCH_LOCATION_OVERRIDE:-$LOCATION}"
+  search_location="${3:-${AI_SEARCH_LOCATION_OVERRIDE:-$LOCATION}}"
+  local REPORT_LOCATION="$search_location"
   url="https://management.azure.com/subscriptions/$sub/providers/Microsoft.Search/locations/$search_location/usages?api-version=2025-05-01"
   local lookup_status
   if az_capture rest --method get --url "$url" -o json; then lookup_status=0; else lookup_status=$?; fi
@@ -843,9 +854,34 @@ check_capacity_configuration() {
     esac
     local search_sku="AI_SEARCH_SKU_$suffix" search_array="AI_SEARCH_SKU_ARRAY_$suffix"
     local search_legacy="AI_SEARCH_SKU_ARRAY_LEGACY_$suffix"
+    local search_fallback="AI_SEARCH_FALLBACK_$suffix" search_regions="AI_SEARCH_REGIONS_$suffix" resolved_regions
     local pg_sku="POSTGRES_SKU_$suffix" pg_array="POSTGRES_SKU_ARRAY_$suffix" pg_tier="POSTGRES_TIER_$suffix"
     local aca_sku="CONTAINER_APPS_SKU_$suffix" aca_array="CONTAINER_APPS_SKU_ARRAY_$suffix"
     if is_true "$ENABLE_AI_SEARCH"; then
+      local region_status=0 fallback="${!search_fallback}"
+      if [[ -z "${fallback//[[:space:]]/}" || "$fallback" =~ ^[[:space:]]*\[[[:space:]]*\][[:space:]]*$ ]]; then
+        # Disabled regional recovery retains config-only operation without Python.
+        resolved_regions="$(aif_capacity_normalize "${AI_SEARCH_LOCATION_OVERRIDE:-$LOCATION}")"
+        if [[ "$resolved_regions" =~ ^[a-z][a-z0-9\ ]{1,49}$ ]]; then
+          resolved_regions="${resolved_regions// /}"
+        else
+          resolved_regions="Primary Search location must be an Azure region name."
+          region_status=2
+        fi
+      else
+        SEARCH_RETRY_REQUIRED="true"
+        resolved_regions="$("$PYBIN" "$CAPACITY_RUNNER" --resolve-search-regions \
+          --primary "${AI_SEARCH_LOCATION_OVERRIDE:-$LOCATION}" --regions "$fallback" 2>&1)" || region_status=$?
+      fi
+      if [ "$region_status" -eq 0 ]; then
+        resolved_regions="${resolved_regions//$'\r'/}"
+        printf -v "$search_regions" '%s' "$resolved_regions"
+      else
+        add_finding FAIL SEARCH_REGION_CONFIG_INVALID \
+          "[$envname] Azure AI Search region configuration is invalid: $resolved_regions" \
+          "Use an empty list or up to five unique Azure region names (CSV or JSON list), without macros."
+        CAPACITY_CONFIG_INVALID="true"
+      fi
       local AI_SEARCH_TIER="${!search_sku}"
       local resolved_array="" resolution_valid=true
       if aif_ai_search_retry_enabled "$AI_SEARCH_RETRY_CAPACITY_ARRAY"; then
@@ -855,7 +891,7 @@ check_capacity_configuration() {
         if [ -z "$PYBIN" ]; then
           resolved_array="Python is required to resolve AI Search capacity arrays."
           resolution_valid=false
-        elif ! resolved_array="$("$PYBIN" "$SCRIPT_DIR/deploy-capacity-resource.py" "${resolver_args[@]}" 2>&1)"; then
+        elif ! resolved_array="$("$PYBIN" "$CAPACITY_RUNNER" "${resolver_args[@]}" 2>&1)"; then
           resolution_valid=false
         else
           printf -v "$search_array" '%s' "$resolved_array"
@@ -1203,6 +1239,7 @@ PY
 }
 
 check_provider_region() { # $1 ns  $2 rt  $3 display  $4 codePrefix
+  local LOCATION="${5:-$LOCATION}"
   local res; res="$(_provider_region_status "$1" "$2")"
   case "$res" in
     YES)        echo "  [OK] $3 supported in $LOCATION." ;;
@@ -1350,7 +1387,13 @@ for t in "${TARGETS[@]:-}"; do
 
   echo ""
   echo "=== Regional readiness: provider/region support ==="
-  is_true "$ENABLE_AI_SEARCH"  && check_provider_region Microsoft.Search           searchServices    "Azure AI Search"            SEARCH
+  if is_true "$ENABLE_AI_SEARCH"; then
+    search_regions_var=AI_SEARCH_REGIONS_STAGE_PROD
+    [ "$envname" != dev ] || search_regions_var=AI_SEARCH_REGIONS_DEV
+    while IFS= read -r search_region; do
+      check_provider_region Microsoft.Search searchServices "Azure AI Search" SEARCH "$search_region"
+    done <<< "${!search_regions_var}"
+  fi
   is_true "$ENABLE_COSMOS"     && check_provider_region Microsoft.DocumentDB        databaseAccounts  "Azure Cosmos DB"            COSMOS
   is_true "$ENABLE_AI_FOUNDRY" && check_provider_region Microsoft.CognitiveServices accounts          "Azure AI Foundry / OpenAI"  COGSVC
   is_true "$ENABLE_WEBAPP" || is_true "$ENABLE_FUNCTION" && check_provider_region Microsoft.Web sites "Azure App Service / Functions" WEB
@@ -1371,11 +1414,13 @@ for t in "${TARGETS[@]:-}"; do
   fi
   if is_true "$ENABLE_AI_SEARCH"; then
     if ai_search_candidates="$(aif_ai_search_candidate_order "$AI_SEARCH_TIER" "$ai_search_retry_array" "$AI_SEARCH_RETRY_CAPACITY_ARRAY")"; then
-      while IFS= read -r ai_search_candidate; do
-        if ! check_ai_search_quota "$sub" "$ai_search_candidate"; then
-          if [ "$SEARCH_RETRY_REQUIRED" = "true" ]; then AI_SEARCH_RETRY_PREFLIGHT_FAILED="true"; fi
-        fi
-      done <<< "$ai_search_candidates"
+      while IFS= read -r search_region; do
+        while IFS= read -r ai_search_candidate; do
+          if ! check_ai_search_quota "$sub" "$ai_search_candidate" "$search_region"; then
+            if [ "$SEARCH_RETRY_REQUIRED" = "true" ]; then AI_SEARCH_RETRY_PREFLIGHT_FAILED="true"; fi
+          fi
+        done <<< "$ai_search_candidates"
+      done <<< "${!search_regions_var}"
     else
       add_finding FAIL SEARCH_RETRY_CONFIG_INVALID \
         "Azure AI Search retry candidates must be one to three unique SKUs and include the selected SKU." \

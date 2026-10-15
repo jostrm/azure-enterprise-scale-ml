@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 
@@ -60,8 +61,21 @@ def test_capacity_retry_matches_only_capacity_failures(tmp_path):
     unrelated.write_text("AuthorizationFailed", encoding="utf-8")
     result = bash(
         f'cd "{ROOT.as_posix()}"; source "environment_setup/aifactory/bicep/scripts/{HELPER.name}"; '
-        f'aif_ai_search_is_capacity_failure "{capacity.as_posix()}"; '
+        f'set -e; aif_ai_search_is_capacity_failure "{capacity.as_posix()}"; '
         f'! aif_ai_search_is_capacity_failure "{unrelated.as_posix()}"'
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_search_shell_error_helper_uses_nested_leaf_and_mixed_error_contract(tmp_path):
+    capacity = tmp_path / "nested.json"
+    mixed = tmp_path / "mixed.json"
+    capacity.write_text('{"error":{"code":"DeploymentFailed","details":[{"code":"InsufficientResourcesAvailable"}]}}', encoding="utf-8")
+    mixed.write_text('{"error":{"details":[{"code":"InsufficientResourcesAvailable"},{"code":"QuotaExceeded"}]}}', encoding="utf-8")
+    result = bash(
+        f'cd "{ROOT.as_posix()}"; source "environment_setup/aifactory/bicep/scripts/{HELPER.name}"; '
+        f'set -e; aif_ai_search_is_capacity_failure "{capacity.as_posix()}"; '
+        f'! aif_ai_search_is_capacity_failure "{mixed.as_posix()}"'
     )
     assert result.returncode == 0, result.stderr
 
@@ -89,3 +103,39 @@ def test_capacity_retry_defaults_and_pipeline_wiring_are_consistent():
         assert "03b-ai-search.bicep" in source
         assert "--parameters deployAISearch=false" in source
         assert "ai-search-capacity-retry.sh" not in source
+
+
+def test_search_region_defaults_and_registration_are_consistent():
+    expected = ["francecentral", "denmarkeast", "italynorth", "norwayeast", "germanywestcentral"]
+    document = json.loads(VARIABLES.read_text(encoding="utf-8"))
+    ado = yaml.safe_load(ADO_VARIABLES.read_text(encoding="utf-8"))["variables"]
+    registration = GHA_ENV.with_name("03a-GH-create-or-update-github-variables.sh").read_text(encoding="utf-8")
+    for suffix, public in [("Dev", "DEV"), ("StageProd", "STAGEPROD")]:
+        key = "aiSearchFallbackLocationArray" + suffix
+        name = "AI_SEARCH_FALLBACK_LOCATION_ARRAY_" + public
+        assert document["dev"][key] == expected
+        assert json.loads(ado[key]) == expected
+        serialized = json.dumps(expected, separators=(",", ":"))
+        assert f"{name}='{serialized}'" in GHA_ENV.read_text(encoding="utf-8")
+        assert f'"{name}"' in registration
+        assert f"{key}: ${{{{ vars.{name} || '[]' }}}}" in GHA_PIPELINE.read_text(encoding="utf-8")
+        assert f"{key}: $({key})" in ADO_PIPELINE.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("suffix", ["DEV", "STAGEPROD"])
+def test_registration_explicit_empty_region_array_clears_previous_opt_in_offline(suffix):
+    source = GHA_ENV.with_name("03a-GH-create-or-update-github-variables.sh").read_text(encoding="utf-8")
+    function = re.search(r"(?ms)^create_or_update_repo_variable\(\) \{.*?^\}", source).group(0)
+    name = "AI_SEARCH_FALLBACK_LOCATION_ARRAY_" + suffix
+    result = bash(
+        f"{function}\n"
+        "single_param_name=; YELLOW=; NC=; GITHUB_NEW_REPO=offline/repo\n"
+        "gh() { printf 'MOCK_GH:<%s>\\n' \"$@\"; }\n"
+        f'{name}=""; create_or_update_repo_variable "{name}" ""\n'
+        f'unset {name}; create_or_update_repo_variable "{name}" ""\n'
+        'OTHER_EMPTY=""; create_or_update_repo_variable OTHER_EMPTY ""\n'
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.count("MOCK_GH:<[]>") == 1
+    assert f"Skipping repo variable '{name}'" in result.stdout
+    assert "Skipping repo variable 'OTHER_EMPTY'" in result.stdout

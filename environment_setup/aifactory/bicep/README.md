@@ -16,6 +16,70 @@ Start with setting up a common AIFactory environment, example, the DEV environme
 ## Alternative: Azure Devops
 - [Azure Devops - readme.md](./copy_to_local_settings/azure-devops/esml-yaml-pipelines/readme.md)
 
+## AI Search provisioning-region recovery
+
+`aiSearchFallbackLocationArrayDev` and `aiSearchFallbackLocationArrayStageProd`
+both default to `["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]`
+in that order, with Germany last: native arrays in JSON, serialized arrays in ADO/GHA.
+GHA names are `AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV` and
+`AI_SEARCH_FALLBACK_LOCATION_ARRAY_STAGEPROD`. Test/Stage and Prod use the latter.
+Explicit `[]` or blank disables regional fallback; missing runtime fields and
+undefined GHA repository variables still resolve to `[]` for historical inputs.
+Nonempty lists configure up to five fallback regions: CSV or JSON lists of strings are accepted; region
+names are lowercased with spaces removed. Malformed JSON, non-string entries,
+empty entries, duplicates and unresolved macros are rejected before deployment.
+
+The primary is `aiSearchLocation`, otherwise project `location`. A primary
+repeated in the fallback list is omitted from subsequent attempts. Each region
+tries the selected SKU first, then remaining configured SKUs when
+`aisearchRetryCapcityArray` is enabled. That historical switch controls SKU
+changes only: a nonempty region array independently opts into regional recovery.
+At most six regions by three SKUs (18 creation attempts) run with the existing
+240-second retry delay. A local normalization step publishes
+`AIF_AISEARCH_REGION_FALLBACK_ENABLED` for the current environment. `[]` or blank
+skips the separate ADO/GHA `63b-ai-search-region-fallback` task entirely and
+retains ordinary Search provisioning/networking and the existing three SKU
+steps. Nonempty lists select that regional task instead of the ordinary SKU
+steps; terminal failure/exhaustion never arms them.
+
+The runner first resolves the exact resource ID through the shared Bicep naming
+and context modules using `capacityIdentityOnly` (deployment metadata and
+output-only modules; no Search/network resource writes), then reads that named
+Search service. Only an explicit resource-not-found response establishes absence;
+read denials and unknown responses fail closed. Existing services keep their
+actual region, including reruns after fallback lists are cleared.
+Region pinning does not freeze the SKU: explicit scalar SKU updates and configured
+SKU retry policy still apply within that existing region. Partial failed
+creation can bind the name to a region: the runner stops before moving it, never
+deletes resources, and directs operators to inspect the failed deployment.
+Nested `InsufficientResourcesAvailable` is capacity; mixed, authorization,
+policy, template, quota and unknown errors are terminal. Private endpoint/shared
+link failures must not trigger Search relocation.
+
+Only the Search service region changes. Subscription deployment `--location`,
+RG/naming, project VNet, inbound private endpoint, DNS governance, shared-link
+target IDs and target `resourceRegion` remain unchanged. The service **and**
+required private-network deployment must succeed before publishing effective
+`aiSearchLocation` and the environment's SKU through ADO/GHA state. Source
+configuration is never rewritten; terminal failure/exhaustion blocks downstream.
+Private Foundry's automatic Search dependency uses the same runner and gates.
+
+Preflight validates the configured region/SKU sequence and regional Search
+provider support and quota. Non-Search checks remain in the project region.
+Quota headroom is not live allocation capacity; existing mandatory quota,
+strict/warn-only and explicit lookup/regional skips remain in force. V1 reports
+are grouped by actual observation region with distinct alternate-region files,
+so the same SKU in different regions cannot overwrite or misattribute evidence.
+
+Review the new-template defaults for residency, latency, egress and cost before
+provisioning: newly created Search indexes/data reside in the selected effective
+region. This is provisioning recovery, not runtime failover, index migration or
+replication. Shared links still require target-side approval and the existing
+managed identity/RBAC; regional fallback never enables public access.
+Denmark East is intentionally retained despite its omission from the Microsoft
+AI Search region list because the portal allows it; Germany remains last with
+its known capacity warning. These defaults do not guarantee availability.
+
 > [!TIP]
 >  A quicker & easier way? You can use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage), ready to run. All files copied already. Just configure and run.
 >

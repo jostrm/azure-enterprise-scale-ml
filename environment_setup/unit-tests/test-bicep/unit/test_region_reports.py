@@ -126,6 +126,19 @@ class RegionReportsTests(unittest.TestCase):
         self.assertEqual(len(reports[1]["observations"]), 1)
         self.assertEqual(reports[1]["subscription_id"], OTHER_SUB)
 
+    def test_region_findings_do_not_collide_or_inherit_project_region(self):
+        os.environ["PF_REPORT_FINDING_FIELDS"] = "7"
+        stream = "\0".join([
+            "dev", SUB, "FAIL", "SEARCH_QUOTA_AT_LIMIT", "", "basic", "eastus2",
+            "dev", SUB, "PASS", "SEARCH_QUOTA_HEADROOM", "", "basic", "westeurope",
+        ]) + "\0"
+        reports = REPORT.preflight_reports(stream, completed=True)
+        self.assertEqual(len(reports), 2)
+        by_region = {r["region"]: r for r in reports}
+        self.assertEqual(by_region["eastus2"]["observations"][-1]["status"], "failed")
+        self.assertEqual(by_region["westeurope"]["observations"][-1]["status"], "passed")
+        self.assertTrue(all(r["schema_version"] == 1 for r in reports))
+
     def test_invalid_target_does_not_drop_a_valid_subscription_report(self):
         os.environ["PF_REPORT_TARGETS"] = f"dev|{SUB}\nprod|<invalid>"
         with redirect_stderr(io.StringIO()):
@@ -187,6 +200,7 @@ class RegionReportsTests(unittest.TestCase):
         path = self.work / "command-error.json"
         for code, count in {
             "SkuNotAvailable": 1, "InsufficientCapacity": 1, "AllocationFailed": 1,
+            "InsufficientResourcesAvailable": 1,
             "QuotaExceeded": 0, "DeploymentFailed": 0, "Unauthorized": 0, "NotFound": 0,
         }.items():
             with self.subTest(code=code):
@@ -204,6 +218,20 @@ class RegionReportsTests(unittest.TestCase):
         path.write_text('{"service":"Azure Storage","sku":"standard","error":{"code":"SkuNotAvailable"}}',
                         encoding="utf-8")
         self.assertEqual(REPORT.capacity_observations(path), [])
+
+    def test_mixed_and_private_endpoint_errors_are_not_search_capacity_evidence(self):
+        path = self.work / "command-error.json"
+        for other in ({"code": "QuotaExceeded"}, {"code": "AuthorizationFailed"}, {
+            "code": "InsufficientResourcesAvailable", "target": "Microsoft.Network/privateEndpoints/pe",
+        }):
+            path.write_text(json.dumps({
+                "service": "Azure AI Search", "sku": "standard", "error": {
+                    "code": "DeploymentFailed", "details": [
+                        {"code": "InsufficientResourcesAvailable"}, other,
+                    ],
+                },
+            }), encoding="utf-8")
+            self.assertEqual(REPORT.capacity_observations(path), [])
 
     def test_cli_persists_json_and_retains_generic_failure_on_invalid_error_file(self):
         path = self.work / "bad-error.json"

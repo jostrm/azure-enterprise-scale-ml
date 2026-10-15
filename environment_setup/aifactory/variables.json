@@ -168,6 +168,8 @@
     "skuArrayAISearchStageProd": "basic,standard,standard2",
     "aisearchRetryCapcityArray": "true",
     "aiSearchLocation": "",
+    "aiSearchFallbackLocationArrayDev": ["francecentral", "denmarkeast", "italynorth", "norwayeast", "germanywestcentral"],
+    "aiSearchFallbackLocationArrayStageProd": ["francecentral", "denmarkeast", "italynorth", "norwayeast", "germanywestcentral"],
     "skuAIServicesDev": "S0",
     "skuAIServicesStageProd": "S0",
     "skuOpenAIDev": "S0",

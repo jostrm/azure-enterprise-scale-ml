@@ -303,6 +303,8 @@ variables:
   skuArrayAISearchStageProd: "basic,standard,standard2" # Ordered fallback SKUs; the configured Stage/Prod SKU is attempted first.
   aisearchRetryCapcityArray: "true" # Validate all candidates' quota headroom and retry only Azure AI Search capacity failures.
   aiSearchLocation: "" # <optional>AI Search region override. Empty keeps the project region; use another supported region only when regional Search capacity is unavailable.
+  aiSearchFallbackLocationArrayDev: '["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]' # <optional>Up to five Search fallback regions in order, Germany last; [] or blank disables regional fallback independently of SKU retries.
+  aiSearchFallbackLocationArrayStageProd: '["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]' # <optional>Up to five Search fallback regions for Test/Stage and Prod in order, Germany last; [] or blank disables regional fallback. Only Search service placement changes.
   skuAIServicesDev: "S0" # Azure AI Services (multi-service account) SKU Dev
   skuAIServicesStageProd: "S0" # Azure AI Services (multi-service account) SKU Stage/Prod
   skuOpenAIDev: "S0" # Azure OpenAI SKU Dev

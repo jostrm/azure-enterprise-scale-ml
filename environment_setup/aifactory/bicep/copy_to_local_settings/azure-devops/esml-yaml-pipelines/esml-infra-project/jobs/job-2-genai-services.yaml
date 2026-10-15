@@ -66,6 +66,8 @@ steps:
     skuArrayAISearchStageProd: $(skuArrayAISearchStageProd)
     aisearchRetryCapcityArray: $(aisearchRetryCapcityArray)
     aiSearchLocation: $(aiSearchLocation)
+    aiSearchFallbackLocationArrayDev: $(aiSearchFallbackLocationArrayDev)
+    aiSearchFallbackLocationArrayStageProd: $(aiSearchFallbackLocationArrayStageProd)
     skuPostgreSQLDev: $(skuPostgreSQLDev)
     skuPostgreSQLStageProd: $(skuPostgreSQLStageProd)
     skuArrayPostgreSQLDev: $(skuArrayPostgreSQLDev)

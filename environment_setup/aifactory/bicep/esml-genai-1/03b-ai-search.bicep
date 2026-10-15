@@ -35,6 +35,8 @@ param skuAISearchDev string = 'standard'
 param skuAISearchStageProd string = 'standard'
 param aiSearchLocation string = ''
 param aiSearchExists bool = false
+@description('Resolve the exact Search resource identity through the shared naming modules without deploying Search or its private networking.')
+param capacityIdentityOnly bool = false
 param enableAISearch bool = true
 param enableAIFoundry bool = false
 param addAISearch bool = false
@@ -99,7 +101,7 @@ var suffix = substring(originalName, max(length(originalName) - 3, 0), min(3, le
 var aiSearchName = take(addAISearch ? '${baseName}${take(context.names.randomSalt, 2)}${suffix}' : originalName, 60)
 var needsAISearch = enableAISearch || (enableAIFoundry && !enablePublicGenAIAccess)
 
-module search '../modules/services/aiSearchDeployment.bicep' = if (needsAISearch) {
+module search '../modules/services/aiSearchDeployment.bicep' = if (needsAISearch && !capacityIdentityOnly) {
   name: '03b-search-${standaloneDeploymentSuffix}'
   params: {
     context: context
@@ -131,4 +133,5 @@ module search '../modules/services/aiSearchDeployment.bicep' = if (needsAISearch
 }
 
 output aiSearchName string = needsAISearch ? aiSearchName : ''
-output aiSearchDeployed bool = needsAISearch
+output aiSearchResourceId string = resourceId(context.subscriptionId, context.targetResourceGroup, 'Microsoft.Search/searchServices', aiSearchName)
+output aiSearchDeployed bool = needsAISearch && !capacityIdentityOnly

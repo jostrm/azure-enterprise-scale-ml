@@ -176,6 +176,8 @@ jobs:
       skuAISearchStageProdArray: ${{ vars.SKU_AI_SEARCH_STAGE_PROD_ARRAY || '' }}
       aisearchRetryCapcityArray: ${{ vars.AISEARCH_RETRY_CAPCITY_ARRAY || 'true' }}
       aiSearchLocation: ${{ vars.AI_SEARCH_LOCATION || '' }}
+      aiSearchFallbackLocationArrayDev: ${{ vars.AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV || '[]' }}
+      aiSearchFallbackLocationArrayStageProd: ${{ vars.AI_SEARCH_FALLBACK_LOCATION_ARRAY_STAGEPROD || '[]' }}
       skuAIServicesDev: ${{ vars.SKU_AISERVICES_DEV || 'S0' }}
       skuAIServicesStageProd: ${{ vars.SKU_AISERVICES_STAGEPROD || 'S0' }}
       skuOpenAIDev: ${{ vars.SKU_OPENAI_DEV || 'S0' }}
@@ -2214,8 +2216,25 @@ jobs:
               --parameters addAISearch="${{ env.addAISearch }}" \
               --parameters disableLocalAuth="${{ env.disableLocalAuth }}"
 
-      - name: 63b-ai-search-attempt-1
+      - name: 63b-ai-search-region-gate
         if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && (env.enableAISearch == 'true' || (env.enableAIFoundry == 'true' && env.enablePublicGenAIAccess != 'true')) && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true'))
+        shell: bash
+        run: |
+            python azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-capacity-resource.py --publish-search-region-gate --provider github
+
+      - name: 63b-ai-search-region-fallback
+        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && (env.enableAISearch == 'true' || (env.enableAIFoundry == 'true' && env.enablePublicGenAIAccess != 'true')) && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true')) && env.AIF_AISEARCH_REGION_FALLBACK_ENABLED == 'true'
+        shell: bash
+        run: |
+            python azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-capacity-resource.py \
+              --service ai-search --attempt 1 --provider github \
+              --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/03b-ai-search.bicep" \
+              --parameters-file "./aifactory/parameters/dynamicNetworkParams.json" \
+              --subscription "${{ env.dev_test_prod_sub_id }}" --location "${{ env.admin_location }}" \
+              --deployment-name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-63b-ai-search"
+
+      - name: 63b-ai-search-attempt-1
+        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && (env.enableAISearch == 'true' || (env.enableAIFoundry == 'true' && env.enablePublicGenAIAccess != 'true')) && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true')) && env.AIF_AISEARCH_REGION_FALLBACK_ENABLED != 'true'
         shell: bash
         run: |
             python azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-capacity-resource.py \
@@ -2226,7 +2245,7 @@ jobs:
               --deployment-name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-63b-ai-search"
 
       - name: 63b-ai-search-attempt-2
-        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && (env.enableAISearch == 'true' || (env.enableAIFoundry == 'true' && env.enablePublicGenAIAccess != 'true')) && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true')) && env.AIF_AISEARCH_CAPACITY_NEXT == '2'
+        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && (env.enableAISearch == 'true' || (env.enableAIFoundry == 'true' && env.enablePublicGenAIAccess != 'true')) && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true')) && env.AIF_AISEARCH_CAPACITY_NEXT == '2' && env.AIF_AISEARCH_REGION_FALLBACK_ENABLED != 'true'
         shell: bash
         run: |
             python azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-capacity-resource.py \
@@ -2237,7 +2256,7 @@ jobs:
               --deployment-name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-63b-ai-search"
 
       - name: 63b-ai-search-attempt-3
-        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && (env.enableAISearch == 'true' || (env.enableAIFoundry == 'true' && env.enablePublicGenAIAccess != 'true')) && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true')) && env.AIF_AISEARCH_CAPACITY_NEXT == '3'
+        if: inputs.phase == 'infra' && env.deleteAllServicesForProject != 'true' && (env.enableAISearch == 'true' || (env.enableAIFoundry == 'true' && env.enablePublicGenAIAccess != 'true')) && (env.debug_disable_63_cognitive_services != 'true' || (env.enableAFoundryCaphost == 'true' && env.enableAIFoundry == 'true')) && env.AIF_AISEARCH_CAPACITY_NEXT == '3' && env.AIF_AISEARCH_REGION_FALLBACK_ENABLED != 'true'
         shell: bash
         run: |
             python azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-capacity-resource.py \

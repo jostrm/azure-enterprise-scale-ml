@@ -149,6 +149,11 @@ separately visible attempt steps** immediately after its batch. Only recognized
 regional/SKU capacity failures schedule another attempt; unrelated errors fail
 immediately, and exhausted candidates fail the pipeline before downstream
 deployments. Attempts 2 and 3 wait **240 seconds at their start** when scheduled.
+With a nonempty AI Search region array, all region/SKU combinations instead run
+inside the separate regional-fallback task, without arming the three legacy SKU
+steps. Local normalization selects the current environment's route; `[]` or blank
+skips that regional task entirely, retaining ordinary Search/networking and
+SKU-only retries.
 Successful attempts export the effective SKU (and PostgreSQL tier) for later steps.
 The existing JSON-array names `skuAISearchDevArray` and
 `skuAISearchStageProdArray` remain supported alongside the comma-separated
@@ -170,9 +175,31 @@ configured candidates in array order. Defaults are:
 
 Configure `skuArray<Service>Dev` / `skuArray<Service>StageProd` alongside
 `sku<Service>Dev` / `sku<Service>StageProd`. All retry switches default to `true`;
-`false` attempts only the selected SKU and fails on its first error. Keep the
+`false` attempts only the selected SKU (for AI Search, in each configured region).
+Keep the
 existing **`Capcity` spelling** in the AI Search switch. The generated inventory
 below lists the corresponding GitHub uppercase variable names.
+
+Both `aiSearchFallbackLocationArrayDev` and `aiSearchFallbackLocationArrayStageProd`
+default in new JSON, ADO and GHA templates to
+`["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]`,
+in that order, Germany last. Test/Stage and Prod share the latter setting.
+The primary remains `aiSearchLocation`, otherwise project `location`; it is tried
+first with selected-first SKUs, then each fallback in list order. Up to five
+fallbacks plus the primary and three SKUs allow **18 creation attempts**, with the
+unchanged **240-second delay** before each retry. Explicit `[]` or blank disables
+regional fallback; missing runtime fields and undefined GHA variables retain `[]`
+for historical inputs. Denmark East is intentionally retained because the portal
+allows it despite its omission from Microsoft's AI Search region list; Germany
+remains last with its known capacity warning. Availability is not guaranteed.
+
+This is **provisioning-only recovery**, not runtime failover, replication or index
+migration. Existing Search keeps its actual region and requested SKU changes;
+only recognized Search capacity errors permit retries. Only Search placement
+changes: the private endpoint remains in the original VNet region and outbound
+shared-link targets are unchanged. Effective region/SKU are published only after
+Search and required network deployment succeed. Review residency, latency, egress
+and cost before provisioning with these defaults.
 
 Attempts honor the infra phase, deletion and service/debug switches, retaining
 the cognitive/database capability-host debug override used by ADO. AI Search
@@ -376,18 +403,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 387 |
-| `env` | 386 |
+| `yaml` | 389 |
+| `env` | 388 |
 | `bootstrap` | 92 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 390 |
+| `json.dev` | 392 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 149, 412; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 150, 413; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 414, 438; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 151, 414; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 152, 415; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 416, 440; one reference row.
 
 ## YAML and variables.json reference
 
@@ -514,6 +541,8 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:admin_projectType --><!-- parameter json.dev:admin_projectType -->`admin_projectType` | `ADMIN_PROJECT_TYPE`, `PROJECT_TYPE` | M | Y: `"all"`<br>J.dev: `"all"` |  |
 | <!-- parameter yaml:admin_semanticSearchTier --><!-- parameter json.dev:admin_semanticSearchTier -->`admin_semanticSearchTier` | `ADMIN_SEMANTIC_SEARCH_TIER`, `AISEARCH_SEMANTIC_TIER` | M | Y: `"free"`<br>J.dev: `"free"` | Semantic search tier mandatory: Semantic search tier |
 | <!-- parameter yaml:aiGatewaySkuResourceId --><!-- parameter json.dev:aiGatewaySkuResourceId -->`aiGatewaySkuResourceId` | `AI_GATEWAY_SKU_RESOURCE_ID` | O | Y: `""`<br>J.dev: `""` | Resource ID of an existing AI Gateway SKU to adopt (never modified) keep-as-is: Empty creates an owned gateway in the project resource group. |
+| <!-- parameter yaml:aiSearchFallbackLocationArrayDev --><!-- parameter json.dev:aiSearchFallbackLocationArrayDev -->`aiSearchFallbackLocationArrayDev` | `AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV` | O | Y: `"[\"francecentral\",\"denmarkeast\",\"italynorth\",\"norwayeast\",\"germanywestcentral\"]"`<br>J.dev: `["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]` | Up to five Search fallback regions in order, Germany last; [] or blank disables regional fallback independently of SKU retries. |
+| <!-- parameter yaml:aiSearchFallbackLocationArrayStageProd --><!-- parameter json.dev:aiSearchFallbackLocationArrayStageProd -->`aiSearchFallbackLocationArrayStageProd` | `AI_SEARCH_FALLBACK_LOCATION_ARRAY_STAGEPROD` | O | Y: `"[\"francecentral\",\"denmarkeast\",\"italynorth\",\"norwayeast\",\"germanywestcentral\"]"`<br>J.dev: `["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]` | Up to five Search fallback regions for Test/Stage and Prod in order, Germany last; [] or blank disables regional fallback. Only Search service placement changes. |
 | <!-- parameter yaml:aiSearchLocation --><!-- parameter json.dev:aiSearchLocation -->`aiSearchLocation` | `AI_SEARCH_LOCATION` | O | Y: `""`<br>J.dev: `""` | AI Search region override. Empty keeps the project region; use another supported region only when regional Search capacity is unavailable. |
 | <!-- parameter yaml:aifactory-dash-01 --><!-- parameter json.dev:aifactory-dash-01 -->`aifactory-dash-01` | `AIFACTORY_DASHBOARD_URL` | O | Y: `""`<br>J.dev: `""` | Existing Azure Portal AI Factory dashboard URL; never deploys a dashboard. |
 | <!-- parameter yaml:aifactoryAgentContainerAppsEnvironment --><!-- parameter json.dev:aifactoryAgentContainerAppsEnvironment -->`aifactoryAgentContainerAppsEnvironment` | `AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT` | O | Y: `""`<br>J.dev: `""` | Name of the internal project Container Apps environment hosting the agent chat keep-as-is: Empty selects the single environment in the project resource group. |
@@ -865,6 +894,8 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:AISEARCH_RETRY_CAPCITY_ARRAY -->`AISEARCH_RETRY_CAPCITY_ARRAY` | `aisearchRetryCapcityArray` | O | `"true"` | Validate every candidate quota and retry only recognized capacity failures after four minutes. |
 | <!-- parameter env:AISEARCH_SEMANTIC_TIER -->`AISEARCH_SEMANTIC_TIER` | `admin_semanticSearchTier` | M | `"free"` | Semantic search tier mandatory: Semantic search tier |
 | <!-- parameter env:AI_GATEWAY_SKU_RESOURCE_ID -->`AI_GATEWAY_SKU_RESOURCE_ID` | `aiGatewaySkuResourceId` | O | `""` | Resource ID of an existing AI Gateway SKU to adopt (never modified) keep-as-is: Empty creates an owned gateway in the project resource group. |
+| <!-- parameter env:AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV -->`AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV` | `aiSearchFallbackLocationArrayDev` | O | `"[\"francecentral\",\"denmarkeast\",\"italynorth\",\"norwayeast\",\"germanywestcentral\"]"` | Up to five Search fallback regions in order, Germany last; [] or blank disables regional fallback independently of SKU retries. |
+| <!-- parameter env:AI_SEARCH_FALLBACK_LOCATION_ARRAY_STAGEPROD -->`AI_SEARCH_FALLBACK_LOCATION_ARRAY_STAGEPROD` | `aiSearchFallbackLocationArrayStageProd` | O | `"[\"francecentral\",\"denmarkeast\",\"italynorth\",\"norwayeast\",\"germanywestcentral\"]"` | Up to five Search fallback regions for Test/Stage and Prod in order, Germany last; [] or blank disables regional fallback. Only Search service placement changes. |
 | <!-- parameter env:AI_SEARCH_LOCATION -->`AI_SEARCH_LOCATION` | `aiSearchLocation` | O | `""` | AI Search region override. Empty keeps AIFACTORY_LOCATION. |
 | <!-- parameter env:AML_STUDIO_UI_PRIVATE -->`AML_STUDIO_UI_PRIVATE` | `AMLStudioUIPrivate` | O | `"true"` | AML Studio UI private access otherwise: false, only data plane is private; control plane is public. |
 | <!-- parameter env:ASE_SKU -->`ASE_SKU` | `aseSku` | O | `"IsolatedV2"` | App Service Environment SKU |

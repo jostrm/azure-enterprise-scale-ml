@@ -161,7 +161,6 @@ class TestPrivateFoundryCapabilityHost(unittest.TestCase):
         assert function
         for variable in (
             "ENABLE_FOUNDRY_CAPHOST",
-            "ENABLE_AI_SEARCH",
             "ENABLE_COSMOS",
         ):
             assignments = {

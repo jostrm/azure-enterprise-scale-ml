@@ -14,6 +14,11 @@ sources:
   - environment_setup/aifactory/bicep/modules/genericProjectWorkbookItems.bicep
   - environment_setup/aifactory/bicep/scripts/deploy-aifactory-dashboard.py
   - environment_setup/aifactory/bicep/scripts/dashboard_usage.py
+  - environment_setup/aifactory/bicep/scripts/deploy-capacity-resource.py
+  - environment_setup/aifactory/bicep/scripts/preflight.sh
+  - environment_setup/aifactory/bicep/scripts/region_report.py
+  - environment_setup/aifactory/bicep/esml-genai-1/03b-ai-search.bicep
+  - environment_setup/aifactory/bicep/modules/services/aiSearchDeployment.bicep
 tests:
   - environment_setup/unit-tests/test-bicep/unit/test_common_network_preservation.py
   - environment_setup/unit-tests/test-bicep/unit/test_subnet_scaling_capacity.py
@@ -22,6 +27,9 @@ tests:
   - environment_setup/unit-tests/test-bicep/test_my_project_workbook.py
   - environment_setup/unit-tests/test-bicep/test_generic_project_workbook.py
   - environment_setup/unit-tests/test-bicep/test_dashboard_usage.py
+  - environment_setup/unit-tests/test-bicep/unit/test_capacity_resource_deployment.py
+  - environment_setup/unit-tests/test-bicep/unit/test_capacity_preflight.py
+  - environment_setup/unit-tests/test-bicep/unit/test_region_reports.py
 graph_symbols:
   - bootstrap/lib/common_network_preservation.py::function:prepare_common_network
   - bootstrap/lib/common_network_preservation.py::function:execute_common_network
@@ -34,6 +42,29 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 The maintained infrastructure path is Bicep-first, invoked through provider templates. Common networking and project phases are distinct. `esml-genai-1` contains foundation, core, cognitive/search, database, compute, AI/ML, RBAC, Foundry, dashboard and integration templates; flags and orchestration select the actual resources. A numbered filename is not proof that every deployment executes it.
 
 Foundation resolves common/project scopes, private DNS routing and managed identities. `centralDnsZoneByPolicyInHub` changes whether zone creation is local or delegated to central governance; explicit DNS subscription/resource-group parameters can differ from project placement. Private endpoint creation alone does not prove name resolution, connectivity or caller data-plane authorization.
+
+Search provisioning recovery (source reviewed at `6e29e663` plus this working tree,
+2026-10-15): the Dev and StageProd fallback-location arrays both default in order
+to `francecentral`, `denmarkeast`, `italynorth`, `norwayeast`, `germanywestcentral`
+(Germany last), with at most five additional regions. The isolated runner tries
+region-major selected-first SKU combinations (maximum 18), while the legacy SKU
+switch controls SKU changes only. Local normalization publishes the environment's
+`AIF_AISEARCH_REGION_FALLBACK_ENABLED` task gate. Explicit empty/blank and missing
+runtime arrays skip the separate regional-fallback task and retain ordinary
+Search/private-network provisioning through the three CI SKU steps. Nonempty
+arrays select the regional task instead; invalid arrays fail before it. Exact identity
+comes from the same output-only naming/context modules before a direct resource
+read; denied reads are not absence, existing services retain actual placement
+without freezing the explicitly configured scalar SKU or its retry policy,
+and partial name binding prevents relocation without resource deletion. Nested
+Search capacity errors alone permit retry; downstream endpoint errors and mixed
+terminal errors do not. Effective location/SKU are CI state, never rewritten
+configuration. Service placement is distinct from subscription deployment metadata,
+project networking/PE/DNS, and shared-link target placement. Preflight checks
+configured Search regions, not project-region aliases; quota evidence remains
+distinct from allocation capacity. V1 reports split by observation region rather
+than collapsing same-SKU observations across regions. Offline source/tests do not
+establish deployed capacity or a supported runtime failover/data-migration path.
 
 Network addressing must be aligned and nonoverlapping. Shared/own-subscription presets are configuration choices, not commands to create subscriptions. Allocation must respect existing subnets, gateway/DNS reservations and fragmentation; headline project counts are not guarantees.
 

@@ -76,5 +76,12 @@ aif_ai_search_candidate_order() {
 }
 
 aif_ai_search_is_capacity_failure() {
-  grep -Eqi '(SkuNotAvailable|SkuNotAvailableForSubscription|InsufficientCapacity|CapacityUnavailable|capacity[[:space:]]+(is[[:space:]]+)?not[[:space:]]+available|insufficient[[:space:]]+capacity)' "$1"
+  local python="${PYBIN:-$(command -v python 2>/dev/null || command -v python3 2>/dev/null || true)}"
+  local runner="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/deploy-capacity-resource.py" log="$1"
+  [[ -n "$python" ]] || { printf 'Python is required to classify Search errors safely.\n' >&2; return 2; }
+  if command -v cygpath >/dev/null 2>&1; then
+    runner="$(cygpath -m "$runner")"
+    log="$(cygpath -m "$log")"
+  fi
+  "$python" "$runner" --classify-search-error "$log" --resource-id "${2:-}"
 }

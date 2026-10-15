@@ -262,6 +262,48 @@ def search_calls(result):
 
 
 @pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
+@pytest.mark.parametrize("fallbacks", [
+    ["westeurope"],
+    ["francecentral", "denmarkeast", "italynorth", "norwayeast", "germanywestcentral"],
+])
+def test_search_regions_preflight_checks_each_candidate_and_reports_actual_region(
+        offline_preflight, target, suffix, fallbacks):
+    result, reports = offline_preflight({
+        "aiSearchLocation": "East US 2", "admin_location": "westus",
+        "aiSearchFallbackLocationArray" + suffix: json.dumps(fallbacks),
+    }, environment=target, reports=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = search_calls(result)
+    regions = ["eastus2", *fallbacks]
+    assert len(calls) == 3 * len(regions)
+    for index, region in enumerate(regions):
+        assert all(f"/locations/{region}/" in call for call in calls[index * 3:(index + 1) * 3])
+    grouped = {report["region"]: report for report in reports}
+    assert {*regions, "westus"} <= grouped.keys()
+    for region in regions:
+        assert len([item for item in grouped[region]["observations"] if item["check_id"] == "search_sku_quota"]) == 3
+
+
+@pytest.mark.parametrize("value", [
+    '["eastus2",1]', "eastus2,", "$(region)", "eastus2,EAST US 2",
+    '["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral","eastus"]',
+])
+def test_search_regions_preflight_rejects_invalid_before_azure(offline_preflight, value):
+    result, _ = offline_preflight({"aiSearchFallbackLocationArrayDev": value})
+    assert result.returncode == 1
+    assert "SEARCH_REGION_CONFIG_INVALID" in result.stdout
+    assert "MOCK_AZ:" not in result.stderr
+
+
+def test_region_only_opt_in_retains_mandatory_quota_gate(offline_preflight):
+    result, _ = offline_preflight({
+        "aisearchRetryCapcityArray": "false", "aiSearchFallbackLocationArrayDev": "westeurope",
+        "MOCK_SEARCH_STATUS": "1",
+    })
+    assert result.returncode == 1 and len(search_calls(result)) == 2
+
+
+@pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
 @pytest.mark.parametrize("legacy", ['["basic",1]', '["basic","standard2"]'])
 def test_ado_automatic_uppercase_alias_is_validated_before_azure(offline_preflight, target, suffix, legacy):
     result, _ = offline_preflight({

@@ -28,6 +28,8 @@ END = "<!-- END GENERATED PARAMETERS -->"
 # Explicit template/backend correspondences reviewed against the shared consumers.
 # Keep this finite: an absent binding must not be fabricated by case conversion.
 REVIEWED_ALIASES = {
+    "aiSearchFallbackLocationArrayDev": "AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV",
+    "aiSearchFallbackLocationArrayStageProd": "AI_SEARCH_FALLBACK_LOCATION_ARRAY_STAGEPROD",
     "org-department-name": "ORG_DEPARTMENT_NAME",
     "org-department-id": "ORG_DEPARTMENT_ID",
     "aifactory-dash-01": "AIFACTORY_DASHBOARD_URL",

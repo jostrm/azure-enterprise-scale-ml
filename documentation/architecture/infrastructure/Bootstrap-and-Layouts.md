@@ -69,6 +69,28 @@ environment. Tests retain only the two reference projects' key inventories,
 never customer values. Provider-specific identity, ownership metadata and
 connection fields are not invented as cross-provider deployment flags.
 
+The canonical templates now expose `aiSearchFallbackLocationArrayDev` and
+`aiSearchFallbackLocationArrayStageProd`, both defaulting in order to
+`["francecentral","denmarkeast","italynorth","norwayeast","germanywestcentral"]`
+(Germany last), as native JSON arrays and serialized ADO/GHA arrays.
+GHA's explicit registration routes
+`AI_SEARCH_FALLBACK_LOCATION_ARRAY_DEV` and
+`AI_SEARCH_FALLBACK_LOCATION_ARRAY_STAGEPROD` as repository variables; project
+job bindings and JSON overrides forward them into preflight and the shared
+Search runner. Up to five fallback regions plus the primary permit at most
+18 region/SKU combinations. The defaults affect only new Search provisioning,
+not runtime failover or index migration; review residency before deployment.
+Denmark East is intentionally retained based on portal availability despite
+its omission from the Microsoft AI Search region list; Germany's capacity
+warning is known, not an availability guarantee. Refreshing templates does not
+alter source pins.
+Registration serializes an explicitly empty region-array value as `[]` to clear
+prior opt-ins; explicit `[]`/blank disables regional fallback. Missing runtime
+fields and undefined GHA variables retain `[]`, and unrelated empty settings
+retain existing behavior. A normalized per-environment CI gate skips the separate
+regional-fallback task for empty values; ordinary Search/networking and SKU-only
+retries remain enabled under their existing service/deletion/debug/phase gates.
+
 Do not bypass blocked registered setup with legacy scripts. Template refresh can modify files; some update routes also commit, push and dispatch. This vault describes those paths but runs none.
 
 See [[Repository-Boundaries]], [[IaC-and-Private-Networking]], [[Lifecycle-and-Recovery]], [[Factory-API-and-SDK]], [[Orchestration-and-Updates]] and [[Index]].
