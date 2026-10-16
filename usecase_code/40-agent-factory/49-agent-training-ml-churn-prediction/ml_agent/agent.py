@@ -4,9 +4,6 @@ from __future__ import annotations
 from copy import deepcopy
 import json
 
-from agent_factory.catalog import OWNER, metadata, validate_agent_name
-from agent_factory.prompt import definition_hash, route_version
-
 from .configuration import fingerprint
 from .runtime import ApprovalRequired, redact
 from .usecases import AIR, CHURN
@@ -62,6 +59,8 @@ DISPATCH = {
 
 
 def _ownership(record, config: dict, digest: str) -> None:
+    from agent_factory.catalog import OWNER
+
     saved = record.metadata or {}
     if (saved.get("aifactory.managed_by") != OWNER or saved.get("aif49.owner") != config["owner"]
             or saved.get("aif49.config_sha256") != digest):
@@ -69,6 +68,8 @@ def _ownership(record, config: dict, digest: str) -> None:
 
 
 def agent_name(config: dict) -> str:
+    from agent_factory.catalog import validate_agent_name
+
     return validate_agent_name(f"{config['owner']}-{config['version']}-ml-churn")
 
 
@@ -76,6 +77,8 @@ def deploy_agent(project, config: dict, *, apply: bool = False, allow_paid: bool
     """Create or reuse the owned agent version; the caller persists the result outside the template."""
     if apply is not True or allow_paid is not True:
         raise ApprovalRequired("Agent deployment requires --apply and --allow-paid.")
+    from agent_factory.catalog import metadata
+    from agent_factory.prompt import definition_hash, route_version
     from azure.ai.projects.models import FunctionTool, PromptAgentDefinition
     from azure.core.exceptions import ResourceNotFoundError
 

@@ -15,7 +15,7 @@ FAILED_JOB = ("Failed", "Canceled", "CancelRequested", "NotResponding")
 MAX_INFERENCE_ATTEMPTS = 5
 
 
-def build_project(config: dict, location, name: str, *, cloud: bool = False, backend=None):
+def build_project(config: dict, location, name: str, *, cloud: bool = False, backend=None, credential=None):
     from azure_esml import ESMLProject
     from azure_esml.domain_layer.rollout import project_from_rollout_config
 
@@ -30,6 +30,8 @@ def build_project(config: dict, location, name: str, *, cloud: bool = False, bac
     if cloud:
         from azure_esml.base_layer import AzureMLSDKBackend
 
+        if credential is not None:  # hosted agent identity instead of the operator's Azure CLI
+            return ESMLProject(built.settings, backend=AzureMLSDKBackend(target, credential=credential))
         return ESMLProject(built.settings, backend=AzureMLSDKBackend.from_cli(target, subscription_bound=True))
     return built
 
@@ -62,8 +64,10 @@ def training_state(directory: Path) -> dict | None:
 
 
 def train(rollout, entry: dict, *, data_date: str, policy: dict, champion_evaluation: dict | None = None,
-          timeout_seconds: int = 7200, poll_seconds: int = 30) -> dict:
-    """Prepare, register definitions and train once; rerunning resumes from receipts."""
+          timeout_seconds: int = 7200, poll_seconds: int = 30, barrier=None) -> dict:
+    """Prepare, register definitions and train once; rerunning resumes from receipts.
+
+    `barrier` (hosted agent) makes the local receipts durable before the definitions are registered."""
     from ml_model_factory.azureml import ModelSelectionRejected
 
     run = entry["train_run_id"]
@@ -71,10 +75,20 @@ def train(rollout, entry: dict, *, data_date: str, policy: dict, champion_evalua
     current = training_state(directory)
     if current and current["state"] in TERMINAL:
         return current
+    if ((directory / "request.json").is_file()
+            and not (directory / "training-submission-intent.json").is_file()
+            and not (directory / "submitted-job.json").is_file()
+            and not (directory / "training" / "code").is_dir()):
+        # A fresh hosted sandbox has the mirrored receipts of a prepared, never-submitted run but not its
+        # generated code. Regenerate the deterministic plan locally; a definitions receipt is kept.
+        shutil.rmtree(directory / "training", ignore_errors=True)
+        (directory / "request.json").unlink()
     if not (directory / "request.json").is_file():
         rollout.prepare(model_number=entry["model_number"], mode=entry["mode"], data_date_utc=data_date,
                         run_id=run, data_version=entry["data_version"])
     if not (directory / "registered-definitions.json").is_file():
+        if barrier is not None:
+            barrier()
         rollout.register_definitions(run, component_version=entry["component_version"])
     try:
         rollout.execute_training(run, timeout_seconds=timeout_seconds, poll_seconds=poll_seconds,
@@ -195,3 +209,17 @@ def latest_inference(rollout_output: Path, entry: dict) -> dict | None:
         if path.is_file():
             found = read_json(path)
     return found
+
+
+def pending_inference(rollout_output: Path, entry: dict) -> dict | None:
+    """The latest submitted scoring attempt if it has no result yet, without Azure calls."""
+    latest = None
+    for folder, inference_id in inference_attempts(entry):
+        directory = Path(rollout_output) / folder
+        receipt = directory / "inference-pipeline-job.json"
+        if receipt.is_file():
+            latest = (directory, receipt, folder, inference_id)
+    if latest is None or (latest[0] / "aif49-inference-result.json").is_file():
+        return None
+    directory, receipt, folder, inference_id = latest
+    return {"job": read_json(receipt).get("name"), "inference_run_id": inference_id, "folder": folder}

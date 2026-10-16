@@ -31,6 +31,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("command", choices=[
         "init-config", "plan", "prepare-local", "offline", "status", "preflight",
         "create-usecase", "train", "retrain", "infer", "deploy", "ask",
+        "hosted-package", "hosted-seed", "hosted-deploy",
     ])
     result.add_argument("--config", type=Path)
     result.add_argument("--output", type=Path)
@@ -76,6 +77,36 @@ def _project_client(config: dict):
     if target.project_endpoint != config["project_endpoint"]:
         raise ValueError("Discovered project endpoint differs from the pinned consumer configuration.")
     return project_client(session, target)
+
+
+def _hosted(args, config: dict, location) -> dict:
+    """Package, seed and deploy the Foundry hosted agent (Playground entry point)."""
+    from ml_agent import hosted_package
+    from ml_agent.runtime import redact
+
+    record = location.state / "hosted-package.json"
+    if args.command == "hosted-package":
+        output = external(args.output) if args.output else location.state / "hosted-package"
+        built = hosted_package.build_package(config, output)
+        write_json(record, built)
+        return redact(built)
+    if args.command == "hosted-seed":
+        from azure.storage.blob import ContainerClient
+
+        from ml_agent import lake
+
+        if not args.apply:
+            raise PermissionError("hosted-seed writes to the shared lake; pass --apply after approval.")
+        shared = config["shared_lake"]
+        container = ContainerClient(shared["account_url"], shared["container"], credential=lake.credential(config))
+        return redact(hosted_package.seed_state(container, config, apply=True))
+    if not record.is_file():
+        raise ValueError("Run hosted-package before hosted-deploy.")
+    with _project_client(config) as project:
+        result = hosted_package.deploy(project, config, read_json(record), apply=args.apply,
+                                       allow_paid=args.allow_paid)
+    write_json(location.state / "hosted-agent.json", result)
+    return redact(result)
 
 
 def run(args) -> dict:
@@ -131,6 +162,8 @@ def run(args) -> dict:
         from ml_agent.runtime import redact
 
         return redact(preflight(config))
+    if args.command.startswith("hosted-"):
+        return _hosted(args, config, location)
     from ml_agent.runtime import MLRuntime, redact
 
     plan = _plan_from_args(args, config) if (args.command in LIVE or args.approved_plan) else None

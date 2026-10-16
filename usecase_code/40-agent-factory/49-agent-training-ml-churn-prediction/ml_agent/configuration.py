@@ -36,7 +36,16 @@ def canonical_sha256(value) -> str:
 
 
 def fingerprint(config: dict) -> str:
-    return canonical_sha256(config)
+    """Bind plans to the configuration. A hosted sandbox's own folder locations (`hosted_paths`) are
+    replaced by labels so a new sandbox session with another home folder keeps the same binding."""
+    roots = config.get("hosted_paths")
+    if not roots:
+        return canonical_sha256(config)
+    text = json.dumps({key: value for key, value in config.items() if key != "hosted_paths"},
+                      sort_keys=True, separators=(",", ":"))
+    for label, root in sorted(roots.items(), key=lambda item: -len(item[1])):
+        text = text.replace(json.dumps(str(root))[1:-1], f"<{label}>")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def external(path: Path) -> Path:

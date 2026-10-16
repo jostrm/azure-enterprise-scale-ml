@@ -27,6 +27,8 @@ sources:
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/runtime.py
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/esml.py
   - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/agent.py
+  - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/hosted.py
+  - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/hosted_package.py
 tests:
   - usecase_code/40-agent-factory/tests/test_prompt.py
   - usecase_code/40-agent-factory/tests/test_hosted.py
@@ -131,8 +133,11 @@ until evaluated, and no oracle is supplied as a tool or prompt.
 
 ## Agent-driven ML training example
 
-`49-agent-training-ml-churn-prediction` is a prompt agent whose client-side tools
-run in the operator's CLI process and call the ESML v2 SDK. The agent can create
+`49-agent-training-ml-churn-prediction` has two entry points with the same tools.
+In the prompt agent, the client-side tools run in the operator's CLI process. In the
+code-based hosted agent, they run inside the Foundry sandbox with the hosted agent's
+own Entra identity, so the Foundry Playground can execute them. Both call the ESML v2
+SDK. The agent can create
 the M49 churn use case from the model-factory churn template, using only
 deterministic synthetic data from `ml_model_factory.synthetic`. It can also train
 M49, retrain the existing M05 air-passengers model and run `GOLD_INFERENCE` batch
@@ -140,7 +145,12 @@ scoring through `AzureMLRollout` receipts.
 
 Every create, train, retrain or inference tool call is checked against an offline
 plan that the operator approved by SHA-256, together with explicit apply and
-paid-call flags. The model therefore cannot widen the scope. Tools accept only the
+paid-call flags. In the hosted agent, only the same platform user's own
+`approve <code>` message approves a plan; the host checks it, never model output,
+and writes expire after 12 hours. Hosted
+receipts are mirrored below the M49 use case's `agent-state` folder in the shared
+lake, so a later Playground session resumes a recorded job instead of resubmitting
+it. The model therefore cannot widen the scope. Tools accept only the
 two enumerated use cases, never take paths or identifiers from the model, and
 expose no delete operation.
 

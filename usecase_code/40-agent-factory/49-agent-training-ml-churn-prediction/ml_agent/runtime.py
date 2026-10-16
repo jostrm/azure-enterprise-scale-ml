@@ -5,6 +5,7 @@ import contextlib
 from copy import deepcopy
 import re
 import sys
+from types import SimpleNamespace
 
 from . import esml, factory, lake
 from .configuration import GUID, paths, read_json
@@ -54,18 +55,62 @@ def model_version(model_id: str) -> tuple[str, str]:
     return match.group(1), match.group(2)
 
 
+PROJECT_WRITES = ("register_pipeline", "execute_pipeline", "wait_for_completion", "register_outputs",
+                  "register_model")
+
+
+class _Fenced:
+    """Proxy that runs a barrier (durable receipt upload) before selected methods of a shared object."""
+
+    def __init__(self, target, names, barrier):
+        self._target, self._names, self._barrier = target, frozenset(names), barrier
+
+    def __getattr__(self, name):
+        value = getattr(self._target, name)
+        if name not in self._names or not callable(value):
+            return value
+
+        def call(*args, **kwargs):
+            self._barrier()
+            return value(*args, **kwargs)
+
+        return call
+
+
 class MLRuntime:
+    """Guarded operations. `credential` replaces the Azure CLI (hosted agent identity); `wait_seconds`
+    bounds each Azure wait so a hosted turn returns `running` and a later call resumes from receipts.
+    `barrier` (hosted) makes the receipts durable before every Azure ML or lake mutation and wait."""
+
     def __init__(self, config: dict, *, plan: dict | None = None, apply: bool = False, allow_paid: bool = False,
-                 project_factory=None, lake_io=None, publisher=None):
+                 project_factory=None, lake_io=None, publisher=None, credential=None, wait_seconds: int | None = None,
+                 hosted: bool = False, barrier=None):
         self.config = config
         self.location = paths(config)
         self.plan = plan
         self.apply = apply is True
         self.allow_paid = allow_paid is True
+        self.hosted = hosted is True
+        self._credential = credential
+        self._barrier = barrier
+        if wait_seconds is not None and (type(wait_seconds) is not int or not 5 <= wait_seconds <= 7200):
+            raise ValueError("wait_seconds must be 5-7200")
+        self._wait = ({"timeout_seconds": wait_seconds, "poll_seconds": min(10, wait_seconds)} if wait_seconds
+                      else {"timeout_seconds": 7200, "poll_seconds": 30})
         self._project_factory = project_factory
-        self._lake_io = lake_io
-        self._publisher = publisher or lake.publish
+        self._lake_io = lake_io if lake_io is None or barrier is None else _Fenced(lake_io, ("upload_folder",), barrier)
+        if publisher is not None:
+            self._publisher = publisher
+        elif credential is not None:
+            self._publisher = lambda config, staged: lake.publish(config, staged, credential_factory=self._identity)
+        else:
+            self._publisher = lake.publish
+        if barrier is not None:
+            self._publisher = _Fenced(SimpleNamespace(call=self._publisher), ("call",), barrier).call
         self.trace: list[dict] = []
+
+    def _identity(self, _config: dict):
+        return self._credential
 
     # ---- guards -------------------------------------------------------------------------
     def _entry(self, name: str, operation: str, *, paid: bool = True) -> dict:
@@ -81,13 +126,23 @@ class MLRuntime:
 
     def _project(self, name: str):
         if self._project_factory is not None:
-            return self._project_factory(name)
-        return esml.build_project(self.config, self.location, name, cloud=True)
+            project = self._project_factory(name)
+        else:
+            project = esml.build_project(self.config, self.location, name, cloud=True, credential=self._credential)
+        if self._barrier is not None:
+            # Each runtime builds its own project, so its write methods are fenced in place.
+            fenced = _Fenced(project, PROJECT_WRITES, self._barrier)
+            for method in PROJECT_WRITES:
+                if callable(getattr(project, method, None)):
+                    setattr(project, method, getattr(fenced, method))
+        return project
 
     @property
     def lake_io(self):
         if self._lake_io is None:
-            self._lake_io = lake.LakeIO(self.config)
+            io = (lake.LakeIO(self.config, credential_factory=self._identity) if self._credential is not None
+                  else lake.LakeIO(self.config))
+            self._lake_io = io if self._barrier is None else _Fenced(io, ("upload_folder",), self._barrier)
         return self._lake_io
 
     def _record(self, operation: str, name: str, result: dict) -> dict:
@@ -111,7 +166,8 @@ class MLRuntime:
             directory = self.location.esml(name) / entry["train_run_id"]
             result.update(train_run_id=entry["train_run_id"], data_version=entry["data_version"],
                           training=esml.training_state(directory),
-                          inference=esml.latest_inference(self.location.esml(name), entry))
+                          inference=esml.latest_inference(self.location.esml(name), entry),
+                          pending_inference=esml.pending_inference(self.location.esml(name), entry))
         return self._record("status", name, result)
 
     def predictions_summary(self, name: str) -> dict:
@@ -127,12 +183,18 @@ class MLRuntime:
 
     # ---- live tools ---------------------------------------------------------------------
     def _prepare(self, plan: dict) -> tuple[dict, dict]:
-        result = {
-            "scenario": factory.write_scenario(self.location),
-            "rollout": factory.write_rollout(self.config, self.location, plan),
-            "notebook": factory.render_notebook(self.location),
-            "data": factory.synthesize(self.location),
-        }
+        if self.hosted:
+            # The hosted package bundles the reviewed M49 scenario; notebooks belong to the orange checkout.
+            result = {"scenario": {"status": "bundled"}, "rollout": factory.write_rollout(self.config, self.location, plan),
+                      "notebook": {"notebook": None, "status": "not-rendered-in-hosted-agent"},
+                      "data": factory.synthesize(self.location)}
+        else:
+            result = {
+                "scenario": factory.write_scenario(self.location),
+                "rollout": factory.write_rollout(self.config, self.location, plan),
+                "notebook": factory.render_notebook(self.location),
+                "data": factory.synthesize(self.location),
+            }
         staged = lake.stage(self.config, self.location, plan["usecases"][CHURN]["data_version"])
         result["staged"] = {"root": staged["root"], "publications": staged["publications"],
                             "files": staged["plan"]["files"], "bytes": staged["plan"]["bytes"]}
@@ -157,15 +219,29 @@ class MLRuntime:
             "scenario": local["scenario"]["status"], "notebook": local["notebook"]["notebook"],
             "rows": local["data"].get("rows"), "publication": {key: receipt.get(key) for key in ("written", "reused")}})
 
+    def _running(self, operation: str, name: str, run_dir, error: TimeoutError, **extra) -> dict:
+        """A bounded hosted wait ended before Azure ML finished; receipts make the next call resume."""
+        if not self.hosted:
+            raise error
+        state = esml.training_state(run_dir) or {}
+        return self._record(operation, name, {"state": "running", "job": extra.pop("job", None) or state.get("job"),
+                                              "message": "Azure ML is still running; check again in a few minutes.",
+                                              **extra})
+
     def train(self, name: str) -> dict:
         if name != CHURN:
             raise ValueError("start_training creates the first M49 model; use start_retraining for air-passengers.")
         entry = self._entry(name, "train")
         project = self._project(name)
         rollout = esml.build_rollout(project, self.location, name)
-        with keep_awake():
-            result = esml.train(rollout, entry, data_date=self.plan["data_date_utc"],
-                                policy=read_json(self.location.selection_policy))
+        try:
+            with keep_awake():
+                result = esml.train(rollout, entry, data_date=self.plan["data_date_utc"],
+                                    policy=read_json(self.location.selection_policy), barrier=self._barrier,
+                                    **self._wait)
+        except TimeoutError as error:
+            return self._running("train", name, rollout.output / entry["train_run_id"], error,
+                                 model=entry["model_name"], run_id=entry["train_run_id"])
         return self._record("train", name, {**result, "model": entry["model_name"], "run_id": entry["train_run_id"]})
 
     def retrain(self, name: str) -> dict:
@@ -179,9 +255,14 @@ class MLRuntime:
             raise ValueError("Champion receipts do not belong to the configured champion model")
         evidence = esml.champion_evidence(project, receipts["job"],
                                           self.location.work(name) / "champion-report" / receipts["job"])
-        with keep_awake():
-            result = esml.train(rollout, entry, data_date=self.plan["data_date_utc"],
-                                policy=read_json(self.location.selection_policy), champion_evaluation=evidence)
+        try:
+            with keep_awake():
+                result = esml.train(rollout, entry, data_date=self.plan["data_date_utc"],
+                                    policy=read_json(self.location.selection_policy), champion_evaluation=evidence,
+                                    barrier=self._barrier, **self._wait)
+        except TimeoutError as error:
+            return self._running("retrain", name, rollout.output / entry["train_run_id"], error,
+                                 champion=entry["champion_model_id"], run_id=entry["train_run_id"])
         return self._record("retrain", name, {**result, "champion": entry["champion_model_id"],
                                               "run_id": entry["train_run_id"]})
 
@@ -227,9 +308,14 @@ class MLRuntime:
         lineage = {"scope": {"aifactory": self.config["aifactory"], "project": f"{self.config['project_number']:03d}",
                              "environment": self.config["environment"]},
                    "model_id": model_id or state["model_id"], "source": source}
-        with keep_awake():
-            result = esml.infer(project, rollout, entry, data_date=self.plan["data_date_utc"], frame=frame,
-                                lake_io=self.lake_io, lineage=lineage, model_id=model_id)
+        try:
+            with keep_awake():
+                result = esml.infer(project, rollout, entry, data_date=self.plan["data_date_utc"], frame=frame,
+                                    lake_io=self.lake_io, lineage=lineage, model_id=model_id, **self._wait)
+        except TimeoutError as error:
+            pending = esml.pending_inference(rollout.output, entry) or {}
+            return self._running("infer", name, rollout.output / entry["train_run_id"], error,
+                                 job=pending.get("job"), inference_run_id=pending.get("inference_run_id"))
         predictions = result.pop("frame")
         summary = {**result, "usecase": name}
         if name == CHURN:

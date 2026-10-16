@@ -50,7 +50,7 @@ own commands, required inputs and expected results.
 | [44-azure-mcp](44-azure-mcp/readme.md) | `44-azure-mcp\deploy.py` for infrastructure planning; shared commands configure/verify the connection. |
 | [45-rag-agent](45-rag-agent/readme.md) | `45-rag-agent\main.py` with one explicit `--source`; its own prepare/deploy/ask lifecycle. |
 | [48-rag-with-splitted-tables-acl-adlsgen2](48-rag-with-splitted-tables-acl-adlsgen2/readme.md) | Whole-table Text Split, native ADLS chunk permissions, two-index evidence and an exhaustive calculator; isolated synthetic image branch. Separate environment/configuration and explicit deployment/paid-call approval. |
-| [49-agent-training-ml-churn-prediction](49-agent-training-ml-churn-prediction/readme.md) | `main.py` with plan-bound client-side tools: creates the synthetic M49 churn use case from the model-factory template, trains it, retrains M05 air-passengers and runs batch inference through ESML v2. Separate environment/configuration and explicit plan/paid-call approval. |
+| [49-agent-training-ml-churn-prediction](49-agent-training-ml-churn-prediction/readme.md) | `main.py` with plan-bound tools: creates the synthetic M49 churn use case from the model-factory template, trains it, retrains M05 air-passengers and runs batch inference through ESML v2. CLI prompt agent (client-side tools) or code-based hosted agent for the Foundry Playground (`hosted-package`, `hosted-deploy`). Separate environment/configuration and explicit plan/paid-call approval. |
 | [agent_factory](agent_factory/readme.md) | Shared library/CLI, not another agent to deploy. |
 | [tests](tests/readme.md) / [fixtures](tests/fixtures/readme.md) | `unittest` from this directory; no agent, Azure login or live dataset needed. |
 

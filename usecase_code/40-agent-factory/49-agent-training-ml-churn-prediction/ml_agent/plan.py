@@ -114,9 +114,19 @@ def plan_sha256(plan_path: Path) -> str:
     return hashlib.sha256(Path(plan_path).read_bytes()).hexdigest()
 
 
-def save_plan(config: dict, plan: dict) -> tuple[Path, str]:
+def save_plan(config: dict, plan: dict, *, unique: bool = False) -> tuple[Path, str]:
+    """Write the plan; `unique` (hosted, several users) adds seconds and a random suffix, create-only."""
     location = paths(config)
-    path = write_json(location.state / "plans" / f"plan-{plan['created_at'][:16].replace(':', '')}.json", plan)
+    if unique:
+        import secrets
+
+        stamp = plan["created_at"][:19].replace(":", "").replace("-", "")
+        path = location.state / "plans" / f"plan-{stamp}-{secrets.token_hex(4)}.json"
+        if path.exists():
+            raise ValueError("Plan file already exists; plan again")
+        path = write_json(path, plan)
+    else:
+        path = write_json(location.state / "plans" / f"plan-{plan['created_at'][:16].replace(':', '')}.json", plan)
     return path, plan_sha256(path)
 
 

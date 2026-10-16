@@ -1,10 +1,12 @@
 # 49 Agent training: ML churn prediction
 
-**Purpose:** a Foundry prompt agent that creates, trains, retrains and batch-scores Azure ML use cases
-through the ESML v2 SDK (`azure_esml`) and the canonical model-factory engines.
+**Purpose:** a Foundry agent that creates, trains, retrains and batch-scores Azure ML use cases
+through the ESML v2 SDK (`azure_esml`) and the canonical model-factory engines. It has two entry
+points with the same plan-bound tools: a CLI prompt agent (`main.py ask`) and a Foundry hosted agent
+that works in the Foundry Playground (see [Foundry Playground](#foundry-playground-hosted-agent)).
 **Status:** Local tests and an offline from-scratch reproduction run without Azure. Every Azure write
-needs an approved plan plus explicit flags. Passing tests is not evidence of a live run; see
-[Evidence](#evidence).
+needs an approved plan plus explicit flags (CLI) or the user's own approval message (Playground).
+Passing tests is not evidence of a live run; see [Evidence](#evidence).
 
 The agent supports exactly two use cases:
 
@@ -30,7 +32,8 @@ main.py ask --demo uc1|uc2
                                         -> one pipeline job -> lake predictions
 ```
 
-Foundry Playground cannot execute these client-side functions. Use `main.py ask` instead.
+The Foundry Playground cannot execute these client-side functions of the prompt agent. For the
+Playground, deploy the hosted agent: it runs the same `MLRuntime` inside Foundry with its own identity.
 
 **Naming.** The model number sets `naming_style=model-prefix`, which gives these names:
 
@@ -122,6 +125,74 @@ its own receipts and its own create-only lake paths, so a recorded job is never 
 - The commands keep the workstation awake during bounded Azure waits. After a sleep or VPN drop,
   rerun the same command with the same approved plan.
 
+## Foundry Playground (hosted agent)
+
+The hosted agent `<owner>-<version>-ml-churn-hosted` (for example
+`aif49-project001-dev-v1-ml-churn-hosted`) is a code-based Foundry hosted agent. It uses the
+Responses protocol, Python 3.13, 1 vCPU and 2 GiB, and a remote dependency build from
+`hosted-requirements.txt`.
+
+```text
+Foundry Playground  ->  hosted agent sandbox (agent identity, network-injected subnet)
+  hosted_main.py (main.py in the package)  ->  ml_agent.hosted.HostedAgent
+    model + function calls in the sandbox  ->  the same plan-bound MLRuntime and AzureMLRollout receipts
+    plans, approvals and receipts  <->  <shared lake>/.../usecases/49-agent-training-ml-churn-prediction/agent-state/
+```
+
+**Package.** `hosted-package` writes a reproducible ZIP from an explicit allowlist:
+
+- `hosted_main.py`, which becomes `main.py` in the package.
+- `ml_agent`.
+- The `azure_esml` and `ml_model_factory` sources of the installed ESML v2 SDK.
+- A bundle of the consumer configuration without workstation paths, the reviewed rollout, the
+  champion receipt, the scenarios and the selection policy.
+
+The package contains no credentials and no generated data. The sandbox does not render notebooks; the
+orange checkout keeps the generated notebook.
+
+**Approval in chat.** The `plan_run` tool proposes a plan and returns an approval code. The plan becomes
+active only when the same platform user (the hashed `x-agent-user-id` that Foundry injects) replies with
+exactly `approve <approval code>` within 30 minutes. The host checks that message itself; model output
+and tool results can never approve a plan. Writes are allowed for 12 hours and only for the user who
+approved the plan; anyone else can read its status. Plans bind to the configuration regardless of where
+the sandbox places its home folder.
+
+**Long jobs.** Each Azure ML wait is bounded to about 20 seconds per tool call. A tool reports `running`
+with the job name. Ask again later; the next call resumes the same recorded job from the shared
+receipts and never submits a duplicate. Receipts are uploaded to the lake before every Azure ML or lake
+write and wait, and after every tool call. Uploads are conditional on the ETag that the session read, so
+a stale session cannot overwrite newer receipts. A renewed blob lease serializes turns across
+Playground conversations.
+
+**Identity and roles.** Foundry creates a dedicated agent identity for the hosted agent. This example
+never assigns roles. An administrator grants that identity the following roles, and nothing broader:
+
+- `AzureML Data Scientist` on the Azure ML workspace.
+- `Storage Blob Data Contributor` on the shared-lake container. Use an ABAC condition that limits
+  writes and deletes to the M49 dataset paths, the two use-case roots and the publication blueprint
+  prefix.
+- `Storage Blob Data Contributor` on the workspace default blob container, only when that datastore uses
+  identity-based access. Azure ML code uploads then use the caller's identity.
+
+The sandbox must also reach Azure ML, the lake and the Foundry project over the network-injected
+subnet.
+
+```powershell
+& $py main.py hosted-package --config <config>                       # offline, reproducible ZIP
+& $py main.py hosted-seed --config <config> --apply                    # create-only: continue the published data versions
+& $py main.py hosted-deploy --config <config> --apply --allow-paid     # create/reuse, wait until active, route
+```
+
+`hosted-deploy` writes the version and the agent identity's principal ID to `hosted-agent.json` in the
+consumer state folder. Then open the agent in the Foundry Playground, for example:
+
+1. "What is the status of both use cases?"
+2. "Create the churn use case from scratch, train it and score new customers." The agent proposes a
+   plan.
+3. "approve <code>". The agent publishes the data and starts training.
+4. "Is training done? Then score the customers." Repeat until the predictions summary appears.
+5. "Retrain air-passengers and run inference."
+
 ## Safety boundaries
 
 **Writes that need approval:**
@@ -130,8 +201,9 @@ its own receipts and its own create-only lake paths, so a recorded job is never 
 - Azure ML data assets and pipeline components.
 - Training and inference jobs.
 - Gated model registration.
-- One owned agent version.
+- One owned agent version (prompt agent and, separately, the hosted agent).
 - Paid model responses.
+- The hosted agent's receipt mirror and lease blob below the M49 use case's `agent-state` folder.
 
 **What it never does:**
 
