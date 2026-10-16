@@ -31,9 +31,16 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Enable Databricks — makes subnetProjDatabricksPublic and subnetProjDatabricksPrivate mandatory when BYO_subnets=true")][string]$enableDatabricks = "false",
     [Parameter(Mandatory = $false, HelpMessage = "Disable agent network injection — when false and enableAIFoundry=true, subnetProjACA2 is mandatory")][string]$disableAgentNetworkInjection = "false",
     [Parameter(Mandatory = $false, HelpMessage = "Enable Azure Web App — makes subnetProjAKS mandatory (used for VNet integration, which requires Microsoft.Web/serverFarms delegation)")][string]$enableWebApp = "false",
-    [Parameter(Mandatory = $false, HelpMessage = "Enable Azure Function App — makes subnetProjAKS mandatory (used for VNet integration, which requires Microsoft.Web/serverFarms delegation)")][string]$enableFunction = "false"
+    [Parameter(Mandatory = $false, HelpMessage = "Enable Azure Function App — makes subnetProjAKS mandatory (used for VNet integration, which requires Microsoft.Web/serverFarms delegation)")][string]$enableFunction = "false",
+    [string]$enableLogicApps = 'false',
+    [string]$logicAppType = 'Standard',
+    [string]$byoASEv3 = 'false',
+    [string]$enablePublicAccessWithPerimeter = 'false',
+    [string]$subnetProjLogicapp = ''
 )
 
+$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'modules\logicAppSubnet.ps1')
     # Default subnet name templates (used when BYO_subnets is false)
     $defaultSubnetProjGenAI = "snt-prj<xxx>-genai"
     $defaultSubnetProjAKS = "snt-prj<xxx>-aks"
@@ -319,6 +326,16 @@ Write-Host "DEBUG: bicepPar5 10-esml-globals-override.json:" -ForegroundColor Cy
 Write-Host ($jsonParameters5 | ConvertTo-Json -Depth 10) -ForegroundColor Yellow
 ConvertTo-Variables -InputObject $jsonParameters5
 
+# Script parameters shadow module globals; omitted historical settings keep safe defaults.
+foreach ($document in @($jsonParameters1, $jsonParameters2, $jsonParameters3, $jsonParameters4, $jsonParameters5)) {
+    foreach ($key in @('enableLogicApps', 'logicAppType', 'byoASEv3', 'enablePublicAccessWithPerimeter', 'subnetProjLogicapp')) {
+        if (-not $PSBoundParameters.ContainsKey($key) -and $null -ne $document.parameters.$key) {
+            Set-Variable -Name $key -Value ([string]$document.parameters.$key.value)
+        }
+    }
+}
+$needsLogicAppSubnet = Test-LogicAppPrivateIntegration $enableLogicApps $logicAppType $byoASEv3 $enablePublicAccessWithPerimeter
+
 # Preserve incoming custom subnet patterns AFTER variables are loaded
 $subnetProjGenAI_input = $subnetProjGenAI
 $subnetProjAKS_input = $subnetProjAKS
@@ -436,6 +453,7 @@ $genaiSubnetId=""
 $acaSubnetId=""
 $aca2SubnetId=""
 $webappSubnetId=""
+$logicappSubnetId=""
 write-host "The following parameters are added to template"
 write-host "vnetResourceGroup is: $($vnetResourceGroup)"
 write-host "BYO_subnets_bool is: $($BYO_subnets_bool)"
@@ -454,29 +472,44 @@ function Get-DeploymentOutputValue {
     )
 
     if ($env:GITHUB_ACTIONS -eq 'true' -or $env:AIFACTORY_USE_AZURE_CLI -eq 'true') {
+        $query = if ($OutputName -eq 'logicappSubnetId') {
+            "properties.{provisioningState: provisioningState, value: outputs.$OutputName.value}"
+        } else { "properties.outputs.$OutputName.value" }
+        $format = if ($OutputName -eq 'logicappSubnetId') { 'json' } else { 'tsv' }
         $value = & az deployment group show `
             --subscription $subscriptionId `
             --resource-group $ResourceGroupName `
             --name $DeploymentName `
-            --query "properties.outputs.$OutputName.value" `
-            --output tsv `
+            --query $query `
+            --output $format `
             --only-show-errors 2>&1
         if ($LASTEXITCODE -ne 0) {
             throw "Unable to read output '$OutputName' from deployment '$ResourceGroupName/$DeploymentName': $($value -join [Environment]::NewLine)"
         }
+        if ($OutputName -eq 'logicappSubnetId') {
+            $deployment = ($value -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop
+            if ($deployment.provisioningState -ine 'Succeeded') {
+                throw "Network deployment '$ResourceGroupName/$DeploymentName' must be Succeeded before using Logic App networking (state '$($deployment.provisioningState)')."
+            }
+            return [string]$deployment.value
+        }
         return ($value -join [Environment]::NewLine).Trim()
     }
 
-    return (Get-AzResourceGroupDeployment `
+    $deployment = Get-AzResourceGroupDeployment `
         -ResourceGroupName $ResourceGroupName `
-        -Name $DeploymentName).Outputs[$OutputName].Value
+        -Name $DeploymentName
+    if ($OutputName -eq 'logicappSubnetId' -and $deployment.ProvisioningState -ine 'Succeeded') {
+        throw "Network deployment '$ResourceGroupName/$DeploymentName' must be Succeeded before using Logic App networking (state '$($deployment.ProvisioningState)')."
+    }
+    return $deployment.Outputs[$OutputName].Value
 }
 
 # Non-BYO path: fetch subnets from prior deployment outputs (never mutate names)
 if ($BYO_subnets_bool -eq $false) {
 
     # Even when BYO_subnets is false, a provided vnetResourceGroup_param should be respected for lookup, but no subnet-name mutation should occur.
-    $lookupResourceGroup = if ([string]::IsNullOrEmpty($vnetResourceGroup_param)) { $vnetResourceGroup } else { $vnetResourceGroup_param }
+    $lookupResourceGroup = $vnetResourceGroup
 
     write-host "BYO_subnets is FALSE and BYOVnet is not true either - Fetching subnet IDs from deployment: $($deploymentPrefix)SubnetDeplProj"
     write-host "Project type all :  trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj for AKS name"
@@ -712,6 +745,33 @@ if ($BYO_subnets_bool -eq $false) {
     }
 }
 
+if ($needsLogicAppSubnet) {
+    $logicVnetName = if ([string]::IsNullOrWhiteSpace($vnetNameFull_param)) {
+        "$vnetNameBase-$locationSuffix-$env$commonResourceSuffix"
+    } else { $vnetNameFull_param.Replace('<network_env>', $network_env) }
+    $logicVnetId = "/subscriptions/$subscriptionId/resourceGroups/$vnetResourceGroup/providers/Microsoft.Network/virtualNetworks/$logicVnetName"
+    if ($BYO_subnets_bool) {
+        if ([string]::IsNullOrWhiteSpace($subnetProjLogicapp)) {
+            throw 'BYO private Logic Apps Standard requires explicit subnetProjLogicapp; no subnet is guessed or redelegated.'
+        }
+        $configuredSubnet = $subnetProjLogicapp.Replace('<xxx>', $projectNumber).Replace('<network_env>', $network_env)
+        $logicappSubnetId = if ($configuredSubnet.StartsWith('/')) { $configuredSubnet } else { "$logicVnetId/subnets/$configuredSubnet" }
+    } else {
+        $logicappSubnetId = Get-DeploymentOutputValue -ResourceGroupName $lookupResourceGroup `
+            -DeploymentName "$($deploymentPrefix)SubnetDeplProj" -OutputName 'logicappSubnetId'
+        if ([string]::IsNullOrWhiteSpace($logicappSubnetId)) {
+            throw 'logicappSubnetId output is missing. Rerun with runNetworkingVar=True to add/reuse snt-prj<projectNumber>-logicapp; existing subnets must not be resized or redelegated.'
+        }
+        if ($logicappSubnetId -ine "$logicVnetId/subnets/snt-prj$projectNumber-logicapp") {
+            throw 'Managed Logic App subnet output does not match the exact configured project and VNet.'
+        }
+    }
+    if ($logicappSubnetId -in @($genaiSubnetId, $aksSubnetId, $aks2SubnetId, $acaSubnetId, $aca2SubnetId, $webappSubnetId)) {
+        throw 'Logic App outbound subnet must be separate from Web App, AKS, ACA and inbound private endpoints.'
+    }
+    $null = Get-ValidatedLogicAppSubnet -SubnetId $logicappSubnetId -VnetId $logicVnetId
+}
+
 $templateAll = @"
 {
     "`$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
@@ -734,6 +794,9 @@ $templateAll = @"
         },
         "webappSubnetId": {
             "value": "$webappSubnetId"
+        },
+        "logicappSubnetId": {
+            "value": "$logicappSubnetId"
         },
         "dbxPubSubnetName": {
             "value": "$dbxPubSubnetName"

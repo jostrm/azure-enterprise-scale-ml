@@ -1,0 +1,18 @@
+steps:
+- task: PowerShell@2
+  displayName: '00_normalize_logic_app_network_settings'
+  inputs:
+    targetType: inline
+    pwsh: true
+    script: |
+      $type = $env:LOGIC_APP_TYPE
+      if ([string]::IsNullOrWhiteSpace($type) -or $type -eq '$' + '(logicAppType)') { $type = 'Standard' }
+      if ($type -notin @('Standard', 'Consumption')) { throw "Invalid logicAppType '$type'." }
+      $subnet = $env:SUBNET_PROJ_LOGICAPP
+      if ($subnet -eq '$' + '(subnetProjLogicapp)') { $subnet = '' }
+      if ($subnet -match '[\r\n]') { throw 'Invalid subnetProjLogicapp.' }
+      Write-Host "##vso[task.setvariable variable=logicAppType]$type"
+      Write-Host "##vso[task.setvariable variable=subnetProjLogicapp]$subnet"
+  env:
+    LOGIC_APP_TYPE: $(logicAppType)
+    SUBNET_PROJ_LOGICAPP: $(subnetProjLogicapp)

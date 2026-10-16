@@ -72,6 +72,8 @@ ALIASES = {
     "elasticSku": "ELASTIC_SKU",
     "deployModel_gpt_54_mini": "DEPLOY_MODEL_GPT_54_MINI",
     "subnetProjWebapp": "SUBNET_PROJ_WEBAPP",
+    "subnetProjLogicapp": "SUBNET_PROJ_LOGICAPP",
+    "logicAppType": "LOGIC_APP_TYPE",
     "tenantId": "TENANT_ID",
     "azure_machinelearning_sp_oid": "TENANT_AZUREML_OID",
     # Per-environment service SKUs (Dev vs Stage/Prod). ADO uses camelCase

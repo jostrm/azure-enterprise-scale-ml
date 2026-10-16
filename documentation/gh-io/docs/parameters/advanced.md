@@ -403,12 +403,12 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 390 |
-| `env` | 389 |
+| `yaml` | 392 |
+| `env` | 390 |
 | `bootstrap` | 92 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 393 |
+| `json.dev` | 395 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
@@ -580,6 +580,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:functionVersion --><!-- parameter json.dev:functionVersion -->`functionVersion` | `FUNCTION_VERSION` | O | Y: `"v7.0"`<br>J.dev: `"v7.0"` | Azure Function runtime version |
 | <!-- parameter yaml:kvNameFromCOMMON_param --><!-- parameter json.dev:kvNameFromCOMMON_param -->`kvNameFromCOMMON_param` | `KV_NAME_FROM_COMMON_PARAM` | O | Y: `""`<br>J.dev: `""` | BYO common Key Vault name otherwise: provide a custom Key Vault name. |
 | <!-- parameter yaml:lakeContainerName --><!-- parameter json.dev:lakeContainerName -->`lakeContainerName` | `LAKE_CONTAINER_NAME` | O | Y: `"lake3"`<br>J.dev: `"lake3"` | Data lake container name |
+| <!-- parameter yaml:logicAppType --><!-- parameter json.dev:logicAppType -->`logicAppType` | `LOGIC_APP_TYPE` | O | Y: `"Standard"`<br>J.dev: `"Standard"` | Logic Apps hosting type |
 | <!-- parameter yaml:org-department-id --><!-- parameter json.dev:org-department-id -->`org-department-id` | `ORG_DEPARTMENT_ID` | O | Y: `""`<br>J.dev: `""` | Project organizational department ID keep-as-is: Text, max 128 characters, not necessarily a GUID; identical across environments. No identity or authentication effect. |
 | <!-- parameter yaml:org-department-name --><!-- parameter json.dev:org-department-name -->`org-department-name` | `ORG_DEPARTMENT_NAME` | O | Y: `""`<br>J.dev: `""` | Project organizational department name keep-as-is: Unicode text, max 200 characters; identical across environments, independent of cost center. No factory inheritance or Azure tag writes. |
 | <!-- parameter yaml:persona_access_manifest --><!-- parameter json.dev:persona_access_manifest -->`persona_access_manifest` | `PERSONA_ACCESS_MANIFEST` | O | Y: `""`<br>J.dev: `""` | Repository-relative reviewed manifest for this environment/project. |
@@ -665,6 +666,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:subnetProjDatabricksPrivate --><!-- parameter json.dev:subnetProjDatabricksPrivate -->`subnetProjDatabricksPrivate` | `SUBNET_PROJ_DATABRICKS_PRIVATE`, `SUBNET_PROJ_DBX_PRIVATE` (not in .env template) | C | Y: `"snt-prj<xxx>-dbxpriv"`<br>J.dev: `"snt-prj<xxx>-dbxpriv"` | BYO Databricks private subnet mandatory: if BYO_subnets:'true' and enableDatabricks:'true'. |
 | <!-- parameter yaml:subnetProjDatabricksPublic --><!-- parameter json.dev:subnetProjDatabricksPublic -->`subnetProjDatabricksPublic` | `SUBNET_PROJ_DATABRICKS_PUBLIC`, `SUBNET_PROJ_DBX_PUBLIC` (not in .env template) | C | Y: `"snt-prj001-dbxpub"`<br>J.dev: `"snt-prj001-dbxpub"` | BYO Databricks public subnet mandatory: if BYO_subnets:'true' and enableDatabricks:'true'. |
 | <!-- parameter yaml:subnetProjGenAI --><!-- parameter json.dev:subnetProjGenAI -->`subnetProjGenAI` | `SUBNET_PROJ_GENAI` | C | Y: `"snt-dev-prj<xxx>-genai"`<br>J.dev: `"snt-dev-prj<xxx>-genai"` | BYO project GenAI subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists. |
+| <!-- parameter yaml:subnetProjLogicapp --><!-- parameter json.dev:subnetProjLogicapp -->`subnetProjLogicapp` | `SUBNET_PROJ_LOGICAPP` | C | Y: `""`<br>J.dev: `""` | BYO dedicated Logic Apps Standard outbound subnet name or full ARM ID mandatory: if BYO_subnets:'true', enableLogicApps:'true', logicAppType:'Standard', byoASEv3:'false' and enablePublicAccessWithPerimeter:'false'. Existing /26 or larger in the configured VNet, delegated only to Microsoft.Web/serverFarms; supports |
 | <!-- parameter yaml:subnetProjWebapp --><!-- parameter json.dev:subnetProjWebapp -->`subnetProjWebapp` | `SUBNET_PROJ_WEBAPP` | C | Y: `"snt-prj<xxx>-webapp"`<br>J.dev: `"snt-prj<xxx>-webapp"` | App Service/Function VNet integration subnet (delegated to Microsoft.Web/serverFarms) mandatory: if BYO_subnets:'true' AND (enableWebApp:'true' OR enableFunction:'true') ensure: subnet exists. |
 | <!-- parameter yaml:test_cidr_range --><!-- parameter json.dev:test_cidr_range -->`test_cidr_range` | `STAGE_CIDR_RANGE` | M | Y: `"64"`<br>J.dev: `"64"` | STAGE network-aligned XX value mandatory: STAGE network-aligned XX value keep-as-is: VNet 172.16.64.0/18. |
 | <!-- parameter yaml:vnetNameBase --><!-- parameter json.dev:vnetNameBase -->`vnetNameBase` | `VNET_NAME_BASE` | O | Y: `"vnt-esmlcmn"`<br>J.dev: `"vnt-esmlcmn"` | Common vNet base name otherwise: ignored if vnetNameFull_param is set (BYOvNet). |
@@ -922,7 +924,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:KV_NAME_FROM_COMMON_PARAM -->`KV_NAME_FROM_COMMON_PARAM` | `kvNameFromCOMMON_param` | O | `""` | BYO common Key Vault name otherwise: provide a custom Key Vault name. |
 | <!-- parameter env:LAKE_CONTAINER_NAME -->`LAKE_CONTAINER_NAME` | `lakeContainerName` | O | `"lake3"` | Data lake container name |
 | <!-- parameter env:LAKE_PREFIX -->`LAKE_PREFIX` | `commonLakeNamePrefixMax8chars` | O | `"xxxyyy"` | Data lake storage name prefix keep-as-is: Max 8 characters. |
-| <!-- parameter env:LOGIC_APP_TYPE -->`LOGIC_APP_TYPE` | No verified counterpart | O | `"Standard"` | Logic Apps plan type keep-as-is: Consumption is multi-tenant with NO private endpoints/VNet integration - only valid when ENABLE_PUBLIC_ACCESS_WITH_PERIMETER:'true'. Use Standard for private networking. |
+| <!-- parameter env:LOGIC_APP_TYPE -->`LOGIC_APP_TYPE` | `logicAppType` | O | `"Standard"` | Logic Apps plan type keep-as-is: Consumption is multi-tenant with NO private endpoints/VNet integration - only valid when ENABLE_PUBLIC_ACCESS_WITH_PERIMETER:'true'. Use Standard for private networking. |
 | <!-- parameter env:MAX_RETRY_ATTEMPTS -->`MAX_RETRY_ATTEMPTS` | `maxRetryAttempts` | O | `"2"` | Maximum retry attempts keep-as-is: Valid values: 1, 2, or 3. |
 | <!-- parameter env:ORG_DEPARTMENT_ID -->`ORG_DEPARTMENT_ID` | `org-department-id` | O | `""` | Project organizational department ID keep-as-is: Text, max 128 characters, not necessarily a GUID; identical across environments. No identity or authentication effect. |
 | <!-- parameter env:ORG_DEPARTMENT_NAME -->`ORG_DEPARTMENT_NAME` | `org-department-name` | O | `""` | Project organizational department name keep-as-is: Unicode text, max 200 characters; identical across environments, independent of cost center. No factory inheritance or Azure tag writes. |
@@ -1101,6 +1103,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:SUBNET_PROJ_DATABRICKS_PRIVATE -->`SUBNET_PROJ_DATABRICKS_PRIVATE` | `subnetProjDatabricksPrivate` | C | `""` | BYO Databricks private subnet name mandatory: if ENABLE_DATABRICKS:'true' and BYO_SUBNETS:'true' |
 | <!-- parameter env:SUBNET_PROJ_DATABRICKS_PUBLIC -->`SUBNET_PROJ_DATABRICKS_PUBLIC` | `subnetProjDatabricksPublic` | C | `""` | BYO Databricks public subnet name mandatory: if ENABLE_DATABRICKS:'true' and BYO_SUBNETS:'true' |
 | <!-- parameter env:SUBNET_PROJ_GENAI -->`SUBNET_PROJ_GENAI` | `subnetProjGenAI` | C | `""` | BYO GenAI project subnet name mandatory: if BYO_SUBNETS:'true' |
+| <!-- parameter env:SUBNET_PROJ_LOGICAPP -->`SUBNET_PROJ_LOGICAPP` | `subnetProjLogicapp` | C | `""` | BYO dedicated Logic Apps Standard outbound subnet name or full ARM ID mandatory: for enabled private Standard without BYO ASE when BYO_SUBNETS:'true'. Existing /26 or larger in the configured VNet, delegated only to Microsoft.Web/serverFarms; supports |
 | <!-- parameter env:SUBNET_PROJ_WEBAPP -->`SUBNET_PROJ_WEBAPP` | `subnetProjWebapp` | C | `""` | BYO App Service/Function VNet-integration project subnet name mandatory: if (ENABLE_WEB_APP:'true' OR ENABLE_FUNCTION:'true') and BYO_SUBNETS:'true' |
 | <!-- parameter env:VNET_NAME_BASE -->`VNET_NAME_BASE` | `vnetNameBase` | O | `"vnt-esmlcmn"` | Common vNet base name keep-as-is: Base name of the common virtual network. |
 | <!-- parameter env:VNET_NAME_FULL_PARAM -->`VNET_NAME_FULL_PARAM` | `vnetNameFull_param` | C | `""` | BYO vNet full name mandatory: if BYO_SUBNETS:'true' ensure: full name of the existing virtual network. |

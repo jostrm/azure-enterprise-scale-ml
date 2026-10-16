@@ -38,6 +38,10 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Virtual network resource group parameter override")][string]$vnetResourceGroup_param,
     [Parameter(Mandatory = $false, HelpMessage = "Virtual network full name parameter override")][string]$vnetNameFull_param,
     [Parameter(Mandatory = $false, HelpMessage = "Project number used in deployed subnet names, e.g. 001; otherwise read from the JSON parameters")][string]$projectNumber,
+    [string]$enableLogicApps = 'false',
+    [string]$logicAppType = 'Standard',
+    [string]$byoASEv3 = 'false',
+    [string]$enablePublicAccessWithPerimeter = 'false',
 
     # Optional subnet CIDR overrides (defaults match legacy values for projectTypeADO=all)
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for GenAI subnet when projectType=all")][string]$genaiSubnetCidrAll = '25',
@@ -51,6 +55,7 @@ param (
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'modules\logicAppSubnet.ps1')
 
 function ConvertTo-IPv4Range {
     param([Parameter(Mandatory = $true)][string]$Cidr)
@@ -90,6 +95,7 @@ function New-SubnetScheme {
         aksSubnetCidr = 'aks'; aks2SubnetCidr = 'aks-002'
         acaSubnetCidr = 'aca'; aca2SubnetCidr = 'aca-002'
         genaiSubnetCidr = 'genai'; webappSubnetCidr = 'webapp'
+        logicappSubnetCidr = 'logicapp'
         dbxPubSubnetCidr = 'dbxpub'; dbxPrivSubnetCidr = 'dbxpriv'
     }
     foreach ($entry in $map.GetEnumerator()) {
@@ -107,7 +113,9 @@ function New-SubnetScheme {
             throw "VNet address prefixes overlap."
         }
     }
-    if ($null -eq $vnetObj.Subnets) { throw "VNet subnet inventory is missing." }
+    if ($vnetObj.Subnets -isnot [System.Collections.IList]) {
+        throw "VNet subnet inventory is missing or is not an array/list."
+    }
     $occupied = @()
     $byName = @{}
     foreach ($subnet in $vnetObj.Subnets) {
@@ -330,6 +338,11 @@ if ($hasAzureContext) {
         }
     }
 
+    $needsLogicAppSubnet = Test-LogicAppPrivateIntegration $enableLogicApps $logicAppType $byoASEv3 $enablePublicAccessWithPerimeter
+    if ($needsLogicAppSubnet -and $projectTypeADO -in @('genai-1', 'all')) {
+        $requiredSubnets['logicappSubnetCidr'] = '26'
+    }
+
     # Handle variable assignments - ADO parameters take precedence, then inline parameters, then JSON parameters
     if ($null -ne $commonRGNamePrefixVar -and $commonRGNamePrefixVar -ne '') {
         $commonRGNamePrefix = $commonRGNamePrefixVar
@@ -394,6 +407,22 @@ if ($hasAzureContext) {
         $vnetObj = Get-AzVirtualNetwork -ResourceGroupName $vnetResourceGroup -Name $vnetName
     }
 
+    if ($requiredSubnets.ContainsKey('logicappSubnetCidr')) {
+        $expectedVnetId = "/subscriptions/$subscriptionId/resourceGroups/$vnetResourceGroup/providers/Microsoft.Network/virtualNetworks/$vnetName"
+        if ($vnetObj.Id -ine $expectedVnetId) { throw "VNet inventory identity is missing or differs from '$expectedVnetId'." }
+        if ($vnetObj.Subnets -isnot [System.Collections.IList]) {
+            throw "VNet subnet inventory is missing or is not an array/list."
+        }
+        foreach ($subnet in $vnetObj.Subnets) {
+            if ($subnet.Id -ine "$expectedVnetId/subnets/$($subnet.Name)") {
+                throw "Subnet inventory identity mismatch for '$($subnet.Name)'."
+            }
+        }
+        $existingLogicAppSubnet = @($vnetObj.Subnets | Where-Object { $_.Name -ieq "snt-prj$projectNumber-logicapp" })
+        if ($existingLogicAppSubnet.Count) {
+            $null = Get-ValidatedLogicAppSubnet -SubnetId "$expectedVnetId/subnets/snt-prj$projectNumber-logicapp" -VnetId $expectedVnetId
+        }
+    }
     $result = New-SubnetScheme -map $requiredSubnets -vnetObj $vnetObj -projectNumber $projectNumber
     Write-Host "Result:"
     Write-Host "Resource group for vNet: $($vnetResourceGroup)"
@@ -553,6 +582,11 @@ if ($hasAzureContext) {
         write-host "dbxPubSubnetCidr : $($result["dbxPubSubnetCidr"])"
     }
 
+    if ($result.ContainsKey('logicappSubnetCidr')) {
+        $document = $template | ConvertFrom-Json -AsHashtable
+        $document.parameters.logicappSubnetCidr = @{ value = $result.logicappSubnetCidr }
+        $template = $document | ConvertTo-Json -Depth 10
+    }
     $templateName = "subnetParameters.json"
     
     # Create directory if it doesn't exist

@@ -33,6 +33,7 @@ steps:
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py'
     arguments: '--file "$(configOverrideFile)" --environment "$(dev_test_prod)" --format azure-devops'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
+- template: ../../variables/logic-app-network-steps.yaml
 - template: ../../variables/persona-access-steps.yaml
   parameters:
     serviceConnection: ${{ parameters.serviceConnection }}
@@ -118,6 +119,10 @@ steps:
     subnetProjACA: $(subnetProjACA)
     subnetProjACA2: $(subnetProjACA2)
     subnetProjWebapp: $(subnetProjWebapp)
+    subnetProjLogicapp: $(subnetProjLogicapp)
+    enableLogicApps: $(enableLogicApps)
+    logicAppType: $(logicAppType)
+    enablePublicAccessWithPerimeter: $(enablePublicAccessWithPerimeter)
     subnetProjDatabricksPublic: $(subnetProjDatabricksPublic)
     subnetProjDatabricksPrivate: $(subnetProjDatabricksPrivate)
     byoASEv3: $(byoASEv3)
@@ -206,6 +211,7 @@ steps:
         echo "##vso[task.setvariable variable=subnetProjAKS2]"
         echo "##vso[task.setvariable variable=subnetProjACA]"
         echo "##vso[task.setvariable variable=subnetProjACA2]"
+        echo "##vso[task.setvariable variable=subnetProjLogicapp]"
         echo "##vso[task.setvariable variable=subnetProjDatabricksPublic]"
         echo "##vso[task.setvariable variable=subnetProjDatabricksPrivate]"
       fi
@@ -1013,6 +1019,7 @@ steps:
       $subnetProjACAVal           = if ($_useSubnetNames) { "$(subnetProjACA)" }           else { "" }
       $subnetProjACA2Val          = if ($_useSubnetNames) { "$(subnetProjACA2)" }          else { "" }
       $subnetProjWebappVal        = if ($_useSubnetNames) { "$(subnetProjWebapp)" }        else { "" }
+      $subnetProjLogicappVal      = if ($_useSubnetNames) { "$(subnetProjLogicapp)" }      else { "" }
       $subnetProjDatabricksPublicVal  = if ($_useSubnetNames) { "$(subnetProjDatabricksPublic)" }  else { "" }
       $subnetProjDatabricksPrivateVal = if ($_useSubnetNames) { "$(subnetProjDatabricksPrivate)" } else { "" }
       Write-Host "BYO_subnets=$_byo => subnetCommon='$subnetCommonVal', subnetProjGenAI='$subnetProjGenAIVal'"
@@ -1031,6 +1038,7 @@ steps:
           subnetProjACA = @{ value = $subnetProjACAVal }
           subnetProjACA2 = @{ value = $subnetProjACA2Val }
           subnetProjWebapp = @{ value = $subnetProjWebappVal }
+          subnetProjLogicapp = @{ value = $subnetProjLogicappVal }
           subnetProjDatabricksPublic = @{ value = $subnetProjDatabricksPublicVal }
           subnetProjDatabricksPrivate = @{ value = $subnetProjDatabricksPrivateVal }
         }
@@ -1093,7 +1101,7 @@ steps:
     scriptType: pscore
     scriptLocation: scriptPath
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
-    arguments: '-BYO_subnets "$(BYO_subnets)" -network_env "$(network_env)" -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)" -enableAIFoundry "$(enableAIFoundry)" -enableAksForAzureML "$(enableAksForAzureML)" -enableContainerApps "$(enableContainerApps)" -enableDatabricks "$(enableDatabricks)" -disableAgentNetworkInjection "$(disableAgentNetworkInjection)" -enableWebApp "$(enableWebApp)" -enableFunction "$(enableFunction)"'
+    arguments: '-BYO_subnets "$(BYO_subnets)" -network_env "$(network_env)" -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)" -enableAIFoundry "$(enableAIFoundry)" -enableAksForAzureML "$(enableAksForAzureML)" -enableContainerApps "$(enableContainerApps)" -enableDatabricks "$(enableDatabricks)" -disableAgentNetworkInjection "$(disableAgentNetworkInjection)" -enableWebApp "$(enableWebApp)" -enableFunction "$(enableFunction)" -enableLogicApps "$(enableLogicApps)" -logicAppType "$(logicAppType)" -byoASEv3 "$(byoASEv3)" -enablePublicAccessWithPerimeter "$(enablePublicAccessWithPerimeter)"'
     powerShellErrorActionPreference: stop
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
   env:
@@ -3666,6 +3674,10 @@ steps:
     inlineScript: |
      set -eo pipefail
      az account set --subscription "$(dev_test_prod_sub_id)"
+     if [ "$(enableLogicApps)" = "true" ] && [ "$(logicAppType)" = "Consumption" ] && [ "$(enablePublicAccessWithPerimeter)" != "true" ]; then
+       echo "##[error]Logic Apps Consumption does not support private endpoints or VNet integration. Use Standard for private networking."
+       exit 1
+     fi
      python scripts/deploy-integration-with-retry.py -- az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-68-integration" \
      --subscription "$(dev_test_prod_sub_id)" \
@@ -3710,6 +3722,10 @@ steps:
      --parameters inputKeyvaultSubscription="$(admin_bicep_input_keyvault_subscription)" \
      --parameters projectServicePrincipleOID_SeedingKeyvaultName="$(project_service_principal_OID_seeding_kv_name)" \
      --parameters enableLogicApps="$(enableLogicApps)" \
+     --parameters logiAppType="$(logicAppType)" \
+     --parameters byoASEv3="$(byoASEv3)" \
+     --parameters byoAseFullResourceId="$(byoAseFullResourceId)" \
+     --parameters byoAseAppServicePlanRID="$(byoAseAppServicePlanResourceId)" \
      --parameters enableEventHubs="$(enableEventHubs)" \
      --parameters logicAppsExists="$(logicAppsExists)" \
      --parameters eventHubsExists="$(eventHubsExists)" \

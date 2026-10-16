@@ -9,6 +9,11 @@ sources:
   - environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml
   - environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml
   - environment_setup/aifactory/bicep/esml-genai-1/31-network.bicep
+  - environment_setup/aifactory/bicep/esml-genai-1/11-integration.bicep
+  - environment_setup/aifactory/bicep/scripts/subnetCalc_v2.ps1
+  - environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1
+  - environment_setup/aifactory/bicep/scripts/getProjectSubnetState.ps1
+  - environment_setup/aifactory/bicep/scripts/modules/logicAppSubnet.ps1
   - bootstrap/lib/common_network_preservation.py
   - bootstrap/lib/aifactory_private_dns.py
   - environment_setup/aifactory/bicep/modules/projectDash01.bicep
@@ -26,6 +31,7 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_shared_acr_update.py
   - environment_setup/unit-tests/test-bicep/unit/test_common_network_preservation.py
   - environment_setup/unit-tests/test-bicep/unit/test_subnet_scaling_capacity.py
+  - environment_setup/unit-tests/test-bicep/unit/test_logic_app_subnet.py
   - environment_setup/unit-tests/test-bicep/unit/test_private_data_services.py
   - environment_setup/unit-tests/test-bicep/test_aifactory_dashboard.py
   - environment_setup/unit-tests/test-bicep/test_my_project_workbook.py
@@ -127,6 +133,26 @@ normal networking call keeps its explicit VNet RG/subnet and PE location; shared
 links, approvals and DNS outputs retain their separate service-only gates.
 
 Network addressing must be aligned and nonoverlapping. Shared/own-subscription presets are configuration choices, not commands to create subscriptions. Allocation must respect existing subnets, gateway/DNS reservations and fragmentation; headline project counts are not guarantees.
+
+Logic Apps Standard outbound isolation (main source, 2026-10-16): ordinary
+managed networking conditionally allocates a dedicated aligned `/26`
+`snt-prj<projectNumber>-logicapp` in the existing VNet/RG, delegates it to
+`Microsoft.Web/serverFarms`, and publishes `logicappSubnetId`. Existing subnets
+are reused without PUT after exact-scope read-only validation; neither the
+Web App/Function `/27` nor AKS is resized or redelegated. Inbound private
+endpoints remain on GenAI. Both providers carry the enable/type/ASE/perimeter
+gates through allocation, discovery, dynamic parameters and task 68; all
+unfiltered phase consumers accept the optional internal ID. Missing historical
+outputs require a networking rerun, not silently disabled integration.
+BYO requires explicit `subnetProjLogicapp` (name or full ID, project/environment
+placeholder substitution) and a validated `/26`-or-larger serverFarms-only
+subnet in the configured VNet, separate from other purposes. Denied/malformed
+reads, wrong identities, private endpoints and NIC IP configurations block reuse.
+Inventory must be a real array/list in the expected VNet; the exact subnet and
+managed network deployment must report `Succeeded` before integration.
+Disabled, Consumption, ASE and perimeter cases allocate nothing. Simple Mode
+disables Logic Apps and retains its existing capacity profile. These are
+offline-tested source contracts, not evidence of a successful live deployment.
 
 Compute deployment ordering (2026-10-16): both optional subnet-delegation modules
 finish before Web App/Function integration. Function also depends on Web App,

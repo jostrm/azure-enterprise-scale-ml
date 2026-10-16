@@ -62,10 +62,22 @@ def invoke_allocator(vnet, *, azure="cli", json_project=None, json_parameters=No
     parameters = {key: value for key, value in parameters.items() if value is not None}
     expected_name = parameters.get("vnetNameFull_param") or f"vnet-swc-{parameters['env']}-008"
     expected_rg = parameters.get("vnetResourceGroup_param") or f"acme-common-swc-{parameters['env']}-007"
+    vnet = copy.deepcopy(vnet)
+    if vnet is not None:
+        vnet.setdefault("id", f"/subscriptions/test-subscription/resourceGroups/{expected_rg}/providers/Microsoft.Network/virtualNetworks/{expected_name}")
+        for item in vnet.get("subnets") if isinstance(vnet.get("subnets"), list) else []:
+            item.setdefault("id", f"{vnet['id']}/subnets/{item['name']}")
+            item.setdefault("provisioningState", "Succeeded")
     code = r"""
 $ErrorActionPreference = 'Stop'
 $parameters = $env:ALLOC_PARAMETERS | ConvertFrom-Json -AsHashtable
 function global:az {
+    if ($args[0] -eq 'rest') {
+        $global:LASTEXITCODE = 0
+        $id = ($args[[array]::IndexOf($args, '--url') + 1] -split '\?')[0]
+        $vnet = $env:ALLOC_INVENTORY | ConvertFrom-Json
+        return ($vnet.subnets | Where-Object { $_.id -ieq $id } | ConvertTo-Json -Depth 10)
+    }
     if (($args[0..2] -join ' ') -ne 'network vnet show' -or
         $args[[array]::IndexOf($args, '--subscription') + 1] -ne 'test-subscription' -or
         $args[[array]::IndexOf($args, '--name') + 1] -ne $env:ALLOC_NAME -or
@@ -75,7 +87,7 @@ function global:az {
     $global:LASTEXITCODE = if ($env:ALLOC_AZURE -eq 'cli-error') { 1 } else { 0 }
     $env:ALLOC_INVENTORY
 }
-if ($env:ALLOC_AZURE -in @('az', 'wrong-context')) {
+if ($env:ALLOC_AZURE -in @('az', 'az-list', 'wrong-context')) {
     Microsoft.PowerShell.Core\Import-Module (Join-Path (Split-Path $env:ALLOC_SCRIPT) 'modules/pipelineFunctions.psm1')
     & (Get-Module pipelineFunctions) { function script:Import-Dependencies {} }
     function global:Get-AzContext {
@@ -86,7 +98,20 @@ if ($env:ALLOC_AZURE -in @('az', 'wrong-context')) {
         if ($Name -ne $env:ALLOC_NAME -or $ResourceGroupName -ne $env:ALLOC_RG) {
             throw 'Wrong environment VNet'
         }
-        $env:ALLOC_INVENTORY | ConvertFrom-Json
+        $vnet = $env:ALLOC_INVENTORY | ConvertFrom-Json
+        if ($env:ALLOC_AZURE -eq 'az-list') {
+            $items = [System.Collections.Generic.List[object]]::new()
+            foreach ($item in $vnet.Subnets) { $items.Add($item) }
+            $vnet.Subnets = $items
+        }
+        return $vnet
+    }
+    function global:Invoke-AzRestMethod {
+        param($Method, $Path)
+        if ($Method -ne 'GET') { throw 'Azure writes are forbidden in this test' }
+        $id = ($Path -split '\?')[0]
+        $vnet = $env:ALLOC_INVENTORY | ConvertFrom-Json
+        [pscustomobject]@{ StatusCode = 200; Content = ($vnet.subnets | Where-Object { $_.id -ieq $id } | ConvertTo-Json -Depth 10) }
     }
 }
 try {

@@ -18,6 +18,12 @@ param acaSubnetCidr string = ''
 param aca2SubnetCidr string = ''
 @description('Specifies cidr notation for the dedicated App Service / Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)')
 param webappSubnetCidr string = ''
+@description('Dedicated Logic Apps Standard outbound subnet CIDR; managed allocation uses /26.')
+param logicappSubnetCidr string = ''
+param enableLogicApps bool = false
+@allowed(['Standard', 'Consumption'])
+param logicAppType string = 'Standard'
+param enablePublicAccessWithPerimeter bool = false
 @description('Specifies cidr notation for databricks subnets')
 param dbxPrivSubnetCidr string = ''
 param dbxPubSubnetCidr string = ''
@@ -63,6 +69,7 @@ param subnetProjDatabricksPrivate string = ''
 param subnetProjACA string = ''
 param subnetProjACA2 string = ''
 param subnetProjWebapp string = ''
+param subnetProjLogicapp string = ''
 
 // Subnet existence flags
 @description('Specifies whether GenAI subnet already exists')
@@ -73,6 +80,7 @@ param sntAcaExists bool = false
 param sntAca002Exists bool = false
 @description('Specifies whether the dedicated App Service / Function VNet integration subnet already exists')
 param sntWebappExists bool = false
+param sntLogicappExists bool = false
 @description('Specifies whether AKS subnet already exists')
 param sntAksExists bool = false
 @description('Specifies whether AKS002 subnet already exists')
@@ -96,6 +104,9 @@ param commonRGNamePrefix string = '' // dummy
 
 var vnetNameFull = !empty(vnetNameFull_param) ? vnetNameFull_param  : '${vnetNameBase}-${locationSuffix}-${env}${commonResourceSuffix}'
 var vnetResourceGroupScope = !empty(vnetResourceGroup_param) ? vnetResourceGroup_param : vnetResourceGroup
+var needsLogicAppSubnet = enableLogicApps && logicAppType == 'Standard' && !byoASEv3 && !enablePublicAccessWithPerimeter
+var createLogicAppSubnet = needsLogicAppSubnet && !BYO_subnets && !sntLogicappExists && !empty(logicappSubnetCidr)
+var logicappSubnetNameOrId = BYO_subnets ? replace(replace(subnetProjLogicapp, '<xxx>', projectNumber), '<network_env>', network_env) : 'snt-${projectName}-logicapp'
 
 var vNetSalt = substring(uniqueString(resourceGroup().id), 0, 5)
 var deploymentProjSpecificUniqueSuffix = '${projectName}${vNetSalt}${locationSuffix}-${env}${commonResourceSuffix}'
@@ -453,6 +464,9 @@ module dbxPubSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPubSubnetCidr) 
     ...(!sntAks002Exists ? [aks2Snt] : [])
     ...(!sntAcaExists || !sntAca002Exists ? [acaSnt2] : [])
     ...(!sntWebappExists && !empty(webappSubnetCidr) ? [webappSnt] : [])
+    aksSnt
+    genaiSnt
+    acaSnt
   ]
 }
 
@@ -476,6 +490,48 @@ module dbxPrivSnt '../modules/subnetWithNsg.bicep' = if(!empty(dbxPrivSubnetCidr
   dependsOn: [
     ...(!sntDatabricksPrivExists && !empty(dbxPrivSubnetCidr) ? [nsgDbx] : [])
     ...(!sntDatabricksPubExists && !empty(dbxPubSubnetCidr) ? [dbxPubSnt] : [])
+    aksSnt
+    genaiSnt
+    acaSnt
+    aks2Snt
+    acaSnt2
+    webappSnt
+  ]
+}
+
+module nsgLogicapp '../modules/nsgGenAI.bicep' = if (createLogicAppSubnet) {
+  name: take('nsgLogicapp-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(vnetResourceGroupScope)
+  params: {
+    name: 'logicapp-nsg-${projectName}-${locationSuffix}-${env}'
+    location: location
+    tags: tags
+  }
+}
+
+module logicappSnt '../modules/subnetWithNsg.bicep' = if (createLogicAppSubnet) {
+  name: take('logicappSnet-${deploymentProjSpecificUniqueSuffix}', 64)
+  scope: resourceGroup(vnetResourceGroupScope)
+  params: {
+    name: 'snt-${projectName}-logicapp'
+    virtualNetworkName: vnetNameFull
+    addressPrefix: logicappSubnetCidr
+    location: location
+    delegations: ['Microsoft.Web/serverFarms']
+    serviceEndpoints: ['Microsoft.KeyVault', 'Microsoft.Storage']
+    nsgId: nsgLogicapp!.outputs.nsgId
+    centralDnsZoneByPolicyInHub: centralDnsZoneByPolicyInHub
+  }
+  // Keep edges to every writer: optional intermediate modules may be skipped.
+  dependsOn: [
+    aksSnt
+    genaiSnt
+    acaSnt
+    aks2Snt
+    acaSnt2
+    webappSnt
+    dbxPubSnt
+    dbxPrivSnt
   ]
 }
 // The following outputs are used for network_parameters.json
@@ -487,6 +543,11 @@ output genaiSubnetId string = !sntGenaiExists ? genaiSnt!.outputs.subnetId : res
 output acaSubnetId string = !sntAcaExists ? acaSnt!.outputs.subnetId : resourceId(subscription().subscriptionId, vnetResourceGroup, 'Microsoft.Network/virtualNetworks/subnets', vnetNameFull, !empty(subnetProjACA) ? replace(subnetProjACA, '<xxx>', projectNumber) : 'snt-${projectName}-aca')
 output aca2SubnetId string = (!sntAca002Exists && !empty(aca2SubnetCidr)) ? acaSnt2!.outputs.subnetId : (sntAca002Exists ? resourceId(subscription().subscriptionId, vnetResourceGroup, 'Microsoft.Network/virtualNetworks/subnets', vnetNameFull,!empty(subnetProjACA2) ? replace(subnetProjACA2, '<xxx>', projectNumber) :  'snt-${projectName}-aca-002') : '')
 output webappSubnetId string = (!sntWebappExists && !empty(webappSubnetCidr)) ? webappSnt!.outputs.subnetId : (sntWebappExists ? resourceId(subscription().subscriptionId, vnetResourceGroup, 'Microsoft.Network/virtualNetworks/subnets', vnetNameFull, !empty(subnetProjWebapp) ? replace(subnetProjWebapp, '<xxx>', projectNumber) : 'snt-${projectName}-webapp') : '')
+output logicappSubnetId string = !needsLogicAppSubnet ? '' : (createLogicAppSubnet ? logicappSnt!.outputs.subnetId : ((sntLogicappExists || BYO_subnets) && !empty(logicappSubnetNameOrId)
+  ? (BYO_subnets && startsWith(toLower(logicappSubnetNameOrId), '/subscriptions/')
+    ? logicappSubnetNameOrId
+    : resourceId(subscription().subscriptionId, vnetResourceGroupScope, 'Microsoft.Network/virtualNetworks/subnets', vnetNameFull, logicappSubnetNameOrId))
+  : fail('Private Logic Apps Standard requires a dedicated /26 subnet allocation or explicit BYO subnet. Rerun networking.')))
 output dbxPubSubnetName string = empty(dbxPubSubnetCidr) ? '' : (!empty(subnetProjDatabricksPublic) ? replace(subnetProjDatabricksPublic, '<xxx>', projectNumber) : 'snt-${projectName}-dbxpub')
 output dbxPrivSubnetName string = empty(dbxPrivSubnetCidr) ? '' : (!empty(subnetProjDatabricksPrivate) ? replace(subnetProjDatabricksPrivate, '<xxx>', projectNumber) : 'snt-${projectName}-dbxpriv')
 output aks2RouteTableId string = aks2RouteTableIdToUse

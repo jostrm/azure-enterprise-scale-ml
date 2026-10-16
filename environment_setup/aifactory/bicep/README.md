@@ -352,3 +352,33 @@ selections must fail closed. With unreviewed business coverage, all three daily
 panels must display their unavailable explanations without chart-column errors.
 Do not enable coverage merely to make a chart appear. Missing cache series/logs
 remain unavailable, and native Metrics are never added to request-log totals.
+
+## Logic Apps Standard outbound networking
+
+Enabled private Logic Apps Standard (without BYO ASE v3 or public perimeter mode)
+uses a **dedicated `/26`** `snt-prj<projectNumber>-logicapp` subnet in the existing
+project VNet and VNet resource group. Project `012` therefore uses
+`snt-prj012-logicapp`, not the resource suffix. The normal managed networking
+update allocates an aligned free range and delegates only the new subnet to
+`Microsoft.Web/serverFarms`. Existing Web App/Function and AKS subnets are not
+resized or redelegated. Inbound private endpoints remain on the undelegated
+GenAI subnet.
+
+With `BYO_subnets=true`, explicitly set `subnetProjLogicapp`
+(`SUBNET_PROJ_LOGICAPP` for GitHub) to an existing dedicated subnet name or full
+ARM ID in that same VNet. `<xxx>` and `<network_env>` substitutions are supported;
+the default is empty, never a guessed cross-project subnet. It must be `/26` or
+larger, delegated only to `Microsoft.Web/serverFarms`, with no private endpoints
+or NIC IP configurations. Inventory must be a real subnet collection belonging
+to the expected VNet. The exact subnet and, for managed networks, its network
+deployment must report `Succeeded`. Read failures, malformed inventories,
+wrong-scope responses, unsafe reuse, and missing `logicappSubnetId` deployment
+outputs fail closed. For historical
+managed deployments, rerun with networking enabled to add/reuse the subnet and
+publish the output; do not delete or resize existing subnets.
+
+`logicAppType` defaults to `Standard` when omitted. Disabled Logic Apps,
+Consumption, BYO ASE and perimeter mode allocate no Logic App subnet. Simple
+Mode currently disables Logic Apps, so its capacity profile is unchanged.
+No runtime AKS fallback or automatic subnet deletion is introduced. Concurrent
+deployments sharing a VNet still require provider-level serialization.
