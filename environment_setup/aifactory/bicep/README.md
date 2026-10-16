@@ -109,6 +109,71 @@ its known capacity warning. These defaults do not guarantee availability.
 >  A quicker & easier way? You can use the AIFactory Github Template repository to get a bootstrappd repo quickly (as a mirror repo, or "bring your own repo"). [AIFactory Template Repo](https://github.com/jostrm/azure-enterprise-scale-ml-usage), ready to run. All files copied already. Just configure and run.
 >
 
+## TODO: project-creation Search RBAC and regional parity
+
+**Deferred implementation backlog, observed during the split-table agent demo
+on 2026-10-16.** A regional or additional project Search service (for example,
+a separate France Central service) must receive the **same correct
+persona-scoped authorization and connectivity contract as the primary Search
+creation task**. Moving regions or adding a named instance must not skip RBAC.
+This list does not change IaC defaults or authorize new grants.
+
+- [ ] **One effective Search target through every phase.** Carry the actual
+  subscription, resource group, service ID and managed-identity principal from
+  primary/regional/additional-service creation into all RBAC, Foundry connection,
+  Storage and private-link steps. Do not recompute the original service name.
+  Entry points: `esml-genai-1/03b-ai-search.bicep`,
+  `modules/services/aiSearchDeployment.bicep`, and
+  `scripts/deploy-capacity-resource.py`.
+- [ ] **User/group and runtime Search roles at project creation.** Invoke the
+  shared assignment contract for every selected Search instance, including
+  regional services. Approved readers need Search Index Data Reader; management
+  Owner/Contributor does not grant document reads. Preserve the intended
+  user/group versus service-principal types and persona distinctions rather than
+  copying all legacy contributor grants onto every reader. Entry points:
+  `esml-genai-1/08-rbac-security.bicep`,
+  `modules/aiSearchRbacUsers.bicep`,
+  `modules/csFoundry/rbacAISearchForAIFv2.bicep`.
+- [ ] **Search identity to model and source permissions.** Assign the newly
+  resolved Search identity its scoped Cognitive Services OpenAI User role on the
+  selected Foundry resource and the reviewed Storage reader contract on the
+  selected project/common source. Native ADLS permission ingestion needs exact
+  root/ancestor permission-metadata access as well as source-file reads and
+  bounded listings. Do not fix this with unconditional common-lake access.
+  Entry points: `modules/csFoundry/rbacAISearchOpenAIUserOnFoundry.bicep`,
+  `esml-genai-1/08b-rbac-common-rg.bicep`; conditional-reader prior art:
+  `../../../usecase_code/40-agent-factory/agent_factory/rag_materialization.py`.
+- [ ] **Readiness/status access for the retrieval backend.** Include
+  `Microsoft.Search/searchServices/indexers/read` through the approved read-only
+  role or existing Reader inheritance, in addition to Search Index Data Reader.
+  Do not give a read-only runtime Search Service Contributor merely to poll
+  status. Confirm real effective access after propagation.
+- [ ] **Private connectivity parity, including common ADLS.** Derive inbound
+  endpoint/subnet/central-DNS configuration and outbound `blob`, `dfs` and
+  applicable Foundry group IDs from the effective service/source bindings.
+  Approve only the proven matching target connections. Check distinct
+  private-link group-type limits before writes; preserve existing services and
+  never silently upgrade/delete them to make space.
+  Entry points: `modules/aiSearch.bicep`,
+  `modules/services/aiSearchDeployment.bicep`, and
+  `modules/aiSearchSharedPrivateLinkFoundry.bicep`.
+- [ ] **Provisioning completion and recoverable cleanup.** Await the actual
+  terminal Network/Search operation and verify private DNS plus authenticated
+  data-plane access before reporting project readiness. Separate an operational
+  replacement from cleanup of an owned failed endpoint; preserve unrelated
+  endpoints/NICs. Record request IDs and bounded retry/recovery state.
+- [ ] **Parity regressions and acceptance.** Exercise primary success, regional
+  capacity recovery, additional-service creation and idempotent reruns with the
+  same approved persona matrix. Assert effective resource IDs on every
+  assignment, private-link target and Foundry binding; verify reader access and
+  expected denial without account-wide test-user data grants. Include a
+  post-creation smoke test so a missing role is found before an agent demo.
+
+Search semantic/agentic feature availability remains a separate region
+compatibility gate. Graph security-webhook consent/hosting and source-specific
+permission mappings are explicit opt-in integrations, not blanket permissions
+to add to every project.
+
 ## Reviewed common-network preservation profile
 
 `esml-common\main\12-networkCommon.bicep` retains its **legacy default**.

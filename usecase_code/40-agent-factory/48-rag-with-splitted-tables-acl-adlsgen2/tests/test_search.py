@@ -111,6 +111,7 @@ class DefinitionsTests(unittest.TestCase):
                              "BoostedRerankerScore")
             self.assertTrue(next(f for f in resources["index"]["fields"] if f["name"] == "chunk_id")["sortable"])
             output = {m["targetFieldName"]: m["sourceFieldName"] for m in resources["indexer"]["outputFieldMappings"]}
+            self.assertEqual(output["split_input_text"], "/document/content")
             self.assertEqual(output["offsets_utf8"], "/document/split_offsets/*/utf8")
             self.assertEqual(output["lengths_codepoint"], "/document/split_lengths/*/codePoint")
             raw = str(resources)
@@ -136,6 +137,14 @@ class DefinitionsTests(unittest.TestCase):
 
 
 class ClientTests(unittest.TestCase):
+    def test_actual_split_input_is_required_and_must_equal_the_pinned_source(self):
+        for extracted in (None, "abcde"):
+            config, partition, responses, _ = self.runtime_fixture()
+            responses[1]["value"][0]["split_input_text"] = extracted
+            identity = SimpleNamespace(search_token="user-token")
+            with self.assertRaisesRegex(ValueError, "Actual Text Split input"):
+                SearchClient(config, Transport(responses)).verify_partition(partition, identity)
+
     def test_mixed_sync_finishes_permission_run_before_normal_content_run(self):
         client = SearchClient(configuration(), Transport())
         calls = []
@@ -188,7 +197,8 @@ class ClientTests(unittest.TestCase):
                          "aif48owner": config["owner"],
                          "source_uri": "https://saleslake.blob.core.windows.net/lake/projects/project001/" + partition["input_path"]})
         metadata["metadata_storage_path"] = metadata["source_uri"]
-        audit = {**metadata, "parent_id": "parent", "pages": ["ab", "cd", "ef"], "split_ordinals": [1, 2, 3]}
+        audit = {**metadata, "parent_id": "parent", "split_input_text": content,
+                 "pages": ["ab", "cd", "ef"], "split_ordinals": [1, 2, 3]}
         for unit in ("utf8", "utf16", "codepoint"):
             audit["offsets_" + unit] = [0, 2, 4]
             audit["lengths_" + unit] = [2, 2, 2]
@@ -230,6 +240,7 @@ class ClientTests(unittest.TestCase):
         partition["input_sha256"] = hashlib.sha256(text.encode("utf-8")).hexdigest()
         audit = responses[1]["value"][0]
         audit["input_sha256"] = partition["input_sha256"]
+        audit["split_input_text"] = text
         audit["pages"] = [text[start:end] for start, end in zip(cuts, cuts[1:])]
         metadata = {key: value for key, value in audit.items()
                     if key in ("dataset", "version", "source", "site", "library", "input_sha256",

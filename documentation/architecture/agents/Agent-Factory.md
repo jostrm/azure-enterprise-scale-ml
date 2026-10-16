@@ -91,6 +91,12 @@ Native permission ingestion retains `metadata_storage_path` on parent and chunk
 indexes, and requires source-ancestor permission metadata as well as file bytes.
 Exact-file ingestion grants do not establish that ancestor access is available;
 the example must report that gap rather than broaden common-lake permissions.
+The parent audit index also retains the actual pre-split input; verification
+compares that pinned source with all returned chunks and never repairs missing
+text or accepts inconsistent offsets merely because three chunks were returned.
+Deferred primary/regional/additional-service RBAC and network parity work is
+tracked in the Bicep README's project-creation TODO list, not silently implemented
+through use-case deployment scripts.
 
 The optional Graph extension uses stable tenant/drive/item IDs and permission-aware
 root delta, with `Prefer: includesecuritywebhooks` on business security-subscription

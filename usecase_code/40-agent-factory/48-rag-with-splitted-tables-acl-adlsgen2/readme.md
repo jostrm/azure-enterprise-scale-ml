@@ -274,7 +274,8 @@ skill precedes the embedding skill:
 | `maximumPagesToTake` | **`0`** (all pages, never truncate to three) |
 | Embedding limit | Each final input must be **below 8,000 tokens** |
 
-A separate native-authorized parent audit index retains the service's actual
+A separate native-authorized parent audit index retains the exact
+`/document/content` input as `split_input_text`, plus the service's actual
 page strings, ordinal positions, offsets and lengths. This avoids unsupported
 custom skills, knowledge stores or debug sessions. Verification correlates audit
 pages with the derived chunk index, validates complete source coverage and checks
@@ -700,9 +701,17 @@ processing documents: existing Storage metrics showed denied
 After separately approved exact ancestor-object reads, both indexers reported
 success with one source processed each. The documented path-key rename advisory
 is retained for these immutable publications; unknown warnings remain failures.
-Query verification then returned 403: the current operator lacks Search Index
-Data Reader on the new service. No real three-chunk or live-agent success is
-claimed from that attempt. Its
+After the separately approved service-scoped reader grant, real queries returned
+three chunks for each source, but complete-coverage verification failed. The
+token-based split output returned zero-based ordinals and inconsistent offsets;
+the JSON chunks omitted source text at a boundary, and the Excel chunks exceeded
+the requested 6,000-token page size (while remaining below 8,000). A bounded
+5,000-token experiment also omitted source text. The audited pre-split input
+matched the original source exactly, so the verifier does not silently repair or
+accept these fragments. Default 6,000-token settings were restored; the
+publication remains blocked and no agent was deployed. This is observed preview
+behavior in this deployment, not a claim that every Text Split deployment behaves
+this way. Its
 identity-specific deployment evidence remains in consumer-owned state, not in
 the indexed corpus or source template.
 The Graph extension has not been registered against a real drive or public
@@ -712,6 +721,12 @@ real permission-change notification. Real Graph reads additionally require
 `AIF48_GRAPH_SYNC_CONFIG`, and `AIF48_CONFIG` for the opt-in source test.
 
 ## Costs, troubleshooting and cleanup
+
+Deferred project-creation fixes are tracked in the
+[IaC Search RBAC and regional-parity TODO list](../../../environment_setup/aifactory/bicep/README.md#todo-project-creation-search-rbac-and-regional-parity).
+Regional/additional Search instances should receive the same correct
+persona-scoped roles and private-connectivity setup as the primary task; this
+demo's manual recovery must not become an undocumented deployment prerequisite.
 
 - Indexing invokes embeddings for all produced chunks. Semantic ranking,
   vectorization, agent inference, image extraction/synthesis and storage consume

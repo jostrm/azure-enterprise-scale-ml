@@ -169,7 +169,7 @@ def build_definitions(config: dict) -> dict:
                        _field("split_ordinals", "Collection(Edm.Int64)"),
                        *[_field(f"{kind}_{unit}", "Collection(Edm.Int64)")
                          for kind in ("offsets", "lengths") for unit in UNITS],
-                       *copy.deepcopy(metadata), *_permission_fields()],
+                       *copy.deepcopy(metadata), *_permission_fields(), _field("split_input_text")],
         }
         datasource = {
             "name": names["datasource"], "description": description, "type": "adlsgen2",
@@ -232,6 +232,7 @@ def build_definitions(config: dict) -> dict:
                 {"sourceFieldName": "/document/split_ordinals/*", "targetFieldName": "split_ordinals"},
                 *[{"sourceFieldName": f"/document/split_{kind}/*/{api_unit}", "targetFieldName": f"{kind}_{unit}"}
                   for kind in ("offsets", "lengths") for unit, api_unit in UNITS.items()],
+                {"sourceFieldName": "/document/content", "targetFieldName": "split_input_text"},
             ],
         }
         result.append({"id": identifier, "names": names, "input_path": "/".join(filter(None, (prefix, relative))),
@@ -583,9 +584,13 @@ class SearchClient:
             raise ValueError("Search did not return the complete authorized partition.")
         for document in [*evidence["audit"], *evidence["chunks"]]:
             self._check_metadata(document, partition)
+        split_input = evidence["audit"][0].get("split_input_text")
+        if (not isinstance(split_input, str)
+                or hashlib.sha256(split_input.encode("utf-8")).hexdigest() != partition["input_sha256"]):
+            raise ValueError("Actual Text Split input differs from the complete pinned source.")
         correlated = correlate_evidence(evidence["audit"], evidence["chunks"])
         text = "".join(chunk["chunk_text"] for chunk in correlated)
-        if hashlib.sha256(text.encode("utf-8")).hexdigest() != partition["input_sha256"]:
+        if text != split_input:
             raise ValueError("Reconstructed service text differs from the pinned source SHA-256.")
         after = self.wait([identifier], max_polls=1, poll_seconds=0)[identifier]
         if before.get("lastResult") != after.get("lastResult"):
