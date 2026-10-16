@@ -401,9 +401,12 @@ def main():
         existing = read_service(search_id)
         fingerprint = fallback_fingerprint(search_id, environment, all_candidates)
         if args.provisioning_mode == "regional":
-            if (os.environ.get("AIF_AISEARCH_FALLBACK_RESOURCE_ID", "").lower() != search_id.lower()
-                    or os.environ.get("AIF_AISEARCH_FALLBACK_CONFIG_SHA256") != fingerprint):
-                raise ValueError("Primary capacity handoff identity/configuration changed; rerun primary provisioning.")
+            if os.environ.get("AIF_AISEARCH_FALLBACK_RESOURCE_ID", "").lower() != search_id.lower():
+                raise ValueError("Primary capacity handoff resource ID does not match the resolved Search service. "
+                                 "Check the pipeline handoff transport; no relocation was attempted.")
+            if os.environ.get("AIF_AISEARCH_FALLBACK_CONFIG_SHA256") != fingerprint:
+                raise ValueError("Search configuration changed between the primary and fallback tasks. "
+                                 "Use the same primary region, SKU policy and ordered fallback list in both tasks.")
             if existing is not None:
                 raise RuntimeError("Search became bound after primary provisioning; refusing regional relocation.")
             publish({"AIF_AISEARCH_FALLBACK_PENDING": "false", "AIF_AISEARCH_STATE": "pending"})

@@ -109,6 +109,11 @@ This patch focuses on **simpler configuration**, **per-environment cost control 
   Primary exhaustion then fails; unrelated, mixed and read errors always fail.
   The regional task requires a matching resource/configuration fingerprint and
   rechecks absence after the delay; late-bound/existing services cannot relocate.
+  On Windows, the ADO/GHA task scripts exclude only the handoff resource-ID
+  environment variable from Git Bash path conversion, preserving any existing
+  conversion exclusions. `/subscriptions/...` must reach native Python unchanged,
+  not become a local Git installation path. Resource/configuration mismatches
+  remain blocking and have distinct diagnostics; no IDs are repaired or ignored.
   If Search is disabled and not required by the release's Foundry capability-host
   dependency, both provisioning tasks skip without marking Search ready.
 - Either task 63a provisions **only Search** through `03b-ai-search.bicep`; task 63

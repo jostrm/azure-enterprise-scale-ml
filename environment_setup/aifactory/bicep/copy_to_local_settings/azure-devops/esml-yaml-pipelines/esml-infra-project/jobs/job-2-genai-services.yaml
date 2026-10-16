@@ -2918,6 +2918,8 @@ steps:
     inlineScript: |
       set -euo pipefail
       az account set --subscription "$(dev_test_prod_sub_id)"
+      # This Azure resource ID is data, not a Unix path for Git Bash to rewrite.
+      export MSYS2_ENV_CONV_EXCL="${MSYS2_ENV_CONV_EXCL:+${MSYS2_ENV_CONV_EXCL};}AIF_AISEARCH_FALLBACK_RESOURCE_ID"
       python scripts/search-region-fallback.py --provisioning-mode regional --network-parameters "../../../../aifactory/parameters/dynamicNetworkParams.json"
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep'
   env:

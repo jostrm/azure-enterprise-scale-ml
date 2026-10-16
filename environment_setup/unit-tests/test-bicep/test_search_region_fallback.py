@@ -7,6 +7,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 from unittest.mock import Mock
 import uuid
 from collections import defaultdict
@@ -629,6 +630,86 @@ def test_regional_task_requires_matching_absent_primary_handoff(
     with pytest.raises((ValueError, RuntimeError)):
         fallback.main()
     assert state["attempts"] == attempts
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("prior_exclusions", ["", "KEEP_EXISTING", "*"])
+def test_actual_fallback_script_preserves_handoff_through_native_python_on_windows(
+        main_cli, monkeypatch, capsys, provider, prior_exclusions):
+    bash = Path(r"C:\Program Files\Git\bin\bash.exe")
+    if os.name != "nt" or not bash.is_file():
+        pytest.skip("Windows Git Bash is required to exercise MSYS environment conversion")
+    env, state = main_cli
+    env["aiSearchFallbackLocationArrayDev"] = '["denmarkeast","italynorth"]'
+    state.update(resource=None, capacity_failure=True, leave_unbound=True)
+    arguments = fallback.sys.argv[:]
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "normal"])
+    fallback.main()
+    env.update(ado_values(capsys.readouterr().out))
+    step = provider_steps(provider)[2]
+    script = step["inputs"]["inlineScript"] if provider == "ado" else step["run"]
+    script = script.replace('$(dev_test_prod_sub_id)', "unit-subscription")
+    script = script.replace('${{ env.dev_test_prod_sub_id }}', "unit-subscription")
+    probe = Path.cwd() / "native-handoff.py"
+    probe.write_text(
+        "import json, os, sys\n"
+        "assert '--provisioning-mode' in sys.argv and 'regional' in sys.argv\n"
+        "print(json.dumps({key:value for key,value in os.environ.items() "
+        "if key.startswith('AIF_AISEARCH_') or key in ('MSYS2_ENV_CONV_EXCL','KEEP_EXISTING')}))\n",
+        encoding="utf-8",
+    )
+    shell = (
+        'az() { [[ "$1 $2" == "account set" ]] || return 91; }\n'
+        'python() { "$TEST_NATIVE_PYTHON" "$TEST_NATIVE_PROBE" "$@"; }\n'
+        + script
+    )
+    process_env = {key: value for key, value in PROCESS_ENV.items()
+                   if not key.startswith(("MSYS", "AIF_AISEARCH_", "BASH_ENV"))}
+    process_env.update(env)
+    process_env.update(TEST_NATIVE_PYTHON=Path(sys.executable).as_posix(),
+                       TEST_NATIVE_PROBE=probe.as_posix(), MSYS2_ENV_CONV_EXCL=prior_exclusions,
+                       KEEP_EXISTING="/operator-owned-value")
+    result = REAL_RUN([str(bash), "--noprofile", "--norc", "-c", shell], cwd=Path.cwd(),
+                      env=process_env, capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    received = json.loads(result.stdout)
+    assert received["AIF_AISEARCH_FALLBACK_RESOURCE_ID"] == SEARCH_ID
+    assert received["AIF_AISEARCH_FALLBACK_CONFIG_SHA256"] == env["AIF_AISEARCH_FALLBACK_CONFIG_SHA256"]
+    if prior_exclusions:
+        assert prior_exclusions in received["MSYS2_ENV_CONV_EXCL"].split(";")
+        assert received["KEEP_EXISTING"] == "/operator-owned-value"
+    env.update({key: value for key, value in received.items() if key.startswith("AIF_AISEARCH_")})
+    state["capacity_failure"] = False
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "regional"])
+    fallback.main()
+    assert state["attempts"] == [("westeurope", "standard2"), ("denmarkeast", "standard2")]
+    assert ado_values(capsys.readouterr().out)["AIF_AISEARCH_PROVISIONED_LOCATION"] == "denmarkeast"
+
+
+@pytest.mark.parametrize("changed,message", [
+    ("identity", "handoff resource ID does not match"),
+    ("windows-path", "handoff resource ID does not match"),
+    ("config", "configuration changed between"),
+])
+def test_mismatched_handoff_is_still_rejected_with_specific_reason(
+        main_cli, monkeypatch, capsys, changed, message):
+    env, state = main_cli
+    env["aiSearchFallbackLocationArrayDev"] = '["denmarkeast"]'
+    state.update(resource=None, capacity_failure=True, leave_unbound=True)
+    arguments = fallback.sys.argv[:]
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "normal"])
+    fallback.main()
+    env.update(ado_values(capsys.readouterr().out))
+    if changed == "identity":
+        env["AIF_AISEARCH_FALLBACK_RESOURCE_ID"] = SEARCH_ID + "-other"
+    elif changed == "windows-path":
+        env["AIF_AISEARCH_FALLBACK_RESOURCE_ID"] = "C:/Program Files/Git" + SEARCH_ID
+    else:
+        env["aiSearchFallbackLocationArrayDev"] = '["italynorth"]'
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "regional"])
+    with pytest.raises(ValueError, match=message):
+        fallback.main()
+    assert state["attempts"] == [("westeurope", "standard2")]
 
 
 def test_regional_plan_does_not_include_primary_even_when_in_array(main_cli, monkeypatch, capsys):

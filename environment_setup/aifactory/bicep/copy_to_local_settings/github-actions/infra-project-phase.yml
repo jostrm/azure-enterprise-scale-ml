@@ -2237,6 +2237,8 @@ jobs:
         run: |
           set -euo pipefail
           az account set --subscription "${{ env.dev_test_prod_sub_id }}"
+          # Preserve the handoff ID if this Bash step runs on Windows.
+          export MSYS2_ENV_CONV_EXCL="${MSYS2_ENV_CONV_EXCL:+${MSYS2_ENV_CONV_EXCL};}AIF_AISEARCH_FALLBACK_RESOURCE_ID"
           python azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/search-region-fallback.py \
             --provisioning-mode regional \
             --network-parameters "./aifactory/parameters/dynamicNetworkParams.json"
