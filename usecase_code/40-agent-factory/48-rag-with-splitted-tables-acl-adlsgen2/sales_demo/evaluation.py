@@ -1,4 +1,4 @@
-"""Opt-in live evaluation. The independent oracle is loaded ONLY in this module."""
+"""Opt-in protected-agent evaluation; separate from the offline LLM-only checker."""
 from __future__ import annotations
 
 import json

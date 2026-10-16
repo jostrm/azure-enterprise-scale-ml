@@ -365,6 +365,30 @@ class RetrievalExperimentTests(unittest.TestCase):
         second = self.invoke_control(fixture)
         self.assertNotEqual(first["artifacts_dir"], second["artifacts_dir"])
 
+    def test_native_ask_retains_raw_response_and_scoring_metadata(self):
+        experiment, deployment, project, client, _, _ = self.control_fixture()
+        call = SimpleNamespace(type="mcp_call", model_dump=lambda **kwargs: {
+            "type": "mcp_call", "name": "knowledge_base_retrieve", "output": '{"documents":[]}',
+        })
+        response = SimpleNamespace(
+            id="native-response", status="completed", output_text="Partial answer",
+            output=[call, SimpleNamespace(type="message")],
+            usage=SimpleNamespace(model_dump=lambda: {"input_tokens": 42}),
+            model_dump=lambda **kwargs: {"id": "native-response", "status": "completed"},
+        )
+        client.responses.create.return_value = response
+        with patch("sales_demo.retrieval_experiment.project_client") as factory, patch.object(experiment, "verify"):
+            factory.return_value.__enter__.return_value = project
+            result = experiment.ask(deployment, "Give me the sum of all sales.", allow_paid=True)
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["output_types"], ["mcp_call", "message"])
+        self.assertEqual(result["usage"], {"input_tokens": 42})
+        self.assertEqual(len(result["sources"]), 2)
+        self.assertTrue((Path(result["artifacts_dir"]) / "response.json").exists())
+        request = client.responses.create.call_args.kwargs
+        self.assertEqual(request["max_output_tokens"], 4096)
+        self.assertNotIn("reasoning", request)
+
     def test_full_text_control_propagates_model_failure_without_retry(self):
         fixture = self.control_fixture()
         experiment, _, project, client, _, _ = fixture

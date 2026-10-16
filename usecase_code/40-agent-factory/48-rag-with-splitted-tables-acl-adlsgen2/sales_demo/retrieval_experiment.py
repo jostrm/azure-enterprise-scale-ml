@@ -186,7 +186,7 @@ def definitions(config, documents):
             "searchIndexParameters": {
                 "searchIndexName": name, "semanticConfigurationName": "sem",
                 "searchFields": [{"name": "content"}, {"name": "title"}],
-                # The semantic content is already in grounding; do not repeat it in each citation payload.
+                # These request additional metadata; they do not exclude semantic content from MCP output.
                 "sourceDataFields": [{"name": field} for field in
                                      ("id", "source", "dataset", "version", "source_uri", "content_sha256")],
             },
@@ -497,24 +497,32 @@ class Experiment:
                 or not isinstance(question, str) or not question.strip() or len(question) > 8000):
             raise ValueError("Invocation or persisted experiment binding is invalid.")
         self.verify()
+        from agent_factory.cli import write_json
+        artifacts = self.state_dir / "ask-runs" / str(uuid4())
+        settings = {"store": False, "max_output_tokens": 4096,
+                    "extra_body": {"agent_reference": {"type": "agent_reference",
+                                                       "name": deployment["name"], "version": deployment["version"]}}}
         with project_client(self.session, self.target) as project:
             latest = project.agents.get_version(agent_name=deployment["name"], agent_version=deployment["version"])
             if (latest.metadata or {}).get("aif48.experiment") != self.plan["binding"]:
                 raise ValueError("Persisted agent changed experiment identity.")
+            write_json(artifacts / "request.json", {"input": question, "settings": settings, "oracle_supplied": False})
             with project.get_openai_client(max_retries=0, timeout=180) as client:
-                response = client.responses.create(
-                    input=question, store=False, max_output_tokens=4096,
-                    extra_body={"agent_reference": {"type": "agent_reference",
-                                                   "name": deployment["name"], "version": deployment["version"]}},
-                )
+                response = client.responses.create(input=question, **settings)
+        write_json(artifacts / "response.json", response.model_dump(mode="json"))
         calls = [item.model_dump(mode="json", exclude_none=True) for item in response.output if item.type == "mcp_call"]
         if (response.status != "completed" or not response.output_text
                 or not any(call.get("name") == "knowledge_base_retrieve" for call in calls)
                 or any(call.get("error") for call in calls)
                 or not any(str(call.get("output", "")).strip() for call in calls)):
-            raise RuntimeError("Agent did not return a completed answer with successful native retrieval.")
+            raise RuntimeError(f"Agent did not complete with successful native retrieval; inspect {artifacts / 'response.json'}.")
         return {"agent": deployment["name"], "version": deployment["version"], "response_id": response.id,
                 "text": response.output_text, "retrieval_calls": calls,
+                "status": response.status, "output_types": [item.type for item in response.output],
+                "usage": response.usage.model_dump() if response.usage else None,
+                "artifacts_dir": str(artifacts), "oracle_supplied": False,
+                "sources": [{"source": part["id"], "content_sha256": part["input_sha256"]}
+                            for part in self.config["partitions"]],
                 "calculator_used": False, "arithmetic_verified": False,
                 "per_user_acl_test": False, "possible_indexes": [item["name"] for item in self.plan["indexes"]]}
 

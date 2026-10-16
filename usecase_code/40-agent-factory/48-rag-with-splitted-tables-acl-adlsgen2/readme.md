@@ -21,6 +21,46 @@ pipeline is still blocked by Text Split completeness checks. These are separate
 results, not a claim that the full split/ACL/image demo has passed. Source code
 and unit tests alone cannot establish that.
 
+## Start here: run and check the calculator-free test
+
+If you want to try the successful LLM-only experiment, start with the full-text
+control. You need the example's Python environment, private-network access,
+an authenticated Entra identity and an already-approved `native-whole-table`
+deployment with its consumer `config.json`. For a first-time setup, follow
+[Local setup and deterministic generation](#local-setup-and-deterministic-generation),
+then the configuration, publication and retrieval-experiment steps below.
+These commands do not create that infrastructure.
+
+```powershell
+$Demo = "C:\path\to\azure-enterprise-scale-ml\usecase_code\40-agent-factory\48-rag-with-splitted-tables-acl-adlsgen2"
+$State = "C:\path\to\orange-repo\aifactory\agent-factory\sales-demo"
+$Python = Join-Path $Demo ".venv\Scripts\python.exe"
+$Config = Join-Path $State "config.json"
+Set-Location $Demo
+$env:TIKTOKEN_CACHE_DIR = Join-Path $Demo ".venv\tiktoken-cache"
+
+# One paid model call, with both full source texts and no tools.
+# Allow about 4-5 minutes on the model used in the recorded runs.
+& $Python retrieval_only.py full-text-sum --config $Config --allow-paid `
+  --output "$State\sum-full-text.json"
+
+# Separate offline check, AFTER inference. No model calls or Azure sign-in.
+& $Python check_sum.py --config $Config `
+  --oracle "$State\data\v1\evaluation\expected.json" `
+  --result "$State\sum-full-text.json" --output "$State\sum-score.json"
+```
+
+The checker reports totals as `correct`, `incorrect` or `unverifiable`, and
+reported audit coverage as `complete`, `incomplete` or `unverifiable`.
+Exit code **0** means every requested check passed; **2** means at least one
+answer failed or could not be verified. A partial response, unsupported table
+format or missing evidence is not counted as success.
+
+The model never sees the checker, oracle or resulting score. Do not paste this
+README's expected totals into its prompt. This control bypasses Playground's
+retrieval path; the [cutoff investigation](#playground-content-cutoff-investigation)
+below explains why that distinction matters.
+
 ## Retrieval-only Playground experiment: no calculator
 
 Use `retrieval_only.py` when you want the **LLM itself** to attempt the arithmetic.
@@ -173,6 +213,44 @@ results (the oracle) and structured rows. The command returns
 `arithmetic_verified:false` on purpose: a completed model response is not proof
 of correct arithmetic or complete coverage.
 
+### Check a saved answer without calling the model
+
+`check_sum.py` reads only local files. It verifies the oracle against the
+configuration's pinned manifest, hashes and row IDs, checks master/project
+equality, and independently calculates expected amounts with Decimal. It then
+compares those expectations with the model's saved answer. It never calls the
+calculator tool, Search, Foundry or an authentication endpoint.
+
+Pass a result from `full-text-sum` or `ask`, or the raw Responses JSON saved in
+that run's `artifacts_dir`. You can score several files in one call:
+
+```powershell
+& $Python check_sum.py --config $Config --oracle "$Data\evaluation\expected.json" `
+  --result "$State\sum-full-text-1.json" "$State\sum-full-text-2.json" `
+  --output "$State\sum-comparison.json"
+```
+
+The current checker targets the two **disjoint primary partitions**, not the
+separate overlapping-record fixture. Its audit format is the Markdown tables
+requested by `FULL_TEXT_SUM_QUESTION`: source, first and last sale ID, record
+count and subtotal in cents; then source and combined counts, cents and USD.
+Common header variants and column reordering are supported. Unknown formats
+fail explicitly rather than being guessed. Merely mentioning the correct total
+in prose is not enough.
+
+It checks every audit range, missing or repeated IDs, groups of at most 20 rows,
+source totals, the grand total and cents-to-dollars conversion. Duplicate totals,
+conflicting amounts, incomplete responses and disallowed or failed tool calls
+cannot pass. New `ask` results save status, usage, source bindings and raw traces;
+older summaries without enough metadata may be unverifiable, so use their raw
+response if available.
+
+A passing report establishes that the **reported audit** matches the selected
+fixture. It does not prove the model's hidden calculation process, authenticate
+a local file as a live service response, or guarantee another run will succeed.
+Keep scores outside the dataset, ingestion prefixes and template. The CLI refuses
+to overwrite its inputs or write scores into the configured data/template roots.
+
 ### Observed results: 16 October 2026
 
 The original test runner used the same request format now available through
@@ -203,6 +281,62 @@ controls use different input delivery and reasoning settings; they do not fix
 Playground or prove Text Split reconstruction or personal file-ACL enforcement.
 The original native-ACL splitter returned three chunks but failed content and
 offset checks. Those checks were kept, rather than relaxed to make the demo pass.
+
+### Playground content cutoff investigation
+
+On 17 October 2026, two fresh probes asked the deployed agent to **copy fields**,
+not add amounts. The boundary probe returned the correct fields for
+`SALE-000061` but not the later requested records. A separate tail probe returned
+`UNKNOWN` for the fields in `SALE-000109` and `SALE-100153`. The boundary probe's
+recorded native MCP output still held both complete source texts. The tail probe
+returned the complete JSON source but no Excel document, so its Excel failure
+also reflects retrieval coverage, not just the suspected clipping.
+
+The next control gave the same model the **exact recorded, JSON-wrapped MCP
+payload** directly, with no tools, medium reasoning and a 4,096-token output
+budget. It correctly copied all eight requested records, including the two
+tails, in about seven seconds. This rules out inability to decode that payload
+or a need for high reasoning as the explanation for this particular copying
+failure. It does not establish reliable full-table arithmetic through MCP.
+
+The measured positions are revealing:
+
+| Source | Decoded source tokens | JSON-wrapped document tokens | Start of the reported cutoff record |
+| --- | ---: | ---: | --- |
+| JSON | 13,618 | 29,207 | `SALE-000062`: token 16,393 |
+| Excel-derived text | 13,572 | 22,057 | `SALE-100115`: token 16,380 |
+
+These are **`cl100k_base` diagnostic counts**, not a claimed context limit for
+the deployed model. Both reported cutoffs lie close to 16,384 tokens in the
+wrapped representation. The copying control used 59,402 model-reported input
+tokens, while the native probes used 17,160 and 17,124. The evidence strongly
+points to clipping in the hosted MCP-to-model delivery path, rather than missing
+indexed rows or the embedding input limit. Microsoft-side telemetry is still
+needed to establish the precise internal limit and where it is applied.
+
+There is no verified switch in this demo that removes that clipping:
+
+- Search's `sourceDataFields` requests **additional** metadata; it is not a
+  field-exclusion list. Removing `content` there does not promise to remove
+  semantic content or wrapping from MCP output.
+- The KB's `maxOutputSizeInTokens`/request `maxOutputSize` controls Search's
+  retrieval output, not a documented hosted MCP context cap. The larger budget
+  already returned complete raw data.
+- The native tool exposes `query_variants`, not a row cursor or page-size option.
+  Asking for "remaining rows" can return the same whole documents again.
+- Responses `truncation: disabled` concerns overall context overflow; it does
+  not establish that hosted tool documents cannot be clipped separately.
+
+For a Playground fix, the next candidate is smaller, row-preserving indexed
+documents with measured wrapped sizes and explicit coverage checks. If reliable
+enumeration is needed, a read-only paged retrieval tool can return original rows
+without calculating anything, but it needs a separately approved tool host.
+Neither change was deployed as part of this investigation. The existing native
+indexes, model, agent, permissions and networking were left unchanged.
+
+See Microsoft's [retrieve response and MCP documentation](https://learn.microsoft.com/en-us/azure/search/agentic-retrieval-how-to-retrieve),
+[additional source-field contract](https://learn.microsoft.com/en-us/python/api/azure-search-documents/azure.search.documents.indexes.models.searchindexknowledgesourceparameters?view=azure-python-preview)
+and [Search projection and pagination guidance](https://learn.microsoft.com/en-us/azure/search/search-pagination-page-layout).
 
 ## Architecture and boundaries
 

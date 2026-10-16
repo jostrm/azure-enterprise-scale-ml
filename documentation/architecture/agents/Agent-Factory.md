@@ -141,6 +141,22 @@ MCP-agent trials did not. This is not a Playground-path fix, Text Split acceptan
 per-user authorization proof or general guarantee of LLM arithmetic. The example
 README records the dated results and reproducible commands without tenant bindings.
 
+`check_sum.py` and `sales_demo.sum_evaluation` provide a separate offline,
+post-inference check of saved answers. They validate fixture integrity and
+independent Decimal expectations, then score reported audit ranges, exact source
+and combined totals, coverage, currency conversion and available response/tool
+metadata. Missing or ambiguous evidence fails rather than accepting a matching
+number in prose. This checker is not imported by inference or exposed as a tool;
+a passing local report is not proof of authenticated live execution.
+
+The 17 October copying diagnostics locate the reported cutoffs near 16,384
+`cl100k_base` tokens in the wrapped document representation, while the same model
+with medium reasoning can copy all selected fields from that exact payload when
+given it directly. This supports a hosted MCP delivery-path cutoff, not a proven
+public token-limit contract. SourceDataFields adds metadata rather than excluding
+semantic content. Smaller indexed documents or an explicitly paged read-only tool
+remain remediation candidates; no cloud resource or permission was changed.
+
 ## Agent-driven ML training example
 
 `49-agent-training-ml-churn-prediction` has two entry points with the same tools.
