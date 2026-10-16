@@ -23,10 +23,14 @@ BUSY = "An earlier operation is still running in the background; ask me for the 
 def main() -> None:
     from azure.ai.agentserver.responses import ResponsesAgentServerHost, ResponsesServerOptions, TextResponse
 
-    from ml_agent.hosted import MAX_HISTORY_ITEMS, HostedAgent
+    from ml_agent.hosted import MAX_HISTORY_ITEMS, HostedAgent, home
     from ml_agent.runtime import redact
 
     agent = HostedAgent.from_environment()
+    # The package folder is read-only; ESML writes temporary projections relative to the working directory.
+    work = home() / "cwd"
+    work.mkdir(parents=True, exist_ok=True)
+    os.chdir(work)
     serial = asyncio.Lock()
     inflight: dict = {"work": None}
     app = ResponsesAgentServerHost(options=ResponsesServerOptions(default_fetch_history_count=MAX_HISTORY_ITEMS))

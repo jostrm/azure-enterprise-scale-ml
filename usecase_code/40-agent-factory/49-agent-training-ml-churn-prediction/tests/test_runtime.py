@@ -108,6 +108,8 @@ class RuntimeTests(unittest.TestCase):
             self.runtime(apply=False).create_usecase(CHURN)
         with self.assertRaises(ApprovalRequired):
             self.runtime(allow_paid=False).train(CHURN)
+        with self.assertRaisesRegex(ValueError, "Create the use case first"):
+            self.runtime().train(CHURN)  # never train M49 before its synthetic data is published
         with self.assertRaises(ValueError):
             self.runtime().train(AIR)
         with self.assertRaises(ValueError):

@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 from . import esml, factory, lake
 from .configuration import GUID, paths, read_json
-from .plan import record_publication, require
+from .plan import published_versions, record_publication, require
 from .usecases import AIR, CHURN, USECASES, expected_names, model_name
 
 
@@ -232,6 +232,9 @@ class MLRuntime:
         if name != CHURN:
             raise ValueError("start_training creates the first M49 model; use start_retraining for air-passengers.")
         entry = self._entry(name, "train")
+        if entry["data_version"] not in published_versions(self.location.state):
+            raise ValueError(f"Create the use case first: synthetic data version {entry['data_version']} is not "
+                             "published to the shared lake yet (create_usecase_from_template).")
         project = self._project(name)
         rollout = esml.build_rollout(project, self.location, name)
         try:

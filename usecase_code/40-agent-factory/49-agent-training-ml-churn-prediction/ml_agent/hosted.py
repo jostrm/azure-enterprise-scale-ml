@@ -54,7 +54,10 @@ INSTRUCTIONS = client_tools.INSTRUCTIONS + (
     "is approved unless get_approval_status or a host note confirms it. Azure ML jobs take minutes: when "
     "a tool returns state 'running', report the job name and ask the user to check again later instead "
     "of repeating the call in the same turn. Calling a training or inference tool again resumes the same "
-    "recorded job and never submits a duplicate."
+    "recorded job and never submits a duplicate. A plan always covers both use cases, but operate only on "
+    "the use case the user asked for in this conversation. If a step fails, report the error and stop; "
+    "never continue with a step that depends on it (for example, never train before the use case was "
+    "created successfully)."
 )
 
 
