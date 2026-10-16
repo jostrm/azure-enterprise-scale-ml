@@ -5,6 +5,9 @@ sources:
   - environment_setup/aifactory/bicep/README.md
   - environment_setup/aifactory/bicep/esml-common/main/12-networkCommon.bicep
   - environment_setup/aifactory/bicep/esml-genai-1/01-foundation.bicep
+  - environment_setup/aifactory/bicep/esml-genai-1/02-core-infrastructure.bicep
+  - environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-2-genai-services.yaml
+  - environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-project-phase.yml
   - environment_setup/aifactory/bicep/esml-genai-1/31-network.bicep
   - bootstrap/lib/common_network_preservation.py
   - bootstrap/lib/aifactory_private_dns.py
@@ -20,6 +23,7 @@ sources:
   - environment_setup/aifactory/bicep/esml-genai-1/03b-ai-search.bicep
   - environment_setup/aifactory/bicep/modules/services/aiSearchDeployment.bicep
 tests:
+  - environment_setup/unit-tests/test-bicep/unit/test_shared_acr_update.py
   - environment_setup/unit-tests/test-bicep/unit/test_common_network_preservation.py
   - environment_setup/unit-tests/test-bicep/unit/test_subnet_scaling_capacity.py
   - environment_setup/unit-tests/test-bicep/unit/test_private_data_services.py
@@ -42,6 +46,19 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 The maintained infrastructure path is Bicep-first, invoked through provider templates. Common networking and project phases are distinct. `esml-genai-1` contains foundation, core, cognitive/search, database, compute, AI/ML, RBAC, Foundry, dashboard and integration templates; flags and orchestration select the actual resources. A numbered filename is not proof that every deployment executes it.
 
 Foundation resolves common/project scopes, private DNS routing and managed identities. `centralDnsZoneByPolicyInHub` changes whether zone creation is local or delegated to central governance; explicit DNS subscription/resource-group parameters can differ from project placement. Private endpoint creation alone does not prove name resolution, connectivity or caller data-plane authorization.
+
+Shared-registry reuse (source reviewed at `e2e1f55c` plus this change,
+2026-10-16): project core infrastructure defaults `updateCommonACR` to true.
+With `useCommonACR=true` and `updateCommonACR=false`, it skips only the shared
+registry/settings/private-endpoint deployment module, not existing-registry
+reads or project access assignments. It does not select a new project registry,
+delete resources or bypass network/RBAC prerequisites. JSON/ADO YAML and
+GitHub environment registration/runtime expose the same default-true option.
+The ADO task passes it as environment data, preserves explicit false through
+macro expansion and accepts omitted legacy settings with the prior true
+default; invalid values fail before the deployment command. Current main
+already forwards `enableApplicationInsights` in both providers. These source
+contracts do not prove deployment or an installed API's configuration schema.
 
 Search provisioning recovery (source reviewed at `e33addf7` plus this working tree,
 2026-10-16): the Dev and StageProd fallback-location arrays both default in order

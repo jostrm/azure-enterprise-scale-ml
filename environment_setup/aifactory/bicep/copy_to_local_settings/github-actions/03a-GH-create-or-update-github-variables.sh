@@ -388,6 +388,7 @@ repo_level_vars=(
   
   # === Cost optimization ===
   "USE_COMMON_ACR_FOR_PROJECTS"
+  "UPDATE_COMMON_ACR"
   
   "ENABLE_DEFENDER_FOR_AI_SUB_LEVEL"
   "ENABLE_DEFENDER_FOR_AI_RESOURCE_LEVEL"

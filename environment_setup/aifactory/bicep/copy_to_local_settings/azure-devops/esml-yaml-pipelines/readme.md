@@ -13,6 +13,22 @@ before sign-in: answer `y` to its custom Azure DevOps URL prompt and paste a ful
 project URL such as `https://example-org.visualstudio.com/AIFactory`.
 It saves the selected destination locally; no customer URL is embedded in source.
 
+### Reuse common ACR without rewriting it
+
+For a project using an already provisioned common registry, keep
+`useCommonACR` and `useCommonACR_override` set to `"true"` and set
+`updateCommonACR: "false"` in the active YAML or JSON configuration.
+The core phase then skips redeploying the shared registry and its private
+endpoint, preserving their settings and tags. It does not create a replacement
+registry. Existing-registry reads and project access assignments still occur;
+this is not a read-only deployment or a bypass for networking/RBAC prerequisites.
+
+The option defaults to `"true"` when omitted, retaining previous behavior.
+Refresh the copied pipeline templates as well as the source pin.
+GitHub Actions exposes the equivalent `UPDATE_COMMON_ACR` variable.
+Configuration acceptance through a registered API remains subject to the
+installed host's schema and reviewed-operation contract.
+
 ## See [Full Prerequisites](../../../../../../documentation/v2/10-19/12-prerequisites-setup.md)
 
 ### Prerequisite reminder - setup tools:  on your laptop (for both option A) Azure Devops and B) Github):
