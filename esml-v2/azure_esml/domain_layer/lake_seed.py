@@ -56,10 +56,14 @@ def stage_kaggle_examples(config: dict, *, source_root: Path, scenario_root: Pat
         provenance = load_json(source.parent / "provenance.json")
         if any(provenance.get(field) != scenario["dataset"].get(field) for field in ("provider", "kind", "slug", "version")):
             raise ValueError("Kaggle provenance differs from the chosen scenario")
+        synthetic = provenance.get("synthetic") is not None
+        if synthetic and provenance["synthetic"] != scenario["dataset"].get("synthetic"):
+            raise ValueError("Synthetic provenance differs from the chosen scenario's generator settings")
         loader.ingest(dataset, version, source, provenance=provenance)
         keys.append(layout.master(dataset, version))
         loader.publish_silver(dataset, version, version, required_columns=scenario["features"] + [scenario["target"]],
-                              owner="kaggle-sample-bootstrap", allowed_projects=(project,), table_format=table_format)
+                              owner="synthetic-sample-bootstrap" if synthetic else "kaggle-sample-bootstrap",
+                              allowed_projects=(project,), table_format=table_format)
         keys.append(layout.product(dataset, version))
         loader.onboard(project, dataset, version, source_version=version, source_kind="master")
         input_key = layout.project(project, dataset, version)
@@ -101,7 +105,8 @@ def stage_kaggle_examples(config: dict, *, source_root: Path, scenario_root: Pat
                 write_json(staging / "source-binding.json", {
                     "source": input_key, "refined": refined_key, "scenario": scenario,
                     "table_format": table_format, "aml_table_format": aml_table_format,
-                    "purpose": "Kaggle teaching data; not a production model-quality claim",
+                    "purpose": ("Synthetic teaching data; not a production model-quality claim" if synthetic
+                                else "Kaggle teaching data; not a production model-quality claim"),
                 })
                 finish(staging, {"kind": "training-snapshot", "scenario": scenario_name})
         keys.append(snapshot_key)

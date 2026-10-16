@@ -209,3 +209,133 @@ def test_endpoint_and_pipeline_inference_routes_exclude_each_other(tmp_path):
     with pytest.raises(ValueError, match="other route"):
         rollout.submit_inference("trained")
     project.execute_pipeline.assert_called_once()
+
+
+CONSUMER = "49-telco-churn-agent"
+
+
+def consumer_scenarios(tmp_path, **overrides):
+    folder = tmp_path / "scenarios"
+    folder.mkdir(parents=True)
+    for path in SCENARIOS.glob("*.json"):
+        (folder / path.name).write_bytes(path.read_bytes())
+    template = load_json(SCENARIOS / "churn.json")
+    scenario = {**template, "name": CONSUMER, "dataset": {
+        "provider": "lake", "kind": "dataset", "file": "telco.csv", "version": 1, "status": "configured",
+        "license": "synthetic"}, **overrides}
+    write_json(folder / f"{CONSUMER}.json", scenario)
+    return folder
+
+
+def consumer_binding():
+    return {"mode": "custom", "compute": "cpu-cluster", "data_version": "synth-v1", "run_id": "m49-1",
+            "input_path": f"mlops/v1/projects/project001/environments/dev/datasets/{CONSUMER}/versions/synth-v1/in"}
+
+
+def test_reviewed_consumer_scenarios_get_explicit_model_numbers(tmp_path):
+    from azure_esml.domain_layer.rollout import project_from_rollout_config, scenario_number, settings_from_rollout_config
+
+    folder = consumer_scenarios(tmp_path)
+    config = {**rollout_config(**{CONSUMER: consumer_binding()}), "model_numbers": {CONSUMER: 49}}
+    assert scenario_number(config, "diabetes") == 2 and scenario_number(None, "churn") == 3
+    assert scenario_number(config, CONSUMER) == 49
+    settings, catalog = settings_from_rollout_config(config, folder)
+    model = settings["models"][0]
+    assert (model["model_number"], model["model_short_alias"], model["model_name"]) == (
+        49, "M49", "M49_49_telco_churn_agent")
+    assert model["use_case"] == model["model_folder_name"] == CONSUMER
+    assert {row["scenario"]: row["model_alias"] for row in catalog}[CONSUMER] == "M49"
+    project = project_from_rollout_config(config, folder, scenario=CONSUMER, base_path=tmp_path)
+    request = AzureMLRollout(project, tmp_path / "runs").prepare(
+        model_number=49, mode="custom", data_date_utc="2026-10-16", run_id="m49-1", data_version="synth-v1")
+    assert request["model_name"] == "M49_49_telco_churn_agent"
+    assert request["experiment_name"] == f"M49_{CONSUMER}_IN_2_GOLD_TRAINING_MANUAL"
+    assert {item["name"] for item in request["data_assets"]} >= {f"M49_{CONSUMER}_gold_train"}
+
+
+@pytest.mark.parametrize("numbers, message", [
+    ({CONSUMER: 5}, "12 to 999"), ({CONSUMER: 1000}, "12 to 999"), ({CONSUMER: "49"}, "12 to 999"),
+    ({"diabetes": 49}, "built-in"), ({CONSUMER: 49, "other-agent": 49}, "assigned twice"),
+    ([CONSUMER], "map reviewed"),
+])
+def test_consumer_model_numbers_are_validated(tmp_path, numbers, message):
+    from azure_esml.domain_layer.rollout import scenario_number, settings_from_rollout_config
+
+    folder = consumer_scenarios(tmp_path)
+    config = {**rollout_config(**{CONSUMER: consumer_binding()}), "model_numbers": numbers}
+    with pytest.raises(ValueError, match=message):
+        settings_from_rollout_config(config, folder)
+    with pytest.raises(ValueError, match=message):
+        scenario_number(config, CONSUMER)
+
+
+def test_consumer_scenarios_need_their_reviewed_file_and_matching_name(tmp_path):
+    from azure_esml.domain_layer.rollout import scenario_number, settings_from_rollout_config
+
+    config = {**rollout_config(**{CONSUMER: consumer_binding()}), "model_numbers": {CONSUMER: 49}}
+    with pytest.raises(ValueError, match="scenario file"):
+        settings_from_rollout_config(config, SCENARIOS)
+    folder = consumer_scenarios(tmp_path, name="another-name")
+    with pytest.raises(ValueError, match="name"):
+        settings_from_rollout_config(config, folder)
+    with pytest.raises(ValueError, match="reviewed model number"):
+        scenario_number({}, CONSUMER)
+    unbound = rollout_config(**{CONSUMER: consumer_binding()})
+    with pytest.raises(ValueError, match="known scenarios"):
+        settings_from_rollout_config(unbound, consumer_scenarios(tmp_path / "second"))
+
+
+def test_interrupted_training_resumes_the_recorded_job_without_resubmitting(tmp_path):
+    project = ESMLProject(LakeSettings.from_dict(configuration()))
+    rollout = AzureMLRollout(project, tmp_path)
+    rollout.prepare(model_number=11, mode="custom", data_date_utc="2026-09-28", run_id="resume-1")
+    project.execute_pipeline = MagicMock(return_value={"name": "recorded-job", "status": "Running"})
+    project.wait_for_completion = MagicMock(side_effect=TimeoutError("still running"))
+    project.register_outputs = MagicMock(return_value=[])
+    project.register_model = MagicMock(return_value="azureml:diabetes-classification:3")
+    with pytest.raises(TimeoutError):
+        rollout.execute_training("resume-1")
+    with pytest.raises(ValueError, match="submitted"):
+        rollout.prepare(model_number=11, mode="custom", data_date_utc="2026-09-28", run_id="resume-1")
+    project.wait_for_completion = MagicMock(return_value={"name": "recorded-job", "status": "Completed"})
+    receipt = rollout.execute_training("resume-1")
+    assert receipt["job"] == "recorded-job" and receipt["model_id"].endswith(":3")
+    project.execute_pipeline.assert_called_once()
+    project.wait_for_completion.assert_called_once_with("recorded-job", timeout_seconds=7200, poll_seconds=30)
+    project.register_model.assert_called_once()
+
+
+def test_uncertain_training_submission_is_never_repeated(tmp_path):
+    project = ESMLProject(LakeSettings.from_dict(configuration()))
+    rollout = AzureMLRollout(project, tmp_path)
+    rollout.prepare(model_number=11, mode="custom", data_date_utc="2026-09-28", run_id="uncertain-1")
+    project.execute_pipeline = MagicMock(side_effect=ConnectionError("reset after send"))
+    with pytest.raises(ConnectionError):
+        rollout.execute_training("uncertain-1")
+    project.execute_pipeline = MagicMock()
+    with pytest.raises(ValueError, match="uncertain"):
+        rollout.execute_training("uncertain-1")
+    project.execute_pipeline.assert_not_called()
+
+
+def test_retained_champion_can_be_scored_only_after_a_rejected_candidate(tmp_path):
+    project = ESMLProject(LakeSettings.from_dict(configuration()))
+    rollout = AzureMLRollout(project, tmp_path)
+    request = rollout.prepare(model_number=11, mode="custom", data_date_utc="2026-09-28", run_id="kept-1")
+    champion = f"azureml:{request['model_name']}:7"
+    with pytest.raises(ValueError, match="rejected"):
+        rollout.prepare_inference("kept-1", inference_date_utc="2026-09-28", inference_run_id="i-1",
+                                  model_id=champion)
+    write_json(tmp_path / "kept-1" / "selection-decision.json", {"decision": "champion_kept"})
+    write_json(tmp_path / "kept-1" / "model-registration-intent.json", {"status": "registration_requested"})
+    with pytest.raises(ValueError, match="model name"):
+        rollout.prepare_inference("kept-1", inference_date_utc="2026-09-28", inference_run_id="i-1",
+                                  model_id="azureml:other-model:7")
+    planned = rollout.prepare_inference("kept-1", inference_date_utc="2026-09-28", inference_run_id="i-1",
+                                        model_id=champion)
+    assert planned["model_id"] == champion and planned["model_source"] == "retained_champion"
+    assert "/models/7/runs/i-1/gold/" in planned["input"]
+    write_json(tmp_path / "kept-1" / "training-completion.json", {"model_id": f"azureml:{request['model_name']}:8"})
+    with pytest.raises(ValueError, match="rejected"):
+        rollout.prepare_inference("kept-1", inference_date_utc="2026-09-28", inference_run_id="i-2",
+                                  model_id=champion)

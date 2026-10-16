@@ -144,11 +144,41 @@ def _csv_header(path: Path) -> None:
             raise ValueError("CSV column names must be unique and nonempty")
 
 
+def _verify_file_hashes(value: dict, inventory: dict, source: Path, label: str) -> None:
+    hashes = value.get("files")
+    if not isinstance(hashes, dict):
+        raise ValueError(f"{label} provenance requires a files checksum mapping")
+    for name, digest in hashes.items():
+        _file_name(name)
+        if not isinstance(digest, str) or re.fullmatch(r"[a-fA-F0-9]{64}", digest) is None:
+            raise ValueError(f"{label} provenance files require SHA-256 digests")
+    for name, digest in inventory.items():
+        expected = hashes.get(name)
+        if expected is None and source.is_file():
+            matches = [key for key in hashes
+                       if tuple(source.parts[-len(PurePosixPath(key).parts):]) == PurePosixPath(key).parts]
+            if len(matches) == 1:
+                expected = hashes[matches[0]]
+        if expected is None or expected.lower() != digest:
+            raise ValueError(f"{label} source file does not match its provenance hash: {name}")
+
+
 def _provenance(provenance: dict, inventory: dict, source: Path) -> dict:
     value = _json_object(provenance, "provenance")
     if not isinstance(value.get("provider"), str) or not value["provider"].strip():
         raise ValueError("provenance.provider must identify the real source")
     if value["provider"] != "kaggle":
+        synthetic = value.get("synthetic")
+        if synthetic is not None:
+            # Deterministic generated data: generator identity and exact bytes, never a download.
+            if (value["provider"] != "lake" or not isinstance(synthetic, dict)
+                    or not isinstance(synthetic.get("generator"), str) or not synthetic["generator"].strip()
+                    or type(synthetic.get("seed")) is not int or synthetic["seed"] < 0
+                    or type(synthetic.get("rows")) is not int or synthetic["rows"] < 1):
+                raise ValueError("Synthetic provenance requires provider lake and generator, seed and rows")
+            if not isinstance(value.get("license"), str) or not value["license"].strip():
+                raise ValueError("Synthetic provenance requires an explicit license statement")
+            _verify_file_hashes(value, inventory, source, "Synthetic")
         return value
     if (value.get("kind") not in ("dataset", "competition")
             or not isinstance(value.get("slug"), str) or not value["slug"].strip()):
@@ -159,22 +189,7 @@ def _provenance(provenance: dict, inventory: dict, source: Path) -> dict:
             not isinstance(value.get("version"), (str, int)) or isinstance(value.get("version"), bool)
             or not str(value["version"]).strip() or str(value["version"]).lower() == "latest"):
         raise ValueError("Kaggle dataset provenance requires a pinned version")
-    hashes = value.get("files")
-    if not isinstance(hashes, dict):
-        raise ValueError("Kaggle provenance requires a files checksum mapping")
-    for name, digest in hashes.items():
-        _file_name(name)
-        if not isinstance(digest, str) or re.fullmatch(r"[a-fA-F0-9]{64}", digest) is None:
-            raise ValueError("Kaggle provenance files require SHA-256 digests")
-    for name, digest in inventory.items():
-        expected = hashes.get(name)
-        if expected is None and source.is_file():
-            matches = [key for key in hashes
-                       if tuple(source.parts[-len(PurePosixPath(key).parts):]) == PurePosixPath(key).parts]
-            if len(matches) == 1:
-                expected = hashes[matches[0]]
-        if expected is None or expected.lower() != digest:
-            raise ValueError(f"Kaggle source file does not match its provenance hash: {name}")
+    _verify_file_hashes(value, inventory, source, "Kaggle")
     return value
 
 

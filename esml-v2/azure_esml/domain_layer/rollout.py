@@ -19,15 +19,48 @@ SCENARIO_NUMBERS = {
     "image-multiclass": 8, "image-multilabel": 9,
     "image-object-detection": 10, "image-instance-segmentation": 11,
 }
+CONSUMER_NUMBERS = range(12, 1000)
 ROLLOUT_CONFIG_SCHEMA = "esml.azureml-rollout-config/v1"
 BLOCKED_DATASETS = ("required-selection", "license-review", "requires-license-review")
 
 
-def model_from_scenario(scenario: dict, *, input_path: str, compute: str, naming_style="model-prefix") -> dict:
-    name = scenario["name"]
-    if name not in SCENARIO_NUMBERS:
+def consumer_model_numbers(config: dict | None) -> dict[str, int]:
+    """Validate reviewed model numbers for consumer scenarios outside the built-in catalog."""
+    numbers = {} if config is None else config.get("model_numbers", {}) if isinstance(config, dict) else None
+    if not isinstance(numbers, dict):
+        raise ValueError("model_numbers must map reviewed scenario names to model numbers")
+    assigned = {}
+    for name, number in numbers.items():
+        identifier(name, "scenario")
+        if name in SCENARIO_NUMBERS:
+            raise ValueError(f"{name} already has built-in model number {SCENARIO_NUMBERS[name]}")
+        if type(number) is not int or number not in CONSUMER_NUMBERS:
+            raise ValueError("Consumer model numbers must be integers from 12 to 999")
+        if number in assigned:
+            raise ValueError(f"Model number {number} is assigned twice ({assigned[number]}, {name})")
+        assigned[number] = name
+    return dict(numbers)
+
+
+def scenario_number(config: dict | None, name: str) -> int:
+    """The built-in model number, or the reviewed consumer number from the rollout configuration."""
+    consumer = consumer_model_numbers(config)
+    if name in SCENARIO_NUMBERS:
+        return SCENARIO_NUMBERS[name]
+    if name not in consumer:
         raise ValueError("Assign a reviewed model number before adding a scenario to this rollout")
-    number = SCENARIO_NUMBERS[name]
+    return consumer[name]
+
+
+def model_from_scenario(scenario: dict, *, input_path: str, compute: str, naming_style="model-prefix",
+                        number: int | None = None) -> dict:
+    name = scenario["name"]
+    if number is None:
+        if name not in SCENARIO_NUMBERS:
+            raise ValueError("Assign a reviewed model number before adding a scenario to this rollout")
+        number = SCENARIO_NUMBERS[name]
+    elif name in SCENARIO_NUMBERS and number != SCENARIO_NUMBERS[name]:
+        raise ValueError(f"{name} keeps its built-in model number {SCENARIO_NUMBERS[name]}")
     model = {
         "model_number": number, "model_short_alias": f"M{number:02d}", "model_folder_name": name,
         "model_name": f"M{number:02d}_{name.replace('-', '_')}", "use_case": name,
@@ -50,17 +83,26 @@ def settings_from_rollout_config(config: dict, scenarios: Path) -> tuple[dict, l
     """Compile reviewed model-factory scenario bindings into esml.lake-settings/v2, offline.
 
     `config` uses esml.azureml-rollout-config/v1: shared factory/storage/runtime settings
-    plus one reviewed source binding per selected scenario. Dataset selection/license
-    gates and the tabular-only ESML boundary are enforced; nothing is submitted.
+    plus one reviewed source binding per selected scenario. Consumer scenarios outside the
+    built-in catalog need an explicit reviewed `model_numbers` entry (12-999) and their own
+    scenario file. Dataset selection/license gates and the tabular-only ESML boundary are
+    enforced; nothing is submitted.
     """
     if not isinstance(config, dict) or config.get("schema") != ROLLOUT_CONFIG_SCHEMA:
         raise ValueError(f"Expected {ROLLOUT_CONFIG_SCHEMA} configuration")
+    consumer = consumer_model_numbers(config)
+    known = {**SCENARIO_NUMBERS, **consumer}
     chosen = config.get("scenarios")
-    if not isinstance(chosen, dict) or not chosen or set(chosen) - set(SCENARIO_NUMBERS):
+    if not isinstance(chosen, dict) or not chosen or set(chosen) - set(known):
         raise ValueError("Choose explicit known scenarios with reviewed source bindings")
     models, catalog = [], []
-    for name, number in SCENARIO_NUMBERS.items():
-        scenario = load_json(Path(scenarios) / f"{name}.json")
+    for name, number in known.items():
+        path = Path(scenarios) / f"{name}.json"
+        if name in consumer and not path.is_file():
+            raise ValueError(f"{name}: a reviewed model number needs its user-config scenario file {name}.json")
+        scenario = load_json(path)
+        if name in consumer and scenario.get("name") != name:
+            raise ValueError(f"Scenario file {name}.json must declare the name {name!r}")
         row = {"scenario": name, "model_number": number, "model_alias": f"M{number:02d}",
                "task": scenario["task"], "dataset_status": scenario["dataset"].get("status"),
                "selected": name in chosen}
@@ -72,7 +114,8 @@ def settings_from_rollout_config(config: dict, scenarios: Path) -> tuple[dict, l
                 raise ValueError(f"{name}: vision needs its ESML task-specific adapter; no tabular fallback")
             if source.get("mode") not in ("custom", "automl"):
                 raise ValueError(f"{name}: binding mode must be custom or automl")
-            model = model_from_scenario(scenario, input_path=source["input_path"], compute=source["compute"])
+            model = model_from_scenario(scenario, input_path=source["input_path"], compute=source["compute"],
+                                        number=number)
             if source["mode"] == "automl":
                 if not config.get("automl_evaluation_environment"):
                     raise ValueError("AutoML bindings require a pinned automl_evaluation_environment")
@@ -134,6 +177,8 @@ class AzureMLRollout:
         kind = (PipelineType.IN_2_GOLD_TRAINING_AUTOML if mode == "automl"
                 else PipelineType.IN_2_GOLD_TRAINING_MANUAL)
         directory = self.output / run_id
+        if any((directory / name).exists() for name in ("training-submission-intent.json", "submitted-job.json")):
+            raise ValueError(f"Run {run_id} already submitted training; resume it or choose a new run_id")
         plan = self.project.create_pipeline(kind, PipelineRequest(data_date_utc, run_id, data_version=data_version),
                                            output=directory / "training", model_number=model_number)
         request = {
@@ -189,6 +234,7 @@ class AzureMLRollout:
     def execute_training(self, run_id: str, *, timeout_seconds=7200, poll_seconds=30,
                          selection_policy: dict | None = None, no_champion=False,
                          champion_evaluation: dict | None = None) -> dict:
+        """Submit once, or resume the recorded job after an interruption; never resubmit."""
         directory = self.output / identifier(run_id, "run_id")
         request = load_json(directory / "request.json")
         if (request["scope"] != self.project.settings.scope or request["workspace"] != self.project.target.workspace_name
@@ -203,8 +249,18 @@ class AzureMLRollout:
         registration_intent = directory / "model-registration-intent.json"
         if registration_intent.exists():
             raise ValueError("A previous model registration may have completed; reconcile it before repeating a registry write")
-        job = self.project.execute_pipeline(plan)
-        write_json(directory / "submitted-job.json", job)
+        submitted = directory / "submitted-job.json"
+        submission_intent = directory / "training-submission-intent.json"
+        if submitted.exists():
+            job = load_json(submitted)
+        else:
+            if submission_intent.exists():
+                raise ValueError("An earlier training submission has an uncertain outcome; reconcile its job "
+                                 "instead of submitting again")
+            write_json(submission_intent, {"pipeline": str(plan.yaml_path), "request_sha256": request["request_sha256"],
+                                           "status": "submission_requested"})
+            job = self.project.execute_pipeline(plan)
+            write_json(submitted, job)
         job = self.project.wait_for_completion(job["name"], timeout_seconds=timeout_seconds, poll_seconds=poll_seconds)
         write_json(directory / "completed-job.json", job)
         assets = self.project.register_outputs(plan, job["name"])
@@ -222,15 +278,30 @@ class AzureMLRollout:
         write_json(completed_receipt, result)
         return result
 
-    def prepare_inference(self, run_id: str, *, inference_date_utc: str, inference_run_id: str) -> dict:
+    def prepare_inference(self, run_id: str, *, inference_date_utc: str, inference_run_id: str,
+                          model_id: str | None = None) -> dict:
+        """Plan GOLD_INFERENCE for this run's registered model, or for the retained champion.
+
+        An explicit `model_id` is accepted only when the run's candidate was rejected by model
+        selection in favour of the champion, so the champion keeps serving this use case.
+        """
         directory = self.output / identifier(run_id, "run_id")
         request = load_json(directory / "request.json")
-        completion = load_json(directory / "training-completion.json")
-        model_id = completion["model_id"]
+        completion_path = directory / "training-completion.json"
+        if model_id is None:
+            model_id = load_json(completion_path)["model_id"]
+            source = "trained"
+        else:
+            decision = directory / "selection-decision.json"
+            if (completion_path.exists() or not decision.exists()
+                    or load_json(decision).get("decision") != "champion_kept"):
+                raise ValueError("An explicit model_id is accepted only after this run's candidate was rejected "
+                                 "in favour of the retained champion")
+            source = "retained_champion"
         from ml_model_factory.serving import _model_name_version
         model_name, version = _model_name_version(model_id)
         if model_name != request["model_name"]:
-            raise ValueError("Registered model differs from the rollout request")
+            raise ValueError("Registered model name differs from the rollout request")
         # Inference data must be separately supplied without labels at the declared lake path.
         inference_project = ESMLProject(
             self.project.settings, backend=self.project.backend,
@@ -241,7 +312,7 @@ class AzureMLRollout:
             PipelineType.GOLD_INFERENCE, PipelineRequest(inference_date_utc, inference_run_id, model_version=version),
             output=directory / "inference", model_number=request["model_number"],
         )
-        result = {"pipeline": str(plan.yaml_path), "model_id": model_id,
+        result = {"pipeline": str(plan.yaml_path), "model_id": model_id, "model_source": source,
                   "input": plan.document["inputs"]["gold"]["path"],
                   "output": plan.document["outputs"]["inference"]["path"], "published": False}
         write_json(directory / "inference-request.json", result)
