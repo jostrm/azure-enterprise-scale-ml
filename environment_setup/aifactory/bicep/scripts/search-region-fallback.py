@@ -91,11 +91,12 @@ def is_capacity(node, depth=0):
         return False
     children = []
     for key in ("error", "innererror", "innerError"):
-        if key in node:
+        # Azure CLI emits absent optional error children as JSON null.
+        if node.get(key) is not None:
             if not isinstance(node[key], dict):
                 return False
             children.append(node[key])
-    if "details" in node:
+    if node.get("details") is not None:
         if not isinstance(node["details"], list):
             return False
         children.extend(node["details"])

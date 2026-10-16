@@ -132,6 +132,11 @@ This patch focuses on **simpler configuration**, **per-environment cost control 
   Persisted ARM wrapper errors missing the inner leaf are resolved read-only
   through nested deployment records in the exact Search resource group;
   missing, unreadable or noncapacity evidence cannot authorize fallback.
+  Azure CLI's optional `details: null` and null inner-error fields are treated
+  as absent children, not malformed failures. An explicit capacity leaf is still
+  required; null alone, malformed non-null children and mixed errors do not
+  enable fallback. A handled primary capacity failure publishes the pending
+  handoff so the next regional task runs; arbitrary task failures are not ignored.
   Authorization, policy, quota, template, mixed and unknown failures stop.
   Existing healthy services keep their actual location while honoring configured
   SKU updates there. Only an explicit not-found result from the exact Search

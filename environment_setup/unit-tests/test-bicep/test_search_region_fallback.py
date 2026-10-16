@@ -92,6 +92,23 @@ def test_capacity_requires_exact_all_capacity_leaves():
     assert not fallback.is_capacity({"message": "InsufficientResourcesAvailable"})
 
 
+@pytest.mark.parametrize("field", ["details", "error", "innererror", "innerError"])
+@pytest.mark.parametrize("code,expected", [
+    ("InsufficientResourcesAvailable", True),
+    ("DeploymentFailed", False), ("AuthorizationFailed", False),
+])
+def test_nullable_error_children_do_not_hide_the_required_capacity_code(field, code, expected):
+    assert fallback.is_capacity({"code": code, field: None, "target": None, "additionalInfo": None}) is expected
+
+
+@pytest.mark.parametrize("field,value", [
+    ("details", ""), ("details", {}), ("details", [None]),
+    ("error", ""), ("error", []), ("innererror", False), ("innerError", 1),
+])
+def test_nonnull_malformed_error_children_still_block_capacity(field, value):
+    assert not fallback.is_capacity({"code": "InsufficientResourcesAvailable", field: value})
+
+
 def test_existing_service_stays_actual_region_and_sku():
     resource = {"name": "search", "location": "North Europe", "sku": {"name": "basic"},
                 "properties": {"provisioningState": "Succeeded"}}
@@ -640,6 +657,73 @@ def test_persisted_nested_deployment_capacity_is_resolved_for_handoff(main_cli, 
     read = state["nested_reads"][0]
     assert read[read.index("--resource-group") + 1] == "project-rg"
     assert read[read.index("--name") + 1] == "search-service"
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("environment", ["dev", "test", "prod"])
+def test_azure_cli_nullable_error_response_continues_from_primary_to_regional_task(
+        main_cli, monkeypatch, capsys, provider, environment):
+    env, state = main_cli
+    env.update(dev_test_prod=environment, admin_location="swedencentral",
+               deleteAllServicesForProject="false", debug_disable_63_cognitive_services="false",
+               enableAFoundryCaphost="false", enableAIFoundry="false")
+    suffix = "Dev" if environment == "dev" else "StageProd"
+    env[f"aiSearchFallbackLocationArray{suffix}"] = '["denmarkeast","italynorth"]'
+    scope = SEARCH_ID.rsplit("/providers/", 1)[0]
+    nested_id = scope + "/providers/Microsoft.Resources/deployments/search-service"
+    primary_error = {
+        "additionalInfo": None, "code": "DeploymentFailed",
+        "target": "/subscriptions/11111111-1111-1111-1111-111111111111/providers/Microsoft.Resources/deployments/search-primary",
+        "details": [{"additionalInfo": None, "code": "ResourceDeploymentFailure",
+                     "details": None, "target": nested_id}],
+    }
+    nested_error = {
+        "additionalInfo": None, "code": "DeploymentFailed", "target": nested_id,
+        "details": [{"additionalInfo": None, "code": "InsufficientResourcesAvailable",
+                     "details": None, "target": None}],
+    }
+    state.update(resource=None, leave_unbound=True, failures_remaining=1,
+                 error=primary_error, nested_error=nested_error)
+    if provider == "github":
+        env["GITHUB_ENV"] = str(Path.cwd() / "github-null-error.env")
+
+    def published():
+        output = capsys.readouterr().out
+        if provider == "ado":
+            return ado_values(output)
+        path = Path(env["GITHUB_ENV"])
+        values = dict(line.split("=", 1) for line in path.read_text().splitlines())
+        path.unlink()
+        return values
+
+    arguments = fallback.sys.argv[:]
+    selector, normal, regional, network, finalizer, _ = provider_steps(provider)
+    outcomes = {"search_mode_63a": "success", "search_provisioning_63a": "skipped",
+                "search_regional_fallback_63a": "skipped", "cognitive_services_63": "skipped"}
+    monkeypatch.setattr(fallback.sys, "argv", ["search-region-fallback.py", "--select-mode"])
+    fallback.main()
+    env.update(published())
+    assert step_enabled(normal, provider, env, outcomes, True)
+    assert not step_enabled(regional, provider, env, outcomes, True)
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "normal"])
+    fallback.main()
+    env.update(published())
+    outcomes["search_provisioning_63a"] = "success"  # Capacity failure was handled, not ignored.
+    assert state["attempts"] == [("swedencentral", "standard2")]
+    assert env["AIF_AISEARCH_FALLBACK_PENDING"] == "true"
+    assert env["aiSearchProvisioned"] == env["AIF_AISEARCH_READY"] == "false"
+    assert step_enabled(regional, provider, env, outcomes, True)
+    assert not step_enabled(network, provider, env, outcomes, True)
+    monkeypatch.setattr(fallback.sys, "argv", [*arguments, "--provisioning-mode", "regional"])
+    fallback.main()
+    env.update(published())
+    outcomes["search_regional_fallback_63a"] = "success"
+    assert state["attempts"] == [("swedencentral", "standard2"), ("denmarkeast", "standard2")]
+    assert env["AIF_AISEARCH_FALLBACK_PENDING"] == "false"
+    assert env["AIF_AISEARCH_READY"] == "false"
+    assert step_enabled(network, provider, env, outcomes, True)
+    assert not step_enabled(finalizer, provider, env, outcomes, True)
+    assert len(state["nested_reads"]) == 1
 
 
 @pytest.mark.parametrize("error", [
