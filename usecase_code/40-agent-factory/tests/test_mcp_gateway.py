@@ -169,6 +169,7 @@ class DecisionTests(unittest.TestCase):
             ({"aifactoryMcpEntraAppId": ""}, "aifactoryMcpEntraAppId"),
             ({"deleteAllForProject": "true"}, "conflict"),
             ({"aiGatewaySkuResourceId": "/subscriptions/x/gateway"}, "aiGatewaySkuResourceId"),
+            ({"aiGatewaySkuOutboundSubnetId": ""}, "aiGatewaySkuOutboundSubnetId"),
         ):
             with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, message):
                 integration.run(request(**changes), apply=True)
@@ -288,7 +289,35 @@ class IntegrationTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "aiGatewaySkuOutboundSubnetId"):
                     gw.McpGatewayIntegration(arm, sleep=lambda _: None).run(
                         request(aiGatewaySkuOutboundSubnetId=""), apply=apply)
-                self.assertEqual(0, len(arm.writes()))
+                self.assertEqual(0, len(arm.calls))
+
+    def test_adopted_gateway_can_use_its_existing_subnet_without_a_parameter(self):
+        arm = FakeArm()
+        integration = gw.McpGatewayIntegration(arm, sleep=lambda _: None, token=lambda: "key")
+        integration.run(request(), apply=True)
+        arm.calls.clear()
+
+        result = integration.run(request(aiGatewaySkuResourceId=gw.names(request())["gateway_id"],
+                                         aiGatewaySkuOutboundSubnetId=""), apply=False)
+
+        self.assertEqual("plan", result["mode"])
+        self.assertEqual([], arm.writes())
+        self.assertTrue(any("/toolServers/" in item["resource"] for item in result["actions"]))
+
+    def test_gateway_only_plan_has_no_mcp_dependency_reads_or_writes(self):
+        arm = FakeArm()
+        arm.lists[f"{GROUP_ID}/resources"] = arm.lists[f"{GROUP_ID}/resources"][:1]
+        arm.lists[f"{ACCOUNT_ID}/projects"] = []
+        arm.lists[f"{ACCOUNT_ID}/deployments"] = []
+
+        result = gw.McpGatewayIntegration(arm).run(request(
+            enableAIFactoryMCP="false", addAIFactoryMCP2AIGatewaySKU="false",
+            enableContainerApps="false", aiGatewaySkuOutboundSubnetId=""), apply=False)
+
+        self.assertEqual("plan", result["mode"])
+        self.assertEqual([], arm.writes())
+        self.assertFalse(any("/containerApps/" in call[1] or "/projects?" in call[1] or "/deployments?" in call[1]
+                             for call in arm.calls))
 
     def test_existing_gateway_with_a_different_requested_subnet_is_refused_before_writes(self):
         gateway_id = gw.names(request())["gateway_id"]

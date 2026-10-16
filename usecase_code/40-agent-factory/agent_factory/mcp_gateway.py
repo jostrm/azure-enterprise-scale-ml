@@ -168,6 +168,8 @@ def decide(request: IntegrationRequest) -> Decision:
         problems.append("deleteAllServicesForProject/deleteAllForProject conflict with enabled MCP & AI Gateway options")
     if request.add_mcp_to_gateway and not (request.enable_mcp and request.enable_gateway):
         problems.append("addAIFactoryMCP2AIGatewaySKU requires enableAIFactoryMCP=true and enableAIGatewaySKU=true")
+    if request.add_mcp_to_gateway and not request.gateway_resource_id and not request.gateway_subnet_id:
+        problems.append("registering MCP to a new AI Gateway requires aiGatewaySkuOutboundSubnetId")
     if request.enable_mcp and not (request.enable_container_apps and request.enable_ai_foundry):
         problems.append("enableAIFactoryMCP requires enableContainerApps=true and enableAIFoundry=true")
     if request.enable_gateway and not request.enable_ai_foundry:

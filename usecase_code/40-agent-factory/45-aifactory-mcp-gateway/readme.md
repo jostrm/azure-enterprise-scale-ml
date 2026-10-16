@@ -24,6 +24,8 @@ steps, and only when at least one flag is `true` and no delete-all flag is set.
 - Registration rejects missing outbound integration before gateway/MCP writes. An explicitly
   requested subnet must match an existing binding; this step never migrates it to another subnet.
   A read-only plan includes an owned gateway's planned subnet configuration without applying it.
+  A new gateway's missing subnet parameter is rejected offline, before any Azure calls.
+  An explicitly adopted gateway may use its read-validated existing subnet without that parameter.
 - **`false` never deletes.** Turning a flag off skips the step; existing resources stay.
 - **Ownership.** Writes only target resources tagged `aifactory-integration: mcp-ai-gateway`
   (or the tool server carrying its managed-by marker). A foreign resource with a derived name is

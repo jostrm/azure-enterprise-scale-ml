@@ -57,6 +57,9 @@ discovery separate from MCP runtime dependencies. It rejects missing or mismatch
 registration subnet bindings before gateway/MCP writes and carries planned owned
 subnet configuration through a read-only plan. Owned tool-server reconciliation
 checks the full governed endpoint and tool state, including additional endpoints.
+New-gateway registration requires the outbound subnet parameter at offline
+validation, before constructing an Azure session or reading inventory; adopted
+gateways retain read validation of their existing subnet.
 Offline regression tests establish these boundaries, not production acceptance.
 
 ## Locally implemented graph tools
