@@ -74,6 +74,11 @@ expanded through read-only group-deployment `properties.error` reads only for
 explicit targets in the exact Search subscription/RG (at most five levels and
 ten reads). Missing/foreign targets, cycles, malformed/denied reads, unknown or
 mixed terminal evidence fail closed; wrapper message hints alone are not proof.
+Azure CLI may serialize absent optional `details`/inner-error fields as null.
+Both classifiers treat those fields as absent children while still requiring
+explicit capacity evidence. Null payloads, malformed non-null children and
+mixed terminal errors remain non-retryable; no general continue-on-error policy
+is introduced for failed primary provisioning.
 The enclosing subscription-deployment error target is accepted only within the
 same subscription; it remains a wrapper, not a capacity signal or a readback
 target. The underlying Search/group-deployment evidence must still qualify.

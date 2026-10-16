@@ -285,6 +285,32 @@ def test_primary_and_regional_capacity_can_resolve_exact_search_rg_wrapper_error
     assert reads == ["search-nested", "search-inner"] * 3
 
 
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
+def test_nullable_azure_cli_error_children_allow_primary_to_regional_handoff(runtime, provider, target, suffix):
+    runtime.configure("ai-search", target)
+    runtime.env[("aiSearchFallbackLocationArray" + suffix).upper()] = "denmarkeast,italynorth"
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = "false"
+    wrapper = {**search_deployment_wrapper(), "details": None, "additionalInfo": None,
+               "error": None, "innererror": None, "innerError": None}
+    payload = {"code": "DeploymentFailed", "additionalInfo": None,
+               "target": "/subscriptions/unit-subscription/providers/Microsoft.Resources/deployments/search-primary",
+               "details": [wrapper]}
+    leaf = {"code": "InsufficientResourcesAvailable", "details": None, "target": None,
+            "additionalInfo": None, "error": None, "innererror": None, "innerError": None}
+    runtime.outcome = (19, "", "ERROR: " + json.dumps(payload))
+    runtime.group_errors["search-nested"] = (0, json.dumps({"code": "DeploymentFailed", "details": [leaf]}), "")
+    status, values, _ = runtime.attempt(provider=provider)
+    assert status == 0 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "primary-capacity-exhausted"
+    assert "aiSearchLocation" not in values and "skuAISearch" + suffix not in values
+    assert [parameters["aiSearchLocation"]["value"] for parameters in runtime.parameters] == ["swedencentral"]
+    runtime.outcome = (0, "{}", "")
+    status, values, _ = runtime.attempt(provider=provider, regional=True)
+    assert status == 0 and values["aiSearchLocation"] == "denmarkeast"
+    assert [parameters["aiSearchLocation"]["value"] for parameters in runtime.parameters] == ["swedencentral", "denmarkeast"]
+    assert sum(call[1:4] == ["deployment", "group", "show"] for call in runtime.calls) == 1
+
+
 @pytest.mark.parametrize("complete", [False, True])
 @pytest.mark.parametrize("subscription", ["unit-subscription", "other-subscription"])
 def test_reported_subscription_deployment_envelope_preserves_capacity_evidence(runtime, complete, subscription):
@@ -349,6 +375,11 @@ def test_untrusted_or_mixed_deployment_wrappers_never_trigger_readback_or_fallba
     (0, '{"code":"InsufficientResourcesAvailable","target":"/subscriptions/unit-subscription/resourceGroups/rg/providers/Microsoft.Search/searchServices/other"}', ""),
     (0, json.dumps({**search_deployment_wrapper("search-inner"), "message": "AuthorizationFailed"}), ""),
     (0, json.dumps({**search_deployment_wrapper("search-inner"), "message": "Private endpoint allocation failed."}), ""),
+    (0, '{"code":"DeploymentFailed","details":null,"target":null}', ""),
+    (0, '{"code":"DeploymentFailed","details":[{"code":"InsufficientResourcesAvailable","details":null},{"code":"InvalidTemplate","details":null}]}', ""),
+    (0, '{"code":"InsufficientResourcesAvailable","details":"malformed"}', ""),
+    (0, '{"code":"InsufficientResourcesAvailable","details":[null]}', ""),
+    (0, '{"code":"InsufficientResourcesAvailable","innerError":false}', ""),
 ])
 @pytest.mark.parametrize("regional", [False, True])
 def test_readback_denials_malformed_mixed_unknown_and_nonsearch_errors_are_terminal(runtime, outcome, regional):

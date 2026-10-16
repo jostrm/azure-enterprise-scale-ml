@@ -364,6 +364,9 @@ def search_capacity_failure_with_readback(az: str, output: str, resource_id: str
         for key in ("error", "details", "innererror", "innerError"):
             if key in node:
                 child = node[key]
+                # Azure CLI serializes absent optional error children as null.
+                if child is None:
+                    continue
                 if not isinstance(child, (dict, list)):
                     raise ValueError("Malformed nested deployment error.")
                 if child:
