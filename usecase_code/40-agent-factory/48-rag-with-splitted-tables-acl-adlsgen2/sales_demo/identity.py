@@ -100,15 +100,19 @@ class GraphTransport:
         return json.loads(raw)
 
 
+def search_endpoint(config: dict) -> str:
+    parsed = urlsplit(config["search_endpoint"])
+    if (parsed.scheme != "https" or not (parsed.hostname or "").endswith(".search.windows.net")
+            or parsed.port is not None or parsed.path not in {"", "/"}
+            or parsed.query or parsed.fragment or parsed.username or parsed.password):
+        raise ValueError("Select one exact HTTPS Search service endpoint.")
+    return config["search_endpoint"].rstrip("/")
+
+
 class ManagedIdentitySearchTransport:
     """Runtime Search backend. Not the operator ingestion/admin transport."""
     def __init__(self, config: dict):
-        parsed = urlsplit(config["search_endpoint"])
-        if (parsed.scheme != "https" or not (parsed.hostname or "").endswith(".search.windows.net")
-                or parsed.port is not None or parsed.path not in {"", "/"}
-                or parsed.query or parsed.fragment or parsed.username or parsed.password):
-            raise ValueError("Select one exact HTTPS Search service endpoint.")
-        self.endpoint = config["search_endpoint"].rstrip("/")
+        self.endpoint = search_endpoint(config)
         self.credential = backend_credential(config["backend_identity_client_id"])
 
     def request(self, method, url, body=None, *, audience=SEARCH, headers=None):

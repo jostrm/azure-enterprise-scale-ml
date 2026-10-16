@@ -330,10 +330,15 @@ class StorageWriter:
         return self.request("GET", path, dfs=False)[0]
 
 
-def publish(config: dict, store, *, apply: bool = False) -> dict:
+def publish(config: dict, store, *, apply: bool = False, single_user_preview: bool = False) -> dict:
     if not apply:
         raise ValueError("Publication requires explicit --apply after reviewing the exact plan.")
-    unresolved = readiness(config)
+    if type(single_user_preview) is not bool:
+        raise ValueError("Single-user preview selection must be an explicit boolean.")
+    if single_user_preview:
+        from .operator_preview import require_preview_policy
+        require_preview_policy(config)
+    unresolved = readiness(config, require_acl_test=not single_user_preview)
     if unresolved:
         raise ValueError("Publication prerequisites unresolved: " + " ".join(unresolved))
     plan = publication_plan(config)
@@ -364,4 +369,5 @@ def publish(config: dict, store, *, apply: bool = False) -> dict:
         "owner": config["owner"], "dataset": config["dataset"], "version": config["version"],
         "state": "copied-not-indexed", "files": plan["files"], "mutations": True,
         "verified_publication": False,
+        "single_user_preview": single_user_preview, "complete_acl_acceptance": False,
     }

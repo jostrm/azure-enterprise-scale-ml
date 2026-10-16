@@ -392,6 +392,50 @@ Offline unit tests, service integration acceptance and live deployed-agent
 prompt evaluations are different layers. Mocked service/model responses test
 client logic; they never establish an actual successful deployment.
 
+### Explicit single-user operator preview
+
+If only one existing user is available, `preview.py` offers a **separate local
+operator path**, not a relaxation of `main.py`'s full ACL acceptance gates.
+In consumer configuration, set `evaluation_mode` to `operator-preview`,
+`operator_preview_user_id` to the verified user's object ID, both partitions'
+`allowed_user_ids` to exactly that one ID, and `allowed_group_ids` plus
+`denied_test_user_ids` to empty lists. This creates no user or group.
+
+Every online command confirms the configured user against authenticated Graph
+`/me` in the selected tenant. The operator's cached subscription-bound OAuth is
+also the CLI Search backend credential; this is **not** managed-identity backend
+validation and is never an automatic fallback for the normal runtime. The
+read-only transport guard, native `x-ms-query-source-authorization`, delegated
+Storage reads, complete chunk/row coverage and exact arithmetic remain intact.
+No elevated-read header is used.
+
+An operator with broad Storage RBAC can demonstrate authorized retrieval and
+calculation, but cannot demonstrate restrictive ACLs or revocation. The
+evaluation reports `authorized_cases_passed` separately and always leaves
+`passed` and `complete_acl_acceptance` false. It never reuses the same user as a
+pretend denied identity. The independent oracle stays evaluator-only.
+
+```powershell
+# Offline plan; reviewed paths must still be approved before publication.
+& $Python preview.py plan --config $Config --output "$State\single-user-plan.json"
+# Only after explicit publication and paid-call approval:
+& $Python preview.py publish --config $Config --apply
+& $Python preview.py configure --config $Config --apply --allow-paid
+& $Python preview.py verify --config $Config --output "$State\chunk-evidence"
+& $Python preview.py deploy --config $Config --apply --allow-paid
+& $Python preview.py ask --config $Config --allow-paid `
+  --input "Give me the sum of all sales."
+& $Python preview.py evaluate --config $Config --allow-paid `
+  --oracle "$Data\evaluation\expected.json" --output "$State\single-user-evaluation.json"
+```
+
+The persisted prompt agent can be inspected in Foundry Playground, but its
+custom functions still execute in this CLI. Playground does **not** automatically
+host `aggregate_sales`. A fully interactive Playground calculator requires a
+separately approved remote tool host and supported per-user delegation; copying
+protected tables into Code Interpreter is not an equivalent permission model.
+No Container App, external tool host, or new user is created by `preview.py`.
+
 The service/live unittest entry points are skipped unless explicitly enabled:
 
 ```powershell
@@ -425,7 +469,7 @@ answers and tool traces from the deployed agent. Do not put expected totals in
 instructions, search content, calculator code, or model mocks presented as live
 results.
 
-Locally exercised: 114 passing offline tests and two skipped opt-in cloud entry
+Locally exercised: 121 passing offline tests and two skipped opt-in cloud entry
 points, generated/read-back workbook, exact independent oracle, both >9,000-token
 inputs, master/project hashes, original embedded image and rendered DOCX.
 Live Search chunk output, group-based allow/deny and revocation, deployed agent

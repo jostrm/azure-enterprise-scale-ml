@@ -179,7 +179,9 @@ def load_config(path: Path) -> dict:
     return result
 
 
-def readiness(config: dict) -> list[str]:
+def readiness(config: dict, *, require_acl_test: bool = True) -> list[str]:
+    if type(require_acl_test) is not bool:
+        raise ValueError("ACL-test readiness selection must be an explicit boolean.")
     missing = []
     if config.get("paths_approved") is not True:
         missing.append("Approve the exact master/project dataset paths.")
@@ -199,15 +201,17 @@ def readiness(config: dict) -> list[str]:
         else:
             _uuid(config[key])
     for partition in config["partitions"]:
-        if not partition.get("allowed_group_ids"):
+        if require_acl_test and not partition.get("allowed_group_ids"):
             missing.append(f"Select Entra reader groups for {partition['id']}.")
+        elif not partition.get("allowed_group_ids") and not partition.get("allowed_user_ids"):
+            missing.append(f"Select an explicit reader for {partition['id']}.")
     groups = {item for p in config["partitions"] for item in p.get("allowed_group_ids", [])}
     users = {item for p in config["partitions"] for item in p.get("allowed_user_ids", [])}
     if len(groups) + len(users) + 5 > 32:
         missing.append("The directory ACL would exceed ADLS's 32-entry limit.")
     if config.get("search_identity_object_id") in users:
         missing.append("An ingestion identity cannot be configured as a delegated test reader.")
-    if not config.get("acl_test_principal_ids") or not config.get("denied_test_user_ids"):
+    if require_acl_test and (not config.get("acl_test_principal_ids") or not config.get("denied_test_user_ids")):
         missing.append("Select allowed and denied test principals for broad-role and ACL checks.")
     if config.get("embedding_deployment") != "text-embedding-3-large":
         missing.append("Select the text-embedding-3-large deployment.")

@@ -16,6 +16,7 @@ sources:
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/runtime.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/search.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/deployment.py
+  - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/preview.py
 tests:
   - usecase_code/40-agent-factory/tests/test_prompt.py
   - usecase_code/40-agent-factory/tests/test_hosted.py
@@ -75,6 +76,13 @@ The publisher plans missing parents only inside its two owned `car-sales` roots.
 Shared `datasets`/`usecases` parents are never modified. Existing task ancestors
 retain their ACLs and require sufficient traversal; an ownership or access
 mismatch blocks rather than rewriting permissions for earlier publications.
+
+The separate `preview.py` entry point binds one existing operator to both
+partitions for authorized-access demonstrations. It retains native Search
+authorization and delegated source reads, but identifies its CLI backend as
+operator-authenticated rather than managed identity. Strict `main.py` behavior
+is unchanged; preview results cannot count as denied-user or revocation proof.
+Foundry Playground does not execute the example's local function implementations.
 
 Local fixtures or passing unit tests do not establish three real service chunks,
 successful revocation, image use, or a deployed Foundry agent. The example's
