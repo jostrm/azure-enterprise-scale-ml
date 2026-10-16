@@ -19,12 +19,19 @@ steps, and only when at least one flag is `true` and no delete-all flag is set.
   `enableAIFoundry` plus digest-pinned `aifactoryMcpImage`/`aifactoryMcpApiImage` and
   `aifactoryMcpEntraAppId`; the gateway requires `enableAIFoundry`; registration requires both
   and outbound VNet integration (`aiGatewaySkuOutboundSubnetId`, or an adopted gateway that has it).
+- Gateway-only runs discover the Foundry account without requiring MCP images, a Foundry project,
+  model deployments, Search, storage or Container Apps. MCP-enabled runs retain those checks.
+- Registration rejects missing outbound integration before gateway/MCP writes. An explicitly
+  requested subnet must match an existing binding; this step never migrates it to another subnet.
+  A read-only plan includes an owned gateway's planned subnet configuration without applying it.
 - **`false` never deletes.** Turning a flag off skips the step; existing resources stay.
 - **Ownership.** Writes only target resources tagged `aifactory-integration: mcp-ai-gateway`
   (or the tool server carrying its managed-by marker). A foreign resource with a derived name is
   refused. An adopted gateway is never modified; only its child model provider and tool server are.
 - **Read-before-write, no deletes, no blind retries.** Re-runs reuse the MCP↔API key, skip existing
   role assignments and leave unchanged resources untouched.
+- Owned tool-server reconciliation checks the complete governed endpoint, exact endpoint count,
+  protocol type, required flag, blocked tools and allowlist—not just the first endpoint's URL.
 - **Private.** The Container Apps environment must be internal; ingress is reachable only inside the VNet.
 
 ## Prerequisites (one-time, outside the pipeline)

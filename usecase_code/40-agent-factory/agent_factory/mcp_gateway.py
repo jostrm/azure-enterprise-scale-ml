@@ -208,10 +208,14 @@ def names(request: IntegrationRequest) -> dict[str, str]:
 
 
 @dataclass
-class ProjectTarget:
+class FoundryTarget:
     account_id: str
     account_name: str
     location: str
+
+
+@dataclass
+class ProjectTarget(FoundryTarget):
     project_name: str
     project_endpoint: str
     project_principal_id: str
@@ -263,7 +267,7 @@ def _system_client_id(session: ArmPort, resource_id: str) -> str:
     return identity["properties"]["clientId"]
 
 
-def discover(session: ArmPort, request: IntegrationRequest) -> ProjectTarget:
+def discover(session: ArmPort, request: IntegrationRequest) -> FoundryTarget:
     """Resolve the project's actual Foundry, data and Container Apps resources (GET only)."""
     group_id = names(request)["group_id"]
     resources = session.pages(f"{ARM}{group_id}/resources?api-version={RESOURCES_API}")
@@ -273,6 +277,8 @@ def discover(session: ArmPort, request: IntegrationRequest) -> ProjectTarget:
 
     account = _one([item for item in of_type("Microsoft.CognitiveServices/accounts") if item.get("kind") == "AIServices"],
                    "project Foundry (AIServices) account")
+    if not request.enable_mcp:
+        return FoundryTarget(account["id"], account["name"], account["location"])
     project = _one(session.pages(f"{ARM}{account['id']}/projects?api-version={COGNITIVE_API}"), "Foundry project")
     project = session.arm("GET", project["id"], api_version=COGNITIVE_API)
     principal = (project.get("identity") or {}).get("principalId", "")
@@ -385,6 +391,9 @@ class McpGatewayIntegration:
         if gateway is None:
             if adopted:
                 raise ValueError("aiGatewaySkuResourceId does not exist; create it or clear the variable to let the pipeline create one.")
+            if request.add_mcp_to_gateway and not request.gateway_subnet_id:
+                raise ValueError("Registering the private MCP requires AI Gateway outbound VNet integration; "
+                                 "set aiGatewaySkuOutboundSubnetId before creating the gateway.")
             body = {"location": request.location, "sku": {"name": "AIGateway", "capacity": 1},
                     "identity": {"type": "SystemAssigned"}, "tags": dict(OWNER_TAGS), "properties": {}}
             if request.gateway_subnet_id:
@@ -405,6 +414,12 @@ class McpGatewayIntegration:
                 raise ValueError(f"{gateway_id} exists but is not owned by this integration; refusing to modify it.")
             report.add(gateway_id, "adopted" if adopted else "unchanged")
             configured = (gateway.get("properties", {}).get("virtualNetworkConfiguration") or {}).get("subnetResourceId")
+            if configured and request.gateway_subnet_id and configured.lower() != request.gateway_subnet_id.lower():
+                raise ValueError("The AI Gateway uses a different outbound subnet than aiGatewaySkuOutboundSubnetId; "
+                                 "refusing to change or ignore the requested network binding.")
+            if request.add_mcp_to_gateway and not (configured or request.gateway_subnet_id):
+                raise ValueError("Registering the private MCP requires AI Gateway outbound VNet integration; "
+                                 "configure the existing gateway or set aiGatewaySkuOutboundSubnetId.")
             if request.gateway_subnet_id and not configured:
                 if adopted:
                     raise ValueError("The adopted AI Gateway has no outbound VNet integration; configure it on that gateway.")
@@ -413,6 +428,8 @@ class McpGatewayIntegration:
                 if apply:
                     self.session.arm("PATCH", gateway_id, patch, api_version=GATEWAY_API)
                     gateway = _wait(self.session, gateway_id, GATEWAY_API, self.sleep)
+                else:
+                    gateway = {**gateway, "properties": {**gateway.get("properties", {}), **patch["properties"]}}
                 report.add(f"{gateway_id} outbound subnet", "updated" if apply else "update")
         principal = (gateway.get("identity") or {}).get("principalId", "")
         if not GUID.fullmatch(principal or ""):
@@ -537,10 +554,11 @@ def tool_server_body(entra_app_id: str, mcp_url: str) -> dict:
 
 def _same_server(current: dict, desired: dict) -> bool:
     props, wanted = current.get("properties", {}), desired["properties"]
-    endpoint = (props.get("endpoints") or [{}])[0]
-    return (props.get("allowList") == wanted["allowList"] and props.get("accessState") == "active"
-            and endpoint.get("credentials") == wanted["endpoints"][0]["credentials"]
-            and endpoint.get("mcp") == wanted["endpoints"][0]["mcp"] and endpoint.get("namespace") == NAMESPACE)
+    endpoints = props.get("endpoints")
+    if not isinstance(endpoints, list) or len(endpoints) != 1 or not isinstance(endpoints[0], dict):
+        return False
+    return (all(props.get(key) == wanted[key] for key in ("type", "allowList", "accessState", "blocked"))
+            and all(endpoints[0].get(key) == value for key, value in wanted["endpoints"][0].items()))
 
 
 def runtime_settings(request: IntegrationRequest, target: ProjectTarget, identity_client_id: str,

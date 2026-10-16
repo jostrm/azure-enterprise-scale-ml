@@ -176,6 +176,21 @@ class DecisionTests(unittest.TestCase):
 
 
 class IntegrationTests(unittest.TestCase):
+    def test_gateway_only_needs_foundry_but_not_mcp_runtime_dependencies(self):
+        arm = FakeArm()
+        arm.lists[f"{GROUP_ID}/resources"] = arm.lists[f"{GROUP_ID}/resources"][:1]
+        arm.lists[f"{ACCOUNT_ID}/projects"] = []
+        arm.lists[f"{ACCOUNT_ID}/deployments"] = []
+
+        result = gw.McpGatewayIntegration(arm, sleep=lambda _: None).run(request(
+            enableAIFactoryMCP="false", addAIFactoryMCP2AIGatewaySKU="false",
+            enableContainerApps="false", aifactoryMcpImage="", aifactoryMcpApiImage="",
+            aifactoryMcpEntraAppId="", aiGatewaySkuOutboundSubnetId=""), apply=True)
+
+        self.assertEqual("apply", result["mode"])
+        self.assertEqual([ACCOUNT_ID], arm.body("/modelProviders/aifacct001")["properties"]["foundry"]["resourceIds"])
+        self.assertFalse(any("/containerApps/" in call[1] or "/projects?" in call[1] for call in arm.calls))
+
     def test_plan_reads_only_and_lists_every_intended_owned_write(self):
         arm = FakeArm()
         result = gw.McpGatewayIntegration(arm).run(request(), apply=False)
@@ -266,11 +281,66 @@ class IntegrationTests(unittest.TestCase):
             gw.McpGatewayIntegration(arm, sleep=lambda _: None).run(request(aiGatewaySkuResourceId=gateway_id), apply=True)
         self.assertFalse([call for call in arm.calls if call[0] in {"PUT", "PATCH"} and call[1] == gateway_id])
 
-    def test_registration_without_subnet_fails_before_registering(self):
+    def test_registration_without_subnet_fails_before_any_write(self):
+        for apply in (False, True):
+            with self.subTest(apply=apply):
+                arm = FakeArm()
+                with self.assertRaisesRegex(ValueError, "aiGatewaySkuOutboundSubnetId"):
+                    gw.McpGatewayIntegration(arm, sleep=lambda _: None).run(
+                        request(aiGatewaySkuOutboundSubnetId=""), apply=apply)
+                self.assertEqual(0, len(arm.writes()))
+
+    def test_existing_gateway_with_a_different_requested_subnet_is_refused_before_writes(self):
+        gateway_id = gw.names(request())["gateway_id"]
+        arm = FakeArm({gateway_id: {
+            "id": gateway_id, "sku": {"name": "AIGateway"}, "tags": dict(gw.OWNER_TAGS),
+            "identity": {"principalId": guid(7)},
+            "properties": {"virtualNetworkConfiguration": {"subnetResourceId": SUBNET + "-other"}},
+        }})
+        arm.add(f"{gateway_id}/providers/Microsoft.ManagedIdentity/identities/default",
+                {"properties": {"clientId": guid(8)}})
+        with self.assertRaisesRegex(ValueError, "different.*subnet"):
+            gw.McpGatewayIntegration(arm, sleep=lambda _: None).run(request(), apply=True)
+        self.assertEqual([], arm.writes())
+
+    def test_plan_can_register_after_planned_owned_gateway_subnet_configuration(self):
+        gateway_id = gw.names(request())["gateway_id"]
+        arm = FakeArm({gateway_id: {
+            "id": gateway_id, "sku": {"name": "AIGateway"}, "tags": dict(gw.OWNER_TAGS),
+            "identity": {"principalId": guid(7)}, "properties": {},
+        }})
+        result = gw.McpGatewayIntegration(arm).run(request(), apply=False)
+        self.assertEqual([], arm.writes())
+        self.assertIn({"resource": f"{gateway_id} outbound subnet", "action": "update"}, result["actions"])
+        self.assertTrue(any("/toolServers/" in item["resource"] for item in result["actions"]))
+
+    def test_registration_comparison_checks_every_governed_endpoint_field(self):
+        desired = gw.tool_server_body(APP_REG, "https://mcp.example/mcp")
+        endpoint = desired["properties"]["endpoints"][0]
+        for field, value in (
+            ("type", "rest"),
+            ("blocked", ["aifactory_factory_health"]),
+            ("endpoints", [endpoint, {**endpoint, "namespace": "unexpected"}]),
+            ("endpoints", [{**endpoint, "kind": "rest"}]),
+            ("endpoints", [{**endpoint, "required": False}]),
+        ):
+            with self.subTest(field=field, value=value):
+                current = copy.deepcopy(desired)
+                current["properties"][field] = value
+                self.assertFalse(gw._same_server(current, desired))
+        self.assertTrue(gw._same_server({**desired, "id": "server-metadata"}, desired))
+
+    def test_owned_registration_with_blocked_read_tool_is_reconciled(self):
         arm = FakeArm()
-        with self.assertRaisesRegex(ValueError, "aiGatewaySkuOutboundSubnetId"):
-            gw.McpGatewayIntegration(arm, sleep=lambda _: None).run(request(aiGatewaySkuOutboundSubnetId=""), apply=True)
-        self.assertFalse([call for call in arm.calls if "/toolServers/" in call[1] and call[0] == "PUT"])
+        integration = gw.McpGatewayIntegration(arm, sleep=lambda _: None, token=lambda: "key")
+        integration.run(request(), apply=True)
+        server_id = f"{gw.names(request())['gateway_id']}/workspaces/default/toolServers/aifactory-mcp-p001-dev"
+        arm.resources[server_id.lower()]["properties"]["blocked"] = ["aifactory_factory_health"]
+        arm.calls.clear()
+
+        integration.run(request(), apply=True)
+
+        self.assertEqual([], arm.body("/toolServers/aifactory-mcp-p001-dev")["properties"]["blocked"])
 
     def test_public_container_apps_environment_is_refused(self):
         arm = FakeArm()

@@ -12,6 +12,7 @@ sources:
   - mcp/readme.md
   - mcp/src/aifactory_mcp/graph.py
   - mcp/src/aifactory_mcp/policy.py
+  - usecase_code/40-agent-factory/agent_factory/mcp_gateway.py
 tests:
   - mcp/tests/test_server.py
   - mcp/tests/test_auth.py
@@ -22,6 +23,7 @@ tests:
   - mcp/tests/test_dual_graph.py
   - mcp/tests/test_graph_protocol.py
   - mcp/tests/test_graph_release.py
+  - usecase_code/40-agent-factory/tests/test_mcp_gateway.py
 graph_symbols:
   - mcp/src/aifactory_mcp/server.py::function:create_server
   - mcp/src/aifactory_mcp/backend.py::class:AgentBackend
@@ -49,6 +51,13 @@ Approvals happen outside model-facing MCP. Preparing an action does not approve 
 MCP health checks are strategies with injected probes. Successful checking is not equivalent to healthy dependencies; readiness reports its bounded coverage. Custom health plugins are trusted operator code, not a sandbox.
 
 Do not confuse this package with `44-azure-mcp` and its narrow Azure resource-read service. Remote hosting, API co-location/capabilities and Foundry connection registration require their own operational validation.
+
+The 2026-10-16 local source in `agent_factory.mcp_gateway` keeps gateway-only Foundry
+discovery separate from MCP runtime dependencies. It rejects missing or mismatched
+registration subnet bindings before gateway/MCP writes and carries planned owned
+subnet configuration through a read-only plan. Owned tool-server reconciliation
+checks the full governed endpoint and tool state, including additional endpoints.
+Offline regression tests establish these boundaries, not production acceptance.
 
 ## Locally implemented graph tools
 
