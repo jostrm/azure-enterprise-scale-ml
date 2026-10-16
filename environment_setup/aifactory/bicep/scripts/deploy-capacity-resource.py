@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a capacity CI step; Search regional mode allows at most 18 combinations."""
+"""Run primary capacity CI steps, then at most 15 Search fallback combinations."""
 
 import argparse
 from dataclasses import dataclass
@@ -41,6 +41,8 @@ SERVICES = {
         "AIF_CONTAINERAPPS_CAPACITY_NEXT", "Consumption", "Consumption", "Consumption,D4,D8",
     ),
 }
+SEARCH_PENDING = "primary-capacity-exhausted"
+SEARCH_CONTEXT = "AIF_AISEARCH_PRIMARY_CONTEXT"
 
 PARAMETER_ALIASES = {
     "env": ("dev_test_prod",),
@@ -86,10 +88,26 @@ TERMINAL_ERROR = re.compile(
     r"QuotaExceeded|QuotaLimitExceeded|SubscriptionIsOverQuota)\b|\b(?:401|403)\b",
     re.IGNORECASE,
 )
+SEARCH_DOWNSTREAM_ERROR = re.compile(
+    r"Microsoft\.Network/|private[\s_-]*endpoint|shared[\s_-]*private[\s_-]*link", re.IGNORECASE,
+)
 DEPLOYMENT_WRAPPERS = {
     "deploymentfailed", "resourcedeploymentfailure", "invalidtemplatedeployment",
     "badrequest", "conflict", "internalservererror", "managedenvironmentprovisioningfailed",
 }
+
+
+def unique_error_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Ambiguous error response.")
+        result[key] = value
+    return result
+
+
+def invalid_error_constant(value):
+    raise ValueError("Invalid JSON error response.")
 
 
 def is_capacity_failure(output: str) -> bool:
@@ -108,20 +126,31 @@ def is_capacity_failure(output: str) -> bool:
         code = value.get("code")
         if children and isinstance(code, str) and code.lower() not in DEPLOYMENT_WRAPPERS and not CAPACITY_ERROR.fullmatch(code):
             return [value, *children]
-        return children or ([value] if isinstance(value.get("code"), str) else [])
+        return children or ([value] if isinstance(value.get("code"), str) else [{"code": "UnclassifiedError"}])
 
-    decoder = json.JSONDecoder()
+    decoder = json.JSONDecoder(object_pairs_hook=unique_error_object, parse_constant=invalid_error_constant)
     errors = []
     consumed_until = 0
+    plain = []
     for match in re.finditer(r"[\{\[]", output):
         if match.start() < consumed_until:
             continue
+        plain.append(output[consumed_until:match.start()])
         try:
             value, length = decoder.raw_decode(output[match.start():])
-        except json.JSONDecodeError:
-            continue
+        except ValueError:
+            return False
         consumed_until = match.start() + length
         errors.extend(leaves(value))
+    plain.append(output[consumed_until:])
+    plain_output = "\n".join(plain)
+    codes = re.findall(r'\bCode\s*[:=]\s*([A-Za-z][A-Za-z0-9]+)|\(([A-Za-z][A-Za-z0-9]+)\)',
+                       plain_output, re.IGNORECASE)
+    codes = [code for pair in codes for code in pair if code]
+    codes.extend(line.strip() for line in plain_output.splitlines()
+                 if re.fullmatch(r"[A-Za-z][A-Za-z0-9]+", line.strip()))
+    if any(code.lower() not in DEPLOYMENT_WRAPPERS and not CAPACITY_ERROR.fullmatch(code) for code in codes):
+        return False
     if errors:
         return all(
             bool(CAPACITY_ERROR.fullmatch(error["code"])) or (
@@ -130,9 +159,6 @@ def is_capacity_failure(output: str) -> bool:
             )
             for error in errors
         )
-    codes = re.findall(r'\bCode\s*[:=]\s*([A-Za-z][A-Za-z0-9]+)', output, re.IGNORECASE)
-    if any(code.lower() not in DEPLOYMENT_WRAPPERS and not CAPACITY_ERROR.fullmatch(code) for code in codes):
-        return False
     return bool(CAPACITY_ERROR.search(output))
 
 
@@ -257,7 +283,7 @@ def search_regions_from_environment(environment: Mapping) -> list[str]:
 def search_candidate_order(primary: str, regions: object, selected: str,
                            configured: str, retry: str) -> list[tuple[str, str]]:
     primary = normalize_search_location(primary)
-    locations = [primary] + [region for region in normalize_search_regions(regions) if region != primary]
+    locations = [region for region in normalize_search_regions(regions) if region != primary]
     skus = candidate_order(selected, configured, retry)
     return [(location, sku.lower()) for location in locations for sku in skus]
 
@@ -265,18 +291,122 @@ def search_candidate_order(primary: str, regions: object, selected: str,
 def is_search_capacity_failure(output: str, resource_id: str) -> bool:
     # A Search deployment also owns private networking. Never relocate Search for
     # an allocation failure on a downstream endpoint/shared link/other resource.
-    if re.search(r"Microsoft\.Network/|private[\s_-]*endpoint|shared[\s_-]*private[\s_-]*link",
-                 output, re.IGNORECASE):
+    if SEARCH_DOWNSTREAM_ERROR.search(output):
         return False
     for target in re.findall(r'"target"\s*:\s*"([^"]+)"', output, re.IGNORECASE):
-        if "/providers/" in target.lower():
-            target_type = target.lower().rsplit("/providers/", 1)[-1]
-            search_target = (target.lower() == resource_id.lower()) if resource_id else (
+        target = target.lower()
+        if "/providers/" in target or target.startswith("microsoft."):
+            target_type = target.rsplit("/providers/", 1)[-1]
+            expected_type = resource_id.lower().rsplit("/providers/", 1)[-1]
+            search_target = (target in (resource_id.lower(), expected_type)) if resource_id else (
                 target_type.startswith("microsoft.search/searchservices/") and len(target_type.split("/")) == 3
             )
-            if not target_type.startswith("microsoft.resources/deployments/") and not search_target:
+            deployment_target = target_type.startswith("microsoft.resources/deployments/")
+            if deployment_target and resource_id:
+                subscription_scope = resource_id.lower().split("/resourcegroups/", 1)[0]
+                deployment_target = (
+                    target.startswith(resource_id.lower().rsplit("/providers/", 1)[0]
+                                      + "/providers/microsoft.resources/deployments/")
+                    or bool(re.fullmatch(re.escape(subscription_scope)
+                                         + r"/providers/microsoft\.resources/deployments/[a-z0-9_.()-]{1,64}", target))
+                )
+            if not deployment_target and not search_target:
                 return False
     return is_capacity_failure(output)
+
+
+def search_capacity_failure_with_readback(az: str, output: str, resource_id: str) -> bool:
+    if not re.search(r"\bResourceDeploymentFailure\b", output, re.IGNORECASE) and is_search_capacity_failure(output, resource_id):
+        return True
+    if TERMINAL_ERROR.search(output) or SEARCH_DOWNSTREAM_ERROR.search(output):
+        return False
+    scope = re.fullmatch(
+        r"/subscriptions/([^/]+)/resourceGroups/([^/]+)/providers/Microsoft.Search/searchServices/[^/]+",
+        resource_id, re.IGNORECASE,
+    )
+    if scope is None:
+        return False
+    deployment_prefix = resource_id[:resource_id.lower().rindex("/providers/")]
+    deployment_pattern = re.compile(
+        re.escape(deployment_prefix) + r"/providers/Microsoft.Resources/deployments/((?!\.{1,2}$)[A-Za-z0-9_.()-]{1,64})",
+        re.IGNORECASE,
+    )
+    subscription_deployment_pattern = re.compile(
+        re.escape(f"/subscriptions/{scope[1]}")
+        + r"/providers/Microsoft.Resources/deployments/((?!\.{1,2}$)[A-Za-z0-9_.()-]{1,64})",
+        re.IGNORECASE,
+    )
+    visited = set()
+
+    def parse(text):
+        return json.loads(re.sub(r"^ERROR:\s*", "", text.strip()),
+                          object_pairs_hook=unique_error_object, parse_constant=invalid_error_constant)
+
+    def pending_nodes(node):
+        if isinstance(node, list):
+            if not node:
+                raise ValueError("Empty deployment error.")
+            return [item for child in node for item in pending_nodes(child)]
+        if not isinstance(node, dict) or not node:
+            raise ValueError("Malformed deployment error.")
+        code = node.get("code")
+        if code is not None and (not isinstance(code, str) or (
+                code.lower() not in DEPLOYMENT_WRAPPERS and not CAPACITY_ERROR.fullmatch(code))):
+            raise ValueError("Noncapacity deployment error.")
+        target = node.get("target")
+        if target is not None:
+            if not isinstance(target, str) or (
+                    target.lower() not in (resource_id.lower(), resource_id.lower().rsplit("/providers/", 1)[-1])
+                    and not deployment_pattern.fullmatch(target)
+                    and not subscription_deployment_pattern.fullmatch(target)):
+                raise ValueError("Deployment error target is outside the exact Search resource group.")
+        children = []
+        for key in ("error", "details", "innererror", "innerError"):
+            if key in node:
+                child = node[key]
+                if not isinstance(child, (dict, list)):
+                    raise ValueError("Malformed nested deployment error.")
+                if child:
+                    children.extend(pending_nodes(child))
+        if any(key in node and node[key] for key in ("error", "details", "innererror", "innerError")):
+            return children
+        if isinstance(code, str) and code.lower() == "resourcedeploymentfailure":
+            if isinstance(target, str) and deployment_pattern.fullmatch(target):
+                return [node]
+            raise ValueError("Deployment wrapper has no exact Search-RG target.")
+        if code is None or not is_search_capacity_failure(json.dumps(node), resource_id):
+            raise ValueError("Unresolved deployment error.")
+        return []
+
+    try:
+        document = parse(output)
+        for depth in range(6):
+            nodes = pending_nodes(document)
+            if not nodes:
+                return is_search_capacity_failure(json.dumps(document), resource_id)
+            if depth == 5:
+                return False
+            for node in nodes:
+                target = node["target"]
+                if target.lower() in visited or len(visited) >= 10:
+                    return False
+                visited.add(target.lower())
+                name = deployment_pattern.fullmatch(target)[1]
+                result = subprocess.run(
+                    [az, "deployment", "group", "show", "--subscription", scope[1],
+                     "--resource-group", scope[2], "--name", name,
+                     "--query", "properties.error", "--output", "json", "--only-show-errors"],
+                    capture_output=True, text=True, check=False,
+                )
+                if (result.returncode or result.stderr.strip() or TERMINAL_ERROR.search(result.stdout)
+                        or SEARCH_DOWNSTREAM_ERROR.search(result.stdout)):
+                    return False
+                error = parse(result.stdout)
+                pending_nodes(error)
+                node["details"] = [error]
+        return False
+    except (OSError, ValueError, KeyError):
+        return False
 
 
 def execute_deployment(args: argparse.Namespace, az: str, parameters: dict,
@@ -312,18 +442,39 @@ def search_identity(args: argparse.Namespace, az: str, parameters: dict) -> str:
 
 def resource_not_found(message: str) -> bool:
     text = message.strip()
+
     try:
-        payload = json.loads(re.sub(r"^ERROR:\s*", "", text))
+        payload = json.loads(re.sub(r"^ERROR:\s*", "", text), object_pairs_hook=unique_error_object,
+                             parse_constant=invalid_error_constant)
     except json.JSONDecodeError:
         # Never recover a code fragment from a truncated or mixed JSON response.
         if re.search(r"[\{\}\[\]]", text):
             return False
+        if not re.fullmatch(
+            r"(?:ERROR:\s*)?(?:\(ResourceNotFound\)[^\r\n]*|Code:\s*ResourceNotFound)"
+            r"(?:\r?\n(?:Code:\s*ResourceNotFound|Message:[^\r\n]*|"
+            r"HTTP(?:/\d(?:\.\d)?)?\s+\d{3}[^\r\n]*|"
+            r"Status(?: Code|_code)?\s*[:=]\s*\d{3}[^\r\n]*))*",
+            text,
+        ):
+            return False
         codes = [code for match in re.findall(
-            r"(?m)^\s*(?:ERROR:\s*)?(?:\(([A-Za-z][A-Za-z0-9]+)\)|Code:\s*([A-Za-z][A-Za-z0-9]+))", text
+            r"\(([A-Za-z][A-Za-z0-9]+)\)|\bCode:\s*([A-Za-z][A-Za-z0-9]+)", text
         ) for code in match if code]
         statuses = re.findall(r"\b(?:HTTP(?:/\d(?:\.\d)?)?\s+|[Ss]tatus(?:\s+[Cc]ode|_code)?\s*[:=]\s*)(\d{3})\b", text)
+    except ValueError:
+        return False
     else:
         if not isinstance(payload, dict):
+            return False
+        error = payload.get("error", payload)
+        if not isinstance(error, dict) or error.get("code") != "ResourceNotFound":
+            return False
+        if "message" in error and not isinstance(error["message"], str):
+            return False
+        if "details" in error and (not isinstance(error["details"], list) or any(
+                not isinstance(detail, dict) or detail.get("code") != "ResourceNotFound"
+                for detail in error["details"])):
             return False
         codes, statuses = [], []
 
@@ -373,29 +524,19 @@ def run_search_regions(args: argparse.Namespace, az: str, template: dict, dynami
                        selected: str, configured: str, retry: str, suffix: str) -> int:
     primary = env_value(environment, "aiSearchLocation", "AI_SEARCH_LOCATION") or args.location
     candidates = search_candidate_order(primary, regions, selected, configured, retry)
-    if normalize_search_location(primary) in regions:
-        print("Primary Search region is also in the fallback list; omitting its redundant regional attempt.", flush=True)
     initial_parameters = deployment_parameters(template, dynamic, environment, overrides)
     resource_id = search_identity(args, az, initial_parameters)
-    existing = read_search(az, resource_id)
-    bound_location = normalize_search_location(existing["location"]) if existing else None
-    if existing:
-        actual = normalize_search_location(existing["location"])
-        print(f"Existing Search service retained in {actual}; relocation is disabled.", flush=True)
-        candidates = search_candidate_order(actual, [], selected, configured, retry)
+    context = search_context(args, environment, resource_id, primary, selected, configured, retry, regions)
+    if json.loads(env_value(environment, SEARCH_CONTEXT) or "null") != {**context, "bound": None}:
+        raise ValueError("Search regional fallback context changed or was not armed by this primary identity.")
+    publish(args.provider, SERVICES["ai-search"].state, "failed")
+    if read_search(az, resource_id):
+        raise ValueError("Search name is now bound; refusing regional fallback. Never delete an existing service.")
     for index, (location, sku) in enumerate(candidates):
-        if index:
-            print("Previous capacity attempt failed; waiting 240 seconds before retry.", flush=True)
-            time.sleep(240)
-            current = read_search(az, resource_id)
-            if current:
-                bound_location = normalize_search_location(current["location"])
-                state = str(current["properties"].get("provisioningState", "")).lower()
-                if bound_location != location or (not existing and state not in ("failed", "canceled")):
-                    print(f"Search name is now bound to {bound_location} ({state or 'unknown state'}). "
-                          "Safe stop: inspect the service and failed deployment; never delete indexed services "
-                          "to enable fallback.", file=sys.stderr)
-                    return deployment.returncode
+        print("Previous capacity attempt failed; waiting 240 seconds before retry.", flush=True)
+        time.sleep(240)
+        if read_search(az, resource_id):
+            raise ValueError("Search name is now bound after retry delay; refusing regional fallback. Never delete it.")
         print(f"ai-search: attempt {index + 1}/{len(candidates)}, region {location}, SKU {sku}.", flush=True)
         attempt_overrides = {**overrides, "aiSearchLocation": location, "skuAISearch" + suffix: sku}
         parameters = deployment_parameters(template, dynamic, environment, attempt_overrides)
@@ -410,31 +551,30 @@ def run_search_regions(args: argparse.Namespace, az: str, template: dict, dynami
             publish(args.provider, "aiSearchLocation", location)
             return 0
         publish(args.provider, SERVICES["ai-search"].state, "failed")
-        if not is_search_capacity_failure(deployment.stdout + "\n" + deployment.stderr, resource_id):
+        if not search_capacity_failure_with_readback(az, deployment.stdout + "\n" + deployment.stderr, resource_id):
             return deployment.returncode
-        bound = existing or read_search(az, resource_id)
+        bound = read_search(az, resource_id)
         if bound:
             actual = normalize_search_location(bound["location"])
-            bound_location = actual
-            state = str(bound["properties"].get("provisioningState", "")).lower()
-            moving = index + 1 < len(candidates) and candidates[index + 1][0] != actual
-            if moving or (not existing and state not in ("failed", "canceled")):
-                print(f"Search name is bound to {actual} ({state or 'unknown state'}). "
-                      "Safe stop: inspect the named service and failed deployment, then rerun in its actual region; "
-                      "never delete an existing indexed service to enable fallback.", file=sys.stderr)
-                return deployment.returncode
-        if bound_location and index + 1 < len(candidates) and candidates[index + 1][0] != bound_location:
-            print(f"Search name was observed bound to {bound_location}; refusing relocation even if a later read "
-                  "reports absence. Inspect the deployment and rerun safely; never delete indexed services.",
-                  file=sys.stderr)
+            print(f"Search name is bound to {actual}; inspect the failed deployment and rerun in its actual region; "
+                  "never delete an existing indexed service to enable fallback.", file=sys.stderr)
             return deployment.returncode
         if index + 1 == len(candidates):
             print("AI Search capacity candidates exhausted; no downstream deployment is allowed.", file=sys.stderr)
-            if bound_location:
-                print(f"The Search name remains bound to {bound_location}; inspect the failed deployment and rerun "
-                      "in that region. Never delete an indexed service to enable fallback.", file=sys.stderr)
             return deployment.returncode
     raise ValueError("No Search capacity candidates were configured.")
+
+
+def search_context(args, environment, resource_id, primary, selected, configured, retry, regions):
+    return {
+        "resourceId": resource_id.lower(), "primary": normalize_search_location(primary),
+        "subscription": args.subscription.lower(), "deployment": args.deployment_name,
+        "environment": env_value(environment, "dev_test_prod", "env"),
+        "run": [env_value(environment, name) or "" for name in
+                ("BUILD_BUILDID", "SYSTEM_JOBID", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_JOB")],
+        "skus": [sku.lower() for sku in candidate_order(selected, configured, retry)],
+        "regions": [region for region in regions if region != normalize_search_location(primary)],
+    }
 
 
 def postgresql_tier(sku: str) -> str:
@@ -537,10 +677,14 @@ def run_attempt(args: argparse.Namespace) -> int:
         retry,
     )
     regions = []
+    regional = getattr(args, "search_region_fallback", False)
     if args.service == "ai-search":
         regions = search_regions_from_environment(environment)
-        if regions and args.attempt != 1:
-            raise ValueError("Search regional mode runs only in its first CI step; later attempts are not armed.")
+        primary = normalize_search_location(env_value(environment, "aiSearchLocation", "AI_SEARCH_LOCATION") or args.location)
+        regions = [region for region in regions if region != primary]
+    if regional and (args.service != "ai-search" or args.attempt != 1 or not regions
+                     or env_value(environment, service.state) != SEARCH_PENDING):
+        raise ValueError("Search regional fallback is not armed by primary capacity exhaustion and a nonempty fallback list.")
     if args.attempt > len(candidates):
         raise ValueError("Attempt exceeds the configured capacity candidates.")
     if args.attempt > 1 and env_value(environment, service.state) != str(args.attempt):
@@ -579,21 +723,40 @@ def run_attempt(args: argparse.Namespace) -> int:
         return build.returncode
     template = json.loads(build.stdout)
     dynamic = json.loads(Path(args.parameters_file).read_text(encoding="utf-8-sig"))
-    if regions:
+    if regional:
         return run_search_regions(args, az, template, dynamic, environment, overrides, regions,
                                   selected, service.default_array if configured is None else configured,
                                   retry, suffix)
     parameters = deployment_parameters(template, dynamic, environment, overrides)
     search_id = None
+    context = None
+    bound_location = None
     if args.service == "ai-search":
         search_id = search_identity(args, az, parameters)
         existing = read_search(az, search_id)
-        primary = env_value(environment, "aiSearchLocation", "AI_SEARCH_LOCATION") or args.location
-        overrides["aiSearchLocation"] = normalize_search_location(existing["location"] if existing else primary)
+        context = search_context(args, environment, search_id, primary, selected,
+                                 service.default_array if configured is None else configured, retry, regions)
+        previous = json.loads(env_value(environment, SEARCH_CONTEXT) or "null") if args.attempt > 1 else None
+        if previous is not None:
+            if not isinstance(previous, dict) or {key: value for key, value in previous.items() if key != "bound"} != context:
+                raise ValueError("Search primary retry context changed; refusing a different identity or configuration.")
+            bound_location = previous.get("bound")
+        elif regions and args.attempt > 1:
+            raise ValueError("Search primary retry context is not armed.")
+        actual = normalize_search_location(existing["location"]) if existing else None
+        if bound_location and actual != bound_location:
+            raise ValueError("Previously bound Search name disappeared or changed region; never recreate or relocate it.")
+        bound_location = actual or bound_location
+        overrides["aiSearchLocation"] = bound_location or primary
         parameters = deployment_parameters(template, dynamic, environment, overrides)
     if args.attempt > 1:
         print("Previous capacity attempt failed; waiting 240 seconds before retry.", flush=True)
         time.sleep(240)
+        if search_id:
+            current = read_search(az, search_id)
+            actual = normalize_search_location(current["location"]) if current else None
+            if actual != bound_location:
+                raise ValueError("Search name binding changed after retry delay; refusing recreation or relocation.")
     print(f"{args.service}: attempt {args.attempt}/{len(candidates)}, SKU {candidate}.", flush=True)
     deployment = execute_deployment(args, az, parameters)
     if deployment.stdout:
@@ -609,10 +772,31 @@ def run_attempt(args: argparse.Namespace) -> int:
             publish(args.provider, "skuTierPostgreSQL" + suffix, overrides["skuTierPostgreSQL" + suffix])
         return 0
     output = deployment.stdout + "\n" + deployment.stderr
-    capacity_failure = is_search_capacity_failure(output, search_id) if search_id else is_capacity_failure(output)
+    capacity_failure = search_capacity_failure_with_readback(az, output, search_id) if search_id else is_capacity_failure(output)
+    if search_id and capacity_failure:
+        current = read_search(az, search_id)
+        actual = normalize_search_location(current["location"]) if current else None
+        if bound_location and actual != bound_location:
+            publish(args.provider, service.state, "failed")
+            print("Search name binding changed; never recreate or relocate an existing service.", file=sys.stderr)
+            return deployment.returncode
+        if current and not bound_location:
+            state = str(current["properties"].get("provisioningState", "")).lower()
+            if actual != overrides["aiSearchLocation"] or state not in ("failed", "canceled") or args.attempt == len(candidates):
+                publish(args.provider, service.state, "failed")
+                print("Search name is now bound; inspect the partial deployment and never delete it for fallback.", file=sys.stderr)
+                return deployment.returncode
+            bound_location = actual
     if capacity_failure and args.attempt < len(candidates):
         print(f"Capacity unavailable for {candidate}; next configured SKU will be attempted.", flush=True)
+        if context and (regions or bound_location):
+            publish(args.provider, SEARCH_CONTEXT, json.dumps({**context, "bound": bound_location}, separators=(",", ":")))
         publish(args.provider, service.state, str(args.attempt + 1))
+        return 0
+    if search_id and capacity_failure and regions and not bound_location:
+        publish(args.provider, SEARCH_CONTEXT, json.dumps({**context, "bound": None}, separators=(",", ":")))
+        publish(args.provider, service.state, SEARCH_PENDING)
+        print("Primary Search capacity exhausted; fallback pending, not provisioned or ready.", flush=True)
         return 0
     publish(args.provider, service.state, "failed")
     print(f"{args.service} deployment failed; no further capacity attempt is allowed.", file=sys.stderr)
@@ -627,7 +811,13 @@ def main() -> int:
         args = parser.parse_args()
         try:
             regions = search_regions_from_environment({name.upper(): value for name, value in os.environ.items()})
+            primary = normalize_search_location(env_value(
+                {name.upper(): value for name, value in os.environ.items()}, "aiSearchLocation", "AI_SEARCH_LOCATION",
+                "admin_location", "location") or "")
+            regions = [region for region in regions if region != primary]
             publish(args.provider, "AIF_AISEARCH_REGION_FALLBACK_ENABLED", str(bool(regions)).lower())
+            publish(args.provider, SERVICES["ai-search"].state, "0")
+            publish(args.provider, SEARCH_CONTEXT, "")
             return 0
         except (OSError, ValueError, KeyError) as error:
             print(f"AI Search region configuration error: {error}", file=sys.stderr)
@@ -669,7 +859,9 @@ def main() -> int:
             return 2
     parser.add_argument("--service", choices=SERVICES, required=True)
     parser.add_argument("--attempt", type=int, choices=(1, 2, 3), required=True,
-                        help="CI SKU step; Search regional retries complete inside step 1.")
+                        help="Primary CI SKU step (at most three).")
+    parser.add_argument("--search-region-fallback", action="store_true",
+                        help="Try only configured fallback regions after validated primary capacity exhaustion.")
     parser.add_argument("--provider", choices=("ado", "github"), required=True)
     parser.add_argument("--template-file", required=True)
     parser.add_argument("--parameters-file", required=True)

@@ -34,13 +34,32 @@ repeated in the fallback list is omitted from subsequent attempts. Each region
 tries the selected SKU first, then remaining configured SKUs when
 `aisearchRetryCapcityArray` is enabled. That historical switch controls SKU
 changes only: a nonempty region array independently opts into regional recovery.
-At most six regions by three SKUs (18 creation attempts) run with the existing
-240-second retry delay. A local normalization step publishes
+The ordinary primary provisioning task and its two conditional SKU-retry tasks
+always run first, with at most three primary attempts. Only their qualifying
+capacity exhaustion can arm the separate regional task. That task tries **only**
+the configured fallback array, in its exact order (for example Denmark then
+Italy when configured that way); it never prepends or retries the primary.
+There are at most five fallback regions by three SKUs (15 regional attempts),
+18 attempts in total, with the existing 240-second retry delay.
+A local normalization step publishes
 `AIF_AISEARCH_REGION_FALLBACK_ENABLED` for the current environment. `[]` or blank
 skips the separate ADO/GHA `63b-ai-search-region-fallback` task entirely and
 retains ordinary Search provisioning/networking and the existing three SKU
-steps. Nonempty lists select that regional task instead of the ordinary SKU
-steps; terminal failure/exhaustion never arms them.
+steps. A nonempty list alone does not run the regional task: primary success
+skips it, as do lists containing only the primary region. Terminal or mixed
+errors fail immediately rather than arming any retry.
+
+`AIF_AISEARCH_CAPACITY_NEXT=primary-capacity-exhausted` is an explicit pending
+state, not provisioned/ready success. It is published only after qualifying
+primary capacity failure and a fresh exact-resource read proving absence.
+`AIF_AISEARCH_PRIMARY_CONTEXT` binds the pending state to the resolved resource
+ID, primary region, environment, deployment, CI run/job, SKU policy and ordered
+effective fallback list. The regional command requires both that state and a
+matching context; stale/manual invocations, changed names and existing services
+are refused. The gate step clears prior-run state. The regional task rechecks
+absence before and after its retry delay, and after each capacity failure.
+Upgrade copied ADO/GHA task templates together with the runner: older mutually
+exclusive regional-task templates do not implement this split-task state contract.
 
 The runner first resolves the exact resource ID through the shared Bicep naming
 and context modules using `capacityIdentityOnly` (deployment metadata and
@@ -55,6 +74,12 @@ deletes resources, and directs operators to inspect the failed deployment.
 Nested `InsufficientResourcesAvailable` is capacity; mixed, authorization,
 policy, template, quota and unknown errors are terminal. Private endpoint/shared
 link failures must not trigger Search relocation.
+When CLI output contains a known `ResourceDeploymentFailure` wrapper without its
+actual leaf error, the runner can read `properties.error` from that wrapper's
+explicit group deployment target, only in the exact Search subscription/RG.
+Readback is read-only and bounded to five nested levels and ten total reads;
+missing targets, cycles, denied/malformed responses, mixed errors and non-Search
+targets fail closed. A capacity hint in a wrapper message alone is not proof.
 
 Only the Search service region changes. Subscription deployment `--location`,
 RG/naming, project VNet, inbound private endpoint, DNS governance, shared-link

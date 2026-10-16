@@ -43,22 +43,41 @@ The maintained infrastructure path is Bicep-first, invoked through provider temp
 
 Foundation resolves common/project scopes, private DNS routing and managed identities. `centralDnsZoneByPolicyInHub` changes whether zone creation is local or delegated to central governance; explicit DNS subscription/resource-group parameters can differ from project placement. Private endpoint creation alone does not prove name resolution, connectivity or caller data-plane authorization.
 
-Search provisioning recovery (source reviewed at `6e29e663` plus this working tree,
-2026-10-15): the Dev and StageProd fallback-location arrays both default in order
+Search provisioning recovery (source reviewed at `e33addf7` plus this working tree,
+2026-10-16): the Dev and StageProd fallback-location arrays both default in order
 to `francecentral`, `denmarkeast`, `italynorth`, `norwayeast`, `germanywestcentral`
-(Germany last), with at most five additional regions. The isolated runner tries
-region-major selected-first SKU combinations (maximum 18), while the legacy SKU
-switch controls SKU changes only. Local normalization publishes the environment's
+(Germany last), with at most five additional regions. Ordinary Search primary
+provisioning and its conditional SKU retries always precede the separate regional
+task (at most three primary attempts). Only validated primary capacity exhaustion
+arms regional fallback, which tries only the configured array in order, excluding
+the primary without reordering the others. Regional attempts are region-major,
+selected-first SKU combinations (maximum 15 regional, 18 total), while the legacy
+SKU switch controls SKU changes only. Local normalization publishes the environment's
 `AIF_AISEARCH_REGION_FALLBACK_ENABLED` task gate. Explicit empty/blank and missing
 runtime arrays skip the separate regional-fallback task and retain ordinary
-Search/private-network provisioning through the three CI SKU steps. Nonempty
-arrays select the regional task instead; invalid arrays fail before it. Exact identity
+Search/private-network provisioning through the three CI SKU steps. Primary success
+skips fallback even with a nonempty list; invalid arrays fail before provisioning.
+The explicit `primary-capacity-exhausted` pending state is not readiness or
+provisioned success, and its context binds exact resource identity, primary region,
+environment, deployment, CI run/job, SKU policy and ordered fallback list across
+tasks. The regional command rejects missing/stale/mismatched state and any existing
+name binding. Absence is checked after capacity failure and again after the
+retry delay; a partial binding blocks relocation without deletion (failed/canceled
+primary bindings can retain same-region SKU retries). Exact identity
 comes from the same output-only naming/context modules before a direct resource
 read; denied reads are not absence, existing services retain actual placement
 without freezing the explicitly configured scalar SKU or its retry policy,
 and partial name binding prevents relocation without resource deletion. Nested
 Search capacity errors alone permit retry; downstream endpoint errors and mixed
-terminal errors do not. Effective location/SKU are CI state, never rewritten
+terminal errors do not. Leaf-less `ResourceDeploymentFailure` wrappers can be
+expanded through read-only group-deployment `properties.error` reads only for
+explicit targets in the exact Search subscription/RG (at most five levels and
+ten reads). Missing/foreign targets, cycles, malformed/denied reads, unknown or
+mixed terminal evidence fail closed; wrapper message hints alone are not proof.
+The enclosing subscription-deployment error target is accepted only within the
+same subscription; it remains a wrapper, not a capacity signal or a readback
+target. The underlying Search/group-deployment evidence must still qualify.
+Effective location/SKU are CI state, never rewritten
 configuration. Service placement is distinct from subscription deployment metadata,
 project networking/PE/DNS, and shared-link target placement. Preflight checks
 configured Search regions, not project-region aliases; quota evidence remains

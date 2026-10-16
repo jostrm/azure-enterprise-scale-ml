@@ -138,7 +138,8 @@ def dynamic_parameters(path):
 
 def publications(provider, stdout, github_env):
     if provider == "ado":
-        return dict(re.findall(r"##vso\[task.setvariable variable=(\w+)\]([^\r\n]*)", stdout))
+        return {name: value.replace("%5D", "]").replace("%3B", ";").replace("%AZP25", "%")
+                for name, value in re.findall(r"##vso\[task.setvariable variable=(\w+)\]([^\r\n]*)", stdout)}
     return dict(
         line.split("=", 1) for line in github_env.read_text(encoding="utf-8").splitlines()
     ) if github_env.exists() else {}
@@ -149,6 +150,7 @@ def runtime(runner, workspace, monkeypatch, capsys):
     class Runtime:
         def __init__(self):
             self.calls, self.parameters, self.paths, self.sleeps = [], [], [], []
+            self.group_errors = {}
             self.env = environment("ai-search")
             self.github_env = workspace / "github-env"
             self.env["GITHUB_ENV"] = str(self.github_env)
@@ -173,6 +175,12 @@ def runtime(runner, workspace, monkeypatch, capsys):
                     return subprocess.CompletedProcess(command, *self.build_outcome)
                 template = parameter_definitions(Path(command[command.index("--file") + 1]))
                 return subprocess.CompletedProcess(command, 0, json.dumps(template), "")
+            if command[1:4] == ["deployment", "group", "show"]:
+                assert command[command.index("--subscription") + 1] == "unit-subscription"
+                assert command[command.index("--resource-group") + 1] == "rg"
+                assert command[command.index("--query") + 1] == "properties.error"
+                return subprocess.CompletedProcess(command, *self.group_errors.get(
+                    command[command.index("--name") + 1], (1, "", "UnknownFailure")))
             assert command[1:4] == ["deployment", "sub", "create"]
             parameter_arg = command[command.index("--parameters") + 1]
             assert parameter_arg.startswith("@") and command.count("--parameters") == 1
@@ -187,9 +195,10 @@ def runtime(runner, workspace, monkeypatch, capsys):
             assert PRIVATE_VALUE not in " ".join(command)
             return subprocess.CompletedProcess(command, *self.outcome)
 
-        def attempt(self, service="ai-search", provider="ado", attempt=1):
+        def attempt(self, service="ai-search", provider="ado", attempt=1, regional=False):
             args = argparse.Namespace(
                 service=service, provider=provider, attempt=attempt,
+                search_region_fallback=regional,
                 template_file=str(BICEP / "esml-genai-1" / SERVICES[service]["template"]),
                 parameters_file=str(self.dynamic), subscription="unit-subscription",
                 location="swedencentral", deployment_name="unit-deployment",
@@ -210,6 +219,326 @@ def runtime(runner, workspace, monkeypatch, capsys):
             self.env["GITHUB_ENV"] = str(self.github_env)
 
     return Runtime()
+
+
+def primary_attempts(runtime, provider="ado"):
+    for attempt in range(1, 4):
+        result = runtime.attempt(provider=provider, attempt=attempt)
+        if result[0] or result[1].get("AIF_AISEARCH_CAPACITY_NEXT") in ("0", "primary-capacity-exhausted"):
+            return result
+    return result
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
+def test_primary_exhaustion_is_pending_not_provisioned_then_denmark_italy(runtime, provider, target, suffix):
+    runtime.configure("ai-search", target)
+    runtime.env[("aiSearchFallbackLocationArray" + suffix).upper()] = '["denmarkeast","italynorth"]'
+    runtime.outcome = (19, "", "InsufficientResourcesAvailable")
+    for attempt in (1, 2, 3):
+        status, values, _ = runtime.attempt(provider=provider, attempt=attempt)
+        assert status == 0
+        assert values["AIF_AISEARCH_CAPACITY_NEXT"] == (str(attempt + 1) if attempt < 3 else "primary-capacity-exhausted")
+        assert "aiSearchLocation" not in values and "skuAISearch" + suffix not in values
+    assert len(runtime.parameters) == 3
+    status, values, _ = runtime.attempt(provider=provider, regional=True)
+    assert status == 19 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "failed"
+    assert [(p["aiSearchLocation"]["value"], p["skuAISearch" + suffix]["value"]) for p in runtime.parameters] == [
+        (region, sku) for region in ("swedencentral", "denmarkeast", "italynorth")
+        for sku in SERVICES["ai-search"]["order"]
+    ]
+    assert runtime.sleeps == [240] * 8
+
+
+def test_manual_regional_invocation_requires_validated_primary_failure(runtime):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "denmarkeast"
+    with pytest.raises(ValueError, match="not armed"):
+        runtime.attempt(regional=True)
+    assert runtime.parameters == []
+
+
+def search_deployment_wrapper(name="search-nested", group="rg", code="ResourceDeploymentFailure"):
+    return {"code": code, "target": (
+        f"/subscriptions/unit-subscription/resourceGroups/{group}/providers/Microsoft.Resources/deployments/{name}"
+    ), "message": "The resource write operation reached terminal provisioning state Failed."}
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
+def test_primary_and_regional_capacity_can_resolve_exact_search_rg_wrapper_errors(runtime, provider, target, suffix):
+    runtime.configure("ai-search", target)
+    runtime.env[("aiSearchFallbackLocationArray" + suffix).upper()] = "denmarkeast,italynorth"
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = "false"
+    runtime.outcome = (19, "", json.dumps({"error": {"code": "DeploymentFailed",
+                                                  "details": [search_deployment_wrapper()]}}))
+    runtime.group_errors["search-nested"] = (0, json.dumps(search_deployment_wrapper("search-inner")), "")
+    runtime.group_errors["search-inner"] = (0, json.dumps({"code": "InsufficientResourcesAvailable"}), "")
+    status, values, _ = runtime.attempt(provider=provider)
+    assert status == 0 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "primary-capacity-exhausted"
+    status, values, _ = runtime.attempt(provider=provider, regional=True)
+    assert status == 19 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "failed"
+    assert [p["aiSearchLocation"]["value"] for p in runtime.parameters] == [
+        "swedencentral", "denmarkeast", "italynorth",
+    ]
+    reads = [call[call.index("--name") + 1] for call in runtime.calls
+             if call[1:4] == ["deployment", "group", "show"]]
+    assert reads == ["search-nested", "search-inner"] * 3
+
+
+@pytest.mark.parametrize("complete", [False, True])
+@pytest.mark.parametrize("subscription", ["unit-subscription", "other-subscription"])
+def test_reported_subscription_deployment_envelope_preserves_capacity_evidence(runtime, complete, subscription):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "denmarkeast"
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = "false"
+    nested = search_deployment_wrapper()
+    if complete:
+        nested["details"] = [{"code": "DeploymentFailed", "details": [
+            {"code": "InsufficientResourcesAvailable"}]}]
+    else:
+        runtime.group_errors["search-nested"] = (0, json.dumps({"code": "InsufficientResourcesAvailable"}), "")
+    payload = {"status": "Failed", "error": {
+        "code": "DeploymentFailed",
+        "target": f"/subscriptions/{subscription}/providers/Microsoft.Resources/deployments/primary-search",
+        "details": [nested],
+    }}
+    runtime.outcome = (19, "", "ERROR: " + json.dumps(payload))
+    status, values, _ = runtime.attempt()
+    if subscription == "unit-subscription":
+        assert status == 0 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "primary-capacity-exhausted"
+    else:
+        assert status == 19 and values == {"AIF_AISEARCH_CAPACITY_NEXT": "failed"}
+    reads = [call for call in runtime.calls if call[1:4] == ["deployment", "group", "show"]]
+    assert len(reads) == int(subscription == "unit-subscription" and not complete)
+
+
+@pytest.mark.parametrize("payload", [
+    {"error": search_deployment_wrapper(group="other-rg")},
+    {"error": search_deployment_wrapper(code="DeploymentFailed")},
+    {"error": {"code": "ResourceDeploymentFailure"}},
+    {"error": {"code": "DeploymentFailed", "details": [search_deployment_wrapper(), {"code": "UnknownFailure"}]}},
+    {"error": {"code": "DeploymentFailed", "details": [search_deployment_wrapper(), {"code": "AuthorizationFailed"}]}},
+    {"error": {"code": "DeploymentFailed", "details": [search_deployment_wrapper(), {"code": "QuotaExceeded"}]}},
+    {"error": {"code": "ResourceDeploymentFailure", "target": (
+        "/subscriptions/other-sub/resourceGroups/rg/providers/Microsoft.Resources/deployments/search-nested")}},
+    {"error": {"code": "ResourceDeploymentFailure", "target": (
+        "/subscriptions/unit-subscription/resourceGroups/rg/providers/Microsoft.Resources/deployments/../escape")}},
+    {"error": search_deployment_wrapper("..")},
+])
+def test_untrusted_or_mixed_deployment_wrappers_never_trigger_readback_or_fallback(runtime, payload):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "denmarkeast"
+    runtime.outcome = (19, "", json.dumps(payload))
+    status, values, _ = runtime.attempt()
+    assert status == 19 and values == {"AIF_AISEARCH_CAPACITY_NEXT": "failed"}
+    assert not any(call[1:4] == ["deployment", "group", "show"] for call in runtime.calls)
+    assert len(runtime.parameters) == 1 and runtime.sleeps == []
+
+
+@pytest.mark.parametrize("outcome", [
+    (1, "", "AuthorizationFailed"),
+    (0, '{"code":"InsufficientResourcesAvailable"}', "AuthorizationFailed"),
+    (0, '{"code":"InsufficientResourcesAvailable"', ""),
+    (0, "null", ""),
+    (0, '[]', ""),
+    (0, '{"code":"UnknownFailure","code":"InsufficientResourcesAvailable"}', ""),
+    (0, '{"code":"AuthorizationFailed"}', ""),
+    (0, '{"code":"UnknownFailure"}', ""),
+    (0, '{"code":"DeploymentFailed"}', ""),
+    (0, '{"code":"DeploymentFailed","details":[{"code":"InsufficientResourcesAvailable"},{"code":"QuotaExceeded"}]}', ""),
+    (0, '{"code":"InsufficientResourcesAvailable","target":"Microsoft.Network/privateEndpoints/pe"}', ""),
+    (0, '{"code":"InsufficientResourcesAvailable","target":"Microsoft.CognitiveServices/accounts/other"}', ""),
+    (0, '{"code":"InsufficientResourcesAvailable","target":"/subscriptions/unit-subscription/resourceGroups/rg/providers/Microsoft.Search/searchServices/other"}', ""),
+    (0, json.dumps({**search_deployment_wrapper("search-inner"), "message": "AuthorizationFailed"}), ""),
+    (0, json.dumps({**search_deployment_wrapper("search-inner"), "message": "Private endpoint allocation failed."}), ""),
+])
+@pytest.mark.parametrize("regional", [False, True])
+def test_readback_denials_malformed_mixed_unknown_and_nonsearch_errors_are_terminal(runtime, outcome, regional):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "denmarkeast,italynorth"
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = "false"
+    if regional:
+        runtime.outcome = (19, "", "InsufficientResourcesAvailable")
+        runtime.attempt()
+    runtime.outcome = (19, "", json.dumps({"error": search_deployment_wrapper()}))
+    runtime.group_errors["search-nested"] = outcome
+    status, values, _ = runtime.attempt(regional=regional)
+    assert status == 19 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "failed"
+    assert "aiSearchLocation" not in values and "skuAISearchDev" not in values
+    assert len(runtime.parameters) == (2 if regional else 1)
+    assert runtime.sleeps == ([240] if regional else [])
+    assert sum(call[1:4] == ["deployment", "group", "show"] for call in runtime.calls) == 1
+
+
+@pytest.mark.parametrize("levels,expected,reads", [(1, True, 1), (5, True, 5), (6, False, 5)])
+def test_nested_error_readback_has_a_bounded_depth(runtime, runner, levels, expected, reads):
+    for index in range(levels):
+        error = search_deployment_wrapper(f"child-{index + 1}") if index + 1 < levels else {
+            "code": "InsufficientResourcesAvailable"}
+        runtime.group_errors[f"child-{index}"] = (0, json.dumps(error), "")
+    resource = "/subscriptions/unit-subscription/resourceGroups/rg/providers/Microsoft.Search/searchServices/search"
+    assert runner.search_capacity_failure_with_readback(
+        "offline-az", json.dumps({"error": search_deployment_wrapper("child-0")}), resource) is expected
+    assert sum(call[1:4] == ["deployment", "group", "show"] for call in runtime.calls) == reads
+
+
+def test_nested_error_readback_refuses_cycles(runtime, runner):
+    wrapper = search_deployment_wrapper()
+    runtime.group_errors["search-nested"] = (0, json.dumps(wrapper), "")
+    assert not runner.search_capacity_failure_with_readback(
+        "offline-az", json.dumps({"error": wrapper}),
+        "/subscriptions/unit-subscription/resourceGroups/rg/providers/Microsoft.Search/searchServices/search")
+    assert sum(call[1:4] == ["deployment", "group", "show"] for call in runtime.calls) == 1
+
+
+@pytest.mark.parametrize("count,expected,reads", [(10, True, 10), (11, False, 10)])
+def test_nested_error_readback_has_a_total_read_budget(runtime, runner, count, expected, reads):
+    for index in range(count):
+        runtime.group_errors[f"child-{index}"] = (0, '{"code":"InsufficientResourcesAvailable"}', "")
+    document = {"code": "DeploymentFailed", "details": [search_deployment_wrapper(f"child-{index}")
+                                                      for index in range(count)]}
+    assert runner.search_capacity_failure_with_readback(
+        "offline-az", json.dumps(document),
+        "/subscriptions/unit-subscription/resourceGroups/rg/providers/Microsoft.Search/searchServices/search") is expected
+    assert sum(call[1:4] == ["deployment", "group", "show"] for call in runtime.calls) == reads
+
+
+@pytest.mark.parametrize("has_target", [False, True])
+def test_wrapper_capacity_message_is_not_a_substitute_for_the_actual_error(runtime, has_target):
+    wrapper = search_deployment_wrapper()
+    wrapper["message"] = "InsufficientResourcesAvailable"
+    if not has_target:
+        wrapper.pop("target")
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "denmarkeast"
+    runtime.outcome = (19, "", json.dumps({"error": wrapper}))
+    runtime.group_errors["search-nested"] = (0, '{"code":"AuthorizationFailed"}', "")
+    status, values, _ = runtime.attempt()
+    assert status == 19 and values == {"AIF_AISEARCH_CAPACITY_NEXT": "failed"}
+    assert sum(call[1:4] == ["deployment", "group", "show"] for call in runtime.calls) == int(has_target)
+
+
+def test_resolved_capacity_on_an_existing_search_never_arms_regional_fallback(runtime, runner, monkeypatch):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "denmarkeast"
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = "false"
+    monkeypatch.setattr(runner, "read_search", lambda *args: {
+        "location": "westeurope", "properties": {"provisioningState": "Succeeded"},
+    })
+    runtime.outcome = (19, "", json.dumps({"error": search_deployment_wrapper()}))
+    runtime.group_errors["search-nested"] = (0, '{"code":"InsufficientResourcesAvailable"}', "")
+    status, values, _ = runtime.attempt()
+    assert status == 19 and values == {"AIF_AISEARCH_CAPACITY_NEXT": "failed"}
+    assert len(runtime.parameters) == 1 and runtime.parameters[0]["aiSearchLocation"]["value"] == "westeurope"
+
+
+@pytest.mark.parametrize("change", ["identity", "primary", "environment", "regions", "sku", "run", "missing", "malformed"])
+def test_regional_pending_context_rejects_stale_or_changed_inputs(runtime, runner, monkeypatch, change):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "denmarkeast,italynorth"
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = "false"
+    runtime.env["GITHUB_RUN_ID"] = "original-run"
+    runtime.outcome = (19, "", "InsufficientResourcesAvailable")
+    status, values, _ = runtime.attempt()
+    assert status == 0 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "primary-capacity-exhausted"
+    if change == "identity":
+        monkeypatch.setattr(runner, "search_identity", lambda *args: "/subscriptions/unit-subscription/resourceGroups/rg/providers/Microsoft.Search/searchServices/changed")
+    elif change == "primary":
+        runtime.env["AISEARCHLOCATION"] = "northeurope"
+    elif change == "environment":
+        runtime.env["DEV_TEST_PROD"] = "prod"
+        runtime.env["AISEARCHFALLBACKLOCATIONARRAYSTAGEPROD"] = "denmarkeast,italynorth"
+    elif change == "regions":
+        runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "italynorth,denmarkeast"
+    elif change == "sku":
+        runtime.env["SKUAISEARCHDEV"] = "basic"
+    elif change == "run":
+        runtime.env["GITHUB_RUN_ID"] = "new-run"
+    elif change == "missing":
+        runtime.env.pop("AIF_AISEARCH_PRIMARY_CONTEXT")
+    else:
+        runtime.env["AIF_AISEARCH_PRIMARY_CONTEXT"] = "{"
+    with pytest.raises(ValueError):
+        runtime.attempt(regional=True)
+    assert len(runtime.parameters) == 1 and runtime.sleeps == []
+
+
+@pytest.mark.parametrize("after_delay", [False, True])
+@pytest.mark.parametrize("state", ["Succeeded", "Failed", "Creating", "Canceled"])
+def test_pending_regional_refuses_any_existing_or_partially_bound_service(
+        runtime, runner, monkeypatch, after_delay, state):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "denmarkeast"
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = "false"
+    runtime.outcome = (19, "", "InsufficientResourcesAvailable")
+    runtime.attempt()
+    bound = {"location": "swedencentral", "properties": {"provisioningState": state}}
+    reads = iter([None, bound] if after_delay else [bound])
+    monkeypatch.setattr(runner, "read_search", lambda *args: next(reads))
+    with pytest.raises(ValueError, match="bound"):
+        runtime.attempt(regional=True)
+    assert len(runtime.parameters) == 1
+    assert runtime.sleeps == ([240] if after_delay else [])
+
+
+@pytest.mark.parametrize("retry", ["true", "false"])
+def test_regional_primary_duplicate_is_excluded_without_reordering(runtime, retry):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "denmarkeast,swedencentral,italynorth"
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = retry
+    runtime.outcome = (19, "", "InsufficientResourcesAvailable")
+    status, values, _ = primary_attempts(runtime)
+    assert status == 0 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "primary-capacity-exhausted"
+    count = len(runtime.parameters)
+    status, _, _ = runtime.attempt(regional=True)
+    assert status == 19
+    skus = SERVICES["ai-search"]["order"] if retry == "true" else ["standard"]
+    assert [(p["aiSearchLocation"]["value"], p["skuAISearchDev"]["value"]) for p in runtime.parameters[count:]] == [
+        (region, sku) for region in ("denmarkeast", "italynorth") for sku in skus
+    ]
+
+
+def test_primary_only_fallback_array_does_not_arm_a_regional_task(runtime):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = '["Sweden Central"]'
+    runtime.env["AISEARCHRETRYCAPCITYARRAY"] = "false"
+    runtime.outcome = (19, "", "InsufficientResourcesAvailable")
+    status, values, _ = runtime.attempt()
+    assert status == 19 and values == {"AIF_AISEARCH_CAPACITY_NEXT": "failed"}
+
+
+@pytest.mark.parametrize("regions", ["[]", "denmarkeast"])
+@pytest.mark.parametrize("after_delay", [False, True])
+def test_existing_primary_binding_must_not_disappear_or_change_between_tasks(
+        runtime, runner, monkeypatch, regions, after_delay):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = regions
+    bound = {"location": "westeurope", "properties": {"provisioningState": "Succeeded"}}
+    monkeypatch.setattr(runner, "read_search", lambda *args: bound)
+    runtime.outcome = (19, "", "InsufficientResourcesAvailable")
+    status, values, _ = runtime.attempt()
+    assert status == 0 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "2"
+    reads = iter([bound, None] if after_delay else [None])
+    monkeypatch.setattr(runner, "read_search", lambda *args: next(reads))
+    with pytest.raises(ValueError, match="binding changed|Previously bound"):
+        runtime.attempt(attempt=2)
+    assert len(runtime.parameters) == 1
+    assert runtime.parameters[0]["aiSearchLocation"]["value"] == "westeurope"
+
+
+@pytest.mark.parametrize("exists", ["true", "false"])
+def test_original_aisearch_exists_flag_is_preserved_for_network_dns_and_cmk(runtime, exists):
+    runtime.env["AISEARCHEXISTS"] = exists
+    status, _, _ = runtime.attempt()
+    assert status == 0
+    assert runtime.parameters[-1]["aiSearchExists"]["value"] is (exists == "true")
+
+
+@pytest.mark.parametrize("regions", ["[]", "denmarkeast"])
+@pytest.mark.parametrize("state", ["Failed", "Canceled"])
+def test_partial_primary_binding_allows_only_same_region_sku_updates(runtime, runner, monkeypatch, regions, state):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = regions
+    bound = {"location": "swedencentral", "properties": {"provisioningState": state}}
+    reads = iter([None, bound])
+    monkeypatch.setattr(runner, "read_search", lambda *args: next(reads, bound))
+    runtime.outcome = (19, "", "InsufficientResourcesAvailable")
+    status, values, _ = primary_attempts(runtime)
+    assert status == 19 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "failed"
+    assert len(runtime.parameters) == 3 and runtime.sleeps == [240, 240]
+    assert [p["skuAISearchDev"]["value"] for p in runtime.parameters] == SERVICES["ai-search"]["order"]
+    assert all(p["aiSearchLocation"]["value"] == "swedencentral" for p in runtime.parameters)
+    with pytest.raises(ValueError, match="not armed"):
+        runtime.attempt(regional=True)
 
 
 @pytest.mark.parametrize("service", SERVICES)
@@ -612,15 +941,14 @@ def test_sixth_search_fallback_is_rejected_before_azure(runtime, suffix):
 def test_search_region_candidates_are_region_major_and_independent_of_sku_switch(runner):
     assert runner.search_candidate_order("East US 2", '["eastus2","West Europe"]',
                                          "standard", "basic,standard,standard2", "true") == [
-        ("eastus2", "standard"), ("eastus2", "basic"), ("eastus2", "standard2"),
         ("westeurope", "standard"), ("westeurope", "basic"), ("westeurope", "standard2"),
     ]
     assert runner.search_candidate_order("eastus2", "westeurope", "standard", "unused", "false") == [
-        ("eastus2", "standard"), ("westeurope", "standard"),
+        ("westeurope", "standard"),
     ]
     assert runner.search_candidate_order("France Central", SEARCH_FALLBACK_REGIONS,
                                          "standard", "basic,standard,standard2", "true") == [
-        (region, sku) for region in SEARCH_FALLBACK_REGIONS
+        (region, sku) for region in SEARCH_FALLBACK_REGIONS[1:]
         for sku in ["standard", "basic", "standard2"]
     ]
 
@@ -639,7 +967,9 @@ def test_search_regional_driver_exhausts_primary_then_publishes_effective_locati
             runtime.outcome = (9, "", '{"error":{"code":"InsufficientResourcesAvailable"}}') if len(runtime.parameters) < 3 else (0, "", "")
         return original(command, **kwargs)
     monkeypatch.setattr(runner.subprocess, "run", azure)
-    status, values, _ = runtime.attempt(provider=provider)
+    primary_status, pending, _ = primary_attempts(runtime, provider)
+    assert primary_status == 0 and pending["AIF_AISEARCH_CAPACITY_NEXT"] == "primary-capacity-exhausted"
+    status, values, _ = runtime.attempt(provider=provider, regional=True)
     assert status == 0 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "0"
     assert values["aiSearchLocation"] == "westeurope"
     assert values["skuAISearch" + suffix] == "standard"
@@ -659,11 +989,11 @@ def test_existing_search_is_never_relocated(runtime, runner, monkeypatch, existi
     monkeypatch.setattr(runner, "search_identity", lambda *args: "search-id")
     monkeypatch.setattr(runner, "read_search", lambda *args: existing)
     runtime.outcome = (9, "", "InsufficientResourcesAvailable")
-    status, values, captured = runtime.attempt()
+    status, values, captured = primary_attempts(runtime)
     assert status == 9 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "failed"
     assert len(runtime.parameters) == 3
     assert all(p["aiSearchLocation"]["value"] == "westeurope" for p in runtime.parameters)
-    assert "never delete" in captured.err.lower()
+    assert values["AIF_AISEARCH_CAPACITY_NEXT"] != "primary-capacity-exhausted"
 
 
 def test_search_partial_creation_stops_before_relocation(runtime, runner, monkeypatch):
@@ -695,8 +1025,10 @@ def test_regional_search_exhaustion_and_terminal_failures_never_arm_legacy_steps
     monkeypatch.setattr(runner, "search_identity", lambda *args: "search-id")
     monkeypatch.setattr(runner, "read_search", lambda *args: None)
     runtime.outcome = (19, "", error)
-    status, values, captured = runtime.attempt(provider=provider)
-    assert status == 19 and values == {"AIF_AISEARCH_CAPACITY_NEXT": "failed"}
+    status, values, captured = primary_attempts(runtime, provider)
+    if status == 0:
+        status, values, captured = runtime.attempt(provider=provider, regional=True)
+    assert status == 19 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "failed"
     assert len(runtime.parameters) == attempts and runtime.sleeps == [240] * (attempts - 1)
     expected = [(region, sku) for region in ["swedencentral", *SEARCH_FALLBACK_REGIONS]
                 for sku in SERVICES["ai-search"]["order"]]
@@ -704,7 +1036,7 @@ def test_regional_search_exhaustion_and_terminal_failures_never_arm_legacy_steps
             for p in runtime.parameters] == expected[:attempts]
     assert all(p["location"]["value"] == "swedencentral" for p in runtime.parameters)
     if attempts == 18:
-        assert "attempt 18/18" in captured.out
+        assert "attempt 15/15" in captured.out
         assert "candidates exhausted" in captured.err
 
 
@@ -732,7 +1064,9 @@ def test_region_only_search_ignores_malformed_sku_arrays(runtime, runner, monkey
     monkeypatch.setattr(runner, "search_identity", lambda *args: "search-id")
     monkeypatch.setattr(runner, "read_search", lambda *args: None)
     runtime.outcome = (19, "", "InsufficientResourcesAvailable")
-    status, _, _ = runtime.attempt()
+    status, _, _ = primary_attempts(runtime)
+    assert status == 0
+    status, _, _ = runtime.attempt(regional=True)
     assert status == 19
     assert [(p["aiSearchLocation"]["value"], p["skuAISearchDev"]["value"]) for p in runtime.parameters] == [
         (region, "standard") for region in ["swedencentral", *SEARCH_FALLBACK_REGIONS]
@@ -744,15 +1078,16 @@ def test_delayed_search_name_binding_is_rechecked_after_retry_delay(runtime, run
     runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "westeurope"
     runtime.env["AISEARCHRETRYCAPCITYARRAY"] = "false"
     monkeypatch.setattr(runner, "search_identity", lambda *args: "search-id")
-    reads = iter([None, None, {
+    reads = iter([None, None, None, {
         "location": "swedencentral", "properties": {"provisioningState": "failed"},
     }])
     monkeypatch.setattr(runner, "read_search", lambda *args: next(reads))
     runtime.outcome = (19, "", "InsufficientResourcesAvailable")
-    status, values, captured = runtime.attempt()
-    assert status == 19 and len(runtime.parameters) == 1
-    assert runtime.sleeps == [240] and values["AIF_AISEARCH_CAPACITY_NEXT"] == "failed"
-    assert "bound" in captured.err.lower()
+    status, values, _ = runtime.attempt()
+    assert status == 0 and values["AIF_AISEARCH_CAPACITY_NEXT"] == "primary-capacity-exhausted"
+    with pytest.raises(ValueError, match="bound after retry delay"):
+        runtime.attempt(regional=True)
+    assert len(runtime.parameters) == 1 and runtime.sleeps == [240]
 
 
 def test_private_endpoint_capacity_is_not_search_region_exhaustion(runner):
@@ -852,6 +1187,17 @@ def test_exact_search_get_is_required_before_any_search_creation(
     '{"statusCode":404}', "HTTP 404 Not Found",
     "(ResourceNotFound) Missing.\nCode: AuthorizationFailed",
     "(ResourceNotFound) Missing.\nHTTP 500 Internal Server Error",
+    "(ResourceNotFound) Missing. (UnexpectedError) Something else failed.",
+    "(ResourceNotFound) Missing.\nUnexpected failure",
+    "unrelated output\n(ResourceNotFound) Missing.",
+    '{"error":{"code":"UnknownFailure","code":"ResourceNotFound"}}',
+    '{"error":{"code":"ResourceNotFound"},"unexpected":NaN}',
+    "(ResourceNotFound) Missing.\nHTTP nonsense",
+    '{"metadata":{"code":"ResourceNotFound"}}',
+    '{"error":[{"code":"ResourceNotFound"}]}',
+    '{"error":{"code":"ResourceNotFound","message":[]}}',
+    '{"error":{"code":"ResourceNotFound","details":"UnknownFailure"}}',
+    '{"error":{"code":"ResourceNotFound","details":[{"message":"Unknown failure"}]}}',
 ])
 def test_search_read_denial_is_not_absence(runtime, runner, monkeypatch, error):
     monkeypatch.setattr(runner.subprocess, "run", lambda command, **kwargs:
@@ -870,6 +1216,24 @@ def test_search_read_accepts_only_complete_explicit_not_found(runner, monkeypatc
     monkeypatch.setattr(runner.subprocess, "run", lambda command, **kwargs:
                         subprocess.CompletedProcess(command, 1, "", error))
     assert runner.read_search("offline-az", "search-id") is None
+
+
+@pytest.mark.parametrize("error", [
+    '{"error":{"code":"InsufficientResourcesAvailable"',
+    '{"error":{"code":"InsufficientResourcesAvailable"}}\nCode: UnknownFailure',
+    '{"error":{"code":"InsufficientResourcesAvailable"}}\n(UnexpectedError) Failed',
+    "InsufficientResourcesAvailable\nUnknownFailure",
+    "InsufficientResourcesAvailable\nCode: UnknownFailure",
+    '{"error":{"code":"UnknownFailure","code":"InsufficientResourcesAvailable"}}',
+    '{"error":{"code":"InsufficientResourcesAvailable"},"unexpected":NaN}',
+    '{"error":{"code":"InsufficientResourcesAvailable","details":[{"message":"Unknown failure"}]}}',
+])
+def test_malformed_or_mixed_primary_errors_do_not_arm_fallback(runtime, error):
+    runtime.env["AISEARCHFALLBACKLOCATIONARRAYDEV"] = "denmarkeast"
+    runtime.outcome = (19, "", error)
+    status, values, _ = runtime.attempt()
+    assert status == 19 and values == {"AIF_AISEARCH_CAPACITY_NEXT": "failed"}
+    assert len(runtime.parameters) == 1 and runtime.sleeps == []
 
 
 def test_private_foundry_search_dependency_is_not_disabled(runtime):
@@ -953,7 +1317,7 @@ def allowed(step, provider, env, phase="infra", success=True):
 
 @pytest.mark.parametrize("service", SERVICES)
 @pytest.mark.parametrize("provider", ["ado", "github"])
-@pytest.mark.parametrize("state", ["", "0", "2", "3", "failed"])
+@pytest.mark.parametrize("state", ["", "0", "2", "3", "failed", "primary-capacity-exhausted"])
 def test_actual_conditions_arm_only_the_exact_next_step(service, provider, state):
     env = environment(service)
     env[SERVICES[service]["state"]] = state
@@ -1016,6 +1380,19 @@ def script_harness(workspace):
             print("(ResourceNotFound) Not found", file=sys.stderr)
             sys.exit(1)
         record = {"argv": args}
+        if args[:3] == ["deployment", "group", "show"]:
+            assert args[args.index("--subscription") + 1] == "unit-subscription"
+            assert args[args.index("--resource-group") + 1] == "rg"
+            assert args[args.index("--query") + 1] == "properties.error"
+            name = args[args.index("--name") + 1]
+            record["error_read"] = name
+            with (root / "az.jsonl").open("a", encoding="utf-8") as output:
+                output.write(json.dumps(record) + "\\n")
+            errors = json.loads(os.environ.get("CAPACITY_TEST_GROUP_ERRORS", "{}"))
+            if name not in errors:
+                sys.exit(1)
+            print(json.dumps(errors[name]))
+            sys.exit(0)
         if args[:2] == ["bicep", "build"]:
             name = pathlib.Path(args[args.index("--file") + 1]).name
             result = json.loads((root / "templates.json").read_text(encoding="utf-8"))[name]
@@ -1042,6 +1419,9 @@ def script_harness(workspace):
             creates = [json.loads(line) for line in (root / "az.jsonl").read_text(encoding="utf-8").splitlines()
                        if "parameters" in json.loads(line)]
             status = 0 if len(creates) == int(os.environ["CAPACITY_TEST_SUCCEED_AT"]) else 29
+            if len(creates) == int(os.environ.get("CAPACITY_TEST_TERMINAL_AT", "0")):
+                print(os.environ.get("CAPACITY_TEST_TERMINAL_ERROR", "AuthorizationFailed"), file=sys.stderr)
+                sys.exit(29)
         if status:
             print(os.environ.get("CAPACITY_TEST_ERROR", ""), file=sys.stderr)
         sys.exit(status)
@@ -1098,7 +1478,7 @@ def script_harness(workspace):
                 child_env.update({key.upper() if provider == "ado" else key: value for key, value in env.items()})
                 child_env.update({
                     "CAPACITY_TEST_ROOT": str(workspace), "CAPACITY_TEST_STATUS": "0" if attempt == succeed_at else "29",
-                    "CAPACITY_TEST_ERROR": "" if attempt == succeed_at else error,
+                    "CAPACITY_TEST_ERROR": error if env.get("CAPACITY_TEST_SUCCEED_AT") or attempt != succeed_at else "",
                     "GITHUB_ENV": str(workspace / "github-env"), "PYTHONIOENCODING": "utf-8",
                     "MSYS_NO_PATHCONV": "1",
                 })
@@ -1167,9 +1547,9 @@ def test_actual_ci_region_task_skip_and_enable_routing(
     assert len(script_harness.preparations) == 1
     assert script_harness.preparations[0].returncode == 0
     assert final["AIF_AISEARCH_REGION_FALLBACK_ENABLED"] == str(enabled).lower()
-    assert any("region-fallback" in name for name in script_harness.executed) is enabled
-    assert any("region-fallback" in name for name in script_harness.skipped) is not enabled
-    assert any(name.endswith("attempt-1") for name in script_harness.executed) is not enabled
+    assert not any("region-fallback" in name for name in script_harness.executed)
+    assert any("region-fallback" in name for name in script_harness.skipped)
+    assert any(name.endswith("attempt-1") for name in script_harness.executed)
     assert len(script_harness.results) == 1 and script_harness.results[0].returncode == 0
     assert len([record for record in script_harness.records() if "parameters" in record]) == 1
 
@@ -1188,6 +1568,109 @@ def test_actual_ci_empty_regions_skip_task_but_keep_all_sku_retries(
     assert len(script_harness.results) == 3
     assert final["skuAISearch" + suffix] == "standard2"
     assert script_harness.sleep_values() == [240, 240]
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
+@pytest.mark.parametrize("retry,primary_count", [("true", 3), ("false", 1)])
+def test_extracted_primary_denmark_italy_are_separate_ordered_phases(
+        script_harness, provider, target, suffix, retry, primary_count):
+    final = script_harness.execute("ai-search", provider, target, overrides={
+        "aiSearchFallbackLocationArray" + suffix: '["denmarkeast","swedencentral","italynorth"]',
+        "aisearchRetryCapcityArray": retry,
+        "CAPACITY_TEST_SUCCEED_AT": str(primary_count * 2 + 1),
+    })
+    assert len(script_harness.results) == primary_count + 1
+    assert all(result.returncode == 0 for result in script_harness.results), [r.stderr for r in script_harness.results]
+    assert script_harness.executed[-1].endswith("region-fallback")
+    assert all("aiSearchLocation" not in values and "skuAISearch" + suffix not in values
+               for values in script_harness.published[:-1])
+    assert script_harness.published[-2]["AIF_AISEARCH_CAPACITY_NEXT"] == "primary-capacity-exhausted"
+    assert final["aiSearchLocation"] == "italynorth" and final["skuAISearch" + suffix] == "standard"
+    creates = [record["parameters"] for record in script_harness.records() if "parameters" in record]
+    assert [p["aiSearchLocation"]["value"] for p in creates] == [
+        *(["swedencentral"] * primary_count), *(["denmarkeast"] * primary_count), "italynorth",
+    ]
+    assert script_harness.sleep_values() == [240] * (primary_count * 2)
+    assert all(p["env"]["value"] == target and p["location"]["value"] == "swedencentral" for p in creates)
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("succeed_at", [1, 2, 3])
+def test_extracted_primary_success_at_any_sku_skips_configured_fallback(script_harness, provider, succeed_at):
+    final = script_harness.execute("ai-search", provider, succeed_at=succeed_at, overrides={
+        "aiSearchFallbackLocationArrayDev": '["denmarkeast","italynorth"]',
+    })
+    assert len(script_harness.results) == succeed_at
+    assert all(result.returncode == 0 for result in script_harness.results)
+    assert any(name.endswith("region-fallback") for name in script_harness.skipped)
+    assert not any(name.endswith("region-fallback") for name in script_harness.executed)
+    assert final["AIF_AISEARCH_CAPACITY_NEXT"] == "0" and final["aiSearchLocation"] == "swedencentral"
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
+def test_extracted_cli_resolves_wrapper_only_errors_before_primary_to_fallback_transition(
+        script_harness, provider, target, suffix):
+    error = json.dumps({"error": {"code": "DeploymentFailed", "details": [search_deployment_wrapper()]}})
+    final = script_harness.execute("ai-search", provider, target, error=error, overrides={
+        "aiSearchFallbackLocationArray" + suffix: "denmarkeast,italynorth",
+        "aisearchRetryCapcityArray": "false",
+        "CAPACITY_TEST_SUCCEED_AT": "3",
+        "CAPACITY_TEST_GROUP_ERRORS": '{"search-nested":{"code":"InsufficientResourcesAvailable"}}',
+    })
+    assert len(script_harness.results) == 2
+    assert all(result.returncode == 0 for result in script_harness.results), [r.stderr for r in script_harness.results]
+    assert script_harness.published[0]["AIF_AISEARCH_CAPACITY_NEXT"] == "primary-capacity-exhausted"
+    assert "aiSearchLocation" not in script_harness.published[0]
+    assert final["aiSearchLocation"] == "italynorth" and final["AIF_AISEARCH_CAPACITY_NEXT"] == "0"
+    records = script_harness.records()
+    assert [record["error_read"] for record in records if "error_read" in record] == ["search-nested"] * 2
+    assert [record["parameters"]["aiSearchLocation"]["value"] for record in records if "parameters" in record] == [
+        "swedencentral", "denmarkeast", "italynorth",
+    ]
+    assert script_harness.sleep_values() == [240, 240]
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("terminal_at", [1, 4])
+@pytest.mark.parametrize("error", [
+    "AuthorizationFailed", "InsufficientResourcesAvailable\nAuthorizationFailed",
+    '{"error":{"code":"UnexpectedError","details":[{"code":"InsufficientResourcesAvailable"}]}}',
+    '{"error":{"code":"InsufficientResourcesAvailable","target":"Microsoft.Network/privateEndpoints/pe"}}',
+])
+def test_extracted_primary_or_fallback_terminal_errors_stop_retries_and_downstream(
+        script_harness, provider, terminal_at, error):
+    final = script_harness.execute("ai-search", provider, overrides={
+        "aiSearchFallbackLocationArrayDev": '["denmarkeast","italynorth"]',
+        "CAPACITY_TEST_SUCCEED_AT": "99",
+        "CAPACITY_TEST_TERMINAL_AT": str(terminal_at),
+        "CAPACITY_TEST_TERMINAL_ERROR": error,
+    })
+    assert len(script_harness.results) == (1 if terminal_at == 1 else 4)
+    assert script_harness.results[-1].returncode == 29
+    assert final["AIF_AISEARCH_CAPACITY_NEXT"] == "failed"
+    assert "aiSearchLocation" not in final
+    creates = [record for record in script_harness.records() if "parameters" in record]
+    assert len(creates) == terminal_at and script_harness.sleep_values() == [240] * (terminal_at - 1)
+    pipeline = load_pipeline(GHA if provider == "github" else ADO_JOB)
+    downstream = next(step for step in objects(pipeline)
+                      if step.get("name", step.get("displayName")) == "64-databases")
+    assert not allowed(downstream, provider, final, success=False)
+    assert all("aiSearchLocation" not in values and "skuAISearchDev" not in values
+               for values in script_harness.published)
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+@pytest.mark.parametrize("gate", ["false", "true"])
+@pytest.mark.parametrize("state", ["", "0", "2", "3", "failed", "primary-capacity-exhausted"])
+def test_parsed_regional_condition_requires_both_nonempty_gate_and_primary_exhaustion(provider, gate, state):
+    env = environment("ai-search")
+    env.update({"AIF_AISEARCH_REGION_FALLBACK_ENABLED": gate, "AIF_AISEARCH_CAPACITY_NEXT": state})
+    regional = expanded_steps(provider, "ai-search", include_search_routing=True)[-1]
+    assert "region-fallback" in regional.get("name", regional.get("displayName"))
+    assert allowed(regional, provider, env) is (gate == "true" and state == "primary-capacity-exhausted")
+    assert "continueOnError" not in regional and "continue-on-error" not in regional
 
 
 @pytest.mark.parametrize("provider", ["ado", "github"])
@@ -1212,6 +1695,8 @@ def test_region_tasks_keep_main_private_foundry_dependency_and_debug_exception(p
     })
     steps = expanded_steps(provider, "ai-search", include_search_routing=True)
     assert [allowed(step, provider, env) for step in steps] == [True, True, False, False, False]
+    env["AIF_AISEARCH_CAPACITY_NEXT"] = "primary-capacity-exhausted"
+    assert [allowed(step, provider, env) for step in steps] == [True, True, False, False, True]
 
 
 @pytest.mark.parametrize("provider", ["ado", "github"])
@@ -1269,14 +1754,19 @@ def test_extracted_ci_scripts_execute_real_cli_offline(script_harness, provider,
 
 @pytest.mark.parametrize("provider", ["ado", "github"])
 @pytest.mark.parametrize("target,suffix", [("dev", "Dev"), ("test", "StageProd"), ("prod", "StageProd")])
-def test_extracted_ci_search_regions_complete_in_first_step_and_never_arm_legacy_steps(
+def test_extracted_ci_search_primary_steps_then_fallback_complete_all_18_attempts(
         script_harness, provider, target, suffix):
     final = script_harness.execute("ai-search", provider, target, overrides={
         "aiSearchFallbackLocationArray" + suffix: json.dumps(SEARCH_FALLBACK_REGIONS),
         "CAPACITY_TEST_SUCCEED_AT": "18",
     })
-    assert len(script_harness.results) == 1
-    assert script_harness.results[0].returncode == 0, script_harness.results[0].stderr
+    assert len(script_harness.results) == 4
+    assert all(result.returncode == 0 for result in script_harness.results), [r.stderr for r in script_harness.results]
+    assert [values["AIF_AISEARCH_CAPACITY_NEXT"] for values in script_harness.published] == [
+        "2", "3", "primary-capacity-exhausted", "0",
+    ]
+    assert all("aiSearchLocation" not in values and "skuAISearch" + suffix not in values
+               for values in script_harness.published[:3])
     assert final["AIF_AISEARCH_CAPACITY_NEXT"] == "0"
     assert final["aiSearchLocation"] == "germanywestcentral"
     assert final["skuAISearch" + suffix] == "standard2"
@@ -1288,7 +1778,7 @@ def test_extracted_ci_search_regions_complete_in_first_step_and_never_arm_legacy
     ]
     assert all(record["argv"][record["argv"].index("--location") + 1] == "swedencentral" for record in creates)
     assert all(record["parameters"]["location"]["value"] == "swedencentral" for record in creates)
-    assert "attempt 18/18" in script_harness.results[0].stdout
+    assert "attempt 15/15" in script_harness.results[-1].stdout
     assert script_harness.sleep_values() == [240] * 17
 
 
@@ -1378,7 +1868,8 @@ def test_defaults_arrays_and_retry_flags_match_all_three_configs(service):
     assert evaluate(bindings[spec["retry"]], {f"vars.{public_retry}": "false"}) == "false"
 
 
-def test_actual_json_exporter_maps_public_capacity_aliases_and_preserves_tags(workspace):
+@pytest.mark.parametrize("regions", [[], ["West Europe"]])
+def test_actual_json_exporter_maps_public_capacity_aliases_and_preserves_tags(workspace, regions):
     public_retry = {
         "ai-search": "AISEARCH_RETRY_CAPCITY_ARRAY",
         "postgresql": "POSTGRESQL_RETRY_CAPACITY_ARRAY",
@@ -1387,8 +1878,8 @@ def test_actual_json_exporter_maps_public_capacity_aliases_and_preserves_tags(wo
     values = {"tagsProject": TAGS}
     expected = {"tagsProject": TAGS}
     for suffix, public in [("Dev", "DEV"), ("StageProd", "STAGEPROD")]:
-        values["AI_SEARCH_FALLBACK_LOCATION_ARRAY_" + public] = ["West Europe"]
-        expected["aiSearchFallbackLocationArray" + suffix] = ["West Europe"]
+        values["AI_SEARCH_FALLBACK_LOCATION_ARRAY_" + public] = regions
+        expected["aiSearchFallbackLocationArray" + suffix] = regions
     for service, spec in SERVICES.items():
         for suffix, public_suffix in [("Dev", "DEV"), ("StageProd", "STAGEPROD")]:
             values[f"SKU_ARRAY_{spec['public']}_{public_suffix}"] = spec["array_value"]
