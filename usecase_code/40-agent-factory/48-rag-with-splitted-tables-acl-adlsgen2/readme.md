@@ -303,6 +303,11 @@ The ADLS data source uses `indexerPermissionOptions` for `userIds`, `groupIds`
 and `rbacScope`; secured indexes enable `permissionFilterOption`. Every projected
 chunk receives the indexer-emitted native permission metadata. Group permissions
 are preferred; this is not a flattened document-level user-membership list.
+Both indexes retain the native `metadata_storage_path` field as well as the
+shared `source_uri` alias: the preview service requires the original field for
+ADLS permission ingestion. Text Split language (`en`) and semantic ranking order
+(`BoostedRerankerScore`) are explicit so service-default round trips do not look
+like foreign definition changes.
 
 Each secured query carries the end user's Search-scoped token in
 `x-ms-query-source-authorization`, independently of backend Search RBAC
@@ -327,6 +332,12 @@ entitlements require different files. Copying a file does not transfer
 SharePoint permissions, and POSIX ACLs are not a perfect SharePoint permission
 model. This example simulates site/library lineage; real SharePoint provisioning
 is optional and not performed.
+Native ingestion also reads permission metadata on the filesystem root and
+every ancestor directory. A reader role restricted to the two source files and
+their list prefixes may therefore be insufficient even when content reads work.
+Do not replace that condition with account-wide access. Inspect the failing
+operations and separately review exact ancestor-object permissions; the source
+selection is not itself a permission boundary.
 
 ACL-only changes might not update blob last-modified timestamps. Refresh
 permissions explicitly and rerun the native indexers:
@@ -476,6 +487,15 @@ Live Search chunk output, group-based allow/deny and revocation, deployed agent
 responses, destructive missing-chunk fault injection, and image serving remain
 unverified. The live evaluator's pass flag covers the protected sales agent, not
 the separate image branch or cloud fault injection.
+
+A subsequent authorized live attempt exercised immutable synthetic publication
+and native index/data-source/skillset/indexer creation. It exposed the required
+native path field and explicit defaults above. Ingestion then failed before
+processing documents: existing Storage metrics showed denied
+`GetPathAccessControl` operations alongside successful content/list operations.
+No real three-chunk or live-agent success is claimed from that attempt. Its
+identity-specific deployment evidence remains in consumer-owned state, not in
+the indexed corpus or source template.
 
 ## Costs, troubleshooting and cleanup
 

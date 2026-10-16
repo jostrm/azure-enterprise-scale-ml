@@ -83,6 +83,10 @@ authorization and delegated source reads, but identifies its CLI backend as
 operator-authenticated rather than managed identity. Strict `main.py` behavior
 is unchanged; preview results cannot count as denied-user or revocation proof.
 Foundry Playground does not execute the example's local function implementations.
+Native permission ingestion retains `metadata_storage_path` on parent and chunk
+indexes, and requires source-ancestor permission metadata as well as file bytes.
+Exact-file ingestion grants do not establish that ancestor access is available;
+the example must report that gap rather than broaden common-lake permissions.
 
 Local fixtures or passing unit tests do not establish three real service chunks,
 successful revocation, image use, or a deployed Foundry agent. The example's

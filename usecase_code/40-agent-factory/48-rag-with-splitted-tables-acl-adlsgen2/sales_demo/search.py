@@ -11,7 +11,8 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 
 API_VERSION = "2026-08-01-preview"
 SEARCH_AUDIENCE = "https://search.azure.com"
-METADATA = ("dataset", "version", "source", "site", "library", "source_uri", "input_sha256", "aif48owner")
+METADATA = ("dataset", "version", "source", "site", "library", "source_uri", "input_sha256",
+            "aif48owner", "metadata_storage_path")
 PERMISSIONS = {"UserIds": "metadata_user_ids", "GroupIds": "metadata_group_ids",
                "RbacScope": "metadata_rbac_scope"}
 UNITS = {"utf8": "utf8", "utf16": "utf16", "codepoint": "codePoint"}
@@ -134,7 +135,7 @@ def build_definitions(config: dict) -> dict:
                        stored=False, dimensions=3072, vectorSearchProfile="vector-profile"),
                 *metadata, *_permission_fields(),
             ],
-            "semantic": {"configurations": [{"name": "sem", "prioritizedFields": {
+            "semantic": {"configurations": [{"name": "sem", "rankingOrder": "BoostedRerankerScore", "prioritizedFields": {
                 "prioritizedContentFields": [{"fieldName": "chunk_text"}], "prioritizedKeywordsFields": [],
             }}]},
             "vectorSearch": {
@@ -166,7 +167,8 @@ def build_definitions(config: dict) -> dict:
             "name": names["skillset"], "description": description,
             "skills": [
                 {"@odata.type": "#Microsoft.Skills.Text.SplitSkill", "name": "split",
-                 "context": "/document", "textSplitMode": "pages", "unit": "azureOpenAITokens",
+                 "context": "/document", "defaultLanguageCode": "en",
+                 "textSplitMode": "pages", "unit": "azureOpenAITokens",
                  "azureOpenAITokenizerParameters": {"encoderModelName": "cl100k_base"},
                  "maximumPageLength": 6000, "pageOverlapLength": 0, "maximumPagesToTake": 0,
                  "inputs": [{"name": "text", "source": "/document/content"}],
@@ -522,7 +524,8 @@ class SearchClient:
         path = self._parts([partition["id"]])[0]["input_path"]
         urls = {f"https://{self._config['storage_account']}.{kind}.core.windows.net/"
                 f"{self._config['container']}/{path}" for kind in ("blob", "dfs")}
-        if document.get("source_uri") not in urls:
+        if (document.get("source_uri") not in urls
+                or document.get("metadata_storage_path") != document.get("source_uri")):
             raise ValueError("Search document source URI escapes the selected immutable input.")
 
     def verify_partition(self, partition, identity):

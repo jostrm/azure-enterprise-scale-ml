@@ -74,6 +74,7 @@ class DefinitionsTests(unittest.TestCase):
                 index = resources[key]
                 self.assertEqual(index["permissionFilterOption"], "enabled")
                 fields = {f["name"]: f for f in index["fields"]}
+                self.assertEqual(fields["metadata_storage_path"]["type"], "Edm.String")
                 self.assertTrue(all(field["stored"] is True for field in fields.values()
                                     if field["type"] != "Collection(Edm.Single)"))
                 for name, permission in (("UserIds", "userIds"), ("GroupIds", "groupIds"), ("RbacScope", "rbacScope")):
@@ -85,6 +86,7 @@ class DefinitionsTests(unittest.TestCase):
             self.assertEqual(split["maximumPagesToTake"], 0)
             self.assertEqual(split["pageOverlapLength"], 0)
             self.assertEqual(split["unit"], "azureOpenAITokens")
+            self.assertEqual(split["defaultLanguageCode"], "en")
             self.assertEqual(split["azureOpenAITokenizerParameters"]["encoderModelName"], "cl100k_base")
             self.assertEqual(embedding["dimensions"], 3072)
             self.assertEqual(embedding["inputs"], [{"name": "text", "source": "/document/pages/*"}])
@@ -99,11 +101,14 @@ class DefinitionsTests(unittest.TestCase):
             self.assertEqual(mappings["GroupIds"], "/document/metadata_group_ids")
             self.assertEqual(mappings["RbacScope"], "/document/metadata_rbac_scope")
             self.assertEqual(mappings["source_uri"], "/document/metadata_storage_path")
+            self.assertEqual(mappings["metadata_storage_path"], "/document/metadata_storage_path")
             self.assertEqual(mappings["aif48owner"], "/document/aif48owner")
             self.assertNotIn("chunk_id", mappings)
             self.assertNotIn("parent_id", mappings)
             self.assertEqual(resources["indexer"]["targetIndexName"], resources["audit_index"]["name"])
             self.assertEqual(resources["indexer"]["parameters"]["configuration"]["executionEnvironment"], "private")
+            self.assertEqual(resources["index"]["semantic"]["configurations"][0]["rankingOrder"],
+                             "BoostedRerankerScore")
             self.assertTrue(next(f for f in resources["index"]["fields"] if f["name"] == "chunk_id")["sortable"])
             output = {m["targetFieldName"]: m["sourceFieldName"] for m in resources["indexer"]["outputFieldMappings"]}
             self.assertEqual(output["offsets_utf8"], "/document/split_offsets/*/utf8")
@@ -141,6 +146,7 @@ class ClientTests(unittest.TestCase):
         metadata.update({"dataset": config["dataset"], "version": config["version"],
                          "aif48owner": config["owner"],
                          "source_uri": "https://saleslake.blob.core.windows.net/lake/projects/project001/" + partition["input_path"]})
+        metadata["metadata_storage_path"] = metadata["source_uri"]
         audit = {**metadata, "parent_id": "parent", "pages": ["ab", "cd", "ef"], "split_ordinals": [1, 2, 3]}
         for unit in ("utf8", "utf16", "codepoint"):
             audit["offsets_" + unit] = [0, 2, 4]
@@ -186,7 +192,7 @@ class ClientTests(unittest.TestCase):
         audit["pages"] = [text[start:end] for start, end in zip(cuts, cuts[1:])]
         metadata = {key: value for key, value in audit.items()
                     if key in ("dataset", "version", "source", "site", "library", "input_sha256",
-                               "source_uri", "aif48owner", "parent_id")}
+                               "source_uri", "metadata_storage_path", "aif48owner", "parent_id")}
         children = []
         for index, (start, end) in enumerate(zip(cuts, cuts[1:])):
             piece = text[start:end]
