@@ -2937,11 +2937,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">389</td>
+<td style="text-align: right;">390</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">388</td>
+<td style="text-align: right;">389</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2957,15 +2957,15 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">392</td>
+<td style="text-align: right;">393</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 151, 414; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 152, 415; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 416, 440; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 152, 415; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 153, 416; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 417, 441; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -3617,6 +3617,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
 <td>Update AI Foundry properties otherwise: true, re-run to update AI Foundry properties and RBAC.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:updateCommonACR --><!-- parameter json.dev:updateCommonACR --><code>updateCommonACR</code></td>
+<td><code>UPDATE_COMMON_ACR</code></td>
+<td>O</td>
+<td>Y: <code>"true"</code><br>J.dev: <code>"true"</code></td>
+<td>Redeploy shared ACR settings and private endpoint otherwise: false reuses the existing registry without rewriting it; project access assignments remain enabled.</td>
 </tr>
 </tbody>
 </table>
@@ -7154,6 +7161,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"false"</code></td>
 <td>Update AI Foundry properties otherwise: true, update existing Foundry properties and RBAC.</td>
+</tr>
+<tr>
+<td><!-- parameter env:UPDATE_COMMON_ACR --><code>UPDATE_COMMON_ACR</code></td>
+<td><code>updateCommonACR</code></td>
+<td>O</td>
+<td><code>"true"</code></td>
+<td>Redeploy shared ACR settings and private endpoint otherwise: false reuses the existing registry without rewriting it; project access assignments remain enabled.</td>
 </tr>
 </tbody>
 </table>
