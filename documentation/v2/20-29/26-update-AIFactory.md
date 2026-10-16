@@ -15,6 +15,64 @@ version does not migrate `aifactory` to `azurefactory`. The commands below use
 the maintained v1.24 launcher; older installed releases may lack these flags or
 fixes and must not be assumed equivalent without checking their contracts.
 
+## Main walkthrough: update the factory and one selected project
+
+For an existing **registered** `azurefactory` consumer on `main`, use the
+shared API workflow below, not the legacy Bash quick path. The app, CLI, REST
+and Python SDK prepare the same scoped operations. **An update is not factory
+creation, automatic promotion, or a request to deploy every project.**
+
+1. **Read the existing target.** Select exact factory, environment/scale-set and
+   project UUIDs from the catalog. Confirm the project's placement. Read current
+   settings and parameter schema; use the returned revisions, not a previous
+   recording's IDs or receipts.
+2. **Prepare the intended configuration change.** Factory-level settings and
+   selected-project settings/typed parameters are separate scopes. Only edit
+   published fields. Existing registered projects snapshot their configuration:
+   changing factory defaults does not silently update them all. Identity,
+   network addresses and code version are not arbitrary editable settings.
+3. **Review, then save separately.** Settings use catalog confirmation;
+   typed parameters use parameter confirmation. Saving configuration deploys
+   nothing. Re-read the saved scope and fresh revisions before the next operation.
+   Typed `unset` removes an override, not a resource; a scale-set profile reset
+   is broader than a one-project edit.
+4. **Prepare common deployment only if needed and supported.** A runtime
+   `deploy` request without `project_id` is **common-only**, not all projects.
+   Review `main` resolved to its exact commit, frozen inputs, what-if effects,
+   ownership, private runner access and non-deletion settings. Common-only and
+   provider support depend on the installed runtime; a blocked preview stays blocked.
+5. **Prepare the selected project separately.** Include its exact `project_id`
+   and existing scale-set placement. Use a fresh catalog revision and a separate
+   deployment review/approval. Do not implicitly select Stage, Prod or another project.
+6. **Confirm once, observe, then inspect Azure.** Runtime confirmation starts the
+   approved operation; preparation alone does not. Keep the returned job ID and
+   provider run. A timeout stops waiting, not the deployment; inspect the existing
+   job and receipts before any further action.
+
+| Interface | Configuration update | Deployment update |
+|---|---|---|
+| UI | Select the existing factory/project; edit supported settings or typed parameters; review/save | Select the exact common or project target and prepare its runtime review |
+| CLI | `catalog configure-settings` or `parameters prepare`; separately the matching confirm command | `runtime deploy --version-ref main` prepares; `runtime confirm` executes after approval |
+| REST | Catalog `/prepare` with action `configure-settings`, or `/parameters/prepare`; separately the matching `/confirm` | Catalog `/prepare` with action `deploy`, exact scope/revision and `version_ref`; separately `/confirm` |
+| Python SDK | `catalog_settings_prepare(...)` or `parameter_prepare(...)`; separately matching confirmation | `review_catalog_prepare(...)` with action `deploy`; separately `catalog_confirm(...)` after runtime approval |
+
+Use [19: tool-specific configuration examples](../10-19/19-cli-and-api-and-usage.md#choose-your-tool)
+and [separate runtime deployment](../10-19/19-cli-and-api-and-usage.md#separate-runtime-deployment)
+for full connection, scope, receipt and observation handling. Installed UI labels
+may vary; do not infer a backend capability from a button or source version alone.
+
+This update path does not repair an unfinished bootstrap. The
+[default integrated-hub limitation](24-end-2-end-setup.md#current-integrated-hub-limitation)
+still applies; do not recreate the factory or switch to legacy scripts to bypass it.
+Selecting `main` does not migrate the consumer layout, update every project
+snapshot or authorize a source-pin change during an active workflow.
+
+Implementation references:
+[`cmd_catalog_settings_prepare`, `cmd_parameters_prepare`, `cmd_runtime_deploy_prepare` and `cmd_runtime_confirm`](../../../environment_setup/azurefactory-cli/src/azurefactory/cli.py),
+and the
+[`AzureFactoryClient` request/confirmation methods](../../../environment_setup/azurefactory-cli/src/azurefactory/client.py).
+Runtime preparation and installed capability checks remain server-owned.
+
 ### File-first quick path: edit, then one command
 
 1. Edit the intended project's **active** configuration file.

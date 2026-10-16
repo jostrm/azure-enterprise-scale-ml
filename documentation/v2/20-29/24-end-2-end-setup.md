@@ -9,8 +9,8 @@ For terminal commands, Python or direct HTTP requests, start with
 > For the Monitor-only, FinOps-focused companion, see [AI Factory tutorial: FinOps monitoring](tutorial-fiops.md).
 
 Use the **Enterprise Scale AI Factory** app or its API to configure factories,
-review and trigger IaC pipelines, monitor Azure resources, promote projects from
-Dev to Stage/Prod, and manage tickets. Configuration, deployment and monitoring
+review and trigger supported IaC pipelines, monitor Azure resources, configure
+environment placements, and manage tickets. Configuration, deployment and monitoring
 are separate operations; a saved definition is not a deployed resource.
 
 Start by [choosing a setup path](#choose-the-setup-path), then follow the
@@ -18,6 +18,59 @@ Start by [choosing a setup path](#choose-the-setup-path), then follow the
 [app-first](#app-first-the-same-configuration-and-execution-contracts) instructions.
 The [legacy setup](#existing-single-factory-setup) section covers existing
 single-factory repositories.
+
+## Main walkthrough: configure, then review deployment
+
+For a new registered factory on **`main` (unstable)**, follow this sequence.
+It describes the implemented client and bootstrap contracts, not a promise that
+the default topology can complete cloud deployment. An installed app/API/runtime
+can lag this source; inspect its capabilities and actual preview.
+
+1. **Connect and select the source.** Use the owning API's URL/key and a compatible
+   app or CLI/SDK. Run `health` and `doctor` for a terminal workflow. Supply the
+   approved API-host folder, tenant, subscription, region, provider and private
+   address plan; do not infer them from a cached Azure sign-in. Select `main`
+   explicitly when that is the intended source.
+2. **Prepare configuration.** Choose Full bootstrap in the app, or prepare factory
+   creation through one of the clients below. Normal AI creation includes one
+   initial project, default `project001`; explicit common-only creation does not.
+   Hub settings save intent, not an operational VPN or private connection.
+3. **Review and save configuration.** Check the complete preview, then confirm in
+   a separate approved action. Re-read the catalog and retain its exact factory,
+   scale-set and project UUIDs. This saves definitions/projections, not Azure
+   resources; a configuration confirmation has no runtime job.
+4. **Prepare privileged execution separately.** The registered workflow requires
+   the complete bootstrap configuration, exact saved scope/revision, source
+   evidence and stage review. Respect the
+   [current integrated-hub limitation](#current-integrated-hub-limitation):
+   default own-hub/private setup is not an executable end-to-end happy path.
+5. **Observe only an approved, supported execution.** Track the returned workflow
+   or job and its provider run, then inspect the intended Azure resources and
+   private paths. A queued job or saved definition is not deployment success.
+   After an uncertain write, inspect existing state rather than repeating it.
+
+Choose one interface; these are clients of the same API, not four deployment engines:
+
+| Interface | Configuration preparation | Separate execution boundary |
+|---|---|---|
+| UI | Start Guide / Full bootstrap, then configuration review | Review the workflow's exact next stage; saving the form starts no deployment |
+| CLI | `factory create`, then separately `catalog confirm` | `bootstrap workflow prepare`; `bootstrap workflow start` only after an executable review and approval |
+| REST | `POST /api/v1/factory-catalog/prepare`, action `create-factory`; separately `/confirm` | `POST /api/v1/creation/workflows/prepare`; separately `/start` after approval |
+| Python SDK | `factory_create_prepare(...)`; separately `catalog_confirm(...)` | `creation_workflow_prepare(...)`; separately `creation_workflow_start(...)` after approval |
+
+For complete connection, request and receipt handling, use
+[19: choose your tool](../10-19/19-cli-and-api-and-usage.md#choose-your-tool).
+For helper installation, continue with
+[shell-first setup](#shell-first-new-registered-consumer-v125--main).
+The manual pipeline sections below describe **existing legacy consumers**;
+they are not a fallback around a blocked registered workflow.
+
+Implementation references:
+[`cmd_factory_create`](../../../environment_setup/azurefactory-cli/src/azurefactory/cli.py),
+[`factory_create_prepare` and workflow client methods](../../../environment_setup/azurefactory-cli/src/azurefactory/client.py),
+and the
+[`registered_creation` configure-first adapter](../../../bootstrap/lib/registered_creation.py).
+These clients do not establish installed backend capabilities or live Azure state.
 
 ## Manual Azure DevOps Run pipeline: variables.yaml
 
@@ -170,8 +223,10 @@ The registered combination `access_hub_mode=integrated` with
 `setup_hub_access=true`, including the default Simple topology, is currently
 blocked. A retained shared lock account cannot put its single canonical private
 endpoint into a factory-owned common VNet without a compatible network, DNS and
-deletion-ownership contract. Use an explicitly configured external hub or no-hub
-setup instead, and review the resulting network configuration before execution.
+deletion-ownership contract. Configuration can still be reviewed and saved; that
+does not make the subsequent bootstrap executable. External hub and no-hub are
+different topologies requiring explicit selection and review, not implicit
+substitutes for successful own-hub deployment.
 
 The external-hub path uses a retained, nondelegated **hub** private-endpoint
 subnet, not the first factory's runner/spoke subnet. Additional factories must
@@ -183,6 +238,14 @@ storage; it does not mean an external hub was precreated.
 Use compatible source, API and app versions that support your selected topology.
 Confirm that the required helpers are available in the selected published source
 before preparing a deployment.
+
+The source enforces this boundary in
+[`registered_prerequisites.prepare`](../../../bootstrap/lib/registered_prerequisites.py)
+(`shared-coordination-requires-explicit-external-hub`) and the
+[`hub_private_transition` workflow adapter](../../../bootstrap/lib/hub_private_transition.py)
+(`integrated-shared-private-endpoint-retention-contract-required`).
+Do not remove these guards, change coordination mode, or reopen public access
+merely to make a walkthrough continue.
 
 ### Private connection discovery requires execution approval
 
