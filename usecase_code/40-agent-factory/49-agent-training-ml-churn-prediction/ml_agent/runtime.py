@@ -168,7 +168,29 @@ class MLRuntime:
                           training=esml.training_state(directory),
                           inference=esml.latest_inference(self.location.esml(name), entry),
                           pending_inference=esml.pending_inference(self.location.esml(name), entry))
+            if self.hosted:
+                result.update(self._live_job(name, result))
         return self._record("status", name, result)
+
+    def _live_job(self, name: str, result: dict) -> dict:
+        """Hosted only: read the Azure ML status of a recorded, unfinished job and say how to finish it."""
+        training, pending = result.get("training") or {}, result.get("pending_inference")
+        if training.get("state") == "submitted":
+            job, tool = training.get("job"), "start_training" if name == CHURN else "start_retraining"
+            finish = f"call {tool} again to check the job and register or compare the model"
+            failed = "the training job failed; plan a new run"
+        elif pending:
+            job, finish = pending.get("job"), "call run_batch_inference again to read the predictions"
+            failed = "call run_batch_inference again to start a fresh scoring attempt"
+        else:
+            return {}
+        try:
+            status = self._project(name)._backend().get_job(job).get("status")
+        except Exception as error:  # status stays receipt-based if Azure ML cannot be read
+            return {"azure_ml_job": {"name": job, "status": None, "error": type(error).__name__}}
+        action = (finish if status == "Completed" else failed if status in esml.FAILED_JOB
+                  else "Azure ML is still running this job; check again in a few minutes")
+        return {"azure_ml_job": {"name": job, "status": status}, "next_action": action}
 
     def predictions_summary(self, name: str) -> dict:
         if self.plan is None:

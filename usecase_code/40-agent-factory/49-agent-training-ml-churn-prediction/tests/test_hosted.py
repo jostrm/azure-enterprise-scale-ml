@@ -410,10 +410,14 @@ class HostedTests(unittest.TestCase):
             # definitions receipt), the next ones resume the recorded jobs.
             shutil.rmtree(self.root / "home-1")
             agent = self.session(self.root / "home-2", model)
-            model.steps = [[("start_training", {"usecase": CHURN})], "Training is running."]
+            model.steps = [[("start_training", {"usecase": CHURN})], [("get_usecase_status", {"usecase": CHURN})],
+                           "Training is running."]
             agent.turn("Try the training again", user="alice")
-            training = model.tool_results()[0]["result"]
-            self.assertEqual((training["state"], training["job"]), ("running", f"training-job-{CHURN}"))
+            training, live = model.tool_results()
+            self.assertEqual((training["result"]["state"], training["result"]["job"]),
+                             ("running", f"training-job-{CHURN}"))
+            self.assertEqual(live["result"]["azure_ml_job"], {"name": f"training-job-{CHURN}", "status": "Running"})
+            self.assertIn("still running", live["result"]["next_action"])
 
             agent = self.session(self.root / "home-3", model)
             model.steps = [[("start_training", {"usecase": CHURN})], [("run_batch_inference", {"usecase": CHURN})],
