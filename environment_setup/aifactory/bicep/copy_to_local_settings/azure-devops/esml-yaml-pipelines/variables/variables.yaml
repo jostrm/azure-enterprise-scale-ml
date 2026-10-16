@@ -43,6 +43,7 @@ variables:
   prod_admin_bicep_kv_fw: "<todo>_Name_Prod" # <mandatory>PROD seeding KV name<default><todo>_Name_Prod<ensure> Key Vault name storing secrets mapped to PROJECT_SERVICE_PRINCIPAL_KV_S_NAME_APPID.
   # ===========================================================================
   useCommonACR: "true" # <optional>Use shared ACR across projects<default>true<keep-as-is> <otherwise> false, each project gets its own ACR (higher cost).
+  updateCommonACR: "true" # <optional>Redeploy shared ACR settings and private endpoint<default>true<otherwise> false reuses the existing registry without rewriting it; project access assignments remain enabled.
   admin_hybridBenefit: "false" # <optional>Azure Hybrid Benefit for VMs<default>false <otherwise> true, if you have eligible Windows licenses with Software Assurance (pay-as-you-go avoided).
   admin_keyvaultSoftDeleteDays: 7 # <optional>Key Vault soft delete days<default>7<keep-as-is> <mandatory> if cmk:'true' (purge protection required). <otherwise> 90 days recommended; 0 to disable.
   azure_machinelearning_sp_oid: "<todo>_ObjectID" # <mandatory>Azure ML service principal OID<default><todo>_ObjectID<ensure> find in Entra ID as "Azure Machine Learning" app (AppId: 0736f41a-0425-4b46-bdb5-1563eff02385). <otherwise> optional if enableAIFoundry:'false'.
@@ -382,6 +383,7 @@ variables:
   # === Container Apps ===
   enableContainerApps: "false" # <optional>Deploy Azure Container Apps<default>false<keep-as-is>
   enableAppInsightsDashboard: "false" # <optional>Deploy Application Insights dashboard<default>false<keep-as-is>
+  enableApplicationInsights: "true" # <optional>Deploy workspace-based project Application Insights<default>true<otherwise> false skips deployment; existing resources are not deleted.
   # aca_a_registry_image: "containerapps-default:latest"
   aca_w_registry_image: "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" # <optional>Container Apps default image<default>mcr.microsoft.com/azuredocs/containerapps-helloworld:latest<keep-as-is> <otherwise> replace with your own ACR image.
   # === Integration ===

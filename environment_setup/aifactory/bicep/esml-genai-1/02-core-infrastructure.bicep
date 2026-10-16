@@ -133,6 +133,8 @@ param hybridBenefit bool = false
 
 // Container Registry
 param useCommonACR bool = true
+@description('When using an existing common ACR, false skips redeploying its registry settings and private endpoint. Project access assignments remain enabled.')
+param updateCommonACR bool = true
 param acr_adminUserEnabled bool = false
 param acr_dedicated bool = true
 
@@ -648,7 +650,7 @@ var _acrCmkGuard = cmk && !canApplyAcrCmk ? fail('DEPLOYMENT FAILED: ACR CMK was
 
 // Update since: "ACR sku cannot be retrieved because of internal error." when creating private endpoint.
 // pend-acr-cmnsdc-containerreg-to-vnt-mlcmn
-module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR == true){
+module acrCommonUpdate '../modules/containerRegistry.bicep' = if (useCommonACR && updateCommonACR) {
   scope: resourceGroup(subscriptionIdDevTestProd,commonResourceGroup)
   name: take('02-AMLGenaIContReg4${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

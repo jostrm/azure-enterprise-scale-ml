@@ -117,6 +117,7 @@ jobs:
 
       # Cost optimization
       useCommonACR: ${{ vars.USE_COMMON_ACR_FOR_PROJECTS || 'true' }}
+      updateCommonACR: ${{ vars.UPDATE_COMMON_ACR || 'true' }}
       useCommonACR_override: ${{ vars.USE_COMMON_ACR_OVERRIDE || vars.USE_COMMON_ACR_FOR_PROJECTS || 'true' }}
 
       # Optional overrides
@@ -2130,7 +2131,14 @@ jobs:
       - name: 62-core-infrastructure
         if: inputs.phase == 'infra' && (env.deleteAllServicesForProject != 'true')
         shell: bash
+        env:
+          UPDATE_COMMON_ACR: ${{ env.updateCommonACR }}
         run: |
+            UPDATE_COMMON_ACR="${UPDATE_COMMON_ACR-true}"
+            case "$UPDATE_COMMON_ACR" in
+              true|false) ;;
+              *) echo "UPDATE_COMMON_ACR must be true or false." >&2; exit 1 ;;
+            esac
             ADMIN_PASSWORD=$(date +%s | sha256sum | base64 | head -c 32)
             echo "=== Debug: IP Whitelist value ==="
             echo "project_IP_whitelist: [${{ env.project_IP_whitelist }}]"
@@ -2150,6 +2158,7 @@ jobs:
               --parameters location="${{ env.admin_location }}" \
               --parameters locationSuffix="${{ env.admin_locationSuffix }}" \
               --parameters useCommonACR="${{ env.useCommonACR_override }}" \
+              --parameters updateCommonACR="$UPDATE_COMMON_ACR" \
               --parameters vnetNameBase="${{ env.vnetNameBase }}" \
               --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
               --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
