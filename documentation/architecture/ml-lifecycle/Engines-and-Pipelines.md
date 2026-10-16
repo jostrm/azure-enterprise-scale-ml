@@ -35,7 +35,9 @@ The ESML wheel build includes the same canonical model-factory code. It does not
 
 ## Execution gates
 
-Rendering, source/data registration, training submission, successful job completion, model registration, endpoint publication and invocation are distinct operations. `AzureMLRollout` retains actual job/registration/inference receipts and applies scope, lineage and quality checks. Explicit cloud execution flags in model-factory examples do not replace human authorization or required cloud permissions.
+Rendering, source/data registration, training submission, successful job completion, model registration, endpoint publication and invocation are distinct operations. `AzureMLRollout` retains actual job/registration/inference receipts and applies scope, lineage and quality checks. Training records a submission intent before submitting. After an interruption it resumes the recorded job instead of resubmitting, and an uncertain submission must be reconciled before anything else happens. When model selection keeps the champion, inference may explicitly target that retained champion. Explicit cloud execution flags in model-factory examples do not replace human authorization or required cloud permissions.
+
+Built-in scenarios keep their fixed model numbers 1-11. A consumer scenario outside that catalog needs a reviewed `model_numbers` entry from 12 to 999 in the rollout configuration, together with its own scenario file. Generated notebooks resolve both kinds through `scenario_number`. Synthetic sources (`dataset.synthetic`) are deterministic, hash-pinned generator output with provider `lake`; they are never downloads.
 
 Databricks jobs and Azure ML steps require existing reviewed cluster/notebook/compute/environment bindings. AutoML forecasting streaming is not offered as an equivalent to history-aware batch/online forecasting.
 

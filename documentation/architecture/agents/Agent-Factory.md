@@ -23,6 +23,10 @@ sources:
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/graph_webhooks.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/retrieval_only.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/retrieval_experiment.py
+  - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/main.py
+  - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/runtime.py
+  - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/esml.py
+  - usecase_code/40-agent-factory/49-agent-training-ml-churn-prediction/ml_agent/agent.py
 tests:
   - usecase_code/40-agent-factory/tests/test_prompt.py
   - usecase_code/40-agent-factory/tests/test_hosted.py
@@ -124,6 +128,27 @@ enforcement in Playground. Whole-table native ingestion (or the separately permi
 only for this isolated experiment; protected indexes and their integrity gates
 remain unchanged. Model arithmetic and retrieval exhaustiveness remain unverified
 until evaluated, and no oracle is supplied as a tool or prompt.
+
+## Agent-driven ML training example
+
+`49-agent-training-ml-churn-prediction` is a prompt agent whose client-side tools
+run in the operator's CLI process and call the ESML v2 SDK. The agent can create
+the M49 churn use case from the model-factory churn template, using only
+deterministic synthetic data from `ml_model_factory.synthetic`. It can also train
+M49, retrain the existing M05 air-passengers model and run `GOLD_INFERENCE` batch
+scoring through `AzureMLRollout` receipts.
+
+Every create, train, retrain or inference tool call is checked against an offline
+plan that the operator approved by SHA-256, together with explicit apply and
+paid-call flags. The model therefore cannot widen the scope. Tools accept only the
+two enumerated use cases, never take paths or identifiers from the model, and
+expose no delete operation.
+
+Retraining runs only when the operator requests it. It is not an autonomous
+drift-to-retraining loop. The selection policy may keep the champion, and scoring
+then uses the retained champion (see [[Monitoring-and-Retraining]]). Local tests
+and the offline reproduction do not establish a live lake publication, an Azure
+ML job, a registered model or a deployed agent.
 
 See [[Chat-and-Grounding]], [[MCP-Boundary]], [[Retrieval-Provenance]], [[Dependency-Injection]], [[System-Context]] and [[Index]].
 

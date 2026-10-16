@@ -32,7 +32,7 @@ Feedback is stored separately by `feedback_in_lake`; the CLI describes that path
 
 ## Gap and proposed operational loop
 
-No automatic drift-to-retraining-to-promotion controller was established in the reviewed engines. A defensible **proposed** loop is: observe signal -> investigate data/labels -> approve new snapshot/training -> evaluate comparable evidence -> separately approve registration/deployment -> observe again. Do not describe this governance loop as an already implemented scheduler.
+No automatic drift-to-retraining-to-promotion controller was established in the reviewed engines. A defensible **proposed** loop is: observe signal -> investigate data/labels -> approve new snapshot/training -> evaluate comparable evidence -> separately approve registration/deployment -> observe again. Do not describe this governance loop as an already implemented scheduler. Agent Factory example 49 starts a retraining only within an operator-approved plan. Its selection policy may keep the champion, which is an expected result and not a failure.
 
 Historical feature-store terminology establishes lake reuse intent, not an observed managed online feature store or feature-serving SLA. [[Lake-and-Data-Lineage]] records the implemented versioned tables/shareback boundary.
 
