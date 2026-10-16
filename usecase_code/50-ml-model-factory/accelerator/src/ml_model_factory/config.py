@@ -46,6 +46,9 @@ def safe_relative(value: str) -> Path:
 
 def validate_scenario(value: dict, *, require_dataset: bool = False) -> dict:
     dataset = value.get("dataset", {})
+    if isinstance(dataset, dict) and "synthetic" in dataset:
+        from .synthetic import validate_synthetic
+        validate_synthetic(dataset)
     name_pattern = r"[a-z0-9][a-z0-9_-]{1,62}" if dataset.get("provider") == "lake" else r"[a-z][a-z0-9_-]{1,62}"
     if not re.fullmatch(name_pattern, value.get("name", "")):
         raise ValueError("Scenario name must be a lowercase identifier of 2-63 characters")
@@ -60,6 +63,11 @@ def validate_scenario(value: dict, *, require_dataset: bool = False) -> dict:
         raise ValueError("dataset.kind must be 'dataset' or 'competition'")
     if dataset.get("file"):
         safe_relative(dataset["file"])
+    leaves = value.get("example_leaves")
+    if leaves is not None and (not isinstance(leaves, list) or not leaves or len(set(leaves)) != len(leaves)
+                               or any(not isinstance(item, str) or not item.startswith("usecase-type/")
+                                      for item in leaves)):
+        raise ValueError("example_leaves must be a nonempty list of unique usecase-type/... leaf folders")
     if require_dataset:
         if dataset.get("status") in ("required-selection", "license-review", "requires-license-review"):
             raise ValueError(f"Dataset {dataset.get('status')}: {dataset.get('notes', 'Resolve dataset selection and license before ingestion')}")

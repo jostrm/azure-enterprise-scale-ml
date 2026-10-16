@@ -255,13 +255,24 @@ def find(pattern: str, task_folder: str, technology: str) -> UseCase:
 def scenarios_by_task(scenarios_dir: Path) -> dict[str, list[dict]]:
     from .config import load_json, validate_scenario
 
+    leaves = {leaf.folder.as_posix(): leaf for leaf in catalog()}
     result: dict[str, list[dict]] = {task: [] for task in TASK_FOLDERS.values()}
     for path in sorted(Path(scenarios_dir).glob("*.json")):
         scenario = validate_scenario(load_json(path))
         if scenario["name"] != path.stem:
             raise ValueError(f"Scenario file name must equal its name: {path.name}")
+        for folder in scenario.get("example_leaves", []):
+            leaf = leaves.get(folder)
+            if leaf is None or not leaf.supported or leaf.task != scenario["task"]:
+                raise ValueError(f"{path.name}: {folder!r} is not a supported {scenario['task']} leaf")
         result[scenario["task"]].append(scenario)
     return result
+
+
+def selected_scenarios(leaf: UseCase, scenarios: list[dict]) -> list[dict]:
+    """Scenarios rendered for one leaf; an optional example_leaves list narrows a consumer scenario."""
+    folder = leaf.folder.as_posix()
+    return [item for item in scenarios if folder in item.get("example_leaves", [folder])]
 
 
 def describe(leaf: UseCase, scenarios: list[dict] | None = None) -> dict:
@@ -282,7 +293,7 @@ def _list_command(args):
     scenarios = scenarios_by_task(root / "user-config" / "model" / "scenarios")
     leaves = [leaf for leaf in catalog() if args.pattern in (None, leaf.pattern)
               and args.task_folder in (None, leaf.task_folder) and args.technology in (None, leaf.technology.key)]
-    return {"leaves": [describe(leaf, scenarios[leaf.task]) for leaf in leaves],
+    return {"leaves": [describe(leaf, selected_scenarios(leaf, scenarios[leaf.task])) for leaf in leaves],
             "supported": sum(leaf.supported for leaf in leaves), "total": len(leaves)}
 
 

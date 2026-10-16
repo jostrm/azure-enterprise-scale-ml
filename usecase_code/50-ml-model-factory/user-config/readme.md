@@ -14,14 +14,14 @@
 
 | Location | Required decisions |
 |---|---|
-| `model\scenarios\<scenario>.json` | Dataset source/version/license, model task, label, features, split policy, algorithm or AutoML limits, and quality thresholds. |
+| `model\scenarios\<scenario>.json` | Dataset source/version/license, model task, label, features, split policy, algorithm or AutoML limits, and quality thresholds. A consumer scenario can instead declare a deterministic `dataset.synthetic` source (`generator`, `seed`, `rows`; provider `lake`; regenerate it with `python -m ml_model_factory synthesize`), and can limit its generated notebooks with `example_leaves`. |
 | `storage-selection.example.json` | Actual common/project accounts, resource groups, containers and credentialless Azure ML datastores; the selector is a JSON boolean, not a string. |
 | `lake.example.json` | Project/environment/use-case scope, immutable source/snapshot/model versions and a unique execution ID. |
 | `model\model-selection.json` | Metrics, direction and improvement thresholds; explicitly choose a champion or first-model policy. |
 | `model\monitoring.example.json` | Pinned model version, observation windows, reference data and drift/performance rules. |
 | `databricks\job-template.json` | Existing cluster, imported notebook/wheel locations, source data and experiment paths. |
 | `model\environments` | Optional reviewed dependency overrides; normally reference an existing pinned environment. |
-| `esml-rollout.example.json` | ESML pipeline-factory leaves: shared factory/storage/runtime settings plus one reviewed source binding per scenario (`mode`, compute, data version, run ID, input path, optional AutoML limits and `inference_history_path` for AutoML forecasting). |
+| `esml-rollout.example.json` | ESML pipeline-factory leaves: shared factory/storage/runtime settings plus one reviewed source binding per scenario (`mode`, compute, data version, run ID, input path, optional AutoML limits and `inference_history_path` for AutoML forecasting). Built-in scenarios use fixed model numbers 1-11. A consumer scenario needs a reviewed `model_numbers` entry from 12 to 999, for example `{"49-agent-training-ml-churn-prediction": 49}`, which gives `M49_` names. |
 | `databricks\inference-settings.example.json` | Databricks batch tables, Model Serving names and Event Hubs streaming settings for the pattern task. |
 | `databricks\azureml-step.example.json` | Existing Databricks job ID, task keys and parameters for Azure ML pipelines with Databricks steps (job rendered with `--orchestration azureml`). |
 

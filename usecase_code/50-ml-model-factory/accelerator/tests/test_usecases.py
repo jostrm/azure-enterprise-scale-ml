@@ -11,13 +11,13 @@ import pytest
 
 from ml_model_factory import cli
 from ml_model_factory.examples import render_all
-from ml_model_factory.usecases import PATTERNS, TASK_FOLDERS, TECHNOLOGIES, catalog, find, scenarios_by_task
+from ml_model_factory.usecases import PATTERNS, TASK_FOLDERS, TECHNOLOGIES, catalog, find, scenarios_by_task, selected_scenarios
 
 
 ROOT = Path(__file__).resolve().parents[2]
 SCENARIOS = scenarios_by_task(ROOT / "user-config" / "model" / "scenarios")
 LEAVES = [leaf for leaf in catalog() if leaf.supported]
-NOTEBOOKS = [(leaf, scenario) for leaf in LEAVES for scenario in SCENARIOS[leaf.task]]
+NOTEBOOKS = [(leaf, scenario) for leaf in LEAVES for scenario in selected_scenarios(leaf, SCENARIOS[leaf.task])]
 
 
 def test_catalog_covers_every_leaf_folder_and_states_unsupported_reasons():

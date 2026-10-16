@@ -14,7 +14,7 @@ from .config import load_json, validate_runtime, validate_scenario, write_json
 # top-level imports light because the parser imports every plugin.
 PLUGINS = (
     "inference", "online", "endpoints", "streaming", "stream_jobs", "databricks_jobs",
-    "vision_automl", "usecases",
+    "vision_automl", "usecases", "synthetic",
 )
 
 

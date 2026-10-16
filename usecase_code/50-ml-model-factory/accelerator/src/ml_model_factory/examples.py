@@ -11,7 +11,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .usecases import PATTERN_SUMMARY, TASK_FOLDER_BY_TASK, UseCase, catalog, find, scenarios_by_task
+from .usecases import (PATTERN_SUMMARY, TASK_FOLDER_BY_TASK, UseCase, catalog, find, scenarios_by_task,
+                       selected_scenarios)
 
 
 GENERATED_START = "<!-- usecase-catalog:start -->"
@@ -36,6 +37,14 @@ def _bullets(values) -> str:
     return "\n".join(f"- {value}" for value in values)
 
 
+def _source_line(dataset: dict) -> str:
+    synthetic = dataset.get("synthetic")
+    if synthetic:
+        return (f"Synthetic source: generator `{synthetic['generator']}`, seed {synthetic['seed']}, "
+                f"{synthetic['rows']} rows; no download, third-party data or license review.")
+    return f"Kaggle-only source: `{dataset.get('slug') or 'NOT SELECTED'}`."
+
+
 def _header(leaf: UseCase, scenario: dict) -> Section:
     dataset = scenario["dataset"]
     return Section([_cell("markdown", f"""# {scenario['name']}: {scenario['task']} ({leaf.pattern}, {leaf.technology.short})
@@ -48,7 +57,7 @@ def _header(leaf: UseCase, scenario: dict) -> Section:
 
 **Status:** {leaf.status}
 
-Kaggle-only source: `{dataset.get("slug") or "NOT SELECTED"}`.
+{_source_line(dataset)}
 Dataset status: **{dataset.get("status", "configured")}**.
 {dataset.get("notes", "")}
 
@@ -119,7 +128,25 @@ def factory(*arguments):
 """)
 
 
-def _data() -> Section:
+def _data(scenario: dict | None = None) -> Section:
+    if scenario is not None and scenario.get("dataset", {}).get("synthetic"):
+        return Section([
+            _cell("markdown", """## Synthetic data and reproducible preparation
+
+`RUN_SYNTHESIZE` regenerates this scenario's deterministic synthetic file and its provenance
+(generator, seed, rows and SHA-256) under `data/in`. Nothing is downloaded and no third-party
+data or license review is involved. Existing different outputs are never silently replaced.
+"""),
+            _cell("code", """
+if RUN_SYNTHESIZE:
+    factory("synthesize", "--scenario", SCENARIO, "--output", RAW)
+INPUT = RAW / scenario["dataset"]["file"]
+if RUN_PREPARE:
+    factory("prepare", "--scenario", SCENARIO, "--input", INPUT, "--output", PREPARED)
+if (PREPARED / "manifest.json").exists():
+    print(json.dumps(load_json(PREPARED / "manifest.json"), indent=2))
+"""),
+        ], switches=("RUN_SYNTHESIZE", "RUN_PREPARE"))
     return Section([
         _cell("markdown", """## Kaggle ingestion and reproducible preparation
 
@@ -502,9 +529,9 @@ if PREPARE_ESML or RUN_ESML_TRAINING:
     rollout, config = esml_rollout(cloud=RUN_ESML_TRAINING)
     binding = config["scenarios"][scenario["name"]]
     RUN_ID = RUN_ID or binding["run_id"]
-    from azure_esml.domain_layer.rollout import SCENARIO_NUMBERS
+    from azure_esml.domain_layer.rollout import scenario_number
     if PREPARE_ESML:
-        request = rollout.prepare(model_number=SCENARIO_NUMBERS[scenario["name"]], mode=MODE,
+        request = rollout.prepare(model_number=scenario_number(config, scenario["name"]), mode=MODE,
                                   data_date_utc=config["data_date_utc"], run_id=RUN_ID,
                                   data_version=binding["data_version"])
         print(json.dumps(request, indent=2))
@@ -649,21 +676,21 @@ model-factory guide). Predictions are never labels. {cleanup}
 """)])
 
 
-def sections(leaf: UseCase) -> list[Section]:
+def sections(leaf: UseCase, scenario: dict | None = None) -> list[Section]:
     engine, vision = leaf.technology.engine, leaf.family == "vision"
     result = []
     if engine == "local":
-        result += [_data(), _local_training()] + ([_vision_note(leaf)] if vision else [])
+        result += [_data(scenario), _local_training()] + ([_vision_note(leaf)] if vision else [])
         result += [_requests(leaf), _local_serving(leaf), _lake(), _render(), _submit(), _register(),
                    _azure_serving(leaf)]
     elif engine == "azureml" or (engine == "pipeline" and not leaf.esml):
-        result += [_data()] + ([_vision_note(leaf)] if vision else [])
+        result += [_data(scenario)] + ([_vision_note(leaf)] if vision else [])
         result += [_lake(), _render(), _submit(), _register(), _requests(leaf), _azure_serving(leaf)]
     elif engine == "pipeline":
-        result += [_data(), _esml_training(leaf), _requests(leaf)]
+        result += [_data(scenario), _esml_training(leaf), _requests(leaf)]
         result += [_esml_batch()] if leaf.pattern == "batch" else [_azure_serving(leaf)]
     elif engine == "databricks":
-        result += [_data(), _requests(leaf), _databricks_job(leaf)]
+        result += [_data(scenario), _requests(leaf), _databricks_job(leaf)]
     else:
         result += [_databricks_job(leaf, "azureml"), _databricks_pipeline(leaf), _submit()]
     return result + [_closing(leaf)]
@@ -678,7 +705,7 @@ def render_example(leaf: UseCase, scenario: dict, output_dir: Path,
         raise ValueError(f"{leaf.folder.as_posix()} is not supported: {leaf.reason}")
     if scenario["task"] != leaf.task:
         raise ValueError("Scenario task does not match the use-case task folder")
-    parts = sections(leaf)
+    parts = sections(leaf, scenario)
     switches = list(dict.fromkeys(name for part in parts for name in part.switches))
     settings = list(dict.fromkeys(item for part in parts for item in part.settings))
     cells = _header(leaf, scenario).cells + [_setup(leaf, scenario, runtime_path, switches, settings)]
@@ -764,11 +791,11 @@ def render_all(source: Path | None = None, *, write: bool = False) -> dict:
         for leaf in catalog():
             folder = root / Path(*leaf.folder.parts)
             readme = folder / "readme.md"
-            expected[readme] = render_readme(readme.read_text(encoding="utf-8"), leaf,
-                                             scenarios[leaf.task]).encode("utf-8")
+            selected = selected_scenarios(leaf, scenarios[leaf.task])
+            expected[readme] = render_readme(readme.read_text(encoding="utf-8"), leaf, selected).encode("utf-8")
             if not leaf.supported:
                 continue
-            for scenario in scenarios[leaf.task]:
+            for scenario in selected:
                 rendered = render_example(leaf, scenario, staging / leaf.folder.as_posix())
                 expected[folder / rendered.name] = rendered.read_bytes()
     parents = set()

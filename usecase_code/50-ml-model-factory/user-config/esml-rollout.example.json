@@ -36,6 +36,7 @@
     "command_timeout_seconds": 7200
   },
   "automl_evaluation_environment": "azureml:esml-automl-runtime:1",
+  "model_numbers": {},
   "scenarios": {
     "diabetes": {
       "mode": "automl",
