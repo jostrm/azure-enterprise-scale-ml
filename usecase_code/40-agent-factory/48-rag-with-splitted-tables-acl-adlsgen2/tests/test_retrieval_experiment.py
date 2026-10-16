@@ -239,6 +239,144 @@ class RetrievalExperimentTests(unittest.TestCase):
             experiment._embedding(experiment.documents["json"][0])
         self.assertFalse(state.exists())
 
+    def control_fixture(self):
+        config = self.config()
+        config["retrieval_experiment"] = {
+            "ingestion": "native-whole-table", "synthetic_project_corpus_approved": True,
+            "authorization": "project-managed-identity", "model_deployment": "reasoning-demo",
+        }
+        experiment = Experiment(config, Mock(), object(), self.root / "full-text-control")
+        deployment = {
+            "name": experiment.plan["agent_name"], "version": "3",
+            "binding": experiment.plan["binding"], "model_deployment": "reasoning-demo",
+        }
+        definition = {"model": "reasoning-demo"}
+        agent = SimpleNamespace(
+            metadata={"aif48.experiment": experiment.plan["binding"]},
+            definition=SimpleNamespace(as_dict=lambda: definition),
+        )
+        project = Mock()
+        project.agents.get_version.return_value = agent
+        client = Mock()
+        project.get_openai_client.return_value.__enter__ = Mock(return_value=client)
+        project.get_openai_client.return_value.__exit__ = Mock(return_value=False)
+        response = SimpleNamespace(
+            id="response-control", status="completed", output_text="Model-generated answer",
+            model="reasoning-demo", output=[SimpleNamespace(type="reasoning"), SimpleNamespace(type="message")],
+            usage=SimpleNamespace(model_dump=lambda: {"input_tokens": 27056, "output_tokens": 13000}),
+            model_dump=lambda **kwargs: {"id": "response-control", "status": "completed"},
+        )
+        client.responses.create.return_value = response
+        return experiment, deployment, project, client, response, definition
+
+    def invoke_control(self, fixture):
+        experiment, deployment, project, _, _, _ = fixture
+        with patch("sales_demo.retrieval_experiment.project_client") as factory, \
+                patch.object(experiment, "verify"), \
+                patch.object(experiment, "_read_index",
+                             side_effect=[experiment.documents["json"], experiment.documents["excel"]]):
+            factory.return_value.__enter__.return_value = project
+            return experiment.full_text_sum(deployment, allow_paid=True)
+
+    def test_full_text_control_sends_exact_live_text_without_tools_or_oracle(self):
+        fixture = self.control_fixture()
+        result = self.invoke_control(fixture)
+        experiment, _, _, client, _, _ = fixture
+        request = client.responses.create.call_args.kwargs
+        self.assertEqual(request["model"], "reasoning-demo")
+        self.assertEqual(request["tools"], [])
+        self.assertEqual(request["tool_choice"], "none")
+        self.assertEqual(request["reasoning"], {"effort": "high"})
+        self.assertEqual(request["max_output_tokens"], 24000)
+        self.assertFalse(request["store"])
+        self.assertNotIn("extra_body", request)
+        for source in ("json", "excel"):
+            self.assertIn(experiment.documents[source][0]["content"], request["input"])
+        self.assertNotIn("3953593262", request["input"])
+        self.assertNotIn("39535932.62", request["input"])
+        self.assertNotIn("expected.json", request["input"])
+        self.assertEqual(result["mode"], "full-text-no-tools-control")
+        self.assertFalse(result["arithmetic_verified"])
+        self.assertFalse(result["agent_invoked"])
+        self.assertEqual(result["text"], "Model-generated answer")
+        evidence = Path(result["artifacts_dir"])
+        self.assertEqual(json.loads((evidence / "request.json").read_text())["input"], request["input"])
+        self.assertEqual(json.loads((evidence / "response.json").read_text())["id"], "response-control")
+
+    def test_full_text_control_requires_paid_and_corpus_approval(self):
+        fixture = self.control_fixture()
+        experiment, deployment, _, _, _, _ = fixture
+        with patch.object(experiment, "verify") as verify:
+            with self.assertRaisesRegex(ValueError, "--allow-paid"):
+                experiment.full_text_sum(deployment)
+            experiment.config["retrieval_experiment"]["synthetic_project_corpus_approved"] = False
+            with self.assertRaises(ValueError):
+                experiment.full_text_sum(deployment, allow_paid=True)
+            verify.assert_not_called()
+
+    def test_full_text_control_rejects_changed_agent_or_model_binding(self):
+        for change in ("binding", "model", "persisted-model", "name", "ingestion"):
+            fixture = self.control_fixture()
+            experiment, deployment, project, client, _, definition = fixture
+            if change == "binding":
+                project.agents.get_version.return_value.metadata["aif48.experiment"] = "foreign"
+            elif change == "model":
+                definition["model"] = "different-model"
+            elif change == "persisted-model":
+                deployment["model_deployment"] = "different-model"
+            elif change == "name":
+                deployment["name"] = "foreign"
+            else:
+                experiment.plan["ingestion"] = "row-aware-push"
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.invoke_control(fixture)
+            client.responses.create.assert_not_called()
+
+    def test_full_text_control_rechecks_actual_payload_before_model_call(self):
+        fixture = self.control_fixture()
+        experiment, deployment, _, client, _, _ = fixture
+        altered = deepcopy(experiment.documents["json"])
+        altered[0]["content"] = altered[0]["content"][:-10]
+        with patch.object(experiment, "verify"), \
+                patch.object(experiment, "_read_index", return_value=altered), \
+                self.assertRaises(ValueError):
+            experiment.full_text_sum(deployment, allow_paid=True)
+        client.responses.create.assert_not_called()
+
+    def test_full_text_control_retains_incomplete_and_unexpected_tool_responses(self):
+        for change in ("incomplete", "empty", "tool"):
+            fixture = self.control_fixture()
+            experiment, _, _, _, response, _ = fixture
+            if change == "incomplete":
+                response.status = "incomplete"
+            elif change == "empty":
+                response.output_text = ""
+            else:
+                response.output.append(SimpleNamespace(type="code_interpreter_call"))
+            before = set((experiment.state_dir / "full-text-sum-runs").glob("*/response.json"))
+            with self.subTest(change=change), self.assertRaisesRegex(RuntimeError, "response.json"):
+                self.invoke_control(fixture)
+            after = set((experiment.state_dir / "full-text-sum-runs").glob("*/response.json"))
+            self.assertEqual(len(after - before), 1)
+
+    def test_full_text_control_fresh_runs_keep_separate_artifacts(self):
+        fixture = self.control_fixture()
+        first = self.invoke_control(fixture)
+        second = self.invoke_control(fixture)
+        self.assertNotEqual(first["artifacts_dir"], second["artifacts_dir"])
+
+    def test_full_text_control_propagates_model_failure_without_retry(self):
+        fixture = self.control_fixture()
+        experiment, _, project, client, _, _ = fixture
+        client.responses.create.side_effect = TimeoutError("Model timed out")
+        before = set((experiment.state_dir / "full-text-sum-runs").glob("*/request.json"))
+        with self.assertRaisesRegex(TimeoutError, "Model timed out"):
+            self.invoke_control(fixture)
+        after = set((experiment.state_dir / "full-text-sum-runs").glob("*/request.json"))
+        self.assertEqual(len(after - before), 1)
+        self.assertEqual(client.responses.create.call_count, 1)
+        project.get_openai_client.assert_called_once_with(max_retries=0, timeout=1200)
+
     def test_cli_has_no_implicit_mutation_or_paid_calls(self):
         spec = importlib.util.spec_from_file_location(
             "retrieval_only_entry", Path(__file__).resolve().parents[1] / "retrieval_only.py")
@@ -247,9 +385,28 @@ class RetrievalExperimentTests(unittest.TestCase):
         for command in ("configure", "deploy"):
             with self.assertRaisesRegex(ValueError, "--apply"):
                 entry.run(entry.parser().parse_args([command, "--config", "not-read.json"]))
-        for command in ("configure", "probe", "ask"):
+        for command in ("configure", "probe", "ask", "full-text-sum"):
             with self.assertRaisesRegex(ValueError, "--allow-paid"):
                 entry.run(entry.parser().parse_args([command, "--config", "not-read.json", "--apply"]))
+        with self.assertRaisesRegex(ValueError, "omit --input"):
+            entry.run(entry.parser().parse_args([
+                "full-text-sum", "--config", "not-read.json", "--allow-paid", "--input", "a different question",
+            ]))
+
+    def test_cli_routes_full_text_control_without_retrieval_agent_invocation(self):
+        spec = importlib.util.spec_from_file_location(
+            "retrieval_only_control_entry", Path(__file__).resolve().parents[1] / "retrieval_only.py")
+        entry = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(entry)
+        args = entry.parser().parse_args(["full-text-sum", "--config", str(self.root / "config.json"), "--allow-paid"])
+        with patch.object(entry, "load_config", return_value={}), \
+                patch.object(entry.common, "operator", return_value=(Mock(), Mock())), \
+                patch.object(entry, "discover"), patch.object(entry, "Experiment") as constructor, \
+                patch.object(entry, "read_json", return_value={"name": "demo"}), \
+                patch.object(entry, "write_json"):
+            entry.run(args)
+        constructor.return_value.full_text_sum.assert_called_once_with({"name": "demo"}, allow_paid=True)
+        constructor.return_value.ask.assert_not_called()
 
 
 if __name__ == "__main__":

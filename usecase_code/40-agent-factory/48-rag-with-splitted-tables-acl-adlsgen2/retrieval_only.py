@@ -12,7 +12,7 @@ from sales_demo.retrieval_experiment import Experiment, build_documents, definit
 
 def parser():
     result = argparse.ArgumentParser(description=__doc__)
-    result.add_argument("command", choices=["plan", "configure", "verify", "probe", "deploy", "ask"])
+    result.add_argument("command", choices=["plan", "configure", "verify", "probe", "deploy", "ask", "full-text-sum"])
     result.add_argument("--config", type=Path, required=True)
     result.add_argument("--apply", action="store_true")
     result.add_argument("--allow-paid", action="store_true")
@@ -24,8 +24,10 @@ def parser():
 def run(args):
     if args.command in {"configure", "deploy"} and not args.apply:
         raise ValueError("Cloud writes require --apply.")
-    if args.command in {"configure", "probe", "ask"} and not args.allow_paid:
+    if args.command in {"configure", "probe", "ask", "full-text-sum"} and not args.allow_paid:
         raise ValueError("Embedding or model calls require --allow-paid.")
+    if args.command == "full-text-sum" and args.input is not None:
+        raise ValueError("full-text-sum uses its fixed audit prompt; omit --input.")
     config = load_config(args.config)
     state = common.external_output(args.config.resolve().parent / "retrieval-only-experiment")
     if args.command == "plan":
@@ -62,6 +64,8 @@ def run(args):
     elif args.command == "deploy":
         result = experiment.deploy(apply=args.apply)
         write_json(deployment, result)
+    elif args.command == "full-text-sum":
+        result = experiment.full_text_sum(read_json(deployment), allow_paid=args.allow_paid)
     else:
         result = experiment.ask(read_json(deployment), args.input, allow_paid=args.allow_paid)
     write_json(state / (args.command + ".json"), result)

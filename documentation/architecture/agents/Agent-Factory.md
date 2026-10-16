@@ -131,6 +131,16 @@ only for this isolated experiment; protected indexes and their integrity gates
 remain unchanged. Model arithmetic and retrieval exhaustiveness remain unverified
 until evaluated, and no oracle is supplied as a tool or prompt.
 
+The separate `retrieval_only.py full-text-sum` control reads and hash-verifies both
+complete live whole-table index documents, then submits their original text to
+the experiment's existing model with no tools, no agent reference and high
+reasoning. It retains exact requests/raw responses for independent evaluation;
+it never reads the oracle or computes row amounts before inference. Two observed
+synthetic-fixture controls produced the exact full total, while two persisted
+MCP-agent trials did not. This is not a Playground-path fix, Text Split acceptance,
+per-user authorization proof or general guarantee of LLM arithmetic. The example
+README records the dated results and reproducible commands without tenant bindings.
+
 ## Agent-driven ML training example
 
 `49-agent-training-ml-churn-prediction` has two entry points with the same tools.

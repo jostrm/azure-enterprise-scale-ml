@@ -1,15 +1,19 @@
 # Split tables: native ADLS permissions, multi-index RAG and exact sales
 
-This example combines a Microsoft Foundry prompt agent with two **different,
-nonempty partitions** of one synthetic car-sales dataset. It is not an example of
-an LLM adding a handful of search snippets. Search supplies cited evidence;
-a deterministic tool reads the complete authorized structured sources and
-calculates the answer in integer USD cents.
+This example combines Microsoft Foundry with two **different, nonempty
+partitions** of one synthetic car-sales dataset. Choose the intended path:
+
+| Path | Arithmetic | What it demonstrates |
+| --- | --- | --- |
+| Native-ACL pipeline (`main.py`) | Deterministic calculator over complete authorized sources | Exact totals independent of top-k evidence; strict split/ACL acceptance gates |
+| Playground experiment (`retrieval_only.py ask`) | LLM only, native multi-index MCP retrieval | Retrieval from both indexes; full summation still fails in the observed runs |
+| Full-text control (`retrieval_only.py full-text-sum`) | Same model, **no tools** | Exact LLM summation succeeded twice when both complete texts were supplied directly |
 
 **Execution status:** local implementation and approval-gated cloud runner.
-No deployment, real Text Split results, live ACL/revocation result, paid agent
-evaluation or image-serving success is implied by the source code or unit tests.
-The cloud acceptance criteria below must pass before claiming the complete demo.
+Source code and unit tests alone do not establish a deployment or cloud success.
+The dated experiment results below are separate from the original native-ACL
+pipeline, whose real Text Split completeness gate remains blocked. Its cloud
+acceptance criteria must pass before claiming the complete split/ACL/image demo.
 
 ## Retrieval-only Playground experiment: no calculator
 
@@ -96,6 +100,96 @@ without a calculator. On the exact sum prompt, the model retrieved twice and
 declined to assert a complete total, saying retrieval was truncated. That answer
 is retained as experimental model behavior, not replaced by a deterministic
 calculation or claimed as numeric success.
+
+### Reproduce the successful no-tools summation control
+
+**This is not a fix to the Playground agent.** `full-text-sum` reads both complete
+live experiment-index documents, verifies their content/provenance against the
+approved publication, and gives their original text directly to the **same model
+deployment** as the persisted experiment agent. It does not invoke that agent or
+its MCP tool. Transport JSON is decoded; rows are not pre-calculated, summarized,
+split or replaced with evaluator answers.
+
+First complete the local setup, consumer configuration, synthetic publication
+and approved `native-whole-table` experiment deployment described in this README.
+Use your own private-network access, Entra identity and consumer configuration;
+sharing this example does not share the original operator's Azure resources.
+`$Python`, `$Config` and `$State` refer to the variables in **Local setup and
+deterministic generation** below. A compatible reasoning model with adequate
+context, output and token-rate capacity must already be deployed and selected by
+`retrieval_experiment.model_deployment`; the command provisions nothing.
+
+```powershell
+# Optional comparison: existing native MCP/Playground route.
+& $Python retrieval_only.py ask --config $Config --allow-paid `
+  --input "Give me the sum of all sales." --output "$State\sum-agent.json"
+
+# Paid full-text control: no calculator, retrieval or code-execution tools.
+& $Python retrieval_only.py full-text-sum --config $Config --allow-paid `
+  --output "$State\sum-full-text-1.json"
+
+# Independent fresh response; no previous answer is supplied.
+& $Python retrieval_only.py full-text-sum --config $Config --allow-paid `
+  --output "$State\sum-full-text-2.json"
+```
+
+The fixed prompt asks for all sales from both supplied texts, using integer USD
+cents, cancelled rows as zero, discounts/refunds deducted and tax excluded. It
+requires deduplication by `(dataset, version, sale_id)`, audit groups of at most
+20 consecutive IDs per source, then source counts/subtotals and the grand total.
+The exact prompt is `FULL_TEXT_SUM_QUESTION` in
+[`sales_demo/retrieval_experiment.py`](sales_demo/retrieval_experiment.py).
+`--input` is intentionally rejected for this fixed control.
+
+Inference uses `tools=[]`, `tool_choice="none"`, `reasoning.effort="high"`,
+`max_output_tokens=24000`, `store=false`, no previous response and no automatic
+retry. It does not send an `agent_reference`: this service rejects per-request
+reasoning overrides when an agent reference is specified. An incompatible model
+or rate limit is surfaced, not silently replaced with another model or tool.
+
+Each run keeps its exact input/settings, source hashes and raw response under
+`$State\retrieval-only-experiment\full-text-sum-runs\<run-id>`. The result also
+contains token usage, duration and the raw model answer. Incomplete responses or
+unexpected tool calls fail explicitly and retain the response for inspection.
+Keep these artifacts and all consumer configuration outside Git.
+
+For a blind comparison, **do not give the model the README, expected amounts or
+`evaluation\expected.json`**. Only after inference, compare the returned source
+counts, subtotals, grand total and audit groups with the independent fixture
+oracle/structured rows. This command deliberately returns
+`arithmetic_verified:false`: completing inference is not proof that arithmetic
+or the model's claimed coverage is correct.
+
+### Observed results: 16 October 2026
+
+The original test harness used the same request shape now exposed by
+`full-text-sum`. All inputs were synthetic `car-sales/v1`, seed 48. No expected
+total, computed row amount or calculator was supplied to the model.
+
+| Route | Completed trials | Exact full totals |
+| --- | ---: | ---: |
+| Persisted native-MCP agent: original and stronger audit prompts | 2 | 0 |
+| Same `gpt-6.1-sol` model: full-text, high-reasoning, no-tools control | 2 | 2 |
+
+Both successful controls returned **262 records and USD 39,535,932.62**, including
+109 JSON records / USD 16,768,818.26 and 153 Excel records / USD 22,767,114.36.
+Independent, post-response Decimal calculations matched **all 14 audit-group
+subtotals**, source totals, row counts and currency conversions in both runs.
+The runs took approximately 241 and 288 seconds (about 4-5 minutes).
+
+The agent baseline declined a full total. The stronger prompt reported only
+61 JSON and 114 Excel records and also introduced a USD 100 arithmetic error.
+Every recorded MCP response nevertheless contained both complete source texts
+with matching hashes. That suggests a hosted tool/context delivery cutoff, but
+the precise internal cause and token limit have not been established. Recorded
+tool output alone does not prove identical text reached the model's context.
+
+**Conclusion:** LLM-only full-dataset arithmetic is possible for this fixture.
+Two successes are not a general accuracy guarantee. The controls change input
+delivery and reasoning settings, do not fix the deployed Playground path, and
+do not demonstrate Text Split reconstruction or personal file-ACL enforcement.
+The original native-ACL splitter produced three chunks but failed exact-content
+reconstruction/offset checks; its gate was not weakened to claim success.
 
 ## Architecture and boundaries
 

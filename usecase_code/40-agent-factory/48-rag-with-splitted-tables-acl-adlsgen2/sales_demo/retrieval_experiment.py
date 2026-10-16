@@ -3,7 +3,7 @@ import json
 import math
 from pathlib import Path
 import time
-from uuid import NAMESPACE_URL, UUID, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 import tiktoken
 
@@ -19,6 +19,24 @@ from .search import API_VERSION, SEARCH_AUDIENCE, _field, check_resource, ensure
 
 FIELDS = ("id", "title", "content", "source", "dataset", "version", "ordinal",
           "source_uri", "content_sha256", "input_tokens")
+
+FULL_TEXT_SUM_QUESTION = (
+    "Give me the sum of ALL sales across BOTH the JSON and Excel sales sources. "
+    "Both complete source texts are supplied below; no tools are available. "
+    "Read the complete returned table content, including nested JSON-escaped text. "
+    "Do not stop after the first portion or the first source. "
+    "Calculate the result yourself; do not use a calculator, code execution, SQL, "
+    "or any precomputed total. Use integer USD cents throughout: for each non-cancelled "
+    "record, quantity * unit_price_minor - discount_minor - refund_minor; "
+    "cancelled records contribute zero, and tax_minor is excluded. "
+    "Deduplicate by dataset, version, and sale_id. "
+    "Return a compact audit table of consecutive groups of at most 20 sale IDs "
+    "within each source, with the first ID, last ID, record count, and net subtotal "
+    "in cents. Then give each source's record count and subtotal and the combined "
+    "record count and grand total in cents and USD. "
+    "Do not claim completeness if the available content is actually truncated. "
+    "Do not include calculation code."
+)
 
 
 def instructions():
@@ -499,3 +517,68 @@ class Experiment:
                 "text": response.output_text, "retrieval_calls": calls,
                 "calculator_used": False, "arithmetic_verified": False,
                 "per_user_acl_test": False, "possible_indexes": [item["name"] for item in self.plan["indexes"]]}
+
+    def full_text_sum(self, deployment, *, allow_paid=False):
+        """Isolate model arithmetic from native MCP delivery; never read the oracle."""
+        if not allow_paid:
+            raise ValueError("Full-text model inference requires --allow-paid.")
+        require_approval(self.config)
+        if (self.plan["ingestion"] != "native-whole-table"
+                or self.config["dataset"] != "car-sales"
+                or set(self.documents) != {"json", "excel"}
+                or deployment.get("binding") != self.plan["binding"]
+                or deployment.get("name") != self.plan["agent_name"]):
+            raise ValueError("Select the matching deployed synthetic whole-table experiment.")
+        self.verify()
+        question, sources = FULL_TEXT_SUM_QUESTION, []
+        for index, source in zip(self.plan["indexes"], ("json", "excel")):
+            live = self._read_index(index["name"])
+            verify_indexed_documents(self.documents[source], live)
+            if len(live) != 1:
+                raise ValueError("Full-text control requires exactly one complete table per source.")
+            content = live[0]["content"]
+            question += f'\n\n<source name="{source}">\n{content}\n</source>'
+            sources.append({
+                "source": source, "index": index["name"], "characters": len(content),
+                "content_sha256": digest(content.encode("utf-8")),
+            })
+        model = self.config.get("retrieval_experiment", {}).get("model_deployment") or self.config["model_deployment"]
+        settings = {
+            "model": model, "tools": [], "tool_choice": "none", "store": False,
+            "reasoning": {"effort": "high"}, "max_output_tokens": 24000,
+            "instructions": instructions().replace(
+                "Use knowledge_base_retrieve for questions about the data.",
+                "For this control, use the complete source texts supplied in the question.",
+            ),
+        }
+        from agent_factory.cli import write_json
+        artifacts = self.state_dir / "full-text-sum-runs" / str(uuid4())
+        with project_client(self.session, self.target) as project:
+            agent = project.agents.get_version(agent_name=deployment["name"], agent_version=deployment["version"])
+            if ((agent.metadata or {}).get("aif48.experiment") != self.plan["binding"]
+                    or agent.definition.as_dict().get("model") != model
+                    or deployment.get("model_deployment") != model):
+                raise ValueError("Persisted agent identity or model differs from the control configuration.")
+            write_json(artifacts / "request.json", {
+                "mode": "full-text-no-tools-control", "input": question, "settings": settings,
+                "sources": sources, "reference_agent": deployment["name"],
+                "reference_agent_version": deployment["version"], "oracle_supplied": False,
+            })
+            started = time.monotonic()
+            with project.get_openai_client(max_retries=0, timeout=1200) as client:
+                response = client.responses.create(input=question, **settings)
+            elapsed = round(time.monotonic() - started, 1)
+        write_json(artifacts / "response.json", response.model_dump(mode="json"))
+        output_types = [item.type for item in response.output]
+        if (response.status != "completed" or not response.output_text
+                or any(kind not in {"reasoning", "message"} for kind in output_types)):
+            raise RuntimeError(f"No completed tool-free answer; inspect {artifacts / 'response.json'}.")
+        return {
+            "mode": "full-text-no-tools-control", "agent_invoked": False,
+            "model_deployment": model, "response_id": response.id, "status": response.status,
+            "text": response.output_text, "sources": sources, "elapsed_seconds": elapsed,
+            "usage": response.usage.model_dump() if response.usage else None,
+            "output_types": output_types, "artifacts_dir": str(artifacts),
+            "calculator_used": False, "oracle_supplied": False, "arithmetic_verified": False,
+            "text_split_test": False, "per_user_acl_test": False,
+        }
