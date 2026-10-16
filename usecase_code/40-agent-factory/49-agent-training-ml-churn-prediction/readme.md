@@ -114,6 +114,9 @@ $py = ".\.venv\Scripts\python.exe"
 `create-usecase`, `train`, `retrain` and `infer` run the same operations without the model, using
 `--usecase`. Rerunning any of them resumes from receipts and does not repeat a recorded job.
 
+If an inference job fails, the next `infer` starts a fresh attempt (`-a2` to `-a5`). Each attempt has
+its own receipts and its own create-only lake paths, so a recorded job is never resubmitted.
+
 - `--fresh` plans the next immutable data version (`aif49-synth-v<n>`). Published versions are never
   overwritten or deleted.
 - The commands keep the workstation awake during bounded Azure waits. After a sleep or VPN drop,

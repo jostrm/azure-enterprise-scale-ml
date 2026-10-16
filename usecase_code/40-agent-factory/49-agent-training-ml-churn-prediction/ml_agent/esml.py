@@ -6,10 +6,13 @@ These helpers only sequence its public operations and never resubmit a recorded 
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 
 from .configuration import read_json, write_json
 
 TERMINAL = ("registered", "not_promoted")
+FAILED_JOB = ("Failed", "Canceled", "CancelRequested", "NotResponding")
+MAX_INFERENCE_ATTEMPTS = 5
 
 
 def build_project(config: dict, location, name: str, *, cloud: bool = False, backend=None):
@@ -96,13 +99,52 @@ def champion_evidence(project, job_name: str, destination: Path) -> dict:
     return read_json(reports[0])
 
 
+def inference_attempts(entry: dict):
+    """Planned scoring folder/run first, then bounded retries with their own receipts and lake paths."""
+    yield entry["train_run_id"], entry["inference_run_id"]
+    for number in range(2, MAX_INFERENCE_ATTEMPTS + 1):
+        yield f"{entry['train_run_id']}-a{number}", f"{entry['inference_run_id']}-a{number}"
+
+
+def _start_attempt(base: Path, directory: Path, previous: dict) -> None:
+    """Copy only the training receipts that GOLD_INFERENCE planning reads; record the failed attempt."""
+    directory.mkdir(parents=True)
+    copied = []
+    for name in ("request.json", "training-completion.json", "selection-decision.json",
+                 "model-registration-intent.json"):
+        if (base / name).is_file():
+            shutil.copy2(base / name, directory / name)
+            copied.append(name)
+    write_json(directory / "aif49-attempt.json", {"copied_from": base.name, "files": copied, "previous": previous})
+
+
+def select_inference_attempt(project, rollout, entry: dict) -> tuple[Path, str]:
+    """Return the first new, pending or successful attempt; a failed job moves to a fresh attempt."""
+    base = rollout.output / entry["train_run_id"]
+    previous = None
+    for folder, inference_id in inference_attempts(entry):
+        directory = rollout.output / folder
+        if directory != base and not directory.exists():
+            _start_attempt(base, directory, previous)
+            return directory, inference_id
+        receipt = directory / "inference-pipeline-job.json"
+        if not receipt.is_file():
+            return directory, inference_id
+        job = read_json(receipt)["name"]
+        status = project._backend().get_job(job).get("status")
+        if status not in FAILED_JOB:
+            return directory, inference_id
+        previous = {"folder": folder, "inference_run_id": inference_id, "job": job, "status": status}
+    raise ValueError(f"Inference failed in {MAX_INFERENCE_ATTEMPTS} attempts; investigate before retrying")
+
+
 def infer(project, rollout, entry: dict, *, data_date: str, frame, lake_io, lineage: dict,
           model_id: str | None = None, timeout_seconds: int = 7200, poll_seconds: int = 30) -> dict:
     """Plan GOLD_INFERENCE, upload unlabeled gold rows once, submit once, then read lake predictions."""
     from azure_esml.base_layer.tables import write_table
 
-    run = entry["train_run_id"]
-    directory = rollout.output / run
+    directory, inference_id = select_inference_attempt(project, rollout, entry)
+    run = directory.name
     submitted = (directory / "inference-pipeline-intent.json").is_file()
     request_path = directory / "inference-request.json"
     if submitted and request_path.is_file():
@@ -110,8 +152,8 @@ def infer(project, rollout, entry: dict, *, data_date: str, frame, lake_io, line
     else:
         options = {"model_id": model_id} if model_id else {}
         planned = rollout.prepare_inference(run, inference_date_utc=data_date,
-                                            inference_run_id=entry["inference_run_id"], **options)
-    if f"/runs/{entry['inference_run_id']}/" not in planned["input"]:
+                                            inference_run_id=inference_id, **options)
+    if f"/runs/{inference_id}/" not in planned["input"]:
         raise ValueError("The prepared inference plan belongs to a different inference run")
     root = entry["lake"]["use_case_root"]
     input_prefix = lake_io.prefix(planned["input"], allowed_root=root)
@@ -138,7 +180,18 @@ def infer(project, rollout, entry: dict, *, data_date: str, frame, lake_io, line
     if len(predictions) != rows or "prediction" not in predictions or predictions["prediction"].isna().any():
         raise ValueError("Inference did not produce one usable prediction per request")
     result = {"job": finished["name"], "status": finished["status"], "model_id": planned["model_id"],
-              "model_source": planned.get("model_source", "trained"), "input": planned["input"],
-              "output": planned["output"], "predictions_blob": blob, "rows": len(predictions)}
+              "model_source": planned.get("model_source", "trained"), "inference_run_id": inference_id,
+              "input": planned["input"], "output": planned["output"], "predictions_blob": blob,
+              "rows": len(predictions)}
     write_json(directory / "aif49-inference-result.json", result)
     return {**result, "frame": predictions}
+
+
+def latest_inference(rollout_output: Path, entry: dict) -> dict | None:
+    """The most recent successful inference result across the planned attempts, without Azure calls."""
+    found = None
+    for folder, _ in inference_attempts(entry):
+        path = Path(rollout_output) / folder / "aif49-inference-result.json"
+        if path.is_file():
+            found = read_json(path)
+    return found

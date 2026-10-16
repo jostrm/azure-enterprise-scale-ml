@@ -111,15 +111,16 @@ class MLRuntime:
             directory = self.location.esml(name) / entry["train_run_id"]
             result.update(train_run_id=entry["train_run_id"], data_version=entry["data_version"],
                           training=esml.training_state(directory),
-                          inference=read_json(directory / "aif49-inference-result.json")
-                          if (directory / "aif49-inference-result.json").is_file() else None)
+                          inference=esml.latest_inference(self.location.esml(name), entry))
         return self._record("status", name, result)
 
     def predictions_summary(self, name: str) -> dict:
         if self.plan is None:
             raise ApprovalRequired("No approved plan is loaded.")
         entry = self.plan["usecases"][name]
-        summary = lake.load_record(self.location, f"{name}-{entry['inference_run_id']}-summary.json")
+        latest = esml.latest_inference(self.location.esml(name), entry)
+        summary = (lake.load_record(self.location, f"{name}-{latest['inference_run_id']}-summary.json")
+                   if latest and latest.get("inference_run_id") else None)
         if summary is None:
             raise ValueError(f"No completed inference for {name} in the approved plan")
         return self._record("predictions_summary", name, summary)
@@ -185,24 +186,30 @@ class MLRuntime:
                                               "run_id": entry["train_run_id"]})
 
     def _requests(self, name: str, entry: dict):
+        """Deterministic unlabeled requests; reused unchanged when an inference attempt is retried."""
         import pandas as pd
 
         work = self.location.work(name) / entry["inference_run_id"]
+        existing = work / "requests" / "requests.parquet"
         if name == CHURN:
-            created = factory.requests(self.location, work / "requests", rows=entry["inference_rows"],
-                                       seed=entry["inference_seed"])
-            return pd.read_parquet(created["requests"]), (
-                f"ml_model_factory.synthetic telco-churn requests (seed {entry['inference_seed']}); no labels")
+            description = f"ml_model_factory.synthetic telco-churn requests (seed {entry['inference_seed']}); no labels"
+            if not existing.is_file():
+                factory.requests(self.location, work / "requests", rows=entry["inference_rows"],
+                                 seed=entry["inference_seed"])
+            return pd.read_parquet(existing), description
         from ml_model_factory.config import validate_scenario
         from ml_model_factory.data import prepare
         from ml_model_factory.inference import sample_requests
 
-        scenario = validate_scenario(read_json(self.location.scenarios / f"{AIR}.json"))
-        source = self.lake_io.download_one(entry["input_path"], work / "source", suffix=".csv")
-        prepare(scenario, source, work / "prepared")
-        sample_requests(scenario, work / "prepared", work / "requests", rows=entry["inference_rows"], split="test")
-        return pd.read_parquet(work / "requests" / "requests.parquet"), (
-            "held-out test months from the approved air-passengers lake version; labels kept separate")
+        description = "held-out test months from the approved air-passengers lake version; labels kept separate"
+        if not existing.is_file():
+            scenario = validate_scenario(read_json(self.location.scenarios / f"{AIR}.json"))
+            source = self.lake_io.download_one(entry["input_path"], work / "source", suffix=".csv")
+            if not (work / "prepared").exists():
+                prepare(scenario, source, work / "prepared")
+            sample_requests(scenario, work / "prepared", work / "requests", rows=entry["inference_rows"],
+                            split="test")
+        return pd.read_parquet(existing), description
 
     def infer(self, name: str) -> dict:
         entry = self._entry(name, "infer")
@@ -224,7 +231,7 @@ class MLRuntime:
             result = esml.infer(project, rollout, entry, data_date=self.plan["data_date_utc"], frame=frame,
                                 lake_io=self.lake_io, lineage=lineage, model_id=model_id)
         predictions = result.pop("frame")
-        summary = {**result, "usecase": name, "inference_run_id": entry["inference_run_id"]}
+        summary = {**result, "usecase": name}
         if name == CHURN:
             churners = predictions[predictions["prediction"].astype(str) == "Yes"]
             summary.update(predicted_churn=int(len(churners)), scored=int(len(predictions)),
@@ -233,5 +240,5 @@ class MLRuntime:
             joined = frame.merge(predictions, on="request_id")
             summary["forecasts"] = [{"month": str(row["Month"])[:10], "passengers": round(float(row["prediction"]), 1)}
                                     for _, row in joined.sort_values("Month").iterrows()]
-        lake.record(self.location, f"{name}-{entry['inference_run_id']}-summary.json", redact(summary))
+        lake.record(self.location, f"{name}-{result['inference_run_id']}-summary.json", redact(summary))
         return self._record("infer", name, deepcopy(summary))

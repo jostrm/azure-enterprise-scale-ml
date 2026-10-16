@@ -327,6 +327,24 @@ def test_real_training_evaluation_and_inference(workdir, task):
         run_operation("inference", cfg, workdir / "latest", inputs={"gold": source}, model=model)
 
 
+def test_inference_applies_the_model_signature_types_to_integer_requests(workdir):
+    cfg = config()
+    prepared = prepare(cfg, workdir, records())
+    model = workdir / "model"
+    run_operation("training_manual", cfg, model, prepared=prepared)
+    schema = mlflow.pyfunc.load_model(str(model)).metadata.get_input_schema()
+    assert {column.name: str(column.type) for column in schema.inputs}["x"].endswith("double")
+    future = pd.DataFrame({"request_id": [f"request-{index}" for index in range(6)],
+                           "x": np.array([-3, -2, -1, 1, 2, 3], dtype="int64"),
+                           "category": ["even", "odd"] * 3})
+    source = parquet(workdir / "integer-requests.parquet", future)
+    run_operation("inference", cfg, workdir / "integer-inference", inputs={"gold": source}, model=model)
+    actual = pd.read_parquet(workdir / "integer-inference" / "predictions.parquet")
+    expected = mlflow.pyfunc.load_model(str(model)).predict(future[["x", "category"]].astype({"x": "float64"}))
+    np.testing.assert_array_equal(actual["prediction"], expected)
+    assert actual["request_id"].tolist() == future["request_id"].tolist()
+
+
 def test_split_labels_groups_and_nonoverlapping_outputs(workdir):
     cfg = config()
     cfg["scenario"]["split"]["group_column"] = "entity"

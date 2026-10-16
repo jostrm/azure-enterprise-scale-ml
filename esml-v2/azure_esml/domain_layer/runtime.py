@@ -876,10 +876,14 @@ class FactoryModelSteps:
         else:
             if "history" in inputs:
                 raise ValueError("This model uses its fitted history; external history requires the AutoML forecast adapter")
-            features_frame = frame.loc[:, features].copy()
+            loaded = mlflow.pyfunc.load_model(str(model))
             if self.scenario["task"] == "forecasting":
-                features_frame = _model_frame(features_frame, self.scenario)
-            predictions = mlflow.pyfunc.load_model(str(model)).predict(features_frame)
+                features_frame = _model_frame(frame.loc[:, features].copy(), self.scenario)
+            else:
+                # Apply the model signature's numeric/datetime types, as local and online scoring do.
+                from ml_model_factory.inference import normalize_features
+                features_frame = normalize_features(loaded, frame, self.scenario)
+            predictions = loaded.predict(features_frame)
         predictions = prediction_vector(predictions, len(frame))
         if pd.isna(predictions).any() or (np.issubdtype(predictions.dtype, np.number) and not np.isfinite(predictions).all()):
             raise ValueError("Model must produce a finite, nonmissing prediction for each request")
