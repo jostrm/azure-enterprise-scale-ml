@@ -161,6 +161,29 @@ This patch focuses on **simpler configuration**, **per-environment cost control 
   This is new-service provisioning recovery, not runtime failover, index
   migration or automatic target-side shared-link approval.
 
+## Logic Apps hosting capacity retries in the same resource group
+
+ADO/GHA task `68-integration` retries the unchanged integration deployment up to
+three times, waiting 120 seconds between attempts, only when all failure evidence
+identifies worker exhaustion on `appfarm-logicapp01` in the selected subscription
+and one resource group. The supported failure is App Service's "No available
+instances to satisfy this request" capacity response (extended code `03029`
+when present). Mixed, policy, quota, authorization, other-resource and unknown
+errors remain terminal.
+
+The helper compiles the existing Bicep once and uses temporary typed parameter
+files to preserve values across Windows `az.cmd` calls. It retains the deployment
+name, resource group, region, SKU and instance request. It creates no alternative
+resource group and does not change the plan type or enable public networking.
+After exhaustion it fails, rather than allowing dependent Logic Apps to proceed.
+
+Retries cannot guarantee Azure worker availability. Persistent exhaustion requires
+waiting for capacity or Azure support assistance for the existing resource group.
+[Asynchronous scaling](https://learn.microsoft.com/en-us/azure/app-service/app-service-plan-manage#scale-an-app-service-plan-asynchronously-preview)
+is documented for Basic, Standard and Premium plans, not explicitly Workflow
+Standard (`WS1`); this patch does not enable an unverified setting for that SKU.
+Refresh copied task templates together with the new retry helper.
+
 ## Compute shared-VNet deployment ordering
 
 Task `65-compute-services` now completes both optional subnet-delegation updates
