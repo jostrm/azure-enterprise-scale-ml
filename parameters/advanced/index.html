@@ -2937,11 +2937,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">390</td>
+<td style="text-align: right;">392</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">389</td>
+<td style="text-align: right;">390</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2957,7 +2957,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">393</td>
+<td style="text-align: right;">395</td>
 </tr>
 </tbody>
 </table>
@@ -4053,6 +4053,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Data lake container name</td>
 </tr>
 <tr>
+<td><!-- parameter yaml:logicAppType --><!-- parameter json.dev:logicAppType --><code>logicAppType</code></td>
+<td><code>LOGIC_APP_TYPE</code></td>
+<td>O</td>
+<td>Y: <code>"Standard"</code><br>J.dev: <code>"Standard"</code></td>
+<td>Logic Apps hosting type</td>
+</tr>
+<tr>
 <td><!-- parameter yaml:org-department-id --><!-- parameter json.dev:org-department-id --><code>org-department-id</code></td>
 <td><code>ORG_DEPARTMENT_ID</code></td>
 <td>O</td>
@@ -4625,6 +4632,13 @@ reported, not silently represented as multiple settings.</p>
 <td>C</td>
 <td>Y: <code>"snt-dev-prj&lt;xxx&gt;-genai"</code><br>J.dev: <code>"snt-dev-prj&lt;xxx&gt;-genai"</code></td>
 <td>BYO project GenAI subnet name mandatory: if BYO_subnets:'true' ensure: subnet exists.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:subnetProjLogicapp --><!-- parameter json.dev:subnetProjLogicapp --><code>subnetProjLogicapp</code></td>
+<td><code>SUBNET_PROJ_LOGICAPP</code></td>
+<td>C</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>BYO dedicated Logic Apps Standard outbound subnet name or full ARM ID mandatory: if BYO_subnets:'true', enableLogicApps:'true', logicAppType:'Standard', byoASEv3:'false' and enablePublicAccessWithPerimeter:'false'. Existing /26 or larger in the configured VNet, delegated only to Microsoft.Web/serverFarms; supports</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:subnetProjWebapp --><!-- parameter json.dev:subnetProjWebapp --><code>subnetProjWebapp</code></td>
@@ -6296,7 +6310,7 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><!-- parameter env:LOGIC_APP_TYPE --><code>LOGIC_APP_TYPE</code></td>
-<td>No verified counterpart</td>
+<td><code>logicAppType</code></td>
 <td>O</td>
 <td><code>"Standard"</code></td>
 <td>Logic Apps plan type keep-as-is: Consumption is multi-tenant with NO private endpoints/VNet integration - only valid when ENABLE_PUBLIC_ACCESS_WITH_PERIMETER:'true'. Use Standard for private networking.</td>
@@ -7504,6 +7518,13 @@ reported, not silently represented as multiple settings.</p>
 <td>C</td>
 <td><code>""</code></td>
 <td>BYO GenAI project subnet name mandatory: if BYO_SUBNETS:'true'</td>
+</tr>
+<tr>
+<td><!-- parameter env:SUBNET_PROJ_LOGICAPP --><code>SUBNET_PROJ_LOGICAPP</code></td>
+<td><code>subnetProjLogicapp</code></td>
+<td>C</td>
+<td><code>""</code></td>
+<td>BYO dedicated Logic Apps Standard outbound subnet name or full ARM ID mandatory: for enabled private Standard without BYO ASE when BYO_SUBNETS:'true'. Existing /26 or larger in the configured VNet, delegated only to Microsoft.Web/serverFarms; supports</td>
 </tr>
 <tr>
 <td><!-- parameter env:SUBNET_PROJ_WEBAPP --><code>SUBNET_PROJ_WEBAPP</code></td>
