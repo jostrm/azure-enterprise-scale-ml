@@ -190,6 +190,23 @@ def test_deploy_requires_a_registered_provider_or_explicit_registration(run, tes
     assert family.registrations == 1 and result["models"][0]["providerRegistration"] == "Registered"
 
 
+@pytest.mark.parametrize("workspace_count", [0, 2])
+def test_invalid_discovered_log_workspace_does_not_register_provider(run, test_env_resources, workspace_count):
+    rows = [row for row in test_env_resources
+            if row["type"].lower() != "microsoft.operationalinsights/workspaces"]
+    rows.extend({
+        "id": f"/subscriptions/{SUB}/resourceGroups/{PRJ}/providers/Microsoft.OperationalInsights/workspaces/log-{i}",
+        "name": f"log-{i}", "type": "Microsoft.OperationalInsights/workspaces", "resourceGroup": PRJ,
+    } for i in range(workspace_count))
+    family = WritableInventory(rows, registered=False)
+
+    with pytest.raises(ValueError, match=f"--log-signals found {workspace_count}"):
+        run("deploy", ["project"], family=family, register_provider=True, log_signals=True)
+
+    assert family.registrations == 0
+    assert family.deployer.deployed == []
+
+
 def test_offline_family_refuses_to_deploy(run, test_env_resources):
     offline = OfflineInfrastructure(test_env_resources, subscription_id=SUB, tenant_id=TENANT)
     with pytest.raises(RuntimeError, match="offline"):

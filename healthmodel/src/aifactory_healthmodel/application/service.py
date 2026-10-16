@@ -75,18 +75,18 @@ class HealthModelService:
             scope.location, request.health_model_location, supported=provider["regions"] or None)
         registered = provider["registrationState"] == "Registered"
         writes = len(self.invoker.history)
-        if request.mode == "deploy" and not registered:
-            if not request.register_provider:
-                raise RuntimeError(f"{scope.subscription_id}: Microsoft.CloudHealth is {provider['registrationState']}. "
-                                   "Rerun with --register-provider (needs */register/action) or register it once.")
-            self.invoker.execute(RegisterProviderCommand(self.providers, scope.subscription_id))
-            registered = True
+        if request.mode == "deploy" and not registered and not request.register_provider:
+            raise RuntimeError(f"{scope.subscription_id}: Microsoft.CloudHealth is {provider['registrationState']}. "
+                               "Rerun with --register-provider (needs */register/action) or register it once.")
 
         nests = any(self.registry.get(key).nests for key in order)
         rows = self.discovery.discover([scope.project_resource_group, scope.common_resource_group],
                                        include_health_models=nests)
         resources = parse_resources(rows)
         workspace = self._workspace(request, resources)
+        if request.mode == "deploy" and not registered:
+            self.invoker.execute(RegisterProviderCommand(self.providers, scope.subscription_id))
+            registered = True
         known = {r.id.lower() for r in resources}
         planned_models: list[DiscoveredResource] = []
         results = []

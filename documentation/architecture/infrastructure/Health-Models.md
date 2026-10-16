@@ -25,6 +25,10 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 
 Read-only proxies protect plan-mode services. The offline infrastructure family can plan from an inventory but refuses deployment. Planning may produce local parameter files; “read-only” here means no cloud mutation, not necessarily no filesystem writes.
 
+Log-signal workspace discovery must resolve unambiguously before provider registration
+or deployment. Offline application regressions cover both missing and ambiguous
+workspaces; this ordering does not establish live signal or identity acceptance.
+
 Optional provider pipelines deploy `Microsoft.CloudHealth` health models using the documented preview API. The model identity is Monitoring Reader, not Contributor/Owner. Pruning is an explicit owned-object operation, not general cleanup.
 
 Health is state-based (`healthy`, `degraded`, `unhealthy`, `unknown`). Layer propagation and limited-impact shared dependencies avoid treating every common-resource problem as total workload failure. Missing telemetry and incomplete coverage must not become inferred healthy.
