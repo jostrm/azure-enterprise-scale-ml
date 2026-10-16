@@ -3019,11 +3019,21 @@ steps:
   displayName: '62-core-infrastructure'
   condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['deleteAllServicesForProject'], 'true'), ne(variables['debug_disable_62_core_infrastructure'], 'true'), succeeded())
   retryCountOnTaskFailure: 2
+  env:
+    UPDATE_COMMON_ACR: $(updateCommonACR)
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
+     # Split the legacy-macro sentinel so ADO cannot expand the comparison.
+     UPDATE_COMMON_ACR="${UPDATE_COMMON_ACR-true}"
+     [[ "$UPDATE_COMMON_ACR" != '$''(updateCommonACR)' ]] || UPDATE_COMMON_ACR=true
+     case "$UPDATE_COMMON_ACR" in
+       true|false) ;;
+       *) echo "##vso[task.logissue type=error]UPDATE_COMMON_ACR must be true or false."; exit 1 ;;
+     esac
+
      # Generate admin password first
      ADMIN_PASSWORD=$(date +%s | sha256sum | base64 | head -c 32)
      echo "Generated admin password"
@@ -3053,6 +3063,7 @@ steps:
      --parameters location="$(admin_location)" \
      --parameters locationSuffix="$(admin_locationSuffix)" \
      --parameters useCommonACR="$(useCommonACR_override)" \
+     --parameters updateCommonACR="$UPDATE_COMMON_ACR" \
      --parameters vnetNameBase="$(vnetNameBase)" \
      --parameters vnetResourceGroup_param="$(vnetResourceGroup_resolved)" \
      --parameters vnetNameFull_param="$(vnetNameFull_resolved)" \

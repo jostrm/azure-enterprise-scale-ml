@@ -43,6 +43,7 @@
     "prod_admin_bicep_kv_fw_rg": "<todo>_ResourceGroup_Prod",
     "prod_admin_bicep_kv_fw": "<todo>_Name_Prod",
     "useCommonACR": "true",
+    "updateCommonACR": "true",
     "admin_hybridBenefit": "false",
     "admin_keyvaultSoftDeleteDays": 7,
     "azure_machinelearning_sp_oid": "<todo>_ObjectID",

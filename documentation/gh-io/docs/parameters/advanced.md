@@ -403,18 +403,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 389 |
-| `env` | 388 |
+| `yaml` | 390 |
+| `env` | 389 |
 | `bootstrap` | 92 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 392 |
+| `json.dev` | 393 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 151, 414; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 152, 415; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 416, 440; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 152, 415; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 153, 416; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 417, 441; one reference row.
 
 ## YAML and variables.json reference
 
@@ -515,6 +515,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:kongGatewayMemoryGb --><!-- parameter json.dev:kongGatewayMemoryGb -->`kongGatewayMemoryGb` | `KONG_GATEWAY_MEMORY_GB` | O | Y: `4`<br>J.dev: `4` | Kong gateway memory gb. |
 | <!-- parameter yaml:serviceSettingDeployProjectVM --><!-- parameter json.dev:serviceSettingDeployProjectVM -->`serviceSettingDeployProjectVM` | `SERVICE_SETTING_DEPLOY_PROJECT_VM` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy VM in project resource group otherwise: true, deploy a jumpbox VM for use with Azure Bastion. |
 | <!-- parameter yaml:updateAIFoundry --><!-- parameter json.dev:updateAIFoundry -->`updateAIFoundry` | `UPDATE_AI_FOUNDRY` | O | Y: `"false"`<br>J.dev: `"false"` | Update AI Foundry properties otherwise: true, re-run to update AI Foundry properties and RBAC. |
+| <!-- parameter yaml:updateCommonACR --><!-- parameter json.dev:updateCommonACR -->`updateCommonACR` | `UPDATE_COMMON_ACR` | O | Y: `"true"`<br>J.dev: `"true"` | Redeploy shared ACR settings and private endpoint otherwise: false reuses the existing registry without rewriting it; project access assignments remain enabled. |
 
 ### Factory, project, naming and orchestration
 
@@ -1048,6 +1049,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:KONG_GATEWAY_MEMORY_GB -->`KONG_GATEWAY_MEMORY_GB` | `kongGatewayMemoryGb` | O | `"4"` | Kong gateway memory gb. |
 | <!-- parameter env:SERVICE_SETTING_DEPLOY_PROJECT_VM -->`SERVICE_SETTING_DEPLOY_PROJECT_VM` | `serviceSettingDeployProjectVM` | O | `"false"` | Deploy VM in project resource group otherwise: true, deploy a jumpbox VM for use with Azure Bastion. |
 | <!-- parameter env:UPDATE_AI_FOUNDRY -->`UPDATE_AI_FOUNDRY` | `updateAIFoundry` | O | `"false"` | Update AI Foundry properties otherwise: true, update existing Foundry properties and RBAC. |
+| <!-- parameter env:UPDATE_COMMON_ACR -->`UPDATE_COMMON_ACR` | `updateCommonACR` | O | `"true"` | Redeploy shared ACR settings and private endpoint otherwise: false reuses the existing registry without rewriting it; project access assignments remain enabled. |
 
 ### GHA: Networking, DNS and existing resources
 
