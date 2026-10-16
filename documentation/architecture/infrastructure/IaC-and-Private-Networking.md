@@ -128,6 +128,18 @@ links, approvals and DNS outputs retain their separate service-only gates.
 
 Network addressing must be aligned and nonoverlapping. Shared/own-subscription presets are configuration choices, not commands to create subscriptions. Allocation must respect existing subnets, gateway/DNS reservations and fragmentation; headline project counts are not guarantees.
 
+Compute deployment ordering (2026-10-16): both optional subnet-delegation modules
+finish before Web App/Function integration. Function also depends on Web App,
+and the batch Container Apps module (v1.24: environment module) waits for both.
+These explicit edges survive omitted/disabled intermediate modules, preventing
+the ACA subnet PUT from racing an integration on a sibling subnet in the same
+VNet. Compiled ARM conditions and dependency reachability cover new, existing
+and disabled services, dedicated/legacy subnets and BYO ASE. The fix changes only
+ordering, not subnet selection, delegation, endpoints, DNS, identities or RBAC.
+Main's separately orchestrated ACA capacity step retains its existing lifecycle.
+This is intra-deployment ordering, not a cross-pipeline VNet lock or proof of a
+successful live redeployment.
+
 The opt-in `preserve-v1` common-network profile is add-only, not a blanket networking skip. `common_network_preservation.py` freezes source/compiled ARM, approved address space, native inventories and exact new/retained resource bodies. Revalidation and lease checks precede deployment; post-checks compare native resource snapshots. Retained resources are preserved without reconciliation. Unexpected changes retain failure evidence rather than triggering destructive rollback.
 
 Dashboard source update (2026-10-08): `projectDash01.bicep` uses compact four-row RG/cost tiles, conditional second-row Azure ML/Databricks/Data Factory shortcuts, existing Log Analytics navigation, and native daily ActualCost charts (total and by service). Usage/token report links are compact cards above service configuration. Phase 10 and the dashboard-only runner already forward the service flags; added AML naming is forwarded to the shared naming module. The factory dashboard's `resource_shortcuts` discovers these services from each project RG, excludes Foundry Hub/Project kinds from AML selection, and `dashboard_parts` places them on its second shortcut row. Configured flags are not resource-existence evidence; discovered inventory is a point-in-time observation and may be retained on read failure. No live deployment, new telemetry, role or network changes are implied.
