@@ -150,6 +150,11 @@ subnet in the configured VNet, separate from other purposes. Denied/malformed
 reads, wrong identities, private endpoints and NIC IP configurations block reuse.
 Inventory must be a real array/list in the expected VNet; the exact subnet and
 managed network deployment must report `Succeeded` before integration.
+The allocator independently checks every child's ID against that VNet and its
+child name. Main-only CLI/Az regressions retain a valid selected Logic App subnet
+while rejecting an ordinary child's missing or wrong-name ID, and accept
+case-insensitive exact IDs for both children. No stable-branch equivalence or
+customer deployment acceptance is inferred from those offline tests.
 Disabled, Consumption, ASE and perimeter cases allocate nothing. Simple Mode
 disables Logic Apps and retains its existing capacity profile. These are
 offline-tested source contracts, not evidence of a successful live deployment.

@@ -133,6 +133,40 @@ def test_allocator_does_not_trust_a_foreign_subnet_in_correct_vnet_response(azur
     assert "Subnet inventory identity" in run.stderr
 
 
+@pytest.mark.parametrize("azure", ["cli", "az"])
+@pytest.mark.parametrize("identity", ["missing", "wrong-child"])
+def test_allocator_checks_ordinary_child_identity_with_valid_selected_logic_subnet(azure, identity):
+    vnet_id = ("/subscriptions/test-subscription/resourceGroups/acme-common-swc-dev-007"
+               "/providers/Microsoft.Network/virtualNetworks/vnet-swc-dev-008")
+    ordinary = {**subnet("ordinary", "10.113.0.0/26"),
+                "id": None if identity == "missing" else f"{vnet_id}/subnets/another-child"}
+    selected = {**subnet("snt-prj001-logicapp", "10.113.0.64/26"),
+                "id": f"{vnet_id}/subnets/snt-prj001-logicapp",
+                "delegations": [{"serviceName": "Microsoft.Web/serverFarms"}]}
+    vnet = {**inventory(subnets=[ordinary, selected]), "id": vnet_id}
+
+    run, data = invoke_allocator(vnet, enableLogicApps="true", azure=azure)
+
+    assert run.returncode != 0 and data is None
+    assert "Subnet inventory identity mismatch for 'ordinary'" in run.stderr
+
+
+@pytest.mark.parametrize("azure", ["cli", "az"])
+def test_allocator_accepts_case_insensitive_exact_ids_for_all_children(azure):
+    vnet_id = ("/subscriptions/test-subscription/resourceGroups/acme-common-swc-dev-007"
+               "/providers/Microsoft.Network/virtualNetworks/vnet-swc-dev-008")
+    ordinary = {**subnet("ordinary", "10.113.0.0/26"), "id": f"{vnet_id}/subnets/ordinary".upper()}
+    selected = {**subnet("SNT-PRJ001-LOGICAPP", "10.113.0.64/26"),
+                "id": f"{vnet_id}/subnets/snt-prj001-logicapp".upper(),
+                "delegations": [{"serviceName": "Microsoft.Web/serverFarms"}]}
+    vnet = {**inventory(subnets=[ordinary, selected]), "id": vnet_id.upper()}
+
+    run, data = invoke_allocator(vnet, enableLogicApps="true", azure=azure)
+
+    assert run.returncode == 0, run.stdout + run.stderr
+    assert data["parameters"]["logicappSubnetCidr"]["value"] == "10.113.0.64/26"
+
+
 def test_allocator_accepts_native_az_list_without_coercing_invalid_objects():
     run, data = invoke_allocator(inventory(subnets=[subnet("ordinary", "10.113.0.0/26")]),
                                  enableLogicApps="true", azure="az-list")
