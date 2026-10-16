@@ -96,6 +96,8 @@ def run(args) -> dict:
     if not args.config:
         raise ValueError(f"{args.command} requires --config.")
     config = load_config(args.config.resolve())
+    if config.get("graph_sync") and args.command in {"publish", "configure", "ingest", "resync"}:
+        raise ValueError("Graph-bound publications must be changed through sync.py's serialized reconciliation.")
     if args.command == "plan":
         from sales_demo.search import build_definitions
         result = {

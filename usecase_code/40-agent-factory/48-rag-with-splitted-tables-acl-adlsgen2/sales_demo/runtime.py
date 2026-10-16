@@ -10,6 +10,7 @@ from urllib.error import HTTPError
 from urllib.request import ProxyHandler, Request, build_opener
 
 from .identity import NoRedirects, SalesUnavailable
+from .sync_state import guard_snapshot, assert_guard_unchanged
 
 
 def config_fingerprint(config: dict) -> str:
@@ -213,6 +214,7 @@ class SalesRuntime:
 
     def aggregate_sales(self, source: str = "all") -> dict:
         try:
+            generation = guard_snapshot(self.config)
             from .arithmetic import aggregate_records
             identity, partitions = self._scope(source)
             partition_rows, provenance, indexes, accessed_indexes = {}, [], [], []
@@ -231,6 +233,7 @@ class SalesRuntime:
             result = aggregate_records(partition_rows)
             result.update({"scope": source, "currency": "USD", "basis": "net pretax",
                            "provenance": provenance, "authorized_scope_only": True})
+            assert_guard_unchanged(self.config, generation)
             self.trace.append({"tool": "aggregate_sales", "arguments": {"source": source},
                                "indexes": indexes, "accessed_indexes": list(dict.fromkeys(accessed_indexes)),
                                "result": deepcopy(result)})
@@ -240,6 +243,7 @@ class SalesRuntime:
 
     def retrieve_sales(self, question: str) -> dict:
         try:
+            generation = guard_snapshot(self.config)
             if not isinstance(question, str) or not question.strip() or len(question) > 8000:
                 raise SalesUnavailable()
             identity, partitions = self._scope("all")
@@ -262,6 +266,7 @@ class SalesRuntime:
                 evidence.append({"partition": doc["partition"], "index": index,
                                  "text": doc["text"][:8000], "source_url": url})
             result = {"evidence": evidence, "top_k_is_not_arithmetic": True}
+            assert_guard_unchanged(self.config, generation)
             self.trace.append({"tool": "retrieve_sales", "arguments": {"question": question},
                                "indexes": [v[0]["index"] for v in verified.values()],
                                "accessed_indexes": list(dict.fromkeys(accessed_indexes)),

@@ -35,9 +35,11 @@ def verify_publication(config: dict, authorization, store, search, export_dir: P
         if after["chunk_hashes"] != receipt["chunk_hashes"] or after["ingestion"] != receipt["ingestion"]:
             raise SalesUnavailable()
         result["service_evidence"][partition["id"]] = after
-    # Exercise every structured row/page without opening or persisting evaluation answers.
+    # Verification can run behind a closed synchronization gate, but exposes no totals.
     runtime = SalesRuntime(config, result, authorization, store, search)
-    runtime.aggregate_sales("all")
+    from .arithmetic import aggregate_records
+    aggregate_records({partition["id"]: runtime._rows(partition, identity)
+                       for partition in config["partitions"]})
     result["structured_coverage_verified"] = True
     result["claims"] = {
         "real_text_split": True, "exact_three_chunks_per_table": True,

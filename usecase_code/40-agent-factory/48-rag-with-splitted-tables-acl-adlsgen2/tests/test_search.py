@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from sales_demo.search import API_VERSION, SearchClient, build_definitions, correlate_evidence
+from sales_demo.search import API_VERSION, SearchClient, build_definitions, correlate_evidence, PATH_KEY_ADVISORY
 
 
 STORAGE_ID = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/saleslake"
@@ -136,6 +136,47 @@ class DefinitionsTests(unittest.TestCase):
 
 
 class ClientTests(unittest.TestCase):
+    def test_mixed_sync_finishes_permission_run_before_normal_content_run(self):
+        client = SearchClient(configuration(), Transport())
+        calls = []
+        with patch.object(client, "resync_permissions", side_effect=lambda **kw: calls.append("resync+run")), \
+                patch.object(client, "run_indexers", side_effect=lambda **kw: calls.append("normal-run")), \
+                patch.object(client, "wait", side_effect=lambda **kw: calls.append("wait") or {"success": True}):
+            result = client.synchronize(permissions_changed=True, content_changed=True, apply=True, allow_paid=True)
+        self.assertEqual(calls, ["resync+run", "wait", "normal-run", "wait"])
+        self.assertEqual(set(result), {"permissions", "content"})
+        with self.assertRaises(ValueError):
+            client.synchronize(permissions_changed=True, content_changed=True, apply=True)
+
+    def test_graph_permission_changes_do_not_change_source_definition_ownership(self):
+        config = configuration()
+        config["graph_sync"] = {"scope_id": "sales"}
+        config["partitions"][0]["allowed_group_ids"] = ["original"]
+        before = build_definitions(config)
+        config["partitions"][0]["allowed_group_ids"] = ["changed"]
+        self.assertEqual(build_definitions(config), before)
+        config["partitions"][0]["input_path"] = "ingestion/json/retail/sales-json/other.json"
+        self.assertNotEqual(build_definitions(config), before)
+
+    def test_only_exact_path_advisory_is_retained_for_immutable_publications(self):
+        config = configuration()
+        config["project_prefix"] += "/versions/v1"
+        client = SearchClient(config, Transport())
+        name = client.plan()["partitions"][0]["names"]["audit_index"]
+        warning = {"name": "Projection.SearchIndex.Index." + name, "message": PATH_KEY_ADVISORY,
+                   "key": None, "details": ""}
+        status = {"lastResult": {"status": "success", "warnings": [warning]}}
+        client.transport = Transport([status])
+        result = client.wait(["json"], max_polls=1, poll_seconds=0)
+        self.assertEqual(result["json"]["lastResult"]["warnings"], [warning])
+        for edit in ({"message": "truncated"}, {"details": "content missing"}, {"key": "one-item"}):
+            client.transport = Transport([{"lastResult": {"status": "success", "warnings": [{**warning, **edit}]}}])
+            with self.assertRaises(RuntimeError):
+                client.wait(["json"], max_polls=1, poll_seconds=0)
+        config["project_prefix"] = "mutable"
+        with self.assertRaises(RuntimeError):
+            SearchClient(config, Transport([status])).wait(["json"], max_polls=1, poll_seconds=0)
+
     def runtime_fixture(self):
         config = configuration()
         content = "abcdef"

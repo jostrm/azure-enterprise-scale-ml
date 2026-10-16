@@ -397,6 +397,207 @@ The result retains activity and `imagesSentToModel`; it does not turn a declared
 without an independently established source-to-image extraction provenance.
 Aggregate image counters alone cannot establish that provenance.
 
+## Optional Graph delta and security-webhook extension
+
+The synthetic `<site>/<library>` folder layout is not a SharePoint site.
+`graph-sync.example.json` must be bound to an explicitly approved **real**
+SharePoint document-library or OneDrive for Business drive and the stable IDs of
+the two sales files. Consumer OneDrive is rejected. No source site, user,
+Container App, subscription, public callback or Graph consent is created by
+enabling the local code.
+
+Use the full root delta enumeration for bootstrap, then preserve Graph's opaque
+`@odata.deltaLink`. Every initial, continuation and incremental request sends:
+
+```http
+Prefer: hierarchicalsharing, deltashowremovedasdeleted, deltatraversepermissiongaps, deltashowsharingchanges
+```
+
+This includes the required companion preferences for
+`@microsoft.graph.sharedChanged` (documented as the string `"True"`). The feed
+represents latest state, not an event log: the last occurrence of a repeated
+item wins; empty pages with `@odata.nextLink` are still followed. Items are
+identified by tenant/drive/item ID, never just filename. Folder moves/renames
+affect descendants even when those descendants are not repeated in delta.
+Tombstones and `410 Gone` trigger reconciliation, not a partial-data total or an
+upload back to Graph. `token=latest` is not used to skip the initial inventory.
+
+Security subscription creation uses the exact business-drive contract:
+
+```http
+POST https://graph.microsoft.com/v1.0/subscriptions
+Prefer: includesecuritywebhooks
+Content-Type: application/json
+
+{
+  "changeType": "updated",
+  "resource": "/drives/<drive-id>/root",
+  "notificationUrl": "https://<approved-host>/notifications",
+  "expirationDateTime": "<future-UTC-time>",
+  "clientState": "<secret-from-approved-secret-store>"
+}
+```
+
+`includesecuritywebhooks` is sent on creation/recreation, not claimed to upgrade
+an old content-only subscription through renewal. The default lifetime is one
+day; the currently documented driveItem maximum is **42,300 minutes**. Renew
+before expiry. A 404 requires explicit recreation with a new secret; a lost
+creation response is an uncertain operation, not permission to blindly POST
+again.
+
+### Permission changes and durable invalidation
+
+The ASGI callback returns a decoded validation token as plain text within the
+Graph handshake contract. Normal batches validate every subscription,
+tenant/resource and `clientState` using constant-time hash comparison, then
+atomically mark the bound drive dirty in SQLite **before** returning 202. The
+receiver does no Graph, Storage, Search or model work before acknowledgement.
+An unavailable durable store returns a retryable failure instead of losing the
+event. Tokens and client-state secrets are not stored in reports; the database
+stores only the secret hash.
+
+A root notification does not reliably identify the changed file or distinguish
+content from permissions. All configured source permissions are therefore
+re-read during reconciliation. Unknown permissions, incomplete responses or
+unresolved identities leave the drive unavailable. Absence of `sharedChanged`
+does not mean permissions were unchanged.
+Retired subscription notifications are authenticated but disregarded. Activity
+is rechecked inside the durable signal transaction, so an event being validated
+during subscription recreation cannot put the healthy replacement on hold.
+
+With `graph_sync` enabled in the demo configuration, retrieval and aggregation
+require a fresh, complete synchronized publication. The agent checks the same
+generation before model calls and before returning an answer. A notification
+arriving during calculation or generation discards that result. There is no
+cross-user answer cache. Expired reconciliation evidence or subscriptions fail
+closed; a successful delta fetch alone does not reopen the gate.
+
+Content changes stage a new immutable publication, including the entire
+normalized workbook text and structured rows. Real Text Split, embedding,
+source hashes and complete calculator coverage must be verified again.
+Permission-only changes update all owned mirrored file ACLs, then call native
+Search `/resync` with `{"options":["permissions"]}`, run and await completion.
+If content also needs processing on an existing pipeline, its normal indexer
+run is separate and follows the completed permission run. The delta checkpoint
+advances only when the corresponding publication is durable and verified.
+An arriving notification invalidates the in-flight reconciliation epoch.
+External publication/ACL writes are serialized with a separate per-scope
+process lock; webhook invalidation never waits on a long-running indexing
+transaction. Partial writes retain a repair marker, so restoring a quarantined
+source forces ACL restoration/resync rather than incorrectly selecting a
+read-only recheck.
+
+Deleting either required sales source quarantines the publication. Named
+readers are removed from its owned mirrored files and native permissions are
+refreshed; the remaining partition is never described as a complete dataset.
+Existing broad Storage RBAC still cannot be revoked by removing a named ACL.
+
+### Graph permissions and deployment prerequisites
+
+Microsoft's permission-scanning guidance requires **`Sites.FullControl.All`**;
+ordinary `Files.Read`/`Files.Read.All` is not proof of a complete authorization
+snapshot. Subscription creation and renewal have their own permission
+requirements; current reference tables differ on the minimum renewal scope.
+No broad permission is granted automatically. An administrator must review the
+actual source scope, consent, reader projection and callback before live use.
+
+Graph permission JSON is **not** a POSIX ACL export. Only explicitly approved
+Entra user/group mappings are supported; sharing links, invitations,
+SharePoint-local groups, unknown roles or incomplete permission snapshots must
+be quarantined rather than interpreted as public access. Missing
+`inheritedFrom` is not proof of an explicit grant: SharePoint/Business responses
+do not reliably return that property.
+The native Graph transport also checks the trusted OAuth token's tenant,
+audience, expiry and permission-scanning grant before requesting source data.
+This claim check is not an external bearer-token validator; Graph validates the
+token itself. An opaque/unverifiable or insufficiently scoped token fails closed.
+
+Webhooks require an externally reachable **HTTPS receiver**. Private ADLS,
+Search and workers do not make a private-only callback reachable by Graph.
+The handler is provided without deploying a host or changing public networking.
+`reauthorizationRequired` is supported; driveItem is not documented to guarantee
+the `missed` or `subscriptionRemoved` lifecycle events. Expiry monitoring and
+periodic delta reconciliation are therefore required independently.
+
+This is not instantaneous revocation: Graph notification/directory replication
+latency exists (the documented driveItem maximum notification latency can reach
+six hours). The gate closes when a change is known and when freshness expires;
+it cannot react to an event not yet delivered. Delegated source reads and live
+native authorization remain mandatory.
+
+### Reproducible extension commands
+
+Keep the source configuration, SQLite state and staged candidates outside the
+template. Fill the real drive/item IDs, approved download host, permission-scan
+authorization and explicit `principal_map` before any source request. For
+example, `{"group:<Entra-group-id>": {"type":"group","id":"<same-id>"}}` preserves
+the group rather than expanding its members into user lists.
+
+```powershell
+$SyncConfig = Join-Path $State "graph-sync.json"
+# Copy graph-sync.example.json there and resolve/review its fields first.
+& $Python sync.py plan --sync-config $SyncConfig --config $Config
+# Local write: attach the initially closed serving gate to this demo.
+& $Python sync.py init --sync-config $SyncConfig --config $Config --apply
+# Approved source reads only; downloads the two bound files and stages local work.
+& $Python sync.py poll --sync-config $SyncConfig --config $Config `
+  --output "$State\candidate-review.json"
+
+# Review the candidate's exact version paths and principal changes before applying.
+# Its new version may need separately approved, equally narrow indexer read rights.
+$Review = Get-Content "$State\candidate-review.json" -Raw | ConvertFrom-Json
+& $Python sync.py reconcile --sync-config $SyncConfig --config $Config `
+  --epoch $Review.epoch --approved-candidate $Review.candidate_sha256 `
+  --apply --allow-paid
+& $Python sync.py status --sync-config $SyncConfig --config $Config
+```
+
+`poll` always performs delta reconciliation and fresh selected-item permission
+reads. Content changes produce a new local candidate and native pipeline;
+permission-only changes retain the existing bytes and version. Unchanged
+content/permissions use a verification-only recheck, without ACL writes or
+re-embedding. Failed/deleted/unrepresentable sources keep serving blocked.
+After a changed binding is activated, redeploy the pinned prompt-agent
+definition explicitly; no model/agent deployment is hidden in reconciliation.
+The full evaluator remains separate and an updated independent oracle is
+required for changed source data.
+
+The worker runs on approved managed-identity compute for native Search reads;
+the source content is still read using the selected end user's delegated
+Storage identity. No operator fallback is introduced by this extension.
+
+For an approved externally reachable ASGI host, mount
+`webhook:create_app` with factory mode and set `AIF48_GRAPH_SYNC_CONFIG` to the
+consumer configuration. `webhook.py` does not start a server. This reference
+implementation is **single-host**: callback and worker must share the same
+durable local SQLite database and process-lock filesystem. Do not independently
+scale instances with separate local databases. A distributed deployment needs
+an equivalent durable queue, shared epoch store and write-serialization adapter.
+
+Only after the callback, consent and source scope are approved:
+
+```powershell
+# Keep the generated secret in memory; do not print it or log notification bodies.
+$env:AIF48_GRAPH_CLIENT_STATE = & $Python -c "from sales_demo.graph_webhooks import generate_client_state; print(generate_client_state())"
+& $Python sync.py subscribe --sync-config $SyncConfig --config $Config
+& $Python sync.py subscribe --sync-config $SyncConfig --config $Config --apply
+Remove-Item Env:AIF48_GRAPH_CLIENT_STATE
+
+# Use the actual returned subscription ID; renew before expiry.
+& $Python sync.py renew --sync-config $SyncConfig --config $Config `
+  --subscription-id "<registered-id>" --apply
+# Repair reauthorizationRequired even outside the normal renewal window:
+& $Python sync.py renew --sync-config $SyncConfig --config $Config `
+  --subscription-id "<registered-id>" --force-renew --apply
+```
+
+For a confirmed missing subscription, `recreate --subscription-id <old-id>`
+requires explicit `--apply` and a newly generated secret. It does not delete
+other subscriptions. Ordinary delta reconciliation cannot clear a lifecycle
+hold; subscription repair and a fresh reconciliation are both required.
+Schedule renewal and polling outside the callback, more frequently than the
+configured `max_age_seconds`; no scheduled job is created automatically.
+
 ## Evaluation and completion
 
 Offline unit tests, service integration acceptance and live deployed-agent
@@ -480,8 +681,11 @@ answers and tool traces from the deployed agent. Do not put expected totals in
 instructions, search content, calculator code, or model mocks presented as live
 results.
 
-Locally exercised: 121 passing offline tests and two skipped opt-in cloud entry
-points, generated/read-back workbook, exact independent oracle, both >9,000-token
+Locally exercised: the offline suite covers the original pipeline plus delta,
+webhook validation/lifecycle, concurrent invalidation, immutable content staging,
+permission-only refresh and deletion quarantine. Three service/live entry
+points are skipped without explicit opt-in. The original local coverage includes
+a generated/read-back workbook, exact independent oracle, both >9,000-token
 inputs, master/project hashes, original embedded image and rendered DOCX.
 Live Search chunk output, group-based allow/deny and revocation, deployed agent
 responses, destructive missing-chunk fault injection, and image serving remain
@@ -493,9 +697,19 @@ and native index/data-source/skillset/indexer creation. It exposed the required
 native path field and explicit defaults above. Ingestion then failed before
 processing documents: existing Storage metrics showed denied
 `GetPathAccessControl` operations alongside successful content/list operations.
-No real three-chunk or live-agent success is claimed from that attempt. Its
+After separately approved exact ancestor-object reads, both indexers reported
+success with one source processed each. The documented path-key rename advisory
+is retained for these immutable publications; unknown warnings remain failures.
+Query verification then returned 403: the current operator lacks Search Index
+Data Reader on the new service. No real three-chunk or live-agent success is
+claimed from that attempt. Its
 identity-specific deployment evidence remains in consumer-owned state, not in
 the indexed corpus or source template.
+The Graph extension has not been registered against a real drive or public
+webhook. Its simulated callback tests are not proof of Microsoft delivering a
+real permission-change notification. Real Graph reads additionally require
+`AIF48_GRAPH_SERVICE_TESTS=1`, `AIF48_GRAPH_SOURCE_READ_APPROVED=1`,
+`AIF48_GRAPH_SYNC_CONFIG`, and `AIF48_CONFIG` for the opt-in source test.
 
 ## Costs, troubleshooting and cleanup
 
@@ -531,6 +745,12 @@ the indexed corpus or source template.
 - [Private indexer execution and shared private links](https://learn.microsoft.com/en-us/azure/search/search-indexer-howto-access-private)
 - [Graph transitive membership query requirements](https://learn.microsoft.com/en-us/graph/api/user-list-transitivememberof?view=graph-rest-1.0)
 - [Pinned Foundry agent-reference contract](https://github.com/Azure/azure-sdk-for-python/blob/azure-ai-projects_2.6.0/sdk/ai/azure-ai-projects/tests/agents/test_agent_responses_crud.py)
+- [Graph driveItem delta and sharing-change preferences](https://learn.microsoft.com/en-us/graph/api/driveitem-delta?view=graph-rest-1.0)
+- [Graph security-webhook subscription header](https://learn.microsoft.com/en-us/graph/api/subscription-post-subscriptions?view=graph-rest-1.0)
+- [Webhook validation, delivery and retries](https://learn.microsoft.com/en-us/graph/change-notifications-delivery-webhooks)
+- [Subscription lifetime limits](https://learn.microsoft.com/en-us/graph/change-notifications-overview#subscription-lifetime)
+- [Resource-specific lifecycle notifications](https://learn.microsoft.com/en-us/graph/change-notifications-lifecycle-events)
+- [Permission scanning guidance](https://learn.microsoft.com/en-us/onedrive/developer/rest-api/concepts/scan-guidance?view=odsp-graph-online)
 
 The repository's dual graph supplies structural/architecture context, not live
 deployment evidence. Source, tests and the actual approved service responses are

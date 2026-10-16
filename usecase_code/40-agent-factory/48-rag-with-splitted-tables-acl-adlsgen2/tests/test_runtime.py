@@ -98,6 +98,25 @@ def runtime(config=None, data=None):
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_dirty_graph_scope_blocks_before_any_source_or_auth_reads(self):
+        service = runtime()
+        with patch("sales_demo.runtime.guard_snapshot", side_effect=SalesUnavailable()):
+            for operation in (service.aggregate_sales, lambda: service.retrieve_sales("evidence")):
+                with self.assertRaises(SalesUnavailable):
+                    operation()
+        self.assertEqual(service.authorization.calls, 0)
+        self.assertEqual(service.store.calls, [])
+        self.assertEqual(service.search.calls, [])
+
+    def test_permission_notification_during_a_tool_discards_the_result(self):
+        service = runtime()
+        with patch("sales_demo.runtime.assert_guard_unchanged", side_effect=SalesUnavailable()):
+            with self.assertRaises(SalesUnavailable):
+                service.aggregate_sales()
+            with self.assertRaises(SalesUnavailable):
+                service.retrieve_sales("evidence")
+        self.assertEqual(service.trace, [])
+
     def test_one_call_exhausts_multiple_partitions_and_pages(self):
         service = runtime()
         result = service.aggregate_sales("all")

@@ -14,6 +14,7 @@ from agent_factory.prompt import definition_hash, project_client, route_version
 from .identity import SalesUnavailable
 from .runtime import config_fingerprint
 from .arithmetic import format_minor
+from .sync_state import guard_snapshot, assert_guard_unchanged
 
 INSTRUCTIONS = (
     "You answer questions about the authenticated user's authorized synthetic car sales. "
@@ -167,6 +168,7 @@ def invoke_agent(project, runtime, question: str, *, deployment: dict,
         raise ValueError("Inference requires --allow-paid.")
     client = None
     try:
+        generation = guard_snapshot(runtime.config)
         if not isinstance(question, str) or not question.strip() or len(question) > 16000:
             raise SalesUnavailable()
         if type(max_rounds) is not int or not 1 <= max_rounds <= 16:
@@ -188,6 +190,7 @@ def invoke_agent(project, runtime, question: str, *, deployment: dict,
         history = [{"role": "user", "content": question}]
         seen_calls, functions, authoritative = set(), [], []
         for _ in range(max_rounds):
+            assert_guard_unchanged(runtime.config, generation)
             response = client.responses.create(
                 input=deepcopy(history), store=False,
                 include=["reasoning.encrypted_content"],
@@ -221,6 +224,7 @@ def invoke_agent(project, runtime, question: str, *, deployment: dict,
                 lines = [f"Authoritative total ({item['scope']}): USD {format_minor(item['total_minor'])}"
                          for item in authoritative]
                 answer = "\n".join([*lines, "Generated explanation (not authoritative):", text])
+                assert_guard_unchanged(runtime.config, generation)
                 return {"agent": name, "version": version, "response_id": response.id,
                         "answer": answer, "generated_text": text, "authoritative": authoritative,
                         "function_calls": functions, "trace": deepcopy(runtime.trace)}

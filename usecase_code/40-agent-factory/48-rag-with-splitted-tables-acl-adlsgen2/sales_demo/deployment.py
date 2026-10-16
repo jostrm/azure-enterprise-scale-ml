@@ -330,15 +330,24 @@ class StorageWriter:
         return self.request("GET", path, dfs=False)[0]
 
 
-def publish(config: dict, store, *, apply: bool = False, single_user_preview: bool = False) -> dict:
+def publish(config: dict, store, *, apply: bool = False, single_user_preview: bool = False,
+            synchronized_source: bool = False) -> dict:
     if not apply:
         raise ValueError("Publication requires explicit --apply after reviewing the exact plan.")
-    if type(single_user_preview) is not bool:
+    if type(single_user_preview) is not bool or type(synchronized_source) is not bool:
         raise ValueError("Single-user preview selection must be an explicit boolean.")
+    if synchronized_source:
+        if single_user_preview or not isinstance(config.get("graph_sync"), dict):
+            raise ValueError("Source synchronization requires a separate configured synchronization gate.")
+        from .sync_state import SyncState
+        graph = config["graph_sync"]
+        state = SyncState(Path(graph["database"])).scope(graph["scope_id"])
+        if state["state"] != "pending" or state["candidate"] is None:
+            raise ValueError("A closed gate and staged Graph candidate are required before publication.")
     if single_user_preview:
         from .operator_preview import require_preview_policy
         require_preview_policy(config)
-    unresolved = readiness(config, require_acl_test=not single_user_preview)
+    unresolved = readiness(config, require_acl_test=not (single_user_preview or synchronized_source))
     if unresolved:
         raise ValueError("Publication prerequisites unresolved: " + " ".join(unresolved))
     plan = publication_plan(config)

@@ -74,6 +74,13 @@ def project(outputs):
 
 
 class AgentTests(unittest.TestCase):
+    def test_notification_during_model_round_discards_final_answer(self):
+        api = project([response([call()]), response([], "Total: USD 123.45")])
+        with patch("sales_demo.agent.assert_guard_unchanged",
+                   side_effect=[None, None, SalesUnavailable()]):
+            with self.assertRaises(SalesUnavailable):
+                invoke_agent(api, Runtime(), "Give me the sum of all sales.",
+                             deployment=deployment(), allow_paid=True)
     def test_sdk_function_schema_is_real_flat_functiontool_schema(self):
         from azure.ai.projects.models import FunctionTool
         tools = tool_definitions()

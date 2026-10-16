@@ -17,6 +17,10 @@ sources:
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/search.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/deployment.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/preview.py
+  - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sync.py
+  - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/sync_state.py
+  - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/graph_delta.py
+  - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/graph_webhooks.py
 tests:
   - usecase_code/40-agent-factory/tests/test_prompt.py
   - usecase_code/40-agent-factory/tests/test_hosted.py
@@ -87,6 +91,18 @@ Native permission ingestion retains `metadata_storage_path` on parent and chunk
 indexes, and requires source-ancestor permission metadata as well as file bytes.
 Exact-file ingestion grants do not establish that ancestor access is available;
 the example must report that gap rather than broaden common-lake permissions.
+
+The optional Graph extension uses stable tenant/drive/item IDs and permission-aware
+root delta, with `Prefer: includesecuritywebhooks` on business security-subscription
+creation. Notifications durably invalidate a scope before acknowledgement; they
+are triggers, not permissions or complete change records. Explicit source reads
+stage immutable content or reviewed named-principal ACL changes, with native
+Search resync and complete verification before committing the delta checkpoint.
+Process-level publication serialization and generation checks prevent stale
+workers/results from reopening revoked access. This local SQLite reference is
+single-host, not a distributed coordinator or an instantaneous-revocation SLA.
+Real source consent, callback hosting and notification delivery are separate
+deployment evidence; synthetic library folders do not establish SharePoint setup.
 
 Local fixtures or passing unit tests do not establish three real service chunks,
 successful revocation, image use, or a deployed Foundry agent. The example's

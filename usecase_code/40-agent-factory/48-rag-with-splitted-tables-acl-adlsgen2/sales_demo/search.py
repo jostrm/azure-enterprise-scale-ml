@@ -17,6 +17,11 @@ PERMISSIONS = {"UserIds": "metadata_user_ids", "GroupIds": "metadata_group_ids",
                "RbacScope": "metadata_rbac_scope"}
 UNITS = {"utf8": "utf8", "utf16": "utf16", "codepoint": "codePoint"}
 CHUNK_SELECT = ",".join(("chunk_id", "parent_id", "chunk_text", *METADATA))
+PATH_KEY_ADVISORY = (
+    "This ADLS Gen2 indexer maps the property 'metadata_storage_path' to the index key, "
+    "which may not reindex documents if directories are renamed. Update the 'LastModified' "
+    "timestamps for all the blobs in the directory to ensure they get reindexed."
+)
 
 
 def endpoint(value, suffix):
@@ -119,8 +124,17 @@ def build_definitions(config: dict) -> dict:
         names = {kind: scoped_name(config["owner"], config["version"], identifier, role)
                  for kind, role in (("datasource", "source"), ("index", "chunks"), ("audit_index", "audit"),
                                     ("skillset", "skills"), ("indexer", "indexer"))}
+        binding = copy.deepcopy(partition)
+        if config.get("graph_sync"):
+            binding.pop("allowed_user_ids", None)
+            binding.pop("allowed_group_ids", None)
+            if isinstance(binding.get("graph_lineage"), dict):
+                binding["graph_lineage"] = {
+                    key: value for key, value in binding["graph_lineage"].items()
+                    if key in {"tenant_id", "drive_id", "item_id", "source_sha256", "source_version", "normalization"}
+                }
         description = _marker({"owner": config["owner"], "dataset": config["dataset"],
-                               "version": config["version"], "partition": partition,
+                               "version": config["version"], "partition": binding,
                                "storage": storage, "container": container, "directory": directory,
                                "embedding": [embedding_endpoint, deployment]})
         metadata = [_field(name, filterable=True) for name in METADATA]
@@ -371,6 +385,22 @@ class SearchClient:
             )
         return self.run_indexers(apply=True)
 
+    def synchronize(self, *, permissions_changed, content_changed, apply=False, allow_paid=False,
+                    max_polls=60, poll_seconds=5):
+        if (type(permissions_changed) is not bool or type(content_changed) is not bool
+                or not (permissions_changed or content_changed)):
+            raise ValueError("Select explicit content and/or permission synchronization.")
+        if apply is not True or (content_changed and allow_paid is not True):
+            raise ValueError("Synchronization requires --apply and content processing requires --allow-paid.")
+        result = {}
+        if permissions_changed:
+            self.resync_permissions(apply=True)
+            result["permissions"] = self.wait(max_polls=max_polls, poll_seconds=poll_seconds)
+        if content_changed:
+            self.run_indexers(apply=True)
+            result["content"] = self.wait(max_polls=max_polls, poll_seconds=poll_seconds)
+        return result
+
     def run_indexers(self, partitions=None, *, apply=False):
         if apply is not True:
             raise ValueError("Running indexers can incur charges and requires apply=True.")
@@ -405,7 +435,18 @@ class SearchClient:
                 if status.get("status") == "error" or state not in (None, "inProgress", "success"):
                     raise RuntimeError(f"Indexer {identifier} did not succeed: {state or status.get('status')}.")
                 if state == "success":
-                    if last.get("itemsFailed", 0) or last.get("errors") or last.get("warnings"):
+                    warnings = last.get("warnings") or []
+                    immutable_prefix = self._config.get("project_prefix", "").endswith(
+                        "/versions/" + self._config["version"])
+                    expected_name = "Projection.SearchIndex.Index." + partition["names"]["audit_index"]
+                    known_advisories = all(
+                        immutable_prefix and isinstance(warning, dict)
+                        and warning.get("message") == PATH_KEY_ADVISORY
+                        and warning.get("name") == expected_name
+                        and warning.get("key") is None and not warning.get("details")
+                        for warning in warnings
+                    )
+                    if last.get("itemsFailed", 0) or last.get("errors") or not known_advisories:
                         raise RuntimeError(f"Indexer {identifier} reported failures or warnings; evidence is incomplete.")
                     complete[identifier] = status
             if len(complete) == len(selected):
