@@ -363,6 +363,7 @@ class HostedTests(unittest.TestCase):
         agent.turn("Retrain air-passengers too", user="alice", conversation_id="c3")
         self.assertIn(f"plan {code} is active until", model.requests[-1]["instructions"])
         self.assertIn(f"covers: {CHURN}.", model.requests[-1]["instructions"])
+        self.assertIn("needs plan_run and the user's approval of the new code", model.requests[-1]["instructions"])
         self.assertIn("does not cover air-passengers", model.tool_results()[0]["error"])
         model.steps = ["Already approved."]
         agent.turn(f"approve {code}", user="alice")

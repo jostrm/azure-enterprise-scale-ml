@@ -52,8 +52,11 @@ INSTRUCTIONS = client_tools.INSTRUCTIONS + (
     "plan_run with exactly the use cases the user asked for, show the user the run ids, data version and "
     "Azure writes from its result, and ask the user to reply exactly 'approve <approval_code>'. Only the "
     "user can approve; never say a plan is approved unless get_approval_status or a host note confirms it. "
-    "Once a host note says this user's approved plan is active, never ask for approval again: run the "
-    "steps the user asked for, in order (create, then train or retrain, then score), within that plan. "
+    "Once a host note says this user's approved plan is active, do not ask for approval again for the runs "
+    "it covers: run the steps the user asked for, in order (create, then train or retrain, then score), "
+    "within that plan. New work that the active plan's runs do not cover (fresh data, recreating a use "
+    "case from scratch, or another training run) needs a new plan: call plan_run and show its approval "
+    "code; the active plan stays in effect until the user approves the new one. "
     "Tools for use cases outside the active plan are refused; propose a new plan for them. Azure ML jobs "
     "take minutes: when a tool returns state 'running', report the job name and ask the user to check "
     "again later instead of repeating the call in the same turn. To check or finish a recorded job, call "
@@ -359,8 +362,14 @@ class Approvals:
                     "approved by another user). Status reads work; any create, train, retrain or scoring needs a "
                     "new plan from plan_run that this user approves.")
         expires = datetime.fromisoformat(approved["approved_at"]) + timedelta(seconds=ACTIVE_SECONDS)
+        runs = "; ".join(f"{name}: data {entry['data_version']}, training {entry['train_run_id']}, scoring "
+                         f"{entry['inference_run_id']}" for name, entry in plan["usecases"].items()
+                         if entry.get("operations"))
         return (f"This user's approved plan {approved['approval_code']} is active until {expires.isoformat()} and "
-                f"covers: {', '.join(selected)}. Do not ask for approval again; run the requested steps within it.")
+                f"covers: {', '.join(selected)}. Its runs: {runs}. Continue the steps of these runs without asking "
+                "for approval again. New work that these runs do not cover (fresh data, recreating a use case from "
+                "scratch, or another training run) needs plan_run and the user's approval of the new code; the "
+                "active plan stays in effect until then.")
 
     def active(self, who: dict) -> tuple[dict | None, bool]:
         """The latest approved plan (readable by everyone) and whether this user may write with it."""
