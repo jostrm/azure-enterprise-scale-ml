@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 
 from .configuration import fingerprint, paths, read_json, write_json
-from .usecases import AIR, CHURN, DATA_VERSION_PREFIX, OPERATIONS, expected_names, model_name, usecase
+from .usecases import AIR, CHURN, DATA_VERSION_PREFIX, OPERATIONS, USECASES, expected_names, model_name, usecase
 
 SCHEMA = "aif49.ml-agent-plan/v1"
 PUBLICATIONS = "publications.json"
@@ -54,21 +54,30 @@ def _lake(config: dict, dataset: str, version: str, use_case: str) -> dict:
     }
 
 
-def build_plan(config: dict, *, now: datetime | None = None, fresh: bool = False) -> dict:
-    """Describe every name, path, run and Azure write before anything is executed."""
+def build_plan(config: dict, *, now: datetime | None = None, fresh: bool = False,
+               usecases: list[str] | None = None, hosted: bool = False) -> dict:
+    """Describe every name, path, run and Azure write before anything is executed.
+
+    `usecases` limits the approved operations to the use cases the user asked for. Both use cases
+    stay described because the ESML rollout binding names both. `hosted` words the agent's own writes.
+    """
+    selected = list(USECASES) if usecases is None else list(usecases)
+    if not selected or len(set(selected)) != len(selected) or any(name not in USECASES for name in selected):
+        raise ValueError(f"Select one or both use cases without repeats: {', '.join(USECASES)}")
     now = now or datetime.now(timezone.utc)
     stamp = now.strftime("%y%m%d%H%M")
     location = paths(config)
     reviewed = read_json(config["reviewed_rollout"])
     air_binding = reviewed["scenarios"][AIR]
-    churn_version = next_data_version(location.state, fresh=fresh)
+    churn_version = next_data_version(location.state, fresh=fresh and CHURN in selected)
     entries = {}
     for name, version, key in ((CHURN, churn_version, "m49"), (AIR, air_binding["data_version"], "m05")):
         item = usecase(name)
         settings = config["usecases"][name]
         entry = {
             "model_number": item["model_number"], "task": item["task"], "mode": item["mode"],
-            "operation": item["operation"], "operations": list(OPERATIONS[name]),
+            "operation": item["operation"], "selected": name in selected,
+            "operations": list(OPERATIONS[name]) if name in selected else [],
             "model_name": model_name(name), "expected_names": expected_names(name),
             "compute": settings["compute"], "data_version": version,
             "train_run_id": f"aif49-{key}-{'train' if name == CHURN else 'retrain'}-{stamp}",
@@ -86,6 +95,20 @@ def build_plan(config: dict, *, now: datetime | None = None, fresh: bool = False
             entry["champion_model_id"] = settings["champion_model_id"]
             entry["synthetic"] = False
         entries[name] = entry
+    writes = []
+    if CHURN in selected:
+        writes += [
+            f"Create-only lake publication of synthetic {CHURN} data version {churn_version} (master, shared silver, project IN).",
+            f"Azure ML data assets and pipeline component for {model_name(CHURN)}; training job on {entries[CHURN]['compute']}.",
+            f"Quality-gated registration of {model_name(CHURN)} (next version, explicit no-champion selection).",
+        ]
+    if AIR in selected:
+        writes.append(f"Azure ML data assets, component and retraining job for {model_name(AIR)} on "
+                      f"{entries[AIR]['compute']}; registration only if the selection policy promotes the candidate.")
+    writes.append("Create-only gold inference inputs and one GOLD_INFERENCE pipeline job per selected use case.")
+    writes.append("Paid model responses for the conversations; plans and receipts are mirrored below the M49 use "
+                  "case's agent-state folder in the shared lake." if hosted else
+                  "One owned Foundry prompt-agent version and paid model responses for the conversations.")
     plan = {
         "schema": SCHEMA, "config_sha256": fingerprint(config), "owner": config["owner"],
         "created_at": now.isoformat(), "data_date_utc": now.strftime("%Y-%m-%d"),
@@ -94,16 +117,7 @@ def build_plan(config: dict, *, now: datetime | None = None, fresh: bool = False
                   "workspace": reviewed["runtime"]["workspace_name"],
                   "resource_group": reviewed["runtime"]["resource_group"]},
         "usecases": entries,
-        "azure_writes": [
-            f"Create-only lake publication of synthetic {CHURN} data version {churn_version} (master, shared silver, project IN).",
-            f"Azure ML data assets and pipeline component for {model_name(CHURN)}; training job on {entries[CHURN]['compute']}.",
-            f"Quality-gated registration of {model_name(CHURN)} (first version, explicit no-champion selection).",
-            f"Azure ML data assets, component and retraining job for {model_name(AIR)} on {entries[AIR]['compute']}; "
-            "registration only if the selection policy promotes the candidate.",
-            "Create-only gold inference inputs and one GOLD_INFERENCE pipeline job per use case.",
-            "Paid model responses for the conversations (the CLI also creates one owned Foundry prompt-agent "
-            "version; the hosted agent mirrors its receipts below the M49 use case's agent-state folder).",
-        ],
+        "azure_writes": writes,
         "never": ["role assignments", "networking, private endpoints or DNS", "Search", "SKUs or tiers",
                   "model deployments", "compute creation or deletion", "endpoint creation",
                   "deletion of any model, data asset, endpoint or lake file"],

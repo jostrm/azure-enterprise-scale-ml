@@ -150,18 +150,21 @@ Foundry Playground  ->  hosted agent sandbox (agent identity, network-injected s
 The package contains no credentials and no generated data. The sandbox does not render notebooks; the
 orange checkout keeps the generated notebook.
 
-**Approval in chat.** The `plan_run` tool proposes a plan and returns an approval code. The plan becomes
+**Approval in chat.** The `plan_run` tool proposes a plan for exactly the use cases the user asked for
+and returns an approval code. Tools for a use case outside the active plan are refused. The plan becomes
 active only when the same platform user (the hashed `x-agent-user-id` that Foundry injects) replies with
 exactly `approve <approval code>` within 30 minutes. The host checks that message itself; model output
 and tool results can never approve a plan. Writes are allowed for 12 hours and only for the user who
-approved the plan; anyone else can read its status. Plans bind to the configuration regardless of where
-the sandbox places its home folder.
+approved the plan; anyone else can read its status. On every turn the host tells the model whether this
+user's plan is active, so the model does not ask for approval again. Plans bind to the configuration
+regardless of where the sandbox places its home folder.
 
 **Long jobs.** Each Azure ML wait is bounded to about 20 seconds per tool call. A tool reports `running`
 with the job name. Ask again later; the next call resumes the same recorded job from the shared
-receipts and never submits a duplicate. Receipts are uploaded to the lake before every Azure ML or lake
-write and wait, and after every tool call. Uploads are conditional on the ETag that the session read, so
-a stale session cannot overwrite newer receipts. A renewed blob lease serializes turns across
+receipts and never submits a duplicate. `get_usecase_status` also reads the live Azure ML status of an
+unfinished job and returns the next action. Receipts are uploaded to the lake before every Azure ML or
+lake write and wait, and after every tool call. Uploads are conditional on the ETag that the session
+read, so a stale session cannot overwrite newer receipts. A renewed blob lease serializes turns across
 Playground conversations.
 
 **Identity and roles.** Foundry creates a dedicated agent identity for the hosted agent. This example
@@ -171,8 +174,9 @@ never assigns roles. An administrator grants that identity the following roles, 
 - `Storage Blob Data Contributor` on the shared-lake container. Use an ABAC condition that limits
   writes and deletes to the M49 dataset paths, the two use-case roots and the publication blueprint
   prefix.
-- `Storage Blob Data Contributor` on the workspace default blob container, only when that datastore uses
-  identity-based access. Azure ML code uploads then use the caller's identity.
+- `Storage Blob Data Contributor` on the workspace default blob container, with an ABAC condition that
+  limits writes and deletes to `LocalUpload/`, when that datastore uses identity-based access. Azure ML
+  code uploads then use the caller's identity.
 
 The sandbox must also reach Azure ML, the lake and the Foundry project over the network-injected
 subnet.
@@ -187,11 +191,10 @@ subnet.
 consumer state folder. Then open the agent in the Foundry Playground, for example:
 
 1. "What is the status of both use cases?"
-2. "Create the churn use case from scratch, train it and score new customers." The agent proposes a
-   plan.
-3. "approve <code>". The agent publishes the data and starts training.
-4. "Is training done? Then score the customers." Repeat until the predictions summary appears.
-5. "Retrain air-passengers and run inference."
+2. "Recreate the churn use case from scratch, train it and score new customers. Also retrain
+   air-passengers and score it." The agent proposes a plan for both use cases.
+3. "approve <code>". The agent publishes the synthetic data and starts both trainings.
+4. "Are the trainings done? Then score both use cases." Repeat until the predictions summaries appear.
 
 ## Safety boundaries
 

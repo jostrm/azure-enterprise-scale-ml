@@ -49,21 +49,18 @@ TOKEN_SCOPE = "https://ai.azure.com/.default"
 INSTRUCTIONS = client_tools.INSTRUCTIONS + (
     " You run as a Foundry hosted agent with your own Entra identity, so the Playground can call your "
     "tools. Every create, train, retrain or inference call needs a plan that this user approved: call "
-    "plan_run, show the user the use cases, run ids, data version and Azure writes from its result, and "
-    "ask the user to reply exactly 'approve <approval_code>'. Only the user can approve; never say a plan "
-    "is approved unless get_approval_status or a host note confirms it. Azure ML jobs take minutes: when "
-    "a tool returns state 'running', report the job name and ask the user to check again later instead "
-    "of repeating the call in the same turn. Calling a training or inference tool again resumes the same "
-    "recorded job and never submits a duplicate. get_usecase_status only reads the shared receipts and "
-    "never contacts Azure ML: when it shows training state 'submitted' or a pending_inference, call "
-    "start_training, start_retraining or run_batch_inference again to check that job and finish it. Once "
-    "get_approval_status or a host note shows an approved plan with writes allowed for this user, never "
-    "ask for approval again: run the steps the user asked for (create, train or retrain, then score) in "
-    "order within that plan. A plan "
-    "always covers both use cases, but operate only on "
-    "the use case the user asked for in this conversation. If a step fails, report the error and stop; "
-    "never continue with a step that depends on it (for example, never train before the use case was "
-    "created successfully)."
+    "plan_run with exactly the use cases the user asked for, show the user the run ids, data version and "
+    "Azure writes from its result, and ask the user to reply exactly 'approve <approval_code>'. Only the "
+    "user can approve; never say a plan is approved unless get_approval_status or a host note confirms it. "
+    "Once a host note says this user's approved plan is active, never ask for approval again: run the "
+    "steps the user asked for, in order (create, then train or retrain, then score), within that plan. "
+    "Tools for use cases outside the active plan are refused; propose a new plan for them. Azure ML jobs "
+    "take minutes: when a tool returns state 'running', report the job name and ask the user to check "
+    "again later instead of repeating the call in the same turn. To check or finish a recorded job, call "
+    "start_training, start_retraining or run_batch_inference again; they resume the same job and never "
+    "submit a duplicate. get_usecase_status shows the live Azure ML status and next_action of an "
+    "unfinished job. If a step fails, report the error and stop; never continue with a step that depends "
+    "on it (for example, never train before the use case was created successfully)."
 )
 
 
@@ -327,6 +324,12 @@ class Approvals:
         code = match.group(1).lower()
         pending_path = self.root / f"pending-{who['user']}.json"
         pending = read_json(pending_path) if pending_path.is_file() else None
+        if pending is not None and pending.get("approved_at") and pending["sha256"].startswith(code):
+            record = self.root / "approved.json"
+            if (record.is_file() and read_json(record).get("sha256") == pending["sha256"]
+                    and self.active(who)[1]):
+                return (f"Plan {pending['approval_code']} is already approved and active for this user; continue "
+                        "with the requested steps without asking for approval again.")
         if pending is None or pending.get("approved_at"):
             return "The user tried to approve a plan, but this user has no pending plan. Offer plan_run."
         if _age(pending.get("proposed_at"), self.clock()) > PENDING_SECONDS:
@@ -342,7 +345,22 @@ class Approvals:
         write_json(self.root / "approved.json", approved)
         write_json(pending_path, approved)  # consumed; it can never be approved twice
         return (f"The user approved plan {pending['approval_code']} in their own message. It is now the active "
-                "plan for 12 hours; continue with the request it covers.")
+                "plan for 12 hours; continue with the request it covers without asking for approval again.")
+
+    def context(self, who: dict) -> str | None:
+        """A host note that states the active plan for this user, so the model never re-asks for approval."""
+        plan, writable = self.active(who)
+        if plan is None:
+            return None
+        approved = read_json(self.root / "approved.json")
+        selected = [name for name, entry in plan["usecases"].items() if entry.get("operations")]
+        if not writable:
+            return ("An approved plan exists, but it does not allow writes for this user (expired after 12 hours or "
+                    "approved by another user). Status reads work; any create, train, retrain or scoring needs a "
+                    "new plan from plan_run that this user approves.")
+        expires = datetime.fromisoformat(approved["approved_at"]) + timedelta(seconds=ACTIVE_SECONDS)
+        return (f"This user's approved plan {approved['approval_code']} is active until {expires.isoformat()} and "
+                f"covers: {', '.join(selected)}. Do not ask for approval again; run the requested steps within it.")
 
     def active(self, who: dict) -> tuple[dict | None, bool]:
         """The latest approved plan (readable by everyone) and whether this user may write with it."""
@@ -373,7 +391,7 @@ class Approvals:
                                   "writes_allowed_for_this_user": writable, "writes_expire_at": expires.isoformat()}
             result["active_plan"] = {
                 name: {key: entry[key] for key in ("model_name", "data_version", "train_run_id", "inference_run_id")}
-                for name, entry in plan["usecases"].items()}
+                for name, entry in plan["usecases"].items() if entry.get("operations")}
         return result
 
 
@@ -401,12 +419,19 @@ def conversation(current: str, history: list) -> list[dict]:
 def tool_definitions() -> list[dict]:
     return client_tools.tool_definitions() + [
         {"type": "function", "name": "plan_run", "strict": True,
-         "description": ("Propose a new plan (model names, lake paths, run ids and Azure writes) for the two use "
-                         "cases. Writes nothing to Azure ML; the user must approve it before any operation."),
-         "parameters": {"type": "object", "additionalProperties": False, "required": ["fresh_data"],
-                        "properties": {"fresh_data": {
-                            "type": "boolean",
-                            "description": "True publishes the next synthetic churn data version (from scratch)."}}}},
+         "description": ("Propose a new plan (model names, lake paths, run ids and Azure writes) for exactly the use "
+                         "cases the user asked for. Writes nothing to Azure ML; the user must approve it before "
+                         "any operation."),
+         "parameters": {"type": "object", "additionalProperties": False, "required": ["usecases", "fresh_data"],
+                        "properties": {
+                            "usecases": {"type": "array", "items": {"type": "string",
+                                                                    "enum": client_tools.USECASE_ENUM},
+                                         "description": "The use cases the user asked to create, train, retrain "
+                                                        "or score; each at most once."},
+                            "fresh_data": {
+                                "type": "boolean",
+                                "description": ("True publishes the next synthetic churn data version (from "
+                                                "scratch); ignored when the churn use case is not selected.")}}}},
         {"type": "function", "name": "get_approval_status", "strict": True,
          "description": "Show this user's pending plan and the approved plan with its run ids and expiry.",
          "parameters": {"type": "object", "properties": {}, "required": [], "additionalProperties": False}},
@@ -475,7 +500,7 @@ class HostedAgent:
                 self.state.pull()
                 answer = None
                 try:
-                    note = self.approvals.approve(text, who)
+                    note = self.approvals.approve(text, who) or self.approvals.context(who)
                     plan, writable = self.approvals.active(who)
                     runtime = self.runtime(plan, writable)
                     answer = self._converse(runtime, conversation(text, history or []), note, deadline, who, writable)
@@ -494,9 +519,11 @@ class HostedAgent:
     def dispatch(self, runtime, name: str, arguments: dict, who: dict, writable: bool) -> dict:
         try:
             if name == "plan_run":
-                if set(arguments) != {"fresh_data"} or type(arguments["fresh_data"]) is not bool:
-                    raise ValueError("plan_run needs only the boolean fresh_data")
-                plan = build_plan(self.config, fresh=arguments["fresh_data"])
+                selected = arguments.get("usecases")
+                if (set(arguments) != {"usecases", "fresh_data"} or type(arguments["fresh_data"]) is not bool
+                        or not isinstance(selected, list) or not all(isinstance(item, str) for item in selected)):
+                    raise ValueError("plan_run needs the selected usecases and the boolean fresh_data")
+                plan = build_plan(self.config, fresh=arguments["fresh_data"], usecases=selected, hosted=True)
                 path, digest = save_plan(self.config, plan, unique=True)
                 pending = self.approvals.propose(path, digest, who)
                 return {"ok": True, "result": redact({
@@ -506,8 +533,9 @@ class HostedAgent:
                     "data_date_utc": plan["data_date_utc"], "azure_writes": plan["azure_writes"],
                     "never": plan["never"],
                     "usecases": {usecase: {key: entry[key] for key in ("model_name", "data_version", "train_run_id",
-                                                                       "inference_run_id", "compute")}
-                                 for usecase, entry in plan["usecases"].items()}})}
+                                                                       "inference_run_id", "compute", "operations")}
+                                 for usecase, entry in plan["usecases"].items() if entry["selected"]},
+                    "not_in_plan": [usecase for usecase, entry in plan["usecases"].items() if not entry["selected"]]})}
             if name == "get_approval_status":
                 if arguments:
                     raise ValueError("get_approval_status takes no arguments")
@@ -516,6 +544,10 @@ class HostedAgent:
                 return {"ok": False, "error": ("No plan approved by this user is active (missing, expired after 12 "
                                                "hours, or approved by another user). Call plan_run and ask the "
                                                "user to approve it.")}
+            if name in MUTATING and not (runtime.plan or {}).get("usecases", {}).get(
+                    arguments.get("usecase"), {}).get("operations"):
+                return {"ok": False, "error": (f"The active plan does not cover {arguments.get('usecase')}. Propose a "
+                                               "new plan with plan_run for it and ask the user to approve it.")}
             return client_tools.dispatch(runtime, name, arguments)
         except StateConflict as error:
             self.state.lost.set()  # stop: another session owns newer receipts

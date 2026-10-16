@@ -20,7 +20,7 @@ from ml_agent.configuration import fingerprint, paths, read_json, write_json
 from ml_agent.lake import LakeIO
 from ml_agent.plan import PUBLICATIONS
 from ml_agent.runtime import MLRuntime
-from ml_agent.usecases import CHURN
+from ml_agent.usecases import AIR, CHURN
 
 DATASTORE = "azureml://datastores/esml_shared_lake/paths/"
 
@@ -333,9 +333,12 @@ class HostedTests(unittest.TestCase):
     def test_only_the_same_users_own_message_approves_and_writes_expire(self):
         model = FakeModel()
         agent = self.session(self.root / "approve-home", model)
-        model.steps = [[("plan_run", {"fresh_data": True})], "Reply approve <code> to run it."]
+        model.steps = [[("plan_run", {"usecases": [CHURN], "fresh_data": True})], "Reply approve <code> to run it."]
         agent.turn("Plan a churn run from scratch", user="alice", conversation_id="c1")
-        code = model.tool_results()[0]["result"]["approval_code"]
+        planned = model.tool_results()[0]["result"]
+        code = planned["approval_code"]
+        self.assertEqual((list(planned["usecases"]), planned["not_in_plan"]), ([CHURN], [AIR]))
+        self.assertFalse([line for line in planned["azure_writes"] if "M05" in line])
         model.steps = ["Not approved."]
         agent.turn("please approve it", user="alice")
         model.steps = ["Not approved."]
@@ -355,18 +358,31 @@ class HostedTests(unittest.TestCase):
         model.steps = [[("start_training", {"usecase": CHURN})], "Not yours."]
         agent.turn("Train churn", user="bob")
         self.assertIn("approved by this user", model.tool_results()[0]["error"])
-        model.steps = ["Nothing pending."]
+        self.assertIn("does not allow writes for this user", model.requests[-1]["instructions"])
+        model.steps = [[("start_retraining", {"usecase": AIR})], "Not in the plan."]
+        agent.turn("Retrain air-passengers too", user="alice", conversation_id="c3")
+        self.assertIn(f"plan {code} is active until", model.requests[-1]["instructions"])
+        self.assertIn(f"covers: {CHURN}.", model.requests[-1]["instructions"])
+        self.assertIn("does not cover air-passengers", model.tool_results()[0]["error"])
+        model.steps = ["Already approved."]
         agent.turn(f"approve {code}", user="alice")
-        self.assertIn("no pending plan", model.requests[-1]["instructions"])
+        self.assertIn("already approved and active", model.requests[-1]["instructions"])
         self.now += timedelta(hours=13)
         self.assertFalse(agent.approvals.active(hosted.caller("alice"))[1])
-        model.steps = [[("plan_run", {"fresh_data": False})], "Approve it."]
+        model.steps = ["Expired."]
+        agent.turn(f"approve {code}", user="alice")
+        self.assertIn("no pending plan", model.requests[-1]["instructions"])
+        model.steps = [[("plan_run", {"usecases": [AIR], "fresh_data": False})], "Approve it."]
         agent.turn("Plan again", user="alice")
         stale = model.tool_results()[0]["result"]["approval_code"]
         self.now += timedelta(minutes=31)
         model.steps = ["Expired."]
         agent.turn(f"approve {stale}", user="alice")
         self.assertIn("expired", model.requests[-1]["instructions"])
+        model.steps = [[("plan_run", {"usecases": [], "fresh_data": False})],
+                       [("plan_run", {"usecases": ["titanic"], "fresh_data": False})], "Invalid."]
+        agent.turn("Plan nothing", user="alice")
+        self.assertTrue(all(not result["ok"] for result in model.tool_results()))
 
     def test_playground_turns_create_train_and_score_m49_without_duplicate_jobs(self):
         from azure_esml.domain_layer.rollout import AzureMLRollout
@@ -394,7 +410,7 @@ class HostedTests(unittest.TestCase):
             model.steps = [[("start_training", {"usecase": CHURN})], "Approval is required."]
             agent.turn("Train churn", user="alice")
             self.assertIn("approved by this user", model.tool_results()[0]["error"])
-            model.steps = [[("plan_run", {"fresh_data": True})], "Please approve."]
+            model.steps = [[("plan_run", {"usecases": [CHURN], "fresh_data": True})], "Please approve."]
             agent.turn("Create the churn use case from scratch", user="alice")
             planned = model.tool_results()[0]["result"]
             self.assertEqual(planned["usecases"][CHURN]["data_version"], "aif49-synth-v2")
@@ -425,6 +441,7 @@ class HostedTests(unittest.TestCase):
             agent.turn("Is training done? Then score the customers.", user="alice")
             trained, scoring = model.tool_results()
             self.assertEqual(trained["result"]["state"], "registered")
+            self.assertIn("call run_batch_inference", trained["result"]["next_action"])
             self.assertEqual((scoring["result"]["state"], scoring["result"]["job"]),
                              ("running", f"inference-job-{CHURN}"))
 

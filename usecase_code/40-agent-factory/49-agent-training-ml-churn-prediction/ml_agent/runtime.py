@@ -267,7 +267,8 @@ class MLRuntime:
         except TimeoutError as error:
             return self._running("train", name, rollout.output / entry["train_run_id"], error,
                                  model=entry["model_name"], run_id=entry["train_run_id"])
-        return self._record("train", name, {**result, "model": entry["model_name"], "run_id": entry["train_run_id"]})
+        return self._record("train", name, {**result, "model": entry["model_name"], "run_id": entry["train_run_id"],
+                                            **self._scoring_hint(result)})
 
     def retrain(self, name: str) -> dict:
         if name != AIR:
@@ -289,7 +290,16 @@ class MLRuntime:
             return self._running("retrain", name, rollout.output / entry["train_run_id"], error,
                                  champion=entry["champion_model_id"], run_id=entry["train_run_id"])
         return self._record("retrain", name, {**result, "champion": entry["champion_model_id"],
-                                              "run_id": entry["train_run_id"]})
+                                              "run_id": entry["train_run_id"], **self._scoring_hint(result)})
+
+    def _scoring_hint(self, result: dict) -> dict:
+        """Hosted only: tell the model that a finished training run is ready for batch scoring."""
+        if not self.hosted or result.get("state") not in esml.TERMINAL:
+            return {}
+        if result["state"] == "not_promoted" and result.get("decision") != "champion_kept":
+            return {}
+        model = "the retained champion" if result["state"] == "not_promoted" else "the registered model"
+        return {"next_action": f"Training is finished; call run_batch_inference to score with {model}."}
 
     def _requests(self, name: str, entry: dict):
         """Deterministic unlabeled requests; reused unchanged when an inference attempt is retried."""
