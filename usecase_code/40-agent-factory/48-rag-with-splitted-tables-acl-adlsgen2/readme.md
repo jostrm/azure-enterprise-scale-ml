@@ -11,6 +11,70 @@ No deployment, real Text Split results, live ACL/revocation result, paid agent
 evaluation or image-serving success is implied by the source code or unit tests.
 The cloud acceptance criteria below must pass before claiming the complete demo.
 
+## Retrieval-only Playground experiment: no calculator
+
+`retrieval_only.py` is a separate, explicitly approved experiment for asking the
+**LLM itself** to reason and calculate from retrieved sales evidence. It gives a
+Foundry prompt agent one native `knowledge_base_retrieve` MCP tool backed by a
+knowledge base with **both JSON and Excel indexes**. The agent chooses whether
+and how often to retrieve; a minimal-reasoning knowledge-base call can query both
+sources. There is no calculator, Code Interpreter, custom function executor or
+Container App in this path. The LLM's arithmetic is not replaced or corrected
+by an oracle.
+
+To avoid the observed Text Split gaps, complete source rows are packed into
+three valid JSON documents per partition **before indexing**, preserving all
+business IDs. Each document is token-measured below 6,000 and directly embedded
+with `text-embedding-3-large`. No Text Split skill runs. This changes the original
+automatic-splitting demonstration; the protected pipeline and its failure
+evidence remain untouched. Retrieval still may select only relevant passages;
+complete indexed coverage does not make every model answer exhaustive.
+
+**Important authorization difference:** native Search document authorization
+needs the separate user-token header; automatic forwarding of that header from
+Foundry Playground has not been established for this setup. This experiment
+therefore creates new, separately named **synthetic project-corpus indexes** with
+project-managed-identity retrieval, not personal file-ACL filtering. Never use
+this path for protected real Graph/customer content. Existing native-ACL indexes,
+their permission filters, source files and sync state are not modified.
+Project/agent users and service readers may access the approved synthetic corpus;
+it is not a per-user ACL acceptance test.
+
+The explicit consumer setting required before cloud changes is:
+
+```json
+"retrieval_experiment": {
+  "synthetic_project_corpus_approved": true,
+  "authorization": "project-managed-identity"
+}
+```
+
+Plan and review the separate index names, the exact Foundry project MI reader
+grant, project MCP connection and agent instructions before setting it. The
+project MI receives Search Index Data Reader on the selected demo service;
+neither personal bearer tokens nor API keys are stored in agent definitions.
+Existing service-level readers retain their current access. No additional
+Storage access is needed for the agent.
+
+```powershell
+& $Python retrieval_only.py plan --config $Config --output "$State\retrieval-only-plan.json"
+# Only after the synthetic project-corpus scope and paid-call approval:
+& $Python retrieval_only.py configure --config $Config --apply --allow-paid
+& $Python retrieval_only.py verify --config $Config
+& $Python retrieval_only.py probe --config $Config --allow-paid `
+  --input "Find evidence from both the JSON and Excel car-sales sources."
+& $Python retrieval_only.py deploy --config $Config --apply
+& $Python retrieval_only.py ask --config $Config --allow-paid `
+  --input "Give me the sum of all sales."
+```
+
+The probe retains real knowledge-base activity/references and the agent
+invocation retains native MCP calls. An agent is not reported as usable in
+Playground until those server-executed calls succeed. This path deliberately
+does not enforce the calculator's numeric-answer gate or claim an exact total.
+It is separate from the Graph delta/security extension; no live protected-source
+content is silently copied into project-readable indexes.
+
 ## Architecture and boundaries
 
 ```text

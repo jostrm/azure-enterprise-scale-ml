@@ -21,6 +21,8 @@ sources:
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/sync_state.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/graph_delta.py
   - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/graph_webhooks.py
+  - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/retrieval_only.py
+  - usecase_code/40-agent-factory/48-rag-with-splitted-tables-acl-adlsgen2/sales_demo/retrieval_experiment.py
 tests:
   - usecase_code/40-agent-factory/tests/test_prompt.py
   - usecase_code/40-agent-factory/tests/test_hosted.py
@@ -113,6 +115,15 @@ deployment evidence; synthetic library folders do not establish SharePoint setup
 Local fixtures or passing unit tests do not establish three real service chunks,
 successful revocation, image use, or a deployed Foundry agent. The example's
 README distinguishes measured local results from approval-gated cloud evidence.
+
+The optional `retrieval_only.py` path tests the model without a calculator or
+client-side function executor. A native Foundry IQ MCP knowledge base can retrieve
+from two separately named synthetic indexes in one request. This path requires
+explicit project-corpus approval: it does not claim per-user native file-ACL
+enforcement in Playground. Complete row-aware preprocessing replaces Text Split
+only for this isolated experiment; protected indexes and their integrity gates
+remain unchanged. Model arithmetic and retrieval exhaustiveness remain unverified
+until evaluated, and no oracle is supplied as a tool or prompt.
 
 See [[Chat-and-Grounding]], [[MCP-Boundary]], [[Retrieval-Provenance]], [[Dependency-Injection]], [[System-Context]] and [[Index]].
 
