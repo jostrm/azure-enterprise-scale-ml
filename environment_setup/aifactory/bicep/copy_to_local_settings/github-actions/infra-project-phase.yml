@@ -2714,6 +2714,7 @@ jobs:
         if: inputs.phase == 'infra' && (env.deleteAllServicesForProject != 'true')
         shell: bash
         run: |
+            set -eo pipefail
             az account set --subscription "${{ env.dev_test_prod_sub_id }}"
             # Guard: Logic Apps 'Consumption' is multi-tenant and has NO private endpoint / VNet integration support.
             # Fail fast instead of silently deploying a public Logic App when private networking is intended.
@@ -2721,7 +2722,7 @@ jobs:
               echo "::error::Logic Apps 'Consumption' cannot be deployed in private networking mode (ENABLE_PUBLIC_ACCESS_WITH_PERIMETER=false). Consumption has no private endpoints / VNet integration. Set LOGIC_APP_TYPE='Standard' for private networking, or set ENABLE_PUBLIC_ACCESS_WITH_PERIMETER='true'."
               exit 1
             fi
-            az deployment sub create \
+            python azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/deploy-integration-with-retry.py -- az deployment sub create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}-${{ env.admin_prjResourceSuffix }}${{ env.admin_commonResourceSuffix }}PrjDepl-68-integration" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
               --location "${{ env.admin_location }}" \

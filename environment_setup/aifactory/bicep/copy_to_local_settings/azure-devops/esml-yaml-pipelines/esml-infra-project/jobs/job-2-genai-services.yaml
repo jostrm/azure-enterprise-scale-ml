@@ -3664,8 +3664,9 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
+     set -eo pipefail
      az account set --subscription "$(dev_test_prod_sub_id)"
-     az deployment sub create \
+     python scripts/deploy-integration-with-retry.py -- az deployment sub create \
      --name "esml-p$(project_number_000)-$(dev_test_prod)-$(admin_locationSuffix)-$(admin_prjResourceSuffix)$(admin_commonResourceSuffix)$PrjDepl-68-integration" \
      --subscription "$(dev_test_prod_sub_id)" \
      --location "$(admin_location)" \

@@ -140,6 +140,17 @@ Main's separately orchestrated ACA capacity step retains its existing lifecycle.
 This is intra-deployment ordering, not a cross-pipeline VNet lock or proof of a
 successful live redeployment.
 
+Logic Apps hosting capacity recovery (2026-10-16): ADO/GHA integration tasks use
+`deploy-integration-with-retry.py` for up to three identical deployments with
+120-second waits only for exclusively recognized App Service worker exhaustion
+on the single `appfarm-logicapp01` plan. Nested stringified Web RP errors and
+nullable diagnostic fields retain their actual evidence; other resource targets,
+mixed/unknown/policy/quota/auth errors stop. The helper compiles Bicep once,
+serializes typed parameters into cleaned-up temporary files for Windows-safe
+transport, and rejects changed source parameter files before retry. No new
+resource group, region/SKU switch, asynchronous WS1 scaling or readiness bypass
+is introduced. Azure capacity remains external and exhaustion still fails.
+
 The opt-in `preserve-v1` common-network profile is add-only, not a blanket networking skip. `common_network_preservation.py` freezes source/compiled ARM, approved address space, native inventories and exact new/retained resource bodies. Revalidation and lease checks precede deployment; post-checks compare native resource snapshots. Retained resources are preserved without reconciliation. Unexpected changes retain failure evidence rather than triggering destructive rollback.
 
 Dashboard source update (2026-10-08): `projectDash01.bicep` uses compact four-row RG/cost tiles, conditional second-row Azure ML/Databricks/Data Factory shortcuts, existing Log Analytics navigation, and native daily ActualCost charts (total and by service). Usage/token report links are compact cards above service configuration. Phase 10 and the dashboard-only runner already forward the service flags; added AML naming is forwarded to the shared naming module. The factory dashboard's `resource_shortcuts` discovers these services from each project RG, excludes Foundry Hub/Project kinds from AML selection, and `dashboard_parts` places them on its second shortcut row. Configured flags are not resource-existence evidence; discovered inventory is a point-in-time observation and may be retained on read failure. No live deployment, new telemetry, role or network changes are implied.
