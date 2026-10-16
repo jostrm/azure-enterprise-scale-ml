@@ -1,7 +1,12 @@
 # Split tables: native ADLS permissions, multi-index RAG and exact sales
 
-This example combines Microsoft Foundry with two **different, nonempty
-partitions** of one synthetic car-sales dataset. Choose the intended path:
+Can an LLM add up every sale when the data spans two search indexes? What happens
+when a table is too large to embed in one piece?
+
+This demo explores both questions with Microsoft Foundry and synthetic car-sales
+data. The JSON file and Excel workbook hold **different, nonempty partitions** of
+the same dataset, so neither source alone can answer "Give me the sum of all sales."
+There are three ways to run it:
 
 | Path | Arithmetic | What it demonstrates |
 | --- | --- | --- |
@@ -9,49 +14,52 @@ partitions** of one synthetic car-sales dataset. Choose the intended path:
 | Playground experiment (`retrieval_only.py ask`) | LLM only, native multi-index MCP retrieval | Retrieval from both indexes; full summation still fails in the observed runs |
 | Full-text control (`retrieval_only.py full-text-sum`) | Same model, **no tools** | Exact LLM summation succeeded twice when both complete texts were supplied directly |
 
-**Execution status:** local implementation and approval-gated cloud runner.
-Source code and unit tests alone do not establish a deployment or cloud success.
-The dated experiment results below are separate from the original native-ACL
-pipeline, whose real Text Split completeness gate remains blocked. Its cloud
-acceptance criteria must pass before claiming the complete split/ACL/image demo.
+**Where things stand:** the code and cloud runner are implemented; cloud writes
+and paid calls require approval. The full-text LLM test worked twice, but the
+Playground agent did not produce a complete total. The original native-ACL
+pipeline is still blocked by Text Split completeness checks. These are separate
+results, not a claim that the full split/ACL/image demo has passed. Source code
+and unit tests alone cannot establish that.
 
 ## Retrieval-only Playground experiment: no calculator
 
-`retrieval_only.py` is a separate, explicitly approved experiment for asking the
-**LLM itself** to reason and calculate from retrieved sales evidence. It gives a
-Foundry prompt agent one native `knowledge_base_retrieve` MCP tool backed by a
-knowledge base with **both JSON and Excel indexes**. The agent chooses whether
-and how often to retrieve; a minimal-reasoning knowledge-base call can query both
-sources. There is no calculator, Code Interpreter, custom function executor or
-Container App in this path. The LLM's arithmetic is not replaced or corrected
-by an oracle.
+Use `retrieval_only.py` when you want the **LLM itself** to attempt the arithmetic.
+This separate experiment needs explicit approval. The Foundry prompt agent gets
+one native MCP tool, `knowledge_base_retrieve`, backed by a knowledge base with
+**both JSON and Excel indexes**. The agent decides whether to search and how often;
+one minimal-reasoning knowledge-base call can query both sources.
 
-The deployed low-permission path is `native-whole-table`: ordinary native Blob
-indexers ingest the two already-approved immutable source files into **separate
-indexes**, one complete JSON table and one complete Excel-derived text table.
-It requires neither operator document-upload rights nor new Storage permissions.
-No Text Split skill, embedding skill or calculator runs. Keyword search plus
-semantic ranking supplies the evidence. The unused vector field is retained for
-schema compatibility, but has no populated vectors or query-time vectorizer.
+There is no calculator, Code Interpreter, custom function executor or Container
+App in this path. The answer is the model's own attempt. An oracle does not supply
+or correct it.
 
-A row-aware push variant remains available for operators with independently
-approved data-write permissions: it packs complete rows into three valid JSON
-documents per partition and embeds each below 6,000 tokens. The CLI does not
-grant itself contributor access if a push fails. Both variants leave the
-protected pipeline and its failure evidence untouched. Complete indexed coverage
-does not guarantee that every retrieval or model answer is exhaustive.
+The deployed setup uses `native-whole-table`. Native Blob indexers read the two
+already-approved immutable files into **separate indexes**: one complete JSON
+table and one complete Excel-derived text table. This avoids giving the operator
+document-upload rights or adding Storage permissions. Retrieval uses keyword
+search and semantic ranking, with no Text Split or embedding skill. The schema
+still has a vector field for compatibility, but it contains no vectors and has
+no query-time vectorizer.
 
-**Important authorization difference:** native Search document authorization
-needs the separate user-token header; automatic forwarding of that header from
-Foundry Playground has not been established for this setup. This experiment
-therefore creates new, separately named **synthetic project-corpus indexes** with
-project-managed-identity retrieval, not personal file-ACL filtering. Never use
-this path for protected real Graph/customer content. Existing native-ACL indexes,
-their permission filters, source files and sync state are not modified.
-Project/agent users and service readers may access the approved synthetic corpus;
-it is not a per-user ACL acceptance test.
+There is also a row-aware push option for operators who have separately approved
+data-write permissions. It packs complete rows into three valid JSON documents
+per partition, each embedded below 6,000 tokens. If a push fails, the CLI does not
+grant itself contributor access. Neither option changes the protected pipeline
+or its recorded failures. Having every row in an index does not mean every search
+or model answer will use every row.
 
-The explicit consumer setting required before cloud changes is:
+**Use synthetic data only here.** Native Search document authorization requires
+a separate user-token header. This setup has not established that Playground
+forwards it automatically. Instead, the experiment creates separately named
+**synthetic project-corpus indexes** and retrieves through the project's managed
+identity, without personal file-ACL filtering.
+
+Project/agent users and service readers may access that approved corpus. Do not
+put protected Graph or customer content in it, or treat it as a per-user ACL test.
+The existing native-ACL indexes, permission filters, source files and sync state
+stay untouched.
+
+Before making cloud changes, add this setting to your consumer configuration:
 
 ```json
 "retrieval_experiment": {
@@ -62,19 +70,20 @@ The explicit consumer setting required before cloud changes is:
 }
 ```
 
-Plan and review the separate index names, the exact Foundry project MI reader
-grant, project MCP connection and agent instructions before setting it. The
-project MI receives Search Index Data Reader on the selected demo service;
-neither personal bearer tokens nor API keys are stored in agent definitions.
-Existing service-level readers retain their current access. No additional
-Storage access is needed for the agent.
-The knowledge base stores a 40,000-token, six-document retrieval budget so the
-whole tables fit. Its MCP response can repeat table content in citation
-payloads; account for the **actual tool response size** when selecting an
-existing model deployment. This demo's existing `gpt-5.1` deployment had only
-30,000 TPM, so the experiment uses the separately configured existing
-`aifactory-agent-gpt-6-1-sol` deployment (200,000 TPM) without changing either
-model's capacity or the primary Factory Agent. Rate limits can still apply.
+Review the plan before setting the approval flag: check the new index names,
+Foundry project managed-identity reader grant, MCP connection and agent
+instructions. The identity receives Search Index Data Reader on the selected
+demo service. Agent definitions contain no personal bearer tokens or API keys.
+Existing service readers keep their access, and the agent needs no additional
+Storage access.
+
+The knowledge base allows 40,000 tokens and six documents per retrieval so the
+tables fit. MCP can repeat table content in citation payloads, though, so size
+your model choice around the **actual tool response**, not just the source files.
+The existing `gpt-5.1` deployment in this demo had only 30,000 TPM. The experiment
+therefore uses the existing `aifactory-agent-gpt-6-1-sol` deployment at 200,000 TPM.
+Neither model's capacity nor the primary Factory Agent was changed. Rate limits
+can still apply.
 
 ```powershell
 & $Python retrieval_only.py plan --config $Config --output "$State\retrieval-only-plan.json"
@@ -88,36 +97,38 @@ model's capacity or the primary Factory Agent. Rate limits can still apply.
   --input "Give me the sum of all sales."
 ```
 
-The probe retains real knowledge-base activity/references and the agent
-invocation retains native MCP calls. An agent is not reported as usable in
-Playground until those server-executed calls succeed. This path deliberately
-does not enforce the calculator's numeric-answer gate or claim an exact total.
-It is separate from the Graph delta/security extension; no live protected-source
-content is silently copied into project-readable indexes.
-Observed live outcome: both indexes contain exact full-source copies; a native
-Foundry agent call returned actual model names from both sources and cited them,
-without a calculator. On the exact sum prompt, the model retrieved twice and
-declined to assert a complete total, saying retrieval was truncated. That answer
-is retained as experimental model behavior, not replaced by a deterministic
-calculation or claimed as numeric success.
+The probe saves knowledge-base activity and references; agent calls save the
+native MCP trace. Those server-executed calls must succeed before the agent can
+be described as usable in Playground. A successful retrieval still says nothing
+about the accuracy of its arithmetic. This path does not apply the calculator's
+numeric-answer check or copy protected content from the Graph delta/security
+extension into project-readable indexes.
+
+In the live run, both indexes held exact copies of their source text. The agent
+returned car-model values found in both sources and cited them, without a calculator.
+Asked for the full sum, it searched twice and declined to give a complete total,
+saying the results were truncated. That response is kept as a result of the
+experiment, not replaced with a calculated answer.
 
 ### Reproduce the successful no-tools summation control
 
-**This is not a fix to the Playground agent.** `full-text-sum` reads both complete
-live experiment-index documents, verifies their content/provenance against the
-approved publication, and gives their original text directly to the **same model
-deployment** as the persisted experiment agent. It does not invoke that agent or
-its MCP tool. Transport JSON is decoded; rows are not pre-calculated, summarized,
-split or replaced with evaluator answers.
+**This test bypasses the Playground agent; it does not fix it.** `full-text-sum`
+reads both complete documents from the live experiment indexes, checks their
+content and provenance against the approved publication, and sends the original
+text directly to the **same model deployment**. It does not invoke the saved agent
+or its MCP tool. The only transformation is decoding the transport JSON: no rows
+are pre-calculated, summarized, split or replaced with evaluator answers.
 
 First complete the local setup, consumer configuration, synthetic publication
 and approved `native-whole-table` experiment deployment described in this README.
-Use your own private-network access, Entra identity and consumer configuration;
-sharing this example does not share the original operator's Azure resources.
+You will need your own private-network access, Entra identity and consumer
+configuration. Sharing the code does not share the original operator's Azure
+resources.
+
 `$Python`, `$Config` and `$State` refer to the variables in **Local setup and
 deterministic generation** below. A compatible reasoning model with adequate
 context, output and token-rate capacity must already be deployed and selected by
-`retrieval_experiment.model_deployment`; the command provisions nothing.
+`retrieval_experiment.model_deployment`. This command creates no Azure resources.
 
 ```powershell
 # Optional comparison: existing native MCP/Playground route.
@@ -133,38 +144,40 @@ context, output and token-rate capacity must already be deployed and selected by
   --output "$State\sum-full-text-2.json"
 ```
 
-The fixed prompt asks for all sales from both supplied texts, using integer USD
-cents, cancelled rows as zero, discounts/refunds deducted and tax excluded. It
-requires deduplication by `(dataset, version, sale_id)`, audit groups of at most
-20 consecutive IDs per source, then source counts/subtotals and the grand total.
+The fixed prompt asks the model to add all sales from both texts in integer USD
+cents. Cancelled rows count as zero; discounts and refunds are deducted, and tax
+is excluded. It asks for deduplication by `(dataset, version, sale_id)`, subtotals
+for groups of at most 20 consecutive IDs per source, and then each source's count
+and subtotal plus the grand total.
 The exact prompt is `FULL_TEXT_SUM_QUESTION` in
 [`sales_demo/retrieval_experiment.py`](sales_demo/retrieval_experiment.py).
-`--input` is intentionally rejected for this fixed control.
+Because this is a fixed comparison, the command rejects `--input`.
 
 Inference uses `tools=[]`, `tool_choice="none"`, `reasoning.effort="high"`,
 `max_output_tokens=24000`, `store=false`, no previous response and no automatic
-retry. It does not send an `agent_reference`: this service rejects per-request
-reasoning overrides when an agent reference is specified. An incompatible model
-or rate limit is surfaced, not silently replaced with another model or tool.
+retry. It leaves out `agent_reference` because the service rejects per-request
+reasoning overrides when an agent reference is present. If the model is
+incompatible or a rate limit is reached, the command reports the error. It does
+not switch models or add a tool.
 
-Each run keeps its exact input/settings, source hashes and raw response under
+Each run saves its exact input and settings, source hashes and raw response under
 `$State\retrieval-only-experiment\full-text-sum-runs\<run-id>`. The result also
-contains token usage, duration and the raw model answer. Incomplete responses or
-unexpected tool calls fail explicitly and retain the response for inspection.
+contains token usage, duration and the raw model answer. An incomplete response
+or unexpected tool call fails the run; the response is kept for inspection.
 Keep these artifacts and all consumer configuration outside Git.
 
 For a blind comparison, **do not give the model the README, expected amounts or
 `evaluation\expected.json`**. Only after inference, compare the returned source
-counts, subtotals, grand total and audit groups with the independent fixture
-oracle/structured rows. This command deliberately returns
-`arithmetic_verified:false`: completing inference is not proof that arithmetic
-or the model's claimed coverage is correct.
+counts, subtotals, grand total and audit groups with the independent expected
+results (the oracle) and structured rows. The command returns
+`arithmetic_verified:false` on purpose: a completed model response is not proof
+of correct arithmetic or complete coverage.
 
 ### Observed results: 16 October 2026
 
-The original test harness used the same request shape now exposed by
-`full-text-sum`. All inputs were synthetic `car-sales/v1`, seed 48. No expected
-total, computed row amount or calculator was supplied to the model.
+The original test runner used the same request format now available through
+`full-text-sum`. It used synthetic `car-sales/v1` data with seed 48. The model
+received no expected total, computed row amount or calculator.
 
 | Route | Completed trials | Exact full totals |
 | --- | ---: | ---: |
@@ -173,23 +186,23 @@ total, computed row amount or calculator was supplied to the model.
 
 Both successful controls returned **262 records and USD 39,535,932.62**, including
 109 JSON records / USD 16,768,818.26 and 153 Excel records / USD 22,767,114.36.
-Independent, post-response Decimal calculations matched **all 14 audit-group
-subtotals**, source totals, row counts and currency conversions in both runs.
+After each response, an independent Decimal calculation matched **all 14
+audit-group subtotals**, source totals, row counts and currency conversions.
 The runs took approximately 241 and 288 seconds (about 4-5 minutes).
 
 The agent baseline declined a full total. The stronger prompt reported only
 61 JSON and 114 Excel records and also introduced a USD 100 arithmetic error.
-Every recorded MCP response nevertheless contained both complete source texts
-with matching hashes. That suggests a hosted tool/context delivery cutoff, but
-the precise internal cause and token limit have not been established. Recorded
-tool output alone does not prove identical text reached the model's context.
+Yet every recorded MCP response contained both complete source texts with
+matching hashes. The content may be cut off between the hosted tool and the
+model's context, but the exact cause and token limit are still unknown. A complete
+tool trace does not prove the model received that same text.
 
-**Conclusion:** LLM-only full-dataset arithmetic is possible for this fixture.
-Two successes are not a general accuracy guarantee. The controls change input
-delivery and reasoning settings, do not fix the deployed Playground path, and
-do not demonstrate Text Split reconstruction or personal file-ACL enforcement.
-The original native-ACL splitter produced three chunks but failed exact-content
-reconstruction/offset checks; its gate was not weakened to claim success.
+**What this tells us:** the LLM can calculate the full total for this fixture
+without a calculator. Two correct runs do not guarantee future accuracy. The
+controls use different input delivery and reasoning settings; they do not fix
+Playground or prove Text Split reconstruction or personal file-ACL enforcement.
+The original native-ACL splitter returned three chunks but failed content and
+offset checks. Those checks were kept, rather than relaxed to make the demo pass.
 
 ## Architecture and boundaries
 
@@ -223,15 +236,16 @@ Separate synthetic-only image source --> agentic knowledge source + asset store
                                      --> answer synthesis + image-use activity
 ```
 
-`Text Split` is **not row-aware**. It controls model-input size, not spreadsheet
-semantics. A JSON fragment cut through an object is not a valid standalone table.
-Exported parts are valid JSON **envelopes** with `chunk_text` and measured
-metadata, not falsely repaired source records.
+`Text Split` is **not row-aware**. It keeps model inputs small enough; it does not
+understand spreadsheet rows. A chunk that ends halfway through a JSON object is
+not a valid table on its own. The exported parts are valid JSON **envelopes**
+containing `chunk_text` and measured metadata, not repaired versions of the rows.
 
-The calculator uses the **authoritative structured-row method**. It does not
-reconstruct arithmetic from top-k search hits. Full chunk reconstruction is
-checked as an ingestion acceptance test, independently of arithmetic. This
-demonstrates RAG plus a calculator, not exhaustive vector aggregation.
+The calculator takes a different route: it reads the **complete authoritative
+structured rows**, rather than trying to total top-k search hits. A separate
+ingestion check verifies that the chunks reconstruct the full source. This path
+demonstrates RAG plus a calculator, not exhaustive aggregation through vector
+search.
 
 ## Prerequisites and pins
 
@@ -267,21 +281,23 @@ demonstrates RAG plus a calculator, not exhaustive vector aggregation.
 | Evaluator | Separate access to the oracle; never expose that access as an agent tool |
 | Image pipeline identity | Approved isolated synthetic source/asset boundary and relevant model permissions |
 
-No role assignment, group creation, SharePoint provisioning, public networking
-change or shared-resource deletion is automatic. Selecting identities does not
-grant them permissions. Existing broad Storage data roles for test users/groups
-can bypass ACL restrictions; preflight reports them, including custom wildcard
-roles and conditional assignments requiring review. Include all transitive group
-principals of test users in that review.
-Live evaluation additionally resolves both real test users' transitive groups
-and checks their effective direct/group assignments before making paid calls.
-Conditional data grants are flagged for review, not assumed harmless.
+Selecting an identity does not grant it permissions. Role assignments, new
+groups, SharePoint provisioning, public-network changes and shared-resource
+deletion are not automatic.
+
+Check the test users' existing Storage roles carefully: broad data roles can
+bypass ACL restrictions. Preflight reports these, including custom wildcard roles
+and conditional assignments that need review. Include every transitive group
+principal for each user. Before paid calls, live evaluation also resolves both
+test users' transitive groups and checks their effective direct and group grants.
+Conditional grants are flagged for review, not assumed safe.
 
 ## Local setup and deterministic generation
 
-Use a component-specific environment; do not change the shared operator's pins.
-For a consumer copy, replace `$Demo` with its `aifactory-usecase-code` location.
-All generated files and consumer settings live **outside** the replaceable code.
+Use a separate environment for this example so the shared operator's dependency
+pins stay unchanged. If you are working from a consumer copy, point `$Demo` at
+its `aifactory-usecase-code` folder. Keep generated files and consumer settings
+**outside** the template code, where an update will not overwrite them.
 
 ```powershell
 $Demo = "C:\path\to\azure-enterprise-scale-ml\usecase_code\40-agent-factory\48-rag-with-splitted-tables-acl-adlsgen2"
@@ -298,26 +314,28 @@ $env:TIKTOKEN_CACHE_DIR = Join-Path $Demo ".venv\tiktoken-cache"
 & $Python -m unittest discover -s tests
 ```
 
-Generation creates the required `car-sales-xyz.json`,
+The generator creates `car-sales-xyz.json`,
 `car-calculator-tool.xlsx` and `car-random-image.docx`, plus the normalized
 whole-workbook text, structured rows and original PNG derivative. JSON and Excel
-contribute disjoint business IDs. A **separate, nonindexed** overlapping fixture
-exercises mirrored-record deduplication. Additional simulated libraries do not
-duplicate sales merely to make the layout look populated.
+contain different business IDs. A **separate, nonindexed** fixture contains
+overlapping records to test deduplication. The simulated libraries do not add
+duplicate sales just to fill out the folder layout.
 
-`publication.json` contains integrity metadata, not totals. The independent
-`evaluation\expected.json` contains the oracle, IDs, row counts, hashes and
-expected exact amounts. It is outside `master` and `project` ingestion and is
-only opened by the evaluator. The generator copies master files to the local
-project tree and checks byte hashes; the publisher independently copies pinned
-master bytes to the Azure project publication.
+`publication.json` holds integrity metadata, not answers.
+`evaluation\expected.json` holds the independent oracle: IDs, row counts, hashes
+and exact expected amounts. It stays outside `master` and `project` ingestion;
+only the evaluator opens it. The generator copies master files to the local
+project tree and checks their byte hashes. The publisher separately copies the
+hash-pinned master files to the Azure project publication.
 
-The **actual whole input strings** are tokenized: the serialized JSON and text
-extracted back from the workbook. Workbook XML and file size are not token
-measurements. Generation targets approximately 13,500-14,500 tokens per input;
-both must exceed 9,000. These counts do not prove three Azure chunks.
-The first tokenizer use downloads its public vocabulary if not already cached;
-an offline machine needs an already populated, verified tokenizer cache.
+Token counts come from the **actual text entering Text Split**: the serialized
+JSON and the text extracted back from the workbook, not workbook XML or file
+size. The generator targets about 13,500-14,500 tokens per input, and both must
+exceed 9,000. Only a real Azure run can establish whether that produces three
+chunks.
+
+The tokenizer downloads its public vocabulary on first use unless it is cached.
+An offline machine needs a populated, verified tokenizer cache.
 
 Measured locally for seed **48**, version **v1**:
 
@@ -327,10 +345,10 @@ Measured locally for seed **48**, version **v1**:
 | Excel | 153 | 13,572 | USD 22,767,114.36 |
 | Combined, disjoint IDs | 262 | Not a shared embedding input | USD 39,535,932.62 |
 
-These are evaluator expectations, not values supplied to the agent. The local
-DOCX passed OOXML schema validation and was rendered with installed Microsoft
-Word for visual inspection. That establishes the local embedded image, **not**
-Azure's DOCX image extraction or image-serving compatibility.
+These amounts are for evaluation, not for the agent's prompt. The local DOCX
+passed OOXML schema validation and was opened in installed Microsoft Word for
+visual inspection. That confirms the embedded image in the file, **not** Azure's
+ability to extract or serve it.
 
 ## Arithmetic and coverage contract
 
@@ -342,30 +360,31 @@ cancelled row          = 0
 tax_minor              = recorded but excluded from sales
 ```
 
-Discounts and refunds apply to the entire row, not each unit. Values and
-quantities are validated integers, never binary floats or booleans. Refunds
-cannot exceed the discounted merchandise amount. Cancelled records remain
-auditable but contribute zero.
+Discounts and refunds apply to the whole row, not to each unit. Amounts and
+quantities must be valid integers, not binary floats or booleans. A refund cannot
+exceed the discounted merchandise amount. Cancelled records stay in the audit
+trail but contribute zero.
 
-The stable identity is `(dataset, version, sale_id)`. Identical mirrored rows
-contribute once; conflicting payloads for the same identity fail. Source
-breakdowns use deterministic first-source attribution so they reconcile to the
-deduplicated grand total; they are not independent double-counted source sums.
-This rule is immaterial to the primary disjoint-partition scenario but essential
-to the overlap fixture.
+Each record is identified by `(dataset, version, sale_id)`. Identical copies count
+once; different row contents with the same identity cause an error. For source
+breakdowns, a duplicate is assigned deterministically to the first source. That
+keeps the breakdown consistent with the deduplicated grand total. The main
+partitions do not overlap, but the separate overlap fixture needs this rule.
 
-The backend selects partitions from trusted configuration and current validated
-identity, not model-supplied index names, paths, groups or arbitrary scope. It
-must check the publication version, source hashes, complete row pages and
-complete ingested chunk coverage. Missing partitions/chunks, inconsistent
-duplicates, unfinished publication, wrong version, unreadable authorized
-sources or incomplete pagination are errors, not a smaller plausible total.
+The backend chooses partitions from trusted configuration and the validated
+current identity. The model cannot choose arbitrary index names, paths, groups
+or scope. Before calculating, the backend checks the publication version, source
+hashes, all row pages and all ingested chunks.
+
+A missing partition or chunk, conflicting duplicate, unfinished publication,
+wrong version, unreadable authorized source or incomplete page sequence is an
+error. The backend must not turn any of these into a plausible-looking subtotal.
 
 ## Resolve the actual lake and plan
 
-Do not derive a container from a portal account URL. Select an existing
-consumer-owned common-lake binding and resolve its explicit account/container.
-The following command does not provision anything:
+Use an existing common-lake binding from your consumer configuration to resolve
+the account and container. Do not guess the container from a portal account URL.
+These commands do not provision Azure resources:
 
 ```powershell
 & $Python main.py init-config `
@@ -379,34 +398,35 @@ The following command does not provision anything:
   --output "$State\preflight.json"
 ```
 
-`discover` is read-only in Azure; `--update-config` only records discovered
-endpoints/identity in the local consumer configuration. It never approves paths
-or selects reader identities on your behalf. Fill the explicit group policies,
-allowed/denied test principals and backend identity, then review the plan.
+`discover` only reads Azure. With `--update-config`, it records the discovered
+endpoints and identity in your local consumer configuration. It does not approve
+paths or choose readers for you. Fill in the group policies, allowed and denied
+test principals, and backend identity, then review the plan.
 
-The generated candidate preserves repository lineage:
+The proposed paths follow the repository's master/project layout:
 
 ```text
 mlops/v1/master/environments/<env>/datasets/car-sales/versions/<version>/
 mlops/v1/projects/projectNNN/environments/<env>/usecases/car-sales/rag/corpora/car-sales/versions/<version>/
 ```
 
-These paths are **candidates until approved**. The shared `datasets` and
-project `usecases` parents must already exist and provide necessary traversal.
-The plan lists every directory to create, starting at the two task-owned
-`car-sales` roots and ending at this version's source directories. After
-approval the publisher can create missing task-owned parents; it never changes
-the shared parents. Existing task ancestors retain their ACLs, and insufficient
-traversal blocks the operation rather than silently broadening those ACLs.
-Foreign-owned directories are never replaced. Oracle data,
-debug chunks and images are excluded from protected sales ingestion.
+These paths are **candidates until approved**. The shared `datasets` and project
+`usecases` parents must already exist and allow traversal. The plan lists every
+directory it would create, from the two task-owned `car-sales` roots down to this
+version's source folders.
+
+After approval, the publisher can create missing task-owned parents. It leaves
+shared parents and existing ancestor ACLs alone. If traversal is insufficient,
+the operation stops instead of widening permissions. It never replaces a
+directory owned by something else. Oracle data, debug chunks and images are
+excluded from protected sales ingestion.
 
 ## Approved cloud execution
 
-The following commands are instructions, **not a record of executed approval**.
-Review the exact resource names, paths, identities and cost-bearing operations
-first. Set `paths_approved` only after that review. `--apply` gates mutations;
-`--allow-paid` separately gates indexing/inference where model calls may occur.
+Review the exact resource names, paths, identities and billable operations before
+running these commands. Their presence in this README is **not approval to run
+them**. Set `paths_approved` only after review. `--apply` allows changes;
+`--allow-paid` separately allows indexing and inference that may call models.
 
 ```powershell
 & $Python main.py plan --config $Config
@@ -423,27 +443,29 @@ first. Set `paths_approved` only after that review. `--apply` gates mutations;
   --restricted-profile "$State\auth\restricted" --output "$State\live-evaluation.json"
 ```
 
-Creating an indexer can start indexing automatically. Consequently `configure`
-also requires paid-call approval and waits for completion; `ingest` explicitly
-runs an already configured pipeline. No source changes are silently retried.
+Creating an indexer can start indexing straight away. That is why `configure`
+requires paid-call approval and waits for completion. Use `ingest` to run a
+pipeline that is already configured. Source changes are not silently retried.
 
-Authenticate the restricted user in a separate existing CLI profile first.
-Use the same tenant, `az login --allow-no-subscriptions`, and a temporary
-`AZURE_CONFIG_DIR` pointing to that profile; restore the previous environment
-after sign-in. The delegated token provider deliberately does not require that
-user to have an Azure subscription role. The current/default profile remains
-the full reader/operator. `--user-profile` can explicitly select a separate full
-reader as well. Never commit or share either profile's authentication cache.
+Sign in the restricted user through a separate existing CLI profile before
+testing. Use the same tenant and `az login --allow-no-subscriptions`, with a
+temporary `AZURE_CONFIG_DIR` pointing to that profile. Restore the previous
+environment after sign-in. The delegated token provider does not require the
+restricted user to have an Azure subscription role.
 
-The Foundry agent definition is persisted and version-pinned. Its functions
-execute in the approved local/private runner; creating a prompt-agent definition
-does **not** host those functions as a web service. Every invocation preserves
-the exact user prompt and inspects actual function calls.
+The current/default profile stays the full reader/operator. You can also select
+a separate full reader with `--user-profile`. Never commit or share either
+profile's authentication cache.
+
+The Foundry agent definition is saved and pinned to a version. Its functions run
+in the approved local/private runner. Creating that definition does **not** host
+the functions as a web service. Each invocation keeps the exact user prompt and
+inspects the function calls that actually ran.
 
 ## Real Text Split acceptance evidence
 
-Both native ADLS indexers read whole text with `parsingMode: text`. The split
-skill precedes the embedding skill:
+Both native ADLS indexers read the whole text with `parsingMode: text`. Text Split
+runs before the embedding skill:
 
 | Setting | Value |
 | --- | --- |
@@ -454,17 +476,17 @@ skill precedes the embedding skill:
 | `maximumPagesToTake` | **`0`** (all pages, never truncate to three) |
 | Embedding limit | Each final input must be **below 8,000 tokens** |
 
-A separate native-authorized parent audit index retains the exact
+For the audit, a separate parent index with native authorization keeps the exact
 `/document/content` input as `split_input_text`, plus the service's actual
 page strings, ordinal positions, offsets and lengths. This avoids unsupported
-custom skills, knowledge stores or debug sessions. Verification correlates audit
-pages with the derived chunk index, validates complete source coverage and checks
-that at least one boundary crosses a row/serialized record.
+custom skills, knowledge stores and debug sessions. The verifier matches those
+pages to the derived chunk index, checks that all source text is present, and
+confirms that at least one boundary cuts through a row or serialized record.
 
-Exactly three chunks are an **assertion on actual service output**, not a
-configuration guarantee. If the real service produces a different number,
-adjust deterministic fixture generation, choose a new version and rerun. Never
-truncate, pre-split the source or manufacture cloud evidence.
+The target is exactly three chunks, but **only the service output can confirm
+that**. It is not guaranteed by configuration. If Azure returns a different
+number, adjust the deterministic fixture generation, choose a new version and
+rerun. Do not truncate, pre-split the source or manufacture cloud evidence.
 
 After a successful real run, the verifier exports:
 
@@ -474,51 +496,55 @@ car-sales-xyz-part-2.json
 car-sales-xyz-part-3.json
 ```
 
-Each envelope records source/parent identity, ordinal, exact chunk text, token
-count, offsets, lengths and hashes. Exports must be outside ingestion prefixes.
-No such files are generated by the offline generator.
+Each envelope records the source and parent identity, ordinal, exact chunk text,
+token count, offsets, lengths and hashes. Keep exports outside ingestion prefixes
+so they are not indexed again. The offline generator does not create these files.
 
 ## Native permissions and revocation
 
 The ADLS data source uses `indexerPermissionOptions` for `userIds`, `groupIds`
-and `rbacScope`; secured indexes enable `permissionFilterOption`. Every projected
-chunk receives the indexer-emitted native permission metadata. Group permissions
-are preferred; this is not a flattened document-level user-membership list.
-Both indexes retain the native `metadata_storage_path` field as well as the
-shared `source_uri` alias: the preview service requires the original field for
-ADLS permission ingestion. Text Split language (`en`) and semantic ranking order
-(`BoostedRerankerScore`) are explicit so service-default round trips do not look
-like foreign definition changes.
+and `rbacScope`. Secured indexes enable `permissionFilterOption`, and every
+projected chunk receives the native permission metadata emitted by the indexer.
+Prefer group permissions over expanding group membership into per-document
+user lists.
 
-Each secured query carries the end user's Search-scoped token in
-`x-ms-query-source-authorization`, independently of backend Search RBAC
-authentication. Missing user identity is rejected before querying. The
-calculator's Storage token must represent the same validated delegated user;
-there is no operator/account-key fallback.
-This is a trusted local CLI boundary, not an HTTP token-validation service:
-tokens originate in Azure CLI OAuth, authenticated Graph `/me` establishes the
-user, and Search/Storage validate their own tokens. Local JWT decoding only
-checks consistency. Do not expose these injectable adapters as a network API.
-Graph transitive-group casts use `$count=true` and `ConsistencyLevel: eventual`;
-their directory replication delay remains a revocation consideration.
+Both indexes keep `metadata_storage_path` alongside the shared `source_uri`
+alias because the preview service needs the original field for ADLS permission
+ingestion. Text Split language (`en`) and semantic ranking order
+(`BoostedRerankerScore`) are set explicitly, so defaults returned by the service
+are not mistaken for changes to the owned definition.
 
-The trusted partition policy is an additional scope/integrity control, **not a
-replacement for native enforcement**. Source reads and citations are authorized
-before returning data. No shared authorization/result cache is used. A user
-with only one authorized partition sees only that partition's total and
-provenance, not hidden totals, counts, IDs or a list of excluded sources.
+Each secured query sends the end user's Search-scoped token in
+`x-ms-query-source-authorization`. This is separate from the backend's Search
+RBAC authentication. A query without a user identity is rejected. The calculator
+must use a Storage token for that same validated delegated user; it cannot fall
+back to the operator or an account key.
 
-Native authorization is file-level, not row-level within a workbook. Different
-entitlements require different files. Copying a file does not transfer
-SharePoint permissions, and POSIX ACLs are not a perfect SharePoint permission
-model. This example simulates site/library lineage; real SharePoint provisioning
-is optional and not performed.
-Native ingestion also reads permission metadata on the filesystem root and
-every ancestor directory. A reader role restricted to the two source files and
-their list prefixes may therefore be insufficient even when content reads work.
-Do not replace that condition with account-wide access. Inspect the failing
-operations and separately review exact ancestor-object permissions; the source
-selection is not itself a permission boundary.
+These adapters are for a trusted local CLI, not an HTTP token-validation service.
+Tokens come from Azure CLI OAuth, authenticated Graph `/me` establishes the user,
+and Search and Storage validate their own tokens. Local JWT decoding checks
+consistency only. Do not expose the injectable adapters as a network API. Graph
+transitive-group casts use `$count=true` and `ConsistencyLevel: eventual`, so
+directory replication delay also matters when testing revocation.
+
+The trusted partition policy adds scope and integrity checks; it **does not
+replace native enforcement**. Source reads and citations must be authorized
+before data is returned. There is no shared authorization or result cache.
+Someone who can read only one partition sees its total and provenance, not
+hidden totals, counts, IDs or a list of excluded sources.
+
+Native authorization applies to files, not individual workbook rows. Different
+entitlements need different files. Copying a file does not carry over SharePoint
+permissions, and POSIX ACLs cannot represent every SharePoint permission. The
+demo simulates site/library lineage; actual SharePoint provisioning is optional
+and has not been performed.
+
+The indexer also reads permission metadata on the filesystem root and every
+ancestor directory. A reader role limited to the two source files and their list
+prefixes may therefore fail even when content reads work. Do not solve that by
+granting account-wide access. Inspect the failed operations and review the exact
+ancestor-object permissions separately. Selecting a source path does not, by
+itself, restrict what an identity is allowed to read.
 
 ACL-only changes might not update blob last-modified timestamps. Refresh
 permissions explicitly and rerun the native indexers:
@@ -528,33 +554,33 @@ permissions explicitly and rerun the native indexers:
 ```
 
 This queues `resync` with `options: ["permissions"]`, then runs the indexers.
-Recheck allowed and revoked identities on every projected chunk and delegated
-source read. Native Search permission refresh, Entra group/token changes and
-client authentication have separate delays; no instantaneous-revocation SLA is
-claimed. Disable access while a required resync is incomplete rather than
-serving a cached answer.
+Afterwards, test allowed and revoked identities against every projected chunk
+and delegated source read. Search permission refresh, Entra group/token changes
+and client authentication each have their own delays, so this is not an
+instantaneous-revocation SLA. Keep access disabled while a required resync is
+unfinished rather than serving a cached answer.
 
 ## Separate image-serving branch
 
-The DOCX contains an original car illustration with a distinctive visual fact
-absent from surrounding document text. Only explicitly non-sensitive synthetic
-content belongs in this branch.
+The DOCX contains an original car illustration with a visual detail that is not
+described in the surrounding text. This branch is for explicitly non-sensitive,
+synthetic content only.
 
 **`assetStore` cannot be combined with `ingestionPermissionOptions`.** Never
 upload protected sales data into the image branch to get around this limitation.
-An approved isolated source/asset storage boundary is required; do not grant
-account-wide image-pipeline write access on the shared master lake.
+Use an approved, isolated area for image sources and assets. Do not give the
+image pipeline account-wide write access to the shared master lake.
 
-Use agentic retrieval's asset store, `enableImageServing: true` and
-`outputMode: answerSynthesis`. Extractive mode is not the demonstration.
-Success requires real retrieval activity with `imagesSentToModel > 0`; an answer
-that merely guesses the image fact is not evidence of visual grounding.
+Use agentic retrieval's asset store with `enableImageServing: true` and
+`outputMode: answerSynthesis`, not extractive mode. To pass, the real retrieval
+activity must show `imagesSentToModel > 0`. Guessing the detail correctly is not
+evidence that the model saw the image.
 
-Direct DOCX embedded-image extraction depends on the chosen extraction path and
-is **not assumed supported**. Test DOCX separately. The original PNG derivative
-can demonstrate image serving if clearly labelled as a derivative; it must not
-be reported as direct DOCX success. Image assets remain private to the approved
-branch even though their synthetic content is non-sensitive.
+**Do not assume direct DOCX image extraction works.** Support depends on the
+extraction path, so test DOCX separately. You can use the original PNG derivative
+to demonstrate image serving, provided it is clearly labelled as a derivative,
+not as successful extraction from DOCX. Keep image assets private to the approved
+branch even though the synthetic content is non-sensitive.
 
 Copy `image.example.json` into consumer configuration's `image` object and
 replace all placeholders. The protected account list must include the selected
@@ -573,35 +599,38 @@ az storage blob upload --auth-mode login --account-name "<isolated-source-accoun
   --input "What shape, color and number are on the car door?"
 ```
 
-The result retains activity and `imagesSentToModel`; it does not turn a declared
-`input_kind: docx` into proof of direct DOCX extraction. `docx_pass` remains false
-without an independently established source-to-image extraction provenance.
-Aggregate image counters alone cannot establish that provenance.
+The result saves activity and `imagesSentToModel`. Setting `input_kind: docx` does
+not prove that the image came from DOCX. `docx_pass` stays false unless the
+source-to-image extraction is independently established; aggregate image counts
+are not enough.
 
 ## Optional Graph delta and security-webhook extension
 
-The synthetic `<site>/<library>` folder layout is not a SharePoint site.
-`graph-sync.example.json` must be bound to an explicitly approved **real**
-SharePoint document-library or OneDrive for Business drive and the stable IDs of
-the two sales files. Consumer OneDrive is rejected. No source site, user,
-Container App, subscription, public callback or Graph consent is created by
-enabling the local code.
+The synthetic `<site>/<library>` folders are not a SharePoint site. To use this
+extension, bind `graph-sync.example.json` to an explicitly approved **real**
+SharePoint document-library or OneDrive for Business drive, using stable IDs for
+the two sales files. Consumer OneDrive is rejected. Enabling the local code does
+not create a source site, user, Container App, subscription or public callback,
+or grant Graph consent.
 
-Use the full root delta enumeration for bootstrap, then preserve Graph's opaque
-`@odata.deltaLink`. Every initial, continuation and incremental request sends:
+Start by enumerating the full drive-root delta, then keep Graph's opaque
+`@odata.deltaLink` for later requests. Every initial, continuation and incremental
+request sends:
 
 ```http
 Prefer: hierarchicalsharing, deltashowremovedasdeleted, deltatraversepermissiongaps, deltashowsharingchanges
 ```
 
-This includes the required companion preferences for
-`@microsoft.graph.sharedChanged` (documented as the string `"True"`). The feed
-represents latest state, not an event log: the last occurrence of a repeated
-item wins; empty pages with `@odata.nextLink` are still followed. Items are
-identified by tenant/drive/item ID, never just filename. Folder moves/renames
-affect descendants even when those descendants are not repeated in delta.
-Tombstones and `410 Gone` trigger reconciliation, not a partial-data total or an
-upload back to Graph. `token=latest` is not used to skip the initial inventory.
+These include the companion preferences required for
+`@microsoft.graph.sharedChanged`, which is documented as the string `"True"`.
+Delta gives the latest state, not a complete event log. If an item appears more
+than once, the last occurrence wins. An empty page with `@odata.nextLink` still
+has to be followed.
+
+Identify items by tenant/drive/item ID, not filename. Folder moves and renames
+affect descendants even if delta does not list those descendants again.
+Tombstones and `410 Gone` trigger reconciliation, never a partial-data total or
+an upload back to Graph. The initial inventory is not skipped with `token=latest`.
 
 Security subscription creation uses the exact business-drive contract:
 
@@ -619,100 +648,106 @@ Content-Type: application/json
 }
 ```
 
-`includesecuritywebhooks` is sent on creation/recreation, not claimed to upgrade
-an old content-only subscription through renewal. The default lifetime is one
-day; the currently documented driveItem maximum is **42,300 minutes**. Renew
-before expiry. A 404 requires explicit recreation with a new secret; a lost
-creation response is an uncertain operation, not permission to blindly POST
-again.
+Send `includesecuritywebhooks` when creating or recreating the subscription.
+Renewing an old content-only subscription is not treated as an upgrade to
+security notifications. The default lifetime is one day; the documented
+driveItem maximum is **42,300 minutes**. Renew before expiry.
+
+A 404 needs explicit recreation with a new secret. If a creation response is
+lost, first establish what happened; do not blindly repeat the POST.
 
 ### Permission changes and durable invalidation
 
-The ASGI callback returns a decoded validation token as plain text within the
-Graph handshake contract. Normal batches validate every subscription,
-tenant/resource and `clientState` using constant-time hash comparison, then
-atomically mark the bound drive dirty in SQLite **before** returning 202. The
-receiver does no Graph, Storage, Search or model work before acknowledgement.
-An unavailable durable store returns a retryable failure instead of losing the
-event. Tokens and client-state secrets are not stored in reports; the database
-stores only the secret hash.
+The ASGI callback returns the decoded validation token as plain text, as required
+by the Graph handshake. For normal batches, it validates each subscription,
+tenant/resource and `clientState`, using constant-time hash comparison for the
+secret. It then atomically marks the bound drive dirty in SQLite **before**
+returning 202.
 
-A root notification does not reliably identify the changed file or distinguish
-content from permissions. All configured source permissions are therefore
-re-read during reconciliation. Unknown permissions, incomplete responses or
-unresolved identities leave the drive unavailable. Absence of `sharedChanged`
-does not mean permissions were unchanged.
-Retired subscription notifications are authenticated but disregarded. Activity
-is rechecked inside the durable signal transaction, so an event being validated
-during subscription recreation cannot put the healthy replacement on hold.
+The receiver does no Graph, Storage, Search or model work before acknowledging
+the event. If the durable store is unavailable, it returns a retryable failure
+instead of losing the notification. Reports contain no tokens or client-state
+secrets; the database stores only the secret hash.
 
-With `graph_sync` enabled in the demo configuration, retrieval and aggregation
-require a fresh, complete synchronized publication. The agent checks the same
-generation before model calls and before returning an answer. A notification
-arriving during calculation or generation discards that result. There is no
-cross-user answer cache. Expired reconciliation evidence or subscriptions fail
-closed; a successful delta fetch alone does not reopen the gate.
+A root notification does not reliably say which file changed or whether the
+change affected content or permissions. Reconciliation therefore re-reads
+permissions for every configured source. Unknown permissions, incomplete
+responses or unresolved identities keep the drive unavailable. An absent
+`sharedChanged` field does not rule out a permission change.
 
-Content changes stage a new immutable publication, including the entire
-normalized workbook text and structured rows. Real Text Split, embedding,
-source hashes and complete calculator coverage must be verified again.
-Permission-only changes update all owned mirrored file ACLs, then call native
-Search `/resync` with `{"options":["permissions"]}`, run and await completion.
-If content also needs processing on an existing pipeline, its normal indexer
-run is separate and follows the completed permission run. The delta checkpoint
-advances only when the corresponding publication is durable and verified.
-An arriving notification invalidates the in-flight reconciliation epoch.
-External publication/ACL writes are serialized with a separate per-scope
-process lock; webhook invalidation never waits on a long-running indexing
-transaction. Partial writes retain a repair marker, so restoring a quarantined
-source forces ACL restoration/resync rather than incorrectly selecting a
-read-only recheck.
+Notifications for retired subscriptions are authenticated, then disregarded.
+The callback rechecks whether a subscription is active inside the durable signal
+transaction. This prevents a notification being validated during recreation from
+putting the healthy replacement on hold.
 
-Deleting either required sales source quarantines the publication. Named
-readers are removed from its owned mirrored files and native permissions are
-refreshed; the remaining partition is never described as a complete dataset.
-Existing broad Storage RBAC still cannot be revoked by removing a named ACL.
+With `graph_sync` enabled, retrieval and aggregation need a fresh, complete
+synchronized publication. The agent checks the same generation before calling
+the model and before returning the answer. If a notification arrives during
+calculation or answer generation, that result is discarded. There is no
+cross-user answer cache. Expired reconciliation evidence or subscriptions block
+serving; a successful delta fetch alone does not make it safe to resume.
+
+A content change stages a new immutable publication, including the whole
+normalized workbook text and structured rows. Text Split, embedding, source
+hashes and complete calculator coverage must all be verified again.
+
+A permission-only change updates the ACLs on every owned mirrored file, calls
+native Search `/resync` with `{"options":["permissions"]}`, runs the indexer and
+waits for completion. If the existing pipeline also has content to process, a
+separate normal indexer run follows the permission run. The delta checkpoint
+advances only after the corresponding publication is durable and verified.
+
+A new notification invalidates reconciliation already in progress. A separate
+per-scope process lock serializes publication and ACL writes, so webhook
+invalidation never waits for a long indexing transaction. Partial writes leave
+a repair marker. Restoring a quarantined source therefore forces ACL restoration
+and resync, rather than taking the read-only recheck path.
+
+Deleting either required sales file quarantines the publication. Named readers
+are removed from its owned mirrored files and native permissions are refreshed.
+The remaining partition is not presented as the whole dataset. Removing a named
+ACL still cannot revoke access granted by broader Storage RBAC.
 
 ### Graph permissions and deployment prerequisites
 
-Microsoft's permission-scanning guidance requires **`Sites.FullControl.All`**;
-ordinary `Files.Read`/`Files.Read.All` is not proof of a complete authorization
-snapshot. Subscription creation and renewal have their own permission
-requirements; current reference tables differ on the minimum renewal scope.
-No broad permission is granted automatically. An administrator must review the
-actual source scope, consent, reader projection and callback before live use.
+Microsoft's permission-scanning guidance requires **`Sites.FullControl.All`**.
+Ordinary `Files.Read`/`Files.Read.All` access does not establish a complete
+authorization snapshot. Subscription creation and renewal have separate permission
+requirements, and the current reference tables differ on the minimum renewal
+scope. No broad permission is granted automatically. An administrator must review
+the actual source scope, consent, reader mapping and callback before live use.
 
-Graph permission JSON is **not** a POSIX ACL export. Only explicitly approved
-Entra user/group mappings are supported; sharing links, invitations,
-SharePoint-local groups, unknown roles or incomplete permission snapshots must
-be quarantined rather than interpreted as public access. Missing
-`inheritedFrom` is not proof of an explicit grant: SharePoint/Business responses
-do not reliably return that property.
-The native Graph transport also checks the trusted OAuth token's tenant,
-audience, expiry and permission-scanning grant before requesting source data.
-This claim check is not an external bearer-token validator; Graph validates the
-token itself. An opaque/unverifiable or insufficiently scoped token fails closed.
+Graph permission JSON is **not** a POSIX ACL export. The extension supports only
+explicitly approved Entra user/group mappings. Sharing links, invitations,
+SharePoint-local groups, unknown roles and incomplete permission snapshots cause
+quarantine, not public access. Nor does a missing `inheritedFrom` prove a grant
+is explicit: SharePoint/Business responses do not reliably include that property.
 
-Webhooks require an externally reachable **HTTPS receiver**. Private ADLS,
-Search and workers do not make a private-only callback reachable by Graph.
-The handler is provided without deploying a host or changing public networking.
-`reauthorizationRequired` is supported; driveItem is not documented to guarantee
-the `missed` or `subscriptionRemoved` lifecycle events. Expiry monitoring and
-periodic delta reconciliation are therefore required independently.
+Before reading source data, the Graph transport checks the trusted OAuth token's
+tenant, audience, expiry and permission-scanning grant. This is a claim check,
+not a validator for arbitrary external bearer tokens; Graph validates the token
+itself. An opaque, unverifiable or insufficiently scoped token is rejected.
 
-This is not instantaneous revocation: Graph notification/directory replication
-latency exists (the documented driveItem maximum notification latency can reach
-six hours). The gate closes when a change is known and when freshness expires;
-it cannot react to an event not yet delivered. Delegated source reads and live
-native authorization remain mandatory.
+Webhooks need an externally reachable **HTTPS receiver**. Having private ADLS,
+Search and workers does not make a private-only callback reachable by Graph.
+The code provides a handler, not a deployed host or a public-network change.
+It supports `reauthorizationRequired`, but driveItem documentation does not
+guarantee the `missed` or `subscriptionRemoved` lifecycle events. Monitor expiry
+and reconcile delta periodically rather than relying on those events.
+
+Revocation is not instantaneous. Graph notification and directory replication
+take time; the documented driveItem maximum notification latency can reach six
+hours. Serving stops when a change becomes known or freshness expires, but the
+system cannot react to a notification it has not received. Delegated source
+reads and live native authorization are still required.
 
 ### Reproducible extension commands
 
-Keep the source configuration, SQLite state and staged candidates outside the
-template. Fill the real drive/item IDs, approved download host, permission-scan
-authorization and explicit `principal_map` before any source request. For
-example, `{"group:<Entra-group-id>": {"type":"group","id":"<same-id>"}}` preserves
-the group rather than expanding its members into user lists.
+Keep source configuration, SQLite state and staged candidates outside the
+template. Before requesting source data, fill in the real drive/item IDs,
+approved download host, permission-scan authorization and explicit `principal_map`.
+For example, `{"group:<Entra-group-id>": {"type":"group","id":"<same-id>"}}`
+keeps a group as a group instead of expanding its members into a user list.
 
 ```powershell
 $SyncConfig = Join-Path $State "graph-sync.json"
@@ -733,27 +768,28 @@ $Review = Get-Content "$State\candidate-review.json" -Raw | ConvertFrom-Json
 & $Python sync.py status --sync-config $SyncConfig --config $Config
 ```
 
-`poll` always performs delta reconciliation and fresh selected-item permission
-reads. Content changes produce a new local candidate and native pipeline;
-permission-only changes retain the existing bytes and version. Unchanged
-content/permissions use a verification-only recheck, without ACL writes or
-re-embedding. Failed/deleted/unrepresentable sources keep serving blocked.
-After a changed binding is activated, redeploy the pinned prompt-agent
-definition explicitly; no model/agent deployment is hidden in reconciliation.
-The full evaluator remains separate and an updated independent oracle is
-required for changed source data.
+`poll` always reconciles delta and reads fresh permissions for the selected
+items. Content changes produce a new local candidate and native pipeline.
+Permission-only changes keep the existing bytes and version. If neither changed,
+the extension only rechecks the result; it does not write ACLs or re-embed data.
+A failed, deleted or unrepresentable source keeps serving blocked.
 
-The worker runs on approved managed-identity compute for native Search reads;
-the source content is still read using the selected end user's delegated
-Storage identity. No operator fallback is introduced by this extension.
+After activating a changed binding, explicitly redeploy the pinned prompt-agent
+definition. Reconciliation does not deploy models or agents behind the scenes.
+The full evaluator is separate, and changed source data needs an updated
+independent oracle.
+
+The worker uses approved managed-identity compute to read native Search. It
+still reads source content with the selected end user's delegated Storage
+identity, never an operator fallback.
 
 For an approved externally reachable ASGI host, mount
 `webhook:create_app` with factory mode and set `AIF48_GRAPH_SYNC_CONFIG` to the
-consumer configuration. `webhook.py` does not start a server. This reference
-implementation is **single-host**: callback and worker must share the same
-durable local SQLite database and process-lock filesystem. Do not independently
-scale instances with separate local databases. A distributed deployment needs
-an equivalent durable queue, shared epoch store and write-serialization adapter.
+consumer configuration. `webhook.py` does not start a server. This is a
+**single-host** reference implementation: the callback and worker must share a
+durable local SQLite database and process-lock filesystem. Do not scale out
+instances with separate local databases. A distributed deployment needs an
+equivalent durable queue, shared epoch store and write-serialization adapter.
 
 Only after the callback, consent and source scope are approved:
 
@@ -772,41 +808,43 @@ Remove-Item Env:AIF48_GRAPH_CLIENT_STATE
   --subscription-id "<registered-id>" --force-renew --apply
 ```
 
-For a confirmed missing subscription, `recreate --subscription-id <old-id>`
-requires explicit `--apply` and a newly generated secret. It does not delete
-other subscriptions. Ordinary delta reconciliation cannot clear a lifecycle
-hold; subscription repair and a fresh reconciliation are both required.
-Schedule renewal and polling outside the callback, more frequently than the
-configured `max_age_seconds`; no scheduled job is created automatically.
+Once a subscription is confirmed missing, use
+`recreate --subscription-id <old-id>` with explicit `--apply` and a new secret.
+Other subscriptions are not deleted. A normal delta reconciliation cannot clear
+a lifecycle hold; both subscription repair and fresh reconciliation are required.
+Schedule renewal and polling outside the callback, more often than the configured
+`max_age_seconds`. The extension does not create a scheduled job.
 
 ## Evaluation and completion
 
-Offline unit tests, service integration acceptance and live deployed-agent
-prompt evaluations are different layers. Mocked service/model responses test
-client logic; they never establish an actual successful deployment.
+There are three different things to check: offline code behavior, service
+integration, and answers from a live deployed agent. Mocked service or model
+responses test the client logic. They do not prove a deployment works.
 
 ### Explicit single-user operator preview
 
-If only one existing user is available, `preview.py` offers a **separate local
-operator path**, not a relaxation of `main.py`'s full ACL acceptance gates.
-In consumer configuration, set `evaluation_mode` to `operator-preview`,
+If you have only one existing user, use `preview.py` for a **separate local
+operator preview**. It does not relax the full ACL checks in `main.py`.
+In the consumer configuration, set `evaluation_mode` to `operator-preview`,
 `operator_preview_user_id` to the verified user's object ID, both partitions'
 `allowed_user_ids` to exactly that one ID, and `allowed_group_ids` plus
 `denied_test_user_ids` to empty lists. This creates no user or group.
 
-Every online command confirms the configured user against authenticated Graph
-`/me` in the selected tenant. The operator's cached subscription-bound OAuth is
-also the CLI Search backend credential; this is **not** managed-identity backend
-validation and is never an automatic fallback for the normal runtime. The
-read-only transport guard, native `x-ms-query-source-authorization`, delegated
-Storage reads, complete chunk/row coverage and exact arithmetic remain intact.
-No elevated-read header is used.
+Every online command checks the configured user against authenticated Graph
+`/me` in the selected tenant. The CLI Search backend also uses the operator's
+cached, subscription-bound OAuth credentials. That means this preview does
+**not** validate a managed-identity backend, and it is never an automatic fallback
+for the normal runtime.
 
-An operator with broad Storage RBAC can demonstrate authorized retrieval and
-calculation, but cannot demonstrate restrictive ACLs or revocation. The
-evaluation reports `authorized_cases_passed` separately and always leaves
-`passed` and `complete_acl_acceptance` false. It never reuses the same user as a
-pretend denied identity. The independent oracle stays evaluator-only.
+The read-only transport guard, native `x-ms-query-source-authorization`, delegated
+Storage reads, complete chunk/row coverage and exact arithmetic checks still
+apply. No elevated-read header is used.
+
+An operator with broad Storage RBAC can show that authorized retrieval and
+calculation work, but not that restrictive ACLs or revocation work. The evaluator
+therefore reports `authorized_cases_passed` separately and always leaves `passed`
+and `complete_acl_acceptance` false. It does not reuse the same user as a pretend
+denied identity. The independent oracle remains evaluator-only.
 
 ```powershell
 # Offline plan; reviewed paths must still be approved before publication.
@@ -822,14 +860,14 @@ pretend denied identity. The independent oracle stays evaluator-only.
   --oracle "$Data\evaluation\expected.json" --output "$State\single-user-evaluation.json"
 ```
 
-The persisted prompt agent can be inspected in Foundry Playground, but its
-custom functions still execute in this CLI. Playground does **not** automatically
-host `aggregate_sales`. A fully interactive Playground calculator requires a
-separately approved remote tool host and supported per-user delegation; copying
-protected tables into Code Interpreter is not an equivalent permission model.
-No Container App, external tool host, or new user is created by `preview.py`.
+You can inspect the saved prompt agent in Foundry Playground, but its custom
+functions still run in this CLI. Playground does **not** automatically host
+`aggregate_sales`. An interactive Playground calculator would need a separately
+approved remote tool host and supported per-user delegation. Copying protected
+tables into Code Interpreter does not preserve the same permission model.
+`preview.py` creates no Container App, external tool host or new user.
 
-The service/live unittest entry points are skipped unless explicitly enabled:
+Service and live unittest entry points are skipped unless you enable them:
 
 ```powershell
 $env:AIF48_CONFIG = $Config
@@ -857,60 +895,69 @@ Remove-Item Env:AIF48_LIVE_EVALUATIONS,Env:AIF48_ALLOW_PAID
 | Missing chunk/partition or unfinished publication | Explicit incomplete-data error, never partial success |
 | Image-dependent question | Supported extraction path plus actual positive image-use statistics |
 
-Only the evaluator opens the independent oracle. It compares exact numeric
-answers and tool traces from the deployed agent. Do not put expected totals in
-instructions, search content, calculator code, or model mocks presented as live
+Only the evaluator opens the independent oracle. It compares the deployed
+agent's exact numeric answers and tool traces. Do not put expected totals in
+instructions, search content or calculator code, or present model mocks as live
 results.
 
-Locally exercised: the offline suite covers the original pipeline plus delta,
-webhook validation/lifecycle, concurrent invalidation, immutable content staging,
-permission-only refresh and deletion quarantine. Three service/live entry
-points are skipped without explicit opt-in. The original local coverage includes
-a generated/read-back workbook, exact independent oracle, both >9,000-token
-inputs, master/project hashes, original embedded image and rendered DOCX.
-Live Search chunk output, group-based allow/deny and revocation, deployed agent
-responses, destructive missing-chunk fault injection, and image serving remain
-unverified. The live evaluator's pass flag covers the protected sales agent, not
-the separate image branch or cloud fault injection.
+The offline suite covers the original pipeline, delta handling, webhook
+validation and lifecycle, concurrent invalidation, immutable content staging,
+permission-only refresh and deletion quarantine. Three service/live entry points
+need explicit opt-in. Local checks also cover generating and reading back the
+workbook, the exact independent oracle, both >9,000-token inputs, master/project
+hashes, the original embedded image and the rendered DOCX.
 
-A subsequent authorized live attempt exercised immutable synthetic publication
-and native index/data-source/skillset/indexer creation. It exposed the required
-native path field and explicit defaults above. Ingestion then failed before
-processing documents: existing Storage metrics showed denied
-`GetPathAccessControl` operations alongside successful content/list operations.
-After separately approved exact ancestor-object reads, both indexers reported
-success with one source processed each. The documented path-key rename advisory
-is retained for these immutable publications; unknown warnings remain failures.
-After the separately approved service-scoped reader grant, real queries returned
-three chunks for each source, but complete-coverage verification failed. The
-token-based split output returned zero-based ordinals and inconsistent offsets;
-the JSON chunks omitted source text at a boundary, and the Excel chunks exceeded
-the requested 6,000-token page size (while remaining below 8,000). A bounded
-5,000-token experiment also omitted source text. The audited pre-split input
-matched the original source exactly, so the verifier does not silently repair or
-accept these fragments. Default 6,000-token settings were restored; the
-publication remains blocked and no agent was deployed. This is observed preview
-behavior in this deployment, not a claim that every Text Split deployment behaves
-this way. Its
-identity-specific deployment evidence remains in consumer-owned state, not in
-the indexed corpus or source template.
+For the **protected sales pipeline**, complete live chunk coverage, group-based
+allow/deny and revocation, deployed-agent answers, destructive missing-chunk
+fault injection and image serving have not passed live acceptance. The evaluator's
+pass flag covers the protected sales agent, not the separate image branch or
+cloud fault injection. The calculator-free experiments earlier in this README
+have their own results.
+
+The approved live attempt published the immutable synthetic files and created
+the native indexes, data sources, skillsets and indexers. It revealed the required
+native path field and explicit defaults described above. Ingestion then failed
+before processing documents: Storage metrics showed denied `GetPathAccessControl`
+calls even though content reads and listing worked.
+
+After separately approved reads of the exact ancestor objects, both indexers
+reported success with one source processed each. The known path-key rename
+advisory is kept for these immutable publications; unknown warnings still fail.
+With a separately approved service-scoped reader grant, queries returned three
+chunks per source. **The chunks did not pass the completeness check.**
+
+The token-based output had zero-based ordinals and inconsistent offsets. JSON
+chunks lost text at a boundary; Excel chunks exceeded the requested 6,000-token
+page size, though they stayed below 8,000. A bounded 5,000-token experiment also
+lost text. The audited input to Text Split matched the original source exactly.
+The verifier therefore did not repair or accept the fragments. The default
+6,000-token settings were restored, but this publication remains blocked and
+no protected-pipeline agent was deployed.
+
+That is what happened in this preview deployment, not a claim about every Text
+Split deployment. Identity-specific evidence stays in consumer-owned state,
+outside the indexed corpus and source template.
+
 The Graph extension has not been registered against a real drive or public
-webhook. Its simulated callback tests are not proof of Microsoft delivering a
-real permission-change notification. Real Graph reads additionally require
+webhook. Simulated callbacks do not prove delivery of a real Microsoft
+permission-change notification. The opt-in source test additionally requires
 `AIF48_GRAPH_SERVICE_TESTS=1`, `AIF48_GRAPH_SOURCE_READ_APPROVED=1`,
-`AIF48_GRAPH_SYNC_CONFIG`, and `AIF48_CONFIG` for the opt-in source test.
+`AIF48_GRAPH_SYNC_CONFIG`, and `AIF48_CONFIG` before real Graph reads.
 
 ## Costs, troubleshooting and cleanup
 
 Deferred project-creation fixes are tracked in the
 [IaC Search RBAC and regional-parity TODO list](../../../environment_setup/aifactory/bicep/README.md#todo-project-creation-search-rbac-and-regional-parity).
-Regional/additional Search instances should receive the same correct
-persona-scoped roles and private-connectivity setup as the primary task; this
-demo's manual recovery must not become an undocumented deployment prerequisite.
+Additional or regional Search instances should get the same correct roles for
+each identity and the same private-connectivity setup as the primary task. The
+manual recovery used here should not become an undocumented prerequisite for
+future deployments.
 
-- Indexing invokes embeddings for all produced chunks. Semantic ranking,
-  vectorization, agent inference, image extraction/synthesis and storage consume
-  service capacity or incur charges. No unverified price estimate is supplied.
+- In the split-and-embed pipeline, indexing invokes embeddings for all produced
+  chunks. Semantic ranking, vectorization, agent inference, image
+  extraction/synthesis and storage consume
+  service capacity or incur charges. This README does not give an unverified
+  price estimate.
 - A missing managed-identity endpoint means the backend is running in the wrong
   host context. Do not replace it with a broadly privileged user token.
 - `403`, unknown membership, hash mismatch or failed indexer status are blockers,
@@ -918,8 +965,8 @@ demo's manual recovery must not become an undocumented deployment prerequisite.
 - Missing task-owned source parents are included in the publication plan.
   Missing shared parents or traversal require a separately reviewed change,
   never recursive ACL broadening of the shared lake.
-- A collision with a foreign-owned Search object or directory is an error. Use a
-  new task/version prefix rather than overwriting it.
+- If a Search object or directory with the chosen name belongs to something else,
+  stop. Use a new task/version prefix rather than overwriting it.
 - No destructive cleanup command is implemented. Retire only resources listed
   in the reviewed task plan and owned by this exact example/version. Never delete
   the Search service, Foundry project, shared account/container, master lake,
@@ -947,6 +994,6 @@ demo's manual recovery must not become an undocumented deployment prerequisite.
 - [Resource-specific lifecycle notifications](https://learn.microsoft.com/en-us/graph/change-notifications-lifecycle-events)
 - [Permission scanning guidance](https://learn.microsoft.com/en-us/onedrive/developer/rest-api/concepts/scan-guidance?view=odsp-graph-online)
 
-The repository's dual graph supplies structural/architecture context, not live
-deployment evidence. Source, tests and the actual approved service responses are
-the authority for this example's exercised behavior.
+The repository's dual graph helps explain the code and architecture. It is not
+evidence of a live deployment. For what actually ran, use the source, tests and
+recorded responses from approved service calls.
