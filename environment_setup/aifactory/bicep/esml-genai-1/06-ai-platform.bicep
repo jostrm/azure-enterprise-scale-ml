@@ -109,6 +109,7 @@ param aca2SubnetId string = ''
 param aks2SubnetId string = ''
 @description('App Service / Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)')
 param webappSubnetId string = ''
+param logicappSubnetId string = ''
 @description('if projectype is not genai-1, but instead all')
 param dbxPubSubnetName string = ''
 param dbxPrivSubnetName string = ''

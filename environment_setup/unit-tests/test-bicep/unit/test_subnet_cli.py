@@ -91,6 +91,7 @@ function Get-Subnet {
     }
 }
 $global:subnetTestVnet = @{
+    id='/subscriptions/__SUBSCRIPTION__/resourceGroups/fixture-esml-common-swe-dev-002/providers/Microsoft.Network/virtualNetworks/vnt-esmlcmn-swe-dev-001'
     addressSpace=@{addressPrefixes=@('172.16.0.0/18')}
     subnets=@(0,64,128,192 | ForEach-Object { @{addressPrefix="172.16.0.$_/26"} })
 }
@@ -126,6 +127,7 @@ $parameters = @{
 ConvertTo-Json -InputObject @{cliCalls=$global:subnetTestCliCalls; azCalls=$global:subnetTestAzCalls} -Depth 5 -Compress
 """
     vnet = {
+        "id": f"/subscriptions/{SUBSCRIPTION}/resourceGroups/fixture-esml-common-swe-dev-002/providers/Microsoft.Network/virtualNetworks/vnt-esmlcmn-swe-dev-001",
         "addressSpace": {"addressPrefixes": ["172.16.0.0/18"]},
         "subnets": [{"addressPrefix": f"172.16.0.{octet}/26"} for octet in (0, 64, 128, 192)],
     }

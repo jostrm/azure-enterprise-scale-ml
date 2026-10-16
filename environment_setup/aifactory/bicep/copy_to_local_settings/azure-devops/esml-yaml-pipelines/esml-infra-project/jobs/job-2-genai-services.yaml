@@ -41,6 +41,12 @@ steps:
 # Set preflight_skip=true (pipeline variable) to bypass; preflight_strict=true
 # to also fail on warnings.
 # ---------------------------------------------------------------------------
+- task: PowerShell@2
+  displayName: '00_resolve_logicapp_network_inputs'
+  inputs:
+    targetType: filePath
+    filePath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/resolve-logicapp-network-inputs.ps1'
+    pwsh: true
 - task: AzureCLI@2
   displayName: '00_preflight_quota_policy_checks'
   condition: and(eq('${{ parameters.phase }}', 'infra'), ne(variables['debug_disable_validation_tasks'], 'true'))
@@ -102,6 +108,10 @@ steps:
     subnetProjACA: $(subnetProjACA)
     subnetProjACA2: $(subnetProjACA2)
     subnetProjWebapp: $(subnetProjWebapp)
+    subnetProjLogicapp: $(subnetProjLogicapp)
+    enableLogicApps: $(enableLogicApps)
+    logicAppType: $(logicAppType)
+    enablePublicAccessWithPerimeter: $(enablePublicAccessWithPerimeter)
     subnetProjDatabricksPublic: $(subnetProjDatabricksPublic)
     subnetProjDatabricksPrivate: $(subnetProjDatabricksPrivate)
     byoASEv3: $(byoASEv3)
@@ -984,6 +994,7 @@ steps:
       $subnetProjACAVal           = if ($_useSubnetNames) { "$(subnetProjACA)" }           else { "" }
       $subnetProjACA2Val          = if ($_useSubnetNames) { "$(subnetProjACA2)" }          else { "" }
       $subnetProjWebappVal        = if ($_useSubnetNames) { "$(subnetProjWebapp)" }        else { "" }
+      $subnetProjLogicappVal      = if ($_useSubnetNames) { "$(subnetProjLogicapp)" }      else { "" }
       $subnetProjDatabricksPublicVal  = if ($_useSubnetNames) { "$(subnetProjDatabricksPublic)" }  else { "" }
       $subnetProjDatabricksPrivateVal = if ($_useSubnetNames) { "$(subnetProjDatabricksPrivate)" } else { "" }
       Write-Host "BYO_subnets=$_byo => subnetCommon='$subnetCommonVal', subnetProjGenAI='$subnetProjGenAIVal'"
@@ -1002,6 +1013,7 @@ steps:
           subnetProjACA = @{ value = $subnetProjACAVal }
           subnetProjACA2 = @{ value = $subnetProjACA2Val }
           subnetProjWebapp = @{ value = $subnetProjWebappVal }
+          subnetProjLogicapp = @{ value = $subnetProjLogicappVal }
           subnetProjDatabricksPublic = @{ value = $subnetProjDatabricksPublicVal }
           subnetProjDatabricksPrivate = @{ value = $subnetProjDatabricksPrivateVal }
         }
@@ -1064,7 +1076,7 @@ steps:
     scriptType: pscore
     scriptLocation: scriptPath
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/genDynamicNetworkParamFile.ps1'
-    arguments: '-BYO_subnets "$(BYO_subnets)" -network_env "$(network_env)" -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)" -enableAIFoundry "$(enableAIFoundry)" -enableAksForAzureML "$(enableAksForAzureML)" -enableContainerApps "$(enableContainerApps)" -enableDatabricks "$(enableDatabricks)" -disableAgentNetworkInjection "$(disableAgentNetworkInjection)" -enableWebApp "$(enableWebApp)" -enableFunction "$(enableFunction)"'
+    arguments: '-BYO_subnets "$(BYO_subnets)" -network_env "$(network_env)" -bicepPar1 "../../../../../aifactory/parameters/10-esml-globals-1.json" -bicepPar2 "../../../../../aifactory/parameters/10-esml-globals-2-12_13_21_22.json" -bicepPar3 "../../../../../aifactory/parameters/10-esml-globals-4-13_21_22.json" -bicepPar4 "../../../../../aifactory/parameters/21-22-esml-prj-parameters.json" -bicepPar5 "../../../../../aifactory/parameters/10-esml-globals-override.json" -filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -locationSuffixADO "$(admin_locationSuffix)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -projectNumber "$(project_number_000)" -subscriptionId "$(dev_test_prod_sub_id)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -projectTypeADO "$(admin_projectType)" -enableAIFoundry "$(enableAIFoundry)" -enableAksForAzureML "$(enableAksForAzureML)" -enableContainerApps "$(enableContainerApps)" -enableDatabricks "$(enableDatabricks)" -disableAgentNetworkInjection "$(disableAgentNetworkInjection)" -enableWebApp "$(enableWebApp)" -enableFunction "$(enableFunction)" -enableLogicApps "$(enableLogicApps)" -logicAppType "$(logicAppType)" -byoASEv3 "$(byoASEv3)" -enablePublicAccessWithPerimeter "$(enablePublicAccessWithPerimeter)"'
     powerShellErrorActionPreference: stop
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
   env:
@@ -1385,7 +1397,7 @@ steps:
       elasticName="elastic-${projectName}-${locationSuffix}-${envName}"
       acrProjectName="acr${projectName}genai${locationSuffix}"
       vmName="dsvm-${projectName}-${locationSuffix}-${envName}"
-      logicAppsName="adf-${projectNumber}-${locationSuffix}-${envName}"
+      logicAppsName="lapp-${projectNumber}-${locationSuffix}-${envName}-"
       eventHubsName="eh-${projectNumber}-${locationSuffix}-${envName}"
       databricksName="dbx-${projectNumber}-${locationSuffix}-${envName}"
       contentSafetyName="cs-${projectName}-${locationSuffix}-${envName}"
@@ -1438,7 +1450,15 @@ steps:
       fi
 
       echo "##vso[task.setvariable variable=databricksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Azure.Databricks/workspaces" "$databricksName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=logicAppsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$logicAppsName" "$suffixStandard")"
+      logicResourceType="Microsoft.Web/sites"
+      if [ "$(logicAppType)" = "Consumption" ]; then logicResourceType="Microsoft.Logic/workflows"; fi
+      logicMatches=$(az resource list --subscription "$(dev_test_prod_sub_id)" --resource-group "$targetResourceGroup" --resource-type "$logicResourceType" --query "[?starts_with(name, '$logicAppsName') && ends_with(name, '$suffixStandard')].name" -o tsv --only-show-errors) || exit 1
+      if [[ "$logicMatches" == *$'\n'* ]]; then echo "Ambiguous existing Logic Apps; refusing to choose or redeploy."; exit 1; fi
+      if [ -n "$logicMatches" ]; then
+        echo "##vso[task.setvariable variable=logicAppsExists]true"
+      else
+        echo "##vso[task.setvariable variable=logicAppsExists]false"
+      fi
       echo "##vso[task.setvariable variable=eventHubsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.EventHub/namespaces" "$eventHubsName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=dataFactoryExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DataFactory/factories" "$dataFactoryName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=botServiceExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.BotService/botServices" "$botServiceName" "$suffixStandard")"
@@ -3554,6 +3574,7 @@ steps:
      --parameters enableLogicApps="$(enableLogicApps)" \
      --parameters enableEventHubs="$(enableEventHubs)" \
      --parameters logicAppsExists="$(logicAppsExists)" \
+     --parameters logiAppType="$(logicAppType)" \
      --parameters eventHubsExists="$(eventHubsExists)" \
      --parameters functionAppExists="$(functionAppExists)" \
      --parameters enableFunction="$(enableFunction)" \

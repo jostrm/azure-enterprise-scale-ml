@@ -122,6 +122,8 @@ param aca2SubnetId string = ''
 param aks2SubnetId string = ''
 @description('App Service / Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)')
 param webappSubnetId string = ''
+@description('Validated dedicated Logic Apps Standard outbound subnet ID; never the AKS or shared webapp subnet')
+param logicappSubnetId string = ''
 @description('if projectype is not genai-1, but instead all')
 param dbxPubSubnetName string = ''
 param dbxPrivSubnetName string = ''
@@ -330,7 +332,7 @@ var resolvedBotAgentEndpoint = empty(botAgentEndpoint) ? defaultBotAgentEndpoint
 // ============== MODULE DEPLOYMENTS ==============
 
 // 1) Create Hosting plan for Logic Apps Standard, using Azure verfied modules (AVM)
-module serverFarm 'br/public:avm/res/web/serverfarm:0.6.0' = if(empty(byoAseAppServicePlanRID) && !logicAppsExists && enableLogicApps) {
+module serverFarm 'br/public:avm/res/web/serverfarm:0.6.0' = if(logiAppType == 'Standard' && empty(byoAseAppServicePlanRID) && !logicAppsExists && enableLogicApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('11-Appfarm-LogicApps01-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {
@@ -345,29 +347,7 @@ module serverFarm 'br/public:avm/res/web/serverfarm:0.6.0' = if(empty(byoAseAppS
   }
 }
 
-// ============== SUBNET DELEGATIONS ==============
-
-// Subnet delegation for Web Apps and Function Apps
-
-//module subnetDelegationServerFarmLapps '../modules/subnetDelegation.bicep' = if(!logicAppsExists && enableLogicApps && !byoASEv3) {
-module subnetDelegationServerFarm '../modules/subnetDelegation.bicep' = if((!logicAppsExists && !functionAppExists && !webAppExists) && ((!enableWebApp && !enableFunction) && enableLogicApps) && !byoASEv3) {
-  name: take('11-snetDelegSF1${deploymentProjSpecificUniqueSuffix}', 64)
-  scope: resourceGroup(vnetResourceGroupName)
-  params: {
-    vnetName: vnetName
-    subnetName: aksSubnetName // TODO: Have a dedicated subnet for WebApp, FunctionApp, logicAppsExists
-    location: location
-    vnetResourceGroupName: vnetResourceGroupName
-    delegations: [
-      {
-        name: 'webapp-delegation'
-        properties: {
-          serviceName: 'Microsoft.Web/serverFarms'
-        }
-      }
-    ]
-  }
-}
+// Outbound delegation is owned by networking (or the BYO owner), never by phase 11.
 
 // 2) Use the User assigned managed Identity "miPrjName", they keyvault with name "keyvaultName", "storageAccount1001Name"
 
@@ -617,12 +597,11 @@ module logicAppStandard 'br/public:avm/res/web/site:0.21.0' = if(logiAppType == 
     ]
     
     // VNet integration (only if not using ASE v3)
-    virtualNetworkSubnetResourceId: byoASEv3 ? '' : (enablePublicAccessWithPerimeter ? '' : resourceId(subscriptionIdDevTestProd, vnetResourceGroupName, 'Microsoft.Network/virtualNetworks/subnets', vnetName, aksSubnetName))
+    virtualNetworkSubnetResourceId: byoASEv3 || enablePublicAccessWithPerimeter ? '' : logicappSubnetId
   }
   dependsOn: [
     serverFarm
     namingConvention
-    subnetDelegationServerFarm
   ]
 }
 

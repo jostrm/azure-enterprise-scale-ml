@@ -388,6 +388,7 @@ variables:
   aca_w_registry_image: "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" # <optional>Container Apps default image<default>mcr.microsoft.com/azuredocs/containerapps-helloworld:latest<keep-as-is> <otherwise> replace with your own ACR image.
   # === Integration ===
   enableLogicApps: "false" # <optional>Deploy Azure Logic Apps<default>false<keep-as-is>
+  logicAppType: "Standard" # <optional>Logic Apps hosting type<default>Standard<allowed>Standard,Consumption
   enableEventHubs: "false" # <optional>Deploy Azure Event Hubs<default>false<keep-as-is>
   enableBotService: "true" # <optional>Deploy Azure Bot Service<default>true<keep-as-is> Required for Microsoft Foundry agent scenarios.
   foundryApiManagementResourceId: "" # <optional>APIM resource ID for Foundry integration<default>""<keep-as-is> <otherwise> provide existing API Management resource ID to integrate with Microsoft Foundry.
@@ -492,6 +493,7 @@ variables:
   subnetProjACA: "snt-prj<xxx>-aca" # <optional>ContainerApps subnet. BYO project Container Apps subnet<default>snt-prj<xxx>-aca<mandatory> if BYO_subnets:'true' <ensure> subnet exists and CIDR is in 172.16.0.0/12 or 192.168.0.0/16 if disableAgentNetworkInjection:'false'.
   subnetProjACA2: "snt-prj<xxx>-aca-002" # <optional>Agent subnet. BYO project secondary Container Apps subnet<default>snt-prj<xxx>-aca-002<mandatory> if BYO_subnets:'true' AND enableAIFoundry:'true' AND disableAgentNetworkInjection is 'false'
   subnetProjWebapp: "snt-prj<xxx>-webapp" # <optional>App Service/Function VNet integration subnet (delegated to Microsoft.Web/serverFarms)<default>snt-prj<xxx>-webapp<mandatory> if BYO_subnets:'true' AND (enableWebApp:'true' OR enableFunction:'true') <ensure> subnet exists.
+  subnetProjLogicapp: "" # <optional>BYO dedicated Logic Apps /26 subnet, Microsoft.Web/serverFarms<default>''<mandatory> if BYO_subnets=true and private Standard Logic Apps without ASE. Supports <xxx> and <network_env>.
   subnetProjDatabricksPublic: "snt-prj001-dbxpub" # <optional>BYO Databricks public subnet<default>snt-prj001-dbxpub<mandatory> if BYO_subnets:'true' and enableDatabricks:'true'.
   subnetProjDatabricksPrivate: "snt-prj<xxx>-dbxpriv" # <optional>BYO Databricks private subnet<default>snt-prj<xxx>-dbxpriv<mandatory> if BYO_subnets:'true' and enableDatabricks:'true'.
   byoASEv3: "false" # <optional>Use BYO App Service Environment v3<default>false<keep-as-is> <otherwise> true, use an existing ASEv3 specified in byoAseFullResourceId.

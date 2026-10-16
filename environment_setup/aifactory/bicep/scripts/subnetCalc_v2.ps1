@@ -39,6 +39,12 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Virtual network resource group parameter override")][string]$vnetResourceGroup_param,
     [Parameter(Mandatory = $false, HelpMessage = "Virtual network full name parameter override")][string]$vnetNameFull_param,
 
+    [string]$projectNumber = '',
+    [string]$enableLogicApps = 'false',
+    [string]$logicAppType = 'Standard',
+    [string]$byoASEv3 = 'false',
+    [string]$enablePublicAccessWithPerimeter = 'false',
+
     # Optional subnet CIDR overrides (defaults match legacy values for projectTypeADO=all)
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for GenAI subnet when projectType=all")][string]$genaiSubnetCidrAll = '25',
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for standalone AKS subnet when projectType=all")][string]$aksSubnetCidrAll = '26',
@@ -49,6 +55,12 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for DBX public subnet when projectType=all")][string]$dbxPubSubnetCidrAll = '26',
     [Parameter(Mandatory = $false, HelpMessage = "CIDR mask for DBX private subnet when projectType=all")][string]$dbxPrivSubnetCidrAll = '26'
 )
+
+. (Join-Path $PSScriptRoot 'modules/logicAppSubnet.ps1')
+$logicappSubnetRequired = Test-LogicAppSubnetRequired $enableLogicApps $logicAppType $byoASEv3 $enablePublicAccessWithPerimeter
+if (($projectNumber -and $projectNumber -notmatch '^\d{3}$') -or ($logicappSubnetRequired -and -not $projectNumber)) {
+    throw 'projectNumber must be an explicit three-digit project number for Logic Apps allocation.'
+}
 
 $useAzureCli = $env:GITHUB_ACTIONS -eq 'true' -or $env:AIFACTORY_USE_AZURE_CLI -eq 'true'
 if ($useAzureCli -and $useServicePrincipal) {
@@ -429,6 +441,10 @@ if ($hasAzureContext) {
         }
     }
 
+    if ($logicappSubnetRequired) {
+        $requiredSubnets['logicappSubnetCidr'] = '26'
+    }
+
     # Handle variable assignments - ADO parameters take precedence, then inline parameters, then JSON parameters
     if ($null -ne $commonRGNamePrefixVar -and $commonRGNamePrefixVar -ne '') {
         $commonRGNamePrefix = $commonRGNamePrefixVar
@@ -489,22 +505,11 @@ if ($hasAzureContext) {
         $vnetObj = ($vnetJson -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop
     }
     else {
-        $vnetObj = Get-AzVirtualNetwork -ResourceGroupName $vnetResourceGroup -Name $vnetName
+        $vnetObj = Get-AzVirtualNetwork -ResourceGroupName $vnetResourceGroup -Name $vnetName -ErrorAction Stop
     }
 
-    $lastAllocatedNetwork, $lastAllocatedCidr = @($vnetObj.Subnets | Sort-Object { $_.AddressPrefix.split("/")[0] -as [Version]} -Bottom 1)[0].AddressPrefix.split("/") # JOSTRM fixed sort (version and no CIDR, instead of "string sort" and CIDR)
-    $startIp  = Find-NextIpAddress $(Get-Subnet $lastAllocatedNetwork -MaskBits $lastAllocatedCidr).BroadcastAddress.IPAddressToString
-    
-    Write-Host "01 lastAllocatedNetwork: $($lastAllocatedNetwork)"
-    Write-Host "02 lastAllocatedCidr: $($lastAllocatedCidr)"
-    Write-Host "03 startIp: $($startIp)"
-
-    $possibleValuesForCidrNotations = @{}
-    $requiredSubnets.values | Select-Object -Unique | Sort-Object -Property Value | Foreach-Object {
-        $possibleValuesForCidrNotations[$_] = Get-SubnetFitting -addressSpace $vnetObj.AddressSpace.AddressPrefixes[0] -cidrNotation $_
-    }
-
-    $result = New-SubnetScheme -map $requiredSubnets -startIp $startIp -possibleValuesMap $possibleValuesForCidrNotations
+    $expectedVnetId = "/subscriptions/$subscriptionId/resourceGroups/$vnetResourceGroup/providers/Microsoft.Network/virtualNetworks/$vnetName"
+    $result = New-SafeProjectSubnetScheme -RequiredSubnets $requiredSubnets -Vnet $vnetObj -ProjectNumber $projectNumber -ExpectedVnetId $expectedVnetId
     Write-Host "Result:"
     Write-Host "Resource group for vNet: $($vnetResourceGroup)"
     Write-Host "vNet: $($vnetName)"
@@ -663,6 +668,11 @@ if ($hasAzureContext) {
         write-host "dbxPubSubnetCidr : $($result["dbxPubSubnetCidr"])"
     }
 
+    if ($logicappSubnetRequired) {
+        $allocation = $template | ConvertFrom-Json
+        $allocation.parameters | Add-Member -NotePropertyName logicappSubnetCidr -NotePropertyValue @{ value = $result['logicappSubnetCidr'] }
+        $template = $allocation | ConvertTo-Json -Depth 10
+    }
     $templateName = "subnetParameters.json"
     
     # Create directory if it doesn't exist

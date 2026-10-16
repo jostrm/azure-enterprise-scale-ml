@@ -2,6 +2,33 @@
 **Release Tag:** [release_124](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/release_124)  
 **Release Date:** January 2026
 
+## Logic Apps Standard dedicated outbound subnet
+
+Private Standard Logic Apps now use `snt-prj<projectNumber>-logicapp`, a dedicated `/26`
+delegated to `Microsoft.Web/serverFarms` in the existing VNet/resource group. Run the
+networking phase before services when enabling this feature on an existing project.
+Allocation preserves every existing subnet, reuses a validated existing Logic Apps
+subnet without overwriting it, and fails if there is insufficient safe append space.
+AKS remains undelegated; inbound private endpoints remain on the nondelegated GenAI
+subnet. The existing webapp `/27` is not resized or shared across hosting plans.
+
+The gate is `enableLogicApps=true`, `logicAppType=Standard`, `byoASEv3=false`, and
+`enablePublicAccessWithPerimeter=false` in dev/test/prod. Other modes allocate no
+Logic Apps subnet. Normal upgrades require no new configuration. With
+`BYO_subnets=true`, explicitly set `subnetProjLogicapp` (`SUBNET_PROJ_LOGICAPP` on
+GitHub), supporting `<xxx>` and `<network_env>`. The existing subnet must be `/26`
+or larger, Succeeded, and exclusively delegated to `Microsoft.Web/serverFarms`.
+BYO resources are read/validated, never modified. Missing, stale, cross-project, or
+shared-service IDs fail before deployment; all phase entrypoints accept the optional
+`logicappSubnetId` dynamic parameter. Existing Logic Apps are not migrated or
+recreated automatically. Task 65 ordering and task 68 bounded same-plan retries remain.
+Allocation and existence detection require the exact selected VNet ID and a
+complete subnet inventory; unreadable or malformed responses never authorize
+replacing an existing subnet.
+
+Sizing references: [App Service multi-plan subnet join requires /26](https://learn.microsoft.com/en-us/azure/app-service/overview-vnet-integration)
+and [Logic Apps private networking (/26 recommended)](https://learn.microsoft.com/en-us/azure/logic-apps/secure-single-tenant-workflow-virtual-network-private-endpoint).
+
 ## 📌 Version Configuration
 
 ### main.bicep

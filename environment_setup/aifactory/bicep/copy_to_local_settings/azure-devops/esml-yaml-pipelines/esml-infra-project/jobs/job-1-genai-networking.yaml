@@ -11,6 +11,12 @@ steps:
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/apply-json-config-overrides.py'
     arguments: '--file "$(configOverrideFile)" --environment "$(dev_test_prod)" --format azure-devops'
     workingDirectory: '$(System.DefaultWorkingDirectory)'
+- task: PowerShell@2
+  displayName: '00_resolve_logicapp_network_inputs'
+  inputs:
+    targetType: filePath
+    filePath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/resolve-logicapp-network-inputs.ps1'
+    pwsh: true
 - task: AzureCLI@2
   displayName: '00_resolve_network_env_placeholders'
   inputs:
@@ -44,6 +50,7 @@ steps:
         echo "##vso[task.setvariable variable=subnetProjACA]"
         echo "##vso[task.setvariable variable=subnetProjACA2]"
         echo "##vso[task.setvariable variable=subnetProjWebapp]"
+        echo "##vso[task.setvariable variable=subnetProjLogicapp]"
         echo "##vso[task.setvariable variable=subnetProjDatabricksPublic]"
         echo "##vso[task.setvariable variable=subnetProjDatabricksPrivate]"
       fi
@@ -69,6 +76,12 @@ steps:
         echo "Replaced with network_env value: $NETWORK_ENV"
       fi
 
+      if [ -z "$VNET_RG" ] || [[ "$VNET_RG" == '$('* ]]; then
+        VNET_RG="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+      fi
+      if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == '$('* ]]; then
+        VNET_NAME="$(vnetNameBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)"
+      fi
       # Set resolved values as pipeline variables for reuse
       echo "##vso[task.setvariable variable=vnetResourceGroup_resolved]$VNET_RG"
       echo "##vso[task.setvariable variable=vnetNameFull_resolved]$VNET_NAME"
@@ -115,6 +128,10 @@ steps:
     subnetProjACA: $(subnetProjACA)
     subnetProjACA2: $(subnetProjACA2)
     subnetProjWebapp: $(subnetProjWebapp)
+    subnetProjLogicapp: $(subnetProjLogicapp)
+    enableLogicApps: $(enableLogicApps)
+    logicAppType: $(logicAppType)
+    enablePublicAccessWithPerimeter: $(enablePublicAccessWithPerimeter)
     subnetProjDatabricksPublic: $(subnetProjDatabricksPublic)
     subnetProjDatabricksPrivate: $(subnetProjDatabricksPrivate)
     byoASEv3: $(byoASEv3)
@@ -189,6 +206,9 @@ steps:
 
       if [ "$(enableWebApp)" = "true" ] || [ "$(enableFunction)" = "true" ]; then
         check_subnet "subnetProjWebapp" "$(subnetProjWebapp)" "enableWebApp=true or enableFunction=true"
+      fi
+      if [ "$(enableLogicApps)" = "true" ] && [ "$(logicAppType)" = "Standard" ] && [ "$(byoASEv3)" = "false" ] && [ "$(enablePublicAccessWithPerimeter)" = "false" ]; then
+        check_subnet "subnetProjLogicapp" "$(subnetProjLogicapp)" "private Standard Logic Apps enabled"
       fi
 
       if [ "$(enableDatabricks)" = "true" ]; then
@@ -748,7 +768,7 @@ steps:
     scriptType: pscore
     scriptLocation: scriptPath
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/subnetCalc_v2.ps1'
-    arguments: '-filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -subscriptionId "$(dev_test_prod_sub_id)" -prjResourceSuffix "$(admin_prjResourceSuffix)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -commonResourceSuffixADO "$(admin_commonResourceSuffix)" -locationADO "$(admin_location)" -locationSuffixADO "$(admin_locationSuffix)" -projectTypeADO "$(admin_projectType)" -aifactorySuffixRG "$(admin_aifactorySuffixRG)" -commonRGNamePrefix "$(admin_aifactoryPrefixRG)" -locationSuffix "$(admin_locationSuffix)" -location "$(admin_location)" -commonResourceSuffix "$(admin_commonResourceSuffix)" -vnetNameBase "$(vnetNameBase)" -tenantId "$(tenantId)" -vnetResourceGroupBase "$(vnetResourceGroupBase)" -vnetResourceGroup_param "$(vnetResourceGroup_resolved)" -vnetNameFull_param "$(vnetNameFull_resolved)"'
+    arguments: '-filePath "../../../../../aifactory/parameters/" -env "$(dev_test_prod)" -subscriptionId "$(dev_test_prod_sub_id)" -prjResourceSuffix "$(admin_prjResourceSuffix)" -commonRGNamePrefixVar "$(admin_aifactoryPrefixRG)" -aifactorySuffixRGADO "$(admin_aifactorySuffixRG)" -commonResourceSuffixADO "$(admin_commonResourceSuffix)" -locationADO "$(admin_location)" -locationSuffixADO "$(admin_locationSuffix)" -projectTypeADO "$(admin_projectType)" -aifactorySuffixRG "$(admin_aifactorySuffixRG)" -commonRGNamePrefix "$(admin_aifactoryPrefixRG)" -locationSuffix "$(admin_locationSuffix)" -location "$(admin_location)" -commonResourceSuffix "$(admin_commonResourceSuffix)" -vnetNameBase "$(vnetNameBase)" -tenantId "$(tenantId)" -vnetResourceGroupBase "$(vnetResourceGroupBase)" -vnetResourceGroup_param "$(vnetResourceGroup_resolved)" -vnetNameFull_param "$(vnetNameFull_resolved)" -projectNumber "$(project_number_000)" -enableLogicApps "$(enableLogicApps)" -logicAppType "$(logicAppType)" -byoASEv3 "$(byoASEv3)" -enablePublicAccessWithPerimeter "$(enablePublicAccessWithPerimeter)"'
     powerShellErrorActionPreference: stop
     workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts'
   env:
@@ -757,91 +777,11 @@ steps:
   displayName: '04b_check_subnet_exists_for_project'
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
-    scriptType: bash
-    scriptLocation: inlineScript
-    inlineScript: |
-      #!/bin/bash
-
-      az account set --subscription "$(dev_test_prod_sub_id)"
-
-      # Input parameters
-      projectNumber="$(project_number_000)"
-      
-      # Get vnet information from resolved variables (with <network_env> already replaced), with fallback to naming convention
-      VNET_NAME="$(vnetNameFull_resolved)"
-      VNET_RG="$(vnetResourceGroup_resolved)"
-      
-      # Fallback to original params if resolved variables are empty
-      if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_resolved\)* ]]; then
-        VNET_NAME="$(vnetNameFull_param)"
-      fi
-      
-      if [ -z "$VNET_RG" ] || [[ "$VNET_RG" == \$\(vnetResourceGroup_resolved\)* ]]; then
-        VNET_RG="$(vnetResourceGroup_param)"
-      fi
-      
-      echo "Using resolved VNET_NAME: $VNET_NAME"
-      echo "Using resolved VNET_RG: $VNET_RG"
-
-      # If VNET variables are not set (empty or unexpanded), use naming convention
-      if [ -z "$VNET_NAME" ] || [[ "$VNET_NAME" == \$\(vnetNameFull_param\)* ]]; then
-        VNET_NAME="$(vnetNameBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_commonResourceSuffix)"
-        echo "VNET name not set, using naming convention: $VNET_NAME"
-      else
-        echo "Using provided VNET name: $VNET_NAME"
-      fi
-      
-      if [ -z "$VNET_RG" ] || [[ "$VNET_RG" == \$\(vnetResourceGroup_param\)* ]]; then
-        # Use the common resource group naming convention
-        VNET_RG="$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
-        echo "VNET resource group not set, using naming convention: $VNET_RG"
-      else
-        echo "Using provided VNET resource group: $VNET_RG"
-      fi
-      
-      echo "Checking subnet existence in VNET: $VNET_NAME"
-      echo "VNET Resource Group: $VNET_RG"
-      echo "Project Number: $projectNumber"
-      
-      # Define subnet names based on naming convention: snt-prj[project_number_000]-[type]-[instance]
-      SNT_GENAI="snt-prj${projectNumber}-genai"
-      SNT_ACA="snt-prj${projectNumber}-aca"
-      SNT_ACA_002="snt-prj${projectNumber}-aca-002"
-      SNT_AKS="snt-prj${projectNumber}-aks"
-      SNT_AKS_002="snt-prj${projectNumber}-aks-002"
-      SNT_WEBAPP="snt-prj${projectNumber}-webapp"
-      SNT_DATABRICKS_PRIV="snt-prj${projectNumber}-dbxpriv"
-      SNT_DATABRICKS_PUB="snt-prj${projectNumber}-dbxpub"
-      
-      # Function to check if subnet exists
-      check_subnet_exists() {
-        local subnet_name="$1"
-        local var_name="$2"
-        
-        echo "Checking subnet: $subnet_name"
-        if az network vnet subnet show --name "$subnet_name" --vnet-name "$VNET_NAME" --resource-group "$VNET_RG" &> /dev/null; then
-          echo "✅ Subnet '$subnet_name' exists."
-          echo "##vso[task.setvariable variable=$var_name]true"
-        else
-          echo "❌ Subnet '$subnet_name' does not exist."
-          echo "##vso[task.setvariable variable=$var_name]false"
-        fi
-      }
-      
-      # Check each subnet and set variables
-      check_subnet_exists "$SNT_GENAI" "sntGenaiExists"
-      check_subnet_exists "$SNT_ACA" "sntAcaExists"
-      check_subnet_exists "$SNT_ACA_002" "sntAca002Exists"
-      check_subnet_exists "$SNT_AKS" "sntAksExists"
-      check_subnet_exists "$SNT_AKS_002" "sntAks002Exists"
-      check_subnet_exists "$SNT_WEBAPP" "sntWebappExists"
-      check_subnet_exists "$SNT_DATABRICKS_PRIV" "sntDatabricksPrivExists"
-      check_subnet_exists "$SNT_DATABRICKS_PUB" "sntDatabricksPubExists"
-      
-      echo "Subnet existence check completed."
-      echo "vnetResourceGroup: $(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
-      echo "vnetResourceGroup_param: $(vnetResourceGroup_param)"
-      echo "vnetNameBase: $(vnetNameBase)"
+    scriptType: pscore
+    scriptLocation: scriptPath
+    scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/getProjectSubnetState.ps1'
+    arguments: '-SubscriptionId "$(dev_test_prod_sub_id)" -ResourceGroupName "$(vnetResourceGroup_resolved)" -VnetName "$(vnetNameFull_resolved)" -ProjectNumber "$(project_number_000)" -Provider ado'
+    powerShellErrorActionPreference: stop
 
 - task: AzureResourceManagerTemplateDeployment@3
   displayName: '05_arm_deploy_subnets_and_NSGs'
@@ -850,7 +790,7 @@ steps:
     azureResourceManagerConnection: ${{ parameters.serviceConnection }}
     subscriptionId: '$(dev_test_prod_sub_id)'
     action: 'Create Or Update Resource Group'
-    resourceGroupName: '$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)'
+    resourceGroupName: '$(vnetResourceGroup_resolved)'
     location: '$(admin_location)'
     templateLocation: 'Linked artifact'
     csmFile: '$(Build.SourcesDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/31-network.bicep'
@@ -865,7 +805,7 @@ steps:
       -tags $(tags)
       -aifactorySuffixRG "$(admin_aifactorySuffixRG)"
       -commonRGNamePrefix "$(admin_aifactoryPrefixRG)"
-      -vnetResourceGroup "$(admin_aifactoryPrefixRG)$(vnetResourceGroupBase)-$(admin_locationSuffix)-$(dev_test_prod)$(admin_aifactorySuffixRG)"
+      -vnetResourceGroup "$(vnetResourceGroup_resolved)"
       -vnetResourceGroup_param "$(vnetResourceGroup_resolved)"
       -vnetNameFull_param "$(vnetNameFull_resolved)"
       -commonResourceGroup_param "$(commonResourceGroup_param)"
@@ -893,6 +833,10 @@ steps:
       -sntAksExists "$(sntAksExists)"
       -sntAks002Exists "$(sntAks002Exists)"
       -sntWebappExists "$(sntWebappExists)"
+      -sntLogicappExists "$(sntLogicappExists)"
+      -enableLogicApps "$(enableLogicApps)"
+      -logicAppType "$(logicAppType)"
+      -enablePublicAccessWithPerimeter "$(enablePublicAccessWithPerimeter)"
       -sntDatabricksPrivExists "$(sntDatabricksPrivExists)"
       -sntDatabricksPubExists "$(sntDatabricksPubExists)"
       -aksOutboundType "$(aksOutboundType)"

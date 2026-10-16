@@ -354,6 +354,10 @@ SUBNET_PROJ_AKS2="$(getval subnetProjAKS2 SUBNET_PROJ_AKS2 '')"
 SUBNET_PROJ_ACA="$(getval subnetProjACA SUBNET_PROJ_ACA '')"
 SUBNET_PROJ_ACA2="$(getval subnetProjACA2 SUBNET_PROJ_ACA2 '')"
 SUBNET_PROJ_WEBAPP="$(getval subnetProjWebapp SUBNET_PROJ_WEBAPP '')"
+SUBNET_PROJ_LOGICAPP="$(getval subnetProjLogicapp SUBNET_PROJ_LOGICAPP '')"
+ENABLE_LOGIC_APPS="$(getval enableLogicApps ENABLE_LOGIC_APPS false)"
+LOGIC_APP_TYPE="$(getval logicAppType LOGIC_APP_TYPE Standard)"
+LOGIC_PUBLIC_PERIMETER="$(getval enablePublicAccessWithPerimeter ENABLE_PUBLIC_ACCESS_WITH_PERIMETER false)"
 SUBNET_PROJ_DBX_PUB="$(getval subnetProjDatabricksPublic SUBNET_PROJ_DBX_PUBLIC '')"
 SUBNET_PROJ_DBX_PRIV="$(getval subnetProjDatabricksPrivate SUBNET_PROJ_DBX_PRIVATE '')"
 
@@ -823,6 +827,9 @@ check_byo_subnets() {
   local webapp_req="false"
   if is_true "$ENABLE_WEBAPP" || is_true "$ENABLE_FUNCTION"; then webapp_req="true"; fi
   _need subnetProjWebapp      "$SUBNET_PROJ_WEBAPP"     "$webapp_req"
+  local logicapp_req="false"
+  if is_true "$ENABLE_LOGIC_APPS" && [ "$LOGIC_APP_TYPE" = "Standard" ] && ! is_true "$BYO_ASEV3" && ! is_true "$LOGIC_PUBLIC_PERIMETER"; then logicapp_req="true"; fi
+  _need subnetProjLogicapp    "$SUBNET_PROJ_LOGICAPP"   "$logicapp_req"
   # Databricks subnets: required if Databricks enabled
   local dbx_req="false"; is_true "$ENABLE_DATABRICKS" && dbx_req="true"
   _need subnetProjDatabricksPublic  "$SUBNET_PROJ_DBX_PUB"  "$dbx_req"

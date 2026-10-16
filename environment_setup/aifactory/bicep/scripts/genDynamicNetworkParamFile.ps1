@@ -31,8 +31,16 @@ param (
     [Parameter(Mandatory = $false, HelpMessage = "Enable Databricks — makes subnetProjDatabricksPublic and subnetProjDatabricksPrivate mandatory when BYO_subnets=true")][string]$enableDatabricks = "false",
     [Parameter(Mandatory = $false, HelpMessage = "Disable agent network injection — when false and enableAIFoundry=true, subnetProjACA2 is mandatory")][string]$disableAgentNetworkInjection = "false",
     [Parameter(Mandatory = $false, HelpMessage = "Enable Azure Web App — makes subnetProjAKS mandatory (used for VNet integration, which requires Microsoft.Web/serverFarms delegation)")][string]$enableWebApp = "false",
-    [Parameter(Mandatory = $false, HelpMessage = "Enable Azure Function App — makes subnetProjAKS mandatory (used for VNet integration, which requires Microsoft.Web/serverFarms delegation)")][string]$enableFunction = "false"
+    [Parameter(Mandatory = $false, HelpMessage = "Enable Azure Function App — makes subnetProjAKS mandatory (used for VNet integration, which requires Microsoft.Web/serverFarms delegation)")][string]$enableFunction = "false",
+    [string]$enableLogicApps = 'false',
+    [string]$logicAppType = 'Standard',
+    [string]$byoASEv3 = 'false',
+    [string]$enablePublicAccessWithPerimeter = 'false'
 )
+
+. (Join-Path $PSScriptRoot 'modules/logicAppSubnet.ps1')
+$logicappSubnetRequired = Test-LogicAppSubnetRequired $enableLogicApps $logicAppType $byoASEv3 $enablePublicAccessWithPerimeter
+if ($logicappSubnetRequired -and $projectNumber -notmatch '^\d{3}$') { throw 'projectNumber must be an explicit three-digit project number.' }
 
     # Default subnet name templates (used when BYO_subnets is false)
     $defaultSubnetProjGenAI = "snt-prj<xxx>-genai"
@@ -311,12 +319,10 @@ $jsonParameters3 = Get-Content -Path $bicepPar3 | ConvertFrom-Json
 ConvertTo-Variables -InputObject $jsonParameters3
 
 $jsonParameters4 = Get-Content -Path $bicepPar4 | ConvertFrom-Json
-Set-DeployedOnTag -InputObject $jsonParameters4
+$null = Set-DeployedOnTag -InputObject $jsonParameters4
 ConvertTo-Variables -InputObject $jsonParameters4
 
 $jsonParameters5 = Get-Content -Path $bicepPar5 | ConvertFrom-Json
-Write-Host "DEBUG: bicepPar5 10-esml-globals-override.json:" -ForegroundColor Cyan
-Write-Host ($jsonParameters5 | ConvertTo-Json -Depth 10) -ForegroundColor Yellow
 ConvertTo-Variables -InputObject $jsonParameters5
 
 # Preserve incoming custom subnet patterns AFTER variables are loaded
@@ -326,6 +332,7 @@ $subnetProjAKS2_input = $subnetProjAKS2
 $subnetProjACA_input = $subnetProjACA
 $subnetProjACA2_input = $subnetProjACA2
 $subnetProjWebapp_input = $subnetProjWebapp
+$subnetProjLogicapp_input = $jsonParameters5.parameters.subnetProjLogicapp.value
 $subnetProjDatabricksPublic_input = $subnetProjDatabricksPublic
 $subnetProjDatabricksPrivate_input = $subnetProjDatabricksPrivate
 
@@ -450,33 +457,47 @@ function Get-DeploymentOutputValue {
         [string] $DeploymentName,
 
         [Parameter(Mandatory = $true)]
-        [string] $OutputName
+        [string] $OutputName,
+        [switch] $RequireSucceeded
     )
 
     if ($env:GITHUB_ACTIONS -eq 'true' -or $env:AIFACTORY_USE_AZURE_CLI -eq 'true') {
+        $query = "properties.outputs.$OutputName.value"
+        $format = 'tsv'
+        if ($RequireSucceeded) {
+            $query = "{state:properties.provisioningState,value:properties.outputs.$OutputName.value}"
+            $format = 'json'
+        }
         $value = & az deployment group show `
             --subscription $subscriptionId `
             --resource-group $ResourceGroupName `
             --name $DeploymentName `
-            --query "properties.outputs.$OutputName.value" `
-            --output tsv `
+            --query $query `
+            --output $format `
             --only-show-errors 2>&1
         if ($LASTEXITCODE -ne 0) {
             throw "Unable to read output '$OutputName' from deployment '$ResourceGroupName/$DeploymentName': $($value -join [Environment]::NewLine)"
         }
+        if ($RequireSucceeded) {
+            $output = ($value -join [Environment]::NewLine) | ConvertFrom-Json -ErrorAction Stop
+            if ($output.state -ine 'Succeeded') { throw 'Logic Apps network deployment must have succeeded; stale outputs are not accepted.' }
+            return $output.value
+        }
         return ($value -join [Environment]::NewLine).Trim()
     }
 
-    return (Get-AzResourceGroupDeployment `
+    $deployment = Get-AzResourceGroupDeployment `
         -ResourceGroupName $ResourceGroupName `
-        -Name $DeploymentName).Outputs[$OutputName].Value
+        -Name $DeploymentName -ErrorAction Stop
+    if ($RequireSucceeded -and $deployment.ProvisioningState -ine 'Succeeded') { throw 'Logic Apps network deployment must have succeeded; stale outputs are not accepted.' }
+    return $deployment.Outputs[$OutputName].Value
 }
 
 # Non-BYO path: fetch subnets from prior deployment outputs (never mutate names)
 if ($BYO_subnets_bool -eq $false) {
 
     # Even when BYO_subnets is false, a provided vnetResourceGroup_param should be respected for lookup, but no subnet-name mutation should occur.
-    $lookupResourceGroup = if ([string]::IsNullOrEmpty($vnetResourceGroup_param)) { $vnetResourceGroup } else { $vnetResourceGroup_param }
+    $lookupResourceGroup = $vnetResourceGroup
 
     write-host "BYO_subnets is FALSE and BYOVnet is not true either - Fetching subnet IDs from deployment: $($deploymentPrefix)SubnetDeplProj"
     write-host "Project type all :  trying to fetch deployment with name: $($deploymentPrefix)SubnetDeplProj for AKS name"
@@ -756,10 +777,47 @@ $templateAll = @"
 }
 "@
 
+$logicappSubnetId = ''
+if ($logicappSubnetRequired) {
+    $vnetName = if ([string]::IsNullOrWhiteSpace($vnetNameFull_param)) {
+        "$vnetNameBase-$locationSuffix-$env$commonResourceSuffix"
+    } else { $vnetNameFull_param -replace '<network_env>', $network_env }
+    $logicappName = "snt-prj$projectNumber-logicapp"
+    if ($BYO_subnets_bool) {
+        if ([string]::IsNullOrWhiteSpace($subnetProjLogicapp_input)) {
+            throw 'Private Standard Logic Apps with BYO_subnets=true requires explicit subnetProjLogicapp. No AKS or webapp fallback is permitted.'
+        }
+        $logicappName = $subnetProjLogicapp_input -replace '<network_env>', $network_env -replace '<xxx>', $projectNumber
+    }
+    foreach ($segment in @($vnetResourceGroup, $vnetName, $logicappName)) {
+        if ([string]::IsNullOrWhiteSpace($segment) -or $segment -match '[<>$()/\\\s]') {
+            throw 'Logic Apps subnet routing contains an invalid name or unresolved placeholder.'
+        }
+    }
+    $expectedLogicappId = Get-AzureSubnetId -subscriptionId $subscriptionId -resourceGroupName $vnetResourceGroup -vnetName $vnetName -subnetName $logicappName
+    if ($BYO_subnets_bool) {
+        $logicappSubnetId = $expectedLogicappId
+    } else {
+        $logicappSubnetId = Get-DeploymentOutputValue -ResourceGroupName $vnetResourceGroup -DeploymentName "$($deploymentPrefix)SubnetDeplProj" -OutputName 'logicappSubnetId' -RequireSucceeded
+        if ($logicappSubnetId -ine $expectedLogicappId) {
+            throw 'Missing or stale logicappSubnetId network output. Run networking for this exact project and environment before integration.'
+        }
+    }
+    $otherSubnetNames = @($subnetProjGenAI, $subnetProjAKS, $subnetProjAKS2, $subnetProjACA, $subnetProjACA2, $subnetProjWebapp, $subnetProjDatabricksPublic, $subnetProjDatabricksPrivate)
+    if ($otherSubnetNames -icontains $logicappName -or @($genaiSubnetId, $aksSubnetId, $aks2SubnetId, $acaSubnetId, $aca2SubnetId, $webappSubnetId) -icontains $logicappSubnetId) {
+        throw 'Logic Apps requires a dedicated subnet distinct from every other project service subnet.'
+    }
+    $logicappSubnet = Read-LogicAppSubnet -SubnetId $logicappSubnetId -SubscriptionId $subscriptionId -ResourceGroupName $vnetResourceGroup -VnetName $vnetName
+    Assert-LogicAppSubnet -Subnet $logicappSubnet -ExpectedId $expectedLogicappId
+}
+
 $template = "not set"
 
 write-host "Template for dynamicNetworkParams.json is projectType: all"
 $template = $templateAll
+$dynamic = $template | ConvertFrom-Json
+$dynamic.parameters | Add-Member -NotePropertyName logicappSubnetId -NotePropertyValue @{ value = $logicappSubnetId }
+$template = $dynamic | ConvertTo-Json -Depth 10
 $outputPath = "$filePath$templateName".Replace('\', '/')
 $template | Out-File $outputPath
 write-host "Template written to $outputPath"

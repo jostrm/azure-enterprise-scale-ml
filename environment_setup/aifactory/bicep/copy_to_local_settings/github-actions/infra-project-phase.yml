@@ -224,6 +224,7 @@ jobs:
       subnetProjACA: ${{ vars.SUBNET_PROJ_ACA || '' }}
       subnetProjACA2: ${{ vars.SUBNET_PROJ_ACA2 || '' }}
       subnetProjWebapp: ${{ vars.SUBNET_PROJ_WEBAPP || '' }}
+      subnetProjLogicapp: ${{ vars.SUBNET_PROJ_LOGICAPP || '' }}
       subnetProjDatabricksPublic: ${{ vars.SUBNET_PROJ_DATABRICKS_PUBLIC || '' }}
       subnetProjDatabricksPrivate: ${{ vars.SUBNET_PROJ_DATABRICKS_PRIVATE || '' }}
       byoASEv3: ${{ vars.BYO_ASEV3 || 'false' }}
@@ -663,6 +664,12 @@ jobs:
             VNET_NAME="${VNET_NAME//<network_env>/$NETWORK_ENV}"
           fi
 
+          if [ -z "$VNET_RG" ]; then
+            VNET_RG="${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}"
+          fi
+          if [ -z "$VNET_NAME" ]; then
+            VNET_NAME="${{ env.vnetNameBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_commonResourceSuffix }}"
+          fi
           echo "vnetResourceGroup_resolved=$VNET_RG" >> $GITHUB_ENV
           echo "vnetNameFull_resolved=$VNET_NAME" >> $GITHUB_ENV
           echo "Resolved vnetResourceGroup: $VNET_RG"
@@ -935,7 +942,13 @@ jobs:
             parameters = @{
               vnetResourceGroup_param = @{ value = '${{ env.vnetResourceGroup_resolved }}' }
               vnetNameFull_param      = @{ value = '${{ env.vnetNameFull_resolved }}' }
+              subnetProjLogicapp      = @{ value = $(if ($env:BYO_subnets -eq 'true') { $env:subnetProjLogicapp } else { '' }) }
             }
+          }
+          # Retain BYO names so the Logic Apps validator can also reject aliases of another service subnet.
+          foreach ($key in @('subnetProjGenAI', 'subnetProjAKS', 'subnetProjAKS2', 'subnetProjACA', 'subnetProjACA2', 'subnetProjWebapp', 'subnetProjDatabricksPublic', 'subnetProjDatabricksPrivate')) {
+            $value = if ($env:BYO_subnets -eq 'true') { [Environment]::GetEnvironmentVariable($key) } else { '' }
+            $override.parameters[$key] = @{ value = $value }
           }
           $override | ConvertTo-Json -Depth 5 | Out-File (Join-Path $paramDir '10-esml-globals-override.json') -Encoding utf8
 
@@ -969,6 +982,11 @@ jobs:
             -locationADO "${{ env.admin_location }}" `
             -locationSuffixADO "${{ env.admin_locationSuffix }}" `
             -projectTypeADO "${{ env.admin_projectType }}" `
+            -projectNumber "${{ env.project_number_000 }}" `
+            -enableLogicApps "${{ env.enableLogicApps }}" `
+            -logicAppType "${{ env.logicAppType }}" `
+            -byoASEv3 "${{ env.byoASEv3 }}" `
+            -enablePublicAccessWithPerimeter "${{ env.enablePublicAccessWithPerimeter }}" `
             -vnetResourceGroupBase "${{ env.vnetResourceGroupBase }}" `
             -vnetNameBase "${{ env.vnetNameBase }}" `
             -tenantId "${{ env.tenantId }}" `
@@ -990,42 +1008,13 @@ jobs:
 
       - name: 06_Check_Subnet_Existence
         if: inputs.phase == 'infra' && (env.runNetworkingVar != 'false' && env.BYO_subnets != 'true')
-        shell: bash
+        shell: pwsh
         run: |
-            set -e
-            az account set --subscription "${{ env.dev_test_prod_sub_id }}"
-
-            projectNumber="${{ env.project_number_000 }}"
-            vnetName="${{ env.vnetNameFull_resolved }}"
-            vnetRg="${{ env.vnetResourceGroup_resolved }}"
-
-            if [ -z "$vnetName" ]; then
-              vnetName="${{ env.vnetNameBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_commonResourceSuffix }}"
-            fi
-
-            if [ -z "$vnetRg" ]; then
-              vnetRg="${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}"
-            fi
-
-            check_subnet_exists() {
-              local subnet_name="$1"
-              local var_name="$2"
-
-              if az network vnet subnet show --name "$subnet_name" --vnet-name "$vnetName" --resource-group "$vnetRg" >/dev/null 2>&1; then
-                echo "${var_name}=true" >> $GITHUB_ENV
-              else
-                echo "${var_name}=false" >> $GITHUB_ENV
-              fi
-            }
-
-            check_subnet_exists "snt-prj${projectNumber}-genai" "sntGenaiExists"
-            check_subnet_exists "snt-prj${projectNumber}-aca" "sntAcaExists"
-            check_subnet_exists "snt-prj${projectNumber}-aca-002" "sntAca002Exists"
-            check_subnet_exists "snt-prj${projectNumber}-aks" "sntAksExists"
-            check_subnet_exists "snt-prj${projectNumber}-aks-002" "sntAks002Exists"
-            check_subnet_exists "snt-prj${projectNumber}-webapp" "sntWebappExists"
-            check_subnet_exists "snt-prj${projectNumber}-dbxpriv" "sntDatabricksPrivExists"
-            check_subnet_exists "snt-prj${projectNumber}-dbxpub" "sntDatabricksPubExists"
+            & "./azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/getProjectSubnetState.ps1" `
+              -SubscriptionId "${{ env.dev_test_prod_sub_id }}" `
+              -ResourceGroupName "${{ env.vnetResourceGroup_resolved }}" `
+              -VnetName "${{ env.vnetNameFull_resolved }}" `
+              -ProjectNumber "${{ env.project_number_000 }}" -Provider github
 
       - name: 07_Deploy_Subnet_IfNotExists
         if: inputs.phase == 'infra' && (env.runNetworkingVar != 'false' && env.BYO_subnets != 'true' && env.deleteAllServicesForProject != 'true')
@@ -1041,7 +1030,7 @@ jobs:
             az deployment group create \
               --name "esml-p${{ env.project_number_000 }}-${{ env.dev_test_prod }}-${{ env.admin_locationSuffix }}${{ env.admin_aifactorySuffixRG }}SubnetDeplProj" \
               --subscription "${{ env.dev_test_prod_sub_id }}" \
-              --resource-group "${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}" \
+              --resource-group "${{ env.vnetResourceGroup_resolved }}" \
               --template-file "${{ github.workspace }}/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-genai-1/31-network.bicep" \
               --parameters @"${{ github.workspace }}/aifactory/parameters/subnetParameters.json" \
               --parameters @"${{ github.workspace }}/aifactory/parameters/10-esml-globals-1.json" \
@@ -1055,7 +1044,7 @@ jobs:
               --parameters tags='${{ env.tags }}' \
               --parameters aifactorySuffixRG="${{ env.admin_aifactorySuffixRG }}" \
               --parameters commonRGNamePrefix="${{ env.admin_aifactoryPrefixRG }}" \
-              --parameters vnetResourceGroup="${{ env.admin_aifactoryPrefixRG }}${{ env.vnetResourceGroupBase }}-${{ env.admin_locationSuffix }}-${{ env.dev_test_prod }}${{ env.admin_aifactorySuffixRG }}" \
+              --parameters vnetResourceGroup="${{ env.vnetResourceGroup_resolved }}" \
               --parameters vnetResourceGroup_param="${{ env.vnetResourceGroup_resolved }}" \
               --parameters vnetNameFull_param="${{ env.vnetNameFull_resolved }}" \
               --parameters commonResourceGroup_param="${{ env.commonResourceGroup_param }}" \
@@ -1072,6 +1061,10 @@ jobs:
               --parameters sntAksExists="${{ env.sntAksExists }}" \
               --parameters sntAks002Exists="${{ env.sntAks002Exists }}" \
               --parameters sntWebappExists="${{ env.sntWebappExists }}" \
+              --parameters sntLogicappExists="${{ env.sntLogicappExists }}" \
+              --parameters enableLogicApps="${{ env.enableLogicApps }}" \
+              --parameters logicAppType="${{ env.logicAppType }}" \
+              --parameters enablePublicAccessWithPerimeter="${{ env.enablePublicAccessWithPerimeter }}" \
               --parameters subnetProjWebapp="${{ env.subnetProjWebapp }}" \
               --parameters sntDatabricksPrivExists="${{ env.sntDatabricksPrivExists }}" \
               --parameters sntDatabricksPubExists="${{ env.sntDatabricksPubExists }}" \
@@ -1171,7 +1164,11 @@ jobs:
             -enableDatabricks "${{ env.enableDatabricks }}" `
             -disableAgentNetworkInjection "${{ env.disableAgentNetworkInjection }}" `
             -enableWebApp "${{ env.enableWebApp }}" `
-            -enableFunction "${{ env.enableFunction }}"
+            -enableFunction "${{ env.enableFunction }}" `
+            -enableLogicApps "${{ env.enableLogicApps }}" `
+            -logicAppType "${{ env.logicAppType }}" `
+            -byoASEv3 "${{ env.byoASEv3 }}" `
+            -enablePublicAccessWithPerimeter "${{ env.enablePublicAccessWithPerimeter }}"
 
       - name: 15_Check_Private_DNS_Zones
         shell: bash
@@ -1268,7 +1265,7 @@ jobs:
             databricksName="dbw-${projectName}-${locationSuffix}-${envName}"
             redisName="redis${projectName}${locationSuffix}${envName}"
             cosmosDbAccountName="cosmos-${projectName}-${locationSuffix}-${envName}"
-            logicAppName="la-${projectName}-${locationSuffix}-${envName}"
+            logicAppName="lapp-${projectNumber}-${locationSuffix}-${envName}-"
             eventHubNsName="evhns-${projectName}-${locationSuffix}-${envName}"
             funcAppName="func-${projectName}-${locationSuffix}-${envName}"
             webAppResourceName="app-${projectName}-${locationSuffix}-${envName}"
@@ -1374,7 +1371,11 @@ jobs:
             set_env "databricksExists"       "$(resource_exists_fuzzy "$targetRG" "Microsoft.Databricks/workspaces" "$databricksName" "$suffixStandard")"
             set_env "redisExists"            "$(resource_exists_fuzzy "$targetRG" "Microsoft.Cache/Redis" "$redisName" "$suffixStandardNoDash")"
             set_env "cosmosDBExists"         "$(resource_exists_fuzzy "$targetRG" "Microsoft.DocumentDB/databaseAccounts" "$cosmosDbAccountName" "$suffixStandard")"
-            set_env "logicAppsExists"        "$(resource_exists_fuzzy "$targetRG" "Microsoft.Logic/workflows" "$logicAppName" "$suffixStandard")"
+            logicResourceType="Microsoft.Web/sites"
+            if [ "${{ env.logicAppType }}" = "Consumption" ]; then logicResourceType="Microsoft.Logic/workflows"; fi
+            logicMatches=$(az resource list --subscription "${{ env.dev_test_prod_sub_id }}" --resource-group "$targetRG" --resource-type "$logicResourceType" --query "[?starts_with(name, '$logicAppName') && ends_with(name, '$suffixStandard')].name" -o tsv --only-show-errors) || exit 1
+            if [[ "$logicMatches" == *$'\n'* ]]; then echo "Ambiguous existing Logic Apps; refusing to choose or redeploy."; exit 1; fi
+            if [ -n "$logicMatches" ]; then set_env "logicAppsExists" "true"; else set_env "logicAppsExists" "false"; fi
             set_env "eventHubsExists"        "$(resource_exists_fuzzy "$targetRG" "Microsoft.EventHub/namespaces" "$eventHubNsName" "$suffixStandard")"
             set_env "functionAppExists"      "$(resource_exists_fuzzy "$targetRG" "Microsoft.Web/sites" "$funcAppName" "$suffixStandard")"
             set_env "webAppExists"           "$(resource_exists_fuzzy "$targetRG" "Microsoft.Web/sites" "$webAppResourceName" "$suffixStandard")"
