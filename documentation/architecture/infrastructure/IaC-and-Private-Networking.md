@@ -78,7 +78,13 @@ The explicit `primary-capacity-exhausted` pending state is not readiness or
 provisioned success, and its context binds exact resource identity, primary region,
 environment, deployment, CI run/job, SKU policy and ordered fallback list across
 tasks. The regional command rejects missing/stale/mismatched state and any existing
-name binding. Absence is checked after capacity failure and again after the
+name binding. Main's JSON handoff retains resource IDs across Windows Git Bash
+environment conversion. The v1.24 raw resource-ID handoff requires a targeted
+`MSYS2_ENV_CONV_EXCL` entry in both provider task scripts before native Python;
+otherwise MSYS rewrites `/subscriptions/...` as a local filesystem path.
+Existing operator exclusions and all identity/fingerprint guards remain intact.
+Real Bash-to-native-Python transport tests cover this boundary, not only in-process
+environment dictionaries. Absence is checked after capacity failure and again after the
 retry delay; a partial binding blocks relocation without deletion (failed/canceled
 primary bindings can retain same-region SKU retries). Exact identity
 comes from the same output-only naming/context modules before a direct resource

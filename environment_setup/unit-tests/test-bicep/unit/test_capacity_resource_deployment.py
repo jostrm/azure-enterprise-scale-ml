@@ -1485,7 +1485,7 @@ def script_harness(workspace):
             self.executed, self.skipped, self.preparations = [], [], []
 
         def execute(self, service, provider, target="dev", succeed_at=3, error="SkuNotAvailable",
-                    overrides=None, remove=()):
+                    overrides=None, remove=(), allow_msys_conversion=False):
             env = environment(service, target)
             env.update(overrides or {})
             for key in remove:
@@ -1513,6 +1513,9 @@ def script_harness(workspace):
                     "GITHUB_ENV": str(workspace / "github-env"), "PYTHONIOENCODING": "utf-8",
                     "MSYS_NO_PATHCONV": "1",
                 })
+                if allow_msys_conversion:
+                    for key in ("MSYS_NO_PATHCONV", "MSYS2_ENV_CONV_EXCL", "MSYS2_ARG_CONV_EXCL"):
+                        child_env.pop(key, None)
                 for key, value in step.get("env", {}).items():
                     if key.startswith("${{"):
                         if f"'{service}'" in key:
@@ -1624,6 +1627,23 @@ def test_extracted_primary_denmark_italy_are_separate_ordered_phases(
     ]
     assert script_harness.sleep_values() == [240] * (primary_count * 2)
     assert all(p["env"]["value"] == target and p["location"]["value"] == "swedencentral" for p in creates)
+
+
+@pytest.mark.parametrize("provider", ["ado", "github"])
+def test_json_primary_context_survives_windows_bash_environment_conversion(script_harness, provider):
+    if os.name != "nt":
+        pytest.skip("Windows Git Bash required for environment-conversion regression")
+    final = script_harness.execute(
+        "ai-search", provider, allow_msys_conversion=True,
+        overrides={"aiSearchFallbackLocationArrayDev": '["denmarkeast","italynorth"]',
+                   "aisearchRetryCapcityArray": "false", "CAPACITY_TEST_SUCCEED_AT": "2"},
+    )
+    assert all(result.returncode == 0 for result in script_harness.results), [
+        result.stderr for result in script_harness.results]
+    context = json.loads(script_harness.published[0]["AIF_AISEARCH_PRIMARY_CONTEXT"])
+    assert context["resourceId"] == "/subscriptions/unit-subscription/resourcegroups/rg/providers/microsoft.search/searchservices/search"
+    assert final["aiSearchLocation"] == "denmarkeast"
+    assert script_harness.executed[-1].endswith("region-fallback")
 
 
 @pytest.mark.parametrize("provider", ["ado", "github"])
