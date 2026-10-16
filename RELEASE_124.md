@@ -161,6 +161,20 @@ This patch focuses on **simpler configuration**, **per-environment cost control 
   This is new-service provisioning recovery, not runtime failover, index
   migration or automatic target-side shared-link approval.
 
+## Compute shared-VNet deployment ordering
+
+Task `65-compute-services` now completes both optional subnet-delegation updates
+before Web App or Function VNet integration. Web App integration precedes Function
+integration when both are deployed, and Container Apps environment provisioning
+waits for both. This prevents sibling-subnet PUTs and service-association changes
+from overlapping inside the same compute deployment, including Function-only
+deployments where the dedicated Web App subnet skips runtime delegation.
+
+Existing/disabled services retain their conditions, and subnet IDs, delegations,
+private endpoints, DNS, RBAC and access settings are unchanged. No sleeps,
+automatic deletion or ignored deployment failures are introduced. Separate
+pipelines targeting the same VNet must still be coordinated externally.
+
 ## 🗑️ Project Delete Modes
 
 **Graduated, opt-in deletion — from a single service sweep to full teardown**

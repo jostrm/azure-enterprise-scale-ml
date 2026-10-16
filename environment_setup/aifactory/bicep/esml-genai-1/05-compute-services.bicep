@@ -849,6 +849,7 @@ module webapp '../modules/webapp.bicep' = if(!webAppExists && enableWebApp) {
   dependsOn: [
     existingTargetRG
     subnetDelegationServerFarm
+    subnetDelegationAca // Subnet PUTs can lock sibling subnets in the same VNet.
   ]
 }
 
@@ -932,6 +933,8 @@ module function '../modules/function.bicep' = if(!functionAppExists && enableFun
   dependsOn: [
     existingTargetRG
     subnetDelegationServerFarm
+    subnetDelegationAca
+    webapp // App Service integrations share the delegated subnet.
   ]
 }
 
@@ -999,7 +1002,10 @@ module containerAppsEnv '../modules/containerapps.bicep' = if(!containerAppsEnvE
   }
   dependsOn: [
     existingTargetRG
+    subnetDelegationServerFarm
     subnetDelegationAca
+    webapp
+    function // Finish App Service VNet integration before ACA mutates the VNet.
   ]
 }
 
