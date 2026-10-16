@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from sales_demo.dataset import generate
 from sales_demo.retrieval_experiment import (
     Experiment, build_documents, definitions, instructions, require_approval, verify_indexed_documents,
+    whole_table_documents,
 )
 
 
@@ -35,6 +36,7 @@ class RetrievalExperimentTests(unittest.TestCase):
             "partitions": deepcopy(self.publication["partitions"]),
             "project_prefix": "mlops/v1/projects/project001/environments/dev/usecases/car-sales/rag/corpora/car-sales/versions/v1",
             "storage_account": "demostorage", "container": "lake3",
+            "storage_resource_id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/demostorage",
             "search_endpoint": "https://demo.search.windows.net",
             "embedding_endpoint": "https://models.openai.azure.com",
             "embedding_deployment": "text-embedding-3-large",
@@ -151,14 +153,81 @@ class RetrievalExperimentTests(unittest.TestCase):
         config["retrieval_experiment"] = {
             "synthetic_project_corpus_approved": True, "authorization": "project-managed-identity"}
         session = Mock()
-        session.request.return_value = {"activity": [], "references": []}
         experiment = Experiment(config, session, object(), self.root / "probe-state")
+        session.request.return_value = {
+            "activity": [{"type": "searchIndex", "knowledgeSourceName": source["name"], "id": index}
+                         for index, source in enumerate(experiment.plan["sources"])],
+            "references": [{"docKey": "json", "activitySource": 0}, {"docKey": "excel", "activitySource": 1}],
+        }
         with patch.object(experiment, "verify"):
             experiment.retrieval_probe("Facts from JSON and Excel", allow_paid=True)
         body = session.request.call_args.args[2]
         self.assertEqual(len(body["knowledgeSourceParams"]), 2)
         self.assertTrue(all(source["alwaysQuerySource"] for source in body["knowledgeSourceParams"]))
         self.assertNotIn("headers", session.request.call_args.kwargs)
+
+    def test_both_source_activity_without_both_references_is_not_evidence(self):
+        config = self.config()
+        config["retrieval_experiment"] = {
+            "synthetic_project_corpus_approved": True, "authorization": "project-managed-identity"}
+        session = Mock()
+        experiment = Experiment(config, session, object(), self.root / "one-source-probe")
+        session.request.return_value = {
+            "activity": [{"type": "searchIndex", "knowledgeSourceName": source["name"], "id": index}
+                         for index, source in enumerate(experiment.plan["sources"])],
+            "references": [{"docKey": "json", "activitySource": 0}],
+        }
+        with patch.object(experiment, "verify"), self.assertRaises(RuntimeError):
+            experiment.retrieval_probe("question", allow_paid=True)
+
+    def test_native_whole_table_preserves_every_source_byte_and_needs_no_operator_upload(self):
+        config = self.config()
+        config["retrieval_experiment"] = {"ingestion": "native-whole-table"}
+        documents = whole_table_documents(config)
+        for part in config["partitions"]:
+            actual = documents[part["id"]][0]
+            expected = (Path(config["artifacts_root"]) / "master" / part["input_path"]).read_bytes()
+            self.assertEqual(actual["content"].encode(), expected)
+        plan = definitions(config, documents)
+        self.assertEqual(plan["ingestion"], "native-whole-table")
+        self.assertTrue(all(index["vectorSearch"]["vectorizers"] == [] for index in plan["indexes"]))
+        self.assertGreaterEqual(plan["base"]["retrieveDefaults"]["maxOutputSizeInTokens"], 30000)
+
+    def test_native_configuration_uses_two_scoped_indexers_and_never_pushes_documents(self):
+        config = self.config()
+        config["retrieval_experiment"] = {
+            "ingestion": "native-whole-table", "synthetic_project_corpus_approved": True,
+            "authorization": "project-managed-identity",
+        }
+        session = Mock()
+        session.request.return_value = {"lastResult": {"status": "success", "itemsFailed": 0}}
+        experiment = Experiment(config, session, object(), self.root / "native-config")
+        with patch.object(experiment, "_private"), patch.object(experiment, "_ensure") as ensure, \
+                patch.object(experiment, "_read_index",
+                             side_effect=[experiment.documents["json"], experiment.documents["excel"]]):
+            result = experiment.configure(apply=True, allow_paid=True)
+        indexers = [call.args[1] for call in ensure.call_args_list if call.args[0] == "indexers"]
+        sources = [call.args[1] for call in ensure.call_args_list if call.args[0] == "datasources"]
+        self.assertEqual(len(indexers), 2)
+        self.assertTrue(all("skillsetName" not in indexer for indexer in indexers))
+        self.assertTrue(all(indexer["parameters"]["configuration"]["executionEnvironment"] == "private"
+                            for indexer in indexers))
+        self.assertTrue(all(source["container"]["query"].startswith(config["project_prefix"] + "/ingestion/")
+                            for source in sources))
+        self.assertTrue(all(call.args[0] == "GET" for call in session.request.call_args_list))
+        self.assertEqual(result["whole_tables"], 2)
+        self.assertFalse(result["text_split"])
+        self.assertFalse(result["embeddings"])
+
+    def test_empty_retrieval_cannot_count_as_a_successful_probe(self):
+        config = self.config()
+        config["retrieval_experiment"] = {
+            "synthetic_project_corpus_approved": True, "authorization": "project-managed-identity"}
+        session = Mock()
+        session.request.return_value = {"activity": [], "references": []}
+        experiment = Experiment(config, session, object(), self.root / "empty-probe")
+        with patch.object(experiment, "verify"), self.assertRaises(RuntimeError):
+            experiment.retrieval_probe("question", allow_paid=True)
 
     def test_failed_embedding_is_not_cached(self):
         config = self.config()

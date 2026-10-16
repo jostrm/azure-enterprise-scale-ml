@@ -26,6 +26,8 @@ def instructions():
         "You are a retrieval-only experiment over synthetic car sales in two sources: JSON and Excel. "
         "Use knowledge_base_retrieve for questions about the data. The knowledge base can retrieve "
         "from both indexes in one call; use additional queries when useful and cite the returned sources. "
+        "Start with one concise query variant; one variant already searches both sources. "
+        "If the tool returns empty evidence, say that no data was returned and do not invent car models or values. "
         "There is no calculator, Python execution or SQL tool. When asked to calculate, try to reason "
         "from the retrieved rows yourself. Monetary fields are integer USD cents: net pretax sales "
         "are quantity times unit_price_minor minus discount_minor minus refund_minor; cancelled rows "
@@ -96,10 +98,33 @@ def build_documents(config):
     return result
 
 
+def whole_table_documents(config):
+    """One intact source per index; native indexing avoids any operator data-write grant."""
+    result = {}
+    for partition in config["partitions"]:
+        raw = local_file(Path(config["artifacts_root"]) / "master", partition["input_path"]).read_bytes()
+        if digest(raw) != partition["input_sha256"]:
+            raise ValueError("Whole synthetic input differs from its approved source hash.")
+        result[partition["id"]] = [{
+            "id": partition["id"], "title": partition["input_path"].rsplit("/", 1)[-1],
+            "content": raw.decode("utf-8"), "source": partition["id"],
+            "dataset": config["dataset"], "version": config["version"],
+            "ordinal": None, "input_tokens": None,
+            "source_uri": (
+                f"https://{config['storage_account']}.blob.core.windows.net/{config['container']}/"
+                + config["project_prefix"] + "/" + partition["input_path"]
+            ),
+            "content_sha256": partition["input_sha256"],
+        }]
+    return result
+
+
 def definitions(config, documents):
+    native = config.get("retrieval_experiment", {}).get("ingestion") == "native-whole-table"
     namespace = scoped_name(config["owner"], config["version"], "experiment", "rag")
     binding = digest(json.dumps({
-        "mode": "synthetic-project-retrieval-only-v1", "namespace": namespace,
+        "mode": "synthetic-project-whole-table-v1" if native else "synthetic-project-retrieval-only-v1",
+        "namespace": namespace,
         "search": config["search_endpoint"], "embedding": config["embedding_endpoint"],
         "deployment": config["embedding_deployment"],
         "documents": documents,
@@ -114,10 +139,8 @@ def definitions(config, documents):
             *[_field(key, filterable=True) for key in ("source", "dataset", "version", "source_uri", "content_sha256")],
             _field("ordinal", "Edm.Int32", filterable=True, sortable=True),
             _field("input_tokens", "Edm.Int32"),
-            _field("content_vector", "Collection(Edm.Single)", searchable=True, retrievable=False,
-                   stored=False, dimensions=3072, vectorSearchProfile="vp"),
         ]
-        indexes.append({
+        index = {
             "name": name, "description": marker, "permissionFilterOption": "disabled",
             "fields": fields, "similarity": {"@odata.type": "#Microsoft.Azure.Search.BM25Similarity"},
             "semantic": {"configurations": [{
@@ -126,35 +149,42 @@ def definitions(config, documents):
                                      "prioritizedContentFields": [{"fieldName": "content"}],
                                      "prioritizedKeywordsFields": []},
             }]},
-            "vectorSearch": {
-                "algorithms": [{"name": "hnsw", "kind": "hnsw", "hnswParameters": {
-                    "metric": "cosine", "m": 4, "efConstruction": 400, "efSearch": 500}}],
-                "profiles": [{"name": "vp", "algorithm": "hnsw", "vectorizer": "aoai"}],
-                "vectorizers": [{"name": "aoai", "kind": "azureOpenAI", "azureOpenAIParameters": {
+        }
+        fields.append(_field("content_vector", "Collection(Edm.Single)", searchable=True, retrievable=False,
+                             stored=False, dimensions=3072, vectorSearchProfile="vp"))
+        index["vectorSearch"] = {
+            "algorithms": [{"name": "hnsw", "kind": "hnsw", "hnswParameters": {
+                "metric": "cosine", "m": 4, "efConstruction": 400, "efSearch": 500}}],
+            "profiles": [{"name": "vp", "algorithm": "hnsw", **({} if native else {"vectorizer": "aoai"})}],
+            "vectorizers": [] if native else [{
+                "name": "aoai", "kind": "azureOpenAI", "azureOpenAIParameters": {
                     "resourceUri": config["embedding_endpoint"], "deploymentId": config["embedding_deployment"],
                     "modelName": "text-embedding-3-large",
                 }}],
-            },
-        })
+        }
+        indexes.append(index)
         sources.append({
             "name": name + "-source", "description": marker, "kind": "searchIndex",
             "searchIndexParameters": {
                 "searchIndexName": name, "semanticConfigurationName": "sem",
                 "searchFields": [{"name": "content"}, {"name": "title"}],
-                "sourceDataFields": [{"name": field} for field in FIELDS],
+                # The semantic content is already in grounding; do not repeat it in each citation payload.
+                "sourceDataFields": [{"name": field} for field in
+                                     ("id", "source", "dataset", "version", "source_uri", "content_sha256")],
             },
         })
     base = {
         "name": namespace, "description": marker,
         "knowledgeSources": [{"name": source["name"]} for source in sources],
         "outputMode": "extractiveData", "retrievalReasoningEffort": {"kind": "minimal"},
+        "retrieveDefaults": {"maxOutputSizeInTokens": 40000, "maxOutputDocuments": 6},
     }
     return {
         "binding": binding, "indexes": indexes, "sources": sources, "base": base,
         "agent_name": namespace + "-agent", "connection_name": namespace + "-mcp",
         "mcp_endpoint": config["search_endpoint"] + "/knowledgebases/" + namespace + "/mcp?api-version=" + API_VERSION,
         "authorization": "synthetic-project-corpus-not-personal-file-acls",
-        "calculator": False, "text_split": False,
+        "calculator": False, "text_split": False, "ingestion": "native-whole-table" if native else "row-aware-push",
     }
 
 
@@ -176,7 +206,8 @@ class Experiment:
     def __init__(self, config, session, target, state_dir):
         self.config, self.session, self.target = config, session, target
         self.state_dir = Path(state_dir)
-        self.documents = build_documents(config)
+        self.documents = (whole_table_documents(config) if config.get("retrieval_experiment", {}).get("ingestion")
+                          == "native-whole-table" else build_documents(config))
         self.plan = definitions(config, self.documents)
 
     def _url(self, collection, name):
@@ -231,6 +262,8 @@ class Experiment:
             raise ValueError("Experiment setup requires --apply and --allow-paid.")
         require_approval(self.config)
         self._private()
+        if self.plan["ingestion"] == "native-whole-table":
+            return self._configure_whole_tables()
         for index, source in zip(self.plan["indexes"], ("json", "excel")):
             self._ensure("indexes", index)
             expected = self.documents[source]
@@ -264,6 +297,55 @@ class Experiment:
         return {"state": "configured", "knowledge_base": self.plan["base"]["name"],
                 "index_names": [x["name"] for x in self.plan["indexes"]], "calculator": False}
 
+    def _configure_whole_tables(self):
+        """Use the Search managed identity's existing exact-file read access."""
+        for index, partition in zip(self.plan["indexes"], ("json", "excel")):
+            self._ensure("indexes", index)
+            selected = next(p for p in self.config["partitions"] if p["id"] == partition)
+            directory = self.config["project_prefix"] + "/" + selected["input_path"].rsplit("/", 1)[0] + "/"
+            source = {
+                "name": index["name"] + "-blob", "description": index["description"], "type": "azureblob",
+                "credentials": {"connectionString": "ResourceId=" + self.config["storage_resource_id"] + ";"},
+                "container": {"name": self.config["container"], "query": directory},
+            }
+            indexer = {
+                "name": index["name"] + "-indexer", "description": index["description"],
+                "dataSourceName": source["name"], "targetIndexName": index["name"],
+                "parameters": {"maxFailedItems": 0, "maxFailedItemsPerBatch": 0, "configuration": {
+                    "parsingMode": "text", "dataToExtract": "contentAndMetadata", "executionEnvironment": "private",
+                    "indexedFileNameExtensions": "." + selected["input_path"].rsplit(".", 1)[-1],
+                }},
+                "fieldMappings": [
+                    {"sourceFieldName": origin, "targetFieldName": target}
+                    for origin, target in (("source", "id"), ("metadata_storage_name", "title"),
+                                           ("content", "content"), ("source", "source"), ("dataset", "dataset"),
+                                           ("version", "version"), ("metadata_storage_path", "source_uri"),
+                                           ("input_sha256", "content_sha256"))
+                ],
+            }
+            self._ensure("datasources", source)
+            self._ensure("indexers", indexer)
+            for attempt in range(60):
+                status = self.session.request("GET", self._url("indexers", indexer["name"] + "/status"),
+                                              audience=SEARCH_AUDIENCE)
+                last = status.get("lastResult") or {}
+                if last.get("status") == "success":
+                    if last.get("errors") or last.get("warnings") or last.get("itemsFailed"):
+                        raise RuntimeError("Whole-table indexing returned errors or warnings.")
+                    break
+                if last.get("status") not in (None, "inProgress"):
+                    raise RuntimeError("Whole-table indexing failed: " + str(last.get("errorMessage") or last["status"]))
+                if attempt == 59:
+                    raise TimeoutError("Whole-table indexer did not finish within the wait budget.")
+                time.sleep(5)
+            verify_indexed_documents(self.documents[partition], self._read_index(index["name"]))
+        for source in self.plan["sources"]:
+            self._ensure("knowledgesources", source)
+        self._ensure("knowledgebases", self.plan["base"])
+        return {"state": "configured", "knowledge_base": self.plan["base"]["name"],
+                "indexes": [item["name"] for item in self.plan["indexes"]],
+                "whole_tables": 2, "calculator": False, "text_split": False, "embeddings": False}
+
     def retrieval_probe(self, query, *, allow_paid=False):
         if not allow_paid:
             raise ValueError("Retrieval may use query embeddings and requires --allow-paid.")
@@ -274,6 +356,7 @@ class Experiment:
             {
                 "intents": [{"type": "semantic", "search": query}],
                 "includeActivity": True,
+                "maxOutputSize": 40000, "maxOutputDocuments": 6,
                 "knowledgeSourceParams": [
                     {"knowledgeSourceName": source["name"], "kind": "searchIndex",
                      "alwaysQuerySource": True, "includeReferences": True}
@@ -283,6 +366,16 @@ class Experiment:
         )
         if response.get("error") or any(item.get("error") for item in response.get("activity", [])):
             raise RuntimeError("Multi-index retrieval returned a service error.")
+        sources = {item.get("knowledgeSourceName") for item in response.get("activity", [])
+                   if item.get("type") == "searchIndex"}
+        if (sources != {item["name"] for item in self.plan["sources"]}
+                or not response.get("references")):
+            raise RuntimeError("The retrieval probe did not return evidence from its configured multi-index search.")
+        activities = {item["id"]: item.get("knowledgeSourceName") for item in response.get("activity", [])
+                      if item.get("type") == "searchIndex" and "id" in item}
+        referenced_sources = {activities.get(item.get("activitySource")) for item in response["references"]}
+        if referenced_sources != {item["name"] for item in self.plan["sources"]}:
+            raise RuntimeError("Retrieval did not return references from both configured source indexes.")
         return response
 
     def verify(self):
@@ -294,7 +387,8 @@ class Experiment:
             check_resource(self.session, self._url("knowledgesources", source["name"]), source)
         check_resource(self.session, self._url("knowledgebases", self.plan["base"]["name"]), self.plan["base"])
         return {"state": "source-copy-verified", "sources": ["json", "excel"],
-                "whole_row_chunks": 6, "calculator": False, "per_user_acl_test": False}
+                "indexed_documents": sum(len(values) for values in self.documents.values()),
+                "calculator": False, "per_user_acl_test": False}
 
     def project_role(self, *, apply=False):
         require_approval(self.config)
@@ -357,7 +451,8 @@ class Experiment:
         }
         spec = {
             "name": self.plan["agent_name"], "grounding": True, "framework": "prompt",
-            "model": self.config["model_deployment"], "instructions": instructions(),
+            "model": self.config.get("retrieval_experiment", {}).get("model_deployment")
+                     or self.config["model_deployment"], "instructions": instructions(),
             "description": "Synthetic two-index retrieval experiment; no calculator or exact-total guarantee.",
             "metadata": {**metadata("prompt", role="knowledge"), "aif48.experiment": self.plan["binding"],
                          "aifactory.solution_id": "synthetic-multi-index-llm-experiment"},
@@ -372,6 +467,7 @@ class Experiment:
                 raise ValueError("Existing agent belongs to a different experiment binding.")
             result = deploy_prompt(project, self.target, spec, tool)
         return {**result, "binding": self.plan["binding"], "knowledge_base": self.plan["base"]["name"],
+                "model_deployment": spec["model"],
                 "authorization": self.plan["authorization"], "calculator": False}
 
     def ask(self, deployment, question, *, allow_paid=False):
@@ -389,14 +485,15 @@ class Experiment:
                 raise ValueError("Persisted agent changed experiment identity.")
             with project.get_openai_client(max_retries=0, timeout=180) as client:
                 response = client.responses.create(
-                    input=question, store=False,
+                    input=question, store=False, max_output_tokens=4096,
                     extra_body={"agent_reference": {"type": "agent_reference",
                                                    "name": deployment["name"], "version": deployment["version"]}},
                 )
         calls = [item.model_dump(mode="json", exclude_none=True) for item in response.output if item.type == "mcp_call"]
         if (response.status != "completed" or not response.output_text
                 or not any(call.get("name") == "knowledge_base_retrieve" for call in calls)
-                or any(call.get("error") for call in calls)):
+                or any(call.get("error") for call in calls)
+                or not any(str(call.get("output", "")).strip() for call in calls)):
             raise RuntimeError("Agent did not return a completed answer with successful native retrieval.")
         return {"agent": deployment["name"], "version": deployment["version"], "response_id": response.id,
                 "text": response.output_text, "retrieval_calls": calls,

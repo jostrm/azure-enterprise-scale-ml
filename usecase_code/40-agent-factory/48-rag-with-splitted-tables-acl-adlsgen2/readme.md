@@ -22,13 +22,20 @@ sources. There is no calculator, Code Interpreter, custom function executor or
 Container App in this path. The LLM's arithmetic is not replaced or corrected
 by an oracle.
 
-To avoid the observed Text Split gaps, complete source rows are packed into
-three valid JSON documents per partition **before indexing**, preserving all
-business IDs. Each document is token-measured below 6,000 and directly embedded
-with `text-embedding-3-large`. No Text Split skill runs. This changes the original
-automatic-splitting demonstration; the protected pipeline and its failure
-evidence remain untouched. Retrieval still may select only relevant passages;
-complete indexed coverage does not make every model answer exhaustive.
+The deployed low-permission path is `native-whole-table`: ordinary native Blob
+indexers ingest the two already-approved immutable source files into **separate
+indexes**, one complete JSON table and one complete Excel-derived text table.
+It requires neither operator document-upload rights nor new Storage permissions.
+No Text Split skill, embedding skill or calculator runs. Keyword search plus
+semantic ranking supplies the evidence. The unused vector field is retained for
+schema compatibility, but has no populated vectors or query-time vectorizer.
+
+A row-aware push variant remains available for operators with independently
+approved data-write permissions: it packs complete rows into three valid JSON
+documents per partition and embeds each below 6,000 tokens. The CLI does not
+grant itself contributor access if a push fails. Both variants leave the
+protected pipeline and its failure evidence untouched. Complete indexed coverage
+does not guarantee that every retrieval or model answer is exhaustive.
 
 **Important authorization difference:** native Search document authorization
 needs the separate user-token header; automatic forwarding of that header from
@@ -45,7 +52,9 @@ The explicit consumer setting required before cloud changes is:
 ```json
 "retrieval_experiment": {
   "synthetic_project_corpus_approved": true,
-  "authorization": "project-managed-identity"
+  "authorization": "project-managed-identity",
+  "ingestion": "native-whole-table",
+  "model_deployment": "<existing model deployment with enough token-rate capacity>"
 }
 ```
 
@@ -55,6 +64,13 @@ project MI receives Search Index Data Reader on the selected demo service;
 neither personal bearer tokens nor API keys are stored in agent definitions.
 Existing service-level readers retain their current access. No additional
 Storage access is needed for the agent.
+The knowledge base stores a 40,000-token, six-document retrieval budget so the
+whole tables fit. Its MCP response can repeat table content in citation
+payloads; account for the **actual tool response size** when selecting an
+existing model deployment. This demo's existing `gpt-5.1` deployment had only
+30,000 TPM, so the experiment uses the separately configured existing
+`aifactory-agent-gpt-6-1-sol` deployment (200,000 TPM) without changing either
+model's capacity or the primary Factory Agent. Rate limits can still apply.
 
 ```powershell
 & $Python retrieval_only.py plan --config $Config --output "$State\retrieval-only-plan.json"
@@ -74,6 +90,12 @@ Playground until those server-executed calls succeed. This path deliberately
 does not enforce the calculator's numeric-answer gate or claim an exact total.
 It is separate from the Graph delta/security extension; no live protected-source
 content is silently copied into project-readable indexes.
+Observed live outcome: both indexes contain exact full-source copies; a native
+Foundry agent call returned actual model names from both sources and cited them,
+without a calculator. On the exact sum prompt, the model retrieved twice and
+declined to assert a complete total, saying retrieval was truncated. That answer
+is retained as experimental model behavior, not replaced by a deterministic
+calculation or claimed as numeric success.
 
 ## Architecture and boundaries
 
