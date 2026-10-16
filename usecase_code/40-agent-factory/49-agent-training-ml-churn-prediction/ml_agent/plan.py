@@ -101,7 +101,8 @@ def build_plan(config: dict, *, now: datetime | None = None, fresh: bool = False
             f"Azure ML data assets, component and retraining job for {model_name(AIR)} on {entries[AIR]['compute']}; "
             "registration only if the selection policy promotes the candidate.",
             "Create-only gold inference inputs and one GOLD_INFERENCE pipeline job per use case.",
-            "One owned Foundry prompt-agent version and paid model responses for the conversations.",
+            "Paid model responses for the conversations (the CLI also creates one owned Foundry prompt-agent "
+            "version; the hosted agent mirrors its receipts below the M49 use case's agent-state folder).",
         ],
         "never": ["role assignments", "networking, private endpoints or DNS", "Search", "SKUs or tiers",
                   "model deployments", "compute creation or deletion", "endpoint creation",

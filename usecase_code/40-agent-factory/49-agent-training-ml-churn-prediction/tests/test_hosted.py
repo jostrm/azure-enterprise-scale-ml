@@ -34,17 +34,24 @@ def conflict(message: str):
 
 
 class LakeContainer:
-    """In-memory ContainerClient: ETags, conditional/create-only uploads, deletes and expiring leases."""
+    """In-memory ADLS Gen2 (hierarchical namespace) container: ETags, conditional/create-only uploads,
+    directory entries listed as blobs, deletes and expiring leases."""
 
     def __init__(self):
         self.blobs: dict[str, bytes] = {}
         self.etags: dict[str, str] = {}
+        self.folders: set[str] = set()
         self.leases: dict[str, tuple[str, datetime]] = {}
         self.fail_uploads: set[str] = set()
 
-    def list_blobs(self, name_starts_with=""):
-        return [SimpleNamespace(name=name, etag=self.etags[name]) for name in sorted(self.blobs)
-                if name.startswith(name_starts_with)]
+    def list_blobs(self, name_starts_with="", include=None):
+        metadata = include is not None and "metadata" in include
+        files = [SimpleNamespace(name=name, etag=self.etags[name], metadata={} if metadata else None)
+                 for name in self.blobs]
+        folders = [SimpleNamespace(name=name, etag='"folder"', metadata={"hdi_isfolder": "true"} if metadata else None)
+                   for name in self.folders]
+        return sorted((item for item in files + folders if item.name.startswith(name_starts_with)),
+                      key=lambda item: item.name)
 
     def upload_blob(self, name, data, overwrite=False, etag=None, match_condition=None):
         from azure.core.exceptions import ResourceExistsError, ResourceModifiedError
@@ -58,6 +65,8 @@ class LakeContainer:
         payload = data.read() if hasattr(data, "read") else data
         self.blobs[name] = payload.encode("utf-8") if isinstance(payload, str) else payload
         self.etags[name] = f'"0x{uuid.uuid4().hex[:12].upper()}"'
+        parts = name.split("/")
+        self.folders.update("/".join(parts[:index]) for index in range(1, len(parts)))
         return {"etag": self.etags[name]}
 
     def download_blob(self, name):

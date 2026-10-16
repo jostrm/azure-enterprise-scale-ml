@@ -181,10 +181,12 @@ class BlobState:
         changed, remote = 0, {}
         for name, root in self.roots.items():
             base = f"{self.prefix}{name}/"
-            for blob in self.container.list_blobs(name_starts_with=base):
+            for blob in self.container.list_blobs(name_starts_with=base, include=["metadata"]):
                 relative = blob.name[len(base):]
                 if not relative or _skipped(relative) or any(part in ("", ".", "..") for part in relative.split("/")):
                     continue
+                if (getattr(blob, "metadata", None) or {}).get("hdi_isfolder") == "true" or (root / relative).is_dir():
+                    continue  # a hierarchical-namespace (ADLS Gen2) directory entry, not a receipt
                 key, etag = f"{name}/{relative}", getattr(blob, "etag", None)
                 pending = self.dirty.get(key)
                 if pending is not None and _etag(pending.get("base")) == _etag(etag):
