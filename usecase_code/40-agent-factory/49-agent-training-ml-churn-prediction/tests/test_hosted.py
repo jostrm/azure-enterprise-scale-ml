@@ -162,6 +162,7 @@ class HostedTests(unittest.TestCase):
         self.waits: dict[str, int] = {}
         self.submitted: list[str] = []
         self.registered: list[str] = []
+        self.job_status = "Running"
 
     # ---- fakes ------------------------------------------------------------------------------
     def project_factory(self, config):
@@ -195,7 +196,7 @@ class HostedTests(unittest.TestCase):
             project.wait_for_completion = MagicMock(side_effect=wait)
             project.register_outputs = MagicMock(return_value=[])
             project.register_model = MagicMock(side_effect=register)
-            project._backend = MagicMock(return_value=SimpleNamespace(get_job=lambda job: {"status": "Running"}))
+            project._backend = MagicMock(return_value=SimpleNamespace(get_job=lambda job: {"status": self.job_status}))
             return project
 
         return build
@@ -447,10 +448,15 @@ class HostedTests(unittest.TestCase):
                              ("running", f"inference-job-{CHURN}"))
 
             agent = self.session(self.root / "home-4", model)
-            model.steps = [[("run_batch_inference", {"usecase": CHURN})], [("get_usecase_status", {"usecase": CHURN})],
+            self.job_status = "Completed"
+            model.steps = [[("get_predictions_summary", {"usecase": CHURN})],
+                           [("run_batch_inference", {"usecase": CHURN})], [("get_usecase_status", {"usecase": CHURN})],
                            "Done."]
             agent.turn("Check the scoring", user="alice")
-            scored, status = model.tool_results()
+            unfinished, scored, status = model.tool_results()
+        self.assertIn(f"inference-job-{CHURN}", unfinished["error"])
+        self.assertIn("Completed", unfinished["error"])
+        self.assertIn("call run_batch_inference", unfinished["error"])
         self.assertEqual(scored["result"]["scored"], 50)
         self.assertEqual(scored["result"]["predicted_churn"], 25)
         self.assertEqual(status["result"]["training"]["state"], "registered")

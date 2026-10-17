@@ -200,6 +200,13 @@ class MLRuntime:
         summary = (lake.load_record(self.location, f"{name}-{latest['inference_run_id']}-summary.json")
                    if latest and latest.get("inference_run_id") else None)
         if summary is None:
+            pending = esml.pending_inference(self.location.esml(name), entry) if self.hosted else None
+            live = self._live_job(name, {"pending_inference": pending}) if pending else {}
+            if live.get("next_action"):
+                # A finished Azure ML job is only read back by run_batch_inference; say so instead of "none".
+                raise ValueError(f"Scoring job {live['azure_ml_job']['name']} for {name} has Azure ML status "
+                                 f"{live['azure_ml_job']['status']} and its predictions are not read yet; "
+                                 f"{live['next_action']}.")
             raise ValueError(f"No completed inference for {name} in the approved plan")
         return self._record("predictions_summary", name, summary)
 
