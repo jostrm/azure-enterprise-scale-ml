@@ -159,6 +159,16 @@ Disabled, Consumption, ASE and perimeter cases allocate nothing. Simple Mode
 disables Logic Apps and retains its existing capacity profile. These are
 offline-tested source contracts, not evidence of a successful live deployment.
 
+Existing-app detection and outbound routing (main source, 2026-10-17): ADO/GHA
+detect an existing Logic App by its deployed `lapp-<projectNumber>-<location>-<env>-`
+name, resource suffix and hosting type, and fail on denied or ambiguous listings,
+so a healthy app is skipped instead of being redeployed onto the new subnet. The
+WS1 plan is created only for Standard. VNet-integrated apps set
+`outboundVnetRouting.allTraffic` and `vnetRouteAllEnabled`, because default routing
+sends only RFC1918 traffic into the VNet and would bypass private endpoints in
+other private ranges such as `100.64.0.0/10`. Internet-bound connector traffic then
+uses the VNet's egress. These are offline-tested source contracts.
+
 Compute deployment ordering (2026-10-16): both optional subnet-delegation modules
 finish before Web App/Function integration. Function also depends on Web App,
 and the batch Container Apps module (v1.24: environment module) waits for both.

@@ -436,6 +436,7 @@ def arm_value(expression, parameters, template):
             "AND": lambda *args: all(args), "OR": lambda *args: any(args), "NOT": lambda value: not value,
             "empty": lambda value: not value, "equals": lambda a, b: a == b,
             "createObject": lambda *args: dict(zip(args[::2], args[1::2])),
+            "true": lambda: True, "false": lambda: False, "null": lambda: None,
         }
         return functions[name](*values)
 
@@ -457,6 +458,23 @@ def test_actual_compiled_outbound_value_and_missing_id_fail_closed(flags, expect
     else:
         with pytest.raises(ValueError, match="requires logicappSubnetId"):
             arm_value(expression, parameters, template)
+
+
+@pytest.mark.parametrize("flags,integrated", [
+    ({}, True), ({"byoASEv3": True}, False), ({"enablePublicAccessWithPerimeter": True}, False),
+])
+def test_compiled_logic_app_routes_all_outbound_traffic_through_vnet(flags, integrated):
+    # RFC1918-only routing would bypass private endpoints in ranges such as 100.64.0.0/10.
+    template = compile_entry("11-integration.bicep")
+    params = template["resources"]["logicAppStandard"]["properties"]["parameters"]
+    values = {"byoASEv3": False, "enablePublicAccessWithPerimeter": False, **flags}
+    routing = arm_value(params["outboundVnetRouting"], values, template)["value"]
+    web = next(config for config in params["configs"]["value"] if config["name"] == "web")["properties"]
+    assert arm_value(web["vnetRouteAllEnabled"], values, template) is integrated
+    if integrated:
+        assert routing == {"allTraffic": True, "applicationTraffic": True, "contentShareTraffic": True}
+    else:
+        assert routing is None
 
 
 @pytest.mark.parametrize("flags", [
