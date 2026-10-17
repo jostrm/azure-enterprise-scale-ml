@@ -534,11 +534,62 @@ def test_source_must_be_clean_exact_published_vendor_commit(workspace, defect, c
             return "https://example.com/repo" if defect == "origin" else fl.SOURCE_ORIGIN
         if argv[1] == "ls-remote":
             return ("b" if defect == "unpublished" else "a") * 40 + "\trefs/tags/v1.25.0"
+        if "fetch" in argv:
+            return ""
+        if argv[1] == "merge-base":
+            return "c" * 40
         raise AssertionError(argv)
 
     cloud.command = command
     with pytest.raises(fl.Blocked, match=code):
         fl.verify_source(cloud, workspace, manifest()["source"])
+
+
+@pytest.mark.parametrize("listing,merge_base,published", [
+    ("tip", None, True),             # the published ref still points at the reviewed commit
+    ("moved", "a", True),            # later pushes: the reviewed commit is an ancestor of the tip
+    ("annotated", "a", True),        # annotated tag: ancestry uses the peeled commit
+    ("moved", "c", False),           # rewritten history: the reviewed commit is gone
+    ("moved", "unrelated", False),   # merge-base fails: unrelated or missing history
+    ("missing", None, False),        # the published ref itself is gone
+])
+def test_reviewed_commit_stays_published_while_the_published_ref_contains_it(workspace, listing, merge_base, published):
+    commit, ref = manifest()["source"]["commit"], manifest()["source"]["ref"]
+    commands = []
+
+    def command(argv, cwd=None):
+        commands.append(argv[1:])
+        if argv[1:] == ["rev-parse", "--show-toplevel"]:
+            return str(workspace)
+        if argv[1:] == ["rev-parse", "HEAD"]:
+            return commit
+        if argv[1] == "status":
+            return ""
+        if argv[1] == "remote":
+            return fl.SOURCE_ORIGIN
+        if argv[1] == "ls-remote":
+            return {"tip": commit + "\t" + ref, "moved": "b" * 40 + "\t" + ref, "missing": "b" * 40 + "\trefs/tags/other",
+                    "annotated": "d" * 40 + "\t" + ref + "\n" + "b" * 40 + "\t" + ref + "^{}"}[listing]
+        if "fetch" in argv:
+            assert argv[1:] == ["-c", "core.hooksPath=" + fl.os.devnull, "-c", "maintenance.auto=false", "-c", "gc.auto=0",
+                                "fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--refmap=", "origin", ref]
+            return ""
+        if argv[1] == "merge-base":
+            assert argv[2:] == [commit, "b" * 40]
+            if merge_base == "unrelated":
+                raise fl.Blocked("command-failed")
+            return merge_base * 40
+        if argv[1] == "show":
+            return Path(fl.__file__).read_text(encoding="utf-8").strip()
+        raise AssertionError(argv)
+
+    cloud = SimpleNamespace(command=command, document={})
+    if published:
+        assert fl.verify_source(cloud, workspace, manifest()["source"]) == workspace
+    else:
+        with pytest.raises(fl.Blocked, match="version-no-longer-published-at-reviewed-commit"):
+            fl.verify_source(cloud, workspace, manifest()["source"])
+    assert any("fetch" in argv for argv in commands) == (listing in ("moved", "annotated"))
 
 
 def test_tokens_are_bound_to_expected_object_not_only_subscription(monkeypatch):

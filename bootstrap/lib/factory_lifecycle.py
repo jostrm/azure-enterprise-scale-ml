@@ -2313,8 +2313,20 @@ def _verify_source(cloud, root, source, *, published):
             fields = line.split()
             require(len(fields) == 2, "invalid-published-version-response")
             refs[fields[1]] = fields[0]
-        require(refs.get(source["ref"] + "^{}", refs.get(source["ref"])) == source["commit"],
-                "version-no-longer-published-at-reviewed-commit")
+        tip = refs.get(source["ref"] + "^{}", refs.get(source["ref"]))
+        if tip != source["commit"]:
+            # The reviewed commit stays published while the published ref still contains it,
+            # so later pushes to the branch do not strand a factory bound to that commit.
+            require(tip is not None, "version-no-longer-published-at-reviewed-commit")
+            # Objects only: no hooks, maintenance, FETCH_HEAD or remote-tracking ref updates.
+            cloud.command(["git", "-c", "core.hooksPath=" + os.devnull, "-c", "maintenance.auto=false", "-c", "gc.auto=0",
+                           "fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "--refmap=", "origin", source["ref"]],
+                          cwd=str(root))
+            try:
+                base = cloud.command(["git", "merge-base", source["commit"], tip], cwd=str(root))
+            except Blocked:
+                base = None
+            require(base == source["commit"], "version-no-longer-published-at-reviewed-commit")
     published_helper = cloud.command(["git", "show", source["commit"] + ":bootstrap/lib/factory_lifecycle.py"], cwd=str(root))
     require(published_helper == Path(__file__).read_text(encoding="utf-8").strip(),
             "published-lifecycle-adapter-mismatch")
