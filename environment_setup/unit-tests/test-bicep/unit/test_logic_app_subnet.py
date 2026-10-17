@@ -1,5 +1,6 @@
 """Offline dedicated Logic Apps subnet contracts: real PowerShell, Bicep and CI sources."""
 
+import ast
 import copy
 import ipaddress
 import json
@@ -305,6 +306,77 @@ def test_compiled_site_uses_logic_id_not_aks_and_keeps_genai_inbound(tmp_path):
     assert "genaiSubnetName" in json.dumps(parameters["privateEndpoints"])
     assert "logicAppsExists" in site["condition"]
     assert "subnetDelegationServerFarm" not in source.read_text(encoding="utf-8")
+
+
+def arm_value(expression, parameters, template):
+    if not isinstance(expression, str) or not expression.startswith("["):
+        return expression
+    source = re.sub(r"\b(and|or|not|if)\(", lambda match: match[1].upper() + "(", expression[1:-1])
+
+    def visit(node):
+        if isinstance(node, ast.Constant):
+            return node.value
+        assert isinstance(node, ast.Call) and not node.keywords
+        if isinstance(node.func, ast.Attribute):
+            member = next(group for group in template["functions"] if group["namespace"] == node.func.value.id)["members"][node.func.attr]
+            args = {key["name"]: visit(value) for key, value in zip(member["parameters"], node.args)}
+            return arm_value(member["output"]["value"], args, template)
+        name = node.func.id
+        if name == "IF":
+            return visit(node.args[1] if visit(node.args[0]) else node.args[2])
+        values = [visit(arg) for arg in node.args]
+        if name == "fail":
+            raise ValueError(values[0])
+        functions = {
+            "parameters": parameters.__getitem__,
+            "variables": lambda key: arm_value(template["variables"][key], parameters, template),
+            "AND": lambda *args: all(args), "OR": lambda *args: any(args), "NOT": lambda value: not value,
+            "empty": lambda value: not value, "equals": lambda a, b: a == b,
+            "createObject": lambda *args: dict(zip(args[::2], args[1::2])),
+            "true": lambda: True, "false": lambda: False, "null": lambda: None,
+        }
+        return functions[name](*values)
+
+    return visit(ast.parse(source, mode="eval").body)
+
+
+def compiled_logic_site(tmp_path):
+    template = compile_bicep(BICEP / "esml-genai-1/11-integration.bicep", tmp_path / "integration.json")
+    resources = template["resources"]
+    site = next(resource for resource in (resources.values() if isinstance(resources, dict) else resources)
+                if "virtualNetworkSubnetResourceId" in resource.get("properties", {}).get("parameters", {}))
+    return template, site["properties"]["parameters"]
+
+
+@pytest.mark.parametrize("flags", [{}, {"byoASEv3": True}, {"enablePublicAccessWithPerimeter": True}])
+def test_compiled_site_fails_closed_without_logic_subnet(tmp_path, flags):
+    # An empty ID must never deploy a private Logic App without outbound integration.
+    template, parameters = compiled_logic_site(tmp_path)
+    expression = parameters["virtualNetworkSubnetResourceId"]
+    values = {"logicappSubnetId": LOGIC_ID, "byoASEv3": False, "enablePublicAccessWithPerimeter": False, **flags}
+    assert arm_value(expression, values, template) == {"value": "" if flags else LOGIC_ID}
+    values["logicappSubnetId"] = ""
+    if flags:
+        assert arm_value(expression, values, template) == {"value": ""}
+    else:
+        with pytest.raises(ValueError, match="requires logicappSubnetId"):
+            arm_value(expression, values, template)
+
+
+@pytest.mark.parametrize("flags,integrated", [
+    ({}, True), ({"byoASEv3": True}, False), ({"enablePublicAccessWithPerimeter": True}, False),
+])
+def test_compiled_logic_app_routes_all_outbound_traffic_through_vnet(tmp_path, flags, integrated):
+    # RFC1918-only routing would bypass private endpoints in ranges such as 100.64.0.0/10.
+    template, parameters = compiled_logic_site(tmp_path)
+    values = {"byoASEv3": False, "enablePublicAccessWithPerimeter": False, **flags}
+    routing = arm_value(parameters["outboundVnetRouting"], values, template)["value"]
+    web = next(config for config in parameters["configs"]["value"] if config["name"] == "web")["properties"]
+    assert arm_value(web["vnetRouteAllEnabled"], values, template) is integrated
+    if integrated:
+        assert routing == {"allTraffic": True, "applicationTraffic": True, "contentShareTraffic": True}
+    else:
+        assert routing is None
 
 
 def test_network_compiles_with_dedicated_delegation_and_all_sibling_dependencies(tmp_path):

@@ -26,6 +26,14 @@ Allocation and existence detection require the exact selected VNet ID and a
 complete subnet inventory; unreadable or malformed responses never authorize
 replacing an existing subnet.
 
+Outbound routing: VNet-integrated Logic Apps set `outboundVnetRouting.allTraffic`
+(with application and content-share traffic) and `vnetRouteAllEnabled`. Default
+routing sends only RFC1918 traffic into the VNet, so private endpoints in other
+private ranges such as `100.64.0.0/10` would be unreachable. Internet-bound connector
+traffic then uses the VNet's egress (NAT gateway, firewall or UDR). An empty
+`logicappSubnetId` now fails the integration deployment instead of deploying a
+private Logic App without outbound integration.
+
 Sizing references: [App Service multi-plan subnet join requires /26](https://learn.microsoft.com/en-us/azure/app-service/overview-vnet-integration)
 and [Logic Apps private networking (/26 recommended)](https://learn.microsoft.com/en-us/azure/logic-apps/secure-single-tenant-workflow-virtual-network-private-endpoint).
 

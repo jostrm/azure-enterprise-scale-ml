@@ -348,6 +348,12 @@ module serverFarm 'br/public:avm/res/web/serverfarm:0.6.0' = if(logiAppType == '
 }
 
 // Outbound delegation is owned by networking (or the BYO owner), never by phase 11.
+func requireLogicAppSubnet(id string) string => empty(id)
+  ? fail('Private Logic Apps Standard requires logicappSubnetId. Rerun managed networking or configure and validate subnetProjLogicapp for BYO.')
+  : id
+// Without all-traffic routing App Service only sends RFC1918 traffic into the VNet, so private
+// endpoints in other private ranges (for example 100.64.0.0/10) would be unreachable.
+var logicAppVnetIntegrated = !byoASEv3 && !enablePublicAccessWithPerimeter
 
 // 2) Use the User assigned managed Identity "miPrjName", they keyvault with name "keyvaultName", "storageAccount1001Name"
 
@@ -575,6 +581,8 @@ module logicAppStandard 'br/public:avm/res/web/site:0.21.0' = if(logiAppType == 
           minTlsVersion: '1.2'
           linuxFxVersion: runtime == 'python' ? 'PYTHON|${runtimeVersion}' : runtime == 'node' ? 'NODE|${runtimeVersion}' : runtime == 'java' ? 'JAVA|${runtimeVersion}' : ''
           netFrameworkVersion: runtime == 'dotnet' ? runtimeVersion : null
+          // Legacy flag kept in step so this config PUT never resets the site-level routing below.
+          vnetRouteAllEnabled: logicAppVnetIntegrated
         }
       }
     ]
@@ -582,6 +590,11 @@ module logicAppStandard 'br/public:avm/res/web/site:0.21.0' = if(logiAppType == 
     // Network and security configuration
     httpsOnly: true
     publicNetworkAccess: byoASEv3 ? 'Disabled' : (enablePublicAccessWithPerimeter ? 'Enabled' : 'Disabled')
+    outboundVnetRouting: logicAppVnetIntegrated ? {
+      allTraffic: true
+      applicationTraffic: true
+      contentShareTraffic: true
+    } : null
     
     // Private endpoint configuration (only if public access is disabled and not using ASE v3)
     privateEndpoints: (byoASEv3 || enablePublicAccessWithPerimeter) ? [] : [
@@ -597,7 +610,7 @@ module logicAppStandard 'br/public:avm/res/web/site:0.21.0' = if(logiAppType == 
     ]
     
     // VNet integration (only if not using ASE v3)
-    virtualNetworkSubnetResourceId: byoASEv3 || enablePublicAccessWithPerimeter ? '' : logicappSubnetId
+    virtualNetworkSubnetResourceId: byoASEv3 || enablePublicAccessWithPerimeter ? '' : requireLogicAppSubnet(logicappSubnetId)
   }
   dependsOn: [
     serverFarm
