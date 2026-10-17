@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # Repository evidence workflow
 
 Read and follow `AGENTS.md` before substantive repository work. Combine fresh,
