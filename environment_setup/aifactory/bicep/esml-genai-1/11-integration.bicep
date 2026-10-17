@@ -334,7 +334,7 @@ var resolvedBotAgentEndpoint = empty(botAgentEndpoint) ? defaultBotAgentEndpoint
 // ============== MODULE DEPLOYMENTS ==============
 
 // 1) Create Hosting plan for Logic Apps Standard, using Azure verfied modules (AVM)
-module serverFarm 'br/public:avm/res/web/serverfarm:0.6.0' = if(empty(byoAseAppServicePlanRID) && !logicAppsExists && enableLogicApps) {
+module serverFarm 'br/public:avm/res/web/serverfarm:0.6.0' = if(logiAppType == 'Standard' && empty(byoAseAppServicePlanRID) && !logicAppsExists && enableLogicApps) {
   scope: resourceGroup(subscriptionIdDevTestProd, targetResourceGroup)
   name: take('11-Appfarm-LogicApps01-${deploymentProjSpecificUniqueSuffix}', 64)
   params: {

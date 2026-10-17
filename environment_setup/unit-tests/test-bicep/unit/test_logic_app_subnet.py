@@ -577,6 +577,79 @@ try { & $script @parameters } catch { [Console]::Error.WriteLine($_.Exception.Me
         shutil.rmtree(workspace)
 
 
+@pytest.mark.parametrize("provider", ["ado", "gha"])
+@pytest.mark.parametrize("hosting", ["Standard", "Consumption"])
+@pytest.mark.parametrize("mode", ["existing", "absent", "ambiguous", "denied"])
+def test_actual_provider_logic_app_existence_matches_deployed_name(provider, hosting, mode):
+    # A false negative redeploys task 68 and silently moves an existing app to the new subnet.
+    base = BICEP / "copy_to_local_settings"
+    if provider == "ado":
+        steps = yaml.safe_load((base / "azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/"
+                                "job-2-genai-services.yaml").read_text(encoding="utf-8"))["steps"]
+        body = next(s for s in steps if s.get("displayName") == "05b_Check if resource exists")["inputs"]["inlineScript"]
+        body = re.sub(r"\$\((\w+)\)", lambda m: {"logicAppType": hosting}.get(m[1], "test-subscription"), body)
+        end_marker = "variable=logicAppsExists]false"
+    else:
+        steps = next(iter(yaml.safe_load((base / "github-actions/infra-project-phase.yml")
+                                         .read_text(encoding="utf-8"))["jobs"].values()))["steps"]
+        body = next(s for s in steps if s.get("name") == "16_Check_Resource_Existence")["run"]
+        body = re.sub(r"\$\{\{ env\.(\w+) }}", lambda m: {"logicAppType": hosting}.get(m[1], "test-subscription"), body)
+        end_marker = 'set_env "logicAppsExists" "false"'
+    lines = body.splitlines()
+    name_line = next(line for line in lines if re.match(r'\s*logicApps?Name="', line))
+    start = next(i for i, line in enumerate(lines) if 'logicResourceType="Microsoft.Web/sites"' in line)
+    end = next(i for i in range(start, len(lines)) if end_marker in lines[i])
+    end += 1 if provider == "ado" else 0
+    block = "\n".join([name_line] + lines[start:end + 1])
+    expected_type = "Microsoft.Web/sites" if hosting == "Standard" else "Microsoft.Logic/workflows"
+    deployed = "lapp-012-swe-dev-h7amw-001"  # 11-integration.bicep logicAppsName with resourceSuffix -001
+    fake = f"""
+projectNumber=012; projectName=prj012; locationSuffix=swe; envName=dev; suffixStandard=-001
+targetResourceGroup=rg; targetRG=rg
+set_env() {{ echo "$1=$2"; }}
+az() {{
+  [ "$MODE" = denied ] && {{ echo Forbidden >&2; return 1; }}
+  type=""; query=""
+  while [ $# -gt 0 ]; do
+    case "$1" in --resource-type) type="$2"; shift;; --query) query="$2"; shift;; esac; shift
+  done
+  [ "$type" = "{expected_type}" ] || {{ echo "unexpected type $type" >&2; return 98; }}
+  case "$query" in *"'lapp-012-swe-dev-'"*"'-001'"*) ;; *) echo "unexpected query $query" >&2; return 97;; esac
+  case "$MODE" in
+    existing) echo "{deployed}";;
+    ambiguous) printf '%s\\n%s\\n' "{deployed}" "lapp-012-swe-dev-other-001";;
+  esac
+}}
+"""
+    workspace = ROOT / ".test-state" / ("logicapp-exists-" + uuid4().hex)
+    workspace.mkdir(parents=True)
+    script = workspace / "exists.sh"
+    script.write_text(fake + block + "\n", encoding="utf-8", newline="\n")
+    bash = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git/bin/bash.exe"
+    try:
+        run = subprocess.run([str(bash) if bash.exists() else "bash", str(script)], cwd=ROOT, text=True,
+                             capture_output=True, timeout=30, env={**os.environ, "MODE": mode})
+    finally:
+        shutil.rmtree(workspace)
+    if mode in ("ambiguous", "denied"):
+        assert run.returncode != 0, run.stdout
+        assert "logicAppsExists" not in run.stdout
+    else:
+        assert run.returncode == 0, run.stdout + run.stderr
+        expected = "true" if mode == "existing" else "false"
+        assert (f"variable=logicAppsExists]{expected}" if provider == "ado" else
+                f"logicAppsExists={expected}") in run.stdout
+
+
+def test_logic_app_plan_is_only_created_for_standard():
+    template = compile_entry("11-integration.bicep")
+    resources = template["resources"].values() if isinstance(template["resources"], dict) else template["resources"]
+    plan = next(item for item in resources if "11-Appfarm-LogicApps01-" in item["name"])
+    # Consumption must not provision (or wait on capacity for) an unused WS1 plan.
+    assert "parameters('logiAppType'), 'Standard'" in plan["condition"]
+    assert "logicAppsExists" in plan["condition"]
+
+
 @pytest.mark.parametrize("hosting", ["", "$(logicAppType)", "Standard", "Consumption", "invalid"])
 def test_actual_ado_normalizer_preserves_historical_standard_default(hosting):
     path = BICEP / "copy_to_local_settings/azure-devops/esml-yaml-pipelines/variables/logic-app-network-steps.yaml"

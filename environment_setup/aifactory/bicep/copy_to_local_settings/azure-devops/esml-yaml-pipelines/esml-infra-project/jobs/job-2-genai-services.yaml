@@ -1422,7 +1422,7 @@ steps:
       elasticName="elastic-${projectName}-${locationSuffix}-${envName}"
       acrProjectName="acr${projectName}genai${locationSuffix}"
       vmName="dsvm-${projectName}-${locationSuffix}-${envName}"
-      logicAppsName="adf-${projectNumber}-${locationSuffix}-${envName}"
+      logicAppsName="lapp-${projectNumber}-${locationSuffix}-${envName}-"
       eventHubsName="eh-${projectNumber}-${locationSuffix}-${envName}"
       databricksName="dbx-${projectNumber}-${locationSuffix}-${envName}"
       contentSafetyName="cs-${projectName}-${locationSuffix}-${envName}"
@@ -1475,7 +1475,15 @@ steps:
       fi
 
       echo "##vso[task.setvariable variable=databricksExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Databricks/workspaces" "$databricksName" "$suffixStandard")"
-      echo "##vso[task.setvariable variable=logicAppsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.Web/sites" "$logicAppsName" "$suffixStandard")"
+      logicResourceType="Microsoft.Web/sites"
+      if [ "$(logicAppType)" = "Consumption" ]; then logicResourceType="Microsoft.Logic/workflows"; fi
+      logicMatches=$(az resource list --subscription "$(dev_test_prod_sub_id)" --resource-group "$targetResourceGroup" --resource-type "$logicResourceType" --query "[?starts_with(name, '$logicAppsName') && ends_with(name, '$suffixStandard')].name" -o tsv --only-show-errors) || exit 1
+      if [[ "$logicMatches" == *$'\n'* ]]; then echo "Ambiguous existing Logic Apps; refusing to choose or redeploy."; exit 1; fi
+      if [ -n "$logicMatches" ]; then
+        echo "##vso[task.setvariable variable=logicAppsExists]true"
+      else
+        echo "##vso[task.setvariable variable=logicAppsExists]false"
+      fi
       echo "##vso[task.setvariable variable=eventHubsExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.EventHub/namespaces" "$eventHubsName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=dataFactoryExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.DataFactory/factories" "$dataFactoryName" "$suffixStandard")"
       echo "##vso[task.setvariable variable=botServiceExists]$(resource_exists_fuzzy "$targetResourceGroup" "Microsoft.BotService/botServices" "$botServiceName" "$suffixStandard")"

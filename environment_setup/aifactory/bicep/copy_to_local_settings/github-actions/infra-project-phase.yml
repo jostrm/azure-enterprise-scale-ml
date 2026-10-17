@@ -1381,7 +1381,7 @@ jobs:
             databricksName="dbw-${projectName}-${locationSuffix}-${envName}"
             redisName="redis${projectName}${locationSuffix}${envName}"
             cosmosDbAccountName="cosmos-${projectName}-${locationSuffix}-${envName}"
-            logicAppName="la-${projectName}-${locationSuffix}-${envName}"
+            logicAppName="lapp-${projectNumber}-${locationSuffix}-${envName}-"
             eventHubNsName="evhns-${projectName}-${locationSuffix}-${envName}"
             funcAppName="func-${projectName}-${locationSuffix}-${envName}"
             webAppResourceName="app-${projectName}-${locationSuffix}-${envName}"
@@ -1488,7 +1488,11 @@ jobs:
             set_env "databricksExists"       "$(resource_exists_fuzzy "$targetRG" "Microsoft.Databricks/workspaces" "$databricksName" "$suffixStandard")"
             set_env "redisExists"            "$(resource_exists_fuzzy "$targetRG" "Microsoft.Cache/Redis" "$redisName" "$suffixStandardNoDash")"
             set_env "cosmosDBExists"         "$(resource_exists_fuzzy "$targetRG" "Microsoft.DocumentDB/databaseAccounts" "$cosmosDbAccountName" "$suffixStandard")"
-            set_env "logicAppsExists"        "$(resource_exists_fuzzy "$targetRG" "Microsoft.Logic/workflows" "$logicAppName" "$suffixStandard")"
+            logicResourceType="Microsoft.Web/sites"
+            if [ "${{ env.logicAppType }}" = "Consumption" ]; then logicResourceType="Microsoft.Logic/workflows"; fi
+            logicMatches=$(az resource list --subscription "${{ env.dev_test_prod_sub_id }}" --resource-group "$targetRG" --resource-type "$logicResourceType" --query "[?starts_with(name, '$logicAppName') && ends_with(name, '$suffixStandard')].name" -o tsv --only-show-errors) || exit 1
+            if [[ "$logicMatches" == *$'\n'* ]]; then echo "Ambiguous existing Logic Apps; refusing to choose or redeploy."; exit 1; fi
+            if [ -n "$logicMatches" ]; then set_env "logicAppsExists" "true"; else set_env "logicAppsExists" "false"; fi
             set_env "eventHubsExists"        "$(resource_exists_fuzzy "$targetRG" "Microsoft.EventHub/namespaces" "$eventHubNsName" "$suffixStandard")"
             set_env "functionAppExists"      "$(resource_exists_fuzzy "$targetRG" "Microsoft.Web/sites" "$funcAppName" "$suffixStandard")"
             set_env "webAppExists"           "$(resource_exists_fuzzy "$targetRG" "Microsoft.Web/sites" "$webAppResourceName" "$suffixStandard")"
