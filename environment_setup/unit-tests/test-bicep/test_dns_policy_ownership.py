@@ -356,6 +356,27 @@ class BicepDnsOwnershipTests(unittest.TestCase):
             foundation,
         )
 
+    def test_bootstrap_managed_private_dns_is_neither_recreated_nor_relinked(self):
+        # The integrated access-hub bootstrap creates and links every zone in the common network group
+        # (aif-<hash> link names); template links named uniqueString(zone id) would be second writes under them.
+        managed = ("var bootstrapManagedPrivateDns = !centralDnsZoneByPolicyInHub && "
+                   "toLower(access_hub_mode) == 'integrated' && setup_hub_access")
+        common = (BICEP / "esml-common/main/13-rgLevel.bicep").read_text(encoding="utf-8")
+        self.assertIn(managed, common)
+        self.assertIn("param access_hub_mode string = ''", common)
+        self.assertIn("param setup_hub_access bool = false", common)
+        self.assertIn(
+            "module createPrivateDnsZonesIfNotExists '../../modules/createPrivateDnsZones.bicep' = "
+            "if(!centralDnsZoneByPolicyInHub && !bootstrapManagedPrivateDns)",
+            common,
+        )
+        foundation = (BICEP / "esml-genai-1/01-foundation.bicep").read_text(encoding="utf-8")
+        self.assertIn(managed, foundation)
+        flags = re.findall(r"exists: (zone\w+Exists)(.*)", foundation)
+        self.assertEqual(len(flags), 6)
+        self.assertTrue(all(rest.strip() == "|| bootstrapManagedPrivateDns" for _, rest in flags))
+        self.assertNotRegex(foundation, r"exists: false")
+
 
 if __name__ == "__main__":
     unittest.main()

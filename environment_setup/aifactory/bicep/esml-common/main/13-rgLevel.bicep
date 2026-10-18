@@ -91,6 +91,10 @@ param technicalAdminsEmail string = 'null'
 param IPwhiteList string = ''
 @description('ESML can run standalone/demo mode, this is deafault mode, meaning default FALSE value, which creates private DnsZones,DnsZoneGroups, and vNetLinks. You can change this, to use your HUB DnzZones instead.')
 param centralDnsZoneByPolicyInHub bool = false // DONE: jåaj 
+@description('Registered bootstrap access hub mode. With integrated + setup_hub_access, the bootstrap already created and linked every private DNS zone in the common network resource group.')
+param access_hub_mode string = ''
+param setup_hub_access bool = false
+var bootstrapManagedPrivateDns = !centralDnsZoneByPolicyInHub && toLower(access_hub_mode) == 'integrated' && setup_hub_access
 @description('Common resource group name. If not set, it will be created as "{commonResourceName}-weu-dev-001"')
 param commonResourceGroup_param string = ''
 param vnetResourceGroup_param string = ''
@@ -493,7 +497,7 @@ var privateLinksDnsZonesArray = [
 ]
 
 
-module createPrivateDnsZonesIfNotExists '../../modules/createPrivateDnsZones.bicep' = if(!centralDnsZoneByPolicyInHub) {
+module createPrivateDnsZonesIfNotExists '../../modules/createPrivateDnsZones.bicep' = if(!centralDnsZoneByPolicyInHub && !bootstrapManagedPrivateDns) {
   scope: resourceGroup(privDnsSubscription,privDnsResourceGroupName)
   name: 'PrivDnsZonesIfNotExistsCmn-${uniqueInAIFenv}'
   params: {

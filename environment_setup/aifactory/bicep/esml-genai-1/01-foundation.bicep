@@ -59,6 +59,10 @@ param zoneMongoExists bool = false
 param zoneRedisExists bool = false
 param zoneServicesAiExists bool = false
 param zoneAPIMExists bool = false
+@description('Registered bootstrap access hub mode. With integrated + setup_hub_access, the bootstrap already created and linked every private DNS zone in the common network resource group.')
+param access_hub_mode string = ''
+param setup_hub_access bool = false
+var bootstrapManagedPrivateDns = !centralDnsZoneByPolicyInHub && toLower(access_hub_mode) == 'integrated' && setup_hub_access
 
 var resourceExists = {
   miACA: miACAExists
@@ -607,32 +611,32 @@ var privateLinksDnsZonesArray = [
   {
     name: privateLinksDnsZones.azurecontainerapps.name
     id: privateLinksDnsZones.azurecontainerapps.id
-    exists: zoneAzurecontainerappsExists
+    exists: zoneAzurecontainerappsExists || bootstrapManagedPrivateDns
   }
   {
     name: privateLinksDnsZones.redis.name
     id: privateLinksDnsZones.redis.id
-    exists: zoneRedisExists
+    exists: zoneRedisExists || bootstrapManagedPrivateDns
   }
   {
     name: privateLinksDnsZones.postgres.name
     id: privateLinksDnsZones.postgres.id
-    exists: zonePostgresExists
+    exists: zonePostgresExists || bootstrapManagedPrivateDns
   }
   {
     name: privateLinksDnsZones.sql.name
     id: privateLinksDnsZones.sql.id
-    exists: zoneSqlExists
+    exists: zoneSqlExists || bootstrapManagedPrivateDns
   }
   {
     name: privateLinksDnsZones.servicesai.name
     id: privateLinksDnsZones.servicesai.id
-    exists: zoneServicesAiExists
+    exists: zoneServicesAiExists || bootstrapManagedPrivateDns
   }
   {
     name: privateLinksDnsZones.cosmosdbmongo.name
     id: privateLinksDnsZones.cosmosdbmongo.id
-    exists: zoneMongoExists
+    exists: zoneMongoExists || bootstrapManagedPrivateDns
   } // 2025-05-30: Added above in Common
   {
     name: privateLinksDnsZones.apim.name
