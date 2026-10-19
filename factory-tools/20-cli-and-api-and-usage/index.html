@@ -4053,6 +4053,14 @@ The order is capability hosts, target-project Search shared private links,
 service-managed lifecycle, project resources, then project network.
 Pipeline success and verified absence of the exact resources are both required.
 Configuration references alone do not establish actual inventory or preservation.</p>
+<p>A factory that its Full bootstrap created but that was never registered or enrolled
+(a catalog draft with no lease store or pipeline, such as dc-batman4) gets a
+<code>bootstrap-operator-teardown-v1</code> plan from the same <code>delete-aifactory prepare</code>. Its
+<code>unlink-hub</code> stage removes only this factory's own private DNS links and both sides of
+its peerings inside the configured connectivity hub; the <code>operator-teardown</code> stage then
+deletes the bootstrap-proven groups in dependency order, groups last. The CLI and SDK
+reject any link outside a protected hub, any deletion that touches the hub, and any
+change after the plan hash. Verified absence removes the draft from the catalog.</p>
 <p><code>deletion_plan.access_hubs</code> is <code>[]</code> unless the factory's own groups hold a
 <strong>factory-owned integrated access hub</strong> (<code>factory-owned-access-hub-v1</code>): the VPN
 gateway, Bastion, DNS resolver, private DNS zones or private runner that its
