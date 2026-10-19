@@ -14,6 +14,7 @@ sources:
 tests:
   - environment_setup/azurefactory-cli/tests/test_client.py
   - environment_setup/azurefactory-cli/tests/test_cli.py
+  - environment_setup/azurefactory-cli/tests/test_gateway.py
   - environment_setup/azurefactory-cli/tests/test_reviews.py
   - environment_setup/azurefactory-cli/tests/test_operation_results.py
   - environment_setup/azurefactory-cli/tests/test_preflight.py
@@ -21,13 +22,15 @@ tests:
   - environment_setup/azurefactory-cli/tests/test_workflow_events.py
 graph_symbols:
   - environment_setup/azurefactory-cli/src/azurefactory/client.py::class:AzureFactoryClient
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
+reviewed_source: '288d6f6a + working tree; observed 2026-10-19'
 ---
 # Factory API and SDK
 
 ## Observed consumer contract
 
 `AzureFactoryClient` is a standard-library-only HTTP SDK for the existing local Factory API. It exposes health/capability inspection, configuration/catalog prepare/confirm, parameter changes, registered creation workflows, runtime jobs, monitoring and named factory-deletion routes.
+
+`gateway_instances`, `gateway_snapshot` and `gateway_refresh` (CLI `azurefactory gateway list | show | refresh`) read the API's `/api/v1/gateway` AI Gateway Portal routes. These return the same DEMO, native AI Gateway SKU and classic APIM instances and menu enablement that both wizards render. Only a refresh makes the API host read ARM, and it reads with GET only; instance IDs are validated before they reach the request path.
 
 The canonical Tkinter API implementation is external. The documented MAUI build packages that API executable; MAUI is not described as a second REST/provisioning backend. Installed binaries may lag this source. Use the actual host URL/key and capability checks rather than assuming a default listening port or feature version.
 

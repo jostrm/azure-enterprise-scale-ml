@@ -201,6 +201,17 @@ def build_parser() -> argparse.ArgumentParser:
     costs.add_argument("--folder", help="Optional registered factory catalog folder on the API host.")
     costs.add_argument("--refresh", action="store_true", help="Bypass the API's scoped read cache.")
     register_saved_commands(monitoring_sub)
+    gateway = sub.add_parser(
+        "gateway", help="AI Gateway Portal: DEMO, native AI Gateway SKU and classic APIM; read-only, same menu as the wizards.")
+    gateway_sub = gateway.add_subparsers(dest="gateway_command", required=True)
+    add_simple(gateway_sub, "list", cmd_gateway_list,
+               help="List DEMO and the configured gateways with their labels; never contacts Azure.")
+    add_simple(gateway_sub, "show", cmd_gateway_show,
+               help="Show the last refreshed menu: enabled areas and inventory; never contacts Azure.",
+               ).add_argument("instance", help="Instance ID from 'azurefactory gateway list'.")
+    add_simple(gateway_sub, "refresh", cmd_gateway_refresh,
+               help="Refresh one gateway with the API host's bounded GET-only ARM reads.",
+               ).add_argument("instance", help="Instance ID from 'azurefactory gateway list'.")
     for action in ("summary", "report", "export"):
         command = add_simple(monitoring_sub, action, cmd_monitoring)
         command.add_argument("--request", help="Exact canonical request JSON, including explicit source and supplied live observations.")
@@ -809,6 +820,18 @@ def cmd_workflow_watch(args):
 
 def cmd_monitoring_catalog(args):
     return emit(client(args).monitoring_catalog())
+
+
+def cmd_gateway_list(args):
+    return emit(client(args).gateway_instances())
+
+
+def cmd_gateway_show(args):
+    return emit(client(args).gateway_snapshot(args.instance))
+
+
+def cmd_gateway_refresh(args):
+    return emit(client(args).gateway_refresh(args.instance))
 
 
 def cmd_resource_group_costs(args):

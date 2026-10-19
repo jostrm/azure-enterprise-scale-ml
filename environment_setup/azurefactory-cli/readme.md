@@ -541,6 +541,25 @@ remains project001 Dev only. See
 [40-aifactory-agent](../../usecase_code/40-agent-factory/40-aifactory-agent/readme.md)
 and [45-aifactory-mcp-gateway](../../usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md).
 
+### AI Gateway Portal: DEMO, native AI Gateway SKU and classic APIM
+
+`azurefactory gateway` reads the same instances and menu as the Tkinter and MAUI
+wizards' AI Gateway Portal, through the API's `/api/v1/gateway` routes. The
+instances are `DEMO`, the native AI Gateway SKU `gentle-dusk-3200`, the classic
+APIM `apim-spider-sdc-dev-001` and any saved connections. `list` and `show` never
+contact Azure. `refresh` asks the API host for bounded GET-only ARM reads with its
+own Azure CLI sign-in. Each menu area is enabled only from what that read
+verified; for example, MCP servers on the new SKU or typed `mcp` APIs on APIM.
+
+```powershell
+azurefactory gateway list
+azurefactory gateway refresh gentle-dusk-3200     # label: AI Gateway New SKU - gentle-dusk-3200
+azurefactory gateway show apim-spider-sdc-dev-001 # last refreshed menu and inventory
+```
+
+The SDK equivalents are `gateway_instances()`, `gateway_snapshot(id)` and
+`gateway_refresh(id)`.
+
 ### AI Factory Agent live voice options (project001 Dev)
 
 `config review` and `config save` also accept dedicated options for the opt-in live

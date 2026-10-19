@@ -394,6 +394,18 @@ $CostMonth = Read-Host 'Billing month YYYY-MM'
 if ($LASTEXITCODE -ne 0) { throw 'Azure billing read failed; missing costs are not zero.' }
 ```
 
+### AI Gateway Portal: same menu as the wizards
+
+`list` and `show` never contact Azure. `refresh` asks the API host for bounded GET-only
+ARM reads. Each menu area turns on only from verified evidence, such as the
+`enterprise-scale-ai-factory` MCP server.
+
+```powershell
+& $Python -m azurefactory gateway list
+& $Python -m azurefactory gateway refresh gentle-dusk-3200
+& $Python -m azurefactory gateway show apim-spider-sdc-dev-001
+```
+
 <details markdown="1">
 <summary>More info</summary>
 

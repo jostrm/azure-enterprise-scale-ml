@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import socket
 import ipaddress
 from dataclasses import dataclass, field
@@ -95,6 +96,16 @@ def _has_control(value: str) -> bool:
 
 def _has_traversal(path: str) -> bool:
     return any(part in {".", ".."} for part in path.split("/"))
+
+
+_GATEWAY_INSTANCE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}")
+
+
+def _gateway_instance(value: Any) -> str:
+    """The API's connection identifier rule; anything else could change the request path."""
+    if not isinstance(value, str) or not _GATEWAY_INSTANCE.fullmatch(value) or ".." in value:
+        raise ConfigError("Use an AI Gateway instance ID from 'azurefactory gateway list'.")
+    return value
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -287,6 +298,20 @@ class AzureFactoryClient(SavedMonitoringClient):
     def monitoring_catalog(self) -> dict[str, Any]:
         """Read canonical report/source capabilities; never start a collector."""
         return self._object(self.request("GET", "/api/v1/monitoring/catalog"), "monitoring catalog")
+
+    def gateway_instances(self) -> dict[str, Any]:
+        """List DEMO and the configured AI gateways with their menu areas; never contacts Azure."""
+        return self._object(self.request("GET", "/api/v1/gateway/instances"), "AI Gateway instances")
+
+    def gateway_snapshot(self, instance_id: str) -> dict[str, Any]:
+        """Read the last refreshed AI Gateway menu and inventory; never contacts Azure."""
+        return self._object(self.request(
+            "GET", f"/api/v1/gateway/instances/{_gateway_instance(instance_id)}/snapshot"), "AI Gateway snapshot")
+
+    def gateway_refresh(self, instance_id: str) -> dict[str, Any]:
+        """Explicitly refresh one gateway; the API host issues bounded GET-only ARM reads."""
+        return self._object(self.request(
+            "POST", f"/api/v1/gateway/instances/{_gateway_instance(instance_id)}/refresh"), "AI Gateway snapshot")
 
     def resource_group_costs(self, request: dict[str, Any]) -> dict[str, Any]:
         """Read Azure billing for explicitly selected subscriptions; never allocate locally."""
