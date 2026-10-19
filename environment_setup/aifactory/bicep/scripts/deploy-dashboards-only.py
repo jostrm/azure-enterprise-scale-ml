@@ -705,7 +705,14 @@ def resource_exists(azure: DashboardAzure, identifier: str) -> bool:
         "resource", "show", "--subscription", subscription, "--ids", identifier,
         "--api-version", version, "--output", "json", "--only-show-errors",
     )
-    if result.returncode and shared.error_code(result) in {"ResourceNotFound", "NotFound"}:
+    # ResourceNotFound/NotFound: standard ARM 404.
+    # AzureCommandFailed: az resource show for Microsoft.Portal/dashboards returns a
+    # non-JSON plain-text error when the resource does not exist; indistinguishable
+    # from a parse failure, but safe to treat as absent after require_group confirmed
+    # the RG exists and is accessible.
+    if result.returncode and shared.error_code(result) in {
+        "ResourceNotFound", "NotFound", "AzureCommandFailed"
+    }:
         return False
     value = json_response(result, "Checking exact dashboard/workbook existence")
     if not isinstance(value, dict) or str(value.get("id", "")).lower() != identifier.lower():
