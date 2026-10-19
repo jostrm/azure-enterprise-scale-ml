@@ -99,6 +99,12 @@ MCP_GATEWAY_OPTIONS = (
     ("--aifactory-mcp-classic-apim-resource-ids", "aifactoryMcpClassicApimResourceIds", None,
      "Comma-separated classic APIM (Microsoft.ApiManagement/service) resource IDs whose system-assigned "
      "identities may call the MCP (requires enableAIFactoryMCP; APIMs are only read)."),
+    ("--aifactory-mcp-container-app-resource-id", "aifactoryMcpContainerAppResourceId", None,
+     "Resource ID of an AI Factory MCP Container App deployed outside the pipeline to adopt; must be in the "
+     "project resource group, only its caller lists grow (requires enableAIFactoryMCP; empty uses the pipeline-managed app)."),
+    ("--add-aifactory-mcp-to-apim", "addAIFactoryMCP2APIM", BOOLEAN,
+     "Publish the AI Factory MCP on the AI gateway pipeline's classic APIM (apimGateway* variables): the project step "
+     "adds the APIM identity to the MCP callers and infra-ai-gateway exposes the MCP API (requires enableAIFactoryMCP)."),
 )
 LIVE_VOICE_OPTIONS = (
     ("--enable-aifactory-agent-live-voice", "enableAIFactoryAgentLiveVoice", BOOLEAN,

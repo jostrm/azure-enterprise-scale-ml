@@ -274,6 +274,7 @@ MCP_IMAGE = "acrcommon.azurecr.io/aifactory-mcp@sha256:" + "a" * 64
 CLASSIC_APIM_IDS = ",".join(
     f"/subscriptions/x/resourceGroups/rg/providers/Microsoft.ApiManagement/service/{name}"
     for name in ("apim-a", "apim-b"))
+MCP_APP_ID = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.App/containerApps/aifactory-mcp-pilot"
 
 
 @pytest.mark.parametrize("command", ["review", "save"])
@@ -288,6 +289,7 @@ def test_dedicated_mcp_gateway_options_map_to_exact_variable_names(command):
         "--aifactory-mcp-container-apps-environment", "aca-env-prj001",
         "--ai-gateway-sku-resource-id", "", "--ai-gateway-sku-outbound-subnet-id", "/subscriptions/x/subnets/y",
         "--aifactory-mcp-classic-apim-resource-ids", CLASSIC_APIM_IDS,
+        "--aifactory-mcp-container-app-resource-id", MCP_APP_ID, "--add-aifactory-mcp-to-apim", "true",
     ])
     assert cli.configuration_changes(args) == {
         "enableAIFactoryMCP": "true", "enableFactoryChatAgent": "true",
@@ -297,6 +299,7 @@ def test_dedicated_mcp_gateway_options_map_to_exact_variable_names(command):
         "aifactoryMcpContainerAppsEnvironment": "aca-env-prj001", "aiGatewaySkuResourceId": "",
         "aiGatewaySkuOutboundSubnetId": "/subscriptions/x/subnets/y",
         "aifactoryMcpClassicApimResourceIds": CLASSIC_APIM_IDS,
+        "aifactoryMcpContainerAppResourceId": MCP_APP_ID, "addAIFactoryMCP2APIM": "true",
     }
     assert cli.configuration_changes(cli.build_parser().parse_args(["config", command, *MCP_SCOPE, *extra])) == {}
 
@@ -304,6 +307,8 @@ def test_dedicated_mcp_gateway_options_map_to_exact_variable_names(command):
 def test_mcp_gateway_options_reject_non_boolean_and_conflicting_changes(tmp_path, capsys):
     with pytest.raises(SystemExit):
         cli.build_parser().parse_args(["config", "review", *MCP_SCOPE, "--enable-aifactory-mcp", "yes"])
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["config", "review", *MCP_SCOPE, "--add-aifactory-mcp-to-apim", "yes"])
     patch = tmp_path / "changes.json"
     patch.write_text('{"enableAIFactoryMCP": "false", "enableAIGatewaySKU": true}', encoding="utf-8")
     agreeing = cli.build_parser().parse_args(["config", "review", *MCP_SCOPE, "--changes-json", str(patch),

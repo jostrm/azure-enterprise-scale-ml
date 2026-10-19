@@ -570,6 +570,8 @@ in that file is a `ConfigError` instead of a silent override:
 | `--ai-gateway-sku-resource-id` | `aiGatewaySkuResourceId` | existing gateway to adopt, or empty to create one |
 | `--ai-gateway-sku-outbound-subnet-id` | `aiGatewaySkuOutboundSubnetId` | outbound integration subnet ID |
 | `--aifactory-mcp-classic-apim-resource-ids` | `aifactoryMcpClassicApimResourceIds` | comma-separated classic APIM resource IDs allowed to call the MCP, or empty |
+| `--aifactory-mcp-container-app-resource-id` | `aifactoryMcpContainerAppResourceId` | MCP Container App deployed outside the pipeline to adopt (project resource group), or empty |
+| `--add-aifactory-mcp-to-apim` | `addAIFactoryMCP2APIM` | `true` / `false` (publish the MCP on the AI gateway pipeline's classic APIM) |
 
 ```powershell
 azurefactory config review --folder C:\legacy\aifactory --project-number 001 `
