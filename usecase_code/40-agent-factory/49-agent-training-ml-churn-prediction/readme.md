@@ -196,6 +196,66 @@ consumer state folder. Then open the agent in the Foundry Playground, for exampl
 3. "approve <code>". The agent publishes the synthetic data and starts both trainings.
 4. "Are the trainings done? Then score both use cases." Repeat until the predictions summaries appear.
 
+## Test retraining of ML via Agent
+
+Use this to check, from the Foundry Playground, that the hosted agent can retrain and score a model end
+to end.
+
+**Open the agent.** In the [Foundry portal](https://ai.azure.com), open your Foundry project, then
+**Agents**, then the hosted agent (for example `aif49-project001-dev-v1-ml-churn-hosted`), and open it
+in the Playground. A direct link has this shape:
+
+```text
+https://ai.azure.com/resource/agentsList?wsid=/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.CognitiveServices/accounts/<foundry-account>/projects/<foundry-project>&tid=<tenant-id>
+```
+
+**Pick a prompt.** Each prompt names a use case from the table above and ends with "Plan it first", so
+the agent proposes a plan and an approval code before it writes anything.
+
+- Retrain `air-passengers` (`M05`) and compare it with the champion:
+
+  ```text
+  Retrain air-passengers (M05) with its reviewed binding and data, compare the result with the champion, then run batch scoring with whichever model wins. Plan it first.
+  ```
+
+- Recreate and train `49-agent-training-ml-churn-prediction` (`M49`) on fresh synthetic data:
+
+  ```text
+  Recreate 49-agent-training-ml-churn-prediction (M49) from the churn template with fresh synthetic data, publish it to the shared lake, train and register the model, then run batch scoring. Plan it first.
+  ```
+
+- Both use cases in one plan:
+
+  ```text
+  Recreate 49-agent-training-ml-churn-prediction with fresh synthetic data, train, register and score it; also retrain air-passengers, compare it with the champion and score it. Plan it first.
+  ```
+
+**Follow-up turns** (the same for every prompt):
+
+1. The agent replies with the plan and a 12-character approval code. Within 30 minutes, send exactly
+   `approve <code>` from the same Playground sign-in.
+2. After about 10–15 minutes (training, including compute scale-up): "Are the trainings done? Then
+   score." The agent registers or compares the model and starts batch scoring.
+3. After about 5 more minutes: "Summarize the predictions."
+
+**What to expect.**
+
+- `M49`: a new synthetic data version is published, a new model version is registered, and 50
+  synthetic customers are scored with the number predicted to churn.
+- `M05`: the retrained candidate is compared with the champion. "Champion kept" is a valid outcome;
+  scoring then uses the champion and returns 12 monthly forecasts.
+- While a job runs, the agent answers `running` with the Azure ML job name. Asking again resumes the
+  same job; it never submits a duplicate.
+
+**Good to know.**
+
+- Approvals belong to the platform user who approved them. Approve in the Playground itself; an
+  approval given through the SDK or CLI with another identity does not allow writes from the
+  Playground.
+- An approved plan allows writes for 12 hours. After that, ask again for a new plan and code.
+- A conversation stays on the hosted agent version it started on. After `hosted-deploy` routes a new
+  version, start a new conversation to use it.
+
 ## Safety boundaries
 
 **Writes that need approval:**
