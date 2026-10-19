@@ -35,6 +35,10 @@ OWN_PEERING = HUB_VNET + "/virtualNetworkPeerings/aif-4d8896b66f23"
 SPIDER_PEERING = HUB_VNET + "/virtualNetworkPeerings/hub-to-spider-dev-001"
 SPOKE_PEERING = VNET + "/virtualNetworkPeerings/aif-5eb3f21fdde8"
 WORKFLOW = "12345678-1234-4234-8234-123456789abc"
+DEPLOYMENT_PRINCIPAL = "31f7a62d-75c5-4dc3-89cb-7ea52829be9b"
+NSG = COMMON + "/providers/Microsoft.Network/networkSecurityGroups/nsg-snet-esml-cmn-001"
+NSG_RULE = NSG + "/securityRules/allow_vnet_inbound"
+ROLE = COMMON + "/providers/Microsoft.Authorization/roleAssignments/5fc13df3-76b7-539e-8d42-af87d71d1f61"
 
 
 class TeardownCloud(HubCloud):
@@ -63,6 +67,12 @@ class TeardownCloud(HubCloud):
                          {"remoteVirtualNetwork": {"id": HUB_VNET}, "peeringState": "Connected"})
         self.bodies[SPOKE_PEERING.lower()] = spoke
         self.bodies[VNET.lower()]["properties"]["virtualNetworkPeerings"] = [copy.deepcopy(spoke)]
+        # A factory-tagged NSG's untagged rules and the recorded deployment principal's RG role.
+        self.bodies[NSG.lower()] = tagged(NSG, "Microsoft.Network/networkSecurityGroups", CORE)
+        self.bodies[NSG_RULE.lower()] = untagged(NSG_RULE, "Microsoft.Network/networkSecurityGroups/securityRules",
+                                                 {"access": "Allow"})
+        self.bodies[ROLE.lower()] = untagged(ROLE, "Microsoft.Authorization/roleAssignments",
+                                             {"principalId": DEPLOYMENT_PRINCIPAL, "scope": COMMON})
 
     def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
         result = super().arm(method, resource_id, api_version, allowed, headers)
@@ -90,7 +100,8 @@ def request(roots=HUB_ROOTS, **changes):
         "scopes": sorted([GROUP.lower(), COMMON.lower()]),
         "bootstrap_record": {"contract": "consumed-bootstrap-stage-evidence-v1", "workflow_id": WORKFLOW,
                              "record_hash": "d" * 64, "groups": sorted([GROUP.lower(), COMMON.lower()]),
-                             "resources": sorted(value.lower() for value in roots)},
+                             "resources": sorted(value.lower() for value in roots),
+                             "principal_ids": [DEPLOYMENT_PRINCIPAL]},
         "hub_scopes": [HUB.lower()], "protected_resource_ids": [HUB.lower()],
     }
     document.update(changes)
@@ -119,6 +130,8 @@ def test_freeze_selects_whole_factory_groups_and_only_this_factorys_hub_links():
             COMMON_IP.lower()} <= set(rows)
     assert rows[RUNNER.lower()]["ownership_source"] == "bootstrap-record"
     assert rows[COMMON_IP.lower()]["ownership_source"] == "tags"
+    assert rows[NSG_RULE.lower()]["ownership_source"] == "parent"
+    assert rows[ROLE.lower()]["ownership_source"] == "bootstrap-principal"
     assert [row["id"] for row in data["hub_links"]] == sorted([OWN_HUB_LINK, OWN_PEERING, SPOKE_PEERING],
                                                               key=str.lower)
     assert {row["side"] for row in data["hub_links"]} == {"hub", "factory"}
@@ -134,6 +147,8 @@ def test_freeze_selects_whole_factory_groups_and_only_this_factorys_hub_links():
     ("site-connection", "bootstrap-teardown-protected-resource"),
     ("tagged-resolver-without-record", "bootstrap-teardown-protected-resource"),
     ("project-resource", "bootstrap-teardown-project-resources-require-pipelines"),
+    ("foreign-principal-role", "bootstrap-teardown-unowned-resource"),
+    ("rule-under-foreign-nsg", "bootstrap-teardown-owner-conflict"),
     ("operator-on-runner", "executing-identity-in-deletion-scope"),
     ("scope-is-connectivity-hub", "bootstrap-teardown-request-invalid"),
     ("record-other-groups", "bootstrap-teardown-request-invalid"),
@@ -160,6 +175,10 @@ def test_unowned_shared_or_unsafe_scopes_block_before_any_change(defect, code):
         # The DNS private resolver is connectivity: tags alone never authorize deleting it.
         resolver = COMMON + "/providers/Microsoft.Network/dnsResolvers/dnspr-874678d6611d"
         cloud.bodies[resolver.lower()] = tagged(resolver, "Microsoft.Network/dnsResolvers", CORE)
+    elif defect == "foreign-principal-role":
+        cloud.bodies[ROLE.lower()]["properties"]["principalId"] = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+    elif defect == "rule-under-foreign-nsg":
+        cloud.bodies[NSG.lower()]["tags"][fl.TAG_KEYS["factory_id"]] = "factory-b"
     elif defect == "project-resource":
         cloud.bodies[RESOURCE.lower()] = tagged(RESOURCE, "Microsoft.Network/publicIPAddresses", OWNER)
     elif defect == "operator-on-runner":

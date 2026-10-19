@@ -47,6 +47,7 @@ TYPES = {
                           "privateDnsZones", "privateDnsZones/virtualNetworkLinks", "networkInterfaces",
                           "connections", "dnsResolvers"],
     "microsoft.compute": ["virtualMachines", "disks"],
+    "microsoft.authorization": ["roleAssignments"],
     "microsoft.managedidentity": ["userAssignedIdentities"],
     "microsoft.keyvault": ["vaults"],
 }

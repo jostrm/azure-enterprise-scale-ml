@@ -890,6 +890,9 @@ def validate_teardown_request(document):
                and record.get("groups") == document["scopes"]
                and _sorted_ids(record.get("resources"), fl.NESTED_ID, allow_empty=True)
                and all(fl.arm_scope(value) in document["scopes"] for value in record["resources"])
+               and isinstance(record.get("principal_ids", []), list)
+               and record.get("principal_ids", []) == sorted(set(record.get("principal_ids", [])))
+               and all(fl.guid(value) and value == value.lower() for value in record.get("principal_ids", []))
                and _sorted_ids(document.get("hub_scopes"), fl.RG_ID, allow_empty=True)
                and not set(document["hub_scopes"]) & set(document["scopes"])
                and isinstance(document.get("protected_resource_ids"), list)
@@ -929,6 +932,40 @@ def _hub_links(cloud, document, factory_vnets):
     return links, hub_vnets
 
 
+def _parent_resource(key):
+    """Nearest parent resource of a child or extension resource; never the resource group."""
+    head, separator, tail = key.rpartition("/providers/")
+    parts = tail.split("/")
+    if separator and len(parts) == 3 and "/providers/" in head:
+        return head  # Extension resource on a resource, e.g. a role assignment on a vault.
+    parent = key.rsplit("/", 2)[0]
+    return parent if separator and "/providers/" in parent and len(parent.rsplit("/providers/", 1)[1].split("/")) >= 3 else None
+
+
+def teardown_owner(document, closure, bodies, key):
+    """(owner, source) proving this resource belongs to exactly this factory and scale set."""
+    record = document["bootstrap_record"]
+    core = {field: document["target"][field] for field in ("factory_id", "scaleset_id")}
+    body = bodies[key]
+    tags = body.get("tags") or {}
+    fl.require(isinstance(tags, dict), "malformed-project-ownership-tags")
+    owner = {field: tags[tag] for field, tag in fl.TAG_KEYS.items() if tag in tags}
+    fl.require(all(owner.get(field, value) == value for field, value in core.items()),
+               "bootstrap-teardown-owner-conflict")
+    if owner:
+        return owner, "tags"
+    if key in record["groups"] or hub_covers({"resource_ids": record["resources"]}, key):
+        return dict(core), TEARDOWN_SOURCE
+    if fl.resource_type_from_id(key).startswith("microsoft.authorization/"):
+        # Role assignments carry no tags: only a principal the bootstrap recorded proves them.
+        principal = str((body.get("properties") or {}).get("principalId", "")).lower()
+        fl.require(principal in record.get("principal_ids", []), "bootstrap-teardown-unowned-resource")
+        return dict(core), "bootstrap-principal"
+    parent = _parent_resource(key)
+    fl.require(parent in bodies, "bootstrap-teardown-unowned-resource")
+    return teardown_owner(document, closure, bodies, parent)[0], "parent"
+
+
 def freeze_teardown(cloud, document):
     validate_teardown_request(document)
     cloud.verify_identity()
@@ -941,14 +978,8 @@ def freeze_teardown(cloud, document):
     core = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
     entries = {}
     for key, body in bodies.items():
-        tags = body.get("tags") or {}
-        fl.require(isinstance(tags, dict), "malformed-project-ownership-tags")
-        owner = {field: tags[tag] for field, tag in fl.TAG_KEYS.items() if tag in tags}
+        owner, source = teardown_owner(document, closure, bodies, key)
         group = key in closure["groups"]
-        covered = key in record["groups"] or hub_covers(proof, key)
-        fl.require(all(owner.get(field, value) == value for field, value in core.items()),
-                   "bootstrap-teardown-owner-conflict")
-        fl.require(owner or covered, "bootstrap-teardown-unowned-resource")
         # Connectivity types pass only as bootstrap-recorded parts of the factory's own hub.
         fl.require(not protected(body, explicit, proof), "bootstrap-teardown-protected-resource")
         fl.require(group or not owner.get("project_id"), "bootstrap-teardown-project-resources-require-pipelines")
@@ -959,7 +990,7 @@ def freeze_teardown(cloud, document):
             "microsoft.authorization/locks", "microsoft.authorization/denyassignments"),
                    "factory-delete-lock-or-deny-present")
         entries[key] = {"id": body["id"], **metadata, "delete": True, "project_number": None,
-                        "ownership_source": "tags" if owner else TEARDOWN_SOURCE, "owner": owner or dict(core),
+                        "ownership_source": source, "owner": owner,
                         "managed_group_ids": [], "depends_on": fl.project_resource_dependencies(body)}
     operations = {}
     for key, item in entries.items():
@@ -1029,8 +1060,9 @@ def validate_teardown(document, require_unexpired=False, check_hash=True):
                    and row.get("managed_group_ids") == [], "bootstrap-teardown-inventory-unbound")
         fl.require(not protected(body, document["protected_resource_ids"], proof),
                    "bootstrap-teardown-protected-resource")
-        fl.require(row.get("ownership_source") == "tags" or (
-            row.get("ownership_source") == TEARDOWN_SOURCE and (key in record["groups"] or hub_covers(proof, key))),
+        owner, source = teardown_owner(document, data["closure"], data["bodies"], key)
+        fl.require(row.get("ownership_source") == source and row.get("owner") == owner
+                   and (key in data["closure"]["groups"] or not owner.get("project_id")),
                    "bootstrap-teardown-unowned-resource")
         if not fl.RG_ID.fullmatch(key):
             fl.require(type(row.get("independent_delete")) is bool, "factory-delete-provider-delete-proof-required")
