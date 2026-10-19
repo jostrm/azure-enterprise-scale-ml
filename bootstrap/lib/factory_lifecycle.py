@@ -55,6 +55,8 @@ RECEIPT_REPLACE_ATTEMPTS = 20
 RECEIPT_REPLACE_RETRY_SECONDS = 0.25
 READ_TRANSPORT_ATTEMPTS = 3
 READ_TRANSPORT_RETRY_DELAYS = (0.25, 0.5)
+# Windows getaddrinfo "no data record": a resolver hiccup for an ARM host that always resolves.
+WSANO_DATA = 11004
 # A retry-admission budget, not cancellation of an in-flight socket operation.
 READ_TRANSPORT_RETRY_WINDOW_SECONDS = 180
 REMOTE_SOCKET_TIMEOUT_SECONDS = 60
@@ -912,7 +914,7 @@ class Cloud:
                 if isinstance(reason, (ssl.SSLError, PermissionError)):
                     transient = False
                 elif isinstance(reason, socket.gaierror):
-                    transient = reason.errno == socket.EAI_AGAIN
+                    transient = reason.errno in (socket.EAI_AGAIN, WSANO_DATA)
                 else:
                     transient = isinstance(reason, (TimeoutError, ConnectionResetError, ConnectionAbortedError,
                                                      ConnectionRefusedError, BrokenPipeError, IncompleteRead)) or (

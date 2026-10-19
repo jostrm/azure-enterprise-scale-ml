@@ -113,6 +113,8 @@ def test_read_retries_proven_errno101_after_60_seconds(clock, capsys, method):
     ConnectionRefusedError(errno.ECONNREFUSED, "refused"),
     BrokenPipeError(errno.EPIPE, "broken pipe"),
     URLError(socket.gaierror(socket.EAI_AGAIN, "temporary resolution failure")),
+    # Windows reports a resolver hiccup for an always-resolvable ARM host as WSANO_DATA.
+    URLError(socket.gaierror(11004, "getaddrinfo failed")),
     OSError(errno.EHOSTUNREACH, "host unreachable"), OSError(errno.ENETDOWN, "network down"),
 ])
 def test_specific_transient_read_errors_retry(clock, failure):
