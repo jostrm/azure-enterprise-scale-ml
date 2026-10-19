@@ -5,6 +5,8 @@ Flags (exact names) drive one late project-pipeline step:
 - enableAIGatewaySKU creates (or adopts an explicitly named) AI Gateway (SKU AIGateway) wired to the
   project Microsoft Foundry account through its managed identity.
 - addAIFactoryMCP2AIGatewaySKU registers the MCP as an exact read-only gateway tool server.
+- aifactoryMcpClassicApimResourceIds (optional) lets existing classic APIM gateways call the MCP with their
+  system-assigned identities; those gateways are only read, never modified.
 
 False never deletes or detaches anything. Resources are only created or updated when this integration
 owns them (tags or a description marker); foreign resources with the derived names are refused. Every
@@ -45,6 +47,7 @@ APP_API = "2024-03-01"
 REGISTRY_API = "2023-07-01"
 ROLE_API = "2022-04-01"
 GATEWAY_API = "2025-09-01-preview"
+APIM_API = "2024-05-01"
 GUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 IMAGE = re.compile(r"^(?P<server>[a-z0-9][a-z0-9.-]*\.azurecr\.io)/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$")
 GATEWAY_ID = re.compile(
@@ -92,6 +95,15 @@ def _text(value) -> str:
     return "" if value is None or _unset_macro(value) else str(value).strip()
 
 
+def _ids(value) -> tuple[str, ...]:
+    """Comma-separated resource IDs: trimmed, empty entries dropped, first spelling of each ID kept."""
+    unique: dict[str, str] = {}
+    for item in _text(value).split(","):
+        unique.setdefault(item.strip().lower(), item.strip())
+    unique.pop("", None)
+    return tuple(unique.values())
+
+
 @dataclass(frozen=True)
 class IntegrationRequest:
     enable_mcp: bool
@@ -113,6 +125,7 @@ class IntegrationRequest:
     container_apps_environment: str = ""
     gateway_resource_id: str = ""
     gateway_subnet_id: str = ""
+    classic_apim_ids: tuple[str, ...] = ()
 
     @property
     def any_enabled(self) -> bool:
@@ -145,6 +158,7 @@ class IntegrationRequest:
             container_apps_environment=_text(get("aifactoryMcpContainerAppsEnvironment")),
             gateway_resource_id=_text(get("aiGatewaySkuResourceId")),
             gateway_subnet_id=_text(get("aiGatewaySkuOutboundSubnetId")),
+            classic_apim_ids=_ids(get("aifactoryMcpClassicApimResourceIds")),
         )
 
 
@@ -182,6 +196,10 @@ def decide(request: IntegrationRequest) -> Decision:
         problems.append("aiGatewaySkuResourceId must be a Microsoft.ApiManagement/service resource ID")
     if request.gateway_subnet_id and not SUBNET_ID.fullmatch(request.gateway_subnet_id):
         problems.append("aiGatewaySkuOutboundSubnetId must be a subnet resource ID")
+    if request.classic_apim_ids and not request.enable_mcp:
+        problems.append("aifactoryMcpClassicApimResourceIds requires enableAIFactoryMCP=true")
+    if not all(GATEWAY_ID.fullmatch(value) for value in request.classic_apim_ids):
+        problems.append("aifactoryMcpClassicApimResourceIds must list Microsoft.ApiManagement/service resource IDs")
     for name, value in (("dev_test_prod_sub_id", request.subscription_id), ("tenantId", request.tenant_id)):
         if not GUID.fullmatch(value):
             problems.append(f"{name} must be a GUID")
@@ -377,9 +395,10 @@ class McpGatewayIntegration:
             return report.to_dict()
         resource_names = names(request)
         target = discover(self.session, request)
+        classic = self._classic_apim_callers(request, resource_names, report) if request.enable_mcp else []
         gateway = self._gateway(request, target, resource_names, report, apply) if request.enable_gateway else None
         if request.enable_mcp:
-            self._mcp(request, target, resource_names, gateway, report, apply)
+            self._mcp(request, target, resource_names, gateway, classic, report, apply)
         if request.add_mcp_to_gateway:
             self._register(request, target, resource_names, gateway, report, apply)
         return report.to_dict()
@@ -465,7 +484,26 @@ class McpGatewayIntegration:
         principal = gateway["identity"]["principalId"].lower()
         return principal, _system_client_id(self.session, gateway["id"]).lower()
 
-    def _mcp(self, request, target, resource_names, gateway, report, apply) -> None:
+    def _classic_apim_callers(self, request, resource_names, report) -> list[tuple[str, str]]:
+        """Resolve the configured classic APIM gateways to MCP callers (GET only; the APIMs stay untouched)."""
+        callers = []
+        for apim_id in request.classic_apim_ids:
+            if request.add_mcp_to_gateway and apim_id.lower() == resource_names["gateway_id"].lower():
+                continue  # the registered AI Gateway is already a caller
+            apim = _optional(self.session, apim_id, APIM_API)
+            if apim is None:
+                raise ValueError(f"aifactoryMcpClassicApimResourceIds: {apim_id} does not exist.")
+            principal = (apim.get("identity") or {}).get("principalId", "")
+            if not GUID.fullmatch(principal or ""):
+                raise ValueError(f"{apim_id} has no system-assigned managed identity to call the MCP with.")
+            principal = principal.lower()
+            callers.append((principal, _system_client_id(self.session, apim_id).lower()))
+            report.add(apim_id, "mcp-caller", f"classic APIM managed identity {principal}")
+            report.prerequisites.append(_app_role_prerequisite(
+                request.entra_app_id, f"the classic APIM managed identity {principal} ({apim_id})") + ".")
+        return callers
+
+    def _mcp(self, request, target, resource_names, gateway, classic, report, apply) -> None:
         identity_id, app_id = resource_names["identity_id"], resource_names["app_id"]
         identity = _optional(self.session, identity_id, IDENTITY_API)
         app = _optional(self.session, app_id, APP_API)
@@ -488,8 +526,9 @@ class McpGatewayIntegration:
         for registry_id in registries.values():
             _ensure_role(self.session, registry_id, principal, ACR_PULL_ROLE, report, True)
         key = self._api_key(app_id) if app else self.token()
+        native = self._gateway_identity(gateway) if request.add_mcp_to_gateway else None
         body = mcp_app_body(request, target, resource_names, identity_id, client, registries,
-                            self._gateway_identity(gateway) if request.add_mcp_to_gateway else None, key)
+                            [*([native] if native else []), *classic], key)
         self.session.arm("PUT", app_id, body, api_version=APP_API)
         current = _wait(self.session, app_id, APP_API, self.sleep)
         fqdn = current["properties"]["configuration"]["ingress"]["fqdn"]
@@ -527,9 +566,8 @@ class McpGatewayIntegration:
             raise ValueError(f"{server_id} exists but is not owned by this integration; refusing to modify it.")
         principal = gateway["identity"]["principalId"].lower()
         report.prerequisites.append(
-            f"One-time Entra admin consent (the pipeline never writes Microsoft Graph): assign app role {REQUIRED_ROLE} "
-            f"of the MCP app registration {request.entra_app_id} to the AI Gateway managed identity {principal}, then "
-            f"grant callers the 'AI Gateway Tools User' role on the tool server.")
+            _app_role_prerequisite(request.entra_app_id, f"the AI Gateway managed identity {principal}")
+            + ", then grant callers the 'AI Gateway Tools User' role on the tool server.")
         if current is not None and _same_server(current, desired):
             report.add(server_id, "unchanged")
         else:
@@ -538,6 +576,11 @@ class McpGatewayIntegration:
             report.add(server_id, ("updated" if current else "created") if apply else ("update" if current else "create"))
         report.outputs["tool_server_url"] = (
             f"{gateway.get('properties', {}).get('gatewayUrl', '').rstrip('/')}/default/toolservers/{resource_names['tool_server']}/mcp")
+
+
+def _app_role_prerequisite(entra_app_id: str, holder: str) -> str:
+    return (f"One-time Entra admin consent (the pipeline never writes Microsoft Graph): assign app role {REQUIRED_ROLE} "
+            f"of the MCP app registration {entra_app_id} to {holder}")
 
 
 def tool_server_body(entra_app_id: str, mcp_url: str) -> dict:
@@ -602,12 +645,21 @@ def application_auth(request: IntegrationRequest, callers: list[tuple[str, str]]
                             "allowed_tools": list(READ_ONLY_TOOLS)} for object_id, client_id in callers]}
 
 
+def unique_callers(callers: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """The MCP refuses duplicate object or client IDs, so each identity is listed once (first wins)."""
+    objects, clients, unique = set(), set(), []
+    for object_id, client_id in callers:
+        if object_id not in objects and client_id not in clients:
+            objects.add(object_id)
+            clients.add(client_id)
+            unique.append((object_id, client_id))
+    return unique
+
+
 def mcp_app_body(request: IntegrationRequest, target: ProjectTarget, resource_names: dict, identity_id: str,
-                 identity_client_id: str, registries: dict[str, str], gateway_identity: tuple[str, str] | None,
+                 identity_client_id: str, registries: dict[str, str], gateway_identities: list[tuple[str, str]],
                  api_key: str) -> dict:
-    callers = [(target.project_principal_id, target.project_client_id)]
-    if gateway_identity:
-        callers.append(gateway_identity)
+    callers = unique_callers([(target.project_principal_id, target.project_client_id), *gateway_identities])
     app_name = resource_names["app_id"].rsplit("/", 1)[1]
     secret = {"name": "AIFACTORY_API_KEY", "secretRef": API_KEY_SECRET}
     resources = {"cpu": 0.5, "memory": "1Gi"}

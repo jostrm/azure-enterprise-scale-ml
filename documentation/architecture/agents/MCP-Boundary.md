@@ -79,7 +79,11 @@ Management service gets the same governed entry point from
 `type: 'mcp'` that passes through to the existing streamable-HTTP MCP and calls it with the APIM
 managed identity. The MCP still authorizes that identity itself: the app role
 `AiFactory.Mcp.Read` and the container app's allowed-caller list are separate one-time steps,
-and the module performs neither.
+and the module performs neither. For a pipeline-hosted MCP, `aifactoryMcpClassicApimResourceIds`
+names the classic APIM services whose system-assigned identities `agent_factory.mcp_gateway`
+adds to the allowed-caller list (read-only GETs of the APIMs, de-duplicated against the
+project and native AI Gateway callers). The app role stays an Entra admin step that the run
+prints as a prerequisite.
 
 `apim-policy-fragments.bicep` holds the throttling, Entra validation, token-metric and
 semantic-cache fragments once, and both the LLM API and the MCP API compose them.

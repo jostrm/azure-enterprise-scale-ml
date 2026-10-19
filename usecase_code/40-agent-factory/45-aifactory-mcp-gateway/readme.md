@@ -12,6 +12,14 @@ steps, and only when at least one flag is `true` and no delete-all flag is set.
 | `enableAIGatewaySKU` | Creates an owned AI Gateway (SKU `AIGateway`, system-assigned identity) in the project resource group, or adopts `aiGatewaySkuResourceId`. Grants the gateway identity **Azure AI User** on the project Foundry account and adds that account as a Foundry model provider. |
 | `addAIFactoryMCP2AIGatewaySKU` | Registers the MCP as gateway tool server `aifactory-mcp-p001-dev` with the exact read-only allow list `aifactory_factory_health`, `aifactory_factory_capabilities`, `aifactory_factory_skills`, managed-identity credentials for `aifactoryMcpEntraAppId`, and adds the gateway identity to the MCP's application callers. |
 
+`aifactoryMcpClassicApimResourceIds` (optional, comma-separated `Microsoft.ApiManagement/service`
+resource IDs, requires `enableAIFactoryMCP`) adds each classic APIM gateway's system-assigned
+identity to the MCP's application callers, after the project and native AI Gateway identities.
+Use it for an APIM that fronts the MCP with `apim-mcp-server.bicep` and
+`authentication-managed-identity`. The step only reads those APIMs: a missing APIM or one without
+a system-assigned identity fails before any write, and an identity already in the list is not
+added twice (the MCP refuses duplicate callers).
+
 ## Rules
 
 - **project001 Dev only.** Another project number fails the step; Stage/Prod runs skip it.
@@ -46,7 +54,8 @@ steps, and only when at least one flag is `true` and no delete-all flag is set.
    set their digest-pinned references.
 2. An Entra admin creates the MCP API app registration with app role `AiFactory.Mcp.Read` and
    sets `aifactoryMcpEntraAppId`. Pipelines never write Microsoft Graph: after the gateway exists,
-   the step prints the exact app-role assignment the admin must grant to the gateway identity.
+   the step prints the exact app-role assignment the admin must grant to the gateway identity
+   and to each identity in `aifactoryMcpClassicApimResourceIds`.
 3. For registration with a new gateway, provide a subnet delegated to `Microsoft.Web/serverFarms`
    (/27 or larger) with outbound 443 to Storage and AzureKeyVault, DNS and the MCP's private IP.
 4. Grant callers **AI Gateway Tools User** on the tool server and sign in with Microsoft Entra ID.

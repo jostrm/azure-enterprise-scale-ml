@@ -25,7 +25,7 @@ INPUTS = (
     "admin_aifactoryPrefixRG", "projectPrefix", "admin_locationSuffix", "admin_aifactorySuffixRG",
     "projectSuffix", "projectResourceGroup", "aifactoryMcpImage", "aifactoryMcpApiImage",
     "aifactoryMcpEntraAppId", "aifactoryMcpContainerAppsEnvironment", "aiGatewaySkuResourceId",
-    "aiGatewaySkuOutboundSubnetId",
+    "aiGatewaySkuOutboundSubnetId", "aifactoryMcpClassicApimResourceIds",
 )
 
 

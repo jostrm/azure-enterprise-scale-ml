@@ -25,6 +25,8 @@ PROJECT_ID = f"{ACCOUNT_ID}/projects/aifproj001"
 ENV_ID = f"{GROUP_ID}/providers/Microsoft.App/managedEnvironments/aca-env-prj001"
 REGISTRY_ID = f"/subscriptions/{SUB}/resourceGroups/common-rg/providers/Microsoft.ContainerRegistry/registries/acrcommon"
 SUBNET = f"/subscriptions/{SUB}/resourceGroups/hub/providers/Microsoft.Network/virtualNetworks/hub/subnets/snet-aigw"
+CLASSIC_APIM = f"/subscriptions/{SUB}/resourceGroups/common-rg/providers/Microsoft.ApiManagement/service/apim-classic"
+OTHER_APIM = f"/subscriptions/{SUB}/resourceGroups/common-rg/providers/Microsoft.ApiManagement/service/apim-other"
 DIGEST = "a" * 64
 VALUES = {
     "enableAIFactoryMCP": "true", "enableAIGatewaySKU": "true", "addAIFactoryMCP2AIGatewaySKU": "true",
@@ -142,6 +144,27 @@ def request(**changes):
     return gw.IntegrationRequest.from_values({**VALUES, **changes})
 
 
+def with_classic_apim(arm, resource_id=CLASSIC_APIM, principal=guid(40), client=guid(41)):
+    """An existing classic APIM gateway (any non-AIGateway SKU) with a system-assigned identity."""
+    arm.add(resource_id, {"id": resource_id, "sku": {"name": "Developer"},
+                          "identity": {"type": "SystemAssigned", "principalId": principal}, "properties": {}})
+    arm.add(f"{resource_id}/providers/Microsoft.ManagedIdentity/identities/default", {"properties": {"clientId": client}})
+    return arm
+
+
+def mcp_env(arm):
+    app = arm.body("/containerApps/aifactory-mcp-p001-dev")
+    return {item["name"]: item for item in app["properties"]["template"]["containers"][0]["env"]}
+
+
+def caller_pairs(env):
+    auth = json.loads(env["AIFACTORY_APPLICATION_AUTH_JSON"]["value"])
+    return [(item["object_id"], item["client_id"]) for item in auth["identities"]]
+
+
+MCP_ONLY = {"enableAIGatewaySKU": "false", "addAIFactoryMCP2AIGatewaySKU": "false", "aiGatewaySkuOutboundSubnetId": ""}
+
+
 class DecisionTests(unittest.TestCase):
     def test_values_derive_the_project_group_and_unset_macros_are_false(self):
         parsed = request()
@@ -170,10 +193,21 @@ class DecisionTests(unittest.TestCase):
             ({"deleteAllForProject": "true"}, "conflict"),
             ({"aiGatewaySkuResourceId": "/subscriptions/x/gateway"}, "aiGatewaySkuResourceId"),
             ({"aiGatewaySkuOutboundSubnetId": "not-a-subnet-resource-id"}, "aiGatewaySkuOutboundSubnetId"),
+            ({"aifactoryMcpClassicApimResourceIds": f"{CLASSIC_APIM},/subscriptions/x/apim"},
+             "aifactoryMcpClassicApimResourceIds must"),
+            ({"aifactoryMcpClassicApimResourceIds": CLASSIC_APIM, "enableAIFactoryMCP": "false",
+              "addAIFactoryMCP2AIGatewaySKU": "false"}, "aifactoryMcpClassicApimResourceIds requires enableAIFactoryMCP"),
         ):
             with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, message):
                 integration.run(request(**changes), apply=True)
         self.assertEqual([], arm.calls)
+
+    def test_classic_apim_caller_ids_are_trimmed_and_deduplicated(self):
+        parsed = request(aifactoryMcpClassicApimResourceIds=(
+            f" {CLASSIC_APIM} ,,{CLASSIC_APIM.replace('common-rg', 'COMMON-RG')}, {OTHER_APIM}"))
+        self.assertEqual((CLASSIC_APIM, OTHER_APIM), parsed.classic_apim_ids)
+        self.assertEqual((), request().classic_apim_ids)
+        self.assertEqual((), request(aifactoryMcpClassicApimResourceIds="$(aifactoryMcpClassicApimResourceIds)").classic_apim_ids)
 
 
 class IntegrationTests(unittest.TestCase):
@@ -406,6 +440,53 @@ class IntegrationTests(unittest.TestCase):
 
         self.assertEqual([], arm.body("/toolServers/aifactory-mcp-p001-dev")["properties"]["blocked"])
 
+    def test_classic_apim_identities_join_the_mcp_callers_without_touching_the_apim(self):
+        values = {**MCP_ONLY, "aifactoryMcpClassicApimResourceIds": CLASSIC_APIM}
+        for apply in (False, True):
+            with self.subTest(apply=apply):
+                arm = with_classic_apim(FakeArm())
+                result = gw.McpGatewayIntegration(arm, sleep=lambda _: None, token=lambda: "k").run(
+                    request(**values), apply=apply)
+                self.assertFalse([call for call in arm.writes() if call[1].lower().startswith(CLASSIC_APIM.lower())])
+                self.assertIn(CLASSIC_APIM, {item["resource"] for item in result["actions"]})
+                self.assertTrue(any(gw.REQUIRED_ROLE in item and APP_REG in item and guid(40) in item
+                                    for item in result["prerequisites"]))
+                if not apply:
+                    self.assertEqual([], arm.writes())
+                    continue
+                env = mcp_env(arm)
+                self.assertEqual([(guid(1), guid(2)), (guid(40), guid(41))], caller_pairs(env))
+                settings = json.loads(env["AIFACTORY_PILOT_CONFIG_JSON"]["value"])
+                self.assertEqual([guid(1), guid(40)], [grant["object_id"] for grant in settings["auth"]["grants"]])
+
+    def test_classic_apim_callers_follow_the_native_gateway_without_duplicates(self):
+        native = gw.names(request())["gateway_id"]
+        arm = with_classic_apim(with_classic_apim(FakeArm()), OTHER_APIM, principal=guid(42), client=guid(43))
+        gw.McpGatewayIntegration(arm, sleep=lambda _: None, token=lambda: "k").run(request(
+            aifactoryMcpClassicApimResourceIds=f"{CLASSIC_APIM},{native},{OTHER_APIM}"), apply=True)
+        self.assertEqual([(guid(1), guid(2)), (guid(11), guid(61)), (guid(40), guid(41)), (guid(42), guid(43))],
+                         caller_pairs(mcp_env(arm)))
+
+    def test_classic_apim_sharing_an_identity_with_another_caller_is_listed_once(self):
+        arm = with_classic_apim(with_classic_apim(FakeArm()), OTHER_APIM)
+        gw.McpGatewayIntegration(arm, sleep=lambda _: None, token=lambda: "k").run(request(
+            **MCP_ONLY, aifactoryMcpClassicApimResourceIds=f"{CLASSIC_APIM},{OTHER_APIM}"), apply=True)
+        self.assertEqual([(guid(1), guid(2)), (guid(40), guid(41))], caller_pairs(mcp_env(arm)))
+
+    def test_missing_or_identity_less_classic_apim_fails_before_any_write(self):
+        for label, arm, message in (
+            ("missing", FakeArm(), "aifactoryMcpClassicApimResourceIds.*does not exist"),
+            ("no identity", FakeArm({CLASSIC_APIM: {"id": CLASSIC_APIM, "identity": {"type": "None"}}}),
+             "system-assigned managed identity"),
+        ):
+            for apply in (False, True):
+                with self.subTest(case=label, apply=apply):
+                    arm.calls.clear()
+                    with self.assertRaisesRegex(ValueError, message):
+                        gw.McpGatewayIntegration(arm, sleep=lambda _: None).run(
+                            request(aifactoryMcpClassicApimResourceIds=CLASSIC_APIM), apply=apply)
+                    self.assertEqual([], arm.writes())
+
     def test_public_container_apps_environment_is_refused(self):
         arm = FakeArm()
         arm.add(ENV_ID, {"id": ENV_ID, "properties": {"vnetConfiguration": {"internal": False}, "defaultDomain": "x"}})
@@ -451,7 +532,8 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual([], sessions)
 
     def test_every_pipeline_input_is_read_by_name(self):
-        self.assertEqual(set(VALUES) | {"aifactoryMcpContainerAppsEnvironment", "aiGatewaySkuResourceId", "projectResourceGroup"},
+        self.assertEqual(set(VALUES) | {"aifactoryMcpContainerAppsEnvironment", "aiGatewaySkuResourceId", "projectResourceGroup",
+                                        "aifactoryMcpClassicApimResourceIds"},
                          set(self.launcher.INPUTS))
 
 
