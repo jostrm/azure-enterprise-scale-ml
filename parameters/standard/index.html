@@ -2067,8 +2067,17 @@ repository visibility or guarantee private-only monitoring.</p>
 <td><code>aifactoryMcpClassicApimResourceIds</code></td>
 <td>Optional, with MCP hosting: classic APIM gateways that call the MCP with their system-assigned identity; an administrator assigns <code>AiFactory.Mcp.Read</code> to each identity.</td>
 </tr>
+<tr>
+<td><code>addAIFactoryMCP2APIM</code> plus the <code>apimGateway*</code> APIM</td>
+<td>Publishing the MCP on the AI gateway pipeline's classic APIM: the project step admits the APIM identity, then the AI gateway pipeline deploys the MCP API and client subscription <code>aifactory-mcp-client</code>.</td>
+</tr>
+<tr>
+<td><code>aifactoryMcpContainerAppResourceId</code></td>
+<td>Optional, with MCP hosting: adopt an MCP app deployed outside the pipeline; only its caller lists grow.</td>
+</tr>
 </tbody>
 </table>
+<p>The step prints, for each MCP caller, the exact admin-run command for the Microsoft Graph Bicep template <code>esml-common/ai-gateway/entra/aifactory-mcp-app-role.bicep</code> that assigns <code>AiFactory.Mcp.Read</code>; no pipeline writes Microsoft Graph.</p>
 <p>All three switches default to false. False skips the component action; it does
 not delete existing resources. See <a href="../advanced/#mcp-and-ai-gateway-parameters">full prerequisites and mappings</a>.
 Regular APIM, optional Kong and Application Gateway are different routes.</p>

@@ -2940,11 +2940,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">393</td>
+<td style="text-align: right;">395</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">391</td>
+<td style="text-align: right;">393</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2960,15 +2960,15 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">398</td>
+<td style="text-align: right;">400</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 152, 416; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 153, 417; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 418, 442; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 152, 418; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 153, 419; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 420, 444; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -3032,6 +3032,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
 <td>Opt-in project001 Dev registration of the Factory MCP tool server on the AI Gateway. Requires both components, private outbound reachability and administrator-granted access. False skips registration; it does not delete existing resources.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:addAIFactoryMCP2APIM --><!-- parameter json.dev:addAIFactoryMCP2APIM --><code>addAIFactoryMCP2APIM</code></td>
+<td><code>ADD_AI_FACTORY_MCP_2_APIM</code></td>
+<td>O</td>
+<td>Y: <code>"false"</code><br>J.dev: <code>"false"</code></td>
+<td>Opt-in publication of the project001 Dev Factory MCP on the AI gateway pipeline's existing classic APIM (apimGateway* settings): the project step adds the APIM identity to the MCP callers, then the AI gateway pipeline deploys the MCP API and client subscription. Requires enableAIFactoryMCP and an administrator-granted app role. False skips both steps; it does not delete the API or the subscription.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:addAIFoundry --><!-- parameter json.dev:addAIFoundry --><code>addAIFoundry</code></td>
@@ -3865,6 +3872,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td>Y: <code>""</code><br>J.dev: <code>""</code></td>
 <td>Comma-separated resource IDs of classic API Management gateways (Microsoft.ApiManagement/service) allowed to call the AI Factory MCP keep-as-is: Requires enableAIFactoryMCP:'true'. Each APIM is only read (never modified); its system-assigned managed identity is added to the MCP application callers. An Entra admin assigns app role AiFactory.Mcp.Read to each identity; pipelines never write Microsoft Graph.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aifactoryMcpContainerAppResourceId --><!-- parameter json.dev:aifactoryMcpContainerAppResourceId --><code>aifactoryMcpContainerAppResourceId</code></td>
+<td><code>AIFACTORY_MCP_CONTAINER_APP_RESOURCE_ID</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Optional adoption of an AI Factory MCP Container App deployed outside the pipeline, in the project resource group. Only its caller lists grow; images, identity, secrets and ingress are never changed. Empty uses the pipeline-managed app.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:aifactoryMcpContainerAppsEnvironment --><!-- parameter json.dev:aifactoryMcpContainerAppsEnvironment --><code>aifactoryMcpContainerAppsEnvironment</code></td>
@@ -6039,6 +6053,13 @@ reported, not silently represented as multiple settings.</p>
 <td>Name of the internal project Container Apps environment hosting the MCP keep-as-is: Empty selects the single environment in the project resource group.</td>
 </tr>
 <tr>
+<td><!-- parameter env:AIFACTORY_MCP_CONTAINER_APP_RESOURCE_ID --><code>AIFACTORY_MCP_CONTAINER_APP_RESOURCE_ID</code></td>
+<td><code>aifactoryMcpContainerAppResourceId</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>Optional adoption of an AI Factory MCP Container App deployed outside the pipeline, in the project resource group. Only its caller lists grow; images, identity, secrets and ingress are never changed. Empty uses the pipeline-managed app.</td>
+</tr>
+<tr>
 <td><!-- parameter env:AIFACTORY_MCP_ENTRA_APP_ID --><code>AIFACTORY_MCP_ENTRA_APP_ID</code></td>
 <td><code>aifactoryMcpEntraAppId</code></td>
 <td>C</td>
@@ -6590,6 +6611,13 @@ reported, not silently represented as multiple settings.</p>
 <td>O</td>
 <td><code>"false"</code></td>
 <td>Opt-in project001 Dev registration of the Factory MCP tool server on the AI Gateway. Requires both components, private outbound reachability and administrator-granted access. False skips registration; it does not delete existing resources.</td>
+</tr>
+<tr>
+<td><!-- parameter env:ADD_AI_FACTORY_MCP_2_APIM --><code>ADD_AI_FACTORY_MCP_2_APIM</code></td>
+<td><code>addAIFactoryMCP2APIM</code></td>
+<td>O</td>
+<td><code>"false"</code></td>
+<td>Opt-in publication of the project001 Dev Factory MCP on the AI gateway pipeline's existing classic APIM (apimGateway* settings): the project step adds the APIM identity to the MCP callers, then the AI gateway pipeline deploys the MCP API and client subscription. Requires enableAIFactoryMCP and an administrator-granted app role. False skips both steps; it does not delete the API or the subscription.</td>
 </tr>
 <tr>
 <td><!-- parameter env:ADD_AI_FOUNDRY --><code>ADD_AI_FOUNDRY</code></td>
