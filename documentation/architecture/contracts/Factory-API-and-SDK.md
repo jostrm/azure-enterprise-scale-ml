@@ -22,7 +22,7 @@ tests:
   - environment_setup/azurefactory-cli/tests/test_workflow_events.py
 graph_symbols:
   - environment_setup/azurefactory-cli/src/azurefactory/client.py::class:AzureFactoryClient
-reviewed_source: '288d6f6a + working tree; observed 2026-10-19'
+reviewed_source: '288d6f6a + d03bc189 teardown review; observed 2026-10-19'
 ---
 # Factory API and SDK
 
@@ -70,6 +70,10 @@ Transport validation permits plaintext HTTP only on loopback, rejects URL creden
 - Review receipts bind request/preview/scope and expiry; they are not signed
   approvals, provider success receipts or permission to retry uncertain writes.
 - Named deletion capability and `can_execute`/retention evidence are required; no fallback to direct shell deletion.
+- Whole-factory review accepts two server plan contracts: `ordered-project-pipelines-v1` and, for a never-enrolled
+  bootstrap draft, `bootstrap-operator-teardown-v1`. The SDK/CLI recheck the teardown plan: one `unlink-hub` and one
+  `operator-teardown` stage per scale set, hub links only inside a protected connectivity hub and pointing at this
+  factory's VNets, teardown deletions inside the frozen groups and never touching the hub, and an unchanged hash.
 - Named whole-factory reviews must declare a server-owned retention policy
   matching the frozen ordered-pipeline plan. The SDK validator and CLI reject
   missing/conflicting policy or selective retention that the whole-group runtime

@@ -21,7 +21,7 @@ graph_symbols:
   - environment_setup/azurefactory-cli/src/azurefactory/review.py::function:write_receipt
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py::class:OperationStore
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py::function:OperationStore.approve
-reviewed_source: 'effdb843 + working tree; native identity boundary observed 2026-10-11; other sections reviewed 2026-10-07'
+reviewed_source: 'effdb843 + d03bc189 deletion review; native identity boundary observed 2026-10-11; deletion reviewed 2026-10-19'
 ---
 # Reviewed operations
 
@@ -68,6 +68,12 @@ completion and stop automatic whole-workflow consent at this boundary. Protected
 host attestation and current durable-receipt/identity verification, not public
 outcome flags alone, govern continuation. Changed, expired or ambiguous evidence
 requires reconciliation without automatic renewal, recreation or retry.
+
+Whole-factory deletion reviews bind one of two frozen server plans. The ordered pipeline plan
+runs every project pipeline before common teardown. The operator teardown plan exists only for a
+never-enrolled bootstrap draft: it is executed by the operator, unlinks only the factory's own hub
+links first and replaces leases with fresh identity, inventory and active-deployment checks. Neither
+plan authorizes deleting a connectivity hub, and a changed plan, record or scope requires a new review.
 
 These local source contracts do not establish published/installed capabilities
 or successful Azure execution.

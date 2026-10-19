@@ -15,7 +15,7 @@ tests:
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/security.py::function:authorize
   - bootstrap/lib/factory_lifecycle.py::function:validate_manifest
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
+reviewed_source: '3e9102ee + d03bc189 connectivity boundary; observed 2026-10-19'
 ---
 # Factory scope model
 
@@ -26,7 +26,7 @@ reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
 - **Project:** stable logical project with one or more placements in selected scale sets. Adding a placement is configuration, not provisioning or model promotion.
 - **Environment:** public lifecycle selection is `dev`, `stage`, `prod`; physical Azure resource naming and ML data contracts commonly use `test` for Stage. Never substitute the Azure ML environment asset named by runtime `environment` for `environment_name`.
 - **Tenant and subscription:** separate validated identity and resource-container coordinates. Azure DevOps organization tenant may differ from the Azure resource tenant on supported routes.
-- **Resource groups:** common/shared and project-specific resources enforce cost, access and operation boundaries. Shared hubs and DNS can introduce dependencies outside both groups.
+- **Resource groups:** common/shared and project-specific resources enforce cost, access and operation boundaries. Shared hubs and DNS can introduce dependencies outside both groups. A connectivity hub RG (an own hub or a shared one) is never deleted by factory deletion; a factory removes only its own DNS links and peerings there.
 
 Registered operations bind factory/scale-set/project IDs, exact environment, source revision, API target and published source. Agent `authorize` re-evaluates a grant for the **same scope and permission**, rather than combining permissions from another project.
 

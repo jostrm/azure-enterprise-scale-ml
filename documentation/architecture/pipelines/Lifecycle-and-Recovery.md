@@ -17,6 +17,7 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_selective_project_deletion.py
   - environment_setup/unit-tests/test-bicep/unit/test_factory_deletion_pipeline.py
   - environment_setup/unit-tests/test-bicep/unit/test_factory_deletion_access_hub.py
+  - environment_setup/unit-tests/test-bicep/unit/test_bootstrap_teardown.py
   - environment_setup/azurefactory-cli/tests/test_factory_deletion.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_operations.py
   - environment_setup/unit-tests/test-bicep/unit/test_project_deletion_lifecycle.py
@@ -26,7 +27,7 @@ graph_symbols:
   - bootstrap/lib/factory_lifecycle.py::function:execute
   - bootstrap/lib/factory_lifecycle.py::class:BlobLocks
   - bootstrap/lib/factory_lifecycle.py::class:RepositoryCoordination
-reviewed_source: '624b8d0c + factory-owned-access-hub-v1 working tree; observed 2026-10-19'
+reviewed_source: 'd03bc189 bootstrap-operator-teardown-v1; observed 2026-10-19'
 ---
 # Lifecycle and recovery
 
@@ -47,6 +48,7 @@ Default coordination uses Blob leases and durable claims/receipts. Explicit sing
 - Agent status observation does not reconfirm or continue jobs. Only the approved paused Full bootstrap supports the specific plan-and-observation-bound continuation.
 - Cancelling an unexecuted agent plan does not cancel an already-running underlying job.
 - Whole-factory teardown (`ordered-project-pipelines-v1`, `factory_deletion_pipeline.py`) runs every project stage in the configured GHA/ADO pipeline first, then common teardown from the operator. Reusable VPN/hub/connectivity types stay protected, with one reviewed exception (`factory-owned-access-hub-v1`): an integrated access hub and private runner that the factory's own bootstrap created inside its own common group. The catalog proves it from consumed bootstrap stage records only; the runtime gives covered untagged resources the core owner, still blocks shared/protected tags, owner conflicts, site connections and any DNS zone link or VNet peering to a VNet the cohort does not delete, and tears the hub/runner closure down last. The deployment principal may sit only on that covered common runner/identity because it runs project stages only; the operator identity may sit on nothing in scope.
+- A factory that its Full bootstrap created but that was never registered or enrolled has no lease store, route or pipeline, so the ordered pipelines cannot run. `bootstrap-operator-teardown-v1` (`freeze_bootstrap_teardown` / `execute_bootstrap_teardown`) covers it: scopes equal the consumed bootstrap record's groups (including old-region groups a confirmed region replan explicitly retained). Ownership is one resolver for freeze and validation: exact factory tags, the record, a role assignment for a principal the bootstrap recorded, or the nearest owned parent resource (never the resource group). Project resources, unowned, shared or protected resources block. The operator first removes only this factory's own DNS links and both sides of its peerings inside configured connectivity hubs, then deletes in dependency order with groups last, re-verifying identity, exact inventory, permissions and no active deployment instead of leases. Its Cloud trusts only ARM and still forbids Entra writes. A failed run keeps evidence and is re-prepared from fresh inventory.
 
 **Intended rule:** reconcile the observed job, receipt, ownership and inventory before deciding on another reviewed operation. Do not automatically retry uncertain writes, clear claims or perform destructive rollback.
 

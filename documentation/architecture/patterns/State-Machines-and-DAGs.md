@@ -15,7 +15,7 @@ tests:
 graph_symbols:
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py::function:OperationStore.continue_operation
   - esml-v2/azure_esml/domain_layer/pipeline.py::class:ESMLPipelineFactory
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
+reviewed_source: '3e9102ee + d03bc189 deletion ordering; observed 2026-10-19'
 ---
 # State machines and DAGs
 
@@ -34,7 +34,7 @@ The observed operation path can loop through `running` observations and `awaitin
 
 Each rendered ML job may be acyclic while the broader ML operating process cycles through data, training, inference, feedback and separately approved retraining. The latter is not evidence of an implemented autonomous retraining controller.
 
-Deletion requires dependency closure and ownership/retention checks, not just reversing a source import graph. Shared network/DNS resources and cascades can cross project boundaries. Static source edges do not capture actual cloud ownership.
+Deletion requires dependency closure and ownership/retention checks, not just reversing a source import graph. Shared network/DNS resources and cascades can cross project boundaries. Static source edges do not capture actual cloud ownership. ARM back-references (NIC to VM, disk `managedBy`, public IP to its IP configuration) name dependents, not dependencies. The operator teardown is a fixed sequence (unlink own hub links, delete resources in dependency order, groups last), each delete preceded by a fresh inventory check.
 
 ## Intended modeling constraint
 
