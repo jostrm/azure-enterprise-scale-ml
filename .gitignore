@@ -56,6 +56,10 @@ coverage.xml
 /.validation-work/
 /%SystemDrive%/
 
+# Graphify generation scratch (source copies, graphify-out/ and its AST cache); graphs ship as snapshots
+/.graph-work-*/
+graphify-out/
+
 # Translations
 *.mo
 *.pot
