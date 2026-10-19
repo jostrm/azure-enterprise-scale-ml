@@ -23,6 +23,9 @@ GROUP_ID = f"/subscriptions/{SUB}/resourceGroups/{GROUP}"
 ACCOUNT_ID = f"{GROUP_ID}/providers/Microsoft.CognitiveServices/accounts/aifacct001"
 PROJECT_ID = f"{ACCOUNT_ID}/projects/aifproj001"
 ENV_ID = f"{GROUP_ID}/providers/Microsoft.App/managedEnvironments/aca-env-prj001"
+PE_ID = f"{GROUP_ID}/providers/Microsoft.Network/privateEndpoints/aca-env-prj001-pend"
+ACA_ZONE = f"/subscriptions/{SUB}/resourceGroups/dns/providers/Microsoft.Network/privateDnsZones/privatelink.swedencentral.azurecontainerapps.io"
+ADOPTED_APP = f"{GROUP_ID}/providers/Microsoft.App/containerApps/aifactory-mcp-project001-dev"
 REGISTRY_ID = f"/subscriptions/{SUB}/resourceGroups/common-rg/providers/Microsoft.ContainerRegistry/registries/acrcommon"
 SUBNET = f"/subscriptions/{SUB}/resourceGroups/hub/providers/Microsoft.Network/virtualNetworks/hub/subnets/snet-aigw"
 CLASSIC_APIM = f"/subscriptions/{SUB}/resourceGroups/common-rg/providers/Microsoft.ApiManagement/service/apim-classic"
@@ -70,12 +73,17 @@ class FakeArm:
             "/providers/Microsoft.ContainerRegistry/registries": [
                 {"id": REGISTRY_ID, "properties": {"loginServer": "acrcommon.azurecr.io"}}],
             "/providers/Microsoft.Authorization/roleAssignments": [],
+            f"{PE_ID}/privateDnsZoneGroups": [
+                {"name": "default", "properties": {"privateDnsZoneConfigs": [
+                    {"name": "aca", "properties": {"privateDnsZoneId": ACA_ZONE}}]}}],
         }
         self.add(PROJECT_ID, {"id": PROJECT_ID, "name": "aifacct001/aifproj001", "identity": {"principalId": guid(1)},
                               "properties": {"endpoints": {"AI Foundry API": "https://aifacct001.services.ai.azure.com/api/projects/aifproj001"}}})
         self.add(f"{PROJECT_ID}/providers/Microsoft.ManagedIdentity/identities/default", {"properties": {"clientId": guid(2)}})
-        self.add(ENV_ID, {"id": ENV_ID, "properties": {"vnetConfiguration": {"internal": True},
-                                                       "defaultDomain": "internal.swedencentral.azurecontainerapps.io"}})
+        self.add(ENV_ID, {"id": ENV_ID, "properties": {
+            "vnetConfiguration": {"internal": True}, "defaultDomain": "internal.swedencentral.azurecontainerapps.io",
+            "privateEndpointConnections": [{"properties": {
+                "privateEndpoint": {"id": PE_ID}, "privateLinkServiceConnectionState": {"status": "Approved"}}}]}})
 
     def add(self, resource_id, body):
         self.resources[resource_id.lower()] = body
@@ -163,6 +171,52 @@ def caller_pairs(env):
 
 
 MCP_ONLY = {"enableAIGatewaySKU": "false", "addAIFactoryMCP2AIGatewaySKU": "false", "aiGatewaySkuOutboundSubnetId": ""}
+ADOPT = {**MCP_ONLY, "aifactoryMcpContainerAppResourceId": ADOPTED_APP, "aifactoryMcpImage": "", "aifactoryMcpApiImage": ""}
+APIM_VARS = {"addAIFactoryMCP2APIM": "true", "apimGatewayResourceGroup": "common-rg", "apimGatewayServiceName": "apim-classic"}
+OPERATOR = guid(30)
+ADOPTED_IMAGE = f"acrcommon.azurecr.io/aifactory-mcp@sha256:{'b' * 64}"
+
+
+def identity_entry(object_id, client_id):
+    return {"object_id": object_id, "client_id": client_id, "scope_keys": [gw.SCOPE_KEY],
+            "allowed_tools": list(gw.READ_ONLY_TOOLS)}
+
+
+def with_adopted_app(arm, callers=((guid(1), guid(2)),), audience=APP_REG, tags=None, containers=None):
+    """A Container App deployed outside this integration (for example by mcp/deploy/rollout.py)."""
+    settings = {"scopes": {gw.SCOPE_KEY: {}}, "factory": {"writes_enabled": False},
+                "auth": {"client_id": audience, "audience": audience, "grants": [
+                    {"object_id": object_id, "scopes": [gw.SCOPE_KEY], "permissions": ["factory.read"]}
+                    for object_id in (OPERATOR, *(pair[0] for pair in callers))]}}
+    auth = {"audience": audience, "required_role": gw.REQUIRED_ROLE,
+            "identities": [identity_entry(*pair) for pair in callers]}
+    arm.add(ADOPTED_APP, {
+        "id": ADOPTED_APP, "location": "swedencentral",
+        "tags": {"aifactory.managed_by": "aifactory-mcp", "app-onboard-skill": "true"} if tags is None else tags,
+        "identity": {"type": "UserAssigned", "userAssignedIdentities": {"mi-aifactory-mcp-dev": {}}},
+        "properties": {
+            "environmentId": ENV_ID, "provisioningState": "Succeeded",
+            "latestRevisionName": "aifactory-mcp-project001-dev--apim-caller-20261019",
+            "configuration": {"ingress": {"external": True,
+                                          "fqdn": "aifactory-mcp-project001-dev.internal.swedencentral.azurecontainerapps.io"},
+                              "secrets": [{"name": gw.API_KEY_SECRET, "keyVaultUrl": "https://kv.vault.azure.net/secrets/key"}]},
+            "template": {"revisionSuffix": "apim-caller-20261019", "scale": {"minReplicas": 1, "maxReplicas": 1},
+                         "containers": containers if containers is not None else [
+                             {"name": "mcp", "image": ADOPTED_IMAGE, "env": [
+                                 {"name": "AIFACTORY_PILOT_CONFIG_JSON", "value": json.dumps(settings)},
+                                 {"name": "AIFACTORY_APPLICATION_AUTH_JSON", "value": json.dumps(auth)},
+                                 {"name": "AIFACTORY_API_KEY", "secretRef": gw.API_KEY_SECRET}]},
+                             {"name": "factory-api", "image": ADOPTED_IMAGE.replace("mcp@", "api@"),
+                              "env": [{"name": "AIFACTORY_API_KEY", "secretRef": gw.API_KEY_SECRET}]}]},
+        }})
+    return arm
+
+
+def adopted_env(arm):
+    patches = [call for call in arm.calls if call[0] == "PATCH" and call[1] == ADOPTED_APP]
+    assert len(patches) == 1, f"expected one PATCH of the adopted app, got {len(patches)}"
+    template = patches[0][3]["properties"]["template"]
+    return template, {item["name"]: item for item in template["containers"][0]["env"]}
 
 
 class DecisionTests(unittest.TestCase):
@@ -208,6 +262,35 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual((CLASSIC_APIM, OTHER_APIM), parsed.classic_apim_ids)
         self.assertEqual((), request().classic_apim_ids)
         self.assertEqual((), request(aifactoryMcpClassicApimResourceIds="$(aifactoryMcpClassicApimResourceIds)").classic_apim_ids)
+
+    def test_the_ai_gateway_pipeline_apim_joins_the_callers_automatically(self):
+        parsed = request(**APIM_VARS, aifactoryMcpClassicApimResourceIds=f"{OTHER_APIM},{CLASSIC_APIM}")
+        self.assertEqual(CLASSIC_APIM, parsed.apim_id)
+        self.assertEqual((OTHER_APIM, CLASSIC_APIM), parsed.apim_caller_ids)
+        other_sub = "44444444-4444-4444-8444-444444444444"
+        self.assertTrue(request(**APIM_VARS, apimGatewaySubscriptionId=other_sub).apim_id.startswith(f"/subscriptions/{other_sub}/"))
+        self.assertEqual((CLASSIC_APIM,), request(**{**APIM_VARS, "addAIFactoryMCP2APIM": "false"},
+                                                  aifactoryMcpClassicApimResourceIds=CLASSIC_APIM).apim_caller_ids)
+
+    def test_invalid_adoption_and_apim_requests_never_touch_azure(self):
+        arm = FakeArm()
+        integration = gw.McpGatewayIntegration(arm)
+        for changes, message in (
+            ({**ADOPT, "aifactoryMcpContainerAppResourceId": "/subscriptions/x/containerApps/app"},
+             "aifactoryMcpContainerAppResourceId must"),
+            ({**ADOPT, "aifactoryMcpContainerAppResourceId": ADOPTED_APP.replace(GROUP, "other-rg")},
+             "project resource group"),
+            ({"aifactoryMcpContainerAppResourceId": ADOPTED_APP, "enableAIFactoryMCP": "false",
+              "addAIFactoryMCP2AIGatewaySKU": "false"}, "aifactoryMcpContainerAppResourceId requires enableAIFactoryMCP"),
+            ({**APIM_VARS, "enableAIFactoryMCP": "false", "addAIFactoryMCP2AIGatewaySKU": "false"},
+             "addAIFactoryMCP2APIM requires enableAIFactoryMCP"),
+            ({**MCP_ONLY, **APIM_VARS, "apimGatewayServiceName": ""}, "apimGatewayResourceGroup and apimGatewayServiceName"),
+            ({**MCP_ONLY, **APIM_VARS, "apimGatewaySubscriptionId": "nope"}, "apimGatewaySubscriptionId must be a GUID"),
+        ):
+            with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, message):
+                integration.run(request(**changes), apply=True)
+        self.assertEqual([], arm.calls)
+        self.assertTrue(gw.decide(request(**ADOPT)).act, "an adopted app needs no image variables")
 
 
 class IntegrationTests(unittest.TestCase):
@@ -510,14 +593,197 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(["project001-dev"], list(settings.scopes))
 
 
+class AdoptionTests(unittest.TestCase):
+    """aifactoryMcpContainerAppResourceId: an MCP app deployed outside the pipeline gains callers, nothing else."""
+
+    def test_adopted_app_keeps_its_runtime_and_only_gains_the_missing_callers(self):
+        arm = with_classic_apim(with_adopted_app(FakeArm()))
+        result = gw.McpGatewayIntegration(arm, sleep=lambda _: None, token=lambda: "never").run(
+            request(**ADOPT, aifactoryMcpClassicApimResourceIds=CLASSIC_APIM), apply=True)
+
+        self.assertEqual([("PATCH", ADOPTED_APP)], [call[:2] for call in arm.writes()])
+        template, env = adopted_env(arm)
+        self.assertEqual({"properties"}, set(arm.writes()[0][3]), "tags, identity, ingress and secrets stay untouched")
+        self.assertEqual([ADOPTED_IMAGE, ADOPTED_IMAGE.replace("mcp@", "api@")],
+                         [item["image"] for item in template["containers"]])
+        self.assertEqual({"secretRef": gw.API_KEY_SECRET}, {k: v for k, v in env["AIFACTORY_API_KEY"].items() if k != "name"})
+        self.assertNotEqual("apim-caller-20261019", template["revisionSuffix"], "a reused suffix would be rejected")
+        self.assertEqual([(guid(1), guid(2)), (guid(40), guid(41))], caller_pairs(env))
+        settings = json.loads(env["AIFACTORY_PILOT_CONFIG_JSON"]["value"])
+        self.assertEqual([OPERATOR, guid(1), guid(40)], [grant["object_id"] for grant in settings["auth"]["grants"]])
+        self.assertEqual("https://aifactory-mcp-project001-dev.internal.swedencentral.azurecontainerapps.io/mcp",
+                         result["outputs"]["mcp_url"])
+        self.assertFalse([call for call in arm.calls if "/containerApps/aifactory-mcp-p001-dev" in call[1]
+                          or "/userAssignedIdentities/" in call[1] or "/roleAssignments" in call[1]])
+
+    def test_adopted_app_with_every_caller_is_unchanged_and_plan_never_writes(self):
+        arm = with_classic_apim(with_adopted_app(FakeArm(), callers=((guid(1), guid(2)), (guid(40), guid(41)))))
+        values = {**ADOPT, "aifactoryMcpClassicApimResourceIds": CLASSIC_APIM}
+        result = gw.McpGatewayIntegration(arm, sleep=lambda _: None).run(request(**values), apply=True)
+        self.assertEqual([], arm.writes())
+        self.assertIn({"resource": ADOPTED_APP, "action": "unchanged", "detail": "adopted; every caller is present"},
+                      result["actions"])
+
+        arm = with_classic_apim(with_adopted_app(FakeArm()))
+        result = gw.McpGatewayIntegration(arm).run(request(**values), apply=False)
+        self.assertEqual([], arm.writes())
+        planned = next(item for item in result["actions"] if item["resource"] == ADOPTED_APP)
+        self.assertEqual("update", planned["action"])
+        self.assertIn(guid(40), planned["detail"])
+
+    def test_adopted_app_feeds_the_native_gateway_registration(self):
+        arm = with_adopted_app(FakeArm())
+        gw.McpGatewayIntegration(arm, sleep=lambda _: None).run(
+            request(aifactoryMcpContainerAppResourceId=ADOPTED_APP), apply=True)
+        _, env = adopted_env(arm)
+        self.assertEqual([(guid(1), guid(2)), (guid(11), guid(61))], caller_pairs(env))
+        endpoint = arm.body("/toolServers/aifactory-mcp-p001-dev")["properties"]["endpoints"][0]
+        self.assertEqual("https://aifactory-mcp-project001-dev.internal.swedencentral.azurecontainerapps.io/mcp",
+                         endpoint["mcp"]["url"])
+
+    def test_unsafe_adoptions_are_refused_before_any_write(self):
+        other_env = f"{GROUP_ID}/providers/Microsoft.App/managedEnvironments/aca-env-other"
+        for label, arm, message in (
+            ("missing", FakeArm(), "aifactoryMcpContainerAppResourceId.*does not exist"),
+            ("pipeline-managed", with_adopted_app(FakeArm(), tags=dict(gw.OWNER_TAGS)), "pipeline-managed"),
+            ("other audience", with_adopted_app(FakeArm(), audience=guid(99)), "audience"),
+            ("no mcp container", with_adopted_app(FakeArm(), containers=[{"name": "web", "image": "x", "env": []}]),
+             "'mcp' container"),
+        ):
+            for apply in (False, True):
+                with self.subTest(case=label, apply=apply):
+                    arm.calls.clear()
+                    with self.assertRaisesRegex(ValueError, message):
+                        gw.McpGatewayIntegration(arm, sleep=lambda _: None).run(request(**ADOPT), apply=apply)
+                    self.assertEqual([], arm.writes())
+        arm = with_adopted_app(FakeArm())
+        arm.lists[f"{GROUP_ID}/resources"].append({"id": other_env, "name": "aca-env-other", "type": "Microsoft.App/managedEnvironments"})
+        gw.McpGatewayIntegration(arm, sleep=lambda _: None).run(request(**ADOPT), apply=False)
+        self.assertTrue(any(call[0] == "GET" and call[1] == ENV_ID for call in arm.calls),
+                        "the adopted app selects its own environment")
+        with self.assertRaisesRegex(ValueError, "runs in environment aca-env-prj001"):
+            gw.McpGatewayIntegration(arm).run(request(**ADOPT, aifactoryMcpContainerAppsEnvironment="aca-env-other"),
+                                              apply=False)
+
+
+class PrivateNetworkTests(unittest.TestCase):
+    """APIM and the AI Gateway reach the MCP through its environment's private endpoint and private DNS."""
+
+    def test_environment_without_an_approved_private_endpoint_is_refused_before_writes(self):
+        for connections in ([], [{"properties": {"privateEndpoint": {"id": PE_ID},
+                                                  "privateLinkServiceConnectionState": {"status": "Pending"}}}]):
+            with self.subTest(connections=connections):
+                arm = FakeArm()
+                arm.resources[ENV_ID.lower()]["properties"]["privateEndpointConnections"] = connections
+                with self.assertRaisesRegex(ValueError, "approved private endpoint"):
+                    gw.McpGatewayIntegration(arm).run(request(**MCP_ONLY), apply=True)
+                self.assertEqual([], arm.writes())
+
+    def test_private_dns_registration_is_reported_and_its_absence_is_a_prerequisite(self):
+        arm = FakeArm()
+        result = gw.McpGatewayIntegration(arm, sleep=lambda _: None, token=lambda: "k").run(request(**MCP_ONLY), apply=True)
+        self.assertEqual(PE_ID, result["outputs"]["mcp_private_endpoint_id"])
+        self.assertFalse(any("private DNS" in item for item in result["prerequisites"]))
+
+        arm = FakeArm()
+        arm.lists[f"{PE_ID}/privateDnsZoneGroups"] = []
+        result = gw.McpGatewayIntegration(arm).run(request(**MCP_ONLY), apply=False)
+        self.assertTrue(any("private DNS" in item and "privatelink.swedencentral.azurecontainerapps.io" in item
+                            for item in result["prerequisites"]))
+
+
+class ApimMcpTests(unittest.TestCase):
+    """addAIFactoryMCP2APIM: the AI gateway pipeline publishes the MCP on the classic APIM (GET only here)."""
+
+    def values(self, **changes):
+        return request(**{**MCP_ONLY, **APIM_VARS, **changes})
+
+    def owned_mcp(self, arm, callers):
+        """The pipeline-managed MCP app as step 71 leaves it."""
+        integration = gw.McpGatewayIntegration(arm, sleep=lambda _: None, token=lambda: "k")
+        integration.run(self.values(**({} if callers else {"addAIFactoryMCP2APIM": "false"})), apply=True)
+        arm.calls.clear()
+        return integration
+
+    def test_disabled_and_non_dev_runs_are_skipped_without_azure(self):
+        arm = FakeArm()
+        integration = gw.McpGatewayIntegration(arm)
+        self.assertEqual("skipped", integration.apim_parameters(self.values(addAIFactoryMCP2APIM="false"))["mode"])
+        self.assertEqual("skipped", integration.apim_parameters(self.values(dev_test_prod="prod"))["mode"])
+        with self.assertRaisesRegex(ValueError, "addAIFactoryMCP2APIM requires enableAIFactoryMCP"):
+            integration.apim_parameters(self.values(enableAIFactoryMCP="false"))
+        self.assertEqual([], arm.calls)
+
+    def test_parameters_point_the_apim_api_at_the_mcp_that_accepts_the_apim_identity(self):
+        arm = with_classic_apim(FakeArm())
+        integration = self.owned_mcp(arm, callers=True)
+        result = integration.apim_parameters(self.values())
+        self.assertEqual([], arm.writes())
+        self.assertEqual("parameters", result["mode"])
+        parameters = {key: value["value"] for key, value in result["parameters"]["parameters"].items()}
+        self.assertEqual({
+            "apimServiceName": "apim-classic", "mcpServerName": gw.APIM_MCP_SERVER,
+            "displayName": "Enterprise Scale AI Factory",
+            "mcpServerBaseUrl": "https://aifactory-mcp-p001-dev.internal.swedencentral.azurecontainerapps.io",
+            "mcpEntraAppId": APP_REG, "clientSubscriptionName": gw.APIM_MCP_CLIENT_SUBSCRIPTION,
+        }, {key: value for key, value in parameters.items() if key != "mcpDescription"})
+        self.assertIn("Read-only", parameters["mcpDescription"])
+        self.assertEqual(CLASSIC_APIM, result["apim_id"])
+        self.assertTrue(any(gw.REQUIRED_ROLE in item and guid(40) in item for item in result["prerequisites"]))
+
+    def test_adopted_mcp_is_published_by_its_own_origin(self):
+        arm = with_classic_apim(with_adopted_app(FakeArm(), callers=((guid(1), guid(2)), (guid(40), guid(41)))))
+        result = gw.McpGatewayIntegration(arm).apim_parameters(self.values(**ADOPT))
+        self.assertEqual("https://aifactory-mcp-project001-dev.internal.swedencentral.azurecontainerapps.io",
+                         result["parameters"]["parameters"]["mcpServerBaseUrl"]["value"])
+
+    def test_missing_mcp_or_not_yet_admitted_apim_fail_with_the_next_step(self):
+        arm = with_classic_apim(FakeArm())
+        with self.assertRaisesRegex(ValueError, "does not exist yet.*project001 Dev pipeline"):
+            gw.McpGatewayIntegration(arm).apim_parameters(self.values())
+        integration = self.owned_mcp(arm, callers=False)
+        with self.assertRaisesRegex(ValueError, "does not accept.*addAIFactoryMCP2APIM"):
+            integration.apim_parameters(self.values())
+        self.assertEqual([], arm.writes())
+        with self.assertRaisesRegex(ValueError, "apim-missing does not exist"):
+            gw.McpGatewayIntegration(FakeArm()).apim_parameters(self.values(apimGatewayServiceName="apim-missing"))
+
+
 class LauncherTests(unittest.TestCase):
     def setUp(self):
         spec = importlib.util.spec_from_file_location("mcp_gateway_launcher", ROOT / "45-aifactory-mcp-gateway" / "deploy.py")
         self.launcher = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.launcher)
 
-    def args(self, command="apply", apply=True):
-        return type("Args", (), {"command": command, "apply": apply})()
+    def args(self, command="apply", apply=True, output=None):
+        return type("Args", (), {"command": command, "apply": apply, "output": output})()
+
+    def test_apim_parameters_writes_the_module_parameters_file_and_skips_quietly(self):
+        import tempfile
+        arm = with_classic_apim(FakeArm())
+        gw.McpGatewayIntegration(arm, sleep=lambda _: None, token=lambda: "k").run(request(**MCP_ONLY, **APIM_VARS), apply=True)
+        sessions = []
+
+        def factory(*values):
+            sessions.append(values)
+            return arm
+
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "apim-mcp.parameters.json"
+            # The MCP always lives in project001, whichever project the shared variables name.
+            environ = {**VALUES, **MCP_ONLY, **APIM_VARS, "project_number_000": "004"}
+            result = self.launcher.run(self.args("apim-parameters", False, str(output)), environ, factory)
+            self.assertEqual("parameters", result["mode"])
+            written = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual("apim-classic", written["parameters"]["apimServiceName"]["value"])
+            self.assertEqual([(SUB, TENANT)], sessions)
+
+            skipped = Path(folder) / "skipped.json"
+            result = self.launcher.run(self.args("apim-parameters", False, str(skipped)),
+                                       {**environ, "addAIFactoryMCP2APIM": "false"}, factory)
+            self.assertEqual("skipped", result["mode"])
+            self.assertFalse(skipped.exists())
+            self.assertEqual(1, len(sessions))
 
     def test_disabled_and_invalid_runs_stop_before_any_session(self):
         sessions = []
@@ -533,7 +799,9 @@ class LauncherTests(unittest.TestCase):
 
     def test_every_pipeline_input_is_read_by_name(self):
         self.assertEqual(set(VALUES) | {"aifactoryMcpContainerAppsEnvironment", "aiGatewaySkuResourceId", "projectResourceGroup",
-                                        "aifactoryMcpClassicApimResourceIds"},
+                                        "aifactoryMcpClassicApimResourceIds", "aifactoryMcpContainerAppResourceId",
+                                        "addAIFactoryMCP2APIM", "apimGatewaySubscriptionId", "apimGatewayResourceGroup",
+                                        "apimGatewayServiceName"},
                          set(self.launcher.INPUTS))
 
 

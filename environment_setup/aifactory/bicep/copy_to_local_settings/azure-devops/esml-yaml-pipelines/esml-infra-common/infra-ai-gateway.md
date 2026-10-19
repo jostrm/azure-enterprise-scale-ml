@@ -114,6 +114,12 @@ A normal manual run evaluates Dev, Stage, and Prod in sequence. The gateway vari
 
 `ENABLE_KONG` is independent and defaults to `false`; Kong configuration is not required for the APIM gateway.
 
+## AI Factory MCP on APIM (`addAIFactoryMCP2APIM`)
+
+`addAIFactoryMCP2APIM: "true"` (default `false`, requires `enableAIFactoryMCP: "true"`) adds the task **Expose the AI Factory MCP on APIM** after the OpenAI pool. It publishes the project001 Dev AI Factory MCP on the APIM named by `apimGatewaySubscriptionId`, `apimGatewayResourceGroup` and `apimGatewayServiceName` as API `enterprise-scale-ai-factory` (`https://<apim-gateway-host>/enterprise-scale-ai-factory/mcp`), with client subscription `aifactory-mcp-client`. It does not need `ENABLE_APIM`.
+
+Run the project pipeline first: with the same flag, its MCP step adds the APIM identity to the MCP callers. The task's launcher (`deploy.py apim-parameters`, GET only) fails with that instruction while the MCP app is missing or does not list the APIM identity, and Stage/Prod skip the task. An Entra admin still assigns app role `AiFactory.Mcp.Read` to the APIM identity once; the project run prints the exact assignment. Details: `usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md`.
+
 ## Preflight checklist
 
 - [ ] Existing APIM name, subscription, and resource group are correct.

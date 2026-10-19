@@ -141,6 +141,13 @@ class McpServerModuleTests(unittest.TestCase):
         self.assertNotIn("context.Response.Body", module)
         self.assertIn("output gatewayMcpUrl string", module)
 
+    def test_module_can_issue_one_client_subscription_scoped_to_the_mcp_api(self):
+        module = text(MCP)
+        self.assertIn("param clientSubscriptionName string = ''", module)
+        self.assertIn("if (!empty(clientSubscriptionName))", module)
+        self.assertIn("scope: '/apis/${mcpApi.name}'", module)
+        self.assertIn("output clientSubscriptionResourceId string", module)
+
     def test_readme_documents_parity_and_prerequisites(self):
         readme = text(README)
         for topic in ("Client IP throttling", "User throttling", "Semantic cache", "Token metrics",
@@ -188,6 +195,11 @@ class CompiledTemplateTests(unittest.TestCase):
         self.assertEqual(1, len(of_type("Microsoft.ApiManagement/service/apis/policies")))
         self.assertIn('<backend><forward-request buffer-response="false" /></backend>',
                       json.dumps(template["variables"]["policyXml"]).replace('\\"', '"'))
+        # Optional: the AI gateway pipeline issues one client subscription; Spider keeps its own.
+        subscriptions = of_type("Microsoft.ApiManagement/service/subscriptions")
+        self.assertEqual(1, len(subscriptions))
+        self.assertIn("clientSubscriptionName", subscriptions[0]["condition"])
+        self.assertEqual("", template["parameters"]["clientSubscriptionName"]["defaultValue"])
 
     def test_compiled_policy_carries_ip_and_cache_fragments(self):
         compiled = json.dumps(self.templates[CONFIGURATION.name])

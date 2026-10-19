@@ -7,14 +7,22 @@ Flags (exact names) drive one late project-pipeline step:
 - addAIFactoryMCP2AIGatewaySKU registers the MCP as an exact read-only gateway tool server.
 - aifactoryMcpClassicApimResourceIds (optional) lets existing classic APIM gateways call the MCP with their
   system-assigned identities; those gateways are only read, never modified.
+- addAIFactoryMCP2APIM adds the AI gateway pipeline's APIM (apimGateway* variables) to those callers, and
+  apim_parameters() gives that pipeline the apim-mcp-server.bicep parameters that publish the MCP on it.
+- aifactoryMcpContainerAppResourceId (optional) adopts an MCP app deployed outside this step (for example
+  by mcp/deploy/rollout.py): only its caller lists grow; images, identity, secrets and ingress stay.
 
 False never deletes or detaches anything. Resources are only created or updated when this integration
 owns them (tags or a description marker); foreign resources with the derived names are refused. Every
-write is a read-before-write PUT/PATCH; nothing here deletes.
+write is a read-before-write PUT/PATCH; nothing here deletes. The MCP's Container Apps environment must
+reach APIM and the AI Gateway through an approved private endpoint; the Bicep that creates the
+environment owns that endpoint and its private DNS registration, so this step only verifies them.
 """
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 import re
 import secrets
@@ -44,16 +52,26 @@ RESOURCES_API = "2021-04-01"
 COGNITIVE_API = "2025-06-01"
 IDENTITY_API = "2023-01-31"
 APP_API = "2024-03-01"
+# 2025-01-01 is the first GA version that returns the environment's privateEndpointConnections.
+ENVIRONMENT_API = "2025-01-01"
+NETWORK_API = "2024-05-01"
 REGISTRY_API = "2023-07-01"
 ROLE_API = "2022-04-01"
 GATEWAY_API = "2025-09-01-preview"
 APIM_API = "2024-05-01"
+APIM_MCP_SERVER = "enterprise-scale-ai-factory"
+APIM_MCP_CLIENT_SUBSCRIPTION = "aifactory-mcp-client"
+DISPLAY_NAME = "Enterprise Scale AI Factory"
+READ_ONLY_DESCRIPTION = ("Read-only Enterprise Scale AI Factory MCP: API health, capabilities and skill discovery. "
+                         "Factory provisioning and deletion are disabled.")
 GUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 IMAGE = re.compile(r"^(?P<server>[a-z0-9][a-z0-9.-]*\.azurecr\.io)/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$")
 GATEWAY_ID = re.compile(
     r"^/subscriptions/[0-9a-fA-F-]{36}/resourceGroups/[^/]+/providers/Microsoft\.ApiManagement/service/[A-Za-z][A-Za-z0-9-]{0,49}$")
 SUBNET_ID = re.compile(
     r"^/subscriptions/[0-9a-fA-F-]{36}/resourceGroups/[^/]+/providers/Microsoft\.Network/virtualNetworks/[^/]+/subnets/[^/]+$")
+CONTAINER_APP_ID = re.compile(
+    r"^/subscriptions/[0-9a-fA-F-]{36}/resourceGroups/[^/]+/providers/Microsoft\.App/containerApps/[a-z][a-z0-9-]{0,30}[a-z0-9]$")
 KNOWLEDGE_INCLUDES = [
     "documentation/v2/**/*.md", "usecase_code/30-machine-learning/**/*.md",
     "usecase_code/20-agent-foundry/**/*.md", "usecase_code/20-agent-foundry/**/*.py",
@@ -126,10 +144,33 @@ class IntegrationRequest:
     gateway_resource_id: str = ""
     gateway_subnet_id: str = ""
     classic_apim_ids: tuple[str, ...] = ()
+    mcp_app_resource_id: str = ""
+    add_mcp_to_apim: bool = False
+    apim_subscription_id: str = ""
+    apim_resource_group: str = ""
+    apim_service_name: str = ""
 
     @property
     def any_enabled(self) -> bool:
         return self.enable_mcp or self.enable_gateway or self.add_mcp_to_gateway
+
+    @property
+    def group_id(self) -> str:
+        return f"/subscriptions/{self.subscription_id}/resourceGroups/{self.resource_group}"
+
+    @property
+    def apim_id(self) -> str:
+        """The AI gateway pipeline's APIM (apimGateway* variables), or empty when they are not set."""
+        if not (self.apim_resource_group and self.apim_service_name):
+            return ""
+        return (f"/subscriptions/{self.apim_subscription_id or self.subscription_id}/resourceGroups/"
+                f"{self.apim_resource_group}/providers/Microsoft.ApiManagement/service/{self.apim_service_name}")
+
+    @property
+    def apim_caller_ids(self) -> tuple[str, ...]:
+        """Classic APIM gateways whose identities call the MCP: the explicit list plus the AI gateway pipeline's APIM."""
+        published = [self.apim_id] if self.add_mcp_to_apim and self.apim_id else []
+        return _ids(",".join([*self.classic_apim_ids, *published]))
 
     @classmethod
     def from_values(cls, values: Mapping[str, object]) -> "IntegrationRequest":
@@ -159,6 +200,11 @@ class IntegrationRequest:
             gateway_resource_id=_text(get("aiGatewaySkuResourceId")),
             gateway_subnet_id=_text(get("aiGatewaySkuOutboundSubnetId")),
             classic_apim_ids=_ids(get("aifactoryMcpClassicApimResourceIds")),
+            mcp_app_resource_id=_text(get("aifactoryMcpContainerAppResourceId")),
+            add_mcp_to_apim=flag(get("addAIFactoryMCP2APIM"), "addAIFactoryMCP2APIM"),
+            apim_subscription_id=_text(get("apimGatewaySubscriptionId")).lower(),
+            apim_resource_group=_text(get("apimGatewayResourceGroup")),
+            apim_service_name=_text(get("apimGatewayServiceName")),
         )
 
 
@@ -187,11 +233,14 @@ def decide(request: IntegrationRequest) -> Decision:
     if request.enable_gateway and not request.enable_ai_foundry:
         problems.append("enableAIGatewaySKU requires enableAIFoundry=true")
     if request.enable_mcp:
+        # An adopted app keeps its own images; only a pipeline-managed app needs them.
         for name, value in (("aifactoryMcpImage", request.mcp_image), ("aifactoryMcpApiImage", request.api_image)):
-            if not IMAGE.fullmatch(value):
+            if not request.mcp_app_resource_id and not IMAGE.fullmatch(value):
                 problems.append(f"{name} must be a digest-pinned Azure Container Registry image (<registry>.azurecr.io/<repo>@sha256:<digest>)")
         if not GUID.fullmatch(request.entra_app_id):
             problems.append("aifactoryMcpEntraAppId must be the MCP API app registration client ID (GUID)")
+    problems.extend(_adoption_problems(request))
+    problems.extend(_apim_problems(request))
     if request.gateway_resource_id and not GATEWAY_ID.fullmatch(request.gateway_resource_id):
         problems.append("aiGatewaySkuResourceId must be a Microsoft.ApiManagement/service resource ID")
     if request.gateway_subnet_id and not SUBNET_ID.fullmatch(request.gateway_subnet_id):
@@ -210,8 +259,50 @@ def decide(request: IntegrationRequest) -> Decision:
     return Decision(True, "Validated project001 Dev MCP & AI Gateway request.")
 
 
+def _adoption_problems(request: IntegrationRequest) -> list[str]:
+    app_id = request.mcp_app_resource_id
+    if not app_id:
+        return []
+    problems = [] if request.enable_mcp else ["aifactoryMcpContainerAppResourceId requires enableAIFactoryMCP=true"]
+    if not CONTAINER_APP_ID.fullmatch(app_id):
+        problems.append("aifactoryMcpContainerAppResourceId must be a Microsoft.App/containerApps resource ID")
+    if not app_id.lower().startswith(request.group_id.lower() + "/providers/"):
+        problems.append(f"aifactoryMcpContainerAppResourceId must be in the project resource group {request.resource_group}")
+    return problems
+
+
+def _apim_problems(request: IntegrationRequest) -> list[str]:
+    if not request.add_mcp_to_apim:
+        return []
+    problems = [] if request.enable_mcp else ["addAIFactoryMCP2APIM requires enableAIFactoryMCP=true"]
+    if not request.apim_id:
+        problems.append("addAIFactoryMCP2APIM requires apimGatewayResourceGroup and apimGatewayServiceName")
+    elif request.apim_subscription_id and not GUID.fullmatch(request.apim_subscription_id):
+        problems.append("apimGatewaySubscriptionId must be a GUID")
+    elif not GATEWAY_ID.fullmatch(request.apim_id):
+        problems.append("apimGatewayServiceName must be an API Management service name")
+    return problems
+
+
+def decide_apim(request: IntegrationRequest) -> Decision:
+    """Validate the AI gateway pipeline's addAIFactoryMCP2APIM step offline (the MCP is project001 Dev only)."""
+    if not request.add_mcp_to_apim:
+        return Decision(False, "addAIFactoryMCP2APIM is false: the APIM MCP API is not managed; existing APIs are untouched.")
+    if request.environment != ENVIRONMENT:
+        return Decision(False, f"The AI Factory MCP runs only in Dev; the APIM MCP API is skipped for '{request.environment}'.")
+    problems = [*_apim_problems(request), *_adoption_problems(request)]
+    if not GUID.fullmatch(request.entra_app_id):
+        problems.append("aifactoryMcpEntraAppId must be the MCP API app registration client ID (GUID)")
+    for name, value in (("dev_test_prod_sub_id", request.subscription_id), ("tenantId", request.tenant_id)):
+        if not GUID.fullmatch(value):
+            problems.append(f"{name} must be a GUID")
+    if problems:
+        raise ValueError("Invalid APIM MCP configuration: " + "; ".join(problems) + ".")
+    return Decision(True, "Validated the APIM MCP API request.")
+
+
 def names(request: IntegrationRequest) -> dict[str, str]:
-    group_id = f"/subscriptions/{request.subscription_id}/resourceGroups/{request.resource_group}"
+    group_id = request.group_id
     digest = uuid.uuid5(uuid.NAMESPACE_URL, group_id.lower()).hex[:8]
     gateway_id = request.gateway_resource_id or (
         f"{group_id}/providers/Microsoft.ApiManagement/service/aigw-p{request.project_number}-{request.environment}-{digest}")
@@ -245,6 +336,10 @@ class ProjectTarget(FoundryTarget):
     insights_name: str
     environment_id: str
     environment_domain: str
+    private_endpoint_id: str = ""
+    private_dns_zone: str = ""
+    private_dns_registered: bool = False
+    adopted_app: dict | None = None
 
 
 @dataclass
@@ -318,12 +413,20 @@ def discover(session: ArmPort, request: IntegrationRequest) -> FoundryTarget:
     data = [item for item in storages if "2001" in item["name"]] or storages
     if not data:
         raise ValueError("enableAIFactoryMCP requires the project data storage account.")
+    adopted = _adoptable(session, request) if request.mcp_app_resource_id else None
+    selector = request.container_apps_environment
+    if adopted is not None:
+        own = adopted["properties"]["environmentId"].rsplit("/", 1)[1]
+        if selector and selector.lower() != own.lower():
+            raise ValueError(f"The adopted MCP app runs in environment {own}, not aifactoryMcpContainerAppsEnvironment {selector}.")
+        selector = own
     environments = of_type("Microsoft.App/managedEnvironments")
-    environment = _one(environments, "project Container Apps environment (set aifactoryMcpContainerAppsEnvironment)",
-                       request.container_apps_environment)
-    environment = session.arm("GET", environment["id"], api_version=APP_API)
+    environment = _one(environments, "project Container Apps environment (set aifactoryMcpContainerAppsEnvironment)", selector)
+    environment = session.arm("GET", environment["id"], api_version=ENVIRONMENT_API)
     if not (environment.get("properties", {}).get("vnetConfiguration") or {}).get("internal"):
         raise ValueError("The MCP stays private: the selected Container Apps environment must be internal (VNet-integrated).")
+    zone = f"privatelink.{(environment.get('location') or account['location']).replace(' ', '').lower()}.azurecontainerapps.io"
+    endpoint_id, registered = _private_endpoint(session, environment, zone)
     insights = of_type("Microsoft.Insights/components")
     chat = chats[0]
     return ProjectTarget(
@@ -338,7 +441,60 @@ def discover(session: ArmPort, request: IntegrationRequest) -> FoundryTarget:
         embedding=embeddings[0] if embeddings else "", search_name=searches[0]["name"],
         storage_name=data[0]["name"], insights_name=insights[0]["name"] if insights else "",
         environment_id=environment["id"], environment_domain=environment["properties"]["defaultDomain"],
+        private_endpoint_id=endpoint_id, private_dns_zone=zone, private_dns_registered=registered, adopted_app=adopted,
     )
+
+
+def _private_endpoint(session: ArmPort, environment: dict, zone: str) -> tuple[str, bool]:
+    """The environment's approved private endpoint and whether it is registered in the private ACA DNS zone.
+
+    The Bicep that creates the environment owns both (containerappsEnv.bicep or azureMcpServer.bicep, with the
+    bootstrap or hub-policy DNS zones); creating a second endpoint here would compete for the same DNS record.
+    """
+    endpoints = sorted(
+        connection["properties"]["privateEndpoint"]["id"] for connection in
+        (environment.get("properties", {}).get("privateEndpointConnections") or [])
+        if ((connection.get("properties") or {}).get("privateLinkServiceConnectionState") or {}).get("status") == "Approved"
+        and ((connection.get("properties") or {}).get("privateEndpoint") or {}).get("id"))
+    if not endpoints:
+        raise ValueError(
+            f"The MCP stays private: Container Apps environment {environment['id'].rsplit('/', 1)[1]} has no approved private "
+            "endpoint, so APIM and the AI Gateway cannot reach it. The pipelines create one with the environment "
+            "(enableContainerApps or enableAzureMcpServer); add one to an environment made outside them.")
+    for endpoint in endpoints:
+        groups = session.pages(f"{ARM}{endpoint}/privateDnsZoneGroups?api-version={NETWORK_API}")
+        zones = [config.get("properties", {}).get("privateDnsZoneId", "").rsplit("/", 1)[-1].lower()
+                 for group in groups for config in group.get("properties", {}).get("privateDnsZoneConfigs") or []]
+        if zone in zones:
+            return endpoint, True
+    return endpoints[0], False
+
+
+def _mcp_runtime(app: dict, app_id: str) -> tuple[dict, dict, dict]:
+    """A copy of the app's template, its 'mcp' container env by name, and the parsed application auth document."""
+    template = copy.deepcopy((app.get("properties") or {}).get("template") or {})
+    container = next((item for item in template.get("containers") or [] if item.get("name") == "mcp"), None)
+    if container is None:
+        raise ValueError(f"{app_id} has no 'mcp' container; it is not an AI Factory MCP app.")
+    env = {item["name"]: item for item in container.get("env") or []}
+    if "value" not in env.get("AIFACTORY_APPLICATION_AUTH_JSON", {}):
+        raise ValueError(f"{app_id} has no AIFACTORY_APPLICATION_AUTH_JSON caller list; it is not an AI Factory MCP app.")
+    return template, env, json.loads(env["AIFACTORY_APPLICATION_AUTH_JSON"]["value"])
+
+
+def _adoptable(session: ArmPort, request: IntegrationRequest) -> dict:
+    """GET and check the app named by aifactoryMcpContainerAppResourceId before anything is written."""
+    app_id = request.mcp_app_resource_id
+    app = _optional(session, app_id, APP_API)
+    if app is None:
+        raise ValueError(f"aifactoryMcpContainerAppResourceId: {app_id} does not exist.")
+    if _owned(app):
+        raise ValueError(f"{app_id} is pipeline-managed by this integration; clear aifactoryMcpContainerAppResourceId.")
+    _, _, auth = _mcp_runtime(app, app_id)
+    if str(auth.get("audience", "")).lower() != request.entra_app_id:
+        raise ValueError(f"{app_id} accepts tokens for audience {auth.get('audience')!r}, not aifactoryMcpEntraAppId; "
+                         "refusing to adopt another MCP.")
+    return app
 
 
 def _owned(resource: dict | None) -> bool:
@@ -395,6 +551,13 @@ class McpGatewayIntegration:
             return report.to_dict()
         resource_names = names(request)
         target = discover(self.session, request)
+        if isinstance(target, ProjectTarget):
+            report.outputs["mcp_private_endpoint_id"] = target.private_endpoint_id
+            if not target.private_dns_registered:
+                report.prerequisites.append(
+                    f"The MCP environment's private endpoint {target.private_endpoint_id} has no private DNS zone group "
+                    f"for {target.private_dns_zone} yet: with centralDnsZoneByPolicyInHub the hub DNS policy adds it; "
+                    "otherwise register it, or APIM and the AI Gateway cannot resolve the MCP.")
         classic = self._classic_apim_callers(request, resource_names, report) if request.enable_mcp else []
         gateway = self._gateway(request, target, resource_names, report, apply) if request.enable_gateway else None
         if request.enable_mcp:
@@ -487,12 +650,14 @@ class McpGatewayIntegration:
     def _classic_apim_callers(self, request, resource_names, report) -> list[tuple[str, str]]:
         """Resolve the configured classic APIM gateways to MCP callers (GET only; the APIMs stay untouched)."""
         callers = []
-        for apim_id in request.classic_apim_ids:
+        for apim_id in request.apim_caller_ids:
             if request.add_mcp_to_gateway and apim_id.lower() == resource_names["gateway_id"].lower():
                 continue  # the registered AI Gateway is already a caller
             apim = _optional(self.session, apim_id, APIM_API)
             if apim is None:
-                raise ValueError(f"aifactoryMcpClassicApimResourceIds: {apim_id} does not exist.")
+                source = ("aifactoryMcpClassicApimResourceIds" if apim_id in request.classic_apim_ids
+                          else "addAIFactoryMCP2APIM (apimGatewayServiceName)")
+                raise ValueError(f"{source}: {apim_id} does not exist.")
             principal = (apim.get("identity") or {}).get("principalId", "")
             if not GUID.fullmatch(principal or ""):
                 raise ValueError(f"{apim_id} has no system-assigned managed identity to call the MCP with.")
@@ -504,6 +669,9 @@ class McpGatewayIntegration:
         return callers
 
     def _mcp(self, request, target, resource_names, gateway, classic, report, apply) -> None:
+        if target.adopted_app is not None:
+            self._adopt(request, target, gateway, classic, report, apply)
+            return
         identity_id, app_id = resource_names["identity_id"], resource_names["app_id"]
         identity = _optional(self.session, identity_id, IDENTITY_API)
         app = _optional(self.session, app_id, APP_API)
@@ -534,6 +702,86 @@ class McpGatewayIntegration:
         fqdn = current["properties"]["configuration"]["ingress"]["fqdn"]
         report.add(app_id, "updated" if app else "created")
         report.outputs.update(mcp_app_id=app_id, mcp_url=f"https://{fqdn}/mcp", mcp_identity_client_id=client)
+
+    def _adopt(self, request, target, gateway, classic, report, apply) -> None:
+        """Add the missing callers to an adopted app; every other setting (and every existing caller) stays."""
+        app_id, app = request.mcp_app_resource_id, target.adopted_app
+        template, env, auth = _mcp_runtime(app, app_id)
+        native = self._gateway_identity(gateway) if request.add_mcp_to_gateway else None
+        callers = unique_callers([(target.project_principal_id, target.project_client_id),
+                                  *([native] if native else []), *classic])
+        identities = auth.setdefault("identities", [])
+        objects = {str(item.get("object_id", "")).lower() for item in identities}
+        clients = {str(item.get("client_id", "")).lower() for item in identities}
+        missing = [(object_id, client_id) for object_id, client_id in callers
+                   if object_id not in objects and client_id not in clients]
+        identities.extend({"object_id": object_id, "client_id": client_id, "scope_keys": [SCOPE_KEY],
+                           "allowed_tools": list(READ_ONLY_TOOLS)} for object_id, client_id in missing)
+        grants_added = False
+        if "value" in env.get("AIFACTORY_PILOT_CONFIG_JSON", {}):
+            settings = json.loads(env["AIFACTORY_PILOT_CONFIG_JSON"]["value"])
+            grants = settings.setdefault("auth", {}).setdefault("grants", [])
+            granted = {str(item.get("object_id", "")).lower() for item in grants}
+            for object_id, _ in callers:
+                if object_id not in granted:
+                    grants.append({"object_id": object_id, "scopes": [SCOPE_KEY], "permissions": ["factory.read"]})
+                    grants_added = True
+            env["AIFACTORY_PILOT_CONFIG_JSON"]["value"] = json.dumps(settings, separators=(",", ":"))
+        fqdn = app["properties"]["configuration"]["ingress"]["fqdn"]
+        report.outputs.update(mcp_app_id=app_id, mcp_url=f"https://{fqdn}/mcp")
+        if not (missing or grants_added):
+            report.add(app_id, "unchanged", "adopted; every caller is present")
+            return
+        detail = "adopted; add callers " + ", ".join(object_id for object_id, _ in missing) if missing else "adopted; add factory.read grants"
+        if not apply:
+            report.add(app_id, "update", detail)
+            return
+        env["AIFACTORY_APPLICATION_AUTH_JSON"]["value"] = json.dumps(auth, separators=(",", ":"))
+        # A new revision needs a new suffix; reusing the current one is rejected.
+        seed = f"{app['properties'].get('latestRevisionName', '')}|{json.dumps(callers)}"
+        template["revisionSuffix"] = "callers-" + hashlib.sha256(seed.encode("utf-8")).hexdigest()[:8]
+        self.session.arm("PATCH", app_id, {"properties": {"template": template}}, api_version=APP_API)
+        current = _wait(self.session, app_id, APP_API, self.sleep)
+        report.add(app_id, "updated", detail)
+        report.outputs["mcp_url"] = f"https://{current['properties']['configuration']['ingress']['fqdn']}/mcp"
+
+    def apim_parameters(self, request: IntegrationRequest) -> dict:
+        """apim-mcp-server.bicep parameters for the AI gateway pipeline's APIM (GET only; the pipeline deploys)."""
+        decision = decide_apim(request)
+        if not decision.act:
+            return {"mode": "skipped", "reason": decision.reason, "mutations": False}
+        apim = _optional(self.session, request.apim_id, APIM_API)
+        if apim is None:
+            raise ValueError(f"addAIFactoryMCP2APIM: {request.apim_id} does not exist.")
+        principal = str((apim.get("identity") or {}).get("principalId") or "").lower()
+        if not GUID.fullmatch(principal):
+            raise ValueError(f"{request.apim_id} has no system-assigned managed identity to call the MCP with.")
+        app_id = request.mcp_app_resource_id or names(request)["app_id"]
+        app = _optional(self.session, app_id, APP_API)
+        if app is None:
+            raise ValueError(f"The AI Factory MCP {app_id} does not exist yet: run the project001 Dev pipeline "
+                             "with enableAIFactoryMCP=true first.")
+        _, _, auth = _mcp_runtime(app, app_id)
+        if str(auth.get("audience", "")).lower() != request.entra_app_id:
+            raise ValueError(f"{app_id} accepts tokens for another audience than aifactoryMcpEntraAppId.")
+        if principal not in {str(item.get("object_id", "")).lower() for item in auth.get("identities") or []}:
+            raise ValueError(f"The AI Factory MCP does not accept the APIM managed identity {principal} yet: run the "
+                             "project001 Dev pipeline with addAIFactoryMCP2APIM=true first.")
+        fqdn = (((app.get("properties") or {}).get("configuration") or {}).get("ingress") or {}).get("fqdn")
+        if not fqdn:
+            raise ValueError(f"{app_id} has no ingress FQDN.")
+        values = {"apimServiceName": request.apim_service_name, "mcpServerName": APIM_MCP_SERVER,
+                  "displayName": DISPLAY_NAME, "mcpDescription": READ_ONLY_DESCRIPTION,
+                  "mcpServerBaseUrl": f"https://{fqdn}", "mcpEntraAppId": request.entra_app_id,
+                  "clientSubscriptionName": APIM_MCP_CLIENT_SUBSCRIPTION}
+        return {
+            "mode": "parameters", "apim_id": request.apim_id, "mcp_app_id": app_id, "mutations": False,
+            "prerequisites": [_app_role_prerequisite(request.entra_app_id,
+                                                     f"the APIM managed identity {principal} ({request.apim_id})") + "."],
+            "parameters": {
+                "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+                "contentVersion": "1.0.0.0", "parameters": {key: {"value": value} for key, value in values.items()}},
+        }
 
     def _registries(self, request) -> dict[str, str]:
         servers = {IMAGE.fullmatch(image)["server"] for image in (request.mcp_image, request.api_image)}
@@ -587,9 +835,8 @@ def tool_server_body(entra_app_id: str, mcp_url: str) -> dict:
     return {"properties": {
         "type": "mcp", "accessState": "active", "blocked": [],
         "allowList": [f"{NAMESPACE}_{tool}" for tool in READ_ONLY_TOOLS],
-        "displayName": "Enterprise Scale AI Factory (project001 Dev)",
-        "description": "Read-only Enterprise Scale AI Factory MCP: API health, capabilities and skill discovery. "
-                       f"Factory provisioning and deletion are disabled. {MARKER}",
+        "displayName": f"{DISPLAY_NAME} (project001 Dev)",
+        "description": f"{READ_ONLY_DESCRIPTION} {MARKER}",
         "endpoints": [{"kind": "mcp", "namespace": NAMESPACE, "required": True,
                        "credentials": {"type": "managedIdentity", "managedIdentity": {"resource": entra_app_id}},
                        "mcp": {"transport": "streamableHttp", "url": mcp_url}}],

@@ -95,7 +95,10 @@ CONFIG_ONLY_EXCEPTIONS = {
     "ENABLE_RETRIES": "Legacy retry setting is not forwarded by GHA; task/script retry policy is outside service provisioning.",
 }
 # Reviewed public switches outside the enable* inventory that pipelines bind: public -> runtime.
-EXTRA_FEATURES = {"ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU": "addAIFactoryMCP2AIGatewaySKU"}
+EXTRA_FEATURES = {
+    "ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU": "addAIFactoryMCP2AIGatewaySKU",
+    "ADD_AI_FACTORY_MCP_2_APIM": "addAIFactoryMCP2APIM",
+}
 DEFAULT_EXCEPTIONS = {
     "ENABLE_AKS_FOR_AZURE_ML": (
         "true", "false",

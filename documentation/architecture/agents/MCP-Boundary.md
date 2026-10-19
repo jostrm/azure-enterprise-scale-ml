@@ -19,6 +19,12 @@ sources:
   - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/main.bicep
   - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/policy.xml
   - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/README.md
+  - usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py
+  - environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-project/jobs/job-aifactory-mcp-ai-gateway.yaml
+  - environment_setup/aifactory/bicep/copy_to_local_settings/azure-devops/esml-yaml-pipelines/esml-infra-common/jobs/job-2-ai-gateway.yaml
+  - environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-ai-gateway.yml
+  - environment_setup/aifactory/bicep/modules/containerappsEnv.bicep
+  - environment_setup/aifactory/bicep/modules/azureMcpServer.bicep
 tests:
   - mcp/tests/test_server.py
   - mcp/tests/test_auth.py
@@ -31,12 +37,13 @@ tests:
   - mcp/tests/test_graph_release.py
   - usecase_code/40-agent-factory/tests/test_mcp_gateway.py
   - usecase_code/40-agent-factory/tests/test_apim_gateway_policies.py
+  - environment_setup/unit-tests/test-bicep/unit/test_mcp_ai_gateway_flags.py
 graph_symbols:
   - mcp/src/aifactory_mcp/server.py::function:create_server
   - mcp/src/aifactory_mcp/backend.py::class:AgentBackend
   - mcp/src/aifactory_mcp/backend.py::function:AgentBackend.call_tool
   - mcp/src/aifactory_mcp/graph.py::function:call
-reviewed_source: '546311bf + working tree; observed 2026-10-19'
+reviewed_source: '0a0595c9 + working tree; observed 2026-10-19'
 ---
 # MCP boundary
 
@@ -86,6 +93,27 @@ names the classic APIM services whose system-assigned identities `agent_factory.
 adds to the allowed-caller list (read-only GETs of the APIMs, de-duplicated against the
 project and native AI Gateway callers). The app role stays an Entra admin step that the run
 prints as a prerequisite.
+
+`addAIFactoryMCP2APIM` closes the loop for the APIM that the AI gateway pipeline manages
+(`apimGateway*` variables): the project step adds its identity to the callers without listing it,
+and the AI gateway pipeline step "Expose the AI Factory MCP on APIM" deploys
+`apim-mcp-server.bicep` with parameters from `deploy.py apim-parameters`. That launcher is GET-only
+and refuses until the MCP app exists and lists the APIM identity, so the order is fixed by evidence
+rather than by convention: project pipeline first, then the AI gateway pipeline. The module's
+optional `clientSubscriptionName` issues one client subscription scoped to the MCP API.
+
+An MCP app deployed outside the step (the `mcp/deploy/rollout.py` pilot in Spider) is adopted by
+`aifactoryMcpContainerAppResourceId`. Adoption is ownership-safe by construction: the app must be in
+the project resource group, must not carry the step's owner tags, and must accept the configured
+audience; the step then only appends missing callers and `factory.read` grants (one template PATCH,
+new revision suffix) and never changes images, identity, secrets, ingress or tags.
+
+The MCP's Container Apps environment must have an approved private endpoint, which is the network
+path for APIM and the AI Gateway. The environment's own Bicep owns that endpoint and its DNS
+registration (`containerappsEnv.bicep` `-pend`, `azureMcpServer.bicep` `-pe`, zone
+`privatelink.<region>.azurecontainerapps.io`, or the hub DNS policy). `mcp_gateway` verifies them
+and does not create a second endpoint, which would compete for the same DNS record; a missing zone
+group is a reported prerequisite rather than a failure because hub policy remediation is asynchronous.
 
 `apim-policy-fragments.bicep` holds the throttling, Entra validation, token-metric and
 semantic-cache fragments once, and both the LLM API and the MCP API compose them.

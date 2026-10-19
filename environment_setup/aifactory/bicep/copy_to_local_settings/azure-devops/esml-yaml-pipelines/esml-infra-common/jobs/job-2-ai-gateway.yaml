@@ -80,6 +80,51 @@ steps:
     apimGatewayAggregateTpm: $(apimGatewayAggregateTpm)
     apimGatewayBackendsJson: $(apimGatewayBackendsJson)
 
+# addAIFactoryMCP2APIM: publish the project001 Dev AI Factory MCP on this APIM as a plain HTTP proxy API.
+# The launcher reads the MCP app and the APIM (GET only) and refuses until the project pipeline has added
+# the APIM identity to the MCP callers; Stage/Prod are skipped because the MCP runs only in Dev.
+- task: AzureCLI@2
+  displayName: Expose the AI Factory MCP on APIM
+  condition: eq(variables['addAIFactoryMCP2APIM'], 'true')
+  inputs:
+    azureSubscription: ${{ parameters.serviceConnection }}
+    scriptType: bash
+    scriptLocation: inlineScript
+    workingDirectory: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml'
+    inlineScript: |
+      set -euo pipefail
+      parameters="$(Agent.TempDirectory)/apim-mcp.parameters.json"
+      rm -f "$parameters"
+      python "usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py" apim-parameters --output "$parameters"
+      if [[ ! -s "$parameters" ]]; then
+        echo "The APIM MCP API was skipped (see the reason above)."
+        exit 0
+      fi
+      apimSubscriptionId="${apimGatewaySubscriptionId:-$dev_test_prod_sub_id}"
+      az deployment group create \
+        --name "aigw-apim-mcp-$(dev_test_prod)-$(Build.BuildId)" \
+        --subscription "$apimSubscriptionId" \
+        --resource-group "$apimGatewayResourceGroup" \
+        --template-file "environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-mcp-server.bicep" \
+        --parameters "@$parameters"
+  env:
+    enableAIFactoryMCP: $(enableAIFactoryMCP)
+    addAIFactoryMCP2APIM: $(addAIFactoryMCP2APIM)
+    dev_test_prod_sub_id: $(dev_test_prod_sub_id)
+    tenantId: $(tenantId)
+    dev_test_prod: $(dev_test_prod)
+    admin_location: $(admin_location)
+    admin_aifactoryPrefixRG: $(admin_aifactoryPrefixRG)
+    projectPrefix: $(projectPrefix)
+    admin_locationSuffix: $(admin_locationSuffix)
+    admin_aifactorySuffixRG: $(admin_aifactorySuffixRG)
+    projectSuffix: $(projectSuffix)
+    aifactoryMcpEntraAppId: $(aifactoryMcpEntraAppId)
+    aifactoryMcpContainerAppResourceId: $(aifactoryMcpContainerAppResourceId)
+    apimGatewaySubscriptionId: $(apimGatewaySubscriptionId)
+    apimGatewayResourceGroup: $(apimGatewayResourceGroup)
+    apimGatewayServiceName: $(apimGatewayServiceName)
+
 - task: AzureCLI@2
   displayName: Deploy Kong edge gateway
   condition: eq(variables['ENABLE_KONG'], 'true')

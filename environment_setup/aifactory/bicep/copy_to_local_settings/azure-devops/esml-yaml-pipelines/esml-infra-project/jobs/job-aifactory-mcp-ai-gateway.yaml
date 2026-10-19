@@ -45,3 +45,8 @@ steps:
       aiGatewaySkuResourceId: '$(aiGatewaySkuResourceId)'
       aiGatewaySkuOutboundSubnetId: '$(aiGatewaySkuOutboundSubnetId)'
       aifactoryMcpClassicApimResourceIds: '$(aifactoryMcpClassicApimResourceIds)'
+      aifactoryMcpContainerAppResourceId: '$(aifactoryMcpContainerAppResourceId)'
+      addAIFactoryMCP2APIM: '$(addAIFactoryMCP2APIM)'
+      apimGatewaySubscriptionId: '$(apimGatewaySubscriptionId)'
+      apimGatewayResourceGroup: '$(apimGatewayResourceGroup)'
+      apimGatewayServiceName: '$(apimGatewayServiceName)'

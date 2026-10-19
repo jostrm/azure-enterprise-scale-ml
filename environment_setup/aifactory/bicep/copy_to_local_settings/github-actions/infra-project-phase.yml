@@ -332,6 +332,11 @@ jobs:
       aiGatewaySkuResourceId: ${{ vars.AI_GATEWAY_SKU_RESOURCE_ID || '' }}
       aiGatewaySkuOutboundSubnetId: ${{ vars.AI_GATEWAY_SKU_OUTBOUND_SUBNET_ID || '' }}
       aifactoryMcpClassicApimResourceIds: ${{ vars.AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS || '' }}
+      aifactoryMcpContainerAppResourceId: ${{ vars.AIFACTORY_MCP_CONTAINER_APP_RESOURCE_ID || '' }}
+      addAIFactoryMCP2APIM: ${{ vars.ADD_AI_FACTORY_MCP_2_APIM || 'false' }}
+      apimGatewaySubscriptionId: ${{ vars.APIM_GATEWAY_SUBSCRIPTION_ID || '' }}
+      apimGatewayResourceGroup: ${{ vars.APIM_GATEWAY_RESOURCE_GROUP || '' }}
+      apimGatewayServiceName: ${{ vars.APIM_GATEWAY_SERVICE_NAME || '' }}
       aifactoryAgentEntraAppId: ${{ vars.AIFACTORY_AGENT_ENTRA_APP_ID || '' }}
       aifactoryAgentContainerAppsEnvironment: ${{ vars.AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT || '' }}
       aifactoryAgentReaderObjectIds: ${{ vars.AIFACTORY_AGENT_READER_OBJECT_IDS || '' }}

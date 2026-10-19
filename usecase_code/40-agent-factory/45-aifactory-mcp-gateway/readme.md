@@ -20,6 +20,51 @@ Use it for an APIM that fronts the MCP with `apim-mcp-server.bicep` and
 a system-assigned identity fails before any write, and an identity already in the list is not
 added twice (the MCP refuses duplicate callers).
 
+## Publish the MCP on the AI gateway pipeline's classic APIM (`addAIFactoryMCP2APIM`)
+
+`addAIFactoryMCP2APIM: "true"` (requires `enableAIFactoryMCP`) wires the classic APIM that the
+AI gateway pipeline manages (`apimGatewaySubscriptionId`, `apimGatewayResourceGroup`,
+`apimGatewayServiceName`) to the MCP with no hand steps:
+
+1. **Project pipeline (this step):** the APIM joins the MCP callers exactly like an entry of
+   `aifactoryMcpClassicApimResourceIds` (no need to list it twice). The report prints the
+   `AiFactory.Mcp.Read` app-role prerequisite for its identity.
+2. **AI gateway pipeline** (ADO `esml-infra-common/jobs/job-2-ai-gateway.yaml`, GitHub
+   `infra-ai-gateway.yml`, step "Expose the AI Factory MCP on APIM", after the OpenAI pool):
+   `deploy.py apim-parameters --output <file>` reads the MCP app and the APIM (GET only) and
+   writes the `esml-common/ai-gateway/apim/apim-mcp-server.bicep` parameters; the pipeline then
+   deploys them to the APIM resource group. The result is API `enterprise-scale-ai-factory`
+   (`https://<apim>/enterprise-scale-ai-factory/mcp`, plain HTTP proxy, 60 requests/min per client IP,
+   APIM managed-identity token for `aifactoryMcpEntraAppId`) and the client subscription
+   `aifactory-mcp-client` scoped to that API.
+
+Order for a new factory: an existing APIM with a system-assigned identity, then the project pipeline,
+then the AI gateway pipeline. The launcher refuses with the next step to take while the MCP app does
+not exist or does not list the APIM identity yet. Stage/Prod runs skip it (the MCP is Dev only).
+
+## Adopt an MCP app deployed outside the pipeline (`aifactoryMcpContainerAppResourceId`)
+
+An MCP app that was deployed another way (for example the pilot rollout `mcp/deploy/rollout.py`,
+which made `aifactory-mcp-project001-dev` in Spider) can be adopted instead of creating
+`aifactory-mcp-p001-dev` next to it. Set `aifactoryMcpContainerAppResourceId` to its resource ID
+(requires `enableAIFactoryMCP`; `aifactoryMcpImage`/`aifactoryMcpApiImage` are then not needed).
+
+- The app must be in the project resource group, must not carry this step's ownership tags (then
+  it is already pipeline-managed: clear the variable), must have an `mcp` container with an
+  `AIFACTORY_APPLICATION_AUTH_JSON` caller list, and must accept tokens for
+  `aifactoryMcpEntraAppId`. Any mismatch fails before any write.
+- The step selects the app's own Container Apps environment and applies the same private-network
+  checks to it.
+- **Only the caller lists grow:** missing project, native AI Gateway and classic APIM identities are
+  appended to `AIFACTORY_APPLICATION_AUTH_JSON`, missing `factory.read` grants to
+  `AIFACTORY_PILOT_CONFIG_JSON`. Existing callers stay. Images, identity, secrets, ingress, scale and
+  tags are never changed. A change is one `PATCH` of the app template with a new revision suffix
+  (`callers-<hash>`); with every caller present nothing is written.
+- Both the native AI Gateway tool server and the APIM MCP API then point at the adopted app's URL.
+
+To move to the pipeline-managed app instead, clear the variable and set the images: the step creates
+`aifactory-mcp-p001-dev`; repoint the gateways (re-run both pipelines) before removing the old app by hand.
+
 ## Rules
 
 - **project001 Dev only.** Another project number fails the step; Stage/Prod runs skip it.
@@ -47,6 +92,15 @@ added twice (the MCP refuses duplicate callers).
 - Owned tool-server reconciliation checks the complete governed endpoint, exact endpoint count,
   protocol type, required flag, blocked tools and allowlist—not just the first endpoint's URL.
 - **Private.** The Container Apps environment must be internal; ingress is reachable only inside the VNet.
+  It must also have an **approved private endpoint**, which is how APIM and the AI Gateway reach the
+  MCP; a missing one fails before any write. The Bicep that creates the environment owns that endpoint
+  and its DNS record (`containerappsEnv.bicep` with `enableContainerApps`: `<environment>-pend`;
+  `azureMcpServer.bicep` with `enableAzureMcpServer`: `<name>-pe`), registered in
+  `privatelink.<region>.azurecontainerapps.io` (the zone in the common VNet resource group, or the hub's
+  zone through its DNS policy when `centralDnsZoneByPolicyInHub` is true). This step only verifies them, so it never creates a
+  second endpoint that would compete for the same record. A missing DNS zone group is reported as a
+  prerequisite (the hub policy may add it a few minutes later); `outputs.mcp_private_endpoint_id` names
+  the endpoint.
 
 ## Prerequisites (one-time, outside the pipeline)
 
@@ -67,6 +121,7 @@ export enableAIFactoryMCP=true enableAIGatewaySKU=true addAIFactoryMCP2AIGateway
 python deploy.py validate          # offline
 python deploy.py plan              # Azure GET only
 python deploy.py apply --apply     # owned writes
+python deploy.py apim-parameters --output apim-mcp.parameters.json  # AI gateway pipeline, GET only
 ```
 
 The JSON report lists every create/update/unchanged action, the MCP and tool-server URLs and any

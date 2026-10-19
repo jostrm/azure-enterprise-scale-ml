@@ -53,9 +53,9 @@ The chat and the **AI Factory MCP** are two front doors to the same governed cor
 
 | | Factory Agent chat | AI Factory MCP |
 |---|---|---|
-| Used by | People, in a browser (text or voice) | Agents and MCP clients, for example through the AI Gateway |
+| Used by | People, in a browser (text or voice) | Agents and MCP clients, for example through the AI Gateway or a classic APIM |
 | Sign-in | Entra user sign-in with exact-scope grants | Entra app role `AiFactory.Mcp.Read`, verified on every request |
-| Switched on by | `enableFactoryChatAgent` (voice: `enableAIFactoryAgentLiveVoice`) | `enableAIFactoryMCP` (gateway: `enableAIGatewaySKU`, `addAIFactoryMCP2AIGatewaySKU`) |
+| Switched on by | `enableFactoryChatAgent` (voice: `enableAIFactoryAgentLiveVoice`) | `enableAIFactoryMCP` (gateway: `enableAIGatewaySKU`, `addAIFactoryMCP2AIGatewaySKU`; classic APIM: `addAIFactoryMCP2APIM`) |
 
 - **Shared core.** Both run the same factory tools, skills and operation store, and the same dual knowledge graph
   query core (next section), so a typed question, a spoken question and an MCP tool call see the same facts and obey

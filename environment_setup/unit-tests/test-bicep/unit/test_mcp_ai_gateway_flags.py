@@ -9,8 +9,8 @@ import pytest
 
 from base.config import REPO_ROOT, env_defaults, yaml_defaults
 from domain.pipeline_contracts import (
-    ADO_ROOT, ADO_SERVICES, CONFIG_ONLY_EXCEPTIONS, EXTRA_FEATURES, FEATURES, GHA_PHASE, evaluate,
-    load_pipeline, objects,
+    ADO_GATEWAY, ADO_ROOT, ADO_SERVICES, CONFIG_ONLY_EXCEPTIONS, EXTRA_FEATURES, FEATURES, GHA_GATEWAY, GHA_PHASE,
+    evaluate, load_pipeline, objects,
 )
 
 FLAGS = {
@@ -26,21 +26,35 @@ INPUTS = {
     "aiGatewaySkuResourceId": "AI_GATEWAY_SKU_RESOURCE_ID",
     "aiGatewaySkuOutboundSubnetId": "AI_GATEWAY_SKU_OUTBOUND_SUBNET_ID",
     "aifactoryMcpClassicApimResourceIds": "AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS",
+    "aifactoryMcpContainerAppResourceId": "AIFACTORY_MCP_CONTAINER_APP_RESOURCE_ID",
+}
+# Publishes the MCP on the AI gateway pipeline's classic APIM; it needs enableAIFactoryMCP, so it adds no gate.
+APIM_FLAG = {"addAIFactoryMCP2APIM": "ADD_AI_FACTORY_MCP_2_APIM"}
+APIM_GATEWAY = {
+    "apimGatewaySubscriptionId": "APIM_GATEWAY_SUBSCRIPTION_ID",
+    "apimGatewayResourceGroup": "APIM_GATEWAY_RESOURCE_GROUP",
+    "apimGatewayServiceName": "APIM_GATEWAY_SERVICE_NAME",
 }
 VARIABLES_JSON = REPO_ROOT / "environment_setup/aifactory/variables.json"
 JOB = ADO_ROOT / "esml-infra-project" / "jobs" / "job-aifactory-mcp-ai-gateway.yaml"
 LAUNCHER = REPO_ROOT / "usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py"
 STEP = "Deploy AI Factory MCP and AI Gateway SKU (project001 Dev)"
+GATEWAY_STEP = "Expose the AI Factory MCP on APIM"
+POOL_STEP = "Deploy APIM Azure OpenAI pool"
 
 
-def launcher_inputs():
+def launcher_tuple(name):
     source = LAUNCHER.read_text(encoding="utf-8")
-    start = source.index("INPUTS = (") + len("INPUTS = ")
+    start = source.index(f"\n{name} = (") + len(f"\n{name} = ")
     return set(ast.literal_eval(source[start:source.index(")\n", start) + 1]))
 
 
+def launcher_inputs():
+    return launcher_tuple("INPUTS")
+
+
 @pytest.mark.parametrize("name,public,default", [
-    *((flag, public, "false") for flag, public in FLAGS.items()),
+    *((flag, public, "false") for flag, public in {**FLAGS, **APIM_FLAG}.items()),
     *((name, public, "") for name, public in INPUTS.items()),
 ])
 def test_every_template_declares_the_exact_setting_with_safe_default(name, public, default):
@@ -50,8 +64,9 @@ def test_every_template_declares_the_exact_setting_with_safe_default(name, publi
 
 
 def test_flags_are_reviewed_pipeline_features_not_configuration_only():
-    assert {**FEATURES, **EXTRA_FEATURES}.items() >= {public: flag for flag, public in FLAGS.items()}.items()
-    assert not set(FLAGS.values()) & set(CONFIG_ONLY_EXCEPTIONS)
+    flags = {**FLAGS, **APIM_FLAG}
+    assert {**FEATURES, **EXTRA_FEATURES}.items() >= {public: flag for flag, public in flags.items()}.items()
+    assert not set(flags.values()) & set(CONFIG_ONLY_EXCEPTIONS)
 
 
 @pytest.mark.parametrize("flag,public", FLAGS.items())
@@ -117,6 +132,48 @@ def test_both_orchestrators_gate_identically(phase, flags, delete, expected):
         ado.update({"parameters.phase": phase, "succeeded": True})
         assert bool(evaluate(gha_condition(), gha)) is expected
         assert bool(evaluate(ado_condition(), ado)) is expected
+
+
+@pytest.mark.parametrize("value", ["false", "true"])
+def test_project_step_binds_the_ai_gateway_apim_so_it_joins_the_mcp_callers(value):
+    env = load_pipeline(GHA_PHASE)["jobs"]["deploy-project"]["env"]
+    for name, public in APIM_FLAG.items():
+        assert evaluate(env[name], {"vars." + public: value}) == value
+        assert evaluate(env[name], {"vars." + public: ""}) == "false"
+    for name, public in APIM_GATEWAY.items():
+        assert evaluate(env[name], {"vars." + public: ""}) == ""
+        assert f"vars.{public}" in env[name]
+
+
+def test_apim_launcher_inputs_are_a_subset_of_the_project_inputs():
+    assert launcher_tuple("APIM_INPUTS") <= launcher_inputs()
+    assert {*APIM_FLAG, *APIM_GATEWAY, "aifactoryMcpEntraAppId", "aifactoryMcpContainerAppResourceId",
+            "enableAIFactoryMCP"} <= launcher_tuple("APIM_INPUTS")
+
+
+def gateway_step(path, key):
+    steps = load_pipeline(path)
+    steps = steps["steps"] if "steps" in steps else steps["jobs"]["deploy"]["steps"]
+    names = [step.get(key) for step in steps]
+    assert names.index(GATEWAY_STEP) == names.index(POOL_STEP) + 1, "the MCP API follows the OpenAI pool (SKU changes first)"
+    return steps[names.index(GATEWAY_STEP)]
+
+
+@pytest.mark.parametrize("value", ["false", "true"])
+def test_ai_gateway_pipelines_publish_the_mcp_on_apim_behind_the_flag(value):
+    ado = gateway_step(ADO_GATEWAY, "displayName")
+    gha = gateway_step(GHA_GATEWAY, "name")
+    assert bool(evaluate(ado["condition"], {"variables.addAIFactoryMCP2APIM": value})) == (value == "true")
+    assert bool(evaluate(gha["if"], {"env.ADD_AI_FACTORY_MCP_2_APIM": value})) == (value == "true")
+    job_env = load_pipeline(GHA_GATEWAY)["jobs"]["deploy"]["env"]
+    assert evaluate(job_env["ADD_AI_FACTORY_MCP_2_APIM"], {"vars.ADD_AI_FACTORY_MCP_2_APIM": ""}) == "false"
+    for script in (ado["inputs"]["inlineScript"], gha["run"]):
+        assert "45-aifactory-mcp-gateway/deploy.py\" apim-parameters --output" in script
+        assert "esml-common/ai-gateway/apim/apim-mcp-server.bicep" in script
+        assert '--parameters "@$' in script
+        assert "deleteAll" not in script
+    assert ado["env"] == {name: f"$({name})" for name in launcher_tuple("APIM_INPUTS")}
+    assert launcher_tuple("APIM_INPUTS") <= set(gha["env"])
 
 
 def test_launcher_and_engine_are_importable_without_azure_access():

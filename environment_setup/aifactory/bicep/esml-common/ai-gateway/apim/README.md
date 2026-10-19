@@ -68,6 +68,17 @@ It does not use an API of `type: 'mcp'`. On 2026-10-19 the resource provider in 
 APIM calls the MCP with its system-assigned managed identity for `mcpEntraAppId`. The Enterprise Scale AI Factory MCP admits that identity only after two one-time steps; the deployment does neither:
 
 1. An Entra admin assigns the MCP app registration's app role `AiFactory.Mcp.Read` to the APIM managed identity. Pipelines never write Microsoft Graph.
-2. The APIM managed identity is added to the MCP container app's allowed callers, as the MCP & AI Gateway integration already does for the native gateway. For a pipeline-hosted MCP, list the APIM in `aifactoryMcpClassicApimResourceIds`.
+2. The APIM managed identity is added to the MCP container app's allowed callers, as the MCP & AI Gateway integration already does for the native gateway. For a pipeline-hosted MCP, list the APIM in `aifactoryMcpClassicApimResourceIds`, or set `addAIFactoryMCP2APIM` (below).
 
-APIM must also resolve and reach the MCP host. For an internal Container Apps environment, link a private DNS zone for its default domain to the APIM VNet; with an environment private endpoint, the `privatelink.<region>.azurecontainerapps.io` zone serves the same purpose. Only inbound policies (plus the unbuffered `forward-request`) are used: reading the response body would buffer it and break MCP streaming.
+APIM must also resolve and reach the MCP host. The MCP step requires an approved private endpoint on the MCP's Container Apps environment; the pipelines create it with the environment and register it in the `privatelink.<region>.azurecontainerapps.io` zone, which must be linked to the APIM VNet. Only inbound policies (plus the unbuffered `forward-request`) are used: reading the response body would buffer it and break MCP streaming.
+
+`clientSubscriptionName` (optional) creates one APIM subscription scoped to the MCP API only; empty (the default) creates none, so a caller can keep its own.
+
+### Pipeline default: `addAIFactoryMCP2APIM`
+
+With `addAIFactoryMCP2APIM: "true"` and `enableAIFactoryMCP: "true"` no manual step is left except the Entra app role:
+
+1. The project pipeline (MCP step) adds the identity of the APIM named by `apimGatewaySubscriptionId`/`apimGatewayResourceGroup`/`apimGatewayServiceName` to the MCP callers and prints the app-role prerequisite.
+2. The AI gateway pipeline step "Expose the AI Factory MCP on APIM" (after the OpenAI pool) runs `usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py apim-parameters`, which reads the MCP app and the APIM (GET only), and deploys this module with API `enterprise-scale-ai-factory` and client subscription `aifactory-mcp-client`. It refuses, naming the next step, while the MCP does not exist or does not list the APIM identity, and it skips Stage/Prod because the MCP runs only in Dev.
+
+See `usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md` for adopting an MCP app that was deployed outside the pipeline (`aifactoryMcpContainerAppResourceId`).

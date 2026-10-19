@@ -57,6 +57,9 @@ param entraClientApplicationIds array = []
 @description('Audiences accepted by the Entra token validation.')
 param entraAudiences array = []
 
+@description('Optional APIM subscription for MCP clients, scoped to this API only. Empty creates none (bring your own).')
+param clientSubscriptionName string = ''
+
 func requireHttpsBaseUrl(url string) string => startsWith(toLower(url), 'https://') && !endsWith(url, '/') && length(split(url, '/')) == 3
   ? url
   : fail('mcpServerBaseUrl must be an https:// origin without a path or trailing slash; put the endpoint path in mcpEndpointPath.')
@@ -112,6 +115,20 @@ resource mcpPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-05-01' = 
   }
 }
 
+resource clientSubscription 'Microsoft.ApiManagement/service/subscriptions@2024-05-01' = if (!empty(clientSubscriptionName)) {
+  parent: apimService
+  name: empty(clientSubscriptionName) ? 'none' : clientSubscriptionName
+  properties: {
+    displayName: '${displayName} MCP client'
+    scope: '/apis/${mcpApi.name}'
+    state: 'active'
+  }
+  dependsOn: [
+    mcpPolicy
+  ]
+}
+
 output mcpApiResourceId string = mcpApi.id
 output gatewayMcpUrl string = '${apimService.properties.gatewayUrl}/${apiPath}${mcpEndpointPath}'
 output managedIdentityPrincipalId string = apimService.identity.principalId
+output clientSubscriptionResourceId string = empty(clientSubscriptionName) ? '' : clientSubscription.id

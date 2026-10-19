@@ -41,6 +41,7 @@ jobs:
       APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE: ${{ vars.APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE || 'false' }}
       APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID: ${{ vars.APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID || '' }}
       APIM_GATEWAY_BACKENDS_JSON: ${{ vars.APIM_GATEWAY_BACKENDS_JSON || '[]' }}
+      ADD_AI_FACTORY_MCP_2_APIM: ${{ vars.ADD_AI_FACTORY_MCP_2_APIM || 'false' }}
       ENABLE_KONG: ${{ vars.ENABLE_KONG || 'false' }}
       KONG_GATEWAY_VNET_RESOURCE_GROUP: ${{ vars.KONG_GATEWAY_VNET_RESOURCE_GROUP || '' }}
       KONG_GATEWAY_VNET_NAME: ${{ vars.KONG_GATEWAY_VNET_NAME || '' }}
@@ -126,6 +127,47 @@ jobs:
           --parameters assignOpenAIUserRole="$APIM_GATEWAY_ASSIGN_OPENAI_USER_ROLE" \
           --parameters apimManagedIdentityPrincipalId="$APIM_GATEWAY_MANAGED_IDENTITY_PRINCIPAL_ID" \
           --parameters azureOpenAIBackends="$APIM_GATEWAY_BACKENDS_JSON"
+
+    # ADD_AI_FACTORY_MCP_2_APIM: publish the project001 Dev AI Factory MCP on this APIM as a plain HTTP proxy API.
+    # The launcher reads the MCP app and the APIM (GET only) and refuses until the project workflow has added
+    # the APIM identity to the MCP callers; stage/prod are skipped because the MCP runs only in dev.
+    - name: Expose the AI Factory MCP on APIM
+      if: env.ADD_AI_FACTORY_MCP_2_APIM == 'true'
+      shell: bash
+      env:
+        enableAIFactoryMCP: ${{ vars.ENABLE_AI_FACTORY_MCP || 'false' }}
+        addAIFactoryMCP2APIM: ${{ env.ADD_AI_FACTORY_MCP_2_APIM }}
+        dev_test_prod_sub_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        tenantId: ${{ secrets.TENANT_ID }}
+        dev_test_prod: ${{ inputs.environment }}
+        admin_location: ${{ vars.AIFACTORY_LOCATION }}
+        admin_aifactoryPrefixRG: ${{ vars.AIFACTORY_PREFIX }}
+        projectPrefix: ${{ vars.PROJECT_PREFIX || 'esml-' }}
+        admin_locationSuffix: ${{ vars.AIFACTORY_LOCATION_SHORT }}
+        admin_aifactorySuffixRG: ${{ vars.AIFACTORY_SUFFIX }}
+        projectSuffix: ${{ vars.PROJECT_SUFFIX || '-rg' }}
+        aifactoryMcpEntraAppId: ${{ vars.AIFACTORY_MCP_ENTRA_APP_ID || '' }}
+        aifactoryMcpContainerAppResourceId: ${{ vars.AIFACTORY_MCP_CONTAINER_APP_RESOURCE_ID || '' }}
+        apimGatewaySubscriptionId: ${{ env.APIM_GATEWAY_SUBSCRIPTION_ID }}
+        apimGatewayResourceGroup: ${{ env.APIM_GATEWAY_RESOURCE_GROUP }}
+        apimGatewayServiceName: ${{ env.APIM_GATEWAY_SERVICE_NAME }}
+      run: |
+        set -euo pipefail
+        if [[ "$dev_test_prod" == "stage" ]]; then export dev_test_prod="test"; fi
+        parameters="$RUNNER_TEMP/apim-mcp.parameters.json"
+        rm -f "$parameters"
+        python "azure-enterprise-scale-ml/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py" apim-parameters --output "$parameters"
+        if [[ ! -s "$parameters" ]]; then
+          echo "The APIM MCP API was skipped (see the reason above)."
+          exit 0
+        fi
+        apim_subscription_id="${apimGatewaySubscriptionId:-$dev_test_prod_sub_id}"
+        az deployment group create \
+          --name "aigw-apim-mcp-${dev_test_prod}-${{ github.run_id }}" \
+          --subscription "$apim_subscription_id" \
+          --resource-group "$apimGatewayResourceGroup" \
+          --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-mcp-server.bicep" \
+          --parameters "@$parameters"
 
     - name: Deploy Kong edge gateway
       if: env.ENABLE_KONG == 'true'
