@@ -164,6 +164,8 @@ def test_ai_gateway_pipelines_publish_the_mcp_on_apim_behind_the_flag(value):
     ado = gateway_step(ADO_GATEWAY, "displayName")
     gha = gateway_step(GHA_GATEWAY, "name")
     assert bool(evaluate(ado["condition"], {"variables.addAIFactoryMCP2APIM": value})) == (value == "true")
+    # Like GHA's implicit success(): a failed OpenAI pool/SKU step stops the MCP step.
+    assert not evaluate(ado["condition"], {"variables.addAIFactoryMCP2APIM": "true", "success": False})
     assert bool(evaluate(gha["if"], {"env.ADD_AI_FACTORY_MCP_2_APIM": value})) == (value == "true")
     job_env = load_pipeline(GHA_GATEWAY)["jobs"]["deploy"]["env"]
     assert evaluate(job_env["ADD_AI_FACTORY_MCP_2_APIM"], {"vars.ADD_AI_FACTORY_MCP_2_APIM": ""}) == "false"
@@ -172,6 +174,9 @@ def test_ai_gateway_pipelines_publish_the_mcp_on_apim_behind_the_flag(value):
         assert "esml-common/ai-gateway/apim/apim-mcp-server.bicep" in script
         assert '--parameters "@$' in script
         assert "deleteAll" not in script
+        # The deployment target comes from the launcher's resolved APIM, not a second derivation in bash.
+        assert '["apim_subscription_id"]' in script and '["apim_resource_group"]' in script
+        assert ":-$dev_test_prod_sub_id" not in script
     assert ado["env"] == {name: f"$({name})" for name in launcher_tuple("APIM_INPUTS")}
     assert launcher_tuple("APIM_INPUTS") <= set(gha["env"])
 

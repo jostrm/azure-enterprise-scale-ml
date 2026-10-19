@@ -120,6 +120,8 @@ A normal manual run evaluates Dev, Stage, and Prod in sequence. The gateway vari
 
 Run the project pipeline first: with the same flag, its MCP step adds the APIM identity to the MCP callers. The task's launcher (`deploy.py apim-parameters`, GET only) fails with that instruction while the MCP app is missing or does not list the APIM identity, and Stage/Prod skip the task. An Entra admin still assigns app role `AiFactory.Mcp.Read` to the APIM identity once; the project run prints the exact assignment. Details: `usecase_code/40-agent-factory/45-aifactory-mcp-gateway/readme.md`.
 
+The task deploys to the APIM subscription and resource group that the launcher resolved and checked, and only after the previous tasks succeeded. A redeploy keeps the current state of `aifactory-mcp-client`, so a key an operator suspended stays suspended. Setting the flag back to `false` skips the task and deletes nothing: the API and the subscription stay until you remove them.
+
 ## Preflight checklist
 
 - [ ] Existing APIM name, subscription, and resource group are correct.

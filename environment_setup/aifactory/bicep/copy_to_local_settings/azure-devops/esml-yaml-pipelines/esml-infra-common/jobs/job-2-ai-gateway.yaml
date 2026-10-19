@@ -85,7 +85,7 @@ steps:
 # the APIM identity to the MCP callers; Stage/Prod are skipped because the MCP runs only in Dev.
 - task: AzureCLI@2
   displayName: Expose the AI Factory MCP on APIM
-  condition: eq(variables['addAIFactoryMCP2APIM'], 'true')
+  condition: and(succeeded(), eq(variables['addAIFactoryMCP2APIM'], 'true'))
   inputs:
     azureSubscription: ${{ parameters.serviceConnection }}
     scriptType: bash
@@ -95,16 +95,19 @@ steps:
       set -euo pipefail
       parameters="$(Agent.TempDirectory)/apim-mcp.parameters.json"
       rm -f "$parameters"
-      python "usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py" apim-parameters --output "$parameters"
+      result="$(python "usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py" apim-parameters --output "$parameters")"
+      echo "$result"
       if [[ ! -s "$parameters" ]]; then
         echo "The APIM MCP API was skipped (see the reason above)."
         exit 0
       fi
-      apimSubscriptionId="${apimGatewaySubscriptionId:-$dev_test_prod_sub_id}"
+      # Deploy to exactly the APIM the launcher resolved and checked.
+      apimSubscriptionId="$(python -c 'import json, sys; print(json.loads(sys.argv[1])["apim_subscription_id"])' "$result")"
+      apimResourceGroup="$(python -c 'import json, sys; print(json.loads(sys.argv[1])["apim_resource_group"])' "$result")"
       az deployment group create \
         --name "aigw-apim-mcp-$(dev_test_prod)-$(Build.BuildId)" \
         --subscription "$apimSubscriptionId" \
-        --resource-group "$apimGatewayResourceGroup" \
+        --resource-group "$apimResourceGroup" \
         --template-file "environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-mcp-server.bicep" \
         --parameters "@$parameters"
   env:

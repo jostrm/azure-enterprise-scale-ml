@@ -406,18 +406,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 393 |
-| `env` | 391 |
+| `yaml` | 395 |
+| `env` | 393 |
 | `bootstrap` | 92 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 398 |
+| `json.dev` | 400 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 152, 416; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 153, 417; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 418, 442; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 152, 418; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 153, 419; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 420, 444; one reference row.
 
 ## YAML and variables.json reference
 
@@ -434,6 +434,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:acr_adminUserEnabled --><!-- parameter json.dev:acr_adminUserEnabled -->`acr_adminUserEnabled` | `ACR_ADMIN_USER_ENABLED` | O | Y: `"false"`<br>J.dev: `"false"` | ACR admin user enabled recommended: false, disable admin user for security. otherwise: true, enable for simpler dev access. |
 | <!-- parameter yaml:acr_dedicated --><!-- parameter json.dev:acr_dedicated -->`acr_dedicated` | `ACR_DEDICATED` | M | Y: `"true"`<br>J.dev: `"true"` | ACR dedicated (Premium tier) mandatory: ACR dedicated (Premium tier) ensure: must be true when using private endpoints or CMK. |
 | <!-- parameter yaml:addAIFactoryMCP2AIGatewaySKU --><!-- parameter json.dev:addAIFactoryMCP2AIGatewaySKU -->`addAIFactoryMCP2AIGatewaySKU` | `ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU` | O | Y: `"false"`<br>J.dev: `"false"` | Opt-in project001 Dev registration of the Factory MCP tool server on the AI Gateway. Requires both components, private outbound reachability and administrator-granted access. False skips registration; it does not delete existing resources. |
+| <!-- parameter yaml:addAIFactoryMCP2APIM --><!-- parameter json.dev:addAIFactoryMCP2APIM -->`addAIFactoryMCP2APIM` | `ADD_AI_FACTORY_MCP_2_APIM` | O | Y: `"false"`<br>J.dev: `"false"` | Opt-in publication of the project001 Dev Factory MCP on the AI gateway pipeline's existing classic APIM (apimGateway* settings): the project step adds the APIM identity to the MCP callers, then the AI gateway pipeline deploys the MCP API and client subscription. Requires enableAIFactoryMCP and an administrator-granted app role. False skips both steps; it does not delete the API or the subscription. |
 | <!-- parameter yaml:addAIFoundry --><!-- parameter json.dev:addAIFoundry -->`addAIFoundry` | `ADD_AI_FOUNDRY` | O | Y: `"false"`<br>J.dev: `"false"` | Add new AI Foundry instance with new name otherwise: true, provisions a new AI Foundry with a new random name (for debugging or re-run) to get a fresh start. Still you should delete the old instance. |
 | <!-- parameter yaml:addAIFoundryHub --><!-- parameter json.dev:addAIFoundryHub -->`addAIFoundryHub` | `ADD_AI_FOUNDRY_HUB` | O | Y: `"false"`<br>J.dev: `"false"` | DEPRECATED. Do not enable. keep-as-is: DEPRECATED. Do not enable. |
 | <!-- parameter yaml:addAISearch --><!-- parameter json.dev:addAISearch -->`addAISearch` | `ADD_AI_SEARCH` | O | Y: `"false"`<br>J.dev: `"false"` | Add new AI Search instance otherwise: false, CreateIfNotExists logic. |
@@ -556,6 +557,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:aifactoryAgentVoiceName --><!-- parameter json.dev:aifactoryAgentVoiceName -->`aifactoryAgentVoiceName` | `AIFACTORY_AGENT_VOICE_NAME` | O | Y: `""`<br>J.dev: `""` | Azure Speech voice used for spoken answers keep-as-is: Empty uses en-US-Ava:DragonHDLatestNeural. Only read when enableAIFactoryAgentLiveVoice:'true'. |
 | <!-- parameter yaml:aifactoryMcpApiImage --><!-- parameter json.dev:aifactoryMcpApiImage -->`aifactoryMcpApiImage` | `AIFACTORY_MCP_API_IMAGE` | C | Y: `""`<br>J.dev: `""` | Digest-pinned Factory API sidecar image mandatory: if enableAIFactoryMCP:'true'. Same format as aifactoryMcpImage. |
 | <!-- parameter yaml:aifactoryMcpClassicApimResourceIds --><!-- parameter json.dev:aifactoryMcpClassicApimResourceIds -->`aifactoryMcpClassicApimResourceIds` | `AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS` | O | Y: `""`<br>J.dev: `""` | Comma-separated resource IDs of classic API Management gateways (Microsoft.ApiManagement/service) allowed to call the AI Factory MCP keep-as-is: Requires enableAIFactoryMCP:'true'. Each APIM is only read (never modified); its system-assigned managed identity is added to the MCP application callers. An Entra admin assigns app role AiFactory.Mcp.Read to each identity; pipelines never write Microsoft Graph. |
+| <!-- parameter yaml:aifactoryMcpContainerAppResourceId --><!-- parameter json.dev:aifactoryMcpContainerAppResourceId -->`aifactoryMcpContainerAppResourceId` | `AIFACTORY_MCP_CONTAINER_APP_RESOURCE_ID` | O | Y: `""`<br>J.dev: `""` | Optional adoption of an AI Factory MCP Container App deployed outside the pipeline, in the project resource group. Only its caller lists grow; images, identity, secrets and ingress are never changed. Empty uses the pipeline-managed app. |
 | <!-- parameter yaml:aifactoryMcpContainerAppsEnvironment --><!-- parameter json.dev:aifactoryMcpContainerAppsEnvironment -->`aifactoryMcpContainerAppsEnvironment` | `AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT` | O | Y: `""`<br>J.dev: `""` | Name of the internal project Container Apps environment hosting the MCP keep-as-is: Empty selects the single environment in the project resource group. |
 | <!-- parameter yaml:aifactoryMcpEntraAppId --><!-- parameter json.dev:aifactoryMcpEntraAppId -->`aifactoryMcpEntraAppId` | `AIFACTORY_MCP_ENTRA_APP_ID` | C | Y: `""`<br>J.dev: `""` | Client ID (GUID) of the MCP API app registration exposing app role AiFactory.Mcp.Read mandatory: if enableAIFactoryMCP:'true'. Created once by an Entra admin; pipelines never write Microsoft Graph. |
 | <!-- parameter yaml:aifactoryMcpImage --><!-- parameter json.dev:aifactoryMcpImage -->`aifactoryMcpImage` | `AIFACTORY_MCP_IMAGE` | C | Y: `""`<br>J.dev: `""` | Digest-pinned AI Factory MCP image mandatory: if enableAIFactoryMCP:'true'. Format |
@@ -888,6 +890,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:AIFACTORY_MCP_API_IMAGE -->`AIFACTORY_MCP_API_IMAGE` | `aifactoryMcpApiImage` | C | `""` | Digest-pinned Factory API sidecar image mandatory: if ENABLE_AI_FACTORY_MCP:'true'. |
 | <!-- parameter env:AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS -->`AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS` | `aifactoryMcpClassicApimResourceIds` | O | `""` | Comma-separated resource IDs of classic API Management gateways (Microsoft.ApiManagement/service) allowed to call the AI Factory MCP keep-as-is: Requires ENABLE_AI_FACTORY_MCP:'true'. Each APIM is only read (never modified); its system-assigned managed identity is added to the MCP application callers. An Entra admin assigns app role AiFactory.Mcp.Read to each identity; pipelines never write Microsoft Graph. |
 | <!-- parameter env:AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT -->`AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT` | `aifactoryMcpContainerAppsEnvironment` | O | `""` | Name of the internal project Container Apps environment hosting the MCP keep-as-is: Empty selects the single environment in the project resource group. |
+| <!-- parameter env:AIFACTORY_MCP_CONTAINER_APP_RESOURCE_ID -->`AIFACTORY_MCP_CONTAINER_APP_RESOURCE_ID` | `aifactoryMcpContainerAppResourceId` | O | `""` | Optional adoption of an AI Factory MCP Container App deployed outside the pipeline, in the project resource group. Only its caller lists grow; images, identity, secrets and ingress are never changed. Empty uses the pipeline-managed app. |
 | <!-- parameter env:AIFACTORY_MCP_ENTRA_APP_ID -->`AIFACTORY_MCP_ENTRA_APP_ID` | `aifactoryMcpEntraAppId` | C | `""` | Client ID (GUID) of the MCP API app registration exposing app role AiFactory.Mcp.Read mandatory: if ENABLE_AI_FACTORY_MCP:'true'. Created once by an Entra admin; pipelines never write Microsoft Graph. |
 | <!-- parameter env:AIFACTORY_MCP_IMAGE -->`AIFACTORY_MCP_IMAGE` | `aifactoryMcpImage` | C | `""` | Digest-pinned AI Factory MCP image mandatory: if ENABLE_AI_FACTORY_MCP:'true'. Format |
 | <!-- parameter env:AIFACTORY_PREFIX -->`AIFACTORY_PREFIX` | `admin_aifactoryPrefixRG` | O | `"acme-ai"` | AI Factory resource group prefix keep-as-is: Max 6 chars. otherwise: set your company prefix, e.g. 'acme-ai-', 'contoso-'. |
@@ -970,6 +973,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:ACR_DEDICATED -->`ACR_DEDICATED` | `acr_dedicated` | O | `"true"` | Dedicated ACR (Premium only) |
 | <!-- parameter env:ACR_SKU -->`ACR_SKU` | `acr_SKU` | O | `"Premium"` | ACR SKU keep-as-is: Premium required for private endpoints or CMK. |
 | <!-- parameter env:ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU -->`ADD_AI_FACTORY_MCP_2_AI_GATEWAY_SKU` | `addAIFactoryMCP2AIGatewaySKU` | O | `"false"` | Opt-in project001 Dev registration of the Factory MCP tool server on the AI Gateway. Requires both components, private outbound reachability and administrator-granted access. False skips registration; it does not delete existing resources. |
+| <!-- parameter env:ADD_AI_FACTORY_MCP_2_APIM -->`ADD_AI_FACTORY_MCP_2_APIM` | `addAIFactoryMCP2APIM` | O | `"false"` | Opt-in publication of the project001 Dev Factory MCP on the AI gateway pipeline's existing classic APIM (apimGateway* settings): the project step adds the APIM identity to the MCP callers, then the AI gateway pipeline deploys the MCP API and client subscription. Requires enableAIFactoryMCP and an administrator-granted app role. False skips both steps; it does not delete the API or the subscription. |
 | <!-- parameter env:ADD_AI_FOUNDRY -->`ADD_AI_FOUNDRY` | `addAIFoundry` | O | `"false"` | Add new AI Foundry instance otherwise: true, add new Foundry even if one already exists. |
 | <!-- parameter env:ADD_AI_FOUNDRY_HUB -->`ADD_AI_FOUNDRY_HUB` | `addAIFoundryHub` | O | `"false"` | DEPRECATED: Add new legacy Hub v1 keep-as-is: Add new Hub even if one exists. Use ADD_AI_FOUNDRY instead. |
 | <!-- parameter env:ADD_AI_SEARCH -->`ADD_AI_SEARCH` | `addAISearch` | O | `"false"` | Add new AI Search instance otherwise: true, add new instance even if one exists. |

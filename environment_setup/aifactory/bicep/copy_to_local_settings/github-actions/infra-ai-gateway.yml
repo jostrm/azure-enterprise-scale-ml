@@ -156,16 +156,19 @@ jobs:
         if [[ "$dev_test_prod" == "stage" ]]; then export dev_test_prod="test"; fi
         parameters="$RUNNER_TEMP/apim-mcp.parameters.json"
         rm -f "$parameters"
-        python "azure-enterprise-scale-ml/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py" apim-parameters --output "$parameters"
+        result="$(python "azure-enterprise-scale-ml/usecase_code/40-agent-factory/45-aifactory-mcp-gateway/deploy.py" apim-parameters --output "$parameters")"
+        echo "$result"
         if [[ ! -s "$parameters" ]]; then
           echo "The APIM MCP API was skipped (see the reason above)."
           exit 0
         fi
-        apim_subscription_id="${apimGatewaySubscriptionId:-$dev_test_prod_sub_id}"
+        # Deploy to exactly the APIM the launcher resolved and checked.
+        apim_subscription_id="$(python -c 'import json, sys; print(json.loads(sys.argv[1])["apim_subscription_id"])' "$result")"
+        apim_resource_group="$(python -c 'import json, sys; print(json.loads(sys.argv[1])["apim_resource_group"])' "$result")"
         az deployment group create \
           --name "aigw-apim-mcp-${dev_test_prod}-${{ github.run_id }}" \
           --subscription "$apim_subscription_id" \
-          --resource-group "$apimGatewayResourceGroup" \
+          --resource-group "$apim_resource_group" \
           --template-file "azure-enterprise-scale-ml/environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-mcp-server.bicep" \
           --parameters "@$parameters"
 

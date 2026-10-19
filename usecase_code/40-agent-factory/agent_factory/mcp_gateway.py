@@ -775,12 +775,17 @@ class McpGatewayIntegration:
         fqdn = (((app.get("properties") or {}).get("configuration") or {}).get("ingress") or {}).get("fqdn")
         if not fqdn:
             raise ValueError(f"{app_id} has no ingress FQDN.")
+        # Keep an operator's suspension of the client key across redeploys; a new subscription starts active.
+        subscription = _optional(self.session, f"{request.apim_id}/subscriptions/{APIM_MCP_CLIENT_SUBSCRIPTION}", APIM_API)
         values = {"apimServiceName": request.apim_service_name, "mcpServerName": APIM_MCP_SERVER,
                   "displayName": DISPLAY_NAME, "mcpDescription": READ_ONLY_DESCRIPTION,
                   "mcpServerBaseUrl": f"https://{fqdn}", "mcpEntraAppId": request.entra_app_id,
-                  "clientSubscriptionName": APIM_MCP_CLIENT_SUBSCRIPTION}
+                  "clientSubscriptionName": APIM_MCP_CLIENT_SUBSCRIPTION,
+                  "clientSubscriptionState": ((subscription or {}).get("properties") or {}).get("state") or "active"}
+        segments = request.apim_id.split("/")  # /subscriptions/<sub>/resourceGroups/<rg>/providers/...
         return {
             "mode": "parameters", "apim_id": request.apim_id, "mcp_app_id": app_id, "mutations": False,
+            "apim_subscription_id": segments[2], "apim_resource_group": segments[4],
             "prerequisites": [_app_role_prerequisite(request, principal,
                                                      f"the APIM managed identity {principal} ({request.apim_id})")],
             "parameters": {

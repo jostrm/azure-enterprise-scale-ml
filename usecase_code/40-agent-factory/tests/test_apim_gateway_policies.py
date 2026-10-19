@@ -145,6 +145,9 @@ class McpServerModuleTests(unittest.TestCase):
         module = text(MCP)
         self.assertIn("param clientSubscriptionName string = ''", module)
         self.assertIn("if (!empty(clientSubscriptionName))", module)
+        # A redeploy must not re-activate a subscription an operator suspended (the pipeline passes the current state).
+        self.assertIn("param clientSubscriptionState string = 'active'", module)
+        self.assertIn("state: clientSubscriptionState", module)
         self.assertIn("scope: '/apis/${mcpApi.name}'", module)
         self.assertIn("output clientSubscriptionResourceId string", module)
 

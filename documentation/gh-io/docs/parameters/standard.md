@@ -101,6 +101,10 @@ These inputs apply only when you intentionally enable the corresponding
 | `addAIFactoryMCP2AIGatewaySKU` plus both components | Registering MCP on the gateway. |
 | `aiGatewaySkuOutboundSubnetId` | Registration with a new gateway; an adopted gateway must already have suitable outbound networking. |
 | `aifactoryMcpClassicApimResourceIds` | Optional, with MCP hosting: classic APIM gateways that call the MCP with their system-assigned identity; an administrator assigns `AiFactory.Mcp.Read` to each identity. |
+| `addAIFactoryMCP2APIM` plus the `apimGateway*` APIM | Publishing the MCP on the AI gateway pipeline's classic APIM: the project step admits the APIM identity, then the AI gateway pipeline deploys the MCP API and client subscription `aifactory-mcp-client`. |
+| `aifactoryMcpContainerAppResourceId` | Optional, with MCP hosting: adopt an MCP app deployed outside the pipeline; only its caller lists grow. |
+
+The step prints, for each MCP caller, the exact admin-run command for the Microsoft Graph Bicep template `esml-common/ai-gateway/entra/aifactory-mcp-app-role.bicep` that assigns `AiFactory.Mcp.Read`; no pipeline writes Microsoft Graph.
 
 All three switches default to false. False skips the component action; it does
 not delete existing resources. See [full prerequisites and mappings](advanced.md#mcp-and-ai-gateway-parameters).

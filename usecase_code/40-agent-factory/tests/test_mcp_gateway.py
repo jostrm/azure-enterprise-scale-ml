@@ -765,9 +765,20 @@ class ApimMcpTests(unittest.TestCase):
             "displayName": "Enterprise Scale AI Factory",
             "mcpServerBaseUrl": "https://aifactory-mcp-p001-dev.internal.swedencentral.azurecontainerapps.io",
             "mcpEntraAppId": APP_REG, "clientSubscriptionName": gw.APIM_MCP_CLIENT_SUBSCRIPTION,
+            "clientSubscriptionState": "active",
         }, {key: value for key, value in parameters.items() if key != "mcpDescription"})
         self.assertIn("Read-only", parameters["mcpDescription"])
         self.assertEqual(CLASSIC_APIM, result["apim_id"])
+        # The pipeline deploys to exactly the APIM the launcher resolved (no second derivation in bash).
+        self.assertEqual((SUB, "common-rg"), (result["apim_subscription_id"], result["apim_resource_group"]))
+
+    def test_a_suspended_client_subscription_stays_suspended(self):
+        arm = with_classic_apim(FakeArm())
+        integration = self.owned_mcp(arm, callers=True)
+        arm.add(f"{CLASSIC_APIM}/subscriptions/{gw.APIM_MCP_CLIENT_SUBSCRIPTION}", {"properties": {"state": "suspended"}})
+        result = integration.apim_parameters(self.values())
+        self.assertEqual("suspended", result["parameters"]["parameters"]["clientSubscriptionState"]["value"])
+        self.assertEqual([], arm.writes())
         self.assertTrue(any(gw.REQUIRED_ROLE in item and guid(40) in item for item in result["prerequisites"]))
 
     def test_adopted_mcp_is_published_by_its_own_origin(self):

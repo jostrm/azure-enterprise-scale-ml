@@ -60,6 +60,17 @@ param entraAudiences array = []
 @description('Optional APIM subscription for MCP clients, scoped to this API only. Empty creates none (bring your own).')
 param clientSubscriptionName string = ''
 
+@allowed([
+  'active'
+  'suspended'
+  'submitted'
+  'rejected'
+  'cancelled'
+  'expired'
+])
+@description('State of the client subscription. Pass the current state on redeploys so a suspended key stays suspended.')
+param clientSubscriptionState string = 'active'
+
 func requireHttpsBaseUrl(url string) string => startsWith(toLower(url), 'https://') && !endsWith(url, '/') && length(split(url, '/')) == 3
   ? url
   : fail('mcpServerBaseUrl must be an https:// origin without a path or trailing slash; put the endpoint path in mcpEndpointPath.')
@@ -121,7 +132,7 @@ resource clientSubscription 'Microsoft.ApiManagement/service/subscriptions@2024-
   properties: {
     displayName: '${displayName} MCP client'
     scope: '/apis/${mcpApi.name}'
-    state: 'active'
+    state: clientSubscriptionState
   }
   dependsOn: [
     mcpPolicy
