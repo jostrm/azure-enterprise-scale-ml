@@ -215,3 +215,30 @@ def test_inventory_drift_after_review_blocks_before_any_deletion(workspace):
     receipt = fl.execute_bootstrap_teardown(document, run / "receipt.json", cloud=cloud, sleep=lambda _: None)
     assert receipt["status"] == "blocked" and receipt["mutation_started"] is False
     assert not cloud.deleted
+
+
+@pytest.mark.parametrize("url,code", [
+    ("https://graph.microsoft.com/v1.0/groups/retained", "entra-mutations-forbidden"),
+    ("https://lockstore.blob.core.windows.net/x", "untrusted-service-endpoint"),
+])
+def test_operator_teardown_cloud_trusts_only_arm_without_any_lease_store(url, code):
+    # A never-enrolled factory has no lease store: no blob host is trusted and Entra writes stay forbidden.
+    cloud = fl.Cloud(request(), opener=object(), command_runner=lambda *args, **kwargs: pytest.fail("No auth"))
+    with pytest.raises(fl.Blocked, match=code):
+        cloud.request("DELETE", url, "https://graph.microsoft.com")
+
+
+def test_operator_teardown_cloud_reaches_arm_without_locks():
+    calls = []
+
+    class Opener:
+        def open(self, request, timeout):
+            calls.append(request.full_url)
+            raise OSError("offline")
+
+    cloud = fl.Cloud(request(), opener=Opener(), command_runner=lambda *args, **kwargs: pytest.fail("No auth"))
+    cloud.token = lambda audience: "token"
+    with pytest.raises(fl.Blocked):
+        cloud.request("GET", "https://management.azure.com" + COMMON + "?api-version=2022-09-01",
+                      "https://management.azure.com/")
+    assert calls and calls[0].startswith("https://management.azure.com/")

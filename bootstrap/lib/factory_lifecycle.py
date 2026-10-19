@@ -865,11 +865,13 @@ class Cloud:
 
     def request(self, method, url, audience, data=None, headers=None, allowed=(200,)):
         parsed = urlsplit(url)
-        require(not (self.document.get("operation") == "delete"
-                     and (parsed.hostname or "").lower() in ("graph.microsoft.com", "graph.windows.net")),
+        deleting = (self.document.get("operation") == "delete"
+                    or self.document.get("contract") == "bootstrap-operator-teardown-v1")
+        require(not (deleting and (parsed.hostname or "").lower() in ("graph.microsoft.com", "graph.windows.net")),
                 "factory-deletion-entra-mutations-forbidden")
         allowed_hosts = {urlsplit(ARM).netloc, "dev.azure.com"}
-        if not single_writer(self.document):
+        # An operator teardown has no lease store, so no storage endpoint is trusted.
+        if self.document.get("locks") and not single_writer(self.document):
             allowed_hosts.add(urlsplit(self.document["locks"]["account_url"]).netloc)
         require(parsed.scheme == "https" and parsed.netloc in allowed_hosts and not parsed.username
                 and not parsed.password and not parsed.fragment, "untrusted-service-endpoint")
