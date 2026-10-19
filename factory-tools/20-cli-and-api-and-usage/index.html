@@ -4023,6 +4023,18 @@ The order is capability hosts, target-project Search shared private links,
 service-managed lifecycle, project resources, then project network.
 Pipeline success and verified absence of the exact resources are both required.
 Configuration references alone do not establish actual inventory or preservation.</p>
+<p><code>deletion_plan.access_hubs</code> is <code>[]</code> unless the factory's own groups hold a
+<strong>factory-owned integrated access hub</strong> (<code>factory-owned-access-hub-v1</code>): the VPN
+gateway, Bastion, DNS resolver, private DNS zones or private runner that its
+integrated access-hub bootstrap created. The API proves this from consumed
+bootstrap stage records only and refuses when any other registered factory or
+scale set references the hub. Each entry lists <code>proven_resource_ids</code>, the exact
+<code>deleted_resources</code> from the common stage, the bootstrap <code>evidence</code> and
+<code>executor: "operator-after-project-barrier"</code>. The runtime requires every DNS zone
+link and VNet peering to target only VNets the cohort deletes, blocks site
+connections, and tears the hub and runner down last, after every project
+pipeline. A shared hub such as <code>aifactory-connectivity</code> stays protected; the SDK,
+CLI and MAUI reject a VPN gateway or Bastion deletion outside <code>access_hubs</code>.</p>
 <p>Draft guards also check protected parameter profiles, ownership, registered
 pipeline connections, bootstrap references and projects shared across scale
 sets. An optional <code>scale_set_id</code> on project resource deletion identifies an
