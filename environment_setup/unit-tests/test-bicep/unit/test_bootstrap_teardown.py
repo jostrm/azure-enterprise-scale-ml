@@ -17,7 +17,7 @@ import pytest
 from .test_factory_lifecycle import fl, GROUP, COMMON, OWNER, RESOURCE, SUB, TENANT, IDENTITY, workspace, no_real_services
 from .test_factory_deletion_access_hub import (
     HubCloud, untagged, CORE, VNET, GATEWAY, BASTION, RUNNER, NIC, DISK, IDENTITY_ID, ZONE, LINK, HUB_ROOTS,
-    COMMON_IP, PROJECT_SUBNET, GATEWAY_SUBNET,
+    COMMON_IP, PROJECT_SUBNET, GATEWAY_SUBNET, RUNNER_SUBNET,
 )
 from .test_selective_project_deletion import VAULT, tagged
 
@@ -81,8 +81,20 @@ class TeardownCloud(HubCloud):
         self.bodies[NIC.lower()]["properties"]["networkSecurityGroup"] = {"id": RUNNER_NSG}
         self.bodies[GATEWAY_SUBNET.lower()]["properties"]["ipConfigurations"] = [
             {"id": GATEWAY + "/ipConfigurations/default"}]
+        # The runner subnet uses the factory NSG, which lists it back; the VNet repeats its subnets inline.
+        self.bodies[RUNNER_SUBNET.lower()]["properties"]["networkSecurityGroup"] = {"id": NSG}
+        self.bodies[NSG.lower()]["properties"] = {"subnets": [{"id": RUNNER_SUBNET}]}
+        self.bodies[VNET.lower()]["properties"]["subnets"] = [
+            copy.deepcopy(self.bodies[row["id"].lower()]) for row in self.bodies[VNET.lower()]["properties"]["subnets"]]
 
     def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
+        if method == "DELETE":
+            # Like ARM, a resource still referenced by a surviving one is in use and cannot go.
+            gone = resource_id.lower()
+            for key, body in self.bodies.items():
+                if not (key == gone or key.startswith(gone + "/")):
+                    fl.require(not any(ref == gone or ref.startswith(gone + "/")
+                                       for ref in fl.project_resource_dependencies(body)), "resource-in-use")
         result = super().arm(method, resource_id, api_version, allowed, headers)
         if method == "DELETE":
             # Like ARM, a deleted dependent leaves the back-reference lists that named it.
@@ -232,11 +244,73 @@ def test_operator_unlinks_its_hub_links_first_then_deletes_groups_last(workspace
     assert deleted[-1] in (GROUP.lower(), COMMON.lower()) and deleted[-2] in (GROUP.lower(), COMMON.lower())
     assert deleted.index(RUNNER.lower()) < deleted.index(NIC.lower())
     assert deleted.index(NIC.lower()) < deleted.index(RUNNER_NSG.lower())
-    assert deleted.index(GATEWAY.lower()) < deleted.index(GATEWAY_SUBNET.lower())
+    # The gateway subnet goes with its VNet, after the gateway that used it.
+    assert deleted.index(GATEWAY.lower()) < deleted.index(VNET.lower())
     assert {SPIDER_HUB_LINK.lower(), SPIDER_PEERING.lower(), HUB_ZONE.lower(), HUB_VNET.lower(), HUB.lower()} <= set(cloud.bodies)
     assert not any(key.startswith((COMMON.lower(), GROUP.lower())) for key in cloud.bodies)
     assert json.loads((run / "receipt.json").read_text()) == receipt
     assert set(receipt["deleted_hub_links"]) == {OWN_HUB_LINK, OWN_PEERING, SPOKE_PEERING}
+
+
+def test_child_resources_go_with_their_parent_which_keeps_their_order(workspace):
+    document, cloud = frozen()
+    rows = {row["id"].lower(): row for row in document["deletion"]["resources"]}
+    assert rows[NSG_RULE.lower()]["delete_via_parent"] == NSG.lower()
+    assert rows[RUNNER_SUBNET.lower()]["delete_via_parent"] == VNET.lower()
+    assert rows[LINK.lower()]["delete_via_parent"] == ZONE.lower()
+    # Extension resources and hub peerings are still deleted one by one.
+    assert "delete_via_parent" not in rows[ROLE.lower()]
+    assert "delete_via_parent" not in rows[SPOKE_PEERING.lower()]
+    run = workspace / "teardown"
+    run.mkdir()
+    receipt = fl.execute_bootstrap_teardown(document, run / "receipt.json", cloud=cloud, sleep=lambda _: None)
+    assert receipt["status"] == "succeeded", (receipt.get("error_code"), receipt.get("pending_resource"), cloud.deleted)
+    deleted = [value.lower() for value in cloud.deleted]
+    assert not {NSG_RULE.lower(), RUNNER_SUBNET.lower(), GATEWAY_SUBNET.lower(), LINK.lower()} & set(deleted)
+    # The runner subnet used the NSG, so its VNet goes first; the zone link pointed at the VNet.
+    assert deleted.index(VNET.lower()) < deleted.index(NSG.lower())
+    assert deleted.index(ZONE.lower()) < deleted.index(VNET.lower())
+    assert {NSG_RULE, RUNNER_SUBNET, GATEWAY_SUBNET, LINK} <= set(receipt["deleted_resources"])
+
+
+def test_execution_checks_each_delete_without_reinventorying_every_group(workspace, monkeypatch):
+    document, cloud = frozen()
+    inventories = []
+    collect = fl.collect_resource_closure
+    monkeypatch.setattr(fl, "collect_resource_closure",
+                        lambda *args, **kwargs: inventories.append(1) or collect(*args, **kwargs))
+    run = workspace / "teardown"
+    run.mkdir()
+    receipt = fl.execute_bootstrap_teardown(document, run / "receipt.json", cloud=cloud, sleep=lambda _: None)
+    assert receipt["status"] == "succeeded", (receipt.get("error_code"), receipt.get("pending_resource"))
+    # One complete inventory before the first change and one after the last, not one per delete.
+    assert len(inventories) == 2
+
+
+@pytest.mark.parametrize("change,code", [
+    ("new-dependency", "bootstrap-teardown-resource-changed"),
+    ("owner-tag", "bootstrap-teardown-resource-changed"),
+    ("deployment-started", "active-or-unknown-deployment"),
+])
+def test_resource_changed_during_the_run_stops_before_its_delete(workspace, change, code):
+    document, cloud = frozen()
+
+    def drift(identifier):
+        if change == "new-dependency":
+            cloud.bodies[RUNNER.lower()]["properties"]["availabilitySet"] = {
+                "id": COMMON + "/providers/Microsoft.Compute/availabilitySets/added-after-review"}
+        elif change == "owner-tag":
+            cloud.bodies[RUNNER.lower()]["tags"] = {fl.TAG_KEYS["factory_id"]: OWNER["factory_id"],
+                                                    fl.TAG_KEYS["scaleset_id"]: "other-scale-set"}
+        else:
+            cloud.active = True
+
+    cloud.after_delete = drift
+    run = workspace / "teardown"
+    run.mkdir()
+    receipt = fl.execute_bootstrap_teardown(document, run / "receipt.json", cloud=cloud, sleep=lambda _: None)
+    assert receipt["status"] == "reconciliation-required" and receipt["error_code"] == code
+    assert RUNNER not in cloud.deleted
 
 
 def test_inventory_drift_after_review_blocks_before_any_deletion(workspace):

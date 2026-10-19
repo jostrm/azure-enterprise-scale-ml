@@ -63,8 +63,17 @@ def phase(item):
 
 def ordered_resources(rows):
     deleted = {row["id"].lower(): copy.deepcopy(row) for row in rows if row["delete"]}
+    inherited = {}
+    for row in deleted.values():
+        parent = str(row.get("delete_via_parent", "")).lower()
+        if parent in deleted:
+            # A child deleted through its parent leaves with it, so the parent precedes what the child must.
+            inherited.setdefault(parent, set()).update(
+                value.lower() for value in row.get("depends_on", []) if value.lower() in deleted
+                and not _overlaps(value.lower(), parent))
     for identifier, row in deleted.items():
         dependencies = {value.lower() for value in row.get("depends_on", []) if value.lower() in deleted}
+        dependencies.update(inherited.get(identifier, ()))
         dependencies.update(parent for parent in deleted if identifier.startswith(parent + "/"))
         fl.require(all(phase(row) <= phase(deleted[value]) for value in dependencies),
                    "factory-delete-phase-dependency-conflict")
@@ -591,7 +600,7 @@ def observed_absent(cloud, document):
     return absent
 
 
-def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep):
+def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep, fresh=None):
     flags = document["deletion"]["flags"]
     validate_flags(flags)
     entries = document["deletion"]["resources"] + document["deletion"]["resource_groups"]
@@ -628,7 +637,10 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
                     receipt["deleted_resources"].append(child["id"])
             persist()
             continue
-        fl.verify_project_inventory(cloud, document, removed)
+        if fresh:
+            fresh(row, body)
+        else:
+            fl.verify_project_inventory(cloud, document, removed)
         if fl.RG_ID.fullmatch(key):
             fl.require(flags["deleteAllForProject"] is True, "factory-delete-group-not-enabled")
             fl.require(all(child["id"].lower() in removed for child in entries
@@ -1105,6 +1117,12 @@ def _parent_resource(key):
     return parent if separator and "/providers/" in parent and len(parent.rsplit("/providers/", 1)[1].split("/")) >= 3 else None
 
 
+def _cascades(key, item, parent):
+    """A true child (not an extension resource such as a role assignment, not a peering) goes with its parent."""
+    return (key.startswith(parent + "/") and "/providers/" not in key[len(parent):]
+            and str(item.get("type", "")).lower() != PEERING_TYPE and phase(item) not in (0, 1))
+
+
 def teardown_owner(document, closure, bodies, key):
     """(owner, source) proving this resource belongs to exactly this factory and scale set."""
     record = document["bootstrap_record"]
@@ -1163,14 +1181,19 @@ def freeze_teardown(cloud, document):
         if namespace not in operations:
             operations[namespace] = set(cloud.provider_operations(namespace))
         item["independent_delete"] = item["type"].lower() + "/delete" in operations[namespace]
-    for key, item in entries.items():
-        if key in closure["groups"] or item["independent_delete"]:
+    # Whole groups go, so a child resource (NSG rule, subnet, zone link, VM extension) leaves with
+    # its nearest deleted parent instead of one checked delete each. Ancestors are decided first.
+    for key in sorted(entries, key=len):
+        item = entries[key]
+        if key in closure["groups"]:
             continue
         parents = [parent for parent, candidate in entries.items() if key.startswith(parent + "/")
-                   and candidate.get("independent_delete") is True]
+                   and candidate.get("independent_delete") is True and not candidate.get("delete_via_parent")]
+        if item["independent_delete"] and not (parents and _cascades(key, item, max(parents, key=len))):
+            continue
         fl.require(parents and phase(item) not in (0, 1), "factory-delete-service-lifecycle-unsupported")
         item["delete_via_parent"] = max(parents, key=len)
-    factory_vnets = {key for key in bodies if not fl.RG_ID.fullmatch(key)
+    factory_vnets ={key for key in bodies if not fl.RG_ID.fullmatch(key)
                      and fl.resource_type_from_id(key) == "microsoft.network/virtualnetworks"}
     links, hub_vnets = _hub_links(cloud, document, factory_vnets)
     # This factory's own side of each hub peering goes in the same unlink stage.
@@ -1227,12 +1250,14 @@ def validate_teardown(document, require_unexpired=False, check_hash=True):
                    "bootstrap-teardown-unowned-resource")
         if not fl.RG_ID.fullmatch(key):
             fl.require(type(row.get("independent_delete")) is bool, "factory-delete-provider-delete-proof-required")
-            if not row["independent_delete"]:
+            if not row["independent_delete"] or "delete_via_parent" in row:
                 parent = row.get("delete_via_parent", "")
                 fl.require(parent in entries and key.startswith(parent + "/")
-                           and entries[parent].get("independent_delete") is True and phase(row) not in (0, 1),
+                           and entries[parent].get("independent_delete") is True
+                           and "delete_via_parent" not in entries[parent] and phase(row) not in (0, 1)
+                           and (not row["independent_delete"] or _cascades(key, row, parent)),
                            "factory-delete-service-cascade-unreviewed")
-    vnets = {key for key in entries if not fl.RG_ID.fullmatch(key)
+    vnets ={key for key in entries if not fl.RG_ID.fullmatch(key)
              and fl.resource_type_from_id(key) == "microsoft.network/virtualnetworks"}
     links = data.get("hub_links")
     fl.require(data.get("factory_virtual_networks") == sorted(vnets)
@@ -1252,6 +1277,29 @@ def validate_teardown(document, require_unexpired=False, check_hash=True):
                         and _remote(data["bodies"][key]) == row["remote_virtual_network_id"]),
                    "bootstrap-teardown-hub-links-invalid")
     ordered_resources(groups + resources)
+
+
+def _teardown_fresh(cloud, document):
+    """Per-delete check: still the reviewed resource, same owner, no new dependency, no deployment running.
+
+    Whole groups are deleted, so the complete inventory is verified only before the first change
+    and after the last; an unreviewed new resource still blocks its group's empty-group check.
+    """
+    bodies, subscription = document["deletion"]["bodies"], document["target"]["subscription_id"]
+
+    def check(row, body):
+        key = row["id"].lower()
+        before = bodies[key]
+        cloud.assert_no_active_deployments(fl.arm_scope(key))
+        fl.require(str(body.get("id", "")).lower() == key
+                   and str(body.get("type", "")).lower() == str(before.get("type", "")).lower()
+                   and body.get("location") == before.get("location")
+                   and (body.get("tags") or {}) == (before.get("tags") or {})
+                   and (body.get("properties") or {}).get("principalId")
+                   == (before.get("properties") or {}).get("principalId")
+                   and set(fl.project_resource_dependencies(body)) <= {value.lower() for value in row["depends_on"]}
+                   and not fl.managed_group_cascades(body, subscription), "bootstrap-teardown-resource-changed")
+    return check
 
 
 def execute_teardown(document, receipt_path, cloud=None, sleep=time.sleep):
@@ -1294,7 +1342,8 @@ def execute_teardown(document, receipt_path, cloud=None, sleep=time.sleep):
                 receipt["deleted_resources"].append(link["id"])
             persist()
         delete_rows(cloud, lease, document, receipt, persist,
-                    [row for row in data["resources"] + data["resource_groups"] if row["delete"]], sleep)
+                    [row for row in data["resources"] + data["resource_groups"] if row["delete"]], sleep,
+                    fresh=_teardown_fresh(cloud, document))
         fl.verify_project_inventory(cloud, document, receipt["deleted_resources"] + receipt["observed_absent"])
         receipt["status"] = "succeeded"
     except BaseException as error:
