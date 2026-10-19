@@ -2487,7 +2487,10 @@ pipelines, not a universal gateway selection switch.</p>
 <code>aifactoryMcpImage</code>, <code>aifactoryMcpApiImage</code> and <code>aifactoryMcpEntraAppId</code> are required
 for MCP hosting. <code>aiGatewaySkuResourceId</code> selects an existing gateway to adopt;
 <code>aiGatewaySkuOutboundSubnetId</code> provides the new gateway's outbound subnet when
-registration needs it. The exact environment names and defaults are in the
+registration needs it. <code>aifactoryMcpClassicApimResourceIds</code> (optional, requires
+<code>enableAIFactoryMCP</code>) lists classic APIM gateways whose system-assigned identities may
+call the MCP; the APIMs are only read and an administrator assigns <code>AiFactory.Mcp.Read</code>
+to each identity. The exact environment names and defaults are in the
 generated tables below.</p>
 <p>Regular APIM pools (<code>ENABLE_APIM</code>), the optional Kong edge (<code>ENABLE_KONG</code>) and
 network Application Gateway are <strong>different routes</strong>. A configuration field
@@ -2937,11 +2940,11 @@ reported, not silently represented as multiple settings.</p>
 <tbody>
 <tr>
 <td><code>yaml</code></td>
-<td style="text-align: right;">392</td>
+<td style="text-align: right;">393</td>
 </tr>
 <tr>
 <td><code>env</code></td>
-<td style="text-align: right;">390</td>
+<td style="text-align: right;">391</td>
 </tr>
 <tr>
 <td><code>bootstrap</code></td>
@@ -2957,15 +2960,15 @@ reported, not silently represented as multiple settings.</p>
 </tr>
 <tr>
 <td><code>json.dev</code></td>
-<td style="text-align: right;">397</td>
+<td style="text-align: right;">398</td>
 </tr>
 </tbody>
 </table>
 <p>Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).</p>
 <ul>
-<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 152, 415; one reference row.</li>
-<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 153, 416; one reference row.</li>
-<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 417, 441; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_COMMON_RESOURCE_SUFFIX</code>, lines 152, 416; one reference row.</li>
+<li>Source duplicate: <code>env:ADMIN_PRJ_RESOURCE_SUFFIX</code>, lines 153, 417; one reference row.</li>
+<li>Source duplicate: <code>env:USE_COMMON_ACR_OVERRIDE</code>, lines 418, 442; one reference row.</li>
 </ul>
 <h2 id="yaml-and-variablesjson-reference">YAML and variables.json reference<a class="headerlink" href="#yaml-and-variablesjson-reference" title="Permanent link">&para;</a></h2>
 <p>Exact YAML keys are under <code>variables:</code>; JSON paths are <code>&lt;section&gt;.&lt;key&gt;</code>. <strong>Y</strong> = YAML assignment; <strong>J.section</strong> = JSON value. JSON quoting and scalar types are preserved. A missing source is explicitly marked. GHA names include workflow bindings/fallbacks and explicitly reviewed template counterparts; they are not automatically interchangeable and inclusion does not guarantee every workflow consumes them.</p>
@@ -3855,6 +3858,13 @@ reported, not silently represented as multiple settings.</p>
 <td>C</td>
 <td>Y: <code>""</code><br>J.dev: <code>""</code></td>
 <td>Digest-pinned Factory API sidecar image mandatory: if enableAIFactoryMCP:'true'. Same format as aifactoryMcpImage.</td>
+</tr>
+<tr>
+<td><!-- parameter yaml:aifactoryMcpClassicApimResourceIds --><!-- parameter json.dev:aifactoryMcpClassicApimResourceIds --><code>aifactoryMcpClassicApimResourceIds</code></td>
+<td><code>AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS</code></td>
+<td>O</td>
+<td>Y: <code>""</code><br>J.dev: <code>""</code></td>
+<td>Comma-separated resource IDs of classic API Management gateways (Microsoft.ApiManagement/service) allowed to call the AI Factory MCP keep-as-is: Requires enableAIFactoryMCP:'true'. Each APIM is only read (never modified); its system-assigned managed identity is added to the MCP application callers. An Entra admin assigns app role AiFactory.Mcp.Read to each identity; pipelines never write Microsoft Graph.</td>
 </tr>
 <tr>
 <td><!-- parameter yaml:aifactoryMcpContainerAppsEnvironment --><!-- parameter json.dev:aifactoryMcpContainerAppsEnvironment --><code>aifactoryMcpContainerAppsEnvironment</code></td>
@@ -6013,6 +6023,13 @@ reported, not silently represented as multiple settings.</p>
 <td>C</td>
 <td><code>""</code></td>
 <td>Digest-pinned Factory API sidecar image mandatory: if ENABLE_AI_FACTORY_MCP:'true'.</td>
+</tr>
+<tr>
+<td><!-- parameter env:AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS --><code>AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS</code></td>
+<td><code>aifactoryMcpClassicApimResourceIds</code></td>
+<td>O</td>
+<td><code>""</code></td>
+<td>Comma-separated resource IDs of classic API Management gateways (Microsoft.ApiManagement/service) allowed to call the AI Factory MCP keep-as-is: Requires ENABLE_AI_FACTORY_MCP:'true'. Each APIM is only read (never modified); its system-assigned managed identity is added to the MCP application callers. An Entra admin assigns app role AiFactory.Mcp.Read to each identity; pipelines never write Microsoft Graph.</td>
 </tr>
 <tr>
 <td><!-- parameter env:AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT --><code>AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT</code></td>

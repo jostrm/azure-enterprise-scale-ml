@@ -2063,6 +2063,10 @@ repository visibility or guarantee private-only monitoring.</p>
 <td><code>aiGatewaySkuOutboundSubnetId</code></td>
 <td>Registration with a new gateway; an adopted gateway must already have suitable outbound networking.</td>
 </tr>
+<tr>
+<td><code>aifactoryMcpClassicApimResourceIds</code></td>
+<td>Optional, with MCP hosting: classic APIM gateways that call the MCP with their system-assigned identity; an administrator assigns <code>AiFactory.Mcp.Read</code> to each identity.</td>
+</tr>
 </tbody>
 </table>
 <p>All three switches default to false. False skips the component action; it does
