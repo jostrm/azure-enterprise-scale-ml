@@ -210,7 +210,10 @@ $Preview | ConvertTo-Json -Depth 100
 
 **Whole resource groups are deleted. Selective retention inside them is not
 implemented.** Protected hub/VPN/platform/bootstrap resources, coordination
-storage, the executing identity and private runners must be outside them.
+storage, the executing identity and private runners must be outside them. The one exception is a factory-owned integrated hub (VPN gateway, Bastion, DNS
+private resolver) and private runner that the factory's own bootstrap created in
+its own groups: those go only with bootstrap proof (`deletion_plan.access_hubs`).
+Connectivity hub resource groups and shared hubs are never deleted.
 Entra security groups and Git repositories/history stay. Key Vault purge is
 not performed; other external dependencies need separate review.
 
@@ -221,6 +224,14 @@ No automatic mode change occurs. All registered project GHA **or ADO**
 deletion pipelines must finish in every environment before shared groups are
 removed; starting a pipeline is not success. Local configuration is removed
 only after verified completion.
+
+A **never-enrolled bootstrap draft** (no registered ownership, no lease store or
+pipeline) instead gets a `bootstrap-operator-teardown-v1` plan from the same
+prepare. It is **conditional** on an API and published runtime that advertise
+`bootstrap_operator_teardown`, needs no Blob coordination or pipelines, and is
+executed by the operator: it first removes only the factory's own DNS links and
+peerings inside the configured connectivity hub, then deletes the bootstrap-proven
+groups, groups last. A failed run keeps the draft; prepare again from fresh inventory.
 
 ```powershell
 $ConfirmFamily = 'delete-aifactory'
@@ -670,7 +681,10 @@ save_review(body, client.scaleset_delete_prepare(**selection),
 
 **Whole-group deletion cannot retain selected resources inside a deleted
 group.** Reusable hub/VPN/platform/bootstrap resources, coordination storage,
-the executing identity and private runners must be outside those groups.
+the executing identity and private runners must be outside those groups. The one exception is a factory-owned integrated hub (VPN gateway, Bastion, DNS
+private resolver) and private runner that the factory's own bootstrap created in
+its own groups: those go only with bootstrap proof (`deletion_plan.access_hubs`).
+Connectivity hub resource groups and shared hubs are never deleted.
 Entra groups and Git repositories/history stay. No Key Vault purge occurs;
 other external dependencies need separate review.
 
@@ -680,6 +694,14 @@ contract; installing a newer SDK does not upgrade it. Do not switch mode to
 bypass a blocker. Every registered project's **GHA or ADO** deletion pipeline
 in every environment must complete before shared-group removal. Configuration
 cleanup follows verified success, not merely pipeline submission.
+
+A **never-enrolled bootstrap draft** (no registered ownership, no lease store or
+pipeline) instead gets a `bootstrap-operator-teardown-v1` plan from the same
+prepare. It is **conditional** on an API and published runtime that advertise
+`bootstrap_operator_teardown`, needs no Blob coordination or pipelines, and is
+executed by the operator: it first removes only the factory's own DNS links and
+peerings inside the configured connectivity hub, then deletes the bootstrap-proven
+groups, groups last. A failed run keeps the draft; prepare again from fresh inventory.
 
 ```python
 body = {
@@ -1128,7 +1150,10 @@ expected_mode=runtime
 
 **Whole-group deletion cannot preserve selected resources inside deleted
 groups.** Protected hub/VPN/platform/bootstrap resources, coordination
-storage, the executing identity and private runners must be outside them.
+storage, the executing identity and private runners must be outside them. The one exception is a factory-owned integrated hub (VPN gateway, Bastion, DNS
+private resolver) and private runner that the factory's own bootstrap created in
+its own groups: those go only with bootstrap proof (`deletion_plan.access_hubs`).
+Connectivity hub resource groups and shared hubs are never deleted.
 Entra groups and Git repositories/history stay. No Key Vault purge occurs;
 other external dependencies need separate review.
 
@@ -1138,6 +1163,14 @@ contract; client publication does not upgrade it. No automatic mode change
 occurs. Every registered project **GHA or ADO** pipeline in every environment
 must finish before shared-group removal. Configuration cleanup follows
 verified completion, not simply pipeline submission.
+
+A **never-enrolled bootstrap draft** (no registered ownership, no lease store or
+pipeline) instead gets a `bootstrap-operator-teardown-v1` plan from the same
+prepare. It is **conditional** on an API and published runtime that advertise
+`bootstrap_operator_teardown`, needs no Blob coordination or pipelines, and is
+executed by the operator: it first removes only the factory's own DNS links and
+peerings inside the configured connectivity hub, then deletes the bootstrap-proven
+groups, groups last. A failed run keeps the draft; prepare again from fresh inventory.
 
 ```bash
 jq -n --arg folder "$folder" --arg factory "$factory_id" --arg revision "$revision" \
