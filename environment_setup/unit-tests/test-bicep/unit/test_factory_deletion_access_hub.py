@@ -35,6 +35,10 @@ IDENTITY_ID = COMMON + "/providers/Microsoft.ManagedIdentity/userAssignedIdentit
 COMMON_IP = NET + "/publicIPAddresses/common-ip"
 FOREIGN_VNET = (f"/subscriptions/{SUB}/resourceGroups/aifactory-connectivity"
                 "/providers/Microsoft.Network/virtualNetworks/vnet-connectivity")
+# A reusable connectivity hub in its own subscription, peered and DNS-linked to several factories.
+SHARED_HUB_SUB = "/subscriptions/99999999-9999-4999-8999-999999999999"
+SHARED_HUB_VNET = (SHARED_HUB_SUB + "/resourceGroups/aifactory-connectivity"
+                   "/providers/Microsoft.Network/virtualNetworks/vnet-aifactory-access-hub-sdc-001")
 HUB_ROOTS = [VNET, GATEWAY, GATEWAY_IP, BASTION, BASTION_IP, ZONE, NIC, RUNNER, DISK, IDENTITY_ID]
 TYPES = {
     "microsoft.network": ["publicIPAddresses", "virtualNetworks", "virtualNetworks/subnets",
@@ -215,9 +219,28 @@ def test_a_hub_resource_missing_from_the_bootstrap_record_stays_retained():
     assert entries[COMMON.lower()]["delete"] is False
 
 
+def test_a_shared_connectivity_hub_in_another_subscription_is_never_deletion_scope():
+    # Deleting one factory never deletes the shared hub that other factories still use.
+    cloud = HubCloud()
+    cloud.bodies[IDENTITY_ID.lower()]["properties"].pop("principalId")
+    cloud.bodies[RUNNER.lower()].pop("identity")
+    peering = VNET + "/virtualNetworkPeerings/to-shared-hub"
+    cloud.bodies[peering.lower()] = untagged(
+        peering, "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+        {"remoteVirtualNetwork": {"id": SHARED_HUB_VNET}})
+    document, cloud = hub_document(cloud, proof=False)
+    entries = rows(freeze(document, cloud))
+    assert not any(identifier.startswith(SHARED_HUB_SUB) for identifier in entries)
+    for identifier in (peering, VNET, GATEWAY):
+        assert entries[identifier.lower()]["delete"] is False, identifier
+    assert not cloud.deleted
+
+
 @pytest.mark.parametrize("defect,code", [
     ("foreign-zone-link", "factory-delete-access-hub-foreign-link"),
     ("foreign-peering", "factory-delete-access-hub-foreign-link"),
+    ("shared-hub-zone-link", "factory-delete-access-hub-foreign-link"),
+    ("shared-hub-peering", "factory-delete-access-hub-foreign-link"),
     ("site-connection", "factory-delete-access-hub-external-connection"),
     ("shared-tag", "factory-delete-access-hub-marked-protected"),
     ("foreign-owner-tag", "factory-delete-access-hub-owner-conflict"),
@@ -239,6 +262,13 @@ def test_shared_foreign_or_self_hosting_hubs_block(defect, code):
         cloud.bodies[peering.lower()] = untagged(
             peering, "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
             {"remoteVirtualNetwork": {"id": FOREIGN_VNET}})
+    elif defect == "shared-hub-zone-link":
+        cloud.bodies[LINK.lower()]["properties"]["virtualNetwork"]["id"] = SHARED_HUB_VNET
+    elif defect == "shared-hub-peering":
+        peering = VNET + "/virtualNetworkPeerings/to-shared-hub"
+        cloud.bodies[peering.lower()] = untagged(
+            peering, "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+            {"remoteVirtualNetwork": {"id": SHARED_HUB_VNET}})
     elif defect == "site-connection":
         connection = NET + "/connections/onprem"
         cloud.bodies[connection.lower()] = untagged(connection, "Microsoft.Network/connections",
