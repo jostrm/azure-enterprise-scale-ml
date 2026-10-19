@@ -75,6 +75,7 @@ ALIASES = {
     "subnetProjLogicapp": "SUBNET_PROJ_LOGICAPP",
     "logicAppType": "LOGIC_APP_TYPE",
     "tenantId": "TENANT_ID",
+    "aifactory-dash-01": "AIFACTORY_DASHBOARD_URL",
     "azure_machinelearning_sp_oid": "TENANT_AZUREML_OID",
     # Per-environment service SKUs (Dev vs Stage/Prod). ADO uses camelCase
     # sku<Service>Dev/StageProd; GitHub uses SKU_<SERVICE>_DEV/STAGEPROD.
@@ -363,7 +364,7 @@ def _parse_yaml_vars(path: Path) -> dict[str, str]:
             continue
         if line.strip().startswith("#"):
             continue
-        match = re.match(r"\s{2}([A-Za-z0-9_]+):\s*(.*)", line)
+        match = re.match(r"\s{2}([A-Za-z0-9_-]+):\s*(.*)", line)
         if not match:
             continue
         key, raw = match.groups()
@@ -399,12 +400,14 @@ def _is_placeholder(value: str) -> bool:
 def _env_key(key: str, aliases: dict[str, str], env_vars: dict[str, str]) -> str:
     if key in aliases:
         return aliases[key]
-    normalized = key.replace("_", "").lower()
+    # GitHub variable names allow only letters, digits and underscores, so a
+    # hyphenated ADO key (scaling-mode) maps like an underscored one (SCALING_MODE).
+    normalized = key.replace("_", "").replace("-", "").lower()
     matches = [candidate for candidate in env_vars
                if candidate.replace("_", "").lower() == normalized]
     if len(matches) > 1:
         raise AssertionError(f"Ambiguous environment alias for {key}: {matches}")
-    return matches[0] if matches else key.upper()
+    return matches[0] if matches else key.replace("-", "_").upper()
 
 
 class TestADOToGitHubEnvParity(unittest.TestCase):
@@ -412,6 +415,26 @@ class TestADOToGitHubEnvParity(unittest.TestCase):
         self.assertIn("persona_preflight_ready", KNOWN_MISSING)
         self.assertEqual("false", _parse_yaml_vars(YAML_PATH)["persona_preflight_ready"])
         self.assertNotIn("PERSONA_PREFLIGHT_READY", _parse_env_template(ENV_TEMPLATE_PATH))
+
+    def test_yaml_parsers_keep_hyphenated_keys(self) -> None:
+        # Local import keeps this module loadable on its own (aif-variable-parity skill).
+        from base.config import parse_yaml_vars
+
+        for parse in (_parse_yaml_vars, parse_yaml_vars):
+            yaml_vars = parse(YAML_PATH)
+            self.assertEqual("shared-subscriptions", yaml_vars.get("scaling-mode"), parse.__name__)
+            for key in ("aifactory-dash-01", "org-department-name", "org-department-id"):
+                self.assertIn(key, yaml_vars, parse.__name__)
+        self.assertEqual(parse_yaml_vars(YAML_PATH), _parse_yaml_vars(YAML_PATH))
+
+    def test_hyphenated_yaml_keys_map_to_underscore_env_names(self) -> None:
+        self.assertEqual("SCALING_MODE", _env_key("scaling-mode", {}, {"SCALING_MODE": ""}))
+        self.assertEqual("ORG_UNREVIEWED", _env_key("org-unreviewed", {}, {}))
+        env_vars = _parse_env_template(ENV_TEMPLATE_PATH)
+        hyphenated = [key for key in _parse_yaml_vars(YAML_PATH) if "-" in key]
+        self.assertTrue(hyphenated)
+        unresolved = [key for key in hyphenated if _env_key(key, ALIASES, env_vars) not in env_vars]
+        self.assertFalse(unresolved, f"hyphenated variables.yaml keys without a .env.template variable: {unresolved}")
 
     def test_camel_case_aliases_require_unique_matches(self) -> None:
         self.assertEqual(

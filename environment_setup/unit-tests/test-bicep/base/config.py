@@ -48,7 +48,7 @@ def parse_yaml_vars(path: Path = ADO_VARIABLES_YAML) -> dict[str, str]:
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.startswith("  ") or line.strip().startswith("#"):
             continue
-        match = re.match(r"\s{2}([A-Za-z0-9_]+):\s*(.*)", line)
+        match = re.match(r"\s{2}([A-Za-z0-9_-]+):\s*(.*)", line)
         if not match:
             continue
         key, raw = match.groups()
