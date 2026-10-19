@@ -5,18 +5,19 @@ reviewed IaC execution, Azure monitoring, project operations and tickets.
 
 ## Install
 
-1. Open the [matched desktop release](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/desktop-v0.47.6) and download the **1.0.1 Setup EXE and all its `.bin` parts** into one folder.
+> **Installer not published yet.** No public desktop release contains a MAUI
+> installer matched to the current API (v0.47.25); the `desktop-v0.47.6` release
+> these steps used to link was never published. Until one does, use the
+> [Tkinter configuration wizard](../readme.md#download), which includes the same
+> Factory API.
+
+1. Open the matched desktop release and download the **Setup EXE and all its `.bin` parts** into one folder.
 2. Double-click the setup EXE and follow the short wizard. It installs for your Windows account; administrator rights are not normally required.
 3. Open **Enterprise Scale AI Factory** from Start. The app starts its bundled local API automatically.
 
-| Download | Version |
-| --- | --- |
-| [Setup EXE](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/ESAIF.ConfigWizard-1.0.1-win-x64-setup.exe) | MAUI 1.0.1 |
-| [All required data parts](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/desktop-v0.47.6) | Match the Setup EXE filename |
-
 **All data parts and the Setup EXE are required.** The `.bin` files contain the compressed application and included components. They are not optional downloads or your personal data.
 
-Keep the files together with their original filenames, then run **only the Setup EXE**. It reads the data parts automatically. [MAUI-SHA256SUMS.txt](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/MAUI-SHA256SUMS.txt) lists their hashes; compare a download with `Get-FileHash .\filename -Algorithm SHA256`. This installer includes the matched v0.47.6 API.
+Keep the files together with their original filenames, then run **only the Setup EXE**. It reads the data parts automatically. The release's `MAUI-SHA256SUMS.txt` lists their hashes; compare a download with `Get-FileHash .\filename -Algorithm SHA256`.
 
 **Unsigned preview:** Windows SmartScreen or your organization's application policy may warn or block installation. Verify the download source and hashes. Follow your organization's approval process; do not disable security controls. This is not a Microsoft Store or signed enterprise deployment package.
 

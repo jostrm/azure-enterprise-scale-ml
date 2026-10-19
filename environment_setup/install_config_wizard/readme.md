@@ -21,28 +21,31 @@ The **AI Factory Configuration Wizard** is a guided, form-based desktop tool tha
 
 <a id="download"></a>
 
-## Download - Version `0.47.6`
+## Download - Version `0.47.25`
 
-The [desktop release](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/desktop-v0.47.6)
+The [desktop release](https://github.com/jostrm/azure-enterprise-scale-ml/releases/tag/desktop-v0.47.25)
 contains the Tkinter wizard and embedded API for Windows x86-64, Linux x86-64
-and macOS Apple Silicon (arm64), plus the matched MAUI Windows installer.
-The macOS archive is not an Intel/universal build. The release assets include
-`SHA256SUMS.txt` and `release-manifest.json` with exact source commits,
-architectures and build provenance. Access to the private API source repository
-is not required.
+and macOS Apple Silicon (arm64). Its tag points to the accelerator commit the
+wizard pins. The macOS archive is not an Intel/universal build. The release
+assets include `SHA256SUMS.txt` and `release-manifest.json` with exact source
+commits, architectures and build provenance; copies of both are kept beside this
+readme. Access to the private API source repository is not required. This
+release does not include the MAUI Windows installer; see the
+[MAUI app](maui/readme.md).
 
 Downloads are release assets rather than a later binary-only commit to `main`,
 so publishing them does not invalidate the API's pinned companion snapshot.
-Older archives retained in these source folders are not the current downloads.
+The older v0.47.2 archives retained in the `windows`, `linux` and `macos`
+folders are not the current downloads.
 
 | Platform | File | Package |
 |---|---|---|
-| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/aifactory-config-windows.zip) | v0.47.6, complete executable and `_internal` folder |
-| Linux x86-64 | [aifactory-config-linux.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/aifactory-config-linux.tar.gz) | v0.47.6, self-contained executable |
-| macOS arm64 | [aifactory-config-macos.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/aifactory-config-macos.tar.gz) | v0.47.6, self-contained executable |
+| Windows x64 | [aifactory-config-windows.zip](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.25/aifactory-config-windows.zip) | v0.47.25, complete executable and `_internal` folder |
+| Linux x86-64 | [aifactory-config-linux.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.25/aifactory-config-linux.tar.gz) | v0.47.25, self-contained executable |
+| macOS arm64 | [aifactory-config-macos.tar.gz](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.25/aifactory-config-macos.tar.gz) | v0.47.25, self-contained executable |
 
-Download integrity: [SHA256SUMS.txt](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/SHA256SUMS.txt).
-Build provenance: [release-manifest.json](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.6/release-manifest.json).
+Download integrity: [SHA256SUMS.txt](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.25/SHA256SUMS.txt).
+Build provenance: [release-manifest.json](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.25/release-manifest.json).
 
 ### ⚠️ Security warning on first run
 
@@ -91,7 +94,7 @@ In most cases you do **not** need Python installed — just download, extract, a
 | **Python** | **Not required.** Python is bundled inside the `.exe`. |
 
 ### Run
-1. Download [`aifactory-config-windows.zip`](https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/windows/aifactory-config-windows.zip).
+1. Download [`aifactory-config-windows.zip`](https://github.com/jostrm/azure-enterprise-scale-ml/releases/download/desktop-v0.47.25/aifactory-config-windows.zip).
 2. Extract the archive (right-click → *Extract All…*).
 3. Open the extracted `aifactory-config` folder and double-click **`aifactory-config.exe`**.
    Keep the `_internal` folder beside it; copying only the executable will not work.
@@ -143,8 +146,8 @@ the previous custom Windows package's workflow results do not apply.
 
 ### Run
 ```bash
-# 1. Extract
-tar -xzf macos/aifactory-config-macos.tar.gz
+# 1. Extract the archive downloaded from the Download table
+tar -xzf aifactory-config-macos.tar.gz
 
 # 2. Allow execution
 chmod +x aifactory-config
@@ -184,8 +187,8 @@ sudo pacman -S tk
 
 ### Run
 ```bash
-# 1. Extract
-tar -xzf linux/aifactory-config-linux.tar.gz
+# 1. Extract the archive downloaded from the Download table
+tar -xzf aifactory-config-linux.tar.gz
 
 # 2. Allow execution
 chmod +x aifactory-config
