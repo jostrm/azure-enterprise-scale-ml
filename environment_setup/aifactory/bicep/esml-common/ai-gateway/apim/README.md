@@ -43,3 +43,29 @@ This API exposes these POST operations:
 - `/openai/v1/responses`
 
 The `apiPath` parameter changes the `openai` prefix.
+
+## AI gateway policy package
+
+These optional policies give a classic or v2 APIM the features of the native AI Gateway SKU (`ai.gateway.azure.com`). They follow the [Azure-Samples/AI-Gateway](https://github.com/Azure-Samples/AI-Gateway) labs. Every feature is off by default, so an existing deployment keeps its current policy until you set a parameter. The fragments live once in `apim-policy-fragments.bicep` and are shared by the LLM API and by MCP servers. Combinations that would be unsafe fail when you compile.
+
+| Feature | Parameters | Policy |
+|---|---|---|
+| Client IP throttling | `clientIpRequestsPerMinute`, `clientIpTokensPerMinute` | `rate-limit-by-key` and `llm-token-limit` keyed on `context.Request.IpAddress` |
+| User throttling | `userTokensPerMinute` plus `entraTenantId` and `entraClientApplicationIds` or `entraAudiences` | `validate-azure-ad-token`, then `llm-token-limit` keyed on the validated `oid` claim. Unvalidated tokens and headers are never used, because a caller could forge them to dodge the limit. |
+| Subscription throttling | `callerTokensPerMinute` (existing) | `llm-token-limit` keyed on the APIM subscription |
+| Semantic cache | `enableSemanticCache`, `embeddingsBackendUrl`, `semanticCacheConnectionString`, `semanticCacheScoreThreshold` (default `0.05`), `semanticCacheDurationSeconds` | `llm-semantic-cache-lookup` and `-store`, partitioned per subscription (and per user with Entra validation) |
+| Token metrics | `emitTokenMetrics`, `applicationInsightsLoggerName` | `llm-emit-token-metric` with API, subscription, client IP and user dimensions, plus API diagnostics with metrics |
+
+- **Semantic cache:** needs an external Redis with the RediSearch module, such as Azure Managed Redis. That is a separate paid resource, so keep `enableSemanticCache` false until it exists. Lower `semanticCacheScoreThreshold` values require closer matches. Microsoft Learn warns that values above 0.2 can return the wrong cached answer.
+- **Token metrics:** need an existing APIM Application Insights logger. Enable custom metrics with dimensions on that Application Insights resource.
+
+## MCP servers
+
+`apim-mcp-server.bicep` exposes an existing streamable-HTTP MCP server through APIM. It is the classic counterpart of a native AI Gateway SKU tool server, and it uses `Microsoft.ApiManagement/service/apis@2025-09-01-preview` with `type: 'mcp'`. `main.bicep` deploys one per item in `mcpServers`. Clients call `https://<gateway>/<apiPath>/mcp` with an APIM subscription key, an Entra token (when `entraTenantId` is set), or both. Calls are limited per client IP (default 60 per minute) and, with Entra validation, per user.
+
+APIM calls the MCP with its system-assigned managed identity for `mcpEntraAppId`. The Enterprise Scale AI Factory MCP admits that identity only after two one-time steps; the deployment does neither:
+
+1. An Entra admin assigns the MCP app registration's app role `AiFactory.Mcp.Read` to the APIM managed identity. Pipelines never write Microsoft Graph.
+2. The APIM managed identity is added to the MCP container app's allowed callers, as the MCP & AI Gateway integration already does for the native gateway.
+
+APIM must also resolve and reach the MCP host. For an internal Container Apps environment, link a private DNS zone for its default domain to the APIM VNet. Only inbound policies are used: reading the response body would buffer it and break MCP streaming.

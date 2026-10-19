@@ -1,5 +1,14 @@
 targetScope = 'resourceGroup'
 
+import {
+  clientLimitsXml
+  entraValidationXml
+  semanticCacheLookupXml
+  semanticCacheStoreXml
+  tokenMetricsXml
+  userLimitsXml
+} from 'apim-policy-fragments.bicep'
+
 @description('Existing API Management service name. The service must have a system-assigned managed identity.')
 param apimServiceName string
 
@@ -29,20 +38,69 @@ param retryCount int
 @description('Azure OpenAI backends. Each object requires name, endpoint, resourceId, and weight; priority is optional and defaults to 1.')
 param azureOpenAIBackends array
 
+@minValue(0)
+@description('Requests per minute allowed from one client IP address. 0 turns the limit off.')
+param clientIpRequestsPerMinute int = 0
+
+@minValue(0)
+@description('LLM tokens per minute allowed from one client IP address. 0 turns the limit off.')
+param clientIpTokensPerMinute int = 0
+
+@minValue(0)
+@description('LLM tokens per minute allowed to one Microsoft Entra user, keyed on the validated oid claim. Requires entraTenantId. 0 turns the limit off.')
+param userTokensPerMinute int = 0
+
+@description('Microsoft Entra tenant whose access tokens callers must present. Empty keeps subscription-key-only access.')
+param entraTenantId string = ''
+
+@description('Client application IDs accepted by the Entra token validation.')
+param entraClientApplicationIds array = []
+
+@description('Audiences accepted by the Entra token validation.')
+param entraAudiences array = []
+
+@description('Emit LLM token metrics to Application Insights. Requires applicationInsightsLoggerName.')
+param emitTokenMetrics bool = false
+
+@description('Existing APIM Application Insights logger name used for token metrics.')
+param applicationInsightsLoggerName string = ''
+
+@description('Serve semantically similar prompts from an external Redis cache with RediSearch. Off by default because the cache is a separate paid resource.')
+param enableSemanticCache bool = false
+
+@description('Similarity threshold from 0.0 to 1.0. Lower values require closer matches; values above 0.2 risk wrong cached answers.')
+param semanticCacheScoreThreshold string = '0.05'
+
+@minValue(1)
+@description('Seconds a cached completion is kept.')
+param semanticCacheDurationSeconds int = 120
+
+@description('Embeddings deployment URL used for semantic matching, for example https://<account>.openai.azure.com/openai/deployments/<embeddings>/embeddings.')
+param embeddingsBackendUrl string = ''
+
+@secure()
+@description('Connection string of the external Redis with RediSearch that APIM uses as its cache.')
+param semanticCacheConnectionString string = ''
+
 var backendEndpoints = [for backend in azureOpenAIBackends: endsWith(backend.endpoint, '/') ? substring(backend.endpoint, 0, length(backend.endpoint) - 1) : backend.endpoint]
-var policyXml = replace(
-  replace(
-    replace(
-      replace(loadTextContent('./policy.xml'), '__BACKEND_POOL_NAME__', backendPoolName),
-      '__AGGREGATE_TPM__',
-      string(aggregateTokensPerMinute)
-    ),
-    '__CALLER_TPM__',
-    string(callerTokensPerMinute)
-  ),
-  '__RETRY_COUNT__',
-  string(retryCount)
-)
+var embeddingsBackendName = '${backendPoolName}-embeddings'
+var policyReplacements = [
+  { token: '__BACKEND_POOL_NAME__', value: backendPoolName }
+  { token: '__AGGREGATE_TPM__', value: string(aggregateTokensPerMinute) }
+  { token: '__CALLER_TPM__', value: string(callerTokensPerMinute) }
+  { token: '__RETRY_COUNT__', value: string(retryCount) }
+  { token: '__ENTRA_VALIDATION__', value: entraValidationXml(entraTenantId, entraClientApplicationIds, entraAudiences) }
+  { token: '__CLIENT_LIMITS__', value: clientLimitsXml(clientIpRequestsPerMinute, clientIpTokensPerMinute) }
+  { token: '__USER_LIMITS__', value: userLimitsXml(entraTenantId, 0, userTokensPerMinute) }
+  { token: '__TOKEN_METRICS__', value: tokenMetricsXml(emitTokenMetrics, applicationInsightsLoggerName, entraTenantId) }
+  {
+    token: '__SEMANTIC_CACHE_LOOKUP__'
+    value: semanticCacheLookupXml(enableSemanticCache, embeddingsBackendName, semanticCacheScoreThreshold,
+      !empty(embeddingsBackendUrl) && !empty(semanticCacheConnectionString), entraTenantId)
+  }
+  { token: '__SEMANTIC_CACHE_STORE__', value: semanticCacheStoreXml(enableSemanticCache, semanticCacheDurationSeconds) }
+]
+var policyXml = reduce(policyReplacements, loadTextContent('./policy.xml'), (xml, item) => replace(xml, item.token, item.value))
 
 resource apimService 'Microsoft.ApiManagement/service@2024-05-01' existing = {
   name: apimServiceName
@@ -155,6 +213,46 @@ resource apiOperations 'Microsoft.ApiManagement/service/apis/operations@2024-05-
   }
 }]
 
+resource semanticCache 'Microsoft.ApiManagement/service/caches@2024-05-01' = if (enableSemanticCache) {
+  parent: apimService
+  name: 'default'
+  properties: {
+    description: 'AI Factory semantic cache (external Redis with RediSearch)'
+    connectionString: semanticCacheConnectionString
+    useFromLocation: 'default'
+  }
+}
+
+resource embeddingsBackend 'Microsoft.ApiManagement/service/backends@2024-05-01' = if (enableSemanticCache) {
+  parent: apimService
+  name: embeddingsBackendName
+  properties: {
+    title: embeddingsBackendName
+    description: 'Embeddings deployment used by the semantic cache lookup.'
+    protocol: 'http'
+    url: embeddingsBackendUrl
+    tls: {
+      validateCertificateChain: true
+      validateCertificateName: true
+    }
+  }
+}
+
+resource tokenMetricDiagnostics 'Microsoft.ApiManagement/service/apis/diagnostics@2024-05-01' = if (emitTokenMetrics) {
+  parent: api
+  name: 'applicationinsights'
+  properties: {
+    loggerId: resourceId('Microsoft.ApiManagement/service/loggers', apimServiceName, applicationInsightsLoggerName)
+    metrics: true
+    alwaysLog: 'allErrors'
+    logClientIp: true
+    sampling: {
+      samplingType: 'fixed'
+      percentage: 100
+    }
+  }
+}
+
 resource apiPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-05-01' = {
   parent: api
   name: 'policy'
@@ -165,9 +263,19 @@ resource apiPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-05-01' = 
   dependsOn: [
     backendPool
     apiOperations
+    semanticCache
+    embeddingsBackend
+    tokenMetricDiagnostics
   ]
 }
 
 output apimApiId string = api.name
 output apimApiPath string = apiPath
 output backendPoolResourceId string = backendPool.id
+output policyFeatures object = {
+  clientIpThrottling: clientIpRequestsPerMinute > 0 || clientIpTokensPerMinute > 0
+  userThrottling: userTokensPerMinute > 0
+  entraValidation: !empty(entraTenantId)
+  tokenMetrics: emitTokenMetrics
+  semanticCache: enableSemanticCache
+}

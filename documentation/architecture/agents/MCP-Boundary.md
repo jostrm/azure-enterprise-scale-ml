@@ -13,6 +13,12 @@ sources:
   - mcp/src/aifactory_mcp/graph.py
   - mcp/src/aifactory_mcp/policy.py
   - usecase_code/40-agent-factory/agent_factory/mcp_gateway.py
+  - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-mcp-server.bicep
+  - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-policy-fragments.bicep
+  - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/apim-configuration.bicep
+  - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/main.bicep
+  - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/policy.xml
+  - environment_setup/aifactory/bicep/esml-common/ai-gateway/apim/README.md
 tests:
   - mcp/tests/test_server.py
   - mcp/tests/test_auth.py
@@ -24,12 +30,13 @@ tests:
   - mcp/tests/test_graph_protocol.py
   - mcp/tests/test_graph_release.py
   - usecase_code/40-agent-factory/tests/test_mcp_gateway.py
+  - usecase_code/40-agent-factory/tests/test_apim_gateway_policies.py
 graph_symbols:
   - mcp/src/aifactory_mcp/server.py::function:create_server
   - mcp/src/aifactory_mcp/backend.py::class:AgentBackend
   - mcp/src/aifactory_mcp/backend.py::function:AgentBackend.call_tool
   - mcp/src/aifactory_mcp/graph.py::function:call
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
+reviewed_source: '546311bf + working tree; observed 2026-10-19'
 ---
 # MCP boundary
 
@@ -63,6 +70,28 @@ that reuse from a new gateway; existing owned/adopted subnet bindings can satisf
 registration without a subnet parameter. Missing outbound integration fails before
 mutations, while only genuinely offline-invalid flags/ID formats promise zero calls.
 Offline regression tests establish these boundaries, not production acceptance.
+
+## Classic APIM gateway: policy package and MCP servers
+
+The native AI Gateway SKU registers the MCP as a workspace tool server. A classic or v2 API
+Management service gets the same governed entry point from
+`esml-common/ai-gateway/apim/apim-mcp-server.bicep`. That module defines an `apis` resource of
+`type: 'mcp'` that passes through to the existing streamable-HTTP MCP and calls it with the APIM
+managed identity. The MCP still authorizes that identity itself: the app role
+`AiFactory.Mcp.Read` and the container app's allowed-caller list are separate one-time steps,
+and the module performs neither.
+
+`apim-policy-fragments.bicep` holds the throttling, Entra validation, token-metric and
+semantic-cache fragments once, and both the LLM API and the MCP API compose them.
+
+- **Per-user limits** use only the `oid` of a token that `validate-azure-ad-token` has checked.
+  Forged headers or unvalidated tokens never count.
+- **Semantic cache entries** are partitioned per subscription, so cached answers are never
+  shared across callers.
+- **Opt-in:** every feature is off by default, and unsafe combinations fail when the template
+  compiles.
+
+The offline contract tests prove the template shape, not deployed behavior or reachability.
 
 ## Locally implemented graph tools
 
