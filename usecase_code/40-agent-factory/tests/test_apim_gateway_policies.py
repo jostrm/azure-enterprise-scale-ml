@@ -127,13 +127,16 @@ class McpServerModuleTests(unittest.TestCase):
     def test_module_passes_an_existing_streamable_mcp_through_apim(self):
         module = text(MCP)
         self.assertIn("targetScope = 'resourceGroup'", module)
-        # Documented MCP server shape: 2025-09-01-preview, serviceUrl plus mcpProperties.endpoints.
-        for fragment in ("Microsoft.ApiManagement/service/apis@2025-09-01-preview", "type: 'mcp'",
-                         "transportType: 'streamable'", "serviceUrl: requireHttpsBaseUrl(mcpServerBaseUrl)",
-                         "uriTemplate: mcpEndpointPath", "param mcpEndpointPath string = '/mcp'",
-                         "param subscriptionRequired bool = true", "param clientIpRequestsPerMinute int = 60",
-                         "func requireHttpsBaseUrl(", "authentication-managed-identity resource="):
+        # A plain HTTP reverse proxy of the streamable endpoint, so the backend MCP answers every call.
+        for fragment in ("Microsoft.ApiManagement/service/apis@2025-09-01-preview", "type: 'http'",
+                         "serviceUrl: requireHttpsBaseUrl(mcpServerBaseUrl)", "urlTemplate: mcpEndpointPath",
+                         "param mcpEndpointPath string = '/mcp'", "param subscriptionRequired bool = true",
+                         "param clientIpRequestsPerMinute int = 60", "func requireHttpsBaseUrl(",
+                         "authentication-managed-identity resource=", '<forward-request buffer-response="false" />'):
             self.assertIn(fragment, module)
+        # type 'mcp' with mcpProperties made APIM answer as its own tool-less MCP server (2026-10-19).
+        self.assertNotIn("type: 'mcp'", module)
+        self.assertNotIn("mcpProperties", module)
         # Reading the response body buffers the stream and breaks MCP streaming.
         self.assertNotIn("context.Response.Body", module)
         self.assertIn("output gatewayMcpUrl string", module)
@@ -167,19 +170,24 @@ class CompiledTemplateTests(unittest.TestCase):
             raise AssertionError(f"Bicep diagnostics must be resolved for {path.name}:\n{result.stderr}")
         return json.loads(result.stdout)
 
-    def test_mcp_api_is_a_typed_streamable_passthrough(self):
+    def test_mcp_api_is_an_unbuffered_streamable_http_passthrough(self):
         template = self.templates[MCP.name]
-        apis = [item for item in resources(template) if item["type"] == "Microsoft.ApiManagement/service/apis"]
+        of_type = lambda kind: [item for item in resources(template) if item["type"] == kind]  # noqa: E731
+        apis = of_type("Microsoft.ApiManagement/service/apis")
         self.assertEqual(1, len(apis))
+        # Older api-versions cannot see a type 'mcp' API (GET/PUT say "Api not found", DELETE is a no-op);
+        # this version converts an existing one in place (verified on apim-spider-sdc-dev-001, 2026-10-19).
         self.assertEqual("2025-09-01-preview", apis[0]["apiVersion"])
-        properties = apis[0]["properties"]
-        self.assertEqual("mcp", properties["type"])
-        self.assertEqual("streamable", properties["mcpProperties"]["transportType"])
-        # ARM rejects an endpoints array: it must be a dictionary keyed by endpoint name.
-        endpoints = properties["mcpProperties"]["endpoints"]
-        self.assertIsInstance(endpoints, dict)
-        self.assertEqual(["message"], list(endpoints))
-        self.assertIn("uriTemplate", endpoints["message"])
+        self.assertEqual("http", apis[0]["properties"]["type"])
+        self.assertNotIn("mcpProperties", apis[0]["properties"])
+        # Streamable HTTP: POST carries JSON-RPC, GET opens the server stream, DELETE ends a session.
+        operations = of_type("Microsoft.ApiManagement/service/apis/operations")
+        self.assertEqual(1, len(operations))
+        self.assertIn("copy", operations[0])
+        self.assertEqual(["POST", "GET", "DELETE"], template["variables"]["mcpMethods"])
+        self.assertEqual(1, len(of_type("Microsoft.ApiManagement/service/apis/policies")))
+        self.assertIn('<backend><forward-request buffer-response="false" /></backend>',
+                      json.dumps(template["variables"]["policyXml"]).replace('\\"', '"'))
 
     def test_compiled_policy_carries_ip_and_cache_fragments(self):
         compiled = json.dumps(self.templates[CONFIGURATION.name])

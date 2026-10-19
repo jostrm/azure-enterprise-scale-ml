@@ -3,6 +3,13 @@ targetScope = 'resourceGroup'
 // Exposes an existing streamable-HTTP MCP server (for example the Enterprise Scale AI Factory MCP)
 // through a classic or v2 API Management service, the classic counterpart of a native
 // AI Gateway SKU tool server. APIM calls the MCP with its system-assigned managed identity.
+//
+// The API is a plain HTTP reverse proxy of the MCP endpoint, so the backend MCP answers every
+// JSON-RPC call (initialize, tools/list, tools/call). An API of type 'mcp' is not used: on
+// 2026-10-19 the resource provider (newest api-version 2025-09-01-preview) stored the MCP
+// properties without a transportType and APIM answered as its own tool-less MCP server instead of passing
+// through. The API is declared at 2025-09-01-preview because older api-versions cannot see a
+// type 'mcp' API ("Api not found"); this version converts an existing one in place.
 
 import { clientLimitsXml, entraValidationXml, userLimitsXml } from 'apim-policy-fragments.bicep'
 
@@ -56,7 +63,15 @@ func requireHttpsBaseUrl(url string) string => startsWith(toLower(url), 'https:/
 
 // Only inbound policies: reading the response body would buffer it and break MCP streaming.
 var backendAuthXml = empty(mcpEntraAppId) ? '' : '<authentication-managed-identity resource="${mcpEntraAppId}" />'
-var policyXml = '<policies><inbound><base />${entraValidationXml(entraTenantId, entraClientApplicationIds, entraAudiences)}${clientLimitsXml(clientIpRequestsPerMinute, 0)}${userLimitsXml(entraTenantId, userRequestsPerMinute, 0)}${backendAuthXml}</inbound><backend><base /></backend><outbound><base /></outbound><on-error><base /></on-error></policies>'
+// The backend section streams the response instead of buffering it (MCP may answer as text/event-stream).
+var policyXml = '<policies><inbound><base />${entraValidationXml(entraTenantId, entraClientApplicationIds, entraAudiences)}${clientLimitsXml(clientIpRequestsPerMinute, 0)}${userLimitsXml(entraTenantId, userRequestsPerMinute, 0)}${backendAuthXml}</inbound><backend><forward-request buffer-response="false" /></backend><outbound><base /></outbound><on-error><base /></on-error></policies>'
+
+// Streamable HTTP: POST carries JSON-RPC, GET opens the optional server stream, DELETE ends a session.
+var mcpMethods = [
+  'POST'
+  'GET'
+  'DELETE'
+]
 
 resource apimService 'Microsoft.ApiManagement/service@2024-05-01' existing = {
   name: apimServiceName
@@ -68,28 +83,27 @@ resource mcpApi 'Microsoft.ApiManagement/service/apis@2025-09-01-preview' = {
   properties: {
     displayName: displayName
     description: mcpDescription
-    type: 'mcp'
+    type: 'http'
     path: apiPath
     protocols: [
       'https'
     ]
     serviceUrl: requireHttpsBaseUrl(mcpServerBaseUrl)
     subscriptionRequired: subscriptionRequired
-    mcpProperties: {
-      transportType: 'streamable'
-      // The resource provider deserializes endpoints as a dictionary keyed by endpoint name and
-      // rejects the array that the Bicep type library declares (verified 2026-10-19).
-      #disable-next-line BCP036
-      endpoints: {
-        message: {
-          uriTemplate: mcpEndpointPath
-        }
-      }
-    }
   }
 }
 
-resource mcpPolicy 'Microsoft.ApiManagement/service/apis/policies@2025-09-01-preview' = {
+resource mcpOperations 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = [for method in mcpMethods: {
+  parent: mcpApi
+  name: 'mcp-${toLower(method)}'
+  properties: {
+    displayName: 'MCP ${method}'
+    method: method
+    urlTemplate: mcpEndpointPath
+  }
+}]
+
+resource mcpPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-05-01' = {
   parent: mcpApi
   name: 'policy'
   properties: {

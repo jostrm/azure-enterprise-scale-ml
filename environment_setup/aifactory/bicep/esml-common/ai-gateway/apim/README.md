@@ -61,11 +61,13 @@ These optional policies give a classic or v2 APIM the features of the native AI 
 
 ## MCP servers
 
-`apim-mcp-server.bicep` exposes an existing streamable-HTTP MCP server through APIM. It is the classic counterpart of a native AI Gateway SKU tool server, and it uses `Microsoft.ApiManagement/service/apis@2025-09-01-preview` with `type: 'mcp'`. `main.bicep` deploys one per item in `mcpServers`. Clients call `https://<gateway>/<apiPath>/mcp` with an APIM subscription key, an Entra token (when `entraTenantId` is set), or both. Calls are limited per client IP (default 60 per minute) and, with Entra validation, per user.
+`apim-mcp-server.bicep` exposes an existing streamable-HTTP MCP server through APIM. It is the classic counterpart of a native AI Gateway SKU tool server. It is a plain HTTP API (`type: 'http'`) with `POST`, `GET` and `DELETE` operations on the MCP endpoint and an unbuffered `forward-request`, so the backend MCP answers every call and responses can stream. `main.bicep` deploys one per item in `mcpServers`.
+
+It does not use an API of `type: 'mcp'`. On 2026-10-19 the resource provider in Sweden Central (newest api-version `2025-09-01-preview`) accepted only a dictionary of endpoints and stored no `transportType`. APIM then answered `initialize` itself (`serverInfo` "Azure API Management") and returned an empty `tools/list`, instead of passing the calls through. The API is declared at `2025-09-01-preview`, which converts an existing `type: 'mcp'` API with the same name in place. Older api-versions cannot see MCP-type APIs: GET and PUT answer "Api not found", and DELETE does nothing. Clients call `https://<gateway>/<apiPath>/mcp` with an APIM subscription key, an Entra token (when `entraTenantId` is set), or both. Calls are limited per client IP (default 60 per minute) and, with Entra validation, per user.
 
 APIM calls the MCP with its system-assigned managed identity for `mcpEntraAppId`. The Enterprise Scale AI Factory MCP admits that identity only after two one-time steps; the deployment does neither:
 
 1. An Entra admin assigns the MCP app registration's app role `AiFactory.Mcp.Read` to the APIM managed identity. Pipelines never write Microsoft Graph.
-2. The APIM managed identity is added to the MCP container app's allowed callers, as the MCP & AI Gateway integration already does for the native gateway.
+2. The APIM managed identity is added to the MCP container app's allowed callers, as the MCP & AI Gateway integration already does for the native gateway. For a pipeline-hosted MCP, list the APIM in `aifactoryMcpClassicApimResourceIds`.
 
-APIM must also resolve and reach the MCP host. For an internal Container Apps environment, link a private DNS zone for its default domain to the APIM VNet. Only inbound policies are used: reading the response body would buffer it and break MCP streaming.
+APIM must also resolve and reach the MCP host. For an internal Container Apps environment, link a private DNS zone for its default domain to the APIM VNet; with an environment private endpoint, the `privatelink.<region>.azurecontainerapps.io` zone serves the same purpose. Only inbound policies (plus the unbuffered `forward-request`) are used: reading the response body would buffer it and break MCP streaming.

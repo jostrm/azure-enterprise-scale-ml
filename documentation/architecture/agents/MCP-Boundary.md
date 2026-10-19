@@ -75,9 +75,11 @@ Offline regression tests establish these boundaries, not production acceptance.
 
 The native AI Gateway SKU registers the MCP as a workspace tool server. A classic or v2 API
 Management service gets the same governed entry point from
-`esml-common/ai-gateway/apim/apim-mcp-server.bicep`. That module defines an `apis` resource of
-`type: 'mcp'` that passes through to the existing streamable-HTTP MCP and calls it with the APIM
-managed identity. The MCP still authorizes that identity itself: the app role
+`esml-common/ai-gateway/apim/apim-mcp-server.bicep`. That module defines a plain HTTP `apis`
+resource (POST/GET/DELETE on the MCP endpoint, unbuffered `forward-request`) that passes through
+to the existing streamable-HTTP MCP and calls it with the APIM managed identity. A `type: 'mcp'`
+API made APIM answer as its own tool-less MCP server on 2026-10-19, so the module avoids it.
+The MCP still authorizes that identity itself: the app role
 `AiFactory.Mcp.Read` and the container app's allowed-caller list are separate one-time steps,
 and the module performs neither. For a pipeline-hosted MCP, `aifactoryMcpClassicApimResourceIds`
 names the classic APIM services whose system-assigned identities `agent_factory.mcp_gateway`
