@@ -175,7 +175,11 @@ class CompiledTemplateTests(unittest.TestCase):
         properties = apis[0]["properties"]
         self.assertEqual("mcp", properties["type"])
         self.assertEqual("streamable", properties["mcpProperties"]["transportType"])
-        self.assertEqual("message", properties["mcpProperties"]["endpoints"][0]["name"])
+        # ARM rejects an endpoints array: it must be a dictionary keyed by endpoint name.
+        endpoints = properties["mcpProperties"]["endpoints"]
+        self.assertIsInstance(endpoints, dict)
+        self.assertEqual(["message"], list(endpoints))
+        self.assertIn("uriTemplate", endpoints["message"])
 
     def test_compiled_policy_carries_ip_and_cache_fragments(self):
         compiled = json.dumps(self.templates[CONFIGURATION.name])

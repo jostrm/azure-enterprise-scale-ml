@@ -77,12 +77,14 @@ resource mcpApi 'Microsoft.ApiManagement/service/apis@2025-09-01-preview' = {
     subscriptionRequired: subscriptionRequired
     mcpProperties: {
       transportType: 'streamable'
-      endpoints: [
-        {
-          name: 'message'
+      // The resource provider deserializes endpoints as a dictionary keyed by endpoint name and
+      // rejects the array that the Bicep type library declares (verified 2026-10-19).
+      #disable-next-line BCP036
+      endpoints: {
+        message: {
           uriTemplate: mcpEndpointPath
         }
-      ]
+      }
     }
   }
 }
