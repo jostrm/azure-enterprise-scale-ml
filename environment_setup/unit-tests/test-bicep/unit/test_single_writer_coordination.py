@@ -361,6 +361,51 @@ def test_worker_errors_preserve_claim_and_block_before_arm_write(monkeypatch, de
     assert not cloud.arm_writes
 
 
+def test_reviewed_release_of_a_retained_run_claim_is_accepted_by_every_reader(monkeypatch):
+    """Contract for the Factory API's reconcile-run-claim: one CAS clears only `active` and adds
+    claim-reconciliations/<run_id>/<confirmation_id>.json; helper bytes need no change to accept it."""
+    document, provider, cloud = lifecycle_setup()
+    monkeypatch.setattr(fl, "_verify_source", lambda cloud, root, source, **kwargs: root)
+    monkeypatch.setattr(fl, "collect_resource_closure", tl.simple_plan_closure)
+    locks = fl.coordination(cloud, document)
+    locks.acquire()
+    locks.claim_run()
+    cloud.bodies[tl.GROUP.lower()]["tags"]["aifactory.factory_id"] = "someone-else"
+    worker = fl.run_deployment_worker(json.loads(fl.protected_worker_envelope(document, locks)), ROOT,
+                                      document["run_id"], document["manifest_hash"], cloud=cloud)
+    assert worker["status"] == "reconciliation-required"
+    locks.store_receipt({"schema": 1, "run_id": document["run_id"], "manifest_hash": document["manifest_hash"],
+                         "status": "reconciliation-required", "mutation_started": True})
+    with pytest.raises(fl.Blocked, match="retained"):
+        locks.release()
+    retained = provider.state()
+    assert retained["active"]["run_id"] == document["run_id"]
+    store = ps.ProviderState(cloud, document["route"], fl.Blocked)
+    head, value = store.read()
+    audit = "claim-reconciliations/" + document["run_id"] + "/" + str(uuid4()) + ".json"
+    released = copy.deepcopy(value)
+    released["active"] = None
+    released["records"][audit] = {"schema": 1, "contract": "retained-run-claim-release-v1",
+                                  "run_id": document["run_id"], "released_claim": value["active"],
+                                  "previous_head": head}
+    store.replace(head, released)
+    assert ps.ProviderState(cloud, document["route"], fl.Blocked).read()[1] == released
+    assert {key: provider.state()["records"][key] for key in retained["records"]} == retained["records"]
+    reader = fl.coordination(cloud, document)
+    assert reader.request("GET", "runs/" + document["run_id"] + ".worker.json")[2] == worker
+    assert reader.read_claim() == retained["records"]["runs/" + document["run_id"] + ".claim.json"]
+    with pytest.raises(fl.Blocked, match="active-claim-changed"):
+        locks.assert_held()
+    with pytest.raises(fl.Blocked, match="already-submitted"):
+        fl.coordination(cloud, document).acquire()
+    fresh = copy.deepcopy(document)
+    fresh["run_id"] = str(uuid4())
+    tl.seal(fresh)
+    fl.coordination(cloud, fresh).acquire()
+    assert provider.state()["active"]["run_id"] == fresh["run_id"]
+    assert provider.state()["records"][audit] == released["records"][audit]
+
+
 def test_non_blob_mode_is_reviewed_and_unsupported_operations_block(monkeypatch):
     document, provider, cloud = lifecycle_setup()
     monkeypatch.setenv("AIFACTORY_COORDINATION_MODE", "blob")

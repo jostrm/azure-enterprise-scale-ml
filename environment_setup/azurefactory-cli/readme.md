@@ -217,6 +217,48 @@ azurefactory delete-aifactory reconcile --folder $env:FACTORY_FOLDER --job-id $e
 denied/timed-out check as absence; partial or unknown runs stay blocked. Tests
 use mocked transport only and do not establish Azure deletion success.
 
+### Release a failed run's retained single-writer claim
+
+Under single-writer coordination, a run that fails after it started changing
+Azure keeps its claim in the provider repository's
+`refs/heads/aifactory-state/single-writer-v1` state, so nothing else writes
+before someone looks. Every later prepare, deploy or delete then stops with
+"Private repository enrollment ... has an active/uncertain claim; reconcile it
+first". Never edit that ref by hand. First review what the failed run changed in
+Azure (its receipts and the GitHub Actions or Azure DevOps run log), then release
+only that claim:
+
+```powershell
+azurefactory reconcile-run-claim prepare --folder $env:FACTORY_FOLDER `
+  --factory-id $env:FACTORY_ID --run-id $env:FAILED_RUN_ID `
+  --save-receipt .\release-claim.receipt.json
+```
+
+`--run-id` is the native run ID named by the claim (`active.run_id`, also the
+`execution-<run id>` folder of the failed catalog job). Preparation writes
+nothing. The API blocks unless you own the local catalog job that dispatched the
+run, the claim names exactly that run and manifest, its run and worker receipts
+are terminal (`succeeded`, `blocked` or `reconciliation-required`), its GitHub
+Actions/Azure DevOps run is `completed`, no other workflow run in that repository
+is queued or in progress, and no local lifecycle job is active. The review shows
+the claim, both receipts, the remote run, the number of records kept and the
+audit record that will be added. Then, after a human approves it:
+
+```powershell
+azurefactory reconcile-run-claim confirm --receipt .\release-claim.receipt.json
+```
+
+Confirmation requires the exact phrase `RELEASE <run id>` (or, without a
+terminal, `--yes` together with `--confirmation-phrase`). The API repeats every
+check, requires the state to be unchanged since the review and makes **one**
+compare-and-swap: `active` becomes `null`, every record is kept and
+`claim-reconciliations/<run id>/<confirmation id>.json` is added. It never
+changes Azure, pipelines or the catalog, and never retries or force-pushes. A
+timeout or an "uncertain" result is an unknown outcome: run `prepare` again to
+read the current claim. The next deployment or deletion plans from live Azure
+state; it does not resume the failed run. SDK: `reconcile_run_claim_prepare` and
+`reconcile_run_claim_confirm`.
+
 ### Shell-first registered onboarding
 
 From the root of an existing consumer Git repository, with a **current approved**

@@ -1500,6 +1500,23 @@ Automatic flag-to-delete behavior, selective retention inside whole-factory
 deleted groups, and generic force/retry/cancel-on-timeout recovery are
 **not implemented**. Do not use legacy paths to bypass a blocker.
 
+### Unblock a factory after a failed single-writer run
+
+If every prepare, deploy or delete stops with "Private repository enrollment ...
+has an active/uncertain claim; reconcile it first", a failed run still holds the
+single-writer claim. Review what that run changed in Azure, then release only its
+claim with `azurefactory reconcile-run-claim prepare --folder <azurefactory folder>
+--factory-id <factory UUID> --run-id <failed run ID> --save-receipt <file>` followed
+by `azurefactory reconcile-run-claim confirm --receipt <file>` and the phrase
+`RELEASE <run ID>` (SDK: `reconcile_run_claim_prepare` / `reconcile_run_claim_confirm`;
+REST: `POST /api/v1/operations/reconcile-run-claim/prepare` and `/confirm`). It is
+**implemented** but blocked unless you own the job that dispatched the run, its
+run and worker receipts are terminal, its GitHub Actions/Azure DevOps run completed
+and nothing else is queued or running. One compare-and-swap clears the claim, keeps
+every record and adds an audit record; Azure is not changed and nothing is retried.
+Never edit `refs/heads/aifactory-state/single-writer-v1` by hand. Details:
+[CLI readme](../../../environment_setup/azurefactory-cli/readme.md#release-a-failed-runs-retained-single-writer-claim).
+
 <details markdown="1">
 <summary>More info</summary>
 
@@ -1595,7 +1612,8 @@ existing placement; it does not replace or broaden the explicit environments.
   [SDK client](../../../environment_setup/azurefactory-cli/src/azurefactory/client.py),
   [request builders](../../../environment_setup/azurefactory-cli/src/azurefactory/catalog_requests.py),
   [receipt validation](../../../environment_setup/azurefactory-cli/src/azurefactory/review.py),
-  [named deletion validation](../../../environment_setup/azurefactory-cli/src/azurefactory/factory_deletion.py).
+  [named deletion validation](../../../environment_setup/azurefactory-cli/src/azurefactory/factory_deletion.py),
+  [run claim release validation](../../../environment_setup/azurefactory-cli/src/azurefactory/run_claims.py).
 * [Saved metrics adapter](../../../environment_setup/azurefactory-cli/src/azurefactory/monitoring_saved.py),
   [workflow observer](../../../environment_setup/azurefactory-cli/src/azurefactory/workflow_events.py),
   [named wrapper tests](../../../environment_setup/azurefactory-cli/tests/test_catalog_wrappers.py),

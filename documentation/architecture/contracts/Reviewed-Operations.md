@@ -5,6 +5,8 @@ sources:
   - bootstrap/lib/factory_lifecycle.py
   - environment_setup/azurefactory-cli/src/azurefactory/review.py
   - environment_setup/azurefactory-cli/src/azurefactory/factory_deletion.py
+  - environment_setup/azurefactory-cli/src/azurefactory/run_claims.py
+  - bootstrap/lib/provider_repository_state.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/signing.py
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/actions.py
@@ -12,6 +14,8 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_native_foundry_lifecycle.py
   - environment_setup/azurefactory-cli/tests/test_reviews.py
   - environment_setup/azurefactory-cli/tests/test_factory_deletion.py
+  - environment_setup/azurefactory-cli/tests/test_run_claims.py
+  - environment_setup/unit-tests/test-bicep/unit/test_single_writer_coordination.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_operations.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_signing.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_actions.py
@@ -21,7 +25,7 @@ graph_symbols:
   - environment_setup/azurefactory-cli/src/azurefactory/review.py::function:write_receipt
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py::class:OperationStore
   - usecase_code/40-agent-factory/40-aifactory-agent/aifactory_agent/operations.py::function:OperationStore.approve
-reviewed_source: 'effdb843 + d03bc189 deletion review; native identity boundary observed 2026-10-11; deletion reviewed 2026-10-19'
+reviewed_source: 'effdb843 + d03bc189 deletion review; f6fa41f5 retained run-claim release 2026-10-19; native identity boundary observed 2026-10-11; deletion reviewed 2026-10-19'
 ---
 # Reviewed operations
 
@@ -40,6 +44,23 @@ The normal path is `pending -> approved -> executing`, then `succeeded`, `runnin
 Status observation does not execute. Continuation is limited to paused approved Full bootstrap and binds both the plan hash and latest observation hash. The operation reports `retry_allowed: false`; uncertainty is an outcome needing reconciliation, not failure that can be automatically retried.
 
 Signed records and backend validation do not let a retrieved document or model become the approver. A changed source revision, scope, endpoint, record or expired review requires the appropriate fresh review rather than editing a receipt.
+
+## Retained run-claim release (single-writer)
+
+`RepositoryCoordination.release()` clears the provider-repository claim only after
+run and worker success, and `abort()` only before mutation started. A run that
+fails after mutation keeps `active` until an operator reviews it. The Factory API's
+`reconcile-run-claim` prepare/confirm (azurefactory `reconcile-run-claim`, SDK
+`reconcile_run_claim_prepare`/`_confirm`) is the reviewed way out: owner-bound to
+the local job that dispatched the run, it requires the claim to name that run,
+manifest and lock scopes, terminal run and worker receipts, a completed GHA/ADO run
+that is this run's dispatch, no other queued or running workflow run and no active
+local job. Confirmation repeats every check, consumes the review, then makes one
+non-force `ProviderState` CAS that sets `active` to null, keeps every record and adds
+`claim-reconciliations/<run_id>/<confirmation_id>.json`. An uncertain write is
+never retried. The service lives in the API (`run_claim_reconciliation.py`); the
+helpers are unchanged, and a contract test proves their readers accept the audit
+record, reject the released run and let a fresh run acquire.
 
 ## Native identity-only boundary
 

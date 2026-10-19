@@ -259,6 +259,34 @@ class AzureFactoryClient(SavedMonitoringClient):
         return self._factory_deletion_request("reconcile", body={
             "contract_version": 1, "folder": folder, "job_id": job_id})
 
+    def _run_claim_request(self, action: str, body: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return self._object(self.request("POST", f"/api/v1/operations/reconcile-run-claim/{action}", body=body),
+                                "run claim reconciliation")
+        except APIError as exc:
+            detail = exc.details.get("detail") if isinstance(exc.details, dict) else None
+            # The operation's own 404 (another caller's run) is kept; only a missing route is translated.
+            if exc.status == 405 or (exc.status == 404 and not (
+                    isinstance(detail, str) and detail.startswith("Run claim reconciliation"))):
+                raise APIError("Run claim reconciliation requires an API supporting the reconcile-run-claim routes; "
+                               "no fallback was attempted.", status=exc.status) from None
+            raise
+
+    def reconcile_run_claim_prepare(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Review the release of a failed run's retained single-writer claim; never writes."""
+        from .run_claims import validate_request
+
+        validate_request(body)
+        return self._run_claim_request("prepare", body)
+
+    def reconcile_run_claim_confirm(self, *, folder: str, confirmation_id: str,
+                                    preview_hash: str, confirmation_phrase: str) -> dict[str, Any]:
+        """Submit exactly one confirmation; an uncertain outcome is never retried."""
+        return self._run_claim_request("confirm", {
+            "contract_version": 1, "folder": folder, "confirmation_id": confirmation_id,
+            "preview_hash": preview_hash, "confirmation_phrase": confirmation_phrase,
+        })
+
     def schema(self) -> dict[str, Any]:
         return self._object(self.request("GET", "/api/v1/schema"), "schema")
 

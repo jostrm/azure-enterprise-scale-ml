@@ -173,6 +173,21 @@ def build_parser() -> argparse.ArgumentParser:
              "retry pipelines or call Azure.")
     deletion_reconcile.add_argument("--folder", required=True)
     deletion_reconcile.add_argument("--job-id", required=True)
+    claim_help = ("Release the single-writer claim that a failed run kept, after review; every record is kept, "
+                  "an audit record is added and Azure is never changed.")
+    claim = sub.add_parser("reconcile-run-claim", help=claim_help, description=claim_help)
+    claim_sub = claim.add_subparsers(dest="claim_command", required=True)
+    claim_prepare = add_simple(claim_sub, "prepare", cmd_reconcile_run_claim_prepare,
+                               help="Review the claim, receipts and remote run; never releases anything.")
+    for field in ("folder", "factory-id", "run-id", "save-receipt"):
+        claim_prepare.add_argument("--" + field, required=True)
+    claim_confirm = add_simple(claim_sub, "confirm", cmd_reconcile_run_claim_confirm,
+                               help="Show the saved review, then require its exact confirmation phrase.")
+    claim_confirm.add_argument("--receipt", required=True, help="Unexpired receipt from reconcile-run-claim prepare.")
+    claim_confirm.add_argument("--yes", action="store_true",
+                               help="Required without a terminal, together with --confirmation-phrase; never enough alone.")
+    claim_confirm.add_argument("--confirmation-phrase",
+                               help="Exact server phrase from the reviewed receipt; required without a terminal.")
     workflow = sub.add_parser("workflow", help="Read-only GitHub Actions status and events; never dispatch or rerun.")
     workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
     for name, handler in (("status", cmd_workflow_status), ("watch", cmd_workflow_watch)):
@@ -719,26 +734,7 @@ def cmd_delete_aifactory_confirm(args):
         raise ConfigError("Deletion receipt contains sensitive values; prepare a new redacted review.")
     preview = receipt["preview"]
     _deletion_review(preview, receipt["folder"])
-    expected = preview["confirmation_phrase"]
-    if args.confirmation_phrase is not None and args.confirmation_phrase != expected:
-        raise ConfigError("Confirmation phrase does not exactly match the reviewed server phrase; nothing was confirmed.")
-    if sys.stdin.isatty():
-        try:
-            print("Continue with this exact review? [y/N]", file=sys.stderr, flush=True)
-            if input().strip().lower() not in ("y", "yes"):
-                raise BlockedError("Cancelled; no deletion request was sent.")
-            print("Type the exact confirmation phrase: " + json.dumps(expected, ensure_ascii=True),
-                  file=sys.stderr, flush=True)
-            phrase = input()
-        except EOFError:
-            raise BlockedError("Cancelled at end of input; no deletion request was sent.") from None
-    else:
-        if not args.yes or args.confirmation_phrase is None:
-            raise ConfigError("Without an interactive terminal, deletion requires both --yes and "
-                              "--confirmation-phrase matching the reviewed receipt; nothing was confirmed.")
-        phrase = args.confirmation_phrase
-    if phrase != expected:
-        raise ConfigError("Confirmation phrase does not exactly match the reviewed server phrase; nothing was confirmed.")
+    phrase = _typed_confirmation(args, preview["confirmation_phrase"], "deletion", "deletion")
     try:
         result = redact_secrets(api.delete_aifactory_confirm(
             folder=receipt["folder"], confirmation_id=receipt["confirmation_id"],
@@ -751,6 +747,83 @@ def cmd_delete_aifactory_confirm(args):
         raise FailureError("Deletion returned an incompatible confirmation. Inspect server state; do not retry.")
     validate_job(result.get("job"), factory_id=receipt["request"]["factory_id"])
     return emit(result, status_exit(result["job"]["status"]))
+
+
+def _typed_confirmation(args, expected: str, request: str, approval: str) -> str:
+    """A terminal y/N plus the exact phrase, or --yes with the exact --confirmation-phrase; nothing else."""
+    if args.confirmation_phrase is not None and args.confirmation_phrase != expected:
+        raise ConfigError("Confirmation phrase does not exactly match the reviewed server phrase; nothing was confirmed.")
+    if sys.stdin.isatty():
+        try:
+            print("Continue with this exact review? [y/N]", file=sys.stderr, flush=True)
+            if input().strip().lower() not in ("y", "yes"):
+                raise BlockedError(f"Cancelled; no {request} request was sent.")
+            print("Type the exact confirmation phrase: " + json.dumps(expected, ensure_ascii=True),
+                  file=sys.stderr, flush=True)
+            phrase = input()
+        except EOFError:
+            raise BlockedError(f"Cancelled at end of input; no {request} request was sent.") from None
+    else:
+        if not args.yes or args.confirmation_phrase is None:
+            raise ConfigError(f"Without an interactive terminal, {approval} requires both --yes and "
+                              "--confirmation-phrase matching the reviewed receipt; nothing was confirmed.")
+        phrase = args.confirmation_phrase
+    if phrase != expected:
+        raise ConfigError("Confirmation phrase does not exactly match the reviewed server phrase; nothing was confirmed.")
+    return phrase
+
+
+def _claim_review(preview):
+    from .run_claims import describe
+
+    print("Release this failed run's retained single-writer claim?", file=sys.stderr)
+    print("Review the claim, receipts and remote run below. Nothing has been changed by this command.",
+          file=sys.stderr)
+    _print_json(describe(preview), file=sys.stderr, flush=True)
+
+
+def cmd_reconcile_run_claim_prepare(args):
+    from .run_claims import OPERATION, PURPOSE, validate_claim_preview
+
+    if os.path.lexists(args.save_receipt):
+        raise ConfigError("Refusing to overwrite an existing run claim receipt.")
+    api = client(args)
+    request = {"contract_version": 1, "folder": args.folder, "factory_id": args.factory_id, "run_id": args.run_id}
+    preview = redact_secrets(api.reconcile_run_claim_prepare(request), api.api_key)
+    request = redact_secrets(request, api.api_key)
+    validate_claim_preview(request, preview)
+    _claim_review(preview)
+    try:
+        write_receipt(args.save_receipt, client=api, purpose=PURPOSE, operation=OPERATION,
+                      request_body=request, preview=preview)
+    except OSError:
+        raise ConfigError("Cannot write a new run claim receipt; nothing was confirmed.") from None
+    return emit(preview)
+
+
+def cmd_reconcile_run_claim_confirm(args):
+    from .run_claims import OPERATION_MODE, PURPOSE, validate_release
+
+    api = client(args)
+    try:
+        receipt = load_receipt(args.receipt, api, PURPOSE, operation_mode=OPERATION_MODE)
+    except (OSError, UnicodeError, ValueError, TypeError):
+        raise ConfigError("Cannot read a valid run claim receipt; nothing was confirmed.") from None
+    if redact_secrets(receipt, api.api_key) != receipt:
+        raise ConfigError("Run claim receipt contains sensitive values; prepare a new redacted review.")
+    preview = receipt["preview"]
+    _claim_review(preview)
+    phrase = _typed_confirmation(args, preview["confirmation_phrase"], "release", "a claim release")
+    try:
+        result = redact_secrets(api.reconcile_run_claim_confirm(
+            folder=receipt["folder"], confirmation_id=receipt["confirmation_id"],
+            preview_hash=preview["preview_hash"], confirmation_phrase=phrase,
+        ), api.api_key)
+    except RequestTimeout:
+        raise RequestTimeout("Run claim release timed out; its outcome is unknown. Prepare again to read the "
+                             "current claim before any further action. No retry was attempted.") from None
+    validate_release(result, receipt)
+    return emit(result)
 
 
 def cmd_delete_aifactory_status(args):
