@@ -689,6 +689,7 @@ def capabilities():
         "factory_deletion_pipeline": "ordered-project-pipelines-v1",
         "factory_deletion_pipeline_coordination_modes": ["blob"],
         "factory_deletion_access_hub": "factory-owned-access-hub-v1",
+        "factory_deletion_shared_hub_links": "shared-hub-spoke-links-v1",
         "bootstrap_operator_teardown": "bootstrap-operator-teardown-v1",
         "factory_deletion_coordination_modes": ["blob", "single-writer"],
         "selective_project_deletion": SELECTIVE_PROJECT_DELETE,

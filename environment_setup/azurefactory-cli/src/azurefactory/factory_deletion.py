@@ -39,6 +39,9 @@ TEARDOWN_POLICY = "unlink-hub-then-whole-groups"
 LINK_TYPES = {"microsoft.network/privatednszones/virtualnetworklinks",
               "microsoft.network/dnsforwardingrulesets/virtualnetworklinks",
               "microsoft.network/virtualnetworks/virtualnetworkpeerings"}
+# A hub-connected factory's own recorded links inside a shared hub go last, after its spoke VNet.
+SHARED_HUB_CONTRACT = "shared-hub-spoke-links-v1"
+SHARED_HUB_EXECUTOR = "operator-after-common-teardown"
 
 
 def _contains(parent: str, child: str) -> bool:
@@ -207,7 +210,50 @@ def validate_deletion_plan(plan: Any, factory_id: str, scales: dict[str, Any], f
     if any(_contains(entry, keep) or _contains(keep, entry) for entry in covered for keep in protected):
         invalid("deletion overlaps protected hub, VPN, bootstrap or shared resources")
     _validate_access_hubs(plan, stages, scales, invalid)
+    _validate_shared_hub_links(plan, stages, scales, invalid)
     return plan
+
+
+def _validate_shared_hub_links(plan, stages, scales, invalid):
+    """Only recorded links inside a shared hub, to a VNet the same scale set's common teardown deletes."""
+    rows = plan.get("shared_hub_links", [])  # Older plans carry no section and remove no hub link.
+    if (not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows)
+            or len({row.get("scale_set_id") for row in rows}) != len(rows)):
+        invalid("malformed shared connectivity hub link section")
+    deleted = {entry.lower() for stage in stages for entry in stage["delete"]}
+    seen = set()
+    for row in rows:
+        scale = scales.get(row.get("scale_set_id"))
+        groups, links, retained = row.get("hub_resource_group_ids"), row.get("links"), row.get("retained_links")
+        if (scale is None or row.get("environment") != scale["environment"]
+                or row.get("contract") != SHARED_HUB_CONTRACT or row.get("executor") != SHARED_HUB_EXECUTOR
+                or not isinstance(row.get("evidence"), dict) or not isinstance(groups, list) or not groups
+                or any(not _text(group) or _full_type(group) != "microsoft.resources/resourcegroups"
+                       or any(_contains(group, entry) or _contains(entry, group) for entry in deleted)
+                       for group in groups)
+                or not isinstance(links, list) or not isinstance(retained, list) or not (links or retained)):
+            invalid("the shared connectivity hub link section changed its target, contract, executor or hub")
+        spokes = {entry.lower() for stage in stages if stage["kind"] == "common" and stage["scale_set_id"] == scale["id"]
+                  for entry in stage["delete"] if _full_type(entry) == "microsoft.network/virtualnetworks"}
+        for link in links:
+            identifier = link.get("id") if isinstance(link, dict) else None
+            if (not _text(identifier) or identifier.lower() in seen or set(link) != {"id", "type", "remote_virtual_network_id"}
+                    or link["type"] not in LINK_TYPES or _full_type(identifier) != link["type"]
+                    or not any(_contains(group, identifier) for group in groups)
+                    or str(link["remote_virtual_network_id"]).lower() not in spokes):
+                invalid("a hub link is not this factory's own link to a spoke VNet its common teardown deletes")
+            seen.add(identifier.lower())
+        if any(not _text(entry) or entry.lower() in seen or not any(_contains(group, entry) for group in groups)
+               for entry in retained):
+            invalid("a retained hub link lies outside the shared connectivity hub")
+
+
+def describe_shared_hub_links(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    return [{"Environment": row["environment"], "Scale set": row["scale_set_id"], "Removed by": row["executor"],
+             "Hub resource groups (kept)": row["hub_resource_group_ids"], "Bootstrap evidence": row["evidence"],
+             "Removes": [{"Link": link["id"], "Spoke VNet": link["remote_virtual_network_id"]} for link in row["links"]],
+             "Kept (not proven this factory's)": row["retained_links"]}
+            for row in plan.get("shared_hub_links", [])]
 
 
 def _validate_access_hubs(plan, stages, scales, invalid):

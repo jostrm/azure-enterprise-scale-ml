@@ -649,7 +649,8 @@ def cmd_preflight(args):
 
 
 def _deletion_review(preview, folder):
-    from .factory_deletion import TEARDOWN_CONTRACT, describe_access_hubs, describe_deletion_plan, describe_teardown_plan
+    from .factory_deletion import (TEARDOWN_CONTRACT, describe_access_hubs, describe_deletion_plan,
+                                   describe_shared_hub_links, describe_teardown_plan)
 
     print("Are you sure you want to delete this factory's Azure resources?", file=sys.stderr)
     print("Review the exact deleted and retained resources below. Nothing has been deleted by this command.",
@@ -666,7 +667,9 @@ def _deletion_review(preview, folder):
                                   "Factory-owned access hub (deleted last, after every project pipeline)":
                                       describe_access_hubs(plan),
                                   "Stages": (describe_teardown_plan(plan) if plan["contract"] == TEARDOWN_CONTRACT
-                                             else describe_deletion_plan(plan))},
+                                             else describe_deletion_plan(plan)),
+                                  "Shared connectivity hub links (removed last, after the spoke VNet; "
+                                  "the hub itself is kept)": describe_shared_hub_links(plan)},
         "Exact resource manifest (delete / retain)": preview["deletion_targets"],
         "Retained Azure resources": preview["retained_resources"],
         "Hub and reusable infrastructure retention policy": preview["deletion_retention_policy"],

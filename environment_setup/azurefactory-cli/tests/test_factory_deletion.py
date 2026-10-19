@@ -795,3 +795,80 @@ def test_dns_resolver_is_connectivity_in_a_pipeline_plan(tmp_path, transport):
     transport.preview["inventory"].append({"resource_id": resolver, "dependencies": []})
     rehash(plan)
     assert prepare(tmp_path) == 2
+
+
+SHARED_HUB_LINKS = "shared-hub-spoke-links-v1"
+HUB_PEERING = HUB_VNET_ID + "/virtualNetworkPeerings/aif-4d8896b66f23"
+SPIDER_VNET = (f"/subscriptions/{SUBSCRIPTION}/resourceGroups/spider-esml-common-sdc-dev-001"
+               "/providers/Microsoft.Network/virtualNetworks/vnt-esmlcmn-sdc-dev-001")
+
+
+def with_shared_hub_links(transport):
+    """dc-batman4 shape: the common teardown deletes the spoke VNet, then its recorded hub links go."""
+    plan = transport.preview["deletion_plan"]
+    common = plan["stages"][1]
+    common["delete"] = [GROUP, RESOURCE, SPOKE_VNET]
+    transport.preview["deletion_targets"][0]["delete"] = list(common["delete"])
+    transport.preview["inventory"].append({"resource_id": SPOKE_VNET, "dependencies": []})
+    plan["shared_hub_links"] = [{
+        "scale_set_id": SCALE, "environment": "dev", "contract": SHARED_HUB_LINKS,
+        "executor": "operator-after-common-teardown", "hub_resource_group_ids": [HUB_GROUP.lower()],
+        "links": [{"id": HUB_DNS_LINK, "type": "microsoft.network/privatednszones/virtualnetworklinks",
+                   "remote_virtual_network_id": SPOKE_VNET.lower()},
+                  {"id": HUB_PEERING, "type": "microsoft.network/virtualnetworks/virtualnetworkpeerings",
+                   "remote_virtual_network_id": SPOKE_VNET.lower()}],
+        "retained_links": [HUB_DNS_LINK.replace("aif-4d8896b66f23", "manual-batman")],
+        "evidence": {"contract": "consumed-bootstrap-stage-evidence-v1",
+                     "workflow_id": "99999999-9999-4999-8999-999999999999", "record_hash": "e" * 64}}]
+    return plan
+
+
+def test_shared_hub_link_cleanup_is_reviewed_and_rendered_last(tmp_path, transport, capsys):
+    rehash(with_shared_hub_links(transport))
+    assert prepare(tmp_path) == 0, capsys.readouterr().err
+    output = capsys.readouterr().err
+    assert "Shared connectivity hub links" in output and "operator-after-common-teardown" in output
+    assert HUB_DNS_LINK in output and HUB_PEERING in output and "manual-batman" in output
+
+
+@pytest.mark.parametrize("defect", ["link-outside-hub", "remote-not-deleted", "hub-group-deleted", "link-in-a-stage",
+                                    "unknown-scale-set", "executor", "contract", "type-mismatch", "duplicate-link",
+                                    "retained-outside-hub", "not-a-list"])
+def test_broadened_or_changed_shared_hub_links_are_rejected(tmp_path, transport, defect):
+    plan = with_shared_hub_links(transport)
+    row = plan["shared_hub_links"][0]
+    if defect == "link-outside-hub":
+        row["links"][0]["id"] = HUB_DNS_LINK.replace("aifactory-connectivity", "other-hub")
+    elif defect == "remote-not-deleted":
+        row["links"][1]["remote_virtual_network_id"] = SPIDER_VNET.lower()
+    elif defect == "hub-group-deleted":
+        row["hub_resource_group_ids"] = [GROUP.lower()]
+        row["links"][0]["id"] = GROUP + "/providers/Microsoft.Network/privateDnsZones/z/virtualNetworkLinks/l"
+        row["links"].pop()
+        row["retained_links"] = []
+    elif defect == "link-in-a-stage":
+        plan["stages"][1]["delete"].append(HUB_PEERING)
+        transport.preview["deletion_targets"][0]["delete"].append(HUB_PEERING)
+        transport.preview["inventory"].append({"resource_id": HUB_PEERING, "dependencies": []})
+    elif defect == "unknown-scale-set":
+        row["scale_set_id"] = "88888888-8888-4888-8888-888888888888"
+    elif defect == "executor":
+        row["executor"] = "operator-after-project-barrier"
+    elif defect == "contract":
+        row["contract"] = "unlink-everything-v1"
+    elif defect == "type-mismatch":
+        row["links"][0]["type"] = "microsoft.network/virtualnetworks/virtualnetworkpeerings"
+    elif defect == "duplicate-link":
+        row["links"].append(dict(row["links"][0]))
+    elif defect == "retained-outside-hub":
+        row["retained_links"] = [SPIDER_VNET]
+    elif defect == "not-a-list":
+        plan["shared_hub_links"] = row
+    rehash(plan)
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+
+
+def test_a_plan_without_shared_hub_links_still_reviews():
+    from azurefactory.factory_deletion import describe_shared_hub_links
+    assert describe_shared_hub_links({"contract": "ordered-project-pipelines-v1"}) == []

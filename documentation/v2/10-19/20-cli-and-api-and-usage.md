@@ -1570,6 +1570,20 @@ connections, and tears the hub and runner down last, after every project
 pipeline. A shared hub such as `aifactory-connectivity` stays protected; the SDK,
 CLI and MAUI reject a VPN gateway or Bastion deletion outside `access_hubs`.
 
+`deletion_plan.shared_hub_links` is `[]` unless a **hub-connected** factory's
+bootstrap created a hub-side VNet peering or private DNS links (named `aif-<hash>`)
+inside the shared connectivity hub (`shared-hub-spoke-links-v1`). Each entry names the
+kept `hub_resource_group_ids`, the `links` to remove (each with the spoke VNet it
+targets), `retained_links` (links to this factory's VNet that the bootstrap records do
+not prove; they are never deleted) and `executor: "operator-after-common-teardown"`.
+The operator removes those links as the very last step, after every project pipeline
+and the whole common teardown, and only while each link still targets its spoke VNet
+and that VNet is verifiably gone; a link Azure already cleared counts as removed. The
+hub VNet, gateway, Bastion, DNS resolver, zones, rulesets, the hub group and every
+other factory's links stay. The CLI renders the section and rejects any link outside
+the hub, any link to a VNet the same scale set does not delete, and any hub group
+that a stage deletes.
+
 Draft guards also check protected parameter profiles, ownership, registered
 pipeline connections, bootstrap references and projects shared across scale
 sets. An optional `scale_set_id` on project resource deletion identifies an

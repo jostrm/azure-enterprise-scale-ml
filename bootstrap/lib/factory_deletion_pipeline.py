@@ -36,6 +36,9 @@ HUB_LINK_TARGETS = {
     "microsoft.network/virtualnetworks/virtualnetworkpeerings": "remoteVirtualNetwork",
 }
 HUB_SOURCE = "access-hub-bootstrap-record"
+# A hub-connected factory's bootstrap-recorded peerings and DNS links inside a shared hub.
+SHARED_HUB_CONTRACT = "shared-hub-spoke-links-v1"
+VNET_TYPE = "microsoft.network/virtualnetworks"
 fl = None
 
 
@@ -117,11 +120,17 @@ def hub_covers(hub, key):
     return bool(hub) and any(key == root or key.startswith(root + "/") for root in hub["resource_ids"])
 
 
-def verify_access_hub_network(hub, bodies):
-    """Deleting a factory-owned hub must not cut DNS, peering or site links of anything else."""
+def verify_access_hub_network(hub, bodies, links=None):
+    """Deleting a factory-owned hub must not cut DNS, peering or site links of anything else.
+
+    The one exception is the factory side of a peering pair whose hub side the shared-hub
+    link proof records: the hub VNet that this factory's bootstrap peered back to it.
+    """
     if not hub:
         return
     allowed = set(hub["factory_resource_groups"])
+    pairs = {(row["id"].rsplit("/virtualnetworkpeerings/", 1)[0], row["remote_virtual_network_id"])
+             for row in (links or {}).get("links", []) if row["type"] == PEERING_TYPE}
     for key, body in bodies.items():
         if fl.RG_ID.fullmatch(key) or fl.arm_scope(key) not in hub["resource_group_ids"]:
             continue
@@ -130,7 +139,140 @@ def verify_access_hub_network(hub, bodies):
         if kind in HUB_LINK_TARGETS:
             remote = ((body.get("properties") or {}).get(HUB_LINK_TARGETS[kind]) or {}).get("id")
             fl.require(isinstance(remote, str) and fl.RG_ID.match(remote)
-                       and fl.arm_scope(remote.lower()) in allowed, "factory-delete-access-hub-foreign-link")
+                       and (fl.arm_scope(remote.lower()) in allowed
+                            or kind == PEERING_TYPE and (remote.lower(), key.rsplit("/virtualnetworkpeerings/", 1)[0])
+                            in pairs), "factory-delete-access-hub-foreign-link")
+
+
+def shared_hub_links(document):
+    """Catalog-built proof that consumed bootstrap records created these links inside a shared hub.
+
+    Each link sits in a protected connectivity hub group outside every deletion scope and
+    targets a VNet inside this manifest's writable scopes; nothing else in the hub qualifies.
+    """
+    proof = document.get("shared_hub_links")
+    if proof is None:
+        return None
+    target, locks = document["target"], document["locks"]
+    scopes = {scope.lower() for scope in locks["scopes"]}
+    closure = scopes | {scope.lower() for scope in locks["common_dependencies"]}
+    explicit = {value.lower() for value in document.get("protected_resource_ids", []) if isinstance(value, str)}
+    links = proof.get("links") if isinstance(proof, dict) else None
+    fl.require(isinstance(proof, dict) and proof.get("contract") == SHARED_HUB_CONTRACT
+               and all(proof.get(key) == target[key] for key in ("factory_id", "scaleset_id", "subscription_id"))
+               and _sorted_ids(proof.get("hub_resource_group_ids"), fl.RG_ID)
+               and set(proof["hub_resource_group_ids"]) <= explicit
+               and not any(_overlaps(group, scope) for group in proof["hub_resource_group_ids"] for scope in closure)
+               and isinstance(links, list) and links and all(isinstance(row, dict) for row in links)
+               and [row.get("id") for row in links] == _sorted_unique([row.get("id") for row in links])
+               and all(set(row) == {"id", "type", "remote_virtual_network_id"}
+                       and _sorted_ids([row["id"]], fl.NESTED_ID) and row["type"] in HUB_LINK_TARGETS
+                       and row["type"] == fl.resource_type_from_id(row["id"])
+                       and fl.arm_scope(row["id"]) in proof["hub_resource_group_ids"]
+                       and _sorted_ids([row["remote_virtual_network_id"]], fl.NESTED_ID)
+                       and fl.resource_type_from_id(row["remote_virtual_network_id"]) == VNET_TYPE
+                       and fl.arm_scope(row["remote_virtual_network_id"]) in scopes for row in links)
+               and isinstance(proof.get("evidence"), dict) and fl.guid(proof["evidence"].get("workflow_id"))
+               and fl.hash_value(proof["evidence"].get("record_hash")),
+               "factory-delete-shared-hub-links-proof-invalid")
+    return proof
+
+
+def _sorted_unique(values):
+    return sorted(set(values)) if all(isinstance(value, str) for value in values) else None
+
+
+def _vnets(entries, deleted_only=False):
+    return {key for key, row in entries.items() if not fl.RG_ID.fullmatch(key)
+            and fl.resource_type_from_id(key) == VNET_TYPE and (row["delete"] or not deleted_only)}
+
+
+def freeze_shared_hub_links(cloud, proof, entries):
+    """Recorded hub links to a VNet this manifest deletes; links nobody can prove stay, reported."""
+    deleted, vnets = _vnets(entries, deleted_only=True), _vnets(entries)
+    recorded = {row["id"]: row for row in proof["links"]}
+    live, _ = _hub_inventory(cloud, proof["hub_resource_group_ids"], "factory-delete-hub-inventory-incomplete")
+    removable, retained = [], []
+    for row in live:
+        expected = recorded.get(row["id"].lower())
+        remote = row["remote_virtual_network_id"]
+        if expected is None:
+            if remote in vnets:
+                retained.append(row["id"])
+            continue
+        # A recorded link that now points elsewhere, or at a VNet this cohort keeps, is ambiguous.
+        fl.require(remote == expected["remote_virtual_network_id"], "factory-delete-hub-link-changed")
+        fl.require(remote in deleted or remote not in vnets, "factory-delete-hub-link-remote-retained")
+        if remote in deleted:
+            removable.append(row)
+        else:
+            retained.append(row["id"])  # Its VNet was already gone before this cohort: not ours to cut.
+    return sorted(removable, key=lambda row: row["id"].lower()), sorted(retained, key=str.lower)
+
+
+def validate_shared_hub_links(data, proof, entries):
+    if not proof:
+        fl.require("hub_links" not in data and "retained_hub_links" not in data,
+                   "factory-delete-shared-hub-links-unproven")
+        return
+    recorded = {row["id"]: row for row in proof["links"]}
+    links, retained = data.get("hub_links"), data.get("retained_hub_links")
+    fl.require(isinstance(links, list) and all(isinstance(row, dict) and isinstance(row.get("id"), str) for row in links)
+               and isinstance(retained, list) and all(isinstance(value, str) for value in retained)
+               and [row["id"].lower() for row in links] == _sorted_unique([row["id"].lower() for row in links])
+               and [value.lower() for value in retained] == _sorted_unique([value.lower() for value in retained])
+               and not {row["id"].lower() for row in links} & {value.lower() for value in retained},
+               "factory-delete-hub-links-invalid")
+    for row in links:
+        expected = recorded.get(row["id"].lower())
+        fl.require(expected is not None and set(row) == {"id", "type", "api_version", "remote_virtual_network_id", "side"}
+                   and row["side"] == "hub" and row["type"] == expected["type"]
+                   and row["api_version"] == HUB_LINK_COLLECTIONS[row["type"].rsplit("/", 1)[0]][1]
+                   and row["remote_virtual_network_id"] == expected["remote_virtual_network_id"]
+                   and entries.get(row["remote_virtual_network_id"], {}).get("delete") is True,
+                   "factory-delete-hub-links-invalid")
+    fl.require(all(fl.RG_ID.match(value) and fl.arm_scope(value.lower()) in proof["hub_resource_group_ids"]
+                   for value in retained), "factory-delete-hub-links-invalid")
+
+
+def require_unique_hub_links(documents):
+    links = [row["id"].lower() for document in documents for row in document["deletion"].get("hub_links", [])]
+    fl.require(len(set(links)) == len(links), "factory-delete-hub-link-overlap")
+
+
+def unlink_shared_hub(cloud, locks, document, receipt, persist, sleep=time.sleep):
+    """Last step: remove the recorded hub-side links only once their spoke VNet is verifiably gone."""
+    data = document["deletion"]
+    removed = {value.lower() for value in receipt.setdefault("deleted_hub_links", [])}
+    deleted = {value.lower() for value in receipt["deleted_resources"]}
+    versions = {row["id"].lower(): row["api_version"] for row in data["resources"]}
+    for link in data["hub_links"]:
+        if link["id"].lower() in removed:
+            continue
+        remote = link["remote_virtual_network_id"]
+        fl.require(remote in deleted, "factory-delete-hub-link-before-spoke")
+        locks.authorize(document)
+        locks.assert_held()
+        cloud.verify_identity()
+        status, _, _ = cloud.arm("GET", remote, versions[remote], allowed=(200, 404))
+        fl.require(status == 404, "factory-delete-hub-link-spoke-present")
+        status, _, body = cloud.arm("GET", link["id"], link["api_version"], allowed=(200, 404))
+        if status != 404:
+            # Azure usually clears a deleted VNet's DNS links itself; a hub peering stays Disconnected.
+            fl.require(_remote(body) == remote, "factory-delete-hub-link-changed")
+            verify_link_permissions(cloud, [link])
+            locks.authorize(document)
+            receipt.update(mutation_started=True, pending_resource=link["id"])
+            persist()
+            cloud.arm("DELETE", link["id"], link["api_version"], allowed=(200, 202, 204, 404),
+                      headers={"If-Match": body["etag"]} if body.get("etag") else None)
+            fl.wait_absent(cloud, locks, link["id"], link["api_version"], sleep)
+            receipt.pop("pending_resource", None)
+        receipt["deleted_hub_links"].append(link["id"])
+        removed.add(link["id"].lower())
+        persist()
+    receipt["hub_unlink_complete"] = True
+    persist()
 
 
 def teardown_order(document, rows):
@@ -204,11 +346,11 @@ def freeze(cloud, document, ownership_records, registered_projects):
     fl.BlobLocks(cloud, document).verify_enrollment()
     scopes = sorted(set(document["locks"]["scopes"] + document["locks"]["common_dependencies"]), key=str.lower)
     writable = {scope.lower() for scope in document["locks"]["scopes"]}
-    hub = access_hub(document)
+    hub, links = access_hub(document), shared_hub_links(document)
     closure, bodies = fl.collect_resource_closure(cloud, scopes)
     # The operator executes common teardown; it must never sit on anything in scope.
     fl.verify_deletion_identity(document, bodies)
-    verify_access_hub_network(hub, bodies)
+    verify_access_hub_network(hub, bodies, links)
     explicit = document.get("protected_resource_ids", [])
     fl.require(isinstance(explicit, list) and all(isinstance(value, str)
                and (fl.RG_ID.fullmatch(value) or fl.NESTED_ID.fullmatch(value)) for value in explicit),
@@ -318,10 +460,14 @@ def freeze(cloud, document, ownership_records, registered_projects):
             "route_hash": fl.digest(document["route"]), "source_hash": fl.digest(document["source"])}
     if hub:
         data["access_hub_hash"] = fl.digest(hub)
+    if links:
+        data["hub_links"], data["retained_hub_links"] = freeze_shared_hub_links(cloud, links, entries)
+        data["shared_hub_links_hash"] = fl.digest(links)
     validate({**document, "deletion": data})
     for scope in scopes:
         cloud.assert_no_active_deployments(scope)
     verify_permissions(cloud, data)
+    verify_link_permissions(cloud, data.get("hub_links", []))
     return data
 
 
@@ -334,8 +480,10 @@ def validate(document):
     fl.require(data.get("configuration_hash") == fl.digest(document["config"])
                and data.get("route_hash") == fl.digest(document["route"])
                and data.get("source_hash") == fl.digest(document["source"]), "factory-delete-plan-binding-changed")
-    hub = access_hub(document)
-    fl.require(data.get("access_hub_hash") == (fl.digest(hub) if hub else None), "factory-delete-plan-binding-changed")
+    hub, links = access_hub(document), shared_hub_links(document)
+    fl.require(data.get("access_hub_hash") == (fl.digest(hub) if hub else None)
+               and data.get("shared_hub_links_hash") == (fl.digest(links) if links else None),
+               "factory-delete-plan-binding-changed")
     projects = normalize_projects(document, data.get("projects"))
     fl.require([row["project_number"] for row in projects] ==
                [row["project_number"] for row in data["projects"]], "factory-delete-project-order-changed")
@@ -349,7 +497,8 @@ def validate(document):
     fl.require(len(entries) == len(groups + resources) and set(entries) == set(data["bodies"]),
                "factory-delete-complete-inventory-required")
     fl.protect_coordination_storage(document)
-    verify_access_hub_network(hub, data["bodies"])
+    verify_access_hub_network(hub, data["bodies"], links)
+    validate_shared_hub_links(data, links, entries)
     for key, row in entries.items():
         fl.require(type(row.get("delete")) is bool and row.get("body_hash") == fl.digest(data["bodies"][key]),
                    "factory-delete-resource-fingerprint-required")
@@ -670,6 +819,7 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
                document["deletion"]["resource_groups"] if row["delete"]}
         fl.require(not (set(document["deletion"]["bodies"]) & (deletes - own)),
                    "factory-delete-overlapping-closure-requires-one-manifest")
+    require_unique_hub_links(documents)
     clouds = [cloud_factory(document) for document in documents]
     members = [(lock_factory or fl.BlobLocks)(cloud, document) for cloud, document in zip(clouds, documents)]
     union = fl._CohortLeases(members)
@@ -756,6 +906,7 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
                 receipt["observed_absent"] = observed_absent(cloud, document)
                 fl.verify_project_inventory(cloud, document, receipt["observed_absent"])
                 verify_permissions(cloud, document["deletion"], receipt["observed_absent"])
+                verify_link_permissions(cloud, document["deletion"].get("hub_links", []))
             for locks, document, receipt in zip(members, documents, aggregate["children"]):
                 claim_attempted = True
                 locks.claim_run()
@@ -787,6 +938,10 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
             delete_rows(cloud, locks, document, receipt, persist, rows)
             fl.verify_project_inventory(cloud, document, receipt["deleted_resources"])
             receipt["deletion_complete"] = True
+        # Last, once every spoke VNet of the cohort is gone: this factory's own links in a shared hub.
+        for cloud, locks, document, receipt in zip(clouds, members, documents, aggregate["children"]):
+            if document["deletion"].get("hub_links"):
+                unlink_shared_hub(cloud, locks, document, receipt, persist)
         union.assert_held()
         # Store completion while leases still exist; the final receipt is only
         # successful after every lease is durably observed released.
@@ -906,30 +1061,38 @@ def validate_teardown_request(document):
     fl.require(0 < expires - prepared <= 3600, "bootstrap-teardown-request-invalid")
 
 
-def _hub_links(cloud, document, factory_vnets):
-    """Only links and peerings in the configured hub groups whose remote is one of this factory's VNets."""
+def _hub_inventory(cloud, hub_scopes, code):
+    """Every DNS zone/ruleset link and VNet peering in the hub groups, plus the hub VNets."""
     links, hub_vnets = [], set()
-    for scope in document["hub_scopes"]:
+    for scope in hub_scopes:
         for row in cloud.list_resources(scope):
             key = str(row.get("id", "")).lower()
-            fl.require(fl.arm_scope(key) == scope, "bootstrap-teardown-hub-inventory-incomplete")
+            fl.require(fl.arm_scope(key) == scope, code)
             kind = fl.resource_type_from_id(key)
-            if kind == "microsoft.network/virtualnetworks":
+            if kind == VNET_TYPE:
                 hub_vnets.add(key)
             if kind not in HUB_LINK_COLLECTIONS:
                 continue
             child, api = HUB_LINK_COLLECTIONS[kind]
             items, unsupported = cloud.collection(row["id"] + "/" + child, api)
-            fl.require(unsupported is None and isinstance(items, list),
-                       "bootstrap-teardown-hub-inventory-incomplete")
+            fl.require(unsupported is None and isinstance(items, list), code)
             for item in items:
                 identifier = str(item.get("id", "")).lower()
-                fl.require(identifier.startswith(key + "/") and fl.NESTED_ID.fullmatch(identifier),
-                           "bootstrap-teardown-hub-inventory-incomplete")
-                if _remote(item) in factory_vnets:
-                    links.append({"id": item["id"], "type": fl.resource_type_from_id(identifier), "api_version": api,
-                                  "remote_virtual_network_id": _remote(item), "side": "hub"})
+                fl.require(identifier.startswith(key + "/") and fl.NESTED_ID.fullmatch(identifier), code)
+                links.append({"id": item["id"], "type": fl.resource_type_from_id(identifier), "api_version": api,
+                              "remote_virtual_network_id": _remote(item), "side": "hub"})
     return links, hub_vnets
+
+
+def _hub_links(cloud, document, factory_vnets):
+    """Only links and peerings in the configured hub groups whose remote is one of this factory's VNets."""
+    links, hub_vnets = _hub_inventory(cloud, document["hub_scopes"], "bootstrap-teardown-hub-inventory-incomplete")
+    return [row for row in links if row["remote_virtual_network_id"] in factory_vnets], hub_vnets
+
+
+def verify_link_permissions(cloud, links):
+    verify_permissions(cloud, {"resource_groups": [], "resources": [
+        {"id": row["id"], "type": row["type"], "delete": True, "depends_on": []} for row in links]})
 
 
 def _parent_resource(key):
@@ -1027,9 +1190,7 @@ def freeze_teardown(cloud, document):
     for scope in scopes:
         cloud.assert_no_active_deployments(scope)
     verify_permissions(cloud, data)
-    verify_permissions(cloud, {"resource_groups": [], "resources": [
-        {"id": row["id"], "type": row["type"], "delete": True, "depends_on": []}
-        for row in data["hub_links"] if row["side"] == "hub"]})
+    verify_link_permissions(cloud, [row for row in data["hub_links"] if row["side"] == "hub"])
     return data
 
 

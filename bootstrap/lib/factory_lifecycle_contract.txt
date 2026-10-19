@@ -63,6 +63,29 @@ from the operator after the all-project barrier and deletes the covered hub and
 runner closure last. ARM back-references (NIC virtualMachine, disk managedBy,
 public IP ipConfiguration) name dependents, not dependencies.
 
+Shared-hub spoke links (shared-hub-spoke-links-v1)
+--------------------------------------------------
+factory_deletion_shared_hub_links advertises this extension. A hub-connected
+factory's bootstrap creates a hub-side VNet peering and private DNS zone (or DNS
+forwarding ruleset) VNet links inside a shared connectivity hub that also serves
+other factories. The API may add manifest shared_hub_links, built only from
+consumed bootstrap stage records: contract, factory_id, scaleset_id,
+subscription_id, hub_resource_group_ids (protected connectivity hub groups, never
+a deletion scope) and links (id, type, remote_virtual_network_id; each inside a
+hub group and targeting a VNet in this manifest's writable scopes) plus evidence
+(workflow_id, record_hash). The frozen inventory binds its hash and lists
+hub_links: the recorded links whose remote is a VNet this manifest deletes.
+A live link to this factory's VNet that the records do not prove, or a recorded
+link whose VNet was already gone, is listed in retained_hub_links and never
+deleted. A recorded link that now targets another VNet, or a VNet that stays,
+blocks. The factory side of a recorded hub peering pair may target the hub VNet
+under factory-owned-access-hub-v1. After every project pipeline and the whole
+common teardown of the cohort, the operator removes each frozen hub link only
+when its spoke VNet is verifiably absent and the link still targets it; a link
+Azure already cleared counts as removed. The hub VNet, gateways, Bastion, DNS
+resolver, zones, rulesets, the hub group and every other network's links stay.
+Children record deleted_hub_links and hub_unlink_complete.
+
 Bootstrap operator teardown (bootstrap-operator-teardown-v1)
 -------------------------------------------------------------
 bootstrap_operator_teardown advertises this separate contract for a factory whose Full
