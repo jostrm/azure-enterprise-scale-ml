@@ -25,6 +25,7 @@ sources:
   - environment_setup/aifactory/bicep/copy_to_local_settings/github-actions/infra-ai-gateway.yml
   - environment_setup/aifactory/bicep/modules/containerappsEnv.bicep
   - environment_setup/aifactory/bicep/modules/azureMcpServer.bicep
+  - environment_setup/aifactory/bicep/esml-common/ai-gateway/entra/aifactory-mcp-app-role.bicep
 tests:
   - mcp/tests/test_server.py
   - mcp/tests/test_auth.py
@@ -91,8 +92,13 @@ The MCP still authorizes that identity itself: the app role
 and the module performs neither. For a pipeline-hosted MCP, `aifactoryMcpClassicApimResourceIds`
 names the classic APIM services whose system-assigned identities `agent_factory.mcp_gateway`
 adds to the allowed-caller list (read-only GETs of the APIMs, de-duplicated against the
-project and native AI Gateway callers). The app role stays an Entra admin step that the run
-prints as a prerequisite.
+project and native AI Gateway callers). The app role stays an Entra admin step: for every caller
+(Foundry project, native AI Gateway, each classic APIM) the run prints the exact
+`az deployment group create` command for the admin-run Microsoft Graph Bicep template
+`esml-common/ai-gateway/entra/aifactory-mcp-app-role.bicep` (`appRoleAssignedTo`, role resolved by
+value on the MCP service principal looked up by `appId`). No pipeline references that template, so
+the rule "pipelines never write Microsoft Graph" holds; the admin's delegated Graph permissions
+(`AppRoleAssignment.ReadWrite.All`, `Application.Read.All`) do the write.
 
 `addAIFactoryMCP2APIM` closes the loop for the APIM that the AI gateway pipeline manages
 (`apimGateway*` variables): the project step adds its identity to the callers without listing it,

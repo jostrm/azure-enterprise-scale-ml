@@ -67,7 +67,7 @@ It does not use an API of `type: 'mcp'`. On 2026-10-19 the resource provider in 
 
 APIM calls the MCP with its system-assigned managed identity for `mcpEntraAppId`. The Enterprise Scale AI Factory MCP admits that identity only after two one-time steps; the deployment does neither:
 
-1. An Entra admin assigns the MCP app registration's app role `AiFactory.Mcp.Read` to the APIM managed identity. Pipelines never write Microsoft Graph.
+1. An Entra admin assigns the MCP app registration's app role `AiFactory.Mcp.Read` to the APIM managed identity. Pipelines never write Microsoft Graph; the MCP step prints the exact `az deployment group create` command for `../entra/aifactory-mcp-app-role.bicep` (Microsoft Graph Bicep) that the admin runs once.
 2. The APIM managed identity is added to the MCP container app's allowed callers, as the MCP & AI Gateway integration already does for the native gateway. For a pipeline-hosted MCP, list the APIM in `aifactoryMcpClassicApimResourceIds`, or set `addAIFactoryMCP2APIM` (below).
 
 APIM must also resolve and reach the MCP host. The MCP step requires an approved private endpoint on the MCP's Container Apps environment; the pipelines create it with the environment and register it in the `privatelink.<region>.azurecontainerapps.io` zone, which must be linked to the APIM VNet. Only inbound policies (plus the unbuffered `forward-request`) are used: reading the response body would buffer it and break MCP streaming.

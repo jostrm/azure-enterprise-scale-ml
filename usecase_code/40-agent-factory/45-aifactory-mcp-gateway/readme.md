@@ -107,9 +107,22 @@ To move to the pipeline-managed app instead, clear the variable and set the imag
 1. Build and push the MCP and Factory API images to a registry in the project subscription and
    set their digest-pinned references.
 2. An Entra admin creates the MCP API app registration with app role `AiFactory.Mcp.Read` and
-   sets `aifactoryMcpEntraAppId`. Pipelines never write Microsoft Graph: after the gateway exists,
-   the step prints the exact app-role assignment the admin must grant to the gateway identity
-   and to each identity in `aifactoryMcpClassicApimResourceIds`.
+   sets `aifactoryMcpEntraAppId`. Pipelines never write Microsoft Graph: the step prints, for every
+   caller (the Foundry project identity, the AI Gateway identity once it exists, and each classic
+   APIM identity), the exact admin command that assigns the role with the Microsoft Graph Bicep
+   template `environment_setup/aifactory/bicep/esml-common/ai-gateway/entra/aifactory-mcp-app-role.bicep`:
+
+   ```bash
+   az deployment group create --subscription <project-subscription> --resource-group <project-rg> \
+     --name aifactory-mcp-app-role-<first 8 of the principal ID> \
+     --template-file environment_setup/aifactory/bicep/esml-common/ai-gateway/entra/aifactory-mcp-app-role.bicep \
+     --parameters mcpEntraAppId=<aifactoryMcpEntraAppId> callerPrincipalId=<caller object ID>
+   ```
+
+   The admin runs it from the accelerator root, once per new caller, signed in with Graph
+   permissions `AppRoleAssignment.ReadWrite.All` and `Application.Read.All` (Bicep CLI 0.36.1+;
+   extension `microsoftgraph/v1.0:1.0.0`). The resource group only records the deployment. No
+   pipeline references the template.
 3. For registration with a new gateway, provide a subnet delegated to `Microsoft.Web/serverFarms`
    (/27 or larger) with outbound 443 to Storage and AzureKeyVault, DNS and the MCP's private IP.
 4. Grant callers **AI Gateway Tools User** on the tool server and sign in with Microsoft Entra ID.

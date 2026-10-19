@@ -62,6 +62,8 @@ APIM_API = "2024-05-01"
 APIM_MCP_SERVER = "enterprise-scale-ai-factory"
 APIM_MCP_CLIENT_SUBSCRIPTION = "aifactory-mcp-client"
 DISPLAY_NAME = "Enterprise Scale AI Factory"
+# Admin-run Microsoft Graph Bicep that assigns REQUIRED_ROLE; no pipeline deploys it.
+APP_ROLE_TEMPLATE = "environment_setup/aifactory/bicep/esml-common/ai-gateway/entra/aifactory-mcp-app-role.bicep"
 READ_ONLY_DESCRIPTION = ("Read-only Enterprise Scale AI Factory MCP: API health, capabilities and skill discovery. "
                          "Factory provisioning and deletion are disabled.")
 GUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
@@ -552,6 +554,9 @@ class McpGatewayIntegration:
         resource_names = names(request)
         target = discover(self.session, request)
         if isinstance(target, ProjectTarget):
+            report.prerequisites.append(_app_role_prerequisite(
+                request, target.project_principal_id,
+                f"the Foundry project managed identity {target.project_principal_id} ({target.project_name})"))
             report.outputs["mcp_private_endpoint_id"] = target.private_endpoint_id
             if not target.private_dns_registered:
                 report.prerequisites.append(
@@ -665,7 +670,7 @@ class McpGatewayIntegration:
             callers.append((principal, _system_client_id(self.session, apim_id).lower()))
             report.add(apim_id, "mcp-caller", f"classic APIM managed identity {principal}")
             report.prerequisites.append(_app_role_prerequisite(
-                request.entra_app_id, f"the classic APIM managed identity {principal} ({apim_id})") + ".")
+                request, principal, f"the classic APIM managed identity {principal} ({apim_id})"))
         return callers
 
     def _mcp(self, request, target, resource_names, gateway, classic, report, apply) -> None:
@@ -776,8 +781,8 @@ class McpGatewayIntegration:
                   "clientSubscriptionName": APIM_MCP_CLIENT_SUBSCRIPTION}
         return {
             "mode": "parameters", "apim_id": request.apim_id, "mcp_app_id": app_id, "mutations": False,
-            "prerequisites": [_app_role_prerequisite(request.entra_app_id,
-                                                     f"the APIM managed identity {principal} ({request.apim_id})") + "."],
+            "prerequisites": [_app_role_prerequisite(request, principal,
+                                                     f"the APIM managed identity {principal} ({request.apim_id})")],
             "parameters": {
                 "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
                 "contentVersion": "1.0.0.0", "parameters": {key: {"value": value} for key, value in values.items()}},
@@ -814,8 +819,8 @@ class McpGatewayIntegration:
             raise ValueError(f"{server_id} exists but is not owned by this integration; refusing to modify it.")
         principal = gateway["identity"]["principalId"].lower()
         report.prerequisites.append(
-            _app_role_prerequisite(request.entra_app_id, f"the AI Gateway managed identity {principal}")
-            + ", then grant callers the 'AI Gateway Tools User' role on the tool server.")
+            _app_role_prerequisite(request, principal, f"the AI Gateway managed identity {principal}")
+            + " Then grant callers the 'AI Gateway Tools User' role on the tool server.")
         if current is not None and _same_server(current, desired):
             report.add(server_id, "unchanged")
         else:
@@ -826,9 +831,18 @@ class McpGatewayIntegration:
             f"{gateway.get('properties', {}).get('gatewayUrl', '').rstrip('/')}/default/toolservers/{resource_names['tool_server']}/mcp")
 
 
-def _app_role_prerequisite(entra_app_id: str, holder: str) -> str:
+def app_role_command(request: IntegrationRequest, principal_id: str) -> str:
+    """The admin-run Graph deployment that assigns REQUIRED_ROLE to one caller (run from the accelerator root)."""
+    return (f"az deployment group create --subscription {request.subscription_id} --resource-group {request.resource_group} "
+            f"--name aifactory-mcp-app-role-{principal_id[:8]} --template-file {APP_ROLE_TEMPLATE} "
+            f"--parameters mcpEntraAppId={request.entra_app_id} callerPrincipalId={principal_id}")
+
+
+def _app_role_prerequisite(request: IntegrationRequest, principal_id: str, holder: str) -> str:
     return (f"One-time Entra admin consent (the pipeline never writes Microsoft Graph): assign app role {REQUIRED_ROLE} "
-            f"of the MCP app registration {entra_app_id} to {holder}")
+            f"of the MCP app registration {request.entra_app_id} to {holder}. An Entra admin with "
+            "AppRoleAssignment.ReadWrite.All and Application.Read.All runs, from the accelerator root, once per caller: "
+            f"{app_role_command(request, principal_id)}")
 
 
 def tool_server_body(entra_app_id: str, mcp_url: str) -> dict:

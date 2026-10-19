@@ -666,6 +666,45 @@ class AdoptionTests(unittest.TestCase):
                                               apply=False)
 
 
+class AppRolePrerequisiteTests(unittest.TestCase):
+    """Pipelines never write Graph: each caller gets the exact admin-run app-role deployment command."""
+
+    def command(self, principal):
+        return (f"az deployment group create --subscription {SUB} --resource-group {GROUP} "
+                f"--name aifactory-mcp-app-role-{principal[:8]} --template-file {gw.APP_ROLE_TEMPLATE} "
+                f"--parameters mcpEntraAppId={APP_REG} callerPrincipalId={principal}")
+
+    def test_every_mcp_caller_gets_its_exact_admin_command(self):
+        arm = with_classic_apim(FakeArm())
+        result = gw.McpGatewayIntegration(arm, sleep=lambda _: None, token=lambda: "k").run(
+            request(aifactoryMcpClassicApimResourceIds=CLASSIC_APIM), apply=True)
+        for principal in (guid(1), guid(40), guid(11)):  # Foundry project, classic APIM, native AI Gateway
+            with self.subTest(principal=principal):
+                self.assertTrue(any(self.command(principal) in item for item in result["prerequisites"]),
+                                result["prerequisites"])
+        self.assertTrue((ROOT.parents[1] / gw.APP_ROLE_TEMPLATE).is_file())
+
+    def test_the_apim_step_prints_the_command_for_the_apim_identity(self):
+        arm = with_classic_apim(FakeArm())
+        gw.McpGatewayIntegration(arm, sleep=lambda _: None, token=lambda: "k").run(
+            request(**MCP_ONLY, **APIM_VARS), apply=True)
+        result = gw.McpGatewayIntegration(arm).apim_parameters(request(**MCP_ONLY, **APIM_VARS))
+        self.assertTrue(any(self.command(guid(40)) in item for item in result["prerequisites"]))
+
+    def test_the_template_is_admin_run_only_and_assigns_the_role_by_value(self):
+        template = (ROOT.parents[1] / gw.APP_ROLE_TEMPLATE).read_text(encoding="utf-8")
+        for fragment in ("extension 'br:mcr.microsoft.com/bicep/extensions/microsoftgraph/v1.0:1.0.0'",
+                         "'Microsoft.Graph/servicePrincipals@v1.0' existing", "appId: mcpEntraAppId",
+                         "'Microsoft.Graph/appRoleAssignedTo@v1.0'", "role.value == appRoleValue",
+                         "principalId: callerPrincipalId", "resourceId: mcpServicePrincipal.id",
+                         f"param appRoleValue string = '{gw.REQUIRED_ROLE}'"):
+            self.assertIn(fragment, template)
+        pipelines = ROOT.parents[1] / "environment_setup/aifactory/bicep/copy_to_local_settings"
+        name = Path(gw.APP_ROLE_TEMPLATE).name
+        self.assertFalse([path for path in pipelines.rglob("*.y*ml") if name in path.read_text(encoding="utf-8")],
+                         "no pipeline may deploy the Graph template")
+
+
 class PrivateNetworkTests(unittest.TestCase):
     """APIM and the AI Gateway reach the MCP through its environment's private endpoint and private DNS."""
 
