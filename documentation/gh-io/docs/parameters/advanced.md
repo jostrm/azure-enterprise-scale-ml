@@ -408,7 +408,7 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 | `bootstrap` | 92 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 395 |
+| `json.dev` | 397 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
@@ -480,7 +480,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:enableApplicationInsights --><!-- parameter json.dev:enableApplicationInsights -->`enableApplicationInsights` | `ENABLE_APPLICATION_INSIGHTS` | O | Y: `"true"`<br>J.dev: `"true"` | Deploy project Application Insights |
 | <!-- parameter yaml:enableAzureAIVision --><!-- parameter json.dev:enableAzureAIVision -->`enableAzureAIVision` | `ENABLE_AZURE_AI_VISION` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure AI Vision |
 | <!-- parameter yaml:enableAzureMachineLearning --><!-- parameter json.dev:enableAzureMachineLearning -->`enableAzureMachineLearning` | `ENABLE_AZURE_MACHINE_LEARNING` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure ML workspace |
-| <!-- parameter yaml:enableAzureMcpServer -->`enableAzureMcpServer` | `ENABLE_AZURE_MCP_SERVER` | O | Y: `"false"`<br>J.dev: absent | Private, read-only MCP deployment; requires prepared project-scoped configuration. |
+| <!-- parameter yaml:enableAzureMcpServer --><!-- parameter json.dev:enableAzureMcpServer -->`enableAzureMcpServer` | `ENABLE_AZURE_MCP_SERVER` | O | Y: `"false"`<br>J.dev: `"false"` | Private, read-only MCP deployment; requires prepared project-scoped configuration. |
 | <!-- parameter yaml:enableAzureOpenAI --><!-- parameter json.dev:enableAzureOpenAI -->`enableAzureOpenAI` | `ENABLE_AZURE_OPENAI` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy standalone Azure OpenAI |
 | <!-- parameter yaml:enableAzureSpeech --><!-- parameter json.dev:enableAzureSpeech -->`enableAzureSpeech` | `ENABLE_AZURE_SPEECH` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Azure AI Speech |
 | <!-- parameter yaml:enableBing --><!-- parameter json.dev:enableBing -->`enableBing` | `ENABLE_BING` | O | Y: `"false"`<br>J.dev: `"false"` | Deploy Bing Search |
@@ -709,7 +709,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 
 | YAML / JSON key | GHA binding(s) | M/C/O | Source defaults | Description / conditions |
 |---|---|---|---|---|
-| <!-- parameter yaml:adminVMSize -->`adminVMSize` | `ADMIN_VM_SIZE` | O | Y: `"Standard_D2s_v5"`<br>J.dev: absent | Admin VM size keep-as-is: Override when the regional SKU is unavailable. |
+| <!-- parameter yaml:adminVMSize --><!-- parameter json.dev:adminVMSize -->`adminVMSize` | `ADMIN_VM_SIZE` | O | Y: `"Standard_D2s_v5"`<br>J.dev: `"Standard_D2s_v5"` | Admin VM size keep-as-is: Override when the regional SKU is unavailable. |
 | <!-- parameter yaml:admin_aks_gpu_sku_dev_override --><!-- parameter json.dev:admin_aks_gpu_sku_dev_override -->`admin_aks_gpu_sku_dev_override` | `ADMIN_AKS_GPU_SKU_DEV_OVERRIDE` | O | Y: `"Standard_D4s_v5"`<br>J.dev: `"Standard_D4s_v5"` | AKS system node VM SKU for DEV ensure: use an AKS-supported system-pool SKU; configure GPU workloads in a separate user pool. |
 | <!-- parameter yaml:admin_aks_gpu_sku_test_prod_override --><!-- parameter json.dev:admin_aks_gpu_sku_test_prod_override -->`admin_aks_gpu_sku_test_prod_override` | `ADMIN_AKS_GPU_SKU_TEST_PROD_OVERRIDE` | O | Y: `"Standard_DS13-2_v2"`<br>J.dev: `"Standard_DS13-2_v2"` | AKS node VM SKU for TEST/PROD |
 | <!-- parameter yaml:admin_aks_nodes_dev_override --><!-- parameter json.dev:admin_aks_nodes_dev_override -->`admin_aks_nodes_dev_override` | `ADMIN_AKS_NODES_DEV_OVERRIDE` | O | Y: `2`<br>J.dev: `2` | AKS system node count for DEV |

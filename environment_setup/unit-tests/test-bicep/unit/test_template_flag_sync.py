@@ -19,6 +19,10 @@ DEFAULTS = {
     "aksSkuTier": "Standard",
     "enableProjectVM": False,
     "updateRbac": False,
+    # Admin VM (bb828096) and private Azure MCP (394825ae) shipped in yaml/env only;
+    # JSON mode (v1.25+) needs the same keys and defaults in variables.json.
+    "adminVMSize": "Standard_D2s_v5",
+    "enableAzureMcpServer": False,
     **{key: True for key in (
         "skipDiagAISearch", "skipDiagAIServices", "skipDiagAOAI",
         "skipDiagContentSafety", "skipDiagDocIntelligence", "skipDiagSpeech", "skipDiagVision",
@@ -27,6 +31,7 @@ DEFAULTS = {
 ENV_NAMES = {
     "enablePersonas": "ENABLE_PERSONAS", "aksSkuTier": "AKS_SKU_TIER",
     "enableProjectVM": "ENABLE_PROJECT_VM", "updateRbac": "UPDATE_RBAC",
+    "adminVMSize": "ADMIN_VM_SIZE", "enableAzureMcpServer": "ENABLE_AZURE_MCP_SERVER",
     "skipDiagAISearch": "SKIP_DIAG_AI_SEARCH", "skipDiagAIServices": "SKIP_DIAG_AI_SERVICES",
     "skipDiagAOAI": "SKIP_DIAG_AOAI", "skipDiagContentSafety": "SKIP_DIAG_CONTENT_SAFETY",
     "skipDiagDocIntelligence": "SKIP_DIAG_DOC_INTELLIGENCE",
