@@ -45,6 +45,10 @@ REVERSE_LINKS = {
     "microsoft.network/networkinterfaces": ("virtualMachine", "privateEndpoint", "privateLinkService"),
     "microsoft.network/publicipaddresses": ("ipConfiguration",),
     "microsoft.compute/disks": ("managedBy", "managedByExtended"),
+    "microsoft.network/networksecuritygroups": ("networkInterfaces", "subnets"),
+    "microsoft.network/virtualnetworks/subnets": ("ipConfigurations", "ipConfigurationProfiles", "privateEndpoints",
+                                                  "serviceAssociationLinks", "resourceNavigationLinks",
+                                                  "applicationGatewayIPConfigurations"),
 }
 MAX_DOCUMENT = 8 * 1024 * 1024
 RECEIPT_REPLACE_ATTEMPTS = 20
@@ -1742,12 +1746,23 @@ def _without_deleted_children(body, removed):
 
 def _without_removed_backlinks(body, removed):
     """ARM drops a back-reference once its dependent is deleted; nothing else may change."""
+    def gone(value):
+        references = resource_references([value])
+        return bool(references) and all(any(ref == item or ref.startswith(item + "/") for item in removed)
+                                        for ref in references)
+
     result = copy.deepcopy(body)
     for field in REVERSE_LINKS.get(str(body.get("type", "")).lower(), ()):
         for holder in (result, result.get("properties") if isinstance(result.get("properties"), dict) else {}):
-            references = resource_references([holder.get(field)])
-            if references and all(any(ref == item or ref.startswith(item + "/") for item in removed)
-                                  for ref in references):
+            value = holder.get(field)
+            if isinstance(value, list):
+                # A list of dependents loses exactly the entries whose dependent was deleted.
+                kept = [entry for entry in value if not gone(entry)]
+                if kept:
+                    holder[field] = kept
+                else:
+                    holder.pop(field)
+            elif gone(value):
                 holder.pop(field)
     return result
 

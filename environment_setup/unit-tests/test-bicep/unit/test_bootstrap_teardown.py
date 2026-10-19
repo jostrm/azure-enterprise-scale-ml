@@ -17,7 +17,7 @@ import pytest
 from .test_factory_lifecycle import fl, GROUP, COMMON, OWNER, RESOURCE, SUB, TENANT, IDENTITY, workspace, no_real_services
 from .test_factory_deletion_access_hub import (
     HubCloud, untagged, CORE, VNET, GATEWAY, BASTION, RUNNER, NIC, DISK, IDENTITY_ID, ZONE, LINK, HUB_ROOTS,
-    COMMON_IP, PROJECT_SUBNET,
+    COMMON_IP, PROJECT_SUBNET, GATEWAY_SUBNET,
 )
 from .test_selective_project_deletion import VAULT, tagged
 
@@ -39,6 +39,7 @@ DEPLOYMENT_PRINCIPAL = "31f7a62d-75c5-4dc3-89cb-7ea52829be9b"
 NSG = COMMON + "/providers/Microsoft.Network/networkSecurityGroups/nsg-snet-esml-cmn-001"
 NSG_RULE = NSG + "/securityRules/allow_vnet_inbound"
 ROLE = COMMON + "/providers/Microsoft.Authorization/roleAssignments/5fc13df3-76b7-539e-8d42-af87d71d1f61"
+RUNNER_NSG = COMMON + "/providers/Microsoft.Network/networkSecurityGroups/runner-gha-sdc-dev-001-nsg"
 
 
 class TeardownCloud(HubCloud):
@@ -73,16 +74,27 @@ class TeardownCloud(HubCloud):
                                                  {"access": "Allow"})
         self.bodies[ROLE.lower()] = untagged(ROLE, "Microsoft.Authorization/roleAssignments",
                                              {"principalId": DEPLOYMENT_PRINCIPAL, "scope": COMMON})
+        # Real ARM back-references: the runner NSG lists its NIC, the gateway subnet lists the
+        # gateway's IP configuration, while both of those point forward at the NSG/subnet.
+        self.bodies[RUNNER_NSG.lower()] = tagged(RUNNER_NSG, "Microsoft.Network/networkSecurityGroups", CORE,
+                                                 {"networkInterfaces": [{"id": NIC}]})
+        self.bodies[NIC.lower()]["properties"]["networkSecurityGroup"] = {"id": RUNNER_NSG}
+        self.bodies[GATEWAY_SUBNET.lower()]["properties"]["ipConfigurations"] = [
+            {"id": GATEWAY + "/ipConfigurations/default"}]
 
     def arm(self, method, resource_id, api_version, allowed=(200,), headers=None):
         result = super().arm(method, resource_id, api_version, allowed, headers)
         if method == "DELETE":
-            # Like ARM, a deleted peering leaves its VNet's inline peering list.
+            # Like ARM, a deleted dependent leaves the back-reference lists that named it.
+            gone = resource_id.lower()
             for body in self.bodies.values():
-                peerings = (body.get("properties") or {}).get("virtualNetworkPeerings")
-                if isinstance(peerings, list):
-                    body["properties"]["virtualNetworkPeerings"] = [
-                        row for row in peerings if row["id"].lower() != resource_id.lower()]
+                properties = body.get("properties") or {}
+                for field in ("virtualNetworkPeerings", "networkInterfaces", "ipConfigurations"):
+                    rows = properties.get(field)
+                    if isinstance(rows, list) and not (field == "ipConfigurations"
+                                                       and "/subnets/" not in body["id"].lower()):
+                        properties[field] = [row for row in rows if not (
+                            row.get("id", "").lower() == gone or row.get("id", "").lower().startswith(gone + "/"))]
         return result
 
 
@@ -219,6 +231,8 @@ def test_operator_unlinks_its_hub_links_first_then_deletes_groups_last(workspace
     assert deleted[:3] == sorted([OWN_HUB_LINK.lower(), OWN_PEERING.lower(), SPOKE_PEERING.lower()])
     assert deleted[-1] in (GROUP.lower(), COMMON.lower()) and deleted[-2] in (GROUP.lower(), COMMON.lower())
     assert deleted.index(RUNNER.lower()) < deleted.index(NIC.lower())
+    assert deleted.index(NIC.lower()) < deleted.index(RUNNER_NSG.lower())
+    assert deleted.index(GATEWAY.lower()) < deleted.index(GATEWAY_SUBNET.lower())
     assert {SPIDER_HUB_LINK.lower(), SPIDER_PEERING.lower(), HUB_ZONE.lower(), HUB_VNET.lower(), HUB.lower()} <= set(cloud.bodies)
     assert not any(key.startswith((COMMON.lower(), GROUP.lower())) for key in cloud.bodies)
     assert json.loads((run / "receipt.json").read_text()) == receipt
