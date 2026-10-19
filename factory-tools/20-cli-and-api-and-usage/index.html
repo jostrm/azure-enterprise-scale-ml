@@ -2952,7 +2952,10 @@ approval to delete the whole group: inspect its <code>delete</code> and <code>re
 <h3 id="e-delete-the-whole-factory-separate-named-operation">E. Delete the whole factory — separate named operation<a class="headerlink" href="#e-delete-the-whole-factory-separate-named-operation" title="Permanent link">&para;</a></h3>
 <p><strong>Whole resource groups are deleted. Selective retention inside them is not
 implemented.</strong> Protected hub/VPN/platform/bootstrap resources, coordination
-storage, the executing identity and private runners must be outside them.
+storage, the executing identity and private runners must be outside them. The one exception is a factory-owned integrated hub (VPN gateway, Bastion, DNS
+private resolver) and private runner that the factory's own bootstrap created in
+its own groups: those go only with bootstrap proof (<code>deletion_plan.access_hubs</code>).
+Connectivity hub resource groups and shared hubs are never deleted.
 Entra security groups and Git repositories/history stay. Key Vault purge is
 not performed; other external dependencies need separate review.</p>
 <p>Execution is <strong>conditional</strong> on named ordered-pipeline support and <strong>Blob</strong>
@@ -2962,6 +2965,13 @@ No automatic mode change occurs. All registered project GHA <strong>or ADO</stro
 deletion pipelines must finish in every environment before shared groups are
 removed; starting a pipeline is not success. Local configuration is removed
 only after verified completion.</p>
+<p>A <strong>never-enrolled bootstrap draft</strong> (no registered ownership, no lease store or
+pipeline) instead gets a <code>bootstrap-operator-teardown-v1</code> plan from the same
+prepare. It is <strong>conditional</strong> on an API and published runtime that advertise
+<code>bootstrap_operator_teardown</code>, needs no Blob coordination or pipelines, and is
+executed by the operator: it first removes only the factory's own DNS links and
+peerings inside the configured connectivity hub, then deletes the bootstrap-proven
+groups, groups last. A failed run keeps the draft; prepare again from fresh inventory.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nv">$ConfirmFamily</span> <span class="p">=</span> <span class="s1">'delete-aifactory'</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nv">$ExpectedMode</span> <span class="p">=</span> <span class="s1">'runtime'</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nv">$Preview</span> <span class="p">=</span> <span class="nb">Invoke-FactoryJson</span> <span class="p">@(</span><span class="s1">'delete-aifactory'</span><span class="p">,</span> <span class="s1">'prepare'</span><span class="p">,</span> <span class="s1">'--folder'</span><span class="p">,</span> <span class="nv">$Folder</span><span class="p">,</span>
@@ -3329,7 +3339,10 @@ inspect the exact delete/retain manifest.</p>
 <h3 id="e-delete-the-whole-factory-named-operation-and-plan-validation">E. Delete the whole factory — named operation and plan validation<a class="headerlink" href="#e-delete-the-whole-factory-named-operation-and-plan-validation" title="Permanent link">&para;</a></h3>
 <p><strong>Whole-group deletion cannot retain selected resources inside a deleted
 group.</strong> Reusable hub/VPN/platform/bootstrap resources, coordination storage,
-the executing identity and private runners must be outside those groups.
+the executing identity and private runners must be outside those groups. The one exception is a factory-owned integrated hub (VPN gateway, Bastion, DNS
+private resolver) and private runner that the factory's own bootstrap created in
+its own groups: those go only with bootstrap proof (<code>deletion_plan.access_hubs</code>).
+Connectivity hub resource groups and shared hubs are never deleted.
 Entra groups and Git repositories/history stay. No Key Vault purge occurs;
 other external dependencies need separate review.</p>
 <p>Execution is <strong>conditional</strong> on named ordered-pipeline support and <strong>Blob</strong>
@@ -3338,6 +3351,13 @@ contract; installing a newer SDK does not upgrade it. Do not switch mode to
 bypass a blocker. Every registered project's <strong>GHA or ADO</strong> deletion pipeline
 in every environment must complete before shared-group removal. Configuration
 cleanup follows verified success, not merely pipeline submission.</p>
+<p>A <strong>never-enrolled bootstrap draft</strong> (no registered ownership, no lease store or
+pipeline) instead gets a <code>bootstrap-operator-teardown-v1</code> plan from the same
+prepare. It is <strong>conditional</strong> on an API and published runtime that advertise
+<code>bootstrap_operator_teardown</code>, needs no Blob coordination or pipelines, and is
+executed by the operator: it first removes only the factory's own DNS links and
+peerings inside the configured connectivity hub, then deletes the bootstrap-proven
+groups, groups last. A failed run keeps the draft; prepare again from fresh inventory.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">body</span> <span class="o">=</span> <span class="p">{</span>
 <a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>    <span class="s2">"contract_version"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"folder"</span><span class="p">:</span> <span class="n">folder</span><span class="p">,</span>
 <a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>    <span class="s2">"factory_id"</span><span class="p">:</span> <span class="n">factory_id</span><span class="p">,</span> <span class="s2">"expected_revision"</span><span class="p">:</span> <span class="n">revision</span><span class="p">,</span>
@@ -3707,7 +3727,10 @@ alone is not approval to delete that group.</p>
 <h3 id="e-delete-the-whole-factory-separate-named-operation_1">E. Delete the whole factory — separate named operation<a class="headerlink" href="#e-delete-the-whole-factory-separate-named-operation_1" title="Permanent link">&para;</a></h3>
 <p><strong>Whole-group deletion cannot preserve selected resources inside deleted
 groups.</strong> Protected hub/VPN/platform/bootstrap resources, coordination
-storage, the executing identity and private runners must be outside them.
+storage, the executing identity and private runners must be outside them. The one exception is a factory-owned integrated hub (VPN gateway, Bastion, DNS
+private resolver) and private runner that the factory's own bootstrap created in
+its own groups: those go only with bootstrap proof (<code>deletion_plan.access_hubs</code>).
+Connectivity hub resource groups and shared hubs are never deleted.
 Entra groups and Git repositories/history stay. No Key Vault purge occurs;
 other external dependencies need separate review.</p>
 <p>Execution is <strong>conditional</strong> on named ordered-pipeline support and <strong>Blob</strong>
@@ -3716,6 +3739,13 @@ contract; client publication does not upgrade it. No automatic mode change
 occurs. Every registered project <strong>GHA or ADO</strong> pipeline in every environment
 must finish before shared-group removal. Configuration cleanup follows
 verified completion, not simply pipeline submission.</p>
+<p>A <strong>never-enrolled bootstrap draft</strong> (no registered ownership, no lease store or
+pipeline) instead gets a <code>bootstrap-operator-teardown-v1</code> plan from the same
+prepare. It is <strong>conditional</strong> on an API and published runtime that advertise
+<code>bootstrap_operator_teardown</code>, needs no Blob coordination or pipelines, and is
+executed by the operator: it first removes only the factory's own DNS links and
+peerings inside the configured connectivity hub, then deletes the bootstrap-proven
+groups, groups last. A failed run keeps the draft; prepare again from fresh inventory.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>jq<span class="w"> </span>-n<span class="w"> </span>--arg<span class="w"> </span>folder<span class="w"> </span><span class="s2">"</span><span class="nv">$folder</span><span class="s2">"</span><span class="w"> </span>--arg<span class="w"> </span>factory<span class="w"> </span><span class="s2">"</span><span class="nv">$factory_id</span><span class="s2">"</span><span class="w"> </span>--arg<span class="w"> </span>revision<span class="w"> </span><span class="s2">"</span><span class="nv">$revision</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="w">  </span><span class="s1">'{contract_version:1, folder:$folder, factory_id:$factory, expected_revision:$revision}'</span><span class="w"> </span>&gt;<span class="w"> </span><span class="s2">"</span><span class="nv">$request_path</span><span class="s2">"</span>
 <a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a><span class="nv">prepare_route</span><span class="o">=</span>/api/v1/operations/delete-aifactory/prepare
