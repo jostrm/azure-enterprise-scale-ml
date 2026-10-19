@@ -18,14 +18,18 @@ steps, and only when at least one flag is `true` and no delete-all flag is set.
 - **Dependencies are validated, never ignored:** the MCP requires `enableContainerApps` and
   `enableAIFoundry` plus digest-pinned `aifactoryMcpImage`/`aifactoryMcpApiImage` and
   `aifactoryMcpEntraAppId`; the gateway requires `enableAIFoundry`; registration requires both
-  and outbound VNet integration (`aiGatewaySkuOutboundSubnetId`, or an adopted gateway that has it).
+  and outbound VNet integration (`aiGatewaySkuOutboundSubnetId`, or an existing owned/adopted
+  gateway that has it).
 - Gateway-only runs discover the Foundry account without requiring MCP images, a Foundry project,
   model deployments, Search, storage or Container Apps. MCP-enabled runs retain those checks.
 - Registration rejects missing outbound integration before gateway/MCP writes. An explicitly
   requested subnet must match an existing binding; this step never migrates it to another subnet.
   A read-only plan includes an owned gateway's planned subnet configuration without applying it.
-  A new gateway's missing subnet parameter is rejected offline, before any Azure calls.
-  An explicitly adopted gateway may use its read-validated existing subnet without that parameter.
+  Omitting the optional gateway ID still selects its deterministic owned name, which may exist.
+  A read distinguishes reuse from creation; an existing owned/adopted gateway may supply its
+  read-validated subnet without the parameter. Missing integration fails before any mutation,
+  not necessarily before reads. Invalid offline flag combinations and ID formats still fail
+  before any Azure calls.
 - **`false` never deletes.** Turning a flag off skips the step; existing resources stay.
 - **Ownership.** Writes only target resources tagged `aifactory-integration: mcp-ai-gateway`
   (or the tool server carrying its managed-by marker). A foreign resource with a derived name is

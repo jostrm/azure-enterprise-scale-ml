@@ -168,8 +168,6 @@ def decide(request: IntegrationRequest) -> Decision:
         problems.append("deleteAllServicesForProject/deleteAllForProject conflict with enabled MCP & AI Gateway options")
     if request.add_mcp_to_gateway and not (request.enable_mcp and request.enable_gateway):
         problems.append("addAIFactoryMCP2AIGatewaySKU requires enableAIFactoryMCP=true and enableAIGatewaySKU=true")
-    if request.add_mcp_to_gateway and not request.gateway_resource_id and not request.gateway_subnet_id:
-        problems.append("registering MCP to a new AI Gateway requires aiGatewaySkuOutboundSubnetId")
     if request.enable_mcp and not (request.enable_container_apps and request.enable_ai_foundry):
         problems.append("enableAIFactoryMCP requires enableContainerApps=true and enableAIFoundry=true")
     if request.enable_gateway and not request.enable_ai_foundry:
@@ -388,6 +386,7 @@ class McpGatewayIntegration:
 
     def _gateway(self, request, target, resource_names, report, apply) -> dict | None:
         gateway_id = resource_names["gateway_id"]
+        # The deterministic name may already exist even without an explicit adoption ID.
         gateway = _optional(self.session, gateway_id, GATEWAY_API)
         adopted = bool(request.gateway_resource_id)
         if gateway is None:

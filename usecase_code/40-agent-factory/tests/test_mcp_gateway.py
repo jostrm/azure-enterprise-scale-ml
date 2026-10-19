@@ -169,7 +169,7 @@ class DecisionTests(unittest.TestCase):
             ({"aifactoryMcpEntraAppId": ""}, "aifactoryMcpEntraAppId"),
             ({"deleteAllForProject": "true"}, "conflict"),
             ({"aiGatewaySkuResourceId": "/subscriptions/x/gateway"}, "aiGatewaySkuResourceId"),
-            ({"aiGatewaySkuOutboundSubnetId": ""}, "aiGatewaySkuOutboundSubnetId"),
+            ({"aiGatewaySkuOutboundSubnetId": "not-a-subnet-resource-id"}, "aiGatewaySkuOutboundSubnetId"),
         ):
             with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, message):
                 integration.run(request(**changes), apply=True)
@@ -289,7 +289,42 @@ class IntegrationTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "aiGatewaySkuOutboundSubnetId"):
                     gw.McpGatewayIntegration(arm, sleep=lambda _: None).run(
                         request(aiGatewaySkuOutboundSubnetId=""), apply=apply)
-                self.assertEqual(0, len(arm.calls))
+                self.assertEqual([], arm.writes())
+                self.assertTrue(any(call[0] == "GET" and call[1] == gw.names(request())["gateway_id"]
+                                    for call in arm.calls))
+
+    def test_implicit_owned_gateway_reuses_existing_subnet_when_optional_parameters_are_omitted(self):
+        for apply in (False, True):
+            with self.subTest(apply=apply):
+                arm = FakeArm()
+                integration = gw.McpGatewayIntegration(arm, sleep=lambda _: None, token=lambda: "key")
+                integration.run(request(), apply=True)
+                gateway_id = gw.names(request())["gateway_id"]
+                arm.calls.clear()
+
+                result = integration.run(request(aiGatewaySkuResourceId="", aiGatewaySkuOutboundSubnetId=""),
+                                         apply=apply)
+
+                self.assertEqual("apply" if apply else "plan", result["mode"])
+                self.assertEqual(gateway_id, result["outputs"]["gateway_id"])
+                self.assertTrue(any(call[0] == "GET" and call[1] == gateway_id for call in arm.calls))
+                self.assertFalse(any(call[0] in {"PUT", "PATCH"} and call[1] == gateway_id for call in arm.calls))
+                self.assertEqual(SUBNET, arm.resources[gateway_id.lower()]["properties"]
+                                 ["virtualNetworkConfiguration"]["subnetResourceId"])
+                if not apply:
+                    self.assertEqual([], arm.writes())
+
+    def test_implicit_owned_gateway_without_any_subnet_fails_before_writes(self):
+        gateway_id = gw.names(request())["gateway_id"]
+        for apply in (False, True):
+            with self.subTest(apply=apply):
+                arm = FakeArm({gateway_id: {
+                    "id": gateway_id, "sku": {"name": "AIGateway"}, "tags": dict(gw.OWNER_TAGS),
+                    "identity": {"principalId": guid(7)}, "properties": {},
+                }})
+                with self.assertRaisesRegex(ValueError, "outbound VNet integration"):
+                    gw.McpGatewayIntegration(arm).run(request(aiGatewaySkuOutboundSubnetId=""), apply=apply)
+                self.assertEqual([], arm.writes())
 
     def test_adopted_gateway_can_use_its_existing_subnet_without_a_parameter(self):
         arm = FakeArm()
