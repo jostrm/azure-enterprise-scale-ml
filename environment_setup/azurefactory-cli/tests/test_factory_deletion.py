@@ -713,3 +713,85 @@ def test_unproven_or_changed_access_hub_is_rejected_before_confirmation(tmp_path
     rehash(plan)
     assert prepare(tmp_path) == 2
     assert not (tmp_path / "receipt.json").exists()
+
+
+TEARDOWN = "bootstrap-operator-teardown-v1"
+HUB_GROUP = "/subscriptions/abababab-abab-4bab-8bab-abababababab/resourceGroups/aifactory-connectivity"
+SPOKE_VNET = GROUP + "/providers/Microsoft.Network/virtualNetworks/vnt-esmlcmn-sdc-dev-001"
+HUB_DNS_LINK = (HUB_GROUP + "/providers/Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net"
+                "/virtualNetworkLinks/aif-4d8896b66f23")
+SPOKE_SIDE = SPOKE_VNET + "/virtualNetworkPeerings/aif-5eb3f21fdde8"
+HUB_VNET_ID = HUB_GROUP + "/providers/Microsoft.Network/virtualNetworks/vnet-aifactory-access-hub-sdc-001"
+
+
+def teardown_policy():
+    return {**retention_policy(), "required_execution_contract": TEARDOWN,
+            "limitations": ["Only this factory's own hub links are removed; the hub stays."]}
+
+
+def with_teardown(transport):
+    """dc-batman4 shape: a never-enrolled bootstrap draft, unlinked from the shared hub, then torn down."""
+    preview = transport.preview
+    deleted = [GROUP, RESOURCE, SPOKE_VNET, SPOKE_SIDE]
+    identity = {"factory_id": FACTORY, "scale_set_id": SCALE, "environment": "dev",
+                "subscription_id": SUBSCRIPTION, "tenant_id": TENANT, "run_id": JOB}
+    plan = {"contract": TEARDOWN, "factory_id": FACTORY, "source_commit": "b" * 40,
+            "policy": "unlink-hub-then-whole-groups", "retention_policy": teardown_policy(), "executor": "operator",
+            "stages": [
+                {"id": "unlink:" + SCALE, "kind": "unlink-hub", **identity, "depends_on": [], "links": [
+                    {"id": HUB_DNS_LINK, "side": "hub", "remote_virtual_network_id": SPOKE_VNET.lower()},
+                    {"id": SPOKE_SIDE, "side": "factory", "remote_virtual_network_id": HUB_VNET_ID.lower()}]},
+                {"id": "teardown:" + SCALE, "kind": "operator-teardown", **identity, "resource_group_ids": [GROUP],
+                 "delete": sorted(deleted, key=str.casefold), "depends_on": ["unlink:" + SCALE]}],
+            "protected_resources": [HUB_GROUP], "retained_resources": [], "access_hubs": [],
+            "bootstrap_evidence": [{"scale_set_id": SCALE, "workflow_id": JOB, "record_hash": "e" * 64}]}
+    preview["deletion_targets"] = [{**preview["deletion_targets"][0], "delete": sorted(deleted, key=str.casefold)}]
+    preview["inventory"] = [{"resource_id": item, "dependencies": []} for item in deleted]
+    preview["retained_resources"] = [HUB_GROUP]
+    preview["deletion_retention_policy"] = teardown_policy()
+    preview["target"]["projects"] = []
+    preview["deletion_plan"] = plan
+    return plan
+
+
+def test_operator_teardown_plan_is_reviewed_and_rendered(tmp_path, transport, capsys):
+    rehash(with_teardown(transport))
+    assert prepare(tmp_path) == 0, capsys.readouterr().err
+    output = capsys.readouterr().err
+    assert "unlink-hub" in output and HUB_DNS_LINK in output and "operator" in output
+
+
+@pytest.mark.parametrize("defect", ["hub-link-outside-hub", "factory-side-remote-foreign", "teardown-deletes-hub",
+                                    "missing-unlink", "hash", "foreign-dns-link", "unknown-contract"])
+def test_broadened_or_changed_operator_teardown_is_rejected(tmp_path, transport, defect):
+    plan = with_teardown(transport)
+    unlink, stage = plan["stages"]
+    if defect == "hub-link-outside-hub":
+        unlink["links"][0]["id"] = HUB_DNS_LINK.replace("aifactory-connectivity", "other-hub")
+    elif defect == "factory-side-remote-foreign":
+        unlink["links"][1]["remote_virtual_network_id"] = SPOKE_VNET.lower().replace("rg-factory-dev", "spider")
+    elif defect == "teardown-deletes-hub":
+        stage["delete"].append(HUB_GROUP)
+    elif defect == "missing-unlink":
+        plan["stages"] = [stage]
+    elif defect == "foreign-dns-link":
+        unlink["links"][0]["remote_virtual_network_id"] = "/subscriptions/x/resourcegroups/spider/providers/microsoft.network/virtualnetworks/v"
+    elif defect == "unknown-contract":
+        plan["contract"] = "raw-group-delete"
+    if defect != "hash":
+        rehash(plan)
+    else:
+        plan["retained_resources"] = [HUB_GROUP]
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()
+
+
+def test_dns_resolver_is_connectivity_in_a_pipeline_plan(tmp_path, transport):
+    resolver = GROUP + "/providers/Microsoft.Network/dnsResolvers/dnspr-874678d6611d"
+    plan = with_access_hub(transport, deleted=(VPN, RUNNER))
+    common = plan["stages"][1]
+    common["delete"].append(resolver)
+    transport.preview["deletion_targets"][0]["delete"].append(resolver)
+    transport.preview["inventory"].append({"resource_id": resolver, "dependencies": []})
+    rehash(plan)
+    assert prepare(tmp_path) == 2

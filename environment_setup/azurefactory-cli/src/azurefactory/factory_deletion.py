@@ -29,8 +29,16 @@ PROTECTED_TYPES = {
     "microsoft.network/virtualhubs", "microsoft.network/virtualwans", "microsoft.network/bastionhosts",
     "microsoft.network/expressroutecircuits", "microsoft.network/connections", "microsoft.network/p2svpngateways",
     "microsoft.network/vpnserverconfigurations", "microsoft.network/localnetworkgateways",
+    "microsoft.network/dnsresolvers", "microsoft.network/dnsforwardingrulesets",
 }
-HUB_TYPES = {"microsoft.network/virtualnetworkgateways", "microsoft.network/bastionhosts"}
+HUB_TYPES = {"microsoft.network/virtualnetworkgateways", "microsoft.network/bastionhosts",
+             "microsoft.network/dnsresolvers", "microsoft.network/dnsforwardingrulesets"}
+# A never-enrolled bootstrap factory is unlinked from its hub, then torn down by the operator.
+TEARDOWN_CONTRACT = "bootstrap-operator-teardown-v1"
+TEARDOWN_POLICY = "unlink-hub-then-whole-groups"
+LINK_TYPES = {"microsoft.network/privatednszones/virtualnetworklinks",
+              "microsoft.network/dnsforwardingrulesets/virtualnetworklinks",
+              "microsoft.network/virtualnetworks/virtualnetworkpeerings"}
 
 
 def _contains(parent: str, child: str) -> bool:
@@ -40,6 +48,86 @@ def _contains(parent: str, child: str) -> bool:
 def _arm_type(identifier: str) -> str:
     segments = identifier.lower().split("/providers/", 1)
     return "/".join(segments[1].split("/")[:2]) if len(segments) == 2 else ""
+
+
+def _full_type(identifier: str) -> str:
+    segments = identifier.lower().split("/providers/", 1)
+    if len(segments) != 2:
+        return "microsoft.resources/resourcegroups"
+    parts = segments[1].split("/")
+    return "/".join([parts[0], *parts[1::2]])
+
+
+def _plan_hash(plan, invalid):
+    try:
+        # The API's catalog_storage.digest uses indented UTF-8 JSON plus a newline, not receipt hashing.
+        encoded = (json.dumps({key: value for key, value in plan.items() if key != "plan_hash"},
+                              ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n").encode("utf-8")
+    except (TypeError, ValueError, UnicodeError):
+        invalid("the ordered pipeline plan is not strict UTF-8 JSON")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def validate_teardown_plan(plan: Any, factory_id: str, scales: dict[str, Any], targets: list[dict[str, Any]]):
+    """Client-side recheck of the server's hashed operator teardown; never a local deletion plan."""
+    def invalid(reason):
+        raise ConfigError("Unsafe or incompatible factory teardown plan: " + reason
+                          + ". Only this factory's own hub links and frozen groups may go; no local fallback.")
+
+    if (not isinstance(plan, dict) or plan.get("contract") != TEARDOWN_CONTRACT
+            or plan.get("factory_id") != factory_id or plan.get("policy") != TEARDOWN_POLICY
+            or plan.get("executor") != "operator" or not _hash(plan.get("plan_hash"))
+            or _plan_hash(plan, invalid) != plan["plan_hash"]
+            or plan.get("retained_resources") != [] or plan.get("access_hubs") != []
+            or not isinstance(plan.get("source_commit"), str) or not re.fullmatch(r"[0-9a-f]{40}", plan["source_commit"])):
+        invalid("missing, modified or broadened bootstrap-operator-teardown-v1 plan")
+    protected, stages = plan.get("protected_resources"), plan.get("stages")
+    if (not isinstance(protected, list) or any(not _text(item) or not item.lower().startswith("/subscriptions/")
+                                               for item in protected)
+            or not isinstance(stages, list) or len(stages) != 2 * len(scales)
+            or any(not isinstance(stage, dict) for stage in stages)):
+        invalid("every scale set needs exactly one unlink and one teardown stage")
+    reviewed = {entry.lower() for target in targets for entry in target["delete"]}
+    deleted, seen = set(), set()
+    for unlink, stage in zip(stages[0::2], stages[1::2]):
+        scale = scales.get(unlink.get("scale_set_id"))
+        if (scale is None or scale["id"] in seen or stage.get("scale_set_id") != scale["id"]
+                or unlink.get("kind") != "unlink-hub" or stage.get("kind") != "operator-teardown"
+                or unlink.get("depends_on") != [] or stage.get("depends_on") != [unlink.get("id")]
+                or any(item.get("factory_id") != factory_id
+                       or any(item.get(field) != scale[field] for field in ("environment", "subscription_id", "tenant_id"))
+                       for item in (unlink, stage))):
+            invalid("a teardown stage changed its scale set, identity or order")
+        seen.add(scale["id"])
+        groups = stage.get("resource_group_ids")
+        removed = [entry for entry in stage.get("delete", []) if _text(entry)]
+        lowered = {entry.lower() for entry in removed}
+        if (not isinstance(groups, list) or len(lowered) != len(stage.get("delete", [])) or lowered & deleted
+                or not all(any(_contains(group, entry) for group in groups) for entry in removed)
+                or any(_contains(keep, entry) or _contains(entry, keep) for entry in removed for keep in protected)):
+            invalid("teardown deletions escape the frozen groups or overlap protected connectivity")
+        deleted |= lowered
+        vnets = {entry for entry in lowered if _full_type(entry) == "microsoft.network/virtualnetworks"}
+        for link in unlink.get("links", []):
+            identifier = link.get("id") if isinstance(link, dict) else None
+            remote = str(link.get("remote_virtual_network_id", "")).lower() if isinstance(link, dict) else ""
+            if not (_text(identifier) and _full_type(identifier) in LINK_TYPES and (
+                    link.get("side") == "hub" and remote in vnets
+                    and any(_contains(keep, identifier) for keep in protected)
+                    or link.get("side") == "factory" and identifier.lower() in lowered
+                    and any(_contains(keep, remote) for keep in protected))):
+                invalid("an unlink entry is not this factory's own link inside a configured connectivity hub")
+    if seen != set(scales) or deleted != reviewed:
+        invalid("teardown stages must cover every reviewed deletion exactly once")
+    return plan
+
+
+def describe_teardown_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    return [{"Stage": stage["id"], "Kind": stage["kind"], "Environment": stage["environment"],
+             "Executor": plan["executor"], "Waits for": stage["depends_on"],
+             **({"Removes hub links": [link["id"] for link in stage["links"]]} if stage["kind"] == "unlink-hub"
+                else {"Resource groups": stage["resource_group_ids"], "Deletes": stage["delete"]})}
+            for stage in plan["stages"]]
 
 
 def validate_deletion_plan(plan: Any, factory_id: str, scales: dict[str, Any], factory: dict[str, Any],
@@ -220,15 +308,16 @@ def validate_deletion_preview(request: dict[str, Any], preview: Any) -> None:
             or preview.get("retain_saved_configuration") is not False):
         invalid("the backend did not prove whole-factory scope, Entra preservation and saved configuration handling")
     policy = preview.get("deletion_retention_policy")
+    contract = policy.get("required_execution_contract") if isinstance(policy, dict) else None
     if (not isinstance(policy, dict) or policy.get("mode") != "preserve-reusable-infrastructure"
-            or policy.get("required_execution_contract") != PLAN_CONTRACT
+            or contract not in (PLAN_CONTRACT, TEARDOWN_CONTRACT)
             or policy.get("execution_scope") != "whole-resource-groups"
             or policy.get("selective_retention_supported") is not False
             or not isinstance(policy.get("limitations"), list) or not policy["limitations"]
             or any(not _text(item) for item in policy["limitations"])):
         invalid("the API must explicitly acknowledge its whole-group retention policy and limitations")
     plan = preview.get("deletion_plan")
-    if (not isinstance(plan, dict) or plan.get("contract") != PLAN_CONTRACT
+    if (not isinstance(plan, dict) or plan.get("contract") != contract
             or canonical_json_hash(plan.get("retention_policy")) != canonical_json_hash(policy)):
         invalid("retention policy differs from the server execution plan")
     factory = preview.get("target")
@@ -299,7 +388,9 @@ def validate_deletion_preview(request: dict[str, Any], preview: Any) -> None:
         retained.update(members["retain"])
     if covered != set(scales):
         invalid("the manifest does not cover every scale set of the whole factory")
-    plan = validate_deletion_plan(preview.get("deletion_plan"), request["factory_id"], scales, factory, targets)
+    plan = (validate_teardown_plan(preview.get("deletion_plan"), request["factory_id"], scales, targets)
+            if contract == TEARDOWN_CONTRACT else
+            validate_deletion_plan(preview.get("deletion_plan"), request["factory_id"], scales, factory, targets))
     for field in ("protected_resources", "retained_resources"):
         entries = plan.get(field)
         if not isinstance(entries, list):

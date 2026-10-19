@@ -1515,6 +1515,15 @@ service-managed lifecycle, project resources, then project network.
 Pipeline success and verified absence of the exact resources are both required.
 Configuration references alone do not establish actual inventory or preservation.
 
+A factory that its Full bootstrap created but that was never registered or enrolled
+(a catalog draft with no lease store or pipeline, such as dc-batman4) gets a
+`bootstrap-operator-teardown-v1` plan from the same `delete-aifactory prepare`. Its
+`unlink-hub` stage removes only this factory's own private DNS links and both sides of
+its peerings inside the configured connectivity hub; the `operator-teardown` stage then
+deletes the bootstrap-proven groups in dependency order, groups last. The CLI and SDK
+reject any link outside a protected hub, any deletion that touches the hub, and any
+change after the plan hash. Verified absence removes the draft from the catalog.
+
 `deletion_plan.access_hubs` is `[]` unless the factory's own groups hold a
 **factory-owned integrated access hub** (`factory-owned-access-hub-v1`): the VPN
 gateway, Bastion, DNS resolver, private DNS zones or private runner that its
