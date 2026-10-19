@@ -4,6 +4,7 @@ status: observed
 sources:
   - bootstrap/lib/factory_lifecycle.py
   - bootstrap/lib/factory_lifecycle_contract.txt
+  - bootstrap/lib/factory_deletion_pipeline.py
   - bootstrap/lib/factory_enrollment.py
   - bootstrap/lib/provider_repository_state.py
   - environment_setup/azurefactory-cli/src/azurefactory/factory_deletion.py
@@ -14,6 +15,8 @@ tests:
   - environment_setup/unit-tests/test-bicep/unit/test_factory_lifecycle.py
   - environment_setup/unit-tests/test-bicep/unit/test_factory_lifecycle_bootstrap_handoff.py
   - environment_setup/unit-tests/test-bicep/unit/test_selective_project_deletion.py
+  - environment_setup/unit-tests/test-bicep/unit/test_factory_deletion_pipeline.py
+  - environment_setup/unit-tests/test-bicep/unit/test_factory_deletion_access_hub.py
   - environment_setup/azurefactory-cli/tests/test_factory_deletion.py
   - usecase_code/40-agent-factory/40-aifactory-agent/tests/test_operations.py
   - environment_setup/unit-tests/test-bicep/unit/test_project_deletion_lifecycle.py
@@ -23,7 +26,7 @@ graph_symbols:
   - bootstrap/lib/factory_lifecycle.py::function:execute
   - bootstrap/lib/factory_lifecycle.py::class:BlobLocks
   - bootstrap/lib/factory_lifecycle.py::class:RepositoryCoordination
-reviewed_source: 'a1acd983 + deletion-hardening working tree; observed 2026-10-07'
+reviewed_source: '624b8d0c + factory-owned-access-hub-v1 working tree; observed 2026-10-19'
 ---
 # Lifecycle and recovery
 
@@ -43,6 +46,7 @@ Default coordination uses Blob leases and durable claims/receipts. Explicit sing
 - Partial, interrupted or uncertain results retain durable evidence/claims for reconciliation. Replanning or resubmitting is not a supported way to erase uncertainty.
 - Agent status observation does not reconfirm or continue jobs. Only the approved paused Full bootstrap supports the specific plan-and-observation-bound continuation.
 - Cancelling an unexecuted agent plan does not cancel an already-running underlying job.
+- Whole-factory teardown (`ordered-project-pipelines-v1`, `factory_deletion_pipeline.py`) runs every project stage in the configured GHA/ADO pipeline first, then common teardown from the operator. Reusable VPN/hub/connectivity types stay protected, with one reviewed exception (`factory-owned-access-hub-v1`): an integrated access hub and private runner that the factory's own bootstrap created inside its own common group. The catalog proves it from consumed bootstrap stage records only; the runtime gives covered untagged resources the core owner, still blocks shared/protected tags, owner conflicts, site connections and any DNS zone link or VNet peering to a VNet the cohort does not delete, and tears the hub/runner closure down last. The deployment principal may sit only on that covered common runner/identity because it runs project stages only; the operator identity may sit on nothing in scope.
 
 **Intended rule:** reconcile the observed job, receipt, ownership and inventory before deciding on another reviewed operation. Do not automatically retry uncertain writes, clear claims or perform destructive rollback.
 

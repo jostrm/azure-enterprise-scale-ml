@@ -635,7 +635,7 @@ def cmd_preflight(args):
 
 
 def _deletion_review(preview, folder):
-    from .factory_deletion import describe_deletion_plan
+    from .factory_deletion import describe_access_hubs, describe_deletion_plan
 
     print("Are you sure you want to delete this factory's Azure resources?", file=sys.stderr)
     print("Review the exact deleted and retained resources below. Nothing has been deleted by this command.",
@@ -649,6 +649,8 @@ def _deletion_review(preview, folder):
         "Ordered pipeline plan": {"Contract": plan["contract"], "Policy": plan["policy"],
                                   "Plan fingerprint": plan["plan_hash"], "Pinned source": plan["source_commit"],
                                   "Protected (never deleted)": plan["protected_resources"],
+                                  "Factory-owned access hub (deleted last, after every project pipeline)":
+                                      describe_access_hubs(plan),
                                   "Stages": describe_deletion_plan(plan)},
         "Exact resource manifest (delete / retain)": preview["deletion_targets"],
         "Retained Azure resources": preview["retained_resources"],

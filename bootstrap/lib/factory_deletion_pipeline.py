@@ -12,8 +12,28 @@ from urllib.parse import quote, unquote, urlsplit
 
 
 CONTRACT = "ordered-project-pipelines-v1"
+HUB_CONTRACT = "factory-owned-access-hub-v1"
 DELETE_FLAGS = ("enableDeleteForDisabledResources", "deleteAllServicesForProject",
                 "deleteKeyvaultAlso", "deleteAllForProject")
+# Reusable VPN/hub/connectivity platform types. Only an integrated hub's own VPN gateway and
+# Bastion may be deleted, and only with catalog bootstrap proof; site links, vWAN and
+# ExpressRoute constructs always stay protected.
+PROTECTED_TYPES = {
+    "microsoft.network/virtualnetworkgateways", "microsoft.network/vpngateways",
+    "microsoft.network/vpnsites", "microsoft.network/virtualhubs",
+    "microsoft.network/virtualwans", "microsoft.network/bastionhosts",
+    "microsoft.network/expressroutecircuits", "microsoft.network/connections",
+    "microsoft.network/p2svpngateways", "microsoft.network/vpnserverconfigurations",
+    "microsoft.network/localnetworkgateways",
+}
+HUB_DELETABLE_TYPES = {"microsoft.network/virtualnetworkgateways", "microsoft.network/bastionhosts"}
+# Child resources that attach a hub to a network; each must target only this factory's VNets.
+HUB_LINK_TARGETS = {
+    "microsoft.network/privatednszones/virtualnetworklinks": "virtualNetwork",
+    "microsoft.network/dnsforwardingrulesets/virtualnetworklinks": "virtualNetwork",
+    "microsoft.network/virtualnetworks/virtualnetworkpeerings": "remoteVirtualNetwork",
+}
+HUB_SOURCE = "access-hub-bootstrap-record"
 fl = None
 
 
@@ -50,15 +70,83 @@ def ordered_resources(rows):
     return ordered
 
 
-def protected(body, explicit):
-    key, kind = body["id"].lower(), str(body.get("type", "")).lower()
+def marked_protected(body):
     tags = {str(k).lower(): str(v).lower() for k, v in (body.get("tags") or {}).items()}
+    return (fl.project_resource_shared(body)
+            or any(tags.get("aifactory." + name) == "true" for name in ("bootstrap", "platform", "protected", "reusable")))
+
+
+def protected(body, explicit, hub=None):
+    key, kind = body["id"].lower(), str(body.get("type", "")).lower()
     return (any(key == identifier or key.startswith(identifier + "/") for identifier in explicit)
-            or fl.project_resource_shared(body)
-            or any(tags.get("aifactory." + name) == "true" for name in ("bootstrap", "platform", "protected", "reusable"))
+            or marked_protected(body)
             or (kind == "microsoft.machinelearningservices/workspaces" and str(body.get("kind", "")).lower() == "hub")
-            or kind in {"microsoft.network/virtualnetworkgateways", "microsoft.network/localnetworkgateways",
-                        "microsoft.network/vpngateways", "microsoft.network/vpnsites", "microsoft.network/connections"})
+            or (kind in PROTECTED_TYPES and not (kind in HUB_DELETABLE_TYPES and hub_covers(hub, key))))
+
+
+def access_hub(document):
+    """Catalog-built proof that bootstrap records, not names/tags, tie a hub to exactly this target."""
+    hub = document.get("access_hub_ownership")
+    if hub is None:
+        return None
+    target, scopes = document["target"], {scope.lower() for scope in document["locks"]["scopes"]}
+
+    def ids(values, pattern):
+        return (isinstance(values, list) and values and values == sorted(set(values))
+                and all(isinstance(value, str) and value == value.lower() and pattern.fullmatch(value)
+                        for value in values))
+
+    fl.require(isinstance(hub, dict) and hub.get("contract") == HUB_CONTRACT
+               and all(hub.get(key) == target[key] for key in ("factory_id", "scaleset_id", "subscription_id"))
+               and hub.get("mode") in ("integrated", "external")
+               and ids(hub.get("resource_group_ids"), fl.RG_ID) and set(hub["resource_group_ids"]) <= scopes
+               and ids(hub.get("resource_ids"), fl.NESTED_ID)
+               and all(fl.arm_scope(value) in hub["resource_group_ids"] for value in hub["resource_ids"])
+               and ids(hub.get("factory_resource_groups"), fl.RG_ID) and scopes <= set(hub["factory_resource_groups"])
+               and isinstance(hub.get("evidence"), dict) and fl.guid(hub["evidence"].get("workflow_id"))
+               and fl.hash_value(hub["evidence"].get("record_hash"))
+               and (hub["mode"] == "integrated" or not any(
+                   fl.resource_type_from_id(value) in HUB_DELETABLE_TYPES for value in hub["resource_ids"])),
+               "factory-delete-access-hub-proof-invalid")
+    return hub
+
+
+def hub_covers(hub, key):
+    return bool(hub) and any(key == root or key.startswith(root + "/") for root in hub["resource_ids"])
+
+
+def verify_access_hub_network(hub, bodies):
+    """Deleting a factory-owned hub must not cut DNS, peering or site links of anything else."""
+    if not hub:
+        return
+    allowed = set(hub["factory_resource_groups"])
+    for key, body in bodies.items():
+        if fl.RG_ID.fullmatch(key) or fl.arm_scope(key) not in hub["resource_group_ids"]:
+            continue
+        kind = fl.resource_type_from_id(key)
+        fl.require(kind != "microsoft.network/connections", "factory-delete-access-hub-external-connection")
+        if kind in HUB_LINK_TARGETS:
+            remote = ((body.get("properties") or {}).get(HUB_LINK_TARGETS[kind]) or {}).get("id")
+            fl.require(isinstance(remote, str) and fl.RG_ID.match(remote)
+                       and fl.arm_scope(remote.lower()) in allowed, "factory-delete-access-hub-foreign-link")
+
+
+def teardown_order(document, rows):
+    """Bootstrap hub and private runner closure last, after every other reviewed deletion."""
+    hub = access_hub(document)
+    deleted = {row["id"].lower(): row for row in rows if row["delete"]}
+    late = {key for key in deleted if hub_covers(hub, key)}
+    pending = list(late)
+    while pending:
+        key = pending.pop()
+        for value in [*deleted[key].get("depends_on", []), *(parent for parent in deleted if key.startswith(parent + "/"))]:
+            if value.lower() in deleted and value.lower() not in late:
+                late.add(value.lower())
+                pending.append(value.lower())
+    if not late:
+        return ordered_resources(rows)
+    return (ordered_resources([row for row in rows if row["id"].lower() not in late])
+            + ordered_resources([row for row in rows if row["id"].lower() in late]))
 
 
 def validate_route(document):
@@ -114,11 +202,11 @@ def freeze(cloud, document, ownership_records, registered_projects):
     fl.BlobLocks(cloud, document).verify_enrollment()
     scopes = sorted(set(document["locks"]["scopes"] + document["locks"]["common_dependencies"]), key=str.lower)
     writable = {scope.lower() for scope in document["locks"]["scopes"]}
+    hub = access_hub(document)
     closure, bodies = fl.collect_resource_closure(cloud, scopes)
+    # The operator executes common teardown; it must never sit on anything in scope.
     fl.verify_deletion_identity(document, bodies)
-    worker = copy.deepcopy(document)
-    worker["identity"]["object_id"] = document["identity"]["deployment_object_id"]
-    fl.verify_deletion_identity(worker, bodies)
+    verify_access_hub_network(hub, bodies)
     explicit = document.get("protected_resource_ids", [])
     fl.require(isinstance(explicit, list) and all(isinstance(value, str)
                and (fl.RG_ID.fullmatch(value) or fl.NESTED_ID.fullmatch(value)) for value in explicit),
@@ -141,6 +229,14 @@ def freeze(cloud, document, ownership_records, registered_projects):
                                              evidence.get("ownership_evidence"), key, fl.digest(body), cache)
             fl.require(owner == evidence.get("owner"), "factory-delete-receipt-owner-mismatch")
             proof = {**evidence, "owner": owner}
+        if hub_covers(hub, key):
+            fl.require(not marked_protected(body), "factory-delete-access-hub-marked-protected")
+            fl.require(all(owner.get(field, value) == value for field, value in core_owner.items()),
+                       "factory-delete-access-hub-owner-conflict")
+            if not owner:
+                owner = dict(core_owner)
+                proof = {"ownership_source": HUB_SOURCE, "owner": owner,
+                         "ownership_evidence": copy.deepcopy(hub["evidence"])}
         number = owner.get("project_id")
         owned = all(owner.get(field) == value for field, value in core_owner.items())
         selected = owned and (not number or number in project_map)
@@ -152,7 +248,7 @@ def freeze(cloud, document, ownership_records, registered_projects):
             fl.require(any(key == value or key.startswith(value + "/") for value in registered),
                        "factory-delete-project-resource-unregistered")
         metadata = closure["groups"].get(key, closure["resources"].get(key))
-        keep = protected(body, explicit)
+        keep = protected(body, explicit, hub)
         if key in explicit:
             fl.require(not selected, "factory-delete-protected-resource-selected")
         entries[key] = {"id": body["id"], **metadata, **proof,
@@ -174,8 +270,14 @@ def freeze(cloud, document, ownership_records, registered_projects):
                    and key in project["registered_resource_ids"]]
         fl.require(len(matches) == 1, "factory-delete-exact-project-group-required")
         project["resource_group_id"] = matches[0]
-        fl.require(all(entry["owner"] == owner or protected(bodies[key], explicit) for key, entry in entries.items()
+        fl.require(all(entry["owner"] == owner or protected(bodies[key], explicit, hub) for key, entry in entries.items()
                        if fl.arm_scope(key) == matches[0]), "factory-delete-project-group-shared-or-unowned")
+    # The deployment principal runs only project stages; it may sit solely on bootstrap-proven
+    # common hub/runner resources, which the operator tears down after the project barrier.
+    worker = copy.deepcopy(document)
+    worker["identity"]["object_id"] = document["identity"]["deployment_object_id"]
+    fl.verify_deletion_identity(worker, {key: body for key, body in bodies.items()
+                                         if not (hub_covers(hub, key) and entries[key]["project_number"] is None)})
     # Retained shared infrastructure prevents deletion of its ancestors and dependencies.
     changed = True
     while changed:
@@ -212,6 +314,8 @@ def freeze(cloud, document, ownership_records, registered_projects):
             "closure_hash": fl.digest(closure), "bodies": bodies, "protected_resource_ids": sorted(explicit),
             "configuration_hash": fl.digest(document["config"]),
             "route_hash": fl.digest(document["route"]), "source_hash": fl.digest(document["source"])}
+    if hub:
+        data["access_hub_hash"] = fl.digest(hub)
     validate({**document, "deletion": data})
     for scope in scopes:
         cloud.assert_no_active_deployments(scope)
@@ -228,6 +332,8 @@ def validate(document):
     fl.require(data.get("configuration_hash") == fl.digest(document["config"])
                and data.get("route_hash") == fl.digest(document["route"])
                and data.get("source_hash") == fl.digest(document["source"]), "factory-delete-plan-binding-changed")
+    hub = access_hub(document)
+    fl.require(data.get("access_hub_hash") == (fl.digest(hub) if hub else None), "factory-delete-plan-binding-changed")
     projects = normalize_projects(document, data.get("projects"))
     fl.require([row["project_number"] for row in projects] ==
                [row["project_number"] for row in data["projects"]], "factory-delete-project-order-changed")
@@ -241,6 +347,7 @@ def validate(document):
     fl.require(len(entries) == len(groups + resources) and set(entries) == set(data["bodies"]),
                "factory-delete-complete-inventory-required")
     fl.protect_coordination_storage(document)
+    verify_access_hub_network(hub, data["bodies"])
     for key, row in entries.items():
         fl.require(type(row.get("delete")) is bool and row.get("body_hash") == fl.digest(data["bodies"][key]),
                    "factory-delete-resource-fingerprint-required")
@@ -255,8 +362,11 @@ def validate(document):
                    and all(row.get("owner", {}).get(field) == document["target"][field]
                            for field in ("factory_id", "scaleset_id")),
                    "factory-delete-resource-owner-mismatch")
-        fl.require(not protected(data["bodies"][key], data["protected_resource_ids"]),
+        fl.require(not protected(data["bodies"][key], data["protected_resource_ids"], hub),
                    "factory-delete-protected-resource-selected")
+        fl.require(row.get("ownership_source") != HUB_SOURCE or (hub_covers(hub, key) and row["owner"] == {
+            field: document["target"][field] for field in ("factory_id", "scaleset_id")}),
+                   "factory-delete-access-hub-owner-unproven")
         fl.require(not owner_number or owner_number in document["target"]["project_ids"],
                    "factory-delete-project-owner-unregistered")
         fl.require(row.get("managed_group_ids", []) == sorted(fl.managed_group_cascades(
@@ -335,7 +445,7 @@ def delete_rows(cloud, locks, document, receipt, persist, rows, sleep=time.sleep
     validate_flags(flags)
     entries = document["deletion"]["resources"] + document["deletion"]["resource_groups"]
     removed = {value.lower() for value in receipt.get("deleted_resources", []) + receipt.get("observed_absent", [])}
-    for row in ordered_resources(rows):
+    for row in teardown_order(document, rows):
         key = row["id"].lower()
         if key in removed:
             if key not in {value.lower() for value in receipt.get("deleted_resources", [])}:

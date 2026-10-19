@@ -21,10 +21,25 @@ PROJECT_ORDER = ["foundry-capability-hosts", "target-project-search-shared-priva
                  "service-managed-lifecycle", "project-resources", "project-network"]
 PIPELINE_DEFINITIONS = {"gha": ".github/workflows/factory-lifecycle.yml",
                         "ado": "aifactory/pipelines/factory-lifecycle.yml"}
+# Same rule as the API: reusable hub types are deleted only as a factory-owned integrated hub.
+HUB_CONTRACT = "factory-owned-access-hub-v1"
+HUB_EXECUTOR = "operator-after-project-barrier"
+PROTECTED_TYPES = {
+    "microsoft.network/virtualnetworkgateways", "microsoft.network/vpngateways", "microsoft.network/vpnsites",
+    "microsoft.network/virtualhubs", "microsoft.network/virtualwans", "microsoft.network/bastionhosts",
+    "microsoft.network/expressroutecircuits", "microsoft.network/connections", "microsoft.network/p2svpngateways",
+    "microsoft.network/vpnserverconfigurations", "microsoft.network/localnetworkgateways",
+}
+HUB_TYPES = {"microsoft.network/virtualnetworkgateways", "microsoft.network/bastionhosts"}
 
 
 def _contains(parent: str, child: str) -> bool:
     return child.lower() == parent.lower() or child.lower().startswith(parent.lower() + "/")
+
+
+def _arm_type(identifier: str) -> str:
+    segments = identifier.lower().split("/providers/", 1)
+    return "/".join(segments[1].split("/")[:2]) if len(segments) == 2 else ""
 
 
 def validate_deletion_plan(plan: Any, factory_id: str, scales: dict[str, Any], factory: dict[str, Any],
@@ -103,7 +118,42 @@ def validate_deletion_plan(plan: Any, factory_id: str, scales: dict[str, Any], f
         invalid("stages do not cover every reviewed deletion exactly once")
     if any(_contains(entry, keep) or _contains(keep, entry) for entry in covered for keep in protected):
         invalid("deletion overlaps protected hub, VPN, bootstrap or shared resources")
+    _validate_access_hubs(plan, stages, scales, invalid)
     return plan
+
+
+def _validate_access_hubs(plan, stages, scales, invalid):
+    hubs = plan.get("access_hubs", [])
+    if (not isinstance(hubs, list) or any(not isinstance(row, dict) for row in hubs)
+            or len({row.get("scale_set_id") for row in hubs}) != len(hubs)):
+        invalid("malformed factory-owned access-hub section")
+    proven = {}
+    for row in hubs:
+        scale = scales.get(row.get("scale_set_id"))
+        roots = row.get("proven_resource_ids")
+        if (scale is None or row.get("environment") != scale["environment"] or row.get("contract") != HUB_CONTRACT
+                or row.get("executor") != HUB_EXECUTOR or not isinstance(roots, list)
+                or not all(_text(root) for root in roots) or not isinstance(row.get("evidence"), dict)):
+            invalid("the factory-owned access-hub section changed its target, contract or executor")
+        expected = sorted((entry for stage in stages if stage["kind"] == "common" and stage["scale_set_id"] == scale["id"]
+                           for entry in stage["delete"] if any(_contains(root, entry) for root in roots)),
+                          key=str.casefold)
+        if row.get("deleted_resources") != expected:
+            invalid("the factory-owned access-hub deletions differ from the reviewed common teardown")
+        proven[scale["id"]] = roots
+    for stage in stages:
+        for entry in stage["delete"]:
+            kind = _arm_type(entry)
+            if kind in PROTECTED_TYPES and not (
+                    kind in HUB_TYPES and stage["kind"] == "common"
+                    and any(_contains(root, entry) for root in proven.get(stage["scale_set_id"], []))):
+                invalid("reusable VPN/hub/connectivity resources are deleted without factory-owned access-hub proof")
+
+
+def describe_access_hubs(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    return [{"Environment": row["environment"], "Scale set": row["scale_set_id"],
+             "Deleted by": row["executor"], "Bootstrap evidence": row["evidence"],
+             "Deletes": row["deleted_resources"]} for row in plan.get("access_hubs", [])]
 
 
 def describe_deletion_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:

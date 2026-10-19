@@ -39,6 +39,30 @@ Protected/shared/bootstrap/platform/VPN resources and reusable hubs are retained
 an explicitly protected selected ID, ambiguous ownership, unmanaged dependency,
 or overlapping mutable snapshots blocks rather than broadening deletion.
 
+Factory-owned access hub (factory-owned-access-hub-v1)
+------------------------------------------------------
+factory_deletion_access_hub advertises this extension. An integrated access-hub
+bootstrap may place its VPN gateway, Bastion, DNS resolver, private DNS zones and
+private runner inside the factory's own common group. The API may then add
+manifest access_hub_ownership, built only from consumed bootstrap stage records
+(never names, tags or an accepted prerequisite baseline): contract, factory_id,
+scaleset_id, subscription_id, mode, resource_group_ids (writable scopes),
+resource_ids (exact bootstrap-created roots), factory_resource_groups (every
+group the cohort deletes) and evidence (workflow_id, record_hash). The frozen
+inventory binds its hash. Covered untagged resources take the core factory and
+scale-set owner; a conflicting owner tag or a shared/protected/bootstrap/
+platform/reusable tag blocks. Only covered virtualNetworkGateways and
+bastionHosts lose type protection; connections, local network gateways, vWAN
+and ExpressRoute stay protected. Every private DNS zone link, DNS forwarding
+ruleset link and VNet peering in a covered group must target a VNet inside
+factory_resource_groups, and any connection in such a group blocks.
+The operator identity must not be attached to anything in scope. The deployment
+principal may be attached only to covered common resources (the private runner
+and its identity) because it executes project stages only. Common teardown runs
+from the operator after the all-project barrier and deletes the covered hub and
+runner closure last. ARM back-references (NIC virtualMachine, disk managedBy,
+public IP ipConfiguration) name dependents, not dependencies.
+
 Receipts and infinite Blob leases survive uncertain dispatch, provider failure,
 permission denial and incomplete teardown. Calling the same cohort with the same
 execution directory observes persisted run IDs instead of redispatching. Local

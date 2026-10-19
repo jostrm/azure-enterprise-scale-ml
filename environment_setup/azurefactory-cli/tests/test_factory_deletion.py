@@ -654,3 +654,62 @@ def test_command_help_uses_plain_language():
             "Entra security groups and Git history are kept.") in help_text
     for child in command._subparsers._group_actions[0].choices.values():
         assert "runtime" not in child.format_help().lower()
+
+
+VPN = GROUP + "/providers/Microsoft.Network/virtualNetworkGateways/vpngw-874678d6611d"
+RUNNER = GROUP + "/providers/Microsoft.Compute/virtualMachines/runner-gha-sdc-dev-001"
+
+
+def with_access_hub(transport, deleted=(VPN, RUNNER)):
+    """aif-118 shape: the integrated hub and private runner live in the factory's own common group."""
+    plan = transport.preview["deletion_plan"]
+    common = plan["stages"][1]
+    common["delete"] = [GROUP, RESOURCE, *deleted]
+    transport.preview["deletion_targets"][0]["delete"] = list(common["delete"])
+    transport.preview["inventory"] += [{"resource_id": item, "dependencies": []} for item in deleted]
+    plan["access_hubs"] = [{
+        "scale_set_id": SCALE, "environment": "dev", "contract": "factory-owned-access-hub-v1",
+        "resource_group_ids": [GROUP.lower()], "proven_resource_ids": sorted(item.lower() for item in deleted),
+        "deleted_resources": sorted(deleted, key=str.casefold),
+        "evidence": {"contract": "consumed-bootstrap-stage-evidence-v1",
+                     "workflow_id": "99999999-9999-4999-8999-999999999999", "record_hash": "e" * 64},
+        "executor": "operator-after-project-barrier"}]
+    return plan
+
+
+def test_factory_owned_access_hub_is_reviewed_and_rendered(tmp_path, transport, capsys):
+    rehash(with_access_hub(transport))
+    assert prepare(tmp_path) == 0
+    output = capsys.readouterr().err
+    assert "Factory-owned access hub" in output and VPN in output
+    assert "operator-after-project-barrier" in output
+
+
+@pytest.mark.parametrize("defect", ["no-hub-section", "changed-deleted-list", "unknown-scale-set", "executor",
+                                    "site-connection", "hub-on-project-stage"])
+def test_unproven_or_changed_access_hub_is_rejected_before_confirmation(tmp_path, transport, defect):
+    plan = with_access_hub(transport)
+    if defect == "no-hub-section":
+        plan.pop("access_hubs")
+    elif defect == "changed-deleted-list":
+        plan["access_hubs"][0]["deleted_resources"] = [VPN]
+    elif defect == "unknown-scale-set":
+        plan["access_hubs"][0]["scale_set_id"] = "88888888-8888-4888-8888-888888888888"
+    elif defect == "executor":
+        plan["access_hubs"][0]["executor"] = "self-hosted-runner"
+    elif defect == "site-connection":
+        connection = GROUP + "/providers/Microsoft.Network/connections/onprem"
+        plan["stages"][1]["delete"].append(connection)
+        transport.preview["deletion_targets"][0]["delete"].append(connection)
+        transport.preview["inventory"].append({"resource_id": connection, "dependencies": []})
+        plan["access_hubs"][0]["proven_resource_ids"] = sorted([*plan["access_hubs"][0]["proven_resource_ids"],
+                                                                connection.lower()])
+        plan["access_hubs"][0]["deleted_resources"] = sorted([*plan["access_hubs"][0]["deleted_resources"],
+                                                              connection], key=str.casefold)
+    elif defect == "hub-on-project-stage":
+        plan["stages"][1]["delete"].remove(VPN)
+        plan["stages"][0]["delete"].append(VPN)
+        plan["access_hubs"][0]["deleted_resources"] = [RUNNER]
+    rehash(plan)
+    assert prepare(tmp_path) == 2
+    assert not (tmp_path / "receipt.json").exists()

@@ -40,6 +40,12 @@ from uuid import uuid4
 CONTRACT = 1
 SELECTIVE_PROJECT_DELETE = "selective-project-resources-v1"
 PROJECT_NETWORK_TYPES = {"microsoft.network/networksecuritygroups", "microsoft.network/routetables"}
+# ARM back-references name a dependent (deleted first), never a dependency of this resource.
+REVERSE_LINKS = {
+    "microsoft.network/networkinterfaces": ("virtualMachine", "privateEndpoint", "privateLinkService"),
+    "microsoft.network/publicipaddresses": ("ipConfiguration",),
+    "microsoft.compute/disks": ("managedBy", "managedByExtended"),
+}
 MAX_DOCUMENT = 8 * 1024 * 1024
 RECEIPT_REPLACE_ATTEMPTS = 20
 RECEIPT_REPLACE_RETRY_SECONDS = 0.25
@@ -662,6 +668,7 @@ def capabilities():
         "factory_deletion_dependencies": "search-shared-private-links-first-v1",
         "factory_deletion_pipeline": "ordered-project-pipelines-v1",
         "factory_deletion_pipeline_coordination_modes": ["blob"],
+        "factory_deletion_access_hub": "factory-owned-access-hub-v1",
         "factory_deletion_coordination_modes": ["blob", "single-writer"],
         "selective_project_deletion": SELECTIVE_PROJECT_DELETE,
         "factory_cohort": "physical-lease-cohort-v1",
@@ -1495,6 +1502,8 @@ def project_resource_dependencies(body):
     if str(body.get("type", "")).lower() in PROJECT_NETWORK_TYPES | {"microsoft.network/virtualnetworks"}:
         # Subnets are reverse links or separately inventoried child bodies.
         references -= resource_references((body.get("properties") or {}).get("subnets", []))
+    for field in REVERSE_LINKS.get(str(body.get("type", "")).lower(), ()):
+        references -= resource_references([body.get(field), (body.get("properties") or {}).get(field)])
     return sorted(ref for ref in references if RG_ID.match(ref) and ref != key and not ref.startswith(key + "/"))
 
 
@@ -1712,6 +1721,18 @@ def _without_deleted_children(body, removed):
     return body
 
 
+def _without_removed_backlinks(body, removed):
+    """ARM drops a back-reference once its dependent is deleted; nothing else may change."""
+    result = copy.deepcopy(body)
+    for field in REVERSE_LINKS.get(str(body.get("type", "")).lower(), ()):
+        for holder in (result, result.get("properties") if isinstance(result.get("properties"), dict) else {}):
+            references = resource_references([holder.get(field)])
+            if references and all(any(ref == item or ref.startswith(item + "/") for item in removed)
+                                  for ref in references):
+                holder.pop(field)
+    return result
+
+
 def verify_project_inventory(cloud, document, removed=()):
     data = document["deletion"]
     removed = {item.lower() for item in removed}
@@ -1727,9 +1748,10 @@ def verify_project_inventory(cloud, document, removed=()):
         before = data["bodies"][key]
         backlinks = (str(before.get("type", "")).lower() in PROJECT_NETWORK_TYPES
                      and bool(resource_references((before.get("properties") or {}).get("subnets", [])) & removed))
-        if any(identifier.startswith(key + "/") for identifier in removed) or backlinks:
-            require(_without_deleted_children(body, removed) == _without_deleted_children(before, removed),
-                    "project-retained-parent-changed")
+        stripped = _without_removed_backlinks(before, removed)
+        if any(identifier.startswith(key + "/") for identifier in removed) or backlinks or stripped != before:
+            require(_without_deleted_children(_without_removed_backlinks(body, removed), removed)
+                    == _without_deleted_children(stripped, removed), "project-retained-parent-changed")
         else:
             require(digest(body) == digest(before), "project-resource-instance-changed")
     expected_collections = {key: value for key, value in expected["collections"].items()
