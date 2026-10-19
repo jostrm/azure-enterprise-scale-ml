@@ -45,7 +45,7 @@ TYPES = {
                           "virtualNetworks/virtualNetworkPeerings", "networkSecurityGroups",
                           "networkSecurityGroups/securityRules", "virtualNetworkGateways", "bastionHosts",
                           "privateDnsZones", "privateDnsZones/virtualNetworkLinks", "networkInterfaces",
-                          "connections", "dnsResolvers"],
+                          "connections", "dnsResolvers", "dnsForwardingRulesets"],
     "microsoft.compute": ["virtualMachines", "disks"],
     "microsoft.authorization": ["roleAssignments"],
     "microsoft.managedidentity": ["userAssignedIdentities"],

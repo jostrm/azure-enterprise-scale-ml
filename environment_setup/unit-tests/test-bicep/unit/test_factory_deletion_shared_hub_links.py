@@ -40,8 +40,23 @@ SPOKE_PEERING = VNET + "/virtualNetworkPeerings/aif-5eb3f21fdde8"
 DNS_LINK_TYPE = "microsoft.network/privatednszones/virtualnetworklinks"
 PEERING_TYPE = "microsoft.network/virtualnetworks/virtualnetworkpeerings"
 OWN_LINKS = [OWN_BLOB_LINK, OWN_VAULT_LINK, OWN_PEERING]
-# A hub-connected bootstrap owns its spoke VNet and private runner, never a VPN gateway or Bastion.
+# A hub-connected bootstrap owns its spoke VNet and private runner; its VPN gateway stays in the hub.
 SPOKE_ROOTS = [VNET, NIC, RUNNER, DISK, IDENTITY_ID]
+# Connectivity a hub-connected bootstrap may still build in the factory's own common VNet:
+# Bastion Developer cannot traverse peering, so it lands there (dc-batman4), never a VPN gateway.
+SPOKE_NET = COMMON + "/providers/Microsoft.Network"
+BASTION_DEVELOPER = SPOKE_NET + "/bastionHosts/bastion-4d8896b66f23"
+SPOKE_RESOLVER = SPOKE_NET + "/dnsResolvers/dnspr-4d8896b66f23"
+SPOKE_RULESET = SPOKE_NET + "/dnsForwardingRulesets/dnsrs-4d8896b66f23"
+SPOKE_GATEWAY = SPOKE_NET + "/virtualNetworkGateways/vpngw-4d8896b66f23"
+STRAYS = {
+    # The Developer SKU binds the VNet directly: no AzureBastionSubnet and no public IP.
+    BASTION_DEVELOPER: ("Microsoft.Network/bastionHosts", {"virtualNetwork": {"id": VNET}},
+                        {"sku": {"name": "Developer"}}),
+    SPOKE_RESOLVER: ("Microsoft.Network/dnsResolvers", {"virtualNetwork": {"id": VNET}}, {}),
+    SPOKE_RULESET: ("Microsoft.Network/dnsForwardingRulesets", {"dnsResolverOutboundEndpoints": []}, {}),
+    SPOKE_GATEWAY: ("Microsoft.Network/virtualNetworkGateways", {"gatewayType": "Vpn", "ipConfigurations": []}, {}),
+}
 
 
 class SharedHubCloud(HubCloud):
@@ -151,6 +166,47 @@ def test_without_link_proof_a_spoke_peered_to_a_shared_hub_still_blocks():
     document, cloud = batman(with_links=False)
     with pytest.raises(fl.Blocked, match="factory-delete-access-hub-foreign-link"):
         freeze(document, cloud)
+    assert not cloud.deleted
+
+
+def stray(*identifiers):
+    cloud = SharedHubCloud()
+    for identifier in identifiers:
+        kind, properties, extra = STRAYS[identifier]
+        cloud.bodies[identifier.lower()] = untagged(identifier, kind, copy.deepcopy(properties), **copy.deepcopy(extra))
+    return cloud
+
+
+@pytest.mark.parametrize("identifier", [BASTION_DEVELOPER, SPOKE_RESOLVER, SPOKE_RULESET],
+                         ids=["bastion-developer", "dns-resolver", "forwarding-ruleset"])
+def test_hub_connected_factory_deletes_its_own_bootstrap_built_bastion_or_dns_resolver(identifier):
+    document, cloud = batman(stray(identifier), roots=[*SPOKE_ROOTS, identifier])
+    assert document["access_hub_ownership"]["mode"] == "external"
+    fl.validate_manifest(freeze(document, cloud))
+    entries = rows(document)
+    row = entries[identifier.lower()]
+    assert row["delete"] is True and row["ownership_source"] == "access-hub-bootstrap-record"
+    assert row["owner"] == CORE and row["project_number"] is None
+    assert entries[COMMON.lower()]["delete"] is True
+    assert not any(value.startswith(f"/subscriptions/{HUB_SUB}") for value in entries)
+    assert not cloud.deleted
+
+
+def test_hub_connected_factory_never_deletes_a_vpn_gateway_from_its_own_groups():
+    # Its VPN gateway belongs in the shared hub; a proof claiming one in the spoke is not a bootstrap shape.
+    document, cloud = batman(stray(BASTION_DEVELOPER, SPOKE_GATEWAY),
+                             roots=[*SPOKE_ROOTS, BASTION_DEVELOPER, SPOKE_GATEWAY])
+    with pytest.raises(fl.Blocked, match="factory-delete-access-hub-proof-invalid"):
+        freeze(document, cloud)
+    assert not cloud.deleted
+
+
+def test_unproven_vpn_gateway_in_a_hub_connected_factory_stays_protected():
+    document, cloud = batman(stray(BASTION_DEVELOPER, SPOKE_GATEWAY), roots=[*SPOKE_ROOTS, BASTION_DEVELOPER])
+    entries = rows(freeze(document, cloud))
+    assert entries[BASTION_DEVELOPER.lower()]["delete"] is True
+    assert entries[SPOKE_GATEWAY.lower()]["delete"] is False
+    assert entries[COMMON.lower()]["delete"] is False
     assert not cloud.deleted
 
 
@@ -295,6 +351,20 @@ def test_operator_removes_recorded_hub_links_last_after_the_spoke_vnet_is_gone(w
     for identifier in (HUB, HUB_VNET, BLOB_ZONE, VAULT_ZONE, HUB_SELF_LINK, MANUAL_LINK, SPIDER_LINK, SPIDER_PEERING):
         assert identifier.lower() in cloud.bodies, identifier
     assert not any(identifier.startswith(f"/subscriptions/{HUB_SUB}") for identifier in worker_deleted)
+
+
+def test_operator_deletes_the_stray_bastion_before_its_vnet_and_unlinks_the_hub_last(workspace, monkeypatch):
+    document, cloud = batman(stray(BASTION_DEVELOPER), roots=[*SPOKE_ROOTS, BASTION_DEVELOPER])
+    freeze(document, cloud)
+    result, worker_deleted = run_cohort(document, cloud, workspace, monkeypatch)
+    assert result["status"] == "succeeded", result
+    # Project pipelines never touch the Bastion; the operator removes it with the common closure.
+    assert BASTION_DEVELOPER.lower() not in {value.lower() for value in worker_deleted}
+    deleted = [value.lower() for value in cloud.deleted]
+    assert deleted.index(BASTION_DEVELOPER.lower()) < deleted.index(VNET.lower()) < deleted.index(COMMON.lower())
+    assert deleted[-3:] == [value.lower() for value in OWN_LINKS]
+    for identifier in (HUB, HUB_VNET, BLOB_ZONE, VAULT_ZONE, SPIDER_LINK, SPIDER_PEERING):
+        assert identifier.lower() in cloud.bodies, identifier
 
 
 @pytest.mark.parametrize("drift,code", [

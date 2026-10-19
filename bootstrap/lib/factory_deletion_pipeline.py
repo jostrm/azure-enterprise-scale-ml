@@ -29,6 +29,9 @@ PROTECTED_TYPES = {
 }
 HUB_DELETABLE_TYPES = {"microsoft.network/virtualnetworkgateways", "microsoft.network/bastionhosts",
                        "microsoft.network/dnsresolvers", "microsoft.network/dnsforwardingrulesets"}
+# A hub-connected (external-mode) factory's VPN gateway lives in the shared hub. Its own groups may
+# hold only a bootstrap-built Bastion Developer (it cannot traverse peering) or DNS resolver parts.
+EXTERNAL_HUB_RETAINED_TYPES = {"microsoft.network/virtualnetworkgateways"}
 # Child resources that attach a hub to a network; each must target only this factory's VNets.
 HUB_LINK_TARGETS = {
     "microsoft.network/privatednszones/virtualnetworklinks": "virtualNetwork",
@@ -120,7 +123,7 @@ def access_hub(document):
                and isinstance(hub.get("evidence"), dict) and fl.guid(hub["evidence"].get("workflow_id"))
                and fl.hash_value(hub["evidence"].get("record_hash"))
                and (hub["mode"] == "integrated" or not any(
-                   fl.resource_type_from_id(value) in HUB_DELETABLE_TYPES for value in hub["resource_ids"])),
+                   fl.resource_type_from_id(value) in EXTERNAL_HUB_RETAINED_TYPES for value in hub["resource_ids"])),
                "factory-delete-access-hub-proof-invalid")
     return hub
 

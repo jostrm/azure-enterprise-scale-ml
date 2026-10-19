@@ -43,7 +43,11 @@ Factory-owned access hub (factory-owned-access-hub-v1)
 ------------------------------------------------------
 factory_deletion_access_hub advertises this extension. An integrated access-hub
 bootstrap may place its VPN gateway, Bastion, DNS resolver, private DNS zones and
-private runner inside the factory's own common group. The API may then add
+private runner inside the factory's own common group. A hub-connected (external
+mode) bootstrap keeps its VPN gateway in the shared hub but may still place a
+Bastion Developer, which cannot traverse peering, in the factory's own common
+VNet; an external-mode proof may cover a Bastion, DNS resolver or forwarding
+ruleset there and never a VPN gateway. The API may then add
 manifest access_hub_ownership, built only from consumed bootstrap stage records
 (never names, tags or an accepted prerequisite baseline): contract, factory_id,
 scaleset_id, subscription_id, mode, resource_group_ids (writable scopes),
@@ -51,9 +55,10 @@ resource_ids (exact bootstrap-created roots), factory_resource_groups (every
 group the cohort deletes) and evidence (workflow_id, record_hash). The frozen
 inventory binds its hash. Covered untagged resources take the core factory and
 scale-set owner; a conflicting owner tag or a shared/protected/bootstrap/
-platform/reusable tag blocks. Only covered virtualNetworkGateways and
-bastionHosts lose type protection; connections, local network gateways, vWAN
-and ExpressRoute stay protected. Every private DNS zone link, DNS forwarding
+platform/reusable tag blocks. Only covered virtualNetworkGateways (integrated
+mode only), bastionHosts, dnsResolvers and dnsForwardingRulesets lose type
+protection; connections, local network gateways, vWAN and ExpressRoute stay
+protected. Every private DNS zone link, DNS forwarding
 ruleset link and VNet peering in a covered group must target a VNet inside
 factory_resource_groups, and any connection in such a group blocks.
 The operator identity must not be attached to anything in scope. The deployment

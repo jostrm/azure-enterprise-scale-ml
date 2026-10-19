@@ -21,7 +21,8 @@ PROJECT_ORDER = ["foundry-capability-hosts", "target-project-search-shared-priva
                  "service-managed-lifecycle", "project-resources", "project-network"]
 PIPELINE_DEFINITIONS = {"gha": ".github/workflows/factory-lifecycle.yml",
                         "ado": "aifactory/pipelines/factory-lifecycle.yml"}
-# Same rule as the API: reusable hub types are deleted only as a factory-owned integrated hub.
+# Same rule as the API: reusable hub types are deleted only under factory-owned access-hub proof
+# (a hub-connected factory's own Bastion or DNS resolver, never its VPN gateway; the runtime enforces mode).
 HUB_CONTRACT = "factory-owned-access-hub-v1"
 HUB_EXECUTOR = "operator-after-project-barrier"
 PROTECTED_TYPES = {

@@ -213,6 +213,8 @@ implemented.** Protected hub/VPN/platform/bootstrap resources, coordination
 storage, the executing identity and private runners must be outside them. The one exception is a factory-owned integrated hub (VPN gateway, Bastion, DNS
 private resolver) and private runner that the factory's own bootstrap created in
 its own groups: those go only with bootstrap proof (`deletion_plan.access_hubs`).
+A hub-connected factory can lose only its own Bastion Developer or DNS resolver
+that way, never a VPN gateway.
 Connectivity hub resource groups and shared hubs are never deleted.
 Entra security groups and Git repositories/history stay. Key Vault purge is
 not performed; other external dependencies need separate review.
@@ -684,6 +686,8 @@ group.** Reusable hub/VPN/platform/bootstrap resources, coordination storage,
 the executing identity and private runners must be outside those groups. The one exception is a factory-owned integrated hub (VPN gateway, Bastion, DNS
 private resolver) and private runner that the factory's own bootstrap created in
 its own groups: those go only with bootstrap proof (`deletion_plan.access_hubs`).
+A hub-connected factory can lose only its own Bastion Developer or DNS resolver
+that way, never a VPN gateway.
 Connectivity hub resource groups and shared hubs are never deleted.
 Entra groups and Git repositories/history stay. No Key Vault purge occurs;
 other external dependencies need separate review.
@@ -1153,6 +1157,8 @@ groups.** Protected hub/VPN/platform/bootstrap resources, coordination
 storage, the executing identity and private runners must be outside them. The one exception is a factory-owned integrated hub (VPN gateway, Bastion, DNS
 private resolver) and private runner that the factory's own bootstrap created in
 its own groups: those go only with bootstrap proof (`deletion_plan.access_hubs`).
+A hub-connected factory can lose only its own Bastion Developer or DNS resolver
+that way, never a VPN gateway.
 Connectivity hub resource groups and shared hubs are never deleted.
 Entra groups and Git repositories/history stay. No Key Vault purge occurs;
 other external dependencies need separate review.
@@ -1577,8 +1583,11 @@ change after the plan hash. Verified absence removes the draft from the catalog.
 `deletion_plan.access_hubs` is `[]` unless the factory's own groups hold a
 **factory-owned integrated access hub** (`factory-owned-access-hub-v1`): the VPN
 gateway, Bastion, DNS resolver, private DNS zones or private runner that its
-integrated access-hub bootstrap created. The API proves this from consumed
-bootstrap stage records only and refuses when any other registered factory or
+integrated access-hub bootstrap created. A **hub-connected** factory keeps its VPN
+gateway in the shared hub, so its entry can cover only the Bastion Developer (it
+cannot traverse peering, so the bootstrap puts it in the common VNet) or a DNS
+resolver or ruleset in its own groups; a VPN gateway there blocks. The API
+proves this from consumed bootstrap stage records only and refuses when any other registered factory or
 scale set references the hub. Each entry lists `proven_resource_ids`, the exact
 `deleted_resources` from the common stage, the bootstrap `evidence` and
 `executor: "operator-after-project-barrier"`. The runtime requires every DNS zone
