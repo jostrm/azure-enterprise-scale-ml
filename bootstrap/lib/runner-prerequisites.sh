@@ -74,28 +74,97 @@ if hashlib.sha256(path.read_bytes()).hexdigest() != digest[7:].lower():
 PY
 }
 
+aif_runner_microsoft_key() {
+  # True only when every primary key in the keyring is the official Microsoft apt signing key.
+  # The first fpr after pub is the primary one (a designated-revoker rvk record may precede it).
+  local fingerprints
+  fingerprints="$(gpg --batch --show-keys --with-colons "$1" 2>/dev/null |
+    awk -F: '$1=="pub" {primary=1} $1=="sub" {primary=0} $1=="fpr" && primary {print $10; primary=0}')" || return
+  [[ "$fingerprints" == BC528686B50D79E339D3721CEB3E94ADBE1229CF ]]
+}
+
+aif_runner_apt_sources() {
+  # Prints "file<TAB>signed-by" for each enabled deb/deb-src entry of the URL and suite, except the own file.
+  python3 - "$@" <<'PY'
+import pathlib
+import re
+import sys
+
+apt, url, suite, own = sys.argv[1:]
+root = pathlib.Path(apt)
+lists = root / "sources.list.d"
+for path in [root / "sources.list", *sorted(lists.glob("*.list")), *sorted(lists.glob("*.sources"))]:
+    if path.name == own or not path.is_file():
+        continue
+    text = path.read_text(encoding="utf-8", errors="replace")
+    entries = []
+    if path.suffix == ".sources":
+        fields, name = {}, None
+        for line in [*text.splitlines(), ""]:
+            if line.startswith("#"):
+                continue
+            if not line.strip():
+                if fields and fields.get("enabled", "yes").lower() != "no":
+                    entries.append((fields.get("types", "").split(), fields.get("uris", "").split(),
+                                    fields.get("suites", "").split(), fields.get("signed-by", "")))
+                fields, name = {}, None
+            elif line[0] in " \t" and name:
+                fields[name] += " " + line.strip()
+            else:
+                name, _, value = line.partition(":")
+                name = name.strip().lower()
+                fields[name] = value.strip()
+    else:
+        for line in text.splitlines():
+            match = re.match(r"\s*(deb|deb-src)\s+(?:\[([^\]]*)\]\s*)?(\S+)\s+(\S+)", line.split("#", 1)[0])
+            if match:
+                options = dict(option.partition("=")[::2] for option in (match[2] or "").split())
+                entries.append(([match[1]], [match[3]], [match[4]], options.get("signed-by", "")))
+    for types, uris, suites, signed_by in entries:
+        if ({"deb", "deb-src"} & set(types) and suite in suites
+                and url.rstrip("/") in (uri.rstrip("/") for uri in uris)):
+            print(f"{path}\t{signed_by}")
+PY
+}
+
 aif_runner_microsoft_repository() {
-  local kind="$1" codename="$2" version="$3" work="$4"
-  local key=/etc/apt/keyrings/aifactory-microsoft.gpg
-  local source="/etc/apt/sources.list.d/aifactory-${kind}.list"
+  local kind="$1" codename="$2" version="$3" work="$4" apt="${5:-/etc/apt}"
+  local key="$apt/keyrings/aifactory-microsoft.gpg"
+  local source="$apt/sources.list.d/aifactory-${kind}.list"
+  local url="https://packages.microsoft.com/ubuntu/$version/prod"
+  [[ "$kind" != azure-cli ]] || url=https://packages.microsoft.com/repos/azure-cli/
+  # apt rejects one repository with two signed-by keyrings. Defender for Endpoint (MDE.Linux) adds microsoft-prod,
+  # so reuse an existing entry whose keyring holds only the Microsoft key; never edit files this script did not create.
+  local entries file keyring reused="" reused_file=""
+  entries="$(aif_runner_apt_sources "$apt" "$url" "$codename" "${source##*/}")" || return
+  while IFS=$'\t' read -r file keyring; do
+    [[ -n "$file" ]] || continue
+    [[ "$keyring" == /* && "$keyring" != *[[:space:],]* && -f "$keyring" ]] && aif_runner_microsoft_key "$keyring" ||
+      { printf 'Existing apt source %s for %s %s needs signed-by=<keyring> holding only the Microsoft key %s; review it explicitly.\n' \
+          "$file" "$url" "$codename" BC528686B50D79E339D3721CEB3E94ADBE1229CF >&2; return 1; }
+    [[ -z "$reused" || "$keyring" == "$reused" ]] ||
+      { printf 'Existing apt sources %s and %s set different signed-by keyrings for %s %s; review them explicitly.\n' \
+          "$reused_file" "$file" "$url" "$codename" >&2; return 1; }
+    reused="$keyring" reused_file="$file"
+  done <<< "$entries"
+  if [[ -n "$reused" ]]; then
+    [[ ! -e "$source" || "$reused" == "$key" ]] ||
+      { printf 'Existing apt source %s conflicts with %s (signed-by=%s) for %s %s; review them explicitly.\n' \
+          "$source" "$reused_file" "$reused" "$url" "$codename" >&2; return 1; }
+    printf 'reusing: %s %s from %s (signed-by=%s)\n' "$url" "$codename" "$reused_file" "$reused"
+    return 0
+  fi
   # Signed apt metadata supplies the package version and integrity, not a curl-to-shell installer.
   if [[ ! -f "$key" ]]; then
     curl --fail --silent --show-error --location 'https://packages.microsoft.com/keys/microsoft.asc' \
       --output "$work/microsoft.asc" || return
-    local fingerprint
-    fingerprint="$(gpg --batch --show-keys --with-colons "$work/microsoft.asc" | awk -F: '$1=="fpr" {print $10; exit}')" || return
-    [[ "$fingerprint" == BC528686B50D79E339D3721CEB3E94ADBE1229CF ]] ||
+    aif_runner_microsoft_key "$work/microsoft.asc" ||
       { printf '%s\n' 'Microsoft apt signing-key fingerprint mismatch.' >&2; return 1; }
     gpg --batch --yes --dearmor --output "$work/microsoft.gpg" "$work/microsoft.asc" || return
-    install -d -m 755 /etc/apt/keyrings || return
+    install -d -m 755 "$apt/keyrings" || return
     install -m 644 "$work/microsoft.gpg" "$key" || return
   fi
-  local line
-  if [[ "$kind" == azure-cli ]]; then
-    line="deb [arch=amd64 signed-by=$key] https://packages.microsoft.com/repos/azure-cli/ $codename main"
-  else
-    line="deb [arch=amd64 signed-by=$key] https://packages.microsoft.com/ubuntu/$version/prod $codename main"
-  fi
+  local line="deb [arch=amd64 signed-by=$key] $url $codename main"
   if [[ -e "$source" ]]; then
     [[ "$(cat "$source")" == "$line" ]] || { printf 'Refusing to replace %s\n' "$source" >&2; return 1; }
   else

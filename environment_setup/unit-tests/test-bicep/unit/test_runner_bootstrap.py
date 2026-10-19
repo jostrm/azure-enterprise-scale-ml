@@ -1498,5 +1498,152 @@ aif_runner_python_alias
                 self.assertFalse((root / "python").exists())
 
 
+@unittest.skipUnless(BASH and Path(BASH).exists(), "Bash is required")
+class RunnerMicrosoftRepositoryTests(unittest.TestCase):
+    """Defender for Endpoint (MDE.Linux) adds the same Microsoft repository with its own signed-by keyring."""
+
+    OFFICIAL = "BC528686B50D79E339D3721CEB3E94ADBE1229CF"
+    OTHER = "0123456789ABCDEF0123456789ABCDEF01234567"
+    PROD = "https://packages.microsoft.com/ubuntu/24.04/prod"
+    MDE = "deb [arch=amd64,arm64,armhf signed-by=$PWD/usr/share/keyrings/microsoft-prod.gpg] " + PROD + " noble main"
+
+    def run_fixture(self, directory: Path, body: str, *, kind: str = "powershell") -> subprocess.CompletedProcess[str]:
+        path = shlex.quote(str(LIB / "runner-prerequisites.sh").replace("\\", "/"))
+        apt = shlex.quote(str(directory / "apt").replace("\\", "/"))
+        script = f"""
+builtin source {path}
+python3() {{ {shlex.quote(sys.executable.replace(chr(92), '/'))} "$@"; }}
+apt={apt}
+mkdir -p "$apt/sources.list.d" "$PWD/usr/share/keyrings" "$PWD/work"
+curl() {{ echo download >> "$PWD/mutations"; printf '%s\\n' "${{AIF_TEST_DOWNLOAD:-{self.OFFICIAL}}}" > "${{@: -1}}"; }}
+gpg() {{
+  # Fixture keyrings list one primary fingerprint per line; every key carries an unrelated subkey.
+  # A "revoker:" prefix adds the designated-revoker record gpg prints between pub and fpr.
+  if [[ " $* " == *' --show-keys '* ]]; then
+    local fingerprint
+    while read -r fingerprint; do
+      printf 'pub:-:4096:1:0:::-:::scSC::::::23::0:\\n'
+      [[ "$fingerprint" != revoker:* ]] || printf 'rvk:::1::::::{'E' * 40}:80:\\n'
+      printf 'fpr:::::::::%s:\\nsub:-:4096:1:1::::::e::::::23:\\nfpr:::::::::{'F' * 40}:\\n' "${{fingerprint#revoker:}}"
+    done < "${{@: -1}}"
+  elif [[ " $* " == *' --dearmor '* ]]; then
+    cp -- "${{@: -1}}" "${{@: -2:1}}"
+  else
+    echo UNEXPECTED_GPG >&2; return 99
+  fi
+}}
+keyring() {{ printf '%s\\n' "${{@:2}}" > "$PWD/usr/share/keyrings/$1"; }}
+{body}
+aif_runner_microsoft_repository {kind} noble 24.04 "$PWD/work" "$apt"
+"""
+        return subprocess.run([BASH, "-c", script], cwd=directory, capture_output=True, text=True, timeout=30)
+
+    def snapshot(self, root: Path, name: str = "apt") -> dict[str, bytes]:
+        return {path.relative_to(root / name).as_posix(): path.read_bytes()
+                for path in (root / name).rglob("*") if path.is_file()}
+
+    def test_defender_source_with_official_key_is_reused_without_any_change(self) -> None:
+        for name, body in (
+            ("one-line", f"keyring microsoft-prod.gpg {self.OFFICIAL}\n"
+                         f"printf '%s\\n' \"{self.MDE}\" > \"$apt/sources.list.d/microsoft-prod.list\""),
+            ("deb822", f"keyring microsoft-prod.gpg {self.OFFICIAL}\n"
+                       "printf '%s\\n' 'Types: deb' "
+                       f"'URIs: {self.PROD}/' 'Suites: noble' 'Components: main' "
+                       "\"Signed-By: $PWD/usr/share/keyrings/microsoft-prod.gpg\" > \"$apt/sources.list.d/microsoft-prod.sources\""),
+            ("revoker", f"keyring microsoft-prod.gpg revoker:{self.OFFICIAL}\n"
+                        f"printf '%s\\n' \"{self.MDE}\" > \"$apt/sources.list.d/microsoft-prod.list\""),
+            ("sources.list", f"keyring microsoft-prod.gpg {self.OFFICIAL}\n"
+                             f"printf '%s\\n' '# comment' \"{self.MDE}\" > \"$apt/sources.list\""),
+        ):
+            with self.subTest(name=name), tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+                root = Path(directory)
+                result = self.run_fixture(root, body + '\ncp -R "$apt" "$PWD/apt-before"')
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(f"reusing: {self.PROD} noble", result.stdout)
+                self.assertIn("microsoft-prod.gpg", result.stdout)
+                self.assertEqual(self.snapshot(root), self.snapshot(root, "apt-before"))
+                self.assertEqual(len(self.snapshot(root)), 1)
+                self.assertFalse((root / "apt/keyrings").exists())
+                self.assertFalse((root / "mutations").exists())
+
+    def test_existing_source_without_the_official_key_fails_closed_and_names_the_file(self) -> None:
+        cases = (
+            ("other-key", f"keyring microsoft-prod.gpg {self.OTHER}", self.MDE),
+            ("extra-key", f"keyring microsoft-prod.gpg {self.OFFICIAL} {self.OTHER}", self.MDE),
+            ("extra-key-with-revoker", f"keyring microsoft-prod.gpg {self.OFFICIAL} revoker:{self.OTHER}", self.MDE),
+            ("missing-keyring", "", self.MDE),
+            ("no-signed-by", "", f"deb [arch=amd64] {self.PROD} noble main"),
+            ("fingerprint-signed-by", "", f"deb [signed-by={self.OFFICIAL}] {self.PROD} noble main"),
+        )
+        for name, keyring, line in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+                root = Path(directory)
+                result = self.run_fixture(root, f"{keyring}\nprintf '%s\\n' \"{line}\" > \"$apt/sources.list.d/microsoft-prod.list\"")
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("microsoft-prod.list", result.stderr)
+                self.assertIn(f"{self.PROD} noble", result.stderr)
+                self.assertIn(self.OFFICIAL, result.stderr)
+                self.assertEqual(set(self.snapshot(root)), {"sources.list.d/microsoft-prod.list"})
+                self.assertFalse((root / "mutations").exists())
+
+    def test_existing_defender_source_next_to_a_differing_own_source_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+            root = Path(directory)
+            result = self.run_fixture(root, f"""
+keyring microsoft-prod.gpg {self.OFFICIAL}
+printf '%s\\n' "{self.MDE}" > "$apt/sources.list.d/microsoft-prod.list"
+printf '%s\\n' "deb [arch=amd64 signed-by=$apt/keyrings/aifactory-microsoft.gpg] {self.PROD} noble main" > "$apt/sources.list.d/aifactory-powershell.list"
+""")
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("aifactory-powershell.list", result.stderr)
+            self.assertIn("microsoft-prod.list", result.stderr)
+            self.assertEqual(set(self.snapshot(root)), {"sources.list.d/microsoft-prod.list",
+                                                        "sources.list.d/aifactory-powershell.list"})
+            self.assertFalse((root / "mutations").exists())
+
+    def test_unrelated_disabled_or_commented_entries_keep_the_own_signed_source(self) -> None:
+        for kind, expected in (
+            ("powershell", f"deb [arch=amd64 signed-by=APT/keyrings/aifactory-microsoft.gpg] {self.PROD} noble main"),
+            ("azure-cli", "deb [arch=amd64 signed-by=APT/keyrings/aifactory-microsoft.gpg] "
+                          "https://packages.microsoft.com/repos/azure-cli/ noble main"),
+        ):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+                root = Path(directory)
+                result = self.run_fixture(root, f"""
+keyring other.gpg {self.OTHER}
+printf '%s\\n' "# {self.MDE}" "deb [signed-by=$PWD/usr/share/keyrings/other.gpg] {self.PROD} jammy main" \\
+  "deb [signed-by=$PWD/usr/share/keyrings/other.gpg] https://packages.microsoft.com/ubuntu/22.04/prod noble main" \\
+  > "$apt/sources.list.d/unrelated.list"
+printf '%s\\n' 'Types: deb' 'URIs: {self.PROD}' 'Suites: noble' 'Enabled: no' \\
+  "Signed-By: $PWD/usr/share/keyrings/other.gpg" > "$apt/sources.list.d/disabled.sources"
+printf '%s\\n' "deb [signed-by=$PWD/usr/share/keyrings/other.gpg] {self.PROD} noble main" > "$apt/sources.list.d/ignored.save"
+""", kind=kind)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                apt = str(root / "apt").replace("\\", "/")
+                own = root / f"apt/sources.list.d/aifactory-{kind}.list"
+                self.assertEqual(own.read_text(), expected.replace("APT", apt) + "\n")
+                self.assertEqual((root / "apt/keyrings/aifactory-microsoft.gpg").read_text(), self.OFFICIAL + "\n")
+                self.assertEqual((root / "mutations").read_text(), "download\n")
+                self.assertNotIn("reusing:", result.stdout)
+
+    def test_own_source_still_requires_the_official_download_and_refuses_replacement(self) -> None:
+        for name, body, message in (
+            ("download-mismatch", f"export AIF_TEST_DOWNLOAD={self.OTHER}", "fingerprint mismatch"),
+            ("download-extra-key", f"export AIF_TEST_DOWNLOAD='{self.OFFICIAL}\n{self.OTHER}'", "fingerprint mismatch"),
+            ("differing-own", "printf 'deb changed\\n' > \"$apt/sources.list.d/aifactory-powershell.list\"",
+             "Refusing to replace"),
+        ):
+            with self.subTest(name=name), tempfile.TemporaryDirectory(prefix=".runner-tests-", dir=ROOT) as directory:
+                root = Path(directory)
+                result = self.run_fixture(root, body)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(message, result.stderr)
+                if name == "differing-own":
+                    self.assertEqual((root / "apt/sources.list.d/aifactory-powershell.list").read_text(), "deb changed\n")
+                else:
+                    self.assertFalse((root / "apt/keyrings").exists())
+                    self.assertFalse((root / "apt/sources.list.d/aifactory-powershell.list").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
