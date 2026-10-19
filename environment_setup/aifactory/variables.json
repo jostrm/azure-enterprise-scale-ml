@@ -274,6 +274,7 @@
     "aifactoryMcpContainerAppsEnvironment": "",
     "aiGatewaySkuResourceId": "",
     "aiGatewaySkuOutboundSubnetId": "",
+    "aifactoryMcpClassicApimResourceIds": "",
     "aifactoryAgentEntraAppId": "",
     "aifactoryAgentContainerAppsEnvironment": "",
     "aifactoryAgentReaderObjectIds": "",

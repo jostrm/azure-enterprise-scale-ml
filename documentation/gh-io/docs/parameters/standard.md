@@ -100,6 +100,7 @@ These inputs apply only when you intentionally enable the corresponding
 | `aiGatewaySkuResourceId` | Adopting an existing gateway rather than creating one. |
 | `addAIFactoryMCP2AIGatewaySKU` plus both components | Registering MCP on the gateway. |
 | `aiGatewaySkuOutboundSubnetId` | Registration with a new gateway; an adopted gateway must already have suitable outbound networking. |
+| `aifactoryMcpClassicApimResourceIds` | Optional, with MCP hosting: classic APIM gateways that call the MCP with their system-assigned identity; an administrator assigns `AiFactory.Mcp.Read` to each identity. |
 
 All three switches default to false. False skips the component action; it does
 not delete existing resources. See [full prerequisites and mappings](advanced.md#mcp-and-ai-gateway-parameters).

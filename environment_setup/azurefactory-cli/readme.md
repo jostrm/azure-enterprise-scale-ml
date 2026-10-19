@@ -527,6 +527,7 @@ in that file is a `ConfigError` instead of a silent override:
 | `--aifactory-mcp-container-apps-environment` | `aifactoryMcpContainerAppsEnvironment` | internal project environment name, or empty |
 | `--ai-gateway-sku-resource-id` | `aiGatewaySkuResourceId` | existing gateway to adopt, or empty to create one |
 | `--ai-gateway-sku-outbound-subnet-id` | `aiGatewaySkuOutboundSubnetId` | outbound integration subnet ID |
+| `--aifactory-mcp-classic-apim-resource-ids` | `aifactoryMcpClassicApimResourceIds` | comma-separated classic APIM resource IDs allowed to call the MCP, or empty |
 
 ```powershell
 azurefactory config review --folder C:\legacy\aifactory --project-number 001 `

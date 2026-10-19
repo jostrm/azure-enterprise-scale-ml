@@ -331,6 +331,7 @@ jobs:
       aifactoryMcpContainerAppsEnvironment: ${{ vars.AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT || '' }}
       aiGatewaySkuResourceId: ${{ vars.AI_GATEWAY_SKU_RESOURCE_ID || '' }}
       aiGatewaySkuOutboundSubnetId: ${{ vars.AI_GATEWAY_SKU_OUTBOUND_SUBNET_ID || '' }}
+      aifactoryMcpClassicApimResourceIds: ${{ vars.AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS || '' }}
       aifactoryAgentEntraAppId: ${{ vars.AIFACTORY_AGENT_ENTRA_APP_ID || '' }}
       aifactoryAgentContainerAppsEnvironment: ${{ vars.AIFACTORY_AGENT_CONTAINER_APPS_ENVIRONMENT || '' }}
       aifactoryAgentReaderObjectIds: ${{ vars.AIFACTORY_AGENT_READER_OBJECT_IDS || '' }}

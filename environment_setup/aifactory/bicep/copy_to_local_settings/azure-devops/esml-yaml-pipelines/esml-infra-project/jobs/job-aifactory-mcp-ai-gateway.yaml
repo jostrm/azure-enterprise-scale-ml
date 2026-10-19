@@ -44,3 +44,4 @@ steps:
       aifactoryMcpContainerAppsEnvironment: '$(aifactoryMcpContainerAppsEnvironment)'
       aiGatewaySkuResourceId: '$(aiGatewaySkuResourceId)'
       aiGatewaySkuOutboundSubnetId: '$(aiGatewaySkuOutboundSubnetId)'
+      aifactoryMcpClassicApimResourceIds: '$(aifactoryMcpClassicApimResourceIds)'

@@ -25,6 +25,7 @@ INPUTS = {
     "aifactoryMcpContainerAppsEnvironment": "AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT",
     "aiGatewaySkuResourceId": "AI_GATEWAY_SKU_RESOURCE_ID",
     "aiGatewaySkuOutboundSubnetId": "AI_GATEWAY_SKU_OUTBOUND_SUBNET_ID",
+    "aifactoryMcpClassicApimResourceIds": "AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS",
 }
 VARIABLES_JSON = REPO_ROOT / "environment_setup/aifactory/variables.json"
 JOB = ADO_ROOT / "esml-infra-project" / "jobs" / "job-aifactory-mcp-ai-gateway.yaml"

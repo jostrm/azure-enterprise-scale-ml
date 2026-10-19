@@ -28,7 +28,10 @@ All three default to false. **False skips the step; it does not delete resources
 `aifactoryMcpImage`, `aifactoryMcpApiImage` and `aifactoryMcpEntraAppId` are required
 for MCP hosting. `aiGatewaySkuResourceId` selects an existing gateway to adopt;
 `aiGatewaySkuOutboundSubnetId` provides the new gateway's outbound subnet when
-registration needs it. The exact environment names and defaults are in the
+registration needs it. `aifactoryMcpClassicApimResourceIds` (optional, requires
+`enableAIFactoryMCP`) lists classic APIM gateways whose system-assigned identities may
+call the MCP; the APIMs are only read and an administrator assigns `AiFactory.Mcp.Read`
+to each identity. The exact environment names and defaults are in the
 generated tables below.
 
 Regular APIM pools (`ENABLE_APIM`), the optional Kong edge (`ENABLE_KONG`) and
@@ -403,18 +406,18 @@ python -m unittest discover -s environment_setup/unit-tests/test-bicep/unit -p t
 
 | Source | Unique public keys |
 |---|---:|
-| `yaml` | 392 |
-| `env` | 390 |
+| `yaml` | 393 |
+| `env` | 391 |
 | `bootstrap` | 92 |
 | `helper` | 17 |
 | `state` | 47 |
-| `json.dev` | 397 |
+| `json.dev` | 398 |
 
 Counts are source-qualified: a spelling present in YAML and JSON is covered in each source, not counted as two settings. Repeated template assignments are consolidated below (last assignment wins).
 
-- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 152, 415; one reference row.
-- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 153, 416; one reference row.
-- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 417, 441; one reference row.
+- Source duplicate: `env:ADMIN_COMMON_RESOURCE_SUFFIX`, lines 152, 416; one reference row.
+- Source duplicate: `env:ADMIN_PRJ_RESOURCE_SUFFIX`, lines 153, 417; one reference row.
+- Source duplicate: `env:USE_COMMON_ACR_OVERRIDE`, lines 418, 442; one reference row.
 
 ## YAML and variables.json reference
 
@@ -552,6 +555,7 @@ Exact YAML keys are under `variables:`; JSON paths are `<section>.<key>`. **Y** 
 | <!-- parameter yaml:aifactoryAgentVoiceLanguages --><!-- parameter json.dev:aifactoryAgentVoiceLanguages -->`aifactoryAgentVoiceLanguages` | `AIFACTORY_AGENT_VOICE_LANGUAGES` | O | Y: `""`<br>J.dev: `""` | Comma-separated speech input languages (BCP-47) for live voice keep-as-is: Empty uses en-US. Swedish needs an explicit entry such as sv-SE,en-US. Only read when enableAIFactoryAgentLiveVoice:'true'. |
 | <!-- parameter yaml:aifactoryAgentVoiceName --><!-- parameter json.dev:aifactoryAgentVoiceName -->`aifactoryAgentVoiceName` | `AIFACTORY_AGENT_VOICE_NAME` | O | Y: `""`<br>J.dev: `""` | Azure Speech voice used for spoken answers keep-as-is: Empty uses en-US-Ava:DragonHDLatestNeural. Only read when enableAIFactoryAgentLiveVoice:'true'. |
 | <!-- parameter yaml:aifactoryMcpApiImage --><!-- parameter json.dev:aifactoryMcpApiImage -->`aifactoryMcpApiImage` | `AIFACTORY_MCP_API_IMAGE` | C | Y: `""`<br>J.dev: `""` | Digest-pinned Factory API sidecar image mandatory: if enableAIFactoryMCP:'true'. Same format as aifactoryMcpImage. |
+| <!-- parameter yaml:aifactoryMcpClassicApimResourceIds --><!-- parameter json.dev:aifactoryMcpClassicApimResourceIds -->`aifactoryMcpClassicApimResourceIds` | `AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS` | O | Y: `""`<br>J.dev: `""` | Comma-separated resource IDs of classic API Management gateways (Microsoft.ApiManagement/service) allowed to call the AI Factory MCP keep-as-is: Requires enableAIFactoryMCP:'true'. Each APIM is only read (never modified); its system-assigned managed identity is added to the MCP application callers. An Entra admin assigns app role AiFactory.Mcp.Read to each identity; pipelines never write Microsoft Graph. |
 | <!-- parameter yaml:aifactoryMcpContainerAppsEnvironment --><!-- parameter json.dev:aifactoryMcpContainerAppsEnvironment -->`aifactoryMcpContainerAppsEnvironment` | `AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT` | O | Y: `""`<br>J.dev: `""` | Name of the internal project Container Apps environment hosting the MCP keep-as-is: Empty selects the single environment in the project resource group. |
 | <!-- parameter yaml:aifactoryMcpEntraAppId --><!-- parameter json.dev:aifactoryMcpEntraAppId -->`aifactoryMcpEntraAppId` | `AIFACTORY_MCP_ENTRA_APP_ID` | C | Y: `""`<br>J.dev: `""` | Client ID (GUID) of the MCP API app registration exposing app role AiFactory.Mcp.Read mandatory: if enableAIFactoryMCP:'true'. Created once by an Entra admin; pipelines never write Microsoft Graph. |
 | <!-- parameter yaml:aifactoryMcpImage --><!-- parameter json.dev:aifactoryMcpImage -->`aifactoryMcpImage` | `AIFACTORY_MCP_IMAGE` | C | Y: `""`<br>J.dev: `""` | Digest-pinned AI Factory MCP image mandatory: if enableAIFactoryMCP:'true'. Format |
@@ -882,6 +886,7 @@ Every unique assignment is included, including orchestrator-only and compatibili
 | <!-- parameter env:AIFACTORY_LOCATION -->`AIFACTORY_LOCATION` | `admin_location` | M | `"eastus2"` | Azure region mandatory: Azure region |
 | <!-- parameter env:AIFACTORY_LOCATION_SHORT -->`AIFACTORY_LOCATION_SHORT` | `admin_locationSuffix` | M | `"eus2"` | Region short name mandatory: Region short name |
 | <!-- parameter env:AIFACTORY_MCP_API_IMAGE -->`AIFACTORY_MCP_API_IMAGE` | `aifactoryMcpApiImage` | C | `""` | Digest-pinned Factory API sidecar image mandatory: if ENABLE_AI_FACTORY_MCP:'true'. |
+| <!-- parameter env:AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS -->`AIFACTORY_MCP_CLASSIC_APIM_RESOURCE_IDS` | `aifactoryMcpClassicApimResourceIds` | O | `""` | Comma-separated resource IDs of classic API Management gateways (Microsoft.ApiManagement/service) allowed to call the AI Factory MCP keep-as-is: Requires ENABLE_AI_FACTORY_MCP:'true'. Each APIM is only read (never modified); its system-assigned managed identity is added to the MCP application callers. An Entra admin assigns app role AiFactory.Mcp.Read to each identity; pipelines never write Microsoft Graph. |
 | <!-- parameter env:AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT -->`AIFACTORY_MCP_CONTAINER_APPS_ENVIRONMENT` | `aifactoryMcpContainerAppsEnvironment` | O | `""` | Name of the internal project Container Apps environment hosting the MCP keep-as-is: Empty selects the single environment in the project resource group. |
 | <!-- parameter env:AIFACTORY_MCP_ENTRA_APP_ID -->`AIFACTORY_MCP_ENTRA_APP_ID` | `aifactoryMcpEntraAppId` | C | `""` | Client ID (GUID) of the MCP API app registration exposing app role AiFactory.Mcp.Read mandatory: if ENABLE_AI_FACTORY_MCP:'true'. Created once by an Entra admin; pipelines never write Microsoft Graph. |
 | <!-- parameter env:AIFACTORY_MCP_IMAGE -->`AIFACTORY_MCP_IMAGE` | `aifactoryMcpImage` | C | `""` | Digest-pinned AI Factory MCP image mandatory: if ENABLE_AI_FACTORY_MCP:'true'. Format |

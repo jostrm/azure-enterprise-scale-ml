@@ -96,6 +96,9 @@ MCP_GATEWAY_OPTIONS = (
      "Existing AI Gateway SKU resource ID to adopt (never modified); empty creates an owned gateway."),
     ("--ai-gateway-sku-outbound-subnet-id", "aiGatewaySkuOutboundSubnetId", None,
      "Subnet ID for AI Gateway outbound VNet integration (needed to register the private MCP)."),
+    ("--aifactory-mcp-classic-apim-resource-ids", "aifactoryMcpClassicApimResourceIds", None,
+     "Comma-separated classic APIM (Microsoft.ApiManagement/service) resource IDs whose system-assigned "
+     "identities may call the MCP (requires enableAIFactoryMCP; APIMs are only read)."),
 )
 LIVE_VOICE_OPTIONS = (
     ("--enable-aifactory-agent-live-voice", "enableAIFactoryAgentLiveVoice", BOOLEAN,

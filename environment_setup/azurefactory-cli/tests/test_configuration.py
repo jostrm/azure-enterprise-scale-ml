@@ -271,6 +271,9 @@ def test_configuration_roundtrip_against_canonical_api_preserves_unknown_json(mo
 
 MCP_SCOPE = ["--folder", r"C:\aifactory", "--project-number", "001"]
 MCP_IMAGE = "acrcommon.azurecr.io/aifactory-mcp@sha256:" + "a" * 64
+CLASSIC_APIM_IDS = ",".join(
+    f"/subscriptions/x/resourceGroups/rg/providers/Microsoft.ApiManagement/service/{name}"
+    for name in ("apim-a", "apim-b"))
 
 
 @pytest.mark.parametrize("command", ["review", "save"])
@@ -284,6 +287,7 @@ def test_dedicated_mcp_gateway_options_map_to_exact_variable_names(command):
         "--aifactory-mcp-api-image", MCP_IMAGE, "--aifactory-mcp-entra-app-id", "33333333-3333-4333-8333-333333333333",
         "--aifactory-mcp-container-apps-environment", "aca-env-prj001",
         "--ai-gateway-sku-resource-id", "", "--ai-gateway-sku-outbound-subnet-id", "/subscriptions/x/subnets/y",
+        "--aifactory-mcp-classic-apim-resource-ids", CLASSIC_APIM_IDS,
     ])
     assert cli.configuration_changes(args) == {
         "enableAIFactoryMCP": "true", "enableFactoryChatAgent": "true",
@@ -292,6 +296,7 @@ def test_dedicated_mcp_gateway_options_map_to_exact_variable_names(command):
         "aifactoryMcpEntraAppId": "33333333-3333-4333-8333-333333333333",
         "aifactoryMcpContainerAppsEnvironment": "aca-env-prj001", "aiGatewaySkuResourceId": "",
         "aiGatewaySkuOutboundSubnetId": "/subscriptions/x/subnets/y",
+        "aifactoryMcpClassicApimResourceIds": CLASSIC_APIM_IDS,
     }
     assert cli.configuration_changes(cli.build_parser().parse_args(["config", command, *MCP_SCOPE, *extra])) == {}
 
