@@ -63,6 +63,26 @@ from the operator after the all-project barrier and deletes the covered hub and
 runner closure last. ARM back-references (NIC virtualMachine, disk managedBy,
 public IP ipConfiguration) name dependents, not dependencies.
 
+Bootstrap operator teardown (bootstrap-operator-teardown-v1)
+-------------------------------------------------------------
+bootstrap_operator_teardown advertises this separate contract for a factory whose Full
+bootstrap created its groups but that was never registered or enrolled, so it has no lease
+store, route or pipeline. freeze_bootstrap_teardown(cloud, request) is read-only. The request
+names the exact scopes (equal to the consumed bootstrap record's groups), the record's
+created resource roots and hash, read-only hub_scopes (configured connectivity hub groups)
+and protected_resource_ids that may not overlap any scope. Every resource in scope must be
+tagged for exactly this factory/scale set or covered by the record; anything unowned, shared
+or protected, any project resource (those need project pipelines), site links, vWAN and
+ExpressRoute block. Connectivity types (VPN gateway, Bastion, DNS private resolver) pass
+only when record-covered. The frozen inventory also lists the hub-side DNS zone/ruleset links
+and peerings, plus this factory's own side of each hub peering, whose remote is one of this
+factory's VNets; nothing else in a hub is ever touched.
+execute_bootstrap_teardown(manifest, receipt_path) runs as the operator: it re-verifies
+identity, the exact frozen inventory, delete permissions and that no deployment is active,
+removes those exact links first, then deletes resources in dependency order with groups last,
+re-verifying fresh inventory before each delete in place of leases, and writes a local
+receipt. Drift before the first delete blocks; anything later requires reconciliation.
+
 Receipts and infinite Blob leases survive uncertain dispatch, provider failure,
 permission denial and incomplete teardown. Calling the same cohort with the same
 execution directory observes persisted run IDs instead of redispatching. Local

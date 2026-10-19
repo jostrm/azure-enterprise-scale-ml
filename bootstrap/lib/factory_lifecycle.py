@@ -261,6 +261,22 @@ def execute_factory_deletion_cohort(documents, source_root, execution_root, rece
         documents, source_root, execution_root, receipt_path, cloud_factory or Cloud, lock_factory)
 
 
+def freeze_bootstrap_teardown(cloud, document):
+    return factory_deletion_module().freeze_teardown(cloud, document)
+
+
+def validate_bootstrap_teardown(document, require_unexpired=False):
+    return factory_deletion_module().validate_teardown(document, require_unexpired=require_unexpired)
+
+
+def teardown_digest(document):
+    return factory_deletion_module().teardown_digest(document)
+
+
+def execute_bootstrap_teardown(document, receipt_path, cloud=None, sleep=time.sleep):
+    return factory_deletion_module().execute_teardown(document, receipt_path, cloud, sleep)
+
+
 def scoped_template(document):
     return SCOPED_SOURCE + ("single-writer-" if single_writer(document) else "") + document["route"]["kind"] + ".yml"
 
@@ -669,6 +685,7 @@ def capabilities():
         "factory_deletion_pipeline": "ordered-project-pipelines-v1",
         "factory_deletion_pipeline_coordination_modes": ["blob"],
         "factory_deletion_access_hub": "factory-owned-access-hub-v1",
+        "bootstrap_operator_teardown": "bootstrap-operator-teardown-v1",
         "factory_deletion_coordination_modes": ["blob", "single-writer"],
         "selective_project_deletion": SELECTIVE_PROJECT_DELETE,
         "factory_cohort": "physical-lease-cohort-v1",

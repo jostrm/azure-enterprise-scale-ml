@@ -15,18 +15,20 @@ CONTRACT = "ordered-project-pipelines-v1"
 HUB_CONTRACT = "factory-owned-access-hub-v1"
 DELETE_FLAGS = ("enableDeleteForDisabledResources", "deleteAllServicesForProject",
                 "deleteKeyvaultAlso", "deleteAllForProject")
-# Reusable VPN/hub/connectivity platform types. Only an integrated hub's own VPN gateway and
-# Bastion may be deleted, and only with catalog bootstrap proof; site links, vWAN and
-# ExpressRoute constructs always stay protected.
+# Reusable VPN/hub/connectivity platform types. Only a factory's own bootstrap-built VPN gateway,
+# Bastion and DNS private resolver may be deleted, and only with bootstrap proof; site links,
+# vWAN and ExpressRoute constructs always stay protected.
 PROTECTED_TYPES = {
     "microsoft.network/virtualnetworkgateways", "microsoft.network/vpngateways",
     "microsoft.network/vpnsites", "microsoft.network/virtualhubs",
     "microsoft.network/virtualwans", "microsoft.network/bastionhosts",
     "microsoft.network/expressroutecircuits", "microsoft.network/connections",
     "microsoft.network/p2svpngateways", "microsoft.network/vpnserverconfigurations",
-    "microsoft.network/localnetworkgateways",
+    "microsoft.network/localnetworkgateways", "microsoft.network/dnsresolvers",
+    "microsoft.network/dnsforwardingrulesets",
 }
-HUB_DELETABLE_TYPES = {"microsoft.network/virtualnetworkgateways", "microsoft.network/bastionhosts"}
+HUB_DELETABLE_TYPES = {"microsoft.network/virtualnetworkgateways", "microsoft.network/bastionhosts",
+                       "microsoft.network/dnsresolvers", "microsoft.network/dnsforwardingrulesets"}
 # Child resources that attach a hub to a network; each must target only this factory's VNets.
 HUB_LINK_TARGETS = {
     "microsoft.network/privatednszones/virtualnetworklinks": "virtualNetwork",
@@ -811,3 +813,301 @@ def execute_cohort(documents, source_root, execution_root, receipt_path, cloud_f
         for cloud in clouds:
             cloud.tokens.clear()
     return aggregate
+
+
+# --- bootstrap-operator-teardown-v1 -------------------------------------------------------
+# A factory whose Full bootstrap created its groups but that was never registered or enrolled
+# has no lease store, route or pipeline. The operator tears it down from frozen, reviewed
+# inventory: fresh identity, inventory and active-deployment checks stand in for leases.
+
+TEARDOWN_CONTRACT = "bootstrap-operator-teardown-v1"
+TEARDOWN_SOURCE = "bootstrap-record"
+RECORD_CONTRACT = "consumed-bootstrap-stage-evidence-v1"
+# Audited child collections that link a hub to a spoke network, with fixed API versions.
+HUB_LINK_COLLECTIONS = {
+    "microsoft.network/privatednszones": ("virtualNetworkLinks", "2024-06-01"),
+    "microsoft.network/dnsforwardingrulesets": ("virtualNetworkLinks", "2022-07-01"),
+    "microsoft.network/virtualnetworks": ("virtualNetworkPeerings", "2024-05-01"),
+}
+PEERING_TYPE = "microsoft.network/virtualnetworks/virtualnetworkpeerings"
+
+
+class _OperatorTeardown:
+    """Stands in for leases: there is no enrollment to lease, so callers re-verify fresh state."""
+
+    held = {}
+
+    def __init__(self, document):
+        self.document = document
+
+    def assert_held(self):
+        return None
+
+    def authorize(self, document):
+        fl.require(document is self.document, "bootstrap-teardown-document-changed")
+
+
+def teardown_digest(document):
+    return fl.digest({key: value for key, value in document.items() if key != "manifest_hash"})
+
+
+def _sorted_ids(values, pattern, allow_empty=False):
+    return (isinstance(values, list) and (allow_empty or values) and values == sorted(set(values))
+            and all(isinstance(value, str) and value == value.lower() and pattern.fullmatch(value)
+                    for value in values))
+
+
+def _overlaps(left, right):
+    return left == right or left.startswith(right + "/") or right.startswith(left + "/")
+
+
+def _remote(body):
+    field = HUB_LINK_TARGETS.get(fl.resource_type_from_id(str(body.get("id", "")).lower()))
+    value = ((body.get("properties") or {}).get(field) or {}).get("id") if field else None
+    return value.lower() if isinstance(value, str) else ""
+
+
+def _request(document):
+    return {key: value for key, value in document.items() if key not in ("deletion", "manifest_hash")}
+
+
+def validate_teardown_request(document):
+    target = document.get("target") if isinstance(document, dict) else None
+    record = document.get("bootstrap_record") if isinstance(document, dict) else None
+    fl.require(isinstance(document, dict) and document.get("schema") == 1
+               and document.get("contract") == TEARDOWN_CONTRACT and fl.guid(document.get("run_id"))
+               and isinstance(target, dict) and all(isinstance(target.get(key), str) and target[key]
+                                                    for key in ("factory_id", "scaleset_id"))
+               and target.get("environment") in ("dev", "stage", "prod")
+               and fl.guid(target.get("tenant_id")) and fl.guid(target.get("subscription_id"))
+               and fl.guid((document.get("identity") or {}).get("object_id"))
+               and isinstance((document.get("source") or {}).get("commit"), str)
+               and re.fullmatch(r"[0-9a-f]{40}", document["source"]["commit"])
+               and _sorted_ids(document.get("scopes"), fl.RG_ID)
+               and all(scope.split("/")[2] == target["subscription_id"].lower() for scope in document["scopes"])
+               and isinstance(record, dict) and record.get("contract") == RECORD_CONTRACT
+               and fl.guid(record.get("workflow_id")) and fl.hash_value(record.get("record_hash"))
+               and record.get("groups") == document["scopes"]
+               and _sorted_ids(record.get("resources"), fl.NESTED_ID, allow_empty=True)
+               and all(fl.arm_scope(value) in document["scopes"] for value in record["resources"])
+               and _sorted_ids(document.get("hub_scopes"), fl.RG_ID, allow_empty=True)
+               and not set(document["hub_scopes"]) & set(document["scopes"])
+               and isinstance(document.get("protected_resource_ids"), list)
+               and all(isinstance(value, str) and value == value.lower()
+                       and (fl.RG_ID.fullmatch(value) or fl.NESTED_ID.fullmatch(value))
+                       for value in document["protected_resource_ids"])
+               and not any(_overlaps(scope, value) for scope in document["scopes"]
+                           for value in document["protected_resource_ids"]),
+               "bootstrap-teardown-request-invalid")
+    prepared, expires = fl.timestamp(document.get("prepared_at")), fl.timestamp(document.get("expires_at"))
+    fl.require(0 < expires - prepared <= 3600, "bootstrap-teardown-request-invalid")
+
+
+def _hub_links(cloud, document, factory_vnets):
+    """Only links and peerings in the configured hub groups whose remote is one of this factory's VNets."""
+    links, hub_vnets = [], set()
+    for scope in document["hub_scopes"]:
+        for row in cloud.list_resources(scope):
+            key = str(row.get("id", "")).lower()
+            fl.require(fl.arm_scope(key) == scope, "bootstrap-teardown-hub-inventory-incomplete")
+            kind = fl.resource_type_from_id(key)
+            if kind == "microsoft.network/virtualnetworks":
+                hub_vnets.add(key)
+            if kind not in HUB_LINK_COLLECTIONS:
+                continue
+            child, api = HUB_LINK_COLLECTIONS[kind]
+            items, unsupported = cloud.collection(row["id"] + "/" + child, api)
+            fl.require(unsupported is None and isinstance(items, list),
+                       "bootstrap-teardown-hub-inventory-incomplete")
+            for item in items:
+                identifier = str(item.get("id", "")).lower()
+                fl.require(identifier.startswith(key + "/") and fl.NESTED_ID.fullmatch(identifier),
+                           "bootstrap-teardown-hub-inventory-incomplete")
+                if _remote(item) in factory_vnets:
+                    links.append({"id": item["id"], "type": fl.resource_type_from_id(identifier), "api_version": api,
+                                  "remote_virtual_network_id": _remote(item), "side": "hub"})
+    return links, hub_vnets
+
+
+def freeze_teardown(cloud, document):
+    validate_teardown_request(document)
+    cloud.verify_identity()
+    scopes = document["scopes"]
+    closure, bodies = fl.collect_resource_closure(cloud, scopes)
+    fl.verify_deletion_identity(document, bodies)
+    record = document["bootstrap_record"]
+    proof = {"resource_ids": record["resources"]}
+    explicit = set(document["protected_resource_ids"])
+    core = {key: document["target"][key] for key in ("factory_id", "scaleset_id")}
+    entries = {}
+    for key, body in bodies.items():
+        tags = body.get("tags") or {}
+        fl.require(isinstance(tags, dict), "malformed-project-ownership-tags")
+        owner = {field: tags[tag] for field, tag in fl.TAG_KEYS.items() if tag in tags}
+        group = key in closure["groups"]
+        covered = key in record["groups"] or hub_covers(proof, key)
+        fl.require(all(owner.get(field, value) == value for field, value in core.items()),
+                   "bootstrap-teardown-owner-conflict")
+        fl.require(owner or covered, "bootstrap-teardown-unowned-resource")
+        # Connectivity types pass only as bootstrap-recorded parts of the factory's own hub.
+        fl.require(not protected(body, explicit, proof), "bootstrap-teardown-protected-resource")
+        fl.require(group or not owner.get("project_id"), "bootstrap-teardown-project-resources-require-pipelines")
+        fl.require(not fl.managed_group_cascades(body, document["target"]["subscription_id"]),
+                   "bootstrap-teardown-managed-group-unsupported")
+        metadata = closure["groups"].get(key, closure["resources"].get(key))
+        fl.require(group or str(metadata["type"]).lower() not in (
+            "microsoft.authorization/locks", "microsoft.authorization/denyassignments"),
+                   "factory-delete-lock-or-deny-present")
+        entries[key] = {"id": body["id"], **metadata, "delete": True, "project_number": None,
+                        "ownership_source": "tags" if owner else TEARDOWN_SOURCE, "owner": owner or dict(core),
+                        "managed_group_ids": [], "depends_on": fl.project_resource_dependencies(body)}
+    operations = {}
+    for key, item in entries.items():
+        if key in closure["groups"]:
+            continue
+        namespace = item["type"].split("/", 1)[0]
+        if namespace not in operations:
+            operations[namespace] = set(cloud.provider_operations(namespace))
+        item["independent_delete"] = item["type"].lower() + "/delete" in operations[namespace]
+    for key, item in entries.items():
+        if key in closure["groups"] or item["independent_delete"]:
+            continue
+        parents = [parent for parent, candidate in entries.items() if key.startswith(parent + "/")
+                   and candidate.get("independent_delete") is True]
+        fl.require(parents and phase(item) not in (0, 1), "factory-delete-service-lifecycle-unsupported")
+        item["delete_via_parent"] = max(parents, key=len)
+    factory_vnets = {key for key in bodies if not fl.RG_ID.fullmatch(key)
+                     and fl.resource_type_from_id(key) == "microsoft.network/virtualnetworks"}
+    links, hub_vnets = _hub_links(cloud, document, factory_vnets)
+    # This factory's own side of each hub peering goes in the same unlink stage.
+    links += [{"id": entries[key]["id"], "type": PEERING_TYPE, "api_version": entries[key]["api_version"],
+               "remote_virtual_network_id": _remote(bodies[key]), "side": "factory"}
+              for key in bodies if not fl.RG_ID.fullmatch(key)
+              and fl.resource_type_from_id(key) == PEERING_TYPE and _remote(bodies[key]) in hub_vnets]
+    resources = [entries[key] for key in sorted(closure["resources"])]
+    data = {"inventory_mode": TEARDOWN_CONTRACT, "inventory_complete": True,
+            "flags": dict.fromkeys(DELETE_FLAGS, True), "resource_groups": [entries[key] for key in sorted(closure["groups"])],
+            "resources": resources, "inventory_hash": fl.digest(resources), "closure": closure,
+            "closure_hash": fl.digest(closure), "bodies": bodies,
+            "hub_links": sorted(links, key=lambda row: row["id"].lower()),
+            "factory_virtual_networks": sorted(factory_vnets), "hub_virtual_networks": sorted(hub_vnets),
+            "request_hash": fl.digest(_request(document))}
+    validate_teardown({**document, "deletion": data}, check_hash=False)
+    for scope in scopes:
+        cloud.assert_no_active_deployments(scope)
+    verify_permissions(cloud, data)
+    verify_permissions(cloud, {"resource_groups": [], "resources": [
+        {"id": row["id"], "type": row["type"], "delete": True, "depends_on": []}
+        for row in data["hub_links"] if row["side"] == "hub"]})
+    return data
+
+
+def validate_teardown(document, require_unexpired=False, check_hash=True):
+    validate_teardown_request(document)
+    fl.require(not check_hash or document.get("manifest_hash") == teardown_digest(document),
+               "bootstrap-teardown-hash-mismatch")
+    fl.require(not require_unexpired or time.time() < fl.timestamp(document["expires_at"]),
+               "bootstrap-teardown-expired")
+    data = document.get("deletion")
+    fl.require(isinstance(data, dict) and data.get("inventory_mode") == TEARDOWN_CONTRACT
+               and data.get("inventory_complete") is True and data.get("request_hash") == fl.digest(_request(document))
+               and data.get("inventory_hash") == fl.digest(data.get("resources"))
+               and data.get("closure_hash") == fl.digest(data.get("closure")) and isinstance(data.get("bodies"), dict),
+               "bootstrap-teardown-inventory-unbound")
+    validate_flags(data.get("flags"))
+    groups, resources = data["resource_groups"], data["resources"]
+    entries = {row["id"].lower(): row for row in groups + resources}
+    fl.require({row["id"].lower() for row in groups} == set(document["scopes"])
+               and len(entries) == len(groups + resources) and set(entries) == set(data["bodies"]),
+               "bootstrap-teardown-inventory-unbound")
+    record = document["bootstrap_record"]
+    proof = {"resource_ids": record["resources"]}
+    for key, row in entries.items():
+        body = data["bodies"][key]
+        fl.require(row.get("delete") is True and row.get("body_hash") == fl.digest(body)
+                   and fl.arm_scope(key) in document["scopes"] and row.get("project_number") is None
+                   and row.get("managed_group_ids") == [], "bootstrap-teardown-inventory-unbound")
+        fl.require(not protected(body, document["protected_resource_ids"], proof),
+                   "bootstrap-teardown-protected-resource")
+        fl.require(row.get("ownership_source") == "tags" or (
+            row.get("ownership_source") == TEARDOWN_SOURCE and (key in record["groups"] or hub_covers(proof, key))),
+                   "bootstrap-teardown-unowned-resource")
+        if not fl.RG_ID.fullmatch(key):
+            fl.require(type(row.get("independent_delete")) is bool, "factory-delete-provider-delete-proof-required")
+            if not row["independent_delete"]:
+                parent = row.get("delete_via_parent", "")
+                fl.require(parent in entries and key.startswith(parent + "/")
+                           and entries[parent].get("independent_delete") is True and phase(row) not in (0, 1),
+                           "factory-delete-service-cascade-unreviewed")
+    vnets = {key for key in entries if not fl.RG_ID.fullmatch(key)
+             and fl.resource_type_from_id(key) == "microsoft.network/virtualnetworks"}
+    links = data.get("hub_links")
+    fl.require(data.get("factory_virtual_networks") == sorted(vnets)
+               and _sorted_ids(data.get("hub_virtual_networks"), fl.NESTED_ID, allow_empty=True)
+               and all(fl.arm_scope(value) in document["hub_scopes"] for value in data["hub_virtual_networks"])
+               and isinstance(links, list) and links == sorted(links, key=lambda row: row["id"].lower())
+               and len({row["id"].lower() for row in links}) == len(links),
+               "bootstrap-teardown-hub-links-invalid")
+    for row in links:
+        key = row["id"].lower()
+        fl.require(row.get("type") in HUB_LINK_TARGETS and row["type"] == fl.resource_type_from_id(key)
+                   and isinstance(row.get("api_version"), str)
+                   and (row.get("side") == "hub" and fl.arm_scope(key) in document["hub_scopes"]
+                        and row.get("remote_virtual_network_id") in vnets
+                        or row.get("side") == "factory" and key in entries and row["type"] == PEERING_TYPE
+                        and row.get("remote_virtual_network_id") in data["hub_virtual_networks"]
+                        and _remote(data["bodies"][key]) == row["remote_virtual_network_id"]),
+                   "bootstrap-teardown-hub-links-invalid")
+    ordered_resources(groups + resources)
+
+
+def execute_teardown(document, receipt_path, cloud=None, sleep=time.sleep):
+    document = json.loads(fl.canonical(document))
+    validate_teardown(document, require_unexpired=True)
+    receipt_path = fl.clean_path(receipt_path)
+    cloud = cloud or fl.Cloud(document)
+    data = document["deletion"]
+    receipt = {"schema": 1, "contract": TEARDOWN_CONTRACT, "run_id": document["run_id"],
+               "manifest_hash": document["manifest_hash"], "source_commit": document["source"]["commit"],
+               "target": document["target"], "status": "running", "mutation_started": False,
+               "deleted_hub_links": [], "deleted_resources": [], "observed_absent": []}
+
+    def persist():
+        receipt["updated_at"] = fl.utc_now()
+        fl.write_receipt(receipt_path, receipt)
+
+    lease = _OperatorTeardown(document)
+    try:
+        persist()
+        cloud.verify_identity()
+        for scope in document["scopes"]:
+            cloud.assert_no_active_deployments(scope)
+        receipt["observed_absent"] = observed_absent(cloud, document)
+        fl.verify_project_inventory(cloud, document, receipt["observed_absent"])
+        verify_permissions(cloud, data, receipt["observed_absent"])
+        # Unlink first: this factory's own hub DNS links and both sides of its hub peerings.
+        for link in data["hub_links"]:
+            status, _, body = cloud.arm("GET", link["id"], link["api_version"], allowed=(200, 404))
+            if status != 404:
+                fl.require(_remote(body) == link["remote_virtual_network_id"], "bootstrap-teardown-hub-link-changed")
+                receipt.update(mutation_started=True, pending_resource=link["id"])
+                persist()
+                cloud.arm("DELETE", link["id"], link["api_version"], allowed=(200, 202, 204, 404),
+                          headers={"If-Match": body["etag"]} if body.get("etag") else None)
+                fl.wait_absent(cloud, lease, link["id"], link["api_version"], sleep)
+                receipt.pop("pending_resource", None)
+            receipt["deleted_hub_links"].append(link["id"])
+            if link["side"] == "factory":
+                receipt["deleted_resources"].append(link["id"])
+            persist()
+        delete_rows(cloud, lease, document, receipt, persist,
+                    [row for row in data["resources"] + data["resource_groups"] if row["delete"]], sleep)
+        fl.verify_project_inventory(cloud, document, receipt["deleted_resources"] + receipt["observed_absent"])
+        receipt["status"] = "succeeded"
+    except BaseException as error:
+        receipt["status"] = "reconciliation-required" if receipt["mutation_started"] else "blocked"
+        receipt.update(fl.failure_fields(error, "unexpected-bootstrap-teardown-failure"))
+    finally:
+        getattr(cloud, "tokens", {}).clear()
+    persist()
+    return receipt
