@@ -17,6 +17,7 @@ import errno
 import fnmatch
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import re
@@ -25,15 +26,18 @@ import socket
 import ssl
 import subprocess
 import sys
+import threading
 import time
 import types
 import zlib
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from http.client import IncompleteRead
+from http.client import HTTPSConnection, IncompleteRead, RemoteDisconnected
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urlencode, urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
+from urllib.response import addinfourl
 from uuid import uuid4
 
 
@@ -60,6 +64,10 @@ WSANO_DATA = 11004
 # A retry-admission budget, not cancellation of an in-flight socket operation.
 READ_TRANSPORT_RETRY_WINDOW_SECONDS = 180
 REMOTE_SOCKET_TIMEOUT_SECONDS = 60
+# Read-ahead threads for one resource-closure walk, so also its most ARM reads in flight at once.
+RESOURCE_CLOSURE_READ_WORKERS = 8
+# How a pooled connection the server already closed while idle fails on its next request.
+STALE_CONNECTION_ERRORS = (RemoteDisconnected, ConnectionResetError, ConnectionAbortedError, BrokenPipeError)
 ARM = "https://management.azure.com"
 SOURCE_ORIGIN = "https://github.com/jostrm/azure-enterprise-scale-ml"
 GUID = r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
@@ -724,15 +732,89 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
+class KeepAliveHTTPSHandler(HTTPSHandler):
+    """Pooled keep-alive HTTPS for GET/HEAD (Object Pool); every other request is unchanged.
+
+    urllib opens a TCP connection and TLS session per request and sends `Connection: close`,
+    which cost minutes across a closure's thousands of reads. A read here borrows an idle
+    connection to its host (one per concurrent reader), drains the body up to `max_body`,
+    and returns the connection only when the response was complete and the server keeps it
+    open. Writes and proxy-tunnelled requests keep urllib's own path, and HTTP errors still
+    flow through the opener's processors (HTTPError, NoRedirect).
+    """
+
+    def __init__(self, context=None, connection_factory=HTTPSConnection, max_body=MAX_DOCUMENT + 1, max_idle=16):
+        super().__init__(context=context)
+        self._factory, self._max_body, self._max_idle = connection_factory, max_body, max_idle
+        self._idle, self._lock = {}, threading.Lock()
+
+    def https_open(self, request):
+        method = request.get_method()
+        if method not in ("GET", "HEAD") or request.data is not None or request._tunnel_host:
+            return super().https_open(request)
+        # The same headers urllib's do_open sends, without its `Connection: close`.
+        headers = dict(request.unredirected_hdrs)
+        headers.update({name: value for name, value in request.headers.items() if name not in headers})
+        headers = {name.title(): value for name, value in headers.items()}
+        timeout = socket.getdefaulttimeout() if request.timeout is socket._GLOBAL_DEFAULT_TIMEOUT else request.timeout
+        for attempt in (1, 2):
+            connection, reused = self._borrow(request.host, timeout, fresh=attempt > 1)
+            answered = False
+            try:
+                try:
+                    connection.request(method, request.selector, headers=headers)
+                except OSError as error:
+                    raise URLError(error)
+                response = connection.getresponse()
+                answered = True
+                body = response.read(self._max_body)
+                reusable = response.isclosed() and not response.will_close
+                response.close()
+            except BaseException as error:
+                connection.close()
+                reason = error.reason if isinstance(error, URLError) else error
+                if reused and not answered and isinstance(reason, STALE_CONNECTION_ERRORS):
+                    continue  # the server closed this idle connection; a read is safe to send again
+                raise
+            self._give_back(request.host, connection, reusable)
+            result = addinfourl(io.BytesIO(body), response.headers, request.full_url, response.status)
+            result.msg = response.reason
+            return result
+
+    def _borrow(self, host, timeout, fresh=False):
+        with self._lock:
+            idle = self._idle.get(host)
+            connection = idle.pop() if idle and not fresh else None
+        if connection is None:
+            return self._factory(host, timeout=timeout, context=self._context), False
+        connection.timeout = timeout
+        if connection.sock is not None:
+            connection.sock.settimeout(timeout)
+        return connection, True
+
+    def _give_back(self, host, connection, reusable):
+        if reusable:
+            with self._lock:
+                idle = self._idle.setdefault(host, [])
+                if len(idle) < self._max_idle:
+                    idle.append(connection)
+                    return
+        connection.close()
+
+
 class Cloud:
     """No shell expansion, CLI output passthrough, interactive auth or write retries."""
+
+    closure_read_workers = RESOURCE_CLOSURE_READ_WORKERS
 
     def __init__(self, document, command_runner=None, opener=None, expected_object_id=None):
         self.document = document
         self.runner = command_runner or subprocess.run
-        self.opener = opener or build_opener(NoRedirect)
+        self.opener = opener or build_opener(NoRedirect, KeepAliveHTTPSHandler())
         self.tokens = {}
         self.token_expiries = {}
+        # Closure reads run on worker threads: one refresh per audience, never a torn cache.
+        self.token_lock = threading.RLock()
         self.expected_object_id = expected_object_id or document["identity"]["object_id"]
         self.pipeline_identity = expected_object_id is not None
         self.workload_client_id = None
@@ -769,6 +851,10 @@ class Cloud:
         return result.stdout.strip()
 
     def token(self, audience):
+        with self.token_lock:
+            return self._token(audience)
+
+    def _token(self, audience):
         require(not single_writer(self.document) or audience.rstrip("/") != "https://storage.azure.com",
                 "single-writer-storage-access-forbidden")
         if self.token_expiries.get(audience, 0) <= time.time() + 60:
@@ -866,9 +952,10 @@ class Cloud:
             require(user.get("type") == "servicePrincipal" and guid(user.get("name")),
                     "github-pipeline-principal-required")
             self.workload_client_id = user["name"]
-        self.tokens.clear()
-        self.token_expiries.clear()
-        self.token(ARM)
+        with self.token_lock:
+            self.tokens.clear()
+            self.token_expiries.clear()
+            self.token(ARM)
 
     def request(self, method, url, audience, data=None, headers=None, allowed=(200,)):
         parsed = urlsplit(url)
@@ -1153,15 +1240,60 @@ def resource_references(body):
     return result
 
 
+class ClosureReads:
+    """Read-ahead for one resource-closure walk (Proxy over the cloud's read calls).
+
+    The walk still makes and consumes every read in its serial order. A read may only start
+    earlier, on at most `workers` threads, and each started read is consumed at most once;
+    its outcome (a value, Blocked or any other error) surfaces where the serial walk makes
+    that call. So the closure, its digests, its insertion order and its failure codes are
+    those of a serial walk over the same responses. With one worker every read runs inline.
+    """
+
+    def __init__(self, cloud, workers):
+        self.cloud, self.started, self.consumed = cloud, {}, set()
+        self.pool = (ThreadPoolExecutor(max_workers=workers, thread_name_prefix="aifactory-closure-read")
+                     if workers > 1 else None)
+
+    def run(self, read):
+        name, args, options = read
+        return getattr(self.cloud, name)(*args, **dict(options))
+
+    def prefetch(self, read):
+        if self.pool is not None and read not in self.started and read not in self.consumed:
+            self.started[read] = self.pool.submit(self.run, read)
+
+    def get(self, read):
+        if self.pool is None:
+            return self.run(read)
+        future = self.started.pop(read, None) or self.pool.submit(self.run, read)
+        self.consumed.add(read)
+        return future.result()
+
+    def close(self):
+        if self.pool is not None:
+            self.pool.shutdown(wait=True, cancel_futures=True)
+
+
 def collect_resource_closure(cloud, scopes, resource_versions=None):
     """Complete registered child-resource closure, including scoped extensions.
 
     Unsupported list endpoints fail closed. Known inline ARM child operations
     are covered by the full parent body fingerprint, not invented resources.
+    Reads run ahead on the cloud's bounded `closure_read_workers` pool (ClosureReads);
+    a cloud without one reads serially.
     """
+    workers = getattr(cloud, "closure_read_workers", 1)
+    reader = ClosureReads(cloud, workers if type(workers) is int else 1)
+    try:
+        return _collect_resource_closure(reader, scopes, resource_versions or {})
+    finally:
+        reader.close()
+
+
+def _collect_resource_closure(reader, scopes, resource_versions):
     schemas, operations, resource_capabilities, versions, bodies = {}, {}, {}, {}, {}
     closure = {"providers": {}, "collections": {}, "resources": {}, "groups": {}, "references": {}, "inline": {}}
-    resource_versions = resource_versions or {}
     scope_ids = {scope.lower() for scope in scopes}
     singleton = {
         "microsoft.storage/storageaccounts/blobservices": "default",
@@ -1178,11 +1310,26 @@ def collect_resource_closure(cloud, scopes, resource_versions=None):
         "microsoft.network/virtualnetworkgateways/ipconfigurations": ("properties", "ipConfigurations"),
     }
     terminal_extensions = {kind.lower() for kind, _ in EXTENSION_COLLECTIONS}
+    ahead = reader.pool is not None
+    planned = set()  # queued resources whose child reads were already started
+
+    def arm_read(path, api, allowed=None):
+        return "arm", ("GET", path, api), () if allowed is None else (("allowed", allowed),)
+
+    def collection_read(path, api, extension=False, single=None):
+        if single:
+            return arm_read(path + "/" + single, api, (200, 404))
+        return "collection", (path, api), (("extension", extension),)
+
+    def provider_reads(namespace):
+        return ("provider_schema", (namespace,), ()), ("provider_operations", (namespace,), ())
 
     def provider(namespace):
         key = namespace.lower()
         if key not in schemas:
-            body = cloud.provider_schema(namespace)
+            schema_read, operations_read = provider_reads(namespace)
+            reader.prefetch(operations_read)
+            body = reader.get(schema_read)
             entries = {}
             for row in body["resourceTypes"]:
                 require(isinstance(row, dict) and isinstance(row.get("resourceType"), str)
@@ -1191,7 +1338,7 @@ def collect_resource_closure(cloud, scopes, resource_versions=None):
                 resource_capabilities[key + "/" + row["resourceType"].lower()] = {
                     value.strip().lower() for value in str(row.get("capabilities", "")).split(",")}
             schemas[key] = entries
-            operations[key] = set(cloud.provider_operations(namespace))
+            operations[key] = set(reader.get(operations_read))
             require(operations[key] and all(isinstance(name, str) and name.startswith(key + "/")
                                             for name in operations[key]), "incomplete-provider-operations")
             closure["providers"][key] = digest({"schema": body, "operations": sorted(operations[key])})
@@ -1225,14 +1372,72 @@ def collect_resource_closure(cloud, scopes, resource_versions=None):
         require(stable or fallback, "resource-api-version-not-discoverable")
         return (stable or fallback)[0]
 
+    def child_steps(resource_id, kind):
+        """The walk's child-inventory steps for one resource, planned lazily in serial order."""
+        namespace, relative = kind.split("/", 1)
+        key = resource_id.lower()
+        if kind == "microsoft.search/services":
+            # This documented ARM child must be inventoried even when omitted
+            # from provider discovery; a failed list never means an empty list.
+            yield "collection", resource_id + "/sharedPrivateLinkResources", "2025-05-01", None
+        for child in sorted(provider(namespace)):
+            tail = child.removeprefix(relative + "/")
+            if not child.startswith(relative + "/") or "/" in tail:
+                continue
+            full_type = namespace + "/" + child
+            if full_type == "microsoft.search/services/sharedprivatelinkresources":
+                continue
+            if full_type in inline:
+                yield "inline", key + "/" + tail, None, None
+            elif resource_kind(full_type) != "resource":
+                yield "metadata", key + "/" + tail, full_type, None
+            else:
+                yield "collection", resource_id + "/" + tail, version(full_type), singleton.get(full_type)
+
+    def extension_steps(scope):
+        for kind, api in EXTENSION_COLLECTIONS:
+            yield (scope + "/providers/" + kind, api,
+                   not (RG_ID.fullmatch(scope) and kind == "Microsoft.Insights/diagnosticSettings"))
+
+    def read_children_ahead(resource_id, kind):
+        # Planning is pure only once the provider is loaded; until then start the provider reads.
+        if not ahead or resource_id.lower() in planned:
+            return
+        namespace = kind.split("/", 1)[0]
+        if namespace not in closure["providers"]:
+            for read in provider_reads(namespace):
+                reader.prefetch(read)
+            return
+        planned.add(resource_id.lower())
+        try:
+            for step, path, api, single in child_steps(resource_id, kind):
+                if step == "collection":
+                    reader.prefetch(collection_read(path, api, single=single))
+        except Exception:  # the serial walk raises it at its own position
+            pass
+
+    def read_extensions_ahead(scope):
+        for path, api, applicable in extension_steps(scope):
+            if applicable:
+                reader.prefetch(collection_read(path, api, extension=True))
+
     queue = []
+
+    def enqueue(resource_id):
+        queue.append(resource_id)
+        if ahead:
+            kind = resource_type_from_id(resource_id)
+            reader.prefetch(arm_read(resource_id, versions[resource_id.lower()]))
+            if kind not in terminal_extensions and kind != "microsoft.search/searchservices":
+                read_children_ahead(resource_id, kind)
+                read_extensions_ahead(resource_id)
 
     def add_collection(path, api, extension=False, single=None):
         if single:
-            status, headers, body = cloud.arm("GET", path + "/" + single, api, allowed=(200, 404))
+            status, headers, body = reader.get(collection_read(path, api, single=single))
             rows, unsupported = ([] if status == 404 else [body]), None
         else:
-            rows, unsupported = cloud.collection(path, api, extension=extension)
+            rows, unsupported = reader.get(collection_read(path, api, extension))
         entry = {"api_version": api, "ids": sorted(row["id"].lower() for row in rows),
                  "items": rows,
                  "body_hash": digest(rows), "unsupported": unsupported}
@@ -1241,33 +1446,44 @@ def collect_resource_closure(cloud, scopes, resource_versions=None):
             resource_id = row["id"].lower()
             if resource_id not in versions:
                 versions[resource_id] = resource_versions.get(resource_id, api)
-                queue.append(row["id"])
+                enqueue(row["id"])
 
     def extensions(scope):
-        for kind, api in EXTENSION_COLLECTIONS:
-            if RG_ID.fullmatch(scope) and kind == "Microsoft.Insights/diagnosticSettings":
-                closure["collections"][(scope + "/providers/" + kind).lower()] = {
+        for path, api, applicable in extension_steps(scope):
+            if not applicable:
+                closure["collections"][path.lower()] = {
                     "not_applicable": "resource-group-activity-logs-are-subscription-scoped"}
                 continue
-            add_collection(scope + "/providers/" + kind, api, extension=True)
+            add_collection(path, api, extension=True)
 
+    for scope in sorted(scopes, key=str.lower) if ahead else ():
+        reader.prefetch(arm_read(scope, RG_API))
+        reader.prefetch(("list_resources", (scope,), ()))
+        read_extensions_ahead(scope)
     for scope in sorted(scopes, key=str.lower):
-        _, headers, body = cloud.arm("GET", scope, RG_API)
+        _, headers, body = reader.get(arm_read(scope, RG_API))
         bodies[scope.lower()] = body
         closure["groups"][scope.lower()] = {"body_hash": digest(body), "etag": body.get("etag") or
                                             next((v for k, v in headers.items() if k.lower() == "etag"), None)}
-        roots = cloud.list_resources(scope)
+        roots = reader.get(("list_resources", (scope,), ()))
         closure["collections"][scope.lower() + "/resources"] = {
             "api_version": RG_API, "ids": sorted(row["id"].lower() for row in roots),
             "items": sorted(roots, key=lambda row: row["id"].lower()),
             "body_hash": digest(sorted(roots, key=lambda row: row["id"].lower())), "unsupported": None}
+        for row in roots if ahead else ():
+            # Each root's provider loads now or when the root is walked: start them together.
+            kind = resource_type_from_id(row["id"])
+            namespace = kind.split("/", 1)[0]
+            if kind not in terminal_extensions and namespace not in closure["providers"]:
+                for read in provider_reads(namespace):
+                    reader.prefetch(read)
         for row in roots:
             resource_id = row["id"]
             require(arm_scope(resource_id) == scope.lower(), "inventory-escaped-resource-group")
             api = resource_versions.get(resource_id.lower()) or version(resource_type_from_id(resource_id))
             if resource_id.lower() not in versions:
                 versions[resource_id.lower()] = api
-                queue.append(resource_id)
+                enqueue(resource_id)
         extensions(scope)
     visited = set()
     while queue:
@@ -1278,7 +1494,7 @@ def collect_resource_closure(cloud, scopes, resource_versions=None):
         require(len(visited) < 10000, "resource-closure-too-large")
         visited.add(key)
         kind, api = resource_type_from_id(resource_id), versions[key]
-        _, headers, body = cloud.arm("GET", resource_id, api)
+        _, headers, body = reader.get(arm_read(resource_id, api))
         require(isinstance(body, dict) and body.get("id", "").lower() == key, "resource-closure-identity-mismatch")
         bodies[key] = body
         require(not body.get("type") or body["type"].lower() == kind, "resource-closure-type-mismatch")
@@ -1301,31 +1517,20 @@ def collect_resource_closure(cloud, scopes, resource_versions=None):
             require(resource_kind(referenced_kind) in ("resource", "readonly"), "resource-reference-is-operation")
             parent_api = api if referenced_kind.split("/")[0] == kind.split("/")[0] else None
             versions[reference] = resource_versions.get(reference) or version(referenced_kind, parent_api)
-            queue.append(reference)
+            enqueue(reference)
         if kind in terminal_extensions:
             continue
-        namespace, relative = kind.split("/", 1)
         if kind == "microsoft.search/searchservices":
             # Search's ARM resource type is services, never searchServices.
             raise Blocked("invalid-search-service-arm-resource-type")
-        if kind == "microsoft.search/services":
-            # This documented ARM child must be inventoried even when omitted
-            # from provider discovery; a failed list never means an empty list.
-            add_collection(resource_id + "/sharedPrivateLinkResources", "2025-05-01")
-        for child in sorted(provider(namespace)):
-            tail = child.removeprefix(relative + "/")
-            if not child.startswith(relative + "/") or "/" in tail:
-                continue
-            full_type = namespace + "/" + child
-            if full_type == "microsoft.search/services/sharedprivatelinkresources":
-                continue
-            if full_type in inline:
-                closure["collections"][key + "/" + tail] = {"inline_parent_hash": digest(body)}
-                continue
-            if resource_kind(full_type) != "resource":
-                closure["collections"][key + "/" + tail] = {"non_resource_metadata": full_type}
-                continue
-            add_collection(resource_id + "/" + tail, version(full_type), single=singleton.get(full_type))
+        for step, path, value, single in child_steps(resource_id, kind):
+            read_children_ahead(resource_id, kind)
+            if step == "inline":
+                closure["collections"][path] = {"inline_parent_hash": digest(body)}
+            elif step == "metadata":
+                closure["collections"][path] = {"non_resource_metadata": value}
+            else:
+                add_collection(path, value, single=single)
         extensions(resource_id)
     for reference, metadata in closure["inline"].items():
         parent = metadata["parent_id"]
