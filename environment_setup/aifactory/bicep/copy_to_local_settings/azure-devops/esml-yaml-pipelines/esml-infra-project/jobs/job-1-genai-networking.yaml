@@ -97,11 +97,13 @@ steps:
     scriptType: bash
     scriptLocation: scriptPath
     scriptPath: '$(System.DefaultWorkingDirectory)/azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh'
-    arguments: '--skip-azure-lookups --environment "$(dev_test_prod)" --subscription "$(dev_test_prod_sub_id)" --location "$(admin_location)"'
+    arguments: '--skip-azure-lookups --scope project --environment "$(dev_test_prod)" --subscription "$(dev_test_prod_sub_id)" --location "$(admin_location)"'
   env:
     PREFLIGHT_SKIP: $(preflight_skip)
     PREFLIGHT_REPORT_DIR: $(Build.ArtifactStagingDirectory)/aifactory-region-reports/$(System.JobId)-$(System.JobAttempt)
     AIFACTORY_REPORT_TENANT_ID: $(tenantId)
+    # Key Vault principal gate. Mapped explicitly because secret variables are never auto-mapped.
+    technical_admins_ad_object_id: $(technical_admins_ad_object_id)
     admin_location: $(admin_location)
     BYO_subnets: $(BYO_subnets)
     common_vnet_cidr: $(common_vnet_cidr)

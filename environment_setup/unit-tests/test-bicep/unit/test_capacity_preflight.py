@@ -18,6 +18,13 @@ SCRIPTS = ROOT / "environment_setup" / "aifactory" / "bicep" / "scripts"
 PREFLIGHT = SCRIPTS / "preflight.sh"
 HELPER = SCRIPTS / "ai-search-capacity-retry.sh"
 SUBSCRIPTION = "11111111-1111-4111-8111-111111111111"
+# Pipeline names kv_principal_object_ids.py reads for the Key Vault principal gate.
+KV_PRINCIPAL_ENVIRONMENT = (
+    "technical_admins_ad_object_id", "TECHNICAL_ADMINS_AD_OBJECT_ID", "PROJECT_MEMBERS",
+    "databricksOID", "DATABRICKSOID", "DATABRICKS_OID", "enableDatabricks", "ENABLEDATABRICKS",
+    "ENABLE_DATABRICKS", "enablePersonas", "ENABLEPERSONAS", "ENABLE_PERSONAS",
+    "persona_access_mode", "PERSONA_ACCESS_MODE",
+)
 TENANT = "22222222-2222-4222-8222-222222222222"
 
 
@@ -202,10 +209,14 @@ def offline_preflight():
     shutil.copyfile(HELPER, workspace / HELPER.name)
     shutil.copyfile(SCRIPTS / "deploy-capacity-resource.py", workspace / "deploy-capacity-resource.py")
     shutil.copyfile(SCRIPTS / "region_report.py", workspace / "region_report.py")
+    for name in ("kv_principal_object_ids.py", "apply-json-config-overrides.py"):
+        shutil.copyfile(SCRIPTS / name, workspace / name)
 
     def run(settings=None, *, arguments=(), environment="dev", subscription=SUBSCRIPTION,
-            reports=False, yaml_settings=None, env_settings=None, capacity_helper=True):
+            reports=False, yaml_settings=None, env_settings=None, json_settings=None, capacity_helper=True):
         env = os.environ.copy()
+        for name in KV_PRINCIPAL_ENVIRONMENT:  # a shell that sourced .env must not block unrelated tests
+            env.pop(name, None)
         for names in re.findall(r"\b(?:getval|get_capacity_value) ([A-Za-z0-9_]+) ([A-Za-z0-9_]+)", source):
             for name in names:
                 env.pop(name, None)
@@ -235,6 +246,11 @@ def offline_preflight():
             path = workspace / "settings.env"
             path.write_text(env_settings, encoding="utf-8")
             args += ["--env-file", path.as_posix()]
+        if json_settings is not None:
+            # <root>/aifactory/variables.json is the consumer default the preflight auto-detects.
+            path = workspace / "aifactory" / "variables.json"
+            path.parent.mkdir(exist_ok=True)
+            path.write_text(json_settings, encoding="utf-8")
         if not capacity_helper:
             (workspace / "deploy-capacity-resource.py").unlink()
         if environment is not None:

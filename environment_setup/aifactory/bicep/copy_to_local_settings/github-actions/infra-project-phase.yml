@@ -662,7 +662,7 @@ jobs:
           chmod +x "$PF" 2>/dev/null || true
           STRICT_FLAG=""
           if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
-          bash "$PF" $STRICT_FLAG \
+          bash "$PF" $STRICT_FLAG --scope project \
             --environment "${{ env.dev_test_prod }}" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}"

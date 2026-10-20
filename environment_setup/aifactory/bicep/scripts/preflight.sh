@@ -14,6 +14,9 @@
 #   5. Resource provider registration    (only for SELECTED services)
 #   6. Provider-region support           (selected resource types in region)
 #   7. Lists ALL policy assignments on the subscription (informational)
+#   8. Key Vault principal object IDs (technical_admins_ad_object_id, databricksOID)
+#      are GUIDs, not placeholders: blocks even in WARN_ONLY mode
+#      (kv_principal_object_ids.py; also reads variables.json)
 #
 # Settings are read (in priority order) from:
 #   1. CLI flags / PREFLIGHT_* env vars (explicit override)
@@ -25,7 +28,8 @@
 #
 # Exit codes:
 #   0  no FAIL findings (deploy may proceed)            -> pipeline continues
-#   1  FAIL findings or mandatory capacity validation   -> pipeline ABORTS
+#   1  FAIL findings or a mandatory gate (capacity,
+#      Key Vault principal object IDs)                 -> pipeline ABORTS
 #   2  non-CIDR warnings AND --strict was supplied      -> pipeline ABORTS
 # Address-planning CIDR_* findings are always advisory, including under --strict.
 #
@@ -46,8 +50,9 @@ STRICT="false"
 # (the task still succeeds, exit 0). Temporary safety valve while the preflight
 # checks are being tuned so a false-positive cannot block deployments.
 # Override via env PREFLIGHT_WARN_ONLY=false or flag --no-warn-only to re-enable hard failures.
-# Invalid capacity configuration and unconfirmed Search retry candidate quota
-# are hard gates even in WARN_ONLY mode; explicit lookup/region skips bypass quota.
+# Invalid capacity configuration, unconfirmed Search retry candidate quota and
+# Key Vault principal placeholders are hard gates even in WARN_ONLY mode;
+# explicit lookup/region skips bypass quota.
 WARN_ONLY="${PREFLIGHT_WARN_ONLY:-true}"
 SKIP="${PREFLIGHT_SKIP:-false}"
 # SKIP_AZURE: run only the static config checks (no `az` calls at all).
@@ -57,6 +62,8 @@ SKIP_AZURE="${PREFLIGHT_SKIP_AZURE_LOOKUPS:-false}"
 SKIP_REGIONAL="${LZ_PREFLIGHT_REGIONAL_SKIP:-false}"
 ENV_FILE=""
 VARS_YAML=""
+VARS_JSON=""
+SCOPE=""                  # common|project: principals that pipeline's templates read (default both)
 ONLY_ENV=""               # restrict to a single env: dev|test|prod
 OVERRIDE_SUB=""           # restrict to a single subscription id
 OVERRIDE_LOCATION=""
@@ -67,8 +74,11 @@ usage() {
 Usage: preflight.sh [options]
   --env-file <path>        Path to GitHub-route .env file (UPPER_SNAKE keys)
   --variables-yaml <path>  Path to ADO-route variables.yaml (lowerCamel keys)
-  --root <path>            Repo root to auto-detect .env / variables.yaml
+  --variables-json <path>  Path to the canonical variables.json (default: <root>/aifactory/variables.json);
+                           read only for the Key Vault principal object ID gate
+  --root <path>            Repo root to auto-detect .env / variables.yaml / variables.json
   --environment <env>      Check only one of: dev | test | prod
+  --scope <scope>          common | project: Key Vault principals that pipeline reads (default: both)
   --subscription <id>      Check only this subscription id (single env)
   --location <region>      Override Azure region (e.g. eastus2)
   --strict                 Treat non-CIDR WARN-only result as failure (exit 2)
@@ -90,8 +100,11 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --env-file)        ENV_FILE="${2:-}"; shift 2;;
     --variables-yaml)  VARS_YAML="${2:-}"; shift 2;;
+    --variables-json)  VARS_JSON="${2:-}"; shift 2;;
     --root)            REPO_ROOT="${2:-}"; shift 2;;
     --environment)     ONLY_ENV="$(printf '%s' "${2:-}" | tr '[:upper:]' '[:lower:]')"; shift 2;;
+    --scope)           SCOPE="${2:-}"; shift 2
+                       case "$SCOPE" in common|project) ;; *) echo "ERROR: --scope must be common or project" >&2; exit 2;; esac;;
     --subscription)    OVERRIDE_SUB="${2:-}"; shift 2;;
     --location)        OVERRIDE_LOCATION="${2:-}"; shift 2;;
     --strict)          STRICT="true"; shift;;
@@ -144,6 +157,7 @@ REPORT_COMPLETED="false"
 CAPACITY_CONFIG_INVALID="false"
 AI_SEARCH_RETRY_PREFLIGHT_FAILED="false"
 SEARCH_RETRY_REQUIRED="false"
+KV_PRINCIPAL_INVALID="false"
 
 record_report_finding() {
   [ -n "${PREFLIGHT_REPORT_DIR:-}" ] || return 0
@@ -167,8 +181,9 @@ add_finding() { # $1 sev  $2 code  $3 msg  $4 hint
   case "$1" in
     # In WARN_ONLY mode a FAIL is still counted (for the summary) but surfaced as a
     # warning annotation so it never marks the CI task red / blocks the pipeline.
+    # KV_PRINCIPAL_* findings block even in WARN_ONLY mode, so they stay errors.
     FAIL) FAIL_COUNT=$((FAIL_COUNT + 1));
-          if [ "$WARN_ONLY" = "true" ]; then ci_warning "[$2] $3 (WARN_ONLY)"; else ci_error "[$2] $3"; fi;;
+          if [ "$WARN_ONLY" = "true" ] && [[ "$2" != KV_PRINCIPAL_* ]]; then ci_warning "[$2] $3 (WARN_ONLY)"; else ci_error "[$2] $3"; fi;;
     WARN) WARN_COUNT=$((WARN_COUNT + 1)); ci_warning "[$2] $3";;
   esac
 }
@@ -242,8 +257,13 @@ if [ -z "$ENV_FILE" ] && [ -z "$VARS_YAML" ]; then
     done
   fi
 fi
+# The canonical consumer variables.json; pipeline values still win for the gate that reads it.
+if [ -z "$VARS_JSON" ] && [ -f "$REPO_ROOT/aifactory/variables.json" ]; then
+  VARS_JSON="$REPO_ROOT/aifactory/variables.json"
+fi
 [ -n "$ENV_FILE" ]  && echo "preflight: using .env settings file        : $ENV_FILE"
 [ -n "$VARS_YAML" ] && echo "preflight: using variables.yaml settings file: $VARS_YAML"
+[ -n "$VARS_JSON" ] && echo "preflight: using variables.json settings file: $VARS_JSON"
 
 # Read a value from a quoted/bare .env line: KEY="value" | KEY=value
 dotenv_get() { # $1 = KEY
@@ -989,6 +1009,41 @@ PY
   [ -z "$fails$warns" ] && echo "  [OK] No <todo>/<optional> placeholder values found in variables.yaml."
 }
 
+# Windows Python cannot open Git Bash /c/... paths.
+native_path() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
+
+# --- Config: Key Vault principal object IDs. modules/kvCmnAccessPolicys.bicep silently skips
+# every principal that is not a GUID, so a placeholder such as <todo>_EntraID_ObjectID would
+# leave the common/admin vaults without an admin policy. Hard gate, even in WARN_ONLY mode.
+check_kv_principals() {
+  local checker="$SCRIPT_DIR/kv_principal_object_ids.py" out kind code msg hint config_env args=()
+  if [ -z "$PYBIN" ] || [ ! -f "$checker" ]; then
+    add_finding WARN KV_PRINCIPAL_UNVALIDATED \
+      "Key Vault principal object IDs were not validated: Python or kv_principal_object_ids.py is unavailable." \
+      "Run the preflight where python3 and the accelerator scripts folder are available."
+    return 0
+  fi
+  for config_env in "${CONFIG_ENVS[@]}"; do args+=(--environment "$config_env"); done
+  [ -n "$SCOPE" ] && args+=(--scope "$SCOPE")
+  [ -n "$VARS_JSON" ] && args+=(--variables-json "$(native_path "$VARS_JSON")")
+  [ -n "$VARS_YAML" ] && args+=(--variables-yaml "$(native_path "$VARS_YAML")")
+  [ -n "$ENV_FILE" ] && args+=(--env-file "$(native_path "$ENV_FILE")")
+  if ! out="$("$PYBIN" "$(native_path "$checker")" "${args[@]}" 2>&1)"; then
+    add_finding FAIL KV_PRINCIPAL_CONFIG_UNREADABLE \
+      "Key Vault principal object IDs could not be validated: $(printf '%s' "$out" | tail -n1)" \
+      "Run kv_principal_object_ids.py with the same settings files for details."
+    KV_PRINCIPAL_INVALID="true"
+    return 0
+  fi
+  out="${out//$'\r'/}"  # Windows agents' Python writes CRLF
+  while IFS=$'\t' read -r kind code msg hint; do
+    case "$kind" in
+      INFO) echo "  [INFO] $code";;
+      FAIL) add_finding FAIL "$code" "$msg" "$hint"; KV_PRINCIPAL_INVALID="true";;
+    esac
+  done <<< "$out"
+}
+
 # --- BYO: when BYO_subnets=true, the subnet-name variables must be set
 # (non-empty, no <todo>/<optional>), honoring each variable's own condition.
 check_byo_subnets() {
@@ -1307,6 +1362,9 @@ check_capacity_configuration
 echo ""
 echo "=== Config: variables.yaml placeholders ==="
 check_config_placeholders
+echo ""
+echo "=== Config: Key Vault principal object IDs ==="
+check_kv_principals
 if ! check_private_foundry_capability_host; then
   echo "preflight FAILED: the private Foundry capability-host bundle cannot be deselected."
   exit 1
@@ -1459,6 +1517,11 @@ fi
 if [ "$CAPACITY_CONFIG_INVALID" = "true" ]; then
   ci_error "Capacity retry configuration is invalid; deployment is blocked even with WARN_ONLY."
   echo "preflight FAILED: invalid capacity retry configuration (exit 1)."
+  exit 1
+fi
+if [ "$KV_PRINCIPAL_INVALID" = "true" ]; then
+  ci_error "Key Vault principal object IDs are placeholders or not GUIDs; deployment is blocked even with WARN_ONLY."
+  echo "preflight FAILED: Key Vault principal object IDs are placeholders or not GUIDs (exit 1)."
   exit 1
 fi
 if [ "$AI_SEARCH_RETRY_PREFLIGHT_FAILED" = "true" ]; then

@@ -182,13 +182,15 @@ jobs:
           enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
           enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
           enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+          # Key Vault principal gate: databricksOID must be a GUID when Databricks is enabled.
+          enableDatabricks: ${{ env.enableDatabricks || vars.ENABLE_DATABRICKS || 'false' }}
         run: |
           set -uo pipefail
           PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
           chmod +x "$PF" 2>/dev/null || true
           STRICT_FLAG=""
           if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
-          bash "$PF" $STRICT_FLAG \
+          bash "$PF" $STRICT_FLAG --scope common \
             --environment "${{ env.dev_test_prod }}" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}"
@@ -592,13 +594,15 @@ jobs:
           enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
           enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
           enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+          # Key Vault principal gate: databricksOID must be a GUID when Databricks is enabled.
+          enableDatabricks: ${{ env.enableDatabricks || vars.ENABLE_DATABRICKS || 'false' }}
         run: |
           set -uo pipefail
           PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
           chmod +x "$PF" 2>/dev/null || true
           STRICT_FLAG=""
           if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
-          bash "$PF" $STRICT_FLAG \
+          bash "$PF" $STRICT_FLAG --scope common \
             --environment "${{ env.dev_test_prod }}" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}"
@@ -1001,13 +1005,15 @@ jobs:
           enableAIFoundry: ${{ vars.ENABLE_AI_FOUNDRY || 'true' }}
           enableCosmosDB: ${{ vars.ENABLE_COSMOS_DB || 'false' }}
           enableElasticsearch: ${{ vars.ENABLE_ELASTICSEARCH || 'false' }}
+          # Key Vault principal gate: databricksOID must be a GUID when Databricks is enabled.
+          enableDatabricks: ${{ env.enableDatabricks || vars.ENABLE_DATABRICKS || 'false' }}
         run: |
           set -uo pipefail
           PF="azure-enterprise-scale-ml/environment_setup/aifactory/bicep/scripts/preflight.sh"
           chmod +x "$PF" 2>/dev/null || true
           STRICT_FLAG=""
           if [ "${{ vars.PREFLIGHT_STRICT || 'false' }}" = "true" ]; then STRICT_FLAG="--strict"; fi
-          bash "$PF" $STRICT_FLAG \
+          bash "$PF" $STRICT_FLAG --scope common \
             --environment "${{ env.dev_test_prod }}" \
             --subscription "${{ env.dev_test_prod_sub_id }}" \
             --location "${{ env.admin_location }}"
