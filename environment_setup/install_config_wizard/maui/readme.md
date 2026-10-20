@@ -6,7 +6,7 @@ reviewed IaC execution, Azure monitoring, project operations and tickets.
 ## Install
 
 > **Installer not published yet.** No public desktop release contains a MAUI
-> installer matched to the current API (v0.47.25); the `desktop-v0.47.6` release
+> installer matched to the current API (v0.47.26); the `desktop-v0.47.6` release
 > these steps used to link was never published. Until one does, use the
 > [Tkinter configuration wizard](../readme.md#download), which includes the same
 > Factory API.

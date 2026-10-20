@@ -1,5 +1,6 @@
-"""Offline checks that the Tkinter wizard download links match one published desktop release."""
+"""Offline checks that the Tkinter wizard downloads are the archives committed beside its readme."""
 
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -8,9 +9,30 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[4]
 WIZARD = ROOT / "environment_setup" / "install_config_wizard"
-RELEASES = "https://github.com/jostrm/azure-enterprise-scale-ml/releases"
-DESKTOP_LINK = re.compile(re.escape(RELEASES) + r"/(?:tag|download)/(desktop-v[^/)\s]+)(?:/([^)\s]+))?")
-PROVENANCE = {"SHA256SUMS.txt", "release-manifest.json"}
+RAW_MAIN = "https://github.com/jostrm/azure-enterprise-scale-ml/raw/refs/heads/main/environment_setup/install_config_wizard/"
+RAW_LINK = re.compile(re.escape(RAW_MAIN) + r"([^)\s]+)")
+FOLDERS = {"aifactory-config-windows.zip": "windows", "aifactory-config-linux.tar.gz": "linux",
+           "aifactory-config-macos.tar.gz": "macos"}
+DESKTOP_RELEASE = re.compile(r"releases/(?:tag|download)/desktop-v")
+# Live links only: relative paths and blob/main URLs. Permalinks pinned to a commit keep their history.
+MAUI_README_LINK = re.compile(r"\]\((?!https?://)[^)\s]*maui/readme\.md"
+                              r"|blob/main/environment_setup/install_config_wizard/maui/readme\.md")
+
+
+def sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def checksums(path):
+    listed = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        digest, name = line.split("  ", 1)
+        listed[name] = digest
+    return listed
 
 
 class InstallConfigWizardDownloadTests(unittest.TestCase):
@@ -18,21 +40,27 @@ class InstallConfigWizardDownloadTests(unittest.TestCase):
     def setUpClass(cls):
         cls.readme = (WIZARD / "readme.md").read_text(encoding="utf-8")
         cls.manifest = json.loads((WIZARD / "release-manifest.json").read_text(encoding="utf-8"))
-        cls.checksums = (WIZARD / "SHA256SUMS.txt").read_text(encoding="utf-8")
-        cls.links = DESKTOP_LINK.findall(cls.readme)
+        cls.artifacts = {artifact["archive"]: artifact for artifact in cls.manifest["artifacts"]}
 
-    def test_readme_links_only_the_release_described_by_the_manifest(self):
-        self.assertTrue(self.links)
-        self.assertEqual({tag for tag, _ in self.links}, {f"desktop-{self.manifest['version']}"})
+    def test_download_heading_matches_the_manifest(self):
         heading = re.search(r"^## Download - Version `([^`]+)`$", self.readme, re.M)
         self.assertIsNotNone(heading)
         self.assertEqual(f"v{heading.group(1)}", self.manifest["version"])
 
-    def test_readme_links_every_archive_and_provenance_file_by_exact_name(self):
-        archives = {artifact["archive"] for artifact in self.manifest["artifacts"]}
-        self.assertEqual({"aifactory-config-windows.zip", "aifactory-config-linux.tar.gz",
-                          "aifactory-config-macos.tar.gz"}, archives)
-        self.assertEqual(archives | PROVENANCE, {asset for _, asset in self.links if asset})
+    def test_readme_downloads_every_archive_from_its_folder_on_main(self):
+        self.assertEqual(set(FOLDERS), set(self.artifacts))
+        self.assertEqual({f"{folder}/{archive}" for archive, folder in FOLDERS.items()},
+                         set(RAW_LINK.findall(self.readme)))
+
+    def test_readme_links_the_provenance_files_beside_it(self):
+        for name in ("SHA256SUMS.txt", "release-manifest.json"):
+            self.assertIn(f"]({name})", self.readme)
+
+    def test_committed_archives_are_the_manifest_builds(self):
+        for archive, folder in FOLDERS.items():
+            path = WIZARD / folder / archive
+            self.assertEqual(self.artifacts[archive]["bytes"], path.stat().st_size, archive)
+            self.assertEqual(self.artifacts[archive]["sha256"], sha256(path), archive)
 
     def test_manifest_artifacts_come_from_one_build(self):
         for field in ("version", "source_commit"):
@@ -41,21 +69,23 @@ class InstallConfigWizardDownloadTests(unittest.TestCase):
             self.assertEqual(len({artifact[field] for artifact in self.manifest["artifacts"]}), 1, field)
 
     def test_checksums_match_the_manifest(self):
-        listed = {}
-        for line in self.checksums.splitlines():
-            digest, name = line.split("  ", 1)
-            listed[name] = digest
-        self.assertEqual({artifact["archive"]: artifact["sha256"] for artifact in self.manifest["artifacts"]}, listed)
+        self.assertEqual({archive: artifact["sha256"] for archive, artifact in self.artifacts.items()},
+                         checksums(WIZARD / "SHA256SUMS.txt"))
 
-    def test_maui_readme_links_no_other_desktop_release(self):
-        maui = (WIZARD / "maui" / "readme.md").read_text(encoding="utf-8")
-        tags = {tag for tag, _ in DESKTOP_LINK.findall(maui)}
-        self.assertLessEqual(tags, {f"desktop-{self.manifest['version']}"})
+    def test_windows_folder_provenance_describes_the_committed_zip(self):
+        windows = self.artifacts["aifactory-config-windows.zip"]
+        self.assertEqual(windows, json.loads((WIZARD / "windows" / "release-manifest.json").read_text(encoding="utf-8")))
+        self.assertEqual({windows["archive"]: windows["sha256"]}, checksums(WIZARD / "windows" / "SHA256SUMS.txt"))
 
-    def test_readme_does_not_download_the_legacy_archives_kept_on_main(self):
-        legacy = re.findall(r"raw/refs/heads/main/environment_setup/install_config_wizard/\w+/[^)\s]+"
-                            r"|tar -xzf (?:linux|macos)/\S+", self.readme)
-        self.assertEqual([], legacy)
+    def test_wizard_readmes_link_no_desktop_release(self):
+        for readme in (WIZARD / "readme.md", WIZARD / "maui" / "readme.md"):
+            self.assertIsNone(DESKTOP_RELEASE.search(readme.read_text(encoding="utf-8")), readme)
+
+    def test_docs_link_the_wizard_page_instead_of_the_maui_readme(self):
+        pages = [*ROOT.glob("*.md"), *(ROOT / "documentation").rglob("*.md"), *WIZARD.rglob("*.md")]
+        linked = [str(page.relative_to(ROOT)) for page in pages
+                  if MAUI_README_LINK.search(page.read_text(encoding="utf-8", errors="replace"))]
+        self.assertEqual([], linked)
 
 
 if __name__ == "__main__":

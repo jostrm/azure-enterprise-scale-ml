@@ -96,7 +96,7 @@ create either an integrated or external VPN/DNS access hub. Use
     This will add a folder in your repo at root (a GIT submodule) called `azure-enterprise-scale-ml` that contains accelerator code (bootstrap scripts, templates)
     
     Example: The [**AI Factory Configuration Wizard**](../../../environment_setup/install_config_wizard/readme.md) is then in this folder: 
-        - `root\azure-enterprise-scale-ml\environment_setup\install_config_wizard\aifactory-config-windows.zip`
+        - `root\azure-enterprise-scale-ml\environment_setup\install_config_wizard\windows\aifactory-config-windows.zip`
             
 
 2) Run the start script `./azure-enterprise-scale-ml/00-start.sh`, from your `root`location. This will create some bootstrap-scripts at your repo root

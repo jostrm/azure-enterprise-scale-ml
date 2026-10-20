@@ -146,7 +146,7 @@ See the [GitHub workflow guide](../../../environment_setup/aifactory/bicep/copy_
   use an authenticated integration, not an exposed loopback port.
   See [ITSM integration with callbacks](./29-ITSM-integrated.md) for the CLI/API workflow.
 - **Core-team managed:** The core team uses the
-  [Enterprise Scale AI Factory app](../../../environment_setup/install_config_wizard/maui/readme.md)
+  [Enterprise Scale AI Factory app](../../../environment_setup/install_config_wizard/readme.md)
   to configure from the ticket, review and trigger the pipeline, and follow its
   progress in the integrated terminal. The API invokes the appropriate reviewed
   Bash/provider flow underneath; users do not need to compose shell commands.
@@ -699,7 +699,7 @@ the protected manifest and existing binding, source and approval checks.
 ### App-first: the same configuration and execution contracts
 
 1. **Prepare access.** Install the
-   [Windows app and prerequisites](../../../environment_setup/install_config_wizard/maui/readme.md).
+   [app and prerequisites](../../../environment_setup/install_config_wizard/readme.md).
    Establish Azure and ADO/GitHub permissions and the reviewed pipeline/provider
    setup. The app bundles its API; Bash execution still needs the documented
    host tools. See [deployment prerequisites](../10-19/12-prerequisites-setup.md).
@@ -809,9 +809,8 @@ gh --version
 
 ### Optional: AI Factory Configuration Wizard
 
-For Windows 11, use the [**AI Factory Configuration Wizard (MAUI) installer and quick start**](../../../environment_setup/install_config_wizard/maui/readme.md).
-The installer includes the local Python API; a separate Python installation is not needed.
-The [classic Tkinter wizard](../../../environment_setup/install_config_wizard/readme.md) remains available for Windows, macOS, and Linux.
+Download the [**AI Factory Configuration Wizard and quick start**](../../../environment_setup/install_config_wizard/readme.md)
+for Windows, macOS or Linux. It bundles its Python runtime and the local API; a separate Python installation is not needed.
 
 ## Setup options
 

@@ -30,7 +30,7 @@ required.
 <a id="take2-workflow-and-ux-changes"></a>
 ## Before opening the app
 
-1. Install the [Windows MAUI app](../../../environment_setup/install_config_wizard/maui/readme.md).
+1. Install the [AI Factory app](../../../environment_setup/install_config_wizard/readme.md).
    Follow [end-to-end setup](24-end-2-end-setup.md) if you do not yet have a
    consumer repository and registered factory. The configuration exercises need
    a functioning local API; deployment needs additional Azure and provider access.
