@@ -21,6 +21,9 @@ Quick Setup
 * [26) UPDATE AIFactory: Update with new features](../v2/20-29/26-update-AIFactory.md)
 * [26) EXTEND AIFactory project type: With new Services, Your BICEP](../v2/20-29/27-extend-AIF-pipelines.md)
 * [21) Agent Factory chat & live voice: talk to your AI Factory (10-19 series, CoreTeam + ProjectTeam)](./10-19/21-agent-factory-chat.md)
+* **From Bicep to agents** (CoreTeam): Bicep -> ADO/GHA -> [Factory API, CLI & Python SDK](./10-19/17-cli-and-api-and-usage.md) -> [29) AI Factory MCP](./20-29/29-factory-MCP.md) -> [29) ESAIF Chat Agent](./20-29/29-ESAIF-Chat-Agent.md)
+    * [29) AI Gateways: native AI Gateway SKU, classic APIM with AI policies, Kong](./20-29/29-factory-AI-Gateways.md)
+    * [29) Dual knowledge graphs: structural graph + architecture vault](./20-29/29-dual-knowledge-graphs.md)
 
 
 **Consumer related** - relevant for developers, data scientists, data engineers (ProjectTeam: 30-39)

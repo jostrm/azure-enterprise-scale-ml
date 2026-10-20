@@ -141,6 +141,12 @@ create the optional project automation SP unless requested.
     - Permissions: None
     - Purpose: For the ESML AIFactory project teams, to be able to run their MLOps and LLMOps pipelines unattended
 
+### Optional: AI Factory MCP API Service Principal (per project, no secret)
+    - Name: esml-project001-mcp-api
+    - Permissions: None. It exposes the app role `AiFactory.Mcp.Read`, the audience `api://<appId>` and v2 tokens
+    - Purpose: Only if the project hosts the [AI Factory MCP](../20-29/29-factory-MCP.md) (`enableAIFactoryMCP`). Callers request tokens for it
+    - Seeding Key Vault: `esml-project001-mcp-app-id` (+ `esml-project001-mcp-sp-oid`). Create it with script `29b` (see F below), in the same batch as the project SPs
+
 [Read more](./12-permissions-users-ad-sps.md) here about the permissions and service principals
 
 
@@ -364,6 +370,21 @@ How-to: Manually edit the variables (`Local-repo-link`) at the top at the script
 ```sh
 bash ./aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh
 ```
+
+**Batch:** set `PROJECT_NUMBER_TO` to create a range in one run (sign in once), for example project001..project010:
+
+```sh
+PROJECT_NUMBER_XXX=001 PROJECT_NUMBER_TO=010 bash ./aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh
+```
+
+**Also the AI Factory MCP API SPs** (secretless, one per project) in the same batch: add `ALSO_CREATE_MCP_API_SP=true`,
+or run [29b-create-mcp-api-sp-for-projects.sh](../../../environment_setup/aifactory/bicep/esml-util/29b-create-mcp-api-sp-for-projects.sh) on its own:
+
+```sh
+PROJECT_NUMBER_FROM=001 PROJECT_NUMBER_TO=010 bash ./aifactory/esml-util/29b-create-mcp-api-sp-for-projects.sh
+```
+
+See [29. AI Factory MCP](../20-29/29-factory-MCP.md#the-mcp-sp-app-registration).
 
 ## 💡 G) Optional: Nice-to-have script: GET AKS version, in your region, to set variable values
 Project type: ESML

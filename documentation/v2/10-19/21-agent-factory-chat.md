@@ -25,6 +25,8 @@ until final source checks. A voice-only failure never signs you out of text chat
     in the [application guide](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/40-aifactory-agent/readme.md)
     and the [live voice step](https://github.com/jostrm/azure-enterprise-scale-ml/blob/main/usecase_code/40-agent-factory/47-aifactory-agent-live-voice/readme.md).
 
+> Where this fits: [29. ESAIF Chat Agent](../20-29/29-ESAIF-Chat-Agent.md) (the flow from Bicep to agents), [29. AI Factory MCP](../20-29/29-factory-MCP.md), [29. AI Gateways](../20-29/29-factory-AI-Gateways.md), [29. Dual knowledge graphs](../20-29/29-dual-knowledge-graphs.md).
+
 ## At a glance
 
 | You want | Turn on | What happens |

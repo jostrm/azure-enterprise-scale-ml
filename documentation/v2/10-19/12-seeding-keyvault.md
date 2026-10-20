@@ -74,9 +74,32 @@ Service principals: Below the secret information about the service principals us
 | esml-project012-sp-id | `-`|
 | esml-project012-sp-oid | `-`|
 | esml-project012-sp-secret | `-`|
+| esml-project001-mcp-app-id | `Optional: client ID of the project's AI Factory MCP API SP (no secret). Read by the pipelines via aifactory_mcp_AppID_seeding_kv_name when enableAIFactoryMCP is on`|
+| esml-project001-mcp-sp-oid | `Optional: object ID of that SP's service principal`|
 | tenant-id | `RBAC`|
 
 ![](./images/13-setup-aifactory-seeding-kv-sps-created.png)
+
+## Optional: AI Factory MCP API service principal ("MCP SP"), one per project
+If a project will host the [AI Factory MCP](../20-29/29-factory-MCP.md), the Entra admin also creates, in the same batch,
+an **MCP SP** per project. It is the MCP's identity as a *resource*: callers (the Foundry project identity, the AI Gateway,
+a classic APIM) request tokens for it, and it exposes the app role `AiFactory.Mcp.Read`.
+
+- **No secret.** The MCP only validates incoming tokens, so only `esml-projectNNN-mcp-app-id` (and optionally
+  `esml-projectNNN-mcp-sp-oid`) are stored.
+- **Separate from the project SP.** The project SP is a client with a secret and RBAC on the project; the MCP SP is a
+  secretless resource. Keep them apart, but create them in one sitting.
+- **Script** (one project, or a range such as 001..010):
+
+  ```sh
+  PROJECT_NUMBER_FROM=001 PROJECT_NUMBER_TO=010 KEY_VAULT_NAME=<seeding-kv> SUBSCRIPTION_ID=<kv-sub> TENANT_ID=<tenant> \n    bash ./aifactory/esml-util/29b-create-mcp-api-sp-for-projects.sh
+  ```
+
+  Or create both kinds in one batch: `ALSO_CREATE_MCP_API_SP=true PROJECT_NUMBER_TO=010 bash ./aifactory/esml-util/29-create-sp-or-update-oid-for-project.sh`.
+- **Pipeline:** set `aifactory_mcp_AppID_seeding_kv_name` (GHA `AIFACTORY_MCP_KV_S_NAME_APPID`) to the secret name, for
+  example `esml-project001-mcp-app-id`, and leave `aifactoryMcpEntraAppId` empty. The ADO and GHA project pipelines read
+  the value from this Key Vault.
+- Granting callers the role stays an admin step: the MCP step prints the exact command (Microsoft Graph Bicep).
 
 ## Service principals - purpose and permissions exaplained
 ### SP AIFactory specific (IaC purpose): 
