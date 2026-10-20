@@ -11,6 +11,20 @@ pr:
     include:
       - "*"
 
+schedules:
+  - cron: "17 2 * * *"
+    displayName: Nightly run of every unit-test tier, including tier 5 (preflight and capacity)
+    branches:
+      include:
+        - main
+    always: false
+
+parameters:
+  - name: testTiers
+    displayName: "Unit-test tiers: default (tiers.py, 1-4), all, 1-5, 5 or 1,3"
+    type: string
+    default: default
+
 pool:
   vmImage: $(imageName)
 
@@ -60,6 +74,9 @@ jobs:
           BICEP_DIRECTORY: $(Agent.TempDirectory)/iac-bicep
           RESULTS_DIRECTORY: $(Agent.TempDirectory)/iac-results
       - bash: |
+          if [[ "$BUILD_REASON" == "Schedule" ]]; then
+            export AIF_TEST_TIERS=all
+          fi
           python environment_setup/unit-tests/test-bicep/run_ci.py \
             --phase "$TEST_PHASE" \
             --require-ci-tools \
@@ -67,6 +84,7 @@ jobs:
             --results-dir "$RESULTS_DIRECTORY"
         displayName: Run credential-free checks
         env:
+          AIF_TEST_TIERS: ${{ parameters.testTiers }}
           TEST_PHASE: $(testPhase)
           BICEP_DIRECTORY: $(Agent.TempDirectory)/iac-bicep
           RESULTS_DIRECTORY: $(Agent.TempDirectory)/iac-results

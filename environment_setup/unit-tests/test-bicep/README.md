@@ -28,12 +28,13 @@ require that external project or .NET.
 ## Automatic checks after a push or pull request
 
 `.github/workflows/infrastructure-tests.yml` runs on every push, pull request and
-manual dispatch. A local commit alone does not start remote CI; push it first.
+manual dispatch, and nightly. A local commit alone does not start remote CI; push it first.
 The checks are **IaC / unit / ubuntu-22.04**, **IaC / unit / windows-2022**,
 **IaC / syntax / ubuntu-22.04** and **IaC / bicep / ubuntu-22.04**.
 
-- **Unit:** all `unit/test_*.py` and root-level `test_*.py`, including the existing
-  parity, bootstrap, project-only, exact-version, DNS and resource-discovery
+- **Unit:** the selected [test tiers](#test-tiers) of `unit/test_*.py` and root-level
+  `test_*.py`: tiers 1-4 on push and pull request, every tier nightly. This includes the
+  existing parity, bootstrap, project-only, exact-version, DNS and resource-discovery
   regressions. The new contracts inventory every exposed `ENABLE_*` setting and
   reject an unreviewed new flag, missing mapping, cross-wiring, wrong boolean
   conversion or missing deployment-parameter forwarding.
@@ -81,6 +82,45 @@ policies automatically.
 These checks belong in the PURPLE repository. GREEN consumers pinned to a
 submodule commit are not changed or deployed by the tests.
 
+## Test tiers
+
+Every offline test file belongs to exactly one tier, listed once in
+[`tiers.py`](tiers.py). Lower tiers guard the most widely shared contracts; tier 5
+holds the slow preflight and capacity suites. `unit/test_tiers.py` fails when a new
+test file is not assigned to a tier, so add it to `tiers.py` in the same change.
+
+| Tier | Name | Covers |
+|---|---|---|
+| 1 | `core` | Configuration templates, `ENABLE_*` flags, ADO/GHA parity, parameter documentation, the domain model and this suite's own harness. |
+| 2 | `pipelines` | Azure DevOps pipelines, GitHub workflows, update and run launchers, manual inputs, run monitoring and release-version selection. |
+| 3 | `infra` | Bicep and compiled ARM resources: networking, private DNS and endpoints, RBAC, personas and identity, storage, dashboards, workbooks and monitoring. |
+| 4 | `lifecycle` | Factory and project lifecycle: bootstrap, enrollment, registration, promotion, deletion, single-writer coordination, runners and read-only transports. |
+| 5 | `capacity` | Preflight and capacity: capacity preflight, regional and SKU fallback, capacity retries, region reports, subnet scaling and peerability checks. |
+
+The default selection is **1-4** (`default` in `tiers.py`), so pushes and pull requests
+skip tier 5. A selection is a tier (`5`), a range (`1-4`), a list (`1,5`) or `all`.
+The first of these that is set wins:
+
+1. `--tiers` on `run_ci.py` or `pytest`, for example `python run_ci.py --phase unit --tiers all`;
+2. the `AIF_TEST_TIERS` environment variable, for example `AIF_TEST_TIERS=all`;
+3. the `default` in `tiers.py`.
+
+`pytest unit/test_capacity_preflight.py` still runs a file you name explicitly unless you
+also give a selection. Each test also carries a `tier1`...`tier5` marker, so
+`pytest --tiers all -m "tier2 or tier5"` works. The run ends with a line naming the
+deselected tiers, and `unit-summary.json` records the selection under `tiers`.
+
+Enabling tier 5 in CI:
+
+- **Once:** GitHub **Actions > AI Factory infrastructure tests > Run workflow** with
+  `tiers` = `all`; Azure Pipelines **Run pipeline** with `testTiers` = `all`.
+- **For every push, without a commit:**
+  `gh variable set AIF_TEST_TIERS --body all --repo jostrm/azure-enterprise-scale-ml`
+  (remove it with `gh variable delete AIF_TEST_TIERS` to return to the default).
+- **Permanently in source:** change `default` in `tiers.py` to `all`.
+- **Nightly:** the scheduled runs (02:17 UTC, GitHub and Azure Pipelines) always run
+  every tier, so tier 5 regressions surface within a day.
+
 ## What the matrix proves (and does not)
 
 The matrix exercises baseline, individual flag values and pairwise boolean
@@ -123,7 +163,8 @@ Install the existing requirements in an isolated Python environment:
 ```bash
 cd environment_setup/unit-tests/test-bicep
 python -m pip install -r requirements.txt
-python run_ci.py --phase unit
+python run_ci.py --phase unit              # default tiers 1-4
+python run_ci.py --phase unit --tiers all  # every tier, including 5 (preflight and capacity)
 python run_ci.py --phase syntax
 python run_bicep_matrix.py --bicep bicep --prepare-cache --report test-results/bicep-dependencies.json
 python run_ci.py --phase bicep --bicep bicep
@@ -136,8 +177,8 @@ On Windows, install Git Bash and pass the full installed `bicep.exe` path to
 `--results-dir` to put CI reports elsewhere. The runner fails if a required tool,
 compilation or test fails; it never silently switches to mocked compiler output.
 
-`python -m pytest -q` now includes root-level regressions and excludes the live
-`integration/` directory by default. CI additionally supplies explicit offline
+`python -m pytest -q` runs the default tiers of the unit and root-level regressions and
+excludes the live `integration/` directory by default. CI additionally supplies explicit offline
 test paths and forces `LIVE_AZURE=0`, so an inherited environment cannot opt it
 into deployment tests.
 

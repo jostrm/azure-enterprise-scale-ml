@@ -11,14 +11,18 @@ sources:
   - .github/workflows/infrastructure-tests.yml
   - environment_setup/unit-tests/test-bicep/azure-pipelines.yml
   - environment_setup/unit-tests/test-bicep/run_ci.py
+  - environment_setup/unit-tests/test-bicep/tiers.py
+  - environment_setup/unit-tests/test-bicep/base/tiers.py
+  - environment_setup/unit-tests/test-bicep/conftest.py
 tests:
   - environment_setup/unit-tests/test-bicep/unit/test_project_deployment_contract.py
   - environment_setup/unit-tests/test-bicep/unit/test_project_only_launchers.py
   - environment_setup/unit-tests/test-bicep/unit/test_project_promotion.py
   - environment_setup/unit-tests/test-bicep/unit/test_ci_runner.py
+  - environment_setup/unit-tests/test-bicep/unit/test_tiers.py
 graph_symbols:
   - bootstrap/lib/project_deployment.py::class:Deployment
-reviewed_source: '3e9102ee + working tree; observed 2026-10-07'
+reviewed_source: '3e9102ee + working tree; observed 2026-10-07; Credential-free CI re-observed at f08ed1ef + working tree 2026-10-20'
 ---
 # Orchestration and updates
 
@@ -80,6 +84,17 @@ Windows unit subprocesses have a 40-minute budget, with a 50-minute outer job
 budget in both GitHub Actions and Azure Pipelines for setup and report upload.
 Linux unit subprocesses retain 20 minutes and Linux jobs retain 30 minutes.
 Persona preflight readiness is runtime state, not a public `.env` input.
+
+Unit tests are split into tiers 1-5 (core, pipelines, infra, lifecycle, capacity).
+`tiers.py` assigns every offline test file to exactly one tier, and
+`unit/test_tiers.py` rejects an unassigned or stale file. The selection comes from
+`--tiers`, then `AIF_TEST_TIERS`, then the `tiers.py` default `1-4`, so push and pull
+request runs skip tier 5 (preflight and capacity). `run_ci.py` validates the
+selection, passes it to pytest and records it in `unit-summary.json`. The GitHub
+workflow takes a `tiers` dispatch input or the `AIF_TEST_TIERS` repository variable;
+Azure Pipelines takes a `testTiers` parameter. Both run every tier on a nightly
+schedule, so tier 5 still runs within a day. Each event type has its own GitHub
+concurrency group, so a push cannot cancel the nightly run.
 
 See [[Bootstrap-and-Layouts]], [[Lifecycle-and-Recovery]], [[Factory-Scope-Model]], [[Engines-and-Pipelines]], [[State-Machines-and-DAGs]] and [[Index]].
 

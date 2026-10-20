@@ -15,7 +15,9 @@ import time
 import yaml
 
 from base.config import REPO_ROOT
+from base.tiers import ENVIRONMENT_VARIABLE
 from base.yaml_config import UniqueKeyLoader
+from tiers import MANIFEST
 
 
 SUITE = Path(__file__).resolve().parent
@@ -101,14 +103,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-ci-tools", action="store_true",
                         help="Fail if Git or PowerShell Core is missing instead of leaving those unit tests skipped")
     parser.add_argument("--results-dir", type=Path, default=SUITE / "test-results")
+    parser.add_argument("--tiers", default=None,
+                        help=f"Unit-test tiers such as 1-4, 1,5, 5 or all (default: ${ENVIRONMENT_VARIABLE}, "
+                             f"else {MANIFEST.default} from tiers.py)")
     args = parser.parse_args(argv)
+    try:
+        selection = MANIFEST.resolve(args.tiers, os.environ)
+    except ValueError as error:
+        parser.error(str(error))
     results = args.results_dir.resolve()
     results.mkdir(parents=True, exist_ok=True)
     failures = []
     phases = ("unit", "syntax", "bicep") if args.phase == "all" else (args.phase,)
     for phase in phases:
         started = time.monotonic()
-        print(f"=== Offline IaC: {phase} ===", flush=True)
+        tiers = f" (tiers {selection.spec}, {selection.source})" if phase == "unit" else ""
+        print(f"=== Offline IaC: {phase}{tiers} ===", flush=True)
         try:
             if phase == "syntax":
                 report = check_syntax(REPO_ROOT, find_bash())
@@ -126,7 +136,8 @@ def main(argv: list[str] | None = None) -> int:
                     environment = offline_environment()
                     environment["TMPDIR"] = Path(temporary).as_posix()
                     code = subprocess.run(
-                        [sys.executable, "-m", "pytest", *offline_test_paths(), "-q", "--tb=short",
+                        [sys.executable, "-m", "pytest", *offline_test_paths(), "--tiers", selection.spec,
+                         "-q", "--tb=short",
                          f"--junitxml={results / 'unit-tests.xml'}"],
                         cwd=SUITE, env=environment,
                         timeout=2400 if sys.platform == "win32" else 1200, check=False,
@@ -155,6 +166,8 @@ def main(argv: list[str] | None = None) -> int:
             failures.append(phase)
         print(f"{phase}: {'FAILED' if code else 'passed'} ({time.monotonic() - started:.1f}s)", flush=True)
     summary = {"phases": list(phases), "failed": failures, "azure_deployment_performed": False}
+    if "unit" in phases:
+        summary["tiers"] = {"selected": selection.spec, "source": selection.source, "skipped": list(selection.skipped)}
     (results / f"{args.phase}-summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     return int(bool(failures))
 

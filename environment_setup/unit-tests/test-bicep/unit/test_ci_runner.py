@@ -139,6 +139,38 @@ def test_github_runs_all_checks_on_push_and_pull_requests_without_azure_permissi
     assert "${{ secrets." not in path.read_text(encoding="utf-8")
 
 
+def test_github_skips_default_tiers_on_push_but_runs_every_tier_nightly_or_on_request():
+    path = REPO_ROOT / ".github" / "workflows" / "infrastructure-tests.yml"
+    workflow = yaml.load(path.read_text(encoding="utf-8"), Loader=run_ci.UniqueKeyLoader)
+    tiers = workflow["on"]["workflow_dispatch"]["inputs"]["tiers"]
+    assert tiers["required"] is False
+    assert tiers["default"] == ""
+    assert tiers["type"] == "string"
+    assert [set(entry) for entry in workflow["on"]["schedule"]] == [{"cron"}]
+    job = workflow["jobs"]["offline"]
+    assert job["env"]["AIF_TEST_TIERS"] == (
+        "${{ github.event_name == 'schedule' && 'all' || inputs.tiers || vars.AIF_TEST_TIERS }}"
+    )
+    assert "github.event_name" in workflow["concurrency"]["group"], "A push must not cancel the nightly run."
+    execution = next(step for step in job["steps"] if "run_ci.py" in step.get("run", ""))
+    assert "--tiers" not in execution["run"], "The selection comes from AIF_TEST_TIERS or tiers.py."
+
+
+def test_ado_exposes_a_tiers_parameter_and_runs_every_tier_on_its_nightly_schedule():
+    path = run_ci.SUITE / "azure-pipelines.yml"
+    pipeline = yaml.load(path.read_text(encoding="utf-8"), Loader=run_ci.UniqueKeyLoader)
+    parameter = next(item for item in pipeline["parameters"] if item["name"] == "testTiers")
+    assert (parameter["type"], parameter["default"]) == ("string", "default")
+    schedule = pipeline["schedules"][0]
+    assert schedule["branches"]["include"] == ["main"]
+    assert schedule["always"] is False
+    execution = next(step for step in pipeline["jobs"][0]["steps"] if "run_ci.py" in step.get("bash", ""))
+    assert execution["env"]["AIF_TEST_TIERS"] == "${{ parameters.testTiers }}"
+    assert '"$BUILD_REASON" == "Schedule"' in execution["bash"]
+    assert "AIF_TEST_TIERS=all" in execution["bash"]
+    assert "--tiers" not in execution["bash"]
+
+
 def test_ado_runs_same_phases_without_service_connections_and_publishes_results():
     path = run_ci.SUITE / "azure-pipelines.yml"
     pipeline = yaml.load(path.read_text(encoding="utf-8"), Loader=run_ci.UniqueKeyLoader)
