@@ -291,6 +291,10 @@ class DecisionTests(unittest.TestCase):
                 integration.run(request(**changes), apply=True)
         self.assertEqual([], arm.calls)
         self.assertTrue(gw.decide(request(**ADOPT)).act, "an adopted app needs no image variables")
+        # Adopting runs in the app's own environment, so it needs no project Container Apps (enableContainerApps).
+        self.assertTrue(gw.decide(request(**ADOPT, enableContainerApps="false")).act)
+        with self.assertRaisesRegex(ValueError, "enableAIFoundry=true"):
+            gw.decide(request(**ADOPT, enableContainerApps="false", enableAIFoundry="false"))
 
 
 class IntegrationTests(unittest.TestCase):
